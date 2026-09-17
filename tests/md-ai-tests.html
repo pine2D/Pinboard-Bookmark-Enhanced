@@ -10409,4 +10409,167 @@ suite("_aiBodyDialect / _aiParamRepair (K133)", () => {
   }, () => {});
 })();
 </script>
+<script>
+// ============ K84: Ask panel open/close preserves the reading position (md-ask.js) ============
+// Drives the REAL _pbpAskSetOpen. The panel build is short-circuited by pre-seeding
+// _pbpAskState.panel with a bare stub (no #ask-meta and no #ask-input in the document,
+// so the meta refresh and the focus handoff are both no-ops here), and md-reader.js's
+// two halves are swapped for recorders: what is under test is md-ask.js's WIRING of
+// them (capture before the class toggle, settle after, one-shot transitionend leg,
+// scroll-abandon), not their own math -- pbpReaderPickScrollAnchor has its own suite.
+suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
+  function setup(opts) {
+    const o = opts || {};
+    const saved = {
+      state: _pbpAskState,
+      capture: window._pbpZenCaptureAnchor,
+      settle: window._pbpZenSettleAnchor,
+      mm: window.matchMedia
+    };
+    const panel = document.createElement("aside");
+    panel.hidden = true;
+    document.body.appendChild(panel);
+    const main = document.createElement("main");
+    document.body.insertBefore(main, document.body.firstChild);
+    const pad = document.createElement("div");
+    pad.style.height = (window.innerHeight * 4) + "px";
+    document.body.appendChild(pad);
+    const anchor = o.anchor === undefined ? { n: 3, frac: 0.25 } : o.anchor;
+    // openAtCapture pins the ORDER: the anchor must be read while the class is
+    // still in its pre-toggle state, otherwise it describes the new layout.
+    const rec = { captures: 0, openAtCapture: [], settles: [] };
+    _pbpAskState = { panel: panel, rounds: [], records: [], ctx: null, running: false, ctrl: null };
+    if (!o.realCapture) {
+      window._pbpZenCaptureAnchor = function () {
+        rec.captures++;
+        rec.openAtCapture.push(document.body.classList.contains("ask-open"));
+        return anchor;
+      };
+    }
+    window._pbpZenSettleAnchor = function (a) { rec.settles.push(a); };
+    window.matchMedia = function (q) {
+      return {
+        matches: !!o.narrow && /max-width/.test(q), media: q,
+        addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}
+      };
+    };
+    window.scrollTo(0, 0);
+    return {
+      rec: rec, main: main, anchor: anchor,
+      end: function (prop) {
+        main.dispatchEvent(new TransitionEvent("transitionend", {
+          propertyName: prop || "margin-right", bubbles: true
+        }));
+      },
+      done: function () {
+        _pbpAskSettleClear();
+        document.body.classList.remove("ask-open");
+        document.body.classList.remove("raw-active");
+        panel.remove();
+        main.remove();
+        pad.remove();
+        _pbpAskState = saved.state;
+        window._pbpZenCaptureAnchor = saved.capture;
+        window._pbpZenSettleAnchor = saved.settle;
+        window.matchMedia = saved.mm;
+        window.scrollTo(0, 0);
+      }
+    };
+  }
+
+  test("opening Ask on a wide viewport settles immediately, then once more when the push ends", () => {
+    const f = setup();
+    try {
+      _pbpAskSetOpen(true);
+      assertEq(f.rec.captures, 1, "the anchor is captured exactly once per toggle");
+      assertEq(f.rec.openAtCapture[0], false, "capture ran BEFORE body.ask-open was added");
+      assertEq(f.rec.settles.length, 1, "leg 1: immediate settle (the only leg reduced motion ever gets)");
+      f.end();
+      assertEq(f.rec.settles.length, 2, "leg 2: the margin-right transition finishing re-settles the same anchor");
+      assertEq(f.rec.settles[1], f.anchor, "leg 2 replays the anchor captured before the toggle");
+      f.end();
+      assertEq(f.rec.settles.length, 2, "one-shot: a second transitionend does not settle again");
+      assertEq(_pbpAskSettleOff, null, "the listener tore itself down when it fired");
+    } finally { f.done(); }
+  });
+
+  test("closing Ask runs the same two legs (the close direction is not an if(open) branch)", () => {
+    const f = setup();
+    try {
+      _pbpAskSetOpen(true);
+      f.end();
+      f.rec.captures = 0;
+      f.rec.openAtCapture.length = 0;
+      f.rec.settles.length = 0;
+      _pbpAskSetOpen(false);
+      assertEq(f.rec.captures, 1, "closing captures an anchor too");
+      assertEq(f.rec.openAtCapture[0], true, "capture ran BEFORE body.ask-open was removed");
+      assertEq(f.rec.settles.length, 1, "leg 1 on close");
+      f.end();
+      assertEq(f.rec.settles.length, 2, "leg 2 on close");
+    } finally { f.done(); }
+  });
+
+  test("a scroll during the 200ms push abandons the second settle", () => {
+    const f = setup();
+    try {
+      _pbpAskSetOpen(true);
+      assertEq(f.rec.settles.length, 1, "leg 1 ran");
+      window.scrollTo(0, 500);
+      assert(window.scrollY > 2, "fixture is actually scrollable, got scrollY " + window.scrollY);
+      f.end();
+      assertEq(f.rec.settles.length, 1,
+        "the reader moved themselves inside the transition window: no yank back (md-reader.js:1507-1512's regression)");
+      assertEq(_pbpAskSettleOff, null, "the listener is still torn down on the abandoned path");
+    } finally { f.done(); }
+  });
+
+  test("narrow viewports short-circuit: no capture, no listener (the panel is a bottom sheet there)", () => {
+    const f = setup({ narrow: true });
+    try {
+      _pbpAskSetOpen(true);
+      assertEq(f.rec.captures, 0, "max-width:1000px means margin-right stays 0: nothing to preserve");
+      assertEq(f.rec.settles.length, 0, "no settle");
+      assertEq(_pbpAskSettleOff, null, "no transitionend listener armed");
+      f.end();
+      assertEq(f.rec.settles.length, 0, "a stray transitionend cannot settle either");
+    } finally { f.done(); }
+  });
+
+  test("at scrollY 0 the real capture returns null, so no leg runs", () => {
+    const f = setup({ realCapture: true });
+    try {
+      window.scrollTo(0, 0);
+      _pbpAskSetOpen(true);
+      assertEq(f.rec.settles.length, 0, "a layout change at the very top must leave the reader at the top");
+      assertEq(_pbpAskSettleOff, null, "no listener armed for a null anchor");
+      f.end();
+      assertEq(f.rec.settles.length, 0, "still nothing after a transitionend");
+    } finally { f.done(); }
+  });
+
+  test("raw view returns no anchor even when scrolled (#rendered-view is display:none there)", () => {
+    const f = setup({ realCapture: true });
+    try {
+      document.body.classList.add("raw-active");
+      window.scrollTo(0, 300);
+      assert(window.scrollY > 0, "fixture is actually scrolled, got scrollY " + window.scrollY);
+      _pbpAskSetOpen(true);
+      assertEq(f.rec.settles.length, 0, "raw view has no block rects to anchor to");
+      assertEq(_pbpAskSettleOff, null, "no listener armed for a null anchor");
+    } finally { f.done(); }
+  });
+
+  test("a transitionend for another property is ignored and does not disarm the leg", () => {
+    const f = setup();
+    try {
+      _pbpAskSetOpen(true);
+      f.end("opacity");
+      assertEq(f.rec.settles.length, 1, "opacity is not the push: no settle");
+      f.end("margin-right");
+      assertEq(f.rec.settles.length, 2, "and the real property still settles afterwards");
+    } finally { f.done(); }
+  });
+});
+</script>
 </body></html>
