@@ -1698,8 +1698,15 @@ check(/const PBP_ROVING_EXTRA_ITEMS = "\.add-all-link, \.regen-link";/.test(popu
 {
   const renderStart = popupAiJs.indexOf("function renderAITags(tags, fromCache) {");
   const cacheBranch = renderStart < 0 ? -1 : popupAiJs.indexOf("  if (fromCache) {", renderStart);
-  const lastSlot = renderStart < 0 ? -1 : popupAiJs.lastIndexOf("pbpAssignAltNumBadges();");
-  check(renderStart >= 0 && cacheBranch > renderStart && lastSlot > cacheBranch,
+  // indexOf FROM cacheBranch, not lastIndexOf over the whole file (F6, final
+  // review): a whole-file lastIndexOf only happens to land on the call this
+  // gate wants because it is today's LAST of three -- any later function that
+  // adds a fourth call anywhere below this one would keep winning that race
+  // and the gate would stop failing even if the call inside the cache branch
+  // were deleted. Anchoring to cacheBranch makes it find the first (and only
+  // needed) call at or after the branch, however many more appear later.
+  const slotInCacheBranch = renderStart < 0 ? -1 : popupAiJs.indexOf("pbpAssignAltNumBadges();", cacheBranch);
+  check(renderStart >= 0 && cacheBranch > renderStart && slotInCacheBranch > cacheBranch,
     "popup-ai.js: renderAITags re-slots Alt+N / the roving toolbar BEFORE its fromCache branch appends the regen links -- they would keep their native tabindex");
 }
 check(/^\s*syncSuggestTagStates\(\);/m.test(popupTagsJs.slice(popupTagsJs.indexOf("function pbpAssignAltNumBadges()"))),
