@@ -150,8 +150,6 @@
   --pp-disabled-fg: #aaa;
   --pp-popover-border: #ddd;
   --pp-oqa-btn-fg: #666;
-  --pp-offline-queue-bg: #fffbea;
-  --pp-offline-queue-border: #e8d88c;
   --pp-offline-queue-empty-fg: #6b6b6b;
   --pp-offline-queue-title-fg: #555;
   --pp-progress-text-fg: #1a3a6e;
@@ -1336,6 +1334,14 @@ html[data-theme] .batch-progress-text {
 }
 .offline-toggle:hover { text-decoration: none; }
 #offline-queue-chevron { font-size: 11px; opacity: 0.7; }
+/* The expanded queue is the offline bar's second tone, not a second colour
+   system: one `color-mix(offline-bg 75%, bg)` fill and one solid
+   --pp-offline-bd hairline on all 15 surfaces (2026-09-18 audit S11, user
+   ruling). The default surface used to stack two unrelated yellows
+   (--pp-offline-queue-bg #fffbea under the bar's #fdf3dd, 1.04:1) separated by
+   the only DASHED line in popup.css / options.css / library.css, while the 13
+   presets already shipped exactly the mix below -- so the two layers were not
+   modelling the same relationship. Both one-off tokens are retired with it. */
 .offline-queue-list {
   max-height: 180px;
   overflow-y: auto;
@@ -1345,8 +1351,8 @@ html[data-theme] .batch-progress-text {
      A margin, not padding, because the fill is the block -- it disappears with
      the list when popup-offline.js re-hides it. */
   margin-bottom: var(--pp-sp-4);
-  background: var(--pp-offline-queue-bg);
-  border-top: 1px dashed var(--pp-offline-queue-border);
+  background: color-mix(in srgb, var(--pp-offline-bg) 75%, var(--pp-bg));
+  border-top: 1px solid var(--pp-offline-bd);
   font-size: 11px;
   /* Same reveal as .existing-banner/.url-warning: replays on display:none->block,
      so the .hidden toggle in popup-offline.js needs no JS change. */
@@ -2550,7 +2556,6 @@ html[data-theme] .edit-cancel:hover { background: color-mix(in srgb, var(--pp-da
 html[data-theme] .edit-cancel:focus-visible { outline-color: var(--pp-accent); }
 html[data-theme] .recent-bm-edit:focus-visible, html[data-theme] .recent-bm-del:focus-visible { outline-color: var(--pp-accent); }
 html[data-theme] .offline-bar { background: var(--pp-offline-bg); border-color: var(--pp-offline-bd); color: var(--pp-offline-fg); }
-html[data-theme] .offline-queue-list { background: color-mix(in srgb, var(--pp-offline-bg) 75%, var(--pp-bg)); border-top-color: var(--pp-offline-bd); }
 html[data-theme] .offline-queue-item { border-bottom-color: color-mix(in srgb, var(--pp-fg) 10%, transparent); }
 html[data-theme] .offline-queue-title { color: var(--pp-fg); }
 html[data-theme] .offline-queue-item > .actions button { border-color: color-mix(in srgb, var(--pp-fg) 18%, transparent); color: var(--pp-fg-muted); background: transparent; }
