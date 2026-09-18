@@ -659,6 +659,24 @@ function assertEq(actual, expected, label) {
       }
       check("hljs.configure is idempotent: unchanged effective set skips a repeat real call",
         calls2.length === 0, "calls2=" + calls2.length);
+
+      // K14 fix wave (D2 review #2): a root with NO code blocks at all must
+      // never touch hljs.configure()'s global state. Before this fix,
+      // highlightCodeBlocks called _pbpConfigureHljs() unconditionally, so an
+      // empty root would reset the effective auto-detect set even though
+      // there was nothing to highlight -- matches highlightCodeBlocksChunked,
+      // which has always checked blocks.length first.
+      const fixtureEmpty = document.createElement("div");
+      fixtureEmpty.innerHTML = "<p>no code blocks here</p>";
+      const callsEmpty = [];
+      hljs.configure = function (opts) { callsEmpty.push(opts); return origConfigure.call(this, opts); };
+      try {
+        highlightCodeBlocks(fixtureEmpty);
+      } finally {
+        hljs.configure = origConfigure;
+      }
+      check("highlightCodeBlocks on a root with no code blocks never calls hljs.configure",
+        callsEmpty.length === 0, "calls=" + callsEmpty.length);
     })();
 
     // -- B: long untagged block (> PBP_HLJS_LONGBLOCK_PREFIX) is probed on

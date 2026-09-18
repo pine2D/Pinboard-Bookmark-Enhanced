@@ -932,8 +932,10 @@ function _pbpTagLongUntaggedBlock(block) {
 
 function highlightCodeBlocks(root) {
   if (!root || typeof hljs === "undefined") return;
-  _pbpConfigureHljs(root);
   const blocks = root.querySelectorAll('pre > code');
+  if (!blocks.length) return; // matches highlightCodeBlocksChunked below: a root
+  // with no code blocks must not touch hljs's global configure() state at all.
+  _pbpConfigureHljs(root);
   blocks.forEach((block) => {
     if (block.classList.contains("hljs")) return; // idempotent: skip already-highlighted blocks
     if (block.classList.contains("language-mermaid")) return; // rendered as a diagram elsewhere; hljs 11 logs a console.error for the unknown language
