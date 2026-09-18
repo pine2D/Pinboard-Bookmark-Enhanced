@@ -1260,6 +1260,15 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
             workerError.status = resolved.status || 0;
             if (resolved.error) workerError.code = resolved.error;
           }
+          // Deliberate: an `ok:false` reply here always throws below rather than
+          // falling through to the direct call, even for reasons the popup could
+          // sometimes recover from on its own (e.g. a transient
+          // getCurrentPinboardAuth() failure inside the worker). A retry would
+          // burn another slot against the 3.1s rate limit for what is likely a
+          // one-off hiccup; console.warn("[lookup_bookmark] failed: ...") on the
+          // worker side leaves a trail to tell that apart from a real outage in
+          // the field. Only a genuinely unreachable worker (rejected
+          // sendMessage, caught below) falls through to the direct call.
         } catch (_) { /* worker unreachable — fall through to the direct call */ }
         if (workerError) throw workerError;
       }

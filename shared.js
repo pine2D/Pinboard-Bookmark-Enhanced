@@ -1347,6 +1347,9 @@ function pbpHighlightBackupOwnerAllowed(backupOwner, currentAccount, accountReso
 function pbpKeyMatchesCategory(key, def) {
   // Reject non-defs (incl. inherited props like PBP_RECLAIM_CATEGORIES["__proto__"],
   // which resolves to Object.prototype — truthy but with no keys/prefixes arrays).
+  // Both current callers (pbpReclaimLocalStorage, pbpMeasureLocalStorage) already
+  // filter to own properties on their side (hasOwnProperty / Object.keys), so this
+  // check is defence in depth now, not the only gate against __proto__ leaking in.
   if (!def || !Array.isArray(def.keys) || !Array.isArray(def.prefixes)) return false;
   if (def.keys.includes(key)) return true;
   return def.prefixes.some((p) => key.startsWith(p));

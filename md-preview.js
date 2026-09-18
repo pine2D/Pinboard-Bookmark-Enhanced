@@ -3049,6 +3049,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // jump -- there is nothing left below it to read. This is also the
       // bulk of the scroll_ pool's residue in practice (K61): most reads
       // that go past one screen run all the way to the end.
+      // Combined with the top-of-article branch above: an article shorter
+      // than about three viewports (scrollHeight < 3 * innerHeight) never
+      // has a scroll position that escapes both branches, so it keeps no
+      // scroll memory at all -- intentional, not a bug. Below ~3 viewports
+      // the remaining content is cheap to re-find by eye, so the record has
+      // little value either way.
       pbpAiCacheDelete(key).catch(() => {});
       return;
     }

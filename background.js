@@ -2160,6 +2160,10 @@ async function pbpGetVocabDriveStatus() {
     .sort((a, b) => (b.lastSuccessAt || 0) - (a.lastSuccessAt || 0));
   const state = states[0] || null;
   const outbox = snapshot.outbox;
+  // snapshot.batches rows are key-derived identity only (drivePermissionId +
+  // length), no body/createdAt -- this call only needs the count. Full rows
+  // (for anything that reads batch contents) come from
+  // pbpVocabListPendingBatches, not from here.
   const pending = state
     ? snapshot.batches.filter((row) => row.drivePermissionId === state.drivePermissionId) : [];
   const notices = snapshot.notices;
@@ -2855,6 +2859,12 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       if (!posts) {
         // Either the cache entry was posts-less, or the shared check failed —
         // one fresh lookup settles both, and its result is what gets cached.
+        // This is also the ONLY path that can surface a 401 to the caller:
+        // checkBookmarked() (inside _dedupedBookmarkCheck) folds !resp.ok into
+        // a plain `false`, so an expired token never reaches here as an error
+        // above. It never fires for a genuinely unbookmarked page, though --
+        // checkBookmarked() still writes `posts: []` on success, and `[]` is
+        // truthy, so freshPosts() returns it and this second request is skipped.
         const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
         if (!resp.ok) {
           sendResponse({ ok: false, status: resp.status, error: resp.error || "", posts: null, account: auth.account });
