@@ -1512,7 +1512,18 @@ function pbpImgFixSweepRules(tabId) {
     const rules = await chrome.declarativeNetRequest.getSessionRules();
     let ids;
     if (tabId === undefined) {
-      const tabs = await chrome.tabs.query({});
+      // K12: ask the browser to pre-filter by URL match pattern instead of
+      // serializing every tab in every window to the SW just to throw most of
+      // them away. Sandboxed measurement (2026-09-18, chrome-extension://
+      // scheme, Chrome 147) confirmed this pattern is accepted and returns the
+      // exact same tab set as tabs.query({}) filtered by _imgFixIsPreviewUrl
+      // for ?k=-query, #fragment, a non-preview tab, and a Memory-Saver
+      // discarded preview tab. tabs.filter(_imgFixIsPreviewUrl) below stays as
+      // a fail-safe second check -- the match pattern's path glob and
+      // _imgFixIsPreviewUrl's startsWith are not guaranteed identical in every
+      // corner (the pattern also ignores the fragment, which is fine: the
+      // fragment is stripped right after anyway).
+      const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("md-preview.html") + "*" });
       const previewTabs = new Map(tabs.filter((t) => _imgFixIsPreviewUrl(t.url)).map((t) => [t.id, _imgFixStripHash(t.url)]));
       // Re-seed the document-owner map from the live tabs. Without this, the
       // first hash change after an SW restart would find an unknown owner and

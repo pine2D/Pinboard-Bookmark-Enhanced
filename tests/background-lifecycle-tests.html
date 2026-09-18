@@ -838,6 +838,65 @@ function buildUndoHarness(source, opts) {
       smuggle.responses[0]?.error === "forbidden");
   }
 
+  // ---- K12: pbpImgFixSweepRules startup scan scopes its tabs.query() to a
+  // URL match pattern instead of listing every tab. buildRouterHarness above
+  // stubs pbpImgFixSweepRules out entirely (spy("imgSweep", ...)), so it never
+  // exercises the real sweep body; this harness slices the real function
+  // (plus its module-scope state and helpers) straight out of background.js.
+  function buildImgFixSweepHarness(opts) {
+    const start = source.indexOf("const PBP_IMGFIX_RULE_MIN");
+    const end = source.indexOf("// A preview tab navigating AWAY is the leak", start);
+    if (start < 0 || end <= start) throw new Error("imgfix sweep source not found");
+    const o = opts || {};
+    const calls = [];
+    const spy = (name, ret) => (...args) => { calls.push([name, args]); return typeof ret === "function" ? ret(...args) : ret; };
+    const chrome = {
+      runtime: { id: EXT_ID, getURL: (p) => `chrome-extension://${EXT_ID}/${p}` },
+      declarativeNetRequest: {
+        getSessionRules: spy("getSessionRules", () => Promise.resolve(o.rules || [])),
+        updateSessionRules: spy("updateSessionRules", () => Promise.resolve()),
+      },
+      tabs: {
+        query: o.tabsQuery || spy("tabsQuery", () => Promise.resolve(o.tabsResult || [])),
+        get: spy("tabsGet", () => Promise.resolve(null)),
+      },
+    };
+    const deps = { chrome };
+    const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
+      return { sweep: pbpImgFixSweepRules, tabDoc: _imgFixTabDoc, ruleOwner: _imgFixRuleOwner, startupOk: () => _imgFixStartupSweepOk };`);
+    const h = factory(...Object.values(deps));
+    return { ...h, calls, chrome };
+  }
+
+  {
+    const h = buildImgFixSweepHarness({ rules: [] });
+    await h.sweep(undefined);
+    const call = h.calls.find(([n]) => n === "tabsQuery");
+    check("K12: the startup sweep's tabs.query is scoped to a URL match pattern, not every tab",
+      !!call && JSON.stringify(call[1][0]) === JSON.stringify({ url: `chrome-extension://${EXT_ID}/md-preview.html*` }));
+  }
+  {
+    // A stub that "lies" about the match pattern -- it hands back a tab whose
+    // URL is NOT actually a preview page, simulating a browser-side match
+    // pattern that disagrees with _imgFixIsPreviewUrl at some edge. The rule
+    // parked on that tab id must still be swept: the second check inside the
+    // .filter(_imgFixIsPreviewUrl) call must not let the lying tab establish
+    // ownership, or a stranded rule would survive the very sweep meant to
+    // clean it up.
+    const lyingTabId = 999;
+    const rule = { id: 786050, condition: { tabIds: [lyingTabId] } };
+    const h = buildImgFixSweepHarness({
+      rules: [rule],
+      tabsResult: [{ id: lyingTabId, url: "https://evil.example/not-a-preview-page" }],
+    });
+    await h.sweep(undefined);
+    const removeCall = h.calls.find(([n]) => n === "updateSessionRules");
+    check("K12: a non-preview tab returned by a lying tabs.query stub is still filtered out by the second check",
+      !h.tabDoc.has(lyingTabId) &&
+      !!removeCall && removeCall[1][0].removeRuleIds.includes(786050) &&
+      h.startupOk() === true);
+  }
+
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>
