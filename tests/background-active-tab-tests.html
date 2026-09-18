@@ -34,7 +34,7 @@ function buildHarness(source, queryTabs, bookmarkResult = true) {
   const end = source.indexOf("// ---- \u6807\u7b7e\u9875\u6fc0\u6d3b/\u66f4\u65b0\u65f6\u5237\u65b0\u56fe\u6807", start);
   assert(start >= 0 && end > start, "active-tab refresh helpers not found");
 
-  const calls = { queries: [], schedule: [], activity: 0, checks: [], icons: [], mirrors: [] };
+  const calls = { queries: [], schedule: [], activity: 0, checks: [], icons: [], mirrors: [], cacheReads: [] };
   let scheduledWork = Promise.resolve();
   const chrome = { tabs: { query: async (query) => {
     calls.queries.push(query);
@@ -45,13 +45,25 @@ function buildHarness(source, queryTabs, bookmarkResult = true) {
     scheduledWork = fn();
   };
   const noteActivity = () => { calls.activity++; };
-  const debouncedCheck = async (url) => { calls.checks.push(url); return bookmarkResult; };
+  // K0: debouncedCheck answers { bookmarked, target } -- `target` is the URL it
+  // actually asked Pinboard about (the cleaned one whenever urlClean applies),
+  // and it is the ONLY key the status cache holds that answer under. A
+  // non-boolean bookmarkResult stands for the disabled/short-circuit path,
+  // where debouncedCheck returns nothing at all.
+  const debouncedCheck = async (url) => {
+    calls.checks.push(url);
+    if (typeof bookmarkResult !== "boolean") return undefined;
+    return { bookmarked: bookmarkResult, target: stripTrackingParams(url, { enabled: true }).cleaned };
+  };
   const setIcon = (tabId, state) => { calls.icons.push({ tabId, state }); };
   const writeMirror = async (...args) => { calls.mirrors.push(args); };
   // _scheduleCurrentTabRefresh re-derives auth + cache to compute the tri-state icon
   // (Task 2); iconStateFor itself is a real global via the shared.js <script> tag above.
   const getCurrentPinboardAuth = async () => ({ token: "t", account: "alice", epoch: 1 });
-  const pbpStatusCacheGet = (url, auth) => ({ bookmarked: bookmarkResult === true });
+  const pbpStatusCacheGet = (url, auth) => {
+    calls.cacheReads.push(url);
+    return { bookmarked: bookmarkResult === true };
+  };
 
   const make = new Function(
     "chrome", "_scheduleTabCheck", "noteActivity", "debouncedCheck", "setIcon", "_writeCurrentTabMirror",
@@ -62,6 +74,72 @@ function buildHarness(source, queryTabs, bookmarkResult = true) {
     getCurrentPinboardAuth, pbpStatusCacheGet);
   return { api, calls, wait: () => scheduledWork };
 }
+
+// K0: the whole bookmark-status chain in one scope -- the cache primitives,
+// debouncedCheck and checkBookmarked, sliced from the shipped file rather than
+// re-implemented. The invariant under test is that the URL handed to posts/get,
+// the _pendingChecks dedup key and the statusCache key are ONE value, and that
+// the value is the URL the popup saves under (popup.js _bookmarkPrefetchUrl).
+// Asserting that with stubs for checkBookmarked would prove nothing: the cache
+// key is written inside checkBookmarked, so it has to be the real one.
+function buildStatusChainHarness(source, { urlClean, warm = true, posts = [], hold = false } = {}) {
+  const cacheStart = source.indexOf("const statusCache = new Map();");
+  const cacheEnd = source.indexOf("// ---- P2: Cached token + invalidation ----", cacheStart);
+  const checkStart = source.indexOf("async function debouncedCheck(url) {");
+  const checkEnd = source.indexOf("// ---- Load settings with deobfuscation", checkStart);
+  const lookupStart = source.indexOf("async function checkBookmarked(url, capturedAuth = null) {");
+  const lookupEnd = source.indexOf("// ---- Badge: unread count ----", lookupStart);
+  assert(cacheStart >= 0 && cacheEnd > cacheStart, "status cache primitives not found");
+  assert(checkStart >= 0 && checkEnd > checkStart, "debouncedCheck source not found");
+  assert(lookupStart >= 0 && lookupEnd > lookupStart, "checkBookmarked source not found");
+
+  const fetches = [];
+  const storageReads = [];
+  // epoch 0 matches the `let _pinboardAuthEpoch = 0` the sliced cache block declares.
+  const auth = { token: "alice:secret", account: "alice", epoch: 0 };
+  const stored = { optCheckBookmarkStatus: true, urlClean };
+  // `hold` keeps every posts/get in flight so a concurrency assertion can look
+  // at _pendingChecks while the merge window is still open.
+  let release = () => {};
+  const gate = hold ? new Promise((resolve) => { release = resolve; }) : Promise.resolve();
+  const deps = {
+    SETTINGS_DEFAULTS,
+    stripTrackingParams,
+    pbpPinboardAccountFromToken,
+    _warmSettings: warm ? { ...stored } : null,
+    getCurrentPinboardAuth: async () => auth,
+    getSettingsStorage: async () => ({
+      get: async (defaults) => {
+        storageReads.push(Object.keys(defaults));
+        const out = { ...defaults };
+        for (const key of Object.keys(defaults)) if (stored[key] !== undefined) out[key] = stored[key];
+        return out;
+      },
+    }),
+    pinboardFetch: async (requestUrl) => {
+      fetches.push(requestUrl);
+      await gate;
+      return { ok: true, status: 200, json: async () => ({ posts }) };
+    },
+    console: { warn: () => {} },
+  };
+  const names = Object.keys(deps);
+  const body = [
+    "const _pendingChecks = new Map();",
+    "let _settingsCache = _warmSettings;",
+    source.slice(cacheStart, cacheEnd),
+    source.slice(checkStart, checkEnd),
+    source.slice(lookupStart, lookupEnd),
+    "return { debouncedCheck, checkBookmarked, statusCache, pendingChecks: _pendingChecks, pbpStatusCacheGet };",
+  ].join("\n");
+  const api = new Function(...names, body)(...names.map((name) => deps[name]));
+  return { api, auth, fetches, storageReads, release: () => release() };
+}
+
+const K0_URL_CLEAN_ON = { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
+const K0_TRACKED = "https://example.com/post?utm_source=newsletter";
+const K0_CLEAN = "https://example.com/post";
+const K0_POST = { href: K0_CLEAN, description: "Article", extended: "Notes", tags: "alpha beta", shared: "no", toread: "no" };
 
 // The tabs.onUpdated listener decides two things per event: whether to schedule
 // a status check, and whether the per-tab icon dedup entry still describes what
@@ -597,6 +675,78 @@ async function run() {
     await h.wait();
     assert(h.calls.icons.length === 0, "disabled status changed icon");
     assert(h.calls.mirrors.length === 1, "current-tab mirror was skipped");
+  });
+
+  await test("K0: a tracked tab URL is queried, deduped and cached under the URL the popup saves", async () => {
+    const h = buildStatusChainHarness(source, { urlClean: K0_URL_CLEAN_ON, posts: [K0_POST] });
+    const status = await h.api.debouncedCheck(K0_TRACKED);
+    assert(h.fetches.length === 1, "expected exactly one posts/get, got " + h.fetches.length);
+    assert(h.fetches[0].includes("url=" + encodeURIComponent(K0_CLEAN)),
+      "posts/get still asks Pinboard about the tracked URL: " + h.fetches[0]);
+    assert(status && status.bookmarked === true, "a saved page did not read as bookmarked: " + JSON.stringify(status));
+    assert(status.target === K0_CLEAN, "debouncedCheck did not report the cleaned target: " + JSON.stringify(status));
+    assert(h.api.statusCache.has(K0_CLEAN), "the status cache is not keyed by the queried URL");
+    assert(!h.api.statusCache.has(K0_TRACKED), "the status cache still holds a raw tracked-URL key");
+    assert(iconStateFor(h.api.pbpStatusCacheGet(status.target, h.auth)) === "saved",
+      "the toolbar icon would still call a saved page unsaved");
+  });
+
+  await test("K0: the urlClean setting rides the status check's existing storage read", async () => {
+    const cold = buildStatusChainHarness(source, { urlClean: K0_URL_CLEAN_ON, warm: false, posts: [K0_POST] });
+    await cold.api.debouncedCheck(K0_TRACKED);
+    assert(cold.storageReads.length === 1, "the cold path made " + cold.storageReads.length + " storage reads, not one");
+    assert(cold.storageReads[0].includes("urlClean") && cold.storageReads[0].includes("optCheckBookmarkStatus"),
+      "urlClean does not ride the existing read: " + JSON.stringify(cold.storageReads[0]));
+    assert(cold.fetches[0].includes("url=" + encodeURIComponent(K0_CLEAN)), "cold read did not clean the query URL");
+
+    const warm = buildStatusChainHarness(source, { urlClean: K0_URL_CLEAN_ON, posts: [K0_POST] });
+    await warm.api.debouncedCheck(K0_TRACKED);
+    assert(warm.storageReads.length === 0, "the warm path issued a redundant storage read");
+    assert(warm.fetches[0].includes("url=" + encodeURIComponent(K0_CLEAN)), "warm read did not clean the query URL");
+  });
+
+  await test("K0 control: urlClean off keeps the raw tracked URL end to end", async () => {
+    const off = { ...K0_URL_CLEAN_ON, enabled: false };
+    const h = buildStatusChainHarness(source, { urlClean: off, posts: [] });
+    const status = await h.api.debouncedCheck(K0_TRACKED);
+    assert(status.target === K0_TRACKED, "urlClean off still cleaned the query URL: " + status.target);
+    assert(h.fetches[0].includes("url=" + encodeURIComponent(K0_TRACKED)), "urlClean off changed the queried URL");
+    assert(h.api.statusCache.has(K0_TRACKED) && !h.api.statusCache.has(K0_CLEAN), "urlClean off changed the cache key");
+
+    // onPopupOpen is the second half of the popup's own condition: with it off
+    // the popup saves the raw URL, so the status check must ask about it too.
+    const perPage = buildStatusChainHarness(source, { urlClean: { ...K0_URL_CLEAN_ON, onPopupOpen: false }, posts: [] });
+    const perPageStatus = await perPage.api.debouncedCheck(K0_TRACKED);
+    assert(perPageStatus.target === K0_TRACKED, "onPopupOpen:false still cleaned the query URL");
+  });
+
+  await test("K0: two tracked URLs that resolve to one bookmark share a single in-flight check", async () => {
+    const h = buildStatusChainHarness(source, { urlClean: K0_URL_CLEAN_ON, posts: [K0_POST], hold: true });
+    const first = h.api.debouncedCheck(K0_TRACKED);
+    const second = h.api.debouncedCheck(K0_CLEAN + "?fbclid=abc&utm_medium=email");
+    // Let both reach the dedup point before the single request is allowed to settle.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const keys = [...h.api.pendingChecks.keys()];
+    assert(keys.length === 1, "dedup did not collapse the two tracked URLs: " + JSON.stringify(keys));
+    assert(keys[0].endsWith("\n" + K0_CLEAN), "_pendingChecks is not keyed by the cleaned target: " + JSON.stringify(keys));
+    h.release();
+    const [a, b] = await Promise.all([first, second]);
+    assert(h.fetches.length === 1, "the merged check still made " + h.fetches.length + " posts/get calls");
+    assert(a.bookmarked === true && b.bookmarked === true, "the deduped caller lost its answer");
+    assert(a.target === K0_CLEAN && b.target === K0_CLEAN, "the deduped caller lost its target");
+    assert(h.api.pendingChecks.size === 0, "the settled check was not removed from _pendingChecks");
+  });
+
+  await test("K0: the icon is read back under the checked target, not the raw tab URL", async () => {
+    const tab = { id: 7, url: K0_TRACKED, title: "Article" };
+    const h = buildHarness(source, [{ ...tab }, { ...tab }]);
+    h.api._scheduleCurrentTabRefresh(7, K0_TRACKED);
+    await h.wait();
+    assert(h.calls.checks.length === 1 && h.calls.checks[0] === K0_TRACKED, "the check no longer runs on the tab URL");
+    assert(h.calls.cacheReads.length === 1, "expected one status-cache read, got " + h.calls.cacheReads.length);
+    assert(h.calls.cacheReads[0] === K0_CLEAN,
+      "the icon read back a key nothing wrote: " + h.calls.cacheReads[0]);
+    assert(h.calls.icons.length === 1 && h.calls.icons[0].state === "saved", "the icon was not applied as saved");
   });
 }
 run();

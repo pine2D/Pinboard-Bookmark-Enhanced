@@ -90,6 +90,13 @@ function pbpStatusCacheGet(url, auth) {
   return cached?.account === auth.account ? cached : null;
 }
 
+// The key MUST be the exact URL whose posts/get produced `value` — never a
+// raw tracking URL's payload under its cleaned key, nor the reverse. Pinboard
+// stores a bookmark under one of the two spellings only, so the other key's
+// honest answer is `posts: []`; serving one across the other reports a saved
+// page as new and turns the next save into an `already exists` conflict. A
+// caller that wants the cleaned spelling must QUERY the cleaned spelling
+// (debouncedCheck does exactly that).
 function pbpStatusCacheSet(url, auth, value) {
   if (!pbpPinboardAuthIsCurrent(auth)) return false;
   statusCache.set(url, { ...value, account: auth.account });
@@ -214,30 +221,60 @@ async function debouncedCheck(url) {
   // is a UI toggle driven by navigation events, not a just-edited credential;
   // a stale read here at worst runs (or skips) one icon check that self-heals
   // on the very next navigation, with no security or externally-visible cost.
+  // K0: `urlClean` rides that SAME read (warm cache, or the one cold single-key
+  // get widened by one key) — the query URL below has to come from the same
+  // settings snapshot as the on/off decision, and no extra round-trip is spent
+  // to get it. A read failure leaves the shipped defaults in place, which is
+  // also what popup.js's _loadUrlCleanSettings falls back to.
+  let urlCleanSettings = SETTINGS_DEFAULTS.urlClean;
   try {
     if (_settingsCache) {
       if (_settingsCache.optCheckBookmarkStatus === false) return;
+      if (_settingsCache.urlClean) urlCleanSettings = _settingsCache.urlClean;
     } else {
-      const { optCheckBookmarkStatus } = await (await getSettingsStorage()).get({ optCheckBookmarkStatus: true });
-      if (optCheckBookmarkStatus === false) return;
+      const read = await (await getSettingsStorage()).get({ optCheckBookmarkStatus: true, urlClean: SETTINGS_DEFAULTS.urlClean });
+      if (read.optCheckBookmarkStatus === false) return;
+      if (read.urlClean) urlCleanSettings = read.urlClean;
     }
   } catch (e) {
     // Storage unavailable — fall through to default behavior (check enabled)
     console.warn("[bookmark-status] settings read failed:", e?.message || e);
   }
-  // Dedup only within one auth epoch. An older request may still settle after
-  // logout/account switch, but its cache write is rejected by the epoch guard.
+  // K0: ask Pinboard about the URL the popup SAVES under, not the raw tab URL.
+  // popup.js derives _bookmarkPrefetchUrl with exactly this condition, so a page
+  // reached through a utm_*/fbclid link was stored under the cleaned URL while
+  // this chain kept asking about the tracked one: posts/get answered `[]` and
+  // the toolbar showed a saved page as unsaved, while the popup's prefetch key
+  // could never match the key this chain wrote. Accepted consequence (user
+  // decision 2026-09-18): a bookmark that genuinely lives under the raw tracked
+  // URL now reads as not-bookmarked. Only the query URL, the dedup key and the
+  // cache key move — tab identity (_lastCheckedUrl, _getFocusedActiveTab,
+  // _writeCurrentTabMirror) keeps speaking in raw tab URLs.
+  let target = url;
+  if (urlCleanSettings && urlCleanSettings.enabled && urlCleanSettings.onPopupOpen) {
+    try { target = stripTrackingParams(url, urlCleanSettings).cleaned || url; } catch (_) { target = url; }
+  }
+  // The caller needs `target` to read the cache entry back: it is the only key
+  // this check wrote, so reading back by the raw tab URL would find nothing.
+  return { bookmarked: await _dedupedBookmarkCheck(target), target };
+}
+
+// Network-layer dedup for the bookmark status check, shared by the toolbar-icon
+// path above and the popup's cold lookup (the lookup_bookmark handler below).
+// Dedup only within one auth epoch: an older request may still settle after a
+// logout/account switch, but its cache write is rejected by the epoch guard.
+// Deliberately separate from debouncedCheck, which returns early when
+// optCheckBookmarkStatus is off — a user who hid the toolbar state still needs
+// the popup to know whether the page is saved.
+function _dedupedBookmarkCheck(url, capturedAuth = null) {
   const pendingKey = _pinboardAuthEpoch + "\n" + url;
-  if (_pendingChecks.has(pendingKey)) {
-    return _pendingChecks.get(pendingKey);
-  }
-  const promise = checkBookmarked(url);
+  const inFlight = _pendingChecks.get(pendingKey);
+  if (inFlight) return inFlight;
+  const promise = checkBookmarked(url, capturedAuth);
   _pendingChecks.set(pendingKey, promise);
-  try {
-    return await promise;
-  } finally {
+  return promise.finally(() => {
     if (_pendingChecks.get(pendingKey) === promise) _pendingChecks.delete(pendingKey);
-  }
+  });
 }
 
 // ---- Load settings with deobfuscation (module-level cache, invalidated on storage.onChanged) ----
@@ -1291,16 +1328,19 @@ function _scheduleCurrentTabRefresh(tabId, expectedUrl) {
       _lastCheckedUrl.set(tabId, tab.url);
 
       noteActivity();
-      const bookmarked = await debouncedCheck(tab.url);
+      const status = await debouncedCheck(tab.url);
 
       // The tab may have navigated or lost focus while the API request was in flight.
       const currentTab = await _getFocusedActiveTab(tab.id, tab.url);
       if (!currentTab) return;
-      if (typeof bookmarked === "boolean") {
+      if (status && typeof status.bookmarked === "boolean") {
         // checkBookmarked (via debouncedCheck) just wrote the cache entry; re-derive
-        // the current auth to read it back atomically (same account/epoch).
+        // the current auth to read it back atomically (same account/epoch). The key
+        // is debouncedCheck's target (K0: the cleaned URL whenever urlClean applies),
+        // never the raw tab URL — reading back a key nothing wrote returns null and
+        // would reset a saved page's icon to "default".
         const auth = await getCurrentPinboardAuth();
-        setIcon(currentTab.id, iconStateFor(pbpStatusCacheGet(currentTab.url, auth)));
+        setIcon(currentTab.id, iconStateFor(pbpStatusCacheGet(status.target, auth)));
       }
       await _writeCurrentTabMirror(currentTab.id, currentTab.url, currentTab.title);
     } catch (_) {
