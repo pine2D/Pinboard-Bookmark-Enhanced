@@ -2478,7 +2478,21 @@ html[data-theme] { --pp-scrollbar-thumb: var(--pp-fg-muted); }
    compound-family scan; the rules that failed either check stayed. Full
    judgment table: task-13-report.md. Do not re-run a blind "same decl
    text = delete" pass over this block without the same two-directional
-   check AND the paired-removal exception above. */
+   check AND the paired-removal exception above.
+   2026-09-18 (audit N7) removed six more, each checked individually:
+   five `outline-color: var(--pp-accent)` no-ops whose base rules already write
+   `outline: 1px solid var(--pp-accent)` bare (.edit-cancel:focus-visible,
+   .recent-bm-edit/-del:focus-visible, .quick-links a:focus-visible,
+   .bottom-bar input[type=checkbox]:focus-visible, .confirm-popover
+   button:focus-visible), plus `html[data-theme] .submit-bar button:focus-visible`,
+   which restated the generated .btn:focus-visible -- both buttons in that bar
+   carry class="btn", .btn.danger:focus-visible supplies the same --pp-focus-bd
+   for the Delete button, and #submit-btn's own (1,1,1) themed rule out-ranked
+   the deleted one for border-color anyway. None of the six was shadowing a
+   later higher-specificity rule, and no surviving html[data-theme] prefix rule
+   declares the same properties on those elements. The ~22 remaining textual
+   duplicates in this block were NOT touched: they still need the
+   two-directional check case by case. */
 html[data-theme] { background: var(--pp-bg); }
 /* html[data-theme] .header-bar deleted 2026-09-18 (audit S1): background and
    color restated the base rule verbatim, and `border-color: var(--pp-border)`
@@ -2576,8 +2590,6 @@ html[data-theme] #tags-copy-all:hover { color: var(--pp-accent); }
 html[data-theme] .last-used-hint:hover { color: var(--pp-accent); }
 html[data-theme] .edit-cancel { background: color-mix(in srgb, var(--pp-fg) 10%, transparent); color: var(--pp-fg); }
 html[data-theme] .edit-cancel:hover { background: color-mix(in srgb, var(--pp-danger) 20%, transparent); color: var(--pp-danger); }
-html[data-theme] .edit-cancel:focus-visible { outline-color: var(--pp-accent); }
-html[data-theme] .recent-bm-edit:focus-visible, html[data-theme] .recent-bm-del:focus-visible { outline-color: var(--pp-accent); }
 html[data-theme] .offline-bar { background: var(--pp-offline-bg); border-color: var(--pp-offline-bd); color: var(--pp-offline-fg); }
 html[data-theme] .offline-queue-item { border-bottom-color: color-mix(in srgb, var(--pp-fg) 10%, transparent); }
 html[data-theme] .offline-queue-title { color: var(--pp-fg); }
@@ -2599,10 +2611,7 @@ html[data-theme] .login-body button:focus-visible { border-color: var(--pp-focus
 /* .preset-btn:focus-visible no longer needs a themed override here: its base
    rule (Tag Presets, above) already reads bare var(--pp-accent) with no
    fallback literal, so this would be a same-value no-op under every theme. */
-html[data-theme] .submit-bar button:focus-visible { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 html[data-theme] .qbtn:focus-visible { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
-html[data-theme] .quick-links a:focus-visible { outline-color: var(--pp-accent); }
-html[data-theme] .bottom-bar input[type="checkbox"]:focus-visible { outline-color: var(--pp-accent); }
 /* Terminal monospace */
 html[data-theme="terminal"] body { font-family: "Courier New", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
@@ -2667,7 +2676,6 @@ html[data-theme] .confirm-popover { color: var(--pp-fg); box-shadow: 0 2px 8px r
    hand-written rule that paints .confirm-yes on any of the three surfaces. */
 html[data-theme] .confirm-popover .confirm-no { color: var(--pp-fg); border-color: var(--pp-border); background: none; }
 html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-hover); }
-html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp-accent); }
 
 /* ===================== Batch 1: Shared keyframes ===================== */
 @keyframes fadeSlideDown {
