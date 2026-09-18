@@ -5712,6 +5712,137 @@ suiteIf("pbpReaderScrollNearEnd", "pbpReaderScrollNearEnd", () => {
 </script>
 
 <script>
+// ============ K153: md-preview.js pbpReaderCollectAnchorRects (sparse anchor-rect scan) ============
+// _pbpReaderSaveScroll itself is unreachable from this harness (same reason
+// as pbpReaderScrollNearEnd above) -- this suite exercises the extracted,
+// pure rect-collection helper directly: the same function the live save
+// path now calls in place of the old unconditional `blocks.map(...)` scan.
+// `rectOf` is a spy so these tests can assert the exact call count/pattern
+// the short-circuit is supposed to produce, then feed the resulting sparse
+// array into the REAL, untouched pbpReaderPickScrollAnchor (md-reader.js,
+// its own 8-test suite above at "R9") and confirm it picks the identical
+// {n, frac} a dense `.map()` over every block would have.
+suiteIf("pbpReaderCollectAnchorRects", "pbpReaderCollectAnchorRects", () => {
+  function spyRectOf(rectsByIndex) {
+    const calls = [];
+    const fn = (b, i) => { calls.push(i); return rectsByIndex[i]; };
+    fn.calls = calls;
+    return fn;
+  }
+
+  test("mid-article hit: rectOf is called exactly hitIndex+1 times, only that slot filled", () => {
+    const rectsByIndex = [
+      { top: -900, bottom: -500 },
+      { top: -500, bottom: -100 },
+      { top: -100, bottom: 300 }, // hitIndex = 2, first bottom > 0
+      { top: 300, bottom: 700 },
+      { top: 700, bottom: 1100 },
+    ];
+    const blocks = rectsByIndex.map((_, i) => ({ id: i }));
+    const rectOf = spyRectOf(rectsByIndex);
+    const rects = pbpReaderCollectAnchorRects(blocks, rectOf);
+    assertEq(rectOf.calls.length, 3, "hitIndex(2)+1 calls -- stops the instant it finds bottom > 0");
+    assertEq(rectOf.calls.join(","), "0,1,2", "measured strictly in document order up to the hit");
+    assertEq(rects.length, 5, "sparse array still reports the full block count");
+    assertEq(rects[2], rectsByIndex[2], "the hit slot is filled");
+    assertEq(rects[0], undefined, "earlier slots are holes, not computed-then-discarded rects");
+    assertEq(rects[1], undefined, "earlier slots are holes, not computed-then-discarded rects");
+    assertEq(rects[3], undefined, "later slots were never measured at all");
+    assertEq(rects[4], undefined, "later slots were never measured at all");
+  });
+
+  test("no block qualifies: rectOf is called blocks.length+1 times, only the last slot filled", () => {
+    const rectsByIndex = [
+      { top: -2000, bottom: -1600 },
+      { top: -1600, bottom: -1200 },
+      { top: -1200, bottom: -800 },
+    ];
+    const blocks = rectsByIndex.map((_, i) => ({ id: i }));
+    const rectOf = spyRectOf(rectsByIndex);
+    const rects = pbpReaderCollectAnchorRects(blocks, rectOf);
+    assertEq(rectOf.calls.length, 4, "blocks.length(3)+1 -- the full miss scan, plus one extra call to re-measure the last block for the fallback slot");
+    assertEq(rectOf.calls.join(","), "0,1,2,2", "scans every block once (all misses), then re-measures the last block");
+    assertEq(rects.length, 3, "sparse array still reports the full block count");
+    assertEq(rects[2], rectsByIndex[2], "only the last slot is filled");
+    assertEq(rects[0], undefined, "not filled -- the picker's re-scan treats this hole as a miss");
+    assertEq(rects[1], undefined, "not filled -- the picker's re-scan treats this hole as a miss");
+  });
+
+  test("empty blocks -> empty array, rectOf never called", () => {
+    const rectOf = spyRectOf([]);
+    const rects = pbpReaderCollectAnchorRects([], rectOf);
+    assertEq(rects.length, 0, "no blocks to anchor to");
+    assertEq(rectOf.calls.length, 0, "nothing to measure");
+  });
+
+  function assertSameAnchor(sparseRects, denseRects, label) {
+    const a = pbpReaderPickScrollAnchor(sparseRects);
+    const b = pbpReaderPickScrollAnchor(denseRects);
+    assert(!!a === !!b, label + ": both null or both non-null");
+    if (a && b) {
+      assertEq(a.n, b.n, label + ": same anchor block");
+      assertEq(Math.round(a.frac * 1000), Math.round(b.frac * 1000), label + ": same frac");
+    }
+  }
+
+  test("normal long article: sparse result feeds pbpReaderPickScrollAnchor identically to a dense .map()", () => {
+    const rectsByIndex = [
+      { top: -1400, bottom: -1000 },
+      { top: -1000, bottom: -600 },
+      { top: -600, bottom: -200 },
+      { top: -200, bottom: 200 }, // first bottom > 0
+      { top: 200, bottom: 600 },
+      { top: 600, bottom: 1000 },
+    ];
+    const blocks = rectsByIndex.map((_, i) => ({ id: i }));
+    const sparse = pbpReaderCollectAnchorRects(blocks, spyRectOf(rectsByIndex));
+    const dense = blocks.map((_, i) => rectsByIndex[i]);
+    assertSameAnchor(sparse, dense, "normal long article");
+  });
+
+  test("forum-like nested target: hit sits deep in a .pb-comment-body index, still matches the dense scan", () => {
+    // Simulates trOnlyScrollTarget resolving each forum block to a nested
+    // .pb-comment-body descendant with its own geometry -- rectOf stands in
+    // for that redirect. pbpReaderCollectAnchorRects itself never touches
+    // the DOM either way, so the redirect is exercised purely through what
+    // rectOf returns, same as the production caller's injected closure.
+    const rectsByIndex = [
+      { top: -3000, bottom: -2500 },
+      { top: -2500, bottom: -2000 },
+      { top: -2000, bottom: -1500 },
+      { top: -1500, bottom: -1000 },
+      { top: -1000, bottom: -100 },
+      { top: -100, bottom: 50 }, // first bottom > 0, deep into a long thread
+      { top: 50, bottom: 400 },
+    ];
+    const blocks = rectsByIndex.map((_, i) => ({ id: i }));
+    const sparse = pbpReaderCollectAnchorRects(blocks, spyRectOf(rectsByIndex));
+    const dense = blocks.map((_, i) => rectsByIndex[i]);
+    assertSameAnchor(sparse, dense, "forum-like nested target");
+  });
+
+  test("tr-only view: every redirected rect is still above the viewport (idx === -1), both fall back to the last block", () => {
+    // Simulates the tr-only view where trOnlyScrollTarget redirects to a
+    // .pb-tr sibling whose geometry differs from the primary block's own --
+    // here every redirected rect is fully above the viewport, so the
+    // idx === -1 fallback path (not the short-circuit hit path) is under
+    // test, matching pbpReaderPickScrollAnchor's own "falls back to the
+    // last block" case in its R9 suite above.
+    const rectsByIndex = [
+      { top: -2200, bottom: -1900 },
+      { top: -1900, bottom: -1600 },
+      { top: -1600, bottom: -1300 },
+    ];
+    const blocks = rectsByIndex.map((_, i) => ({ id: i }));
+    const sparse = pbpReaderCollectAnchorRects(blocks, spyRectOf(rectsByIndex));
+    const dense = blocks.map((_, i) => rectsByIndex[i]);
+    assertSameAnchor(sparse, dense, "tr-only view, idx === -1 fallback");
+    assertEq(pbpReaderPickScrollAnchor(sparse).n, 3, "falls back to the last (3rd) block");
+  });
+});
+</script>
+
+<script>
 // ============ md-preview.js: pbpRailCollapsible (install + storage, async) ============
 // NOTE: this suite is a hand-rolled async IIFE, NOT suiteIf()/test() -- this
 // file's test() helper is fully synchronous (calls fn() and records PASS

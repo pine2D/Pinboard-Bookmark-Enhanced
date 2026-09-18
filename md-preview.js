@@ -777,6 +777,43 @@ function pbpReaderScrollNearEnd(scrollHeight, innerHeight, scrollY) {
   return scrollHeight - innerHeight - scrollY < innerHeight;
 }
 
+// K153: rect-collection for _pbpReaderSaveScroll, extracted for the same
+// reason as pbpReaderScrollNearEnd above (that closure is unreachable from
+// tests/md-ai-tests.html). md-reader.js's pbpReaderPickScrollAnchor only
+// ever reads rects[idx] (via `rects.findIndex((r) => r && r.bottom > 0)`)
+// and rects.length -- every other element is dead weight once idx is known.
+// Unconditionally mapping getBoundingClientRect() over every block was pure
+// waste, so this short-circuits at the first block whose rect clears the
+// viewport top (mirroring the Raw/Rendered toggle's own
+// `blocks.findIndex((b) => trOnlyScrollTarget(b.el).getBoundingClientRect()
+// .bottom > 0)` a few hundred lines below) and returns a SPARSE array with
+// only that one slot filled -- or, when no block qualifies, only the last
+// slot (matching pickScrollAnchor's own idx===-1 fallback). This is
+// deliberate, not a bug: Array.prototype.findIndex does not skip holes
+// (unlike map/forEach), so pickScrollAnchor's re-scan reads `undefined` for
+// every unfilled slot, its `r && r.bottom > 0` guard treats that as a miss,
+// and it lands on the exact same idx a dense array would have produced. Do
+// not "fix" this back to a `.map()` over every block -- that reintroduces
+// the O(all blocks) getBoundingClientRect cost this exists to avoid.
+// `rectOf` is injected (rather than this function calling
+// trOnlyScrollTarget/getBoundingClientRect itself) so it stays pure and
+// testable here; the real caller below passes a closure that does the live
+// DOM read.
+function pbpReaderCollectAnchorRects(blocks, rectOf) {
+  const rects = new Array(blocks.length);
+  for (let i = 0; i < blocks.length; i++) {
+    const r = rectOf(blocks[i], i);
+    if (r && r.bottom > 0) {
+      rects[i] = r;
+      return rects;
+    }
+  }
+  if (blocks.length > 0) {
+    rects[blocks.length - 1] = rectOf(blocks[blocks.length - 1], blocks.length - 1);
+  }
+  return rects;
+}
+
 (async function () {
   initI18n();
   applyI18n();
@@ -3017,7 +3054,7 @@ function pbpReaderScrollNearEnd(scrollHeight, innerHeight, scrollY) {
     }
     const blocks = pbpScrollMapBlocks(); // force-index if empty, same defensive call the Raw/Rendered toggle above already makes
     if (!blocks.length) return;
-    const rects = blocks.map((b) => trOnlyScrollTarget(b.el).getBoundingClientRect());
+    const rects = pbpReaderCollectAnchorRects(blocks, (b) => trOnlyScrollTarget(b.el).getBoundingClientRect());
     const anchor = typeof pbpReaderPickScrollAnchor === "function" ? pbpReaderPickScrollAnchor(rects) : null;
     if (!anchor) return;
     const ts = Date.now();
