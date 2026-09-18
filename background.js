@@ -1282,18 +1282,22 @@ function resolvePrefixSettings(s, prefix) {
   };
 }
 
-// B4: write current tab data to session storage for popup mirror prefill (Phase 1)
+// B4: write current tab data to session storage for popup mirror prefill (Phase 1).
+// No `posts` field: this used to read pbpStatusCacheGet(url, auth) and carry a
+// cached posts array, but it was keyed by the RAW tab URL while K0 made every
+// statusCache writer key off the CLEANED url, so on a tracked-param page this
+// was always null anyway. popup.js's only reads of the mirror are tabId/ts
+// (staleness/identity check) -- dropped instead of fixed, since nothing ever
+// consumed it, and every tab event was paying an extra cache read for it.
 async function _writeCurrentTabMirror(tabId, url, title) {
   if (!url || !url.startsWith("http")) {
     try { await chrome.storage.session.remove("_currentTab"); } catch (_) {}
     return;
   }
   const auth = await getCurrentPinboardAuth();
-  const cached = pbpStatusCacheGet(url, auth);
-  const posts = (cached && Date.now() - cached.timestamp < CACHE_TTL) ? (cached.posts || null) : null;
   try {
     await chrome.storage.session.set({
-      _currentTab: { tabId, url, title: title || "", posts, account: auth.account, ts: Date.now() }
+      _currentTab: { tabId, url, title: title || "", account: auth.account, ts: Date.now() }
     });
     if (!pbpPinboardAuthIsCurrent(auth)) await chrome.storage.session.remove("_currentTab");
   } catch (_) {}
