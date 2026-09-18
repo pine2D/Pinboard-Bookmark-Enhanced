@@ -1012,8 +1012,10 @@ async function pbpVocabSeedLegacy(owner, limit = 100) {
     // One key scan per round, not one sync.get per scanned row: the per-row
     // lookup re-read every already-registered record on every round, so a
     // bootstrap over N words cost ~N^2/200 serial gets inside this one
-    // readwrite transaction. ";" is the code point after ":", so the open upper
-    // bound covers every key under this prefix -- including one whose record
+    // readwrite transaction. The bound comes from the shared prefix-range
+    // helper: its successor-character upper bound is the same range this used
+    // to spell out with a literal ";" (the code point after ":"), open above
+    // the prefix so it covers every key under it -- including one whose record
     // key sorts past U+FFFF.
     // That it reaches no OTHER scope rests on one fact and nothing else:
     // pbpDictOwnerScope percent-encodes ":" and ";" out of the scope. The key
@@ -1022,8 +1024,8 @@ async function pbpVocabSeedLegacy(owner, limit = 100) {
     // real key of scope "a" that also reads as scope "a:b". Anyone widening the
     // scope charset past encodeURIComponent has to revisit this range.
     const prefix = `record:${scope}:`;
-    const registered = new Set(await _pbpVocabRequest(sync.getAllKeys(
-      IDBKeyRange.bound(prefix, prefix.slice(0, -1) + ";", false, true))));
+    const registered = new Set(await _pbpVocabRequest(
+      sync.getAllKeys(_pbpVocabSyncPrefixRange(prefix))));
     const selected = [];
     for (const record of rows) {
       if (selected.length >= max) break;
