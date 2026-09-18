@@ -50,7 +50,12 @@ function pbpEchoTermSet(rows, cap) {
     if (key.length !== display.length) key = display;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ key, display, bound });
+    // fold = the form _echoScanBlock's block prefilter compares against a
+    // lowercased copy of the block text. Identical to the old inline
+    // key.toLowerCase() -- a normal key is already lowercase, and a degraded
+    // key (İ, kept at original case above) folds here exactly as it did in the
+    // loop -- just computed once per term instead of once per (block x term).
+    out.push({ key, display, bound, fold: key.toLowerCase() });
     if (out.length >= limit) break;
   }
   out.sort((a, b) => b.key.length - a.key.length);
@@ -245,16 +250,36 @@ function _echoStandDown() {
   _echoDisconnect();
 }
 
-function _echoClearAll() {
+// The pending-work half of _echoClearAll, split out for _echoRestart: the
+// previous generation's queued idle slices and debounced rescan must stop
+// before this generation's two awaits (valid() would refuse them at the next
+// callback anyway, but leaving live handles dangling across two IndexedDB
+// reads is needless), while the ranges they already drew have to stay on
+// screen until the replacement is ready.
+function _echoCancelWork() {
   for (const id of _echoIdles) cancelIdleCallback(id);
   _echoIdles.clear();
   if (_echoDebounce) { clearTimeout(_echoDebounce); _echoDebounce = 0; }
+}
+
+function _echoClearAll() {
+  _echoCancelWork();
   _echoDirty.clear();
   _echoRanges.clear();
   _echoCounts.clear();
   _echoTotal = 0;
   try { CSS.highlights.delete("pbp-vocab-echo"); } catch (_) {}
   _echoHl = null;
+}
+
+// Fail-closed exit from _echoRestart. Since the rebuild now clears LATE, a
+// bare _echoStandDown() would leave the outgoing generation's underlines
+// painted -- and for the live-account branch that means showing one Pinboard
+// account's vocabulary to whoever is logged in now, which is the exact thing
+// that check exists to prevent. Clear the pixels first, then stand down.
+function _echoBailClosed() {
+  _echoClearAll();
+  _echoStandDown();
 }
 
 function _echoScanBlock(key) {
@@ -264,7 +289,7 @@ function _echoScanBlock(key) {
   if (!el) return;
   const blockFold = (el.textContent || "").toLowerCase();
   const live = _echoTerms.filter((t) =>
-    (_echoCounts.get(t.key) || 0) < PBP_ECHO_PER_TERM && blockFold.includes(t.key.toLowerCase()));
+    (_echoCounts.get(t.key) || 0) < PBP_ECHO_PER_TERM && blockFold.includes(t.fold));
   if (!live.length) return;
   // Registry init BEFORE any counting: if CSS.highlights.set throws we bail
   // with zero side effects -- counts bumped ahead of a failed commit could
@@ -327,12 +352,28 @@ function _echoScheduleScan(keys) {
   _echoRequestIdle(step);
 }
 
+// Compute, then swap. The drawn ranges survive both reads below and are
+// replaced in one step at the end, instead of being wiped up front: clearing
+// first meant every single word save blanked every underline in the article
+// for the length of a live-account read plus a full-partition IndexedDB read,
+// and nothing repaints during that window (K149). Only the pending WORK dies
+// here, not the pixels.
+//
+// The price is that no bail-out inherits a clear any more, so each return
+// between here and the swap is classified explicitly:
+//   fail-closed / stand-down (feature off or no view, live-account mismatch,
+//     empty term set) -> _echoBailClosed(), because this generation still owns
+//     the state and is choosing to paint nothing;
+//   "a newer generation already took over" (the two epoch/owner/enabled
+//     rechecks after each await) -> BARE return, because the state, including
+//     whatever that newer generation has already painted, is no longer ours to
+//     erase.
 async function _echoRestart() {
   const epoch = ++_echoEpoch;
   const owner = _echoOwner;
-  _echoClearAll();
+  _echoCancelWork();
   const view = _echoView();
-  if (!_echoEnabled || !view) { _echoStandDown(); return; }
+  if (!_echoEnabled || !view) { _echoBailClosed(); return; }
   // Ask/translate init owns the canonical pbpAiIndexBlocks call on
   // pbp:rendered; this mirrors md-ask's lazy backfill for safety.
   if (typeof pbpAiIndexBlocks === "function" && typeof pbpAiBlocks === "function"
@@ -348,19 +389,23 @@ async function _echoRestart() {
     // A newer generation already owns this module's state; it decides what the
     // term set and the observer hold, not this stale continuation.
     if (epoch !== _echoEpoch || owner !== _echoOwner || !_echoEnabled) return;
-    if (live !== owner) { _echoStandDown(); return; }
+    if (live !== owner) { _echoBailClosed(); return; }
   }
   const rows = await (typeof pbpVocabAll === "function" ? pbpVocabAll(owner).catch(() => []) : []);
   if (epoch !== _echoEpoch || owner !== _echoOwner || !_echoEnabled) return;
   _echoTerms = pbpEchoTermSet(rows);
-  // An empty term set is a bail-out like the other two, so it stands down for
-  // the same reason: a bare return leaves the previous generation's observer
-  // watching the article, and every later mutation (streamed .pb-tr
-  // translation output, a rebuilt timeline) would still queue a debounced idle
-  // rescan of every block to find nothing. _echoStandDown is idempotent here
-  // -- the assignment above already emptied the set -- and it also releases
-  // the timeline list watch.
-  if (!_echoTerms.length) { _echoStandDown(); return; }
+  // An empty term set is a bail-out like the other two, so it fails closed for
+  // the same reason: a bare return leaves the previous generation's underlines
+  // painted for words that are no longer saved, and leaves its observer
+  // watching the article, so every later mutation (streamed .pb-tr translation
+  // output, a rebuilt timeline) would still queue a debounced idle rescan of
+  // every block to find nothing. The stand-down half is idempotent here -- the
+  // assignment above already emptied the set -- and it also releases the
+  // timeline list watch.
+  if (!_echoTerms.length) { _echoBailClosed(); return; }
+  // The swap: the outgoing generation's ranges come down and the rebuild goes
+  // up in the same task, so the underlines never blink through an empty state.
+  _echoClearAll();
   _echoScheduleScan(_echoBlockKeys());
   _echoObserve();
 }

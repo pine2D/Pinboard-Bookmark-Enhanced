@@ -531,6 +531,14 @@ const _ets = (rows, cap) => pbpEchoTermSet(rows, cap);
   assert(lem.length === 1 && lem[0].key === "running", "lemma is NOT echoed (term only)");
   const turk = _ets([{ term: "İstanbul" }]);
   assertEq(turk[0].key, "İstanbul", "length-shifting case fold degrades to exact-case key");
+  // fold is what _echoScanBlock's prefilter tests a lowercased block against,
+  // hoisted out of the per-(block x term) loop. It must keep matching the
+  // lowercased block text in BOTH cases -- including the degraded key, whose
+  // own case was preserved for index-safe matching, not for the prefilter.
+  assertEq(set1[0].fold, "internet", "fold carries the prefilter needle for an ordinary term");
+  assertEq(turk[0].fold, "İstanbul".toLowerCase(), "a degraded key still folds for the prefilter");
+  assert("İstanbul, henüz".toLowerCase().includes(turk[0].fold),
+    "and that fold still hits a lowercased block containing the term");
   const knownSkip = _ets([{ term: "mastered", status: "known" }, { term: "learning" }]);
   assert(knownSkip.length === 1 && knownSkip[0].key === "learning",
     "known words retire from the echo underline; the record itself stays");
@@ -657,12 +665,24 @@ section("vocab echo: timeline row / translation keys");
 async function runVocabEchoWiringTests() {
   const tick = () => new Promise((r) => setTimeout(r, 0));
 
+  // _echoRestart computes the new term set BEFORE dropping the old underlines
+  // ("compute, then swap"), so the two reads it awaits no longer blank the
+  // article on every word save. That reordering moves the clear out of the
+  // function's head, where it used to cover every bail-out for free, so each
+  // return now has to be classified: the fail-closed ones must clear
+  // themselves, the "a newer generation took over" ones must not. Seeding real
+  // CSS.highlights entries before each restart is what makes these rows say
+  // anything -- against an empty registry both classes look identical.
   section("vocab echo: fail-closed restart");
   {
     const saved = { owner: _echoOwner, enabled: _echoEnabled, epoch: _echoEpoch, terms: _echoTerms, total: _echoTotal };
     const realAll = window.pbpVocabAll;
     const hadOwnerFn = "pbpVocabCurrentOwner" in window;
     const realOwnerFn = window.pbpVocabCurrentOwner;
+    const hadBlocks = "pbpAiBlocks" in window;
+    const realBlocks = window.pbpAiBlocks;
+    const hadBlockEl = "pbpAiBlockEl" in window;
+    const realBlockEl = window.pbpAiBlockEl;
     const prevView = document.getElementById("rendered-view");
     if (prevView) prevView.remove();
     const docBody = document.createElement("div");
@@ -670,7 +690,39 @@ async function runVocabEchoWiringTests() {
     view.id = "rendered-view";
     docBody.appendChild(view);
     document.body.appendChild(docBody);
+    // One real block, so a rebuild has something to repaint and "the
+    // underlines on screen" is a Highlight over real text, not a flag.
+    const para = document.createElement("p");
+    para.dataset.pb = "1";
+    para.textContent = "residue here";
+    view.appendChild(para);
+    // Everything a finished scan leaves behind -- registry entry, range list,
+    // per-term count, draw budget -- planted in one step.
+    const seedPaint = () => {
+      const r = document.createRange();
+      r.setStart(para.firstChild, 0);
+      r.setEnd(para.firstChild, 7);
+      const h = new Highlight();
+      h.priority = -1;
+      h.add(r);
+      CSS.highlights.set("pbp-vocab-echo", h);
+      _echoHl = h;
+      _echoRanges.set("o1", [{ range: r, key: "residue", n: 1 }]);
+      _echoCounts.set("residue", 1);
+      _echoTotal = 1;
+      return h;
+    };
+    const drawn = () => CSS.highlights.get("pbp-vocab-echo") || null;
+    // The repaint runs on requestIdleCallback slices, so it is polled for
+    // rather than awaited; anything still false after the budget is a failure.
+    const settle = async (cond) => {
+      const until = Date.now() + 3000;
+      while (Date.now() < until && !cond()) await tick();
+      return cond();
+    };
     try {
+      window.pbpAiBlocks = () => [{ n: 1, el: para }];
+      window.pbpAiBlockEl = (n) => (Number(n) === 1 ? para : null);
       window.pbpVocabAll = async () => [{ term: "residue" }];
       // The live account (B) is no longer the one this document rendered
       // under (A) -- the fail-closed branch.
@@ -680,22 +732,45 @@ async function runVocabEchoWiringTests() {
       _echoTerms = pbpEchoTermSet([{ term: "residue" }]);
       _echoObserve();
       assert(_echoObserver !== null, "precondition: the previous account's scan left the observer attached");
+      const stalePaint = seedPaint();
+      assert(drawn() === stalePaint, "precondition: the previous account's underlines are on screen before the restart");
       await _echoRestart();
       assertEq(_echoTerms.length, 0, "a live-account mismatch drops the rendered account's term set, not only its painted ranges");
       assertEq(_echoObserver, null, "and disconnects the observer, so no later article mutation can repaint from it");
+      assertEq(drawn(), null, "and takes the previous account's underlines off the screen: the rebuild clears late, so this branch clears itself");
+      assertEq(_echoTotal, 0, "releasing their draw budget with them");
 
       _echoTerms = pbpEchoTermSet([{ term: "residue" }]);
       _echoObserve();
+      seedPaint();
       _echoEnabled = false;
       await _echoRestart();
       assertEq(_echoTerms.length, 0, "restarting while the feature is switched off drops the term set too");
       assertEq(_echoObserver, null, "and leaves no observer running behind it");
+      assertEq(drawn(), null, "and no underlines either: a switched-off feature paints nothing, whatever was on screen");
 
+      // The point of the reorder. Saving one word re-reads the whole owner
+      // partition out of IndexedDB and nothing repaints while that is in
+      // flight, so the underlines already drawn have to survive it; clearing
+      // up front blanked every underline in the article on every save.
       window.pbpVocabCurrentOwner = async () => "acct_YQ";
       _echoEnabled = true;
-      await _echoRestart();
+      const kept = seedPaint();
+      let releaseRows = null;
+      window.pbpVocabAll = () => new Promise((r) => { releaseRows = () => r([{ term: "residue" }]); });
+      const restarting = _echoRestart();
+      await tick();
+      assert(releaseRows !== null, "precondition: the restart is parked on the vocabulary read");
+      assert(drawn() === kept, "the underlines drawn before the restart stay registered while the vocabulary read is pending");
+      assertEq(_echoTotal, 1, "and keep their draw budget until the replacement is ready");
+      releaseRows();
+      await restarting;
       assert(_echoTerms.length === 1 && _echoTerms[0].key === "residue", "a matching live account still loads the owner's terms");
       assert(_echoObserver !== null, "and arms the observer");
+      assert(await settle(() => drawn() && drawn() !== kept),
+        "and the rebuild replaces the old registry entry with its own instead of leaving it up");
+      assertEq(_echoRanges.has("o1"), true, "the block is registered again under its own key");
+      assertEq(_echoTotal, 1, "and the repaint accounts for its draw budget");
 
       // Emptying the vocabulary (deleting the last word, or marking every word
       // known) is a bail-out of the same class as the two above. Without a
@@ -704,9 +779,41 @@ async function runVocabEchoWiringTests() {
       // timeline -- still queues a debounced idle rescan over every block to
       // find nothing at all.
       window.pbpVocabAll = async () => [];
+      assert(drawn() !== null, "precondition: the article is underlined before the vocabulary empties");
       await _echoRestart();
       assertEq(_echoTerms.length, 0, "an emptied vocabulary leaves no term set behind");
       assertEq(_echoObserver, null, "and stands the observer down instead of leaving it rescanning for nothing");
+      assertEq(drawn(), null, "and takes the underlines for the no-longer-saved words down with it");
+
+      // The other class: a continuation whose generation has been overtaken
+      // must NOT clear. The state -- including whatever the newer generation
+      // has already painted -- stopped being its to erase at the recheck.
+      let releaseOwner = null;
+      window.pbpVocabCurrentOwner = () => new Promise((r) => { releaseOwner = () => r("acct_YQ"); });
+      window.pbpVocabAll = async () => [{ term: "residue" }];
+      _echoEnabled = true;
+      const stale1 = _echoRestart();
+      await tick();
+      assert(releaseOwner !== null, "precondition: the restart is parked on the live-account read");
+      _echoEpoch++;                // a newer generation takes the state over ...
+      const newer1 = seedPaint();  // ... and paints
+      releaseOwner();
+      await stale1;
+      assert(drawn() === newer1, "a continuation stranded past the live-account read leaves the newer generation's underlines alone");
+      assertEq(_echoTotal, 1, "and its draw budget untouched");
+
+      window.pbpVocabCurrentOwner = async () => "acct_YQ";
+      releaseRows = null;
+      window.pbpVocabAll = () => new Promise((r) => { releaseRows = () => r([{ term: "residue" }]); });
+      const stale2 = _echoRestart();
+      await tick();
+      assert(releaseRows !== null, "precondition: the second restart is parked on the vocabulary read");
+      _echoEpoch++;
+      const newer2 = seedPaint();
+      releaseRows();
+      await stale2;
+      assert(drawn() === newer2, "a continuation stranded past the vocabulary read leaves the newer generation's underlines alone too");
+      assertEq(_echoTotal, 1, "with its draw budget intact as well");
     } finally {
       _echoEnabled = false;
       _echoClearAll();
@@ -714,8 +821,11 @@ async function runVocabEchoWiringTests() {
       docBody.remove();
       window.pbpVocabAll = realAll;
       if (hadOwnerFn) window.pbpVocabCurrentOwner = realOwnerFn; else delete window.pbpVocabCurrentOwner;
+      if (hadBlocks) window.pbpAiBlocks = realBlocks; else delete window.pbpAiBlocks;
+      if (hadBlockEl) window.pbpAiBlockEl = realBlockEl; else delete window.pbpAiBlockEl;
       _echoOwner = saved.owner; _echoEnabled = saved.enabled; _echoEpoch = saved.epoch;
       _echoTerms = saved.terms; _echoTotal = saved.total;
+      _echoRanges.clear(); _echoCounts.clear();
       if (prevView && !document.getElementById("rendered-view")) document.body.appendChild(prevView);
     }
   }
