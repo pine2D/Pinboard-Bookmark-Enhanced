@@ -761,6 +761,22 @@ function pbpRailSettingsBtnInit() {
   if (btn) btn.addEventListener("click", () => pbpOpenOptionsTab("reader"));
 }
 
+// K61 tail-delete: pure geometry for _pbpReaderSaveScroll's symmetric
+// bottom-of-article branch below (mirrors its existing top-of-article
+// `scrollY <= innerHeight` check). True when less than one viewport of
+// scrollable distance remains -- reading finished the article. A named
+// top-level function (like pbpResolveColorScheme/pbpResolveReaderScheme/
+// pbpRailCollapseState above), not inlined into _pbpReaderSaveScroll,
+// because that function is a closure defined deep inside the async IIFE
+// below: tests/md-ai-tests.html loads this whole file on file://, but the
+// IIFE's own file://-safe bailout (the `if (typeof chrome === "undefined"
+// ...) return;` a few lines down) returns before any MP_KEY payload exists,
+// so _pbpReaderSaveScroll itself is never defined in that harness. This
+// predicate is the one piece of its boundary math a test can actually reach.
+function pbpReaderScrollNearEnd(scrollHeight, innerHeight, scrollY) {
+  return scrollHeight - innerHeight - scrollY < innerHeight;
+}
+
 (async function () {
   initI18n();
   applyI18n();
@@ -2984,6 +3000,16 @@ function pbpRailSettingsBtnInit() {
     if (window.scrollY <= window.innerHeight) {
       // Back inside the first screen: nothing worth restoring, and any
       // earlier deeper-scroll record is now stale -- drop it.
+      pbpAiCacheDelete(key).catch(() => {});
+      return;
+    }
+    if (pbpReaderScrollNearEnd(document.documentElement.scrollHeight, window.innerHeight, window.scrollY)) {
+      // Symmetric with the top-of-article branch above: within one viewport
+      // of the very end, the article has been read to completion, so
+      // restoring to "the last block" on a later reopen is a zero-value
+      // jump -- there is nothing left below it to read. This is also the
+      // bulk of the scroll_ pool's residue in practice (K61): most reads
+      // that go past one screen run all the way to the end.
       pbpAiCacheDelete(key).catch(() => {});
       return;
     }

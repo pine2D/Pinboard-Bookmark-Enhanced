@@ -5679,6 +5679,39 @@ suiteIf("pbpResolveColorScheme", "pbpResolveColorScheme", () => {
 </script>
 
 <script>
+// ============ md-preview.js: pbpReaderScrollNearEnd (K61 tail-delete geometry) ============
+// _pbpReaderSaveScroll itself (the scroll_ cache save/delete closure) is a
+// nested function inside md-preview.js's async IIFE and unreachable from this
+// page (its file://-safe bailout returns before MP_KEY exists, so nothing
+// past that point is ever defined here) -- see the comment on
+// pbpReaderScrollNearEnd's declaration in md-preview.js. This suite exercises
+// the extracted boundary predicate directly: the same function the live save
+// path calls for its symmetric bottom-of-article branch, not a re-implemented
+// copy of the arithmetic.
+suiteIf("pbpReaderScrollNearEnd", "pbpReaderScrollNearEnd", () => {
+  test("mid-article (more than one viewport left to scroll) is not near the end", () => {
+    assertEq(pbpReaderScrollNearEnd(10000, 800, 0), false, "top of a long article, 9200px still below the fold");
+    assertEq(pbpReaderScrollNearEnd(10000, 800, 3000), false, "well into the article, 6200px remaining");
+  });
+
+  test("within one viewport of the bottom is near the end", () => {
+    assertEq(pbpReaderScrollNearEnd(3000, 800, 1500), true, "700px remaining < 800px viewport");
+    assertEq(pbpReaderScrollNearEnd(3000, 800, 2200), true, "scrolled to the literal maximum, 0px remaining");
+  });
+
+  test("boundary is exclusive: exactly one viewport remaining is NOT yet near the end", () => {
+    // scrollHeight - innerHeight - scrollY === innerHeight exactly.
+    assertEq(pbpReaderScrollNearEnd(3000, 800, 1400), false, "remaining === viewport height, strict '<' must not fire");
+    assertEq(pbpReaderScrollNearEnd(3000, 800, 1401), true, "one px past the boundary flips to near-end");
+  });
+
+  test("a short article that never needed scrolling is trivially near its own end", () => {
+    assertEq(pbpReaderScrollNearEnd(500, 800, 0), true, "scrollHeight < innerHeight -- negative remaining");
+  });
+});
+</script>
+
+<script>
 // ============ md-preview.js: pbpRailCollapsible (install + storage, async) ============
 // NOTE: this suite is a hand-rolled async IIFE, NOT suiteIf()/test() -- this
 // file's test() helper is fully synchronous (calls fn() and records PASS
