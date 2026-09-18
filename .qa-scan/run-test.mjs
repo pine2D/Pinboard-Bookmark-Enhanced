@@ -57,8 +57,8 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/jina-cache-tests.html": 28,
   "tests/library-notes-tests.html": 118,
   "tests/library-vocab-tests.html": 206,
-  "tests/md-ai-tests.html": 981,
-  "tests/md-convert-tests.html": 724,
+  "tests/md-ai-tests.html": 984,
+  "tests/md-convert-tests.html": 728,
   "tests/md-dict-tests.html": 436,
   "tests/md-embed-tests.html": 48,
   "tests/md-explain-layout-tests.html": 4,
@@ -86,7 +86,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/url-strip-tests.html": 19,
   "tests/vocab-background-tests.html": 17,
   "tests/vocab-gdrive-tests.html": 73,
-  "tests/vocab-store-tests.html": 73,
+  "tests/vocab-store-tests.html": 74,
   "tests/wayback-tests.html": 44,
 });
 const expected = EXPECTED_RESULTS[rel];
