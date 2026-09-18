@@ -566,8 +566,8 @@ async function pbpBuildSanitizedDiagnostics() {
       if (typeof navigator.storage?.estimate !== "function") return null;
       const e = await navigator.storage.estimate();
       return {
-        usage: e.usage,
-        quota: e.quota,
+        usage: typeof e.usage === "number" ? e.usage : undefined,
+        quota: typeof e.quota === "number" ? e.quota : undefined,
         indexedDB: e.usageDetails && typeof e.usageDetails.indexedDB === "number"
           ? e.usageDetails.indexedDB : undefined,
       };
@@ -623,11 +623,12 @@ async function pbpBuildSanitizedDiagnostics() {
     permissions: { identity, aiHost, driveApi, ankiHost, eudicHost },
     storage: {
       localBytes, syncBytes, sessionBytes,
-      ...(storageEst ? {
-        usage: storageEst.usage,
-        quota: storageEst.quota,
-        ...(storageEst.indexedDB !== undefined ? { indexedDB: storageEst.indexedDB } : {}),
-      } : {}),
+      // Each key spread in individually (not one `storageEst ? {...} : {}`
+      // block): a partial/malformed estimate() result must not leave an
+      // own key with an `undefined` value sitting on the object.
+      ...(storageEst?.usage !== undefined ? { usage: storageEst.usage } : {}),
+      ...(storageEst?.quota !== undefined ? { quota: storageEst.quota } : {}),
+      ...(storageEst?.indexedDB !== undefined ? { indexedDB: storageEst.indexedDB } : {}),
     },
     // Counts only -- pbpAiCacheStats() never returns a key, since dict2_/
     // dictctx2_ keys embed the looked-up word and summary_owner_ embeds the

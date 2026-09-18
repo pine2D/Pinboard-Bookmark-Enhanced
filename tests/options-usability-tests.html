@@ -689,6 +689,33 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     walk(diagnostics.aiCache);
   });
 
+  await test("diagnostics omit storage.estimate() keys when navigator.storage is unavailable or throws", async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, "storage");
+    let stubbedEstimateOnly = false;
+    let originalEstimate = null;
+    try {
+      try {
+        Object.defineProperty(navigator, "storage", { value: undefined, configurable: true });
+      } catch (_) {
+        // navigator.storage isn't configurable in this Chromium -- fall back
+        // to making estimate() itself reject, exercising the same catch path.
+        stubbedEstimateOnly = true;
+        originalEstimate = navigator.storage.estimate;
+        navigator.storage.estimate = () => Promise.reject(new DOMException("boom", "NotAllowedError"));
+      }
+      const d = await pbpBuildSanitizedDiagnostics();
+      assert(!("usage" in d.storage) && !("quota" in d.storage) && !("indexedDB" in d.storage),
+        "storage.estimate failure path left a key behind: " + JSON.stringify(d.storage));
+      assert(typeof d.storage.localBytes === "number" && typeof d.storage.syncBytes === "number"
+        && typeof d.storage.sessionBytes === "number",
+        "existing storage byte fields regressed: " + JSON.stringify(d.storage));
+    } finally {
+      if (stubbedEstimateOnly) navigator.storage.estimate = originalEstimate;
+      else if (originalDescriptor) Object.defineProperty(navigator, "storage", originalDescriptor);
+      else delete navigator.storage;
+    }
+  });
+
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";
 })();
 </script></body></html>
