@@ -147,6 +147,22 @@ async function putLegacyWords(words) {
   for (const word of words) tx.objectStore("words").put(word);
   await idbTxDone(tx);
 }
+async function putSyncRows(rows) {
+  const db = await _pbpVocabOpenDB();
+  const tx = db.transaction("sync", "readwrite");
+  for (const row of rows) tx.objectStore("sync").put(row);
+  await idbTxDone(tx);
+}
+// The sync row _pbpVocabLocalMutation leaves behind for a registered record,
+// written out by hand rather than replayed through the writer.
+function recordRow(scope, record, deleted = false) {
+  const recordKey = pbpDictCacheKeyPublic(record.language, record.term);
+  return {
+    key: `record:${scope}:${recordKey}`, owner: scope, recordKey,
+    vector: { "already-seeded-device": 4 },
+    dot: { deviceId: "already-seeded-device", counter: 4 }, deleted
+  };
+}
 function word(owner, term, patch = {}) {
   const language = patch.language || "en";
   const now = patch.updatedAt || 10;
@@ -479,6 +495,101 @@ async function runIdbChecks() {
   await pbpVocabDeletePendingBatch("drive-seed", OWNER_HASH_SEED, "seed-file");
   const checkpointed = await pbpVocabCheckpointOwner("acct_seed");
   check("legacy seed is safely resumable", task3ApiReady && seededSecond.processed === 5 && seededThird.processed === 0 && (await syncGet("meta")).counter === 105 && checkpointed === 105 && (await pbpVocabListOutbox("acct_seed")).length === 105);
+
+  // K144: the loader used to ask sync for one record key per scanned row, so
+  // every already-registered row was re-read on every round -- ~N^2/200 serial
+  // gets inside one readwrite transaction. What must not move is the selection
+  // itself, so the pre-change algorithm is re-implemented here as the oracle
+  // instead of being frozen into a recorded id list.
+  await deleteVocabDb();
+  const scanScope = "acct_scan";
+  const scanRows = Array.from({ length: 300 }, (_, i) => word(scanScope, `Scan ${i}`, { createdAt: i + 1, updatedAt: i + 1 }));
+  await putLegacyWords(scanRows);
+  // Half the library arrives already registered, interleaved so a loader that
+  // stopped at the first unregistered row could not fake the answer.
+  await putSyncRows(scanRows.filter((_, i) => i % 2 === 0).map((record) => recordRow(scanScope, record)));
+  const scanRegisteredKeys = async (scope) => (await storeRows("sync"))
+    .filter((row) => typeof row.key === "string" && row.key.startsWith(`record:${scope}:`))
+    .map((row) => row.key.slice(`record:${scope}:`.length));
+  // The pre-change loader, verbatim: walk the owner index in order and ask for
+  // each row's record key until max unregistered rows have been collected.
+  const seedOracle = async (scope, max) => {
+    const db = await _pbpVocabOpenDB();
+    const tx = db.transaction(["words", "sync"], "readonly");
+    const rows = await idbReq(tx.objectStore("words").index("owner").getAll(scope));
+    const sync = tx.objectStore("sync");
+    const selected = [];
+    for (const record of rows) {
+      if (selected.length >= max) break;
+      const recordKey = pbpDictCacheKeyPublic(record.language, record.term);
+      if (!await idbReq(sync.get(`record:${scope}:${recordKey}`))) selected.push(recordKey);
+    }
+    return selected.sort().join(",");
+  };
+  const realIdbGet = IDBObjectStore.prototype.get;
+  const realIdbGetAllKeys = IDBObjectStore.prototype.getAllKeys;
+  let scanRecordGets = 0;
+  let scanKeyScans = 0;
+  const scanOracle = [];
+  const scanPicked = [];
+  const scanProcessed = [];
+  for (let round = 0; round < 3; round++) {
+    scanOracle.push(await seedOracle(scanScope, 100));
+    const before = new Set(await scanRegisteredKeys(scanScope));
+    IDBObjectStore.prototype.get = function (key) {
+      if (this.name === "sync" && typeof key === "string" && key.startsWith(`record:${scanScope}:`)) scanRecordGets++;
+      return realIdbGet.call(this, key);
+    };
+    IDBObjectStore.prototype.getAllKeys = function (...args) {
+      if (this.name === "sync") scanKeyScans++;
+      return realIdbGetAllKeys.apply(this, args);
+    };
+    let seeded;
+    try {
+      seeded = await pbpVocabSeedLegacy(scanScope, 100);
+    } finally {
+      IDBObjectStore.prototype.get = realIdbGet;
+      IDBObjectStore.prototype.getAllKeys = realIdbGetAllKeys;
+    }
+    scanProcessed.push(seeded.processed);
+    scanPicked.push((await scanRegisteredKeys(scanScope)).filter((key) => !before.has(key)).sort().join(","));
+  }
+  check("legacy seed picks exactly the rows the per-row lookup picked",
+    task3ApiReady && scanProcessed.join(",") === "100,50,0" &&
+    scanPicked.join(" | ") === scanOracle.join(" | ") &&
+    (await pbpVocabListOutbox(scanScope)).length === 150);
+  // The loader's own lookups are what had to disappear; the only record: gets
+  // left are the one-per-written-row reads the write path does itself.
+  check("legacy seed reads the registered keys once per round, not once per row",
+    task3ApiReady && scanKeyScans === 3 &&
+    scanRecordGets === scanProcessed.reduce((sum, n) => sum + n, 0));
+
+  // A tombstone record: row lands in the key scan exactly as the old truthy
+  // sync.get treated it -- registered, so its word is not seeded again.
+  await deleteVocabDb();
+  const tombScope = "acct_tomb";
+  const tombRows = [word(tombScope, "Alpha"), word(tombScope, "Buried"), word(tombScope, "Gamma")];
+  await putLegacyWords(tombRows);
+  await putSyncRows([recordRow(tombScope, tombRows[1], true)]);
+  const tombBefore = JSON.stringify(await syncGet(`record:${tombScope}:en|buried`));
+  const tombSeed = await pbpVocabSeedLegacy(tombScope);
+  check("a deleted:true record row still counts as registered",
+    task3ApiReady && tombSeed.processed === 2 &&
+    (await pbpVocabListOutbox(tombScope)).map((row) => row.recordKey).sort().join(",") === "en|alpha,en|gamma" &&
+    JSON.stringify(await syncGet(`record:${tombScope}:en|buried`)) === tombBefore);
+
+  // The upper bound has to sit past every key under the prefix rather than at
+  // U+FFFF: a record key whose language folds to U+FFFF sorts above
+  // "record:<scope>:\uffff" and would fall out of a naive bound.
+  await deleteVocabDb();
+  const edgeScope = "acct_edge";
+  const edgeRows = [word(edgeScope, "Plain"), word(edgeScope, "Edge", { language: "\uffff" })];
+  await putLegacyWords(edgeRows);
+  await putSyncRows([recordRow(edgeScope, edgeRows[1])]);
+  const edgeSeed = await pbpVocabSeedLegacy(edgeScope);
+  check("a record key past U+FFFF is still inside the scanned range",
+    task3ApiReady && edgeSeed.processed === 1 &&
+    (await pbpVocabListOutbox(edgeScope)).map((row) => row.recordKey).join(",") === "en|plain");
 
   await deleteVocabDb();
   const existingImport = await pbpVocabSaveWord("acct_import", { term: "Case Term", language: "en", gloss: "local" });

@@ -961,14 +961,24 @@ async function pbpVocabSeedLegacy(owner, limit = 100) {
     // ponytail: one-time bootstrap scans local vocabulary; add a persisted
     // cursor only if real large libraries make this measurable.
     const rows = await _pbpVocabRequest(words.index("owner").getAll(scope));
+    // One key scan per round, not one sync.get per scanned row: the per-row
+    // lookup re-read every already-registered record on every round, so a
+    // bootstrap over N words cost ~N^2/200 serial gets inside this one
+    // readwrite transaction. ";" is the code point after ":", so the open upper
+    // bound covers every key under this prefix -- including one whose record
+    // key sorts past U+FFFF -- and reaches no other scope.
+    const prefix = `record:${scope}:`;
+    const registered = new Set(await _pbpVocabRequest(sync.getAllKeys(
+      IDBKeyRange.bound(prefix, prefix.slice(0, -1) + ";", false, true))));
     const selected = [];
     for (const record of rows) {
       if (selected.length >= max) break;
+      // A row whose id is not self-consistent with its owner/term/language has
+      // no key to look up: let it into the batch and have mutate's
+      // {invalid: true} abort the whole transaction, instead of throwing here.
       const recordKey = _pbpVocabRecordKey(scope, record);
-      if (!recordKey) throw new Error("invalid legacy record");
-      if (!await _pbpVocabRequest(sync.get(`record:${scope}:${recordKey}`))) {
-        selected.push({ id: record.id, current: record });
-      }
+      if (recordKey && registered.has(prefix + recordKey)) continue;
+      selected.push({ id: record.id, current: record });
     }
     return selected;
   }, (record) => {
