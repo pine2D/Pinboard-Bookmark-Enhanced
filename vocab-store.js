@@ -1137,8 +1137,17 @@ function _pbpVocabBatchKeyIdentity(key) {
   if (typeof key !== "string") return null;
   const parts = key.split(":");
   if (parts.length < 4 || parts[0] !== "batch") return null;
+  const ownerHash = parts[2];
+  // A drivePermissionId containing ":" would shift every field after it out
+  // of position, and split() alone can't tell that misaligned parts[2] apart
+  // from a real ownerHash -- validate its shape explicitly. Fail-safe: a
+  // rejected row just drops out of the pending-batch count (the caller sees
+  // one fewer pending batch), it can never be misattributed to a different
+  // real owner, since that would require the shifted fragment to itself
+  // collide with another account's valid 64-hex hash.
+  if (!_pbpVocabValidOwnerHash(ownerHash)) return null;
   return {
-    key, drivePermissionId: parts[1], ownerHash: parts[2],
+    key, drivePermissionId: parts[1], ownerHash,
     driveFileId: parts.slice(3).join(":")
   };
 }

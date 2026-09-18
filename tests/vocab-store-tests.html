@@ -804,6 +804,18 @@ async function runIdbChecks() {
       retryAt: 0, lastError: "network", blocked: false
     }
   ]);
+  // A drivePermissionId containing ":" shifts every field after it out of
+  // position in _pbpVocabBatchKeyIdentity's split(":") parse -- without a
+  // shape check on the recovered ownerHash, that misaligned fragment could
+  // in principle land on a real 64-hex hash and get counted against the
+  // wrong account. Pure function, no fixture write needed: must reject the
+  // malformed key (fail-safe -- dropped, not miscounted) without throwing,
+  // and must still accept a well-formed key.
+  check("a malformed batch key (colon inside drivePermissionId) is rejected, not misparsed",
+    task3ApiReady &&
+    _pbpVocabBatchKeyIdentity(`batch:drive:evil:${OWNER_HASH_A}:file-z`) === null &&
+    _pbpVocabBatchKeyIdentity(`batch:drive-a:${OWNER_HASH_A}:file-a`) !== null,
+    JSON.stringify(_pbpVocabBatchKeyIdentity(`batch:drive:evil:${OWNER_HASH_A}:file-z`)));
   const onlyPrefix = (keys, prefix) => keys.length > 0 &&
     keys.every((key) => typeof key === "string" && key.startsWith(prefix));
   const rangeSpy = installSyncReadSpy();
