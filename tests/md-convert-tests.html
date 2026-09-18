@@ -983,6 +983,71 @@ function assertEq(actual, expected, label) {
     const rendered = norm(renderMarkdown(md));
     check("renderMarkdown keeps the pbp-gallery div + figure, no <li> in the output",
       /<div class="pbp-gallery">/.test(rendered) && /<figure>/.test(rendered) && !/<li[\s>]/.test(rendered), rendered);
+
+    // K17 (task 9): PBP_GALLERY_ATTRS now allows width/height through the
+    // gallery raw-HTML passthrough, so Defuddle's intrinsic image size
+    // survives instead of being stripped by _pbpStripDisallowedAttrs -- the
+    // browser then knows the aspect ratio before decode and the grid's row
+    // height settles without a reflow (see the comment on PBP_GALLERY_ATTRS).
+    // Uppercase WIDTH/HEIGHT confirms the HTML parser normalizes attribute
+    // names to lowercase before turndown / _pbpStripDisallowedAttrs ever see
+    // them (the scrub's own attr.name.toLowerCase() is a second, redundant
+    // safety net -- either mechanism alone is enough).
+    const sizedGalleryHtml = '<ul class="gallery">' +
+      '<li><img src="https://e.com/w.jpg" alt="w" width="640" height="480"><p>Cap W</p></li>' +
+      '<li><img src="https://e.com/x.jpg" alt="x" WIDTH="640" HEIGHT="480"><p>Cap X</p></li>' +
+      '<li><img src="https://e.com/y.jpg" alt="y"><p>Cap Y (no size)</p></li>' +
+      '</ul>';
+    const sizedMd = htmlToMarkdown(sizedGalleryHtml);
+    check("gallery img keeps width/height through the raw-HTML passthrough",
+      /<img src="https:\/\/e\.com\/w\.jpg"[^>]*\bwidth="640"[^>]*\bheight="480"/.test(sizedMd), sizedMd);
+    check("gallery img with uppercase WIDTH/HEIGHT source attrs also survives (parser lower-cases attr names)",
+      /<img src="https:\/\/e\.com\/x\.jpg"[^>]*\bwidth="640"[^>]*\bheight="480"/.test(sizedMd), sizedMd);
+    check("gallery img with no source size stays sizeless (nothing invented)",
+      !/src="https:\/\/e\.com\/y\.jpg"[^>]*\b(?:width|height)=/.test(sizedMd), sizedMd);
+    const sizedRendered = norm(renderMarkdown(sizedMd));
+    check("renderMarkdown keeps width/height on the gallery img after marked+DOMPurify",
+      /<img[^>]*src="https:\/\/e\.com\/w\.jpg"[^>]*width="640"[^>]*height="480"/.test(sizedRendered), sizedRendered);
+
+    // Non-gallery path is untouched: canonical markdown for an ordinary
+    // (non-gallery, non-figure) image goes through turndown's default img
+    // rule -- ![alt](src) -- which has no width/height syntax at all, so a
+    // source img's size attributes never reach the markdown or the render.
+    const plainImgHtml = '<p><img src="https://e.com/plain.jpg" alt="plain" width="640" height="480"></p>';
+    const plainMd = htmlToMarkdown(plainImgHtml);
+    check("a non-gallery image's canonical markdown carries no width/height (marked has no syntax for it)",
+      /!\[plain\]\(https:\/\/e\.com\/plain\.jpg\)/.test(plainMd) && !/width=|height=/.test(plainMd), plainMd);
+    const plainRendered = norm(renderMarkdown(plainMd));
+    check("a non-gallery image's rendered <img> also has no width/height attribute",
+      /<img[^>]*src="https:\/\/e\.com\/plain\.jpg"/.test(plainRendered) && !/<img[^>]*\b(?:width|height)=/.test(plainRendered), plainRendered);
+
+    // A junk width value inside a gallery is harmless either way, but the two
+    // sanitize layers disagree on HOW they handle it, empirically confirmed
+    // here rather than assumed: _pbpStripDisallowedAttrs only scheme-checks
+    // href/src (javascript:/vbscript:/data:), never width/height, so the raw
+    // value survives into canonical markdown untouched -- it was never a live
+    // href/src to begin with, so nothing executes at that stage regardless.
+    // DOMPurify, at render time, DOES strip it: its generic attribute-value
+    // scan removes anything shaped like a dangerous URI scheme (javascript:)
+    // from ANY attribute, not just src/href-typed ones -- so the width
+    // attribute itself disappears from #rendered-view while the sibling
+    // height="480" (a plain numeric value) survives untouched. Net effect:
+    // strips it, consistently, at the sanitize point that actually matters
+    // (what reaches the DOM) -- never allows it through to render.
+    const junkGalleryHtml = '<ul class="gallery">' +
+      '<li><img src="https://e.com/j.jpg" alt="j" width="javascript:alert(1)" height="480"><p>Cap J</p></li>' +
+      '<li><img src="https://e.com/k.jpg" alt="k"><p>Cap K</p></li>' +
+      '<li><img src="https://e.com/l.jpg" alt="l"><p>Cap L</p></li>' +
+      '</ul>';
+    const junkMd = htmlToMarkdown(junkGalleryHtml);
+    check("_pbpStripDisallowedAttrs does not value-scheme-check width (that gate is href/src-only), so the raw value reaches canonical markdown",
+      /<img[^>]*src="https:\/\/e\.com\/j\.jpg"[^>]*width="javascript:alert\(1\)"/.test(junkMd), junkMd);
+    const junkRendered = norm(renderMarkdown(junkMd));
+    check("DOMPurify strips the junk width attribute entirely at render time; the legitimate height sibling survives",
+      /<img[^>]*src="https:\/\/e\.com\/j\.jpg"[^>]*height="480"/.test(junkRendered) && !/\bwidth=/.test(junkRendered.match(/<img[^>]*src="https:\/\/e\.com\/j\.jpg"[^>]*>/)[0]),
+      junkRendered);
+    check("the junk width value never becomes a live href/src or a script/event handler in the rendered DOM",
+      !/onerror|onload|<script/i.test(junkRendered), junkRendered);
   })();
 
   // ---- GitHub alerts: Defuddle -> Obsidian callout (data-callout) -> > [!TYPE] ----

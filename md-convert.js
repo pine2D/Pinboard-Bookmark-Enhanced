@@ -70,9 +70,16 @@ const PBP_COMPLEX_TABLE_ATTRS = new Set([
 // than PBP_COMPLEX_TABLE_ATTRS -- a gallery figure has no table-structure
 // attrs (colspan/rowspan/headers/scope/role) to keep -- srcset is the one
 // addition (galleries commonly carry responsive image sources tables don't).
+// width/height (K17, task 9): this is raw-HTML pass-through, and Defuddle
+// already preserves the source img's intrinsic size -- _pbpStripDisallowedAttrs
+// was the thing throwing it away. Keeping the two attributes costs nothing:
+// browsers only use width/height (without an explicit CSS size) to compute
+// the aspect ratio, so #rendered-view .pbp-gallery img{width:100%;height:auto}
+// still decides the actual rendered width -- the grid's row height just
+// settles up front instead of jumping when each image finishes decoding.
 const PBP_GALLERY_ATTRS = new Set([
-  "src", "srcset", "alt",   // image
-  "href", "target", "rel"   // links inside a caption (task: preserve them)
+  "src", "srcset", "alt", "width", "height",  // image
+  "href", "target", "rel"                     // links inside a caption (task: preserve them)
 ]);
 // A TeX string headed into markdown will be re-parsed by marked, whose
 // CommonMark inline escaping eats a backslash before ASCII punctuation
