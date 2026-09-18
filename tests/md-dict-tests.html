@@ -1153,6 +1153,91 @@ async function runDictNoAiAndSavedStateTests() {
   }
 }
 
+async function runDictCtxObserverLifecycleTests() {
+  section("dictionary AI-gloss fold observer lifecycle (K151)");
+  const realResolveLang = _pbpDictResolveLang;
+  const realSlotRun = _pbpDictSlotRun;
+  const realCtxRun = _pbpDictCtxRun;
+  const realIO = window.IntersectionObserver;
+  const realGBCR = Element.prototype.getBoundingClientRect;
+
+  // Counting fake: constructor increments live, disconnect decrements
+  // (idempotently -- a second disconnect on the same instance is a no-op,
+  // matching real IntersectionObserver semantics), observe just records the
+  // target. instances[] lets the test grab a specific run's observer back
+  // out to fire its callback directly, simulating a late/stale notification.
+  class FakeIO {
+    constructor(cb) {
+      this.cb = cb;
+      this._live = true;
+      FakeIO.live++;
+      FakeIO.instances.push(this);
+    }
+    observe(el) { this.target = el; }
+    disconnect() { if (this._live) { this._live = false; FakeIO.live--; } }
+    unobserve() {}
+  }
+  FakeIO.live = 0;
+  FakeIO.instances = [];
+
+  _pbpDictResolveLang = async () => "en";
+  _pbpDictSlotRun = async () => null;
+  _pbpDictCtxRun = async (_el, _cap, _ctx, _s, _signal, resolveLemmaOnce) => {
+    resolveLemmaOnce("");
+    return { gloss: "ctx gloss", lemma: "" }; // truthy `parsed` -> _pbpDictCtxSignal runs
+  };
+  window.IntersectionObserver = FakeIO;
+  // _pbpDictCtxSignal's own fold check reads real getBoundingClientRect() off
+  // the popover body and the ctx element; force every reading "below the
+  // fold" (ctxEl.top >= body.bottom - 12) so the observer actually gets built
+  // instead of early-returning as already-visible.
+  Element.prototype.getBoundingClientRect = function () {
+    return { top: 500, bottom: 100, left: 0, right: 0, width: 0, height: 0 };
+  };
+
+  const pop = document.createElement("div");
+  pop.innerHTML = '<div class="xp-body"></div>'; // no .xp-vocab -> skips the vocab-lookup branch
+  document.body.appendChild(pop); // .xp-dict-ctx must be isConnected for _pbpDictCtxSignal to arm
+  try {
+    // (a) two consecutive lookups, neither scrolled into view nor dot-clicked:
+    // the first run's observer must be torn down when the second run starts,
+    // not left to accumulate. RED (pre-fix): 2.
+    await pbpDictRun({ text: "alpha" }, { sentence: "alpha" }, pop, new AbortController(), {});
+    await pbpDictRun({ text: "beta" }, { sentence: "beta" }, pop, new AbortController(), {});
+    assertEq(FakeIO.live, 1, "a second lookup's teardown leaves only the newest fold observer live");
+
+    // (b) action switch (leaving the reader action / pbp:article-will-replace)
+    // is the other teardown point -- it must disconnect whatever is still live.
+    window.pbpDictOnActionSwitch();
+    assertEq(FakeIO.live, 0, "an action switch disconnects the still-live fold observer");
+
+    // (c) identity guard: a stale observer's callback firing AFTER a newer
+    // run has already replaced the module handle must not null out the NEW
+    // handle -- only the run's own teardown (or the newer run's) may do that.
+    await pbpDictRun({ text: "gamma" }, { sentence: "gamma" }, pop, new AbortController(), {});
+    const staleIo = FakeIO.instances[FakeIO.instances.length - 1];
+    await pbpDictRun({ text: "delta" }, { sentence: "delta" }, pop, new AbortController(), {});
+    const freshIo = FakeIO.instances[FakeIO.instances.length - 1];
+    assert(staleIo !== freshIo, "each run allocates its own observer instance");
+    // "delta"'s run-top teardown already disconnected staleIo. Firing its
+    // (now-stale) callback simulates a notification that was queued before
+    // disconnect landed -- it must not clobber the module handle, which by
+    // now points at freshIo.
+    staleIo.cb([{ isIntersecting: true }]);
+    assert(_pbpDictCtxIo === freshIo,
+      "a stale observer's late callback does not null out a newer run's live handle");
+    window.pbpDictOnActionSwitch();
+    assertEq(FakeIO.live, 0, "the current handle still tears down normally after a stale callback no-ops");
+  } finally {
+    _pbpDictResolveLang = realResolveLang;
+    _pbpDictSlotRun = realSlotRun;
+    _pbpDictCtxRun = realCtxRun;
+    window.IntersectionObserver = realIO;
+    Element.prototype.getBoundingClientRect = realGBCR;
+    pop.remove();
+  }
+}
+
 async function runVocabIdbTests() {
   section("pbp-vocab IDB (runtime)");
   await new Promise((r) => { const del = indexedDB.deleteDatabase("pbp-vocab"); del.onsuccess = del.onerror = del.onblocked = r; });
@@ -1354,6 +1439,7 @@ async function runDictResolveLangLadderTests() {
   await runDictPackRoutingTests();
   await runDictPermissionFeedbackTests();
   await runDictNoAiAndSavedStateTests();
+  await runDictCtxObserverLifecycleTests();
   await runDictResolveLangLadderTests();
   await runVocabIdbTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;

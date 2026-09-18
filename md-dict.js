@@ -615,15 +615,18 @@ function _pbpDictCtxSignal(body, ctxEl, btn) {
     if (entries.some((e) => e.isIntersecting)) {
       btn.hidden = true;
       io.disconnect();
+      if (_pbpDictCtxIo === io) _pbpDictCtxIo = null;
     }
   }, { root: body });
   io.observe(ctxEl);
+  _pbpDictCtxIo = io;
   btn.addEventListener("click", () => {
     // shared.js pbpScrollIntoView owns the reduced-motion downgrade -- the
     // md-preview.css comment already points every smooth scroll at it.
     pbpScrollIntoView(ctxEl, { block: "start", behavior: "smooth" });
     btn.hidden = true;
     io.disconnect();
+    if (_pbpDictCtxIo === io) _pbpDictCtxIo = null;
   }, { once: true });
 }
 
@@ -1189,6 +1192,12 @@ let _pbpDictManualLang = "";
 let _pbpDictCurrent = null;      // merged results of the LIVE run only
 let _pbpDictChildCtrl = null;    // the live run's own controller (child of md-ask's)
 let _pbpDictParentCleanup = null; // removes the previous run's parent-abort listener
+// The AI-gloss "landed below the fold" observer (_pbpDictCtxSignal) has only
+// two disconnect paths: scrolled into view, or the ready-dot clicked. A run
+// that does neither (reader just queries the next word, or the popover
+// closes) leaves a detached-subtree observer per lookup, so the next run and
+// an action switch tear it down explicitly (K151).
+let _pbpDictCtxIo = null;
 let _pbpDictSaveTarget = null;   // {itemId} | {range} | null — explain-shaped
 let _pbpDictOwner = "ownerless"; // set from pbp:rendered detail.account (Task 8 listener)
 
@@ -1382,6 +1391,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   // A language switch / rerun aborts ONLY the old child (Codex HIGH 1).
   if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort();
   if (_pbpDictParentCleanup) { _pbpDictParentCleanup(); _pbpDictParentCleanup = null; }
+  if (_pbpDictCtxIo) { try { _pbpDictCtxIo.disconnect(); } catch (_) {} _pbpDictCtxIo = null; }
   const child = new AbortController();
   _pbpDictChildCtrl = child;
   const onParentAbort = () => child.abort();
@@ -1727,6 +1737,7 @@ window.pbpDictOnActionSwitch = () => {
   _pbpDictSaveTarget = null;
   if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort(); // invalidate the run, not just the range
   _pbpDictCurrent = null;
+  if (_pbpDictCtxIo) { try { _pbpDictCtxIo.disconnect(); } catch (_) {} _pbpDictCtxIo = null; }
 };
 
 // Owner arrives with the page render (dict-run/save read _pbpDictOwner; the
