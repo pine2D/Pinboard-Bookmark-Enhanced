@@ -733,6 +733,8 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    applies to the reference implementation as well -- otherwise the oracle's
    own model citizen would be the next thing to fail it. */
 .tags-input-wrap:focus-within { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
+/* Fused with the suggestion list while it is open: one box, one bottom edge. */
+.tags-input-wrap.ac-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .tags-display { display: contents; }
 .tag-item {
   display: inline-flex; align-items: center; background: var(--pp-tag-bg); color: var(--pp-tag-fg);
@@ -793,13 +795,26 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   font-size: 12px; flex: 1; min-width: 80px; background: transparent; font-family: inherit; color: var(--pp-fg);
 }
 
+/* The seam with .tags-input-wrap (2026-09-18 audit S10, user ruling): the two
+   meet on one pixel row (measured field bottom == dropdown top), so a frameless
+   focus-tinted shell must not suddenly grow a neutral 3:1 --pp-border frame
+   there, and the shell's two 8px bottom corners must not leave a notch against
+   a square-topped list. The shell squares its bottom corners while the list is
+   open (.ac-open, toggled by openAutocomplete/closeAutocomplete in
+   popup-tags.js -- a class, not `:has(+ .autocomplete-dropdown:not(.hidden))`,
+   which would put a :has() on the hottest keystroke path in the popup), and the
+   list drops its side and top borders: what makes it read as a popover is the
+   shadow, and one --pp-divider hairline closes its bottom edge.
+   --pp-shadow-lg, not a re-typed literal: it is declared with the same
+   geometry the literal spelled out and had no consumer at all (audit N1),
+   and being a token it is one value on all 15 surfaces -- the themed twin used
+   to substitute the shallower --pp-shadow-md on the 13 presets, i.e. exactly
+   the value the deeper one was written to replace (audit S14). */
 .autocomplete-dropdown {
-  background: var(--pp-bg); border: 1px solid var(--pp-border); border-top: none;
+  background: var(--pp-bg); border: 0; border-bottom: 1px solid var(--pp-divider);
   border-radius: 0 0 var(--pp-radius-md) var(--pp-radius-md);
   max-height: 150px; z-index: var(--pp-z-autocomplete);
-  /* One notch deeper than --pp-shadow-md: compensates the lightened border now
-     that surrounding surfaces are borderless soft fills. */
-  box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+  box-shadow: var(--pp-shadow-lg);
   display: flex; flex-direction: column;
   /* No open animation: the list is summoned by typing (keyboard, several times
      per save) and it is an in-flow element, so tweening max-height pushed the
@@ -816,7 +831,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .ac-hint-footer {
   flex: 0 0 auto;
   padding: var(--pp-sp-1) var(--pp-sp-3); font-size: 11px; color: var(--pp-fg-hint); border-top: 1px solid var(--pp-divider);
-  background: var(--pp-bg2); user-select: none; cursor: default; line-height: 1.4;
+  /* No fill (2026-09-18 audit S2): the dropdown already has one, and bg2
+     inside it flipped polarity exactly like the md strip did -- lighter than
+     the list on 9 palettes, darker on 6 (1.048-1.305:1). The --pp-divider
+     hairline above is the whole separation, on all 15 surfaces. */
+  user-select: none; cursor: default; line-height: 1.4;
 }
 .ac-hint-footer kbd {
   display: inline-block; padding: 0 var(--pp-sp-2); margin: 0 1px;
@@ -2431,8 +2450,17 @@ html[data-theme] { --pp-scrollbar-thumb: var(--pp-fg-muted); }
    text = delete" pass over this block without the same two-directional
    check AND the paired-removal exception above. */
 html[data-theme] { background: var(--pp-bg); }
-html[data-theme] .header-bar { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-fg-muted); }
-html[data-theme] .login-body input { background: var(--pp-input-bg); color: var(--pp-fg); }
+/* html[data-theme] .header-bar deleted 2026-09-18 (audit S1): background and
+   color restated the base rule verbatim, and `border-color: var(--pp-border)`
+   turned the popup's one section edge into a 3.2-3.8:1 structural rule on all
+   13 presets while the strip's own .divider stayed a --pp-divider hairline --
+   two section edges in one window disagreeing under every preset.
+   --pp-border is reserved for real structural edges (overlays, table lines,
+   scrollbars) per COMPONENTS.md §9.1 law 1. The base already reads a
+   per-theme --pp-divider, and it also scopes the colour to the one side that
+   has a width (the override set all four). Checked both directions: no
+   .header-bar compound rule was losing to it, and no surviving
+   html[data-theme] prefix rule matches the element. */html[data-theme] .login-body input { background: var(--pp-input-bg); color: var(--pp-fg); }
 html[data-theme] .login-body input:focus { border-color: var(--pp-focus-bd); }
 /* The two `html[data-theme] .login-body button` rules that used to sit here
    are gone (2026-09-18 audit M2 + N13). #login-btn carries class="btn", so its
@@ -2466,7 +2494,6 @@ html[data-theme] .tags-input-wrap { background: var(--pp-input-bg); }
 html[data-theme] .tags-input-wrap:focus-within { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 html[data-theme] .tag-item { background: var(--pp-tag-bg); color: var(--pp-tag-fg); }
 html[data-theme] .tag-item:hover { background: var(--pp-tag-hover, var(--pp-drop-hover)); }
-html[data-theme] .autocomplete-dropdown { background: var(--pp-bg); border-color: var(--pp-border); box-shadow: var(--pp-shadow-md); }
 html[data-theme] .ac-item { color: var(--pp-fg); }
 html[data-theme] .label { color: var(--pp-fg-muted); }
 html[data-theme] .stag.ai { color: var(--pp-accent2); }
@@ -2498,7 +2525,6 @@ html[data-theme] #submit-btn.save-error { background: var(--pp-warn-bg); border-
 html[data-theme] .bottom-bar label { color: var(--pp-fg); }
 html[data-theme] .ac-new-hint { color: var(--pp-fg-hint); }
 html[data-theme] .ac-new-hint:hover { background: var(--pp-drop-hover); color: var(--pp-fg); }
-html[data-theme] .ac-hint-footer { color: var(--pp-fg-hint); border-top-color: var(--pp-border); background: var(--pp-bg2); }
 html[data-theme] .ac-hint-footer kbd { color: var(--pp-fg); background: var(--pp-bg); border-color: var(--pp-border); box-shadow: none; }
 html[data-theme] .qbtn { background: var(--pp-btn-bg); border-color: var(--pp-btn-bd); color: var(--pp-fg-muted); }
 html[data-theme] .qbtn:hover { background: var(--pp-btn-hover); color: var(--pp-link); }

@@ -289,14 +289,22 @@ function setupTagsInput() {
   const input = $id("tags-input");
   const dropdown = $id("tags-autocomplete");
   let acRaf = 0;
+  // The shell and the list meet on one pixel row, so while the list is open the
+  // shell squares its two bottom corners and the pair reads as one box
+  // (popup.css .tags-input-wrap.ac-open). A class rather than
+  // `:has(+ .autocomplete-dropdown:not(.hidden))`: this runs on every keystroke
+  // in the tag field, which is the popup's hottest path.
+  const wrap = input.closest(".tags-input-wrap");
   function closeAutocomplete() {
     dropdown.classList.add("hidden");
+    wrap?.classList.remove("ac-open");
     input.setAttribute("aria-expanded", "false");
     input.removeAttribute("aria-activedescendant");
     acIndex = -1;
   }
   function openAutocomplete() {
     dropdown.classList.remove("hidden");
+    wrap?.classList.add("ac-open");
     input.setAttribute("aria-expanded", "true");
   }
   /* rAF, not a debounce timer: the filter is an in-memory array scan, so the
