@@ -807,61 +807,71 @@ async function runIdbChecks() {
   const onlyPrefix = (keys, prefix) => keys.length > 0 &&
     keys.every((key) => typeof key === "string" && key.startsWith(prefix));
   const rangeSpy = installSyncReadSpy();
-  const spiedOutbox = await pbpVocabListOutbox(rangeA);
-  const outboxRead = rangeSpy.takeSyncKeys();
-  const spiedNotices = await pbpVocabReadNotices(rangeA);
-  const noticeRead = rangeSpy.takeSyncKeys();
-  const spiedBatches = await pbpVocabListPendingBatches("drive-a", OWNER_HASH_A);
-  const batchRead = rangeSpy.takeSyncKeys();
-  const spiedStates = await pbpVocabListAccountStates(OWNER_HASH_A);
-  const stateRead = rangeSpy.takeSyncKeys();
-  check("outbox, notice and pending-batch reads iterate only their own key range",
-    task3ApiReady &&
-    onlyPrefix(outboxRead, `outbox:${rangeA}:`) &&
-    onlyPrefix(noticeRead, `notice:${rangeA}:`) &&
-    onlyPrefix(batchRead, `batch:drive-a:${OWNER_HASH_A}:`) &&
-    spiedOutbox.length === 3 && spiedOutbox.every((row) => row.owner === rangeA) &&
-    spiedNotices.length === 1 && spiedNotices[0].recordKey === "en|alpha" &&
-    spiedBatches.length === 2 && spiedBatches.every((row) => row.ownerHash === OWNER_HASH_A),
-    JSON.stringify({ outboxRead, noticeRead, batchRead }));
-  // "account:<drivePermissionId>:<ownerHash>" puts the permission id first, so
-  // the range can only narrow to the family: both accounts' rows are read and
-  // the ownerHash comparison still picks the owner, but nothing else is.
-  check("account-state read narrows to the account: family and still filters by owner hash",
-    task3ApiReady && onlyPrefix(stateRead, "account:") && stateRead.length === 2 &&
-    spiedStates.length === 1 && spiedStates[0].ownerHash === OWNER_HASH_A,
-    JSON.stringify(stateRead));
-  check("a sync key whose next character is U+FFFF stays inside its prefix range",
-    task3ApiReady && outboxRead.includes(ffffKey) &&
-    spiedOutbox.some((row) => row.key === ffffKey),
-    JSON.stringify(outboxRead));
-  const spiedSnapshot = await pbpVocabSyncSnapshot(rangeA, OWNER_HASH_A);
-  const snapshotCalls = rangeSpy.takeSyncCalls();
-  const snapshotKeys = snapshotCalls.flatMap((call) => call.keys);
-  check("the settings snapshot reads no record row, no other owner's row and no batch body",
-    snapshotKeys.length > 0 &&
-    !snapshotKeys.some((key) => key === "meta" || key.startsWith("record:") || key.startsWith("preflight:")) &&
-    !snapshotKeys.some((key) => key.startsWith(`outbox:${rangeB}:`) || key.startsWith(`notice:${rangeB}:`)) &&
-    snapshotCalls.filter((call) => call.keys.some((key) => key.startsWith("batch:")))
-      .every((call) => call.method === "getAllKeys") &&
-    spiedSnapshot.states.length === 1 && spiedSnapshot.outbox.length === 3 &&
-    spiedSnapshot.notices.length === 1 && spiedSnapshot.batches.length === 2 &&
-    spiedSnapshot.batches.every((row) => row.ownerHash === OWNER_HASH_A &&
-      row.drivePermissionId === "drive-a" && row.body === undefined),
-    JSON.stringify(snapshotKeys));
-  const spiedCheckpoint = await pbpVocabCheckpointOwner(rangeA);
-  const checkpointRead = rangeSpy.takeSyncKeys();
-  const otherOwnerOutbox = await pbpVocabListOutbox(rangeB);
-  rangeSpy.takeSyncKeys();
-  check("checkpoint rebuilds the outbox from its own record rows and reads nothing else",
-    task3ApiReady && spiedCheckpoint === 2 &&
-    onlyPrefix(checkpointRead, `record:${rangeA}:`) && checkpointRead.length === 2 &&
-    otherOwnerOutbox.length === 1 && otherOwnerOutbox[0].owner === rangeB,
-    JSON.stringify({ spiedCheckpoint, checkpointRead }));
-  const noticesCleared = await pbpVocabClearNotices(rangeA);
-  const clearRead = rangeSpy.takeSyncKeys();
-  const survivingNotices = await pbpVocabReadNotices(rangeB);
-  rangeSpy.restore();
+  // installSyncReadSpy() patches IDBObjectStore.prototype.getAll/getAllKeys
+  // globally; a dozen+ awaits run between here and restore(), so any one of
+  // them throwing would otherwise leave the patched prototype in place for
+  // the rest of the file (deleteVocabDb() and any later failure output would
+  // then run against a monkey-patched IDBObjectStore, same hazard the K144
+  // spy above already guards against with try/finally).
+  let noticesCleared, clearRead, survivingNotices;
+  try {
+    const spiedOutbox = await pbpVocabListOutbox(rangeA);
+    const outboxRead = rangeSpy.takeSyncKeys();
+    const spiedNotices = await pbpVocabReadNotices(rangeA);
+    const noticeRead = rangeSpy.takeSyncKeys();
+    const spiedBatches = await pbpVocabListPendingBatches("drive-a", OWNER_HASH_A);
+    const batchRead = rangeSpy.takeSyncKeys();
+    const spiedStates = await pbpVocabListAccountStates(OWNER_HASH_A);
+    const stateRead = rangeSpy.takeSyncKeys();
+    check("outbox, notice and pending-batch reads iterate only their own key range",
+      task3ApiReady &&
+      onlyPrefix(outboxRead, `outbox:${rangeA}:`) &&
+      onlyPrefix(noticeRead, `notice:${rangeA}:`) &&
+      onlyPrefix(batchRead, `batch:drive-a:${OWNER_HASH_A}:`) &&
+      spiedOutbox.length === 3 && spiedOutbox.every((row) => row.owner === rangeA) &&
+      spiedNotices.length === 1 && spiedNotices[0].recordKey === "en|alpha" &&
+      spiedBatches.length === 2 && spiedBatches.every((row) => row.ownerHash === OWNER_HASH_A),
+      JSON.stringify({ outboxRead, noticeRead, batchRead }));
+    // "account:<drivePermissionId>:<ownerHash>" puts the permission id first, so
+    // the range can only narrow to the family: both accounts' rows are read and
+    // the ownerHash comparison still picks the owner, but nothing else is.
+    check("account-state read narrows to the account: family and still filters by owner hash",
+      task3ApiReady && onlyPrefix(stateRead, "account:") && stateRead.length === 2 &&
+      spiedStates.length === 1 && spiedStates[0].ownerHash === OWNER_HASH_A,
+      JSON.stringify(stateRead));
+    check("a sync key whose next character is U+FFFF stays inside its prefix range",
+      task3ApiReady && outboxRead.includes(ffffKey) &&
+      spiedOutbox.some((row) => row.key === ffffKey),
+      JSON.stringify(outboxRead));
+    const spiedSnapshot = await pbpVocabSyncSnapshot(rangeA, OWNER_HASH_A);
+    const snapshotCalls = rangeSpy.takeSyncCalls();
+    const snapshotKeys = snapshotCalls.flatMap((call) => call.keys);
+    check("the settings snapshot reads no record row, no other owner's row and no batch body",
+      snapshotKeys.length > 0 &&
+      !snapshotKeys.some((key) => key === "meta" || key.startsWith("record:") || key.startsWith("preflight:")) &&
+      !snapshotKeys.some((key) => key.startsWith(`outbox:${rangeB}:`) || key.startsWith(`notice:${rangeB}:`)) &&
+      snapshotCalls.filter((call) => call.keys.some((key) => key.startsWith("batch:")))
+        .every((call) => call.method === "getAllKeys") &&
+      spiedSnapshot.states.length === 1 && spiedSnapshot.outbox.length === 3 &&
+      spiedSnapshot.notices.length === 1 && spiedSnapshot.batches.length === 2 &&
+      spiedSnapshot.batches.every((row) => row.ownerHash === OWNER_HASH_A &&
+        row.drivePermissionId === "drive-a" && row.body === undefined),
+      JSON.stringify(snapshotKeys));
+    const spiedCheckpoint = await pbpVocabCheckpointOwner(rangeA);
+    const checkpointRead = rangeSpy.takeSyncKeys();
+    const otherOwnerOutbox = await pbpVocabListOutbox(rangeB);
+    rangeSpy.takeSyncKeys();
+    check("checkpoint rebuilds the outbox from its own record rows and reads nothing else",
+      task3ApiReady && spiedCheckpoint === 2 &&
+      onlyPrefix(checkpointRead, `record:${rangeA}:`) && checkpointRead.length === 2 &&
+      otherOwnerOutbox.length === 1 && otherOwnerOutbox[0].owner === rangeB,
+      JSON.stringify({ spiedCheckpoint, checkpointRead }));
+    noticesCleared = await pbpVocabClearNotices(rangeA);
+    clearRead = rangeSpy.takeSyncKeys();
+    survivingNotices = await pbpVocabReadNotices(rangeB);
+  } finally {
+    rangeSpy.restore();
+  }
   check("clearing notices reads and deletes only the current owner's notices",
     noticesCleared && onlyPrefix(clearRead, `notice:${rangeA}:`) && clearRead.length === 1 &&
     (await pbpVocabReadNotices(rangeA)).length === 0 &&
