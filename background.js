@@ -193,10 +193,34 @@ async function debouncedCheck(url) {
   if (!url || !url.startsWith("http")) {
     return;
   }
-  // Check if bookmark status icon is enabled
+  // Check if bookmark status icon is enabled. optCheckBookmarkStatus is a plain
+  // key in SETTINGS_DEFAULTS, so it is invalidated by the exact same path as every
+  // other setting: storage.onChanged -> pbpSettingsKeysChanged -> invalidateSettingsCache
+  // (verified — no key of SETTINGS_DEFAULTS escapes that check). So when
+  // _settingsCache is already warm, take the value from it instead of issuing a
+  // second, redundant storage.get: this callback's own next step
+  // (_writeCurrentTabMirror -> getCurrentPinboardAuth -> getCachedToken) calls
+  // loadSettings() unconditionally a few lines down, so a warm cache here can
+  // never skip a settings read that would otherwise not happen. A cold cache
+  // keeps today's single-key get rather than forcing a full loadSettings() read
+  // this early (deliberately not calling loadSettings() itself, so a read
+  // failure stays fail-open through this same catch instead of throwing).
+  // This is a different judgment than extractForPreview's jinaApiKey "Fresh
+  // read — do NOT use loadSettings()" comment further down: that one guards an
+  // API credential handed to an outbound request moments after the user pastes
+  // it into options.js, where the async gap before onChanged's invalidation
+  // lands is exactly the window that matters (same class of concern as this
+  // file's Pinboard-token reread-before-dispatch rule). optCheckBookmarkStatus
+  // is a UI toggle driven by navigation events, not a just-edited credential;
+  // a stale read here at worst runs (or skips) one icon check that self-heals
+  // on the very next navigation, with no security or externally-visible cost.
   try {
-    const { optCheckBookmarkStatus } = await (await getSettingsStorage()).get({ optCheckBookmarkStatus: true });
-    if (!optCheckBookmarkStatus) return;
+    if (_settingsCache) {
+      if (_settingsCache.optCheckBookmarkStatus === false) return;
+    } else {
+      const { optCheckBookmarkStatus } = await (await getSettingsStorage()).get({ optCheckBookmarkStatus: true });
+      if (optCheckBookmarkStatus === false) return;
+    }
   } catch (e) {
     // Storage unavailable — fall through to default behavior (check enabled)
     console.warn("[bookmark-status] settings read failed:", e?.message || e);

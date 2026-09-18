@@ -2003,6 +2003,88 @@ async function run() {
     }
   })();
 
+  // ---------- K11: debouncedCheck reads optCheckBookmarkStatus from the warm
+  // _settingsCache instead of a redundant single-key storage.get, falling back
+  // to today's single-key fresh read only when the cache is cold. Sliced
+  // together with loadSettings/invalidateSettingsCache (they sit contiguously
+  // in background.js) so debouncedCheck's `_settingsCache` reference resolves
+  // to the SAME cache loadSettings() warms/clears -- not a copy. ----------
+  await (async () => {
+    const backgroundSource = await fetch("../background.js").then((response) => response.text());
+    const k11Start = backgroundSource.indexOf("async function debouncedCheck");
+    const k11End = backgroundSource.indexOf("// F7: Track recent saves", k11Start);
+    check("K11 debouncedCheck+_settingsCache: slice found", k11Start >= 0 && k11End > k11Start);
+    try {
+      const k11Source = backgroundSource.slice(k11Start, k11End);
+      const k11Factory = new Function(
+        "SETTINGS_DEFAULTS", "getSettingsStorage", "pbpReadSettingsWithSecrets", "deobfuscateSettings", "checkBookmarked",
+        `let _pinboardAuthEpoch = 0;\nconst _pendingChecks = new Map();\n${k11Source}\n` +
+        `return { debouncedCheck, loadSettings, invalidateSettingsCache, cached: () => _settingsCache };`
+      );
+
+      // Warm cache: loadSettings() has already populated _settingsCache (the
+      // same way this callback's own next step -- getCurrentPinboardAuth ->
+      // getCachedToken -- warms it) -- no storage.get for optCheckBookmarkStatus.
+      {
+        let getCalls = 0, checkCalls = 0;
+        const api = k11Factory(
+          SETTINGS_DEFAULTS,
+          async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
+          async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: true }),
+          deobfuscateSettings,
+          async () => { checkCalls++; return true; }
+        );
+        await api.loadSettings();
+        getCalls = 0; // the warm-up read above isn't the behavior under test
+        await api.debouncedCheck("https://example.com/warm");
+        check("K11 warm cache: debouncedCheck takes optCheckBookmarkStatus from _settingsCache, no storage.get",
+          getCalls === 0 && checkCalls === 1 && api.cached()?.optCheckBookmarkStatus === true);
+      }
+
+      // Cold cache: no prior loadSettings() call, so _settingsCache is still
+      // null -- debouncedCheck must keep today's single-key fresh read, and
+      // must not have warmed _settingsCache as a side effect (no new
+      // invalidation-chain coupling on the cold path).
+      {
+        let getCalls = 0, checkCalls = 0;
+        const api = k11Factory(
+          SETTINGS_DEFAULTS,
+          async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
+          async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: true }),
+          deobfuscateSettings,
+          async () => { checkCalls++; return true; }
+        );
+        await api.debouncedCheck("https://example.com/cold");
+        check("K11 cold cache: debouncedCheck falls back to the single-key storage.get",
+          getCalls === 1 && checkCalls === 1 && api.cached() === null);
+      }
+
+      // Warm cache with the toggle off: the check is skipped entirely, and
+      // still without any storage.get for the disabled key.
+      {
+        let getCalls = 0, checkCalls = 0;
+        const api = k11Factory(
+          SETTINGS_DEFAULTS,
+          async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
+          async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: false }),
+          deobfuscateSettings,
+          async () => { checkCalls++; return true; }
+        );
+        await api.loadSettings();
+        getCalls = 0;
+        await api.debouncedCheck("https://example.com/disabled");
+        check("K11 warm cache with optCheckBookmarkStatus===false: check is skipped, no storage.get",
+          getCalls === 0 && checkCalls === 0);
+      }
+    } catch (error) {
+      for (const name of [
+        "K11 warm cache: debouncedCheck takes optCheckBookmarkStatus from _settingsCache, no storage.get",
+        "K11 cold cache: debouncedCheck falls back to the single-key storage.get",
+        "K11 warm cache with optCheckBookmarkStatus===false: check is skipped, no storage.get",
+      ]) check(name + " -- " + String(error && error.message), false);
+    }
+  })();
+
   // ---------- E5: three-state matrix + migration idempotency ----------
   await (async () => {
     const syncArea = { syncApiKeys: false };
