@@ -72,7 +72,6 @@
      (design-uplift Task 13 step 2) -- same role, same #ffffff value, emitted
      into the generated :root block at the end of @generated:ui-themes below;
      a hand-written duplicate here would just be dead weight. */
-  --pp-label-fg: #62676e;
   /* Scrollbar thumb only — fg-muted is tuned for TEXT (5.2:1) and reads as a
      harsh black bar on the soft-fill surfaces; this stays ≥3:1 vs the bg2
      track (1.4.11 UI-component floor) without shouting. */
@@ -107,12 +106,19 @@
      touching --pp-radius-full users (progress bar, avatars). */
   --pp-radius-tag: var(--pp-radius-full);
 
-  /* Shadow scale */
+  /* Shadow scale. Three rungs, all consumed: xs = the keycap lip on
+     .ac-hint-footer kbd, md = --pp-toast-shadow and .confirm-popover, lg = the
+     autocomplete popover. --pp-shadow-sm and --pp-shadow-focus were retired
+     2026-09-18 (audit N1): neither had a single var() consumer while three
+     sites hand-rolled literals, and the focus one duplicated --pp-focus-ring,
+     which is the token every focus rule in this file actually reads. Unlike
+     --pp-z-popover below, these were never documented as reserved rungs.
+     One literal survives on purpose: html[data-theme] .confirm-popover's
+     `0 2px 8px rgba(0,0,0,0.3)` is a dark-preset depth compensation and no
+     rung on this ladder is that opaque. */
   --pp-shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
-  --pp-shadow-sm: 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --pp-shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
   --pp-shadow-lg: 0 8px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
-  --pp-shadow-focus: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 25%, transparent);
 
   /* === Batch 1 additions (2026-05-18 popup-uiux) === */
   --pp-info-bg: var(--pp-banner-bg);
@@ -141,7 +147,11 @@
   /* One-off page-local tokens (design-uplift Task 13, var()-first hex/rgba
      migration). Real :root defaults only -- no var(--pp-X, literal) fallback
      form (CLAUDE.md single-default-per-token discipline, options.css's
-     Task 12 precedent). Dark values come from the preset blocks in the
+     Task 12 precedent). The seven fallbacks that had drifted back in
+     (--pp-popup-width, --pp-ok-fg x2, --pp-danger, --pp-divider, --pp-accent,
+     --pp-tag-hover, --pp-on-accent) were removed 2026-09-18, audit N2:
+     every one of those tokens resolves on all 15 surfaces, so each literal was
+     a second default nobody would have found when the first one moved. Dark values come from the preset blocks in the
      generated region: the popup's no-preset dark is the flexoki-dark preset
      (theme model 2026-08-25), so there is no separate html.dark layer. */
   --pp-fg-soft: #666;
@@ -165,24 +175,29 @@
      shared fg-muted / border / btn-hover roles now, same as options and
      library (COMPONENTS.md §4.2 leaves .confirm-no hand-written but on real
      role tokens). */
-  --pp-tag-remove-fg: #888;
-  /* Scrim: the tint color()-mix()'d at a low percentage to darken/lighten a
-     surface for a subtle overlay (hover fills, pressed states, hairline
-     borders) without a dedicated token per surface. Always tints AWAY from
-     the background -- black in light mode, white in dark mode (below) --
-     so `color-mix(in srgb, var(--pp-scrim) N%, transparent)` reads as "N%
-     darker/lighter than whatever's underneath" in both modes with the same
-     declaration. design-uplift Task 13 review round: replaces bare #000/
-     #fff literals inside color-mix() and border-shorthand rgba(0,0,0,A)
-     that were exempt from the hex/rgba ratchet by construction (the ratchet
-     already special-cases #000/#fff INSIDE color-mix() as a legitimate
-     "blend a token against black/white" pattern -- this token is what that
-     exemption was meant for, not a literal escape hatch). */
+  /* Scrim: the tint color-mix()'d at a low percentage to darken a surface for
+     a subtle overlay (hover fills, pressed states, hairline borders) without
+     a dedicated token per surface. It replaces bare #000/#fff literals inside
+     color-mix() and border-shorthand rgba(0,0,0,A), which were exempt from the
+     hex/rgba ratchet by construction (the ratchet special-cases #000/#fff
+     INSIDE color-mix() as a legitimate "blend a token against black/white"
+     pattern -- this token is what that exemption was meant for, not a literal
+     escape hatch).
+     It is DEFAULT-SURFACE ONLY, and the comment that used to sit here was
+     wrong about that (2026-09-18 audit S7): it promised a white value "in dark
+     mode (below)", but the html.dark layer was retired with the 2026-08-25
+     theme model and --pp-scrim appears zero times in the generated theme
+     blocks. What makes that safe is that every one of its five consumers has
+     an html[data-theme] twin replacing the mix with a --pp-fg mix -- .fc-details
+     was the sixth and had none, so on dark presets its panel composited to
+     1.03:1 against the card and simply did not exist. It reads the --pp-fg mix
+     directly now, on every surface, which is why it needs no twin. Do NOT add
+     a scrim consumer without one. */
   --pp-scrim: #000;
 }
 
 body {
-  width: var(--pp-popup-width, 550px); max-width: 100%;
+  width: var(--pp-popup-width); max-width: 100%;
   /* At widths >=715px with page zoom above 1, Chrome can clamp the popup at
      its 800 DIP ceiling, leaving a fractional CSS viewport whose rounded
      scrollWidth exceeds clientWidth by one pixel. The body already shrinks
@@ -314,8 +329,8 @@ input[type="checkbox"], input[type="radio"] {
    Segoe UI Emoji and stall ~1.6s on first paint, Windows hi-DPI). currentColor inherits
    the host element's colour; .ok/.bad force green/red where the host has no status colour. */
 .status-ic { display: inline-flex; vertical-align: -2px; }
-.status-ic.ok { color: var(--pp-ok-fg, #2a8a2a); }
-.status-ic.bad { color: var(--pp-danger, #c0392b); }
+.status-ic.ok { color: var(--pp-ok-fg); }
+.status-ic.bad { color: var(--pp-danger); }
 .status-ic svg, .add-all-link svg, .recent-bm-del svg, .recent-bm-edit svg, .offline-queue-remove svg, .offline-queue-retry svg { display: block; }
 
 /* Early section visibility — popup-theme-early.js sets html[data-section] from a synchronous
@@ -511,7 +526,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .fc-details {
   margin-top: var(--pp-sp-3); padding: var(--pp-sp-3) var(--pp-sp-4);
   max-height: 120px; overflow: auto;
-  background: color-mix(in srgb, var(--pp-scrim) 4%, transparent);
+  background: color-mix(in srgb, var(--pp-fg) 6%, transparent);
   font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 11px;
   white-space: pre-wrap; word-break: break-all;
   border-radius: var(--pp-radius-sm);
@@ -630,7 +645,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .row { display: flex; padding: var(--pp-sp-2) var(--pp-sp-5); gap: var(--pp-sp-4); }
 .label {
   width: 52px; flex-shrink: 0; text-align: right;
-  font-weight: bold; font-size: 11px; color: var(--pp-label-fg); padding-top: var(--pp-sp-2); line-height: 1.5;
+  font-weight: bold; font-size: 11px; color: var(--pp-fg-muted); padding-top: var(--pp-sp-2); line-height: 1.5;
 }
 .label.top { padding-top: var(--pp-sp-2); align-self: flex-start; }
 .field { flex: 1; min-width: 0; }
@@ -685,7 +700,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 /* Tag suggestion skeleton — opacity pulse on solid divider color. Gentler than the
    previous horizontal shimmer (which had a 14-unit luminance jump that read as harsh
    on dark backgrounds). var(--pp-divider) is theme-aware: every preset defines it. */
-.tag-skel { display: inline-block; height: 18px; margin: 0 var(--pp-sp-2) var(--pp-sp-1) 0; border-radius: var(--pp-radius-lg); background: var(--pp-divider, #d8d8d8); animation: tagSkelPulse 1.6s ease-in-out infinite; vertical-align: middle; }
+.tag-skel { display: inline-block; height: 18px; margin: 0 var(--pp-sp-2) var(--pp-sp-1) 0; border-radius: var(--pp-radius-lg); background: var(--pp-divider); animation: tagSkelPulse 1.6s ease-in-out infinite; vertical-align: middle; }
 @keyframes tagSkelPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 /* Button-as-link reset: applied when these link-styled classes wrap a <button>
    (so middle-click/Cmd+click don't try to navigate to "#"). */
@@ -747,7 +762,12 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tag-remove {
   display: inline-flex; align-items: center; justify-content: center;
   border: 0; background: none; padding: 0; cursor: pointer;
-  color: var(--pp-tag-remove-fg); line-height: 1; transition: color var(--pp-motion-state);
+  /* --pp-fg-muted, not a literal: --pp-tag-remove-fg (#888) was the only
+     .tag-remove colour on all 15 surfaces and had no themed twin, so it fell
+     to 2.57-2.93:1 against --pp-tag-bg on default / catppuccin-latte /
+     catppuccin-mocha (floor 3:1 for an icon control). The muted role is
+     AA-derived against each theme's own surface. */
+  color: var(--pp-fg-muted); line-height: 1; transition: color var(--pp-motion-state);
   position: relative;
 }
 /* Out-of-flow hit pad: 10px glyph -> ~24px target without touching the chip's
@@ -844,7 +864,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   display: inline-block; padding: 0 var(--pp-sp-2); margin: 0 1px;
   font-family: SFMono-Regular, "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 11px;
   color: var(--pp-fg-muted); background: var(--pp-bg); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-sm);
-  box-shadow: 0 1px 0 rgba(0,0,0,0.04); vertical-align: baseline;
+  box-shadow: var(--pp-shadow-xs); vertical-align: baseline;
 }
 .submit-hint { color: var(--pp-fg-hint); font-size: 11px; margin-left: auto; align-self: center; }
 .kb-hint { color: var(--pp-fg-hint); font-size: 11px; align-self: center; }
@@ -876,7 +896,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .last-used-hint:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 .last-used-hint .lu-label { font-weight: bold; margin-right: var(--pp-sp-2); }
 .last-used-hint .lu-tags { font-style: italic; }
-.tag-copied-flash { color: var(--pp-ok-fg, #2a8a2a) !important; }
+.tag-copied-flash { color: var(--pp-ok-fg) !important; }
 
 .suggest-area { line-height: 1.9; word-wrap: break-word; overflow-wrap: break-word; }
 .suggest-area.muted { padding-top: var(--pp-sp-1); }
@@ -1166,7 +1186,6 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
   filter: invert(1);
 }
 html[data-theme] .batch-progress { background: var(--pp-input-bg); border-color: var(--pp-border); }
-html[data-theme] .batch-progress-fill { background: var(--pp-accent, #4477bb); }
 /* Themed accents (--pp-accent) are often bright/mid (cyan/green/blue) and --pp-fg is
    tuned for body text, so plain --pp-fg over the accent fill fails contrast on all 13
    themes (terminal is fg==accent → invisible). The count text sits over TWO backdrops
@@ -2503,18 +2522,17 @@ html[data-theme] .field > input[type="text"]:focus, html[data-theme] .field > te
 }
 html[data-theme] .tags-input-wrap { background: var(--pp-input-bg); }
 html[data-theme] .tags-input-wrap:focus-within { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
-html[data-theme] .tag-item { background: var(--pp-tag-bg); color: var(--pp-tag-fg); }
-html[data-theme] .tag-item:hover { background: var(--pp-tag-hover, var(--pp-drop-hover)); }
 html[data-theme] .ac-item { color: var(--pp-fg); }
-html[data-theme] .label { color: var(--pp-fg-muted); }
 html[data-theme] .stag.ai { color: var(--pp-accent2); }
 html[data-theme] .action-link { color: var(--pp-accent2); }
 html[data-theme] .regen-link { color: var(--pp-accent2); }
 html[data-theme] .regen-link + .regen-link { border-color: var(--pp-divider); }
 /* Themed skeleton: base rule's var(--pp-divider) already picks the theme's divider color. */
-/* on-accent falls back to the theme bg (the long-standing derivation); themes
-   may pin an explicit --pp-on-accent via pilot ui overrides. */
-html[data-theme] #submit-btn { background: var(--pp-accent); color: var(--pp-on-accent, var(--pp-bg)); border-color: var(--pp-accent); }
+/* No `var(--pp-on-accent, var(--pp-bg))` fallback: the composer emits
+   --pp-on-accent in all 15 blocks (14 presets + the generated default :root),
+   and rules/theme-factory.md names this exact site -- custom-property
+   inheritance makes the fallback dead code either way. */
+html[data-theme] #submit-btn { background: var(--pp-accent); color: var(--pp-on-accent); border-color: var(--pp-accent); }
 html[data-theme] .submit-bar button.loading { color: var(--pp-fg-hint); }
 html[data-theme] .submit-bar button.loading::before, html[data-theme] .action-link.loading::before {
   border-color: var(--pp-spinner-bg); border-top-color: var(--pp-spinner-fg);
