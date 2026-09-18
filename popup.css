@@ -9,7 +9,7 @@
      Theme-invariant, hand-maintained (NOT composer-emitted). Literal 0 and
      1px hairlines stay unscaled. Structural offsets are exempt and stay
      literal at their sites: 72px status-msg field indent, 30px secret-field
-     eye reserve, the 3px .quick-actions hi-DPI clip buffer. */
+     eye reserve. */
   --pp-sp-1: 2px;  /* hairline: chip-internal gaps, micro nudges */
   --pp-sp-2: 4px;  /* tight: chip-flow gap, label-control gaps, button v-inset */
   --pp-sp-3: 6px;  /* snug inset: input/list-item insets */
@@ -598,9 +598,9 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .preset-btn.used::before { background: currentColor; opacity: .5; }
 
 .form-body {
-  /* No bottom inset: the submit bar already carries sp-3 below the button and
-     the quick-actions strip adds its own sp-4 top margin, so a third layer
-     here read as dead space above the strip (user report 2026-09-17). */
+  /* No bottom inset: the submit bar already carries sp-4 below the button and
+     the quick-actions divider sits directly under it, so a third layer here
+     read as dead space above the strip (user report 2026-09-17). */
   padding: var(--pp-sp-4) 0 0;
 }
 /* Unsupported-URL empty state: hide the dead form, keep only #url-warning
@@ -1069,8 +1069,8 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
 .batch-progress {
   position: relative;
   /* symmetric 6px top/bottom so the bar isn't flush against the popup's bottom
-     edge (.quick-actions has only its 3px clip buffer below this). The margins
-     collapse through the border-less wrap, so the cancel button stays centred. */
+     edge (.quick-actions carries no buffer of its own). The margins collapse
+     through the border-less wrap, so the cancel button stays centred. */
   margin: var(--pp-sp-3) 0;
   height: 14px;
   background: var(--pp-input-bg);
@@ -2442,7 +2442,6 @@ html[data-theme] #submit-btn.saved-success { background: var(--pp-ok-bg); border
    ones. */
 html[data-theme] #submit-btn.save-error { background: var(--pp-warn-bg); border-color: var(--pp-warn-bd); color: var(--pp-warn-fg); }
 
-html[data-theme] .quick-actions .divider { border-color: transparent; }
 html[data-theme] .bottom-bar label { color: var(--pp-fg); }
 html[data-theme] .ac-new-hint { color: var(--pp-fg-hint); }
 html[data-theme] .ac-new-hint:hover { background: var(--pp-drop-hover); color: var(--pp-fg); }
@@ -2585,7 +2584,11 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
   flex-wrap: wrap;
   align-items: stretch;
   gap: var(--pp-sp-4);
-  margin-top: var(--pp-sp-3);
+  /* sp-4 below like every other block of the strip: when the strip is the
+     last visible block (default install, empty offline queue, recent list
+     off) this margin is what keeps its rounded bottom edge off the popup's
+     fractional-height floor now that the container has no buffer of its own. */
+  margin: var(--pp-sp-3) 0 var(--pp-sp-4);
   padding: var(--pp-sp-3) var(--pp-sp-4);
   background: var(--pp-bg2);
   border: 1px solid var(--pp-divider);
@@ -2632,8 +2635,8 @@ html[data-theme] .md-strip-btn:focus-visible { border-color: var(--pp-focus-bd);
    reads dpr>=1.5 -> 1.5 x 1.12 = 1.68x total; 200% reads dpr=2 -> 2 x 1.22
    = 2.44x. Known and accepted, not a bug -- 1.12/1.22 are tuned to the
    author's 4K real-machine look; don't "fix" this by touching the values.
-   See the 800 DIP clamp (body width, above) and the .quick-actions 3px
-   clip buffer, which absorb the extra size. options.css dropped this same
+   See the 800 DIP clamp (body width, above) and the sp-4 every block of
+   .quick-actions ends with, which absorb the extra size. options.css dropped this same
    zoom in c50983e0 (2026-07-12, "fractional-pixel hairlines, scale
    desync") -- popup keeps it, a separate real-machine-verified call.
    render-audit runs at dpr=1, so neither tier is gated; to measure hi-DPI
