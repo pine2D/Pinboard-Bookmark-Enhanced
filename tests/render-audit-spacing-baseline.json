@@ -1,21 +1,5 @@
 {
   "version": 1,
   "identity": "surface + `parent > element` (tag.classes or #id, no sibling index) + property + computed px value that is off that surface's live --*-sp-N scale (spacingScale, ui-render-audit family 11). Shrink-only: delete entries as rules migrate to the scale; regenerate deliberately with --write-spacing-baseline. `scale` is informational.",
-  "entries": [
-    {
-      "surface": "popup",
-      "path": "body > div.quick-actions",
-      "prop": "padding-bottom",
-      "value": 3,
-      "scale": [
-        2,
-        4,
-        6,
-        8,
-        12,
-        16,
-        24
-      ]
-    }
-  ]
+  "entries": []
 }

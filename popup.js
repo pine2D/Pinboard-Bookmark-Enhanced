@@ -462,6 +462,15 @@ async function showMain(token) {
     const qr = document.querySelector(".quick-row");
     if (qr) qr.classList.add("hidden");
   }
+  // The section divider only makes sense with a section under it: when every
+  // static block of the strip is switched off (search, links, quick row,
+  // recent list) the strip is 0px tall and the hairline would sit alone at
+  // the popup's bottom edge. The dynamic blocks (offline queue, batch
+  // progress, md strip) carry their own chrome and need no divider.
+  const stripEmpty = !settings.optShowSearch && settings.optShowQuickLinks === false &&
+    settings.optShowQuickRow === false && !settings.optShowRecent;
+  const stripDivider = document.querySelector(".quick-actions .divider");
+  if (stripDivider) stripDivider.classList.toggle("hidden", stripEmpty);
   const searchInput = $id("search-input");
   if (searchInput) {
     searchInput.addEventListener("keydown", (e) => {

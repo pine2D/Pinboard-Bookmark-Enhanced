@@ -165,7 +165,6 @@
      library (COMPONENTS.md §4.2 leaves .confirm-no hand-written but on real
      role tokens). */
   --pp-tag-remove-fg: #888;
-  --pp-recent-bm-border: #e8e8e8;
   /* Scrim: the tint color()-mix()'d at a low percentage to darken/lighten a
      surface for a subtle overlay (hover fills, pressed states, hairline
      borders) without a dedicated token per surface. Always tints AWAY from
@@ -883,7 +882,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .bottom-bar { padding: var(--pp-sp-3) var(--pp-sp-5) var(--pp-sp-2) 72px; display: flex; flex-wrap: wrap; gap: var(--pp-sp-6); font-size: 12px; }
 .bottom-bar label { display: inline-flex; align-items: center; gap: var(--pp-sp-2); cursor: pointer; }
 .bottom-bar input[type="checkbox"]:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
-.submit-bar { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-3) 72px; display: flex; gap: var(--pp-sp-4); } /* button-row gap: sp-4 on every surface (actionRowGap) */
+.submit-bar { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-4) 72px; display: flex; gap: var(--pp-sp-4); } /* button-row gap: sp-4 on every surface (actionRowGap); sp-4 below = the same 8px the quick-actions divider keeps to its first block */
 /* Both buttons in this bar carry class="btn" now, so their chrome (padding,
    border, fill, radius, transition, hover, press, focus, disabled) comes
    from @generated:ui-components. The .submit-bar button base rule that used
@@ -951,7 +950,7 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
 .wayback-indicator { font-size: 0.9em; opacity: 0.85; }
 
 /* Search Bar */
-.search-row { padding: 0 var(--pp-sp-4) var(--pp-sp-3); }
+.search-row { padding: 0 var(--pp-sp-4) var(--pp-sp-4); }
 .search-field {
   width: 100%; padding: var(--pp-sp-2) var(--pp-sp-4);
   border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md);
@@ -963,31 +962,35 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
 .search-field:focus { outline: none; border-color: var(--pp-focus-bd); }
 .search-field:focus-visible { box-shadow: var(--pp-focus-ring); }
 
-/* Quick Actions Bar */
-.quick-actions {
-  margin-top: var(--pp-sp-4);
-  background: var(--pp-bg2);
-  /* Bottom buffer: on hi-DPI the body zoom (1.12/1.22) makes the content height
-     fractional and Chrome floors the popup window height, clipping the last 1-2px
-     — visible on the last row's rounded bottom borders (height sibling of the
-     714px fractional-width bug). Padding (not a child margin) so it can't
-     margin-collapse out of the container and it paints in the strip's own bg.
-     3px: the rounding clip is at most ~2px; anything more reads as dead space. */
-  padding-bottom: 3px;
-}
+/* Quick Actions Bar -- the tools column below the form: search, site links,
+ * the three quick buttons, then the dynamic blocks (batch permission, md
+ * strip, batch progress, offline queue, recent list).
+ * Single tone (2026-09-18 ruling): the strip paints NO fill of its own. It used
+ * to sit on --pp-bg2, but bg2 is lighter than the page in 9 of the 15 popup
+ * palettes and darker in the other 6, so the same rule read as a floating
+ * white card in modern-card and as a recessed tray in the default surface;
+ * either way a hard, uninset edge (user report). One --pp-divider hairline
+ * (the same token the header bar uses for its bottom edge) marks the section
+ * instead, and the strip's rhythm lives on its blocks: each visible block ends
+ * with sp-4 below itself and insets sp-4 left/right, so hiding any block (the
+ * optShow* settings) removes its space with it and an all-hidden strip is 0px
+ * tall -- the container itself carries no margin, padding or fill, and
+ * popup.js hides the divider when every static block is hidden. That also
+ * retires the 3px hi-DPI clip buffer this container used to carry: the last
+ * block's own sp-4 now absorbs the fractional-height floor instead of a
+ * rounded button edge. */
 .quick-actions .divider {
   border: none;
-  /* Soft Fill (COMPONENTS.md §9 law 4): the rule collapses -- the 8px margin
-     below it plus the search field's own fill carry the separation. The
-     border-top declaration stays at 1px so the box keeps its exact height;
-     only the colour goes. */
-  border-top: 1px solid transparent;
-  margin: var(--pp-sp-4) 0 0;
+  border-top: 1px solid var(--pp-divider);
+  margin: 0 0 var(--pp-sp-4);
 }
 .quick-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* Same sp-4 inset as .search-row / .quick-links: the three buttons used to
+     run edge to edge (0..550px) beside a search field inset by 8px. */
+  padding: 0 var(--pp-sp-4) var(--pp-sp-4);
   /* wrap-not-truncate (project rule): de/fr labels fold to a 2+1 second row
      instead of squeezing three nowrap buttons into one. */
   flex-wrap: wrap;
@@ -1215,7 +1218,7 @@ html[data-theme] .batch-progress-text {
   align-items: center;
   justify-content: center;
   gap: var(--pp-sp-2);
-  padding: var(--pp-sp-3) var(--pp-sp-4);
+  padding: 0 var(--pp-sp-4) var(--pp-sp-4);
   font-size: 11px;
 }
 .quick-links a {
@@ -1356,8 +1359,11 @@ html[data-theme] .batch-progress-text {
 
 /* Recent Bookmarks */
 .recent-bm-area {
-  padding: var(--pp-sp-3) var(--pp-sp-4) var(--pp-sp-2);
-  border-top: 1px solid var(--pp-recent-bm-border);
+  /* No hairline: the bold "Recent:" label plus the sp-4 the block above ends
+     with carry the break (user ruling 2026-09-18; the old border-top sat flush
+     under the quick-row buttons and showed through their gaps as a stray 1px
+     line). */
+  padding: 0 var(--pp-sp-4) var(--pp-sp-4);
   font-size: 11px;
   line-height: 1.8;
 }
@@ -2456,7 +2462,6 @@ html[data-theme] .search-field:focus { border-color: var(--pp-focus-bd); }
 html[data-theme] #tags-copy-all:hover { color: var(--pp-accent); }
 html[data-theme] .last-used-hint:hover { color: var(--pp-accent); }
 html[data-theme] .ql-sep { color: var(--pp-fg-hint); }
-html[data-theme] .recent-bm-area { border-color: var(--pp-divider); }
 html[data-theme] .recent-bm-del { color: var(--pp-fg-hint); }
 html[data-theme] .recent-bm-del:hover { color: var(--pp-danger); }
 html[data-theme] .recent-bm-edit { color: var(--pp-fg-hint); }
