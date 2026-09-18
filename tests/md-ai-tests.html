@@ -4689,6 +4689,34 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
     assert(res.freed > 0, "fallback still reports freed bytes");
   });
 
+  // #7 (D2 review, minor): two degrade branches used to disagree on the shape
+  // of `removed` -- one returned the {} the doc comment promises, the other
+  // returned the partially-built map of empty { keys: [], bytes: 0 } rows for
+  // the requested categories (dead code at that point, since nothing was
+  // actually read or removed). Both must now return the exact same {}.
+  await atest("C2-6 reclaim degrade paths (empty catOf / getKeys' get(candidates) failure) share one removed shape", async () => {
+    // Path A: a requested category is valid but matches zero keys in the
+    // store -- returns before any value read (`if (!catOf.size)`).
+    const emptyCatLocal = mockLocal({}, { getKeys: true, getBytesInUse: true });
+    window.chrome = { storage: { local: emptyCatLocal } };
+    const emptyCatRes = await pbpReclaimLocalStorage(["jina"]);
+    assertEq(emptyCatRes.freed, 0, "no matching keys -> freed 0");
+    assertEq(JSON.stringify(emptyCatRes.removed), "{}",
+      "no matching keys -> removed is {} (not a category row map)");
+
+    // Path B: getKeys() finds candidates, but the follow-up get(candidates)
+    // read for their VALUES rejects.
+    const store = freshStore();
+    const partialFailLocal = mockLocal(store, { getKeys: true, getBytesInUse: true });
+    partialFailLocal.get = (arg) => Array.isArray(arg)
+      ? Promise.reject(new Error("boom")) : Promise.resolve(arg == null ? { ...store } : {});
+    window.chrome = { storage: { local: partialFailLocal } };
+    const partialFailRes = await pbpReclaimLocalStorage(["jina"]);
+    assertEq(partialFailRes.freed, 0, "get(candidates) failure -> freed 0");
+    assertEq(JSON.stringify(partialFailRes.removed), "{}",
+      "get(candidates) failure -> removed is {}, same shape as every other degrade path");
+  });
+
   window.chrome = realChrome;
 })();
 </script>

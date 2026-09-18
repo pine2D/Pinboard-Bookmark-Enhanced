@@ -1443,12 +1443,19 @@ async function pbpReclaimLocalStorage(categories, opts) {
       if (pbpKeyMatchesCategory(key, def)) { catOf.set(key, cat); break; } // a key belongs to at most one category
     }
   }
-  if (!catOf.size) return { freed: 0, removed };
+  // Every degrade path in this function returns the SAME shape,
+  // { freed: 0, removed: {} } -- including here, where `removed` already
+  // holds one empty { keys: [], bytes: 0 } row per requested category. That
+  // partially-built map is deliberately NOT what gets returned: this is a
+  // degrade path (nothing was actually measured/removed), and a second,
+  // different "empty" shape for `removed` would be a trap for the first
+  // caller that starts reading removed's contents instead of just freed.
+  if (!catOf.size) return { freed: 0, removed: {} };
   const candidates = [...catOf.keys()];
   if (!values) {
     // getKeys path: this is the ONLY value read, and it is scoped to the keys
     // that are about to be deleted.
-    try { values = await local.get(candidates); } catch (_) { return { freed: 0, removed }; }
+    try { values = await local.get(candidates); } catch (_) { return { freed: 0, removed: {} }; }
     values = values || {};
   }
   const toRemove = [];
