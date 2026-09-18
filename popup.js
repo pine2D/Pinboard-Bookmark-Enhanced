@@ -1231,6 +1231,38 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
           if (cached?.posts) data = { posts: cached.posts };
         } catch (_) {}
       }
+      // K1: a cold miss goes BACK to the worker rather than straight to the
+      // network. The worker resolves it through the same status cache and
+      // in-flight dedup the toolbar icon uses, so this query and the icon's own
+      // check for the same page become one posts/get instead of two competing
+      // for the same rate-limit slot, and the answer is cached for the next
+      // open (the bare proxy path below never wrote it back). forceFresh keeps
+      // the direct call: after a save or delete the cache is exactly what must
+      // not be trusted. A worker that cannot answer (rejected sendMessage) just
+      // falls through to the direct call, unchanged.
+      if (!forceFresh && !data) {
+        let workerError = null;
+        try {
+          const lookupAccount = pbpPinboardAccountFromToken(token);
+          const resolved = await chrome.runtime.sendMessage({ type: "lookup_bookmark", url: lookupUrl, account: lookupAccount });
+          if (resolved?.ok && resolved.account === lookupAccount && Array.isArray(resolved.posts)) {
+            data = { posts: resolved.posts };
+          } else if (resolved && resolved.ok === false) {
+            // This reply did not travel through _pbpProxyPinboardFetch, so the
+            // 401 -> login-screen handoff it owns has to be made here too --
+            // otherwise an invalidated token would leave the popup silently
+            // stuck on a form it can never submit (the catch below stays quiet
+            // on 401 precisely because the login screen is supposed to be up).
+            if (resolved.status === 401) resetPinboardSession();
+            // Same error shape the proxied branch below builds, so the catch
+            // names an account switch and a dead network apart either way.
+            workerError = new Error(`HTTP ${resolved.status || 0}`);
+            workerError.status = resolved.status || 0;
+            if (resolved.error) workerError.code = resolved.error;
+          }
+        } catch (_) { /* worker unreachable — fall through to the direct call */ }
+        if (workerError) throw workerError;
+      }
       if (!data) {
         const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?url=${enc(lookupUrl)}&auth_token=${token}&format=json`);
         // Carry the status on the error so the catch can name the failure

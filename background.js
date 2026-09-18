@@ -2817,6 +2817,64 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     return true;
   }
 
+  // K1: the popup's COLD bookmark lookup, resolved inside the worker instead of
+  // through the bare pinboard_api_call proxy. Three things follow from that:
+  // the popup's request and the toolbar icon's own check for the same page
+  // collapse into one posts/get via _pendingChecks (whichever arrives first
+  // wins; the other awaits it) instead of racing for the same 3.1s rate-limit
+  // slot; the answer lands in statusCache, which the proxy path never wrote, so
+  // the next tab event and the next popup open are free; and the icon is
+  // correct the moment the popup finishes.
+  // NOT debouncedCheck: that one returns early when optCheckBookmarkStatus is
+  // off, and a user who hid the toolbar state still needs the popup to know
+  // whether this page is saved. _dedupedBookmarkCheck is the shared half.
+  // The URL is the popup's verbatim (already-cleaned) lookup URL — the worker
+  // must not re-derive it, or the key would stop matching the caller's query.
+  // Shape copied from mdPreviewBookmarkInfo below, including BOTH account
+  // guards and the "TTL hit without .posts -> one fresh posts/get" rule: the
+  // save / quick-save / batch / skip / offline-queue call sites write status
+  // entries carrying `bookmarked` and no posts, and the popup needs
+  // description/extended/tags/shared/toread to fill its form.
+  if (message.type === "lookup_bookmark" && message.url) {
+    const url = message.url;
+    const refuse = () => sendResponse({ ok: false, status: 0, error: "account_changed", posts: null, account: "" });
+    (async () => {
+      const auth = await getCurrentPinboardAuth();
+      if (!message.account || message.account !== auth.account) { refuse(); return; }
+      if (!auth.token) { refuse(); return; }
+      const freshPosts = () => {
+        const cached = pbpStatusCacheGet(url, auth);
+        return cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts ? cached.posts : null;
+      };
+      let posts = freshPosts();
+      if (!posts) {
+        await _dedupedBookmarkCheck(url, auth);
+        if (!pbpPinboardAuthIsCurrent(auth)) { refuse(); return; }
+        posts = freshPosts();
+      }
+      if (!posts) {
+        // Either the cache entry was posts-less, or the shared check failed —
+        // one fresh lookup settles both, and its result is what gets cached.
+        const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
+        if (!resp.ok) {
+          sendResponse({ ok: false, status: resp.status, error: resp.error || "", posts: null, account: auth.account });
+          return;
+        }
+        const data = await resp.json();
+        posts = data.posts || [];
+        if (!pbpPinboardAuthIsCurrent(auth)) { refuse(); return; }
+        if (!pbpStatusCacheSet(url, auth, { bookmarked: posts.length > 0, timestamp: Date.now(), posts })) { refuse(); return; }
+      }
+      sendResponse({ ok: true, status: 200, posts, account: auth.account });
+    })().catch((e) => {
+      // Fold to the proxy's own failure shape (status 0 + reason) so the popup
+      // names the cause the same way it does for every other proxied call.
+      console.warn("[lookup_bookmark] failed:", e && e.name, e && e.message);
+      sendResponse({ ok: false, status: 0, error: e?.code || "Failed to fetch", posts: null, account: "" });
+    });
+    return true;
+  }
+
   if (message.type === "get_offline_queue") {
     readOfflineQueueWithIds()
       .then((queue) => sendResponse({ ok: true, queue }))

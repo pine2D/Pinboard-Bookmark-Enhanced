@@ -108,9 +108,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
 (async () => {
   try {
-    const [source, backgroundSource, popupAiSource, popupTagsSource, popupHtml, popupCss, enMessages, popupOfflineSource] = await Promise.all([
+    const [source, backgroundSource, sharedSource, popupAiSource, popupTagsSource, popupHtml, popupCss, enMessages, popupOfflineSource] = await Promise.all([
       fetch("../popup.js").then((response) => response.text()),
       fetch("../background.js").then((response) => response.text()),
+      fetch("../shared.js").then((response) => response.text()),
       fetch("../popup-ai.js").then((response) => response.text()),
       fetch("../popup-tags.js").then((response) => response.text()),
       fetch("../popup.html").then((response) => response.text()),
@@ -2643,6 +2644,261 @@ test("posts/add default remains replace=yes for existing callers", () => {
       await harness.run();
       assert(harness.statuses.length === 0, "401 spoke over the login screen: " + JSON.stringify(harness.statuses));
       assert(harness.resets() === 1, "401 did not reset the session exactly once (" + harness.resets() + ")");
+    });
+
+    // ---- K1: the popup's cold lookup is resolved inside the service worker ----
+    // Both halves built from shipped source in ONE scope: the popup's
+    // checkExistingBookmark, and the worker's get_bookmark_data /
+    // lookup_bookmark branches sitting on the real statusCache +
+    // checkBookmarked. A stubbed worker reply would only prove the popup reads
+    // a field; what has to hold is that the popup's prefetch miss and the
+    // toolbar icon's own check collapse into ONE posts/get, that the answer is
+    // left in the cache, and that neither account guard can be talked past.
+    const K1_CLEAN = "https://example.com/article";
+    const K1_TRACKED = K1_CLEAN + "?utm_source=newsletter";
+    const K1_POST = { href: K1_CLEAN, description: "Saved title", extended: "Notes", tags: "alpha beta", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" };
+
+    // `const URL = ...` at the top of this page is a global LEXICAL binding, so
+    // shared.js's own `new URL()` throws here and the shipped global
+    // stripTrackingParams degrades to identity (see the note above the add-tag
+    // runtime). The worker slices below genuinely depend on the strip, so give
+    // them the SAME shipped source re-scoped with the real constructor handed
+    // in -- a tracked-URL case built on the degraded global would pass
+    // vacuously. Everything else it reads (the tier tables, _isOAuthCallback,
+    // _matchHostRule) is an unshadowed shared.js global.
+    const stripStart = sharedSource.indexOf("function stripTrackingParams(");
+    const stripEnd = sharedSource.indexOf("// True when two URLs refer to the same bookmark", stripStart);
+    assert(stripStart >= 0 && stripEnd > stripStart, "stripTrackingParams source not found");
+    const realStripTrackingParams = new Function("URL", sharedSource.slice(stripStart, stripEnd) + "\nreturn stripTrackingParams;")(window.URL);
+    assert(realStripTrackingParams(K1_TRACKED, { enabled: true }).cleaned === K1_CLEAN,
+      "the re-scoped stripTrackingParams is still degraded -- the tracked-URL cases below would pass vacuously");
+
+    function createWorkerLookupHarness({ posts = [K1_POST], token = "alice:token", workerAccount = "alice", seedCache = null, hold = false, brokenWorker = false, unauthorized = false } = {}) {
+      const cacheStart = backgroundSource.indexOf("const statusCache = new Map();");
+      const cacheEnd = backgroundSource.indexOf("// ---- P2: Cached token + invalidation ----", cacheStart);
+      const checkStart = backgroundSource.indexOf("async function debouncedCheck(url) {");
+      const checkEnd = backgroundSource.indexOf("// ---- Load settings with deobfuscation", checkStart);
+      const bookmarkStart = backgroundSource.indexOf("async function checkBookmarked(url, capturedAuth = null) {");
+      const bookmarkEnd = backgroundSource.indexOf("// ---- Badge: unread count ----", bookmarkStart);
+      const branchStart = backgroundSource.indexOf('if (message.type === "get_bookmark_data" && message.url) {');
+      const branchEnd = backgroundSource.indexOf('if (message.type === "get_offline_queue")', branchStart);
+      assert(cacheStart >= 0 && cacheEnd > cacheStart, "worker status cache primitives not found");
+      assert(checkStart >= 0 && checkEnd > checkStart, "worker debouncedCheck not found");
+      assert(bookmarkStart >= 0 && bookmarkEnd > bookmarkStart, "worker checkBookmarked not found");
+      assert(branchStart >= 0 && branchEnd > branchStart, "worker bookmark message branches not found");
+
+      const fetches = [];
+      let release = () => {};
+      const gate = hold ? new Promise((resolve) => { release = resolve; }) : Promise.resolve();
+      // epoch 0 matches the `let _pinboardAuthEpoch = 0` the sliced cache block declares.
+      const workerAuth = { token: workerAccount + ":secret", account: workerAccount, epoch: 0 };
+      const workerFetch = async (requestUrl) => {
+        fetches.push(requestUrl);
+        await gate;
+        if (unauthorized) return { ok: false, status: 401, json: async () => ({}), text: async () => "" };
+        const text = JSON.stringify({ posts });
+        return { ok: true, status: 200, json: async () => JSON.parse(text), text: async () => text };
+      };
+      const urlClean = { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
+      const workerDeps = {
+        SETTINGS_DEFAULTS,
+        stripTrackingParams: realStripTrackingParams,
+        pbpPinboardAccountFromToken,
+        getCurrentPinboardAuth: async () => workerAuth,
+        getSettingsStorage: async () => ({ get: async (defaults) => ({ ...defaults, optCheckBookmarkStatus: true, urlClean }) }),
+        pinboardFetch: workerFetch,
+        console: { warn: () => {} },
+      };
+      const workerNames = Object.keys(workerDeps);
+      const workerBody = [
+        "const _pendingChecks = new Map();",
+        "let _settingsCache = null;",
+        backgroundSource.slice(cacheStart, cacheEnd),
+        backgroundSource.slice(checkStart, checkEnd),
+        backgroundSource.slice(bookmarkStart, bookmarkEnd),
+        "function handleMessage(message, sendResponse) {\n" + backgroundSource.slice(branchStart, branchEnd) + "\n  return false;\n}",
+        "return { handleMessage, debouncedCheck, statusCache, pbpStatusCacheSet, pendingChecks: _pendingChecks };",
+      ].join("\n");
+      const worker = new Function(...workerNames, workerBody)(...workerNames.map((name) => workerDeps[name]));
+      if (seedCache) worker.pbpStatusCacheSet(K1_CLEAN, workerAuth, { timestamp: Date.now(), ...seedCache });
+
+      const sent = [];
+      const statuses = [];
+      const warns = [];
+      let resets = 0;
+      const sendMessage = (message) => {
+        sent.push(message);
+        // The popup's own pinboardFetch is the worker proxy, so a fallback to
+        // the direct path lands on the SAME counter the worker's fetch uses --
+        // "one posts/get" below is a claim about the pair, not about one side.
+        if (message.type === "pinboard_api_call") {
+          return (async () => {
+            const resp = await workerFetch(message.url);
+            return { ok: resp.ok, status: resp.status, text: await resp.text() };
+          })();
+        }
+        if (brokenWorker && message.type === "lookup_bookmark") {
+          return Promise.reject(new Error("Could not establish connection. Receiving end does not exist."));
+        }
+        return new Promise((resolve, reject) => {
+          const handled = worker.handleMessage(message, resolve);
+          if (handled !== true) reject(new Error("Could not establish connection. Receiving end does not exist."));
+        });
+      };
+
+      const elements = {
+        "url-input": createElementStub({ value: K1_CLEAN }),
+        "title-input": createElementStub(),
+        "description-input": createElementStub(),
+        "private-check": createElementStub(),
+        "readlater-check": createElementStub(),
+        "submit-btn": createElementStub(),
+        "delete-btn": createElementStub({ classes: ["hidden"] }),
+        "existing-banner": createElementStub({ classes: ["hidden"] }),
+        "status-msg": createElementStub(),
+      };
+      const dependencies = {
+        chrome: { runtime: { sendMessage } },
+        resetPinboardSession() { resets++; },
+        $id: (id) => (elements[id] ||= createElementStub()),
+        t: (key) => key,
+        showStatus: (...args) => statuses.push(args),
+        console: { warn: (...args) => warns.push(args) },
+        enc: encodeURIComponent,
+        shouldUpdateField: () => true,
+        invalidateBookmarkLookup() {},
+        recomputeArchiveCheck() {},
+        renderTags() {},
+        updateCharCount() {},
+        autoResizeTextarea() {},
+        setTimeout: () => 0,
+        localStorage: { setItem() {} },
+        uiLangToBCP47: () => "en",
+        _activeTabAtOpen: null,
+        pbpRebasePopupTags: rebasePopupTags,
+        pbpParseJsonText,
+        pbpPinboardAccountFromToken,
+        classifyPinboardError,
+        unionTags,
+      };
+      const body = [
+        'let bookmarkLookup = { status: "idle", url: "", generation: 0, promise: null, formLoaded: false };',
+        "let existingBookmark = null;",
+        "let currentTags = [];",
+        "let pinboardFetch, pinboardFetchImmediate;",
+        proxySource,
+        lookupSource,
+        "return { checkExistingBookmark, getTags: () => currentTags };",
+      ].join("\n");
+      const names = Object.keys(dependencies);
+      const built = new Function(...names, body)(...names.map((name) => dependencies[name]));
+      return {
+        worker, workerAuth, elements, fetches, sent, statuses, warns,
+        ask: (message) => sendMessage(message),
+        resets: () => resets,
+        release: () => release(),
+        tick: async () => { for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0)); },
+        run: (prefetch = null) => built.checkExistingBookmark(token, K1_CLEAN, prefetch, false),
+        tags: () => built.getTags(),
+      };
+    }
+
+    await testAsync("K1: a prefetch miss is resolved by the worker, merging with the icon check into one posts/get", async () => {
+      const h = createWorkerLookupHarness({ hold: true });
+      // The toolbar icon check for the same page is already in flight, under
+      // the cleaned URL the popup asks about (K0).
+      const iconCheck = h.worker.debouncedCheck(K1_TRACKED);
+      await h.tick();
+      assert(h.fetches.length === 1, "setup: the icon check did not start a posts/get");
+
+      const prefetch = {
+        prefetchUrl: K1_CLEAN,
+        prefetchPromise: h.ask({ type: "get_bookmark_data", url: K1_CLEAN, account: "alice" }),
+      };
+      assert((await prefetch.prefetchPromise).posts === null, "setup: the cold prefetch unexpectedly hit the cache");
+
+      const running = h.run(prefetch);
+      await h.tick();
+      assert(h.fetches.length === 1,
+        "the popup started its own posts/get while the worker's was in flight: " + JSON.stringify(h.fetches));
+      h.release();
+      const result = await running;
+      await iconCheck;
+
+      assert(h.fetches.length === 1, "expected exactly one posts/get, got " + h.fetches.length + ": " + JSON.stringify(h.fetches));
+      assert(h.fetches[0].includes("url=" + encodeURIComponent(K1_CLEAN)), "the single request did not ask about the cleaned URL");
+      assert(result.status === "found", "the lookup did not find the bookmark: " + JSON.stringify(result));
+      assert(h.elements["submit-btn"].textContent === "update", "the main button still says Save");
+      assert(!h.elements["delete-btn"].classList.contains("hidden"), "Delete stayed hidden on a saved page");
+      assert(h.elements["description-input"].value === "Notes", "the saved notes were not filled in");
+      assert(h.tags().join(" ") === "alpha beta", "the saved tags were not filled in: " + JSON.stringify(h.tags()));
+      assert(!h.elements["existing-banner"].classList.contains("hidden"), "the already-saved banner stayed hidden");
+      assert(h.sent.some((m) => m.type === "lookup_bookmark"), "the popup never asked the worker to resolve the miss");
+      assert(!h.sent.some((m) => m.type === "pinboard_api_call"), "the popup still went to the network itself");
+      const cached = h.worker.statusCache.get(K1_CLEAN);
+      assert(cached && Array.isArray(cached.posts) && cached.posts.length === 1, "the answer was not left in the worker's status cache");
+      assert(h.worker.pendingChecks.size === 0, "the settled check was not removed from _pendingChecks");
+    });
+
+    await testAsync("K1: the worker refuses a bookmark lookup that carries another account", async () => {
+      const h = createWorkerLookupHarness();
+      const mismatched = await h.ask({ type: "lookup_bookmark", url: K1_CLEAN, account: "bob" });
+      assert(mismatched.ok === false && mismatched.posts === null && mismatched.account === "",
+        "a mismatched account was answered: " + JSON.stringify(mismatched));
+      const accountless = await h.ask({ type: "lookup_bookmark", url: K1_CLEAN });
+      assert(accountless.ok === false && accountless.posts === null && accountless.account === "",
+        "an accountless lookup was answered: " + JSON.stringify(accountless));
+      assert(h.fetches.length === 0, "a refused lookup still reached the network: " + JSON.stringify(h.fetches));
+      assert(h.worker.statusCache.size === 0, "a refused lookup still wrote the status cache");
+
+      // End to end: the popup holds bob's token while the worker is on alice --
+      // the refusal has to read as an auth failure, not as a missing bookmark.
+      const popup = createWorkerLookupHarness({ token: "bob:token" });
+      const result = await popup.run(null);
+      assert(result.status === "failed", "a refused lookup was reported as a normal outcome: " + JSON.stringify(result));
+      assert(popup.statuses.length === 1 && popup.statuses[0][1] === "pinboardErrorAuth",
+        "the refusal did not surface as an auth failure: " + JSON.stringify(popup.statuses));
+      assert(popup.fetches.length === 0, "a refused lookup still reached the network from the popup");
+    });
+
+    await testAsync("K1: a TTL cache hit carrying no posts is refreshed with exactly one posts/get", async () => {
+      // The save / quick-save / batch / offline-queue call sites write status
+      // entries that carry `bookmarked` and no posts. checkBookmarked's TTL
+      // branch answers `true` off one of those without going to the network, so
+      // the boolean alone can never fill tags/notes -- the handler owes one
+      // fresh request, and exactly one.
+      const h = createWorkerLookupHarness({ seedCache: { bookmarked: true } });
+      const seeded = h.worker.statusCache.get(K1_CLEAN);
+      assert(seeded && seeded.bookmarked === true && seeded.posts === undefined, "setup: the seeded entry is not posts-less");
+      const result = await h.run(null);
+      assert(h.fetches.length === 1, "expected exactly one fresh posts/get, got " + h.fetches.length + ": " + JSON.stringify(h.fetches));
+      assert(result.status === "found", "the refreshed lookup did not find the bookmark: " + JSON.stringify(result));
+      assert(h.elements["submit-btn"].textContent === "update", "the main button still says Save");
+      assert(h.tags().join(" ") === "alpha beta", "the refreshed posts did not reach the form");
+      const cached = h.worker.statusCache.get(K1_CLEAN);
+      assert(cached && Array.isArray(cached.posts) && cached.posts.length === 1, "the fresh posts were not written back to the cache");
+    });
+
+    await testAsync("K1: a 401 on the worker path still hands off to the login screen", async () => {
+      // The worker path bypasses _pbpProxyPinboardFetch, which owns the
+      // 401 -> resetPinboardSession handoff; the lookup's catch stays silent on
+      // 401 on the assumption that the login screen is already up, so losing
+      // the reset would leave the user on a form that can never submit.
+      const h = createWorkerLookupHarness({ unauthorized: true });
+      const result = await h.run(null);
+      assert(result.status === "failed", "a 401 lookup did not fail: " + JSON.stringify(result));
+      assert(h.resets() === 1, "the worker path reset the session " + h.resets() + " times, expected once");
+      assert(h.statuses.length === 0, "401 spoke over the login screen: " + JSON.stringify(h.statuses));
+    });
+
+    await testAsync("K1: a worker that cannot answer still leaves the popup a working direct lookup", async () => {
+      const h = createWorkerLookupHarness({ brokenWorker: true });
+      const result = await h.run(null);
+      assert(result.status === "found", "the fallback lookup did not find the bookmark: " + JSON.stringify(result));
+      assert(h.sent.some((m) => m.type === "pinboard_api_call"), "the popup never fell back to its own request");
+      assert(h.fetches.length === 1, "the fallback made " + h.fetches.length + " requests: " + JSON.stringify(h.fetches));
+      assert(h.elements["submit-btn"].textContent === "update", "the fallback did not fill the form");
+      assert(h.statuses.length === 0, "a recoverable worker miss was reported to the user: " + JSON.stringify(h.statuses));
     });
 
     // ---- K71: chip / Add-all hand focus back to #tags-input, conditionally ----
