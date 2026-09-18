@@ -5163,6 +5163,61 @@ suiteIf("pbpHlGlobalLocateNormalized", "pbpHlGlobalLocateNormalized", () => {
       { quote: "cat sat", prefix: "", suffix: "" });
     assertEq(r, null, "ambiguous after normalization");
   });
+  // K15: the pool built from `blocks` (one pbpHlWsNormalize call per block)
+  // must be cached by the array's REFERENCE IDENTITY across calls, since
+  // pbpHlRestore's origBlocks() (md-highlight.js) hands back the exact same
+  // array object to every item in one restore pass -- rebuilding it per item
+  // is the O(items x whole-article) cost K15 exists to remove.
+  test("same blocks reference across two calls builds the pool once (per-item quote/prefix/suffix normalization still runs each call)", () => {
+    const real = window.pbpHlWsNormalize;
+    let calls = 0;
+    window.pbpHlWsNormalize = (...args) => { calls++; return real(...args); };
+    try {
+      const blocks = [B(1, "aaa"), B(2, "xx foo\nbar yy"), B(3, "zzz")];
+      pbpHlGlobalLocateNormalized(blocks, { quote: "foo bar", prefix: "xx ", suffix: " yy" });
+      const afterFirst = calls;
+      calls = 0;
+      pbpHlGlobalLocateNormalized(blocks, { quote: "zzz", prefix: "", suffix: "" });
+      // Second call, SAME array reference: only the 3 per-item normalize
+      // calls (quote/prefix/suffix) should run -- zero additional calls for
+      // the 3 pool blocks, since the pool is cached by blocks' identity.
+      assertEq(calls, 3, "pool not rebuilt on same reference: expected 3 per-item calls, got " + calls + " (afterFirst=" + afterFirst + ")");
+    } finally {
+      window.pbpHlWsNormalize = real;
+    }
+  });
+  test("a different array with equal contents rebuilds the pool", () => {
+    const real = window.pbpHlWsNormalize;
+    let calls = 0;
+    window.pbpHlWsNormalize = (...args) => { calls++; return real(...args); };
+    try {
+      const blocksA = [B(1, "aaa"), B(2, "xx foo\nbar yy"), B(3, "zzz")];
+      const blocksB = [B(1, "aaa"), B(2, "xx foo\nbar yy"), B(3, "zzz")]; // same content, new array
+      pbpHlGlobalLocateNormalized(blocksA, { quote: "foo bar", prefix: "xx ", suffix: " yy" });
+      calls = 0;
+      pbpHlGlobalLocateNormalized(blocksB, { quote: "foo bar", prefix: "xx ", suffix: " yy" });
+      // 3 per-item + 3 pool blocks: a new array identity must rebuild even
+      // though its contents are byte-identical to the previous one.
+      assertEq(calls, 6, "new array identity rebuilds the pool: expected 3+3=6 calls, got " + calls);
+    } finally {
+      window.pbpHlWsNormalize = real;
+    }
+  });
+  test("cached pool still resolves correctly across repeated calls on the same reference", () => {
+    const blocks = [B(1, "aaa"), B(2, "xx foo\nbar yy"), B(3, "cat\nsat here")];
+    const r1 = pbpHlGlobalLocateNormalized(blocks, { quote: "foo bar", prefix: "xx ", suffix: " yy" });
+    assert(r1, "first call on cold pool found it");
+    assertEq(r1.n, 2, "first call block n");
+    assertEq(r1.start, 3, "first call original start");
+    assertEq(r1.end, 10, "first call original end");
+    // Second call, same reference -> served from the cached pool -- offsets
+    // must still be correct for a DIFFERENT item/quote in a DIFFERENT block.
+    const r2 = pbpHlGlobalLocateNormalized(blocks, { quote: "cat sat", prefix: "", suffix: " here" });
+    assert(r2, "second call on warm pool found it");
+    assertEq(r2.n, 3, "second call block n");
+    assertEq(r2.start, 0, "second call original start");
+    assertEq(r2.end, 7, "second call original end (spans the newline)");
+  });
 });
 
 suiteIf("pbpHlFpOfBlocks", "pbpHlFpOfBlocks", () => {

@@ -160,18 +160,39 @@ function pbpHlWsNormalize(text) {
 // offsets. NOT skipped when the quote itself has no collapsible runs --
 // the BLOCK text may still differ from the quote only in whitespace shape
 // ("foo bar" vs "foo\nbar"), which is exactly the case this rescues.
+//
+// K15: pbpHlRestore (md-highlight.js) calls this once PER highlight item in
+// its restore loop, always passing the same origBlocks() array for every
+// item in one restore pass -- rebuilding the whole-article normalized pool
+// K times (K = item count) was the O(items x article length) cost this
+// module-level cache removes. Cached by the `blocks` ARRAY'S REFERENCE
+// IDENTITY, not a deep-equality or content hash: origBlocks() builds
+// `_origBlocks` exactly once per pbpHlRestore call and hands back that same
+// object to every item, so same-reference IS "same restore pass, pool still
+// valid" and a new reference (the next pbpHlRestore, which always builds a
+// fresh `_origBlocks` array) IS "article/blocks may have changed, rebuild"
+// -- no explicit invalidation needed, and nothing outlives the blocks array
+// itself (no WeakMap needed either: a single slot is enough since only ONE
+// blocks array is ever "current" within a restore pass).
+let _pbpHlNormPoolSrc = null;
+let _pbpHlNormPool = null;
 function pbpHlGlobalLocateNormalized(blocks, item) {
   const qn = pbpHlWsNormalize(item && item.quote).norm;
   if (!qn) return null;
   const pn = pbpHlWsNormalize(item && item.prefix).norm;
   const sn = pbpHlWsNormalize(item && item.suffix).norm;
-  const normBlocks = [];
-  const maps = new Map();
-  for (const b of (Array.isArray(blocks) ? blocks : [])) {
-    const { norm, map } = pbpHlWsNormalize(b && b.text);
-    normBlocks.push({ n: b.n, text: norm });
-    maps.set(b.n, map);
+  if (blocks !== _pbpHlNormPoolSrc) {
+    const normBlocks = [];
+    const maps = new Map();
+    for (const b of (Array.isArray(blocks) ? blocks : [])) {
+      const { norm, map } = pbpHlWsNormalize(b && b.text);
+      normBlocks.push({ n: b.n, text: norm });
+      maps.set(b.n, map);
+    }
+    _pbpHlNormPoolSrc = blocks;
+    _pbpHlNormPool = { normBlocks, maps };
   }
+  const { normBlocks, maps } = _pbpHlNormPool;
   const hit = pbpHlGlobalLocate(normBlocks, { quote: qn, prefix: pn, suffix: sn });
   if (!hit) return null;
   const map = maps.get(hit.n);
