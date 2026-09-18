@@ -3031,6 +3031,16 @@ async function runSweep(page, sw, extBase) {
     const fb = document.getElementById("ai-error-fallback");
     if (fb && !fb.textContent.trim()) fb.textContent = "Use fallback";
   });
+  // ...except the queue ROWS, which no class toggle can conjure: popup-offline.js
+  // builds .offline-queue-item (and its two icon-only action buttons) only inside
+  // renderList(), which runs on the toggle's click -- `expanded` starts false. The
+  // unhide above therefore measured an EMPTY list for as long as this leg existed,
+  // while its own comment claimed .offline-queue-item > .actions button as covered
+  // (they shipped 17px tall against the 24px floor, 2026-09-18 audit M4). Driving
+  // the toggle is the only way to render them, so this one block is driven, not
+  // unhidden.
+  await page.evaluate(() => document.getElementById("offline-queue-toggle")?.click());
+  await page.waitForSelector(".offline-queue-item", { timeout: TIMEOUT_MS }).catch(() => {});
   await page.waitForTimeout(150);
   add(await page.evaluate(sweepProbe, SWEEP_CFG), "popup", "states");
 

@@ -1363,6 +1363,17 @@ html[data-theme] .batch-progress-text {
   text-overflow: ellipsis;
 }
 .offline-queue-item > .actions { flex-shrink: 0; }
+/* Both children are icon-only (PBP_ICONS.refresh / .cross, injected by
+   popup-offline.js), so the 24px hit floor applies -- COMPONENTS.md §1.4/§1.5.
+   They measured 17x27 until 2026-09-18 (audit M4) because nothing ever saw
+   them: ui-render-audit's popup "states" leg unhid #offline-queue-list by
+   class, but popup-offline.js only builds the rows in renderList(), which runs
+   after the toggle is clicked -- so the sweep measured an empty list. The leg
+   clicks the toggle now. Box shape copied from .recent-bm-del (inline-flex +
+   centring, min-height rather than a fixed height so a longer glyph cannot
+   clip), and `line-height: 1` replaces a unitless 1.4 -- a unitless
+   line-height on a control is the CI-vs-local font drift shape
+   rules/ui-primitives.md warns about. */
 .offline-queue-item > .actions button {
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--pp-scrim) 12%, transparent);
@@ -1371,7 +1382,11 @@ html[data-theme] .batch-progress-text {
   font-size: 11px;
   color: var(--pp-oqa-btn-fg);
   cursor: pointer;
-  line-height: 1.4;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   position: relative;
   transition: background var(--pp-motion-state), color var(--pp-motion-state), border-color var(--pp-motion-state);
 }
