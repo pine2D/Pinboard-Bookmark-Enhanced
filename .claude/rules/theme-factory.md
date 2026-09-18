@@ -22,7 +22,7 @@ paths:
 
 ## 唯一编辑顺序
 
-改 `composers/*.mjs` 或 `pilots/*.tokens.json` → `node docs/theme-surface/tools/sync-all.mjs`（写入并执行 12 道门）→ `node docs/theme-surface/tools/sync-all.mjs --check`（同一管线、严格只读、生成物逐字节一致）→ commit。**禁止手工编辑 `pinboard-themes.js` 与六个 `@generated:*` 区。** CSS 规则、声明和选择器列表统一经 `tools/css-syntax.mjs` 扫描；它保留字符串/注释/嵌套 component value 边界，并把 `@media`/`@supports` 等分组 at-rule 上下文纳入规则身份，工具内禁止再写正则或裸逗号/分号切分器。
+改 `composers/*.mjs` 或 `pilots/*.tokens.json` → `node docs/theme-surface/tools/sync-all.mjs`（写入并执行 13 道门，末道 `node --check pinboard-themes.js`——overrides.css 原样拼进模板字面量，一个反引号能让前 12 道 CSS 解析门全绿而产物是坏 JS）→ `node docs/theme-surface/tools/sync-all.mjs --check`（同一管线、严格只读、生成物逐字节一致）→ commit。**禁止手工编辑 `pinboard-themes.js` 与六个 `@generated:*` 区。** CSS 规则、声明和选择器列表统一经 `tools/css-syntax.mjs` 扫描；它保留字符串/注释/嵌套 component value 边界，并把 `@media`/`@supports` 等分组 at-rule 上下文纳入规则身份，工具内禁止再写正则或裸逗号/分号切分器。
 
 ## 间距边界（design-uplift 修订）
 

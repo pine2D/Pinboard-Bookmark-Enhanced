@@ -75,6 +75,8 @@ try {
   }
   check(syncAllSource.includes('runGate("override-debt"'),
     "sync-all must run the override-debt gate");
+  check(syncAllSource.includes('["--check", resolve(SURFACE, "../../pinboard-themes.js")]'),
+    "sync-all must node --check the generated pinboard-themes.js (overrides.css is spliced into a template literal; a backtick there passes every CSS gate)");
   check(verifySource.includes('node "docs/theme-surface/tools/override-debt.mjs"'),
     "verify must run the repository override-debt baseline gate");
   check(verifySource.includes('node "tests/theme-media-audit-tests.mjs"'),

@@ -157,7 +157,7 @@ A composer that wants to reuse another composer's work can do so — see
 ### Contrast guard (automated)
 
 Every theme passes `tools/contrast-audit.mjs`, which the `tools/sync-all.mjs`
-pipeline runs automatically (12 steps: validate-contracts, render-all,
+pipeline runs automatically (13 steps: validate-contracts, render-all,
 apply-ui-themes --write, dynamic apply-tokens, diff-all --strict,
 contrast-audit, css-region-audit, ui-token-coverage, layout-lint, url-lint,
 recipe-lint, override-debt).

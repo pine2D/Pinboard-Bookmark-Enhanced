@@ -402,7 +402,7 @@ node docs/theme-surface/tools/sync-all.mjs --check   # same pipeline, strict rea
 bash scripts/verify.sh                               # contract/tool tests + all CI gates
 ```
 
-`sync-all` is the orchestrator — 12 steps: `validate-contracts`, `render-all`,
+`sync-all` is the orchestrator — 13 steps: `validate-contracts`, `render-all`,
 `apply-ui-themes --write` (both UI regions), dynamically discovered
 `apply-tokens`, `diff-all --strict`,
 `contrast-audit`, `css-region-audit`, `ui-token-coverage`, `layout-lint`,
