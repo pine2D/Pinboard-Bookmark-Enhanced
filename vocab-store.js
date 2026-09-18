@@ -748,7 +748,10 @@ async function pbpVocabGetSyncMeta() {
 
 async function pbpVocabListAccountStates(ownerHash) {
   if (!_pbpVocabValidOwnerHash(ownerHash)) return [];
-  return (await _pbpVocabSyncRows()).filter((row) =>
+  // "account:<drivePermissionId>:<ownerHash>" puts the permission id first, so
+  // the range can only narrow to the family, not to this owner -- the
+  // ownerHash comparison below is what selects the account, as before.
+  return (await _pbpVocabSyncRows("account:")).filter((row) =>
     row && row.ownerHash === ownerHash && typeof row.key === "string" &&
     row.key.startsWith("account:"));
 }
@@ -766,20 +769,49 @@ async function pbpVocabPutAccountState(state) {
   } catch (_) { return false; }
 }
 
-async function _pbpVocabSyncRows() {
+// Half-open key range holding exactly the keys that start with `prefix`.
+// The upper bound is "last character + 1", exclusive. `prefix + "\uffff"`
+// reads like the same thing but silently drops every key whose first
+// character after the prefix is U+FFFF -- on the outbox path that is a queued
+// row that stays in the store and is never uploaded, i.e. silent data loss on
+// the sync path rather than a visible failure. "last character + 1" is exact
+// for any string prefix and assumes nothing about which code points a key may
+// contain. Every prefix here ends in ":" (U+003A), whose successor ";" is an
+// ordinary BMP character.
+function _pbpVocabSyncPrefixRange(prefix) {
+  return IDBKeyRange.bound(
+    prefix,
+    prefix.slice(0, -1) + String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1),
+    false, true
+  );
+}
+
+// The sync store is one flat keyspace: `meta`, `account:`, `preflight:`,
+// `record:` (one row per word), `outbox:`, `notice:` and `batch:` (a frozen
+// upload body, up to PBP_VOCAB_BATCH_MAX_BYTES apiece) all live in it. An
+// unranged getAll() therefore deserialises every word's metadata and every
+// pending batch body to answer a question about a handful of outbox rows.
+// Each caller knows its own key prefix and reads only that range.
+//
+// This is a read narrowing and nothing more: every caller keeps its JS-side
+// `row.owner === scope` / `row.ownerHash === ownerHash` check, so the worst a
+// wrong range could do is read too few rows -- it can never surface another
+// account's row.
+async function _pbpVocabSyncRows(prefix) {
   const db = await _pbpVocabOpenDB();
-  return await _pbpVocabRequest(db.transaction("sync", "readonly").objectStore("sync").getAll());
+  const sync = db.transaction("sync", "readonly").objectStore("sync");
+  return await _pbpVocabRequest(sync.getAll(_pbpVocabSyncPrefixRange(prefix)));
 }
 
 async function pbpVocabListOutbox(owner) {
   const scope = owner || "ownerless";
-  return (await _pbpVocabSyncRows()).filter((row) =>
+  return (await _pbpVocabSyncRows(`outbox:${scope}:`)).filter((row) =>
     row && row.owner === scope && typeof row.key === "string" &&
     row.key.startsWith(`outbox:${scope}:`));
 }
 
 async function pbpVocabListPendingBatches(drivePermissionId, ownerHash) {
-  return (await _pbpVocabSyncRows()).filter((row) =>
+  return (await _pbpVocabSyncRows(`batch:${drivePermissionId}:${ownerHash}:`)).filter((row) =>
     row && row.drivePermissionId === drivePermissionId && row.ownerHash === ownerHash &&
     typeof row.key === "string" && row.key.startsWith(`batch:${drivePermissionId}:${ownerHash}:`));
 }
@@ -835,7 +867,13 @@ async function pbpVocabCheckpointOwner(owner) {
     done = _pbpVocabTransactionDone(tx);
     const words = tx.objectStore(_PBP_VOCAB_STORE);
     const sync = tx.objectStore("sync");
-    const metadata = (await _pbpVocabRequest(sync.getAll())).filter((row) =>
+    // This getAll() runs inside the [words, sync] readwrite transaction, so
+    // everything it deserialises is deserialised while the lock is held. The
+    // scope's own record: rows are the point of the pass and stay; the range
+    // keeps the other accounts' rows -- and the multi-megabyte frozen batch
+    // bodies -- out of the lock window.
+    const metadata = (await _pbpVocabRequest(
+      sync.getAll(_pbpVocabSyncPrefixRange(`record:${scope}:`)))).filter((row) =>
       row && row.owner === scope && row.key.startsWith(`record:${scope}:`));
     for (const row of metadata) {
       const word = row.deleted ? null : await _pbpVocabRequest(words.get(scope + "|" + row.recordKey));
@@ -1084,20 +1122,50 @@ async function pbpVocabImportRecords(owner, records, limit = 100) {
   };
 }
 
-// One sweep for the whole settings panel. The status read used four separate
-// getAll() passes over the sync store, and every pass deserialises each frozen
-// batch body -- up to PBP_VOCAB_BATCH_MAX_BYTES apiece.
+// A frozen batch row carries its whole upload body -- up to
+// PBP_VOCAB_BATCH_MAX_BYTES -- and the only thing anyone asks a snapshot about
+// batches is how many of them belong to one drivePermissionId. So this path
+// reads KEYS and rebuilds the identity from them rather than pulling
+// multi-megabyte strings through structured clone to answer a `.length`.
+// pbpVocabFreezeOutbox is the sole writer of a `batch:` row and always builds
+// the key with _pbpVocabBatchKey() out of the very fields it stores alongside
+// it, so the key carries the same identity the row fields do, and the
+// ownerHash comparison in the snapshot is the same account check as before.
+// The returned rows carry no `body`: pbpVocabListPendingBatches is the reader
+// for that, and it is the one the upload path uses.
+function _pbpVocabBatchKeyIdentity(key) {
+  if (typeof key !== "string") return null;
+  const parts = key.split(":");
+  if (parts.length < 4 || parts[0] !== "batch") return null;
+  return {
+    key, drivePermissionId: parts[1], ownerHash: parts[2],
+    driveFileId: parts.slice(3).join(":")
+  };
+}
+
+// One sweep for the whole settings panel: four ranged reads in one readonly
+// transaction, so they still observe a single consistent state. Before the
+// ranges this was one unranged getAll() over a keyspace whose `record:` rows
+// number one per word and whose `batch:` rows each carry an upload body, to
+// produce four small filtered lists.
 async function pbpVocabSyncSnapshot(owner, ownerHash) {
   const scope = owner || "ownerless";
-  const rows = await _pbpVocabSyncRows();
+  const hashed = _pbpVocabValidOwnerHash(ownerHash);
+  const db = await _pbpVocabOpenDB();
+  const sync = db.transaction("sync", "readonly").objectStore("sync");
+  const [states, batchKeys, outbox, notices] = await Promise.all([
+    hashed ? _pbpVocabRequest(sync.getAll(_pbpVocabSyncPrefixRange("account:"))) : [],
+    hashed ? _pbpVocabRequest(sync.getAllKeys(_pbpVocabSyncPrefixRange("batch:"))) : [],
+    _pbpVocabRequest(sync.getAll(_pbpVocabSyncPrefixRange(`outbox:${scope}:`))),
+    _pbpVocabRequest(sync.getAll(_pbpVocabSyncPrefixRange(`notice:${scope}:`)))
+  ]);
   const keyed = (row, prefix) => row && typeof row.key === "string" && row.key.startsWith(prefix);
   return {
-    states: _pbpVocabValidOwnerHash(ownerHash)
-      ? rows.filter((row) => keyed(row, "account:") && row.ownerHash === ownerHash) : [],
-    batches: _pbpVocabValidOwnerHash(ownerHash)
-      ? rows.filter((row) => keyed(row, "batch:") && row.ownerHash === ownerHash) : [],
-    outbox: rows.filter((row) => keyed(row, `outbox:${scope}:`) && row.owner === scope),
-    notices: rows.filter((row) => keyed(row, `notice:${scope}:`) && row.owner === scope)
+    states: states.filter((row) => keyed(row, "account:") && row.ownerHash === ownerHash),
+    batches: batchKeys.map(_pbpVocabBatchKeyIdentity)
+      .filter((row) => keyed(row, "batch:") && row.ownerHash === ownerHash),
+    outbox: outbox.filter((row) => keyed(row, `outbox:${scope}:`) && row.owner === scope),
+    notices: notices.filter((row) => keyed(row, `notice:${scope}:`) && row.owner === scope)
   };
 }
 
@@ -1107,7 +1175,7 @@ async function pbpVocabSyncSnapshot(owner, ownerHash) {
 async function pbpVocabClearNotices(owner) {
   const scope = owner || "ownerless";
   try {
-    const rows = await _pbpVocabSyncRows();
+    const rows = await _pbpVocabSyncRows(`notice:${scope}:`);
     const keys = rows.filter((row) =>
       row && typeof row.key === "string" && row.key.startsWith(`notice:${scope}:`) &&
       row.owner === scope).map((row) => row.key);
@@ -1124,7 +1192,7 @@ async function pbpVocabClearNotices(owner) {
 
 async function pbpVocabReadNotices(owner) {
   const scope = owner || "ownerless";
-  return (await _pbpVocabSyncRows()).filter((row) =>
+  return (await _pbpVocabSyncRows(`notice:${scope}:`)).filter((row) =>
     row && row.owner === scope && typeof row.key === "string" &&
     row.key.startsWith(`notice:${scope}:`));
 }

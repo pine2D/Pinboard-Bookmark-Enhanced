@@ -147,16 +147,30 @@ function _pbpAiPoolForKey(key) {
   return "other";
 }
 
+// Half-open range holding exactly the keys that start with `prefix`. The
+// upper bound is "last character + 1", exclusive: `prefix + "\uffff"` reads
+// like the same thing but excludes every key whose first character after the
+// prefix is U+FFFF, and a term or an article URL is arbitrary page text. Such
+// a key would be invisible to both its pool's count and its pool's eviction
+// scan -- it would be filed under "other" in the diagnostics and let the pool
+// grow past its cap. "last character + 1" is exact for any string prefix and
+// assumes nothing about which code points a key may contain; every prefix
+// here ends in "_" (U+005F), whose successor "`" is an ordinary BMP
+// character.
 function _pbpAiPrefixRange(prefix) {
-  return IDBKeyRange.bound(prefix, prefix + "\uffff");
+  return IDBKeyRange.bound(
+    prefix,
+    prefix.slice(0, -1) + String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1),
+    false, true
+  );
 }
 
 function _pbpAiDict2Range() {
   return _pbpAiPrefixRange(_PBP_AI_DICT2_PREFIX);
 }
 
-// "dictctx2_" sorts ABOVE "dict2_￿" ('c' > '2' at index 4), so the two
-// prefix ranges cannot overlap.
+// "dictctx2_" sorts ABOVE the exclusive upper bound "dict2`" ('c' > '2' at
+// index 4), so the two prefix ranges cannot overlap.
 function _pbpAiDictCtxRange() {
   return _pbpAiPrefixRange(_PBP_AI_DICTCTX_PREFIX);
 }
@@ -165,8 +179,9 @@ function _pbpAiSummaryOwnerRange() {
   return _pbpAiPrefixRange(_PBP_AI_SUMMARY_OWNER_PREFIX);
 }
 
-// "trview_" sorts ABOVE "tr_￿" ('v' U+0076 > '_' U+005F at index 2), and no
-// other family starts with "tr_", so this range holds exactly the tr_ pool.
+// "trview_" sorts ABOVE the exclusive upper bound "tr`" ('v' U+0076 > '`'
+// U+0060 at index 2), and no other family starts with "tr_", so this range
+// holds exactly the tr_ pool.
 // Pinned by the "prefix range geometry" test -- an easy invariant to break in
 // a rename; keep the test with the code.
 function _pbpAiTrRange() {

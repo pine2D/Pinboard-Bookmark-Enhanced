@@ -153,6 +153,42 @@ async function putSyncRows(rows) {
   for (const row of rows) tx.objectStore("sync").put(row);
   await idbTxDone(tx);
 }
+// What a reader actually pulled out of the flat sync keyspace, observed at
+// the IndexedDB boundary. The filtered RESULT of every sync reader was already
+// correct before the key ranges, so the result can never tell a narrow read
+// from a whole-table read that filters afterwards -- the set of rows the
+// reader made IndexedDB deserialise is the only oracle that can.
+function installSyncReadSpy() {
+  const calls = [];
+  const getAll = IDBObjectStore.prototype.getAll;
+  const getAllKeys = IDBObjectStore.prototype.getAllKeys;
+  function record(request, store, method, extract) {
+    request.addEventListener("success", () => {
+      calls.push({ store, method, keys: extract(request.result || []) });
+    });
+    return request;
+  }
+  IDBObjectStore.prototype.getAll = function (...args) {
+    return record(getAll.apply(this, args), this.name, "getAll",
+      (rows) => rows.map((row) => row && row.key));
+  };
+  IDBObjectStore.prototype.getAllKeys = function (...args) {
+    return record(getAllKeys.apply(this, args), this.name, "getAllKeys",
+      (keys) => keys.slice());
+  };
+  return {
+    takeSyncCalls() {
+      const taken = calls.filter((call) => call.store === "sync");
+      calls.length = 0;
+      return taken;
+    },
+    takeSyncKeys() { return this.takeSyncCalls().flatMap((call) => call.keys); },
+    restore() {
+      IDBObjectStore.prototype.getAll = getAll;
+      IDBObjectStore.prototype.getAllKeys = getAllKeys;
+    }
+  };
+}
 // The sync row _pbpVocabLocalMutation leaves behind for a registered record,
 // written out by hand rather than replayed through the writer.
 function recordRow(scope, record, deleted = false) {
@@ -716,6 +752,122 @@ async function runIdbChecks() {
     !!freshOutbox && freshOutbox.event.deleted === false && freshOutbox.event.value.gloss === "d" &&
     !!freshMeta && freshMeta.deleted === false);
 
+  // K146: the sync store is one flat keyspace (meta / account: / preflight: /
+  // record: / outbox: / notice: / batch:), so a library with two owners and
+  // every prefix present at once is the only shape that can catch a reader
+  // straying outside its own range.
+  await deleteVocabDb();
+  const rangeA = "acct_range_a";
+  const rangeB = "acct_range_b";
+  const rangeWordsA = [word(rangeA, "alpha"), word(rangeA, "beta")];
+  const rangeWordsB = [word(rangeB, "gamma")];
+  await putLegacyWords(rangeWordsA.concat(rangeWordsB));
+  const rangeOutboxRow = (scope, record) => {
+    const recordKey = pbpDictCacheKeyPublic(record.language, record.term);
+    return {
+      key: `outbox:${scope}:${recordKey}`, owner: scope, recordKey,
+      event: remoteLive(recordKey, "range-device", 4, eventValue(record))
+    };
+  };
+  const rangeNoticeRow = (scope, recordKey) => ({
+    key: `notice:${scope}:${recordKey}`, owner: scope, recordKey,
+    code: "delete-live-conflict", createdAt: 5
+  });
+  const rangeBatchRow = (permissionId, ownerHash, driveFileId) => ({
+    key: `batch:${permissionId}:${ownerHash}:${driveFileId}`,
+    drivePermissionId: permissionId, ownerHash, driveFileId,
+    body: JSON.stringify(batch(ownerHash, [])), createdAt: 6
+  });
+  // A key whose first character after the prefix is U+FFFF -- the one shape an
+  // upper bound of `prefix + "\uffff"` drops. On the outbox path that is a
+  // queued row that stays in the store and is never uploaded: silent loss, not
+  // a visible failure. Written by hand at the store level, because it is the
+  // key range that is under test, not the writer.
+  const ffffKey = `outbox:${rangeA}:\uffffen|omega`;
+  await putSyncRows([
+    ...rangeWordsA.map((record) => recordRow(rangeA, record)),
+    ...rangeWordsB.map((record) => recordRow(rangeB, record)),
+    ...rangeWordsA.map((record) => rangeOutboxRow(rangeA, record)),
+    ...rangeWordsB.map((record) => rangeOutboxRow(rangeB, record)),
+    {
+      key: ffffKey, owner: rangeA, recordKey: "\uffffen|omega",
+      event: remoteLive("en|omega", "range-device", 4, eventValue(word(rangeA, "omega")))
+    },
+    rangeNoticeRow(rangeA, "en|alpha"), rangeNoticeRow(rangeB, "en|gamma"),
+    rangeBatchRow("drive-a", OWNER_HASH_A, "file-a"),
+    rangeBatchRow("drive-a", OWNER_HASH_A, "file-a2"),
+    rangeBatchRow("drive-b", OWNER_HASH_B, "file-b"),
+    { key: `account:drive-a:${OWNER_HASH_A}`, drivePermissionId: "drive-a", ownerHash: OWNER_HASH_A, lastSuccessAt: 9 },
+    { key: `account:drive-b:${OWNER_HASH_B}`, drivePermissionId: "drive-b", ownerHash: OWNER_HASH_B, lastSuccessAt: 8 },
+    {
+      key: `preflight:${OWNER_HASH_A}`, ownerHash: OWNER_HASH_A, retryAttempt: 0,
+      retryAt: 0, lastError: "network", blocked: false
+    }
+  ]);
+  const onlyPrefix = (keys, prefix) => keys.length > 0 &&
+    keys.every((key) => typeof key === "string" && key.startsWith(prefix));
+  const rangeSpy = installSyncReadSpy();
+  const spiedOutbox = await pbpVocabListOutbox(rangeA);
+  const outboxRead = rangeSpy.takeSyncKeys();
+  const spiedNotices = await pbpVocabReadNotices(rangeA);
+  const noticeRead = rangeSpy.takeSyncKeys();
+  const spiedBatches = await pbpVocabListPendingBatches("drive-a", OWNER_HASH_A);
+  const batchRead = rangeSpy.takeSyncKeys();
+  const spiedStates = await pbpVocabListAccountStates(OWNER_HASH_A);
+  const stateRead = rangeSpy.takeSyncKeys();
+  check("outbox, notice and pending-batch reads iterate only their own key range",
+    task3ApiReady &&
+    onlyPrefix(outboxRead, `outbox:${rangeA}:`) &&
+    onlyPrefix(noticeRead, `notice:${rangeA}:`) &&
+    onlyPrefix(batchRead, `batch:drive-a:${OWNER_HASH_A}:`) &&
+    spiedOutbox.length === 3 && spiedOutbox.every((row) => row.owner === rangeA) &&
+    spiedNotices.length === 1 && spiedNotices[0].recordKey === "en|alpha" &&
+    spiedBatches.length === 2 && spiedBatches.every((row) => row.ownerHash === OWNER_HASH_A),
+    JSON.stringify({ outboxRead, noticeRead, batchRead }));
+  // "account:<drivePermissionId>:<ownerHash>" puts the permission id first, so
+  // the range can only narrow to the family: both accounts' rows are read and
+  // the ownerHash comparison still picks the owner, but nothing else is.
+  check("account-state read narrows to the account: family and still filters by owner hash",
+    task3ApiReady && onlyPrefix(stateRead, "account:") && stateRead.length === 2 &&
+    spiedStates.length === 1 && spiedStates[0].ownerHash === OWNER_HASH_A,
+    JSON.stringify(stateRead));
+  check("a sync key whose next character is U+FFFF stays inside its prefix range",
+    task3ApiReady && outboxRead.includes(ffffKey) &&
+    spiedOutbox.some((row) => row.key === ffffKey),
+    JSON.stringify(outboxRead));
+  const spiedSnapshot = await pbpVocabSyncSnapshot(rangeA, OWNER_HASH_A);
+  const snapshotCalls = rangeSpy.takeSyncCalls();
+  const snapshotKeys = snapshotCalls.flatMap((call) => call.keys);
+  check("the settings snapshot reads no record row, no other owner's row and no batch body",
+    snapshotKeys.length > 0 &&
+    !snapshotKeys.some((key) => key === "meta" || key.startsWith("record:") || key.startsWith("preflight:")) &&
+    !snapshotKeys.some((key) => key.startsWith(`outbox:${rangeB}:`) || key.startsWith(`notice:${rangeB}:`)) &&
+    snapshotCalls.filter((call) => call.keys.some((key) => key.startsWith("batch:")))
+      .every((call) => call.method === "getAllKeys") &&
+    spiedSnapshot.states.length === 1 && spiedSnapshot.outbox.length === 3 &&
+    spiedSnapshot.notices.length === 1 && spiedSnapshot.batches.length === 2 &&
+    spiedSnapshot.batches.every((row) => row.ownerHash === OWNER_HASH_A &&
+      row.drivePermissionId === "drive-a" && row.body === undefined),
+    JSON.stringify(snapshotKeys));
+  const spiedCheckpoint = await pbpVocabCheckpointOwner(rangeA);
+  const checkpointRead = rangeSpy.takeSyncKeys();
+  const otherOwnerOutbox = await pbpVocabListOutbox(rangeB);
+  rangeSpy.takeSyncKeys();
+  check("checkpoint rebuilds the outbox from its own record rows and reads nothing else",
+    task3ApiReady && spiedCheckpoint === 2 &&
+    onlyPrefix(checkpointRead, `record:${rangeA}:`) && checkpointRead.length === 2 &&
+    otherOwnerOutbox.length === 1 && otherOwnerOutbox[0].owner === rangeB,
+    JSON.stringify({ spiedCheckpoint, checkpointRead }));
+  const noticesCleared = await pbpVocabClearNotices(rangeA);
+  const clearRead = rangeSpy.takeSyncKeys();
+  const survivingNotices = await pbpVocabReadNotices(rangeB);
+  rangeSpy.restore();
+  check("clearing notices reads and deletes only the current owner's notices",
+    noticesCleared && onlyPrefix(clearRead, `notice:${rangeA}:`) && clearRead.length === 1 &&
+    (await pbpVocabReadNotices(rangeA)).length === 0 &&
+    survivingNotices.length === 1 && survivingNotices[0].owner === rangeB,
+    JSON.stringify(clearRead));
+
   await deleteVocabDb();
 }
 
@@ -723,7 +875,7 @@ async function runIdbChecks() {
   try {
     await runIdbChecks();
   } catch (error) {
-    while (pass + fail < 46) check("IDB harness completed", false, error && (error.stack || error.message));
+    while (pass + fail < 73) check("IDB harness completed", false, error && (error.stack || error.message));
   }
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();

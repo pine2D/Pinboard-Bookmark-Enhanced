@@ -342,6 +342,22 @@ function counts(entries) {
     assert(stats.total === 10, "total=" + stats.total);
   });
 
+  await test("a pool key whose next character is U+FFFF still counts in its own pool", async () => {
+    await clearEntries();
+    // The prefix ranges are what assign a record to a pool, for the counts
+    // here and for that pool's eviction scan. An upper bound of
+    // prefix + "\uffff" drops exactly the keys whose first character after the
+    // prefix is U+FFFF: such a record would be filed under "other" and would
+    // stay invisible to its own pool's pruning, letting the pool grow past its
+    // cap. No key builder produces that shape today -- which is the point: the
+    // bound is exact instead of resting on that, so a future key family cannot
+    // fall out of its pool silently.
+    await seed([{ key: "dict2_\uffff|ghost", result: "x", ts: 1 }]);
+    const stats = await pbpAiCacheStats();
+    assert(stats.pools.dict2 === 1 && stats.pools.other === 0, JSON.stringify(stats));
+    assert(stats.total === 1, "total=" + stats.total);
+  });
+
   await test("pbpAiCacheStats never serialises a URL- or account-shaped key", async () => {
     await clearEntries();
     await seed([
