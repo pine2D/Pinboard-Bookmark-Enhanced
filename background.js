@@ -2633,14 +2633,23 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         typeof sender.url === "string" && /^https:\/\/([a-z0-9-]+\.)?pinboard\.in\//.test(sender.url) &&
         message.type === "get_site_prefs") {
       (async () => {
-        const s = await loadSettings();
-        const overlay = await pbpWithLargeStorageLock("customOverlayCSS", () =>
-          pbpReadLargeWithFallbackUnlocked("customOverlayCSS", async () => {
-            try {
-              const st = await getSettingsStorage();
-              return (await st.get("customOverlayCSS")).customOverlayCSS;
-            } catch (_) { return ""; }
-          }, ""));
+        // K19: loadSettings() and the overlay-CSS read have no data
+        // dependency on each other (the overlay reader's readMeta calls
+        // getSettingsStorage() itself, not `s`), so run them concurrently —
+        // the overlay Web Lock + storage.get calls stop sitting behind the
+        // settings read in this cloak-blocked critical path. A rejection
+        // from either side still rejects the combined promise and is caught
+        // below exactly as it was when the two awaits were sequential.
+        const [s, overlay] = await Promise.all([
+          loadSettings(),
+          pbpWithLargeStorageLock("customOverlayCSS", () =>
+            pbpReadLargeWithFallbackUnlocked("customOverlayCSS", async () => {
+              try {
+                const st = await getSettingsStorage();
+                return (await st.get("customOverlayCSS")).customOverlayCSS;
+              } catch (_) { return ""; }
+            }, "")),
+        ]);
         sendResponse({
           customFont: String(s.customFont || ""),
           optTheme: String(s.optTheme || "auto"),

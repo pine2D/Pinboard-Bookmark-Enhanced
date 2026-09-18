@@ -666,7 +666,11 @@ function buildUndoHarness(source, opts) {
       notifySaveFailure: spy("notifyFail"),
       handleBatchSave: spy("batchSave", Promise.resolve()),
       handleSaveTabSet: spy("saveTabSet", Promise.resolve()),
-      loadSettings: async () => ({}),
+      // K19: overridable via opts.loadSettings so a test can hand back a
+      // deferred promise and prove the overlay lock below is not waiting on
+      // it to settle first (concurrency), without disturbing every other
+      // test in this harness that just wants the default {}.
+      loadSettings: o.loadSettings || (async () => ({})),
       pbpWaybackArchive: spy("wayback", Promise.resolve()),
       pbpIsAllowedPinboardApiUrl: (u) => String(u).startsWith("https://api.pinboard.in/v1/"),
       pbpAuthorizePinboardApiUrl: (u) => u,
@@ -686,7 +690,9 @@ function buildUndoHarness(source, opts) {
       deobfuscateKey: (v) => v,
       showNotification: spy("notify"),
       t: (k, ...a) => (a.length ? `${k}:${a.join(":")}` : k),
-      pbpWithLargeStorageLock: (key, fn) => fn(),
+      // K19: overridable via opts.pbpWithLargeStorageLock for the same
+      // concurrency proof as loadSettings above.
+      pbpWithLargeStorageLock: o.pbpWithLargeStorageLock || ((key, fn) => fn()),
       pbpReadLargeWithFallbackUnlocked: async (key, read, dflt) => (await read()) ?? dflt,
       getSettingsStorage: async () => ({ get: async () => ({ customOverlayCSS: "/*ov*/" }) }),
       console,
@@ -836,6 +842,40 @@ function buildUndoHarness(source, opts) {
       p.optTheme === "auto" && p.overlayCss === "/*ov*/" &&
       !("pinboardToken" in p) && !Object.keys(p).some((k) => /token|key/i.test(k) && k !== "themePresetKey") &&
       smuggle.responses[0]?.error === "forbidden");
+  }
+  // ---- K19: get_site_prefs parallelizes loadSettings() with the overlay-CSS
+  // lock+read (previously two serial awaits). The response shape must stay
+  // byte-identical, and the two reads must actually run concurrently rather
+  // than the parallelization being a no-op refactor.
+  {
+    const h = buildRouterHarness();
+    const site = { id: EXT_ID, url: "https://pinboard.in/u:alice/t:tag" };
+    const prefs = await h.invoke({ type: "get_site_prefs" }, site);
+    const expected = { customFont: "", optTheme: "auto", themePresetKey: "", overlayCss: "/*ov*/", tagSortByPopEnabled: true };
+    check("router: get_site_prefs response is byte-identical to the pre-K19 serial shape",
+      JSON.stringify(prefs.responses[0]) === JSON.stringify(expected));
+  }
+  {
+    // Stub loadSettings with a promise that never settles until released, and
+    // prove the overlay lock is invoked before that release -- RED under the
+    // old `await loadSettings(); await pbpWithLargeStorageLock(...)` serial
+    // code, which cannot call the lock helper until loadSettings resolves.
+    let releaseSettings = null;
+    const settingsPromise = new Promise((resolve) => { releaseSettings = () => resolve({}); });
+    const lockCalls = [];
+    const h = buildRouterHarness({
+      loadSettings: () => settingsPromise,
+      pbpWithLargeStorageLock: (key, fn) => { lockCalls.push(key); return fn(); },
+    });
+    const site = { id: EXT_ID, url: "https://pinboard.in/u:alice/t:tag" };
+    const pending = h.invoke({ type: "get_site_prefs" }, site);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    check("router: get_site_prefs starts the overlay-CSS lock before loadSettings resolves (K19 concurrency)",
+      lockCalls.includes("customOverlayCSS"));
+    releaseSettings();
+    const r = await pending;
+    check("router: get_site_prefs still resolves the full response once the deferred loadSettings settles",
+      r.responses[0]?.optTheme === "auto" && r.responses[0]?.overlayCss === "/*ov*/");
   }
 
   // ---- K12: pbpImgFixSweepRules startup scan scopes its tabs.query() to a
