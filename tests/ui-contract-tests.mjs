@@ -2766,7 +2766,7 @@ check(/@media[^{]*\(max-height:[^)]*\)\s*\{[\s\S]*?\.options-nav\s*\{[^}]*positi
     `options.css: disabled checkbox rows keep full-contrast text in ${missing.map((c) => "." + c).join(", ")} -- the user cannot tick them and the page never says why`);
 }
 
-function runOptionsEarly({ mode = "auto", preset = "", dark = false, chrome } = {}) {
+function runOptionsEarly({ mode = "auto", preset = "", dark = false, syncMirror, chrome } = {}) {
   // dataset is a Proxy that counts real mutations (K33): the write-only-on-
   // change guard is the actual product of the options-theme-early.js fix,
   // so tests need to see how many times dataset.theme was actually touched,
@@ -2784,6 +2784,10 @@ function runOptionsEarly({ mode = "auto", preset = "", dark = false, chrome } = 
   });
   const root = { dataset };
   const values = new Map([["pp-theme", mode], ["pp-theme-preset", preset]]);
+  // task-7/K5: "pp-sync-enabled" is only seeded when a test explicitly asks
+  // for it, so the pre-existing tests above (which pass no syncMirror) keep
+  // exercising the two-hop fallback path unchanged.
+  if (syncMirror !== undefined) values.set("pp-sync-enabled", syncMirror);
   const timers = [];
   const context = {
     document: { documentElement: root, addEventListener() {}, getElementById() { return null; } },
@@ -2921,7 +2925,7 @@ check(corrected.values.get("pp-theme") === "light" && corrected.values.get("pp-t
 // stated rules, not against the twin's own source (a self-referential
 // "diff the two copies" check would pass even if both sides drifted the
 // same way).
-function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = false, search = "", chrome } = {}) {
+function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = false, search = "", syncMirror, chrome } = {}) {
   const root = { style: {} };
   const links = {
     "hljs-light-link": { media: "(prefers-color-scheme: light)" },
@@ -2936,6 +2940,9 @@ function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = fals
     ["md-preview-scheme", override],
     ["md-preview-video-dark", videoDark ? "1" : "0"],
   ]);
+  // task-7/K5: only seeded when a test asks for it, so every pre-existing
+  // caller above (no syncMirror) keeps exercising the two-hop fallback.
+  if (syncMirror !== undefined) values.set("pp-sync-enabled", syncMirror);
   const context = {
     // videoMode (line 33) is read from location.search at parse time, not a
     // constructor argument -- this is the one input runOptionsEarly's
@@ -3031,6 +3038,173 @@ function expectedReaderResolve(mode) {
     readerCorrected.links["hljs-light-link"].media === "not all" &&
     readerCorrected.links["hljs-dark-link"].media === "all",
     "md-preview-theme-early.js: chrome.storage correction (override=dark) did not re-seed the mirrors and re-apply the resolved scheme");
+}
+
+// ============ task-7/K5: "pp-sync-enabled" one-hop mirror merge ============
+// All three theme-early scripts read the localStorage mirror shared.js keeps
+// current on every authoritative settings read/write (shared.js:
+// getSettingsStorage's sync fast-path, its onChanged invalidation listener,
+// and pbpReadSettingsWithSecrets -- the last one refreshes it on every popup/
+// options/library open, so the mirror is hit in steady state). A hit lets
+// each script's optSyncEnabled hop collapse: popup and options skip the
+// local.get({optSyncEnabled}) round trip outright and read the routed area
+// directly; the reader (which also needs the local-only pbp_color_scheme key
+// in the same hop) instead fires its local + routed-area reads CONCURRENTLY
+// once the mirror picks the area. A miss (first run / cleared site data)
+// must fall back to today's two-hop chain byte-for-byte.
+//
+// countingArea/countingLocalDual wrap a storage.get so a test can assert not
+// just the end VALUE (already covered above) but the CALL SHAPE -- how many
+// times, and with which defaults, chrome.storage.{local,sync}.get fired --
+// which is the actual product of this task (CLAUDE.md: assertions must
+// question the category, and "was this hop skipped" can only be answered
+// from what the code actually called, not from the value it settled on).
+function countingArea(response) {
+  let calls = 0;
+  return { get: () => { calls++; return Promise.resolve(response); }, count: () => calls };
+}
+function countingLocalDual(syncEnabledResponse, themeResponse) {
+  let calls = 0;
+  return {
+    get: (defaults) => {
+      calls++;
+      return Promise.resolve(Object.prototype.hasOwnProperty.call(defaults, "optSyncEnabled")
+        ? syncEnabledResponse : themeResponse);
+    },
+    count: () => calls,
+  };
+}
+
+// Twin of runOptionsEarly/runReaderEarly above: popup-theme-early.js had no
+// VM harness at all before this task (only extractAdaptiveMapLiteral's
+// static text parse). Only exercises the async tail (section 41-107 of the
+// file) relevant to the mirror merge; applyTabMirror's DOMContentLoaded path
+// is inert here (no "pp-last-tab" seeded, same abstinence runOptionsEarly
+// shows toward fields it does not need).
+function runPopupEarly({ syncMirror, chrome } = {}) {
+  const datasetStore = {};
+  const dataset = new Proxy(datasetStore, {
+    set(target, prop, value) { target[prop] = value; return true; },
+    deleteProperty(target, prop) { delete target[prop]; return true; },
+  });
+  const styleProps = {};
+  const root = { dataset, style: { setProperty(k, v) { styleProps[k] = v; } } };
+  const values = new Map();
+  if (syncMirror !== undefined) values.set("pp-sync-enabled", syncMirror);
+  const context = {
+    document: { documentElement: root, addEventListener() {}, getElementById() { return null; } },
+    window: { matchMedia: () => ({ matches: false }) },
+    localStorage: {
+      getItem: key => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, String(value)),
+    },
+    chrome,
+  };
+  runInNewContext(popupThemeEarlyJs, context);
+  return { root, values, styleProps };
+}
+
+// --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---
+{
+  const syncArea = countingArea({ optTheme: "dark", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 600 });
+  const localSpy = countingArea({});
+  const run = runPopupEarly({ syncMirror: "1", chrome: { storage: { sync: syncArea, local: localSpy } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(localSpy.count() === 0,
+    'popup-theme-early.js: pp-sync-enabled mirror "1" still called chrome.storage.local.get (the optSyncEnabled hop was not skipped)');
+  check(syncArea.count() === 1,
+    'popup-theme-early.js: pp-sync-enabled mirror "1" did not read the sync area in exactly one hop');
+  check(run.values.get("pp-theme") === "dark" && run.root.dataset.theme === "flexoki-dark",
+    'popup-theme-early.js: pp-sync-enabled mirror "1" did not apply/mirror the sync-area theme correctly');
+}
+
+// --- popup-theme-early.js: mirror "0" picks local directly, exactly one hop ---
+{
+  const localArea = countingArea({ optTheme: "light", themePresetKey: "dracula", optPopupFollowTheme: true, popupWidth: 480 });
+  const run = runPopupEarly({ syncMirror: "0", chrome: { storage: { local: localArea, sync: countingArea({}) } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(localArea.count() === 1,
+    'popup-theme-early.js: pp-sync-enabled mirror "0" did not read the local area in exactly one hop');
+  check(run.values.get("pp-theme") === "light" && run.root.dataset.theme === "dracula",
+    'popup-theme-early.js: pp-sync-enabled mirror "0" did not apply/mirror the local-area theme correctly');
+}
+
+// --- popup-theme-early.js: missing mirror falls back to the original two-hop chain ---
+{
+  const localDual = countingLocalDual({ optSyncEnabled: false },
+    { optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 550 });
+  const syncSpy = countingArea({});
+  runPopupEarly({ chrome: { storage: { local: localDual, sync: syncSpy } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(localDual.count() === 2 && syncSpy.count() === 0,
+    "popup-theme-early.js: a missing pp-sync-enabled mirror did not fall back to the original two-hop local-only chain");
+}
+
+// --- options-theme-early.js: same three cases over its boot-time hop ---
+{
+  const syncArea = countingArea({ optTheme: "dark", themePresetKey: "flexoki", optPopupFollowTheme: true });
+  const localSpy = countingArea({});
+  const run = runOptionsEarly({ syncMirror: "1", dark: true, chrome: { storage: { sync: syncArea, local: localSpy } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(localSpy.count() === 0,
+    'options-theme-early.js: pp-sync-enabled mirror "1" still called chrome.storage.local.get on boot (the optSyncEnabled hop was not skipped)');
+  check(syncArea.count() === 1,
+    'options-theme-early.js: pp-sync-enabled mirror "1" did not read the sync area in exactly one hop on boot');
+  check(run.root.dataset.theme === "flexoki-dark",
+    'options-theme-early.js: pp-sync-enabled mirror "1" did not apply the sync-area theme correctly on boot');
+}
+{
+  const localArea = countingArea({ optTheme: "light", themePresetKey: "dracula", optPopupFollowTheme: true });
+  const run = runOptionsEarly({ syncMirror: "0", chrome: { storage: { local: localArea, sync: countingArea({}) } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(localArea.count() === 1,
+    'options-theme-early.js: pp-sync-enabled mirror "0" did not read the local area in exactly one hop on boot');
+  check(run.root.dataset.theme === "dracula",
+    'options-theme-early.js: pp-sync-enabled mirror "0" did not apply the local-area theme correctly on boot');
+}
+{
+  const localDual = countingLocalDual({ optSyncEnabled: false },
+    { optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true });
+  const syncSpy = countingArea({});
+  runOptionsEarly({ chrome: { storage: { local: localDual, sync: syncSpy } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(localDual.count() === 2 && syncSpy.count() === 0,
+    "options-theme-early.js: a missing pp-sync-enabled mirror did not fall back to the original two-hop chain on boot");
+}
+
+// --- md-preview-theme-early.js: mirror "1" fires local(pbp_color_scheme) + sync(theme) concurrently ---
+{
+  const localArea = countingArea({ pbp_color_scheme: "dark" });
+  const syncArea = countingArea({ optTheme: "light", mdVideoDarkScheme: false });
+  const run = runReaderEarly({ syncMirror: "1", chrome: { storage: { local: localArea, sync: syncArea } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(localArea.count() === 1 && syncArea.count() === 1,
+    'md-preview-theme-early.js: pp-sync-enabled mirror "1" did not read local(pbp_color_scheme) and sync(theme keys) exactly once each');
+  check(run.values.get("md-preview-theme") === "light" && run.values.get("md-preview-scheme") === "dark",
+    'md-preview-theme-early.js: pp-sync-enabled mirror "1" did not re-seed the mirrors from the concurrent reads');
+}
+
+// --- md-preview-theme-early.js: mirror "0" folds pbp_color_scheme + theme keys into ONE local.get ---
+{
+  const localArea = countingArea({ pbp_color_scheme: "light", optTheme: "dark", mdVideoDarkScheme: true });
+  const run = runReaderEarly({ syncMirror: "0", chrome: { storage: { local: localArea, sync: countingArea({}) } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(localArea.count() === 1,
+    'md-preview-theme-early.js: pp-sync-enabled mirror "0" did not fold pbp_color_scheme and the theme keys into a single chrome.storage.local.get call');
+  check(run.values.get("md-preview-theme") === "dark" && run.values.get("md-preview-scheme") === "light" &&
+    run.values.get("md-preview-video-dark") === "1",
+    'md-preview-theme-early.js: pp-sync-enabled mirror "0" did not re-seed the mirrors from the merged local read');
+}
+
+// --- md-preview-theme-early.js: missing mirror falls back to the original two-hop chain ---
+{
+  const localDual = countingLocalDual({ optSyncEnabled: false, pbp_color_scheme: "auto" },
+    { optTheme: "auto", mdVideoDarkScheme: false });
+  const syncSpy = countingArea({});
+  runReaderEarly({ chrome: { storage: { local: localDual, sync: syncSpy } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(localDual.count() === 2 && syncSpy.count() === 0,
+    "md-preview-theme-early.js: a missing pp-sync-enabled mirror did not fall back to the original two-hop local-only chain");
 }
 
 const optionsHead = optionsHtml.slice(optionsHtml.indexOf("<head>"), optionsHtml.indexOf("</head>"));

@@ -61,7 +61,19 @@ const PBP_POPUP_ADAPTIVE_MAP = {
 })();
 
 // Async source-of-truth read — corrects mirror if stale, populates on first run.
-chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {
+// The optSyncEnabled hop below has its own localStorage mirror ("pp-sync-enabled",
+// written by shared.js on every authoritative settings read/write -- see
+// getSettingsStorage() and pbpReadSettingsWithSecrets()). A hit lets the two-hop
+// chain collapse into one: the area for the theme-keys read is chosen straight
+// from the mirror instead of waiting on a chrome.storage.local IPC round trip
+// first. A miss (first run, cleared site data, private mode) falls back to the
+// original two-hop chain unchanged.
+let _optSyncMirror = null;
+try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
+(_optSyncMirror === "1" || _optSyncMirror === "0"
+  ? Promise.resolve({ optSyncEnabled: _optSyncMirror === "1" })
+  : chrome.storage.local.get({ optSyncEnabled: false })
+).then(({ optSyncEnabled }) => {
   return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
     .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 550 });
 }).then(s => {

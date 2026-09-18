@@ -67,13 +67,50 @@
   } catch (_) { /* localStorage unavailable (rare); CSS default (auto) already applies */ }
 
   // 2) Async source-of-truth read -- corrects the mirrors if stale, seeds them
-  //    on first run. Mirrors popup-theme-early.js's async tail exactly.
+  //    on first run. Mirrors popup-theme-early.js's async tail exactly, plus
+  //    the same one-hop merge: "pp-sync-enabled" is the localStorage mirror
+  //    shared.js writes on every authoritative settings read/write. Unlike
+  //    popup's hop, this file's first read also needs pbp_color_scheme (a
+  //    local-only, never-synced key), so the merge has two shapes:
+  //      - mirror "0" (local): pbp_color_scheme and the theme keys are both
+  //        local-only, so they fold into ONE chrome.storage.local.get call --
+  //        a true single hop.
+  //      - mirror "1" (sync): the theme keys live in a different area than
+  //        pbp_color_scheme, so both reads fire CONCURRENTLY via Promise.all
+  //        instead of the local.get({optSyncEnabled}) round trip gating the
+  //        area read first -- one round trip's worth of latency instead of
+  //        two in series.
+  //    A mirror miss (first run, cleared site data) falls back to the
+  //    original two-hop chain unchanged.
   if (typeof chrome === "undefined" || !chrome.storage) return;
   var override = "auto";
-  chrome.storage.local.get({ optSyncEnabled: false, pbp_color_scheme: "auto" }).then(function (l) {
-    override = l.pbp_color_scheme || "auto";
-    return (l.optSyncEnabled ? chrome.storage.sync : chrome.storage.local).get({ optTheme: "auto", mdVideoDarkScheme: false });
-  }).then(function (s) {
+  var _optSyncMirror = null;
+  try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
+
+  var _firstHop;
+  if (_optSyncMirror === "0") {
+    _firstHop = chrome.storage.local
+      .get({ pbp_color_scheme: "auto", optTheme: "auto", mdVideoDarkScheme: false })
+      .then(function (l) {
+        override = l.pbp_color_scheme || "auto";
+        return l;
+      });
+  } else if (_optSyncMirror === "1") {
+    _firstHop = Promise.all([
+      chrome.storage.local.get({ pbp_color_scheme: "auto" }),
+      chrome.storage.sync.get({ optTheme: "auto", mdVideoDarkScheme: false })
+    ]).then(function (pair) {
+      override = pair[0].pbp_color_scheme || "auto";
+      return pair[1];
+    });
+  } else {
+    _firstHop = chrome.storage.local.get({ optSyncEnabled: false, pbp_color_scheme: "auto" }).then(function (l) {
+      override = l.pbp_color_scheme || "auto";
+      return (l.optSyncEnabled ? chrome.storage.sync : chrome.storage.local).get({ optTheme: "auto", mdVideoDarkScheme: false });
+    });
+  }
+
+  _firstHop.then(function (s) {
     var mode = s.optTheme || "auto";
     var videoDark = s.mdVideoDarkScheme === true;
     try {

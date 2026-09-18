@@ -140,7 +140,17 @@ if (typeof chrome !== "undefined" && chrome.storage?.local) {
   // a slower earlier one never overwrites it.
   let _optionsThemeGen = 0;
   const _optionsBootGen = ++_optionsThemeGen;
-  chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {
+  // Same one-hop merge as popup-theme-early.js: "pp-sync-enabled" is the
+  // localStorage mirror shared.js writes on every authoritative settings
+  // read/write (getSettingsStorage() / pbpReadSettingsWithSecrets()). A hit
+  // picks the area straight from the mirror and skips the optSyncEnabled
+  // round trip below; a miss falls back to the original two-hop chain.
+  let _optSyncMirror = null;
+  try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
+  (_optSyncMirror === "1" || _optSyncMirror === "0"
+    ? Promise.resolve({ optSyncEnabled: _optSyncMirror === "1" })
+    : chrome.storage.local.get({ optSyncEnabled: false })
+  ).then(({ optSyncEnabled }) => {
     return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
       .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true });
   }).then(s => {
