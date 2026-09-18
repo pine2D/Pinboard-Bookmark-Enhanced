@@ -1421,9 +1421,11 @@ function _aiEffectiveEndpointForFp(s) {
     : (OPENAI_COMPAT_PROVIDERS[p] ? _openaiCompatBase(OPENAI_COMPAT_PROVIDERS[p], s) : "");
   // Normalise (trim + strip trailing slashes) so an equivalent base -
   // "https://api.openai.com/v1" vs ".../v1/" - fingerprints identically
-  // (K37): the request path already collapses both to the same URL
-  // (see the .replace(/\/+$/, "") calls around L457/478/844), so treating
-  // them as different backends was a pure cache-key artifact, not a real
+  // (K37): the request path already collapses both to the same URL (see the
+  // four request-path .replace(/\/+$/, "") calls in callOpenAICompat,
+  // callOllama, _streamOpenAICompat and _streamOllama -- named, not lined,
+  // since line numbers here have already drifted twice), so treating them
+  // as different backends was a pure cache-key artifact, not a real
   // endpoint change.
   return String(raw || "").trim().replace(/\/+$/, "");
 }
