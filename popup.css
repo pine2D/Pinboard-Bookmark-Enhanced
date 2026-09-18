@@ -437,7 +437,10 @@ html[data-section="login"] .quick-actions { display: none !important; }
 /* ===================== Feedback Card (B2) ===================== */
 .feedback-card {
   display: flex; gap: var(--pp-sp-4); align-items: flex-start;
-  margin: var(--pp-sp-3) var(--pp-sp-4) 0; padding: var(--pp-sp-4) var(--pp-sp-4);
+  /* sp-5 sides: this card mounts inside .form-body, whose column (.row,
+     .status-msg, .bottom-bar, .submit-bar) is inset sp-5 -- at sp-4 the card
+     hung 4px outside the form on both sides (2026-09-18 audit S6). */
+  margin: var(--pp-sp-3) var(--pp-sp-5) 0; padding: var(--pp-sp-4) var(--pp-sp-4);
   border: 1px solid var(--pp-border);
   border-radius: var(--pp-radius-md);
   font-size: 11px;
@@ -1060,18 +1063,26 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
    progressbar element (AT treats progressbar descendants as presentational). */
 .batch-progress-wrap {
   position: relative;
-  /* Horizontal inset only. The vertical sp-3 lives on the bar itself (below)
-     so it disappears with the bar: the wrap is always display:block and an
-     empty block's margins collapse into a 6px strip of dead space at the
-     popup's bottom edge (user report 2026-09-17). */
-  margin: 0 var(--pp-sp-5);
+  /* Horizontal inset only, and sp-4 like every other block of the strip: at
+     sp-5 this bar started 12px in while the permission card above it started
+     at 8 and the md strip at 0, i.e. three consecutive blocks with three
+     different left edges (2026-09-18 audit S3). The vertical rhythm lives on
+     the bar itself (below) so it disappears with the bar: the wrap is always
+     display:block and an empty block's margins collapse into a strip of dead
+     space at the popup's bottom edge (user report 2026-09-17). */
+  margin: 0 var(--pp-sp-4);
 }
 .batch-progress {
   position: relative;
-  /* symmetric 6px top/bottom so the bar isn't flush against the popup's bottom
-     edge (.quick-actions carries no buffer of its own). The margins collapse
-     through the border-less wrap, so the cancel button stays centred. */
-  margin: var(--pp-sp-3) 0;
+  /* sp-4 below, nothing above: the previous block already ends with sp-4 and
+     spacing is owned by the relationship, not by both sides of it
+     (COMPONENTS.md §10.3; 2026-09-18 audit S4 measured 6px here against 8px
+     everywhere else). The margin collapses through the border-less wrap, so
+     the cancel button stays centred -- and the extra 2px below is also what
+     lifts .batch-cancel-btn's 24px hit box off .offline-bar's top hairline
+     (audit N8: 1px of clearance before, 3px now, symmetric with the 3px it
+     keeps above). */
+  margin: 0 0 var(--pp-sp-4);
   height: 14px;
   background: var(--pp-input-bg);
   border: 1px solid var(--pp-input-bg);
@@ -1150,7 +1161,10 @@ html[data-theme] .batch-progress-text {
    Token-bound, so the old html.dark / html[data-theme] literal branches
    are gone; themes and dark mode flow through their own offline-* values. */
 .batch-permission {
-  margin: var(--pp-sp-3) var(--pp-sp-4);
+  /* sp-4 inset + sp-4 below, no top margin: the quick-row above already ends
+     with its own sp-4 and the two sp-3s used to stack into a 14px gap while
+     every other seam in the strip was 8 (2026-09-18 audit S4). */
+  margin: 0 var(--pp-sp-4) var(--pp-sp-4);
   padding: var(--pp-sp-4) var(--pp-sp-4);
   border: 1px solid var(--pp-offline-bd);
   border-radius: var(--pp-radius-md);
@@ -1297,6 +1311,12 @@ html[data-theme] .batch-progress-text {
 .offline-queue-list {
   max-height: 180px;
   overflow-y: auto;
+  /* The one block of the strip that handed nothing down: .recent-bm-area has
+     no padding-top because it relies on the previous block's sp-4, so "Recent:"
+     started exactly on this list's fill boundary (measured gap 0, audit S5).
+     A margin, not padding, because the fill is the block -- it disappears with
+     the list when popup-offline.js re-hides it. */
+  margin-bottom: var(--pp-sp-4);
   background: var(--pp-offline-queue-bg);
   border-top: 1px dashed var(--pp-offline-queue-border);
   font-size: 11px;
@@ -2579,23 +2599,31 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
 }
 
 /* ---- Markdown post-copy action strip (popup) ---- */
+/* Single tone, like the .quick-actions container it lives in (2026-09-18 audit
+   M1). It used to paint --pp-bg2 inside a --pp-divider frame, which is the
+   SAME defect the .quick-actions comment above already ruled on: bg2 is
+   lighter than the page on 9 of the 15 popup palettes and darker on the other
+   6, so one rule read as a floating white card on modern-card (+0.114
+   luminance) and as a recessed tray on the default surface (-0.070). Two more
+   consequences went with it -- the block was the only child of the strip with
+   ZERO horizontal inset, so its 1px border and 8px radius landed ON the
+   popup's own left/right edges, and its four buttons sat on bg2 while
+   --pp-btn-bg is fillSeparate()d against --pp-bg (1.000:1 on terminal, i.e.
+   no separation at all). Dropping the fill puts the buttons back on the
+   surface their token was derived against, so no new derived token is needed.
+   Padding, not margin, for the sp-4 the family contract asks each block to end
+   with: .search-row / .quick-links / .quick-row / .recent-bm-area all spell it
+   `padding: 0 sp-4 sp-4`, and this block is now the same shape. */
 .md-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
   gap: var(--pp-sp-4);
-  /* sp-4 below like every other block of the strip: when the strip is the
-     last visible block (default install, empty offline queue, recent list
-     off) this margin is what keeps its rounded bottom edge off the popup's
-     fractional-height floor now that the container has no buffer of its own. */
-  margin: var(--pp-sp-3) 0 var(--pp-sp-4);
-  padding: var(--pp-sp-3) var(--pp-sp-4);
-  background: var(--pp-bg2);
-  border: 1px solid var(--pp-divider);
-  border-radius: var(--pp-radius-md);
+  margin: 0;
+  padding: 0 var(--pp-sp-4) var(--pp-sp-4);
   font-size: 11px;
-  /* Card-family entrance (same note as .batch-permission: every member of the
-     card family enters via fadeSlideDown; this one was a holdout). */
+  /* Entrance kept (the strip appears asynchronously, after a markdown copy);
+     it is the arrival that is animated, not the card that no longer exists. */
   animation: fadeSlideDown var(--pp-motion-duration) var(--ease-out);
 }
 .md-strip.hidden { display: none; }
@@ -2623,7 +2651,6 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
 .md-strip-btn:focus-visible { outline: none; border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 .md-strip-btn .btn-ic { display: inline-flex; }
 
-html[data-theme] .md-strip { background: var(--pp-bg2); border-color: var(--pp-divider); }
 html[data-theme] .md-strip-btn { background: var(--pp-btn-bg); border-color: var(--pp-btn-bd); color: var(--pp-link); }
 html[data-theme] .md-strip-btn:hover { background: var(--pp-btn-hover); }
 html[data-theme] .md-strip-btn:focus-visible { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
