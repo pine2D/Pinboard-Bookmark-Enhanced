@@ -761,6 +761,12 @@ function _ensurePurifyHook() {
 
 // The SINGLE sanitize point for the preview page. Replaces both the old
 // hand-rolled renderMarkdown AND the raw contentHtml innerHTML injection.
+// K16 perf (measured 2026-09 on a 773 KB / 3601-block Chinese article):
+// marked.parse ~103ms, DOMPurify.sanitize ~147ms, innerHTML ~34ms;
+// RETURN_DOM_FRAGMENT + replaceChildren was tried and gains ~7%
+// (176-181ms -> 164-170ms) -- not worth breaking the single-point sanitize
+// contract above. Chunked rendering is out because every module after
+// pbp:rendered assumes the article DOM is complete.
 function renderMarkdown(md) {
   if (!md) return "";
   if (typeof marked === "undefined" || typeof DOMPurify === "undefined") {

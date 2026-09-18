@@ -2590,7 +2590,9 @@ function pbpReaderScrollNearEnd(scrollHeight, innerHeight, scrollY) {
   // forum marking -> lang/dir -> stats repaint -> post-paint enhancers, in
   // exactly that order. Extracted verbatim from the inline first-render block
   // so an in-place replacement can re-run the identical sequence instead of
-  // reloading the page; the first render below is its only caller today.
+  // reloading the page. Two callers today: the initial render below (once per
+  // page load) and _applyArticleCommit's in-place swap inside the
+  // pbp:article-will-replace transaction (e.g. a video transcript commit).
   //
   // Everything it touches is scoped to #rendered-view's CHILDREN — the element
   // itself is never replaced, which is what lets the one-time ResizeObserver,
