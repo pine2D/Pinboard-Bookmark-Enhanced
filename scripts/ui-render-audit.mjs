@@ -1550,6 +1550,13 @@ async function runOneCheck(page, theme, check, results, extBase) {
       if (clearDisabled) el.disabled = false;
     }, { selector: check.selector, removeCls: check.removeClass || null, clearDisabled: !!check.clearDisabled });
     await mirror();
+    // Settle before reading the rest baseline (final review F1): mirror()
+    // itself triggers `.btn`'s `transition: background var(--pp-motion-state)`
+    // regression, and reading restBgStack in the same task as the mutation can
+    // land mid-interpolation -- under 4 parallel shards this produced two
+    // unreproducible bgChangedFromRest false reds (submit-btn, Task 15 and
+    // Task 16). Same 260ms discipline as the target-state read below (:1566).
+    await page.waitForTimeout(260);
     restBgStack = await page.evaluate(({ selector }) => {
       const el = document.querySelector(selector);
       if (!el) return null;
