@@ -470,7 +470,20 @@ async function showMain(token) {
   const stripEmpty = !settings.optShowSearch && settings.optShowQuickLinks === false &&
     settings.optShowQuickRow === false && !settings.optShowRecent;
   const stripDivider = document.querySelector(".quick-actions .divider");
-  if (stripDivider) stripDivider.classList.toggle("hidden", stripEmpty);
+  // ...and it makes no sense with nothing above it either. In the
+  // unsupported-URL empty state the form is gone and #url-warning is the only
+  // thing left over the strip, so its own bottom border and this hairline
+  // stacked with zero gap between them: two 1px rules of different colours,
+  // a 2-3 device-pixel band at 2x zoom (2026-09-18 audit S13). The warning
+  // strip's edge already separates the two regions. Called again from the
+  // unsupported-URL branch below, which is where that class is set.
+  const syncStripDivider = () => {
+    if (!stripDivider) return;
+    const warned = $id("main-section")?.classList.contains("unsupported-url") &&
+      !$id("url-warning")?.classList.contains("hidden");
+    stripDivider.classList.toggle("hidden", stripEmpty || !!warned);
+  };
+  syncStripDivider();
   const searchInput = $id("search-input");
   if (searchInput) {
     searchInput.addEventListener("keydown", (e) => {
@@ -556,6 +569,7 @@ async function showMain(token) {
     // quick-actions bar (a sibling of #main-section) untouched.
     $id("main-section").classList.add("unsupported-url");
     $id("url-warning").classList.remove("hidden");
+    syncStripDivider();
     $id("url-input").value = "";
     $id("title-input").value = "";
     $id("submit-btn").disabled = true;

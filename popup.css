@@ -538,16 +538,21 @@ html[data-section="login"] .quick-actions { display: none !important; }
   line-height: 1.4;
   animation: fadeSlideDown var(--pp-motion-duration) var(--ease-out);
 }
-.hint-warn::before {
-  content: "";
-  display: inline-block;
-  width: 11px; height: 11px;
-  margin-right: var(--pp-sp-2);
-  vertical-align: -2px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23c0840a' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M8 2 15 14H1Z'/%3E%3Cpath d='M8 6.5v3.5' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12' r='0.6' fill='%23c0840a' stroke='none'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-size: contain;
-}
+/* One warning triangle, one language (2026-09-18 audit S12). The strip used to
+   draw a `.hint-warn::before` data-URI with stroke='%23c0840a' baked in: an
+   amber icon at 2.77:1 inside a RED warning strip whose sentence beside it
+   measured 5.26:1 -- a different hue and a different contrast from the text it
+   introduces, and currentColor cannot reach inside a url("data:...").
+   #url-warning carries the inline PBP_ICONS.warning span the feedback card
+   already uses (popup.js hydrates .btn-ic[data-ic]), so the mark inherits
+   --pp-warn-fg on every surface. Sized to the 11px text scale exactly like
+   .clear-all-link / .offline-clear do it two rules apart; the -2px baseline
+   nudge replaces .btn-ic's button-sized -3px, which is measured against a
+   26px control's line box, not an 11px sentence. options.css keeps its own
+   .hint-warn::before -- there the triangle sits on the page background and
+   introduces a neutral hint, which is a different problem. */
+.url-warning .btn-ic { vertical-align: -2px; }
+.url-warning .btn-ic svg { width: 11px; height: 11px; }
 
 /* Tag Presets — borderless swatch pill (design-uplift, user-selected Variant
    A, 2026-08-04). Border removed entirely (see COMPONENTS.md Appendix C's
