@@ -556,6 +556,26 @@ async function pbpBuildSanitizedDiagnostics() {
       return null;
     }
   };
+  // navigator.storage.estimate() is the only view onto IndexedDB footprint
+  // (pbp-ai-cache/pbp-dict-packs/pbp-vocab) -- getBytesInUse above only ever
+  // covers the three chrome.storage areas. usageDetails.indexedDB is a
+  // Chrome-only extra the spec does not guarantee, so it's omitted rather
+  // than written as a misleading 0 when the browser doesn't provide it.
+  const storageEstimate = async () => {
+    try {
+      if (typeof navigator.storage?.estimate !== "function") return null;
+      const e = await navigator.storage.estimate();
+      return {
+        usage: e.usage,
+        quota: e.quota,
+        indexedDB: e.usageDetails && typeof e.usageDetails.indexedDB === "number"
+          ? e.usageDetails.indexedDB : undefined,
+      };
+    } catch (error) {
+      console.warn("[diagnostics] storage.estimate failed:", error?.name, error?.message);
+      return null;
+    }
+  };
   let local = {};
   try {
     local = await chrome.storage.local.get([
@@ -566,7 +586,8 @@ async function pbpBuildSanitizedDiagnostics() {
   const progress = local.batch_progress && typeof local.batch_progress === "object" ? local.batch_progress : null;
   const knownBatchErrors = new Set(["cancelled", "interrupted", "account_changed", "not_logged_in"]);
   const batchError = !progress?.error ? null : (knownBatchErrors.has(progress.error) ? progress.error : "failed");
-  const [identity, aiHost, driveApi, ankiHost, eudicHost, localBytes, syncBytes, sessionBytes] = await Promise.all([
+  const [identity, aiHost, driveApi, ankiHost, eudicHost, localBytes, syncBytes, sessionBytes,
+    storageEst, aiCacheStats] = await Promise.all([
     contains({ permissions: ["identity"] }),
     aiPattern ? contains({ origins: [aiPattern] }) : Promise.resolve(null),
     contains({ origins: ["https://www.googleapis.com/*"] }),
@@ -574,6 +595,8 @@ async function pbpBuildSanitizedDiagnostics() {
     eudicPattern ? contains({ origins: [eudicPattern] }) : Promise.resolve(null),
     bytes(chrome.storage.local, "local"), bytes(chrome.storage.sync, "sync"),
     bytes(chrome.storage.session, "session"),
+    storageEstimate(),
+    typeof pbpAiCacheStats === "function" ? pbpAiCacheStats() : Promise.resolve(null),
   ]);
   return {
     schemaVersion: 1,
@@ -598,7 +621,18 @@ async function pbpBuildSanitizedDiagnostics() {
       vocabularyEcho: check("dict-echo-enabled"), wayback: check("opt-wayback-enabled"),
     },
     permissions: { identity, aiHost, driveApi, ankiHost, eudicHost },
-    storage: { localBytes, syncBytes, sessionBytes },
+    storage: {
+      localBytes, syncBytes, sessionBytes,
+      ...(storageEst ? {
+        usage: storageEst.usage,
+        quota: storageEst.quota,
+        ...(storageEst.indexedDB !== undefined ? { indexedDB: storageEst.indexedDB } : {}),
+      } : {}),
+    },
+    // Counts only -- pbpAiCacheStats() never returns a key, since dict2_/
+    // dictctx2_ keys embed the looked-up word and summary_owner_ embeds the
+    // Pinboard account name.
+    aiCache: aiCacheStats,
     state: {
       offlineQueueCount: Array.isArray(local.offlineQueue) ? local.offlineQueue.length : 0,
       batch: progress ? {

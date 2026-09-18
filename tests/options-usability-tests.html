@@ -150,6 +150,12 @@ function _aiTargetOriginPattern() { return "https://private.example/*"; }
 function pbpAnkiEndpointFor() { return "http://127.0.0.1:8765"; }
 function pbpEndpointOriginPattern(value) { return value + "/*"; }
 const PBP_EUDIC_ENDPOINT = "https://api.frdic.com";
+// Stands in for ai-cache.js's pbpAiCacheStats, which this fixture does not
+// load -- options.js only guards `typeof pbpAiCacheStats === "function"`, so
+// defining it here is what makes diagnostics.aiCache non-null.
+async function pbpAiCacheStats() {
+  return { pools: { dict2:3, dictctx:0, "summary-owner":1, tr:2, vpunct:0, other:4 }, total:10 };
+}
 </script>
 <script src="../shared.js"></script>
 <script src="../vocab-store.js"></script>
@@ -649,6 +655,16 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(diagnostics.schemaVersion === 1 && diagnostics.extension.version === "2.108", "version missing");
     assert(diagnostics.storage.localBytes === 1234 && diagnostics.permissions.identity === true, "system categories missing");
     assert(diagnostics.state.offlineQueueCount === 1 && diagnostics.state.batch.error === "failed", "runtime categories missing");
+    // navigator.storage.estimate() is a real call against this page's own
+    // http://127.0.0.1 origin (a secure context in Chromium), not a fixture
+    // mock -- usage/quota are always numbers per spec; usageDetails.indexedDB
+    // is a Chrome-only extra that may legitimately be absent.
+    assert(typeof diagnostics.storage.usage === "number" && typeof diagnostics.storage.quota === "number",
+      "storage.estimate() usage/quota missing: " + JSON.stringify(diagnostics.storage));
+    assert(diagnostics.storage.indexedDB === undefined || typeof diagnostics.storage.indexedDB === "number",
+      "storage.indexedDB present but not a number");
+    assert(diagnostics.aiCache && diagnostics.aiCache.total === 10 && diagnostics.aiCache.pools.tr === 2,
+      "aiCache pool counts missing: " + JSON.stringify(diagnostics.aiCache));
   });
 
   await test("diagnostics never contain credentials, owners, page URLs, titles or custom endpoints", async () => {
@@ -661,6 +677,16 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(diagnostics, "diagnostics unavailable");
     assert(Object.values(diagnostics.permissions).every((value) => value === true || value === false || value === null), "non-boolean permission");
     assert(!serialized.includes("127.0.0.1") && !serialized.includes("api.frdic.com"), "origin leaked");
+  });
+
+  await test("diagnostics aiCache contains only numbers, no key or string leaves", async () => {
+    assert(diagnostics && diagnostics.aiCache, "aiCache missing");
+    const walk = (value) => {
+      if (typeof value === "number") { assert(Number.isFinite(value), "non-finite number leaf"); return; }
+      if (value && typeof value === "object") { for (const key of Object.keys(value)) walk(value[key]); return; }
+      throw new Error("non-number leaf in aiCache: " + JSON.stringify(value));
+    };
+    walk(diagnostics.aiCache);
   });
 
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";

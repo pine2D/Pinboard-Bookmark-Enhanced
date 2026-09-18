@@ -330,6 +330,31 @@ function counts(entries) {
     assert(entry && entry.ts === 200 && entry.result.join(",") === "kept", "append rollback changed record");
   });
 
+  await test("pbpAiCacheStats reports exact per-pool counts and a matching total", async () => {
+    await clearEntries();
+    await seed(rows("dict2_en|word", 3, 1)
+      .concat(rows("tr_article_", 5, 100), rows("ask_misc_", 2, 200)));
+    const stats = await pbpAiCacheStats();
+    assert(stats
+      && stats.pools.dict2 === 3 && stats.pools.tr === 5 && stats.pools.other === 2
+      && stats.pools.dictctx === 0 && stats.pools["summary-owner"] === 0 && stats.pools.vpunct === 0,
+      JSON.stringify(stats));
+    assert(stats.total === 10, "total=" + stats.total);
+  });
+
+  await test("pbpAiCacheStats never serialises a URL- or account-shaped key", async () => {
+    await clearEntries();
+    await seed([
+      { key: "tr_https://secret.example/article|en|gpt", result: "x", ts: 1 },
+      { key: "summary_owner_alice|https://secret.example/article", result: "y", ts: 2 },
+    ]);
+    const stats = await pbpAiCacheStats();
+    const serialized = JSON.stringify(stats);
+    assert(!/https?:\/\//.test(serialized), "leaked a URL: " + serialized);
+    assert(!serialized.includes("alice"), "leaked an account: " + serialized);
+    assert(!serialized.includes("secret.example"), "leaked a hostname: " + serialized);
+  });
+
   await clearEntries();
   document.title = fail ? "FAIL ai-cache Tests" : "PASS ai-cache Tests";
 })();

@@ -326,3 +326,43 @@ async function pbpAiCacheDelete(key) {
     });
   } catch (_) {}
 }
+
+// Read-only pool-count snapshot for the diagnostics export (options.js).
+// One readonly transaction, counting with the SAME range helpers
+// _pbpAiPruneWrittenPool already relies on, so this can never drift from the
+// real pool boundaries. Returns COUNTS ONLY -- dict2_/dictctx2_ keys embed
+// the looked-up word and summary_owner_ embeds the Pinboard account name, so
+// this must never surface a key, only a number. Diagnostics JSON is meant to
+// be pasted into a bug report.
+async function pbpAiCacheStats() {
+  try {
+    const db = await _pbpAiOpenDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(_PBP_AI_STORE, "readonly");
+      const store = tx.objectStore(_PBP_AI_STORE);
+      const pools = { dict2: 0, dictctx: 0, "summary-owner": 0, tr: 0, vpunct: 0, other: 0 };
+      let total = 0;
+      tx.onabort = () => reject(tx.error || new Error("AI cache stats transaction aborted"));
+      const totalReq = store.count();
+      totalReq.onsuccess = () => { total = totalReq.result || 0; };
+      [
+        ["dict2", _pbpAiDict2Range()],
+        ["dictctx", _pbpAiDictCtxRange()],
+        ["summary-owner", _pbpAiSummaryOwnerRange()],
+        ["tr", _pbpAiTrRange()],
+        ["vpunct", _pbpAiVpunctRange()],
+      ].forEach(([name, range]) => {
+        const req = store.count(range);
+        req.onsuccess = () => { pools[name] = req.result || 0; };
+      });
+      tx.oncomplete = () => {
+        const named = pools.dict2 + pools.dictctx + pools["summary-owner"] + pools.tr + pools.vpunct;
+        pools.other = Math.max(0, total - named);
+        resolve({ pools, total });
+      };
+    });
+  } catch (e) {
+    console.warn("[ai-cache] stats failed:", (e && e.name) || "", (e && e.message) || "");
+    return null;
+  }
+}
