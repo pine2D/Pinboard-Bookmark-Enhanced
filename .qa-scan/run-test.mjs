@@ -39,11 +39,11 @@ const SAFETY_MARGIN_MS = 1000;
 // unregistered suite is rejected instead of guessed complete.
 const EXPECTED_RESULTS = Object.freeze({
   "tests/a11y-tests.html": 27,
-  "tests/ai-cache-tests.html": 25,
+  "tests/ai-cache-tests.html": 26,
   "tests/ai-tags-tests.html": 98,
   "tests/anki-connect-tests.html": 41,
-  "tests/background-active-tab-tests.html": 33,
-  "tests/background-lifecycle-tests.html": 50,
+  "tests/background-active-tab-tests.html": 38,
+  "tests/background-lifecycle-tests.html": 55,
   "tests/batch-dedup-tests.html": 27,
   "tests/bili-bridge-tests.html": 1,
   "tests/contrast-tests.html": 6,
@@ -57,8 +57,8 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/jina-cache-tests.html": 28,
   "tests/library-notes-tests.html": 118,
   "tests/library-vocab-tests.html": 206,
-  "tests/md-ai-tests.html": 953,
-  "tests/md-convert-tests.html": 715,
+  "tests/md-ai-tests.html": 981,
+  "tests/md-convert-tests.html": 724,
   "tests/md-dict-tests.html": 436,
   "tests/md-embed-tests.html": 48,
   "tests/md-explain-layout-tests.html": 4,
@@ -75,7 +75,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/pinboard-style-cloak-tests.html": 21,
   "tests/popup-ai-sw-tests.html": 52,
   "tests/popup-tag-cache-tests.html": 23,
-  "tests/popup-save-tests.html": 172,
+  "tests/popup-save-tests.html": 177,
   "tests/save-pipeline-tests.html": 63,
   "tests/settings-cache-invalidate-tests.html": 8,
   "tests/settings-persist-tests.html": 450,
@@ -86,7 +86,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/url-strip-tests.html": 19,
   "tests/vocab-background-tests.html": 17,
   "tests/vocab-gdrive-tests.html": 73,
-  "tests/vocab-store-tests.html": 67,
+  "tests/vocab-store-tests.html": 73,
   "tests/wayback-tests.html": 44,
 });
 const expected = EXPECTED_RESULTS[rel];
