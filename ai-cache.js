@@ -56,6 +56,7 @@ function _pbpAiOpenDB() {
       db.onversionchange = () => { try { db.close(); } catch (_) {} _pbpAiDbPromise = null; };
       resolve(db);
     };
+    req.onblocked = () => console.warn("[ai-cache] open blocked: another context still holds an older connection (onversionchange should have closed it)");
     req.onerror = () => reject(req.error);
   });
   _pbpAiDbPromise.catch(() => { _pbpAiDbPromise = null; }); // allow retry

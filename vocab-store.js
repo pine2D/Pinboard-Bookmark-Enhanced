@@ -245,6 +245,15 @@ function _pbpVocabOpenDB() {
   if (_pbpVocabDbPromise) return _pbpVocabDbPromise;
   _pbpVocabDbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(_PBP_VOCAB_DB_NAME, _PBP_VOCAB_DB_VERSION);
+    // The two `!contains` guards below are the fresh-install path, and they
+    // also self-heal a db whose version already landed but a store is
+    // missing because a prior upgrade got interrupted -- keep them. The next
+    // version bump (v3) must NOT add to these branches: giving an EXISTING
+    // store a new index, or migrating its existing rows, has to live in a
+    // new `if (ev.oldVersion >= 1 && ev.oldVersion < 3) { ... }` tier using
+    // `req.transaction` instead (see dict-pack.js:429-431 -- calling
+    // createObjectStore on a store that already exists throws ConstraintError
+    // and rolls back the whole upgrade).
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(_PBP_VOCAB_STORE)) {
@@ -265,6 +274,7 @@ function _pbpVocabOpenDB() {
       db.onversionchange = () => { try { db.close(); } catch (_) {} _pbpVocabDbPromise = null; };
       resolve(db);
     };
+    req.onblocked = () => console.warn("[vocab-store] open blocked: another context still holds an older connection (onversionchange should have closed it)");
     req.onerror = () => reject(req.error);
   });
   _pbpVocabDbPromise.catch(() => { _pbpVocabDbPromise = null; });
