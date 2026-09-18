@@ -1097,17 +1097,19 @@ suite("endpoint origin policy", () => {
     // field on purpose: pbpLiveAiSettingsSnapshot carries no previewAiModel* key
     // at all, and options.js keeps that one field showing exactly the selected
     // provider's entry.
-    async function runProviderTest({ selected, override, secondFails }) {
+    async function runProviderTest({ selected, override, secondFails, readerEnabled }) {
       const fixture = document.createElement("div");
       fixture.innerHTML = '<button id="test-gemini"></button>' +
         '<span id="test-gemini-status" class="save-status"></span>' +
         '<input id="opt-gemini-key" value="live-key" />' +
         '<select id="opt-ai-provider"><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select>' +
         '<input id="opt-preview-ai-model" />' +
+        '<input type="checkbox" id="opt-preview-ai-enabled" checked />' +
         '<input id="opt-pinboard-token" value="user:0123456789abcdef" /><span id="token-format-warn"></span>';
       document.body.appendChild(fixture);
       document.getElementById("opt-ai-provider").value = selected;
       document.getElementById("opt-preview-ai-model").value = override;
+      if (readerEnabled === false) document.getElementById("opt-preview-ai-enabled").checked = false;
       const calls = [];
       const health = [];
       const realCallAI = window.callAI;
@@ -1164,6 +1166,18 @@ suite("endpoint origin policy", () => {
       const run = await runProviderTest({ selected: "openai", override: "reader-only-model" });
       assertEq(run.calls.length, 1, "calls made");
       assert(!run.status.includes("reader-only-model"), "status borrowed another provider's override: " + run.status);
+    });
+
+    // F4 (final review): with Reader AI turned off, the override field can
+    // still hold a stale value -- the second probe must not fire against a
+    // model the Reader will never actually call.
+    await atest("Reader AI turned off skips the override probe even with a value left in the field", async () => {
+      const run = await runProviderTest({ selected: "gemini", override: "reader-only-model", readerEnabled: false });
+      assertEq(run.calls.length, 1, "calls made");
+      assertEq(run.calls[0].model, undefined, "the lone call must not borrow the reader override model");
+      assert(run.status.includes("testConnected"), "status: " + run.status);
+      assert(!run.status.includes("reader-only-model"), "status named the override the Reader master switch has disabled: " + run.status);
+      assertEq(run.health.at(-1).code, "connected", "health code");
     });
 
     await atest("a failing reader override warns without marking the provider down", async () => {

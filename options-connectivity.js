@@ -149,7 +149,13 @@ function setupApiTests() {
         // previewAiModelByProvider on submit). Hence the guard: the other
         // fourteen Test buttons must not borrow a model their provider was
         // never asked to serve.
-        const ov = $id("opt-ai-provider")?.value === provider
+        //
+        // Second guard (F4, final review): the Reader AI master switch. A
+        // user who turned Reader AI off can still have a stale value sitting
+        // in #opt-preview-ai-model -- without this, every Test click pays
+        // for a second request probing a model the Reader will never call.
+        // `!== false` matches options.js:242's own reading of this checkbox.
+        const ov = $id("opt-ai-provider")?.value === provider && $id("opt-preview-ai-enabled")?.checked !== false
           ? ($id("opt-preview-ai-model")?.value || "").trim()
           : "";
         if (ov) {
