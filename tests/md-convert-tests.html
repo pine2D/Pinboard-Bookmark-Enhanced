@@ -734,6 +734,51 @@ function assertEq(actual, expected, label) {
         !!codeEl && codeEl.classList.contains("hljs") && codeEl.querySelector("span[class*='hljs-']") !== null,
         codeEl ? codeEl.className : "<no code el>");
     })();
+
+    // -- E: the prefix-probe boundary is exactly PBP_HLJS_LONGBLOCK_PREFIX.
+    // B/C above sit far on either side of 4096, so neither would catch an
+    // off-by-one (e.g. `text.length < PBP_HLJS_LONGBLOCK_PREFIX` instead of
+    // `<=`) flipping the boundary itself: a block AT the threshold must stay
+    // unprobed, one character past it must be probed. --
+    (() => {
+      const atThreshold = pyGen(PBP_HLJS_LONGBLOCK_PREFIX).slice(0, PBP_HLJS_LONGBLOCK_PREFIX);
+      const overThreshold = atThreshold + "x";
+      check("boundary fixtures are exactly PBP_HLJS_LONGBLOCK_PREFIX and PBP_HLJS_LONGBLOCK_PREFIX + 1 chars (sanity)",
+        atThreshold.length === PBP_HLJS_LONGBLOCK_PREFIX && overThreshold.length === PBP_HLJS_LONGBLOCK_PREFIX + 1,
+        "at=" + atThreshold.length + " over=" + overThreshold.length);
+
+      const makeFixture = (text) => {
+        const root = document.createElement("div");
+        const pre = document.createElement("pre");
+        const code = document.createElement("code");
+        code.textContent = text;
+        pre.appendChild(code);
+        root.appendChild(pre);
+        return root;
+      };
+      const origAuto = hljs.highlightAuto;
+
+      const atCalls = [];
+      hljs.highlightAuto = function (...args) { atCalls.push(args); return origAuto.apply(this, args); };
+      try {
+        highlightCodeBlocks(makeFixture(atThreshold));
+      } finally {
+        hljs.highlightAuto = origAuto;
+      }
+      check("a block AT exactly PBP_HLJS_LONGBLOCK_PREFIX chars is NOT prefix-probed",
+        atCalls.length === 0, "highlightAuto calls=" + atCalls.length);
+
+      const overCalls = [];
+      hljs.highlightAuto = function (...args) { overCalls.push(args); return origAuto.apply(this, args); };
+      try {
+        highlightCodeBlocks(makeFixture(overThreshold));
+      } finally {
+        hljs.highlightAuto = origAuto;
+      }
+      check("a block ONE character over PBP_HLJS_LONGBLOCK_PREFIX IS prefix-probed",
+        overCalls.length === 1 && overCalls[0][0].length === PBP_HLJS_LONGBLOCK_PREFIX,
+        "highlightAuto calls=" + overCalls.length);
+    })();
   })();
 </script>
 
