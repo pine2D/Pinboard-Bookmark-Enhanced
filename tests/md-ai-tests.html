@@ -5917,6 +5917,102 @@ suiteIf("pbpHlNotebookModel", "pbpHlNotebookModel", () => {
 });
 </script>
 <script>
+// ============ K152: body-class observer gates the Notebook rebuild on the
+// translation-view classes actually changing (md-highlight.js startBodyObs) ============
+// NOTE: async IIFE, NOT suiteIf()/test() -- the MutationObserver callback
+// fires on a microtask after the class mutation, and this file's test()
+// helper is fully synchronous (same rationale as pbpRailCollapsible above).
+// Exercises the REAL production observer already attached to this page's
+// document.body by md-highlight.js's own top-level startBodyObs() call (it
+// starts at module load, since document.body exists by the time that
+// <script src="../md-highlight.js"> tag runs) -- no separate fixture needed.
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "pbpHl body-class observer (Notebook rebuild gating, K152)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  if (typeof _pbpHlNotebookRender !== "function") {
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP pbpHl body-class observer (not loaded)";
+    host.appendChild(div); SKIP++; return;
+  }
+
+  // Attribute mutations dispatch the observer callback on a microtask, not
+  // synchronously -- flush it the same way pbpTrRunQueue's MutationObserver
+  // cases do below (await Promise.resolve() chained twice).
+  async function flush() { await Promise.resolve().then(() => {}).then(() => {}); }
+
+  await atest("unrelated body classes (ask-open/zen/rail-open/raw-active) do not trigger a Notebook rebuild", async () => {
+    const prevState = _pbpHlState, prevRender = _pbpHlNotebookRender;
+    _pbpHlState = { items: [] };
+    let renders = 0;
+    _pbpHlNotebookRender = () => { renders++; };
+    try {
+      for (const cls of ["ask-open", "zen", "rail-open", "raw-active"]) {
+        document.body.classList.add(cls);
+        await flush();
+        document.body.classList.remove(cls);
+        await flush();
+      }
+      assertEq(renders, 0, "none of ask-open/zen/rail-open/raw-active is tr-bilingual/tr-only");
+    } finally {
+      _pbpHlNotebookRender = prevRender;
+      _pbpHlState = prevState;
+      document.body.classList.remove("ask-open", "zen", "rail-open", "raw-active");
+    }
+  });
+
+  await atest("toggling tr-only triggers a Notebook rebuild on each real flip", async () => {
+    const prevState = _pbpHlState, prevRender = _pbpHlNotebookRender;
+    _pbpHlState = { items: [] };
+    let renders = 0;
+    _pbpHlNotebookRender = () => { renders++; };
+    try {
+      document.body.classList.add("tr-only");
+      await flush();
+      assertEq(renders, 1, "tr-only flipped on -> one rebuild");
+      document.body.classList.remove("tr-only");
+      await flush();
+      assertEq(renders, 2, "tr-only flipped back off -> another rebuild");
+    } finally {
+      _pbpHlNotebookRender = prevRender;
+      _pbpHlState = prevState;
+      document.body.classList.remove("tr-only", "tr-bilingual");
+    }
+  });
+
+  await atest("a flip while _pbpHlState is not ready still updates the snapshot, so the later flip-back still rebuilds", async () => {
+    const prevState = _pbpHlState, prevRender = _pbpHlNotebookRender;
+    _pbpHlState = null; // not ready
+    let renders = 0;
+    _pbpHlNotebookRender = () => { renders++; };
+    try {
+      document.body.classList.add("tr-only"); // flips while state is null
+      await flush();
+      assertEq(renders, 0, "not ready yet -- no render, but the snapshot must still move to tr-only=true");
+      _pbpHlState = { items: [] }; // now ready
+      document.body.classList.remove("tr-only"); // the flip BACK -- must not read as "no change"
+      await flush();
+      assertEq(renders, 1, "flip-back is a real class change and must rebuild, even though the flip-on was missed while not ready");
+    } finally {
+      _pbpHlNotebookRender = prevRender;
+      _pbpHlState = prevState;
+      document.body.classList.remove("tr-only", "tr-bilingual");
+    }
+  });
+})();
+</script>
+<script>
 // ============ M1 hardening: watched-block locate-text source ============
 suiteIf("_pbpHlLocateTextFor", "_pbpHlLocateTextFor", () => {
   test("watched block: uses live textContent, ignoring a stale pbpAiTextOf cache", () => {

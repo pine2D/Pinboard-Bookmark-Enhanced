@@ -2717,15 +2717,29 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
 // H5 (spec 1.4 / 1.5): the Notebook dim state of tr rows and the mirror bars
 // both depend on the current translation view (tr-bilingual / tr-only), which
 // md-translate toggles as a body class (V key, mode buttons, peek). Re-render
-// on any body-class mutation so those stay correct without md-translate
-// calling us. Cheap: replaceChildren + attribute writes; class mutations are
-// rare (view toggle, rail open, raw toggle). ponytail: not filtered to the
-// tr-* classes specifically -- the extra renders are harmless; narrow only if
-// ever profiled.
+// when those two classes actually change so this stays correct without
+// md-translate calling us. md-translate.js's _pbpTrApplyMode (lines 2795-2796)
+// is the only writer of tr-bilingual / tr-only; a new translation-related body
+// class needs this snapshot updated too. Body class also flips for unrelated
+// reasons (ask-open, rail-open, raw-active, zen) -- the guard below compares
+// "did either of these two classes change", not "was the change one of these",
+// so those flips are skipped for free instead of triggering a full Notebook
+// rebuild + mirror re-anchor pass.
 if (typeof MutationObserver === "function" && typeof document !== "undefined") {
   const startBodyObs = () => {
     if (!document.body) return;
+    let lastBi = document.body.classList.contains("tr-bilingual");
+    let lastOnly = document.body.classList.contains("tr-only");
     new MutationObserver(() => {
+      const bi = document.body.classList.contains("tr-bilingual");
+      const only = document.body.classList.contains("tr-only");
+      // Snapshot before the not-ready gate below: a flip that happens while
+      // _pbpHlState is still null must still be recorded, or the eventual
+      // flip-back reads as "no change" and silently skips the render it needs.
+      const changed = bi !== lastBi || only !== lastOnly;
+      lastBi = bi;
+      lastOnly = only;
+      if (!changed) return;
       if (!_pbpHlState) return;
       _pbpHlNotebookRender();
       pbpHlSyncMirrorAll();
