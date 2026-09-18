@@ -147,19 +147,22 @@
   --pp-fg-soft: #666;
   --pp-preset-btn-bg: #eef2ff;
   --pp-preset-btn-hover-bg: #d5e0ff;
-  --pp-used-fg: #bbb;
-  --pp-neutral-panel: #f5f5f0;
   --pp-disabled-fg: #aaa;
   --pp-popover-border: #ddd;
-  --pp-fg-faint: #ccc;
   --pp-oqa-btn-fg: #666;
   --pp-offline-queue-bg: #fffbea;
   --pp-offline-queue-border: #e8d88c;
   --pp-offline-queue-empty-fg: #6b6b6b;
   --pp-offline-queue-title-fg: #555;
-  --pp-offline-queue-meta-fg: #999;
   --pp-progress-text-fg: #1a3a6e;
   --pp-edit-cancel-fg: #444;
+  /* --pp-used-fg (#bbb), --pp-neutral-panel (#f5f5f0), --pp-fg-faint (#ccc)
+     and --pp-offline-queue-meta-fg (#999) retired 2026-09-18 (audit M5): each
+     was the DEFAULT surface's hand-written literal for a site whose
+     html[data-theme] twin already swapped in an AA-derived role token, so the
+     out-of-box surface was the only place they painted and the only place no
+     contrast gate looks (1.61-2.75:1 against their own fills). The five sites
+     read --pp-fg-hint / --pp-bg2 on every surface now. */
   /* --pp-confirm-no-hover-bg/-fg/-border retired: .confirm-no reads the
      shared fg-muted / border / btn-hover roles now, same as options and
      library (COMPONENTS.md §4.2 leaves .confirm-no hand-written but on real
@@ -596,15 +599,14 @@ html[data-section="login"] .quick-actions { display: none !important; }
    feedback) so this is written out bare rather than inherited. */
 .preset-btn:active:not(:disabled) { transform: scale(0.97); }
 .preset-btn:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
-.preset-btn.used { color: var(--pp-used-fg); background: var(--pp-neutral-panel); pointer-events: none; }
+.preset-btn.used { color: var(--pp-fg-hint); background: var(--pp-bg2); pointer-events: none; }
 /* .used means "already inserted this preset" (informational/consumed), not
    "selected" -- see the popup section of preset-variants-report.md's
    formal-implementation note for why it stays low-emphasis (fades the dot)
    rather than borrowing options' selection ring below. */
-/* currentColor, not a token: .used's own `color` already resolves to the
-   right muted shade per layer (--pp-used-fg in base/dark, --pp-fg-hint under
-   html[data-theme] -- two different tokens across layers), so matching it
-   via currentColor needs one rule instead of three per-layer duplicates. */
+/* currentColor, not a token: .used's own `color` is --pp-fg-hint on every
+   layer now, and currentColor keeps the dot bound to whatever that resolves
+   to without a second declaration. */
 .preset-btn.used::before { background: currentColor; opacity: .5; }
 
 .form-body {
@@ -864,7 +866,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   color: var(--pp-link); cursor: pointer; font-size: 12px; margin-right: var(--pp-sp-2); white-space: nowrap;
 }
 .stag:hover { text-decoration: underline; }
-.stag.used { color: var(--pp-used-fg); text-decoration: line-through; pointer-events: none; }
+.stag.used { color: var(--pp-fg-hint); text-decoration: line-through; pointer-events: none; }
 .stag:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 .stag.ai { color: var(--pp-accent2); }
 .stag.ai:hover { color: color-mix(in srgb, var(--pp-accent2) 80%, #000); }
@@ -1251,7 +1253,7 @@ html[data-theme] .batch-progress-text {
 }
 .quick-links a:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 .ql-sep {
-  color: var(--pp-fg-faint);
+  color: var(--pp-fg-hint);
   font-size: 11px;
 }
 
@@ -1356,7 +1358,7 @@ html[data-theme] .batch-progress-text {
   text-overflow: ellipsis;
 }
 .offline-queue-meta {
-  color: var(--pp-offline-queue-meta-fg);
+  color: var(--pp-fg-hint);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
@@ -1451,7 +1453,7 @@ html[data-theme] .batch-progress-text {
    border would otherwise paint a chip around the icon and break the 24px box. */
 .recent-bm-del {
   flex-shrink: 0;
-  color: var(--pp-fg-faint);
+  color: var(--pp-fg-hint);
   cursor: pointer;
   font-size: 11px;
   width: 24px;
@@ -1468,7 +1470,7 @@ html[data-theme] .batch-progress-text {
 .recent-bm-del:hover { color: var(--pp-danger); }
 .recent-bm-edit {
   flex-shrink: 0;
-  color: var(--pp-disabled-fg);
+  color: var(--pp-fg-hint);
   cursor: pointer;
   font-size: 11px;
   width: 24px;
@@ -1481,9 +1483,13 @@ html[data-theme] .batch-progress-text {
   justify-content: center;
   line-height: 1;
   border-radius: var(--pp-radius-sm);
-  opacity: 0.7;
+  /* No `opacity: 0.7` any more: stacked on --pp-fg-hint it composited to
+     2.80:1 against the page, under the 3:1 floor an icon control owes
+     (1.4.11) -- and it applied on all 15 surfaces, not just the default one.
+     De-emphasis is the hint role itself; the hover still says "this one" by
+     going accent. */
 }
-.recent-bm-edit:hover { opacity: 1; color: var(--pp-accent); }
+.recent-bm-edit:hover { color: var(--pp-accent); }
 /* Keyboard parity: activation and focus order are the platform's now, but the
    ring stays token-drawn -- the UA default one matches nothing else in this
    file (.tag-remove / .edit-cancel convention). */
@@ -2463,8 +2469,6 @@ html[data-theme] .tag-item:hover { background: var(--pp-tag-hover, var(--pp-drop
 html[data-theme] .autocomplete-dropdown { background: var(--pp-bg); border-color: var(--pp-border); box-shadow: var(--pp-shadow-md); }
 html[data-theme] .ac-item { color: var(--pp-fg); }
 html[data-theme] .label { color: var(--pp-fg-muted); }
-html[data-theme] .stag { color: var(--pp-link); }
-html[data-theme] .stag.used { color: var(--pp-fg-hint); }
 html[data-theme] .stag.ai { color: var(--pp-accent2); }
 html[data-theme] .action-link { color: var(--pp-accent2); }
 html[data-theme] .regen-link { color: var(--pp-accent2); }
@@ -2504,16 +2508,17 @@ html[data-theme] .existing-banner { background: var(--pp-banner-bg); border-colo
 html[data-theme] .url-warning { background: var(--pp-warn-bg); border-color: var(--pp-warn-bd); color: var(--pp-warn-fg); }
 html[data-theme] .preset-btn { color: var(--pp-preset-fg); background: var(--pp-preset-bg); }
 html[data-theme] .preset-btn:hover { background: var(--pp-drop-hover); }
+/* Byte-identical to the base rule since 2026-09-18 -- and load-bearing all
+   the same: `html[data-theme] .preset-btn` above is (0,2,1) and out-ranks the
+   base `.preset-btn.used` (0,2,0), so without this line the used chip would
+   repaint itself with the resting preset pair under all 13 presets. The base
+   cannot simply read --pp-preset-bg instead: that token is emitted per theme
+   only, the default surface has none. */
 html[data-theme] .preset-btn.used { color: var(--pp-fg-hint); background: var(--pp-bg2); }
 html[data-theme] .search-field { background: var(--pp-input-bg); color: var(--pp-fg); }
 html[data-theme] .search-field:focus { border-color: var(--pp-focus-bd); }
 html[data-theme] #tags-copy-all:hover { color: var(--pp-accent); }
 html[data-theme] .last-used-hint:hover { color: var(--pp-accent); }
-html[data-theme] .ql-sep { color: var(--pp-fg-hint); }
-html[data-theme] .recent-bm-del { color: var(--pp-fg-hint); }
-html[data-theme] .recent-bm-del:hover { color: var(--pp-danger); }
-html[data-theme] .recent-bm-edit { color: var(--pp-fg-hint); }
-html[data-theme] .recent-bm-edit:hover { color: var(--pp-accent); }
 html[data-theme] .edit-cancel { background: color-mix(in srgb, var(--pp-fg) 10%, transparent); color: var(--pp-fg); }
 html[data-theme] .edit-cancel:hover { background: color-mix(in srgb, var(--pp-danger) 20%, transparent); color: var(--pp-danger); }
 html[data-theme] .edit-cancel:focus-visible { outline-color: var(--pp-accent); }
@@ -2522,7 +2527,6 @@ html[data-theme] .offline-bar { background: var(--pp-offline-bg); border-color: 
 html[data-theme] .offline-queue-list { background: color-mix(in srgb, var(--pp-offline-bg) 75%, var(--pp-bg)); border-top-color: var(--pp-offline-bd); }
 html[data-theme] .offline-queue-item { border-bottom-color: color-mix(in srgb, var(--pp-fg) 10%, transparent); }
 html[data-theme] .offline-queue-title { color: var(--pp-fg); }
-html[data-theme] .offline-queue-meta { color: var(--pp-fg-hint); }
 html[data-theme] .offline-queue-item > .actions button { border-color: color-mix(in srgb, var(--pp-fg) 18%, transparent); color: var(--pp-fg-muted); background: transparent; }
 html[data-theme] .offline-queue-item > .actions button:focus-visible { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 html[data-theme] .offline-queue-item > .actions button:hover:not(:disabled) { background: color-mix(in srgb, var(--pp-accent) 10%, transparent); color: var(--pp-accent); }
