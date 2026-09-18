@@ -591,6 +591,29 @@ async function runIdbChecks() {
     task3ApiReady && edgeSeed.processed === 1 &&
     (await pbpVocabListOutbox(edgeScope)).map((row) => row.recordKey).join(",") === "en|plain");
 
+  // The one path whose semantics moved: the loader no longer throws
+  // "invalid legacy record" the instant it scans a row whose id disagrees with
+  // owner|language|term -- that row now rides into the batch and mutate's
+  // {invalid: true} aborts there. The end state is what callers and the store
+  // see, so that is what is pinned: nothing committed, nothing queued, the
+  // words rows untouched. (This row is load-bearing on mutate's abort, not on
+  // where the throw comes from: letting mutate accept the inconsistent row
+  // turns it red.)
+  await deleteVocabDb();
+  const brokenScope = "acct_broken";
+  const brokenRows = [
+    word(brokenScope, "Fine"),
+    { ...word(brokenScope, "Broken"), id: `${brokenScope}|en|not the folded key` }
+  ];
+  await putLegacyWords(brokenRows);
+  const brokenWordsBefore = JSON.stringify(await storeRows("words"));
+  const brokenSeed = await pbpVocabSeedLegacy(brokenScope);
+  check("a legacy row whose id disagrees with its term commits nothing",
+    task3ApiReady && brokenSeed.ok === false && brokenSeed.processed === 0 &&
+    (await pbpVocabListOutbox(brokenScope)).length === 0 &&
+    JSON.stringify(await storeRows("words")) === brokenWordsBefore &&
+    (await storeRows("sync")).every((row) => !String(row.key).startsWith("outbox:")));
+
   await deleteVocabDb();
   const existingImport = await pbpVocabSaveWord("acct_import", { term: "Case Term", language: "en", gloss: "local" });
   const reviveImport = await pbpVocabSaveWord("acct_import", { term: "Revive", language: "fr", gloss: "old" });
