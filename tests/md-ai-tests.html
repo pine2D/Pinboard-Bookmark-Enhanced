@@ -4530,6 +4530,21 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
       assert(res.freed > 0, "freed bytes must be > 0, got " + res.freed);
     });
 
+    // freed > 0 above only proves reclaim agrees with itself: getBytesInUse and
+    // the getKeys-path candidate values are read from the SAME store, so a
+    // consistent bug in pbpEntryBytes would pass either way. This oracle is
+    // hand-computed from the fixture with the formula written out by hand
+    // (key.length + JSON.stringify(value).length) -- not by calling
+    // pbpEntryBytes -- so it cannot share a bug with the function under test.
+    await atest("C2-6 reclaim(all cats): freed bytes match a hand-computed oracle" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      const res = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
+      const expectedFreed = RECLAIMABLE.reduce(
+        (sum, k) => sum + (k.length + JSON.stringify({ cache: "y".repeat(200), timestamp: 1 }).length), 0);
+      assertEq(res.freed, expectedFreed, "freed bytes match the independently computed total");
+    });
+
     await atest("C2-6 reclaim returns per-category removed {keys,bytes} that sum to freed" + tag, async () => {
       const local = mockLocal(freshStore(), shape.caps);
       window.chrome = { storage: { local } };
