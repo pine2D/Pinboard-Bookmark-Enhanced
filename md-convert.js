@@ -805,12 +805,126 @@ function renderMarkdown(md) {
 // untagged blocks via hljs auto-detection. Inline `<code>` is not matched.
 // No-op (not a throw) when hljs is absent — popup never vendors highlight.js,
 // and the pure string functions in this file must stay usable without it.
+//
+// K14 perf: unrestricted, hljs auto-detection tries every language registered
+// in the vendored build (36 in 11.12.0) and measures ~20-30x the cost of the
+// SAME input already carrying a language-xxx class (a tagged block skips
+// auto-detection entirely — the class already names the grammar). Two
+// independent, additive mitigations below, both REDUCING total CPU rather
+// than just spreading it across frames:
+//   (a) _pbpConfigureHljs() narrows the auto-detect candidate set to
+//       PBP_HLJS_SUBSET via hljs.configure({ languages }) — highlight.js's
+//       own documented auto-detect tuning knob — merged per-render with any
+//       language THIS article already tags explicitly (so a tagged-but-
+//       exotic language, e.g. language-graphql, still gets its own correct
+//       grammar even though it's outside SUBSET). Idempotent: a repeat call
+//       with the same effective set skips the actual hljs.configure() call.
+//   (b) _pbpTagLongUntaggedBlock() detects the language from only the first
+//       PBP_HLJS_LONGBLOCK_PREFIX bytes of an untagged block once it's
+//       longer than that (auto-detect cost scales with input length — a
+//       single very large untagged block is a shape neither (a) nor the rAF
+//       chunker below can bound), writes the winning language back as a
+//       language-<L> class, then the normal hljs.highlightElement() call
+//       below renders the FULL block against that one grammar (cheap — no
+//       auto-detection) instead of auto-detecting the whole thing.
+// Both apply identically here and in the rAF-chunked preview path
+// (highlightCodeBlocksChunked) below.
+
+// Auto-detect candidate set. Deliberately generous — better to keep a
+// rarely-needed language in than to mis-detect a common one — sourced from
+// the controller's floor list, mapped to the canonical names THIS vendored
+// build (11.12.0, 36 languages) actually registers per hljs.listLanguages():
+// aliases collapse to their canonical form (js->javascript, ts->typescript,
+// html/xhtml->xml, sh->bash, cs->csharp, toml->ini) and three names from the
+// floor list — dockerfile, scala, powershell — aren't registered in this
+// build at all, so they're omitted (hljs silently ignores an unregistered
+// name in `languages` either way; they can never match regardless).
+// TRADE-OFF (ships with this commit): a language outside SUBSET is
+// classified as whichever in-set language hljs scores closest — a visible
+// quality regression for that case, accepted because unrestricted auto-
+// detect is the 20x+ cost path this change exists to avoid. An article that
+// explicitly tags an out-of-SUBSET language is unaffected (merged in
+// dynamically below); only an UNTAGGED block in a language outside this list
+// can hit the trade-off.
+const PBP_HLJS_SUBSET = ["javascript", "typescript", "json", "xml", "css", "scss",
+  "python", "bash", "shell", "go", "rust", "java", "kotlin", "swift", "c", "cpp",
+  "csharp", "php", "ruby", "sql", "yaml", "ini", "markdown", "diff", "makefile",
+  "lua", "r", "perl"];
+
+// Effective language set from the last _pbpConfigureHljs() call (see below) —
+// lets a repeat call in the same article render skip a redundant
+// hljs.configure() when the merged set hasn't changed.
+let _pbpHljsConfiguredKey = null;
+
+// Languages already tagged (language-xxx, marked's own class on a fenced
+// block that named one) anywhere in root. Must be computed BEFORE any
+// highlighting/prefix-probe mutation touches root — _pbpTagLongUntaggedBlock
+// below adds language-<guess> classes of its own, and those must never feed
+// back into this scan (an auto-detected guess on one block silently
+// widening the candidate set for every other block in the same pass).
+// "language-mermaid" is a diagram marker, not a real grammar.
+function _pbpTaggedLanguagesIn(root) {
+  const found = new Set();
+  root.querySelectorAll('pre > code[class*="language-"]').forEach((block) => {
+    block.classList.forEach((cls) => {
+      const m = /^language-(\S+)$/.exec(cls);
+      if (m && m[1] !== "mermaid") found.add(m[1]);
+    });
+  });
+  return found;
+}
+
+// Idempotently configures hljs's auto-detect candidate set to PBP_HLJS_SUBSET
+// plus whatever this article already tags explicitly. Cheap to call at the
+// top of every highlight pass: skips the actual hljs.configure() call when
+// the effective set hasn't changed since the last call.
+function _pbpConfigureHljs(root) {
+  if (typeof hljs === "undefined") return;
+  const extra = _pbpTaggedLanguagesIn(root);
+  let subset = PBP_HLJS_SUBSET;
+  if (extra.size) {
+    subset = PBP_HLJS_SUBSET.slice();
+    extra.forEach((lang) => { if (!subset.includes(lang)) subset.push(lang); });
+  }
+  const key = subset.join(",");
+  if (key === _pbpHljsConfiguredKey) return;
+  hljs.configure({ languages: subset });
+  _pbpHljsConfiguredKey = key;
+}
+
+// K14: auto-detect cost scales with input length, so a single very large
+// untagged block (a pasted log dump, a big generated file) is a shape
+// neither SUBSET narrowing above nor the rAF chunker below can bound — it's
+// still one auto-detect call over the WHOLE block. Above this threshold,
+// detect the language from just the first PBP_HLJS_LONGBLOCK_PREFIX bytes
+// (long enough for hljs's relevance scoring to settle on real code; short
+// enough to keep the probe itself cheap) and, on a hit, tag the block so the
+// hljs.highlightElement() call below renders the FULL text against that ONE
+// grammar instead of auto-detecting it. On a miss (or if hljs throws) the
+// block is left untagged and falls through to the existing full-text auto-
+// detect path — same behavior as before this change.
+const PBP_HLJS_LONGBLOCK_PREFIX = 4096;
+function _pbpTagLongUntaggedBlock(block) {
+  if (/(?:^|\s)language-\S+/.test(block.className)) return; // already tagged
+  const text = block.textContent || "";
+  if (text.length <= PBP_HLJS_LONGBLOCK_PREFIX) return; // short enough: normal path handles it
+  try {
+    const guess = hljs.highlightAuto(text.slice(0, PBP_HLJS_LONGBLOCK_PREFIX));
+    if (guess && guess.language) block.classList.add("language-" + guess.language);
+  } catch (_) {
+    // Leave the block untagged — falls through to the existing full-text
+    // auto-detect path below, same as before this change.
+  }
+}
+
 function highlightCodeBlocks(root) {
   if (!root || typeof hljs === "undefined") return;
+  _pbpConfigureHljs(root);
   const blocks = root.querySelectorAll('pre > code');
   blocks.forEach((block) => {
     if (block.classList.contains("hljs")) return; // idempotent: skip already-highlighted blocks
     if (block.classList.contains("language-mermaid")) return; // rendered as a diagram elsewhere; hljs 11 logs a console.error for the unknown language
+    _pbpTagLongUntaggedBlock(block);
     try {
       hljs.highlightElement(block);
     } catch (_) {
@@ -830,6 +944,7 @@ function highlightCodeBlocksChunked(root) {
   if (!root || typeof hljs === "undefined") return;
   const blocks = Array.from(root.querySelectorAll('pre > code'));
   if (!blocks.length) return;
+  _pbpConfigureHljs(root); // once per pass, before any block is touched — see K14 comment above highlightCodeBlocks
   const raf = (typeof requestAnimationFrame === "function") ? requestAnimationFrame : (fn) => setTimeout(fn, 0);
   let i = 0;
   const step = () => {
@@ -838,6 +953,7 @@ function highlightCodeBlocksChunked(root) {
       const block = blocks[i];
       if (block.classList.contains("hljs")) continue; // idempotent
       if (block.classList.contains("language-mermaid")) continue; // rendered as a diagram elsewhere; hljs 11 logs a console.error for the unknown language
+      _pbpTagLongUntaggedBlock(block);
       try {
         hljs.highlightElement(block);
       } catch (_) {

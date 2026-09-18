@@ -601,6 +601,190 @@ function assertEq(actual, expected, label) {
 </script>
 
 <script>
+  // ---- P3.2b hljs SUBSET narrowing + long-block prefix probe (K14; needs
+  // vendor/highlight.min.js). md-convert.js's top-level functions/consts are
+  // plain globals (this file is a classic <script>, not a module), so the
+  // private helpers _pbpConfigureHljs/_pbpTaggedLanguagesIn/PBP_HLJS_SUBSET/
+  // PBP_HLJS_LONGBLOCK_PREFIX are reachable directly for spying/inspection. ----
+  section("P3.2b hljs SUBSET + long-block prefix probe (K14)");
+  (() => {
+    // Deterministic, decisively-Python text, well past the 4KB prefix threshold.
+    function pyGen(minLen) {
+      let out = "", i = 0;
+      while (out.length <= minLen) { out += "def handler_" + i + "(x):\n    return x + " + i + "\n\n"; i++; }
+      return out;
+    }
+    const longPy = pyGen(PBP_HLJS_LONGBLOCK_PREFIX + 500);
+
+    // -- A: configure called once per page (not once per block), and merges
+    // a language this article already tags explicitly (dynamic merge) --
+    (() => {
+      const fixtureA = document.createElement("div");
+      // "graphql" is a real language in the vendored hljs build (per
+      // hljs.listLanguages()) but is NOT in PBP_HLJS_SUBSET — used nowhere
+      // else in this test file, so it forces a genuinely new effective set
+      // and guarantees hljs.configure() actually runs for this call.
+      fixtureA.innerHTML =
+        '<pre><code class="language-graphql">query { user { id } }</code></pre>' +
+        '<pre><code>short untagged one</code></pre>' +
+        '<pre><code>short untagged two</code></pre>' +
+        '<pre><code>short untagged three</code></pre>';
+      const origConfigure = hljs.configure;
+      const calls = [];
+      hljs.configure = function (opts) { calls.push(opts); return origConfigure.call(this, opts); };
+      try {
+        highlightCodeBlocks(fixtureA); // 4 blocks in ONE pass
+      } finally {
+        hljs.configure = origConfigure;
+      }
+      check("hljs.configure called exactly once for a 4-block pass (not once per block)",
+        calls.length === 1, "calls=" + calls.length);
+      check("hljs.configure's languages list dynamically merges this article's tagged 'graphql'",
+        calls.length === 1 && Array.isArray(calls[0].languages) && calls[0].languages.includes("graphql"),
+        calls.length ? JSON.stringify(calls[0]) : "<not called>");
+      check("hljs.configure's languages list still carries PBP_HLJS_SUBSET (generous, not narrowed away)",
+        calls.length === 1 && calls[0].languages.includes("python") && calls[0].languages.includes("javascript"),
+        calls.length ? JSON.stringify(calls[0].languages) : "<not called>");
+
+      // Idempotent: a second, separate render with the SAME effective set
+      // (same tagged language, nothing new) must NOT call hljs.configure again.
+      const fixtureA2 = document.createElement("div");
+      fixtureA2.innerHTML = '<pre><code class="language-graphql">query { id }</code></pre>';
+      const calls2 = [];
+      hljs.configure = function (opts) { calls2.push(opts); return origConfigure.call(this, opts); };
+      try {
+        highlightCodeBlocks(fixtureA2);
+      } finally {
+        hljs.configure = origConfigure;
+      }
+      check("hljs.configure is idempotent: unchanged effective set skips a repeat real call",
+        calls2.length === 0, "calls2=" + calls2.length);
+    })();
+
+    // -- B: long untagged block (> PBP_HLJS_LONGBLOCK_PREFIX) is probed on
+    // just its PREFIX and the detected language is written back -- //
+    (() => {
+      const fixtureB = document.createElement("div");
+      const pre = document.createElement("pre");
+      const code = document.createElement("code");
+      code.textContent = longPy;
+      pre.appendChild(code);
+      fixtureB.appendChild(pre);
+      check("long fixture block is actually longer than the prefix threshold (sanity)",
+        code.textContent.length > PBP_HLJS_LONGBLOCK_PREFIX, "len=" + code.textContent.length);
+
+      const origAuto = hljs.highlightAuto;
+      const autoCalls = [];
+      hljs.highlightAuto = function (...args) { autoCalls.push(args); return origAuto.apply(this, args); };
+      try {
+        highlightCodeBlocks(fixtureB);
+      } finally {
+        hljs.highlightAuto = origAuto;
+      }
+      check("long untagged block triggers exactly one prefix probe via hljs.highlightAuto",
+        autoCalls.length === 1, "highlightAuto calls=" + autoCalls.length);
+      check("the probe is given ONLY the first PBP_HLJS_LONGBLOCK_PREFIX chars, not the whole block",
+        autoCalls.length === 1 && autoCalls[0][0].length === PBP_HLJS_LONGBLOCK_PREFIX,
+        autoCalls.length ? ("probed length=" + autoCalls[0][0].length) : "<not called>");
+      check("long untagged block gets a language-<detected> class written back",
+        /(?:^|\s)language-\S+/.test(code.className), "className=" + code.className);
+      check("long untagged block is fully highlighted (hljs class + token spans) after prefix-probe tagging",
+        code.classList.contains("hljs") && code.querySelector("span[class*='hljs-']") !== null,
+        "className=" + code.className);
+    })();
+
+    // -- C: short untagged block (<= PBP_HLJS_LONGBLOCK_PREFIX) is UNCHANGED:
+    // the prefix probe must not fire (hljs's own existing full-text
+    // auto-detect inside highlightElement — which does not go through the
+    // public hljs.highlightAuto — still highlights it as before). --
+    (() => {
+      const fixtureC = document.createElement("div");
+      const pre = document.createElement("pre");
+      const code = document.createElement("code");
+      code.textContent = "def small(x):\n    return x + 1\n";
+      pre.appendChild(code);
+      fixtureC.appendChild(pre);
+      check("short fixture block is at or under the prefix threshold (sanity)",
+        code.textContent.length <= PBP_HLJS_LONGBLOCK_PREFIX, "len=" + code.textContent.length);
+
+      const origAuto = hljs.highlightAuto;
+      const autoCalls = [];
+      hljs.highlightAuto = function (...args) { autoCalls.push(args); return origAuto.apply(this, args); };
+      try {
+        highlightCodeBlocks(fixtureC);
+      } finally {
+        hljs.highlightAuto = origAuto;
+      }
+      check("short untagged block never reaches the prefix probe (hljs.highlightAuto not called by our code)",
+        autoCalls.length === 0, "highlightAuto calls=" + autoCalls.length);
+      check("short untagged block is still highlighted via hljs's own unchanged auto-detect path",
+        code.classList.contains("hljs") && code.querySelector("span[class*='hljs-']") !== null,
+        "className=" + code.className);
+    })();
+
+    // -- D: a block already tagged with a language outside PBP_HLJS_SUBSET
+    // still highlights correctly (SUBSET only narrows AUTO-detection; an
+    // explicit language-xxx class always resolves its own grammar directly). --
+    (() => {
+      const fixtureD = document.createElement("div");
+      fixtureD.innerHTML = '<pre><code class="language-graphql">query { viewer { id } }</code></pre>';
+      highlightCodeBlocks(fixtureD);
+      const codeEl = fixtureD.querySelector("pre > code");
+      check("tagged exotic language (graphql, outside SUBSET) still highlights after narrowing",
+        !!codeEl && codeEl.classList.contains("hljs") && codeEl.querySelector("span[class*='hljs-']") !== null,
+        codeEl ? codeEl.className : "<no code el>");
+    })();
+  })();
+</script>
+
+<script>
+  // ---- P3.2c same two K14 techniques on the CHUNKED (preview, rAF) path ----
+  section("P3.2c highlightCodeBlocksChunked SUBSET + prefix probe (K14, async)");
+  window._pbpHljsChunkedK14Done = (async () => {
+    function pyGen(minLen) {
+      let out = "", i = 0;
+      while (out.length <= minLen) { out += "def handler_" + i + "(x):\n    return x + " + i + "\n\n"; i++; }
+      return out;
+    }
+    const fixture = document.createElement("div");
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+    code.textContent = pyGen(PBP_HLJS_LONGBLOCK_PREFIX + 500);
+    pre.appendChild(code);
+    fixture.appendChild(pre);
+    document.body.appendChild(fixture); // detached roots never get an rAF tick in some engines; attach for the wait
+
+    // Spy on the PUBLIC hljs.highlightAuto — confirmed elsewhere in this file
+    // (P3.2b sub-test B/C) that hljs.highlightElement()'s OWN internal
+    // full-text auto-detect does NOT go through this public method, so a
+    // call here can only be OUR prefix probe, not old unchanged behavior
+    // (which would leave a language-<detected> class too, but via a
+    // different internal path — a bare "gets a class" assertion can't tell
+    // the two apart; this can).
+    const origAuto = hljs.highlightAuto;
+    const autoCalls = [];
+    hljs.highlightAuto = function (...args) { autoCalls.push(args); return origAuto.apply(this, args); };
+
+    highlightCodeBlocksChunked(fixture);
+    // Poll for the async rAF pass to finish instead of guessing a frame count.
+    const deadline = Date.now() + 3000;
+    while (!code.classList.contains("hljs") && Date.now() < deadline) {
+      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+    }
+    hljs.highlightAuto = origAuto;
+    check("highlightCodeBlocksChunked's untagged-block branch also runs the prefix probe (not full-text auto-detect)",
+      autoCalls.length === 1 && autoCalls[0][0].length === PBP_HLJS_LONGBLOCK_PREFIX,
+      autoCalls.length ? ("calls=" + autoCalls.length + " probedLen=" + autoCalls[0][0].length) : "hljs.highlightAuto not called");
+    check("highlightCodeBlocksChunked writes the probed language back onto the block",
+      /(?:^|\s)language-\S+/.test(code.className), "className=" + code.className);
+    check("highlightCodeBlocksChunked highlights the long block (hljs class + token spans)",
+      code.classList.contains("hljs") && code.querySelector("span[class*='hljs-']") !== null,
+      "className=" + code.className);
+    fixture.remove();
+  })();
+</script>
+
+<script>
   // ---- P3.6 buildToc -> sidebar slug-contract smoke (deterministic; no hljs/scroll) ----
   section("P3.6 buildToc -> sidebar slug contract");
   (() => {
@@ -3432,6 +3616,7 @@ section("mathml + pbpLatexNormalize: doubled backslashes survive normalization")
   if (window._pbpEpubIntegrationDone) await window._pbpEpubIntegrationDone;
   if (window._pbpEpubA8Done) await window._pbpEpubA8Done;
   if (window._pbpInertDocDone) await window._pbpInertDocDone;
+  if (window._pbpHljsChunkedK14Done) await window._pbpHljsChunkedK14Done;
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
   document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 })();
