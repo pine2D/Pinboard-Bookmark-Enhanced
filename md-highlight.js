@@ -174,7 +174,10 @@ function pbpHlWsNormalize(text) {
 // -- no explicit invalidation needed, and nothing outlives the blocks array
 // itself (no WeakMap needed either: a single slot is enough since only ONE
 // blocks array is ever "current" within a restore pass).
-let _pbpHlNormPoolSrc = null;
+// Sentinel is a private object, not null: a null/undefined `blocks` argument
+// must never compare equal to "no pool yet" and skip the build.
+const _PBP_HL_NORM_POOL_UNSET = {};
+let _pbpHlNormPoolSrc = _PBP_HL_NORM_POOL_UNSET;
 let _pbpHlNormPool = null;
 function pbpHlGlobalLocateNormalized(blocks, item) {
   const qn = pbpHlWsNormalize(item && item.quote).norm;
