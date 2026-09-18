@@ -146,8 +146,6 @@
   --opt-error-border: #f5c6c6;
   --opt-option-hover-bg: rgba(127,127,127,.14);
   --opt-overlimit-fg: #ff5050;
-  --opt-pf-border: #e0e0d8;
-  --opt-preview-border: #ddd;
   --opt-preview-hover-bg: #f0f0f0;
   --opt-preview-content-bg: #f6f8fa;
   --opt-select-hover-bg: #f1f5f9;
@@ -935,7 +933,13 @@ html.motion-ready .backup-import-result:not([hidden]) {
 .section-title { display: block; font-size: 13px; font-weight: bold; color: var(--opt-fg-dim); margin-bottom: var(--opt-sp-4); margin-top: var(--opt-sp-4); }
 
 /* ---- Provider fields ---- */
-.pf { margin-top: var(--opt-sp-4); padding: var(--opt-sp-5); background: var(--opt-pf-bg); border: 1px solid var(--opt-pf-border); border-radius: var(--opt-radius-md); }
+/* Provider fieldset: a resting container, so its edge is the hairline section
+   token (COMPONENTS.md §9 law 4), not the 3:1 --opt-border frame that overlays
+   use. It had slipped through C36 with a one-off #e0e0d8 unthemed and a themed
+   override to --opt-border, which painted a near-black box on modern-card
+   (user report 2026-09-18). --opt-border-section is defined per theme, so one
+   rule serves the default surface and every preset. */
+.pf { margin-top: var(--opt-sp-4); padding: var(--opt-sp-5); background: var(--opt-pf-bg); border: 1px solid var(--opt-border-section); border-radius: var(--opt-radius-md); }
 .pf[hidden] { display: none; }
 /* Same reveal recipe as .backup-import-preview, but the transition lives
    inside :not([hidden]): provider switches swap two panels at once, and an
@@ -1959,9 +1963,6 @@ html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select
   }
 }
 html[data-theme] .hint code { color: var(--opt-fg-muted); }
-/* .pf border-color: second form -- unthemed uses --opt-pf-border (#e0e0d8,
-   a one-off tint), themed states fall back to the plain --opt-border role. */
-html[data-theme] .pf { border-color: var(--opt-border); }
 /* .pf h3 / .et-onboarding: second form, same shape as .fg label.bl above --
    unthemed reads --opt-fg-soft, themed reads --opt-fg-muted. */
 html[data-theme] .pf h3 { color: var(--opt-fg-muted); }
@@ -2167,7 +2168,7 @@ html[data-theme] .overlay-byte-counter.over { color: var(--opt-overlimit-fg); }
 /* ---- Preset preview (collapsible read-only) ---- */
 .preset-preview-section {
   margin-top: var(--opt-sp-6);
-  border: 1px solid var(--opt-preview-border);
+  border: 1px solid var(--opt-border-section);
   border-radius: var(--opt-radius-md);
   overflow: hidden;
 }
@@ -2189,12 +2190,11 @@ html[data-theme] .overlay-byte-counter.over { color: var(--opt-overlimit-fg); }
   font-size: 11px;
   line-height: 1.5;
   white-space: pre;
-  border-top: 1px solid var(--opt-preview-border);
+  border-top: 1px solid var(--opt-border-section);
 }
-html[data-theme] .preset-preview-section { border-color: var(--opt-border); }
 html[data-theme] .preset-preview-section summary { color: var(--opt-fg-muted); }
 html[data-theme] .preset-preview-section summary:hover { background: var(--opt-btn-hover); }
-html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var(--opt-fg); border-top-color: var(--opt-border); }
+html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var(--opt-fg); }
 
 /* ---- Reduced motion ----
    `scroll-behavior` is deliberately absent -- it cannot reach these calls; the
@@ -2234,7 +2234,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   grid-template-columns: minmax(0, 1fr) 72px minmax(0, 200px) 22px;
   gap: var(--opt-sp-4);
   padding: var(--opt-sp-2) var(--opt-sp-4);
-  border-bottom: 1px solid var(--opt-border);
+  border-bottom: 1px solid var(--opt-border-section);
   align-items: center;
 }
 .wayback-log-row:last-child { border-bottom: none; }
