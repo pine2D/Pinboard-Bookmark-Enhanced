@@ -2323,28 +2323,34 @@ html[data-theme="github-light"] {
 }
 /* @generated:ui-themes end */
 
-/* Scrollbars — ALL surfaces (default light and every preset theme)
- * share the same token contract: track=bg2, thumb=fg-muted, hover=accent.
+/* Scrollbars — ALL surfaces (default light and every preset theme) share one
+ * contract with options.css / library.css / md-preview.css: transparent track
+ * (no fill, no edge line -- the 1px track border-left that used to sit here
+ * read as a stray vertical rule at 2x zoom, user report 2026-09-18), thumb =
+ * --pp-scrollbar-thumb inset by a 3px transparent border + background-clip so
+ * the visible pill is ~4px wide at rest, hover = accent.
  * Unscoped on purpose: the default surface previously had no webkit rules and
  * fell back to the UA classic path — arrow buttons on Windows (the acbe621
- * symptom, which that fix only covered for html[data-theme]). Webkit-custom
- * scrollbars have no buttons unless ::-webkit-scrollbar-button is styled.
+ * symptom). Webkit-custom scrollbars have no buttons unless
+ * ::-webkit-scrollbar-button is styled. A bare ::-webkit-scrollbar already
+ * matches every scroller including textarea, so no textarea:: twin is needed.
  * Do not add scrollbar-width/scrollbar-color: in Chromium the standard
- * properties disable these webkit customizations and can restore arrow
- * buttons. This extension is Chromium-only, so no Firefox fallback is needed. */
-::-webkit-scrollbar,
-textarea::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track,
-textarea::-webkit-scrollbar-track { background: var(--pp-bg2); border-left: 1px solid var(--pp-border); }
+ * properties disable these webkit customizations wholesale (proved 2026-09-18
+ * on Chromium 140) and can restore arrow buttons. This extension is
+ * Chromium-only, so no Firefox fallback is needed. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
 /* Preset themes keep their audited thumb contract (fg-muted, ≥3:1 on all 14
    per contrast-audit); the softer default-surface thumb is default-only. */
 html[data-theme] { --pp-scrollbar-thumb: var(--pp-fg-muted); }
-::-webkit-scrollbar-thumb,
-textarea::-webkit-scrollbar-thumb { background: var(--pp-scrollbar-thumb); border: 2px solid var(--pp-bg2); border-radius: var(--pp-radius-md); }
-::-webkit-scrollbar-thumb:hover,
-textarea::-webkit-scrollbar-thumb:hover { background: var(--pp-accent); }
-::-webkit-scrollbar-corner,
-textarea::-webkit-scrollbar-corner { background: var(--pp-bg2); }
+::-webkit-scrollbar-thumb {
+  background-color: var(--pp-scrollbar-thumb);
+  border: 3px solid transparent;
+  border-radius: var(--pp-radius-md);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--pp-accent); }
 /* Shared popup themed rules. design-uplift Task 13 step 3 removed 36 rules
    here that were pure duplicates of what the bare (unprefixed) selector
    already declares -- byte-identical values, so the cascade renders the

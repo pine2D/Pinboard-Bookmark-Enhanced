@@ -87,6 +87,10 @@
   --opt-accent-hover: #2255aa;
   --opt-fg: #333;
   --opt-fg-muted: #666;
+  /* Scrollbar thumb only -- same value as popup's --pp-scrollbar-thumb: fg-muted
+     is tuned for TEXT and reads as a harsh bar; this stays ≥3:1 vs the page
+     (1.4.11 UI-component floor) without shouting. Presets override to fg-muted. */
+  --opt-scrollbar-thumb: #818893;
   /* --opt-border's default lives in the composer's DEFAULT_LIGHT block now
      (design-uplift Task 16), same reason as --opt-bg/--opt-panel above --
      AA-derived against --opt-btn-bg/--opt-panel (3:1, COMPONENTS.md's
@@ -1923,8 +1927,8 @@ html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select
     padding: var(--opt-sp-2);
     max-height: min(320px, calc(100dvh - 32px));
     overflow: auto;
-    /* The themed 10px scrollbar (html[data-theme] *::-webkit-scrollbar,
-       ~:881) can't reach in here: the picker is a pseudo-element, so the
+    /* The page's 10px webkit scrollbar (::-webkit-scrollbar block near the
+       confirm popover) can't reach in here: the picker is a pseudo-element, so the
        universal descendant selector never matches it and a second
        pseudo-element can't be chained on. The STANDARD properties do apply
        directly and render ~the same thin profile as the 10px webkit custom
@@ -1994,21 +1998,27 @@ html[data-theme] .key-toggle:hover { color: var(--opt-fg); }
 html[data-theme] .fg input[type="checkbox"]:focus-visible { outline-color: var(--opt-accent); }
 html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--opt-accent); }
 
-/* ---- Themed scrollbars (light + dark themes share the same token contract).
- * Do not add scrollbar-width/scrollbar-color here: in Chromium the standard
- * properties disable these webkit customizations and can restore arrow
- * buttons. The select ::picker exception above is intentionally retained
+/* ---- Scrollbars: same contract as popup.css / library.css / md-preview.css
+ * (transparent track, no edge line, ~4px inset thumb pill, hover = accent).
+ * Unscoped on purpose -- the html[data-theme] scoping this block used to carry
+ * left the no-preset settings page on the UA classic scrollbar (arrow buttons,
+ * 15px track) while every preset got the custom one. Thumb colour is the
+ * --opt-scrollbar-thumb token (default-surface softness in :root, fg-muted
+ * under a preset). Do not add scrollbar-width/scrollbar-color here: in
+ * Chromium the standard properties disable these webkit customizations
+ * wholesale. The select ::picker exception above is intentionally retained
  * because webkit scrollbar pseudo-elements cannot reach that pseudo-element. ---- */
-html[data-theme] ::-webkit-scrollbar,
-html[data-theme] textarea::-webkit-scrollbar { width: 10px; height: 10px; }
-html[data-theme] ::-webkit-scrollbar-track,
-html[data-theme] textarea::-webkit-scrollbar-track { background: var(--opt-panel); border-left: 1px solid var(--opt-border); }
-html[data-theme] ::-webkit-scrollbar-thumb,
-html[data-theme] textarea::-webkit-scrollbar-thumb { background: var(--opt-fg-muted); border: 2px solid var(--opt-panel); border-radius: var(--opt-radius-md); }
-html[data-theme] ::-webkit-scrollbar-thumb:hover,
-html[data-theme] textarea::-webkit-scrollbar-thumb:hover { background: var(--opt-accent); }
-html[data-theme] ::-webkit-scrollbar-corner,
-html[data-theme] textarea::-webkit-scrollbar-corner { background: var(--opt-panel); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+html[data-theme] { --opt-scrollbar-thumb: var(--opt-fg-muted); }
+::-webkit-scrollbar-thumb {
+  background-color: var(--opt-scrollbar-thumb);
+  border: 3px solid transparent;
+  border-radius: var(--opt-radius-md);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--opt-accent); }
 /* ---- Confirm popover (replaces native confirm()) ---- */
 .reset-tab-btn { position: relative; }
 .confirm-popover {

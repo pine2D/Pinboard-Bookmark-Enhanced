@@ -632,9 +632,11 @@ html[data-theme="<dark preset>"] { color-scheme: dark; }
 - 基线选择器 `:root` 与 `html` **特异性不等价**（`:root` 是 (0,1,0)，`html` 是 (0,0,1)）。options 现状写的是
   `html { color-scheme: light }`（:1082）。因为手写块与发射同 commit 删除，两者不会共存，用哪个都行——
   但**别**在保留手写块的情况下用 `:root` 发射，那会静默翻转谁赢。
-- **library 是三表面里唯一没有 webkit 自定义滚动条兜底的表面**，`color-scheme` 落地后它的滚动条外观会
-  真的变——进渲染抽测。popup 的滚动条被 webkit 规则接管，`popup.css` 注释明令**不得**引入
-  `scrollbar-width` / `scrollbar-color`，勿犯。
+- 三表面的滚动条自 2026-09-18 起同走一份手写 webkit 契约（透明轨道、无边线、拇指 3px 透明边内缩 +
+  `background-clip`、hover 走 accent；拇指色 token `--{ns}-scrollbar-thumb`，默认面 `#818893`，预设态
+  `fg-muted`），与 md-preview.css 同形；规则无作用域，默认面也不再落到 UA 经典滚动条（Windows 箭头）。
+  三份 CSS 的注释都明令**不得**引入 `scrollbar-width` / `scrollbar-color`——Chromium ≥121 一旦设了标准
+  属性就整体忽略 `::-webkit-scrollbar` 定制（2026-09-18 实测），勿犯。
 
 ### 7.3 focus ring
 

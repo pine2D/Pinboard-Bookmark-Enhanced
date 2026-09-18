@@ -21,6 +21,9 @@
   --lib-panel: #ffffff;
   --lib-fg: #1a1a2e;
   --lib-fg-muted: #5f6368;
+  /* Scrollbar thumb only -- same value as popup's --pp-scrollbar-thumb (see the
+     scrollbar block below). Presets override to fg-muted. */
+  --lib-scrollbar-thumb: #818893;
   --lib-fg-hint: #666d74;
   --lib-accent: #1a73e8;
   /* accent, pushed to clear AA on both bg and panel (composer's fgToAAMulti) --
@@ -162,6 +165,25 @@ button, input, select, textarea { font-family: inherit; }
    role); elements that want to read as plain text instead (.notes-row-title a,
    .xp-dict-src a) already set their own `color: inherit` and win by specificity. */
 a { color: var(--lib-link, #1a66c2); }
+
+/* ---- Scrollbars: same contract as popup.css / options.css / md-preview.css
+ * (transparent track, no edge line, ~4px inset thumb pill, hover = accent).
+ * library was the one surface with no webkit rules at all, so it rendered the
+ * UA classic scrollbar (arrow buttons on Windows) next to the custom ones the
+ * other three surfaces draw. Do not add scrollbar-width/scrollbar-color: in
+ * Chromium the standard properties disable these webkit customizations
+ * wholesale. ---- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
+::-webkit-scrollbar-thumb {
+  background-color: var(--lib-scrollbar-thumb);
+  border: 3px solid transparent;
+  border-radius: var(--lib-radius-md);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--lib-accent); }
 
 /* @generated:ui-components start (library) */
 .btn {
