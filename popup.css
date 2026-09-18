@@ -41,6 +41,12 @@
      for every themed block, so the default surface would have been the one
      place the invariant did not hold. */
   --pp-input-bg: #edf0f4;
+  /* No consumer since 2026-09-18: §8 law 6 took the fill change out of every
+     focus rule, and the last reader was `html[data-theme] .login-body
+     button:hover`, which was painting a BUTTON with this input role (audit
+     M2). Kept because the composer emits it in all 14 preset blocks, so the
+     default surface would otherwise be the one surface missing the role.
+     If something needs it again, check §8 law 6 first. */
   --pp-input-focus-bg: #ffffff;
   /* --pp-input-bd (resting field border) is emitted by the composer now
      (Soft Fill, design-uplift 2026-08-05): it equals --pp-input-bg on every
@@ -388,7 +394,13 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .login-body .secret-field { position: relative; }
 .login-body .secret-field input { padding-right: 30px; }
 .login-body .key-toggle {
-  position: absolute; right: 3px; top: 2px;
+  /* Absolute offsets inside the fused shell, not rhythm: `top` is sp-1, and
+     `right: 3px` is the optical centring of this 22px box inside the 30px
+     reserve the field's padding-right holds open for it -- the same derived
+     pair the 30px itself belongs to. Moving it to a scale value would shift
+     the eye a pixel for a number no user can see (see the note below on why
+     this button's box is not allowed to move). */
+  position: absolute; right: 3px; top: var(--pp-sp-1);
   padding: var(--pp-sp-2); border: 0; background: none; color: var(--pp-fg-soft);
 }
 .login-body .key-toggle svg { display: block; }
@@ -490,7 +502,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
    At 11px an underline alone is a weak cue, so bold (matching .fc-title) +
    underline-offset make "clickable" unambiguous without recolouring. */
 .fc-message a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
-.model-not-found-hint { margin-top: var(--pp-sp-1); font-size: 0.9em; opacity: 0.8; }
+.model-not-found-hint { margin-top: var(--pp-sp-1); font-size: 11px; /* px, not 0.9em: inserted into .fc-body (11px), which rendered it at 9.9px -- under the textFloor */ opacity: 0.8; }
 /* flex-wrap: ru's grant-retry label runs 31 chars; long labels fold to a new
    line instead of squeezing the row (the buttons stay text by ruling). */
 .fc-actions { display: flex; flex-wrap: wrap; gap: var(--pp-sp-4); margin-top: var(--pp-sp-2); align-items: center; }
@@ -525,6 +537,15 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .fc-dismiss:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); border-radius: var(--pp-radius-sm); }
 .fc-details {
   margin-top: var(--pp-sp-3); padding: var(--pp-sp-3) var(--pp-sp-4);
+  /* Reclaim the dismiss channel. .fc-dismiss is a flex item of the card, so
+     its 24px box plus the card's sp-4 gap reserve a 32px column down the WHOLE
+     card height even though the x only occupies the first line -- which left
+     this filled panel with a 32px right gutter against the card's own 8px
+     padding (audit N11). Negative margin rather than absolute positioning: the
+     x is always the card's last child (shared.js showFeedback), the panel
+     always sits below the title/message that the x shares a line with, and
+     this keeps the title/message column exactly where it is. */
+  margin-right: calc(-24px - var(--pp-sp-4));
   max-height: 120px; overflow: auto;
   background: color-mix(in srgb, var(--pp-fg) 6%, transparent);
   font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 11px;
@@ -583,10 +604,11 @@ html[data-section="login"] .quick-actions { display: none !important; }
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--pp-sp-3);
   padding: 3px var(--pp-sp-4) 3px var(--pp-sp-3);
   margin-right: var(--pp-sp-2);
   font-size: 11px;
+  line-height: 14px; /* 3 + 14 + 3 = the 20px sm rung exactly; `normal` measured 19.1px, 0.1px from falling off it and drift-prone */
   font-family: inherit;
   color: var(--pp-preset-fg);
   background: var(--pp-preset-btn-bg);
@@ -605,7 +627,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .preset-btn::before {
   content: "";
   width: 6px; height: 6px;
-  border-radius: 50%;
+  border-radius: var(--pp-radius-full);
   background: var(--pp-accent);
   flex-shrink: 0;
 }
@@ -647,7 +669,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
   width: 52px; flex-shrink: 0; text-align: right;
   font-weight: bold; font-size: 11px; color: var(--pp-fg-muted); padding-top: var(--pp-sp-2); line-height: 1.5;
 }
-.label.top { padding-top: var(--pp-sp-2); align-self: flex-start; }
+.label.top { align-self: flex-start; } /* padding-top is .label's own; this rule only pins the alignment */
 .field { flex: 1; min-width: 0; }
 /* .actions (COMPONENTS.md §10.2): a row of buttons -- flex, wrap, centred, the
    surface's one button-row gap (sp-4 = 8px, actionRowGap). Margins belong to
@@ -721,7 +743,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   width: 10px; height: 10px;
   border: 2px solid var(--pp-spinner-bg);
   border-top-color: var(--pp-spinner-fg);
-  border-radius: 50%;
+  border-radius: var(--pp-radius-full);
   animation: spin 0.6s linear infinite;
   vertical-align: middle;
 }
@@ -758,6 +780,10 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   display: inline-flex; align-items: center; background: var(--pp-tag-bg); color: var(--pp-tag-fg);
   padding: 1px var(--pp-sp-4); border-radius: var(--pp-radius-tag); font-size: 11px; gap: var(--pp-sp-1);
   line-height: 18px; white-space: nowrap;
+  /* No `transform` in the transition list: no rule and no JS ever sets a
+     transform on .tag-item (drag state is opacity, the drop marker is a
+     ::before bar). */
+  position: relative; transition: background var(--pp-motion-state);
 }
 .tag-remove {
   display: inline-flex; align-items: center; justify-content: center;
@@ -778,9 +804,6 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tag-remove:hover { color: var(--pp-danger); }
 .tag-remove:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 .tag-item:hover { background: var(--pp-tag-hover); }
-/* No `transform` in the transition list: no rule and no JS ever sets a transform
-   on .tag-item (drag state is opacity, the drop marker is a ::before bar). */
-.tag-item { position: relative; transition: background var(--pp-motion-state); }
 .tag-item[draggable] { cursor: grab; }
 .tag-item.dragging { opacity: 0.4; }
 .tag-item.drag-over::before {
@@ -884,7 +907,6 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    the 10-11px text scale, and drop .btn-ic's button-sized margin (gap rules). */
 .clear-all-link .btn-ic, .offline-clear .btn-ic { margin-right: 0; vertical-align: 0; }
 .clear-all-link .btn-ic svg, .offline-clear .btn-ic svg { width: 11px; height: 11px; }
-.field > .actions > .clear-all-link { margin-top: var(--pp-sp-1); }
 #tags-copy-all:hover { color: var(--pp-link); text-decoration: underline; }
 .last-used-hint {
   display: block; width: 100%; border: 0; background: none; text-align: left; font-family: inherit;
@@ -906,6 +928,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .stag {
   border: 0; background: none; padding: 0; font-family: inherit;
   color: var(--pp-link); cursor: pointer; font-size: 12px; margin-right: var(--pp-sp-2); white-space: nowrap;
+  transition: color var(--pp-motion-state);
 }
 .stag:hover { text-decoration: underline; }
 .stag.used { color: var(--pp-fg-hint); text-decoration: line-through; pointer-events: none; }
@@ -1001,13 +1024,18 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
 .status-msg { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-2) 72px; font-size: 11px; }
 .status-msg.success { color: var(--pp-ok-fg); }
 .status-msg.error { color: var(--pp-danger); }
-.wayback-indicator { font-size: 0.9em; opacity: 0.85; }
+.wayback-indicator { font-size: 11px; /* px, not 0.9em: appended to #status-msg (11px), i.e. 9.9px rendered -- under the textFloor */ opacity: 0.85; }
 
 /* Search Bar */
 .search-row { padding: 0 var(--pp-sp-4) var(--pp-sp-4); }
 .search-field {
   width: 100%; padding: var(--pp-sp-2) var(--pp-sp-4);
   border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md);
+  /* line-height pinned, same reason as .field > input[type="text"]: with
+     `normal` this field measured 23px on every theme -- off both control rungs
+     (26 / 20) and drifting with the fallback font, the CI-vs-local shape
+     rules/ui-primitives.md warns about. 4 + 16 + 4 + 2 = the 26px md rung. */
+  line-height: 16px;
   font-size: 11px; font-family: inherit;
   background: var(--pp-input-bg); color: var(--pp-fg);
   transition: border-color var(--pp-motion-state), background var(--pp-motion-state), box-shadow var(--pp-motion-state);
@@ -1056,7 +1084,7 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--pp-sp-1);
+  gap: var(--pp-sp-2); /* the icon-beside-label gap the .btn family and .header-icons already use; this was the one sp-1 holdout */
   padding: var(--pp-sp-2) var(--pp-sp-2);
   font-size: 11px;
   color: var(--pp-fg-muted);
@@ -1342,6 +1370,7 @@ html[data-theme] .batch-progress-text {
   display: inline-block; width: 6px; height: 6px;
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
+  opacity: 0.7;
   transform: translateY(-2px) rotate(45deg);
   transition: transform var(--pp-motion-state) var(--ease-in-out);
 }
@@ -1357,7 +1386,6 @@ html[data-theme] .batch-progress-text {
   cursor: pointer;
 }
 .offline-toggle:hover { text-decoration: none; }
-#offline-queue-chevron { font-size: 11px; opacity: 0.7; }
 /* The expanded queue is the offline bar's second tone, not a second colour
    system: one `color-mix(offline-bg 75%, bg)` fill and one solid
    --pp-offline-bd hairline on all 15 surfaces (2026-09-18 audit S11, user
@@ -1593,8 +1621,6 @@ html[data-theme] .batch-progress-text {
   border-color: var(--pp-warn-bd);
   color: var(--pp-warn-fg);
 }
-
-.stag { transition: color var(--pp-motion-state); }
 
 /* ===================== URL Cleaned Hint (B4) ===================== */
 .url-clean-hint {
@@ -2739,6 +2765,7 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-h
   border-radius: var(--pp-radius-md);
   cursor: pointer;
   font-family: inherit;
+  font-size: 11px; /* the one control in this file with no declared size: it inherited the UA's 13.333px. 11px is its row neighbour .qbtn's */
 }
 .md-strip-btn .btn-ic { margin: 0; vertical-align: 0; }
 .md-strip-btn:hover { background: var(--pp-btn-hover); border-color: var(--pp-accent); }
