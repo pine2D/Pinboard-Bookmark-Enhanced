@@ -361,9 +361,12 @@ function _echoScheduleScan(keys) {
 //
 // The price is that no bail-out inherits a clear any more, so each return
 // between here and the swap is classified explicitly:
-//   fail-closed / stand-down (feature off or no view, live-account mismatch,
-//     empty term set) -> _echoBailClosed(), because this generation still owns
-//     the state and is choosing to paint nothing;
+//   fail-closed / stand-down (feature off or no view, block index threw,
+//     live-account mismatch, empty term set) -> _echoBailClosed(), because this
+//     generation still owns the state and is choosing to paint nothing. A
+//     rejected read is not a fourth class: the .catch fallbacks route it into
+//     one of these (owner read -> live === null -> mismatch; vocabulary read ->
+//     [] -> empty term set), which is why both end with the underlines down;
 //   "a newer generation already took over" (the two epoch/owner/enabled
 //     rechecks after each await) -> BARE return, because the state, including
 //     whatever that newer generation has already painted, is no longer ours to
@@ -375,9 +378,21 @@ async function _echoRestart() {
   const view = _echoView();
   if (!_echoEnabled || !view) { _echoBailClosed(); return; }
   // Ask/translate init owns the canonical pbpAiIndexBlocks call on
-  // pbp:rendered; this mirrors md-ask's lazy backfill for safety.
-  if (typeof pbpAiIndexBlocks === "function" && typeof pbpAiBlocks === "function"
-      && !pbpAiBlocks().length) pbpAiIndexBlocks(view);
+  // pbp:rendered; this mirrors md-ask's lazy backfill for safety. Both calls
+  // walk foreign DOM state this module does not own, so a throw is possible and
+  // now costly: it would escape as a rejected _echoRestart() with the clear
+  // still unreached at the far end of the function, stranding the outgoing
+  // generation's underlines on screen for good. Fail closed instead, and leave
+  // a trace rather than folding the exception into silence (no token, no
+  // vocabulary content in the message).
+  try {
+    if (typeof pbpAiIndexBlocks === "function" && typeof pbpAiBlocks === "function"
+        && !pbpAiBlocks().length) pbpAiIndexBlocks(view);
+  } catch (e) {
+    console.warn("[echo] block index failed:", e && e.name, e && e.message);
+    _echoBailClosed();
+    return;
+  }
   // _echoOwner is derived from the account the page render froze in, so a
   // token swap in another tab would keep replaying the PREVIOUS account's
   // words as underlines for whoever is logged in now. Check the live account

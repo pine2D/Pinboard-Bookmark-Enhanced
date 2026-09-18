@@ -675,7 +675,7 @@ async function runVocabEchoWiringTests() {
   // anything -- against an empty registry both classes look identical.
   section("vocab echo: fail-closed restart");
   {
-    const saved = { owner: _echoOwner, enabled: _echoEnabled, epoch: _echoEpoch, terms: _echoTerms, total: _echoTotal };
+    const saved = { owner: _echoOwner, enabled: _echoEnabled, epoch: _echoEpoch, terms: _echoTerms };
     const realAll = window.pbpVocabAll;
     const hadOwnerFn = "pbpVocabCurrentOwner" in window;
     const realOwnerFn = window.pbpVocabCurrentOwner;
@@ -683,6 +683,8 @@ async function runVocabEchoWiringTests() {
     const realBlocks = window.pbpAiBlocks;
     const hadBlockEl = "pbpAiBlockEl" in window;
     const realBlockEl = window.pbpAiBlockEl;
+    const hadIndexFn = "pbpAiIndexBlocks" in window;
+    const realIndexFn = window.pbpAiIndexBlocks;
     const prevView = document.getElementById("rendered-view");
     if (prevView) prevView.remove();
     const docBody = document.createElement("div");
@@ -814,6 +816,58 @@ async function runVocabEchoWiringTests() {
       await stale2;
       assert(drawn() === newer2, "a continuation stranded past the vocabulary read leaves the newer generation's underlines alone too");
       assertEq(_echoTotal, 1, "with its draw budget intact as well");
+
+      // A REJECTED read is not a fourth class of exit: each .catch fallback
+      // routes it into an existing fail-closed branch, and the whole point of
+      // pinning that here is that the branches are the only thing standing
+      // between an IndexedDB hiccup and underlines stranded on screen forever
+      // now that the clear sits at the far end of the function. Awaiting via
+      // .catch rather than bare, so that losing a fallback shows up as failing
+      // rows instead of an unhandled rejection that takes the suite with it.
+      _echoEpoch++;
+      _echoEnabled = true;
+      seedPaint();
+      window.pbpVocabCurrentOwner = async () => { throw new Error("idb"); };
+      let escaped = "none";
+      await _echoRestart().catch((e) => { escaped = String(e && e.message); });
+      assertEq(escaped, "none", "a rejected live-account read is absorbed inside the restart, not re-thrown at its caller");
+      assertEq(drawn(), null, "and fails closed: an account that cannot be read is treated as a mismatch, so the underlines come down");
+      assertEq(_echoTotal, 0, "with the draw budget released");
+
+      _echoEnabled = true;
+      seedPaint();
+      window.pbpVocabCurrentOwner = async () => "acct_YQ";
+      window.pbpVocabAll = async () => { throw new Error("idb"); };
+      escaped = "none";
+      await _echoRestart().catch((e) => { escaped = String(e && e.message); });
+      assertEq(escaped, "none", "a rejected vocabulary read is absorbed too");
+      assertEq(drawn(), null, "and lands in the empty-term-set branch, which takes the underlines down rather than leaving stale ones lit");
+      assertEq(_echoTotal, 0, "releasing the draw budget with them");
+
+      // The block index belongs to md-ask / md-translate, not to this module:
+      // a throw there is foreign DOM state failing, and before the clear moved
+      // to the end of the function it was harmless. Now it has to fail closed
+      // like the rest, and say so in the console instead of vanishing.
+      const realWarn = console.warn;
+      const warned = [];
+      window.pbpVocabAll = async () => [{ term: "residue" }];
+      window.pbpAiBlocks = () => [];
+      window.pbpAiIndexBlocks = () => { throw new TypeError("index exploded"); };
+      _echoEnabled = true;
+      seedPaint();
+      escaped = "none";
+      console.warn = (...a) => { warned.push(a.map((x) => String(x)).join(" ")); };
+      try {
+        await _echoRestart().catch((e) => { escaped = String(e && e.message); });
+      } finally {
+        console.warn = realWarn;
+      }
+      assertEq(escaped, "none", "a throwing block index is caught, not left as a rejected restart");
+      assertEq(drawn(), null, "and fails closed: the underlines it could not rebuild over come down");
+      assertEq(_echoTotal, 0, "and their draw budget is released");
+      assert(warned.some((w) => w.includes("[echo] block index failed:") && w.includes("TypeError")),
+        "and the swallowed exception leaves a trace carrying its name (no token, no vocabulary content)");
+      window.pbpAiBlocks = () => [{ n: 1, el: para }];
     } finally {
       _echoEnabled = false;
       _echoClearAll();
@@ -823,9 +877,14 @@ async function runVocabEchoWiringTests() {
       if (hadOwnerFn) window.pbpVocabCurrentOwner = realOwnerFn; else delete window.pbpVocabCurrentOwner;
       if (hadBlocks) window.pbpAiBlocks = realBlocks; else delete window.pbpAiBlocks;
       if (hadBlockEl) window.pbpAiBlockEl = realBlockEl; else delete window.pbpAiBlockEl;
+      if (hadIndexFn) window.pbpAiIndexBlocks = realIndexFn; else delete window.pbpAiIndexBlocks;
       _echoOwner = saved.owner; _echoEnabled = saved.enabled; _echoEpoch = saved.epoch;
-      _echoTerms = saved.terms; _echoTotal = saved.total;
+      _echoTerms = saved.terms;
       _echoRanges.clear(); _echoCounts.clear();
+      // Not restored from a snapshot: the budget has to agree with the range
+      // and count maps this teardown just emptied, and _echoClearAll above
+      // already zeroed it. Saying so explicitly keeps the ordering readable.
+      _echoTotal = 0;
       if (prevView && !document.getElementById("rendered-view")) document.body.appendChild(prevView);
     }
   }
