@@ -287,6 +287,12 @@ function pbpAiEstimateTokensText(text) {
     len++;
   }
   if (!len) return 0;
+  // CJK punctuation (。、，「」 etc.) is Script=Common, not Han/Hiragana/
+  // Katakana/Hangul, so it is deliberately NOT counted into the CJK share
+  // below -- a punctuation-dense Chinese passage reads slightly low, which
+  // is fine for a cost estimate (punctuation tokenizes close to Latin
+  // density in most BPE vocabularies anyway) but worth naming so it does
+  // not get "fixed" as a missed script.
   const m = s.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu);
   const share = m ? m.length / len : 0;
   return Math.ceil(len * ((1 - share) / 4 + share / 1.5));
