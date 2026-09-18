@@ -398,8 +398,15 @@ html[data-section="login"] .quick-actions { display: none !important; }
   box-shadow: var(--pp-focus-ring);
 }
 /* Hover is where the eye may show a fill -- it is a pointer affordance, and
-   the rest/focus invariant does not cover it. */
-.login-body .key-toggle:hover { background: color-mix(in srgb, var(--pp-fg) 8%, var(--pp-input-bg)); border-radius: var(--pp-radius-sm); }
+   the rest/focus invariant does not cover it.
+   `.secret-field` is specificity ballast, not scoping -- the same trick the
+   :focus-visible rule below documents, and for the same reason: the themed
+   `html[data-theme] .login-body .key-toggle` rule is (0,3,1), so the (0,3,0)
+   form this rule used to have was outranked by the RESTING themed rule on all
+   13 presets and the fill never appeared there (measured transparent ->
+   transparent on dracula / modern-card / solarized-light, 2026-09-18 audit
+   M3). (0,4,0) wins on every surface with one rule. */
+.login-body .secret-field .key-toggle:hover { background: color-mix(in srgb, var(--pp-fg) 8%, var(--pp-input-bg)); border-radius: var(--pp-radius-sm); }
 /* `.secret-field` in the selector is specificity ballast, not scoping: the
    themed `html[data-theme] .login-body .key-toggle` rule below is (0,3,1),
    so a (0,3,0) selector here would render on the default surface and
@@ -2406,18 +2413,25 @@ html[data-theme] { background: var(--pp-bg); }
 html[data-theme] .header-bar { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-fg-muted); }
 html[data-theme] .login-body input { background: var(--pp-input-bg); color: var(--pp-fg); }
 html[data-theme] .login-body input:focus { border-color: var(--pp-focus-bd); }
-html[data-theme] .login-body button { background: var(--pp-btn-bg); border-color: var(--pp-btn-bd); color: var(--pp-fg); }
-html[data-theme] .login-body button:hover { background: var(--pp-input-focus-bg); }
-/* `background: transparent` here is NOT a duplicate of the base rule's
-   `background: none` -- it is load-bearing, and this comment exists because
-   deleting it during the §8 pass silently painted an opaque --pp-bg2 box
-   behind the eye icon under all 13 presets (measured on dracula and
-   terminal before it shipped). The rule it beats is
-   `html[data-theme] .login-body button { background: var(--pp-bg2) }` two
-   lines up: .key-toggle IS a <button> in .login-body, and (0,3,1) here wins
-   over that selector's (0,2,2). Do not "simplify" it away. */
+/* The two `html[data-theme] .login-body button` rules that used to sit here
+   are gone (2026-09-18 audit M2 + N13). #login-btn carries class="btn", so its
+   whole chrome belongs to the generated .btn recipe, and both rules were
+   fighting it: the resting one swapped the finalizer-derived --pp-btn-fg (AA-
+   paired with --pp-btn-bg by construction, §7.1) for the body text colour, and
+   the :hover one substituted an INPUT role token (--pp-input-focus-bg) for the
+   button hover role -- which equals --pp-bg on six light presets, so hovering
+   the only button on a new user's first screen made it vanish into the page
+   (1.000:1 measured on modern-card / paper-ink / flexoki-light /
+   solarized-light / catppuccin-latte / github-light, and two steps the wrong
+   way on dracula). .btn:hover:not(:disabled) is (0,3,0) and out-ranks what is
+   left, so the login button now hovers on --pp-btn-hover everywhere.
+   The `background: transparent` below is what is left of that story: it used
+   to be load-bearing against the deleted resting rule (deleting it during the
+   §8 pass painted an opaque box behind the eye on all 13 presets). It is kept
+   as the explicit statement that this button has no fill at rest -- the row
+   below no longer cancels the hover fill the base rule gives it. */
 html[data-theme] .login-body .key-toggle { background: transparent; border: 0; color: var(--pp-fg-hint); }
-html[data-theme] .login-body .key-toggle:hover { background: transparent; color: var(--pp-fg); }
+html[data-theme] .login-body .key-toggle:hover { color: var(--pp-fg); }
 html[data-theme] .field > input[type="text"], html[data-theme] .field > textarea {
   background: var(--pp-input-bg); color: var(--pp-fg);
 }
