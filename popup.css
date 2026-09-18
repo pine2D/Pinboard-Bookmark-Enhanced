@@ -2615,6 +2615,18 @@ html[data-theme] .md-strip-btn:hover { background: var(--pp-btn-hover); }
 html[data-theme] .md-strip-btn:focus-visible { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 
 /* ===================== High-DPI Scaling ===================== */
+/* `resolution` = devicePixelRatio x 96dpi, and Chrome folds the browser's
+   default page zoom into it -- it can't tell a physical high-DPI screen
+   from 150%/200% zoom, so these tiers stack: 150% on a 1x screen already
+   reads dpr>=1.5 -> 1.5 x 1.12 = 1.68x total; 200% reads dpr=2 -> 2 x 1.22
+   = 2.44x. Known and accepted, not a bug -- 1.12/1.22 are tuned to the
+   author's 4K real-machine look; don't "fix" this by touching the values.
+   See the 800 DIP clamp (body width, above) and the .quick-actions 3px
+   clip buffer, which absorb the extra size. options.css dropped this same
+   zoom in c50983e0 (2026-07-12, "fractional-pixel hairlines, scale
+   desync") -- popup keeps it, a separate real-machine-verified call.
+   render-audit runs at dpr=1, so neither tier is gated; to measure hi-DPI
+   hairlines, use options-help-render-audit.mjs's DPR harness shape. */
 @media (min-resolution: 144dpi) { body { zoom: 1.12; } }
 @media (min-resolution: 192dpi) { body { zoom: 1.22; } }
 
