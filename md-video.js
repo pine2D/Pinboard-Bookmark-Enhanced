@@ -5933,9 +5933,11 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
               // the passed batches are cached, so the retry click re-pays only
               // for the failures.
               rejected++;
-              console.info("[pbp-video] ai punctuation: batch " + (bi + 1) + "/" + batches.length
-                + " hit a transient provider failure (" + ((e && e.name) || "Error") + " " + ((e && e.status) || "")
-                + ") -- keeping original, remaining batches go one at a time");
+              // Iron rule (吞异常必须留痕): name/message only, never the batch
+              // text or a key. The hard failure at the end of the pass already
+              // logs e.message (below); the two transient hits before it are
+              // the ones a slow-but-recovering run most needs explained.
+              console.warn("[pbp-video] punctuation batch kept after transient error:", e?.name, e?.status, e?.message);
               setAiRing(++freshDone, freshTotal);
               return { ok: false, out: b, transient: true };
             }
