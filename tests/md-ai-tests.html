@@ -4421,6 +4421,13 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
 // C2-6: storage.local reclaim safety (pbpMeasureLocalStorage / pbpReclaimLocalStorage).
 // Adversarial: never-clear keys (pending data, credentials, settings, in-progress
 // handoffs) must survive reclaim(ALL categories); only allowlist keys are removed.
+//
+// K67: every safety assertion below runs TWICE -- once against a legacy
+// get/remove-only storage mock (Chrome 123-129, where reclaim has to fall back
+// to get(null)) and once against a mock that also exposes getKeys/getBytesInUse
+// (Chrome 130+, where reclaim enumerates key NAMES and only deserialises the
+// candidates it is about to delete). The two shapes differ in cost only: what
+// gets deleted, what survives and the freed byte total must be identical.
 (async function () {
   if (typeof pbpReclaimLocalStorage !== "function" || typeof pbpMeasureLocalStorage !== "function") {
     SKIP++;
@@ -4438,18 +4445,48 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
     document.getElementById("results").appendChild(div);
   }
   // In-memory chrome.storage.local mock (get(null)/get(str)/get(arr)/get(obj), remove).
-  function mockLocal(initial) {
+  // caps.getKeys / caps.getBytesInUse opt the mock into the Chrome 130+ surface;
+  // without them it is exactly the Chrome 123 surface. _getNullCalls / _getKeyReads
+  // record what the implementation actually deserialised.
+  function mockLocal(initial, caps) {
     const store = { ...initial };
-    return {
+    const c = caps || {};
+    const local = {
       _store: store,
-      get: (arg) => Promise.resolve(
-        arg == null ? { ...store }
-        : typeof arg === "string" ? (arg in store ? { [arg]: store[arg] } : {})
-        : Array.isArray(arg) ? arg.reduce((o, k) => { if (k in store) o[k] = store[k]; return o; }, {})
-        : Object.keys(arg).reduce((o, k) => { o[k] = (k in store) ? store[k] : arg[k]; return o; }, {})
-      ),
+      _getNullCalls: 0,
+      _getKeyReads: [],
+      get: (arg) => {
+        if (arg == null) local._getNullCalls++;
+        else if (typeof arg === "string") local._getKeyReads.push(arg);
+        else if (Array.isArray(arg)) arg.forEach((k) => local._getKeyReads.push(k));
+        else Object.keys(arg).forEach((k) => local._getKeyReads.push(k));
+        return Promise.resolve(
+          arg == null ? { ...store }
+          : typeof arg === "string" ? (arg in store ? { [arg]: store[arg] } : {})
+          : Array.isArray(arg) ? arg.reduce((o, k) => { if (k in store) o[k] = store[k]; return o; }, {})
+          : Object.keys(arg).reduce((o, k) => { o[k] = (k in store) ? store[k] : arg[k]; return o; }, {})
+        );
+      },
       remove: (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((k) => delete store[k]); return Promise.resolve(); },
     };
+    if (c.getKeys) local.getKeys = () => Promise.resolve(Object.keys(store));
+    if (c.getBytesInUse) {
+      local.getBytesInUse = (keys) => Promise.resolve(
+        (Array.isArray(keys) ? keys : Object.keys(store))
+          .reduce((n, k) => n + (k in store ? pbpEntryBytes(k, store[k]) : 0), 0));
+    }
+    return local;
+  }
+  // Same two shapes, but every read rejects -- the degrade path must stay silent.
+  function failingLocal(caps) {
+    const c = caps || {};
+    const local = {
+      get: () => Promise.reject(new Error("boom")),
+      remove: () => Promise.resolve(),
+    };
+    if (c.getKeys) local.getKeys = () => Promise.reject(new Error("boom"));
+    if (c.getBytesInUse) local.getBytesInUse = () => Promise.reject(new Error("boom"));
+    return local;
   }
   const NEVER = [
     "offlineQueue", "batch_progress", "pinboardToken", "openaiApiKey", "jinaApiKey",
@@ -4475,76 +4512,166 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
     return s;
   }
   const realChrome = window.chrome;
+  const SHAPES = [
+    { label: "legacy get/remove", caps: {} },
+    { label: "getKeys+getBytesInUse", caps: { getKeys: true, getBytesInUse: true } },
+  ];
 
-  await atest("C2-6 reclaim(all cats): never-clear survive, allowlist removed, freed>0", async () => {
-    const local = mockLocal(freshStore());
-    window.chrome = { storage: { local } };
-    const freed = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
-    NEVER.forEach((k) => assert(k in local._store, "must SURVIVE reclaim: " + k));
-    RECLAIMABLE.forEach((k) => assert(!(k in local._store), "must be CLEARED: " + k));
-    WAYBACK_LEGACY.forEach((k) => assert(k in local._store, "must SURVIVE reclaim (out of the misc allowlist, owned by the archive panel's Clear): " + k));
-    assert(freed > 0, "freed bytes must be > 0, got " + freed);
-  });
+  for (const shape of SHAPES) {
+    const tag = " [" + shape.label + "]";
 
-  await atest("C2-6 reclaim([]): empty categories deletes nothing", async () => {
-    const local = mockLocal(freshStore());
-    window.chrome = { storage: { local } };
-    const before = Object.keys(local._store).length;
-    const freed = await pbpReclaimLocalStorage([]);
-    assertEq(Object.keys(local._store).length, before, "no keys removed on empty selection");
-    assertEq(freed, 0, "zero freed on empty selection");
-  });
+    await atest("C2-6 reclaim(all cats): never-clear survive, allowlist removed, freed>0" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      const res = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
+      NEVER.forEach((k) => assert(k in local._store, "must SURVIVE reclaim: " + k));
+      RECLAIMABLE.forEach((k) => assert(!(k in local._store), "must be CLEARED: " + k));
+      WAYBACK_LEGACY.forEach((k) => assert(k in local._store, "must SURVIVE reclaim (out of the misc allowlist, owned by the archive panel's Clear): " + k));
+      assert(res.freed > 0, "freed bytes must be > 0, got " + res.freed);
+    });
 
-  await atest("C2-6 reclaim(garbage/unknown categories): zero deletions", async () => {
-    const local = mockLocal(freshStore());
-    window.chrome = { storage: { local } };
-    const before = Object.keys(local._store).length;
-    const freed = await pbpReclaimLocalStorage(["everything", "__proto__", "settings", null, 42]);
-    assertEq(Object.keys(local._store).length, before, "garbage category names delete nothing");
-    assertEq(freed, 0, "zero freed for garbage categories");
-  });
+    await atest("C2-6 reclaim returns per-category removed {keys,bytes} that sum to freed" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      const res = await pbpReclaimLocalStorage(["jina", "tags"]);
+      assert(res && typeof res === "object" && !Array.isArray(res), "result is an object, got " + typeof res);
+      assert(res.removed && typeof res.removed === "object", "result carries a removed map");
+      // Only the requested categories appear; each one names exactly the keys it dropped.
+      assertEq(Object.keys(res.removed).sort().join(","), "jina,tags", "removed covers exactly the requested categories");
+      assertEq(res.removed.jina.keys.slice().sort().join("|"),
+        ["jina_md_https://ex.com/a", "jina_md_https://ex.com/b"].join("|"), "jina keys named");
+      assertEq(res.removed.tags.keys.slice().sort().join("|"),
+        ["cached_suggest_https://ex.com/a", "cached_user_tags"].join("|"), "tag keys named");
+      const sum = Object.keys(res.removed).reduce((n, c) => n + res.removed[c].bytes, 0);
+      assertEq(sum, res.freed, "per-category bytes sum to freed");
+      assert(res.removed.jina.bytes > 0 && res.removed.tags.bytes > 0, "both categories report bytes");
+      // The categories that were NOT requested are still on disk.
+      assert("cached_existing_urls" in local._store, "urls untouched");
+      assert("pbp_ai_usage" in local._store, "misc untouched");
+    });
 
-  await atest("C2-6 reclaim(non-array input): treated as empty, no deletions", async () => {
-    const local = mockLocal(freshStore());
-    window.chrome = { storage: { local } };
-    const before = Object.keys(local._store).length;
-    await pbpReclaimLocalStorage("jina");        // string, not array
-    await pbpReclaimLocalStorage(undefined);
-    assertEq(Object.keys(local._store).length, before, "non-array categories delete nothing");
-  });
+    await atest("C2-6 reclaim([]): empty categories deletes nothing" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      const before = Object.keys(local._store).length;
+      const res = await pbpReclaimLocalStorage([]);
+      assertEq(Object.keys(local._store).length, before, "no keys removed on empty selection");
+      assertEq(res.freed, 0, "zero freed on empty selection");
+    });
 
-  await atest("C2-6 reclaim(tags only): removes tag caches, leaves jina/urls/misc + never-clear", async () => {
-    const local = mockLocal(freshStore());
+    await atest("C2-6 reclaim(garbage/unknown categories): zero deletions" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      const before = Object.keys(local._store).length;
+      const res = await pbpReclaimLocalStorage(["everything", "__proto__", "settings", null, 42]);
+      assertEq(Object.keys(local._store).length, before, "garbage category names delete nothing");
+      assertEq(res.freed, 0, "zero freed for garbage categories");
+    });
+
+    await atest("C2-6 reclaim(non-array input): treated as empty, no deletions" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      const before = Object.keys(local._store).length;
+      await pbpReclaimLocalStorage("jina");        // string, not array
+      await pbpReclaimLocalStorage(undefined);
+      assertEq(Object.keys(local._store).length, before, "non-array categories delete nothing");
+    });
+
+    await atest("C2-6 reclaim(tags only): removes tag caches, leaves jina/urls/misc + never-clear" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      await pbpReclaimLocalStorage(["tags"]);
+      assert(!("cached_user_tags" in local._store), "cached_user_tags cleared");
+      assert(!("cached_suggest_https://ex.com/a" in local._store), "cached_suggest_ cleared");
+      assert("jina_md_https://ex.com/a" in local._store, "jina cache untouched");
+      assert("cached_existing_urls" in local._store, "url cache untouched");
+      assert("pbp_ai_usage" in local._store, "misc untouched");
+      NEVER.forEach((k) => assert(k in local._store, "never-clear untouched: " + k));
+    });
+
+    // The supplied candidate list is a HINT, never a trust source: a caller (or a
+    // tampered/stale panel state) that names credentials, pending data or
+    // in-progress handoffs still gets nothing deleted, because reclaim re-runs
+    // pbpIsNeverClearKey + pbpKeyMatchesCategory on every candidate it considers.
+    await atest("C2-6 reclaim(keys hint poisoned with never-clear keys): still deletes none of them" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      const poisoned = NEVER.concat(WAYBACK_LEGACY, ["pbp_hl_https://ex.com/a", "pbp_hl_last_color"]);
+      const res = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"], { keys: poisoned });
+      NEVER.forEach((k) => assert(k in local._store, "never-clear survives a poisoned hint: " + k));
+      WAYBACK_LEGACY.forEach((k) => assert(k in local._store, "out-of-allowlist survives a poisoned hint: " + k));
+      const named = Object.keys(res.removed).reduce((a, c) => a.concat(res.removed[c].keys), []);
+      NEVER.concat(WAYBACK_LEGACY).forEach((k) => assert(!named.includes(k), "poisoned key absent from removed: " + k));
+      // The real allowlist keys are still cleared -- the hint neither adds nor blocks.
+      RECLAIMABLE.forEach((k) => assert(!(k in local._store), "allowlist still CLEARED: " + k));
+    });
+
+    // ...and the hint can never NARROW the sweep either: reclaim keeps its own
+    // fresh enumeration, so a key written after the panel measured (hence missing
+    // from the caller's list) is still found and removed.
+    await atest("C2-6 reclaim(keys hint missing a match): fresh enumeration still removes it" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      // Written "after" the caller enumerated: absent from the hint entirely.
+      local._store["jina_md_https://ex.com/late"] = { cache: "z".repeat(300), timestamp: 2 };
+      const stale = ["jina_md_https://ex.com/a"]; // omits /b and /late
+      const res = await pbpReclaimLocalStorage(["jina"], { keys: stale });
+      assert(!("jina_md_https://ex.com/b" in local._store), "key omitted from the hint is still removed");
+      assert(!("jina_md_https://ex.com/late" in local._store), "key written after the hint is still removed");
+      assertEq(res.removed.jina.keys.length, 3, "all three jina keys reported removed");
+      assert("cached_user_tags" in local._store, "unrequested category untouched");
+    });
+
+    await atest("C2-6 measure: groups keys by category with byte totals, ignores never-clear" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      window.chrome = { storage: { local } };
+      const m = await pbpMeasureLocalStorage();
+      assertEq(m.jina.keys.length, 2, "two jina keys");
+      assertEq(m.urls.keys.length, 1, "one url key");
+      assertEq(m.tags.keys.length, 2, "cached_user_tags + one suggest");
+      assertEq(m.misc.keys.length, 3, "ai usage + think reject + param fix");
+      ["jina", "urls", "tags", "misc"].forEach((c) => assert(m[c].bytes > 0, c + " bytes > 0"));
+      // never-clear keys never appear in any category
+      const allMeasured = [].concat(m.jina.keys, m.urls.keys, m.tags.keys, m.misc.keys);
+      NEVER.forEach((k) => assert(!allMeasured.includes(k), "never-clear absent from measure: " + k));
+    });
+
+    await atest("C2-6 measure/reclaim degrade (every storage read throws) without throwing" + tag, async () => {
+      window.chrome = { storage: { local: failingLocal(shape.caps) } };
+      const m = await pbpMeasureLocalStorage();
+      assertEq(m.jina.keys.length, 0, "empty measure on storage failure");
+      const res = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
+      assertEq(res.freed, 0, "zero freed on storage failure");
+      assertEq(Object.keys(res.removed).length, 0, "nothing reported removed on storage failure");
+    });
+  }
+
+  // Cost, not behaviour: with getKeys available reclaim must never ask for the
+  // whole area, and must only deserialise the values of the keys it deletes --
+  // this is the entire point of the fast path, and the MB-scale jina_md_ blobs
+  // are exactly what must stay out of JS when only "tags" is selected.
+  await atest("C2-6 getKeys path: reclaim(tags) skips get(null) and reads only the candidates", async () => {
+    const local = mockLocal(freshStore(), { getKeys: true, getBytesInUse: true });
     window.chrome = { storage: { local } };
     await pbpReclaimLocalStorage(["tags"]);
-    assert(!("cached_user_tags" in local._store), "cached_user_tags cleared");
-    assert(!("cached_suggest_https://ex.com/a" in local._store), "cached_suggest_ cleared");
-    assert("jina_md_https://ex.com/a" in local._store, "jina cache untouched");
-    assert("cached_existing_urls" in local._store, "url cache untouched");
-    assert("pbp_ai_usage" in local._store, "misc untouched");
-    NEVER.forEach((k) => assert(k in local._store, "never-clear untouched: " + k));
+    assertEq(local._getNullCalls, 0, "no whole-area get(null) on the getKeys path");
+    const read = local._getKeyReads;
+    read.forEach((k) => assert(k === "cached_user_tags" || k === "cached_suggest_https://ex.com/a",
+      "only tag-cache values deserialised, saw: " + k));
+    assert(!read.some((k) => k.startsWith("jina_md_")), "jina page caches never deserialised");
   });
 
-  await atest("C2-6 measure: groups keys by category with byte totals, ignores never-clear", async () => {
-    const local = mockLocal(freshStore());
+  // ...and the fallback must not rot: when getKeys is present but fails, reclaim
+  // still falls back to get(null) and behaves exactly as on Chrome 123-129.
+  await atest("C2-6 getKeys rejects: falls back to get(null) and still clears the allowlist", async () => {
+    const local = mockLocal(freshStore(), { getBytesInUse: true });
+    local.getKeys = () => Promise.reject(new Error("no keys for you"));
     window.chrome = { storage: { local } };
-    const m = await pbpMeasureLocalStorage();
-    assertEq(m.jina.keys.length, 2, "two jina keys");
-    assertEq(m.urls.keys.length, 1, "one url key");
-    assertEq(m.tags.keys.length, 2, "cached_user_tags + one suggest");
-    assertEq(m.misc.keys.length, 3, "ai usage + think reject + param fix");
-    ["jina", "urls", "tags", "misc"].forEach((c) => assert(m[c].bytes > 0, c + " bytes > 0"));
-    // never-clear keys never appear in any category
-    const allMeasured = [].concat(m.jina.keys, m.urls.keys, m.tags.keys, m.misc.keys);
-    NEVER.forEach((k) => assert(!allMeasured.includes(k), "never-clear absent from measure: " + k));
-  });
-
-  await atest("C2-6 measure/reclaim degrade (storage.get throws) without throwing", async () => {
-    window.chrome = { storage: { local: { get: () => Promise.reject(new Error("boom")), remove: () => Promise.resolve() } } };
-    const m = await pbpMeasureLocalStorage();
-    assertEq(m.jina.keys.length, 0, "empty measure on storage failure");
-    const freed = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
-    assertEq(freed, 0, "zero freed on storage failure");
+    const res = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
+    assert(local._getNullCalls > 0, "get(null) fallback actually ran");
+    RECLAIMABLE.forEach((k) => assert(!(k in local._store), "must be CLEARED via the fallback: " + k));
+    NEVER.forEach((k) => assert(k in local._store, "never-clear survives the fallback: " + k));
+    assert(res.freed > 0, "fallback still reports freed bytes");
   });
 
   window.chrome = realChrome;

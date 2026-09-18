@@ -1379,29 +1379,94 @@ async function pbpMeasureLocalStorage() {
 }
 
 // Remove ONLY the allowlist keys for the given categories. Every candidate is
-// re-checked against pbpIsNeverClearKey before deletion. Returns freed bytes.
-// Degrades to 0 (no throw) on any storage failure.
-async function pbpReclaimLocalStorage(categories) {
+// re-checked against pbpIsNeverClearKey AND pbpKeyMatchesCategory before
+// deletion, no matter where its name came from.
+//
+// opts.keys is an OPTIONAL candidate-name hint from a caller that has already
+// enumerated (the options Storage panel). It is additive only and is never a
+// trust source: it cannot suppress a removal (reclaim always re-enumerates for
+// itself, so a cache written after the caller measured is still swept) and it
+// cannot authorise one (both guards run on every name, and a name the fresh
+// read does not back is dropped instead of removed or charged for).
+//
+// Enumeration differs in COST only, never in outcome: on Chrome 130+ getKeys()
+// lists key NAMES without deserialising anything, so only the candidates about
+// to be deleted are read back -- an MB-scale jina_md_ page cache stays out of JS
+// when the user clears just "tags". min_chrome is 123, so the get(null) fallback
+// (which hands back every value) stays for 123-129 and pays the same full read
+// it always did. Byte figures are pbpEntryBytes on both paths, so the two shapes
+// report identical numbers. Same precedent as library-notes.js's highlight scan.
+//
+// Returns { freed, removed: { [cat]: { keys, bytes } } }; degrades to
+// { freed: 0, removed: {} } (no throw) on any storage failure.
+async function pbpReclaimLocalStorage(categories, opts) {
   const cats = Array.isArray(categories) ? categories : [];
-  let all;
-  try { all = await chrome.storage.local.get(null); } catch (_) { return 0; }
-  const toRemove = [];
-  let freed = 0;
-  for (const key of Object.keys(all || {})) {
+  // Own-property lookup only: PBP_RECLAIM_CATEGORIES["__proto__"] resolves up
+  // the prototype chain, so an unknown/garbage category name can never seed a
+  // row in `removed` either.
+  const wanted = new Map();
+  for (const cat of cats) {
+    if (typeof cat !== "string") continue;
+    if (!Object.prototype.hasOwnProperty.call(PBP_RECLAIM_CATEGORIES, cat)) continue;
+    wanted.set(cat, PBP_RECLAIM_CATEGORIES[cat]);
+  }
+  if (!wanted.size) return { freed: 0, removed: {} };
+  let local;
+  try { local = chrome.storage.local; } catch (_) { return { freed: 0, removed: {} }; }
+  if (!local) return { freed: 0, removed: {} };
+  // Fresh enumeration, always -- the caller's hint is not an enumeration source.
+  let names = null;
+  let values = null;
+  if (typeof local.getKeys === "function") {
+    try {
+      const listed = await local.getKeys();
+      if (Array.isArray(listed)) names = listed;
+    } catch (_) { names = null; } // transient failure -> take the get(null) path below
+  }
+  if (!names) {
+    try { values = await local.get(null); } catch (_) { return { freed: 0, removed: {} }; }
+    values = values || {};
+    names = Object.keys(values);
+  }
+  const hinted = opts && Array.isArray(opts.keys)
+    ? opts.keys.filter((k) => typeof k === "string") : [];
+  const pool = hinted.length ? Array.from(new Set(names.concat(hinted))) : names;
+  const removed = {};
+  for (const cat of wanted.keys()) removed[cat] = { keys: [], bytes: 0 };
+  const catOf = new Map();
+  for (const key of pool) {
     if (pbpIsNeverClearKey(key)) continue; // second-line guard
-    for (const cat of cats) {
-      const def = PBP_RECLAIM_CATEGORIES[cat]; // unknown/garbage category -> undefined -> skipped
-      if (def && pbpKeyMatchesCategory(key, def)) {
-        toRemove.push(key);
-        freed += pbpEntryBytes(key, all[key]);
-        break;
-      }
+    for (const [cat, def] of wanted) {
+      if (pbpKeyMatchesCategory(key, def)) { catOf.set(key, cat); break; } // a key belongs to at most one category
     }
   }
-  if (toRemove.length) {
-    try { await chrome.storage.local.remove(toRemove); } catch (_) { return 0; }
+  if (!catOf.size) return { freed: 0, removed };
+  const candidates = [...catOf.keys()];
+  if (!values) {
+    // getKeys path: this is the ONLY value read, and it is scoped to the keys
+    // that are about to be deleted.
+    try { values = await local.get(candidates); } catch (_) { return { freed: 0, removed }; }
+    values = values || {};
   }
-  return freed;
+  const toRemove = [];
+  let freed = 0;
+  for (const key of candidates) {
+    // Not backed by the fresh read (stale hint, or a concurrent delete): not
+    // ours to remove, and not ours to count as freed.
+    if (!Object.prototype.hasOwnProperty.call(values, key)) continue;
+    const bytes = pbpEntryBytes(key, values[key]);
+    const row = removed[catOf.get(key)];
+    row.keys.push(key);
+    row.bytes += bytes;
+    freed += bytes;
+    toRemove.push(key);
+  }
+  if (toRemove.length) {
+    // Failure is silent by design; the caller re-renders from a fresh read
+    // rather than trusting this return value as an optimistic UI update.
+    try { await local.remove(toRemove); } catch (_) { return { freed: 0, removed: {} }; }
+  }
+  return { freed, removed };
 }
 
 // Human-readable byte size (B / KB / MB) for the storage panel.

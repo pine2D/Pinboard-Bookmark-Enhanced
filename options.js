@@ -1387,7 +1387,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       _storageClearBtn.disabled = true;
       let freed = 0;
       try {
-        freed = await pbpReclaimLocalStorage(cats);
+        // { freed, removed: { [cat]: { keys, bytes } } } -- the per-category rows
+        // are deliberately NOT painted onto the panel here: reclaim swallows a
+        // failed remove() and returns zero without rolling back, so the rows have
+        // to come from the fresh re-read below, not from an optimistic update.
+        ({ freed } = await pbpReclaimLocalStorage(cats));
       } catch (_) {
         showStorageStatus(t("storageClearFailed"), "err");
         _storageClearBtn.disabled = false;
