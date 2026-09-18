@@ -3040,7 +3040,14 @@ async function runSweep(page, sw, extBase) {
   // the toggle is the only way to render them, so this one block is driven, not
   // unhidden.
   await page.evaluate(() => document.getElementById("offline-queue-toggle")?.click());
-  await page.waitForSelector(".offline-queue-item", { timeout: TIMEOUT_MS }).catch(() => {});
+  // Wait for either outcome of renderList(): rows, or the empty placeholder.
+  // A bare .offline-queue-item wait would burn the full timeout and then
+  // measure an empty list in silence if the seeded queue record ever went
+  // missing -- exactly the blind spot this leg exists to close.
+  await page.waitForSelector(".offline-queue-item, .offline-queue-empty", { timeout: TIMEOUT_MS }).catch(() => {});
+  if (!(await page.$(".offline-queue-item"))) {
+    console.warn("[render-audit] popup states: no .offline-queue-item rendered -- the offline queue seed is missing, .offline-queue-item > .actions button is NOT being measured");
+  }
   await page.waitForTimeout(150);
   add(await page.evaluate(sweepProbe, SWEEP_CFG), "popup", "states");
 

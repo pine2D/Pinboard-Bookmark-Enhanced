@@ -122,7 +122,7 @@
      One literal survives on purpose: html[data-theme] .confirm-popover's
      `0 2px 8px rgba(0,0,0,0.3)` is a dark-preset depth compensation and no
      rung on this ladder is that opaque. */
-  --pp-shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --pp-shadow-xs: 0 1px 0 rgba(0,0,0,0.04); /* keycap lip: a crisp 1px step, no blur (its one consumer, .ac-hint-footer kbd) */
   --pp-shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
   --pp-shadow-lg: 0 8px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
 
@@ -435,11 +435,8 @@ html[data-section="login"] .quick-actions { display: none !important; }
    transparent on dracula / modern-card / solarized-light, 2026-09-18 audit
    M3). (0,4,0) wins on every surface with one rule. */
 .login-body .secret-field .key-toggle:hover { background: color-mix(in srgb, var(--pp-fg) 8%, var(--pp-input-bg)); border-radius: var(--pp-radius-sm); }
-/* `.secret-field` in the selector is specificity ballast, not scoping: the
-   themed `html[data-theme] .login-body .key-toggle` rule below is (0,3,1),
-   so a (0,3,0) selector here would render on the default surface and
-   silently lose under all 13 presets. (0,4,0) wins everywhere with one rule.
-   Focus = the standard button ring (§7.3) pulled inside the eye's own box.
+/* `.secret-field` is the same specificity ballast as the :hover rule above
+   (see that comment). Focus = the standard button ring (§7.3) pulled inside the eye's own box.
    See options.css's .key-toggle:focus-visible for the two rejected
    predecessors (ghost fill, then an invented underline) and for the
    measurement showing that the underline's inset shadow was also what
@@ -542,16 +539,19 @@ html[data-section="login"] .quick-actions { display: none !important; }
      card height even though the x only occupies the first line -- which left
      this filled panel with a 32px right gutter against the card's own 8px
      padding (audit N11). Negative margin rather than absolute positioning: the
-     x is always the card's last child (shared.js showFeedback), the panel
-     always sits below the title/message that the x shares a line with, and
-     this keeps the title/message column exactly where it is. */
-  margin-right: calc(-24px - var(--pp-sp-4));
+     x is always the card's last child (shared.js showFeedback), and this
+     keeps the title/message column exactly where it is. Scoped to a panel
+     that follows a message row (`.fc-message ~ .fc-details`, below): on a
+     title-only card the panel's top row would sit under the x's 24px hit box
+     and the x would capture clicks aimed at the panel's scrollbar (measured
+     2.6px overlap, 2026-09-18 review). */
   max-height: 120px; overflow: auto;
   background: color-mix(in srgb, var(--pp-fg) 6%, transparent);
   font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 11px;
   white-space: pre-wrap; word-break: break-all;
   border-radius: var(--pp-radius-sm);
 }
+.fc-message ~ .fc-details { margin-right: calc(-24px - var(--pp-sp-4)); }
 
 /* Existing Bookmark Banner */
 .existing-banner {
@@ -581,8 +581,9 @@ html[data-section="login"] .quick-actions { display: none !important; }
    introduces, and currentColor cannot reach inside a url("data:...").
    #url-warning carries the inline PBP_ICONS.warning span the feedback card
    already uses (popup.js hydrates .btn-ic[data-ic]), so the mark inherits
-   --pp-warn-fg on every surface. Sized to the 11px text scale exactly like
-   .clear-all-link / .offline-clear do it two rules apart; the -2px baseline
+   --pp-warn-fg on every surface. Sized to the 11px text scale the way
+   .clear-all-link / .offline-clear size theirs (this one keeps .btn-ic's
+   margin-right: it is the icon/sentence gap); the -2px baseline
    nudge replaces .btn-ic's button-sized -3px, which is measured against a
    26px control's line box, not an 11px sentence. options.css keeps its own
    .hint-warn::before -- there the triangle sits on the page background and
@@ -849,15 +850,20 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    open (.ac-open, toggled by openAutocomplete/closeAutocomplete in
    popup-tags.js -- a class, not `:has(+ .autocomplete-dropdown:not(.hidden))`,
    which would put a :has() on the hottest keystroke path in the popup), and the
-   list drops its side and top borders: what makes it read as a popover is the
-   shadow, and one --pp-divider hairline closes its bottom edge.
+   list continues the shell's own focus-coloured frame down its sides and
+   bottom (border-top: 0 -- the shell's bottom edge is the seam). Not shadow
+   only: --pp-shadow-lg composited on --pp-bg separates 1.32:1 on the light
+   surfaces but 1.05-1.07 on the dark presets and 1.006 on terminal, so a
+   borderless list had no boundary at all there (2026-09-18 review). The
+   focus colour rather than --pp-border: while the list is open the shell is
+   focused, and shell + list read as one continuous control.
    --pp-shadow-lg, not a re-typed literal: it is declared with the same
    geometry the literal spelled out and had no consumer at all (audit N1),
    and being a token it is one value on all 15 surfaces -- the themed twin used
    to substitute the shallower --pp-shadow-md on the 13 presets, i.e. exactly
    the value the deeper one was written to replace (audit S14). */
 .autocomplete-dropdown {
-  background: var(--pp-bg); border: 0; border-bottom: 1px solid var(--pp-divider);
+  background: var(--pp-bg); border: 1px solid var(--pp-focus-bd); border-top: 0;
   border-radius: 0 0 var(--pp-radius-md) var(--pp-radius-md);
   max-height: 150px; z-index: var(--pp-z-autocomplete);
   box-shadow: var(--pp-shadow-lg);
@@ -1322,7 +1328,11 @@ html[data-theme] .batch-progress-text {
 }
 .quick-links a:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 .ql-sep {
+  /* Decorative punctuation, not text: --pp-fg-hint alone out-weighed the
+     links it separates (4.99:1 vs the links' 4.78:1 on the default surface,
+     2026-09-18 review), so it is dimmed below them on every surface. */
   color: var(--pp-fg-hint);
+  opacity: 0.6;
   font-size: 11px;
 }
 
@@ -2530,7 +2540,8 @@ html[data-theme] { background: var(--pp-bg); }
    per-theme --pp-divider, and it also scopes the colour to the one side that
    has a width (the override set all four). Checked both directions: no
    .header-bar compound rule was losing to it, and no surviving
-   html[data-theme] prefix rule matches the element. */html[data-theme] .login-body input { background: var(--pp-input-bg); color: var(--pp-fg); }
+   html[data-theme] prefix rule matches the element. */
+html[data-theme] .login-body input { background: var(--pp-input-bg); color: var(--pp-fg); }
 html[data-theme] .login-body input:focus { border-color: var(--pp-focus-bd); }
 /* The two `html[data-theme] .login-body button` rules that used to sit here
    are gone (2026-09-18 audit M2 + N13). #login-btn carries class="btn", so its
@@ -2768,7 +2779,11 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-h
   font-size: 11px; /* the one control in this file with no declared size: it inherited the UA's 13.333px. 11px is its row neighbour .qbtn's */
 }
 .md-strip-btn .btn-ic { margin: 0; vertical-align: 0; }
-.md-strip-btn:hover { background: var(--pp-btn-hover); border-color: var(--pp-accent); }
+/* `.md-strip` is specificity ballast (0,3,0): the themed RESTING rule
+   `html[data-theme] .md-strip-btn` is (0,2,1) and outranked the (0,2,0) form,
+   so the accent edge only ever showed on the default surface (2026-09-18
+   review; same defect class as the key-toggle hover above). */
+.md-strip .md-strip-btn:hover { background: var(--pp-btn-hover); border-color: var(--pp-accent); }
 .md-strip-btn:active:not(:disabled) { transform: scale(0.97); }
 .md-strip-btn:focus-visible { outline: none; border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 .md-strip-btn .btn-ic { display: inline-flex; }

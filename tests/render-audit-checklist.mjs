@@ -978,6 +978,13 @@ export const CHECKS = [
     focusTarget: ":scope", expect: { focusRecipe: "bordered" } },
   { surface: "popup", page: "popup.html", selector: ".md-strip-btn", state: "focusWithin",
     focusTarget: ":scope", expect: { focusRecipe: "bordered" } },
+  // #delete-btn: the themed `.submit-bar button:focus-visible` twin C45 added
+  // was deleted on 2026-09-18 (both submit-bar buttons carry class="btn", so
+  // the generated .btn / .btn.danger focus recipe supplies the same tokens).
+  // This probe is what stands between that deletion and a silent regression
+  // if a themed resting rule on the bar ever comes back.
+  { surface: "popup", page: "popup.html", selector: "#delete-btn", state: "focusWithin",
+    focusTarget: ":scope", expect: { focusRecipe: "bordered" } },
   // `inset` CARRIED for a passenger: the vocab row's ring is drawn on
   // .notes-card-top, not on the .notes-card-head button that actually takes
   // focus -- the head spans only the first of the row's three grid columns,
