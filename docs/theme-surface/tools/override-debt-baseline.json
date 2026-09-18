@@ -3086,6 +3086,15 @@
     },
     {
       "context": [],
+      "selector": "html.pbp-dark .search_button input[type=\"submit\"]",
+      "property": "border",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
       "selector": "html.pbp-dark .service_box",
       "property": "color",
       "important": true,
@@ -3212,6 +3221,15 @@
     },
     {
       "context": [],
+      "selector": "html.pbp-dark #main_column form[name=\"sort\"] table a.bundle",
+      "property": "font-weight",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
       "selector": "html.pbp-dark #main_column form[name=\"sort\"] table a[style*=\"color: #aaa\"]",
       "property": "color",
       "important": true,
@@ -3257,8 +3275,35 @@
     },
     {
       "context": [],
+      "selector": "html.pbp-dark #main_column form[name=\"sort\"] table input[name^=\"id_\"]",
+      "property": "border-radius",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
+      "selector": "html.pbp-dark #main_column form[name=\"sort\"] table td a.destroy",
+      "property": "font-weight",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
       "selector": "html.pbp-dark #main_column form[name=\"sort\"] table td a.edit",
       "property": "color",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
+      "selector": "html.pbp-dark #main_column form[name=\"sort\"] table td a.edit",
+      "property": "opacity",
       "important": true,
       "themes": [
         "flexoki"
@@ -3581,8 +3626,35 @@
     },
     {
       "context": [],
+      "selector": "html.pbp-dark a.url_display",
+      "property": "font-size",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
       "selector": "html.pbp-dark a.url_link",
       "property": "background",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
+      "selector": "html.pbp-dark a.url_link",
+      "property": "border-radius",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
+      "selector": "html.pbp-dark a.url_link",
+      "property": "padding",
       "important": true,
       "themes": [
         "flexoki"
@@ -3608,8 +3680,26 @@
     },
     {
       "context": [],
+      "selector": "html.pbp-dark input[type=\"button\"]",
+      "property": "border",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
       "selector": "html.pbp-dark input[type=\"password\"]",
       "property": "border-color",
+      "important": true,
+      "themes": [
+        "flexoki"
+      ]
+    },
+    {
+      "context": [],
+      "selector": "html.pbp-dark input[type=\"submit\"]",
+      "property": "border",
       "important": true,
       "themes": [
         "flexoki"

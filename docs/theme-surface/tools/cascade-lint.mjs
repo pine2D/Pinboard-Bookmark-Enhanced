@@ -28,7 +28,21 @@ const VERBOSE = process.argv.includes("--verbose");
 // ----------------------------------------------------------------------------
 // PROBES - pixel-aligned to the bug class we hit during the tag-style refactor.
 // `expected[prop]` is a substring that the winning selector MUST contain.
+// `expectValue[prop]` asserts the winning DECLARATION VALUE instead. It exists
+// because composeTheme() re-emits the whole base sheet under `html.pbp-dark `,
+// so a mode rule and the overrides.css rule that corrects it share one selector
+// string byte for byte - selector-substring probes cannot tell them apart.
+// `elem.attrs` / `ancestors[].attrs` model real attributes so probes can reach
+// `input[type="submit"]`, `form[name="sort"]` and `input[name^="id_"]`; probes
+// that declare no attrs keep the original conservative refusal of every
+// attribute-scoped selector.
+// `theme` pins a probe to one slug (values below are that theme's shipped
+// literals, not a cross-theme invariant).
 // ----------------------------------------------------------------------------
+// Shared ancestor chains for the k22 probes below.
+const DARK_ROOT = { tag: "html", classes: ["pbp-dark"] };
+const SORT_TABLE = [{ id: "main_column" }, { tag: "form", attrs: { name: "sort" } }, { tag: "table" }, { tag: "tr" }];
+
 const PROBES = [
   // --- REGRESSION PROBES: the same element as a REAL link (`:link` matches any
   // <a href>). Without the :link state the simulated element can never match the
@@ -155,11 +169,59 @@ const PROBES = [
     mode: "dark",
     elem: { tag: "a", classes: ["cached"],
       ancestors: [{ tag: "html", classes: ["pbp-dark"] }, { classes: ["bookmark"] }], state: ["hover"] },
-    expected: { color: ".bookmark a.cached", "text-decoration": ".bookmark a.cached:hover" } }
+    expected: { color: ".bookmark a.cached", "text-decoration": ".bookmark a.cached:hover" } },
+
+  // ----- K22: flexoki dark restorations (2026-09-18) -----
+  // Ten properties the hand-written dark theme never re-stated, so the light
+  // value carried through. The regenerated `html.pbp-dark ` mode rules re-state
+  // them from composer tokens and outrank the bare overrides that restore the
+  // shipped values, so the dark side drifted. flexoki's overrides.css now
+  // carries an explicit `html.pbp-dark` rule per item; these probes assert the
+  // RESTORED VALUE wins, which is the only thing that distinguishes the two
+  // (identical selector text, equal specificity, source order decides).
+  // Diagnosis: docs/superpowers/sdd-archive/2026-09-18-k22-flexoki-diagnosis.md
+  { name: "k22 html.pbp-dark a.url_display font-size (light carries 12px)",
+    mode: "dark", theme: "flexoki",
+    elem: { tag: "a", classes: ["url_display"], ancestors: [DARK_ROOT, { classes: ["bookmark"] }] },
+    expectValue: { "font-size": "12px" } },
+  { name: "k22 html.pbp-dark a.url_link padding + radius (light carries 1px 5px / 3px)",
+    mode: "dark", theme: "flexoki",
+    elem: { tag: "a", classes: ["url_link"], ancestors: [DARK_ROOT, { classes: ["bookmark"] }] },
+    expectValue: { padding: "1px 5px", "border-radius": "3px" } },
+  { name: "k22 html.pbp-dark .search_button input[type=submit] border (light carries none)",
+    mode: "dark", theme: "flexoki",
+    elem: { tag: "input", attrs: { type: "submit" }, ancestors: [DARK_ROOT, { classes: ["search_button"] }] },
+    expectValue: { border: "none" } },
+  { name: "k22 html.pbp-dark input[type=submit] border (light carries none)",
+    mode: "dark", theme: "flexoki",
+    elem: { tag: "input", attrs: { type: "submit" }, ancestors: [DARK_ROOT] },
+    expectValue: { border: "none" } },
+  { name: "k22 html.pbp-dark input[type=button] border (light carries none)",
+    mode: "dark", theme: "flexoki",
+    elem: { tag: "input", attrs: { type: "button" }, ancestors: [DARK_ROOT] },
+    expectValue: { border: "none" } },
+  { name: "k22 html.pbp-dark sort-table input[name^=id_] border-radius (light carries 4px)",
+    mode: "dark", theme: "flexoki",
+    elem: { tag: "input", attrs: { type: "text", name: "id_34405" },
+      ancestors: [DARK_ROOT, ...SORT_TABLE, { tag: "td" }] },
+    expectValue: { "border-radius": "4px" } },
+  { name: "k22 html.pbp-dark sort-table a.bundle font-weight (light carries 600)",
+    mode: "dark", theme: "flexoki",
+    elem: { tag: "a", classes: ["bundle"], ancestors: [DARK_ROOT, ...SORT_TABLE, { tag: "td" }] },
+    expectValue: { "font-weight": "600" } },
+  { name: "k22 html.pbp-dark sort-table td a.edit opacity at rest (light carries 0.75)",
+    mode: "dark", theme: "flexoki",
+    elem: { tag: "a", classes: ["edit"], ancestors: [DARK_ROOT, ...SORT_TABLE, { tag: "td" }] },
+    expectValue: { opacity: "0.75" } },
+  { name: "k22 html.pbp-dark sort-table td a.destroy font-weight (light carries 600)",
+    mode: "dark", theme: "flexoki",
+    elem: { tag: "a", classes: ["destroy"], ancestors: [DARK_ROOT, ...SORT_TABLE, { tag: "td" }] },
+    expectValue: { "font-weight": "600" } }
 ];
 
 const LIGHT_PROBES = PROBES.filter(p => p.mode === "light");
 const DARK_PROBES  = PROBES.filter(p => p.mode === "dark");
+const VALUE_CHECKS = PROBES.reduce((n, p) => n + Object.keys(p.expectValue || {}).length, 0);
 
 // ----------------------------------------------------------------------------
 // Extract per-theme CSS blocks from pinboard-themes.js.
@@ -325,8 +387,46 @@ function probeCompound(probe) {
     classes: probe.classes || [],
     states: (probe.state || []).map(s => ({ name: s, arg: null })),
     pseudo: probe.pseudo || null,
-    negations: []
+    negations: [],
+    attrs: probe.attrs || null
   };
+}
+
+// ----------------------------------------------------------------------------
+// Attribute selectors. parseCompound() stores the raw text inside [...] as a
+// state named "attr"; this turns it into { name, op, value } and tests it
+// against a probe's declared attributes. Probes that declare no `attrs` keep
+// the original conservative refusal (see compoundMatches) so every pre-K22
+// probe resolves exactly as before.
+// ----------------------------------------------------------------------------
+function parseAttrCondition(text) {
+  const m = String(text).match(/^\s*([A-Za-z_][\w.:-]*)\s*(?:([~^$*|]?=)\s*([\s\S]*?)\s*)?$/);
+  if (!m) return null;
+  let value = m[3];
+  if (value !== undefined) {
+    value = value.replace(/\s+[iIsS]$/, "");
+    const q = value.match(/^(['"])([\s\S]*)\1$/);
+    if (q) value = q[2];
+  }
+  return { name: m[1], op: m[2] || null, value: value === undefined ? null : value };
+}
+
+function attrMatches(cond, attrs) {
+  if (!cond) return false;
+  const raw = attrs[cond.name];
+  if (raw === undefined || raw === null) return false;
+  const actual = String(raw);
+  if (!cond.op) return true;
+  const want = cond.value ?? "";
+  switch (cond.op) {
+    case "=":  return actual === want;
+    case "^=": return want !== "" && actual.startsWith(want);
+    case "$=": return want !== "" && actual.endsWith(want);
+    case "*=": return want !== "" && actual.includes(want);
+    case "~=": return want !== "" && actual.split(/\s+/).includes(want);
+    case "|=": return actual === want || actual.startsWith(want + "-");
+    default:   return false;
+  }
 }
 
 function compoundMatches(sel, probe) {
@@ -338,8 +438,14 @@ function compoundMatches(sel, probe) {
   for (const st of sel.states) {
     if (st.name === "attr") {
       // Probe doesn't model attributes - refuse the match conservatively so
-      // attribute-scoped selectors don't collide with plain probes.
-      return false;
+      // attribute-scoped selectors don't collide with plain probes. Probes
+      // that DO declare `attrs` get real matching; that is what lets the k22
+      // probes reach input[type="submit"] and form[name="sort"], and it also
+      // makes :not([type]) resolve correctly for them (the negation asks this
+      // same branch, which now answers "no such attribute" instead of "no").
+      if (!probe.attrs) return false;
+      if (!attrMatches(parseAttrCondition(st.arg), probe.attrs)) return false;
+      continue;
     }
     if (st.name === "not" || st.name === "is" || st.name === "where" || st.name === "has") continue;
     if (!probe.states.some(ps => ps.name === st.name)) return false;
@@ -419,10 +525,28 @@ for (const theme of themes) {
   const rules = parseRules(theme.css);
   const adaptive = isAdaptive(theme.css);
   if (adaptive) adaptiveCount++;
-  const probesForTheme = adaptive ? PROBES : LIGHT_PROBES;
+  const probesForTheme = (adaptive ? PROBES : LIGHT_PROBES)
+    .filter((probe) => !probe.theme || probe.theme === theme.slug);
   const themeConflicts = [];
   for (const probe of probesForTheme) {
-    for (const [prop, wantedSubstr] of Object.entries(probe.expected)) {
+    for (const [prop, wantedValue] of Object.entries(probe.expectValue || {})) {
+      const { winner, candidates } = resolveCascade(rules, probe.elem, prop);
+      if (!winner) {
+        themeConflicts.push({
+          probe: probe.name, prop, wanted: wantedValue, kind: "value",
+          winner: null, candidates,
+          reason: "no rule matched the probe for this property"
+        });
+        continue;
+      }
+      if (normalizeValue(winner.value) !== normalizeValue(wantedValue)) {
+        themeConflicts.push({
+          probe: probe.name, prop, wanted: wantedValue, kind: "value", winner, candidates,
+          reason: `winning declaration is "${winner.value}" from ${winner.rule.selectorText} (line ${winner.rule.lineNum}, specificity ${winner.spec.join(",")})`
+        });
+      }
+    }
+    for (const [prop, wantedSubstr] of Object.entries(probe.expected || {})) {
       const { winner, candidates } = resolveCascade(rules, probe.elem, prop);
       if (!winner) {
         themeConflicts.push({
@@ -447,6 +571,12 @@ for (const theme of themes) {
   }
 }
 
+// Declaration values are compared after whitespace collapse + lowercasing so
+// `1px  5px` and `1PX 5PX` do not read as regressions.
+function normalizeValue(value) {
+  return String(value).trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function explainReason(winner, candidates, wanted) {
   const expected = candidates.find(c => c.rule.selectorText.includes(wanted));
   if (!expected) return "expected rule absent from CSS";
@@ -463,11 +593,12 @@ if (VERBOSE) {
   for (const theme of themes) {
     const rules = parseRules(theme.css);
     const adaptive = isAdaptive(theme.css);
-    const probesForTheme = adaptive ? PROBES : LIGHT_PROBES;
+    const probesForTheme = (adaptive ? PROBES : LIGHT_PROBES)
+      .filter((probe) => !probe.theme || probe.theme === theme.slug);
     console.log(`\n# theme: ${theme.slug}${adaptive ? " (adaptive — running dark probes)" : ""}`);
     for (const probe of probesForTheme) {
       console.log(`  probe: ${probe.name} [${probe.mode}]`);
-      for (const [prop, wantedSubstr] of Object.entries(probe.expected)) {
+      for (const [prop, wantedSubstr] of Object.entries(probe.expected || {})) {
         const { candidates } = resolveCascade(rules, probe.elem, prop);
         console.log(`    ${prop} (want substr "${wantedSubstr}"):`);
         if (candidates.length === 0) { console.log("      <no candidates>"); continue; }
@@ -482,7 +613,7 @@ if (VERBOSE) {
 }
 
 if (conflictReports.length === 0) {
-  console.log(`[cascade-lint] PASS - ${themes.length} themes (${adaptiveCount} adaptive), ${LIGHT_PROBES.length} light + ${DARK_PROBES.length} dark probes, 0 conflicts`);
+  console.log(`[cascade-lint] PASS - ${themes.length} themes (${adaptiveCount} adaptive), ${LIGHT_PROBES.length} light + ${DARK_PROBES.length} dark probes (${VALUE_CHECKS} value assertions), 0 conflicts`);
   process.exit(0);
 }
 
@@ -498,9 +629,12 @@ for (const r of conflictReports) {
     console.log(`  probe: ${name}`);
     for (const c of list) {
       console.log(`    ${c.prop}:`);
-      console.log(`      expected winner selector contains: ${c.wanted}`);
+      console.log(c.kind === "value"
+        ? `      expected winning value: ${c.wanted}`
+        : `      expected winner selector contains: ${c.wanted}`);
       if (c.winner) {
         const sp = c.winner.spec.join(",");
+        if (c.kind === "value") console.log(`      (value assertion: winner value must equal the shipped literal)`);
         const imp = c.winner.important ? " !important" : "";
         console.log(`      actual winner: ${c.winner.rule.selectorText} (line ${c.winner.rule.lineNum}) - specificity (${sp})${imp}, ${c.prop}: ${c.winner.value}`);
       } else {
