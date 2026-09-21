@@ -172,6 +172,12 @@ hover 把填充与边框一起往 `--{ns}-fg` 混 12%（`color-mix(in srgb, acce
 分支——popup 已有自己的 `#submit-btn` 主按钮配方（比本战役更早存在，颜色语言不同），迁到 `.btn.primary` 是
 一次独立的、有自身布局后果的按钮迁移，不在本批范围。
 
+**`.btn.primary` 与 `.ghost`/`.danger`/`.tonal` 互斥，不得叠加**：`.btn.primary.danger` 与 `.btn.primary`
+特异性相同（均为 0,2,0），由源序决定胜负——`.btn.danger` emit 在 `.btn.primary` 之后，`color` 被判给
+`--{ns}-danger-quiet-fg`，于是渲染成「accent 填充 + danger 文字」这种两档拼接的怪状态；`.btn.primary.ghost`
+同理特异性相同，但 `.btn.ghost` emit 在 `.btn.primary` 之前，`background`/`border-color` 判给后写的
+primary，`.ghost` 被静默吃掉、视觉上什么也没发生。lint 规则是后续工作，本轮不写。
+
 `--{ns}-on-accent` 是 primary 唯一新增的颜色角色，对 options / library 用 `fgToAAMulti(palette["btn-fg"],
 [accent, primaryHoverFill(accent, fg)])`——固定前景是这个主题「品牌按钮文字」本来的颜色，同时对**两个**背景
 （静息 accent 填充，与 `.btn.primary:hover` 的 `color-mix(...)` 结果）都推到 ≥4.5:1，与 §1.3 `--{ns}-btn-fg`
@@ -1052,6 +1058,11 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
    - **阈值 1.10（2026-09-21 用户裁决，原 1.06）。** 三档实渲染对比后选定：1.10 在浅色表面上读作独立的一层；
      1.15 开始接近旧式灰按钮，并会让 5 处比宿主更暗的「凹槽」输入框被混过宿主亮度、翻成「凸起药丸」
      （`fillSeparate` 只会往 fg 方向混）。常量：`_ui-derive.mjs` 的 `FILL_SEPARATE_MIN`。
+   - **`btn-bg` / `input-bg` / `btn-hover` 是种子，不是逐字值。** pilot 填的值只是 `fillSeparate`
+     的起点，会被推到对每个宿主都 ≥1.10 为止（已达标则恒等返回）；`border` 同理，是 `borderToAA`
+     推到 3:1 的种子。只有 pilot 同时声明了对应的边框角色（`btn-border`/`input-border`；popup
+     用 `btn-bd`/`input-bd`）时，composer 才把这次声明本身当作豁免信号，让填充保持字面量
+     （terminal 豁免，见 §9.5）——不声明边框角色，填充就永远是种子而非最终值。
 
 3. **列表选中 / hover 高亮内嵌。** 高亮带不得满幅铺到容器边：`border-radius > 0`
    且左右各留 ≥4px 内距，**永不触容器角**。左侧 accent 条不需要额外规则——inset `box-shadow`

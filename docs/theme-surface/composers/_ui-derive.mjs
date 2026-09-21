@@ -508,8 +508,13 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
   // under FILL_SEPARATE_MIN's floor is fixed at ITS OWN pilot-file source
   // instead (see solarized-{light,dark}.tokens.json's `ui.options/popup.fg`,
   // re-derived 2026-09-22 for the same 1.06->1.10 raise this gap-fill
-  // covers for every theme that does NOT override fg). Identity when fg
-  // already clears both fills, so 12/14 themes emit byte-for-byte unchanged
+  // covers for every theme that does NOT override fg). "Values win" scopes
+  // to TEXT roles only (fg/fg-hint/fg-muted/popup's on-accent) -- the
+  // btn-bg/input-bg/btn-hover fillSeparate() calls a few lines above and
+  // below this one stay SEEDS regardless of a pilot value, same for
+  // border/borderToAA() further down (NEW_THEME.md "FILL / EDGE input
+  // roles are SEEDS"). Identity when fg already clears both fills, so
+  // 12/14 themes emit byte-for-byte unchanged
   // -- only library/popup's solarized-light and library's solarized-dark
   // (the 3 (surface, theme) pairs with no fg override at all) actually move.
   if (ovr.fg == null) {

@@ -313,11 +313,14 @@ mode in the tokens file — values win over `_ui-derive.mjs`:
 ```
 
 Emittable popup keys include every `--pp-*` role plus `radius-sm/md/lg/tag`,
-`focus-bd`, `focus-ring`, and `on-accent`; the options composer accepts any
-`--opt-*` role and the library composer any `--lib-*` role. `ui.library` is
+`focus-bd`, `focus-ring`, and `on-accent` (an INPUT role on popup only — see
+the derived-colors bullet below for options/library). The options composer
+accepts any `--opt-*` role and the library composer any `--lib-*` role,
+short of the derived component-pair colors listed below. `ui.library` is
 no longer purely theoretical — `terminal` is the first (and, as of this
 campaign, only) pilot to carry one, for the border-restore mechanism below.
-Four rules, two carried over and regression-tested, two new this campaign:
+Six rules, four carried over and regression-tested, two new in the batch2
+final-fix wave:
 
 - **`on-accent` (submit-button text) is ALWAYS emitted explicitly** — never
   rely on a `var()` fallback in shared rules (custom properties inherit, so
@@ -333,11 +336,39 @@ Four rules, two carried over and regression-tested, two new this campaign:
 - **Derived component-pair colors are not `ui` inputs.** The shared
   `btn-fg`, `danger-quiet-fg`, `on-danger`, `chip-bg`, `chip-fg` roles and
   popup-only `preset-fg` / `spinner-fg` are computed from the FINAL,
-  post-override map. `validate-contracts.mjs` rejects these names at their
-  exact JSON pointer instead of silently discarding them. Change supported
-  inputs (`btn-bg`, `danger`, `tag-bg`, `tag-fg`, `preset-bg`, `spinner-bg`)
-  and trust the finalizer; a new output escape hatch requires an explicit
-  derivation-contract change plus tests.
+  post-override map — as is `on-accent` on options and library (Task 4,
+  taste-uplift-batch2): neither surface has ever declared this role, so
+  there is no legacy pilot value to preserve, and `.btn.primary`'s text
+  colour there is always derived, the same as `on-danger`/`chip-bg`.
+  `on-accent` stays an INPUT role on popup — its long-standing
+  `ui.popup.<mode>.on-accent` override (5/13 pilots use it) is unaffected.
+  `validate-contracts.mjs` rejects a pilot writing any of these names at
+  its exact JSON pointer instead of silently discarding it (this now
+  includes `ui.options.*.on-accent` / `ui.library.*.on-accent`). Change
+  supported inputs (`btn-bg`, `danger`, `tag-bg`, `tag-fg`, `preset-bg`,
+  `spinner-bg`) and trust the finalizer; a new output escape hatch requires
+  an explicit derivation-contract change plus tests.
+- **TEXT input roles are taken VERBATIM (batch2 final-fix wave).** `fg`,
+  `fg-hint`, `fg-muted`, and popup's `on-accent` are never adjusted by the
+  derivation once a pilot overrides them — `_ui-derive.mjs`'s own gap-fill
+  only ever touches a role the pilot left unset ("values win" above).
+  `contrast-audit.mjs` now measures every one of these against the
+  elevated surface (`panel`/`bg2`) and against the control fills
+  (`btn-bg`, `input-bg`, `btn-hover`); an override that does not clear
+  4.5:1 against one of them FAILS the gate and must be corrected AT THE
+  PILOT, hue-preserving: `fgToAAMulti(old, [the failing hosts])`
+  (solarized-light/dark's `ui.options.*.fg` are the worked examples).
+- **FILL / EDGE input roles are SEEDS, not verbatim values.** Unlike the
+  TEXT roles above, `btn-bg` / `input-bg` / `btn-hover` are starting
+  points `fillSeparate()` pushes until they clear `FILL_SEPARATE_MIN`
+  against their hosts (identity when they already do), and `border` is a
+  seed `borderToAA()` pushes to WCAG 1.4.11's 3:1 floor — e.g.
+  solarized-light options' `btn-bg` seed `#fdf6e3` ships as `#e1decf`. A
+  pilot's `btn-bg` / `input-bg` is kept verbatim ONLY when it also
+  declares the matching frame role (`btn-border` / `input-border`; popup:
+  `btn-bd` / `input-bd`) — that declaration is itself the opt-out signal
+  `finalizeUiControlRoles` reads (the terminal exemption below); without
+  it, the fill is always a seed, never the literal.
 - **A pilot can restore a real border by declaring its own `-bd`/`-border`
   role — the terminal exemption.** Every theme's controls default to the
   Soft Fill language (COMPONENTS.md §9): no resting border, identity
