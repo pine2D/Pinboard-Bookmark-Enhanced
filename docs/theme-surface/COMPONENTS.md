@@ -147,6 +147,12 @@ YaHei/PingFang 时行盒比 Latin 高一截，同一颗按钮在 zh-CN 和 en �
 `color: --{ns}-chip-fg`、600。hover 走 `--{ns}-btn-hover`。两组配对（chip-fg/chip-bg、chip-fg/btn-hover）都已在
 contrast-audit 的 `COMPONENT_PAIR_SPEC` 里逐表面审计，不新增颜色角色。与 rung 正交：`.btn.btn-sm.tonal` 合法。
 
+**tonal 填充与 `.btn` 填充的可分辨度**（2026-09，Task 2）由 contrast-audit 的 `chip-bg ΔE btn-bg ≥ 6` 守着——两个
+档位挨在一起（一个 tonal 按钮紧挨一个普通按钮、一个选中 chip 紧挨未选中的）必须靠**填充本身**分得开，这是感知
+距离问题，不是亮度比问题（default 表面的 chip 淡蓝对按钮灰只有 1.01:1 亮度比却 ΔE 6.1、肉眼可分；
+catppuccin-mocha 两者逐字节相同、ΔE 0）。派生在 `finalizeUiControlRoles`（`_ui-derive.mjs` 的 `fillDistinct`，
+往主题自己的 accent 方向混，保留 tint 的色相识别度）。
+
 上一句「逐表面审计、不新增颜色角色」只对**审计本身**成立，对 popup 的**渲染结果**具有误导性：`--pp-chip-bg` 在
 15 套 popup 主题块里有 8 套字面值就是 `transparent`（实测：`transparent`/`#e8f0fe`/`#FAEEC6`/`#3A2D04`/`#dce0e8`/
 `#45475a`/`#ddf4ff`/`#e2eafa`，8 个 `transparent`）。`contrast-audit` 把非十六进制的 `chip-bg` 合成到面板背景上再
@@ -498,6 +504,7 @@ fg/panel 基线本就只有 4.86:1，任何 fg 浸染都会吃掉这点余量）
 | 属性 | token | 派生要求 |
 |---|---|---|
 | `background` | **`--{ns}-chip-bg`** | 新增派生。现状 `tag-bg`/`tag-fg` 直取 palette **无 AA 校正** |
+| `background`（档位可分辨性，Task 2） | `--{ns}-chip-bg` | `fillDistinct(chip, [btn-bg], accent)` ≥6 ΔE2000 vs `--{ns}-btn-bg`——options/library only（popup 的 `chipMode: "verbatim"` 不受此约束，见 §1.2 tonal 段） |
 | `color` | **`--{ns}-chip-fg`** | `fgToAA(chip-fg, chip-bg)` ≥4.5:1。chip 若可按压（`[aria-pressed]`，hover 底换成 `btn-hover`），改用 `fgToAAMulti(chip-fg, [chip-bg, btn-hover])` |
 
 popup 现有的 `--pp-tag-bg` / `--pp-tag-fg` 是同一角色的旧名。Task 5 发射新名、消费点迁移完成后
@@ -1059,6 +1066,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | render oracle `insetBand` | 列表高亮带内嵌：inline ≥4px、block ≥2px、圆角**等于本主题的 md 阶**（两个列表各一条，15 主题） |
 | render oracle `tabChrome` | tab 无壳 + 选中下划线（选中/未选中各一条，15 主题） |
 | `ui-token-coverage` | 新角色 token 在每个主题块都有定义 |
+| `contrast-audit` 的 `chip-bg ΔE btn-bg`（Task 2） | 档位可分辨性：tonal 填充 / 选中 chip 填充与相邻的静息 `.btn` 填充 ΔE2000 ≥6，options/library only |
 
 `fillSeparate` 本身**没有独立的门**：它的正确性由 `contrast-audit` 从下游反向约束
 （填充错了，btn-fg / border / danger-quiet-fg 的配对必然红），加上恒等性质

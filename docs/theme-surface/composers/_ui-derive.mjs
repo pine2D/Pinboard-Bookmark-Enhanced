@@ -38,6 +38,61 @@ export function contrast(a, b) {
   const L = [relLum(a), relLum(b)].sort((x, y) => x - y);
   return (L[1] + 0.05) / (L[0] + 0.05);
 }
+
+// PERCEPTUAL color distance (CIEDE2000). Not interchangeable with cr() above:
+// the WCAG ratio is a pure LUMINANCE relation and is blind to hue, so it rates
+// gruvbox's green->pink link hover (#83a598 -> #d3869b) at 1.02:1, the same
+// number it gives two colors that are literally identical. Anything asking
+// "would a person SEE this change" — a rest state against its :hover — has to
+// use deltaE2000; anything asking "is this text legible on that fill" stays on
+// cr(). Reference: CIE 142-2001, kL=kC=kH=1, D65. Verified against Sharma's
+// published CIEDE2000 test set (2005) -- including the four hue-discontinuity
+// pairs at (50, 2.49, -0.001) vs (50, -2.49, 0.0009..0.0012), which is where a
+// naive mean-hue branch goes wrong: 7.1792 / 7.1792 / 7.2195 / 7.2195, exact.
+//
+// rgbToLab moved down here alongside deltaE2000 (its only caller, not
+// separately imported anywhere -- verified via `rg -n rgbToLab` before the
+// move): deltaE2000 cannot work without it, and leaving it behind in
+// contrast-audit.mjs while deltaE2000 imports it back would either dangle a
+// stale re-export or create a circular import between the two modules for a
+// helper nothing outside this pair ever needed.
+const rgbToLab = (rgb) => {
+  const s = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const [r, g, b] = rgb.map((c) => s(c / 255));
+  let x = (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047;
+  let y = (0.2126729 * r + 0.7151522 * g + 0.0721750 * b) / 1.0;
+  let z = (0.0193339 * r + 0.1191920 * g + 0.9503041 * b) / 1.08883;
+  const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116);
+  [x, y, z] = [f(x), f(y), f(z)];
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+};
+export const deltaE2000 = (rgb1, rgb2) => {
+  const [L1, a1, b1] = rgbToLab(rgb1), [L2, a2, b2] = rgbToLab(rgb2);
+  const rad = Math.PI / 180, deg = 180 / Math.PI;
+  const Cb = (Math.hypot(a1, b1) + Math.hypot(a2, b2)) / 2;
+  const G = 0.5 * (1 - Math.sqrt(Cb ** 7 / (Cb ** 7 + 25 ** 7)));
+  const ap1 = (1 + G) * a1, ap2 = (1 + G) * a2;
+  const Cp1 = Math.hypot(ap1, b1), Cp2 = Math.hypot(ap2, b2);
+  const hue = (bb, aa) => { if (bb === 0 && aa === 0) return 0; const h = Math.atan2(bb, aa) * deg; return h >= 0 ? h : h + 360; };
+  const hp1 = hue(b1, ap1), hp2 = hue(b2, ap2);
+  const dLp = L2 - L1, dCp = Cp2 - Cp1;
+  let dhp = 0;
+  if (Cp1 * Cp2 !== 0) { dhp = hp2 - hp1; if (dhp > 180) dhp -= 360; else if (dhp < -180) dhp += 360; }
+  const dHp = 2 * Math.sqrt(Cp1 * Cp2) * Math.sin((dhp / 2) * rad);
+  const Lbp = (L1 + L2) / 2, Cbp = (Cp1 + Cp2) / 2;
+  let hbp;
+  if (Cp1 * Cp2 === 0) hbp = hp1 + hp2;
+  else if (Math.abs(hp1 - hp2) > 180) hbp = (hp1 + hp2 + (hp1 + hp2 < 360 ? 360 : -360)) / 2;
+  else hbp = (hp1 + hp2) / 2;
+  const T = 1 - 0.17 * Math.cos((hbp - 30) * rad) + 0.24 * Math.cos(2 * hbp * rad)
+          + 0.32 * Math.cos((3 * hbp + 6) * rad) - 0.20 * Math.cos((4 * hbp - 63) * rad);
+  const Sl = 1 + (0.015 * (Lbp - 50) ** 2) / Math.sqrt(20 + (Lbp - 50) ** 2);
+  const Sc = 1 + 0.045 * Cbp, Sh = 1 + 0.015 * Cbp * T;
+  const Rt = -Math.sin(2 * (30 * Math.exp(-(((hbp - 275) / 25) ** 2))) * rad)
+           * (2 * Math.sqrt(Cbp ** 7 / (Cbp ** 7 + 25 ** 7)));
+  return Math.sqrt((dLp / Sl) ** 2 + (dCp / Sc) ** 2 + (dHp / Sh) ** 2 + Rt * (dCp / Sc) * (dHp / Sh));
+};
+
 export function rgbToHsl([r, g, b]) {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -317,6 +372,30 @@ export function fillSeparate(fill, surfaces, fg, min = FILL_SEPARATE_MIN) {
   return mix(fill, fg, 0.5);
 }
 
+// Two control TIERS that sit side by side (a tonal button next to a plain one, a
+// checked selectable chip next to unchecked ones) have to be tellable apart by
+// their FILL. That is a perceptual-distance question, not a luminance one: the
+// default surface's chip (pale blue) and button (grey) are 1.01:1 in contrast
+// but ΔE 6.1 and plainly different, while catppuccin-mocha shipped the two
+// byte-identical. Same yardstick and floor as contrast-audit's rest-vs-hover
+// gate (ΔE2000 >= 6).
+export const TIER_DISTINCT_MIN_DE = 6;
+
+// Mix `toward` (the theme's accent -- keeps the tier's hue identity; mixing fg
+// in would just grey it) into `fill` until it is >= minDE from EVERY fill in
+// `others`, verified on the hex-rounded value that ships. Identity when already
+// distinct, so compliant themes emit byte-for-byte unchanged.
+export function fillDistinct(fill, others, toward, minDE = TIER_DISTINCT_MIN_DE) {
+  const round = c => hexToRgb(rgbToHex(c));
+  const clears = c => others.every(o => deltaE2000(round(c), round(o)) >= minDE);
+  if (clears(fill)) return fill;
+  for (let i = 1; i <= 60; i++) {
+    const out = mix(fill, toward, i * 0.01);
+    if (clears(out)) return out;
+  }
+  return mix(fill, toward, 0.6);
+}
+
 // Final post-override pass shared by popup/options/library. It owns only the
 // roles whose validity depends on several final control fills; surface-specific
 // status roles and popup's preset/spinner pairs remain in their composers.
@@ -383,11 +462,14 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
   } else {
     const tagBg = map["tag-bg"] ?? palette["tag-bg"];
     const tagFg = map["tag-fg"] ?? palette["tag-fg"];
-    const chipBgRgb = fillSeparate(
+    const chipTinted = fillSeparate(
       resolveChipBg(tagBg, hexToRgb(map.accent), panelRgb),
       [panelRgb],
       fgRgb,
     );
+    // ...then apart from the resting control fill it sits beside (.btn.tonal
+    // next to .btn; a checked chip next to unchecked ones resting on btn-bg).
+    const chipBgRgb = fillDistinct(chipTinted, [btnBgRgb], hexToRgb(map.accent));
     map["chip-bg"] = rgbToHex(chipBgRgb);
     map["chip-fg"] = rgbToHex(fgToAAMulti(
       hexToRgb(tagFg),

@@ -1,5 +1,7 @@
 import {
   contrast,
+  deltaE2000,
+  fillDistinct,
   fillSeparate,
   FILL_SEPARATE_MIN,
   finalizeUiControlRoles,
@@ -7,6 +9,7 @@ import {
   relLum,
   resolveOpaqueBg,
   rgbToHex,
+  TIER_DISTINCT_MIN_DE,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 
 const failures = [];
@@ -139,6 +142,23 @@ check(contrast(hexToRgb(popup["chip-fg"]), popupChipBg) >= 4.5 &&
   // 4. the explicit-min form still works (callers may pin a different floor)
   check(contrast(rounded(fillSeparate(hexToRgb("#ffffff"), [panel], fg, 1.3)), panel) >= 1.3,
     "explicit min argument overrides the default floor");
+}
+
+// --- fillDistinct: two control TIERS must be tellable apart (COMPONENTS.md §1.2 tonal / §5 selectable) ---
+{
+  check(TIER_DISTINCT_MIN_DE === 6, "the tier-distinctness floor is ΔE 6, contrast-audit's own STATE_DELTA_MIN_DE yardstick");
+  const accent = hexToRgb("#89b4fa");
+  const same = hexToRgb("#45475a");                       // catppuccin-mocha: chip-bg === btn-bg, ΔE 0
+  const out = fillDistinct(same, [same], accent);
+  check(deltaE2000(hexToRgb(rgbToHex(out)), same) >= 6,
+    "identical fills are pushed apart, measured on the rounded value");
+  // moves TOWARD the accent (keeps the chip's hue identity), not toward fg
+  check(deltaE2000(out, accent) < deltaE2000(same, accent),
+    "distance to the accent shrinks");
+  // identity when already distinct
+  const blue = hexToRgb("#ddf4ff"), grey = hexToRgb("#f0f1f1");   // github-light, ΔE 8.5
+  check(JSON.stringify(fillDistinct(blue, [grey], accent)) === JSON.stringify(blue),
+    "already-distinct fill is returned untouched");
 }
 
 if (failures.length) {

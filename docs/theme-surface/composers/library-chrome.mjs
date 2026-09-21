@@ -29,12 +29,18 @@ const DEFAULT_LIGHT = {
   "on-danger": "#ffffff",       // = .confirm-popover .confirm-yes color: var(--lib-panel, #fff)
                                  // default (library.css:207); already 5.80:1 on --lib-danger default,
                                  // clears AA unmodified.
-  "chip-bg": "#e8f1fd",         // = the resolved literal of .vocab-group-chip's own current formula
+  "chip-bg": "#e6f0fd",         // = the resolved literal of .vocab-group-chip's own current formula
                                  // (color-mix(--lib-accent 10%, transparent), library.css:1141-1145)
                                  // composited over --lib-panel default (#ffffff) — 10% of --lib-accent
-                                 // default (#1a73e8) mixed in.
+                                 // default (#1a73e8) mixed in, then pushed 1% further toward accent by
+                                 // fillDistinct(chip, [btn-bg], accent) (Task 2, taste-uplift-batch2):
+                                 // the raw 10%-tint value (#e8f1fd) was only ΔE 5.6 from --lib-btn-bg
+                                 // (#ececed, re-derived Task 1) -- not tellable apart from a resting
+                                 // .btn -- and needs >=6. Re-derived value clears at ΔE 6.06, and still
+                                 // 1.15:1 against --lib-panel (>= FILL_SEPARATE_MIN 1.10).
   "chip-fg": "#1a1a2e",         // = --lib-fg default (.vocab-group-chip's current `color`,
-                                 // library.css:1145); fgToAA(fg, chip-bg) is identity at 14.97:1.
+                                 // library.css:1145); fgToAA(fg, chip-bg) is identity at 14.82:1
+                                 // (re-verified against the ΔE-pushed chip-bg above, was 14.97:1).
   // Soft Fill control fills (design-uplift 2026-08-05), moved off their
   // hand-written :root literals for the same reason options' pair was: both
   // were #ffffff, exactly --lib-panel/--lib-pane-bg, so a frameless control

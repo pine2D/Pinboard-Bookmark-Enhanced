@@ -12,10 +12,17 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, resolveOpaqueBg } from "../composers/_ui-derive.mjs";
+import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
 import { parseDeclarations, parseStyleRules } from "./css-syntax.mjs";
+
+// deltaE2000 moved to _ui-derive.mjs (Task 2, taste-uplift-batch2) so
+// composers and unit tests can use it without importing this file's whole
+// static-CSS audit -- re-exported here so existing importers keep working.
+// See its definition there for the "not interchangeable with cr()"
+// explanation and the Sharma test-set verification note.
+export { deltaE2000 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..", "..", "..");
@@ -60,52 +67,6 @@ export const parseRgba = (s) => {
 };
 export const composite = (fg, alpha, bg) => fg.map((c, i) => Math.round(alpha * c + (1 - alpha) * bg[i]));
 
-// PERCEPTUAL color distance (CIEDE2000). Not interchangeable with cr() above:
-// the WCAG ratio is a pure LUMINANCE relation and is blind to hue, so it rates
-// gruvbox's green->pink link hover (#83a598 -> #d3869b) at 1.02:1, the same
-// number it gives two colors that are literally identical. Anything asking
-// "would a person SEE this change" — a rest state against its :hover — has to
-// use deltaE2000; anything asking "is this text legible on that fill" stays on
-// cr(). Reference: CIE 142-2001, kL=kC=kH=1, D65. Verified against Sharma's
-// published CIEDE2000 test set (2005) -- including the four hue-discontinuity
-// pairs at (50, 2.49, -0.001) vs (50, -2.49, 0.0009..0.0012), which is where a
-// naive mean-hue branch goes wrong: 7.1792 / 7.1792 / 7.2195 / 7.2195, exact.
-export const rgbToLab = (rgb) => {
-  const s = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  const [r, g, b] = rgb.map((c) => s(c / 255));
-  let x = (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047;
-  let y = (0.2126729 * r + 0.7151522 * g + 0.0721750 * b) / 1.0;
-  let z = (0.0193339 * r + 0.1191920 * g + 0.9503041 * b) / 1.08883;
-  const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116);
-  [x, y, z] = [f(x), f(y), f(z)];
-  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
-};
-export const deltaE2000 = (rgb1, rgb2) => {
-  const [L1, a1, b1] = rgbToLab(rgb1), [L2, a2, b2] = rgbToLab(rgb2);
-  const rad = Math.PI / 180, deg = 180 / Math.PI;
-  const Cb = (Math.hypot(a1, b1) + Math.hypot(a2, b2)) / 2;
-  const G = 0.5 * (1 - Math.sqrt(Cb ** 7 / (Cb ** 7 + 25 ** 7)));
-  const ap1 = (1 + G) * a1, ap2 = (1 + G) * a2;
-  const Cp1 = Math.hypot(ap1, b1), Cp2 = Math.hypot(ap2, b2);
-  const hue = (bb, aa) => { if (bb === 0 && aa === 0) return 0; const h = Math.atan2(bb, aa) * deg; return h >= 0 ? h : h + 360; };
-  const hp1 = hue(b1, ap1), hp2 = hue(b2, ap2);
-  const dLp = L2 - L1, dCp = Cp2 - Cp1;
-  let dhp = 0;
-  if (Cp1 * Cp2 !== 0) { dhp = hp2 - hp1; if (dhp > 180) dhp -= 360; else if (dhp < -180) dhp += 360; }
-  const dHp = 2 * Math.sqrt(Cp1 * Cp2) * Math.sin((dhp / 2) * rad);
-  const Lbp = (L1 + L2) / 2, Cbp = (Cp1 + Cp2) / 2;
-  let hbp;
-  if (Cp1 * Cp2 === 0) hbp = hp1 + hp2;
-  else if (Math.abs(hp1 - hp2) > 180) hbp = (hp1 + hp2 + (hp1 + hp2 < 360 ? 360 : -360)) / 2;
-  else hbp = (hp1 + hp2) / 2;
-  const T = 1 - 0.17 * Math.cos((hbp - 30) * rad) + 0.24 * Math.cos(2 * hbp * rad)
-          + 0.32 * Math.cos((3 * hbp + 6) * rad) - 0.20 * Math.cos((4 * hbp - 63) * rad);
-  const Sl = 1 + (0.015 * (Lbp - 50) ** 2) / Math.sqrt(20 + (Lbp - 50) ** 2);
-  const Sc = 1 + 0.045 * Cbp, Sh = 1 + 0.015 * Cbp * T;
-  const Rt = -Math.sin(2 * (30 * Math.exp(-(((hbp - 275) / 25) ** 2))) * rad)
-           * (2 * Math.sqrt(Cbp ** 7 / (Cbp ** 7 + 25 ** 7)));
-  return Math.sqrt((dLp / Sl) ** 2 + (dCp / Sc) ** 2 + (dHp / Sh) ** 2 + Rt * (dCp / Sc) * (dHp / Sh));
-};
 const resolveColor = (s, bg) => {
   s = s.trim();
   // #rgba / #rrggbbaa: hexRgb() alone returns null for both lengths, which
@@ -440,6 +401,22 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
       continue;
     }
     console.log(check(scope, blockLabel, label, cr(fg.rgb, bg.rgb), min));
+  }
+
+  // Tier distinctness (COMPONENTS.md §1.2 tonal / §5.2 selectable): the chip
+  // pair doubles as the tonal button fill and the checked-chip fill, both of
+  // which sit beside controls resting on btn-bg. Perceptual distance, not
+  // contrast -- see deltaE2000's own note. options + library only: popup's
+  // chip-bg is `transparent` on 8/15 themes and has no tonal consumer yet.
+  if (ns !== "pp") {
+    const chip = resolveRole("chip-bg"), btn = resolveRole("btn-bg");
+    if (chip.rgb && btn.rgb) {
+      const de = deltaE2000(chip.rgb, btn.rgb);
+      const ok = de >= TIER_DISTINCT_MIN_DE;
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + "chip-bg ΔE btn-bg".padEnd(28) + " " + de.toFixed(1) + (ok ? "" : "  FAIL (< " + TIER_DISTINCT_MIN_DE + ")");
+      console.log(line);
+      if (!ok) violations.push(line);
+    }
   }
 }
 
