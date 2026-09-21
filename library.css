@@ -24,7 +24,17 @@
   /* Scrollbar thumb only -- same value as popup's --pp-scrollbar-thumb (see the
      scrollbar block below). Presets override to fg-muted. */
   --lib-scrollbar-thumb: #818893;
-  --lib-fg-hint: #666d74;
+  /* FILL_SEPARATE_MIN's 1.06->1.10 raise (2026-09-21) deepened the composer's
+     default --lib-btn-bg/--lib-input-bg literals to #ececed (from #f0f0f1),
+     dropping the old #666d74 to 4.44:1 there. No live consumer currently
+     paints fg-hint text on either fill on this surface (every rule that
+     backgrounds btn-bg/input-bg colors its text with plain fg or the
+     AA-derived btn-fg -- verified 2026-09-22, options-usability/vocab-tests
+     task-7-report.md), so contrast-audit's default-surface probe does not
+     gate this pair; re-derived anyway for hygiene, same formula options'
+     twin literal uses. fgToAAMulti(#666d74, [bg, panel, btn-bg, input-bg])
+     -- #61686f, 5.28:1 / 5.65:1 / 4.78:1 / 4.78:1. Hue preserved. */
+  --lib-fg-hint: #61686f;
   --lib-accent: #1a73e8;
   /* accent, pushed to clear AA on both bg and panel (composer's fgToAAMulti) --
      see library-chrome.mjs's `link` role for the per-theme derivation this falls
@@ -2703,7 +2713,7 @@ html[data-theme="solarized-light"] {
   color-scheme: light;
   --lib-bg: #fdf6e3;
   --lib-panel: #eee8d5;
-  --lib-fg: #54696f;
+  --lib-fg: #506469;
   --lib-fg-muted: #54696f;
   --lib-fg-hint: #5b6969;
   --lib-accent: #268bd2;
@@ -2738,7 +2748,7 @@ html[data-theme="solarized-dark"] {
   color-scheme: dark;
   --lib-bg: #002b36;
   --lib-panel: #073642;
-  --lib-fg: #8e9e9f;
+  --lib-fg: #94a3a4;
   --lib-fg-muted: #859ca3;
   --lib-fg-hint: #859ca3;
   --lib-accent: #268bd2;

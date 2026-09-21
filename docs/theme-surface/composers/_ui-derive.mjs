@@ -462,6 +462,33 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
   map[inputBorderRole] = ovr[inputBorderRole] ?? map["input-bg"];
 
   const btnBgRgb = hexToRgb(map["btn-bg"]);
+
+  // Body text itself has to clear AA against the two control fills it
+  // genuinely sits on -- `.theme-name-popover input[type=text]` paints
+  // `color: fg; background: input-bg` directly, and
+  // `.connection-health-row`/`.qbtn` do the same with btn-bg (options.css /
+  // popup.css). `fg`'s OWN derivation (_util.mjs's deriveTextTiers) only
+  // pushes it against [bg, bg-surface] -- it runs at the shared palette
+  // layer, before any surface's btn-bg/input-bg exist as separated fills, so
+  // it structurally cannot know about them. This is the first point in the
+  // pipeline where the REAL, post-fillSeparate btn-bg/input-bg are known, so
+  // it is the right place to close that gap -- same "missing host" fix
+  // COMPONENT_PAIR_SPEC's contrast-audit rows now gate.
+  //
+  // Skipped when the pilot overrides `fg` directly: an override is an INPUT
+  // role and must win completely unmodified (NEW_THEME.md "values win over
+  // _ui-derive.mjs", USER-confirmed ruling) -- an override that itself falls
+  // under FILL_SEPARATE_MIN's floor is fixed at ITS OWN pilot-file source
+  // instead (see solarized-{light,dark}.tokens.json's `ui.options/popup.fg`,
+  // re-derived 2026-09-22 for the same 1.06->1.10 raise this gap-fill
+  // covers for every theme that does NOT override fg). Identity when fg
+  // already clears both fills, so 12/14 themes emit byte-for-byte unchanged
+  // -- only library/popup's solarized-light and library's solarized-dark
+  // (the 3 (surface, theme) pairs with no fg override at all) actually move.
+  if (ovr.fg == null) {
+    map.fg = rgbToHex(fgToAAMulti(fgRgb, [btnBgRgb, hexToRgb(map["input-bg"])]));
+  }
+
   map["btn-hover"] = rgbToHex(fillSeparate(hexToRgb(map["btn-hover"]), [btnBgRgb], fgRgb));
   const btnHoverRgb = hexToRgb(map["btn-hover"]);
   if (map["focus-bd"] == null) {

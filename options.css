@@ -112,10 +112,21 @@
      --opt-pf-bg each only ever had one fallback text, so those three are
      zero-diff by construction. */
   --opt-border-section: #e8e8e8;
-  /* #757575 was only 4.21:1 on the default #f5f5f0 page background. These
-     labels are 10-11px text; #6b6b6b keeps 4.87:1 there and 4.58:1 on the
-     default #eeeee9 button fill used by connection-state labels. */
-  --opt-fg-hint: #6b6b6b;
+  /* #757575 was only 4.21:1 on the default #f5f5f0 page background. #6b6b6b
+     (chosen then) kept 4.87:1 there and 4.58:1 on the default button fill
+     used by connection-state labels (.connection-health-state, on
+     .connection-health-row's --opt-btn-bg) -- but that fill was #eeeee9 at
+     the time. FILL_SEPARATE_MIN's 1.06->1.10 raise (2026-09-21) deepened the
+     composer's default --opt-btn-bg/--opt-input-bg literals to #eaeae5/
+     #eaeaea, dropping #6b6b6b to 4.42:1 there -- caught live by
+     tests/options-usability-tests.html, not by any contrast-audit row (its
+     default-surface probe never checked fg-hint against anything before
+     this fix). Re-derived 2026-09-22: fgToAAMulti(#6b6b6b, [bg, panel,
+     btn-bg, input-bg]) -- #666666, 5.25:1 / 5.74:1 / 4.76:1 / 4.77:1. Hue
+     preserved (pure grey either way). Re-derive (do not eyeball) if bg,
+     panel or either control fill moves -- contrast-audit's default-surface
+     `fg-hint vs bg`/`vs panel`/`vs btn-bg` rows now catch it. */
+  --opt-fg-hint: #666666;
   --opt-tab-active: rgba(0,0,0,0.05);
   --opt-code-bg: #f0f0e8;
   --opt-pf-bg: #f9f9f6;
@@ -1599,16 +1610,16 @@ html[data-theme="solarized-light"] {
   --opt-panel: #eee8d5;
   --opt-tab: #e6dfca;
   --opt-tab-active: #fdf6e3;
-  --opt-fg: #52666d;
+  --opt-fg: #4e6167;
   --opt-fg-muted: #52666d;
   --opt-fg-hint: #5b686a;
   --opt-accent: #1e6ca4;
   --opt-save: #1f7972;
   --opt-border: #88774b;
   --opt-border-section: #d6cdb5;
-  --opt-input-bg: #e1ded0;
-  --opt-input-border: #e1ded0;
-  --opt-btn-bg: #e1ded0;
+  --opt-input-bg: #e1decf;
+  --opt-input-border: #e1decf;
+  --opt-btn-bg: #e1decf;
   --opt-btn-hover: #d8d4c1;
   --opt-pf-bg: #eee8d5;
   --opt-code-bg: #eee8d5;
@@ -1617,9 +1628,9 @@ html[data-theme="solarized-light"] {
   --opt-radius-lg: 4px;
   --opt-danger: #c02b28;
   --opt-warn: #7d5f00;
-  --opt-btn-border: #e1ded0;
+  --opt-btn-border: #e1decf;
   --opt-focus-bd: #4784ad;
-  --opt-btn-fg: #495b61;
+  --opt-btn-fg: #4a5c61;
   --opt-danger-quiet-fg: #a72523;
   --opt-on-danger: #fdf6e3;
   --opt-chip-bg: #ccd4cd;
@@ -1632,7 +1643,7 @@ html[data-theme="solarized-dark"] {
   --opt-panel: #073642;
   --opt-tab: #073642;
   --opt-tab-active: #002b36;
-  --opt-fg: #93a1a1;
+  --opt-fg: #98a6a6;
   --opt-fg-muted: #8e9e9f;
   --opt-fg-hint: #8e9e9f;
   --opt-accent: #268bd2;

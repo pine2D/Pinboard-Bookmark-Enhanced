@@ -90,7 +90,7 @@
   "ui": {
     "popup": {
       "dark": {
-        "fg": "#93a1a1",
+        "fg": "#98a6a6",
         "fg-muted": "#8e9e9f",
         "fg-hint": "#8e9e9f",
         "link": "#5eabe2",
@@ -116,7 +116,7 @@
     },
     "options": {
       "dark": {
-        "fg": "#93a1a1",
+        "fg": "#98a6a6",
         "fg-muted": "#8e9e9f",
         "fg-hint": "#8e9e9f",
         "input-bg": "#002b36",

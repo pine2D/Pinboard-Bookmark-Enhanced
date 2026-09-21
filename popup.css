@@ -25,7 +25,19 @@
   --pp-bg2: #f6f7f9;
   --pp-fg: #2a2d33;
   --pp-fg-muted: #62676e;
-  --pp-fg-hint: #6b7077;
+  /* FILL_SEPARATE_MIN's 1.06->1.10 raise (2026-09-21) deepened the composer's
+     default --pp-btn-bg/--pp-input-bg literals to #ebecee/#e9ecf0 (from
+     #eff0f2/#edf0f4), dropping the old #6b7077 to 4.22:1 / 4.21:1 there. No
+     live consumer currently paints fg-hint TEXT on either fill on this
+     surface at rest (.login-body .key-toggle sits over input-bg but is a
+     non-text SVG icon at WCAG 1.4.11's 3:1 floor, not this 4.5:1 text floor;
+     #submit-btn:disabled is the documented :disabled contrast exemption,
+     COMPONENTS.md §3.4) -- verified 2026-09-22, task-7-report.md -- so
+     contrast-audit's default-surface probe does not gate this pair;
+     re-derived anyway for hygiene, same formula options'/library's twin
+     literals use. fgToAAMulti(#6b7077, [bg, bg2, btn-bg, input-bg]) --
+     #666b72, 5.37:1 / 5.01:1 / 4.54:1 / 4.53:1. Hue preserved. */
+  --pp-fg-hint: #666b72;
   --pp-link: #3f6fd0;
   --pp-accent: #3b72d9;
   --pp-accent2: #8b5cc9;
@@ -2093,7 +2105,7 @@ html[data-theme="solarized-light"] {
   color-scheme: light;
   --pp-bg: #fdf6e3;
   --pp-bg2: #eee8d5;
-  --pp-fg: #54696f;
+  --pp-fg: #506469;
   --pp-fg-muted: #54696f;
   --pp-fg-hint: #5b6969;
   --pp-link: #1e6ca4;
@@ -2147,7 +2159,7 @@ html[data-theme="solarized-dark"] {
   color-scheme: dark;
   --pp-bg: #002b36;
   --pp-bg2: #073642;
-  --pp-fg: #93a1a1;
+  --pp-fg: #98a6a6;
   --pp-fg-muted: #8e9e9f;
   --pp-fg-hint: #8e9e9f;
   --pp-link: #5eabe2;
