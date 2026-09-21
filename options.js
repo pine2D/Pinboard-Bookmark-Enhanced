@@ -1027,14 +1027,19 @@ function pbpExportTargetsResetSeed(current) {
 // "Clear selected" answers with a warning) and gate the button on the
 // selection. Programmatic .checked writes (select-all, shift-range) fire no
 // 'change', so every path that can move a box calls this explicitly.
-// It also owns the "N selected" readout, for the same reason: programmatic
-// .checked writes fire no 'change'.
+// It now owns three derived states for the same reason -- programmatic
+// .checked writes fire no 'change': the Delete button's disabled state, the
+// "N selected" readout, and Select-all's own checked state (all-checked =
+// ticked, anything else = unticked; an empty list can't be "all checked").
 function pbpSyncTagGovDeleteBtnState() {
-  const n = document.querySelectorAll(".tag-gov-lowcount-checkbox:checked").length;
+  const boxes = document.querySelectorAll(".tag-gov-lowcount-checkbox");
+  const n = [...boxes].filter((cb) => cb.checked).length;
   const count = $id("tag-gov-selected-count");
   if (count) count.textContent = t("tagGovSelectedCount", String(n));
   const btn = $id("tag-gov-delete-selected");
   if (btn) btn.disabled = n === 0;
+  const selectAll = $id("tag-gov-select-all");
+  if (selectAll) selectAll.checked = boxes.length > 0 && n === boxes.length;
 }
 
 // One tag rendered as a selectable chip: a real radio/checkbox, visually hidden
@@ -1324,11 +1329,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       $id("tag-gov-bundles-warn")?.querySelector("a")?.remove();
       if (!auth) {
-        // Sign-out: the ignored tail is per-account state, and this branch
-        // returns before reaching renderTagGov() -- the only other place that
-        // resets it -- so it must be cleared here or it keeps showing the
-        // previous account's "Ignored: N" / reset link after the account is gone.
+        // Sign-out: the ignored tail, the low-count summary badge and the
+        // "N selected" readout / Delete button are all per-account state, and
+        // this branch returns before reaching renderTagGov() / renderLowCountTags()
+        // -- the only other places that reset them -- so they must be cleared
+        // here or they keep showing the previous account's numbers after the
+        // account is gone.
         pbpSetTagGovIgnoredCount(0);
+        pbpSyncTagGovDeleteBtnState();
+        const lowCountBadge = $id("tag-gov-lowcount-count");
+        if (lowCountBadge) lowCountBadge.textContent = "";
         _tagGovShowLoadFailed();
         return;
       }
@@ -5002,8 +5012,10 @@ async function renderLowCountTags() {
     return;
   }
 
+  // Reuses .tag-gov-chipset (the similar-tag groups' member-chip row): same
+  // wrapping flex flow, no new wrapper class needed for one more list of chips.
   const flow = document.createElement("div");
-  flow.className = "tag-gov-lowcount-flow";
+  flow.className = "tag-gov-chipset";
   const boxes = [];
   let lastIdx = null;            // anchor = last individually-clicked box; resets each render
   lowCount.forEach((item, i) => {
@@ -5037,7 +5049,9 @@ async function renderLowCountTags() {
 
   const selectAll = $id("tag-gov-select-all");
   if (selectAll) {
-    selectAll.checked = false;
+    // No explicit reset here: every chip built above starts unchecked, and the
+    // pbpSyncTagGovDeleteBtnState() call a few lines up already derived
+    // Select-all's checked state from those (all-unchecked) boxes.
     selectAll.onchange = () => {
       listContainer.querySelectorAll(".tag-gov-lowcount-checkbox")
         .forEach(cb => { cb.checked = selectAll.checked; });

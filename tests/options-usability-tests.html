@@ -119,6 +119,7 @@
 <div id="hidden-jump-host"><span>Drive actions</span>
   <button type="button" id="hidden-jump-target" hidden>Connect</button>
 </div>
+<input type="checkbox" id="tag-gov-select-all" />
 <span id="tag-gov-selected-count"></span>
 <button type="button" class="btn btn-sm danger tag-gov-delete-btn" id="tag-gov-delete-selected">Delete selected</button>
 <div id="results"></div>
@@ -481,6 +482,26 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(out.textContent === "tagGovSelectedCount:2", "2 selected, got " + out.textContent);
     assert(!list.querySelector(".tag-gov-chip-count"), "low-count chips carry no count: every one of them is 0 or 1 use");
     list.replaceChildren();
+  });
+
+  await test("tag-gov low-count: Select-all follows whether every box ended up checked", async () => {
+    const list = document.getElementById("tag-gov-lowcount-list");
+    const selectAll = document.getElementById("tag-gov-select-all");
+    const out = document.getElementById("tag-gov-selected-count");
+    list.replaceChildren(
+      pbpBuildTagGovChip({ type: "checkbox", value: "til", className: "tag-gov-lowcount-checkbox" }),
+      pbpBuildTagGovChip({ type: "checkbox", value: "tmp", className: "tag-gov-lowcount-checkbox" }));
+    const boxes = [...list.querySelectorAll(".tag-gov-lowcount-checkbox")];
+    boxes.forEach(cb => { cb.checked = true; });  // programmatic: fires no 'change'
+    pbpSyncTagGovDeleteBtnState();
+    assert(selectAll.checked === true, "both boxes checked: Select-all stayed unticked");
+    boxes[0].checked = false;
+    pbpSyncTagGovDeleteBtnState();
+    assert(selectAll.checked === false, "one box unticked: Select-all stayed ticked (contradicts the readout)");
+    assert(out.textContent === "tagGovSelectedCount:1", "1 selected, got " + out.textContent);
+    list.replaceChildren();
+    pbpSyncTagGovDeleteBtnState();
+    assert(selectAll.checked === false, "empty list: Select-all stayed ticked");
   });
 
   await test("connection overview is read-only and never requests permission or contacts a service", async () => {

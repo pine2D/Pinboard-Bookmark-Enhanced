@@ -19,10 +19,12 @@ function pass(name){const d=document.createElement("div");d.className="case pass
 function fail(name,msg){const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
 function test(name,fn){try{fn();pass(name);}catch(e){fail(name,e.message);}}
 
-// Build the low-count list exactly like renderLowCountTags does.
+// Build the low-count list exactly like renderLowCountTags does -- it reuses
+// .tag-gov-chipset (the same wrapping flex flow the similar-tag groups use
+// for their member chips), not a dedicated wrapper class.
 const list=document.getElementById("tag-gov-lowcount-list");
 const flow=document.createElement("div");
-flow.className="tag-gov-lowcount-flow";
+flow.className="tag-gov-chipset";
 for(let i=0;i<12;i++){
   const l=document.createElement("label");l.className="tag-gov-chip";
   const cb=document.createElement("input");cb.type="checkbox";cb.className="tag-gov-lowcount-checkbox";

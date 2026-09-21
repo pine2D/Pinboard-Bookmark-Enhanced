@@ -2445,6 +2445,11 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   margin-bottom: 0;
 }
 .tag-gov-kind { font-size: 12px; color: var(--opt-fg-muted); }
+/* Wrapping flex flow for a set of .tag-gov-chip members: the similar-tag
+   groups' member-chip row AND the low-count list (renderLowCountTags reuses
+   this same class -- no separate wrapper for one more list of chips). The
+   `min-width: 0` only matters inside the group row's grid track; harmless
+   where the low-count list's container has no such constraint. */
 .tag-gov-chipset {
   display: flex;
   flex-wrap: wrap;
@@ -2502,11 +2507,6 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
 @media (max-width: 720px) {
   .tag-gov-group-row { grid-template-columns: minmax(0, 1fr); }
   .tag-gov-reason, .tag-gov-queued-note { grid-column: 1; }
-}
-.tag-gov-lowcount-flow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--opt-sp-1) var(--opt-sp-3);
 }
 .tag-gov-count {
   font-weight: 400;
