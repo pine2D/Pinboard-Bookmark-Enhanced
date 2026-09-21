@@ -318,6 +318,46 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     "the real two-host on-accent derivation must clear AA on BOTH the resting accent and the primary hover fill");
 }
 
+// --- Stale-`fgRgb` regression guard (task-7 fix round 1, per-review).
+// finalizeUiControlRoles's `fg`-vs-control-fill gap-fill (task 7,
+// taste-uplift-batch2) reassigns `map.fg` in place, but every role derived
+// AFTER it (btn-hover, btn-fg, the tinted chip, and on-accent's hover mix
+// below) reads a LOCAL `fgRgb` variable captured once at the top of the
+// function -- if that local is never refreshed, those later roles are
+// derived from the PRE-gap-fill fg instead of the fg that actually ships.
+// The reviewer measured zero byte impact on today's 14 shipped themes (the
+// 3 slots where the gap-fill fires happen to round to the same on-accent
+// either way), so this is a synthetic literal-hex case built to actually
+// discriminate, same technique as the naive-vs-real on-accent case just
+// above: `fg` (#8a8a8a) is deliberately fine against `bg`/`panel` (white)
+// but marginal against a deepened `btn-bg`/`input-bg` (#e0e0e0), so the
+// gap-fill fires and moves it a long way (to #616161) -- large enough that
+// feeding the STALE pre-gap-fill fg vs the REFRESHED shipped fg through
+// on-accent's own hover-mix formula lands on opposite ends of the AA push
+// (#000000 vs #ffffff), not just a rounding-level difference.
+{
+  const palette2 = { "btn-fg": "#ffffff", "tag-bg": "transparent", "tag-fg": "#0055aa" };
+  const input = {
+    bg: "#ffffff", panel: "#ffffff", fg: "#8a8a8a", accent: "#4477bb", danger: "#bb2222",
+    border: "#eeeeee", "btn-bg": "#e0e0e0", "btn-hover": "#e0e0e0", "input-bg": "#e0e0e0",
+  };
+  const result = finalizeUiControlRoles(structuredClone(input), palette2);
+  check(result.fg !== input.fg,
+    "sanity: this synthetic fg must actually get moved by the gap-fill, or it has stopped discriminating anything");
+
+  const accentRgb2 = hexToRgb(input.accent);
+  const staleHover = primaryHoverFill(accentRgb2, hexToRgb(input.fg));
+  const staleOnAccent = rgbToHex(fgToAAMulti(hexToRgb(palette2["btn-fg"]), [accentRgb2, staleHover]));
+  const freshHover = primaryHoverFill(accentRgb2, hexToRgb(result.fg));
+  const freshOnAccent = rgbToHex(fgToAAMulti(hexToRgb(palette2["btn-fg"]), [accentRgb2, freshHover]));
+  check(staleOnAccent !== freshOnAccent,
+    "sanity: the stale-fg and refreshed-fg formulas must actually diverge on this synthetic case, or it has stopped discriminating anything");
+
+  check(result["on-accent"] === freshOnAccent,
+    `on-accent must be derived from the fg that actually ships (${result.fg}), not the pre-gap-fill fg (${input.fg}) -- ` +
+    `got ${result["on-accent"]}, expected ${freshOnAccent} (the stale formula would have produced ${staleOnAccent})`);
+}
+
 if (failures.length) {
   console.error(failures.map((message) => `FAIL ${message}`).join("\n"));
   process.exit(1);

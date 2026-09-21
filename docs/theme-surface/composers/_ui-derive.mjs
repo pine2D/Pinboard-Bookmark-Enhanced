@@ -447,7 +447,7 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
 
   const map = { ...inputMap };
   const ovr = overrides ?? {};
-  const fgRgb = hexToRgb(map.fg);
+  let fgRgb = hexToRgb(map.fg);
   const bgRgb = hexToRgb(map.bg);
   const panelRgb = hexToRgb(map[panelRole]);
   const hosts = [panelRgb, bgRgb];
@@ -488,6 +488,10 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
   if (ovr.fg == null) {
     map.fg = rgbToHex(fgToAAMulti(fgRgb, [btnBgRgb, hexToRgb(map["input-bg"])]));
   }
+  // Refresh the local: every role derived BELOW this line (btn-hover,
+  // btn-fg, the tinted chip's fillSeparate, on-accent's hover mix) must see
+  // the fg that actually ships, not the pre-gap-fill value captured above.
+  fgRgb = hexToRgb(map.fg);
 
   map["btn-hover"] = rgbToHex(fillSeparate(hexToRgb(map["btn-hover"]), [btnBgRgb], fgRgb));
   const btnHoverRgb = hexToRgb(map["btn-hover"]);
