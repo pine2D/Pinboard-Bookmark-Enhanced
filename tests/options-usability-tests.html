@@ -753,7 +753,6 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     const reason = row.querySelector(".tag-gov-reason");
     assert(reason && reason.textContent === "缩写与全称同义", "reason rendered");
     assert(getComputedStyle(reason).fontStyle === "normal", "CJK has no true italic; got " + getComputedStyle(reason).fontStyle);
-    assert(row.querySelector(".tag-gov-kind").classList.contains("is-ai"), "AI kind flagged for its colour");
     row.remove();
   });
 

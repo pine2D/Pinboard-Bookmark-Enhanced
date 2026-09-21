@@ -1076,7 +1076,7 @@ function pbpBuildTagGovGroupRow(group, { onMerge, onIgnore }) {
   row.className = "tag-gov-group-row";
 
   const kind = document.createElement("span");
-  kind.className = "tag-gov-kind" + (group.kind === "ai" ? " is-ai" : "");
+  kind.className = "tag-gov-kind";
   kind.textContent = t(group.kind === "plural" ? "tagGovKindPlural"
     : group.kind === "separator" ? "tagGovKindSeparator"
     : group.kind === "typo" ? "tagGovKindTypo"

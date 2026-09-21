@@ -2488,7 +2488,7 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
 .tag-gov-actions { margin: 0; }
 @media (max-width: 720px) {
   .tag-gov-group-row { grid-template-columns: minmax(0, 1fr); }
-  .tag-gov-reason { grid-column: 1; }
+  .tag-gov-reason, .tag-gov-queued-note { grid-column: 1; }
 }
 .tag-gov-lowcount-table {
   display: grid;
