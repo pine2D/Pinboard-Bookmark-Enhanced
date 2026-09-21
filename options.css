@@ -733,11 +733,11 @@ html[data-theme] .opt-error {
   font-size: 12px;
   line-height: 14px;
   border-radius: var(--opt-radius-full);
-  background: color-mix(in srgb, var(--opt-fg) 7%, var(--opt-panel));
-  color: var(--opt-fg);
+  background: var(--opt-btn-bg);
+  color: var(--opt-btn-fg);
 }
 input:hover:not(:disabled) + .tag-gov-chip-face {
-  background: color-mix(in srgb, var(--opt-fg) 11%, var(--opt-panel));
+  background: var(--opt-btn-hover);
 }
 input:checked + .tag-gov-chip-face, input:checked:hover:not(:disabled) + .tag-gov-chip-face {
   background: var(--opt-chip-bg);
@@ -2466,9 +2466,11 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
 .tag-gov-chip-tick { display: none; }
 .tag-gov-chip-tick svg { display: block; width: 11px; height: 11px; }
 .tag-gov-chip > input:checked + .tag-gov-chip-face > .tag-gov-chip-tick { display: inline-flex; }
-/* color: inherit, not fg-muted -- fg-muted on the chip face's tinted panel is
-   not an audited pair (render-audit caught it under 4.5:1 in several themes),
-   and the count is already visually secondary from its 11px size alone. */
+/* color: inherit, not fg-muted -- the face now rests on the audited Soft Fill
+   control pair (btn-bg/btn-fg, see ui-components.mjs's chipRules), and
+   fg-muted was never audited against either that or the checked chip-bg
+   pair (render-audit caught it under 4.5:1 in several themes). The count is
+   already visually secondary from its 11px size alone. */
 .tag-gov-chip-count {
   font-size: 11px;
   font-weight: 400;

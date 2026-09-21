@@ -535,14 +535,18 @@ export const CHECKS = [
   // "tags" tab active AND a seeded plural pair (book/books) before a group
   // row exists to probe; see runSimpleTheme's options-specific branch and the
   // cached_user_tags seed in main(). Two rows because the two looks consume
-  // DIFFERENT colour pairs: resting is fg on a fg-tinted panel (not a token
-  // pair, so only this oracle sees it), checked is chip-fg/chip-bg. ----
+  // DIFFERENT colour pairs: resting is btn-fg/btn-bg (the audited Soft Fill
+  // control pair -- a fg-tint-of-panel fill was tried first and fell to
+  // 4.39:1 on solarized-dark, since that theme's base fg/panel margin is only
+  // 4.86:1 and any further fg-tint erodes it below 4.5), checked is
+  // chip-fg/chip-bg. ----
   { surface: "options", page: "options.html", selector: ".tag-gov-chip > input:not(:checked) + .tag-gov-chip-face", state: "default",
     expect: { textContrast: 4.5, padGteRadiusH: true, padVMin: 2 } },
   { surface: "options", page: "options.html", selector: ".tag-gov-chip > input:checked + .tag-gov-chip-face", state: "default",
     expect: { textContrast: 4.5, padGteRadiusH: true, padVMin: 2 } },
-  // The unchecked count is fg-muted on that same tinted panel -- the one text
-  // in the row whose pair no token audit covers.
+  // The count inherits its face's own color (see .tag-gov-chip-count in
+  // options.css) rather than fg-muted, so it shares whichever pair above
+  // applies to its state -- no separate unaudited pair to probe here.
   { surface: "options", page: "options.html", selector: ".tag-gov-chip > input:not(:checked) + .tag-gov-chip-face > .tag-gov-chip-count", state: "default",
     expect: { textContrast: 4.5 } },
   // Tonal merge button: chip-fg/chip-bg at rest, chip-fg/btn-hover on hover.

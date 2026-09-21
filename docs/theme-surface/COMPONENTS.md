@@ -475,8 +475,12 @@ quiet 档在 popup 目前只有 `.del-btn` 一个消费者。
 
 **可选中 chip（`selectable`）**——chip 是一颗视觉隐藏的 radio / checkbox 的**面**：
 `<label class="tag-gov-chip"><input type="radio|checkbox"><span class="tag-gov-chip-face">…</span></label>`。
-静息为**中性**填充（`color-mix(fg 7%, panel)` + `color: fg`），只有 `input:checked + face` 才吃 chip 对——
-一排全是 accent 色的标签就没有「选中」可表达了。input 绝对定位、`opacity: 0` 盖在面上（不是 `display: none`：
+静息为**中性**填充——`background: var(--{ns}-btn-bg)` + `color: var(--{ns}-btn-fg)`，未选中 hover 换
+`var(--{ns}-btn-hover)`（`pairColorWith` 复用同一色对）——只有 `input:checked + face` 才吃 chip 对：
+一排全是 accent 色的标签就没有「选中」可表达了。静息/hover 复用 Soft Fill 控件对而不是自造一个
+fg-tint-of-panel 填充，是因为 `btn-bg`/`btn-fg`（及其 `btn-hover` 搭档）在每套主题下都被 contrast-audit
+钉在 ≥4.5:1，而 fg 混 panel 不是被审计的 token 对——2026-09 曾在 solarized-dark 量出 4.39:1（该主题
+fg/panel 基线本就只有 4.86:1，任何 fg 浸染都会吃掉这点余量）。input 绝对定位、`opacity: 0` 盖在面上（不是 `display: none`：
 要保键盘与读屏语义），焦点走 §7.3 `borderless`（1px accent 核 + token 光晕），挂在 `input:focus-visible + face`。
 几何仍是本族三定律；≥24px 命中区由外层 `label` 的 padding 提供，不加高 chip 面。**不用 `:has()`。**
 

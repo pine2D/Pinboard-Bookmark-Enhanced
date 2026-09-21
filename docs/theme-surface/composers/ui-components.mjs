@@ -330,11 +330,16 @@ function chipRules(ns) {
     decls.push(
       ["line-height", `${CHIP_GEOM.lineHeight}px`],
       ["border-radius", `var(--${ns}-radius-${radius})`],
-      // A selectable chip rests neutral: the panel with a trace of its own fg
-      // mixed in, so it separates from the surface the same way a Soft Fill
-      // control does, and `color` stays the surface fg it was mixed from.
-      ["background", selectable ? `color-mix(in srgb, var(--${ns}-fg) 7%, var(--${ns}-panel))` : `var(--${ns}-chip-bg)`],
-      ["color", selectable ? `var(--${ns}-fg)` : `var(--${ns}-chip-fg)`],
+      // A selectable chip rests on the Soft Fill control pair (btn-bg/btn-fg),
+      // not a bespoke fg-tinted panel: btn-bg/btn-fg (and its btn-hover
+      // partner below) are token-audited on every theme by contrast-audit,
+      // while a fg-tint-of-panel is not a token pair at all -- it fell to
+      // 4.39:1 on solarized-dark (base fg/panel there is only 4.86:1, and any
+      // further fg-tint erodes that margin below 4.5). Reusing the already-
+      // audited pair removes the failure mode instead of re-tuning a bespoke
+      // mix percentage per theme.
+      ["background", selectable ? `var(--${ns}-btn-bg)` : `var(--${ns}-chip-bg)`],
+      ["color", selectable ? `var(--${ns}-btn-fg)` : `var(--${ns}-chip-fg)`],
     );
     out.push(rule(selector, decls));
     if (pressable) {
@@ -351,7 +356,7 @@ function chipRules(ns) {
     }
     if (selectable) {
       out.push(rule(`input:hover:not(:disabled) + ${selector}`, [
-        ["background", `color-mix(in srgb, var(--${ns}-fg) 11%, var(--${ns}-panel))`],
+        ["background", `var(--${ns}-btn-hover)`],
       ], { pairColorWith: selector }));
       // The hover rule above is (0,3,1); a bare `input:checked + face` is only
       // (0,2,1) and would LOSE to it, flashing a checked chip back to neutral
