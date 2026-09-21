@@ -1346,11 +1346,6 @@
     },
     {
       "surface": "options",
-      "token": "tag-gov-warns",
-      "structural": false
-    },
-    {
-      "surface": "options",
       "token": "theme-group-label",
       "structural": false
     },

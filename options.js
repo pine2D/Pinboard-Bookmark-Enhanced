@@ -1320,6 +1320,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       $id("tag-gov-bundles-warn")?.querySelector("a")?.remove();
       if (!auth) {
+        // Sign-out: the ignored tail is per-account state, and this branch
+        // returns before reaching renderTagGov() -- the only other place that
+        // resets it -- so it must be cleared here or it keeps showing the
+        // previous account's "Ignored: N" / reset link after the account is gone.
+        pbpSetTagGovIgnoredCount(0);
         _tagGovShowLoadFailed();
         return;
       }
