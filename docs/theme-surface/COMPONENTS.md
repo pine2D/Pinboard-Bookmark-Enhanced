@@ -172,14 +172,25 @@ hover 把填充与边框一起往 `--{ns}-fg` 混 12%（`color-mix(in srgb, acce
 分支——popup 已有自己的 `#submit-btn` 主按钮配方（比本战役更早存在，颜色语言不同），迁到 `.btn.primary` 是
 一次独立的、有自身布局后果的按钮迁移，不在本批范围。
 
-`--{ns}-on-accent` 是 primary 唯一新增的颜色角色：`fgToAA(palette["btn-fg"], accent)`——与 `on-danger`
-（危险实心档的文字色）同一手法，固定前景是这个主题「品牌按钮文字」本来的颜色，再按需把它往能过 AA 的方向推。
+`--{ns}-on-accent` 是 primary 唯一新增的颜色角色，对 options / library 用 `fgToAAMulti(palette["btn-fg"],
+[accent, primaryHoverFill(accent, fg)])`——固定前景是这个主题「品牌按钮文字」本来的颜色，同时对**两个**背景
+（静息 accent 填充，与 `.btn.primary:hover` 的 `color-mix(...)` 结果）都推到 ≥4.5:1，与 §1.3 `--{ns}-btn-fg`
+那行「对两个背景同时达标」是同一手法。**hover 底必须是第二个宿主，不能只查静息 accent**：hover 把填充往
+`--{ns}-fg` 混（`primaryHoverFill`，`_ui-derive.mjs`，与 `ui-components.mjs` 发射的 `color-mix(...)` 读同一个
+`PRIMARY_HOVER_FG_MIX` 常量），是真实的填色变化，不是文字色不变的纯 hover 反馈；只查静息 accent 的单宿主公式
+曾让 library 的 solarized-light 静息 4.52:1 达标，一旦画上 hover 底却跌到 4.27:1（render oracle 抓到，
+task-4-report.md「Fix round」）——`fgToAAMulti` 的多宿主收敛把两个状态都钉住，是同一份 `on-danger` 早就在用的
+处理（`danger-quiet-fg` 对着自己 8% 混色的 hover 底做同样的事）。
 `on-accent` 对 popup 是**输入**角色（`ui.popup.<mode>.on-accent` 可覆盖，5/13 pilot 这样做，`#submit-btn`
-一直这样消费）；对 options / library 是**派生输出**角色（`UI_DERIVED_OUTPUT_ROLES`，与 `on-danger`/`chip-bg`
-同一批）——这两个表面此前从未声明过这个角色，没有存量 pilot 值要保留，`.btn.primary` 的文字色因此永远派生，
-不接受 pilot 覆盖，`validate-contracts` 同步禁止 `ui.options.*.on-accent` / `ui.library.*.on-accent`。
-`contrast-audit` 的 `COMPONENT_PAIR_SPEC` 收了 `["on-accent","accent",4.5]` 一行，三表面共用同一行——popup
-一侧原先是一条不进注册表的 ad-hoc 检查，随本次改动一并退役。
+一直这样消费，且 `#submit-btn` 不消费 `.btn.primary` 的 hover 配方，因此 popup 的 gap-fill 分支仍是原始
+单宿主 `fgToAA` 写法——见 `finalizeUiControlRoles` 源码）；对 options / library 是**派生输出**角色
+（`UI_DERIVED_OUTPUT_ROLES`，与 `on-danger`/`chip-bg` 同一批）——这两个表面此前从未声明过这个角色，没有存量
+pilot 值要保留，`.btn.primary` 的文字色因此永远派生，不接受 pilot 覆盖，`validate-contracts` 同步禁止
+`ui.options.*.on-accent` / `ui.library.*.on-accent`。
+`contrast-audit` 有两道门覆盖这一对：`COMPONENT_PAIR_SPEC` 的 `["on-accent","accent",4.5]`（静息态，三表面
+共用同一行——popup 一侧原先是一条不进注册表的 ad-hoc 检查，随本次改动一并退役）+ `auditComponentPairs` 里
+`chip-bg ΔE btn-bg` 那段旁边新增的「on-accent vs primary-hover」token 级门（hover 态，options/library only，
+BLOCKING，因为 hover 底是 `color-mix(...)` 而非一对 token，`COMPONENT_PAIR_SPEC` 的声明式行表达不了它）。
 
 ### 1.3 消费 token 对
 
@@ -188,6 +199,7 @@ hover 把填充与边框一起往 `--{ns}-fg` 混 12%（`color-mix(in srgb, acce
 | `background` | `--{ns}-btn-bg` | 既有 |
 | `background`（hover） | `--{ns}-btn-hover` | 既有 |
 | `color`（默认与 hover 共用一个值） | **`--{ns}-btn-fg`** | `fgToAAMulti(fg, [btn-bg, btn-hover])`——对**两个**背景同时 ≥4.5:1。只声明一次，hover 规则不重复声明。`fgToAAMulti` 现是 `library-chrome.mjs:11-23` 的本地函数，`_ui-derive.mjs` 只有 `fgToAA`/`bgToAA`/`pairToAA`；Task 5 把它上移并 export 后三表面共用 |
+| `color`（`.btn.primary`，默认与 hover 共用一个值） | **`--{ns}-on-accent`**（options/library only） | `fgToAAMulti(palette["btn-fg"], [accent, primaryHoverFill(accent, fg)])`——对**两个**背景同时 ≥4.5:1：静息 `accent` 填充与 `.btn.primary:hover` 的 `color-mix(...)` 结果。`primaryHoverFill`/`PRIMARY_HOVER_FG_MIX`（`_ui-derive.mjs`）是这两个背景之一（hover 底）与 `ui-components.mjs` 发射的 `color-mix(...)` 百分比共用的唯一来源。只声明一次，hover 规则不重复声明——与 `btn-fg` 那行同一惯例，唯一差异是第二个宿主本身是 hover 才出现的合成色，不是一个另有其名的静息 token |
 | `border-color` | `--{ns}-border` | `borderToAA(border, [btn-bg, panel])`——对 `btn-bg` 与 `panel` 两个背景同时 ≥3:1（非文本对比，WCAG 1.4.11）。design-uplift Task 16 前只是文档要求，未接线到 contrast-audit；Task 16 补上派生与门（`_ui-derive.mjs` 的 `borderToAA`，仿 `fgToAAMulti` 的收敛写法） |
 | `outline`（focus） | `--{ns}-accent` | 对 `bg` 与 `panel` ≥3:1 |
 

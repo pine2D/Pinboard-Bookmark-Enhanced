@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 
 const root = resolve(import.meta.dirname, "..");
 const sourceRecipePath = resolve(root, "docs/theme-surface/composers/ui-components.mjs");
+const uiDerivePath = resolve(root, "docs/theme-surface/composers/_ui-derive.mjs");
 const sourceLintPath = resolve(root, "docs/theme-surface/tools/recipe-lint.mjs");
 const cssSyntaxPath = resolve(root, "docs/theme-surface/tools/css-syntax.mjs");
 const applyTokensPath = resolve(root, "docs/theme-surface/tools/apply-tokens.mjs");
@@ -20,7 +21,15 @@ const temp = mkdtempSync(resolve(tmpdir(), "pbp-theme-tooling-"));
 try {
   const recipePath = resolve(temp, "ui-components.mjs");
   const lintPath = resolve(temp, "recipe-lint.mjs");
-  const recipeSource = readFileSync(sourceRecipePath, "utf8");
+  // ui-components.mjs imports PRIMARY_HOVER_FG_MIX from "./_ui-derive.mjs"
+  // (Task 4 fix round 1, shared hover-mix constant) -- a relative import
+  // that would otherwise resolve to a non-existent temp/_ui-derive.mjs once
+  // the recipe is copied out to its own directory below. Rewritten to an
+  // absolute file:// URL pointing at the REAL module, same technique this
+  // file already uses for recipe-lint.mjs's own "./css-syntax.mjs" import
+  // just below.
+  const recipeSource = readFileSync(sourceRecipePath, "utf8")
+    .replace("./_ui-derive.mjs", pathToFileURL(uiDerivePath).href);
   const originalTransition = "[\"transition\", `background ${motion(ns)}, border-color ${motion(ns)}, color ${motion(ns)}, box-shadow ${motion(ns)}`]";
   const mutatedTransition = "[\"transition\", `background ${motion(ns)}, border-color ${motion(ns)}, color ${motion(ns)}, box-shadow ${motion(ns)}, transform ${motion(ns)}`]";
   check(recipeSource.includes(originalTransition),

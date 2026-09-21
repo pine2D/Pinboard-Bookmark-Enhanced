@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs";
 import {
   contrast,
   deltaE2000,
+  fgToAA,
+  fgToAAMulti,
   fillDistinct,
   fillSeparate,
   FILL_SEPARATE_MIN,
   finalizeUiControlRoles,
   hexToRgb,
-  mix,
+  primaryHoverFill,
   relLum,
   resolveOpaqueBg,
   rgbToHex,
@@ -246,21 +248,27 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
 
 // --- on-accent vs accent (rest) AND vs the settled `.btn.primary:hover`
 // fill >= 4.5, EVERY options theme (Task 4, taste-uplift-batch2 --
-// `.btn.primary`'s fill/text pair). The hover half is a real regression
-// guard, not belt-and-suspenders: the render audit caught library
-// solarized-light at 4.52:1 resting but only 4.27:1 once
-// `color-mix(in srgb, accent 88%, fg)` (ui-components.mjs's hover recipe)
-// pulled the fill toward fg -- fixed by deriving on-accent with
-// fgToAAMulti against both hosts (same technique danger-quiet-fg already
-// uses against its own settled hover fills). Same composeOptionsThemeMap-
-// walks-POPUP_THEME_MAP technique as the fg-hint/fg-muted loop above, for
-// the same reason: this is the real composer pipeline, not a hand-rebuilt
-// approximation of it. Library has no exported per-theme map builder either
-// (same documented gap above), so library's rest-vs-accent coverage lives in
-// contrast-audit's COMPONENT_PAIR_SPEC ["on-accent", "accent", 4.5] row
-// instead of here, and library's hover-mix coverage lives in the render
-// audit's hand-written `.vocab-note-save` hover checklist entry (see
-// docs/theme-surface/tools/contrast-audit.mjs and task-4-report.md). ---
+// `.btn.primary`'s fill/text pair).
+//
+// What this loop actually guards: that the role EXISTS and clears 4.5 on
+// both the resting accent and the hover-mix fill for every pilot options
+// currently renders -- a coverage/regression guard against options
+// drifting, not proof that the two-host formula is doing real work FOR
+// OPTIONS. Verified separately (all 14 options pilots, both the naive
+// single-host formula and the real two-host one): options never actually
+// dips under 4.5 on either host either way, so this loop by itself could
+// not have caught the real regression (library-only, see below) and is not
+// claimed to. The DISCRIMINATING guard for that defect class is
+// contrast-audit's "on-accent vs primary-hover" row (a BLOCKING token-level
+// check, all 15 blocks x both options/library, next to the `chip-bg ΔE
+// btn-bg` tier check) plus the render oracle's live library instance
+// (`.vocab-note-save`) -- see task-4-report.md's "Fix round 1" for the
+// RED/GREEN proof neither of those ran through this file. `primaryHoverFill`
+// (imported above) is the same shared helper the real derivation and that
+// contrast-audit row both call, so this loop's hover host can never quietly
+// drift from what ships. Same composeOptionsThemeMap-walks-POPUP_THEME_MAP
+// technique as the fg-hint/fg-muted loop above, for the same reason: this is
+// the real composer pipeline, not a hand-rebuilt approximation of it.
 {
   const pilotCache = new Map();
   const loadPilot = (slug) => {
@@ -277,7 +285,7 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     assertionCount++;
     check(c >= 4.5,
       `options theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} on-accent=${map["on-accent"]} vs accent=${map.accent} = ${c.toFixed(3)}, need 4.5`);
-    const hoverRgb = mix(hexToRgb(map.accent), hexToRgb(map.fg), 0.12);
+    const hoverRgb = primaryHoverFill(hexToRgb(map.accent), hexToRgb(map.fg));
     const ch = contrast(hexToRgb(map["on-accent"]), hoverRgb);
     assertionCount++;
     check(ch >= 4.5,
@@ -286,6 +294,28 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   // Guard against the loop silently degenerating to zero iterations.
   check(assertionCount === POPUP_THEME_MAP.length * 2,
     `expected ${POPUP_THEME_MAP.length * 2} (rest + hover per theme) assertions, ran ${assertionCount}`);
+}
+
+// --- ONE synthetic case that DOES discriminate the naive single-host
+// formula from the real two-host one, since the loop above cannot (Task 4
+// fix round 1, per-review). Literal colour constants copied out of the real
+// regression's numbers (library/solarized-light: palette.btn-fg #fdf6e3,
+// accent #268bd2, fg #54696f) -- not a read of that pilot file, so this stays
+// independent of whatever a future edit to that pilot does; it exists to
+// pin the SHAPE of the defect, not to duplicate coverage of that one pilot.
+// The naive `fgToAA(btn-fg, accent)` clears rest (4.517:1) but fails hover
+// (4.261:1 -- matches the render oracle's live 4.27:1 and contrast-audit's
+// 4.26:1 finding, task-4-report.md); `fgToAAMulti` against both hosts (the
+// real derivation) clears both. ---
+{
+  const btnFg = hexToRgb("#fdf6e3"), accentRgb = hexToRgb("#268bd2"), fgForHover = hexToRgb("#54696f");
+  const hoverFill = primaryHoverFill(accentRgb, fgForHover);
+  const naive = fgToAA(btnFg, accentRgb);
+  check(contrast(naive, accentRgb) >= 4.5 && contrast(naive, hoverFill) < 4.5,
+    "sanity: the naive single-host formula must actually fail on this synthetic case, or it has stopped discriminating anything");
+  const fixed = fgToAAMulti(btnFg, [accentRgb, hoverFill]);
+  check(contrast(fixed, accentRgb) >= 4.5 && contrast(fixed, hoverFill) >= 4.5,
+    "the real two-host on-accent derivation must clear AA on BOTH the resting accent and the primary hover fill");
 }
 
 if (failures.length) {

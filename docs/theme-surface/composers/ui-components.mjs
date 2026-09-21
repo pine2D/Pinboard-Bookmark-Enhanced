@@ -22,6 +22,14 @@
 // ACTIVE_COMPONENT_FAMILIES in apply-ui-themes.mjs, deleting the
 // hand-written rules each family supersedes in the same commit.
 
+import { PRIMARY_HOVER_FG_MIX } from "./_ui-derive.mjs";
+// `.btn.primary:hover`'s `color-mix(...)` percentage, derived from the SAME
+// constant _ui-derive.mjs's on-accent derivation reads (finalizeUiControlRoles)
+// and contrast-audit.mjs's "on-accent vs primary-hover" gate checks against --
+// one source, three consumers, so the recipe's emitted percentage can never
+// drift out of step with what the contrast math actually assumes.
+const PRIMARY_HOVER_ACCENT_PCT = Math.round((1 - PRIMARY_HOVER_FG_MIX) * 100);
+
 // -----------------------------------------------------------------------
 // Spacing adapter (COMPONENTS.md "记号约定"): recipes declare padding/gap in
 // px semantics; this maps each px value to the surface token of EQUAL
@@ -200,8 +208,8 @@ function btnRules(ns) {
       // (0,4,0): beats `.btn:hover:not(:disabled)` (0,3,0), which would otherwise
       // repaint a filled accent button with the neutral btn-hover fill.
       rule(".btn.primary:hover:not(:disabled)", [
-        ["background", `color-mix(in srgb, var(--${ns}-accent) 88%, var(--${ns}-fg))`],
-        ["border-color", `color-mix(in srgb, var(--${ns}-accent) 88%, var(--${ns}-fg))`],
+        ["background", `color-mix(in srgb, var(--${ns}-accent) ${PRIMARY_HOVER_ACCENT_PCT}%, var(--${ns}-fg))`],
+        ["border-color", `color-mix(in srgb, var(--${ns}-accent) ${PRIMARY_HOVER_ACCENT_PCT}%, var(--${ns}-fg))`],
       ], { pairColorWith: ".btn.primary" }),
       rule(".btn.primary:focus-visible", [["border-color", `var(--${ns}-focus-bd)`]], { pairColorWith: ".btn.primary" }),
     ]),

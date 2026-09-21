@@ -12,7 +12,7 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE } from "../composers/_ui-derive.mjs";
+import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, primaryHoverFill } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
 import { parseDeclarations, parseStyleRules } from "./css-syntax.mjs";
@@ -424,6 +424,38 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
       const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + "chip-bg ΔE btn-bg".padEnd(28) + " " + de.toFixed(1) + (ok ? "" : "  FAIL (< " + TIER_DISTINCT_MIN_DE + ")");
       console.log(line);
       if (!ok) violations.push(line);
+    }
+  }
+
+  // Primary hover contrast (COMPONENTS.md §1.2 primary chrome, Task 4 fix
+  // round 1): `.btn.primary:hover` repaints the fill via `color-mix(...)`
+  // (ui-components.mjs), not a token pair, so COMPONENT_PAIR_SPEC's
+  // declarative rows above can't express it -- this is the token-level gate
+  // that would have caught library solarized-light's live 4.27:1 (found by
+  // the render oracle, task-4-report.md) before it ever reached a browser.
+  // `primaryHoverFill` (_ui-derive.mjs) is the SAME function on-accent's own
+  // derivation calls, so this check and the value it's checking can never
+  // silently diverge. options + library only, same reason as the chip-bg ΔE
+  // row above: popup has no `.btn.primary` consumer to protect.
+  //
+  // Unlike that chip-bg row, a missing role here is NOT silently skipped:
+  // strict (themed) blocks FAIL and non-strict (default) blocks SKIP,
+  // printed either way -- the same shape the COMPONENT_PAIR_SPEC loop above
+  // already uses, not the "resolves or nothing happens" shape the chip-bg
+  // row uses (an earlier review round flagged that shape as inconsistent
+  // with this file's own stated anti-pattern for a BLOCKING check).
+  if (ns !== "pp") {
+    const hoverLabel = "on-accent vs primary-hover";
+    const onAccent = resolveRole("on-accent"), accentForHover = resolveRole("accent"), fgForHover = resolveRole("fg");
+    if (!onAccent.rgb || !accentForHover.rgb || !fgForHover.rgb) {
+      const why = onAccent.note || accentForHover.note || fgForHover.note;
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + hoverLabel.padEnd(28) + " " + (strict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
+      console.log(line);
+      if (strict) violations.push(line);
+      else skipCount++;
+    } else {
+      const hoverFill = primaryHoverFill(accentForHover.rgb, fgForHover.rgb);
+      console.log(check(scope, blockLabel, hoverLabel, cr(onAccent.rgb, hoverFill), 4.5));
     }
   }
 }

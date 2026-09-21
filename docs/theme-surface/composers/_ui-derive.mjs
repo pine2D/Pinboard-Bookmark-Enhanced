@@ -405,6 +405,20 @@ export function fillDistinct(fill, others, toward, minDE = TIER_DISTINCT_MIN_DE)
   return mix(fill, toward, 0.6);
 }
 
+// `.btn.primary`'s hover fill (COMPONENTS.md §1.2, ui-components.mjs's
+// `.btn.primary:hover` rule): `color-mix(in srgb, accent <100-x>%, fg)`,
+// i.e. accent kept at (1 - this fraction) and this fraction of fg mixed in.
+// ONE shared source for the fraction, read by three places that would
+// otherwise drift out of step: this file's own on-accent derivation below
+// (finalizeUiControlRoles), ui-components.mjs's emitted `color-mix(...)`
+// percentage, and contrast-audit.mjs's "on-accent vs primary-hover" gate.
+// CSS `color-mix(in srgb, …)` is plain gamma-encoded sRGB channel
+// interpolation -- the same arithmetic as this file's own `mix()` -- so
+// `primaryHoverFill` below is a faithful Node-side reimplementation of what
+// the browser actually paints, not an approximation of it.
+export const PRIMARY_HOVER_FG_MIX = 0.12;
+export const primaryHoverFill = (accentRgb, fgRgb) => mix(accentRgb, fgRgb, PRIMARY_HOVER_FG_MIX);
+
 // Final post-override pass shared by popup/options/library. It owns only the
 // roles whose validity depends on several final control fills; surface-specific
 // status roles and popup's preset/spinner pairs remain in their composers.
@@ -508,15 +522,15 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
     }
   } else {
     // options/library also paint `.btn.primary:hover` as
-    // `color-mix(in srgb, accent 88%, fg)` (ui-components.mjs) -- a real
-    // fill change, not just a rest colour, so on-accent has to clear AA
-    // against BOTH the resting accent AND that settled hover mix, the same
-    // multi-host treatment danger-quiet-fg gets against its own settled
-    // hover fills above. Caught live (render audit, Task 4): library
-    // solarized-light measured 4.52:1 at rest but only 4.27:1 once the 12%
-    // fg mix pulled the fill toward --lib-fg.
+    // `color-mix(in srgb, accent <100-PRIMARY_HOVER_FG_MIX*100>%, fg)`
+    // (ui-components.mjs) -- a real fill change, not just a rest colour, so
+    // on-accent has to clear AA against BOTH the resting accent AND that
+    // settled hover mix, the same multi-host treatment danger-quiet-fg gets
+    // against its own settled hover fills above. Caught live (render audit,
+    // Task 4): library solarized-light measured 4.52:1 at rest but only
+    // 4.27:1 once the fg mix pulled the fill toward --lib-fg.
     const accentRgb = hexToRgb(map.accent);
-    const onAccentHoverRgb = mix(accentRgb, fgRgb, 0.12);
+    const onAccentHoverRgb = primaryHoverFill(accentRgb, fgRgb);
     map["on-accent"] = rgbToHex(fgToAAMulti(hexToRgb(palette["btn-fg"]), [accentRgb, onAccentHoverRgb]));
   }
   return map;
