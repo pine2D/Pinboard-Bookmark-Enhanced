@@ -17,6 +17,12 @@ const DEFAULT_LIGHT = {
   "danger-quiet-fg": "#cc0000", // = --opt-danger default #c00 (options.css:74), 6-digit form
   "on-danger": "#ffffff",       // = .confirm-popover .confirm-yes `color` default (options.css:1329);
                                  // already 5.89:1 on --opt-danger default, clears AA unmodified.
+  "on-accent": "#ffffff",       // options has no existing "text on filled accent" role -- new for
+                                 // Task 4 (taste-uplift-batch2), `.btn.primary`'s text colour.
+                                 // fgToAAMulti(white, [accent-default #4477bb, its 88%-accent/12%-fg
+                                 // hover mix]) is identity on both hosts: white already clears
+                                 // 4.56:1 / 5.14:1, the same "white brand-button text" convention
+                                 // on-danger and popup's own on-accent default use.
   "chip-bg": "#e8edf4",         // options has no existing chip role. Derived, not copied: 10% of
                                  // --opt-accent default (#4477bb) mixed over --opt-panel default
                                  // (#fafafa at the time this was derived — see the "panel" entry

@@ -187,7 +187,7 @@
           <label><input type="checkbox" id="backup-section-secrets" /> <span data-i18n="backupSectionSecrets">API keys and tokens</span></label>
         </fieldset>
         <div class="backup-apply-row fg-actions">
-          <button type="button" class="btn" id="backup-import-apply" data-i18n="backupApplySelected">Apply selected</button>
+          <button type="button" class="btn primary" id="backup-import-apply" data-i18n="backupApplySelected">Apply selected</button>
           <span id="backup-import-progress" role="status" aria-live="polite"></span>
         </div>
       </section>
@@ -218,7 +218,7 @@
           </details>
         </div>
         <div class="fg fg-actions">
-          <button type="button" class="btn" id="copy-diagnostics-btn" data-i18n="diagnosticsCopy">Copy diagnostics</button>
+          <button type="button" class="btn ghost" id="copy-diagnostics-btn" data-i18n="diagnosticsCopy">Copy diagnostics</button>
           <span id="diagnostics-status" class="et-test-status hidden" role="status" aria-live="polite"></span>
         </div>
       </section>
@@ -333,7 +333,7 @@
     <!-- Tab 4: Quick Actions -->
     <div id="panel-quick" class="panel" role="tabpanel" aria-labelledby="tab-quick">
       <h2 class="section-title" data-i18n="secQuickSave">Quick Save</h2>
-      <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="quick_save"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
+      <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="quick_save"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
       <div class="fg fg-stack choice-stack">
         <div class="choice-row"><label><input type="checkbox" id="qs-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
         <div class="choice-row"><label><input type="checkbox" id="qs-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
@@ -349,7 +349,7 @@
 
       <div class="divider"></div>
       <h2 class="section-title" data-i18n="secReadLater">Read Later</h2>
-      <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="read_later"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
+      <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="read_later"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
       <div class="fg fg-stack choice-stack">
         <div class="choice-row"><label><input type="checkbox" id="rl-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
         <div class="choice-row"><label><input type="checkbox" id="rl-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
@@ -707,7 +707,7 @@
           <p class="hint context-help-body" data-i18n="tagPromptHint">Leave empty to use the default prompt shown in this field. Must instruct AI to return <code>["tag1","tag2"]</code> format.</p>
         </details>
         <textarea id="opt-custom-tag-prompt" rows="8"></textarea>
-        <div class="fg-actions"><button class="btn btn-sm" id="reset-tag-prompt" data-i18n="resetToDefault">Reset to default</button></div>
+        <div class="fg-actions"><button class="btn btn-sm ghost" id="reset-tag-prompt" data-i18n="resetToDefault">Reset to default</button></div>
       </div>
 
       <div class="fg context-help-host" data-help-role="field">
@@ -717,7 +717,7 @@
           <p class="hint context-help-body" data-i18n="summaryPromptHint">Leave empty to use the default prompt shown in this field. Use <code>{{lang_instruction}}</code> for auto language.</p>
         </details>
         <textarea id="opt-custom-summary-prompt" rows="8"></textarea>
-        <div class="fg-actions"><button class="btn btn-sm" id="reset-summary-prompt" data-i18n="resetToDefault">Reset to default</button></div>
+        <div class="fg-actions"><button class="btn btn-sm ghost" id="reset-summary-prompt" data-i18n="resetToDefault">Reset to default</button></div>
       </div>
     </div>
 
@@ -831,7 +831,7 @@
         <label class="bl" data-i18n="mdShortcutLabel">Open the reader</label>
         <p class="hint">
           <span id="md-shortcut-current" class="shortcut-current" data-command="markdown_preview"></span>
-          <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-md" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+          <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-md" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
         </p>
       </div>
     </div>

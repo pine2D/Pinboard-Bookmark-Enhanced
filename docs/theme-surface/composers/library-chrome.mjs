@@ -29,6 +29,14 @@ const DEFAULT_LIGHT = {
   "on-danger": "#ffffff",       // = .confirm-popover .confirm-yes color: var(--lib-panel, #fff)
                                  // default (library.css:207); already 5.80:1 on --lib-danger default,
                                  // clears AA unmodified.
+  "on-accent": "#ffffff",       // library has no existing "text on filled accent" role -- new for
+                                 // Task 4 (taste-uplift-batch2), `.btn.primary`'s text colour
+                                 // (`.vocab-note-save`). fgToAAMulti(white, [accent-default #1a73e8,
+                                 // its 88%-accent/12%-fg hover mix]) is identity on both hosts: white
+                                 // already clears 4.51:1 / 5.30:1 (rest margin is thin, same
+                                 // convention as on-danger's default above; the render audit caught a
+                                 // THEMED library block fail this hover pair at only 4.27:1 before this
+                                 // derivation went multi-host -- see _ui-derive.mjs).
   "chip-bg": "#e6f0fd",         // = the resolved literal of .vocab-group-chip's own current formula
                                  // (color-mix(--lib-accent 10%, transparent), library.css:1141-1145)
                                  // composited over --lib-panel default (#ffffff) — 10% of --lib-accent

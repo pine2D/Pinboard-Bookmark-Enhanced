@@ -236,6 +236,14 @@ const COMPONENT_PAIR_SPEC = [
   ["danger-quiet-fg", "panel", 4.5],
   ["danger-quiet-fg", "btn-bg", 4.5],
   ["on-danger", "danger", 4.5],
+  // on-accent (Task 4, taste-uplift-batch2 -- `.btn.primary`'s fill/text
+  // pair): all 3 surfaces now declare it, so this graduates out of the
+  // popup-only ad-hoc "on-accent vs accent" probe auditCssThemes used to run
+  // (varPrefix === "--pp" branch, retired in the same commit that added this
+  // row) into one shared row, the same on-danger already gets. ORPHAN_ALLOWLIST's
+  // "pp:on-accent" entry is retired alongside it (COMPONENT_PAIR_ROLES now
+  // covers it automatically), same "graduated" pattern warn-fg used below.
+  ["on-accent", "accent", 4.5],
   // warn-fg/warn-bg (debt-sweep 2026-08-08, independent review F1): both
   // come out of the same pairToAA(destroy, bg, mode) call in
   // deriveUiColors (_ui-derive.mjs) -- the foreground's lightness is
@@ -474,10 +482,12 @@ const ORPHAN_ALLOWLIST = new Set([
   "pp:banner-fg",
   "pp:ok-fg",
   "pp:offline-fg",
-  // --pp-on-accent: audited by the dedicated "on-accent vs accent" check in
-  // auditCssThemes (varPrefix === "--pp" branch) -- real coverage, same
-  // "predates this task's role registry" reason as the four above.
-  "pp:on-accent",
+  // --pp-on-accent graduated out of this list (Task 4, taste-uplift-batch2):
+  // it used to be audited only by a popup-only ad-hoc "on-accent vs accent"
+  // check in auditCssThemes; now that options/library also declare the role,
+  // it's a real COMPONENT_PAIR_SPEC row for all 3 surfaces, so
+  // COMPONENT_PAIR_ROLES already short-circuits it above -- same
+  // "unreachable dead code" reason warn-fg's entry was removed for.
   // --lib-row-selected-fg: audited by the "row-selected-fg vs
   // row-selected-bg" check in auditLibraryThemes -- real coverage, not a
   // COMPONENT_PAIR_SPEC role.
@@ -1181,19 +1191,13 @@ function auditCssThemes(label, varPrefix, cssPath) {
       const ff = resolveColor(fS, bb);
       if (ff) console.log(check(label, theme, lbl, cr(ff, bb), 4.5));
     }
-    // Submit-button text (BLOCKING): --pp-on-accent is emitted per theme and is
-    // the ONLY sanctioned text color on the accent surface. This probe exists
-    // because a var() fallback made every themed submit button silently white
-    // (2026-07): nothing audited the rendered pairing until a user caught it
-    // on terminal's phosphor green.
-    if (varPrefix === "--pp") {
-      const onS = grab("on-accent"), accS = grab("accent");
-      if (onS && accS && accS.startsWith("#")) {
-        const accBg = hexRgb(accS);
-        const onF = resolveColor(onS, accBg);
-        if (onF) console.log(check(label, theme, "on-accent vs accent", cr(onF, accBg), 4.5));
-      }
-    }
+    // Submit-button text: --pp-on-accent is emitted per theme and is the ONLY
+    // sanctioned text color on the accent surface. This probe used to exist
+    // here alone because a var() fallback made every themed submit button
+    // silently white (2026-07); retired (Task 4, taste-uplift-batch2) now
+    // that options/library also declare on-accent -- the "on-accent vs
+    // accent" pair is real COMPONENT_PAIR_SPEC coverage (all 3 surfaces) via
+    // auditComponentPairs below, not a popup-only ad-hoc probe any more.
     // Scrollbar thumb (uses fg-muted) against scrollbar track (uses panel for options, bg2 for popup).
     // Threshold 3:1 — UI components, not text.
     const trackKey = label === "options" ? "panel" : "bg2";

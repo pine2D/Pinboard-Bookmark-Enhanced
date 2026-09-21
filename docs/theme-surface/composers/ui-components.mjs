@@ -187,6 +187,24 @@ function btnRules(ns) {
     // emitted after `.btn:focus-visible` (0,2,0) and would keep its chip-bg
     // frame during focus. Decided by specificity, not by file position.
     rule(".btn.tonal:focus-visible", [["border-color", `var(--${ns}-focus-bd)`]], { pairColorWith: ".btn.tonal" }),
+    // Primary chrome -- the one committing action of a flow (apply an import,
+    // save a note). At most one per view; a repeated affirmative action takes
+    // `.tonal` instead. Filled accent, frame collapsed into the fill (§9.1 law 1).
+    ...(ns === "pp" ? [] : [
+      rule(".btn.primary", [
+        ["background", `var(--${ns}-accent)`],
+        ["border-color", `var(--${ns}-accent)`],
+        ["color", `var(--${ns}-on-accent)`],
+        ["font-weight", "600"],
+      ]),
+      // (0,4,0): beats `.btn:hover:not(:disabled)` (0,3,0), which would otherwise
+      // repaint a filled accent button with the neutral btn-hover fill.
+      rule(".btn.primary:hover:not(:disabled)", [
+        ["background", `color-mix(in srgb, var(--${ns}-accent) 88%, var(--${ns}-fg))`],
+        ["border-color", `color-mix(in srgb, var(--${ns}-accent) 88%, var(--${ns}-fg))`],
+      ], { pairColorWith: ".btn.primary" }),
+      rule(".btn.primary:focus-visible", [["border-color", `var(--${ns}-focus-bd)`]], { pairColorWith: ".btn.primary" }),
+    ]),
   ];
 }
 

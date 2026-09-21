@@ -1700,6 +1700,14 @@ const BATCH_BAR_SELECTORS = new Set([
   "#vocab-batch-toolbar .vocab-group-unit",
 ]);
 function needsBatchBarOpen(selector) { return BATCH_BAR_SELECTORS.has(selector); }
+// .vocab-note-save (Task 4, taste-uplift-batch2 -- COMPONENTS.md §1.2 primary
+// tier): the detail-open click above is not enough to reveal it. It starts
+// `hidden` (visibility, not display -- library.css) until the note textarea's
+// value diverges from the word's saved note, so the cheapest REAL reveal is
+// typing into the field the same way a user would, letting the existing
+// `input` listener flip `.hidden` itself -- not toggling the DOM property
+// directly, which would exercise a path the actual UI never takes.
+function needsNoteDirty(selector) { return selector.includes("vocab-note-save"); }
 
 async function runLibraryTheme(page, extBase, theme, checks, results) {
   // Explicit #vocab hash (not bare navigation): _pbpLibInitialView() prefers
@@ -1750,7 +1758,31 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
       await head.click({ modifiers: ["Control"] });
       await page.waitForTimeout(350);
     }
-    for (const check of vocabChecks) await runOneCheck(page, theme, check, results, extBase);
+    for (const check of vocabChecks) {
+      // .vocab-note-save cannot use the same one-shot-at-the-top pattern as
+      // needsDetailOpen/needsBatchBarOpen above: `state: "rowStates"`
+      // (driveRowStates) does its OWN full `page.goto()` reload partway
+      // through this loop and restores only the "current row" / "selected
+      // for batch" flags it knows about (its own click sequence happens to
+      // reconstruct both, which is why the detail-open and batch-bar groups
+      // above survive it untouched) -- it has no notion of "the note field
+      // was typed into" and silently drops that JS-runtime-only state.
+      // Re-assert idempotently right before every check that needs it
+      // instead of trusting a group-wide setup to survive a reload it
+      // doesn't know is coming.
+      if (needsNoteDirty(check.selector)) {
+        const dirty = await page.evaluate(() => document.querySelector(".vocab-note-save")?.hidden === false);
+        if (!dirty) {
+          const noteInput = page.locator(".vocab-note-input").first();
+          if (!(await noteInput.count())) {
+            throw new Error(`SETUP: no ".vocab-note-input" to dirty .vocab-note-save (theme=${theme}) -- seed fixture broken or markup renamed`);
+          }
+          await noteInput.fill("render-audit probe");
+          await page.waitForSelector(".vocab-note-save:not([hidden])", { timeout: TIMEOUT_MS });
+        }
+      }
+      await runOneCheck(page, theme, check, results, extBase);
+    }
   }
 
   if (notesChecks.length) {

@@ -156,6 +156,11 @@ export function composePopupThemes(tokensByPilot) {
       buttonBorderRole: "btn-bd",
       inputBorderRole: "input-bd",
       chipMode: "verbatim",
+      // on-accent stays popup's own INPUT role (already set unconditionally
+      // above via `"on-accent": derived.bg`, then possibly overridden by
+      // ppO) -- this only says "don't clobber it", never "always derive"
+      // (Task 4, taste-uplift-batch2).
+      onAccentIsInput: true,
     });
     // preset-bd RETIRED (design-uplift, preset-row Variant A, 2026-08-04):
     // `.preset-btn` is borderless now (COMPONENTS.md Appendix C30), so no

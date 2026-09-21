@@ -162,6 +162,25 @@ catppuccin-mocha 两者逐字节相同、ΔE 0）。派生在 `finalizeUiControl
 字面量），审计门本身不会自动拦下这个问题。`.btn.tonal` 目前只有**一个**消费点：options 的标签治理相似组行
 （`options.js`『合并为 …』按钮），尚未在 popup 或 library 出现过。
 
+**primary chrome**（2026-09-21，Task 4，taste-uplift-batch2）——一个视图里**唯一**的提交动作（应用一批导入
+选择、保存一条笔记）：实心 `background/border-color: --{ns}-accent`、`color: --{ns}-on-accent`、字重 600。
+hover 把填充与边框一起往 `--{ns}-fg` 混 12%（`color-mix(in srgb, accent 88%, fg)`），读作「同一块填充变深」，
+不是换色；focus 只重涂 `border-color`（`box-shadow` 沿用 `.btn:focus-visible` 的辉光，不重复声明）。**每个视图
+至多一颗**——四档现在是**主 / tonal / 次 / 幽灵**：主档是唯一的提交动作，tonal 是列表里重复出现的肯定动作
+（见上），次档（裸 `.btn`）是本页的常规动作，幽灵档是低频/跳出页面/支持性的动作。第二个「提交」要么改档
+（tonal/ghost），要么不该出现在同一屏。**popup 不发射本档**：`btnRules(ns)` 对 `ns === "pp"` 短路整条 primary
+分支——popup 已有自己的 `#submit-btn` 主按钮配方（比本战役更早存在，颜色语言不同），迁到 `.btn.primary` 是
+一次独立的、有自身布局后果的按钮迁移，不在本批范围。
+
+`--{ns}-on-accent` 是 primary 唯一新增的颜色角色：`fgToAA(palette["btn-fg"], accent)`——与 `on-danger`
+（危险实心档的文字色）同一手法，固定前景是这个主题「品牌按钮文字」本来的颜色，再按需把它往能过 AA 的方向推。
+`on-accent` 对 popup 是**输入**角色（`ui.popup.<mode>.on-accent` 可覆盖，5/13 pilot 这样做，`#submit-btn`
+一直这样消费）；对 options / library 是**派生输出**角色（`UI_DERIVED_OUTPUT_ROLES`，与 `on-danger`/`chip-bg`
+同一批）——这两个表面此前从未声明过这个角色，没有存量 pilot 值要保留，`.btn.primary` 的文字色因此永远派生，
+不接受 pilot 覆盖，`validate-contracts` 同步禁止 `ui.options.*.on-accent` / `ui.library.*.on-accent`。
+`contrast-audit` 的 `COMPONENT_PAIR_SPEC` 收了 `["on-accent","accent",4.5]` 一行，三表面共用同一行——popup
+一侧原先是一条不进注册表的 ad-hoc 检查，随本次改动一并退役。
+
 ### 1.3 消费 token 对
 
 | 属性 | token | 派生要求 |
@@ -224,6 +243,11 @@ composer 一旦开始发射 `color: var(--opt-btn-fg)`，它们会逐条覆盖�
   文件尾。`.row-del-x`、`.vocab-load-more`、`.lib-cluster > .btn.ghost`、`.vocab-batch-bar .btn:not(.vocab-group-step)`、
   `.vocab-group-step` 这些排在插入点之后的手写规则**靠源顺序或特异性赢**，换位置会静默翻转级联。
 - 新增按钮先 grep 同表面同类控件，归入既有阶与档，不新造第三套 padding。
+- **即时自动保存的设置页，大多数 tab 没有主档，这是预期，不是遗漏**（2026-09-21，Task 4）：options 一进
+  tab 就落盘，没有「提交」这个动作可言，主档消费者目前只有两处——options 导入预览的
+  `#backup-import-apply`（应用所选导入项）与 library 详情面板的 `.vocab-note-save`（保存笔记）。不要因为
+  某个 tab「看起来缺一个主按钮」就把某颗常规动作强行升到 primary；同一屏出现第二个「提交」感先检查它是不是
+  真的提交（多半该是 tonal 或维持次档）。
 
 ---
 

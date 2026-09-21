@@ -371,7 +371,7 @@ function _pbpVocabBuildNoteEditor(w) {
   noteInput.setAttribute("aria-keyshortcuts", "Control+Enter");
   const noteSave = document.createElement("button");
   noteSave.type = "button";
-  noteSave.className = "btn btn-sm vocab-note-save";
+  noteSave.className = "btn btn-sm primary vocab-note-save";
   // icon + label, as confirmed on the mockup. `check` is the commit gesture
   // (the tick you get back), distinct from `checkCircle`, which this page
   // already spends on "mark as known".

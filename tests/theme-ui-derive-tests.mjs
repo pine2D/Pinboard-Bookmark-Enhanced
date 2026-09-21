@@ -7,6 +7,7 @@ import {
   FILL_SEPARATE_MIN,
   finalizeUiControlRoles,
   hexToRgb,
+  mix,
   relLum,
   resolveOpaqueBg,
   rgbToHex,
@@ -122,6 +123,40 @@ check(contrast(hexToRgb(popup["chip-fg"]), popupChipBg) >= 4.5 &&
   ratio(popup["chip-fg"], popup["btn-hover"]) >= 4.5,
 "popup chip foreground must clear AA against the composited tag fill and hover fill");
 
+// --- on-accent: OUTPUT role for options/library, INPUT role for popup
+// (Task 4, taste-uplift-batch2 -- `.btn.primary`'s fill/text pair). Neither
+// options nor library has ever declared this role, so (unlike on-danger,
+// which every surface already had a literal for) there is no legacy value
+// to preserve -- it is always derived, the same way on-danger is. ---
+check(ratio(finalized["on-accent"], finalized.accent) >= 4.5,
+  "options/library on-accent (no onAccentIsInput config) must be derived and clear AA against accent");
+
+// A value already sitting in the map before this call (a stray key, or a
+// pilot override validate-contracts should have blocked) must NOT survive
+// for options/library: on-accent is an OUTPUT role there, unconditionally
+// recomputed every call, never trusted as an input the way on-danger never
+// is either.
+const poisonedOnAccent = finalizeUiControlRoles({ ...base, "on-accent": "#000000" }, palette);
+check(poisonedOnAccent["on-accent"] !== "#000000" && ratio(poisonedOnAccent["on-accent"], poisonedOnAccent.accent) >= 4.5,
+  "options/library on-accent must be unconditionally recomputed, never left at a pre-existing value");
+
+// popup: on-accent IS an input (its own composer always supplies one before
+// calling here, and 5/13 pilots override it). A given value must survive
+// untouched even when it fails AA -- popup's own composer is the one place
+// allowed to choose a value the derivation would not have picked.
+const popupGivenOnAccent = finalizeUiControlRoles({ ...base, "on-accent": "#000000" }, palette, {}, {
+  onAccentIsInput: true,
+});
+check(popupGivenOnAccent["on-accent"] === "#000000",
+  "popup (onAccentIsInput: true) must keep a caller-supplied on-accent unchanged, even off-AA");
+
+// popup with NO on-accent supplied (the gap the brief's `== null` guard
+// exists for) must still get a derived, AA-clearing value -- the config flag
+// only stops an OVERWRITE of a given value, it does not disable the fallback.
+const popupNoOnAccent = finalizeUiControlRoles(base, palette, {}, { onAccentIsInput: true });
+check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"], popupNoOnAccent.accent) >= 4.5,
+  "popup (onAccentIsInput: true) must still derive on-accent when none was given");
+
 // --- fillSeparate: the Soft Fill separation floor (COMPONENTS.md §9.1 law 2) ---
 {
   check(FILL_SEPARATE_MIN === 1.10, "user ruling 2026-09-21: 1.10, not 1.06 and not 1.15");
@@ -207,6 +242,50 @@ check(contrast(hexToRgb(popup["chip-fg"]), popupChipBg) >= 4.5 &&
   // emptied POPUP_THEME_MAP would make every check() above vacuously true).
   check(assertionCount === POPUP_THEME_MAP.length * 4,
     `expected ${POPUP_THEME_MAP.length * 4} (theme x role x host) assertions, ran ${assertionCount}`);
+}
+
+// --- on-accent vs accent (rest) AND vs the settled `.btn.primary:hover`
+// fill >= 4.5, EVERY options theme (Task 4, taste-uplift-batch2 --
+// `.btn.primary`'s fill/text pair). The hover half is a real regression
+// guard, not belt-and-suspenders: the render audit caught library
+// solarized-light at 4.52:1 resting but only 4.27:1 once
+// `color-mix(in srgb, accent 88%, fg)` (ui-components.mjs's hover recipe)
+// pulled the fill toward fg -- fixed by deriving on-accent with
+// fgToAAMulti against both hosts (same technique danger-quiet-fg already
+// uses against its own settled hover fills). Same composeOptionsThemeMap-
+// walks-POPUP_THEME_MAP technique as the fg-hint/fg-muted loop above, for
+// the same reason: this is the real composer pipeline, not a hand-rebuilt
+// approximation of it. Library has no exported per-theme map builder either
+// (same documented gap above), so library's rest-vs-accent coverage lives in
+// contrast-audit's COMPONENT_PAIR_SPEC ["on-accent", "accent", 4.5] row
+// instead of here, and library's hover-mix coverage lives in the render
+// audit's hand-written `.vocab-note-save` hover checklist entry (see
+// docs/theme-surface/tools/contrast-audit.mjs and task-4-report.md). ---
+{
+  const pilotCache = new Map();
+  const loadPilot = (slug) => {
+    if (!pilotCache.has(slug)) {
+      pilotCache.set(slug, JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${slug}.tokens.json`, import.meta.url), "utf8")));
+    }
+    return pilotCache.get(slug);
+  };
+  let assertionCount = 0;
+  for (const entry of POPUP_THEME_MAP) {
+    const tk = loadPilot(entry.pilot);
+    const { map } = composeOptionsThemeMap(tk, entry.mode, entry.useDarkMode);
+    const c = ratio(map["on-accent"], map.accent);
+    assertionCount++;
+    check(c >= 4.5,
+      `options theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} on-accent=${map["on-accent"]} vs accent=${map.accent} = ${c.toFixed(3)}, need 4.5`);
+    const hoverRgb = mix(hexToRgb(map.accent), hexToRgb(map.fg), 0.12);
+    const ch = contrast(hexToRgb(map["on-accent"]), hoverRgb);
+    assertionCount++;
+    check(ch >= 4.5,
+      `options theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} on-accent=${map["on-accent"]} vs primary-hover-mix=${rgbToHex(hoverRgb)} = ${ch.toFixed(3)}, need 4.5`);
+  }
+  // Guard against the loop silently degenerating to zero iterations.
+  check(assertionCount === POPUP_THEME_MAP.length * 2,
+    `expected ${POPUP_THEME_MAP.length * 2} (rest + hover per theme) assertions, ran ${assertionCount}`);
 }
 
 if (failures.length) {

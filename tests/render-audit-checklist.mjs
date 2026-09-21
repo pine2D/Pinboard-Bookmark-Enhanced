@@ -504,6 +504,41 @@ export const CHECKS = [
   { surface: "library", page: "library.html", selector: ".notes-detail-delete", state: "hover",
     expect: { textContrast: 4.5 } },
 
+  // ---- primary tier (COMPONENTS.md §1.2, Task 4 taste-uplift-batch2):
+  // `.btn.primary` is the one committing action of a flow -- library's only
+  // instance is `.vocab-note-save` (library-vocab.js). Same "default AND
+  // hover" shape as the danger-quiet pair just above, for the same reason:
+  // `.btn.primary:hover:not(:disabled)` repaints `background` to
+  // `color-mix(in srgb, accent 88%, fg)`, a real fill change, so on-accent's
+  // AA margin has to survive that tint too, not just the resting accent fill
+  // it was solved against.
+  //
+  // Options' primary instance, `#backup-import-apply`, is NOT used here: it
+  // stays `disabled` until a real backup file has been picked and its
+  // preview parsed (options-backup.js), and sits inside
+  // `#backup-import-preview[hidden]` until then -- reaching it live would
+  // mean driving a full JSON-backup-import round trip through this harness,
+  // not a cheap DOM reveal. library's `.vocab-note-save` is used as the
+  // audited primary instance instead (sanctioned fallback, task-4-brief.md
+  // Step 2); `:disabled` is exempt from textContrast (§3.4) so
+  // `#backup-import-apply` not being probed here is not a coverage gap on
+  // that axis either way.
+  //
+  // The selector is compound (`.vocab-detail-footer .vocab-note-save`, not
+  // the bare class) for the same reason `.vocab-detail-pane .vocab-group-unit`
+  // is above: `.vocab-note-save`'s own class carries no "-detail-" substring,
+  // so scripts/ui-render-audit.mjs's needsDetailOpen() would not open the
+  // detail pane for it on the selector string alone. `.vocab-note-save`
+  // ALSO starts `hidden` (visibility, not display -- library.css) until the
+  // note textarea's value diverges from the word's saved note; the runner's
+  // needsNoteDirty() reveal step types into `.vocab-note-input` (the same
+  // `input` event a real user's keystroke fires) right after the detail pane
+  // opens, which is what actually flips `.vocab-note-save`'s `hidden` off. ----
+  { surface: "library", page: "library.html", selector: ".vocab-detail-footer .vocab-note-save", state: "default",
+    expect: { textContrast: 4.5 } },
+  { surface: "library", page: "library.html", selector: ".vocab-detail-footer .vocab-note-save", state: "hover",
+    expect: { textContrast: 4.5 } },
+
   // options has a themed-state override (options.css:1244) that patches
   // every preset -- but the DEFAULT (no-preset) state ALSO passes today,
   // for an unrelated reason: options.css sets `:root { color-scheme: light }`

@@ -14,10 +14,19 @@ const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
 // outputs of the final post-override contrast pass, not supported ui.* inputs:
 // accepting them would make a pilot look configurable while silently replacing
 // its value moments later. Popup has two additional paired outputs.
+//
+// on-accent is the one role that is an INPUT for popup (its `#submit-btn`
+// precedent -- a pilot may set `ui.popup.<mode>.on-accent`, and 5/13 do) but
+// an OUTPUT for options/library (Task 4, taste-uplift-batch2): neither
+// surface has ever had this role, so there is no existing pilot value to
+// preserve, and `.btn.primary`'s text colour is always derived, never
+// pilot-configurable, the same as on-danger/chip-bg. Per-surface arrays
+// (rather than one shared COMMON_DERIVED_OUTPUT_ROLES) so popup is not
+// blocked from the input it legitimately accepts.
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
   popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg"]),
-  options: COMMON_DERIVED_OUTPUT_ROLES,
-  library: COMMON_DERIVED_OUTPUT_ROLES,
+  options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent"]),
+  library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent"]),
 });
 
 export function hexToRgb(h) {
@@ -406,6 +415,17 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
     buttonBorderRole = "btn-border",
     inputBorderRole = "input-border",
     chipMode = "tinted",
+    // Task 4 (taste-uplift-batch2): on-accent is popup's INPUT role (its own
+    // composer always supplies one before calling here, and a pilot may
+    // override it -- NEW_THEME.md) but an OUTPUT role for options/library
+    // (UI_DERIVED_OUTPUT_ROLES), same bucket as on-danger/chip-bg above.
+    // false is the options/library default: on-accent is unconditionally
+    // (re)computed every call, so a value that slipped past
+    // validate-contracts's ban on a pilot setting it (a defense this
+    // function does not rely on alone) can never silently win. popup passes
+    // true so its own pre-set/overridden value is left untouched, mirroring
+    // the on-danger-style `== null` gap-fill instead of an overwrite.
+    onAccentIsInput = false,
   } = config;
   if (chipMode !== "tinted" && chipMode !== "verbatim") {
     throw new Error(`finalizeUiControlRoles: unsupported chipMode ${JSON.stringify(chipMode)}`);
@@ -475,6 +495,29 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
       hexToRgb(tagFg),
       [chipBgRgb, btnHoverRgb],
     ));
+  }
+
+  // Text/icon colour on a filled accent control (.btn.primary). Same
+  // derivation as on-danger above -- a fixed "brand button text" foreground
+  // (palette["btn-fg"], the pilot's own text-on-filled-button colour, not to
+  // be confused with the DERIVED --{ns}-btn-fg role this function also
+  // computes) pushed to clear AA against the fill it actually sits on.
+  if (onAccentIsInput) {
+    if (map["on-accent"] == null) {
+      map["on-accent"] = rgbToHex(fgToAA(hexToRgb(palette["btn-fg"]), hexToRgb(map.accent)));
+    }
+  } else {
+    // options/library also paint `.btn.primary:hover` as
+    // `color-mix(in srgb, accent 88%, fg)` (ui-components.mjs) -- a real
+    // fill change, not just a rest colour, so on-accent has to clear AA
+    // against BOTH the resting accent AND that settled hover mix, the same
+    // multi-host treatment danger-quiet-fg gets against its own settled
+    // hover fills above. Caught live (render audit, Task 4): library
+    // solarized-light measured 4.52:1 at rest but only 4.27:1 once the 12%
+    // fg mix pulled the fill toward --lib-fg.
+    const accentRgb = hexToRgb(map.accent);
+    const onAccentHoverRgb = mix(accentRgb, fgRgb, 0.12);
+    map["on-accent"] = rgbToHex(fgToAAMulti(hexToRgb(palette["btn-fg"]), [accentRgb, onAccentHoverRgb]));
   }
   return map;
 }
