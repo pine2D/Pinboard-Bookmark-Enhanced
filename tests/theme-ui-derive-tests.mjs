@@ -13,6 +13,7 @@ import {
   TIER_DISTINCT_MIN_DE,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
+import { POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
 
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); };
@@ -163,23 +164,49 @@ check(contrast(hexToRgb(popup["chip-fg"]), popupChipBg) >= 4.5 &&
     "already-distinct fill is returned untouched");
 }
 
-// --- fg-hint / fg-muted must clear AA on the ELEVATED surface too, on the
-// rounded hex that ships (Task 3, taste-uplift-batch2 tokens batch,
-// 2026-09-21). contrast-audit's bg2/panel blind spot let flexoki-light's
-// options fg-hint ship at 4.47:1 against --opt-panel: the pilot's
-// ui.options.light.fg-hint override is a raw literal chosen by the pilot
-// author (it happens to equal palette.muted, not muted-soft) that bypasses
-// deriveUiColors' AA-guaranteed fgToAAMulti derivation entirely once merged
-// into the map -- nothing downstream re-validated an override against the
-// surfaces it actually has to clear. Built via the real composer pipeline
-// (composeOptionsThemeMap), not a hand-rebuilt approximation of it. ---
+// --- fg-hint / fg-muted must clear AA on BOTH the page bg and the ELEVATED
+// panel, on the rounded hex that ships, for EVERY pilot x mode options-
+// chrome.mjs actually renders (Task 3, taste-uplift-batch2 tokens batch,
+// 2026-09-21, fix round 1). contrast-audit's bg2/panel blind spot let
+// flexoki-light's options fg-hint ship at 4.47:1 against --opt-panel: a
+// pilot's ui.options.<mode>.fg-hint/fg-muted override is a plain literal the
+// pilot author chose (input roles win by contract -- NEW_THEME.md -- so the
+// derivation does not adjust them), and nothing had ever checked such an
+// override against `panel` for options (or against ANYTHING for library's
+// fg-hint). The gate closes the blind spot; this test asserts the CATEGORY
+// ("no pilot's hint-tier override fails AA on options"), not one instance --
+// it walks POPUP_THEME_MAP (the same pilot+mode enumeration
+// composeOptionsThemes itself iterates, so it never invents a mode a pilot
+// isn't actually rendered in) and builds each theme's real map via
+// composeOptionsThemeMap, the exact composer pipeline. Library/popup have no
+// equivalent exported per-theme map builder (only composeLibraryThemes /
+// composePopupThemes, which return the joined multi-theme CSS text, not a
+// map) -- not adding one just for this test, per scope. ---
 {
-  const tokens = JSON.parse(readFileSync(new URL("../docs/theme-surface/pilots/flexoki.tokens.json", import.meta.url), "utf8"));
-  const { map } = composeOptionsThemeMap(tokens, "light");
-  for (const role of ["fg-hint", "fg-muted"]) {
-    const c = ratio(map[role], map.panel);
-    check(c >= 4.5, `flexoki-light options ${role} ${map[role]} on panel ${map.panel} = ${c.toFixed(3)}, need 4.5`);
+  const pilotCache = new Map();
+  const loadPilot = (slug) => {
+    if (!pilotCache.has(slug)) {
+      pilotCache.set(slug, JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${slug}.tokens.json`, import.meta.url), "utf8")));
+    }
+    return pilotCache.get(slug);
+  };
+  let assertionCount = 0;
+  for (const entry of POPUP_THEME_MAP) {
+    const tk = loadPilot(entry.pilot);
+    const { map } = composeOptionsThemeMap(tk, entry.mode, entry.useDarkMode);
+    for (const role of ["fg-hint", "fg-muted"]) {
+      for (const hostRole of ["panel", "bg"]) {
+        const c = ratio(map[role], map[hostRole]);
+        assertionCount++;
+        check(c >= 4.5,
+          `options theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} ${role}=${map[role]} vs ${hostRole}=${map[hostRole]} = ${c.toFixed(3)}, need 4.5`);
+      }
+    }
   }
+  // Guard against the loop silently degenerating to zero iterations (an
+  // emptied POPUP_THEME_MAP would make every check() above vacuously true).
+  check(assertionCount === POPUP_THEME_MAP.length * 4,
+    `expected ${POPUP_THEME_MAP.length * 4} (theme x role x host) assertions, ran ${assertionCount}`);
 }
 
 if (failures.length) {

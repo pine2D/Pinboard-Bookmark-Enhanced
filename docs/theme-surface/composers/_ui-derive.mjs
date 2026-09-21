@@ -418,28 +418,6 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
   const panelRgb = hexToRgb(map[panelRole]);
   const hosts = [panelRgb, bgRgb];
 
-  // fg-hint / fg-muted are supported pilot-override inputs (unlike the
-  // COMMON_DERIVED_OUTPUT_ROLES locked above) -- deriveUiColors already
-  // guarantees its OWN fgToAAMulti output clears bg/bg-surface/accent-soft,
-  // but a pilot's `ui.<surface>.<mode>.fg-hint`/`fg-muted` literal is merged
-  // into the map AFTER that guarantee runs and nothing re-validated it since.
-  // That gap is exactly how flexoki-light's ui.options.light.fg-hint (a raw
-  // "#6F6E69", chosen to equal palette.muted rather than the derivation's
-  // muted-soft input) shipped at 4.47:1 against --opt-panel -- not a bug in
-  // fgToAAMulti's convergence or rounding (both verified correct in
-  // isolation), but an override bypassing the guarantee entirely (found
-  // 2026-09-21 via the contrast-audit bg2/panel blind-spot fix). Re-run both
-  // tiers through the same worst-case AA derivation on the FINAL, post-
-  // override map: identity for every theme that already clears (the
-  // un-overridden default already does, by construction), so this only ever
-  // moves a value that was failing, and only toward MORE contrast (fgToAA
-  // never relaxes lightness back toward bg once it has moved away).
-  for (const role of ["fg-hint", "fg-muted"]) {
-    if (map[role] != null) {
-      map[role] = rgbToHex(fgToAAMulti(hexToRgb(map[role]), hosts));
-    }
-  }
-
   if (ovr[buttonBorderRole] == null) {
     map["btn-bg"] = rgbToHex(fillSeparate(hexToRgb(map["btn-bg"]), hosts, fgRgb));
   }

@@ -176,7 +176,7 @@
     },
     "options": {
       "light": {
-        "fg-hint": "#6F6E69",
+        "fg-hint": "#6a6964",
         "save": "#536907",
         "btn-hover": "#E6E4D9",
         "code-bg": "#E6E4D9",
