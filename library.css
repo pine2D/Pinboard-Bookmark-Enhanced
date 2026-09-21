@@ -920,7 +920,7 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 .notes-detail-note { margin: var(--lib-sp-3) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--lib-fg-muted); }
 .notes-detail-sib-title {
   margin: 0 0 var(--lib-sp-2);
-  font-size: 12px; line-height: normal; font-weight: bold;
+  font-size: 12px; line-height: normal; font-weight: 600;
   letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--lib-fg-muted);
 }

@@ -687,7 +687,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .row { display: flex; padding: var(--pp-sp-2) var(--pp-sp-5); gap: var(--pp-sp-4); }
 .label {
   width: 52px; flex-shrink: 0; text-align: right;
-  font-weight: bold; font-size: 11px; color: var(--pp-fg-muted); padding-top: var(--pp-sp-2); line-height: 1.5;
+  font-weight: 400; font-size: 11px; color: var(--pp-fg-muted); padding-top: var(--pp-sp-2); line-height: 1.5;
 }
 .label.top { align-self: flex-start; } /* padding-top is .label's own; this rule only pins the alignment */
 .field { flex: 1; min-width: 0; }

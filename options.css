@@ -127,17 +127,19 @@
      input-bg #fff was --opt-panel exactly). Derived there by the same
      fillSeparate() the 14 themed blocks use, emitted into the generated :root
      block at the end of @generated:ui-themes below. */
-  /* Task 12: two shared secondary-text shades used verbatim across several
+  /* Task 12: shared secondary-text shade used verbatim across several
      unrelated hand-written rules (label.bl, free-tier-help, .pf h3,
-     et-onboarding, theme-name-popover label, key-toggle:hover / disclosure
-     header, section-title). Neither has a per-theme role of its own -- every
-     one of these selectors is either fully superseded by an existing
-     html[data-theme] override that reads a DIFFERENT token (so this default
-     only ever paints the true no-preset surface) or has no themed coverage
-     at all, so a plain :root default (not a per-property var() fallback)
-     is the correct, lowest-risk migration: one definition, reused bare. */
+     et-onboarding, theme-name-popover label, key-toggle:hover). Has no
+     per-theme role of its own -- every one of these selectors is either
+     fully superseded by an existing html[data-theme] override that reads a
+     DIFFERENT token (so this default only ever paints the true no-preset
+     surface) or has no themed coverage at all, so a plain :root default
+     (not a per-property var() fallback) is the correct, lowest-risk
+     migration: one definition, reused bare. --opt-fg-dim (disclosure
+     header / section-title's old dim shade) is retired here: taste-uplift
+     batch2 Task 5 moves both to --opt-fg so titles read at full foreground
+     strength under every theme. */
   --opt-fg-soft: #555;
-  --opt-fg-dim: #444;
   /* Task 12 review round 2 (C-class, 11 tokens): page-local one-off colors
      that reviewer round 1 left as var(--opt-X, literal) inline fallbacks --
      none of them has (or should have) a per-theme role (none appear in any
@@ -353,7 +355,7 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 .fg.fg-stack > .hint { margin-top: var(--opt-sp-3); }
 .fg-stack > div:has(input[type="number"]),
 .fg-stack > div:has(input[type="text"]) { margin-top: var(--opt-sp-2); margin-bottom: var(--opt-sp-3); }
-.fg label.bl { display: block; font-weight: bold; margin-bottom: var(--opt-sp-2); cursor: default; font-size: 12px; color: var(--opt-fg-soft); }
+.fg label.bl { display: block; font-weight: 400; margin-bottom: var(--opt-sp-2); cursor: default; font-size: 12px; color: var(--opt-fg-soft); }
 /* A form group has exactly four vertical relationships, and each has ONE owner:
    group -> group (.fg margin-bottom, 12px), label -> control (label.bl
    margin-bottom, 4px), control -> hint (.fg > .hint, 2px) and control -> action
@@ -972,7 +974,7 @@ html.motion-ready .backup-import-result:not([hidden]) {
 }
 .field-warn { display:none; font-size: 12px; color: var(--opt-warn); margin-top: var(--opt-sp-2); }
 .field-warn.visible { display: block; }
-.section-title { display: block; font-size: 13px; font-weight: bold; color: var(--opt-fg-dim); margin-bottom: var(--opt-sp-4); margin-top: var(--opt-sp-4); }
+.section-title { display: block; font-size: 15px; font-weight: 600; color: var(--opt-fg); margin-bottom: var(--opt-sp-4); margin-top: var(--opt-sp-4); }
 
 /* ---- Provider fields ---- */
 /* Provider fieldset: a resting container, so its edge is the hairline section
@@ -1064,7 +1066,7 @@ html[data-theme] .et-field input[type="password"]:hover:not(:focus) { border-col
    "disclosure" data-acc-key="..."> with a <summary> and a .disclosure-body:
    the connection overview, the five vocabulary sections, the Send-to
    destination cards (built by options.js) and the low-count tag list. The
-   header is a section title (13px bold, --fg-dim, accent hover -- the same
+   header is a section title (15px/600, --fg, accent hover -- the same
    face as .section-title) plus the right-edge chevron below; the body is
    flush with the panel like every other section body. Rows stack as a list:
    each member owns its top rule, so between two closed rows the gap is
@@ -1087,9 +1089,9 @@ html[data-theme] .et-field input[type="password"]:hover:not(:focus) { border-col
   padding: var(--opt-sp-5) var(--opt-sp-3);
   margin: 0 calc(-1 * var(--opt-sp-3));
   border-radius: var(--opt-radius-sm);
-  color: var(--opt-fg-dim);
-  font-size: 13px;
-  font-weight: bold;
+  color: var(--opt-fg);
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
   transition: color var(--motion-state), background-color var(--motion-state);
 }
@@ -2030,11 +2032,13 @@ html[data-theme] .et-onboarding { color: var(--opt-fg-muted); }
 .et-test-status.err { color: var(--opt-danger); }
 .et-test-status.warn { color: var(--opt-warn); }
 .et-doc-link { display: inline-block; margin-top: var(--opt-sp-3); }
-/* .section-title / .disclosure > summary (+ :hover): second form,
-   same shape as .fg label.bl / .pf h3 above -- unthemed reads the --fg-dim /
-   --accent-hover role, themed reads the plainer --fg-muted / --accent role. */
-html[data-theme] .section-title { color: var(--opt-fg-muted); }
-html[data-theme] .disclosure > summary { color: var(--opt-fg-muted); }
+/* .section-title / .disclosure > summary: Task 5 (taste-uplift batch2)
+   drops the themed/unthemed colour split -- both now read --opt-fg at rest
+   under every preset, same as the unthemed default, so render-audit's
+   headerFace family sees one face everywhere; only :hover still diverges
+   into --opt-accent. */
+html[data-theme] .section-title { color: var(--opt-fg); }
+html[data-theme] .disclosure > summary { color: var(--opt-fg); }
 html[data-theme] .disclosure > summary:hover { color: var(--opt-accent); }
 /* .theme-preset-btn.active / .saved-theme-btn.active / .theme-preset-btn
    :focus-visible no longer need a themed override here: the borderless
