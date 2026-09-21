@@ -2432,7 +2432,20 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
 #tag-gov-groups:empty { display: none; }   /* signed out: no frame around nothing */
 .tag-gov-group-row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) auto;
+  /* Content-fitted, not on the --opt-sp-N scale (ui-primitives.md: a track
+     sized to fit a specific label is component geometry). 92px: measured via
+     headless Chromium (getBoundingClientRect) with the real declared body
+     font stack -- de's "Trennzeichen" and ru's "разделитель" are the widest
+     single UNBREAKABLE kind words across all 9 locales (fr/pl/ru's longer
+     labels all contain a space or "/", which is a break opportunity even
+     without overflow-wrap). The stack resolves to Verdana in that
+     measurement (Helvetica Neue isn't installed) at 78.95px / 78.13px; the
+     CJK fallback faces (Microsoft YaHei, Noto Sans SC/CJK SC) measured a
+     little narrower (~75px). 92px keeps ~13-17px of headroom over the widest
+     measured value for font-hinting/rendering variance across browsers/OSes.
+     `auto` would leave chip columns ragged between rows -- each row is its
+     own grid, so a fixed track is required for chip alignment. */
+  grid-template-columns: 92px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--opt-sp-2) var(--opt-sp-5);
   padding: var(--opt-sp-2) var(--opt-sp-4);
@@ -2444,7 +2457,11 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   padding: var(--opt-sp-4);  /* empty-state message sits inside the same frame */
   margin-bottom: 0;
 }
-.tag-gov-kind { font-size: 12px; color: var(--opt-fg-muted); }
+/* overflow-wrap: anywhere is a locale-proof backstop, not the primary fix --
+   the 92px track above is sized to keep every known kind label on one line.
+   A future/unmeasured locale whose label is still wider breaks mid-word
+   instead of overlapping the chips to its right. */
+.tag-gov-kind { font-size: 12px; color: var(--opt-fg-muted); overflow-wrap: anywhere; }
 /* Wrapping flex flow for a set of .tag-gov-chip members: the similar-tag
    groups' member-chip row AND the low-count list (renderLowCountTags reuses
    this same class -- no separate wrapper for one more list of chips). The
@@ -2480,6 +2497,17 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   cursor: inherit;
 }
 .tag-gov-chip > input:disabled { cursor: not-allowed; }
+/* Same selector, same specificity (0,1,0) as the generated recipe's own
+   .tag-gov-chip-face rule (@generated:ui-components region, ≈:729) -- this
+   hand-written rule wins ties only by sitting after that region in the
+   cascade, not by outranking it (COMPONENTS.md §8.6: don't bet on source
+   order for a same-specificity override). The recipe owns display/
+   align-items, padding, font-size, line-height, border-radius, background
+   and color, plus every input-state rule (:hover/:checked/:focus-visible).
+   This rule must only ever ADD properties the recipe does not declare --
+   gap and overflow-wrap here -- never repeat or shadow one of the recipe's
+   own; a sync-all regeneration that reorders the insertion point would
+   otherwise flip which declaration wins silently. */
 .tag-gov-chip-face { gap: var(--opt-sp-2); overflow-wrap: anywhere; }
 .tag-gov-chip-tick { display: none; }
 .tag-gov-chip-tick svg { display: block; width: 11px; height: 11px; }
@@ -2514,6 +2542,14 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   font-variant-numeric: tabular-nums;
 }
 #tag-gov-lowcount-list { margin-bottom: var(--opt-sp-4); }   /* list -> select-all row; an empty list still separates summary and row */
+/* .hint's own `margin: 2px 0 12px` (baseline-flow spacing) shifts this
+   readout ~5px above the row centre inside .fg-actions (flex,
+   align-items:center). Checked options.html and options.js for any OTHER
+   .hint living inside a .fg-actions row before writing this: there is none,
+   so this stays an ID rule scoped to this one readout rather than a general
+   `.fg-actions > .hint` rule an unrelated future pairing would inherit
+   without review. */
+#tag-gov-selected-count { margin: 0; }
 /* Pinned to the viewport bottom while its natural position (end of the Tags panel)
    is below the fold, so batch progress is visible from any scroll position without
    yanking the view away from the groups list. Falls back into normal flow once the
@@ -2582,7 +2618,6 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
   grid-column: 2 / -1;
   font-size: 11px;
   color: var(--opt-fg-muted);
-  margin-left: var(--opt-sp-3);
 }
 .tag-gov-problems-title {
   color: var(--opt-fg-muted);

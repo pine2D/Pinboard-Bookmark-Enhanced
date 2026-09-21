@@ -19,6 +19,26 @@ function pass(name){const d=document.createElement("div");d.className="case pass
 function fail(name,msg){const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
 function test(name,fn){try{fn();pass(name);}catch(e){fail(name,e.message);}}
 
+// Mirrors pbpBuildTagGovChip's real DOM shape (options.js) so the geometry
+// tests below exercise the actual node structure -- label.tag-gov-chip >
+// input + span.tag-gov-chip-face > [span.tag-gov-chip-tick, span(text),
+// optional span.tag-gov-chip-count] -- not a stand-in that happens to carry
+// the right classes.
+function buildChip(type, value, count){
+  const label=document.createElement("label");label.className="tag-gov-chip";
+  const input=document.createElement("input");input.type=type;input.value=value;
+  const face=document.createElement("span");face.className="tag-gov-chip-face";
+  const tick=document.createElement("span");tick.className="tag-gov-chip-tick";tick.setAttribute("aria-hidden","true");
+  const text=document.createElement("span");text.textContent=value;
+  face.append(tick,text);
+  if(count!==undefined){
+    const n=document.createElement("span");n.className="tag-gov-chip-count";n.textContent=String(count);
+    face.appendChild(n);
+  }
+  label.append(input,face);
+  return label;
+}
+
 // Build the low-count list exactly like renderLowCountTags does -- it reuses
 // .tag-gov-chipset (the same wrapping flex flow the similar-tag groups use
 // for their member chips), not a dedicated wrapper class.
@@ -26,20 +46,25 @@ const list=document.getElementById("tag-gov-lowcount-list");
 const flow=document.createElement("div");
 flow.className="tag-gov-chipset";
 for(let i=0;i<12;i++){
-  const l=document.createElement("label");l.className="tag-gov-chip";
-  const cb=document.createElement("input");cb.type="checkbox";cb.className="tag-gov-lowcount-checkbox";
-  const f=document.createElement("span");f.className="tag-gov-chip-face";f.textContent="tag-number-"+i;
-  l.append(cb,f);flow.appendChild(l);
+  const chip=buildChip("checkbox","tag-number-"+i);
+  chip.querySelector("input").className="tag-gov-lowcount-checkbox";
+  flow.appendChild(chip);
 }
 list.appendChild(flow);
 
 // Build similar-group rows like renderTagGov does (real child structure, since
 // the queue tests below probe the row's own box, not just its outer class).
+// Row 0's kind carries "Trennzeichen" (de's separator label, the longest
+// single unbreakable kind word across all 9 locales) with real member chips
+// in its chipset -- the chipset used to be built EMPTY here, which is why
+// this file never caught the kind column overlapping the first chip (B).
 const groups=document.getElementById("tag-gov-groups");
 for(let i=0;i<4;i++){
   const row=document.createElement("div");row.className="tag-gov-group-row";
-  const kind=document.createElement("span");kind.className="tag-gov-kind";kind.textContent="kind";
+  const kind=document.createElement("span");kind.className="tag-gov-kind";
+  kind.textContent = i===0 ? "Trennzeichen" : "kind";
   const chips=document.createElement("div");chips.className="tag-gov-chipset";
+  chips.append(buildChip("radio","tag-"+i+"-a",5), buildChip("radio","tag-"+i+"-b",3));
   const acts=document.createElement("div");acts.className="fg-actions tag-gov-actions";
   const b=document.createElement("button");b.className="btn btn-sm tonal";b.textContent="Merge into tag"+i;acts.appendChild(b);
   row.append(kind,chips,acts);groups.appendChild(row);
@@ -100,10 +125,49 @@ test("queue rows draw no separator lines (Soft Fill law 4) and inset their hover
   const inset = row.getBoundingClientRect().left - groups.getBoundingClientRect().left;
   if (inset < 4) throw new Error("band must sit >=4px inside the queue frame, got " + inset);
 });
-test("non-card child spans the full grid width", () => {
-  // A single 280px-min column is ~321px at 650px; a full-span child must be much wider.
-  const w = groupsEmptyProbe.offsetWidth;
-  if (w < 500) throw new Error("expected full-width (~650px) span, got " + w);
+test("kind label fits its track without wrapping or overlapping the chips (longest known label: Trennzeichen)", () => {
+  const rows = [...groups.querySelectorAll(".tag-gov-group-row")];
+  const longRow = rows[0], shortRow = rows[1];
+  const longKind = longRow.querySelector(".tag-gov-kind");
+  const chipset = longRow.querySelector(".tag-gov-chipset");
+  // Measure the actual painted text extent via a Range, not the element's own
+  // box: an unbreakable word with no wrap opportunity overflows its grid item
+  // visually while the box itself still reports the track's own width, so
+  // getBoundingClientRect() on the element alone would never catch the
+  // exact overlap this test exists to catch (proven while writing this test:
+  // it silently passed against the un-widened 56px track).
+  const range = document.createRange();
+  range.selectNodeContents(longKind);
+  const textRect = range.getBoundingClientRect();
+  const chipsetRect = chipset.getBoundingClientRect();
+  if (textRect.right > chipsetRect.left) {
+    throw new Error("kind text (right=" + textRect.right.toFixed(1) + "px) overlaps the chipset (left=" + chipsetRect.left.toFixed(1) + "px)");
+  }
+  // A row using the short "kind" text is a reliable single-line reference:
+  // if "Trennzeichen" wrapped to a second line (e.g. overflow-wrap:anywhere
+  // added without widening the track) its box height would roughly double
+  // instead of matching it.
+  const longH = longKind.getBoundingClientRect().height;
+  const shortH = shortRow.querySelector(".tag-gov-kind").getBoundingClientRect().height;
+  if (longH > shortH + 1) {
+    throw new Error("kind label wrapped to more than one line: height " + longH.toFixed(1) + "px vs single-line reference " + shortH.toFixed(1) + "px");
+  }
+});
+
+test("non-card child sits inside the queue frame's own padding, not styled as a group row", () => {
+  // #tag-gov-groups is a flex column, so a plain child already spans the full
+  // width by default stretch -- that used to be this test's only assertion,
+  // which could never fail once .tag-gov-group-row stopped being a grid
+  // *item* of #tag-gov-groups (it never was; #tag-gov-groups itself is flex).
+  // Assert what actually distinguishes a non-card child instead: it must not
+  // pick up the group row's grid layout or its always-on hover-band radius,
+  // and it gets its own inset via padding rather than the row's grid gap.
+  const rowStyle = getComputedStyle(groups.querySelector(".tag-gov-group-row"));
+  if (rowStyle.display !== "grid") throw new Error("sanity check failed: a real group row must be display:grid, got " + rowStyle.display);
+  const probeStyle = getComputedStyle(groupsEmptyProbe);
+  if (probeStyle.display === "grid") throw new Error("non-card child must not use the group-row grid layout, got " + probeStyle.display);
+  if (parseFloat(probeStyle.borderTopLeftRadius) !== 0) throw new Error("non-card child must not carry the group-row's hover-band radius, got " + probeStyle.borderTopLeftRadius);
+  if (parseFloat(probeStyle.paddingLeft) < 4) throw new Error("non-card child must be inset from the frame via its own padding, got " + probeStyle.paddingLeft);
 });
 
 test("export-target select uses the styled field treatment", () => {
