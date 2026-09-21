@@ -39,7 +39,9 @@ const DEFAULT_LIGHT = {
   "danger-quiet-fg": "#bd3d3d", // WAS a verbatim copy of --pp-danger default (#c24343); re-derived
                                  // 2026-08-05 because Soft Fill's btn-bg (#eff0f2) is a darker fill
                                  // than the #ffffff this text used to sit on, dropping it to 4.41:1.
-                                 // fgToAAMulti(danger, [bg, panel, btn-bg]) — 5.39 / 5.03 / 4.72:1.
+                                 // fgToAAMulti(danger, [bg, bg2, btn-bg]) — 5.39 / 5.03 / 4.56:1.
+                                 // Re-checked 2026-09-21 against the 1.10-separated btn-bg (#ebecee);
+                                 // #bd3d3d unchanged, still clears (4.56:1, a thin margin over 4.5).
   "on-danger": "#ffffff",       // = .confirm-popover .confirm-yes `color` default light (popup.css:2048)
   "on-accent": "#ffffff",       // = --pp-on-accent default (popup.css:47) -- moved here design-uplift
                                  // Task 13 step 2, retiring the hand-written :root duplicate of the
@@ -78,7 +80,7 @@ const DEFAULT_LIGHT = {
                                  // 1.12:1 against --pp-bg2 (design-uplift Task 16, USER RULING --
                                  // border reads visibly heavier now, the intended effect). Derived the
                                  // same way the themed border is:
-                                 // borderToAA(border, [btn-bg, panel]) — 3.15:1 / 3.48:1. Re-derived
+                                 // borderToAA(border, [btn-bg, bg2]) — 3.15:1 / 3.48:1. Re-derived
                                  // 2026-09-21 (was #7e8aa0, which had dropped to 2.95:1 against the
                                  // 1.10-separated btn-bg above) for FILL_SEPARATE_MIN 1.06 -> 1.10;
                                  // before that, re-derived 2026-08-05 (was #848fa4 against a btn-bg
