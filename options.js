@@ -1316,6 +1316,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   let _tagGovAccountReloadTail = Promise.resolve();
+  // Declared here rather than down by runTagGovAi() (its main reader/writer)
+  // because the account listener just below resets it on every account
+  // change, and that listener goes live as soon as _tagGovInited flips true --
+  // possibly before this closure's remaining top-level awaits have run far
+  // enough to reach the declaration further down.
+  let tagGovAiPendingSettings = null;
   chrome.storage.onChanged.addListener((changes, area) => {
     if (!_tagGovInited || (area !== "sync" && area !== "local")
         || !(changes.pinboardToken || changes.syncApiKeys || changes.optSyncEnabled)) return;
@@ -3907,8 +3913,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   });
-
-  let tagGovAiPendingSettings = null;
 
   async function runTagGovAi(sNow) {
     const btn = $id("tag-gov-ai-btn");
