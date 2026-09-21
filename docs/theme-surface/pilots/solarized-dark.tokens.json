@@ -116,7 +116,7 @@
     },
     "options": {
       "dark": {
-        "fg": "#98a6a6",
+        "fg": "#aeb9b9",
         "fg-muted": "#8e9e9f",
         "fg-hint": "#8e9e9f",
         "input-bg": "#002b36",

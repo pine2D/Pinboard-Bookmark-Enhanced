@@ -343,6 +343,15 @@ const COMPONENT_PAIR_SPEC = [
   // it -- see _ui-derive.mjs). Identity on every other theme.
   ["fg", "btn-bg", 4.5],
   ["fg", "input-bg", 4.5],
+  // `fg` vs `btn-hover` (C1, batch2 final-fix wave): the row above only ever
+  // checked the two RESTING fills -- btn-hover is structurally always the
+  // worst of the three (fillSeparate pushes it further toward fg than
+  // btn-bg's own separation step), and this batch's 1.06->1.10 raise pushed
+  // it deep enough to break options solarized-light's `fg` override live
+  // (4.53:1 on main -> 4.37:1). Fixed at the pilot (solarized-light/dark's
+  // `ui.options.{light,dark}.fg`, Ruling 5) the same way the two rows above
+  // already are for those two themes; identity everywhere else.
+  ["fg", "btn-hover", 4.5],
   // fg-hint / fg-muted vs the control fills are DELIBERATELY NOT added here
   // as a general (all-14-themed-blocks) row, even though a real consumer
   // exists on both surfaces -- options' .connection-health-state (color:

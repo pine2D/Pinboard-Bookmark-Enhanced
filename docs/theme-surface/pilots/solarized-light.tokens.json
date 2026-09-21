@@ -110,7 +110,7 @@
     },
     "options": {
       "light": {
-        "fg": "#4e6167",
+        "fg": "#4a5c61",
         "fg-muted": "#52666d",
         "fg-hint": "#5b686a",
         "accent": "#1e6ca4",
