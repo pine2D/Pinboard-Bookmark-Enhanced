@@ -176,7 +176,10 @@ const PINBOARD_API = new Map([
     ],
   })],
   ["/v1/posts/suggest", '[{"popular":["reading","systems"]},{"recommended":["qa","设计","longform"]}]'],
-  ["/v1/tags/get", '{"reading":12,"systems":8,"design":5,"qa":3,"中文标签":2,"longform":1}'],
+  // Includes plural / separator near-duplicates and a run of single-use tags on
+  // purpose: with none, the Tags tab only ever rendered its empty state and the
+  // review queue -- the tab's whole job -- never appeared in a walkthrough.
+  ["/v1/tags/get", '{"reading":212,"readings":3,"systems":88,"system":4,"design":145,"web-dev":40,"webdev":12,"web_dev":2,"javascript":96,"javascripts":1,"machine-learning":33,"machinelearning":5,"qa":3,"中文标签":2,"longform":1,"til":1,"misc-notes":1,"oldproject":1,"tmp":1,"xkcd":1,"recipes-2019":1,"conference-talk":1,"toread-later":1,"golang":1,"rustlang":1,"papers-we-love":1,"a-very-long-tag-name-that-wraps":1}'],
   ["/v1/posts/add", '{"result_code":"done"}'],
   ["/v1/posts/update", '{"update_time":"2026-08-01T00:00:00Z"}'],
   ["/v1/user/api_token", '{"result":"0000000000000000000000000000000000000000"}'],
