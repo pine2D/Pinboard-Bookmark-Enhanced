@@ -376,10 +376,23 @@ function pbpBuildSettingsSearchIndex(root = document) {
     // cannot search for the heading they are looking straight at. The
     // context-help toggles are summaries too, but their only content is an
     // icon span, so add() drops them on the empty-text guard.
-    for (const node of panelEl.querySelectorAll("h2,h3,label,.hint,button[data-i18n],summary")) {
+    // button > [data-i18n]: a button whose visible label lives on a direct
+    // child span rather than the button itself (an icon span + a label span,
+    // so applyI18n's textContent write can update the label without wiping
+    // the icon -- #tag-gov-ai-btn / #tag-gov-refresh). A bare `button`
+    // selector would also catch the per-row "Merge into X" / "Ignore"
+    // buttons options.js builds at render time, but those set textContent
+    // directly and carry no data-i18n anywhere, on themselves or a child, so
+    // neither this nor `button[data-i18n]` ever matches them.
+    for (const node of panelEl.querySelectorAll("h2,h3,label,.hint,button[data-i18n],summary,button > [data-i18n]")) {
+      // data-search-skip: a live readout, not a heading or a control's label
+      // (#tag-gov-overview: "27 tags · 3,412 uses" -- resolves to no target
+      // and would otherwise print as a dead row).
+      if (node.closest("[data-search-skip]")) continue;
       let target = "";
       let weak = false;
       const isSectionName = node.matches("summary");
+      const labelledButton = node.parentElement?.tagName === "BUTTON" ? node.parentElement : null;
       if (node.matches("label")) target = node.htmlFor || node.querySelector("input,select,textarea,button")?.id || "";
       // A section name owns no control of its own: aim at the first control in
       // the <details> it opens (pbpOpenOptionsTarget expands the ancestors on
@@ -396,6 +409,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
           || body?.id || node.nextElementSibling?.id || "";
       }
       else if (node.matches("button")) target = node.id;
+      else if (labelledButton) target = labelledButton.id;
       else if (node.matches(".hint")) target = node.closest(".choice-row,.fg")?.querySelector("input,select,textarea,button")?.id || "";
       else {
         target = node.id || "";

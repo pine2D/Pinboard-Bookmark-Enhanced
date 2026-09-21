@@ -82,6 +82,25 @@
   </div>
 </div>
 
+<!-- Tags panel: the real production markup for the two settings-search
+     regressions this file exists to catch. #tag-gov-ai-btn / #tag-gov-refresh
+     carry their label on an inner span (not the button itself) so
+     applyI18n's textContent write doesn't wipe the leading icon span --
+     button[data-i18n] alone no longer matches either. #tag-gov-overview is a
+     live readout, not a heading or a control's label, and must stay out of
+     the index entirely (data-search-skip). -->
+<button class="tab-btn" data-panel="tags">Tags</button>
+<div id="panel-tags" class="panel active">
+  <div class="fg-actions">
+    <button class="btn btn-sm" id="tag-gov-ai-btn" type="button"><span class="btn-ic" data-ic="robot"></span><span data-i18n="tagGovAiBtn">AI deep analysis</span></button>
+    <button class="btn btn-sm ghost" id="tag-gov-refresh" type="button"><span class="btn-ic" data-ic="refresh"></span><span data-i18n="tagGovRefresh">Refresh</span></button>
+  </div>
+  <p class="hint" id="tag-gov-overview" data-search-skip>
+    <span id="tag-gov-stats"></span><span id="tag-gov-ignored" hidden> · <span id="tag-gov-ignored-count"></span> ·
+    <span class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored">Reset ignored list</a></span></span>
+  </p>
+</div>
+
 <select id="opt-ai-provider"><option value="openai" selected>OpenAI</option></select>
 <input id="opt-openai-key" value="sk-LEAK-ME" />
 <input id="opt-openai-baseurl" value="https://private.example/v1" />
@@ -103,15 +122,10 @@
 <input id="dict-echo-enabled" type="checkbox" checked />
 <input id="opt-wayback-enabled" type="checkbox" />
 <!-- Tag-governance low-count list, outside every .panel so it stays out of the
-     settings-search index. -->
+     settings-search index. #tag-gov-overview and #tag-gov-ai-btn/-refresh live
+     inside #panel-tags above instead (see that comment) -- they are exactly
+     what the settings-search regression tests below assert on. -->
 <div id="tag-gov-lowcount-list"></div>
-<!-- Tag-governance overview line head skeleton: stats text + the ignored tail
-     (hidden at zero) + the reset link, outside every .panel like the fixtures
-     above so it stays visible under .panel{display:none}. -->
-<div id="tag-gov-overview">
-  <span id="tag-gov-stats"></span><span id="tag-gov-ignored" hidden> · <span id="tag-gov-ignored-count"></span> ·
-  <span class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored">Reset ignored list</a></span></span>
-</div>
 <!-- A hard-coded jump target with no layout box, outside every .panel so it
      stays out of the settings-search index. Stands in for the connection
      overview's "vocab-drive-connect", which is `hidden` exactly when the Drive
@@ -190,6 +204,41 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(index.some((entry) => entry.text.includes("API Token") && entry.targetId === "secret-token"), "label missing");
     assert(index.some((entry) => entry.text.includes("Chrome Sync")), "hint missing");
     assert(!index.some((entry) => entry.text.includes("TOP_SECRET") || entry.text.includes("private-model")), "field value leaked");
+  });
+
+  await test("a button whose label lives on an inner data-i18n span is still indexed, jump target is the button", async () => {
+    // Regression: their data-i18n moved off the <button> onto an inner <span>
+    // (so applyI18n's textContent write doesn't wipe the leading .btn-ic icon
+    // span) and dropped out of the index because button[data-i18n] no longer
+    // matched. The per-row "Merge into X" / "Ignore" buttons options.js builds
+    // at render time must NOT be swept in by whatever selector fixes this --
+    // they carry no data-i18n anywhere (name comes from a direct t() call).
+    const index = pbpBuildSettingsSearchIndex(document);
+    const ai = index.find((entry) => entry.text === "AI deep analysis");
+    assert(ai && ai.targetId === "tag-gov-ai-btn", "AI deep analysis button unsearchable or wrong target: " + JSON.stringify(ai));
+    const refresh = index.find((entry) => entry.text === "Refresh");
+    assert(refresh && refresh.targetId === "tag-gov-refresh", "Refresh button unsearchable or wrong target: " + JSON.stringify(refresh));
+    const mergeBtn = document.createElement("button");
+    mergeBtn.className = "btn btn-sm tonal";
+    mergeBtn.textContent = "Merge into example";
+    document.getElementById("panel-tags").appendChild(mergeBtn);
+    try {
+      assert(!pbpBuildSettingsSearchIndex(document).some((entry) => entry.text.includes("Merge into")),
+        "a JS-built per-row button leaked into the search index");
+    } finally { mergeBtn.remove(); }
+  });
+
+  await test("a live readout (#tag-gov-overview) marked data-search-skip never becomes a dead search row", async () => {
+    // Regression: it changed from <p class="fg"> to <p class="hint">, which
+    // the .hint branch resolves a target from via .closest(".choice-row,.fg")
+    // -- neither ancestor exists here, so it used to enter the index with an
+    // empty targetId, e.g. "27 tags · 3,412 uses · Ignored: 2 · Reset
+    // ignored list" pointing nowhere.
+    const index = pbpBuildSettingsSearchIndex(document);
+    assert(!index.some((entry) => entry.text.includes("Reset ignored list") && !entry.targetId),
+      "the overview readout produced a dead (targetId-less) search row");
+    assert(document.getElementById("tag-gov-overview").hasAttribute("data-search-skip"),
+      "fixture drifted: #tag-gov-overview no longer carries data-search-skip");
   });
 
   await test("a section named twice in one panel produces one search result", async () => {

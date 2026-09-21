@@ -976,7 +976,13 @@
           <button class="btn btn-sm ghost" id="tag-gov-refresh" type="button"><span class="btn-ic" data-ic="refresh"></span><span data-i18n="tagGovRefresh">Refresh</span></button>
         </div>
       </div>
-      <p class="hint" id="tag-gov-overview">
+      <!-- data-search-skip: a live readout ("27 tags · 3,412 uses · Ignored: 2"),
+           not a heading or a label for a control -- pbpBuildSettingsSearchIndex
+           would otherwise index it as a junk row with no jump target (it isn't
+           wrapped in .choice-row/.fg, the only containers the .hint branch
+           resolves a target from) now that this is a <p class="hint"> instead
+           of a <p class="fg">. -->
+      <p class="hint" id="tag-gov-overview" data-search-skip>
         <span id="tag-gov-stats">…</span><span id="tag-gov-ignored" hidden> · <span id="tag-gov-ignored-count"></span> ·
         <span class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored" data-i18n="tagGovResetIgnored">Reset ignored list</a></span></span>
       </p>
