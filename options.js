@@ -1319,6 +1319,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       _tagGovVisibleAccount = nextAccount;
       if (_tagGovUnfinishedBatches === 0) _tagGovProblems.length = 0;
       _tagGovUser = auth?.account || "";
+      // #tag-gov-ai-status sits directly above the queue, and two of its
+      // states are sticky by design (no auto-clear for "AI found no
+      // additional groups"; the grant-retry error path skips its own 5s
+      // clear). Reset it -- and the settings snapshot a grant-retry captured
+      // -- on every account change reaching this point (sign-out AND
+      // switching to a different account), or a stale message from the
+      // account being left sits on top of the new account's queue.
+      const aiStatusEl = $id("tag-gov-ai-status");
+      if (aiStatusEl) { aiStatusEl.textContent = ""; aiStatusEl.classList.remove("ok", "bad"); }
+      tagGovAiPendingSettings = null;
       $id("tag-gov-groups")?.replaceChildren();
       $id("tag-gov-lowcount-list")?.replaceChildren();
       $id("tag-gov-problems")?.replaceChildren();
@@ -1329,12 +1339,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       $id("tag-gov-bundles-warn")?.querySelector("a")?.remove();
       if (!auth) {
-        // Sign-out: the ignored tail, the low-count summary badge and the
-        // "N selected" readout / Delete button are all per-account state, and
-        // this branch returns before reaching renderTagGov() / renderLowCountTags()
-        // -- the only other places that reset them -- so they must be cleared
-        // here or they keep showing the previous account's numbers after the
-        // account is gone.
+        // Sign-out is an account change like any other: delegate to
+        // renderTagGov() / renderLowCountTags()'s own !auth paths instead of
+        // hand-enumerating their resets here, so a node added to either
+        // signed-out path later is covered automatically -- they own the
+        // ignored tail, the lowcount badge and the delete-button state.
+        // #tag-gov-stats is the only readout neither writes.
+        await renderTagGov();
+        await renderLowCountTags();
+        _tagGovShowLoadFailed();
+        return;
+      }
+      const counts = await loadTagCounts(false, auth.account);
+      if (_tagGovVisibleAccount !== auth.account || !(await getTagGovAuth(auth.account))) {
+        // The visible account moved again while this pass was awaiting: a
+        // newer onChanged event already queued its own pass right behind
+        // this one in _tagGovAccountReloadTail, but until it runs, don't
+        // leave this (now stale) account's per-account readouts on screen.
         pbpSetTagGovIgnoredCount(0);
         pbpSyncTagGovDeleteBtnState();
         const lowCountBadge = $id("tag-gov-lowcount-count");
@@ -1342,8 +1363,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         _tagGovShowLoadFailed();
         return;
       }
-      const counts = await loadTagCounts(false, auth.account);
-      if (_tagGovVisibleAccount !== auth.account || !(await getTagGovAuth(auth.account))) return;
       if (counts) updateTagGovOverview(counts);
       else _tagGovShowLoadFailed();
       await renderTagGov();
