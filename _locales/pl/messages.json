@@ -2317,6 +2317,10 @@
   "tagGovSelectAll": {
     "message": "Zaznacz wszystko"
   },
+  "tagGovSelectedCount": {
+    "message": "Zaznaczono: $N$",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "tagGovDeleteSelected": {
     "message": "Usuń zaznaczone"
   },

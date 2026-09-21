@@ -2317,6 +2317,10 @@
   "tagGovSelectAll": {
     "message": "すべて選択"
   },
+  "tagGovSelectedCount": {
+    "message": "$N$ 件を選択中",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "tagGovDeleteSelected": {
     "message": "選択したものを削除"
   },

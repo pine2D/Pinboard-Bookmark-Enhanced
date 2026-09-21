@@ -1301,11 +1301,6 @@
     },
     {
       "surface": "options",
-      "token": "tag-gov-lowcount-row",
-      "structural": true
-    },
-    {
-      "surface": "options",
       "token": "tag-gov-problem-kind",
       "structural": false
     },

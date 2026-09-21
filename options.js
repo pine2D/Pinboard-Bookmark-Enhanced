@@ -1027,10 +1027,14 @@ function pbpExportTargetsResetSeed(current) {
 // "Clear selected" answers with a warning) and gate the button on the
 // selection. Programmatic .checked writes (select-all, shift-range) fire no
 // 'change', so every path that can move a box calls this explicitly.
+// It also owns the "N selected" readout, for the same reason: programmatic
+// .checked writes fire no 'change'.
 function pbpSyncTagGovDeleteBtnState() {
+  const n = document.querySelectorAll(".tag-gov-lowcount-checkbox:checked").length;
+  const count = $id("tag-gov-selected-count");
+  if (count) count.textContent = t("tagGovSelectedCount", String(n));
   const btn = $id("tag-gov-delete-selected");
-  if (!btn) return;
-  btn.disabled = !document.querySelector(".tag-gov-lowcount-checkbox:checked");
+  if (btn) btn.disabled = n === 0;
 }
 
 // One tag rendered as a selectable chip: a real radio/checkbox, visually hidden
@@ -4966,7 +4970,13 @@ async function renderLowCountTags() {
   const listContainer = $id("tag-gov-lowcount-list");
   if (!listContainer) return;
   const auth = await getTagGovAuth();
-  if (!auth) { listContainer.replaceChildren(); pbpSyncTagGovDeleteBtnState(); return; }
+  if (!auth) {
+    listContainer.replaceChildren();
+    pbpSyncTagGovDeleteBtnState();
+    const badge = $id("tag-gov-lowcount-count");
+    if (badge) badge.textContent = "";
+    return;
+  }
 
   // Same scroll-jump guard as renderTagGov: never leave the container empty across
   // an await — build first, swap atomically.
@@ -4976,6 +4986,8 @@ async function renderLowCountTags() {
   if (!counts) {
     listContainer.replaceChildren();
     pbpSyncTagGovDeleteBtnState();
+    const badge = $id("tag-gov-lowcount-count");
+    if (badge) badge.textContent = "";
     return;
   }
 
@@ -4985,21 +4997,20 @@ async function renderLowCountTags() {
     empty.textContent = t("tagGovNoLowCount");
     listContainer.replaceChildren(empty);
     pbpSyncTagGovDeleteBtnState();
+    const badge = $id("tag-gov-lowcount-count");
+    if (badge) badge.textContent = "0";
     return;
   }
 
-  const table = document.createElement("div");
-  table.className = "tag-gov-lowcount-table";
+  const flow = document.createElement("div");
+  flow.className = "tag-gov-lowcount-flow";
   const boxes = [];
   let lastIdx = null;            // anchor = last individually-clicked box; resets each render
   lowCount.forEach((item, i) => {
-    const row = document.createElement("div");
-    row.className = "tag-gov-lowcount-row";
-    const label = document.createElement("label");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "tag-gov-lowcount-checkbox";
-    checkbox.value = item.tag;
+    // No count on these chips: every tag in this list has 0 or 1 use, which the
+    // section title already says.
+    const chip = pbpBuildTagGovChip({ type: "checkbox", value: item.tag, className: "tag-gov-lowcount-checkbox" });
+    const checkbox = chip.querySelector("input");
     checkbox.dataset.account = auth.account;
     checkbox.addEventListener("click", (e) => {
       // The browser already toggled this checkbox before the click handler runs,
@@ -5016,18 +5027,13 @@ async function renderLowCountTags() {
       pbpSyncTagGovDeleteBtnState();
     });
     boxes.push(checkbox);
-    label.appendChild(checkbox);
-    const text = document.createElement("span");
-    text.textContent = " " + item.tag + " (" + item.count + ")";
-    label.appendChild(text);
-    row.appendChild(label);
-    table.appendChild(row);
+    flow.appendChild(chip);
   });
-  listContainer.replaceChildren(table);
+  listContainer.replaceChildren(flow);
   pbpSyncTagGovDeleteBtnState();
 
-  const summary = $id("tag-gov-lowcount")?.querySelector("summary");
-  if (summary) summary.textContent = t("tagGovLowCountTitle") + " (" + lowCount.length + ")";
+  const lowCountBadge = $id("tag-gov-lowcount-count");
+  if (lowCountBadge) lowCountBadge.textContent = String(lowCount.length);
 
   const selectAll = $id("tag-gov-select-all");
   if (selectAll) {

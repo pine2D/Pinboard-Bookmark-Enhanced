@@ -119,6 +119,7 @@
 <div id="hidden-jump-host"><span>Drive actions</span>
   <button type="button" id="hidden-jump-target" hidden>Connect</button>
 </div>
+<span id="tag-gov-selected-count"></span>
 <button type="button" class="btn btn-sm danger tag-gov-delete-btn" id="tag-gov-delete-selected">Delete selected</button>
 <div id="results"></div>
 
@@ -465,6 +466,21 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     list.replaceChildren();
     pbpSyncTagGovDeleteBtnState();
     assert(btn.disabled === true, "Delete selected stayed enabled over an emptied list");
+  });
+
+  await test("tag-gov low-count: the selected count follows every path that moves a box", async () => {
+    const list = document.getElementById("tag-gov-lowcount-list");
+    list.replaceChildren(
+      pbpBuildTagGovChip({ type: "checkbox", value: "til", className: "tag-gov-lowcount-checkbox" }),
+      pbpBuildTagGovChip({ type: "checkbox", value: "tmp", className: "tag-gov-lowcount-checkbox" }));
+    const out = document.getElementById("tag-gov-selected-count");
+    pbpSyncTagGovDeleteBtnState();
+    assert(out.textContent === "tagGovSelectedCount:0", "0 selected, got " + out.textContent);
+    list.querySelectorAll(".tag-gov-lowcount-checkbox").forEach(cb => { cb.checked = true; });  // programmatic: fires no 'change'
+    pbpSyncTagGovDeleteBtnState();
+    assert(out.textContent === "tagGovSelectedCount:2", "2 selected, got " + out.textContent);
+    assert(!list.querySelector(".tag-gov-chip-count"), "low-count chips carry no count: every one of them is 0 or 1 use");
+    list.replaceChildren();
   });
 
   await test("connection overview is read-only and never requests permission or contacts a service", async () => {

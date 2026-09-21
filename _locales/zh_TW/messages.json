@@ -2317,6 +2317,10 @@
   "tagGovSelectAll": {
     "message": "全選"
   },
+  "tagGovSelectedCount": {
+    "message": "已選 $N$ 個",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "tagGovDeleteSelected": {
     "message": "刪除所選"
   },

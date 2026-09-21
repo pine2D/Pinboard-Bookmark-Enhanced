@@ -2317,6 +2317,10 @@
   "tagGovSelectAll": {
     "message": "Выбрать все"
   },
+  "tagGovSelectedCount": {
+    "message": "Выбрано: $N$",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "tagGovDeleteSelected": {
     "message": "Удалить выбранные"
   },

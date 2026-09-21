@@ -18,21 +18,18 @@
 function pass(name){const d=document.createElement("div");d.className="case pass";d.textContent="OK "+name;document.getElementById("results").appendChild(d);}
 function fail(name,msg){const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
 function test(name,fn){try{fn();pass(name);}catch(e){fail(name,e.message);}}
-function trackCount(el){const c=getComputedStyle(el).gridTemplateColumns;return c==="none"?1:c.split(/\s+/).filter(Boolean).length;}
 
 // Build the low-count list exactly like renderLowCountTags does.
 const list=document.getElementById("tag-gov-lowcount-list");
-const table=document.createElement("div");
-table.className="tag-gov-lowcount-table";
+const flow=document.createElement("div");
+flow.className="tag-gov-lowcount-flow";
 for(let i=0;i<12;i++){
-  const r=document.createElement("div");r.className="tag-gov-lowcount-row";
-  const l=document.createElement("label");
+  const l=document.createElement("label");l.className="tag-gov-chip";
   const cb=document.createElement("input");cb.type="checkbox";cb.className="tag-gov-lowcount-checkbox";
-  l.appendChild(cb);
-  const s=document.createElement("span");s.textContent=" tag"+i+" (1)";l.appendChild(s);
-  r.appendChild(l);table.appendChild(r);
+  const f=document.createElement("span");f.className="tag-gov-chip-face";f.textContent="tag-number-"+i;
+  l.append(cb,f);flow.appendChild(l);
 }
-list.appendChild(table);
+list.appendChild(flow);
 
 // Build similar-group rows like renderTagGov does (real child structure, since
 // the queue tests below probe the row's own box, not just its outer class).
@@ -65,16 +62,20 @@ etField.appendChild(etSelect);
 etCard.appendChild(etField);
 document.getElementById("fixture").appendChild(etCard);
 
-test("low-count table is a multi-column grid", () => {
-  const n = trackCount(table);
-  // 650px fixture, minmax(160px,1fr) + 12px col-gap => exactly 3 tracks
-  // (3*160+2*12=504<=650; 4*160+3*12=676>650). >1 is too weak to catch regressions.
-  if (n < 3) throw new Error("expected >=3 grid tracks at 650px, got " + n);
+test("low-count chips flow and wrap instead of sitting in grid columns", () => {
+  const cs = getComputedStyle(flow);
+  if (cs.display !== "flex" || cs.flexWrap !== "wrap") throw new Error("expected a wrapping flex flow, got " + cs.display + "/" + cs.flexWrap);
+  const tops = new Set([...flow.children].map(c => Math.round(c.getBoundingClientRect().top)));
+  if (tops.size < 2) throw new Error("12 chips in 650px must wrap to >=2 lines, got " + tops.size);
 });
-test("low-count label disables text selection", () => {
-  const lbl = table.querySelector("label");
-  const cs = getComputedStyle(lbl);
-  const us = cs.userSelect || cs.webkitUserSelect;
+test("a chip label gives its hidden input a >=24px hit area and disables text selection", () => {
+  const lbl = flow.querySelector("label.tag-gov-chip");
+  const h = lbl.getBoundingClientRect().height;
+  if (h < 24) throw new Error("hit area height " + h + " < 24");
+  const input = lbl.querySelector("input");
+  const ir = input.getBoundingClientRect(), lr = lbl.getBoundingClientRect();
+  if (Math.abs(ir.width - lr.width) > 1 || Math.abs(ir.height - lr.height) > 1) throw new Error("input must cover the whole label");
+  const us = getComputedStyle(lbl).userSelect || getComputedStyle(lbl).webkitUserSelect;
   if (us !== "none") throw new Error("expected user-select:none, got " + us);
 });
 test("similar-group container is a single-column queue", () => {

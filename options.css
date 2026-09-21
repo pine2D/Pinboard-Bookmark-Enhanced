@@ -2503,26 +2503,17 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   .tag-gov-group-row { grid-template-columns: minmax(0, 1fr); }
   .tag-gov-reason, .tag-gov-queued-note { grid-column: 1; }
 }
-.tag-gov-lowcount-table {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--opt-sp-2) var(--opt-sp-5);
-  margin-bottom: var(--opt-sp-4);
+.tag-gov-lowcount-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--opt-sp-1) var(--opt-sp-3);
+}
+.tag-gov-count {
+  font-weight: 400;
+  color: var(--opt-fg-muted);
+  font-variant-numeric: tabular-nums;
 }
 #tag-gov-lowcount-list { margin-bottom: var(--opt-sp-4); }   /* list -> select-all row; an empty list still separates summary and row */
-.tag-gov-lowcount-row {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  min-width: 0;            /* allow the grid item to shrink to the track width */
-}
-.tag-gov-lowcount-row label {
-  user-select: none;       /* prevent text selection while shift-clicking a range */
-  overflow-wrap: anywhere; /* wrap very long tag names instead of overflowing the cell */
-}
-.tag-gov-lowcount-checkbox {
-  margin-right: var(--opt-sp-3);
-}
 /* Pinned to the viewport bottom while its natural position (end of the Tags panel)
    is below the fold, so batch progress is visible from any scroll position without
    yanking the view away from the groups list. Falls back into normal flow once the
@@ -2607,8 +2598,8 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
   color: var(--opt-danger);
 }
 .tag-gov-delete-btn {
-  margin-top: var(--opt-sp-4);
   position: relative;
+  margin-left: auto;
 }
 .tag-gov-reset-link {
   position: relative;

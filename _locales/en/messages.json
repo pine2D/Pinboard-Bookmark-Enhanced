@@ -2317,6 +2317,10 @@
   "tagGovSelectAll": {
     "message": "Select all"
   },
+  "tagGovSelectedCount": {
+    "message": "$N$ selected",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "tagGovDeleteSelected": {
     "message": "Delete selected"
   },
