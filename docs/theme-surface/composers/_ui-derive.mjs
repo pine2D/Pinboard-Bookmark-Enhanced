@@ -392,17 +392,44 @@ export const TIER_DISTINCT_MIN_DE = 6;
 
 // Mix `toward` (the theme's accent -- keeps the tier's hue identity; mixing fg
 // in would just grey it) into `fill` until it is >= minDE from EVERY fill in
-// `others`, verified on the hex-rounded value that ships. Identity when already
-// distinct, so compliant themes emit byte-for-byte unchanged.
-export function fillDistinct(fill, others, toward, minDE = TIER_DISTINCT_MIN_DE) {
+// `others` AND still clears >= minContrast against every fill in `hosts`,
+// verified on the hex-rounded value that ships. Identity when already
+// distinct AND separated, so compliant themes emit byte-for-byte unchanged.
+//
+// `hosts` matters because the caller (finalizeUiControlRoles's tinted chip)
+// hands this function a `fill` that fillSeparate() JUST pushed to clear
+// FILL_SEPARATE_MIN against the panel -- and mixing further toward an accent
+// can walk luminance right back toward the panel while ΔE keeps climbing on
+// chroma alone (a pale-yellow or pale-cyan accent on a light panel is the
+// breaking shape: batch2 final-fix I2). Checking only ΔE here would silently
+// undo the separation fillSeparate just guaranteed.
+//
+// When no step in the mix range satisfies BOTH constraints together, prefer
+// HOST separation over tier distinctness: an invisible chip (identical to
+// its own container) is a worse defect than a chip that merely resembles the
+// neighboring button tier. Walk the same range once more, host-constraint
+// only, and keep the candidate with the greatest ΔE among those that still
+// clear every host -- i.e. get as distinct as possible without giving up
+// separation. `fill` itself (i=0) is always eligible for that fallback pass,
+// since fillSeparate's own contract guarantees it clears every host already.
+export function fillDistinct(fill, others, toward, hosts = [], minDE = TIER_DISTINCT_MIN_DE, minContrast = FILL_SEPARATE_MIN) {
   const round = c => hexToRgb(rgbToHex(c));
-  const clears = c => others.every(o => deltaE2000(round(c), round(o)) >= minDE);
+  const clearsDE = c => others.every(o => deltaE2000(round(c), round(o)) >= minDE);
+  const clearsHosts = c => hosts.every(h => contrast(round(c), round(h)) >= minContrast);
+  const clears = c => clearsDE(c) && clearsHosts(c);
   if (clears(fill)) return fill;
   for (let i = 1; i <= 60; i++) {
     const out = mix(fill, toward, i * 0.01);
     if (clears(out)) return out;
   }
-  return mix(fill, toward, 0.6);
+  let best = null, bestDE = -Infinity;
+  for (let i = 0; i <= 60; i++) {
+    const out = mix(fill, toward, i * 0.01);
+    if (!clearsHosts(out)) continue;
+    const de = Math.min(...others.map((o) => deltaE2000(round(out), round(o))));
+    if (de > bestDE) { bestDE = de; best = out; }
+  }
+  return best ?? mix(fill, toward, 0.6);
 }
 
 // `.btn.primary`'s hover fill (COMPONENTS.md §1.2, ui-components.mjs's
@@ -533,8 +560,10 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
       fgRgb,
     );
     // ...then apart from the resting control fill it sits beside (.btn.tonal
-    // next to .btn; a checked chip next to unchecked ones resting on btn-bg).
-    const chipBgRgb = fillDistinct(chipTinted, [btnBgRgb], hexToRgb(map.accent));
+    // next to .btn; a checked chip next to unchecked ones resting on btn-bg),
+    // WITHOUT undoing the panel separation fillSeparate just established
+    // above (I2, batch2 final-fix wave -- see fillDistinct's own comment).
+    const chipBgRgb = fillDistinct(chipTinted, [btnBgRgb], hexToRgb(map.accent), [panelRgb]);
     map["chip-bg"] = rgbToHex(chipBgRgb);
     map["chip-fg"] = rgbToHex(fgToAAMulti(
       hexToRgb(tagFg),

@@ -201,6 +201,32 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     "already-distinct fill is returned untouched");
 }
 
+// --- fillDistinct's JOINT criterion (I2, batch2 final-fix wave): mixing
+// toward the accent for tier-distinctness must not undo the panel separation
+// fillSeparate just guaranteed a few lines earlier in finalizeUiControlRoles.
+// INTEGRATION case (drives the real finalizeUiControlRoles, not the
+// standalone helper alone): a pale-cyan accent close to a white panel is the
+// breaking shape I2 found -- ΔE keeps climbing on chroma alone while
+// luminance walks back toward the panel. Literal hex, not a read of any
+// shipped pilot, so this pins the SHAPE of the defect independent of future
+// pilot edits.
+{
+  const paletteJoint = { "btn-fg": "#ffffff", "tag-bg": "transparent", "tag-fg": "#775500" };
+  const inputJoint = {
+    bg: "#f7f7f7", panel: "#ffffff", fg: "#222222", accent: "#d8ffff", danger: "#bb2222",
+    border: "#dddddd", "btn-bg": "#efefef", "btn-hover": "#efefef", "input-bg": "#efefef",
+  };
+  const outJoint = finalizeUiControlRoles(structuredClone(inputJoint), paletteJoint);
+  const chipBg = hexToRgb(outJoint["chip-bg"]);
+  const btnBg = hexToRgb(outJoint["btn-bg"]);
+  const panelRgb = hexToRgb(outJoint.panel);
+  const deOut = deltaE2000(chipBg, btnBg), crOut = contrast(chipBg, panelRgb);
+  check(deOut >= TIER_DISTINCT_MIN_DE,
+    `chip-bg (${outJoint["chip-bg"]}) must stay >= ΔE ${TIER_DISTINCT_MIN_DE} from btn-bg (${outJoint["btn-bg"]}), got ${deOut.toFixed(2)}`);
+  check(crOut >= FILL_SEPARATE_MIN,
+    `chip-bg (${outJoint["chip-bg"]}) must stay >= ${FILL_SEPARATE_MIN} vs panel (${outJoint.panel}) -- fillDistinct's accent mix must not undo fillSeparate's own guarantee, got ${crOut.toFixed(3)}`);
+}
+
 // --- fg-hint / fg-muted must clear AA on BOTH the page bg and the ELEVATED
 // panel, on the rounded hex that ships, for EVERY pilot x mode options-
 // chrome.mjs actually renders (Task 3, taste-uplift-batch2 tokens batch,

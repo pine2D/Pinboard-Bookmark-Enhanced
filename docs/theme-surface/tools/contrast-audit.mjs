@@ -12,7 +12,7 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, primaryHoverFill } from "../composers/_ui-derive.mjs";
+import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, primaryHoverFill } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
 import { parseDeclarations, parseStyleRules } from "./css-syntax.mjs";
@@ -475,14 +475,47 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
   // which sit beside controls resting on btn-bg. Perceptual distance, not
   // contrast -- see deltaE2000's own note. options + library only: popup's
   // chip-bg is `transparent` on 8/15 themes and has no tonal consumer yet.
+  //
+  // M1 (batch2 final-fix wave): both rows below now use the same
+  // strict/themed-FAIL, non-strict/default-SKIP shape "on-accent vs
+  // primary-hover" already uses -- the previous "if (chip.rgb && btn.rgb)
+  // { ... }" guard printed NOTHING when a role failed to resolve, silently
+  // no-opping a BLOCKING check instead of FAILing or SKIPping like every
+  // other row in this file.
   if (ns !== "pp") {
-    const chip = resolveRole("chip-bg"), btn = resolveRole("btn-bg");
-    if (chip.rgb && btn.rgb) {
+    const chip = resolveRole("chip-bg"), btn = resolveRole("btn-bg"), panel = resolveRole("panel");
+    const tierLabel = "chip-bg ΔE btn-bg";
+    if (!chip.rgb || !btn.rgb) {
+      const why = chip.note || btn.note;
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + tierLabel.padEnd(28) + " " + (strict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
+      console.log(line);
+      if (strict) violations.push(line);
+      else skipCount++;
+    } else {
       const de = deltaE2000(chip.rgb, btn.rgb);
       const ok = de >= TIER_DISTINCT_MIN_DE;
-      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + "chip-bg ΔE btn-bg".padEnd(28) + " " + de.toFixed(1) + (ok ? "" : "  FAIL (< " + TIER_DISTINCT_MIN_DE + ")");
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + tierLabel.padEnd(28) + " " + de.toFixed(1) + (ok ? "" : "  FAIL (< " + TIER_DISTINCT_MIN_DE + ")");
       console.log(line);
       if (!ok) violations.push(line);
+    }
+
+    // chip-bg vs panel >= FILL_SEPARATE_MIN (I2, batch2 final-fix wave): the
+    // token-level gate for the joint criterion fillDistinct now enforces
+    // (_ui-derive.mjs) -- its accent mix can walk chip-bg's luminance back
+    // toward the panel while chroma alone keeps ΔE climbing against btn-bg,
+    // silently undoing the separation fillSeparate just established. Same
+    // relationship the border/focus-bd rows above have to their own
+    // derivations: gate what ships, don't just trust the function that
+    // computed it.
+    const panelLabel = "chip-bg vs panel";
+    if (!chip.rgb || !panel.rgb) {
+      const why = chip.note || panel.note;
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + panelLabel.padEnd(28) + " " + (strict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
+      console.log(line);
+      if (strict) violations.push(line);
+      else skipCount++;
+    } else {
+      console.log(check(scope, blockLabel, panelLabel, cr(chip.rgb, panel.rgb), FILL_SEPARATE_MIN));
     }
   }
 
