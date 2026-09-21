@@ -658,6 +658,20 @@ async function driveOptions(context, extId, rep) {
         await page.waitForTimeout(tab === "vocab" ? 1200 : 400);
         await rep.shot(page, s, `tab-${tab}`, { fullPage: true });
         if (tab === "general") await axeScan(page, s, "options");
+        if (tab === "tags") {
+          // Second shot with the low-count disclosure open: renderLowCountTags's
+          // checkbox chips (and the "N selected" / Select all / Delete row below
+          // them) otherwise never appear in any qa-drive screenshot. Own
+          // try/catch so a failure here is recorded as a finding, same as every
+          // other tab, and does not abort the rest of the tab loop.
+          try {
+            await page.locator("#tag-gov-lowcount > summary").click({ timeout: 3000 });
+            await page.waitForTimeout(300);
+            await rep.shot(page, s, "tab-tags-lowcount-open", { fullPage: true });
+          } catch (e) {
+            s.failures.push(`tab-tags-lowcount-open: ${e.message}`);
+          }
+        }
         // The vocab-batch-bar / select-all / batch-delete flow this used to
         // drive here (#vocab-select-all, #vocab-batch-delete) moved to
         // library.html when the vocab list left options for its own page --
