@@ -39,21 +39,24 @@ const DEFAULT_LIGHT = {
   // hand-written :root literals for the same reason options' pair was: both
   // were #ffffff, exactly --lib-panel/--lib-pane-bg, so a frameless control
   // in a detail pane had nothing left to see. fillSeparate(fill, [panel,
-  // bg], fg) — 1.14:1 vs panel, 1.06:1 vs --lib-bg.
-  "btn-bg": "#f0f0f1",
-  "btn-border": "#f0f0f1",      // = btn-bg (frame collapsed into the fill).
-  "btn-hover": "#e6e9f1",       // NOT a literal copy: the old #eef2f9 is 1.01:1 against the new rest
-                                 // fill. fillSeparate(btn-hover, [btn-bg], fg) — 1.07:1.
-  "input-bg": "#f0f0f1",
-  "input-border": "#f0f0f1",    // = input-bg.
+  // bg], fg) — 1.18:1 vs panel, 1.10:1 vs --lib-bg (re-derived 2026-09-21,
+  // FILL_SEPARATE_MIN 1.06 -> 1.10; was #f0f0f1 for both roles).
+  "btn-bg": "#ececed",
+  "btn-border": "#ececed",      // = btn-bg (frame collapsed into the fill).
+  "btn-hover": "#dee1e9",       // NOT a literal copy: the old #eef2f9 is 1.01:1 against the new rest
+                                 // fill. fillSeparate(btn-hover, [btn-bg], fg) — 1.11:1.
+                                 // (re-derived 2026-09-21 alongside btn-bg; was #e6e9f1).
+  "input-bg": "#ececed",
+  "input-border": "#ececed",    // = input-bg.
   "border": "#858596",          // NOT a literal copy: the hand-written :root's old #e2e2e6 was only
                                  // 1.29:1 against --lib-btn-bg/--lib-panel (both #fff by default)
                                  // (design-uplift Task 16, USER RULING -- border reads visibly heavier
                                  // now, the intended effect). Derived the same way the themed border
-                                 // is: borderToAA(border, [btn-bg, panel]) — 3.18:1 / 3.63:1, clears
-                                 // the 3:1 non-text floor. Re-derived 2026-08-05 (was #90909f) because
-                                 // Soft Fill darkened btn-bg out from under it — contrast-audit's
-                                 // `border vs btn-bg` row caught the stale value at 2.76:1.
+                                 // is: borderToAA(border, [btn-bg, panel]) — 3.07:1 / 3.63:1, clears
+                                 // the 3:1 non-text floor (re-checked 2026-09-21 against the 1.10-separated
+                                 // btn-bg above; #858596 still clears, unchanged). Re-derived 2026-08-05
+                                 // (was #90909f) because Soft Fill darkened btn-bg out from under it —
+                                 // contrast-audit's `border vs btn-bg` row caught the stale value at 2.76:1.
 };
 
 // Map canonical UI colors to --lib-* names for the standalone library page

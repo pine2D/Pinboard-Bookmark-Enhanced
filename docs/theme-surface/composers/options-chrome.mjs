@@ -67,20 +67,23 @@ const DEFAULT_LIGHT = {
   // moment the resting frame collapsed into the fill they became invisible
   // controls (btn-bg #f5f5f0 == --opt-bg 1.00:1; input-bg #ffffff == --opt-panel
   // 1.00:1). Derived by the same fillSeparate(fill, [panel, bg], fg) the themed
-  // blocks use: btn-bg 1.16:1 vs panel / 1.06:1 vs bg, input-bg 1.16 / 1.06.
-  "btn-bg": "#eeeee9",
-  "btn-border": "#eeeee9",       // = btn-bg (frame collapsed into the fill).
-  "btn-hover": "#e7e7e7",        // NOT a literal copy: the old #eee is 1.00:1 against the new rest fill.
-                                  // fillSeparate(btn-hover, [btn-bg], fg) — 1.06:1, hover reads again.
-  "input-bg": "#eeeeee",
-  "input-border": "#eeeeee",     // = input-bg.
+  // blocks use: btn-bg 1.21:1 vs panel / 1.10:1 vs bg, input-bg 1.20 / 1.10
+  // (re-derived 2026-09-21, FILL_SEPARATE_MIN 1.06 -> 1.10; was #eeeee9/#eeeeee).
+  "btn-bg": "#eaeae5",
+  "btn-border": "#eaeae5",       // = btn-bg (frame collapsed into the fill).
+  "btn-hover": "#dfdfdf",        // NOT a literal copy: the old #eee is 1.00:1 against the new rest fill.
+                                  // fillSeparate(btn-hover, [btn-bg], fg) — 1.10:1, hover reads again.
+                                  // (re-derived 2026-09-21 alongside btn-bg; was #e7e7e7).
+  "input-bg": "#eaeaea",
+  "input-border": "#eaeaea",     // = input-bg.
   "border": "#858585",           // NOT a literal copy: the hand-written :root's old #ccc was only
                                   // 1.47:1 against --opt-btn-bg (#f5f5f0) and 1.61:1 against panel
                                   // (#fff) (design-uplift Task 16, USER RULING -- border reads visibly
                                   // heavier now, the intended effect). Derived the same way the themed
-                                  // border is: borderToAA(border, [btn-bg, panel]) — 3.17:1 / 3.69:1,
-                                  // both clear the 3:1 non-text floor. Re-derived 2026-08-05 (was
-                                  // #8a8a8a) because Soft Fill darkened btn-bg out from under it:
+                                  // border is: borderToAA(border, [btn-bg, panel]) — 3.06:1 / 3.69:1,
+                                  // both clear the 3:1 non-text floor (re-checked 2026-09-21 against the
+                                  // 1.10-separated btn-bg above; #858585 still clears, unchanged). Re-derived
+                                  // 2026-08-05 (was #8a8a8a) because Soft Fill darkened btn-bg out from under it:
                                   // contrast-audit's `border vs btn-bg` row caught the stale value at
                                   // 2.97:1 -- this pair is gated by derivation, never by allowlist.
 };

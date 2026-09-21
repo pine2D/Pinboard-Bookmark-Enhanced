@@ -53,30 +53,36 @@ const DEFAULT_LIGHT = {
                                  // main pass fixed. Derived the same way: fgToAAMulti(link, [preset-
                                  // btn-bg, preset-btn-hover-bg]) — 5.62:1 / 4.77:1, both clear AA
                                  // (design-uplift Task 13 review round).
-  "btn-bg": "#eff0f2",          // NOT a literal copy (Soft Fill, design-uplift 2026-08-05): popup had no
+  "btn-bg": "#ebecee",          // NOT a literal copy (Soft Fill, design-uplift 2026-08-05): popup had no
                                  // button-fill role at all -- .qbtn/.submit-bar button painted --pp-bg on
                                  // the default surface and --pp-bg2 under every preset, i.e. the same
                                  // token that paints the .quick-actions strip they sit ON. With the
                                  // resting frame gone that is an invisible button. fillSeparate(bg2,
-                                 // [bg, bg2], fg) -- 1.14:1 vs --pp-bg, 1.06:1 vs --pp-bg2.
-  "btn-bd": "#eff0f2",          // = btn-bg: the resting border collapses INTO the fill (border-width
+                                 // [bg, bg2], fg) -- 1.18:1 vs --pp-bg, 1.10:1 vs --pp-bg2 (re-derived
+                                 // 2026-09-21, FILL_SEPARATE_MIN 1.06 -> 1.10; was #eff0f2).
+  "btn-bd": "#ebecee",          // = btn-bg: the resting border collapses INTO the fill (border-width
                                  // kept, zero layout shift). terminal restores a real frame through its
                                  // pilot ui.popup override; nothing else does.
-  "btn-hover": "#dee5f2",       // NOT a literal copy: --pp-drop-hover (#e6eefb) is only 1.02:1 against
+  "btn-hover": "#dbe2ef",       // NOT a literal copy: --pp-drop-hover (#e6eefb) is only 1.02:1 against
                                  // the new btn-bg above -- with rest no longer white, the old hover fill
                                  // stopped reading as a change at all. fillSeparate(drop-hover, [btn-bg],
-                                 // fg) -- 1.06:1 vs rest, still the same accent-tinted family.
-  "input-bd": "#edf0f4",        // = --pp-input-bg (itself nudged to #edf0f4 in :root by the same
-                                 // fillSeparate([bg, bg2]) pass) -- the field's resting frame collapses
-                                 // into its own fill, same rule as btn-bd. Replaces the hand-written
-                                 // `--pp-input-bd: transparent`, which only ever held on the default
-                                 // surface: every preset re-armed a full --pp-border frame further down.
-  "border": "#7e8aa0",          // NOT a literal copy: the hand-written :root's old #e8eaee was only
+                                 // fg) -- 1.10:1 vs rest, still the same accent-tinted family. (re-derived
+                                 // 2026-09-21 alongside btn-bg; was #dee5f2).
+  "input-bd": "#e9ecf0",        // = --pp-input-bg (itself nudged to #e9ecf0 in :root by the same
+                                 // fillSeparate([bg, bg2]) pass, re-derived 2026-09-21 for the 1.10 floor;
+                                 // was #edf0f4) -- the field's resting frame collapses into its own fill,
+                                 // same rule as btn-bd. Replaces the hand-written `--pp-input-bd:
+                                 // transparent`, which only ever held on the default surface: every
+                                 // preset re-armed a full --pp-border frame further down.
+  "border": "#78859c",          // NOT a literal copy: the hand-written :root's old #e8eaee was only
                                  // 1.12:1 against --pp-bg2 (design-uplift Task 16, USER RULING --
                                  // border reads visibly heavier now, the intended effect). Derived the
                                  // same way the themed border is:
-                                 // borderToAA(border, [btn-bg, panel]) — 3.05:1 / 3.25:1. Re-derived
-                                 // 2026-08-05 (was #848fa4 against a btn-bg that was still bg2).
+                                 // borderToAA(border, [btn-bg, panel]) — 3.15:1 / 3.48:1. Re-derived
+                                 // 2026-09-21 (was #7e8aa0, which had dropped to 2.95:1 against the
+                                 // 1.10-separated btn-bg above) for FILL_SEPARATE_MIN 1.06 -> 1.10;
+                                 // before that, re-derived 2026-08-05 (was #848fa4 against a btn-bg
+                                 // that was still bg2).
 };
 // DEFAULT_DARK (the popup's `html.dark` component-layer tokens) is gone:
 // since the theme model of 2026-08-25 (batch 2 D6) the popup's no-preset

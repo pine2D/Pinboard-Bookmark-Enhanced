@@ -48,9 +48,13 @@
      focusBdToAA(accent, seed, [btn-bg, input-bg]) from
      composers/_ui-derive.mjs, i.e. the same number the 14 themed blocks are
      derived to, hand-carried because the default surface has no emit path.
-     Now 3.01:1 against both. Re-derive (do not eyeball) if accent or either fill moves --
-     contrast-audit's `focus-bd vs btn-bg`/`vs input-bg` rows will catch it. */
-  --lib-focus-bd: #438bea;
+     Re-derived 2026-09-21 for FILL_SEPARATE_MIN's 1.06 -> 1.10 raise (was
+     #438bea at 3.01:1 against both; the 1.10-separated btn-bg/input-bg above
+     dropped it to 2.91:1 against both, caught by contrast-audit, not
+     eyeballed). Now 3.01:1 against both. Re-derive (do not eyeball) if accent
+     or either fill moves -- contrast-audit's `focus-bd vs btn-bg`/`vs
+     input-bg` rows will catch it. */
+  --lib-focus-bd: #3e88e9;
   --lib-focus-ring: 0 0 6px 1px color-mix(in srgb, var(--lib-accent, #4477bb) 45%, transparent);
   /* --lib-border's default lives in the composer's DEFAULT_LIGHT block now
      (design-uplift Task 16) -- same role, AA-derived against --lib-btn-bg/
@@ -2449,10 +2453,10 @@ html[data-theme="modern-card"] {
   --lib-warn: #a65a00;
   --lib-border: #828282;
   --lib-border-section: #e8e8e8;
-  --lib-input-bg: #eaeaec;
-  --lib-input-border: #eaeaec;
-  --lib-btn-bg: #eaeaec;
-  --lib-btn-hover: #dde4f3;
+  --lib-input-bg: #e7e7e9;
+  --lib-input-border: #e7e7e9;
+  --lib-btn-bg: #e7e7e9;
+  --lib-btn-hover: #d5ddeb;
   --lib-code-bg: #ffffff;
   --lib-pane-bg: #ffffff;
   --lib-pane-divider: #e8e8e8;
@@ -2461,8 +2465,8 @@ html[data-theme="modern-card"] {
   --lib-radius-sm: 4px;
   --lib-radius-md: 8px;
   --lib-radius-lg: 12px;
-  --lib-btn-border: #eaeaec;
-  --lib-focus-bd: #3b86e9;
+  --lib-btn-border: #e7e7e9;
+  --lib-focus-bd: #3984e8;
   --lib-btn-fg: #1a1a2e;
   --lib-danger-quiet-fg: #b6281f;
   --lib-on-danger: #ffffff;
@@ -2481,11 +2485,11 @@ html[data-theme="nord-night"] {
   --lib-save: #a3be8c;
   --lib-danger: #d18d93;
   --lib-warn: #ed8100;
-  --lib-border: #8792a9;
+  --lib-border: #8d98ad;
   --lib-border-section: #434c5e;
   --lib-input-bg: #434c5e;
   --lib-input-border: #434c5e;
-  --lib-btn-bg: #3f4656;
+  --lib-btn-bg: #424959;
   --lib-btn-hover: #3b4252;
   --lib-code-bg: #3b4252;
   --lib-pane-bg: #3b4252;
@@ -2495,7 +2499,7 @@ html[data-theme="nord-night"] {
   --lib-radius-sm: 4px;
   --lib-radius-md: 4px;
   --lib-radius-lg: 4px;
-  --lib-btn-border: #3f4656;
+  --lib-btn-border: #424959;
   --lib-focus-bd: #75a0b0;
   --lib-btn-fg: #d8dee9;
   --lib-danger-quiet-fg: #e3b9bc;
@@ -2552,9 +2556,9 @@ html[data-theme="paper-ink"] {
   --lib-warn: #a65a00;
   --lib-border: #987d4c;
   --lib-border-section: #e8dfd0;
-  --lib-input-bg: #eae9e7;
-  --lib-input-border: #eae9e7;
-  --lib-btn-bg: #eee9e1;
+  --lib-input-bg: #e6e5e3;
+  --lib-input-border: #e6e5e3;
+  --lib-btn-bg: #eae5de;
   --lib-btn-hover: #f5f0e8;
   --lib-code-bg: #f5f0e8;
   --lib-pane-bg: #f5f0e8;
@@ -2566,9 +2570,9 @@ html[data-theme="paper-ink"] {
   --lib-radius-sm: 2px;
   --lib-radius-md: 4px;
   --lib-radius-lg: 4px;
-  --lib-btn-border: #eee9e1;
+  --lib-btn-border: #eae5de;
   --lib-btn-fg: #2c2c2c;
-  --lib-danger-quiet-fg: #af3427;
+  --lib-danger-quiet-fg: #a73225;
   --lib-on-danger: #faf8f5;
   --lib-chip-bg: #dfdeda;
   --lib-chip-fg: #8b4513;
@@ -2589,7 +2593,7 @@ html[data-theme="dracula"] {
   --lib-border-section: #44475a;
   --lib-input-bg: #44475a;
   --lib-input-border: #44475a;
-  --lib-btn-bg: #2e2f38;
+  --lib-btn-bg: #30313a;
   --lib-btn-hover: #21222c;
   --lib-code-bg: #21222c;
   --lib-pane-bg: #21222c;
@@ -2599,10 +2603,10 @@ html[data-theme="dracula"] {
   --lib-radius-sm: 2px;
   --lib-radius-md: 4px;
   --lib-radius-lg: 4px;
-  --lib-btn-border: #2e2f38;
+  --lib-btn-border: #30313a;
   --lib-focus-bd: #6ba0b4;
   --lib-btn-fg: #f8f8f2;
-  --lib-danger-quiet-fg: #ff7474;
+  --lib-danger-quiet-fg: #ff7e7e;
   --lib-on-danger: #282a36;
   --lib-chip-bg: #2c3641;
   --lib-chip-fg: #50fa7b;
@@ -2619,11 +2623,11 @@ html[data-theme="flexoki-light"] {
   --lib-save: #5f770a;
   --lib-danger: #af3029;
   --lib-warn: #b06000;
-  --lib-border: #8c855c;
+  --lib-border: #867f58;
   --lib-border-section: #E6E4D9;
-  --lib-input-bg: #ece9de;
-  --lib-input-border: #ece9de;
-  --lib-btn-bg: #ebe9df;
+  --lib-input-bg: #e8e5db;
+  --lib-input-border: #e8e5db;
+  --lib-btn-bg: #e7e5da;
   --lib-btn-hover: #f2f0e5;
   --lib-code-bg: #F2F0E5;
   --lib-pane-bg: #F2F0E5;
@@ -2633,8 +2637,8 @@ html[data-theme="flexoki-light"] {
   --lib-radius-sm: 3px;
   --lib-radius-md: 6px;
   --lib-radius-lg: 6px;
-  --lib-btn-border: #ebe9df;
-  --lib-focus-bd: #5f89b7;
+  --lib-btn-border: #e7e5da;
+  --lib-focus-bd: #5a85b5;
   --lib-btn-fg: #100f0f;
   --lib-danger-quiet-fg: #af3029;
   --lib-on-danger: #fffcf0;
@@ -2655,10 +2659,10 @@ html[data-theme="flexoki-dark"] {
   --lib-warn: #cf7100;
   --lib-border: #7a7672;
   --lib-border-section: #343331;
-  --lib-input-bg: #2d2c2b;
-  --lib-input-border: #2d2c2b;
-  --lib-btn-bg: #2d2c2b;
-  --lib-btn-hover: #343331;
+  --lib-input-bg: #2f2e2d;
+  --lib-input-border: #2f2e2d;
+  --lib-btn-bg: #2f2e2d;
+  --lib-btn-hover: #363532;
   --lib-code-bg: #282726;
   --lib-pane-bg: #282726;
   --lib-pane-divider: #403E3C;
@@ -2667,8 +2671,8 @@ html[data-theme="flexoki-dark"] {
   --lib-radius-sm: 3px;
   --lib-radius-md: 6px;
   --lib-radius-lg: 6px;
-  --lib-btn-border: #2d2c2b;
-  --lib-focus-bd: #4079a9;
+  --lib-btn-border: #2f2e2d;
+  --lib-focus-bd: #417bad;
   --lib-btn-fg: #cecdc3;
   --lib-danger-quiet-fg: #df837b;
   --lib-on-danger: #1c1b1a;
@@ -2687,11 +2691,11 @@ html[data-theme="solarized-light"] {
   --lib-save: #1f7972;
   --lib-danger: #d32724;
   --lib-warn: #a65a00;
-  --lib-border: #8f7d4f;
+  --lib-border: #88774b;
   --lib-border-section: #d6cdb5;
-  --lib-input-bg: #f5efdd;
-  --lib-input-border: #f5efdd;
-  --lib-btn-bg: #e6e2d0;
+  --lib-input-bg: #e0decf;
+  --lib-input-border: #e0decf;
+  --lib-btn-bg: #e2decd;
   --lib-btn-hover: #eee8d5;
   --lib-code-bg: #eee8d5;
   --lib-pane-bg: #eee8d5;
@@ -2701,8 +2705,8 @@ html[data-theme="solarized-light"] {
   --lib-radius-sm: 2px;
   --lib-radius-md: 4px;
   --lib-radius-lg: 4px;
-  --lib-btn-border: #e6e2d0;
-  --lib-focus-bd: #2485c9;
+  --lib-btn-border: #e2decd;
+  --lib-focus-bd: #2380c1;
   --lib-btn-fg: #506469;
   --lib-danger-quiet-fg: #b0211e;
   --lib-on-danger: #fdf6e3;
@@ -2723,9 +2727,9 @@ html[data-theme="solarized-dark"] {
   --lib-warn: #d97600;
   --lib-border: #1191ad;
   --lib-border-section: #094b5a;
-  --lib-input-bg: #0d3b46;
-  --lib-input-border: #0d3b46;
-  --lib-btn-bg: #0d3b46;
+  --lib-input-bg: #103d48;
+  --lib-input-border: #103d48;
+  --lib-btn-bg: #103d48;
   --lib-btn-hover: #073642;
   --lib-code-bg: #073642;
   --lib-pane-bg: #073642;
@@ -2737,9 +2741,9 @@ html[data-theme="solarized-dark"] {
   --lib-radius-sm: 2px;
   --lib-radius-md: 4px;
   --lib-radius-lg: 4px;
-  --lib-btn-border: #0d3b46;
+  --lib-btn-border: #103d48;
   --lib-btn-fg: #94a3a4;
-  --lib-danger-quiet-fg: #eb8886;
+  --lib-danger-quiet-fg: #ec918f;
   --lib-on-danger: #302403;
   --lib-chip-bg: #0a3f50;
   --lib-chip-fg: #30b9af;
@@ -2758,10 +2762,10 @@ html[data-theme="catppuccin-latte"] {
   --lib-warn: #a65a00;
   --lib-border: #737e9a;
   --lib-border-section: #bcc0cc;
-  --lib-input-bg: #e0e2e8;
-  --lib-input-border: #e0e2e8;
-  --lib-btn-bg: #dfe2e9;
-  --lib-btn-hover: #d7dbe4;
+  --lib-input-bg: #dcdee5;
+  --lib-input-border: #dcdee5;
+  --lib-btn-bg: #dbdee6;
+  --lib-btn-hover: #d0d4de;
   --lib-code-bg: #e6e9ef;
   --lib-pane-bg: #e6e9ef;
   --lib-pane-divider: #ccd0da;
@@ -2770,13 +2774,13 @@ html[data-theme="catppuccin-latte"] {
   --lib-radius-sm: 8px;
   --lib-radius-md: 10px;
   --lib-radius-lg: 12px;
-  --lib-btn-border: #dfe2e9;
-  --lib-focus-bd: #3f7bf3;
+  --lib-btn-border: #dbdee6;
+  --lib-focus-bd: #3b78f3;
   --lib-btn-fg: #4c4f69;
-  --lib-danger-quiet-fg: #b50d31;
+  --lib-danger-quiet-fg: #ac0c2f;
   --lib-on-danger: #eff1f5;
-  --lib-chip-bg: #dce0e8;
-  --lib-chip-fg: #10686d;
+  --lib-chip-bg: #dadee6;
+  --lib-chip-fg: #0f5f64;
 }
 html[data-theme="catppuccin-mocha"] {
   color-scheme: dark;
@@ -2790,11 +2794,11 @@ html[data-theme="catppuccin-mocha"] {
   --lib-save: #94e2d5;
   --lib-danger: #f38ba8;
   --lib-warn: #cf7100;
-  --lib-border: #7e809c;
+  --lib-border: #8386a0;
   --lib-border-section: #45475a;
-  --lib-input-bg: #232434;
-  --lib-input-border: #232434;
-  --lib-btn-bg: #353648;
+  --lib-input-bg: #262637;
+  --lib-input-border: #262637;
+  --lib-btn-bg: #37394b;
   --lib-btn-hover: #313244;
   --lib-code-bg: #313244;
   --lib-pane-bg: #313244;
@@ -2804,8 +2808,8 @@ html[data-theme="catppuccin-mocha"] {
   --lib-radius-sm: 8px;
   --lib-radius-md: 12px;
   --lib-radius-lg: 12px;
-  --lib-btn-border: #353648;
-  --lib-focus-bd: #6582b5;
+  --lib-btn-border: #37394b;
+  --lib-focus-bd: #6784b8;
   --lib-btn-fg: #cdd6f4;
   --lib-danger-quiet-fg: #f494af;
   --lib-on-danger: #1e1e2e;
@@ -2824,11 +2828,11 @@ html[data-theme="gruvbox-dark"] {
   --lib-save: #539fa3;
   --lib-danger: #fb5b48;
   --lib-warn: #d97600;
-  --lib-border: #91857f;
+  --lib-border: #958b84;
   --lib-border-section: #504945;
-  --lib-input-bg: #2e2d2c;
-  --lib-input-border: #2e2d2c;
-  --lib-btn-bg: #403c39;
+  --lib-input-bg: #302f2e;
+  --lib-input-border: #302f2e;
+  --lib-btn-bg: #433f3b;
   --lib-btn-hover: #3c3836;
   --lib-code-bg: #3c3836;
   --lib-pane-bg: #3c3836;
@@ -2838,10 +2842,10 @@ html[data-theme="gruvbox-dark"] {
   --lib-radius-sm: 2px;
   --lib-radius-md: 2px;
   --lib-radius-lg: 2px;
-  --lib-btn-border: #403c39;
-  --lib-focus-bd: #718c81;
+  --lib-btn-border: #433f3b;
+  --lib-focus-bd: #749085;
   --lib-btn-fg: #ebdbb2;
-  --lib-danger-quiet-fg: #fc9184;
+  --lib-danger-quiet-fg: #fd9a8e;
   --lib-on-danger: #282828;
   --lib-chip-bg: #434340;
   --lib-chip-fg: #b8bb26;
@@ -2858,12 +2862,12 @@ html[data-theme="rose-pine"] {
   --lib-save: #9ccfd8;
   --lib-danger: #eb6f92;
   --lib-warn: #c46b00;
-  --lib-border: #6f67a3;
+  --lib-border: #756da7;
   --lib-border-section: #393552;
-  --lib-input-bg: #26233a;
-  --lib-input-border: #26233a;
-  --lib-btn-bg: #242233;
-  --lib-btn-hover: #29263d;
+  --lib-input-bg: #27243b;
+  --lib-input-border: #27243b;
+  --lib-btn-bg: #272536;
+  --lib-btn-hover: #2f2c43;
   --lib-code-bg: #1f1d2e;
   --lib-pane-bg: #1f1d2e;
   --lib-pane-divider: #26233a;
@@ -2872,8 +2876,8 @@ html[data-theme="rose-pine"] {
   --lib-radius-sm: 4px;
   --lib-radius-md: 6px;
   --lib-radius-lg: 8px;
-  --lib-btn-border: #242233;
-  --lib-focus-bd: #7d6c99;
+  --lib-btn-border: #272536;
+  --lib-focus-bd: #7d6c9a;
   --lib-btn-fg: #e0def4;
   --lib-danger-quiet-fg: #eb6f92;
   --lib-on-danger: #191724;
@@ -2894,10 +2898,10 @@ html[data-theme="github-light"] {
   --lib-warn: #a65a00;
   --lib-border: #768a9f;
   --lib-border-section: #d0d7de;
-  --lib-input-bg: #f0f1f1;
-  --lib-input-border: #f0f1f1;
-  --lib-btn-bg: #f0f1f1;
-  --lib-btn-hover: #d7eef9;
+  --lib-input-bg: #ececed;
+  --lib-input-border: #ececed;
+  --lib-btn-bg: #ececed;
+  --lib-btn-hover: #d0e5f0;
   --lib-code-bg: #ffffff;
   --lib-pane-bg: #ffffff;
   --lib-pane-divider: #d0d7de;
@@ -2906,8 +2910,8 @@ html[data-theme="github-light"] {
   --lib-radius-sm: 3px;
   --lib-radius-md: 6px;
   --lib-radius-lg: 6px;
-  --lib-btn-border: #f0f1f1;
-  --lib-focus-bd: #458ce0;
+  --lib-btn-border: #ececed;
+  --lib-focus-bd: #3f88df;
   --lib-btn-fg: #1f2328;
   --lib-danger-quiet-fg: #bd1f2a;
   --lib-on-danger: #ffffff;
@@ -2921,11 +2925,11 @@ html[data-theme="github-light"] {
   --lib-on-danger: #ffffff;
   --lib-chip-bg: #e8f1fd;
   --lib-chip-fg: #1a1a2e;
-  --lib-btn-bg: #f0f0f1;
-  --lib-btn-border: #f0f0f1;
-  --lib-btn-hover: #e6e9f1;
-  --lib-input-bg: #f0f0f1;
-  --lib-input-border: #f0f0f1;
+  --lib-btn-bg: #ececed;
+  --lib-btn-border: #ececed;
+  --lib-btn-hover: #dee1e9;
+  --lib-input-bg: #ececed;
+  --lib-input-border: #ececed;
   --lib-border: #858596;
 }
 /* @generated:ui-themes end */

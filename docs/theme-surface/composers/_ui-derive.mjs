@@ -282,11 +282,11 @@ export function focusBdToAA(accent, seedBg, hosts, min = 3) {
 // onto the other. Same repeated-worst-case shape as fgToAAMulti, just at a
 // perceptibility floor instead of a legibility one.
 //
-// 1.06:1 is deliberately far below WCAG 1.4.11's 3:1 -- that clause governs a
+// 1.10:1 is deliberately far below WCAG 1.4.11's 3:1 -- that clause governs a
 // control's boundary against its background, a job the focus ring and the
 // hover fill still do at full strength. This is the much weaker "the resting
 // shape is perceivable at all" bar: on white, a 1-step-per-channel difference
-// is ~1.005:1 (invisible), 1.06:1 is ~4 steps, which is where a flat fill
+// is ~1.005:1 (invisible), 1.10:1 is ~11 steps, which is where a flat fill
 // starts reading as a distinct plane rather than as banding.
 //
 // Mixes into the FILL, not into the surface, so a theme whose fill already
@@ -296,7 +296,17 @@ export function focusBdToAA(accent, seedBg, hosts, min = 3) {
 // fill === surface the two are identical anyway. Identity when the pair
 // already clears `min`, so an already-separated theme emits byte-for-byte
 // unchanged.
-export function fillSeparate(fill, surfaces, fg, min = 1.06) {
+//
+// The separation floor. 1.06 until 2026-09-21; raised to 1.10 by user ruling
+// after a rendered three-way comparison (1.06 / 1.10 / 1.15): 1.10 is where a
+// resting fill reads as its own plane on light surfaces, while 1.15 starts to
+// read as an old-style grey button AND pushes five "recessed well" input fields
+// (darker than their hosts) far enough toward fg that they cross the hosts'
+// luminance and come out as raised pills -- this function only ever mixes
+// toward fg, so a well can only be separated further by flipping it.
+export const FILL_SEPARATE_MIN = 1.10;
+
+export function fillSeparate(fill, surfaces, fg, min = FILL_SEPARATE_MIN) {
   const round = c => hexToRgb(rgbToHex(c));
   const clears = c => surfaces.every(s => contrast(round(c), round(s)) >= min);
   if (clears(fill)) return fill;

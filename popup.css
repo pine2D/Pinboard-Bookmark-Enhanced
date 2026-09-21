@@ -37,10 +37,13 @@
   --pp-divider: #eef0f3;
   /* Nudged from #eef1f5 by the Soft Fill separation pass (design-uplift
      2026-08-05): the search field sits on the --pp-bg2 strip, and #eef1f5 was
-     only 1.05:1 against it -- under the 1.06:1 floor fillSeparate() enforces
-     for every themed block, so the default surface would have been the one
-     place the invariant did not hold. */
-  --pp-input-bg: #edf0f4;
+     only 1.05:1 against it -- under the 1.06:1 floor fillSeparate() enforced
+     at the time, so the default surface would have been the one place the
+     invariant did not hold. Re-derived 2026-09-21 for FILL_SEPARATE_MIN's
+     1.06 -> 1.10 raise (was #edf0f4, only 1.07:1 against --pp-bg2 under the
+     new floor) -- kept in sync by hand with popup-chrome.mjs's DEFAULT_LIGHT
+     `input-bd`, which mirrors this same value. */
+  --pp-input-bg: #e9ecf0;
   /* No consumer since 2026-09-18: §8 law 6 took the fill change out of every
      focus rule, and the last reader was `html[data-theme] .login-body
      button:hover`, which was painting a BUTTON with this input role (audit
@@ -70,9 +73,12 @@
      focusBdToAA(accent, seed, [btn-bg, input-bg]) from
      composers/_ui-derive.mjs, i.e. the same number the 14 themed blocks are
      derived to, hand-carried because the default surface has no emit path.
+     Re-derived 2026-09-21 for FILL_SEPARATE_MIN's 1.06 -> 1.10 raise (was
+     #5a89df at 3.03:1 / 3.02:1; the 1.10-separated btn-bg/input-bg above
+     dropped it to 2.92:1 / 2.92:1, caught by contrast-audit, not eyeballed).
      Now 3.03:1 / 3.02:1. Re-derive (do not eyeball) if accent or either fill moves --
      contrast-audit's `focus-bd vs btn-bg`/`vs input-bg` rows will catch it. */
-  --pp-focus-bd: #5a89df;
+  --pp-focus-bd: #5686de;
   --pp-focus-ring: 0 0 6px 1px color-mix(in srgb, var(--pp-accent) 45%, transparent);
   /* --pp-on-accent's default lives in the composer's DEFAULT_LIGHT block now
      (design-uplift Task 13 step 2) -- same role, same #ffffff value, emitted
@@ -1716,8 +1722,8 @@ html[data-theme="modern-card"] {
   --pp-accent2: #7b1fa2;
   --pp-border: #828282;
   --pp-divider: #e8e8e8;
-  --pp-input-bg: #eaeaec;
-  --pp-input-bd: #eaeaec;
+  --pp-input-bg: #e7e7e9;
+  --pp-input-bd: #e7e7e9;
   --pp-input-focus-bg: #f0f2f5;
   --pp-tag-bg: #e8f0fe;
   --pp-tag-fg: #1967d2;
@@ -1725,9 +1731,9 @@ html[data-theme="modern-card"] {
   --pp-drop-hover: #e8f0fe;
   --pp-chip-bg: #e8f0fe;
   --pp-chip-fg: #175ec0;
-  --pp-btn-bg: #eaeaec;
-  --pp-btn-bd: #eaeaec;
-  --pp-btn-hover: #dde4f3;
+  --pp-btn-bg: #e7e7e9;
+  --pp-btn-bd: #e7e7e9;
+  --pp-btn-hover: #d5ddeb;
   --pp-btn-fg: #1a1a2e;
   --pp-banner-bg: #e8f0fe;
   --pp-banner-bd: #a3c7f6;
@@ -1747,11 +1753,11 @@ html[data-theme="modern-card"] {
   --pp-spinner-bg: #e8e8e8;
   --pp-spinner-fg: #1a73e8;
   --pp-preset-bg: #e8f0fe;
-  --pp-preset-fg: #1461c5;
+  --pp-preset-fg: #135cbc;
   --pp-radius-sm: 4px;
   --pp-radius-md: 8px;
   --pp-radius-lg: 12px;
-  --pp-focus-bd: #3a86ea;
+  --pp-focus-bd: #3684ea;
   --pp-on-accent: #ffffff;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
@@ -1767,7 +1773,7 @@ html[data-theme="nord-night"] {
   --pp-link: #88c0d0;
   --pp-accent: #88c0d0;
   --pp-accent2: #b48ead;
-  --pp-border: #8792a9;
+  --pp-border: #8d98ad;
   --pp-divider: #434c5e;
   --pp-input-bg: #434c5e;
   --pp-input-bd: #434c5e;
@@ -1778,8 +1784,8 @@ html[data-theme="nord-night"] {
   --pp-drop-hover: #3b4252;
   --pp-chip-bg: transparent;
   --pp-chip-fg: #aec89a;
-  --pp-btn-bg: #3f4656;
-  --pp-btn-bd: #3f4656;
+  --pp-btn-bg: #424959;
+  --pp-btn-bd: #424959;
   --pp-btn-hover: #3b4252;
   --pp-btn-fg: #d8dee9;
   --pp-banner-bg: #394551;
@@ -1878,8 +1884,8 @@ html[data-theme="paper-ink"] {
   --pp-accent2: #8b4513;
   --pp-border: #987d4c;
   --pp-divider: #e8dfd0;
-  --pp-input-bg: #eae9e7;
-  --pp-input-bd: #eae9e7;
+  --pp-input-bg: #e6e5e3;
+  --pp-input-bd: #e6e5e3;
   --pp-input-focus-bg: #faf8f5;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #8b4513;
@@ -1887,8 +1893,8 @@ html[data-theme="paper-ink"] {
   --pp-drop-hover: #f5f0e8;
   --pp-chip-bg: transparent;
   --pp-chip-fg: #8b4513;
-  --pp-btn-bg: #eee9e1;
-  --pp-btn-bd: #eee9e1;
+  --pp-btn-bg: #eae5de;
+  --pp-btn-bd: #eae5de;
   --pp-btn-hover: #f5f0e8;
   --pp-btn-fg: #2c2c2c;
   --pp-banner-bg: #dfe1e3;
@@ -1904,7 +1910,7 @@ html[data-theme="paper-ink"] {
   --pp-offline-bd: #d4bb6e;
   --pp-offline-fg: #866500;
   --pp-danger: #c0392b;
-  --pp-danger-quiet-fg: #af3427;
+  --pp-danger-quiet-fg: #a73225;
   --pp-on-danger: #faf8f5;
   --pp-spinner-bg: #d4c5a9;
   --pp-spinner-fg: #1a3a5c;
@@ -1942,8 +1948,8 @@ html[data-theme="dracula"] {
   --pp-drop-hover: #21222c;
   --pp-chip-bg: transparent;
   --pp-chip-fg: #50fa7b;
-  --pp-btn-bg: #2e2f38;
-  --pp-btn-bd: #2e2f38;
+  --pp-btn-bg: #30313a;
+  --pp-btn-bd: #30313a;
   --pp-btn-hover: #21222c;
   --pp-btn-fg: #f8f8f2;
   --pp-banner-bg: #34414e;
@@ -1959,7 +1965,7 @@ html[data-theme="dracula"] {
   --pp-offline-bd: #787d58;
   --pp-offline-fg: #f1fa8c;
   --pp-danger: #ff5555;
-  --pp-danger-quiet-fg: #ff7474;
+  --pp-danger-quiet-fg: #ff7e7e;
   --pp-on-danger: #282a36;
   --pp-spinner-bg: #44475a;
   --pp-spinner-fg: #8be9fd;
@@ -1985,10 +1991,10 @@ html[data-theme="flexoki-light"] {
   --pp-link: #205EA6;
   --pp-accent: #205EA6;
   --pp-accent2: #5E409D;
-  --pp-border: #8c855c;
+  --pp-border: #867f58;
   --pp-divider: #E6E4D9;
-  --pp-input-bg: #ebe9df;
-  --pp-input-bd: #ebe9df;
+  --pp-input-bg: #e7e5da;
+  --pp-input-bd: #e7e5da;
   --pp-input-focus-bg: #FFFCF0;
   --pp-tag-bg: #FAEEC6;
   --pp-tag-fg: #664D01;
@@ -1996,8 +2002,8 @@ html[data-theme="flexoki-light"] {
   --pp-drop-hover: #F2F0E5;
   --pp-chip-bg: #FAEEC6;
   --pp-chip-fg: #664d01;
-  --pp-btn-bg: #ebe9df;
-  --pp-btn-bd: #ebe9df;
+  --pp-btn-bg: #e7e5da;
+  --pp-btn-bd: #e7e5da;
   --pp-btn-hover: #f2f0e5;
   --pp-btn-fg: #100f0f;
   --pp-banner-bg: #E1ECEB;
@@ -2023,7 +2029,7 @@ html[data-theme="flexoki-light"] {
   --pp-radius-md: 6px;
   --pp-radius-lg: 8px;
   --pp-radius-tag: 6px;
-  --pp-focus-bd: #5c89ba;
+  --pp-focus-bd: #5886b9;
   --pp-on-accent: #FFFCF0;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
@@ -2041,8 +2047,8 @@ html[data-theme="flexoki-dark"] {
   --pp-accent2: #8B7EC8;
   --pp-border: #7a7672;
   --pp-divider: #343331;
-  --pp-input-bg: #2d2c2b;
-  --pp-input-bd: #2d2c2b;
+  --pp-input-bg: #2f2e2d;
+  --pp-input-bd: #2f2e2d;
   --pp-input-focus-bg: #343331;
   --pp-tag-bg: #3A2D04;
   --pp-tag-fg: #D0A215;
@@ -2050,9 +2056,9 @@ html[data-theme="flexoki-dark"] {
   --pp-drop-hover: #343331;
   --pp-chip-bg: #3A2D04;
   --pp-chip-fg: #d0a215;
-  --pp-btn-bg: #2d2c2b;
-  --pp-btn-bd: #2d2c2b;
-  --pp-btn-hover: #343331;
+  --pp-btn-bg: #2f2e2d;
+  --pp-btn-bd: #2f2e2d;
+  --pp-btn-hover: #363532;
   --pp-btn-fg: #cecdc3;
   --pp-banner-bg: #12253B;
   --pp-banner-bd: #163B66;
@@ -2077,7 +2083,7 @@ html[data-theme="flexoki-dark"] {
   --pp-radius-md: 6px;
   --pp-radius-lg: 8px;
   --pp-radius-tag: 6px;
-  --pp-focus-bd: #4179a9;
+  --pp-focus-bd: #417bad;
   --pp-on-accent: #0d0f12;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
@@ -2093,10 +2099,10 @@ html[data-theme="solarized-light"] {
   --pp-link: #1e6ca4;
   --pp-accent: #268bd2;
   --pp-accent2: #6c71c4;
-  --pp-border: #8f7d4f;
+  --pp-border: #88774b;
   --pp-divider: #d6cdb5;
-  --pp-input-bg: #e6e2d0;
-  --pp-input-bd: #e6e2d0;
+  --pp-input-bg: #e2decd;
+  --pp-input-bd: #e2decd;
   --pp-input-focus-bg: #fdf6e3;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #1e746d;
@@ -2104,8 +2110,8 @@ html[data-theme="solarized-light"] {
   --pp-drop-hover: #eee8d5;
   --pp-chip-bg: transparent;
   --pp-chip-fg: #1e746d;
-  --pp-btn-bg: #e6e2d0;
-  --pp-btn-bd: #e6e2d0;
+  --pp-btn-bg: #e2decd;
+  --pp-btn-bd: #e2decd;
   --pp-btn-hover: #eee8d5;
   --pp-btn-fg: #506469;
   --pp-banner-bg: #e3e9e1;
@@ -2131,7 +2137,7 @@ html[data-theme="solarized-light"] {
   --pp-radius-md: 4px;
   --pp-radius-lg: 4px;
   --pp-radius-tag: 3px;
-  --pp-focus-bd: #2485c9;
+  --pp-focus-bd: #2380c1;
   --pp-on-accent: #001014;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
@@ -2149,8 +2155,8 @@ html[data-theme="solarized-dark"] {
   --pp-accent2: #9193cb;
   --pp-border: #1191ad;
   --pp-divider: #094b5a;
-  --pp-input-bg: #0d3b46;
-  --pp-input-bd: #0d3b46;
+  --pp-input-bg: #103d48;
+  --pp-input-bd: #103d48;
   --pp-input-focus-bg: #073642;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #4aada3;
@@ -2158,10 +2164,10 @@ html[data-theme="solarized-dark"] {
   --pp-drop-hover: #073642;
   --pp-chip-bg: transparent;
   --pp-chip-fg: #4aada3;
-  --pp-btn-bg: #0d3b46;
-  --pp-btn-bd: #0d3b46;
+  --pp-btn-bg: #103d48;
+  --pp-btn-bd: #103d48;
   --pp-btn-hover: #073642;
-  --pp-btn-fg: #93a1a1;
+  --pp-btn-fg: #98a6a6;
   --pp-banner-bg: #073c52;
   --pp-banner-bd: #32749a;
   --pp-banner-fg: #5eabe2;
@@ -2204,8 +2210,8 @@ html[data-theme="catppuccin-latte"] {
   --pp-accent2: #8839ef;
   --pp-border: #737e9a;
   --pp-divider: #bcc0cc;
-  --pp-input-bg: #dfe2e9;
-  --pp-input-bd: #dfe2e9;
+  --pp-input-bg: #dbdee6;
+  --pp-input-bd: #dbdee6;
   --pp-input-focus-bg: #eff1f5;
   --pp-tag-bg: #dce0e8;
   --pp-tag-fg: #116e73;
@@ -2213,9 +2219,9 @@ html[data-theme="catppuccin-latte"] {
   --pp-drop-hover: #dce0e8;
   --pp-chip-bg: #dce0e8;
   --pp-chip-fg: #10666a;
-  --pp-btn-bg: #dfe2e9;
-  --pp-btn-bd: #dfe2e9;
-  --pp-btn-hover: #d7dbe4;
+  --pp-btn-bg: #dbdee6;
+  --pp-btn-bd: #dbdee6;
+  --pp-btn-hover: #d0d4de;
   --pp-btn-fg: #4c4f69;
   --pp-banner-bg: #d6e0f5;
   --pp-banner-bd: #9bb9f5;
@@ -2230,16 +2236,16 @@ html[data-theme="catppuccin-latte"] {
   --pp-offline-bd: #e9c99f;
   --pp-offline-fg: #8c5912;
   --pp-danger: #d20f39;
-  --pp-danger-quiet-fg: #b50d31;
+  --pp-danger-quiet-fg: #ac0c2f;
   --pp-on-danger: #eff1f5;
   --pp-spinner-bg: #ccd0da;
   --pp-spinner-fg: #1e66f5;
   --pp-preset-bg: #dce0e8;
-  --pp-preset-fg: #0a52e0;
+  --pp-preset-fg: #0a4ed6;
   --pp-radius-sm: 6px;
   --pp-radius-md: 10px;
   --pp-radius-lg: 12px;
-  --pp-focus-bd: #3d7bf5;
+  --pp-focus-bd: #3978f5;
   --pp-on-accent: #ffffff;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
@@ -2255,7 +2261,7 @@ html[data-theme="catppuccin-mocha"] {
   --pp-link: #89b4fa;
   --pp-accent: #89b4fa;
   --pp-accent2: #cba6f7;
-  --pp-border: #7e809c;
+  --pp-border: #8386a0;
   --pp-divider: #45475a;
   --pp-input-bg: #11111b;
   --pp-input-bd: #11111b;
@@ -2266,8 +2272,8 @@ html[data-theme="catppuccin-mocha"] {
   --pp-drop-hover: #313244;
   --pp-chip-bg: #45475a;
   --pp-chip-fg: #94e2d5;
-  --pp-btn-bg: #353648;
-  --pp-btn-bd: #353648;
+  --pp-btn-bg: #37394b;
+  --pp-btn-bd: #37394b;
   --pp-btn-hover: #313244;
   --pp-btn-fg: #cdd6f4;
   --pp-banner-bg: #313953;
@@ -2292,7 +2298,7 @@ html[data-theme="catppuccin-mocha"] {
   --pp-radius-sm: 4px;
   --pp-radius-md: 10px;
   --pp-radius-lg: 12px;
-  --pp-focus-bd: #6481b4;
+  --pp-focus-bd: #6684b8;
   --pp-on-accent: #1e1e2e;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
@@ -2308,7 +2314,7 @@ html[data-theme="gruvbox-dark"] {
   --pp-link: #83a598;
   --pp-accent: #83a598;
   --pp-accent2: #d3869b;
-  --pp-border: #91857f;
+  --pp-border: #958b84;
   --pp-divider: #504945;
   --pp-input-bg: #1d2021;
   --pp-input-bd: #1d2021;
@@ -2319,8 +2325,8 @@ html[data-theme="gruvbox-dark"] {
   --pp-drop-hover: #3c3836;
   --pp-chip-bg: transparent;
   --pp-chip-fg: #b8bb26;
-  --pp-btn-bg: #403c39;
-  --pp-btn-bd: #403c39;
+  --pp-btn-bg: #433f3b;
+  --pp-btn-bd: #433f3b;
   --pp-btn-hover: #3c3836;
   --pp-btn-fg: #ebdbb2;
   --pp-banner-bg: #313533;
@@ -2336,7 +2342,7 @@ html[data-theme="gruvbox-dark"] {
   --pp-offline-bd: #7c642b;
   --pp-offline-fg: #fabd2f;
   --pp-danger: #fc6a52;
-  --pp-danger-quiet-fg: #fd9584;
+  --pp-danger-quiet-fg: #fd9e8e;
   --pp-on-danger: #282828;
   --pp-spinner-bg: #504945;
   --pp-spinner-fg: #83a598;
@@ -2346,7 +2352,7 @@ html[data-theme="gruvbox-dark"] {
   --pp-radius-md: 2px;
   --pp-radius-lg: 2px;
   --pp-radius-tag: 3px;
-  --pp-focus-bd: #728c82;
+  --pp-focus-bd: #749085;
   --pp-on-accent: #282828;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
@@ -2364,8 +2370,8 @@ html[data-theme="rose-pine"] {
   --pp-accent2: #f6c177;
   --pp-border: #736ca0;
   --pp-divider: #393552;
-  --pp-input-bg: #26233a;
-  --pp-input-bd: #26233a;
+  --pp-input-bg: #27243b;
+  --pp-input-bd: #27243b;
   --pp-input-focus-bg: #403d52;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #9ccfd8;
@@ -2373,9 +2379,9 @@ html[data-theme="rose-pine"] {
   --pp-drop-hover: #26233a;
   --pp-chip-bg: transparent;
   --pp-chip-fg: #9ccfd8;
-  --pp-btn-bg: #242233;
-  --pp-btn-bd: #242233;
-  --pp-btn-hover: #29263d;
+  --pp-btn-bg: #272536;
+  --pp-btn-bd: #272536;
+  --pp-btn-hover: #2f2c43;
   --pp-btn-fg: #e0def4;
   --pp-banner-bg: #2e283b;
   --pp-banner-bd: #5d5172;
@@ -2417,8 +2423,8 @@ html[data-theme="github-light"] {
   --pp-accent2: #8250df;
   --pp-border: #768a9f;
   --pp-divider: #d0d7de;
-  --pp-input-bg: #f0f1f1;
-  --pp-input-bd: #f0f1f1;
+  --pp-input-bg: #ececed;
+  --pp-input-bd: #ececed;
   --pp-input-focus-bg: #f6f8fa;
   --pp-tag-bg: #ddf4ff;
   --pp-tag-fg: #0550ae;
@@ -2426,9 +2432,9 @@ html[data-theme="github-light"] {
   --pp-drop-hover: #ddf4ff;
   --pp-chip-bg: #ddf4ff;
   --pp-chip-fg: #0550ae;
-  --pp-btn-bg: #f0f1f1;
-  --pp-btn-bd: #f0f1f1;
-  --pp-btn-hover: #d7eef9;
+  --pp-btn-bg: #ececed;
+  --pp-btn-bd: #ececed;
+  --pp-btn-hover: #d0e5f0;
   --pp-btn-fg: #1f2328;
   --pp-banner-bg: #ddf4ff;
   --pp-banner-bd: #bbdfff;
@@ -2448,11 +2454,11 @@ html[data-theme="github-light"] {
   --pp-spinner-bg: #d0d7de;
   --pp-spinner-fg: #0969da;
   --pp-preset-bg: #ddf4ff;
-  --pp-preset-fg: #0964d0;
+  --pp-preset-fg: #0860c6;
   --pp-radius-sm: 3px;
   --pp-radius-md: 6px;
   --pp-radius-lg: 6px;
-  --pp-focus-bd: #448de2;
+  --pp-focus-bd: #3d88e1;
   --pp-on-accent: #f6f8fa;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
@@ -2467,11 +2473,11 @@ html[data-theme="github-light"] {
   --pp-on-danger: #ffffff;
   --pp-on-accent: #ffffff;
   --pp-preset-fg: #2d5cb9;
-  --pp-btn-bg: #eff0f2;
-  --pp-btn-bd: #eff0f2;
-  --pp-btn-hover: #dee5f2;
-  --pp-input-bd: #edf0f4;
-  --pp-border: #7e8aa0;
+  --pp-btn-bg: #ebecee;
+  --pp-btn-bd: #ebecee;
+  --pp-btn-hover: #dbe2ef;
+  --pp-input-bd: #e9ecf0;
+  --pp-border: #78859c;
 }
 /* @generated:ui-themes end */
 

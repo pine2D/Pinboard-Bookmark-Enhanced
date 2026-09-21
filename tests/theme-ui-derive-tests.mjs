@@ -1,8 +1,12 @@
 import {
   contrast,
+  fillSeparate,
+  FILL_SEPARATE_MIN,
   finalizeUiControlRoles,
   hexToRgb,
+  relLum,
   resolveOpaqueBg,
+  rgbToHex,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 
 const failures = [];
@@ -111,6 +115,31 @@ const popupChipBg = resolveOpaqueBg(popup["chip-bg"], hexToRgb(popup.bg2));
 check(contrast(hexToRgb(popup["chip-fg"]), popupChipBg) >= 4.5 &&
   ratio(popup["chip-fg"], popup["btn-hover"]) >= 4.5,
 "popup chip foreground must clear AA against the composited tag fill and hover fill");
+
+// --- fillSeparate: the Soft Fill separation floor (COMPONENTS.md §9.1 law 2) ---
+{
+  check(FILL_SEPARATE_MIN === 1.10, "user ruling 2026-09-21: 1.10, not 1.06 and not 1.15");
+  const fg = hexToRgb("#1a1a2e"), panel = hexToRgb("#ffffff"), bg = hexToRgb("#f0f2f5");
+  const rounded = (c) => hexToRgb(rgbToHex(c));
+  // 1. clears EVERY host, measured on the hex-rounded value that actually ships
+  const out = fillSeparate(hexToRgb("#ffffff"), [panel, bg], fg);
+  for (const host of [panel, bg]) {
+    check(contrast(rounded(out), host) >= FILL_SEPARATE_MIN,
+      `separated fill must clear ${FILL_SEPARATE_MIN} vs every host`);
+  }
+  // 2. identity when the pair already clears: an already-separated theme must emit byte-for-byte unchanged
+  const far = hexToRgb("#c8c8d0");
+  check(JSON.stringify(fillSeparate(far, [panel, bg], fg)) === JSON.stringify(far),
+    "already-separated fill is returned untouched");
+  // 3. it only ever moves toward fg (keeps the fill's own tint family)
+  const tinted = hexToRgb("#eef3ff");
+  const moved = fillSeparate(tinted, [panel, bg], fg);
+  check(relLum(moved) <= relLum(tinted),
+    "on a light surface the fill darkens toward fg, never lightens");
+  // 4. the explicit-min form still works (callers may pin a different floor)
+  check(contrast(rounded(fillSeparate(hexToRgb("#ffffff"), [panel], fg, 1.3)), panel) >= 1.3,
+    "explicit min argument overrides the default floor");
+}
 
 if (failures.length) {
   console.error(failures.map((message) => `FAIL ${message}`).join("\n"));
