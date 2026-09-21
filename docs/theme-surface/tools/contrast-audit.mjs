@@ -421,15 +421,16 @@ function foldSelectorBlocks(text, selector) {
 //  - default-surface blocks (:root / html.dark): Task 5 deliberately added
 //    ONLY the 5 new tokens there (visual-zero-change scope), leaving
 //    whichever of bg/panel/btn-bg/btn-hover/danger/border the surface
-//    already had (or didn't -- options' default surface has no
-//    --opt-btn-bg/--opt-btn-hover at all yet, pre-Task-9). A missing role
-//    there is an intentional, in-scope-elsewhere gap, so it SKIPs (printed,
-//    non-blocking, counted in skipCount) instead of failing. Callers of the
-//    non-strict path MUST guard against the fold itself coming back empty or
-//    missing its sentinel role first (see auditComponentPairsDefault) --
-//    otherwise every pair here degrades to a silent SKIP and this function
-//    alone can't tell "legitimately not-yet-wired" apart from "the caller's
-//    selector regex matched nothing at all".
+//    already had (or didn't -- options' default surface once lacked
+//    --opt-btn-bg/--opt-btn-hover, pre-Task-9; both are declared there
+//    now). A missing role there is an intentional, in-scope-elsewhere gap,
+//    so it SKIPs (printed, non-blocking, counted in skipCount) instead of
+//    failing. Callers of the non-strict path MUST guard against the fold
+//    itself coming back empty or missing its sentinel role first (see
+//    auditComponentPairsDefault) -- otherwise every pair here degrades to
+//    a silent SKIP and this function alone can't tell "legitimately
+//    not-yet-wired" apart from "the caller's selector regex matched
+//    nothing at all".
 function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
   const alias = ROLE_ALIAS[ns] || {};
   const roleKey = (role) => `${ns}-${alias[role] || role}`;
@@ -1426,9 +1427,9 @@ auditLibraryThemes(resolve(ROOT, "library.css"));
 // cascade the browser resolves. strict=false: unlike the 13/14 themed
 // blocks, Task 5 deliberately left the default surface's non-new roles
 // exactly as they were (visual-zero-change scope), so a role this surface
-// simply never declared (e.g. options' default has no --opt-btn-bg/
-// --opt-btn-hover yet, pre-Task-9) is an in-scope-elsewhere gap, not a
-// regression to fail on.
+// simply never declared (e.g. options' default once had no --opt-btn-bg/
+// --opt-btn-hover, pre-Task-9; both are declared there now) is an
+// in-scope-elsewhere gap, not a regression to fail on.
 function auditComponentPairsDefault(scope, ns, cssPath, selector, blockLabel) {
   const text = readFileSync(cssPath, "utf8");
   const dict = foldSelectorBlocks(text, selector);

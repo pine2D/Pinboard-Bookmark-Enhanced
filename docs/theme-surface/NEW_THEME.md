@@ -352,12 +352,29 @@ final-fix wave:
   `fg-hint`, `fg-muted`, and popup's `on-accent` are never adjusted by the
   derivation once a pilot overrides them — `_ui-derive.mjs`'s own gap-fill
   only ever touches a role the pilot left unset ("values win" above).
-  `contrast-audit.mjs` now measures every one of these against the
-  elevated surface (`panel`/`bg2`) and against the control fills
-  (`btn-bg`, `input-bg`, `btn-hover`); an override that does not clear
-  4.5:1 against one of them FAILS the gate and must be corrected AT THE
-  PILOT, hue-preserving: `fgToAAMulti(old, [the failing hosts])`
+  `contrast-audit.mjs` gates each role DIFFERENTLY, not uniformly. `fg` is
+  the only one of these measured against ALL of `bg`, the elevated
+  surface (`panel`/`bg2`), AND the three control fills (`btn-bg`,
+  `input-bg`, `btn-hover`) — `COMPONENT_PAIR_SPEC`'s three `fg` rows run
+  against every themed block and the default surface alike.
+  `fg-hint`/`fg-muted` are gated only against `bg` and the elevated
+  surface, in every themed block (`auditCssThemes`/`auditLibraryThemes`)
+  — they get NO control-fill row there at all; only the DEFAULT
+  (no-preset) block adds one, and only for a single (surface, role) pair
+  each: options' `fg-hint` vs `btn-bg`, popup's `fg-muted` vs `btn-bg`
+  (library gets none — see `auditDefaultTextTiers`). Popup's `on-accent`
+  is gated only against `accent`. An override that fails a gate that DOES
+  apply to its role FAILS sync-all and must be corrected AT THE PILOT,
+  hue-preserving: `fgToAAMulti(old, [the failing hosts])`
   (solarized-light/dark's `ui.options.*.fg` are the worked examples).
+  **Hint/muted text — and popup's `link`, which this file never gates at
+  all — painted on a control fill is covered by NONE of the above.** It
+  is known to fall below 4.5:1 on many themes today (options `fg-hint` vs
+  `btn-bg` fails 9/14 themes, popup `fg-muted` vs `btn-bg` fails 6/14,
+  popup `link` vs `btn-bg`/`btn-hover` fails 11/28 rows) — a pending
+  product decision, not yet fixed. Do not place hint/muted/link text on a
+  control fill, and do not assume a green `contrast-audit` run covers
+  that placement.
 - **FILL / EDGE input roles are SEEDS, not verbatim values.** Unlike the
   TEXT roles above, `btn-bg` / `input-bg` / `btn-hover` are starting
   points `fillSeparate()` pushes until they clear `FILL_SEPARATE_MIN`

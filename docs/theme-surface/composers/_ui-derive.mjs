@@ -411,8 +411,16 @@ export const TIER_DISTINCT_MIN_DE = 6;
 // neighboring button tier. Walk the same range once more, host-constraint
 // only, and keep the candidate with the greatest ΔE among those that still
 // clear every host -- i.e. get as distinct as possible without giving up
-// separation. `fill` itself (i=0) is always eligible for that fallback pass,
-// since fillSeparate's own contract guarantees it clears every host already.
+// separation. `fill` itself (i=0) is just the first candidate checked in
+// that loop, NOT a guaranteed-clearing floor: `fillSeparate` has its own
+// unverified escape hatch (`return mix(fill, fg, 0.5)` when nothing in its
+// own 100-step walk clears every host) that can ship a `fill` already
+// below the floor. When that happens, `clearsHosts(fill)` fails at i=0
+// same as every other step, `best` can stay `null` through the whole
+// loop, and this function falls through to ITS OWN unverified constant-mix
+// escape (`mix(fill, toward, 0.6)`) too. The `chip-bg vs panel` row in
+// contrast-audit.mjs (the FILL_SEPARATE_MIN gate, I2 batch2 final-fix
+// wave) is what turns that case red.
 export function fillDistinct(fill, others, toward, hosts = [], minDE = TIER_DISTINCT_MIN_DE, minContrast = FILL_SEPARATE_MIN) {
   const round = c => hexToRgb(rgbToHex(c));
   const clearsDE = c => others.every(o => deltaE2000(round(c), round(o)) >= minDE);

@@ -12,6 +12,7 @@ import {
   primaryHoverFill,
   PRIMARY_HOVER_FG_MIX,
   relLum,
+  resolveChipBg,
   resolveOpaqueBg,
   rgbToHex,
   TIER_DISTINCT_MIN_DE,
@@ -253,6 +254,50 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     `chip-bg (${outJoint["chip-bg"]}) must stay >= ΔE ${TIER_DISTINCT_MIN_DE} from btn-bg (${outJoint["btn-bg"]}), got ${deOut.toFixed(2)}`);
   check(crOut >= FILL_SEPARATE_MIN,
     `chip-bg (${outJoint["chip-bg"]}) must stay >= ${FILL_SEPARATE_MIN} vs panel (${outJoint.panel}) -- fillDistinct's accent mix must not undo fillSeparate's own guarantee, got ${crOut.toFixed(3)}`);
+}
+
+// --- fillDistinct's FALLBACK branch (no candidate in the primary ΔE>=6 +
+// host-separation walk satisfies BOTH at once): the block above never
+// exercises this path -- its #d8ffff accent happens to satisfy both
+// constraints together, so it never falls through. That leaves the
+// fallback's own "keep the candidate with the greatest ΔE among those that
+// still clear every host" contract (_ui-derive.mjs's fillDistinct comment)
+// completely uncovered: a regression that replaces the whole best-candidate
+// walk with the bare escape hatch (`return mix(fill, toward, 0.6)`, no
+// clearsHosts check at all) leaves this suite green. #fffbd8 (same palette
+// otherwise) is the shape that forces the fallback: its accent's luminance
+// sits close enough to the panel that no mix fraction keeps chip-bg tonally
+// distinct from btn-bg (ΔE >= 6) while ALSO holding the panel separation
+// floor.
+{
+  const paletteFb = { "btn-fg": "#ffffff", "tag-bg": "transparent", "tag-fg": "#775500" };
+  const inputFb = {
+    bg: "#f7f7f7", panel: "#ffffff", fg: "#222222", accent: "#fffbd8", danger: "#bb2222",
+    border: "#dddddd", "btn-bg": "#efefef", "btn-hover": "#efefef", "input-bg": "#efefef",
+  };
+  const outFb = finalizeUiControlRoles(structuredClone(inputFb), paletteFb);
+  const btnBgFb = hexToRgb(outFb["btn-bg"]);
+  const panelFb = hexToRgb(outFb.panel);
+  const chipBgFb = hexToRgb(outFb["chip-bg"]);
+
+  // Independently reconstruct the UN-MIXED `fill` fillDistinct was actually
+  // called with -- finalizeUiControlRoles's own chipTinted, built the exact
+  // same way its call site builds it (fillSeparate(resolveChipBg(...),
+  // [panel], fg)) -- NOT a second call to fillDistinct, the function under
+  // test.
+  const chipTintedFb = fillSeparate(
+    resolveChipBg(paletteFb["tag-bg"], hexToRgb(outFb.accent), panelFb),
+    [panelFb],
+    hexToRgb(outFb.fg),
+  );
+  const deUnmixed = deltaE2000(hexToRgb(rgbToHex(chipTintedFb)), btnBgFb);
+  const crChipBg = contrast(chipBgFb, panelFb);
+  const deChipBg = deltaE2000(chipBgFb, btnBgFb);
+
+  check(crChipBg >= FILL_SEPARATE_MIN,
+    `fallback branch: chip-bg (${outFb["chip-bg"]}) must still clear FILL_SEPARATE_MIN (${FILL_SEPARATE_MIN}) vs panel (${outFb.panel}), got ${crChipBg.toFixed(3)} -- a regression to the bare mix(fill, toward, 0.6) escape can ship below the floor`);
+  check(deChipBg >= deUnmixed,
+    `fallback branch: chip-bg (${outFb["chip-bg"]}) must be at least as distinct from btn-bg (${outFb["btn-bg"]}) as the un-mixed input fill was (ΔE ${deUnmixed.toFixed(3)}), got ΔE ${deChipBg.toFixed(3)} -- pins "best host-clearing candidate", not "any"`);
 }
 
 // --- fg-hint / fg-muted must clear AA on BOTH the page bg and the ELEVATED
