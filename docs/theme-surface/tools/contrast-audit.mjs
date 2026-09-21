@@ -1142,11 +1142,19 @@ function auditCssThemes(label, varPrefix, cssPath) {
     // footer and offline empty state, options' panels put them there, and
     // "vs bg" alone let flexoki-dark's fg-hint through at 4.05:1 on bg2
     // (2026-08-26, Codex). BLOCKING like the bg rows.
-    const bg2S = grab("bg2");
+    //
+    // options / library name the elevated surface `panel`; only popup calls it
+    // `bg2`. Reading `bg2` alone meant these two BLOCKING rows never ran for
+    // options at all -- which is how flexoki-light shipped fg-hint at 4.47:1 on
+    // every options panel (found 2026-09-21). Fall back to `panel` and label the
+    // row with whichever role was actually read.
+    const bg2Raw = grab("bg2");
+    const bg2Key = bg2Raw != null ? "bg2" : "panel";
+    const bg2S = bg2Raw ?? grab("panel");
     const bg2 = bg2S && bg2S.startsWith("#") ? hexRgb(bg2S) : null;
     if (bg2) {
-      if (hintS) { const c = resolveColor(hintS, bg2); if (c) console.log(check(label, theme, "fg-hint vs bg2", cr(c, bg2), 4.5)); }
-      if (mutedS) { const c = resolveColor(mutedS, bg2); if (c) console.log(check(label, theme, "fg-muted vs bg2", cr(c, bg2), 4.5)); }
+      if (hintS) { const c = resolveColor(hintS, bg2); if (c) console.log(check(label, theme, `fg-hint vs ${bg2Key}`, cr(c, bg2), 4.5)); }
+      if (mutedS) { const c = resolveColor(mutedS, bg2); if (c) console.log(check(label, theme, `fg-muted vs ${bg2Key}`, cr(c, bg2), 4.5)); }
     }
     // ...and on the accent-tinted hover/selected row fill (popup's
     // .ac-item.selected keeps its hint-tier count there; terminal read 3.5:1
@@ -1232,7 +1240,11 @@ function auditLibraryThemes(cssPath) {
     if (!bg) continue;
     // Body text sits on both the page bg and the elevated panel/pane surface —
     // both must clear AA, not just the one popup/options happen to check.
-    for (const [key, label] of [["fg", "fg"], ["fg-muted", "fg-muted"]]) {
+    // fg-hint had NO coverage at all here (not even vs bg) until this row was
+    // added -- library's other two text tiers were checked, the third tier
+    // was silently skipped (found 2026-09-21, same audit sweep as options'
+    // bg2/panel blind spot).
+    for (const [key, label] of [["fg", "fg"], ["fg-muted", "fg-muted"], ["fg-hint", "fg-hint"]]) {
       const s = grab(key);
       if (!s) continue;
       const onBg = resolveColor(s, bg);

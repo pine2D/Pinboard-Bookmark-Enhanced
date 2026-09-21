@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   contrast,
   deltaE2000,
@@ -11,6 +12,7 @@ import {
   rgbToHex,
   TIER_DISTINCT_MIN_DE,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
+import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
 
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); };
@@ -159,6 +161,25 @@ check(contrast(hexToRgb(popup["chip-fg"]), popupChipBg) >= 4.5 &&
   const blue = hexToRgb("#ddf4ff"), grey = hexToRgb("#f0f1f1");   // github-light, ΔE 8.5
   check(JSON.stringify(fillDistinct(blue, [grey], accent)) === JSON.stringify(blue),
     "already-distinct fill is returned untouched");
+}
+
+// --- fg-hint / fg-muted must clear AA on the ELEVATED surface too, on the
+// rounded hex that ships (Task 3, taste-uplift-batch2 tokens batch,
+// 2026-09-21). contrast-audit's bg2/panel blind spot let flexoki-light's
+// options fg-hint ship at 4.47:1 against --opt-panel: the pilot's
+// ui.options.light.fg-hint override is a raw literal chosen by the pilot
+// author (it happens to equal palette.muted, not muted-soft) that bypasses
+// deriveUiColors' AA-guaranteed fgToAAMulti derivation entirely once merged
+// into the map -- nothing downstream re-validated an override against the
+// surfaces it actually has to clear. Built via the real composer pipeline
+// (composeOptionsThemeMap), not a hand-rebuilt approximation of it. ---
+{
+  const tokens = JSON.parse(readFileSync(new URL("../docs/theme-surface/pilots/flexoki.tokens.json", import.meta.url), "utf8"));
+  const { map } = composeOptionsThemeMap(tokens, "light");
+  for (const role of ["fg-hint", "fg-muted"]) {
+    const c = ratio(map[role], map.panel);
+    check(c >= 4.5, `flexoki-light options ${role} ${map[role]} on panel ${map.panel} = ${c.toFixed(3)}, need 4.5`);
+  }
 }
 
 if (failures.length) {

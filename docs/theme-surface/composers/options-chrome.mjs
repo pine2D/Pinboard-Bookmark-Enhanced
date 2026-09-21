@@ -158,6 +158,21 @@ const SWATCH_SOURCE_BY_BUTTON_KEY = {
   "rose-pine": "rose-pine",
 };
 
+// Compute ONE theme's real, final --opt-* color map (post-derivation,
+// post-pilot-override, post-finalizer) from its raw pilot tokens JSON --
+// hoisted out of composeOptionsThemes' per-entry loop below (Task 3,
+// taste-uplift-batch2 tokens batch, 2026-09-21) so a derivation test can
+// exercise the exact pipeline that ships a theme's CSS block instead of
+// hand-rebuilding an approximation of it that could silently drift from the
+// real one. No behavior change: composeOptionsThemes now calls this instead
+// of inlining the same four lines.
+export function composeOptionsThemeMap(tk, mode, useDarkMode = false) {
+  const merged = useDarkMode && tk.modes?.dark ? mergeTokens(tk, tk.modes.dark) : tk;
+  const palette = expandPalette(merged.palette);
+  const ui = deriveUiColors(palette, mode);
+  return emitOpt(ui, palette, tk.ui?.options?.[mode], merged.radius, mode);
+}
+
 // tokensByPilot: { [pilotSlug]: parsedTokensJson }
 export function composeOptionsThemes(tokensByPilot) {
   const blocks = [];
@@ -165,10 +180,7 @@ export function composeOptionsThemes(tokensByPilot) {
   for (const entry of POPUP_THEME_MAP) {
     const tk = tokensByPilot[entry.pilot];
     if (!tk) throw new Error(`options-chrome: missing pilot ${entry.pilot} for ${entry.id}`);
-    const merged = entry.useDarkMode && tk.modes?.dark ? mergeTokens(tk, tk.modes.dark) : tk;
-    const palette = expandPalette(merged.palette);
-    const ui = deriveUiColors(palette, entry.mode);
-    const { map, text } = emitOpt(ui, palette, tk.ui?.options?.[entry.mode], merged.radius, entry.mode);
+    const { map, text } = composeOptionsThemeMap(tk, entry.mode, entry.useDarkMode);
     accentByThemeId[entry.id] = map.accent;
     blocks.push(`html[data-theme="${entry.id}"] {\n${text}\n}`);
   }
