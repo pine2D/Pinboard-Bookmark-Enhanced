@@ -995,7 +995,7 @@ html.motion-ready .pf:not([hidden]) {
               display var(--motion-pop) allow-discrete;
   @starting-style { opacity: 0; translate: 0 -4px; }
 }
-.pf h3 { font-size: 12px; color: var(--opt-fg-soft); margin-bottom: var(--opt-sp-4); font-weight: bold; }
+.pf h3 { font-size: 12px; color: var(--opt-fg-soft); margin-bottom: var(--opt-sp-4); font-weight: 600; }
 
 /* ---- Markdown export targets (Send-to destination cards) ---- */
 .et-field { margin-top: var(--opt-sp-4); }
@@ -2781,7 +2781,7 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     margin-bottom: var(--opt-sp-2);
     color: var(--opt-fg-muted);
     font-size: 12px;
-    font-weight: bold;
+    font-weight: 400;
   }
   .mobile-tab-picker select {
     width: 100%;

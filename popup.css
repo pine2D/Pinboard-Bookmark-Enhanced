@@ -941,7 +941,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 }
 .last-used-hint:hover { color: var(--pp-link); }
 .last-used-hint:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
-.last-used-hint .lu-label { font-weight: bold; margin-right: var(--pp-sp-2); }
+.last-used-hint .lu-label { font-weight: 400; margin-right: var(--pp-sp-2); }
 .last-used-hint .lu-tags { font-style: italic; }
 .tag-copied-flash { color: var(--pp-ok-fg) !important; }
 
@@ -949,7 +949,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .suggest-area.muted { padding-top: var(--pp-sp-1); }
 .suggest-group { margin-bottom: var(--pp-sp-1); }
 .suggest-group:last-child { margin-bottom: 0; }
-.group-label { font-size: 11px; color: var(--pp-fg-hint); font-weight: bold; margin-right: var(--pp-sp-2); }
+.group-label { font-size: 11px; color: var(--pp-fg-hint); font-weight: 400; margin-right: var(--pp-sp-2); }
 .stag {
   border: 0; background: none; padding: 0; font-family: inherit;
   color: var(--pp-link); cursor: pointer; font-size: 12px; margin-right: var(--pp-sp-2); white-space: nowrap;
@@ -1520,7 +1520,7 @@ html[data-theme] .batch-progress-text {
 .recent-bm-label {
   color: var(--pp-fg-hint);
   font-size: 11px;
-  font-weight: bold;
+  font-weight: 600;
   margin-bottom: var(--pp-sp-1);
 }
 .recent-bm-row {
