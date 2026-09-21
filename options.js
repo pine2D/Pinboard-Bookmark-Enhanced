@@ -5049,6 +5049,13 @@ async function renderLowCountTags() {
   // wrapping flex flow, no new wrapper class needed for one more list of chips.
   const flow = document.createElement("div");
   flow.className = "tag-gov-chipset";
+  // A plain checkbox set (any number may be checked), not a radiogroup (the
+  // group-row chips above pick ONE canonical tag) -- role="group" with the
+  // disclosure's own title span as its accessible name (id set in
+  // options.html), so a screen reader announces what these checkboxes belong
+  // to without a second, redundant label.
+  flow.setAttribute("role", "group");
+  flow.setAttribute("aria-labelledby", "tag-gov-lowcount-title");
   const boxes = [];
   let lastIdx = null;            // anchor = last individually-clicked box; resets each render
   lowCount.forEach((item, i) => {

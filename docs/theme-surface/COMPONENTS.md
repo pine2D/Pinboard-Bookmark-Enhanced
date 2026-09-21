@@ -147,6 +147,15 @@ YaHei/PingFang 时行盒比 Latin 高一截，同一颗按钮在 zh-CN 和 en �
 `color: --{ns}-chip-fg`、600。hover 走 `--{ns}-btn-hover`。两组配对（chip-fg/chip-bg、chip-fg/btn-hover）都已在
 contrast-audit 的 `COMPONENT_PAIR_SPEC` 里逐表面审计，不新增颜色角色。与 rung 正交：`.btn.btn-sm.tonal` 合法。
 
+上一句「逐表面审计、不新增颜色角色」只对**审计本身**成立，对 popup 的**渲染结果**具有误导性：`--pp-chip-bg` 在
+15 套 popup 主题块里有 8 套字面值就是 `transparent`（实测：`transparent`/`#e8f0fe`/`#FAEEC6`/`#3A2D04`/`#dce0e8`/
+`#45475a`/`#ddf4ff`/`#e2eafa`，8 个 `transparent`）。`contrast-audit` 把非十六进制的 `chip-bg` 合成到面板背景上再
+测对比度，`transparent` 合成结果等于面板色本身，于是这 8 套主题下的门照样判过，但 `.btn.tonal` 一旦被 popup 消费，
+背景会渲染成**无填充**（塌陷成 ghost 的观感，却仍带着 tonal 的粗体文字），不是 chip 配对本该有的实心填充。popup
+在采用 tonal 之前必须先修 `--pp-chip-bg` 的派生（让它在这 8 套主题下也解析出一个真实颜色，而不是 `transparent`
+字面量），审计门本身不会自动拦下这个问题。`.btn.tonal` 目前只有**一个**消费点：options 的标签治理相似组行
+（`options.js`『合并为 …』按钮），尚未在 popup 或 library 出现过。
+
 ### 1.3 消费 token 对
 
 | 属性 | token | 派生要求 |
