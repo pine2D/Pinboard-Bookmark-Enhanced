@@ -320,6 +320,56 @@ const COMPONENT_PAIR_SPEC = [
   // here that no theme can pass.
   ["focus-bd", "btn-bg", 3],
   ["focus-bd", "input-bg", 3],
+  // Body-text `fg` vs the two control fills (2026-09-22, taste-uplift
+  // batch2 task 7 -- FILL_SEPARATE_MIN's 1.06->1.10 raise, a77c1061).
+  // `fg` is not a COMPONENT_PAIR_SPEC role at all until now: it is the
+  // plain page-text tier, and nothing here or in auditCssThemes's own
+  // fg-hint/fg-muted probe below ever checked it against anything but
+  // `bg` (an unrelated per-theme `fg vs bg` row lives in auditCssThemes).
+  // But `fg` genuinely paints TEXT directly on both fills on every
+  // surface -- options'/library's/popup's `.theme-name-popover input[type
+  // =text]` / `.et-field input` / `.login-body input` / `.search-field`
+  // (`color: fg; background: input-bg`) and `.connection-health-row` /
+  // `.vocab-sort-seg` / `.qbtn`-family containers (`color: fg; background:
+  // btn-bg`) -- so this is real coverage, not a speculative row. Caught
+  // live (tests/options-vocab-tests.html's `.theme-name-popover input`
+  // probe) at solarized-light 4.47:1 / solarized-dark 4.39:1 on
+  // --opt-input-bg, with zero red anywhere in this file, because this
+  // exact pair had never been gated. Only solarized-light/dark fail today
+  // (options: pilot `ui.options.{light,dark}.fg` override, fixed at its
+  // own source in the pilot file; library/popup: no such override, fixed
+  // in the shared derivation instead -- finalizeUiControlRoles now pushes
+  // `fg` against [btn-bg, input-bg] itself when a pilot has not overridden
+  // it -- see _ui-derive.mjs). Identity on every other theme.
+  ["fg", "btn-bg", 4.5],
+  ["fg", "input-bg", 4.5],
+  // fg-hint / fg-muted vs the control fills are DELIBERATELY NOT added here
+  // as a general (all-14-themed-blocks) row, even though a real consumer
+  // exists on both surfaces -- options' .connection-health-state (color:
+  // fg-hint) inside .connection-health-row (background: btn-bg), and
+  // popup's .qbtn (color: fg-muted; background: btn-bg, unconditional
+  // resting state). Measuring the ACTUAL shipped values first (2026-09-22,
+  // task-7-report.md) showed this is not a 1-2-theme gap like `fg` above:
+  // options' fg-hint-vs-btn-bg fails on 9/14 themes (modern-card,
+  // nord-night, paper-ink, dracula, flexoki-light, solarized-light/dark,
+  // catppuccin-mocha, gruvbox-dark) and popup's fg-muted-vs-btn-bg fails on
+  // 6/14 (nord-night, flexoki-light, solarized-light/dark, gruvbox-dark,
+  // github-light) -- FILL_SEPARATE_MIN's 1.10 floor pushed btn-bg deep
+  // enough on roughly two-thirds of the themes that BOTH real consumers'
+  // long-standing hint/muted values now read sub-AA there, a live bug on
+  // every one of those themes today, invisible to every existing test.
+  // That is well past the "more than ~6 rows" line the batch controller
+  // drew for "this needs a decision, not a theme-by-theme patch" -- so
+  // this task fixes ONLY the DEFAULT (no-preset) surface's instance of each
+  // (auditDefaultTextTiers below -- the exact pair
+  // tests/options-usability-tests.html's failing assertion measures) and
+  // reports the wider 9+6-theme finding instead of silently re-deriving 15
+  // pilot literals. `vs input-bg` has zero real text occurrences on any
+  // surface for either role (every input's own text is plain `fg`, the row
+  // above) -- .key-toggle's SVG icon (options + popup) overlaps input-bg
+  // but is a non-text glyph (WCAG 1.4.11's 3:1 floor, not this 4.5:1 text
+  // floor), and popup's `#submit-btn:disabled` fg-hint-on-btn-bg is the
+  // documented `:disabled` contrast exemption (COMPONENTS.md §3.4 / row 9).
 ];
 
 // Generic `--name: value;` extractor over an arbitrary block body -- the
@@ -1359,6 +1409,72 @@ function auditComponentPairsDefault(scope, ns, cssPath, selector, blockLabel) {
     return;
   }
   auditComponentPairs(scope, ns, blockLabel, dict, false);
+  auditDefaultTextTiers(scope, ns, blockLabel, dict);
+}
+
+// fg-hint / fg-muted vs the page bases (+ the two real control-fill
+// consumers), on the DEFAULT (no-preset) surface -- 2026-09-22,
+// taste-uplift batch2 task 7. auditCssThemes's own fg-hint/fg-muted probe
+// (above) ONLY runs against `[data-theme="..."]` blocks (its regex requires
+// that attribute selector) -- the DEFAULT `:root` block was never matched
+// by it, so these two text tiers had NEVER been checked against anything at
+// all on the default surface, not even `bg`/`panel`. That is how
+// --opt-fg-hint (#6b6b6b) shipped against a #eaeae5 --opt-btn-bg
+// (FILL_SEPARATE_MIN's 1.10 floor, a77c1061) at 4.42:1 with zero red
+// anywhere in this file (tests/options-usability-tests.html caught it, this
+// file did not).
+//
+// vs bg / vs panel(bg2): BLOCKING for both roles on all 3 surfaces -- a
+// broad generic tier that genuinely lands on both hosts on every surface's
+// default state (.hint, .notes-detail-empty, .submit-hint, ... -- the same
+// claim auditCssThemes's themed-block probe already makes for these hosts).
+//
+// vs btn-bg: gated ONLY for the two (surface, role) pairs with a genuine
+// TEXT consumer -- options' fg-hint (.connection-health-state, inside
+// .connection-health-row's btn-bg fill; this is the exact pair
+// tests/options-usability-tests.html's failing assertion measures) and
+// popup's fg-muted (.qbtn, unconditional resting state). Deliberately NOT
+// promoted to a themed-block COMPONENT_PAIR_SPEC row (see that registry's
+// own comment): the real shipped values fail on 9/14 and 6/14 themes
+// respectively, well past a 1-2-theme derivation slip -- flagged as a
+// wider, unresolved finding instead of silently patched theme by theme.
+// library has no real fg-hint/fg-muted-on-btn-bg consumer at all, so it
+// gets no btn-bg row here (its default fg-hint numerically fails btn-bg
+// too, 4.44:1, but nothing paints it there -- re-derived anyway for hygiene
+// in library.css's own :root comment). `vs input-bg` has zero real text
+// occurrences for either role on any surface (every input's own text is
+// plain `fg`) -- excluded the same way, for both surfaces.
+const DEFAULT_TEXT_TIER_BTN_BG = { opt: "fg-hint", pp: "fg-muted", lib: null };
+function auditDefaultTextTiers(scope, ns, blockLabel, dict) {
+  const alias = ROLE_ALIAS[ns] || {};
+  const panelRole = alias.panel || "panel";
+  const bgS = dict[`${ns}-bg`];
+  const panelS = dict[`${ns}-${panelRole}`];
+  const btnBgS = dict[`${ns}-btn-bg`];
+  const bg = bgS && isHex(bgS) ? hexRgb(bgS) : null;
+  const panel = panelS && isHex(panelS) ? hexRgb(panelS) : null;
+  const btnBg = btnBgS && isHex(btnBgS) ? hexRgb(btnBgS) : null;
+  const btnBgRole = DEFAULT_TEXT_TIER_BTN_BG[ns];
+  for (const role of ["fg-hint", "fg-muted"]) {
+    const raw = dict[`${ns}-${role}`];
+    if (!raw || !isHex(raw)) {
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + `${role} vs bg/${panelRole}`.padEnd(28) + ` FAIL (--${ns}-${role} not declared)`;
+      console.log(line);
+      violations.push(line);
+      continue;
+    }
+    const rgb = hexRgb(raw);
+    if (bg) console.log(check(scope, blockLabel, `${role} vs bg`, cr(rgb, bg), 4.5));
+    if (panel) console.log(check(scope, blockLabel, `${role} vs ${panelRole}`, cr(rgb, panel), 4.5));
+    if (role === btnBgRole) {
+      if (btnBg) console.log(check(scope, blockLabel, `${role} vs btn-bg`, cr(rgb, btnBg), 4.5));
+      else {
+        const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + `${role} vs btn-bg`.padEnd(28) + ` FAIL (--${ns}-btn-bg not declared)`;
+        console.log(line);
+        violations.push(line);
+      }
+    }
+  }
 }
 console.log("\n=== component pairs: default surfaces (:root) ===");
 auditComponentPairsDefault("options", "opt", resolve(ROOT, "options.css"), ":root", "default");
