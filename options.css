@@ -289,7 +289,7 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 }
 /* Focus ring: shared soft-focus recipe below the .fg focus rules. */
 .tab-btn:hover:not(.active) { color: var(--opt-fg); border-left-color: var(--opt-tab-hover-border); background: var(--opt-tab-hover-bg); }
-.tab-btn.active { color: var(--opt-fg); font-weight: bold; border-left-color: var(--opt-fg); background: var(--opt-tab-active); }
+.tab-btn.active { color: var(--opt-fg); font-weight: 600; border-left-color: var(--opt-fg); background: var(--opt-tab-active); }
 .reset-tab-btn {
   margin: var(--opt-sp-6) 0 0 0; padding: var(--opt-sp-5) var(--opt-sp-5) 0;
   border: none; border-top: 1px solid var(--opt-border-section);
