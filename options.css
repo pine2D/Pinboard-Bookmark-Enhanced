@@ -2550,6 +2550,24 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
    `.fg-actions > .hint` rule an unrelated future pairing would inherit
    without review. */
 #tag-gov-selected-count { margin: 0; }
+/* Found while adding this element's render-audit textContrast:4.5 checklist
+   row (Ruling 8): flexoki-light's generated --opt-fg-hint (#6F6E69) measures
+   ~4.465:1 against --opt-panel (#F2F0E5) here -- verified by hand (WCAG
+   relative-luminance formula), not just the render-audit's own number. The
+   shared derivation (`_ui-derive.mjs`'s fgToAAMulti) targets bg/bg2/
+   accent-soft and panel is exactly bg2 (options-chrome.mjs: `panel: ui.bg2`),
+   so this is a narrow miss in that shared derivation, not an absent one --
+   out of scope here (it would need retuning shared code three surfaces and
+   15 theme blocks consume). Same fix already used for an identical gap
+   elsewhere (options.css's `html[data-theme="flexoki-dark"] #panel-vocab
+   .disclosure-body > .hint` rule): swap to --opt-fg-muted, which clears
+   ~4.75:1 against this same panel. Scoped to this one ID rather than every
+   `.hint` in #panel-tags so it can't fight #tag-gov-ai-status's .ok/.bad
+   state colors (higher specificity here would win over `.hint.bad`'s
+   color:var(--opt-danger) too). #tag-gov-overview's own .hint likely has the
+   same gap in this theme; it carries no render-audit assertion today so it
+   is left as a follow-up rather than an unscoped expansion of this fix. */
+html[data-theme="flexoki-light"] #tag-gov-selected-count { color: var(--opt-fg-muted); }
 /* Pinned to the viewport bottom while its natural position (end of the Tags panel)
    is below the fold, so batch progress is visible from any scroll position without
    yanking the view away from the groups list. Falls back into normal flow once the

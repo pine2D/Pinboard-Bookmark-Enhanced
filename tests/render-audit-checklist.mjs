@@ -554,6 +554,23 @@ export const CHECKS = [
     expect: { textContrast: 4.5 } },
   { surface: "options", page: "options.html", selector: ".tag-gov-group-row .btn.tonal", state: "hover",
     expect: { textContrast: 4.5 } },
+  // ---- Ruling 8: #tag-gov-lowcount-list's own checkbox chips (renderLowCountTags,
+  // "Low-count tags" disclosure). Same .tag-gov-chip primitive as the group-row
+  // chips just above, but a DIFFERENT DOM branch never seeded (the seed's plural
+  // pair never has count<=1) and never opened before this -- the checklist rows
+  // above never exercised it, and neither did --sweep's own click-every-tab pass,
+  // because the disclosure it opens generically had nothing but the empty state
+  // inside. See main()'s cached_user_tags seed (misc/wip) and the "tags" tab
+  // setup above (clicks #tag-gov-lowcount > summary before this group runs).
+  // Unchecked only: every low-count chip starts and stays unchecked until a
+  // reader clicks one, same as the group-row's own unchecked-state entry above. ----
+  { surface: "options", page: "options.html", selector: "#tag-gov-lowcount-list .tag-gov-chip > input:not(:checked) + .tag-gov-chip-face", state: "default",
+    expect: { textContrast: 4.5, padGteRadiusH: true, padVMin: 2 } },
+  // "N selected" (options.js's pbpSyncTagGovDeleteBtnState): a <span class="hint">
+  // living in .fg-actions next to Select-all and Delete -- shares the panel's
+  // ordinary hint-on-panel contrast pair, not the chip-fg/chip-bg pair above.
+  { surface: "options", page: "options.html", selector: "#tag-gov-selected-count", state: "default",
+    expect: { textContrast: 4.5 } },
 
   // ---- defect 5 (2nd instance): .btn-ic in library only has 4 container-
   // scoped equivalents; every other host (incl. .vocab-detail-speak) falls

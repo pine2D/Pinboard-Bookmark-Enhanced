@@ -1871,7 +1871,11 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // zero-size across all 16 themes). Each group's checks now run
     // immediately after its own setup click, before the next group touches
     // the tab strip.
-    const tagGovChecks = checks.filter((c) => c.selector.includes(".tag-gov-"));
+    // `#tag-gov-selected-count` is an ID selector with no ".tag-gov-" class
+    // substring -- widened alongside it (Ruling 8) so an ID-based tag-gov
+    // check is still bucketed onto the "tags" tab instead of falling through
+    // to otherChecks, which by the time it runs has #tab-general active.
+    const tagGovChecks = checks.filter((c) => c.selector.includes(".tag-gov-") || c.selector.includes("#tag-gov-"));
     // presetRowChecks (design-uplift, preset-row redesign, 2026-08-04):
     // .theme-preset-btn.active only exists once SOME preset is selected --
     // reuses the exact same "click flexoki on the appearance tab" step
@@ -1902,6 +1906,15 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // renderTagGov()'s init actually hangs off of.
       await page.click("#tab-tags");
       await page.waitForSelector(".tag-gov-chip-face", { timeout: TIMEOUT_MS });
+      // #tag-gov-lowcount-list's checkbox chips render into a closed
+      // <details id="tag-gov-lowcount">: `renderLowCountTags()` populates it
+      // regardless of `open`, but a closed <details> computes display:none on
+      // its body, so every geometry/contrast check on those chips would
+      // measure a zero-size, invisible box (Ruling 8) without this. Click the
+      // summary rather than set `.open` directly so this exercises the same
+      // path a reader's click does.
+      await page.click("#tag-gov-lowcount > summary");
+      await page.waitForSelector("#tag-gov-lowcount-list .tag-gov-chip-face", { state: "visible", timeout: TIMEOUT_MS });
       for (const check of tagGovChecks) await runOneCheck(page, theme, check, results);
     }
     if (presetPreviewChecks.length || presetRowChecks.length || savedThemeChecks.length) {
@@ -3298,8 +3311,17 @@ async function main() {
   // render -- so a plural pair here reaches .tag-gov-chip-face with no
   // network mocking needed. book/books is tag-gov.js's own simplest
   // heuristic case (_pluralizeCandidates: base + "s", base.length >= 3).
+  // misc/wip (count <= 1) seed #tag-gov-lowcount-list's checkbox chips --
+  // pbpTagGovLowCountTags's own threshold -- so its disclosure has something
+  // to open (Ruling 8: neither count in the plural pair qualifies, so before
+  // this the list always rendered its empty state and the checkbox-chip
+  // family never appeared in a DOM render-audit or --sweep scans). Both stay
+  // clear of every OTHER heuristic: too short for the typo pass's length>=5
+  // gate, and their normalized forms don't collide with book/books or each
+  // other, so they can't accidentally form a second plural/separator/typo
+  // group and change what the plain-groups checks below expect.
   await sw.evaluate((account) => chrome.storage.local.set({
-    cached_user_tags: { account, counts: { book: 5, books: 3 }, timestamp: Date.now() },
+    cached_user_tags: { account, counts: { book: 5, books: 3, misc: 1, wip: 0 }, timestamp: Date.now() },
   }), SEED_TOKEN_ACCOUNT);
 
   // Highlight record for library.html's Notes view, which enumerates every
