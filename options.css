@@ -674,6 +674,19 @@ html[data-theme] .opt-error {
 .btn.ghost:focus-visible {
   border-color: var(--opt-focus-bd);
 }
+.btn.tonal {
+  background: var(--opt-chip-bg);
+  border-color: var(--opt-chip-bg);
+  color: var(--opt-chip-fg);
+  font-weight: 600;
+}
+.btn.tonal:hover:not(:disabled) {
+  background: var(--opt-btn-hover);
+  border-color: var(--opt-btn-hover);
+}
+.btn.tonal:focus-visible {
+  border-color: var(--opt-focus-bd);
+}
 
 .btn-ic {
   display: inline-flex;
@@ -722,6 +735,29 @@ html[data-theme] .opt-error {
   border-radius: var(--opt-radius-full);
   background: var(--opt-chip-bg);
   color: var(--opt-chip-fg);
+}
+.tag-gov-chip-face {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--opt-sp-1) 10px;
+  font-size: 12px;
+  line-height: 14px;
+  border-radius: var(--opt-radius-full);
+  background: color-mix(in srgb, var(--opt-fg) 7%, var(--opt-panel));
+  color: var(--opt-fg);
+}
+input:hover:not(:disabled) + .tag-gov-chip-face {
+  background: color-mix(in srgb, var(--opt-fg) 11%, var(--opt-panel));
+}
+input:checked + .tag-gov-chip-face, input:checked:hover:not(:disabled) + .tag-gov-chip-face {
+  background: var(--opt-chip-bg);
+  color: var(--opt-chip-fg);
+  font-weight: 600;
+}
+input:focus-visible + .tag-gov-chip-face {
+  outline: 1px solid var(--opt-accent);
+  outline-offset: 2px;
+  box-shadow: var(--opt-focus-ring);
 }
 
 .fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea {

@@ -161,6 +161,32 @@ function btnRules(ns) {
     // the outcome is decided by specificity, not by where in this file the
     // rules happen to sit (COMPONENTS.md §8.6: "别赌源序").
     rule(".btn.ghost:focus-visible", [["border-color", `var(--${ns}-focus-bd)`]], { pairColorWith: ".btn" }),
+    // Tonal chrome -- the affirmative action that REPEATS down a list (tag
+    // governance's "Merge into X" on every row). A filled accent primary is
+    // capped at one per view; stacking five of them reads as five competing
+    // calls to action, so the repeated one takes the chip pair instead. Both
+    // colour pairs it can show are already token-audited for every surface:
+    // chip-fg/chip-bg and chip-fg/btn-hover (contrast-audit
+    // COMPONENT_PAIR_SPEC), so this adds no new colour role.
+    // border-color collapses into the fill like every Soft Fill control
+    // (COMPONENTS.md §9.1 law 1).
+    rule(".btn.tonal", [
+      ["background", `var(--${ns}-chip-bg)`],
+      ["border-color", `var(--${ns}-chip-bg)`],
+      ["color", `var(--${ns}-chip-fg)`],
+      ["font-weight", "600"],
+    ]),
+    // `.btn:hover:not(:disabled)` (0,3,0) already wins the background, but it
+    // sets no border-color, so the resting chip-bg frame would survive as a
+    // lighter ring around the hover fill. Restated at (0,4,0).
+    rule(".btn.tonal:hover:not(:disabled)", [
+      ["background", `var(--${ns}-btn-hover)`],
+      ["border-color", `var(--${ns}-btn-hover)`],
+    ], { pairColorWith: ".btn.tonal" }),
+    // Same source-order trap as .btn.ghost above: `.btn.tonal` (0,2,0) is
+    // emitted after `.btn:focus-visible` (0,2,0) and would keep its chip-bg
+    // frame during focus. Decided by specificity, not by file position.
+    rule(".btn.tonal:focus-visible", [["border-color", `var(--${ns}-focus-bd)`]], { pairColorWith: ".btn.tonal" }),
   ];
 }
 
@@ -281,12 +307,19 @@ export const CHIP_TARGETS = [
   // C10: padding-inline 6px->10px (+4px, law 2), radius-full; font-size unchanged
   // from current shipped value (10px) — Appendix C only calls out the padding/height change.
   { ns: "opt", selector: ".tag-gov-kind-badge", radius: "full", pressable: false, padH: 10, fontSize: "11px" }, // 11px = the cross-surface text floor (COMPONENTS.md §10.3 textFloor)
+  // Tag governance's tag chips (2026-09 review-queue redesign). `selectable`:
+  // the chip is the FACE of a visually hidden radio/checkbox
+  // (<label class="tag-gov-chip"><input><span class="tag-gov-chip-face">), so
+  // it rests NEUTRAL and only takes the chip pair when its input is checked --
+  // a row of tags where every one is accent-tinted has no selected state left
+  // to show. Geometry is the family's: 2px/10px, 14px line box, radius-full.
+  { ns: "opt", selector: ".tag-gov-chip-face", radius: "full", pressable: false, selectable: true, padH: 10, fontSize: "12px" },
 ];
 
 function chipRules(ns) {
   const out = [];
   for (const target of CHIP_TARGETS.filter(t => t.ns === ns)) {
-    const { selector, radius, pressable, padH, fontSize } = target;
+    const { selector, radius, pressable, selectable, padH, fontSize } = target;
     const decls = [
       ["display", "inline-flex"],
       ["align-items", "center"],
@@ -300,8 +333,11 @@ function chipRules(ns) {
     decls.push(
       ["line-height", `${CHIP_GEOM.lineHeight}px`],
       ["border-radius", `var(--${ns}-radius-${radius})`],
-      ["background", `var(--${ns}-chip-bg)`],
-      ["color", `var(--${ns}-chip-fg)`],
+      // A selectable chip rests neutral: the panel with a trace of its own fg
+      // mixed in, so it separates from the surface the same way a Soft Fill
+      // control does, and `color` stays the surface fg it was mixed from.
+      ["background", selectable ? `color-mix(in srgb, var(--${ns}-fg) 7%, var(--${ns}-panel))` : `var(--${ns}-chip-bg)`],
+      ["color", selectable ? `var(--${ns}-fg)` : `var(--${ns}-chip-fg)`],
     );
     out.push(rule(selector, decls));
     if (pressable) {
@@ -313,6 +349,28 @@ function chipRules(ns) {
       out.push(rule(`${selector}[aria-pressed]:focus-visible`, [
         ["outline", "none"],
         ["border-color", `var(--${ns}-focus-bd)`],
+        ["box-shadow", `var(--${ns}-focus-ring)`],
+      ]));
+    }
+    if (selectable) {
+      out.push(rule(`input:hover:not(:disabled) + ${selector}`, [
+        ["background", `color-mix(in srgb, var(--${ns}-fg) 11%, var(--${ns}-panel))`],
+      ], { pairColorWith: selector }));
+      // The hover rule above is (0,3,1); a bare `input:checked + face` is only
+      // (0,2,1) and would LOSE to it, flashing a checked chip back to neutral
+      // under the pointer. The second selector restates the checked look at
+      // (0,4,1) so specificity decides it, not source order (§8.6 "别赌源序").
+      out.push(rule(`input:checked + ${selector}, input:checked:hover:not(:disabled) + ${selector}`, [
+        ["background", `var(--${ns}-chip-bg)`],
+        ["color", `var(--${ns}-chip-fg)`],
+        ["font-weight", "600"],
+      ]));
+      // §7.3 `borderless` placement, same as the .fg checkbox: the chip paints
+      // no frame, so a 1px accent core carries legibility and the token glow
+      // carries the family resemblance.
+      out.push(rule(`input:focus-visible + ${selector}`, [
+        ["outline", `1px solid var(--${ns}-accent)`],
+        ["outline-offset", "2px"],
         ["box-shadow", `var(--${ns}-focus-ring)`],
       ]));
     }

@@ -142,6 +142,11 @@ YaHei/PingFang 时行盒比 Latin 高一截，同一颗按钮在 zh-CN 和 en �
 `<a class="btn">` 与 `<button class="btn">` 自动同形。`gap: 4px` 由此接管图标与文字的间距，
 `.btn-ic` 不再需要 `margin-right`（§2）。
 
+**tonal chrome**（2026-09）——列表里**重复出现**的肯定动作（标签治理每行的「合并为 …」）。实心 accent 主按钮每视图至多一个；
+同一动作在列表里叠五次会读成五个互相竞争的号召，所以重复项改吃 chip 对：`background/border-color: --{ns}-chip-bg`、
+`color: --{ns}-chip-fg`、600。hover 走 `--{ns}-btn-hover`。两组配对（chip-fg/chip-bg、chip-fg/btn-hover）都已在
+contrast-audit 的 `COMPONENT_PAIR_SPEC` 里逐表面审计，不新增颜色角色。与 rung 正交：`.btn.btn-sm.tonal` 合法。
+
 ### 1.3 消费 token 对
 
 | 属性 | token | 派生要求 |
@@ -467,6 +472,13 @@ quiet 档在 popup 目前只有 `.del-btn` 一个消费者。
 
 方角 chip（`radius-sm`，如 `.vocab-stat-chip`）沿用同一 padding-block（≥2px）与 line-height，
 只换 `border-radius`；定律 2 不适用。
+
+**可选中 chip（`selectable`）**——chip 是一颗视觉隐藏的 radio / checkbox 的**面**：
+`<label class="tag-gov-chip"><input type="radio|checkbox"><span class="tag-gov-chip-face">…</span></label>`。
+静息为**中性**填充（`color-mix(fg 7%, panel)` + `color: fg`），只有 `input:checked + face` 才吃 chip 对——
+一排全是 accent 色的标签就没有「选中」可表达了。input 绝对定位、`opacity: 0` 盖在面上（不是 `display: none`：
+要保键盘与读屏语义），焦点走 §7.3 `borderless`（1px accent 核 + token 光晕），挂在 `input:focus-visible + face`。
+几何仍是本族三定律；≥24px 命中区由外层 `label` 的 padding 提供，不加高 chip 面。**不用 `:has()`。**
 
 ### 5.3 消费 token 对
 

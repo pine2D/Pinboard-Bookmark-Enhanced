@@ -286,6 +286,19 @@ a:hover { text-decoration: underline; }
 .btn.ghost:focus-visible {
   border-color: var(--pp-focus-bd);
 }
+.btn.tonal {
+  background: var(--pp-chip-bg);
+  border-color: var(--pp-chip-bg);
+  color: var(--pp-chip-fg);
+  font-weight: 600;
+}
+.btn.tonal:hover:not(:disabled) {
+  background: var(--pp-btn-hover);
+  border-color: var(--pp-btn-hover);
+}
+.btn.tonal:focus-visible {
+  border-color: var(--pp-focus-bd);
+}
 
 .btn-ic {
   display: inline-flex;

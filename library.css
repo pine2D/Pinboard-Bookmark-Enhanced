@@ -233,6 +233,19 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
 .btn.ghost:focus-visible {
   border-color: var(--lib-focus-bd);
 }
+.btn.tonal {
+  background: var(--lib-chip-bg);
+  border-color: var(--lib-chip-bg);
+  color: var(--lib-chip-fg);
+  font-weight: 600;
+}
+.btn.tonal:hover:not(:disabled) {
+  background: var(--lib-btn-hover);
+  border-color: var(--lib-btn-hover);
+}
+.btn.tonal:focus-visible {
+  border-color: var(--lib-focus-bd);
+}
 
 .btn-ic {
   display: inline-flex;
