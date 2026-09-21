@@ -1033,6 +1033,98 @@ function pbpSyncTagGovDeleteBtnState() {
   btn.disabled = !document.querySelector(".tag-gov-lowcount-checkbox:checked");
 }
 
+// One tag rendered as a selectable chip: a real radio/checkbox, visually hidden
+// under its face (COMPONENTS.md §5.2 `selectable`). The input stays the single
+// source of truth -- every reader of the old markup (`:checked` lookups, shift
+// ranges, the queued-row freeze that disables `button, input`) keeps working.
+// The face MUST be the input's next sibling: the checked / hover / focus looks
+// are all `input:… + .tag-gov-chip-face`.
+function pbpBuildTagGovChip({ type, name, value, count = null, checked = false, className = "" }) {
+  const label = document.createElement("label");
+  label.className = "tag-gov-chip";
+  const input = document.createElement("input");
+  input.type = type;
+  if (name) input.name = name;
+  if (className) input.className = className;
+  input.value = value;
+  input.defaultChecked = checked;
+  const face = document.createElement("span");
+  face.className = "tag-gov-chip-face";
+  const tick = document.createElement("span");
+  tick.className = "tag-gov-chip-tick";
+  tick.setAttribute("aria-hidden", "true");
+  tick.innerHTML = PBP_ICONS.check;   // static registry string, not user data
+  const text = document.createElement("span");
+  text.textContent = value;
+  face.append(tick, text);
+  if (count !== null) {
+    const n = document.createElement("span");
+    n.className = "tag-gov-chip-count";
+    n.textContent = String(count);
+    face.appendChild(n);
+  }
+  label.append(input, face);
+  return label;
+}
+
+// One similar-tag group as a review-queue row: kind (plain text) | member chips
+// | merge (tonal, names the tag that survives) + ignore (ghost). Pure DOM, no
+// storage and no auth -- renderTagGov supplies the callbacks, so this is what
+// the tests build directly.
+function pbpBuildTagGovGroupRow(group, { onMerge, onIgnore }) {
+  const row = document.createElement("div");
+  row.className = "tag-gov-group-row";
+
+  const kind = document.createElement("span");
+  kind.className = "tag-gov-kind" + (group.kind === "ai" ? " is-ai" : "");
+  kind.textContent = t(group.kind === "plural" ? "tagGovKindPlural"
+    : group.kind === "separator" ? "tagGovKindSeparator"
+    : group.kind === "typo" ? "tagGovKindTypo"
+    : "tagGovKindAi");
+  row.appendChild(kind);
+
+  const chips = document.createElement("div");
+  chips.className = "tag-gov-chipset";
+  chips.setAttribute("role", "radiogroup");
+  chips.setAttribute("aria-label", t("tagGovKeepGroupAria"));
+  for (const member of group.members) {
+    chips.appendChild(pbpBuildTagGovChip({
+      type: "radio", name: "group-" + group.id, value: member.tag, count: member.count,
+      checked: member.tag === group.suggestedCanonical,
+    }));
+  }
+  row.appendChild(chips);
+
+  const canonical = () => {
+    const selected = row.querySelector('input[type="radio"]:checked');
+    return selected ? selected.value : group.suggestedCanonical;
+  };
+  const actions = document.createElement("div");
+  actions.className = "fg-actions tag-gov-actions";
+  const mergeBtn = document.createElement("button");
+  mergeBtn.type = "button";
+  mergeBtn.className = "btn btn-sm tonal";
+  const syncLabel = () => { mergeBtn.textContent = t("tagGovMergeInto", canonical()); };
+  syncLabel();
+  chips.addEventListener("change", syncLabel);
+  mergeBtn.addEventListener("click", () => onMerge(canonical(), mergeBtn));
+  const ignoreBtn = document.createElement("button");
+  ignoreBtn.type = "button";
+  ignoreBtn.className = "btn btn-sm ghost";
+  ignoreBtn.textContent = t("tagGovIgnore");
+  ignoreBtn.addEventListener("click", () => onIgnore());
+  actions.append(mergeBtn, ignoreBtn);
+  row.appendChild(actions);
+
+  if (group.kind === "ai" && group.reason) {
+    const reason = document.createElement("div");
+    reason.className = "tag-gov-reason";
+    reason.textContent = group.reason;
+    row.appendChild(reason);
+  }
+  return row;
+}
+
 let _tagGovVisibleAccount = "";
 
 // Enable decorative transitions only after the initial page has painted.
@@ -4830,65 +4922,15 @@ async function renderTagGov() {
 
   const frag = document.createDocumentFragment();
   for (const group of allGroups) {
-    const row = document.createElement("div");
-    row.className = "tag-gov-group-row";
-
-    const badge = document.createElement("span");
-    badge.className = "tag-gov-kind-badge";
-    const kindKey = group.kind === "plural" ? "tagGovKindPlural"
-      : group.kind === "separator" ? "tagGovKindSeparator"
-      : group.kind === "typo" ? "tagGovKindTypo"
-      : "tagGovKindAi";
-    badge.textContent = t(kindKey);
-    row.appendChild(badge);
-
-    const membersList = document.createElement("div");
-    membersList.className = "tag-gov-members";
-    for (const member of group.members) {
-      const label = document.createElement("label");
-      const radio = document.createElement("input");
-      radio.type = "radio";
-      radio.name = "group-" + group.id;
-      radio.value = member.tag;
-      radio.defaultChecked = (member.tag === group.suggestedCanonical);
-      label.appendChild(radio);
-      const text = document.createElement("span");
-      text.textContent = " " + member.tag + " (" + member.count + ")";
-      label.appendChild(text);
-      membersList.appendChild(label);
-    }
-    row.appendChild(membersList);
-
-    if (group.kind === "ai" && group.reason) {
-      const reason = document.createElement("small");
-      reason.className = "tag-gov-reason";
-      reason.textContent = group.reason;
-      row.appendChild(reason);
-    }
-
-    const btnGroup = document.createElement("div");
-    btnGroup.className = "fg-actions tag-gov-actions";
-
-    const mergeBtn = document.createElement("button");
-    mergeBtn.className = "btn btn-sm";
-    mergeBtn.textContent = t("tagGovMerge");
-    mergeBtn.addEventListener("click", () => {
-      const selected = row.querySelector("input[type=\"radio\"]:checked");
-      const canonical = selected ? selected.value : group.suggestedCanonical;
-      if (typeof confirmMergeGroup === "function") confirmMergeGroup(group, canonical, mergeBtn, auth.account);
+    const row = pbpBuildTagGovGroupRow(group, {
+      onMerge: (canonical, mergeBtn) => {
+        if (typeof confirmMergeGroup === "function") confirmMergeGroup(group, canonical, mergeBtn, auth.account);
+      },
+      onIgnore: async () => {
+        await _tagGovIgnoreGroup(auth.account, group.id);
+        if (await getTagGovAuth(auth.account)) await renderTagGov();
+      },
     });
-    btnGroup.appendChild(mergeBtn);
-
-    const ignoreBtn = document.createElement("button");
-    ignoreBtn.className = "btn btn-sm";
-    ignoreBtn.textContent = t("tagGovIgnore");
-    ignoreBtn.addEventListener("click", async () => {
-      await _tagGovIgnoreGroup(auth.account, group.id);
-      if (await getTagGovAuth(auth.account)) await renderTagGov();
-    });
-    btnGroup.appendChild(ignoreBtn);
-
-    row.appendChild(btnGroup);
     frag.appendChild(row);
 
     // Re-freeze rows whose tags belong to a queued/RUNNING op — a user-triggered

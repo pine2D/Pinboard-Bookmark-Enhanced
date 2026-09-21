@@ -2281,6 +2281,11 @@
   "tagGovMerge": {
     "message": "合并"
   },
+  "tagGovMergeInto": {
+    "message": "合并为 $TAG$",
+    "placeholders": { "tag": { "content": "$1" } }
+  },
+  "tagGovKeepGroupAria": { "message": "要保留的标签" },
   "tagGovIgnore": {
     "message": "忽略"
   },

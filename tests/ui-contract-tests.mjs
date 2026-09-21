@@ -3851,7 +3851,7 @@ check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code
 // and 9 of 13 pilots declare tag-bg as the literal CSS keyword
 // "transparent" -- shipping `--lib-chip-bg: transparent;` straight into the
 // generated region, which made .vocab-group-chip (and options'
-// .tag-gov-kind-badge, same derivation) render with NO pill background at
+// .tag-gov-chip-face, same derivation) render with NO pill background at
 // all in those themes (dracula caught live: floating text, no pill).
 // contrast-audit.mjs's chip-fg-vs-chip-bg pair can't catch a regression back
 // to this shape -- it treats a non-hex chip-bg as "composite onto panel"

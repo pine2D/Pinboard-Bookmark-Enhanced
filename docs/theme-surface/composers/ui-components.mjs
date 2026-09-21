@@ -304,9 +304,6 @@ export const CHIP_TARGETS = [
   // C9: padding 2px 8px (not 10 — Appendix C gives this target 8px specifically),
   // radius-sm, aria-pressed toggle; font-size unchanged from current shipped value (12px).
   { ns: "lib", selector: ".vocab-stat-chip", radius: "sm", pressable: true, padH: 8, fontSize: "12px" },
-  // C10: padding-inline 6px->10px (+4px, law 2), radius-full; font-size unchanged
-  // from current shipped value (10px) — Appendix C only calls out the padding/height change.
-  { ns: "opt", selector: ".tag-gov-kind-badge", radius: "full", pressable: false, padH: 10, fontSize: "11px" }, // 11px = the cross-surface text floor (COMPONENTS.md §10.3 textFloor)
   // Tag governance's tag chips (2026-09 review-queue redesign). `selectable`:
   // the chip is the FACE of a visually hidden radio/checkbox
   // (<label class="tag-gov-chip"><input><span class="tag-gov-chip-face">), so

@@ -107,7 +107,7 @@ export function resolveOpaqueBg(raw, fallbackBg) {
 // verbatim (mixing in 0% of a fully-transparent color) -- correct for its
 // other callers (a border/spinner compositing onto whatever sits behind it),
 // but wrong for chip-bg specifically: chip-bg IS the fill of a real pill
-// (.vocab-group-chip / .tag-gov-kind-badge), and a pill whose background
+// (.vocab-group-chip / .tag-gov-chip-face), and a pill whose background
 // exactly equals its own container is exactly as invisible as the literal
 // `transparent` it would replace (vocab-group-inspect-report.md 2026-08-05
 // Finding 2: dracula's .vocab-group-chip rendered with zero pill background,

@@ -34,11 +34,16 @@ for(let i=0;i<12;i++){
 }
 list.appendChild(table);
 
-// Build similar-group cards like renderTagGov does (only the outer card class matters here).
+// Build similar-group rows like renderTagGov does (real child structure, since
+// the queue tests below probe the row's own box, not just its outer class).
 const groups=document.getElementById("tag-gov-groups");
 for(let i=0;i<4;i++){
   const row=document.createElement("div");row.className="tag-gov-group-row";
-  row.textContent="group "+i;groups.appendChild(row);
+  const kind=document.createElement("span");kind.className="tag-gov-kind";kind.textContent="kind";
+  const chips=document.createElement("div");chips.className="tag-gov-chipset";
+  const acts=document.createElement("div");acts.className="fg-actions tag-gov-actions";
+  const b=document.createElement("button");b.className="btn btn-sm tonal";b.textContent="Merge into tag"+i;acts.appendChild(b);
+  row.append(kind,chips,acts);groups.appendChild(row);
 }
 // A non-card child (like renderTagGov's empty-state ".fg" message) must span all columns.
 const groupsEmptyProbe=document.createElement("div");
@@ -72,11 +77,25 @@ test("low-count label disables text selection", () => {
   const us = cs.userSelect || cs.webkitUserSelect;
   if (us !== "none") throw new Error("expected user-select:none, got " + us);
 });
-test("similar-group container is a multi-column grid", () => {
-  const n = trackCount(groups);
-  // 650px fixture, minmax(280px,1fr) + 8px col-gap => exactly 2 tracks
-  // (2*280+8=568<=650; 3*280+16=856>650).
-  if (n < 2) throw new Error("expected >=2 grid tracks at 650px, got " + n);
+test("similar-group container is a single-column queue", () => {
+  const rows = [...groups.querySelectorAll(".tag-gov-group-row")];
+  const lefts = new Set(rows.map(r => Math.round(r.getBoundingClientRect().left)));
+  if (lefts.size !== 1) throw new Error("rows must share one left edge (one column), got " + [...lefts].join(","));
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i].getBoundingClientRect().top <= rows[i - 1].getBoundingClientRect().top)
+      throw new Error("row " + i + " does not sit below row " + (i - 1));
+  }
+});
+test("queue rows draw no separator lines (Soft Fill law 4) and inset their hover band (law 3)", () => {
+  const row = groups.querySelector(".tag-gov-group-row");
+  const cs = getComputedStyle(row);
+  for (const side of ["Top", "Bottom"]) {
+    const w = parseFloat(cs["border" + side + "Width"]);
+    if (w !== 0) throw new Error("row border-" + side.toLowerCase() + " must be 0, got " + w);
+  }
+  if (parseFloat(cs.borderTopLeftRadius) <= 0) throw new Error("hover band needs a radius > 0");
+  const inset = row.getBoundingClientRect().left - groups.getBoundingClientRect().left;
+  if (inset < 4) throw new Error("band must sit >=4px inside the queue frame, got " + inset);
 });
 test("non-card child spans the full grid width", () => {
   // A single 280px-min column is ~321px at 650px; a full-span child must be much wider.

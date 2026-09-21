@@ -1,5 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Options Usability Tests</title>
+<link rel="stylesheet" href="../options.css">
 <style>body{font-family:monospace;padding:16px}.case{padding:5px}.pass{color:#176}.fail{color:#b00}</style>
 </head><body>
 <div class="options-search" role="search">
@@ -9,7 +10,7 @@
 </div>
 <button class="tab-btn" data-panel="general">General</button>
 <button class="tab-btn" data-panel="ai">AI Providers</button>
-<div id="panel-general" class="panel">
+<div id="panel-general" class="panel active">
   <h2>Pinboard Account</h2>
   <div class="fg"><label for="secret-token">API Token</label><input id="secret-token" value="alice:TOP_SECRET" /></div>
   <p class="hint">Use Chrome Sync on this device</p>
@@ -47,7 +48,7 @@
   <div class="fg"><label for="long-hint-input">Zzqx probe</label><input id="long-hint-input" />
     <p class="hint">Zzqx truncation probe sentence written deliberately long enough to run past the label budget so the search result has to be shortened before it is painted.</p></div>
 </div>
-<div id="panel-ai" class="panel">
+<div id="panel-ai" class="panel active">
   <h2>AI Provider</h2>
   <div class="fg"><label for="model-name">Model name</label><input id="model-name" value="private-model" /></div>
 </div>
@@ -59,7 +60,7 @@
      deliberately hidden as well, so a fallback target that does not skip
      [hidden] would hand the jump another box-less element. -->
 <button class="tab-btn" data-panel="providers">Providers</button>
-<div id="panel-providers" class="panel">
+<div id="panel-providers" class="panel active">
   <button type="button" id="pf-hidden-first" hidden>Hidden first action</button>
   <div class="fg"><label for="pf-select">Wqzz provider</label>
     <select id="pf-select"><option>Wqzz Alpha</option></select></div>
@@ -714,6 +715,46 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       else if (originalDescriptor) Object.defineProperty(navigator, "storage", originalDescriptor);
       else delete navigator.storage;
     }
+  });
+
+  await test("tag-gov group row: chips carry the radios, the merge label names the kept tag", async () => {
+    const group = { id: "web-dev|web_dev|webdev", kind: "separator", suggestedCanonical: "web-dev",
+      members: [{ tag: "webdev", count: 12 }, { tag: "web_dev", count: 2 }, { tag: "web-dev", count: 40 }] };
+    const calls = [];
+    const row = pbpBuildTagGovGroupRow(group, {
+      onMerge: (canonical, btn) => calls.push(["merge", canonical, btn.tagName]),
+      onIgnore: () => calls.push(["ignore"]),
+    });
+    assert(row.classList.contains("tag-gov-group-row"), "row class");
+    assert(!row.querySelector(".tag-gov-kind-badge"), "kind is plain text now, the badge chip is retired");
+    assert(row.querySelector(".tag-gov-kind").textContent === "tagGovKindSeparator", "kind label");
+    const radios = [...row.querySelectorAll('input[type="radio"]')];
+    assert(radios.length === 3, "one radio per member, got " + radios.length);
+    assert(radios.every(r => r.name === "group-" + group.id), "radios share the group name");
+    assert(radios.every(r => r.closest("label.tag-gov-chip") && r.nextElementSibling.classList.contains("tag-gov-chip-face")),
+      "every radio sits in a chip label directly before its face (input:checked + face needs adjacency)");
+    assert(radios.find(r => r.checked).value === "web-dev", "suggested canonical pre-checked");
+    assert(row.querySelector('[role="radiogroup"]').getAttribute("aria-label") === "tagGovKeepGroupAria", "radiogroup labelled");
+    const merge = row.querySelector(".btn.btn-sm.tonal");
+    assert(merge && merge.textContent === "tagGovMergeInto:web-dev", "merge label names the kept tag, got " + merge?.textContent);
+    radios[0].checked = true;
+    radios[0].dispatchEvent(new Event("change", { bubbles: true }));
+    assert(merge.textContent === "tagGovMergeInto:webdev", "label follows the selection, got " + merge.textContent);
+    merge.click();
+    row.querySelector(".btn.btn-sm.ghost").click();
+    assert(JSON.stringify(calls) === JSON.stringify([["merge", "webdev", "BUTTON"], ["ignore"]]), "callbacks: " + JSON.stringify(calls));
+  });
+
+  await test("tag-gov group row: an AI group shows its reason upright, never italic", async () => {
+    const row = pbpBuildTagGovGroupRow({ id: "ml|machine-learning", kind: "ai", suggestedCanonical: "machine-learning",
+      reason: "缩写与全称同义", members: [{ tag: "ml", count: 5 }, { tag: "machine-learning", count: 33 }] },
+      { onMerge() {}, onIgnore() {} });
+    document.body.appendChild(row);
+    const reason = row.querySelector(".tag-gov-reason");
+    assert(reason && reason.textContent === "缩写与全称同义", "reason rendered");
+    assert(getComputedStyle(reason).fontStyle === "normal", "CJK has no true italic; got " + getComputedStyle(reason).fontStyle);
+    assert(row.querySelector(".tag-gov-kind").classList.contains("is-ai"), "AI kind flagged for its colour");
+    row.remove();
   });
 
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";

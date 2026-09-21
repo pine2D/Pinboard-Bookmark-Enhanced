@@ -1867,11 +1867,11 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // Task 14 edit briefly introduced: clicking #tab-appearance for the
     // preset-preview group after already clicking #tab-tags for the
     // tag-gov group left options on the WRONG tab by the time
-    // .tag-gov-kind-badge's checks ran in that shared loop, reporting it as
+    // .tag-gov-chip-face's checks ran in that shared loop, reporting it as
     // zero-size across all 16 themes). Each group's checks now run
     // immediately after its own setup click, before the next group touches
     // the tab strip.
-    const tagGovChecks = checks.filter((c) => c.selector === ".tag-gov-kind-badge");
+    const tagGovChecks = checks.filter((c) => c.selector.includes(".tag-gov-"));
     // presetRowChecks (design-uplift, preset-row redesign, 2026-08-04):
     // .theme-preset-btn.active only exists once SOME preset is selected --
     // reuses the exact same "click flexoki on the appearance tab" step
@@ -1896,12 +1896,12 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c));
     if (tagGovChecks.length) {
-      // .tag-gov-kind-badge lives on the "tags" tab (#panel-tags), not
+      // .tag-gov-chip-face lives on the "tags" tab (#panel-tags), not
       // #panel-general (the default active one on a bare goto()) -- its
       // panel is `display:none` until #tab-tags is clicked, which is what
       // renderTagGov()'s init actually hangs off of.
       await page.click("#tab-tags");
-      await page.waitForSelector(".tag-gov-kind-badge", { timeout: TIMEOUT_MS });
+      await page.waitForSelector(".tag-gov-chip-face", { timeout: TIMEOUT_MS });
       for (const check of tagGovChecks) await runOneCheck(page, theme, check, results);
     }
     if (presetPreviewChecks.length || presetRowChecks.length || savedThemeChecks.length) {
@@ -3295,7 +3295,7 @@ async function main() {
 
   // Tag governance reads a LOCAL cache (options.js's renderTagGov ->
   // chrome.storage.local.cached_user_tags), never a live tags/get fetch on
-  // render -- so a plural pair here reaches .tag-gov-kind-badge with no
+  // render -- so a plural pair here reaches .tag-gov-chip-face with no
   // network mocking needed. book/books is tag-gov.js's own simplest
   // heuristic case (_pluralizeCandidates: base + "s", base.length >= 3).
   await sw.evaluate((account) => chrome.storage.local.set({

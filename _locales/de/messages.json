@@ -2281,6 +2281,11 @@
   "tagGovMerge": {
     "message": "Zusammenführen"
   },
+  "tagGovMergeInto": {
+    "message": "In $TAG$ zusammenführen",
+    "placeholders": { "tag": { "content": "$1" } }
+  },
+  "tagGovKeepGroupAria": { "message": "Beizubehaltendes Tag" },
   "tagGovIgnore": {
     "message": "Ignorieren"
   },

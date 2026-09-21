@@ -726,16 +726,6 @@ html[data-theme] .opt-error {
   box-shadow: inset 0 0 0 1px var(--opt-on-danger);
 }
 
-.tag-gov-kind-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--opt-sp-1) 10px;
-  font-size: 11px;
-  line-height: 14px;
-  border-radius: var(--opt-radius-full);
-  background: var(--opt-chip-bg);
-  color: var(--opt-chip-fg);
-}
 .tag-gov-chip-face {
   display: inline-flex;
   align-items: center;
@@ -2411,70 +2401,93 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   vertical-align: middle;
 }
 
-/* ---- Tag Governance UI (T3) ---- */
+/* ---- Tag Governance UI: review queue (2026-09). One column -- this is a
+   triage list worked top to bottom, and the old two-column card grid left a
+   hole under the shorter column and made the eye zig-zag. Soft Fill law 4:
+   the frame is hairline, rows are separated by spacing only; law 3: the hover
+   band is inset (sp-2 of queue padding) and rounded, never touching the frame's
+   corners. ---- */
 #tag-gov-groups {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  gap: var(--opt-sp-1);
+  padding: var(--opt-sp-2);
   margin-bottom: var(--opt-rhythm);
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--opt-sp-4);
-  align-items: start;        /* each card hugs its own height; no stretch to row max */
-}
-.tag-gov-group-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--opt-sp-3);
-  padding: var(--opt-sp-5);
-  background: var(--opt-panel);
   border: 1px solid var(--opt-border-section);
-  border-radius: var(--opt-radius-sm);
-  margin-bottom: 0;          /* grid gap now owns vertical spacing */
+  border-radius: var(--opt-radius-md);
 }
-#tag-gov-groups > :not(.tag-gov-group-row) {
-  grid-column: 1 / -1;       /* empty-state / non-card messages span the full grid width */
-}
-/* Geometry/color (padding/line-height/radius/background/color) now come from
-   @generated:ui-components above (COMPONENTS.md §5, Appendix C10) -- but its
-   `display: inline-flex` gets blockified here: this badge is a flex ITEM of
-   `.tag-gov-group-row` (display:flex; flex-direction:column), and flex items
-   are always block-level regardless of their own inline-flex/inline-block
-   display value (CSS Display §2.7). Column direction's cross axis is width,
-   and the default `align-items: stretch` on the container stretches every
-   block-level child to fill it -- a real regression this task caught
-   (Playwright-measured: 33px -> 270px) when `width: fit-content` (the thing
-   actually preventing the stretch, not the display value) got dropped along
-   with the rest of the pre-uplift hand-written rule. font-weight is still
-   the one declaration the chip family recipe itself doesn't cover. */
-.tag-gov-kind-badge { width: fit-content; font-weight: bold; }
-.tag-gov-members {
-  display: flex;
-  flex-direction: column;
-  gap: var(--opt-sp-2);
-  margin-left: var(--opt-sp-4);
-}
-.tag-gov-members label {
-  display: flex;
+#tag-gov-groups:empty { display: none; }   /* signed out: no frame around nothing */
+.tag-gov-group-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--opt-sp-3);
-  font-size: 12px;
+  gap: var(--opt-sp-2) var(--opt-sp-5);
+  padding: var(--opt-sp-2) var(--opt-sp-4);
+  border-radius: var(--opt-radius-md);
+  transition: background var(--motion-state);
 }
-.tag-gov-members input[type="radio"] {
+.tag-gov-group-row:hover { background: color-mix(in srgb, var(--opt-fg) 4%, var(--opt-panel)); }
+#tag-gov-groups > :not(.tag-gov-group-row) {
+  padding: var(--opt-sp-4);  /* empty-state message sits inside the same frame */
+  margin-bottom: 0;
+}
+.tag-gov-kind { font-size: 12px; color: var(--opt-fg-muted); }
+.tag-gov-chipset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--opt-sp-1) var(--opt-sp-3);
+  min-width: 0;
+}
+/* The label supplies the >=24px hit area around the 18px face. `padding: 3px 0`
+   (18 + 3 + 3 = 24) is off the --opt-sp-N scale, so the spacingScale render-audit
+   rejects it -- use the sp-1 rung plus an explicit min-height for the same 24px
+   instead (ui-primitives.md: a chip's own vertical inset is component geometry,
+   but the scan still wants it on-scale where a token rung reaches the target). */
+.tag-gov-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: var(--opt-sp-1) 0;
+  cursor: pointer;
+  user-select: none;         /* shift-clicking a range must not select text */
+}
+.tag-gov-chip > input {
+  position: absolute;
+  inset: 0;
   margin: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: inherit;
+}
+.tag-gov-chip > input:disabled { cursor: not-allowed; }
+.tag-gov-chip-face { gap: var(--opt-sp-2); overflow-wrap: anywhere; }
+.tag-gov-chip-tick { display: none; }
+.tag-gov-chip-tick svg { display: block; width: 11px; height: 11px; }
+.tag-gov-chip > input:checked + .tag-gov-chip-face > .tag-gov-chip-tick { display: inline-flex; }
+/* color: inherit, not fg-muted -- fg-muted on the chip face's tinted panel is
+   not an audited pair (render-audit caught it under 4.5:1 in several themes),
+   and the count is already visually secondary from its 11px size alone. */
+.tag-gov-chip-count {
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
 }
 .tag-gov-reason {
+  grid-column: 2 / -1;
   font-size: 11px;
-  color: var(--opt-fg-muted);
-  display: block;
-  margin-left: var(--opt-sp-4);
-  font-style: italic;
+  color: var(--opt-fg-muted);   /* upright: CJK has no true italic */
 }
-/* The row itself is a .fg-actions (options.js adds both classes): one
-   button-row gap for the page. This class only keeps the indent and the
-   popover anchor. It carried its own flex + 6px gap until the actionRowGap
-   scan (2026-09-05) flagged it as the page's one 6px button row. */
-.tag-gov-actions {
-  margin-left: var(--opt-sp-4);
-}
+/* .fg-actions (added alongside by options.js) owns the 8px button-row gap.
+   This class keeps only the popover anchor. */
 .tag-gov-actions button { position: relative; }
+.tag-gov-actions { margin: 0; }
+@media (max-width: 720px) {
+  .tag-gov-group-row { grid-template-columns: minmax(0, 1fr); }
+  .tag-gov-reason { grid-column: 1; }
+}
 .tag-gov-lowcount-table {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -2560,6 +2573,7 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
   opacity: 0.65;
 }
 .tag-gov-queued-note {
+  grid-column: 2 / -1;
   font-size: 11px;
   color: var(--opt-fg-muted);
   margin-left: var(--opt-sp-3);

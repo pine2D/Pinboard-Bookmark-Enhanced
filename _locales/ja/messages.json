@@ -2281,6 +2281,11 @@
   "tagGovMerge": {
     "message": "マージ"
   },
+  "tagGovMergeInto": {
+    "message": "$TAG$ に統合",
+    "placeholders": { "tag": { "content": "$1" } }
+  },
+  "tagGovKeepGroupAria": { "message": "残すタグ" },
   "tagGovIgnore": {
     "message": "無視"
   },

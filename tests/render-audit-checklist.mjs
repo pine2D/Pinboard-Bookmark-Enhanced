@@ -529,16 +529,27 @@ export const CHECKS = [
   // pill -- both pill laws violated (COMPONENTS.md §5.1, §5.4). ----
   { surface: "library", page: "library.html", selector: ".vocab-group-chip", state: "default",
     expect: { textContrast: 4.5, padGteRadiusH: true, padVMin: 2 } },
-  // ---- defect 3 (2nd instance, options side): the chip family's options
-  // target (.tag-gov-kind-badge, Appendix C10) had ZERO render-audit
-  // coverage at all -- a real fix-round regression (width stretched to its
-  // flex-column parent's full width, see widthLtParent's doc comment above)
-  // shipped and no automated check saw it. Needs the "tags" tab active AND
-  // a seeded plural tag pair (book/books) before a group -- and its badge --
-  // exists to probe; see runSimpleTheme's options-specific branch and the
-  // cached_user_tags seed in main(). ----
-  { surface: "options", page: "options.html", selector: ".tag-gov-kind-badge", state: "default",
-    expect: { textContrast: 4.5, padGteRadiusH: true, padVMin: 2, widthLtParent: true } },
+  // ---- options' chip-family target (COMPONENTS.md §5.2 `selectable`). The
+  // review-queue redesign (2026-09) retired .tag-gov-kind-badge -- the kind is
+  // plain text now -- and the tags themselves became the chips. Needs the
+  // "tags" tab active AND a seeded plural pair (book/books) before a group
+  // row exists to probe; see runSimpleTheme's options-specific branch and the
+  // cached_user_tags seed in main(). Two rows because the two looks consume
+  // DIFFERENT colour pairs: resting is fg on a fg-tinted panel (not a token
+  // pair, so only this oracle sees it), checked is chip-fg/chip-bg. ----
+  { surface: "options", page: "options.html", selector: ".tag-gov-chip > input:not(:checked) + .tag-gov-chip-face", state: "default",
+    expect: { textContrast: 4.5, padGteRadiusH: true, padVMin: 2 } },
+  { surface: "options", page: "options.html", selector: ".tag-gov-chip > input:checked + .tag-gov-chip-face", state: "default",
+    expect: { textContrast: 4.5, padGteRadiusH: true, padVMin: 2 } },
+  // The unchecked count is fg-muted on that same tinted panel -- the one text
+  // in the row whose pair no token audit covers.
+  { surface: "options", page: "options.html", selector: ".tag-gov-chip > input:not(:checked) + .tag-gov-chip-face > .tag-gov-chip-count", state: "default",
+    expect: { textContrast: 4.5 } },
+  // Tonal merge button: chip-fg/chip-bg at rest, chip-fg/btn-hover on hover.
+  { surface: "options", page: "options.html", selector: ".tag-gov-group-row .btn.tonal", state: "default",
+    expect: { textContrast: 4.5 } },
+  { surface: "options", page: "options.html", selector: ".tag-gov-group-row .btn.tonal", state: "hover",
+    expect: { textContrast: 4.5 } },
 
   // ---- defect 5 (2nd instance): .btn-ic in library only has 4 container-
   // scoped equivalents; every other host (incl. .vocab-detail-speak) falls

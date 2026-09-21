@@ -1187,7 +1187,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
       （(0,1,1)，与 §6 form family 给 pp 发射的同一条选择器同特异性，排在生成区插入点之后——
       源顺序赢，配方打开后手写这条成死代码）、`options.css:1729` `.tag-gov-kind-badge { ... }`
       （C10 的目标选择器本体，Task 9 打开 options 的 chip family 后同理须删，否则配方的
-      `padding: 2px 10px` 赢不过它）。
+      `padding: 2px 10px` 赢不过它——**已删除（2026-09 审阅队列改版，见 C10）**）。
 - [ ] **更高特异性的 `html[data-theme]` 覆盖块**是否已在发射的同一 commit 里删除：
       `options.css:1325/1326/1359`（`.btn` 的 background/border-color/**color**、hover、focus outline-color，
       §1.3 有表）、`options.css:1187-1196`（`.fg` 字段的三色与 hover 边框，§6.2 有表）。
@@ -1244,7 +1244,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | C7 | `.btn-ic`（lib） | 仅 4 处容器限定规则 | 全局基础规则 + 宿主 `gap: 4px` | 详情面板按钮的图标**从基线对齐变为居中对齐**（缺陷 5 核销）；四条窄例外删除 | 本战役 |
 | C8 | `.vocab-group-chip`（lib） | `padding: 0 4px` + `radius-full`，字号继承、高度由行盒自撑（≈13–14px） | `padding: 2px 10px` + `line-height: 14px`，高 18px | 文字不再贴边（缺陷 3 核销）；高 +4~5px。字号仍继承容器，本规范只钉 line-height | 本战役 |
 | C9 | `.vocab-stat-chip`（lib） | `padding: 1px 8px`，无 `line-height` | `padding: 2px 8px` + `line-height: 14px` | 高 18→20px（定律 3 + 行盒钉死） | 本战役 |
-| C10 | `.tag-gov-kind-badge`（opt） | `padding: 2px 6px` + `radius-full`，高 ≈16px、有效半径 ≈8px | `padding: 2px 10px` + `line-height: 14px` | 水平内边距 +4px（定律 2：6px < 8px 现状违规）、高 +2px | 本战役 |
+| C10 | `.tag-gov-kind-badge`（opt） | `padding: 2px 6px` + `radius-full`，高 ≈16px、有效半径 ≈8px | `padding: 2px 10px` + `line-height: 14px` | 水平内边距 +4px（定律 2：6px < 8px 现状违规）、高 +2px | 本战役；**已退役（2026-09 审阅队列改版）**：类型改为 muted 文字，options 的 chip 目标换成 `.tag-gov-chip-face`（§5.2 selectable） |
 | C11 | `.tag-item`（pp） | `padding: 1px 8px` / `line-height: 18px`，有效半径 10px | `padding: 2px 10px` / `line-height: 14px` | 标签 chip 高 −2px、水平 +2px（定律 2、3 现状均违规） | **记账**：popup 本战役以颜色补课为主；由 Task 9 判定是否属「小幅修正」范围，不做则留在本表 |
 | C12 | `.btn.danger`（opt + lib） | `color: var(--{ns}-danger)` | `color: var(--{ns}-danger-quiet-fg)` | 红色前景被推到对 btn-bg / bg / panel 三背景达标，个别主题下红色会略偏 | 本战役 |
 | C13 | 详情面板删除钮（lib） | `.btn.btn-sm.danger`（常亮红字红边） | 追加 `ghost` chrome | **两半均已交付（Task 10，一次 fix round 后）**：`library-vocab.js:513`/`library-notes.js:405` 的 `class` 追加 `ghost`（`#vocab-batch-delete`/`library.html:122` 不在 §4.5 点名范围内，**保持 quiet 非 ghost** 不动）；`.btn.danger` 同时接住 quiet 前景 token。**geometry/chrome 也变了**：静息态背景/边框归零，按钮从"带底带边的红色药丸"变成正文里一段红色文字+图标，14 套预设下**全部**可见变化（与颜色是否恰好在 AA 派生下改变无关，chrome 移除本身就是可见变化）；`.notes-detail-delete.is-error` 的失败标记（`box-shadow: inset 0 0 0 1px`）在透明底上实测仍清晰可辨（真机截图核验，见 task-10-report.md） | 本战役 |

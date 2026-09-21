@@ -1306,11 +1306,6 @@
     },
     {
       "surface": "options",
-      "token": "tag-gov-members",
-      "structural": true
-    },
-    {
-      "surface": "options",
       "token": "tag-gov-problem-kind",
       "structural": false
     },
