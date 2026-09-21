@@ -2289,6 +2289,10 @@
   "tagGovIgnore": {
     "message": "忽略"
   },
+  "tagGovIgnoredCount": {
+    "message": "已忽略 $N$ 組",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "tagGovResetIgnored": {
     "message": "重設忽略清單"
   },

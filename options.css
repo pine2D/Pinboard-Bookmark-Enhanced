@@ -2401,6 +2401,19 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   vertical-align: middle;
 }
 
+/* Section title on the left, its tools on the right. The title's own block
+   margins would stack on the row, so the row owns them instead. */
+.tag-gov-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--opt-sp-2) var(--opt-sp-4);
+  margin: var(--opt-sp-4) 0 var(--opt-sp-2);
+}
+.tag-gov-head > .section-title { margin: 0; }
+.tag-gov-head > .fg-actions { margin: 0; }
+
 /* ---- Tag Governance UI: review queue (2026-09). One column -- this is a
    triage list worked top to bottom, and the old two-column card grid left a
    hole under the shorter column and made the eye zig-zag. Soft Fill law 4:
@@ -2593,16 +2606,12 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
 .tag-gov-problem-kind.bad {
   color: var(--opt-danger);
 }
-.tag-gov-warns {
-  margin-top: var(--opt-sp-5);
-}
 .tag-gov-delete-btn {
   margin-top: var(--opt-sp-4);
   position: relative;
 }
 .tag-gov-reset-link {
   position: relative;
-  font-size: 11px; /* <small> would fall to 10.83px (UA `smaller`); 11px is the text floor (textFloor) */
 }
 
 /* ---- Vocabulary settings disclosures (hand-maintained): the Drive sync /

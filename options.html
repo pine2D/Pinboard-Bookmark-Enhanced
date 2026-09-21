@@ -967,24 +967,22 @@
 
     <!-- Tab: Tags -->
     <div id="panel-tags" class="panel" role="tabpanel" aria-labelledby="tab-tags">
-      <h2 class="section-title" data-i18n="secPinboardTagPages">Pinboard.in Tag Pages</h2>
-      <div class="fg"><label><input type="checkbox" id="opt-tag-sort-by-pop" checked /> <span data-i18n="optTagSortByPop">Add a popularity sort control on tag pages</span></label></div>
-
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="tagGovGroupsTitle">Similar Tag Groups</h2>
-      <div class="fg" id="tag-gov-overview">
-        <span>…</span>
-        <button class="btn btn-sm" id="tag-gov-refresh" data-i18n="tagGovRefresh">Refresh</button>
-      </div>
-      <p class="hint hint-warn tag-gov-warns" data-i18n="tagGovIrreversibleWarn">Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change, for manual reference only.</p>
-      <div id="tag-gov-groups"></div>
-      <div class="fg">
+      <!-- Governance first: it is what this tab is for. The pinboard.in sort
+           option is a one-checkbox setting and sits at the end. -->
+      <div class="tag-gov-head">
+        <h2 class="section-title" data-i18n="tagGovGroupsTitle">Similar Tag Groups</h2>
         <div class="fg-actions">
-          <button class="btn btn-sm" id="tag-gov-ai-btn" data-i18n="tagGovAiBtn">AI deep analysis</button>
-          <small class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored" data-i18n="tagGovResetIgnored">Reset ignored list</a></small>
+          <button class="btn btn-sm" id="tag-gov-ai-btn" type="button"><span class="btn-ic" data-ic="robot"></span><span data-i18n="tagGovAiBtn">AI deep analysis</span></button>
+          <button class="btn btn-sm ghost" id="tag-gov-refresh" type="button"><span class="btn-ic" data-ic="refresh"></span><span data-i18n="tagGovRefresh">Refresh</span></button>
         </div>
-        <div id="tag-gov-ai-status" class="hint"></div>
       </div>
+      <p class="hint" id="tag-gov-overview">
+        <span id="tag-gov-stats">…</span><span id="tag-gov-ignored" hidden> · <span id="tag-gov-ignored-count"></span> ·
+        <span class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored" data-i18n="tagGovResetIgnored">Reset ignored list</a></span></span>
+      </p>
+      <p class="hint" data-i18n="tagGovIrreversibleWarn">Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change, for manual reference only.</p>
+      <div id="tag-gov-ai-status" class="hint"></div>
+      <div id="tag-gov-groups"></div>
       <!-- No <h2> above this disclosure: its own <summary> is the section
            header (the .disclosure primitive: section-title face + chevron; its
            own top rule replaces a .divider). The heading used to be spelled
@@ -1011,6 +1009,10 @@
         </div>
       </div>
       <div id="tag-gov-problems" class="hidden"></div>
+
+      <div class="divider"></div>
+      <h2 class="section-title" data-i18n="secPinboardTagPages">Pinboard.in Tag Pages</h2>
+      <div class="fg"><label><input type="checkbox" id="opt-tag-sort-by-pop" checked /> <span data-i18n="optTagSortByPop">Add a popularity sort control on tag pages</span></label></div>
       <p class="hint" id="tag-gov-bundles-warn" data-i18n="tagGovBundlesWarn">Tag bundles on pinboard.in are not updated by renames; review them manually after merging.</p>
     </div>
 

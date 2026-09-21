@@ -2289,6 +2289,10 @@
   "tagGovIgnore": {
     "message": "Ignorieren"
   },
+  "tagGovIgnoredCount": {
+    "message": "Ignoriert: $N$",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "tagGovResetIgnored": {
     "message": "Ignorierte zurücksetzen"
   },

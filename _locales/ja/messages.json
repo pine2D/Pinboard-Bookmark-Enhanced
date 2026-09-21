@@ -2289,6 +2289,10 @@
   "tagGovIgnore": {
     "message": "無視"
   },
+  "tagGovIgnoredCount": {
+    "message": "無視中: $N$ 件",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "tagGovResetIgnored": {
     "message": "無視をリセット"
   },

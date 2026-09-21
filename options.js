@@ -1225,8 +1225,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // loadTagCounts failed (no token yet, offline), the gated binding left a dead
     // Refresh button and no recovery short of a full page reload (_tagGovInited
     // never resets). Static #tag-gov-refresh from options.html (data-i18n
-    // localized); updateTagGovOverview preserves it across re-renders.
-    const refreshBtn = overview ? overview.querySelector("#tag-gov-refresh") : null;
+    // localized).
+    const refreshBtn = $id("tag-gov-refresh");
     if (refreshBtn) refreshBtn.addEventListener("click", async () => {
       refreshBtn.disabled = true;
       const auth = await getTagGovAuth();
@@ -3860,6 +3860,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function runTagGovAi(sNow) {
     const btn = $id("tag-gov-ai-btn");
+    // The button carries a leading .btn-ic icon span; write the label text into
+    // its own inner span (not btn.textContent) so the running/retry states don't
+    // wipe the icon.
+    const btnLabel = btn?.querySelector("[data-i18n]");
     const statusEl = $id("tag-gov-ai-status");
     if (!hasAIKey(sNow)) {
       if (statusEl) {
@@ -3874,7 +3878,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     let grantRetry = false;
     btn.disabled = true;
-    btn.textContent = t("tagGovAiRunning");
+    if (btnLabel) btnLabel.textContent = t("tagGovAiRunning");
     if (statusEl) { statusEl.textContent = ""; statusEl.classList.remove("ok", "bad"); }
 
     try {
@@ -3917,7 +3921,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } finally {
       btn.disabled = false;
-      btn.textContent = grantRetry ? t("aiGrantRetry") : t("tagGovAiBtn");
+      if (btnLabel) btnLabel.textContent = grantRetry ? t("aiGrantRetry") : t("tagGovAiBtn");
     }
   }
 
@@ -3925,7 +3929,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     tagGovAiPendingSettings = null;
     const btn = $id("tag-gov-ai-btn");
     const statusEl = $id("tag-gov-ai-status");
-    if (btn && !btn.disabled) btn.textContent = t("tagGovAiBtn");
+    if (btn && !btn.disabled) {
+      const btnLabel = btn.querySelector("[data-i18n]");
+      if (btnLabel) btnLabel.textContent = t("tagGovAiBtn");
+    }
     if (statusEl) { statusEl.textContent = ""; statusEl.classList.remove("ok", "bad"); }
   });
 
@@ -3968,19 +3975,25 @@ const TAG_GOV_LIST_RETRY_WAIT_MS = 60000; // posts/all has its own documented on
 // Rebuild the tag-overview line (tag count + total uses). Top level, NOT inside the
 // DOMContentLoaded closure: runTagGovOps calls it after every batch (a closure-scoped
 // version threw "updateTagGovOverview is not defined" there, killing the post-batch
-// re-render). Preserves the #tag-gov-refresh button across replaceChildren — query it
-// live from the container instead of $id, whose memoized cache could hold a stale node.
+// re-render). Only writes #tag-gov-stats' text; the ignored tail and reset link that
+// share the overview line are static DOM and must not be blown away by a whole-row
+// rebuild.
 function updateTagGovOverview(counts) {
-  const overview = $id("tag-gov-overview");
-  if (!counts || !overview) return;
+  const stats = $id("tag-gov-stats");
+  if (!counts || !stats) return;
   const tagCount = Object.keys(counts).length;
   const totalUses = Object.values(counts).reduce((a, b) => a + b, 0);
-  const refreshBtn = overview.querySelector("#tag-gov-refresh");
-  overview.replaceChildren();
-  const span = document.createElement("span");
-  span.textContent = t("tagGovOverview", String(tagCount), String(totalUses));
-  overview.appendChild(span);
-  if (refreshBtn) overview.appendChild(refreshBtn);
+  stats.textContent = t("tagGovOverview", String(tagCount), String(totalUses));
+}
+
+// The "· Ignored: N · Reset ignored list" tail of the overview line. Hidden at
+// zero: a reset link with nothing to reset is a dead control.
+function pbpSetTagGovIgnoredCount(n) {
+  const wrap = $id("tag-gov-ignored");
+  if (!wrap) return;
+  wrap.hidden = !(n > 0);
+  const count = $id("tag-gov-ignored-count");
+  if (count) count.textContent = n > 0 ? t("tagGovIgnoredCount", String(n)) : "";
 }
 
 // Pinboard username (token prefix), stashed by getTagGovToken for building
@@ -3989,16 +4002,10 @@ let _tagGovUser = "";
 
 // Loading tag counts failed (no token / offline / API error): say so in the
 // overview line instead of leaving the unfilled "$TAGS$ tags" template visible.
-// Preserves the Refresh button the same way updateTagGovOverview does.
+// Only writes #tag-gov-stats' text, same as updateTagGovOverview.
 function _tagGovShowLoadFailed() {
-  const overview = $id("tag-gov-overview");
-  if (!overview) return;
-  const refreshBtn = overview.querySelector("#tag-gov-refresh");
-  overview.replaceChildren();
-  const span = document.createElement("span");
-  span.textContent = t("tagGovLoadFailed");
-  overview.appendChild(span);
-  if (refreshBtn) overview.appendChild(refreshBtn);
+  const stats = $id("tag-gov-stats");
+  if (stats) stats.textContent = t("tagGovLoadFailed");
 }
 
 // Shared token reader for tag-governance operations.
@@ -4866,7 +4873,7 @@ async function renderTagGov() {
   const container = $id("tag-gov-groups");
   if (!container) return;
   const auth = await getTagGovAuth();
-  if (!auth) { container.replaceChildren(); return; }
+  if (!auth) { pbpSetTagGovIgnoredCount(0); container.replaceChildren(); return; }
 
   // Do NOT empty the container before the awaits below: a paint during the async gap
   // collapses the panel height, Chrome clamps the scroll offset, and the page visibly
@@ -4878,6 +4885,7 @@ async function renderTagGov() {
   const tagCounts = _tagGovOwned(stored.cached_user_tags, auth.account)?.counts;
 
   if (!tagCounts) {
+    pbpSetTagGovIgnoredCount(0);
     const empty = document.createElement("div");
     empty.className = "fg";
     empty.textContent = t("tagGovNoGroups");
@@ -4886,6 +4894,7 @@ async function renderTagGov() {
   }
 
   const ignoredList = _tagGovOwned(stored[ignoredKey], auth.account)?.ids || [];
+  pbpSetTagGovIgnoredCount(ignoredList.length);
   // AI groups are a stored snapshot and never expire on their own. After a merge the
   // heuristic groups self-heal (rebuilt from fresh counts) but stale AI groups would
   // keep showing vanished members — worse, an AI group whose canonical was itself

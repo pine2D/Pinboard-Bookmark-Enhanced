@@ -105,6 +105,13 @@
 <!-- Tag-governance low-count list, outside every .panel so it stays out of the
      settings-search index. -->
 <div id="tag-gov-lowcount-list"></div>
+<!-- Tag-governance overview line head skeleton: stats text + the ignored tail
+     (hidden at zero) + the reset link, outside every .panel like the fixtures
+     above so it stays visible under .panel{display:none}. -->
+<div id="tag-gov-overview">
+  <span id="tag-gov-stats"></span><span id="tag-gov-ignored" hidden> · <span id="tag-gov-ignored-count"></span> ·
+  <span class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored">Reset ignored list</a></span></span>
+</div>
 <!-- A hard-coded jump target with no layout box, outside every .panel so it
      stays out of the settings-search index. Stands in for the connection
      overview's "vocab-drive-connect", which is `hidden` exactly when the Drive
@@ -754,6 +761,24 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(reason && reason.textContent === "缩写与全称同义", "reason rendered");
     assert(getComputedStyle(reason).fontStyle === "normal", "CJK has no true italic; got " + getComputedStyle(reason).fontStyle);
     row.remove();
+  });
+
+  await test("tag-gov overview: stats text is replaced in place, the ignored tail survives", async () => {
+    updateTagGovOverview({ a: 2, b: 3 });
+    assert(document.getElementById("tag-gov-stats").textContent === "tagGovOverview:2:5", "stats");
+    assert(document.getElementById("tag-gov-reset-ignored"), "overview re-render must not drop the reset link");
+    _tagGovShowLoadFailed();
+    assert(document.getElementById("tag-gov-stats").textContent === "tagGovLoadFailed", "load-failed text");
+    assert(document.getElementById("tag-gov-reset-ignored"), "load-failed re-render must not drop the reset link either");
+  });
+
+  await test("tag-gov overview: the ignored tail shows only when something is ignored", async () => {
+    const wrap = document.getElementById("tag-gov-ignored");
+    pbpSetTagGovIgnoredCount(0);
+    assert(wrap.hidden === true, "hidden at 0");
+    pbpSetTagGovIgnoredCount(3);
+    assert(wrap.hidden === false, "shown at 3");
+    assert(document.getElementById("tag-gov-ignored-count").textContent === "tagGovIgnoredCount:3", "count text");
   });
 
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";
