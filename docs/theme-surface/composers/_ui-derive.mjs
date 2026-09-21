@@ -350,8 +350,9 @@ export function focusBdToAA(accent, seedBg, hosts, min = 3) {
 // control's boundary against its background, a job the focus ring and the
 // hover fill still do at full strength. This is the much weaker "the resting
 // shape is perceivable at all" bar: on white, a 1-step-per-channel difference
-// is ~1.005:1 (invisible), 1.10:1 is ~11 steps, which is where a flat fill
-// starts reading as a distinct plane rather than as banding.
+// is ~1.005:1 (invisible), 1.10:1 is 12 steps (contrast() first clears it
+// at #f3f3f3 on a #ffffff surface) -- where a flat fill starts reading as a
+// distinct plane rather than as banding.
 //
 // Mixes into the FILL, not into the surface, so a theme whose fill already
 // carries its own tint keeps that hue and only gains separation (mixing into

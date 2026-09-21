@@ -10,6 +10,7 @@ import {
   finalizeUiControlRoles,
   hexToRgb,
   primaryHoverFill,
+  PRIMARY_HOVER_FG_MIX,
   relLum,
   resolveOpaqueBg,
   rgbToHex,
@@ -184,9 +185,36 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     "explicit min argument overrides the default floor");
 }
 
+// --- fillSeparate: the DARK mirror (M5, batch2 final-fix wave) -- every
+// case above is a light surface; a dark panel/bg with a light fg exercises
+// the OTHER branch of fillSeparate's bgIsLight-equivalent direction check
+// (it moves toward fg regardless of surface polarity, so on a dark surface
+// that means LIGHTENING, not darkening). ---
+{
+  const darkFg = hexToRgb("#e5e5f0"), darkPanel = hexToRgb("#1c2128"), darkBg = hexToRgb("#161a20");
+  const roundedD = (c) => hexToRgb(rgbToHex(c));
+  // 1. clears EVERY host, measured on the hex-rounded value that actually ships
+  const startFill = hexToRgb("#1c2128");                  // == darkPanel, contrast 1.00 -> must separate
+  const outD = fillSeparate(startFill, [darkPanel, darkBg], darkFg);
+  for (const host of [darkPanel, darkBg]) {
+    check(contrast(roundedD(outD), host) >= FILL_SEPARATE_MIN,
+      `dark-surface separated fill must clear ${FILL_SEPARATE_MIN} vs every host`);
+  }
+  // 2. identity when the pair already clears
+  const farD = hexToRgb("#3a3a44");
+  check(JSON.stringify(fillSeparate(farD, [darkPanel, darkBg], darkFg)) === JSON.stringify(farD),
+    "already-separated dark-surface fill is returned untouched");
+  // 3. it moves toward fg -- on a DARK surface with a LIGHT fg that means it
+  // LIGHTENS, the mirror image of the light-surface case's "darkens, never
+  // lightens" assertion above.
+  check(relLum(roundedD(outD)) >= relLum(startFill),
+    "on a dark surface the fill lightens toward fg, never darkens");
+}
+
 // --- fillDistinct: two control TIERS must be tellable apart (COMPONENTS.md §1.2 tonal / §5 selectable) ---
 {
   check(TIER_DISTINCT_MIN_DE === 6, "the tier-distinctness floor is ΔE 6, contrast-audit's own STATE_DELTA_MIN_DE yardstick");
+  check(PRIMARY_HOVER_FG_MIX === 0.12, "the .btn.primary:hover fg-mix fraction is 0.12 -- shared by ui-components.mjs's color-mix(...) and contrast-audit's on-accent-vs-primary-hover gate; a drift here would desync all three");
   const accent = hexToRgb("#89b4fa");
   const same = hexToRgb("#45475a");                       // catppuccin-mocha: chip-bg === btn-bg, ΔE 0
   const out = fillDistinct(same, [same], accent);
