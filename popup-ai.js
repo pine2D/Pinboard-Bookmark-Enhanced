@@ -1357,10 +1357,15 @@ function renderAITags(tags, fromCache) {
 
   if (fromCache) {
     const cachedTagSet = new Set(tags.map(t => t.toLowerCase()));
+    // No inline display/margin-left here (T5 fix round F2, dropped): #ai-
+    // suggest-tags is a flex row (popup.css chip-flow rule), which blockifies
+    // every child regardless of its own `display` -- an explicit
+    // `inline-block` was already inert -- and the container's own `gap`
+    // already spaces this wrap from `.add-all-link` the same way it spaces
+    // every other chip; the old literal 8px margin stacked on top of that
+    // gap (12px total) instead of sharing it.
     const hintWrap = document.createElement("span");
     hintWrap.className = "cache-hint-wrap";
-    hintWrap.style.display = "inline-block";
-    hintWrap.style.marginLeft = "8px";
 
     const cachedSpan = document.createElement("span");
     cachedSpan.className = "cache-hint";

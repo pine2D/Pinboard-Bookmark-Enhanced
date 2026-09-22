@@ -649,7 +649,6 @@ html[data-section="login"] .quick-actions { display: none !important; }
   align-items: center;
   gap: var(--pp-sp-3);
   padding: 3px var(--pp-sp-4) 3px var(--pp-sp-3);
-  margin-right: var(--pp-sp-2);
   font-size: 11px;
   line-height: 14px; /* 3 + 14 + 3 = the 20px sm rung exactly; `normal` measured 19.1px, 0.1px from falling off it and drift-prone */
   font-family: inherit;
@@ -765,7 +764,14 @@ html[data-section="login"] .quick-actions { display: none !important; }
 /* Tag suggestion skeleton — opacity pulse on solid divider color. Gentler than the
    previous horizontal shimmer (which had a 14-unit luminance jump that read as harsh
    on dark backgrounds). var(--pp-divider) is theme-aware: every preset defines it. */
-.tag-skel { display: inline-block; height: 18px; margin: 0 var(--pp-sp-2) var(--pp-sp-1) 0; border-radius: var(--pp-radius-lg); background: var(--pp-divider); animation: tagSkelPulse 1.6s ease-in-out infinite; vertical-align: middle; }
+/* No margin (T5 fix round F3): .tag-skel now always renders inside a
+   .suggest-group (popup.html), whose flex `gap` owns chip-to-chip AND
+   wrapped-row spacing -- the old right/bottom margin double-counted against
+   that gap (measured live: 4px margin-right + 4px gap = 8px between
+   same-row bars; 2px margin-bottom + 4px row-gap = 6px between wrapped
+   rows), the same double-count shape as .preset-btn's and .group-label's
+   dropped margins above. */
+.tag-skel { display: inline-block; height: 18px; border-radius: var(--pp-radius-lg); background: var(--pp-divider); animation: tagSkelPulse 1.6s ease-in-out infinite; vertical-align: middle; }
 @keyframes tagSkelPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 /* Button-as-link reset: applied when these link-styled classes wrap a <button>
    (so middle-click/Cmd+click don't try to navigate to "#"). */
@@ -971,18 +977,24 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 
 .suggest-area { word-wrap: break-word; overflow-wrap: break-word; }
 .suggest-area.muted { padding-top: var(--pp-sp-1); }
-/* Chip flow (D6/D7, taste-uplift batch3 Task 5): the row that actually holds
-   .stag chips. #pinboard-suggest-tags wraps its chips in a .suggest-group per
-   label (popular/recommended); #ai-suggest-tags has no such wrapper -- its
-   chips sit directly under the .suggest-area div (popup-ai.js renderAITags)
-   -- so both are listed here. `gap` now owns chip-to-chip AND wrapped-row
+/* Chip flow (D6/D7, taste-uplift batch3 Task 5; T5 fix round F1/F3/F4):
+   the row that actually holds .stag/.preset-btn chips. #pinboard-suggest-tags
+   wraps its chips (and, while loading, its four .tag-skel bars -- same
+   primitive, same rhythm, see popup.html) in a .suggest-group per label
+   (popular/recommended); #ai-suggest-tags and #tag-presets have no such
+   wrapper -- their chips sit directly under the .suggest-area div
+   (popup-ai.js renderAITags / popup-batch.js setupTagPresets) -- so all
+   three are listed here. `gap` now owns chip-to-chip AND wrapped-row
    spacing (replaces the old line-height:1.9 on .suggest-area above, which
    was compensating for .stag's height when it was plain inline text, not a
-   chip with its own padding/line-height). */
-.suggest-group, #ai-suggest-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pp-sp-2); }
+   chip with its own padding/line-height) -- items must not carry their own
+   margin against this (the container owns spacing; .preset-btn's old
+   margin-right and .group-label's old margin-right both double-counted
+   against this gap and were dropped). */
+.suggest-group, #ai-suggest-tags, #tag-presets { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pp-sp-2); }
 .suggest-group { margin-bottom: var(--pp-sp-1); }
 .suggest-group:last-child { margin-bottom: 0; }
-.group-label { font-size: 11px; color: var(--pp-fg-hint); font-weight: 400; margin-right: var(--pp-sp-2); }
+.group-label { font-size: 11px; color: var(--pp-fg-hint); font-weight: 400; }
 /* Geometry/fill/text (display, padding, font-size, line-height, radius,
    background, color) now come from the chip recipe (ui-components.mjs
    CHIP_TARGETS, popup-only entry) -- this hand region only adds what the
@@ -1766,6 +1778,17 @@ html[data-theme] .batch-progress-text {
   text-align: center;
 }
 .empty-state svg { width: 28px; height: 28px; opacity: 0.5; }
+/* #ai-suggest-tags is unconditionally `display:flex` now (chip-flow rule
+   above) and also hosts the parked #ai-tags-btn (popup.html) -- without this,
+   the empty state (popup-ai.js _aiAppendEmptyState, every renderAITags([]))
+   became a shrink-to-fit flex item sitting BESIDE the button instead of the
+   full-width block it was before flex landed (T5 fix round F2). `flex: 1 0
+   100%` forces it onto its own wrapped row, restoring that block layout
+   without touching #ai-suggest-tags itself (which must stay a plain flex row
+   for the chip case). Scoped to this one consumer: the OTHER .empty-state
+   (popup.js recent-bookmarks list) sits in a non-flex container and needs no
+   override. */
+#ai-suggest-tags .empty-state { flex: 1 0 100%; }
 
 /* ===================== AI Progress (B3) ===================== */
 .action-link .ai-progress-label {
