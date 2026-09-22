@@ -215,6 +215,17 @@
 //                      assert the number itself (COMPONENTS.md §5.1's 18px
 //                      chip rung, "no border" case), not just its two law
 //                      components.
+//   widthPx        -- { max, tolerancePx=0.5 }: getBoundingClientRect().width
+//                      <= max + tolerancePx. A CEILING, not heightPx's target
+//                      value -- `max-width` never forces a field wider than
+//                      its container, so the same field legitimately renders
+//                      narrower than `max` on a viewport too small for the
+//                      cap to engage; asserting |diff| <= tolerance would
+//                      wrongly fail that case. Options field-width-by-kind
+//                      (T6, taste-uplift-batch3, D2, COMPONENTS.md §6): one
+//                      representative id per content kind (select/key-wrap/
+//                      .fg-url/plain-text/number), each pinned to that
+//                      kind's ceiling from ui-components.mjs's formRules().
 //   fontSizePx     -- { value, tolerancePx=0.5 }: |computed font-size (px) -
 //                      value| <= tolerancePx. For a typography rule with no
 //                      geometry law of its own, e.g. `.stag-num`'s pinned
@@ -1399,6 +1410,54 @@ export const CHECKS = [
   // uses it to assert "no filled shell".
   { surface: "popup", page: "popup.html", selector: ".stag", state: "classState", addClass: ["used"],
     expect: { backgroundAlphaMax: 0, colorEqVar: "fg-hint", textDecorationLineContains: "line-through" } },
+
+  // ---- options field width by content kind (T6, taste-uplift-batch3, D2,
+  // COMPONENTS.md §6). Before this batch every `.fg` text/password/number/
+  // select field was a flat `width: 100%` -- at the >=1040px viewport this
+  // audit runs at, that measured 790px for a plain `.fg` field and 764px
+  // inside a provider `.pf` card (Step 0 measurement, task report), i.e. a
+  // one-word select or a three-digit number field stretched to nearly the
+  // full panel width. ui-components.mjs's formRules() now ADDS a max-width
+  // ceiling per kind on top of the unchanged `width: 100%` (so a narrow
+  // viewport, where the panel column is already under the cap, still gets
+  // the full-width field the base rule always gave it). One representative
+  // id per kind below, each already reachable from a tab this file's own
+  // options branch (scripts/ui-render-audit.mjs) either visits by default
+  // (general) or now switches to for this purpose (ai / ai-behavior).
+  //
+  // select 240: bare `.fg select` matches the FIRST such element in DOM
+  // order, #opt-lang (general tab, active on a bare goto(), no extra setup).
+  { surface: "options", page: "options.html", selector: ".fg select", state: "default",
+    expect: { widthPx: { max: 240 } } },
+  // .key-wrap 420 (password/API-key fields, fused with the eye toggle --
+  // COMPONENTS.md §8 -- the cap sits on the WRAPPER so the toggle stays
+  // fused to the input's own right edge, not the field's full-width box).
+  // Bare `.key-wrap` matches #opt-pinboard-token's wrap (general tab) --
+  // same selector string the two fusedStateStable entries above already use,
+  // so this reuses that group's existing `#tab-general` click rather than
+  // adding a third one.
+  { surface: "options", page: "options.html", selector: ".key-wrap", state: "default",
+    expect: { widthPx: { max: 420 } } },
+  // .fg-url 520 (the three baseurl endpoints) and plain input[type=text] 320
+  // (everything else typed free text) both live on the AI Providers tab;
+  // #opt-openai-baseurl/#opt-openai-model specifically live inside
+  // #fields-openai, which is `hidden` until the provider select is switched
+  // to openai (options.js's updateProviderFields) -- scripts/ui-render-
+  // audit.mjs's aiProviderChecks group does that switch once for both rows.
+  { surface: "options", page: "options.html", selector: "#opt-openai-baseurl", state: "default",
+    expect: { widthPx: { max: 520 } } },
+  { surface: "options", page: "options.html", selector: "#opt-openai-model", state: "default",
+    expect: { widthPx: { max: 320 } } },
+  // input[type=number] 96 (a handful of digits). #opt-ai-cache-duration
+  // lives on the AI Behavior tab; scripts/ui-render-audit.mjs's
+  // aiBehaviorChecks group clicks that tab once for this row. (The OTHER
+  // number field, #opt-popup-width-custom on the Popup tab, is the one this
+  // batch deleted an inline `style="width:80px"` from -- not picked as the
+  // representative here only because #opt-ai-cache-duration needed a new
+  // tab-click group regardless and this campaign didn't want a THIRD one for
+  // the same kind; both get the identical `.fg input[type="number"]` rule.)
+  { surface: "options", page: "options.html", selector: "#opt-ai-cache-duration", state: "default",
+    expect: { widthPx: { max: 96 } } },
 ];
 
 // Hand-copied literal `data-theme` values, verified at authoring time with:

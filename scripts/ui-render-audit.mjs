@@ -826,6 +826,23 @@ function evaluateCheck(check, raw, theme) {
     if (hostZero) out.push(verdict("heightPx", false, null, value, zeroNote));
     else out.push(verdict("heightPx", Math.abs(raw.rect.height - value) <= tolerancePx, round2(raw.rect.height), value));
   }
+  // widthPx (T6, taste-uplift-batch3, D2): a content-kind field's measured
+  // width must not EXCEED its max-width tier (COMPONENTS.md §6, the
+  // composer's new per-kind ui-components.mjs rules) -- unlike heightPx
+  // above (a literal target value, |diff| <= tolerance, since a chip's
+  // height IS its geometry), this is a one-sided ceiling: `max-width` never
+  // forces a field WIDER than its container, so the same field legitimately
+  // renders narrower than `max` on a viewport too small for the cap to even
+  // engage (D2's "still 100% on narrow viewports" requirement) -- FAILing
+  // that would be asserting the wrong thing. No new probe slot needed: it
+  // reads the SAME raw.rect.width heightPx's raw.rect.height sibling
+  // already carries out of probeSelector, so there is no extraBgVarName/
+  // extraColorVarName-shaped ambiguity for this key to guard against.
+  if ("widthPx" in exp) {
+    const { max, tolerancePx = 0.5 } = exp.widthPx;
+    if (hostZero) out.push(verdict("widthPx", false, null, max, zeroNote));
+    else out.push(verdict("widthPx", raw.rect.width <= max + tolerancePx, round2(raw.rect.width), max));
+  }
   if ("fontSizePx" in exp) {
     const { value, tolerancePx = 0.5 } = exp.fontSizePx;
     out.push(verdict("fontSizePx", Math.abs(raw.fontSize - value) <= tolerancePx, round2(raw.fontSize), value));
@@ -2673,8 +2690,20 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // check fails at setup, which is how this was found). Click back
     // explicitly rather than depending on group order.
     const keyWrapChecks = checks.filter((c) => c.selector === ".key-wrap");
+    // T6 field-width checks (taste-uplift-batch3, D2). #opt-openai-baseurl
+    // (.fg-url tier) and #opt-openai-model (plain-text tier) both live in
+    // #fields-openai (#panel-ai), which is `hidden` by default -- the
+    // provider select defaults to gemini (options.js's updateProviderFields)
+    // -- so both need the provider switched to openai before they exist at
+    // all, not just a tab click. #opt-ai-cache-duration (number tier) lives
+    // on the separate #panel-ai-behavior tab, reached with a plain click.
+    // Both run in their OWN groups below (like keyWrapChecks above), not
+    // folded into otherChecks.
+    const aiProviderChecks = checks.filter((c) => c.selector === "#opt-openai-baseurl" || c.selector === "#opt-openai-model");
+    const aiBehaviorChecks = checks.filter((c) => c.selector === "#opt-ai-cache-duration");
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
-      && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c));
+      && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
+      && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c));
     if (tagGovChecks.length) {
       // .tag-gov-chip-face lives on the "tags" tab (#panel-tags), not
       // #panel-general (the default active one on a bare goto()) -- its
@@ -2721,6 +2750,25 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       for (const check of keyWrapChecks) await runOneCheck(page, theme, check, results);
     }
     for (const check of otherChecks) await runOneCheck(page, theme, check, results);
+
+    // T6 field-width groups (taste-uplift-batch3, D2). Run AFTER otherChecks
+    // (not interleaved with the tagGov/presetPreview/keyWrap dance above,
+    // same reasoning presetPreviewChecks/savedThemeChecks already share one
+    // click) -- nothing later in this options branch depends on which tab is
+    // left active, since the weakTextOnFill loop right below does its own
+    // fresh page.goto() before touching anything.
+    if (aiProviderChecks.length) {
+      await page.click("#tab-ai");
+      await page.selectOption("#opt-ai-provider", "openai");
+      await page.waitForSelector("#fields-openai:not([hidden])", { timeout: TIMEOUT_MS });
+      await page.waitForSelector("#fields-openai #opt-openai-baseurl", { state: "visible", timeout: TIMEOUT_MS });
+      for (const check of aiProviderChecks) await runOneCheck(page, theme, check, results);
+    }
+    if (aiBehaviorChecks.length) {
+      await page.click("#tab-ai-behavior");
+      await page.waitForSelector("#opt-ai-cache-duration", { state: "visible", timeout: TIMEOUT_MS });
+      for (const check of aiBehaviorChecks) await runOneCheck(page, theme, check, results);
+    }
 
     // ---- weakTextOnFill (family 13, T5 fix wave F1+F5a): options' own
     // activation loop, run AFTER the CHECKS groups above finish (their own
