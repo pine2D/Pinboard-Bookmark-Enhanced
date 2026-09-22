@@ -1565,8 +1565,8 @@ html[data-theme="flexoki-light"] {
   --opt-tab: #F2F0E5;
   --opt-tab-active: #FFFCF0;
   --opt-fg: #100f0f;
-  --opt-fg-muted: #6a6964;
-  --opt-fg-hint: #6a6964;
+  --opt-fg-muted: #65645f;
+  --opt-fg-hint: #65645f;
   --opt-accent: #205EA6;
   --opt-save: #536907;
   --opt-border: #867f58;

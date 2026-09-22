@@ -1300,6 +1300,29 @@ function auditCssThemes(label, varPrefix, cssPath) {
       if (hintS) { const c = resolveColor(hintS, bg2); if (c) console.log(check(label, theme, `fg-hint vs ${bg2Key}`, cr(c, bg2), 4.5)); }
       if (mutedS) { const c = resolveColor(mutedS, bg2); if (c) console.log(check(label, theme, `fg-muted vs ${bg2Key}`, cr(c, bg2), 4.5)); }
     }
+    // pf-bg / code-bg vs panel (options only, D5 -- weak-text-on-fill batch
+    // T2). emitOpt (options-chrome.mjs) aliases both roles to the SAME
+    // ui.bg2 the `panel`/bg2Key row above measures -- UNLESS a pilot's
+    // `ui.options.<mode>` override moves pf-bg/code-bg independently of
+    // panel, which flexoki's does (light: panel #F2F0E5, pf-bg/code-bg
+    // #E6E4D9). fg-hint/fg-muted's own derivation only ever targets
+    // bg/bg-surface/accent-soft (deriveUiColors, _util.mjs) or, once a pilot
+    // overrides them, whatever hosts THAT override was tuned against -- never
+    // pf-bg/code-bg specifically -- so a value tuned to clear panel at 4.81:1
+    // measured 4.31:1 against pf-bg/code-bg with zero red anywhere in this
+    // file (real consumers: `.pf`/`.hint code` in options.css paint fg-hint/
+    // fg-muted directly on these fills). Options-only: popup/library declare
+    // neither role. Every other current pilot leaves pf-bg/code-bg aliased to
+    // panel/bg2, so this is identity (same value, same ratio already proven
+    // by the row above) on 12/13 of them plus the default surface.
+    if (label === "options") {
+      for (const [fillRole, fillS] of [["pf-bg", grab("pf-bg")], ["code-bg", grab("code-bg")]]) {
+        const fill = fillS && fillS.startsWith("#") ? hexRgb(fillS) : null;
+        if (!fill) continue;
+        if (hintS) { const c = resolveColor(hintS, fill); if (c) console.log(check(label, theme, `fg-hint vs ${fillRole}`, cr(c, fill), 4.5)); }
+        if (mutedS) { const c = resolveColor(mutedS, fill); if (c) console.log(check(label, theme, `fg-muted vs ${fillRole}`, cr(c, fill), 4.5)); }
+      }
+    }
     // ...and on the accent-tinted hover/selected row fill (popup's
     // .ac-item.selected keeps its hint-tier count there; terminal read 3.5:1
     // before the derivation covered it -- Codex 2026-08-26). BLOCKING.
@@ -1524,6 +1547,24 @@ function auditDefaultTextTiers(scope, ns, blockLabel, dict) {
         const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + `${role} vs btn-bg`.padEnd(28) + ` FAIL (--${ns}-btn-bg not declared)`;
         console.log(line);
         violations.push(line);
+      }
+    }
+    // pf-bg / code-bg default-surface counterpart of the themed-block rows
+    // added above (D5, weak-text-on-fill batch T2). options.css's hand-
+    // written :root carries its own pf-bg (#f9f9f6) / code-bg (#f0f0e8)
+    // literals, DISTINCT from --opt-panel (#fff) -- the same panel/pf-bg
+    // split the themed rows guard against, just hand-written here instead of
+    // pilot-driven. Options-only.
+    if (ns === "opt") {
+      for (const fillRole of ["pf-bg", "code-bg"]) {
+        const fillRaw = dict[`${ns}-${fillRole}`];
+        if (!fillRaw || !isHex(fillRaw)) {
+          const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + `${role} vs ${fillRole}`.padEnd(28) + ` FAIL (--${ns}-${fillRole} not declared)`;
+          console.log(line);
+          violations.push(line);
+          continue;
+        }
+        console.log(check(scope, blockLabel, `${role} vs ${fillRole}`, cr(rgb, hexRgb(fillRaw)), 4.5));
       }
     }
   }
