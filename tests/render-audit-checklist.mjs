@@ -205,6 +205,46 @@
 //                      any rendered ring). design-uplift preset-row
 //                      redesign: the 2px accent selection ring that
 //                      replaced the old border-drawn check tick.
+//   heightPx       -- { value, tolerancePx=1 }: |getBoundingClientRect().
+//                      height - value| <= tolerancePx. Added for popup's
+//                      `.stag` chip (D6/D7, Task 5): no prior chip entry
+//                      (.vocab-group-chip, .tag-gov-chip-face) needed a
+//                      literal height, since their rung was already proven
+//                      indirectly via padVMin+padGteRadiusH below -- this is
+//                      the direct form for when the checklist wants to
+//                      assert the number itself (COMPONENTS.md §5.1's 18px
+//                      chip rung, "no border" case), not just its two law
+//                      components.
+//   fontSizePx     -- { value, tolerancePx=0.5 }: |computed font-size (px) -
+//                      value| <= tolerancePx. For a typography rule with no
+//                      geometry law of its own, e.g. `.stag-num`'s pinned
+//                      11px ordinal (D7).
+//   fontVariantNumericContains -- string: computed `font-variant-numeric`
+//                      must contain this token, e.g. "tabular-nums"
+//                      (`.stag-num`, D7 -- keeps 1-9 from jittering the
+//                      chip's width as Alt+N slots reassign).
+//   bgEqVar / colorEqVar -- role name (e.g. "chip-bg"/"chip-fg"/
+//                      "ai-chip-fg"): the element's computed background-
+//                      color / color must equal (±1 per RGB channel,
+//                      browser-rounding headroom only) the ACTIVE theme's
+//                      live `--{ns}-{role}` token, read the same way
+//                      textContrastMulti's extraBgSelectorVar already reads
+//                      a token. bgEqVar shares that same background-role
+//                      slot (no check sets both it and textContrastMulti);
+//                      colorEqVar reads its OWN separate slot, because a
+//                      single check legitimately sets BOTH at once against
+//                      TWO DIFFERENT tokens (`.stag` below: bgEqVar
+//                      "chip-bg" + colorEqVar "chip-fg") -- sharing one slot
+//                      between them was tried first and silently made
+//                      colorEqVar compare against whichever token bgEqVar
+//                      had already claimed (caught live before this shipped).
+//                      Distinct from textContrast: that proves the PAIR clears AA;
+//                      this proves the fill/text is THIS token specifically,
+//                      not a coincidentally-similar colour that happens to
+//                      pass. `.stag`/`.stag.ai` (D6/D7, Task 5) are the first
+//                      consumers -- chip-bg/chip-fg/ai-chip-fg are all
+//                      already contrast-audit-gated token PAIRS, so this
+//                      checks token IDENTITY on top of that, render-side.
 //
 // weakTextOnFill (family 13, weak-text-on-fill batch T5, COMPONENTS.md
 // §9.1 law 8): no CHECKS entries carry this key -- like hitAreaMin (family
@@ -1313,6 +1353,32 @@ export const CHECKS = [
   // pre-ruling geometry, which is the only reason it is worth having.
   { surface: "popup", page: "popup.html", selector: ".qbtn", state: "default",
     expect: { heightEqWith: { selector: "#submit-btn", tolerancePx: 1 } } },
+
+  // ---- popup's suggest/AI tag chips (D6/D7, Task 5, taste-uplift batch3):
+  // .stag joins the chip family (ui-components.mjs CHIP_TARGETS, popup-only
+  // entry) -- geometry per COMPONENTS.md §5.1 (18px, no border -- padV 2 +
+  // line-height 14), colour per §5.3/§9.1 law 8. Requires real chips to
+  // exist: scripts/ui-render-audit.mjs's runSimpleTheme calls
+  // fetchPinboardSuggestTags/renderAITags directly (see that file's comment
+  // for why popup.js's normal boot never reaches them on this fixture) and
+  // unhides #suggest-row before this file's CHECKS loop runs. Bare `.stag`
+  // matches the FIRST rendered chip (popular group's "reading") -- kept in
+  // its REST state on purpose (the seeded `.used` click targets `.last()`).
+  { surface: "popup", page: "popup.html", selector: ".stag", state: "default",
+    expect: { heightPx: { value: 18, tolerancePx: 1 }, padGteRadiusH: true, padVMin: 2,
+      textContrast: 4.5, bgEqVar: "chip-bg", colorEqVar: "chip-fg" } },
+  // .stag.ai: same geometry, but its text is the AI role (Task 4, D9) rather
+  // than the plain chip role -- ai-chip-fg is gated against BOTH chip-bg
+  // (this rest-state row) and btn-hover (contrast-audit's token-level hover
+  // row; not re-proven here since .stag has no dedicated hover recipe of its
+  // own to drive a render-side hover state for -- see popup.css's .stag:hover).
+  { surface: "popup", page: "popup.html", selector: ".stag.ai", state: "default",
+    expect: { textContrast: 4.5, colorEqVar: "ai-chip-fg" } },
+  // .stag-num: the Alt+N ordinal riding the chip. D7 moved it off
+  // fg-hint/opacity onto the chip's own paired text token; tabular-nums is
+  // new (keeps 1-9 from jittering the chip's width as slots reassign).
+  { surface: "popup", page: "popup.html", selector: ".stag .stag-num", state: "default",
+    expect: { fontSizePx: { value: 11 }, fontVariantNumericContains: "tabular-nums", colorEqVar: "chip-fg" } },
 ];
 
 // Hand-copied literal `data-theme` values, verified at authoring time with:

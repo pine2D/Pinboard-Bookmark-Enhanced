@@ -239,10 +239,17 @@ function skip(check, expected, note) { return { check, status: "SKIP", actual: n
 
 // Runs INSIDE the page (Playwright serializes this function's source), so it
 // must be self-contained -- no references to anything outside its own body.
-// `compareSelector` (heightEqWith) and `extraBgVarName` (textContrastMulti)
-// are both optional -- one evaluate() round-trip covers whatever the check
-// needs instead of a second page.evaluate call per check.
-function probeSelector({ selector, compareSelector, extraBgVarName, radiusVarName, childSelectors, focusTargetSelector }) {
+// `compareSelector` (heightEqWith) and `extraBgVarName` (textContrastMulti,
+// bgEqVar) are both optional -- one evaluate() round-trip covers whatever
+// the check needs instead of a second page.evaluate call per check.
+// `extraColorVarName` (colorEqVar, D6/D7 Task 5) is a SEPARATE slot, not
+// reused from extraBgVarName: a single check (popup's `.stag`) legitimately
+// needs both a background-role token (bgEqVar: "chip-bg") AND a DIFFERENT
+// color-role token (colorEqVar: "chip-fg") at once -- sharing one slot
+// between the two silently made colorEqVar compare against whichever token
+// bgEqVar/textContrastMulti had already claimed (caught live: `.stag`'s
+// colorEqVar read chip-BG's value while labelled chip-fg in the verdict).
+function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVarName, radiusVarName, childSelectors, focusTargetSelector }) {
   const el = document.querySelector(selector);
   if (!el) return { found: false };
   const cs = getComputedStyle(el);
@@ -370,6 +377,10 @@ function probeSelector({ selector, compareSelector, extraBgVarName, radiusVarNam
   let extraBgRaw = null;
   if (extraBgVarName) {
     extraBgRaw = getComputedStyle(document.documentElement).getPropertyValue(extraBgVarName).trim() || null;
+  }
+  let extraColorRaw = null;
+  if (extraColorVarName) {
+    extraColorRaw = getComputedStyle(document.documentElement).getPropertyValue(extraColorVarName).trim() || null;
   }
   // Effective hit-area box (COMPONENTS.md §1.5's ::before hit-area expansion
   // recipe, e.g. .row-del-x / #vocab-invert-selection): getBoundingClientRect()
@@ -533,6 +544,7 @@ function probeSelector({ selector, compareSelector, extraBgVarName, radiusVarNam
     svg,
     compareRect,
     extraBgRaw,
+    extraColorRaw,
     textInset,
     containmentChildren,
     // Unconditional (cheap, selector-independent) -- colorSchemeMatchesTheme's
@@ -560,6 +572,16 @@ function probeSelector({ selector, compareSelector, extraBgVarName, radiusVarNam
     radiusVarPx: radiusVarName ? (parseFloat(getComputedStyle(document.documentElement).getPropertyValue(radiusVarName)) || 0) : null,
     borderBottomColor: cs.borderBottomColor,
     borderBottomWidth: parseFloat(cs.borderBottomWidth) || 0,
+    // heightPx / fontSizePx / fontVariantNumericContains (D6/D7, Task 5,
+    // taste-uplift batch3): the chip family has no literal geometry/
+    // typography assertion anywhere in this evaluator today -- every prior
+    // chip entry (.vocab-group-chip, .tag-gov-chip-face) proves its rung
+    // only indirectly via padVMin+padGteRadiusH. .stag-num's tabular-nums
+    // and .stag's exact 18px chip-rung height have no such proxy, so these
+    // two cheap, selector-independent fields are captured unconditionally
+    // for every check to read.
+    fontSize: parseFloat(cs.fontSize) || 0,
+    fontVariantNumeric: cs.fontVariantNumeric,
   };
 }
 
@@ -787,6 +809,54 @@ function evaluateCheck(check, raw, theme) {
       const diff = Math.abs(raw.rect.height - raw.compareRect.height);
       out.push(verdict("heightEqWith", diff <= tolerancePx, round2(diff), tolerancePx));
     }
+  }
+  // heightPx / fontSizePx / fontVariantNumericContains (D6/D7, Task 5,
+  // taste-uplift batch3): literal geometry/typography assertions -- no
+  // existing chip check needed one (.vocab-group-chip/.tag-gov-chip-face
+  // only prove their rung indirectly via padVMin+padGteRadiusH below), but
+  // COMPONENTS.md §5.1's "18px, no border" chip rung and .stag-num's
+  // tabular-nums have no such proxy.
+  if ("heightPx" in exp) {
+    const { value, tolerancePx = 1 } = exp.heightPx;
+    if (hostZero) out.push(verdict("heightPx", false, null, value, zeroNote));
+    else out.push(verdict("heightPx", Math.abs(raw.rect.height - value) <= tolerancePx, round2(raw.rect.height), value));
+  }
+  if ("fontSizePx" in exp) {
+    const { value, tolerancePx = 0.5 } = exp.fontSizePx;
+    out.push(verdict("fontSizePx", Math.abs(raw.fontSize - value) <= tolerancePx, round2(raw.fontSize), value));
+  }
+  if ("fontVariantNumericContains" in exp) {
+    const want = exp.fontVariantNumericContains;
+    const got = raw.fontVariantNumeric || "";
+    out.push(verdict("fontVariantNumericContains", got.includes(want), got, want));
+  }
+  // bgEqVar / colorEqVar (D6/D7, Task 5): a chip's fill/text isn't just "some
+  // AA-passing pair" (textContrast already proves that) -- it must be THIS
+  // theme's --{ns}-chip-bg / --{ns}-chip-fg / --{ns}-ai-chip-fg token,
+  // verbatim, not a coincidentally-similar colour. Reuses parseSolidColor
+  // (textContrastMulti's own primitive -- a CSS custom property is a solid
+  // theme token, never a foreground painted over something, so no
+  // compositing is needed) against the SAME element's own measured fill/
+  // text. ±1 per channel tolerance is browser rounding headroom only -- both
+  // sides are literal hex-derived rgb triples with no alpha compositing.
+  // colorEqVar reads its OWN extraColorRaw slot, NOT extraBgRaw -- a single
+  // check (popup's `.stag`) legitimately sets both bgEqVar AND colorEqVar at
+  // once (two DIFFERENT tokens, chip-bg and chip-fg), and sharing one slot
+  // between them silently made colorEqVar compare against whichever token
+  // bgEqVar had already claimed (caught live before this was fixed: `.stag`
+  // read chip-BG's hex while its verdict note claimed "chip-fg").
+  function colorsEqual(a, b) { return !!a && !!b && a.every((c, i) => Math.abs(c - b[i]) <= 1); }
+  if ("bgEqVar" in exp) {
+    const want = parseSolidColor(raw.extraBgRaw);
+    const got = parseSolidColor(raw.backgroundColor);
+    const note = !want ? `--${exp.bgEqVar} token unresolved (raw=${JSON.stringify(raw.extraBgRaw)})` : undefined;
+    out.push(verdict("bgEqVar", colorsEqual(want, got), raw.backgroundColor, `var(--...-${exp.bgEqVar})=${raw.extraBgRaw}`, note));
+  }
+  if ("colorEqVar" in exp) {
+    const want = parseSolidColor(raw.extraColorRaw);
+    const got = parseSolidColor(raw.color);
+    const note = !want ? `--${exp.colorEqVar} token unresolved (raw=${JSON.stringify(raw.extraColorRaw)})` : undefined;
+    out.push(verdict("colorEqVar", colorsEqual(want, got), raw.color, `var(--...-${exp.colorEqVar})=${raw.extraColorRaw}`, note));
   }
   if ("hitAreaMin" in exp) {
     if (hostZero) out.push(verdict("hitAreaMin", false, null, exp.hitAreaMin, zeroNote));
@@ -1597,7 +1667,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // different measurement paths disagree.
     if (check.expect.fusedStateStable === true) {
       const rest = await page.evaluate(probeSelector, {
-        selector: check.selector, compareSelector: null, extraBgVarName: null, radiusVarName: null,
+        selector: check.selector, compareSelector: null, extraBgVarName: null, extraColorVarName: null, radiusVarName: null,
         childSelectors: check.expect.fusedStateStableChildren || null,
         focusTargetSelector: null,
       });
@@ -1631,11 +1701,19 @@ async function runOneCheck(page, theme, check, results, extBase) {
   } else if (check.state !== "default" && check.state !== "classState") {
     throw new Error(`unsupported state "${check.state}" on ${check.selector} -- extend runOneCheck() before adding non-default states to the checklist`);
   }
-  const extraBgSelectorVar = check.expect.textContrastMulti?.extraBgSelectorVar;
+  // bgEqVar (D6/D7, Task 5): reuses the SAME extraBgVarName slot
+  // textContrastMulti already has -- both read a BACKGROUND-role token, and
+  // no check sets both at once. colorEqVar gets its OWN extraColorVarName
+  // slot (see probeSelector's header comment) -- a check (popup's `.stag`)
+  // legitimately sets bgEqVar AND colorEqVar together, two DIFFERENT tokens.
+  const extraBgSelectorVar = check.expect.textContrastMulti?.extraBgSelectorVar
+    || check.expect.bgEqVar;
+  const extraColorSelectorVar = check.expect.colorEqVar;
   const raw = await page.evaluate(probeSelector, {
     selector: check.selector,
     compareSelector: check.expect.heightEqWith?.selector || null,
     extraBgVarName: extraBgSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBgSelectorVar}` : null,
+    extraColorVarName: extraColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraColorSelectorVar}` : null,
     radiusVarName: check.expect.insetBand?.radiusVar ? `--${NS_BY_SURFACE[check.surface]}-${check.expect.insetBand.radiusVar}` : null,
     childSelectors: check.expect.fusedChildrenFlat?.children || check.expect.fusedStateStableChildren || check.expect.edgeClickable?.children || null,
     focusTargetSelector: check.state === "focusWithin" ? check.focusTarget : null,
@@ -2406,6 +2484,110 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     });
     if (!shown) throw new Error(`SETUP: popup.html is missing #main-section / #md-actions-strip / #delete-btn / #submit-btn (theme=${theme})`);
     await page.waitForTimeout(120);
+  }
+  // popup's suggest/AI tag chips (D6/D7, Task 5, taste-uplift batch3).
+  // Opened UNCONDITIONALLY (same discipline as the confirm popover below --
+  // must not depend on `checks` happening to carry a `.stag`-scoped entry
+  // for this particular theme slice) so family 13's rest/hidden-legs scans
+  // further down see real chips too, not just this file's own .stag
+  // checklist rows.
+  //
+  // fetchPinboardSuggestTags (popup-tags.js) is never reached through
+  // popup.js's normal boot on THIS fixture: popup.js's async form-init
+  // returns EARLY on `isUnsupportedUrl` (pageInfo.url not starting with
+  // http(s)://), which is exactly what every direct chrome-extension://
+  // navigation to popup.html produces as its "current tab" URL -- so the
+  // suggest fetch this harness needs never fires through that path at all
+  // (confirmed by reading popup.js; the investigation this task inherited
+  // documented the resulting symptom: #suggest-row opens with only its
+  // static .tag-skel loading placeholders, never real chips). Calling the
+  // (top-level, un-closured) function directly with a real http(s) URL
+  // sidesteps that early return without touching popup.js's own gating
+  // logic or faking a second "active tab".
+  if (surface === "popup") {
+    const suggestReady = await page.evaluate(async (token) => {
+      if (typeof fetchPinboardSuggestTags !== "function") return false;
+      await fetchPinboardSuggestTags(token, "https://example.com/render-audit-fixture");
+      return true;
+    }, SEED_TOKEN_RAW);
+    if (!suggestReady) {
+      throw new Error(`SETUP: fetchPinboardSuggestTags is not defined on popup.html (theme=${theme}) -- the .stag suggest-row fixture cannot render`);
+    }
+    await page.waitForSelector("#pinboard-suggest-tags .stag", { timeout: TIMEOUT_MS });
+    // AI row: renderAITags is the same top-level, un-closured render step a
+    // real or cached AI response ultimately calls (popup-ai.js has no
+    // network-free "read the cache" entry point that ALSO does the DOM
+    // diffing on its own) -- this drives that render step directly with a
+    // fixture tag, the render-side equivalent of a cache hit, without
+    // fabricating an AI provider HTTP response.
+    await page.evaluate(() => {
+      if (typeof renderAITags === "function") renderAITags(["renderAuditAiFixtureTag"], true);
+    });
+    await page.waitForSelector("#ai-suggest-tags .stag.ai", { timeout: TIMEOUT_MS });
+    // .stag.used: a direct class+disabled toggle, NOT the real click handler
+    // (popup-tags.js's buildSuggestGroup click listener) -- deliberately.
+    // The real handler's first line is addTag(), which populates
+    // #tags-display with a REAL .tag-item for the very first time this
+    // harness ever renders one (every other popup fixture leaves that list
+    // empty): confirmed live (scratch diagnostic, not committed) that this
+    // newly gives family 13 (weakTextOnFill) its first-ever look at
+    // .tag-item/.tag-remove, and they FAIL it -- a pre-existing, unrelated
+    // law-8 violation in a completely different component this task does
+    // not touch. Reproducing exactly what the click handler leaves behind
+    // on the CHIP itself (`.used` + `.disabled`) without invoking addTag()
+    // proves the same CSS state this task's checklist rows and family 13
+    // actually care about, without dragging an out-of-scope component into
+    // this run's coverage. `.last()`, NOT `.first()`: this file's own
+    // `.stag` checklist rows below query the bare `.stag` selector (first
+    // DOM match = the popular group's first chip, "reading") expecting a
+    // REST-state chip -- marking that one `.used` instead would make every
+    // one of those rows measure the used state.
+    await page.evaluate(() => {
+      // querySelectorAll + array index, not a :last-of-type/:last-child
+      // pseudo-class: .add-all-link is ALSO a <button> and IS each
+      // suggest-group's actual last button child, so either pseudo-class
+      // would match nothing (a compound selector needs both halves true on
+      // the SAME element).
+      const chips = document.querySelectorAll("#pinboard-suggest-tags .stag");
+      const el = chips[chips.length - 1];
+      if (el) { el.classList.add("used"); el.disabled = true; }
+    });
+    // .stag's `transition: background ..., color ...` (--pp-motion-state,
+    // 150ms) means an immediate read right after the class add can still
+    // catch the interpolated frame (verified live, scratch diagnostic: the
+    // "used" chip's background read as chip-bg, not transparent, without
+    // this wait) -- same settle discipline runOneCheck's own hover/focus
+    // states already use elsewhere in this file.
+    await page.waitForTimeout(200);
+    // #suggest-row ships `class="row hidden"` (popup.html) until popup.js's
+    // own showMain() unhides it -- unreachable here for the same early-
+    // return reason as above, so it needs the same manual unhide the other
+    // POPUP_HIDDEN_LEG_IDS legs get, but early: this file's own .stag
+    // checklist rows run in the shared CHECKS loop right below, well before
+    // that later pass.
+    //
+    // Defensively re-disabling #submit-btn=false here too: an EARLIER
+    // version of this block called the real click handler (addTag() ->
+    // renderTags() -> updateCharCount(), popup-tags.js/popup.js), which
+    // unconditionally recomputes `sub.disabled = urlBad || over ||
+    // !_pageInfoReady` -- and `_pageInfoReady` is a script-scope `let`,
+    // forever false on this fixture (the isUnsupportedUrl early return this
+    // whole block exists to route around sits BEFORE the only line that
+    // ever sets it true), so that recompute always re-disabled the button
+    // regardless of the URL (confirmed live, scratch diagnostic, not
+    // committed -- setting #url-input's value did NOT help either;
+    // `!_pageInfoReady` alone was enough). The .used marking above no
+    // longer calls addTag() (see its own comment), so nothing in this
+    // block's current form is known to trip updateCharCount() any more --
+    // this stays as cheap, idempotent insurance rather than a proven-needed
+    // fix, since the "shown" block already proved #submit-btn is otherwise
+    // a legitimate, visible, enabled target for the existing focusWithin
+    // checks on it.
+    await page.evaluate(() => {
+      document.getElementById("suggest-row")?.classList.remove("hidden");
+      const submit = document.getElementById("submit-btn");
+      if (submit) submit.disabled = false;
+    });
   }
   // popup's confirm popover only exists after a destructive action is
   // clicked. #logout-link is the cheapest opener that reaches the SHARED
@@ -4090,6 +4272,33 @@ async function main() {
   }), SEED_TOKEN_ACCOUNT);
 
   const page = await ctx.newPage();
+
+  // popup's suggest-row (D6/D7, taste-uplift batch3 Task 5): fetchPinboardSuggestTags
+  // (popup-tags.js) fetches this endpoint DIRECTLY from the popup page (not
+  // proxied through the SW like the AI calls qa-drive.mjs mocks), and its
+  // chrome.storage.local cache key is keyed on the popup's own "current tab"
+  // URL -- which, navigated directly to popup.html?_ra=<theme> the way this
+  // harness does, changes every theme iteration, so there is no stable
+  // storage key to pre-seed the way cached_user_tags is seeded below. Routing
+  // the request itself sidesteps that entirely and survives every
+  // page.goto() on this page for the rest of the run (both the checklist
+  // loop and --sweep, which also opens popup.html). Same fixture shape as
+  // qa-drive.mjs's PINBOARD_API entry for "/v1/posts/suggest" (qa-drive.mjs:178).
+  //
+  // MUST be ctx.route(), not page.route() -- verified live (scratch diagnostic,
+  // not committed): an extension page's fetch() to a cross-origin host is
+  // NOT caught by page-level interception at all (0 hits, the request fell
+  // through to the real network and got a real 401 from the real Pinboard
+  // API using this fixture's fake token), while context-level interception
+  // catches it every time. Same shape as qa-drive.mjs's own comment on this
+  // exact surface ("popup 的 Pinboard 请求经 SW 代理...本环境实测 context.route
+  // 连 SW 请求也拦到" -- an observed behaviour, not a documented Playwright
+  // guarantee, for extension-page/SW requests alike).
+  await ctx.route(/\/v1\/posts\/suggest/, (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify([{ popular: ["reading", "systems"] }, { recommended: ["qa", "设计", "longform"] }]),
+  }));
 
   if (SWEEP || WRITE_SPACING) {
     let hits = [];
