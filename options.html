@@ -253,7 +253,7 @@
         <div><label><input type="radio" name="popup-width-preset" value="550" /> <span data-i18n="optPopupWidth550">Standard (550px)</span></label></div>
         <div><label><input type="radio" name="popup-width-preset" value="650" /> <span data-i18n="optPopupWidth650">Wide (650px)</span></label></div>
         <div><label><input type="radio" name="popup-width-preset" value="custom" /> <span data-i18n="optPopupWidthCustom">Custom:</span>
-          <input type="number" id="opt-popup-width-custom" min="420" max="720" step="10" style="width:80px" /> px
+          <input type="number" id="opt-popup-width-custom" min="420" max="720" step="10" /> px
         </label></div>
       </div>
       <div class="divider"></div>
@@ -445,7 +445,7 @@
         <h3 data-i18n="provOpenai">OpenAI (ChatGPT)</h3>
         <div class="fg"><label class="bl" for="opt-openai-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-openai-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-openai-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
         <div class="fg"><label class="bl" for="opt-openai-model" data-i18n="labelModel">Model</label><input type="text" id="opt-openai-model" value="gpt-5.4-nano" /></div>
-        <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-openai-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintOpenAIBaseUrl">Change for proxy or compatible endpoint</p></details><input type="text" id="opt-openai-baseurl" value="https://api.openai.com/v1" /></div>
+        <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-openai-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintOpenAIBaseUrl">Change for proxy or compatible endpoint</p></details><input type="text" class="fg-url" id="opt-openai-baseurl" value="https://api.openai.com/v1" /></div>
         <div class="fg-actions">
           <button class="btn btn-sm" id="test-openai" data-i18n="testConnection">Test Connection</button>
           <span class="save-status" id="test-openai-status" role="status" aria-live="polite"></span>
@@ -576,7 +576,7 @@
       <!-- Ollama -->
       <div class="pf" hidden id="fields-ollama">
         <h3 data-i18n="provOllama">Ollama (Local)</h3>
-        <div class="fg"><label class="bl" for="opt-ollama-baseurl" data-i18n="labelBaseUrl">Base URL</label><input type="text" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
+        <div class="fg"><label class="bl" for="opt-ollama-baseurl" data-i18n="labelBaseUrl">Base URL</label><input type="text" class="fg-url" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
         <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-ollama-model" data-i18n="labelModel">Model</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintOllamaModel">Run <code>ollama pull llama3.2</code> first</p></details><input type="text" id="opt-ollama-model" value="llama3.2" /></div>
         <div class="fg-actions">
           <button class="btn btn-sm" id="test-ollama" data-i18n="testConnection">Test Connection</button>
@@ -587,7 +587,7 @@
       <!-- Custom -->
       <div class="pf" hidden id="fields-custom">
         <h3 data-i18n="provCustom">Custom OpenAI-compatible</h3>
-        <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-custom-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomBaseUrl">Must support <code>/chat/completions</code> endpoint</p></details><input type="text" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /></div>
+        <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-custom-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomBaseUrl">Must support <code>/chat/completions</code> endpoint</p></details><input type="text" class="fg-url" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /></div>
         <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-custom-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomKey">Leave empty if not required</p></details><span class="key-wrap"><input type="password" id="opt-custom-key" /><button type="button" class="key-toggle" data-target="opt-custom-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span></div>
         <div class="fg"><label class="bl" for="opt-custom-model" data-i18n="labelModel">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
         <div class="fg-actions">

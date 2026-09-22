@@ -846,6 +846,21 @@ input:focus-visible + .tag-gov-chip-face {
   box-shadow: none;
   transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
 }
+.fg select {
+  max-width: 240px;
+}
+.fg .key-wrap {
+  max-width: 420px;
+}
+.fg input[type="text"].fg-url {
+  max-width: 520px;
+}
+.fg input[type="text"]:not(.fg-url) {
+  max-width: 320px;
+}
+.fg input[type="number"] {
+  max-width: 96px;
+}
 .fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus) {
   border-color: color-mix(in srgb, var(--opt-input-border) 55%, var(--opt-fg));
 }
@@ -1090,6 +1105,22 @@ html.motion-ready .pf:not([hidden]) {
   padding-right: 26px;
   cursor: pointer;
 }
+/* Field width by content kind (taste-uplift-batch3, T6/D2), mirroring the
+   generated .fg recipe's two narrowest tiers -- .et-field only ever renders
+   two DOM shapes (a bare text/select input, or the secret's .key-wrap;
+   options.js's renderExportTargets() builder, not this file, decides which),
+   so there is no third "short text" kind to mirror here the way .fg has
+   input[type=text]:not(.fg-url). The secret cap goes on the WRAPPER for the
+   same fused-control reason the generated .fg .key-wrap rule does (the eye
+   toggle is position:absolute inside .key-wrap, COMPONENTS.md §8); the text
+   cap covers vault/folder names AND the one true URL field (Notion's parent
+   page) alike -- options.js gives every .et-field text input the same DOM
+   shape, so there is no per-field hook to split them narrower without also
+   touching that builder, out of this task's scope. .et-field select is left
+   uncapped (out of scope; its two known consumers are short preset labels
+   that were never the width complaint). */
+.et-field .key-wrap { max-width: 420px; }
+.et-field input[type="text"] { max-width: 520px; }
 /* Reuses the same hover-border recipe as the generated .fg field family
    above (COMPONENTS.md §6.1's "et-field mirrors .fg" convention) instead of
    its own fixed literal (Task 12 review round 2, Minor) -- .et-field never
@@ -2062,7 +2093,24 @@ html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select
    invalid appearance value and keep the native popup -- degrade, don't
    break. */
 @supports selector(::picker(select)) {
-  .fg select, .et-field select, .mobile-tab-picker select { appearance: base-select; }
+  /* T6 (taste-uplift-batch3, D2) fallout: `appearance: base-select` makes
+     the select's OWN box a flex container whose child is the selected
+     option's live text node -- with no white-space control of its own, a
+     long option ("Auto (follow interface language)", the first option on
+     two of these selects) wrapped to a second line instead of clipping once
+     max-width:240px (the new .fg select rule two rules up in this file)
+     made it narrower than the text, doubling the control's rendered height
+     (measured 41.33px vs the 26px rung -- caught by render-audit's
+     controlRung on #translate-target-lang/#opt-md-image-policy). A native
+     (non-base-select) <select> never had this failure mode: the UA always
+     single-lines and clips its own selected-value display regardless of
+     width. Restores that same clipping behavior for the opt-in flex layout. */
+  .fg select, .et-field select, .mobile-tab-picker select {
+    appearance: base-select;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .fg select::picker-icon, .et-field select::picker-icon, .mobile-tab-picker select::picker-icon { display: none; }
   .fg select::picker(select), .et-field select::picker(select), .mobile-tab-picker select::picker(select) {
     appearance: base-select;

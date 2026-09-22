@@ -467,6 +467,38 @@ function formRules(ns) {
         ["box-shadow", "none"],
         ["transition", `border-color ${motion(ns)} ease, background-color ${motion(ns)} ease, box-shadow ${motion(ns)} ease`],
       ]),
+      // Field width by CONTENT KIND (taste-uplift-batch3, T6/D2). `width:
+      // 100%` above stays -- these only ADD a ceiling, so a narrow viewport
+      // (the panel column already narrower than the cap) still gets the
+      // full-width field the base rule always gave it; the cap only ever
+      // engages once the panel is wide enough to make a 750px+ field look
+      // like it's asking for an essay. Kinds and their ceilings (COMPONENTS.md
+      // §6, Step 0 measurement: the panel's plain-`.fg` content column
+      // measures 790px, the `.pf` provider-card column 764px, at a >=1040px
+      // viewport -- both far past every cap below):
+      //   select        240 -- a handful of words, never grows with input
+      //   .key-wrap     420 -- password/API-key fields (fused with the eye
+      //                        toggle, COMPONENTS.md §8) -- the cap sits on
+      //                        the WRAPPER, not the input, so the eye button
+      //                        (position: absolute; right: 2px, relative to
+      //                        .key-wrap) stays fused to the input's own
+      //                        right edge instead of the field's box.
+      //   .fg-url       520 -- the three baseurl endpoints (options.html
+      //                        adds this class; deliberately not `type=url`,
+      //                        which would add browser validation semantics
+      //                        this field never asked for)
+      //   input[text]   320 -- everything else typed free text (model-name
+      //                        overrides, custom tag separators, shortcuts)
+      //                        that isn't marked .fg-url
+      //   input[number]  96 -- a handful of digits (popup width, cache
+      //                        duration in minutes)
+      //   textarea      (unchanged, no cap) -- prompt templates are prose,
+      //                        capping their width would just wrap more.
+      rule(`.fg select`, [["max-width", "240px"]]),
+      rule(`.fg .key-wrap`, [["max-width", "420px"]]),
+      rule(`.fg input[type="text"].fg-url`, [["max-width", "520px"]]),
+      rule(`.fg input[type="text"]:not(.fg-url)`, [["max-width", "320px"]]),
+      rule(`.fg input[type="number"]`, [["max-width", "96px"]]),
       rule(`.fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus)`, [
         ["border-color", `color-mix(in srgb, ${v(ns, "input-border")} 55%, var(--${ns}-fg))`],
       ], { pairColorWith: FIELD_SEL }),
