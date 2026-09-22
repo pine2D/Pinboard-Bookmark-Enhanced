@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
+import { parseStyleRules, parseDeclarations } from "../docs/theme-surface/tools/css-syntax.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
@@ -219,6 +220,56 @@ check(mdPreviewJs.includes('renderEmptyState(t("mdPreviewEmpty"), "mdPreviewClos
 
 check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/.test(optionsCss),
   "connection overview does not use the balanced three-column desktop grid");
+
+// ---- weak-text-on-fill (T2, COMPONENTS.md §9.1 law 8): --opt-fg-hint /
+// --opt-fg-muted must never paint text that rests on a control fill
+// (--opt-btn-bg / --opt-btn-hover); the only sanctioned token for secondary
+// text on those fills is --opt-btn-fg-muted. Parsed with the theme-factory's
+// own CSS-syntax scanner (not a text-grep regex) over the HAND-WRITTEN region
+// only, so a comment or string literal that happens to mention one of these
+// token names can't be counted as coverage the way a plain grep could
+// (COMPONENTS.md's own "text grep 覆盖判定被注释击穿" lesson).
+//
+// STATED BLIND SPOTS (honestly, not just in a comment nobody reads): this is
+// a STATIC source scan, not a render probe.
+//   - It cannot see the CASCADE. A higher-specificity `html[data-theme] ...`
+//     rule restating `color` on the SAME selector can silently win at
+//     runtime and this check has no way to know which declaration actually
+//     paints -- that is scripts/ui-render-audit.mjs's `weakTextOnFill`
+//     family's job (T5), not this one's.
+//   - It cannot see INHERITANCE across rules. A selector with no `background`
+//     of its own that happens to sit inside a btn-bg/btn-hover ancestor at
+//     runtime (the real shape every consumer this task fixed actually has --
+//     .connection-health-state's fill comes from its PARENT
+//     .connection-health-row, not its own rule) is invisible to a same-rule
+//     pairing check. Check 2 below only catches the narrower case of a
+//     single rule declaring BOTH `color` and `background` on the same
+//     selector -- a real, if narrower, regression shape worth guarding
+//     against even though it is not the shape any of this task's real bugs
+//     took.
+{
+  const hand = stripGeneratedRegions(optionsCss);
+  const rules = parseStyleRules(hand);
+
+  const stateRule = rules.find((r) => r.context.length === 0 && r.selectors.includes(".connection-health-state"));
+  const stateUsesBtnFgMuted = !!stateRule && parseDeclarations(stateRule.body)
+    .some((d) => d.property === "color" && d.value.includes("--opt-btn-fg-muted"));
+  check(stateUsesBtnFgMuted,
+    "options.css: .connection-health-state's base rule no longer reads --opt-btn-fg-muted for its (rest + hover) text color");
+
+  const offenders = [];
+  for (const rule of rules) {
+    const decls = parseDeclarations(rule.body);
+    const colorDecl = decls.find((d) => d.property === "color");
+    const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
+    if (!colorDecl || !bgDecl) continue;
+    if (/--opt-(fg-hint|fg-muted)\b/.test(colorDecl.value) && /--opt-(btn-bg|btn-hover)\b/.test(bgDecl.value)) {
+      offenders.push(rule.selectorText);
+    }
+  }
+  check(offenders.length === 0,
+    "options.css: a hand-written rule pairs --opt-fg-hint/--opt-fg-muted directly with --opt-btn-bg/--opt-btn-hover on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offenders.join(", "));
+}
 
 check(/id="vocab-no-account"[^>]*role="region"[^>]*aria-labelledby="vocab-no-account-title"/.test(libraryHtml) &&
   /id="vocab-signed-out-lookup"[^>]*data-i18n="libraryLookupOpen"/.test(libraryHtml),
