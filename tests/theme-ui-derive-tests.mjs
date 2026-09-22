@@ -597,6 +597,110 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     `expected ${POPUP_THEME_MAP.length * LIB_BATCH_BAND_MIX.length} (theme x band) assertions, ran ${bandAssertionCount}`);
 }
 
+// --- popup chip family: chip-bg tinted + ai-chip-fg (Task 4, taste-uplift-
+// batch3, D8/D9). CATEGORY assertion walking the real pilot registry through
+// the real composer pipeline (composePopupThemeMap, same POPUP_THEME_MAP
+// enumeration technique as every loop above), not a hand-rebuilt
+// approximation. Per pilot x mode: (1) chip-bg must be a real hex, never the
+// literal "transparent" the old chipMode: "verbatim" path shipped on 8/13
+// pilots; (2) chip-bg must stay >= TIER_DISTINCT_MIN_DE from btn-bg (the
+// tonal/selectable tier-distinctness floor options/library's own joint-
+// criterion tests above already pin, now proven for popup too); (3) chip-bg
+// must clear FILL_SEPARATE_MIN against its own panel (bg2); (4) chip-fg must
+// clear AA against chip-bg; (5)+(6) the new ai-chip-fg must clear AA against
+// BOTH chip-bg (rest) and btn-hover (the pressable-chip hover swap chip-fg's
+// own second COMPONENT_PAIR_SPEC row already covers) -- 6 assertions per
+// theme (14 pilots x mode).
+{
+  const pilotCache3 = new Map();
+  const loadPilot3 = (slug) => {
+    if (!pilotCache3.has(slug)) {
+      pilotCache3.set(slug, JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${slug}.tokens.json`, import.meta.url), "utf8")));
+    }
+    return pilotCache3.get(slug);
+  };
+  let chipAssertionCount = 0;
+  for (const entry of POPUP_THEME_MAP) {
+    const tk = loadPilot3(entry.pilot);
+    const map = composePopupThemeMap(tk, entry.mode, entry.useDarkMode);
+    const chipBgRgb = hexToRgb(map["chip-bg"]);
+    const btnBgRgb = hexToRgb(map["btn-bg"]);
+    const panelRgb = hexToRgb(map.bg2);
+
+    check(map["chip-bg"] !== "transparent" && /^#[0-9a-f]{6}$/i.test(map["chip-bg"]),
+      `popup theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} chip-bg=${map["chip-bg"]} must be a real hex, never the literal transparent`);
+    chipAssertionCount++;
+
+    const de = deltaE2000(chipBgRgb, btnBgRgb);
+    check(de >= TIER_DISTINCT_MIN_DE,
+      `popup theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} chip-bg (${map["chip-bg"]}) vs btn-bg (${map["btn-bg"]}) ΔE=${de.toFixed(2)}, need >= ${TIER_DISTINCT_MIN_DE}`);
+    chipAssertionCount++;
+
+    const crPanel = contrast(chipBgRgb, panelRgb);
+    check(crPanel >= FILL_SEPARATE_MIN,
+      `popup theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} chip-bg (${map["chip-bg"]}) vs panel/bg2 (${map.bg2}) = ${crPanel.toFixed(3)}, need >= ${FILL_SEPARATE_MIN}`);
+    chipAssertionCount++;
+
+    const cChipFg = ratio(map["chip-fg"], map["chip-bg"]);
+    check(cChipFg >= 4.5,
+      `popup theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} chip-fg=${map["chip-fg"]} vs chip-bg=${map["chip-bg"]} = ${cChipFg.toFixed(3)}, need 4.5`);
+    chipAssertionCount++;
+
+    for (const hostRole of ["chip-bg", "btn-hover"]) {
+      const c = ratio(map["ai-chip-fg"], map[hostRole]);
+      check(c >= 4.5,
+        `popup theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} ai-chip-fg=${map["ai-chip-fg"]} vs ${hostRole}=${map[hostRole]} = ${c.toFixed(3)}, need 4.5`);
+      chipAssertionCount++;
+    }
+  }
+  // Guard against the loop silently degenerating to zero iterations. 4 single
+  // assertions per theme (hex-shape, ΔE, panel-contrast, chip-fg) + 2 more
+  // (ai-chip-fg x [chip-bg, btn-hover]) = 6 per theme.
+  check(chipAssertionCount === POPUP_THEME_MAP.length * 6,
+    `expected ${POPUP_THEME_MAP.length * 6} assertions, ran ${chipAssertionCount}`);
+}
+
+// --- ai-chip-fg LITERAL-HEX check on one adversarial palette where the RAW
+// accent2 is well below AA on a light chip (2.14:1 vs chip-bg, 1.89:1 vs
+// btn-hover) -- independently computed expectation (#714bba), not a second
+// call of fgToAAMulti (the function under test) at assertion time: the value
+// below was computed once, out of band, by running fgToAAMulti(hexToRgb(
+// "#b19cd9"), [hexToRgb("#eef0f5"), hexToRgb("#dfe3ec")]) and is pinned here
+// as a literal, same technique as the btn-fg-muted literal-hex check above.
+// This exercises the EXACT shape popup-chrome.mjs's ai-chip-fg derivation
+// calls (fgToAAMulti(accent2, [chip-bg, btn-hover])) directly on adversarial
+// literals, rather than threading a synthetic full pilot through
+// composePopupThemeMap (which needs a much larger, easy-to-typo palette
+// object just to reach expandPalette/deriveUiColors without crashing) --
+// the category loop above already proves the real composer wiring end to
+// end on all 14 real pilots; this pins the FORMULA'S shape independent of
+// any pilot file. ---
+{
+  const accent2Adv = hexToRgb("#b19cd9"), chipBgAdv = hexToRgb("#eef0f5"), btnHoverAdv = hexToRgb("#dfe3ec");
+  check(contrast(accent2Adv, chipBgAdv) < 4.5 && contrast(accent2Adv, btnHoverAdv) < 4.5,
+    "sanity: this adversarial accent2 must actually fail AA on both hosts pre-derivation, or it has stopped discriminating anything");
+  const aiChipFgAdv = rgbToHex(fgToAAMulti(accent2Adv, [chipBgAdv, btnHoverAdv]));
+  const expectedAiChipFg = "#714bba";
+  check(aiChipFgAdv === expectedAiChipFg,
+    `ai-chip-fg must match the independently precomputed golden value for this adversarial palette -- got ${aiChipFgAdv}, expected ${expectedAiChipFg}`);
+}
+
+// --- ai-chip-fg MUTANT proof for the category loop above -- NOT a permanent
+// part of this suite. Verified manually during authorship by temporarily
+// narrowing popup-chrome.mjs's `ui["ai-chip-fg"] = rgbToHex(fgToAAMulti(
+// hexToRgb(ui["accent2"]), [hexToRgb(ui["chip-bg"]), hexToRgb(ui["btn-hover"])]))`
+// to derive against `[hexToRgb(ui["chip-bg"])]` only (dropping the btn-hover
+// host): the category loop's `vs btn-hover` assertions went RED on 2/14
+// pilots (the two closest to the 4.5 margin once only one host is
+// satisfied) --
+//   FAIL popup theme=flexoki-dark pilot=flexoki mode=dark ai-chip-fg=#9e93d1 vs btn-hover=#363532 = 4.408, need 4.5
+//   FAIL popup theme=github-light pilot=github-light mode=light ai-chip-fg=#7c47dd vs btn-hover=#d0e5f0 = 4.247, need 4.5
+// -- then the file was restored byte-for-byte (verified via md5sum before/
+// after) and the suite went GREEN again. Left as a comment, not code, same
+// reason (c) above documents for btn-fg-muted: a self-mutating test would
+// have to un-import/re-import the module under test at runtime, which this
+// file's other tests do not do either.
+
 if (failures.length) {
   console.error(failures.map((message) => `FAIL ${message}`).join("\n"));
   process.exit(1);
