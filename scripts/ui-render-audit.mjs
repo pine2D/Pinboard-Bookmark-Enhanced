@@ -1747,26 +1747,45 @@ function needsNoteDirty(selector) { return selector.includes("vocab-note-save");
 // `safeHostRoles` (T5 implementer, added after the pre-batch discrimination
 // run surfaced a real false-positive class -- see the T5 report): NEW_THEME.md's
 // "TEXT input roles" section states fg-hint/fg-muted (and, for options,
-// pf-bg/code-bg via T2's D5 gate; for options/popup, drop-hover) are
-// INDEPENDENTLY guaranteed >=4.5:1 against these page-level surfaces on
-// every themed block (contrast-audit.mjs's auditCssThemes/auditLibraryThemes
-// -- verified by reading those functions directly, not inferred). A render
-// probe can only compare RESOLVED PIXEL VALUES, not which named custom
-// property produced them -- and Soft Fill's fillSeparate() only promises
-// >=1.10:1 separation from the hosts it was actually TOLD about, so a
-// control fill can coincidentally resolve to the EXACT same hex as an
-// unrelated page surface it was never separated from (real example: popup's
-// nord-night resolves --pp-btn-hover and --pp-bg2 to the byte-identical
-// #3b4252 -- .header-bar's #user-info/.header-ic sit on --pp-bg2, not any
-// control fill, but the walk cannot tell the two apart once they're equal).
-// When the walked "nearest fill" ALSO equals one of these guaranteed-safe
-// surfaces, this occurrence is provably readable regardless of which token
-// name happens to produce that colour, so it is excluded here rather than
-// reported as a family-13 hit.
+// pf-bg/code-bg via T2's D5 gate) are INDEPENDENTLY guaranteed >=4.5:1
+// against these page-level surfaces on every themed block (contrast-
+// audit.mjs's auditCssThemes/auditLibraryThemes -- verified by reading those
+// functions directly, not inferred). A render probe can only compare
+// RESOLVED PIXEL VALUES, not which named custom property produced them --
+// and Soft Fill's fillSeparate() only promises >=1.10:1 separation from the
+// hosts it was actually TOLD about, so a control fill can coincidentally
+// resolve to the EXACT same hex as an unrelated page surface it was never
+// separated from (real example: popup's nord-night resolves --pp-btn-hover
+// and --pp-bg2 to the byte-identical #3b4252 -- .header-bar's #user-info/
+// .header-ic sit on --pp-bg2, not any control fill, but the walk cannot
+// tell the two apart once they're equal). When the walked "nearest fill"
+// ALSO equals one of these guaranteed-safe surfaces AND the painted ratio
+// on THIS instance clears the same threshold a real hit would need (T5 fix
+// wave, F4 -- exact equality below, no tolerance), this occurrence is
+// provably readable regardless of which token name happens to produce that
+// colour, so it is excluded here rather than reported as a family-13 hit.
+// safeHostRoles / safeHostExcludeTextRoles (T5 fix wave, F4): a safe-host
+// role is sound ONLY where a BLOCKING `fg-hint|fg-muted vs <host>` row
+// actually exists in contrast-audit.mjs (auditCssThemes/auditLibraryThemes)
+// -- popup bg :1284-1292, bg2 :1307-1308, drop-hover :1339-1341 (popup DOES
+// declare --pp-drop-hover); options bg/panel same rows, pf-bg/code-bg
+// :1329-1330 (D5, options only); options never declares --opt-drop-hover
+// (`grab("drop-hover")` returns null for every options block, so that row
+// never even prints) -- an inert entry, dropped here, not carried as dead
+// weight. `link` has NO "link vs <host>" row at all on popup/options (no
+// such check exists in auditCssThemes) -- only auditLibraryThemes checks
+// "link vs bg"/"link vs panel" (:1427-1434) -- so the safe-host exemption
+// must never cover `link` on popup/options regardless of the painted ratio:
+// there is no page-level guarantee to fall back on, only the ratio actually
+// measured, and F4's fix is to remove the ±3 tolerance that let it borrow
+// one anyway (rose-pine input-bg #27243b "≈" drop-hover #26233a; catppuccin-
+// latte btn-bg #dbdee6 "≈" drop-hover #dce0e8) -- library keeps `link`
+// eligible since ITS bg/panel rows genuinely cover it.
 const WEAK_TEXT_CFG = {
   popup: {
     prefix: "pp", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg"],
     safeHostRoles: ["bg", "bg2", "drop-hover"],
+    safeHostExcludeTextRoles: ["link"],
   },
   // NOTE (T5 implementer): the plan's D4 mentions an options "fg-dim" role --
   // verified against options.css: --opt-fg-dim was RETIRED before this batch
@@ -1777,7 +1796,8 @@ const WEAK_TEXT_CFG = {
   // three on options too -- not a narrowing, the role doesn't exist to check.
   options: {
     prefix: "opt", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg"],
-    safeHostRoles: ["bg", "panel", "pf-bg", "code-bg", "drop-hover"],
+    safeHostRoles: ["bg", "panel", "pf-bg", "code-bg"],
+    safeHostExcludeTextRoles: ["link"],
   },
   // library additionally gates its two batch-selection bands (D6 follow-up /
   // Ruling 17): see the file-header import comment for why the percentages
@@ -1785,6 +1805,8 @@ const WEAK_TEXT_CFG = {
   // fg-hint/fg-muted are gated (auditLibraryThemes) only against bg/panel --
   // no drop-hover-equivalent (row-selected-bg) row exists for those two
   // roles, only for row-selected-fg, a role outside this family's text set.
+  // link IS gated vs bg/panel here (auditLibraryThemes :1427-1434), so it
+  // stays eligible for the safe-host exemption -- no exclusion list.
   library: {
     prefix: "lib", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg"],
     batchBandMix: LIB_BATCH_BAND_MIX, bgRole: "bg", accentRole: "accent",
@@ -1919,24 +1941,28 @@ function weakTextProbe(cfg) {
       }
     }
   }
-  // Page-level surfaces fg-hint/fg-muted (and, for options, pf-bg/code-bg;
-  // for options/popup, drop-hover) are ALREADY guaranteed AA against on
-  // every themed block (contrast-audit.mjs's auditCssThemes/
-  // auditLibraryThemes -- see WEAK_TEXT_CFG's comment above). A coincidental
-  // colour collision between one of these and a control fill (verified real:
-  // popup nord-night's --pp-bg2 === --pp-btn-hover, byte-identical) must not
-  // be reported -- the text is provably readable there regardless of which
-  // token name resolves to that colour.
+  // Page-level surfaces fg-hint/fg-muted (and, for options, pf-bg/code-bg)
+  // are ALREADY guaranteed AA against on every themed block (contrast-
+  // audit.mjs's auditCssThemes/auditLibraryThemes -- see WEAK_TEXT_CFG's
+  // comment above). A coincidental colour collision between one of these and
+  // a control fill (verified real: popup nord-night's --pp-bg2 ===
+  // --pp-btn-hover, byte-identical) is a TRIGGER, not an automatic exemption
+  // (T5 fix wave, F4): it still has to clear the SAME painted-ratio gate as
+  // every other exemption class below, and the match itself is now exact
+  // equality, not the ±3 tolerance that used to let an unrelated fill
+  // (rose-pine input-bg, catppuccin-latte btn-bg) borrow a nearby safe
+  // host's guarantee it never had.
   const safeHostTargets = (cfg.safeHostRoles || []).map((role) => ({ role, rgb: readToken(role) })).filter((t) => t.rgb);
+  const safeHostExcludeTextRoles = new Set(cfg.safeHostExcludeTextRoles || []);
   // Text-side counterpart to safeHostTargets: a role NOT in cfg.textRoles
   // whose current value the scanned colour might coincidentally equal, and
   // which is independently guaranteed safe wherever it is actually used.
   // `btn-fg`/`btn-fg-muted` are UNIVERSAL and UNCONDITIONAL on all three
-  // surfaces: they are the TWO tokens COMPONENTS.md §9.1 law 8 itself names
-  // as the only sanctioned text on a control fill (D1/D2), and their own
-  // derivation (fgToAAMulti(fg[-muted], [btn-bg, btn-hover])) starts FROM
-  // fg/fg-muted and stays IDENTITY to it whenever the raw value already
-  // clears both fills -- so a CORRECTLY migrated consumer (post-T1-T4:
+  // surfaces: they are the two tokens COMPONENTS.md §9.1 law 8's D1/D2 name
+  // as the primary/muted text on a control fill, and their own derivation
+  // (fgToAAMulti(fg[-muted], [btn-bg, btn-hover])) starts FROM fg/fg-muted
+  // and stays IDENTITY to it whenever the raw value already clears both
+  // fills -- so a CORRECTLY migrated consumer (post-T1-T4:
   // .qbtn, .md-strip-btn, .connection-health-state, the sort-seg cell) can
   // still read back as "fg-muted"/"fg-hint" on many themes purely because
   // the sanctioned replacement never had to move. Caught live: an earlier
@@ -1960,7 +1986,35 @@ function weakTextProbe(cfg) {
   // link: library's pressed sort-seg cell (`[aria-pressed="true"]`, a
   // REVIEWED, accepted design -- T4's ledger: "pressed cell = accent, ...
   // no STOP").
-  const safeTextTargets = ["btn-fg", "btn-fg-muted", ...(cfg.safeTextRoles || [])]
+  //
+  // T5 fix wave (F2/F3): identity and marker matches used to `return` here
+  // unconditionally -- "the colour equals a sanctioned token's CURRENT
+  // value" is not the same claim as "the colour is READABLE on THIS fill",
+  // because btn-fg-muted/btn-fg/row-selected-fg are only ever derived
+  // against their OWN host list (btn-bg/btn-hover; the two batch bands),
+  // never against input-bg/chip-bg -- a genuine fg-muted/fg-hint/link
+  // consumer painted on input-bg can coincidentally equal btn-fg-muted's
+  // value on one theme (a "collapse", T1's own report) while failing AA
+  // against THAT fill on another (dracula: identity hid a real 3.79:1 hit;
+  // flexoki-dark: the marker case hid a real 3.44:1 hit). Both are now
+  // TRIGGERS collected below and gated by the painted ratio in
+  // recordWeakTextHits (Node side, reusing contrast-audit.mjs's own `cr` --
+  // this in-page function stays self-contained per Playwright's
+  // page.evaluate serialization constraint, so it hands back colorRgb/
+  // fillRgb rather than computing the ratio itself).
+  //
+  // `fg` (T5 review F6, T3 review's Ruling-16-adjacent note, COMPONENTS.md
+  // §9.1 law 8's "合法 token 补记"): `contrast-audit`'s `fg vs btn-bg` / `fg
+  // vs input-bg` / `fg vs btn-hover` rows already gate it to 4.5:1 on three
+  // of the four fills (not chip-bg, which has no such row) -- without it
+  // here, a raw `--{ns}-fg` consumer that happens to collapse onto
+  // fg-hint/fg-muted/link's value (terminal: "whole palette collapses fg/
+  // accent/link/row-selected-fg to the same #33ff33") would be reported
+  // unconditionally, with no ratio gate to rescue it even when the measured
+  // pair is genuinely safe -- today only that coincidence (fg landing on a
+  // fill it isn't independently gated against never actually failing on the
+  // shipped palettes) keeps it quiet.
+  const safeTextTargets = ["fg", "btn-fg", "btn-fg-muted", ...(cfg.safeTextRoles || [])]
     .map((role) => ({ role, rgb: readToken(role) })).filter((t) => t.rgb);
   const accentRgb = readToken("accent");
   function isSelectionIndicator(el) {
@@ -1969,6 +2023,9 @@ function weakTextProbe(cfg) {
       || el.getAttribute("aria-current") != null
       || el.classList.contains("active")
       || el.classList.contains("selected");
+  }
+  function exactEqual(a, b) {
+    return !!a && !!b && a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
   }
 
   // Tokens didn't resolve at all (a broken theme block, or a page that never
@@ -1979,12 +2036,18 @@ function weakTextProbe(cfg) {
   const iconLabel = (el) => el.textContent.replace(/\u00D7/g, "").trim();
   const seen = new Set();
 
+  // T5 fix wave: every exemption class below (identity, selection-marker,
+  // safe-host) is now a TRIGGER, not an automatic drop -- it only survives
+  // as a non-hit once recordWeakTextHits (Node side) confirms the REAL
+  // painted ratio between colorRgb and fillRgb clears the same threshold a
+  // real violation would need. `textRole` gates entry: if the scanned
+  // colour isn't independently one of fg-hint/fg-muted/link, none of this
+  // family's business no matter what else it happens to equal (a genuinely
+  // accent-only or btn-fg-only element was never a law-8 candidate).
   function probe(el, label) {
     if (!visible(el) || isDisabled(el)) return;
     scanned++;
     const colorRgb = parseColor(getComputedStyle(el).color);
-    if (matchRole(colorRgb, safeTextTargets)) return; // provably safe wherever used -- see the comment above safeTextTargets
-    if (accentRgb && isSelectionIndicator(el) && closeEnough(colorRgb, accentRgb, TOL)) return; // a selection indicator painted with accent, not hint/muted/link
     const textRole = matchRole(colorRgb, textTargets);
     if (!textRole) return;
     let fillRole = null;
@@ -1996,13 +2059,33 @@ function weakTextProbe(cfg) {
       fillRole = matchRole(rgb, fillTargets); // nearest non-transparent bg, matched or not -- stop here either way
       break;
     }
+    // Not resting on one of the four control fills (or a batch band) at
+    // all -- out of this family's scope regardless of any exemption class.
     if (!fillRole) return;
-    if (matchRole(fillRgb, safeHostTargets)) return; // provably safe -- see the comment above safeHostTargets
+
+    // Every matching identity role (F6: "print all matching role names on
+    // collapse" -- first-match-wins used to mislabel when more than one
+    // sanctioned token collapsed onto the same value).
+    const identityRoles = safeTextTargets.filter((t) => closeEnough(colorRgb, t.rgb, TOL)).map((t) => t.role);
+    const isMarker = !!(accentRgb && isSelectionIndicator(el) && closeEnough(colorRgb, accentRgb, TOL));
+    // F4: exact equality only (no +/-3 tolerance -- that was the mechanism
+    // that let an unrelated fill borrow a nearby safe host's guarantee),
+    // and `link` is categorically excluded on surfaces with no "link vs
+    // <host>" row (safeHostExcludeTextRoles, popup/options).
+    const safeHostRole = safeHostExcludeTextRoles.has(textRole)
+      ? null
+      : (safeHostTargets.find((t) => exactEqual(fillRgb, t.rgb))?.role || null);
+
+    const exemptedBy = [];
+    for (const role of identityRoles) exemptedBy.push(`identity:${role}`);
+    if (isMarker) exemptedBy.push("marker:accent");
+    if (safeHostRole) exemptedBy.push(`safe-host:${safeHostRole}`);
+
     const path = pathOf(el);
     const key = `${label}|${path}|${textRole}|${fillRole}`;
     if (seen.has(key)) return;
     seen.add(key);
-    hits.push({ path, label, textRole, fillRole });
+    hits.push({ path, label, textRole, fillRole, colorRgb, fillRgb, exemptedBy: exemptedBy.length ? exemptedBy : null });
   }
 
   // Direct (own, non-descendant) text nodes -- same convention as sweepProbe's
@@ -2033,21 +2116,62 @@ function weakTextProbe(cfg) {
 // main() next to the media-preferences summary line.
 const weakTextScanLog = [];
 
+// "" (default light) renders with NO data-theme attribute at all (see
+// themeToStorage's comment and the early-theme scripts it mirrors:
+// options-theme-early.js `delete _optionsRoot.dataset.theme`, popup-
+// theme-early.js's no branch taken at all on a fresh navigation) -- every
+// other THEMES entry is its own literal value.
+function expectedDatasetTheme(theme) { return theme || null; }
+
 async function recordWeakTextHits(page, surface, theme, results, context) {
   const cfg = WEAK_TEXT_CFG[surface];
   if (!cfg) return;
+  // F1 (T5 review, CRITICAL): assert the page is actually showing the theme
+  // this iteration thinks it's scanning before paying for the scan at all.
+  // A click earlier in the SAME loaded page can silently repaint
+  // documentElement.dataset.theme to something else -- the concrete bug:
+  // options' appearance-tab preset-preview button (`.theme-preset-btn[data-
+  // theme='flexoki']`) is nominally picking a pinboard.in SITE theme, but
+  // its click handler (options.js applyPreset -> applyOptionsPageTheme) is
+  // the SAME function "Extension pages follow the Pinboard theme preset"
+  // drives, so it ALSO re-derives the options page's own chrome theme as a
+  // side effect -- only 3/15 theme slices were measuring a real palette
+  // before this assertion existed, the rest were measuring flexoki-light/
+  // dark no matter what `theme` said. Throwing SETUP here, not silently
+  // mis-scanning, is the same discipline every other setup step in this
+  // file uses (needsDetailOpen/needsBatchBarOpen's throws above).
+  const liveTheme = await page.evaluate(() => document.documentElement.dataset.theme || null);
+  const expected = expectedDatasetTheme(theme);
+  if (liveTheme !== expected) {
+    throw new Error(`SETUP: weakTextOnFill ${surface}/${context} expected documentElement.dataset.theme=${JSON.stringify(expected)} (theme=${JSON.stringify(theme)}) but found ${JSON.stringify(liveTheme)} -- theme drifted before the family-13 scan; re-apply themeToStorage(theme) and reload/re-sync before scanning`);
+  }
   const { hits, scanned } = await page.evaluate(weakTextProbe, cfg);
   weakTextScanLog.push({ surface, theme, context, scanned });
   for (const h of hits) {
+    // F2/F3/F4 (T5 review): the painted ratio is a PRECONDITION for every
+    // exemption class weakTextProbe flagged (identity / selection-marker /
+    // safe-host) -- reusing THIS runner's own `cr` (imported from contrast-
+    // audit.mjs at module scope) so the two audits can never disagree on
+    // what "clears" means. Text needs 4.5:1 (WCAG 1.4.3); an icon-only
+    // affordance needs 3:1 (1.4.11 floor), matching the one real hit the T5
+    // review's ratio-guarded run found on the current (post-batch) tree:
+    // library nord-night's pressed sort-seg cell at 3.67 -- passes at the
+    // icon floor, correctly NOT exempted by identity/muted/marker alone.
+    const threshold = h.label === "icon" ? 3.0 : 4.5;
+    const ratio = h.colorRgb && h.fillRgb ? cr(h.colorRgb, h.fillRgb) : 0;
+    if (h.exemptedBy && ratio >= threshold) continue; // provably safe on THIS painted pair -- drop, not reported
     results.push({
       surface, theme,
       selector: h.path,
       state: `${context}|${h.label}`,
       check: "weakTextOnFill",
       status: "FAIL",
-      actual: `${h.textRole} on ${h.fillRole}`,
+      actual: `${h.textRole} on ${h.fillRole} (painted ${round2(ratio)}:1, needs ${threshold}:1)`,
       expected: "no fg-hint/fg-muted/link on btn-bg/btn-hover/input-bg/chip-bg (or the batch bands, library only) -- COMPONENTS.md §9.1 law 8",
-      note: null,
+      // F6: keep the annotation when an exemption class fired but failed the
+      // ratio gate -- this is what makes "a trigger existed but didn't save
+      // it" visible in the report instead of looking like a plain miss.
+      note: h.exemptedBy ? `[was-exempt-by ${h.exemptedBy.join(", ")}]` : null,
     });
   }
 }
