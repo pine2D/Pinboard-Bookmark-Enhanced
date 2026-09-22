@@ -267,14 +267,23 @@ button, input, select, textarea { font-family: inherit; }
    #ask-scope-near[aria-pressed] ~:2217, now also adopted here instead of the
    old near-black/near-white invert (--active-bg/--active-fg deleted from
    :root -- this was their last remaining consumer alongside the five sites
-   below that point back to this comment). TEXT is
+   below that point back to this comment). Two of these ten sites paint no
+   edge at all, by design rather than oversight (T1 review NOTE B / Ruling
+   22): .src-seg (~:311) is `border: 0` -- a segmented control whose pressed
+   cue is fill + text + the tinted shared `.src-seg + .src-seg` divider
+   (~:321), not a border of its own -- and the `option:checked` pair
+   (~:1315) styles a native <option> inside a top-layer picker, which has no
+   border to paint in the first place. No border was added to either;
+   "link-colored edge" below describes the eight sites that actually have
+   one. TEXT is
    light-dark(var(--link), var(--link-hover)), not a flat var(--link):
    --link against --btn-hover measures 3.97:1 in dark mode (under the 4.5:1
    AA text floor) while --link-hover against the same --btn-hover fill
    measures 5.35:1 -- the identical swap M3-c already applied to
-   .ask-chip:hover (~:2206) for this same pair. BORDER-color stays a flat
-   var(--link): it is a non-text edge, WCAG's 3:1 floor applies there (not
-   4.5:1), and 3.97:1 clears it. tests/md-preview-contrast-tests.mjs asserts
+   .ask-chip:hover (~:2206) for this same pair. BORDER-color, on the eight
+   sites that have one, stays a flat var(--link): it is a non-text edge,
+   WCAG's 3:1 floor applies there (not 4.5:1), and 3.97:1 clears it.
+   tests/md-preview-contrast-tests.mjs asserts
    both resolved branches (light-dark's light value against --btn-hover, and
    its dark value against --btn-hover) with no exemption -- see that file's
    PAIRS table. Kept as six separate declarations rather than one shared

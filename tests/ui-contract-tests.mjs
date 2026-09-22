@@ -5348,6 +5348,51 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
     ` -- update the registered set (PBP_HL_LOCK_PREFIX_WRITERS in tests/ui-contract-tests.mjs) and the contract comments in all writers.`);
 }
 
+// Ruling 22 (T1 review NOTE A, taste-uplift batch3): tests/md-preview-contrast-tests.mjs
+// pins the pressed-state text/btn-hover contrast ratio at the TOKEN level --
+// reverting a single CSS site's `color` does not move `--link`/`--link-hover`
+// so that gate does not trip. This is the selector-level companion: every
+// md-preview.css rule whose selector list contains "[aria-pressed", ".active"
+// or ":checked" AND whose declarations paint `background: var(--btn-hover)`
+// must also paint `color: light-dark(var(--link), var(--link-hover))` --
+// the exact recipe documented in the comment above .toggle-btn.active
+// (md-preview.css ~:263).
+{
+  const rules = parseStyleRules(mdCss);
+  const offenders = [];
+  const matchedSelectors = [];
+  for (const rule of rules) {
+    const isPressedFamily = rule.selectors.some((sel) =>
+      sel.includes("[aria-pressed") || sel.includes(".active") || sel.includes(":checked"));
+    if (!isPressedFamily) continue;
+    const decls = parseDeclarations(rule.body);
+    const bg = decls.find((d) => d.property === "background");
+    if (!bg || bg.value !== "var(--btn-hover)") continue;
+    matchedSelectors.push(rule.selectorText);
+    const color = decls.find((d) => d.property === "color");
+    if (!color || color.value !== "light-dark(var(--link), var(--link-hover))") {
+      offenders.push(`${rule.selectorText} (md-preview.css:${rule.lineNum})`);
+    }
+  }
+  check(offenders.length === 0,
+    "md-preview.css: a pressed-state rule (selector matches [aria-pressed]/.active/:checked, paints background:var(--btn-hover)) does not pair it with color: light-dark(var(--link), var(--link-hover)) -- offenders: " + offenders.join(", "));
+  // Expected matches today: the ten pressed-state consumers named in that
+  // comment -- .toggle-btn.active, .src-seg.active, .src-seg[aria-pressed="true"],
+  // .exp-tgl[aria-pressed="true"], ".exp-img-row option:checked, .xp-dict-lang
+  // option:checked", .xp-pin[aria-pressed="true"], .xp-act[aria-pressed="true"],
+  // #ask-scope-near[aria-pressed="true"], .srch-regex[aria-pressed="true"],
+  // .typo-seg-btn[aria-pressed="true"], and the grouped four-selector rule
+  // ".pbv-follow/.pbv-loop/.pbv-autopause/.pbv-estimate[aria-pressed=\"true\"]"
+  // -- eleven CSS rules in total (.src-seg alone contributes two declarations,
+  // .active and [aria-pressed="true"], for one control family, which is why
+  // "ten consumers" and "eleven rules" are both correct at once). Expected
+  // non-matches, which correctly stay OUT of this gate: .toc-list a.active
+  // (paints `background: var(--border-light)`, not --btn-hover) and
+  // .hl-card-dot.active (no background declared at all).
+  check(matchedSelectors.length === 11,
+    `md-preview.css: pressed-state background:var(--btn-hover) rule count drifted from the expected 11 (found ${matchedSelectors.length}) -- a consumer was added, removed, or changed its fill; update this gate's comment and expectation once the drift is intentional`);
+}
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);
