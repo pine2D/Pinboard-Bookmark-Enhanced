@@ -663,13 +663,20 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
 .notes-row-open:focus-visible {
   text-decoration: underline;
 }
-/* External-link mark on the row's "leaves the page" action (dot-notation
-   selector, not a --lib token: sizing only, no themed color). */
-.btn .ext-icon { width: 11px; height: 11px; vertical-align: -1px; }
+/* Same focus recipe as the dictionary pane's own in-pane links
+   (.xp-dict-more / .xp-dict-lemma-link below) -- Ruling 23 carry-over from
+   T2's review: this link had no themed focus ring of its own, relying on
+   the browser's native outline only. */
+.notes-row-open:focus-visible {
+  outline: 1px solid var(--lib-accent);
+  outline-offset: 2px;
+  box-shadow: var(--lib-focus-ring);
+}
 /* Same 10px mark as options' .wayback-log-url .ext-icon -- both are a link
-   label followed by an icon glyph, not a button. Scoped here (not folded
-   into .btn .ext-icon above) because these two are plain <a>/<span>, not
-   .btn. */
+   label followed by an icon glyph, not a button. There is no `.btn
+   .ext-icon` sibling rule on this surface (removed 2026-09-22, Ruling 23
+   carry-over: zero .btn consumers in library.html/js -- grep-proven, both
+   .ext-icon consumers are the plain <a> links below). */
 .notes-detail-source .ext-icon,
 .notes-row-open .ext-icon {
   width: 10px;
@@ -956,6 +963,15 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 a.notes-detail-source:hover,
 a.notes-detail-source:focus-visible {
   text-decoration: underline;
+}
+/* Same focus recipe as .notes-row-open above / the dictionary pane's
+   .xp-dict-more / .xp-dict-lemma-link (Ruling 23 carry-over). Scoped to the
+   <a> variant only, same as the hover/focus underline rule above it -- the
+   <span> fallback (no safe href) is never focusable. */
+a.notes-detail-source:focus-visible {
+  outline: 1px solid var(--lib-accent);
+  outline-offset: 2px;
+  box-shadow: var(--lib-focus-ring);
 }
 .notes-detail-quote {
   margin: 0;
