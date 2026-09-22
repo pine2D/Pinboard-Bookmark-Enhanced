@@ -17,14 +17,19 @@
 // contrast gate in this repo uses (tests/contrast-tests.html's own comment:
 // "same formula as tools/contrast-audit.mjs").
 //
-// Token-level, not selector-level: every pair below is a (text token, fill
-// token) contract -- e.g. "link vs btn-hover" is ONE number per mode
-// regardless of which selector consumes it (.srch-regex[aria-pressed],
-// .typo-seg-btn[aria-pressed], .pbv-*[aria-pressed], #ask-scope-near
-// [aria-pressed], and after this task's CSS change six more). Citations in
-// each PAIR entry name representative consumers as of this commit; line
-// numbers drift with future edits the way every other "~:NNN" comment in
-// this file does; the token names are the durable contract.
+// Token-level, not selector-level: every pair below is a (text expression,
+// fill token) contract -- e.g. the pressed-state text pair is ONE pair of
+// numbers (one per mode) regardless of which selector consumes it
+// (.srch-regex[aria-pressed], .typo-seg-btn[aria-pressed], .pbv-*
+// [aria-pressed], #ask-scope-near[aria-pressed], .toggle-btn.active,
+// .src-seg.active/[aria-pressed], .exp-tgl[aria-pressed], .xp-pin
+// [aria-pressed], .xp-act[aria-pressed], option:checked -- ten consumers as
+// of Ruling 21's fix round). Citations in each PAIR entry name
+// representative consumers as of this commit; line numbers drift with
+// future edits the way every other "~:NNN" comment in this file does; the
+// token names (or, for the pressed-state pair, the literal light-dark()
+// expression every one of those ten selectors now paints) are the durable
+// contract.
 
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -174,6 +179,22 @@ function resolveToken(name, mode) {
   return resolveColor(TOKENS.get(name), mode);
 }
 
+// A PAIRS entry's `text` is normally a plain token name (string), resolved
+// via resolveToken above. The pressed-state pair (see PAIRS below) instead
+// carries the literal light-dark() expression every one of its ten
+// consumers now paints for `color` -- resolving THAT expression per mode
+// (rather than a single token name) is what makes the light row assert
+// --link's number and the dark row assert --link-hover's number, honestly
+// modeling what the CSS actually does instead of picking one flat token.
+function resolvePairText(pair, mode) {
+  if (typeof pair.text === "string") return resolveToken(pair.text, mode);
+  if (pair.text && typeof pair.text.expr === "string") return resolveColor(pair.text.expr, mode);
+  throw new Error(`PAIRS entry "${pair.id}": text must be a token name (string) or { expr }`);
+}
+function textLabel(pair) {
+  return typeof pair.text === "string" ? `--${pair.text}` : pair.text.expr;
+}
+
 // ---- WCAG 2.x relative luminance / contrast ratio --------------------------
 // Same formula as docs/theme-surface/tools/contrast-audit.mjs's lum()/cr().
 
@@ -261,11 +282,20 @@ const PAIRS = [
     note: "a second, pre-existing hover family that swaps text to --fg over --btn-hover -- .rail-sec-open:hover/:focus-visible ~:1454/1460, .pb-hl-note-btn:hover/:focus-visible ~:2589/2596, .ask-ic:hover ~:2914.",
   },
   {
-    id: "link/btn-hover",
-    text: "link", fill: "btn-hover", min: 4.5,
-    // See the STOP-LINE note below this table: this pair is EXPECTED to
-    // fail in dark mode, pre-existing this task.
-    note: "the pressed-state vocabulary this task (D3) converges six more controls onto -- ALREADY used before this task by .srch-regex[aria-pressed] ~:3481, .typo-seg-btn[aria-pressed] ~:3638, .pbv-*[aria-pressed] ~:3851, #ask-scope-near[aria-pressed] ~:2217. After this task also: .toggle-btn.active ~:279, .src-seg.active/[aria-pressed] ~:314/317, .exp-tgl[aria-pressed] ~:1217, .xp-pin[aria-pressed] ~:1910, option:checked ~:1303, .xp-act[aria-pressed] ~:1934.",
+    id: "pressed-text/btn-hover",
+    // The pressed-state TEXT is light-dark(var(--link), var(--link-hover)),
+    // not a flat --link (Ruling 21's fix round): a flat --link against
+    // --btn-hover measures 3.97:1 in dark mode, under the 4.5:1 AA text
+    // floor. Resolving this literal expression per mode -- rather than
+    // looking up one token name -- makes this pair's light row assert
+    // --link's number (light-dark's light branch) and its dark row assert
+    // --link-hover's number (its dark branch), i.e. exactly what every one
+    // of the ten consumers now paints in each mode. border-color on all ten
+    // stays a flat var(--link): a non-text edge, WCAG's 3:1 floor applies
+    // there, and 3.97:1 clears it (not asserted by this text/fill table,
+    // which is normal-text-only per the file header's min=4.5 note).
+    text: { expr: "light-dark(var(--link), var(--link-hover))" }, fill: "btn-hover", min: 4.5,
+    note: "the pressed-state vocabulary -- .srch-regex[aria-pressed] ~:3481, .typo-seg-btn[aria-pressed] ~:3638, .pbv-*[aria-pressed] ~:3851, #ask-scope-near[aria-pressed] ~:2217, .toggle-btn.active ~:279, .src-seg.active/[aria-pressed] ~:314/317, .exp-tgl[aria-pressed] ~:1217, .xp-pin[aria-pressed] ~:1910, option:checked ~:1303, .xp-act[aria-pressed] ~:1934 (ten consumers total, all migrated to this recipe by Ruling 21's fix round).",
   },
   {
     id: "on-danger/danger",
@@ -294,44 +324,38 @@ const PAIRS = [
   },
 ];
 
-// STOP LINE (task spec): "link vs btn-hover" is the ONE pair this task's
-// own D3 change designates as the active/pressed-state contract -- it is
-// simultaneously already relied on by four pre-existing selectors (listed
-// above) and, per the M3-c comment at md-preview.css ~:2179-2186, ALREADY
-// KNOWN to fail in dark mode (3.97:1, that comment's own measured number)
-// for exactly this token pair -- M3-c fixed ONE consumer (.ask-chip:hover)
-// by swapping to light-dark(var(--link), var(--link-hover)) in dark, but
-// the other four pre-existing consumers this task's new six converge
-// alongside (.srch-regex/.typo-seg-btn/.pbv-*/#ask-scope-near[aria-pressed])
-// were never migrated to that swap and still fail. This task's brief is
-// explicit that "link vs btn-hover" is exempted from the stop line ("an
-// EXISTING pair, NOT the new active pair") -- unlike every other pair in
-// this file, a dark-mode failure here does not mean tokens were touched
-// silently or that the CSS change should have been withheld; it means the
-// pre-existing defect is now VISIBLE through a real gate instead of
-// undetected. See this test run's own report for the current numbers.
-const STOP_LINE_EXEMPT = new Set(["link/btn-hover"]);
-
+// No stop-line exemption: every pair in PAIRS, including the pressed-state
+// one above, must clear its `min` in both modes or this test fails. An
+// earlier revision of this gate (batch3 T1's first commit, 0137488)
+// soft-exempted "link vs btn-hover" from failing in dark mode -- the SAME
+// pair this task's own D3 change was actively multiplying onto six more
+// controls, i.e. an exemption for the one pair the batch just made more
+// consumers depend on. Ruling 21 removed that exemption entirely and had
+// the CSS fixed instead (md-preview.css's .toggle-btn.active comment
+// ~:263-286 has the measured numbers): the pressed-state pair's `text` is
+// now the literal light-dark() expression the CSS paints, so this table
+// asserts the real light AND dark numbers with no carve-out, the same as
+// every other pair here.
 const MODES = ["light", "dark"];
 console.log("md-preview.css :root contrast pairs (WCAG AA text floor 4.5:1)\n");
 for (const pair of PAIRS) {
   for (const mode of MODES) {
-    const textRgb = resolveToken(pair.text, mode);
+    const textRgb = resolvePairText(pair, mode);
     const fillRgb = resolveToken(pair.fill, mode);
     const ratio = contrastRatio(textRgb, fillRgb);
     const ok = ratio >= pair.min;
-    const tag = ok ? "OK  " : (STOP_LINE_EXEMPT.has(pair.id) ? "RED*" : "FAIL");
-    console.log(`${tag} ${pair.id.padEnd(20)} ${mode.padEnd(5)} ${ratio.toFixed(2)}:1  (>= ${pair.min}:1)`);
-    if (!ok && !STOP_LINE_EXEMPT.has(pair.id)) {
-      check(false, `${pair.id} (--${pair.text} vs --${pair.fill}) fails in ${mode} mode: ${ratio.toFixed(2)}:1 < ${pair.min}:1 -- ${pair.note}`);
+    const tag = ok ? "OK  " : "FAIL";
+    console.log(`${tag} ${pair.id.padEnd(24)} ${mode.padEnd(5)} ${ratio.toFixed(2)}:1  (>= ${pair.min}:1)`);
+    if (!ok) {
+      check(false, `${pair.id} (${textLabel(pair)} vs --${pair.fill}) fails in ${mode} mode: ${ratio.toFixed(2)}:1 < ${pair.min}:1 -- ${pair.note}`);
     }
   }
 }
-console.log("\n(RED* rows are stop-line-exempt per this task's spec -- see the comment above; still printed, not silently hidden.)\n");
-for (const pair of PAIRS) console.log(`  ${pair.id.padEnd(20)} -- ${pair.note}`);
+console.log("");
+for (const pair of PAIRS) console.log(`  ${pair.id.padEnd(24)} -- ${pair.note}`);
 
 if (fail.length) {
   console.error("\n" + fail.join("\n"));
   process.exit(1);
 }
-console.log("\nmd-preview contrast gate ok (link/btn-hover dark-mode gap is stop-line-exempt and pre-existing -- see report)");
+console.log("\nmd-preview contrast gate ok (all pairs, including the pressed-state text, clear AA in both modes -- no exemptions)");
