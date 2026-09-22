@@ -325,6 +325,74 @@ check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax
     "popup.css: a hand-written rule pairs --pp-fg-hint/--pp-fg-muted/--pp-link directly with --pp-btn-bg/--pp-btn-hover on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offendersPp.join(", "));
 }
 
+// ---- weak-text-on-fill (T4, COMPONENTS.md §9.1 law 8, D6): --lib-fg-hint /
+// --lib-fg-muted / --lib-link must never paint text that rests on a control
+// fill (--lib-btn-bg / --lib-btn-hover). .vocab-sort-seg > .vocab-sort-btn's
+// unpressed rest state is this batch's one real consumer -- its `background`
+// is `transparent`, so the fill it actually sits on is the shell's own
+// --lib-btn-bg, and the raw --lib-fg-muted it used to read is not AA-derived
+// against that (or --lib-btn-hover, which its own :hover/:active rules paint
+// after T4's fix). Same theme-factory CSS-syntax scanner as the T2/T3 checks
+// above (not a text-grep regex) over the HAND-WRITTEN region only.
+//
+// STATED BLIND SPOTS (same shape as the T2/T3 checks above): this is a
+// STATIC source scan, not a render probe.
+//   - It cannot see the CASCADE. A higher-specificity rule restating `color`
+//     on the SAME selector (library.css has none for .vocab-sort-btn today,
+//     verified -- `grep -c 'html\[data-theme\][^{]*vocab-sort' library.css`
+//     is 0) can silently win at runtime -- that is
+//     scripts/ui-render-audit.mjs's `weakTextOnFill` family's job (T5, not
+//     yet landed as of this commit), not this one's.
+//   - It cannot see INHERITANCE across rules. A selector with no `background`
+//     of its own is invisible to a same-rule pairing check -- exactly
+//     .vocab-sort-btn's OWN shape (background: transparent, resting on its
+//     ancestor .vocab-sort-seg's fill), which is why this check pins the
+//     specific selector by name (Check 1) rather than relying on the generic
+//     same-rule pairing scan (Check 2) to catch it. Check 2 only catches a
+//     single rule declaring BOTH `color` and `background` on the same
+//     selector -- the four D6 batch-selection-band consumers
+//     (.vocab-row-gloss / .notes-row-meta / .notes-hit-note /
+//     .notes-hit-meta) are a THIRD blind spot this static scan cannot see at
+//     all: their fill is a runtime color-mix() composed from a CSS custom
+//     property the row sets, not a `background`/`background-color` literal
+//     on their own rule or any ancestor's -- and D6 itself did not ship this
+//     task (see this commit's message / task-4-report.md: `fg` failed the
+//     26% band on 2/15 blocks, so the plan's own stop line applied).
+// No render-audit-checklist.mjs row is added for this task: same reasoning
+// as the T3 popup check above (no existing family pins a computed `color` to
+// a token value); T5's `weakTextOnFill` family is where that render-probe
+// coverage is planned to land.
+{
+  const hand = stripGeneratedRegions(libraryCss);
+  const rules = parseStyleRules(hand);
+
+  const sortBtnRule = rules.find((r) => r.context.length === 0 && r.selectors.includes(".vocab-sort-seg > .vocab-sort-btn"));
+  const sortBtnUsesBtnFgMuted = !!sortBtnRule && parseDeclarations(sortBtnRule.body)
+    .some((d) => d.property === "color" && d.value.includes("--lib-btn-fg-muted"));
+  check(sortBtnUsesBtnFgMuted,
+    "library.css: .vocab-sort-seg > .vocab-sort-btn's base rule no longer reads --lib-btn-fg-muted for its resting text color");
+
+  const offendersLib = [];
+  for (const rule of rules) {
+    // :disabled is the one documented WCAG 1.4.3 exemption (plan §0 /
+    // COMPONENTS.md's #submit-btn:disabled note) -- excluded by the
+    // `disabled` state itself, not by selector name, matching T5's planned
+    // weakTextOnFill exemption rule. library.css has no disabled-state
+    // consumer of these tokens today; the exclusion is kept for parity with
+    // the T2/T3 checks and to stay correct if one is added later.
+    if (rule.selectors.some((s) => /:disabled\b/.test(s))) continue;
+    const decls = parseDeclarations(rule.body);
+    const colorDecl = decls.find((d) => d.property === "color");
+    const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
+    if (!colorDecl || !bgDecl) continue;
+    if (/--lib-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--lib-(btn-bg|btn-hover)\b/.test(bgDecl.value)) {
+      offendersLib.push(rule.selectorText);
+    }
+  }
+  check(offendersLib.length === 0,
+    "library.css: a hand-written rule pairs --lib-fg-hint/--lib-fg-muted/--lib-link directly with --lib-btn-bg/--lib-btn-hover on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offendersLib.join(", "));
+}
+
 check(/id="vocab-no-account"[^>]*role="region"[^>]*aria-labelledby="vocab-no-account-title"/.test(libraryHtml) &&
   /id="vocab-signed-out-lookup"[^>]*data-i18n="libraryLookupOpen"/.test(libraryHtml),
   "signed-out Vocabulary state lacks a named region or localized narrow lookup route");
