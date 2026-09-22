@@ -258,35 +258,103 @@ function selectorEndsWithDisabled(selector) {
   // DIFFERENT element than the one this rule paints.
   const combinator = stripped.match(/(.*[\s>+~])([^\s>+~]+)\s*$/);
   const finalCompound = combinator ? combinator[2] : stripped;
-  return /:disabled\b/.test(finalCompound);
+  // F7 (T5 fix wave): `\b` is a WORD-boundary assertion, and '-' is not a
+  // word character, so the transition from 'd' to '-' in ':disabled-thing'
+  // already satisfies `\b` right after "disabled" -- `/:disabled\b/` wrongly
+  // matched a LONGER identifier that merely starts with "disabled", not the
+  // real pseudo-class. Require the match to be the end of the compound, or
+  // immediately followed by '::' (a chained pseudo-element still targets the
+  // disabled element, e.g. ':disabled::before').
+  return /:disabled($|::)/.test(finalCompound);
 }
 
-// ---- Ruling 16 (T3 review): the two adversarial selector shapes above,
-// reproduced as scratch CSS (not the real popup/options/library source),
-// pairing a weak-text colour with a control fill on the SAME rule, run
-// through the exact same exempt-then-pair pipeline the three real checks
-// below use. Both must now be CAUGHT as offenders (not silently exempted) --
+// F7 (T5 fix wave): a CSS rule's selector LIST is comma-separated
+// (`rule.selectors`), and every selector in that list shares the SAME
+// declaration block -- `#submit-btn:disabled, .t5-listhole { color: ...;
+// background: ...; }` paints BOTH, one of them disabled and one not. The
+// three checks below used to test the exemption with `rule.selectors.some(
+// ...)`, which exempts the WHOLE RULE (every co-listed selector, including
+// the enabled ones) the moment ANY ONE selector in the list ends with
+// `:disabled` -- an enabled `.t5-listhole` riding along in the same rule as
+// `#submit-btn:disabled` was silently exempted too. Fixed to filter
+// per-selector: only the selectors that themselves end with `:disabled` are
+// dropped, and if any non-exempt selector remains, the whole rule's
+// declarations are still checked against it.
+function nonExemptSelectors(rule) {
+  return rule.selectors.filter((s) => !selectorEndsWithDisabled(s));
+}
+
+// ---- Ruling 16 (T3 review) + F7 (T5 fix wave): three adversarial selector
+// shapes, reproduced as scratch CSS (not the real popup/options/library
+// source), pairing a weak-text colour with a control fill on the SAME rule,
+// run through the exact same exempt-then-pair pipeline the three real checks
+// below use. All three must be CAUGHT as offenders (not silently exempted),
+// and the negative control (a GENUINE `:disabled` selector) must NOT be --
 // proving the fix end-to-end, not just asserting selectorEndsWithDisabled's
 // return value in isolation.
 {
   const scratch = ".x:not(:disabled) { color: var(--opt-fg-hint); background: var(--opt-btn-bg); }\n"
-    + ".x:disabled ~ .y { color: var(--opt-fg-hint); background: var(--opt-btn-bg); }\n";
+    + ".x:disabled ~ .y { color: var(--opt-fg-hint); background: var(--opt-btn-bg); }\n"
+    // F7: a selector LIST where one entry is a genuine `:disabled` selector
+    // and the other is not -- `rule.selectors.some(...)` used to exempt the
+    // WHOLE rule (both co-listed selectors) the moment #submit-btn:disabled
+    // matched, silently waving the enabled .t5-listhole through too.
+    + "#submit-btn:disabled, .t5-listhole { color: var(--opt-fg-hint); background: var(--opt-btn-bg); }\n"
+    // F7: `\b` after ":disabled" wrongly matched a LONGER identifier that
+    // merely starts with "disabled" -- not a real pseudo-class, but a
+    // realistic adversarial shape (a hypothetical custom pseudo/attribute
+    // token) this scan must not treat as the WCAG 1.4.3 exemption.
+    + ".t5-longer-token:disabled-thing { color: var(--opt-fg-hint); background: var(--opt-btn-bg); }\n";
   const rules = parseStyleRules(scratch);
   const caught = [];
+  const exempted = [];
   for (const rule of rules) {
-    if (rule.selectors.some((s) => selectorEndsWithDisabled(s))) continue; // the real exemption path
+    const liveSelectors = nonExemptSelectors(rule); // the real (fixed) exemption path
+    for (const s of rule.selectors) if (!liveSelectors.includes(s)) exempted.push(s);
+    if (!liveSelectors.length) continue;
     const decls = parseDeclarations(rule.body);
     const colorDecl = decls.find((d) => d.property === "color");
     const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
     if (!colorDecl || !bgDecl) continue;
-    if (/--opt-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--opt-(btn-bg|btn-hover)\b/.test(bgDecl.value)) {
-      caught.push(rule.selectorText);
+    if (/--opt-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--opt-(btn-bg|btn-hover|input-bg|chip-bg)\b/.test(bgDecl.value)) {
+      caught.push(...liveSelectors);
     }
   }
-  check(caught.length === 2 && caught.includes(".x:not(:disabled)") && caught.includes(".x:disabled ~ .y"),
+  const expectCaught = [".x:not(:disabled)", ".x:disabled ~ .y", ".t5-listhole", ".t5-longer-token:disabled-thing"];
+  check(expectCaught.every((s) => caught.includes(s)) && caught.length === expectCaught.length,
     "ui-contract-tests.mjs: the tightened :disabled exemption still lets " +
-    [".x:not(:disabled)", ".x:disabled ~ .y"].filter((s) => !caught.includes(s)).join(", ") +
-    " through as a false exemption -- ':not(:disabled)' matches an ENABLED element and ':disabled ~ .y' paints a DIFFERENT (non-disabled) element, neither is the WCAG 1.4.3 exemption");
+    expectCaught.filter((s) => !caught.includes(s)).join(", ") +
+    " through as a false exemption, or over-catches -- caught=[" + caught.join(", ") + "]");
+  check(exempted.length === 1 && exempted.includes("#submit-btn:disabled"),
+    "ui-contract-tests.mjs: the genuine :disabled selector #submit-btn:disabled was not exempted (or something else wrongly was) -- exempted=[" + exempted.join(", ") + "]");
+}
+
+// ---- Q3 (T5 fix wave, discrimination): the static pair regex used to be
+// `btn-bg|btn-hover` only -- law 8 names FOUR control fills
+// (btn-bg/btn-hover/input-bg/chip-bg), so a rule pairing a weak-text colour
+// with `--opt-input-bg` or `--opt-chip-bg` on the SAME selector was
+// structurally invisible to this static scan even though it is exactly the
+// shape law 8 forbids. Proven end-to-end (not just regex-in-isolation) with
+// scratch CSS run through the exact same pipeline the three real checks use.
+{
+  const scratch = ".t5-input { color: var(--opt-fg-muted); background: var(--opt-input-bg); }\n"
+    + ".t5-chip { color: var(--opt-fg-hint); background: var(--opt-chip-bg); }\n"
+    + ".t5-safe { color: var(--opt-fg); background: var(--opt-input-bg); }\n"; // fg is not a weak-text role -- must NOT be caught
+  const rules = parseStyleRules(scratch);
+  const caught = [];
+  for (const rule of rules) {
+    const liveSelectors = nonExemptSelectors(rule);
+    if (!liveSelectors.length) continue;
+    const decls = parseDeclarations(rule.body);
+    const colorDecl = decls.find((d) => d.property === "color");
+    const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
+    if (!colorDecl || !bgDecl) continue;
+    if (/--opt-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--opt-(btn-bg|btn-hover|input-bg|chip-bg)\b/.test(bgDecl.value)) {
+      caught.push(...liveSelectors);
+    }
+  }
+  check(caught.length === 2 && caught.includes(".t5-input") && caught.includes(".t5-chip") && !caught.includes(".t5-safe"),
+    "ui-contract-tests.mjs: the Q3-widened pair regex does not catch a weak-text-on-input-bg/chip-bg pairing (or over-catches .t5-safe's fg-on-input-bg, which law 8 permits) -- caught=[" + caught.join(", ") + "]");
 }
 
 // ---- weak-text-on-fill (T2, COMPONENTS.md §9.1 law 8): --opt-fg-hint /
@@ -328,18 +396,27 @@ function selectorEndsWithDisabled(selector) {
   const offenders = [];
   for (const rule of rules) {
     // :disabled is the one documented WCAG 1.4.3 exemption (plan §0 /
-    // COMPONENTS.md's #submit-btn:disabled note) -- excluded via
-    // selectorEndsWithDisabled (Ruling 16), which options.css has no live
-    // consumer of today (verified: `grep -c 'fg-hint\|fg-muted' options.css`
-    // around any `:disabled` selector is 0) but is kept here for parity with
-    // the popup/library checks below and to stay correct if one is added.
-    if (rule.selectors.some((s) => selectorEndsWithDisabled(s))) continue;
+    // COMPONENTS.md's #submit-btn:disabled note) -- excluded PER SELECTOR
+    // via nonExemptSelectors (Ruling 16 + F7: the old `rule.selectors.some
+    // (...)` exempted the WHOLE rule, including any enabled selector
+    // co-listed with a genuine `:disabled` one), which options.css has no
+    // live consumer of today (verified: `grep -c 'fg-hint\|fg-muted'
+    // options.css` around any `:disabled` selector is 0) but is kept here
+    // for parity with the popup/library checks below and to stay correct if
+    // one is added.
+    const liveSelectors = nonExemptSelectors(rule);
+    if (!liveSelectors.length) continue;
     const decls = parseDeclarations(rule.body);
     const colorDecl = decls.find((d) => d.property === "color");
     const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
     if (!colorDecl || !bgDecl) continue;
-    if (/--opt-(fg-hint|fg-muted)\b/.test(colorDecl.value) && /--opt-(btn-bg|btn-hover)\b/.test(bgDecl.value)) {
-      offenders.push(rule.selectorText);
+    // Q3 (T5 fix wave): widened from btn-bg/btn-hover to law 8's full
+    // four-fill set (input-bg, chip-bg added) -- the discrimination run
+    // confirmed cross-rule offenders on all three surfaces, and this static
+    // pair scan's own fill list was narrower than the fills it claims to
+    // guard (COMPONENTS.md §9.1 law 8 / §10.3 weakTextOnFill).
+    if (/--opt-(fg-hint|fg-muted)\b/.test(colorDecl.value) && /--opt-(btn-bg|btn-hover|input-bg|chip-bg)\b/.test(bgDecl.value)) {
+      offenders.push(...liveSelectors);
     }
   }
   check(offenders.length === 0,
@@ -383,18 +460,23 @@ function selectorEndsWithDisabled(selector) {
   const offendersPp = [];
   for (const rule of rules) {
     // :disabled is the one documented WCAG 1.4.3 exemption (plan §0 /
-    // COMPONENTS.md's #submit-btn:disabled note) -- excluded via
-    // selectorEndsWithDisabled (Ruling 16: a bare `:disabled\b` substring
-    // test wrongly exempted `:not(:disabled)` and `:disabled ~ .y`, matching
+    // COMPONENTS.md's #submit-btn:disabled note) -- excluded PER SELECTOR
+    // via nonExemptSelectors (Ruling 16: a bare `:disabled\b` substring test
+    // wrongly exempted `:not(:disabled)` and `:disabled ~ .y`, matching
     // scripts/ui-render-audit.mjs's weakTextOnFill family's own exemption
-    // rule, which walks the live `disabled` IDL property instead).
-    if (rule.selectors.some((s) => selectorEndsWithDisabled(s))) continue;
+    // rule, which walks the live `disabled` IDL property instead; F7: the
+    // per-RULE `rule.selectors.some(...)` shape also wrongly exempted any
+    // enabled selector co-listed with a genuine `:disabled` one).
+    const liveSelectors = nonExemptSelectors(rule);
+    if (!liveSelectors.length) continue;
     const decls = parseDeclarations(rule.body);
     const colorDecl = decls.find((d) => d.property === "color");
     const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
     if (!colorDecl || !bgDecl) continue;
-    if (/--pp-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--pp-(btn-bg|btn-hover)\b/.test(bgDecl.value)) {
-      offendersPp.push(rule.selectorText);
+    // Q3 (T5 fix wave): widened to law 8's full four-fill set (input-bg,
+    // chip-bg added) -- see the options check above for the rationale.
+    if (/--pp-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--pp-(btn-bg|btn-hover|input-bg|chip-bg)\b/.test(bgDecl.value)) {
+      offendersPp.push(...liveSelectors);
     }
   }
   check(offendersPp.length === 0,
@@ -452,19 +534,22 @@ function selectorEndsWithDisabled(selector) {
   const offendersLib = [];
   for (const rule of rules) {
     // :disabled is the one documented WCAG 1.4.3 exemption (plan §0 /
-    // COMPONENTS.md's #submit-btn:disabled note) -- excluded via
-    // selectorEndsWithDisabled (Ruling 16), matching scripts/ui-render-
+    // COMPONENTS.md's #submit-btn:disabled note) -- excluded PER SELECTOR
+    // via nonExemptSelectors (Ruling 16 + F7), matching scripts/ui-render-
     // audit.mjs's weakTextOnFill family's own exemption rule. library.css
     // has no disabled-state consumer of these tokens today; the exclusion is
     // kept for parity with the T2/T3 checks and to stay correct if one is
     // added later.
-    if (rule.selectors.some((s) => selectorEndsWithDisabled(s))) continue;
+    const liveSelectors = nonExemptSelectors(rule);
+    if (!liveSelectors.length) continue;
     const decls = parseDeclarations(rule.body);
     const colorDecl = decls.find((d) => d.property === "color");
     const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
     if (!colorDecl || !bgDecl) continue;
-    if (/--lib-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--lib-(btn-bg|btn-hover)\b/.test(bgDecl.value)) {
-      offendersLib.push(rule.selectorText);
+    // Q3 (T5 fix wave): widened to law 8's full four-fill set (input-bg,
+    // chip-bg added) -- see the options check above for the rationale.
+    if (/--lib-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--lib-(btn-bg|btn-hover|input-bg|chip-bg)\b/.test(bgDecl.value)) {
+      offendersLib.push(...liveSelectors);
     }
   }
   check(offendersLib.length === 0,
