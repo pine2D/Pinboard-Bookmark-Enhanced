@@ -546,9 +546,11 @@ fg/panel 基线本就只有 4.86:1，任何 fg 浸染都会吃掉这点余量）
 | `background` | **`--{ns}-chip-bg`** | 新增派生。现状 `tag-bg`/`tag-fg` 直取 palette **无 AA 校正** |
 | `background`（档位可分辨性，Task 2） | `--{ns}-chip-bg` | `fillDistinct(chip, [btn-bg], accent)` ≥6 ΔE2000 vs `--{ns}-btn-bg`——三表面（popup 自 Task 4/taste-uplift-batch3/D9 起同路，`chipMode: "verbatim"` 已退役，见 §1.2 tonal 段） |
 | `color` | **`--{ns}-chip-fg`** | `fgToAA(chip-fg, chip-bg)` ≥4.5:1。chip 若可按压（`[aria-pressed]`，hover 底换成 `btn-hover`），改用 `fgToAAMulti(chip-fg, [chip-bg, btn-hover])` |
+| `color`（popup only，AI 标签族 `.stag.ai`，Task 4/taste-uplift-batch3/D8） | **`--pp-ai-chip-fg`** | `fgToAAMulti(accent2, [chip-bg, btn-hover])`——种子是 `--pp-accent2`（`.action-link`/`.regen-link` 共用的原始紫，无 AA 保证）而非 `tag-fg`，派生须在 `chip-bg` 自己的 tinted finalization **之后**跑（读最终 chip-bg，不是 tint 前的 tag-bg） |
 
 popup 现有的 `--pp-tag-bg` / `--pp-tag-fg` 是同一角色的旧名。Task 5 发射新名、消费点迁移完成后
-**退役旧名，不留别名**——两套真源迟早会漂移。
+**退役旧名，不留别名**——两套真源迟早会漂移。`--pp-ai-chip-fg` 是 popup 独有的第三个 chip 文字角色，
+不是 `chip-fg` 的别名——AI 建议的标签需要保留紫色识别度，`chip-fg` 走中性色。
 
 ### 5.4 几何约束
 
@@ -1151,6 +1153,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | render oracle `tabChrome` | tab 无壳 + 选中下划线（选中/未选中各一条，15 主题） |
 | `ui-token-coverage` | 新角色 token 在每个主题块都有定义 |
 | `contrast-audit` 的 `chip-bg ΔE btn-bg`（Task 2；Task 4/taste-uplift-batch3 起加入 popup） | 档位可分辨性：tonal 填充 / 选中 chip 填充与相邻的静息 `.btn` 填充 ΔE2000 ≥6，三表面 |
+| `contrast-audit` 的 `ai-chip-fg vs chip-bg` / `ai-chip-fg vs btn-hover`（Task 4/taste-uplift-batch3/D8，popup only） | `.stag.ai` 的紫色文字对静息 chip 填充与可按压 hover 底都 ≥4.5:1；15 行（14 主题块 + default），default 块缺角色现在 **FAIL 不 SKIP**（Ruling 25，见 `contrast-audit.mjs` 的 `isOutputRoleForDefault`） |
 
 `fillSeparate` 本身**没有独立的门**：它的正确性由 `contrast-audit` 从下游反向约束
 （填充错了，btn-fg / border / danger-quiet-fg 的配对必然红），加上恒等性质

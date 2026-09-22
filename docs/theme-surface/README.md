@@ -430,15 +430,20 @@ ui-components) are covered without any per-region code in the audit itself.
 colors (`btn-fg`, `danger-quiet-fg`, `on-danger`, `chip-bg`, `chip-fg`) are
 computed by `_ui-derive.mjs#finalizeUiControlRoles` from the FINAL,
 post-`ui`-override map, so popup/options/library use one contrast and soft-fill
-algorithm. Popup then derives its surface-only `preset-fg` and `spinner-fg`.
+algorithm. Popup then derives its surface-only `preset-fg` / `spinner-fg`, plus
+`ai-chip-fg` (Task 4, taste-uplift-batch3, D8) — text for the AI-suggested
+chip family (`.stag.ai`), seeded from `--pp-accent2` instead of `tag-fg`,
+derived right after `chip-bg`'s own tinted finalization so it reads the
+FINAL chip-bg, not the pre-tint `tag-bg`.
 
-**These seven names are derived outputs, not authoring inputs.**
+**These eight names are derived outputs, not authoring inputs.**
 `validate-contracts.mjs` rejects the five shared names on every surface and
-also rejects `preset-fg` / `spinner-fg` under `ui.popup.*`, naming the exact
-JSON pointer. This replaces the former silent-discard limitation with an
-executable contract. Change supported inputs (`btn-bg`, `danger`, `tag-bg`,
-`tag-fg`, `preset-bg`, `spinner-bg`, etc.) and let the finalizer produce a
-passing pair; adding a genuinely new output escape hatch requires changing
+also rejects `preset-fg` / `spinner-fg` / `ai-chip-fg` under `ui.popup.*`,
+naming the exact JSON pointer. This replaces the former silent-discard
+limitation with an executable contract. Change supported inputs (`btn-bg`,
+`danger`, `tag-bg`, `tag-fg`, `preset-bg`, `spinner-bg`, `accent2`, etc.) and
+let the finalizer produce a passing pair; adding a genuinely new output escape
+hatch requires changing
 the derivation contract and its tests rather than hiding it in a pilot.
 
 **Spacing adapter.** The recipe declares padding/gap in plain px semantics;

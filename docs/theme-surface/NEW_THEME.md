@@ -356,10 +356,19 @@ final-fix wave:
   tinted finalization (it reads the FINAL chip-bg, not the pre-tint
   tag-bg). Its gate is two `contrast-audit.mjs` `COMPONENT_PAIR_SPEC` rows
   (`ai-chip-fg vs chip-bg`, `ai-chip-fg vs btn-hover`), each counted at 15
-  rows (14 themed blocks + the default surface) — stated by counted rows,
-  not by a hand-picked example, since that count is the only thing that
-  proves the gate ran against every block instead of silently skipping
-  some.
+  rows (14 themed blocks + the default surface). **That row count alone does
+  NOT prove no silent skip** (Ruling 25, 2026-09-23 — corrected from an
+  earlier, false version of this paragraph): the 14 themed-block rows are
+  strict (a missing role there always FAILs), but the default-surface row
+  used to run non-strict, where an unresolvable role prints one SKIP line
+  and the total count stays 15 either way — a negative control that deleted
+  `--pp-ai-chip-fg` from popup's default `:root` proved the run still
+  exited 0 with the count unchanged. What actually closes that hole is
+  `contrast-audit.mjs`'s `isOutputRoleForDefault()`: every
+  `UI_DERIVED_OUTPUT_ROLES` member (which `ai-chip-fg` is) now FAILs, not
+  SKIPs, when a default block doesn't declare it, even on that non-strict
+  path — see that function's own comment for the roles that still
+  legitimately SKIP there and why.
 - **TEXT input roles are taken VERBATIM (batch2 final-fix wave).** `fg`,
   `fg-hint`, `fg-muted`, and popup's `on-accent` are never adjusted by the
   derivation once a pilot overrides them — `_ui-derive.mjs`'s own gap-fill

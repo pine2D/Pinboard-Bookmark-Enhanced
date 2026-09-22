@@ -12,7 +12,7 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, primaryHoverFill, mix } from "../composers/_ui-derive.mjs";
+import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, primaryHoverFill, mix, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
 // LIB_BATCH_BAND_MIX: library.css paints a batch-selected row's fill as an
@@ -303,10 +303,20 @@ const COMPONENT_PAIR_SPEC = [
   // tag-fg/tag-bg is the pre-chip-migration role pair (COMPONENTS §5.3
   // marks --pp-chip-fg as chip-fg/chip-bg's intended replacement, but
   // popup.css:453/2016's .tag-item still reads tag-fg/tag-bg directly).
-  // Verified identical to chip-fg/chip-bg on every current theme (the
-  // composer copies tag-bg into chip-bg verbatim and chip-fg's derivation is
-  // already an identity on tag-fg's own value everywhere), so this is pure
-  // coverage -- zero derivation change needed.
+  // Both are RAW palette values (tag-fg is not AA-corrected against tag-bg
+  // by any derivation step) -- this row is what actually keeps them legible,
+  // not a proxy for some other row.
+  // CORRECTION (Ruling 25, 2026-09-23): this comment used to claim tag-fg/
+  // tag-bg was "verified identical to chip-fg/chip-bg on every current
+  // theme" and needed no coverage of its own for that reason. That was true
+  // only while popup-chrome.mjs passed chipMode: "verbatim" (chip-bg WAS a
+  // byte-copy of tag-bg). Task 4/D9 (taste-uplift-batch3) tinted chip-bg
+  // (`fillSeparate`+`fillDistinct` in finalizeUiControlRoles, same path
+  // options/library always used) -- chip-bg now differs from tag-bg on
+  // 12/14 popup themes, and chip-fg's own fgToAAMulti call is derived
+  // against the NEW chip-bg, not tag-bg, so it is no longer an identity on
+  // tag-fg either. This row was never redundant with the chip-fg/chip-bg
+  // rows above; it is independent, real coverage for a still-live consumer.
   ["tag-fg", "tag-bg", 4.5, ["pp"]],
   // Loading-spinner ring: a non-text UI indicator (WCAG 1.4.11's 3:1 floor,
   // not the 4.5:1 text minimum), same class as the scrollbar-thumb-vs-track
@@ -432,6 +442,59 @@ function foldSelectorBlocks(text, selector) {
   return dict;
 }
 
+// Ruling 25 (2026-09-23, taste-uplift-batch3 ledger): which roles a DEFAULT
+// (:root) block may legitimately go without. `ns` here is the CSS prefix
+// ("pp"/"opt"/"lib"); UI_DERIVED_OUTPUT_ROLES (_ui-derive.mjs) is keyed by
+// the surface's full name -- this is the one place that translates between
+// them for this purpose.
+const SURFACE_BY_NS = { pp: "popup", opt: "options", lib: "library" };
+
+// A role in UI_DERIVED_OUTPUT_ROLES[<surface>] is what finalizeUiControlRoles
+// (or, for popup's ai-chip-fg, popup-chrome.mjs's own follow-up derivation
+// run immediately after it) PRODUCES -- once that pipeline runs at all, it
+// always emits every one of these, so the role's absence from a default
+// block is a real regression (the derivation silently not running, or a
+// hand-authored DEFAULT_LIGHT/DEFAULT block losing a line), never a
+// legitimate gap. isOutputRoleForDefault() is therefore this file's single
+// source of truth for "must this default block declare this role" -- it is
+// ns-aware on purpose: on-accent is a UI_DERIVED_OUTPUT_ROLES member for
+// options/library (never had a pilot-configurable value, see _ui-derive.mjs)
+// but stays an INPUT role on popup (`ui.popup.<mode>.on-accent`, 5/13
+// pilots use it, `#submit-btn`'s own long-standing precedent) -- the SAME
+// role name is strict on two surfaces and not on the third.
+function isOutputRoleForDefault(ns, role) {
+  const roles = UI_DERIVED_OUTPUT_ROLES[SURFACE_BY_NS[ns]];
+  return !!roles && roles.includes(role);
+}
+
+// Every role COMPONENT_PAIR_SPEC (or the two bespoke chip-bg/primary-hover
+// checks below) mentions that is NOT a UI_DERIVED_OUTPUT_ROLES member, with
+// the one-line reason a default (:root) block may legitimately go without
+// it -- Ruling 25 asked for these spelled out explicitly rather than left as
+// an unexplained double-negative ("not an output role"). This object is
+// documentation, consulted by a human reading this file or the test that
+// cross-checks it (tests/theme-ui-derive-tests.mjs) -- isOutputRoleForDefault()
+// above, not this object, is what the audit actually runs on, so the two can
+// never drift into disagreeing about what's strict without a red test.
+const DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS = {
+  bg: "hand-maintained base surface color, predates the derivation pipeline entirely",
+  panel: "hand-maintained elevated-surface base token, same reasoning as bg",
+  "btn-bg": "Soft Fill fill -- fillSeparate ADJUSTS a hand/pilot seed, it does not originate one; never added to UI_DERIVED_OUTPUT_ROLES",
+  "btn-hover": "derived from btn-bg by the same fillSeparate call, same reasoning as btn-bg",
+  "input-bg": "hand-maintained base token for field fills",
+  danger: "raw palette input role (ui.<surface>.<mode>.danger), never a derived output",
+  accent: "raw palette input role, same reasoning as danger",
+  border: "derived by borderToAA, a separate pass from finalizeUiControlRoles; never added to UI_DERIVED_OUTPUT_ROLES",
+  "focus-bd": "derived by focusBdToAA, same separate-pass reasoning as border",
+  fg: "TEXT input role, taken VERBATIM from a pilot override (NEW_THEME.md \"TEXT input roles\") -- the opposite of a derived output",
+  "on-accent": "popup ONLY: an INPUT role there (5/13 pilots override ui.popup.<mode>.on-accent); on options/library it IS a UI_DERIVED_OUTPUT_ROLES member and stays strict",
+  "warn-fg": "popup-only: derived by pairToAA(destroy, bg, mode) in deriveUiColors, not finalizeUiControlRoles, so never added to UI_DERIVED_OUTPUT_ROLES",
+  "warn-bg": "popup-only: same pairToAA origin as warn-fg",
+  "tag-fg": "popup-only: legacy pre-chip-migration raw palette pair (COMPONENTS.md §5.3), taken verbatim",
+  "tag-bg": "popup-only: same legacy pair as tag-fg",
+  "spinner-bg": "popup-only: hand-maintained UI-indicator base fill (spinner-fg IS a derived output; this is only what it's measured against)",
+};
+
 // Runs COMPONENT_PAIR_SPEC against one already-parsed token dict (a themed
 // block's body, or a folded default-surface dict). `strict` distinguishes
 // the two block kinds Task 5 actually guarantees differently:
@@ -441,20 +504,28 @@ function foldSelectorBlocks(text, selector) {
 //    regression, not a legitimate gap, so it FAILs loudly (same philosophy
 //    as this file's existing metadata-fg check: "a MISSING token is itself
 //    a failure").
-//  - default-surface blocks (:root / html.dark): Task 5 deliberately added
-//    ONLY the 5 new tokens there (visual-zero-change scope), leaving
-//    whichever of bg/panel/btn-bg/btn-hover/danger/border the surface
-//    already had (or didn't -- options' default surface once lacked
-//    --opt-btn-bg/--opt-btn-hover, pre-Task-9; both are declared there
-//    now). A missing role there is an intentional, in-scope-elsewhere gap,
-//    so it SKIPs (printed, non-blocking, counted in skipCount) instead of
-//    failing. Callers of the non-strict path MUST guard against the fold
-//    itself coming back empty or missing its sentinel role first (see
+//  - default-surface blocks (:root / html.dark), `strict = false`,
+//    `isDefaultSurface = true`: Task 5 deliberately added ONLY the 5 new
+//    tokens there at the time (visual-zero-change scope), leaving whichever
+//    of bg/panel/btn-bg/btn-hover/danger/border the surface already had (or
+//    didn't -- options' default surface once lacked --opt-btn-bg/
+//    --opt-btn-hover, pre-Task-9; both are declared there now). That is
+//    still true for the roles listed in DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS
+//    above, which SKIP (printed, non-blocking, counted in skipCount) when
+//    missing, same as before -- but Ruling 25 (2026-09-23) found this
+//    non-strict path was ALSO swallowing a UI_DERIVED_OUTPUT_ROLES member
+//    going missing (a negative control that deleted --pp-ai-chip-fg from
+//    popup's :root printed one SKIP line, the total row count stayed 15,
+//    and the whole run still exited 0): a working derivation pipeline
+//    always emits every output role once it runs at all, so ANY missing
+//    role that isOutputRoleForDefault() recognizes now FAILs even on this
+//    non-strict path. Callers of the non-strict path MUST guard against the
+//    fold itself coming back empty or missing its sentinel role first (see
 //    auditComponentPairsDefault) -- otherwise every pair here degrades to
 //    a silent SKIP and this function alone can't tell "legitimately
 //    not-yet-wired" apart from "the caller's selector regex matched
 //    nothing at all".
-function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
+function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurface = false) {
   const alias = ROLE_ALIAS[ns] || {};
   const roleKey = (role) => `${ns}-${alias[role] || role}`;
   const roleRaw = (role) => dict[roleKey(role)];
@@ -477,6 +548,18 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
     if (COMPOSITE_OVER_PANEL.has(role) && panelRgb) return { rgb: resolveOpaqueBg(raw, panelRgb), note: null };
     return { rgb: null, note: "non-hex value" };
   };
+  // Ruling 25: escalate a SKIP to a FAIL, even on the non-strict (default-
+  // surface) path, when whichever role(s) actually failed to resolve are a
+  // UI_DERIVED_OUTPUT_ROLES member -- see isOutputRoleForDefault() above.
+  // `missingRoles` is only the role name(s) that ACTUALLY failed to resolve
+  // this time, not both columns of the pair unconditionally: a row whose
+  // fgRole is an output role but whose bgRole (present) is the optional one
+  // must still FAIL when fgRole itself is the one missing, and must NOT
+  // spuriously escalate a genuinely-optional bgRole's own absence just
+  // because its sibling column happens to be strict in the abstract.
+  const rowMustFail = (strictFlag, missingRoles) =>
+    strictFlag || (isDefaultSurface && missingRoles.some((r) => isOutputRoleForDefault(ns, r)));
+
   for (const [fgRole, bgRole, min, onlyNs, themedOnly] of COMPONENT_PAIR_SPEC) {
     if (onlyNs && !onlyNs.includes(ns)) continue; // role doesn't exist on this surface -- not a gap, just N/A
     if (themedOnly && !strict) continue; // themed-layer role; the default surface names the same pair differently
@@ -484,10 +567,14 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
     const label = `${fgRole} vs ${bgRole}`;
     const fg = resolveRole(fgRole), bg = resolveRole(bgRole);
     if (!fg.rgb || !bg.rgb) {
+      const missingRoles = [];
+      if (!fg.rgb) missingRoles.push(fgRole);
+      if (!bg.rgb) missingRoles.push(bgRole);
+      const rowStrict = rowMustFail(strict, missingRoles);
       const why = fg.note || bg.note;
-      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + label.padEnd(28) + " " + (strict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + label.padEnd(28) + " " + (rowStrict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
       console.log(line);
-      if (strict) violations.push(line);
+      if (rowStrict) violations.push(line);
       else skipCount++;
       continue;
     }
@@ -513,10 +600,14 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
     const chip = resolveRole("chip-bg"), btn = resolveRole("btn-bg"), panel = resolveRole("panel");
     const tierLabel = "chip-bg ΔE btn-bg";
     if (!chip.rgb || !btn.rgb) {
+      const missingRoles = [];
+      if (!chip.rgb) missingRoles.push("chip-bg");
+      if (!btn.rgb) missingRoles.push("btn-bg");
+      const rowStrict = rowMustFail(strict, missingRoles);
       const why = chip.note || btn.note;
-      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + tierLabel.padEnd(28) + " " + (strict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + tierLabel.padEnd(28) + " " + (rowStrict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
       console.log(line);
-      if (strict) violations.push(line);
+      if (rowStrict) violations.push(line);
       else skipCount++;
     } else {
       const de = deltaE2000(chip.rgb, btn.rgb);
@@ -536,10 +627,14 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
     // computed it.
     const panelLabel = "chip-bg vs panel";
     if (!chip.rgb || !panel.rgb) {
+      const missingRoles = [];
+      if (!chip.rgb) missingRoles.push("chip-bg");
+      if (!panel.rgb) missingRoles.push("panel");
+      const rowStrict = rowMustFail(strict, missingRoles);
       const why = chip.note || panel.note;
-      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + panelLabel.padEnd(28) + " " + (strict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + panelLabel.padEnd(28) + " " + (rowStrict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
       console.log(line);
-      if (strict) violations.push(line);
+      if (rowStrict) violations.push(line);
       else skipCount++;
     } else {
       console.log(check(scope, blockLabel, panelLabel, cr(chip.rgb, panel.rgb), FILL_SEPARATE_MIN));
@@ -567,10 +662,15 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
     const hoverLabel = "on-accent vs primary-hover";
     const onAccent = resolveRole("on-accent"), accentForHover = resolveRole("accent"), fgForHover = resolveRole("fg");
     if (!onAccent.rgb || !accentForHover.rgb || !fgForHover.rgb) {
+      const missingRoles = [];
+      if (!onAccent.rgb) missingRoles.push("on-accent");
+      if (!accentForHover.rgb) missingRoles.push("accent");
+      if (!fgForHover.rgb) missingRoles.push("fg");
+      const rowStrict = rowMustFail(strict, missingRoles);
       const why = onAccent.note || accentForHover.note || fgForHover.note;
-      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + hoverLabel.padEnd(28) + " " + (strict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + hoverLabel.padEnd(28) + " " + (rowStrict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
       console.log(line);
-      if (strict) violations.push(line);
+      if (rowStrict) violations.push(line);
       else skipCount++;
     } else {
       const hoverFill = primaryHoverFill(accentForHover.rgb, fgForHover.rgb);
@@ -1494,19 +1594,23 @@ auditLibraryThemes(resolve(ROOT, "library.css"));
 // file's hand-maintained :root (bg/panel/btn-bg/btn-hover/danger/border —
 // pre-existing, NOT touched by Task 5) with the generated :root appended at
 // the end of @generated:ui-themes (Task 5's 5 new tokens only) — the same
-// cascade the browser resolves. strict=false: unlike the 13/14 themed
-// blocks, Task 5 deliberately left the default surface's non-new roles
-// exactly as they were (visual-zero-change scope), so a role this surface
-// simply never declared (e.g. options' default once had no --opt-btn-bg/
-// --opt-btn-hover, pre-Task-9; both are declared there now) is an
-// in-scope-elsewhere gap, not a regression to fail on.
+// cascade the browser resolves. strict=false, isDefaultSurface=true: unlike
+// the 13/14 themed blocks, Task 5 deliberately left the default surface's
+// non-new roles exactly as they were (visual-zero-change scope), so a role
+// in DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS above (e.g. options' default once
+// had no --opt-btn-bg/--opt-btn-hover, pre-Task-9; both are declared there
+// now) going missing is an in-scope-elsewhere gap, not a regression to fail
+// on. A UI_DERIVED_OUTPUT_ROLES member going missing is a DIFFERENT class of
+// gap (Ruling 25, 2026-09-23) -- auditComponentPairs's own rowMustFail()
+// FAILs on those even here.
 function auditComponentPairsDefault(scope, ns, cssPath, selector, blockLabel) {
   const text = readFileSync(cssPath, "utf8");
   const dict = foldSelectorBlocks(text, selector);
   // Guard against the whole default-surface probe silently degrading to a
-  // no-op. `strict=false` below means an unresolvable role SKIPs rather than
-  // FAILs -- correct for a role Task 5 legitimately never touched, but if
-  // `selectorSrc` itself stops matching ANY block (e.g. `:root { ... }`
+  // no-op. `strict=false` below means an unresolvable OPTIONAL role SKIPs
+  // rather than FAILs -- correct for a role Task 5 legitimately never
+  // touched, but if `selectorSrc` itself stops matching ANY block (e.g.
+  // `:root { ... }`
   // rewritten to `:root, html { ... }` -- verified via a real repro: the
   // fold then returns {} for that occurrence, every one of the surviving
   // small :root blocks in these files is font/motion-only and none declares
@@ -1521,7 +1625,7 @@ function auditComponentPairsDefault(scope, ns, cssPath, selector, blockLabel) {
     violations.push(line);
     return;
   }
-  auditComponentPairs(scope, ns, blockLabel, dict, false);
+  auditComponentPairs(scope, ns, blockLabel, dict, false, true);
   auditDefaultTextTiers(scope, ns, blockLabel, dict);
 }
 

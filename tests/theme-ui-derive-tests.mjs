@@ -14,6 +14,7 @@ import {
   PRIMARY_HOVER_FG_MIX,
   relLum,
   resolveChipBg,
+  resolveOpaqueBg,
   rgbToHex,
   TIER_DISTINCT_MIN_DE,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
@@ -700,6 +701,76 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
 // reason (c) above documents for btn-fg-muted: a self-mutating test would
 // have to un-import/re-import the module under test at runtime, which this
 // file's other tests do not do either.
+
+// --- ai-chip-fg DEFAULT-SURFACE literal check (Ruling 25, 2026-09-23,
+// taste-uplift-batch3 ledger). popup-chrome.mjs's DEFAULT_LIGHT is a
+// hand-authored literal block (not run through composePopupThemeMap's
+// finalizeUiControlRoles pipeline -- see that file's own comment on
+// DEFAULT_LIGHT), so nothing before this test independently verified its
+// `ai-chip-fg` entry actually equals what the SAME formula the themed-block
+// derivation uses would produce from the default surface's own hosts. Reads
+// the real SHIPPED popup.css (not a re-imported copy of DEFAULT_LIGHT, which
+// isn't exported) so this stays honest if a future edit changes any of the
+// three inputs: --pp-accent2 (hand-maintained top-of-file :root) and
+// --pp-chip-bg/--pp-btn-hover (the generated default :root block, the last
+// `:root { ... }` before the `@generated:ui-themes end` sentinel -- same
+// block auditComponentPairsDefault's `foldSelectorBlocks(text, ":root")`
+// reads in contrast-audit.mjs).
+{
+  const popupCssPath = new URL("../popup.css", import.meta.url);
+  const popupCssText = readFileSync(popupCssPath, "utf8");
+  const genEndIdx = popupCssText.indexOf("@generated:ui-themes end");
+  check(genEndIdx !== -1, "popup.css must still carry the @generated:ui-themes end sentinel");
+  const beforeEnd = popupCssText.slice(0, genEndIdx);
+  const lastRootStart = beforeEnd.lastIndexOf(":root {");
+  check(lastRootStart !== -1, "popup.css must have a :root block before @generated:ui-themes end");
+  const defaultBlock = beforeEnd.slice(lastRootStart, genEndIdx);
+  const grabHex = (source, name) => {
+    const m = source.match(new RegExp(`--pp-${name}:\\s*(#[0-9a-fA-F]{6})`));
+    return m ? m[1] : null;
+  };
+  const accent2Hex = grabHex(popupCssText, "accent2");
+  const chipBgHex = grabHex(defaultBlock, "chip-bg");
+  const btnHoverHex = grabHex(defaultBlock, "btn-hover");
+  const aiChipFgHex = grabHex(defaultBlock, "ai-chip-fg");
+  check(accent2Hex && chipBgHex && btnHoverHex && aiChipFgHex,
+    `popup.css must declare --pp-accent2 (${accent2Hex}), and the default block must declare --pp-chip-bg (${chipBgHex}), --pp-btn-hover (${btnHoverHex}), and --pp-ai-chip-fg (${aiChipFgHex})`);
+  if (accent2Hex && chipBgHex && btnHoverHex && aiChipFgHex) {
+    const expected = rgbToHex(fgToAAMulti(hexToRgb(accent2Hex), [hexToRgb(chipBgHex), hexToRgb(btnHoverHex)]));
+    check(aiChipFgHex.toLowerCase() === expected.toLowerCase(),
+      `popup.css's default-surface --pp-ai-chip-fg (${aiChipFgHex}) must equal fgToAAMulti(accent2=${accent2Hex}, [chip-bg=${chipBgHex}, btn-hover=${btnHoverHex}]) = ${expected}, the same formula the themed-block derivation uses (popup-chrome.mjs)`);
+  }
+}
+
+// --- resolveOpaqueBg direct coverage (Ruling 25, 2026-09-23). Every prior
+// use of this exported function was indirect (through contrast-audit.mjs's
+// own CLI run, or through resolveChipBg/finalizeUiControlRoles's internal
+// calls) -- nothing in this suite imported and called it directly, so a
+// regression in its own three branches (opaque hex passthrough, 8-digit
+// alpha-hex compositing, anything-else falls through to the fallback) could
+// only ever be caught as a downstream contrast-number shift, not attributed
+// to this function. Three branches, one assertion each. ---
+{
+  // (1) A plain opaque hex is returned unchanged -- no compositing needed.
+  const opaque = resolveOpaqueBg("#33589f", [1, 2, 3]);
+  check(opaque[0] === 0x33 && opaque[1] === 0x58 && opaque[2] === 0x9f,
+    `resolveOpaqueBg must pass an opaque hex through unchanged -- got [${opaque}]`);
+
+  // (2) An 8-digit RRGGBBAA hex is alpha-blended over the fallback -- uses
+  // terminal's real pilot value (#33ff3340, its border/selection-bg) so this
+  // is not a synthetic shape nothing in the codebase actually emits.
+  const fallback = [10, 10, 10];
+  const composited = resolveOpaqueBg("#33ff3340", fallback);
+  const expectedComposite = mix(fallback, hexToRgb("#33ff33"), 0x40 / 255);
+  check(composited.every((c, i) => Math.abs(c - expectedComposite[i]) < 1e-9),
+    `resolveOpaqueBg must alpha-composite an 8-digit hex over the fallback -- got [${composited}], expected [${expectedComposite}]`);
+
+  // (3) Anything else (the literal keyword "transparent", or any other
+  // non-hex value) is treated as fully transparent: the fallback verbatim.
+  const fellThrough = resolveOpaqueBg("transparent", [200, 150, 100]);
+  check(fellThrough[0] === 200 && fellThrough[1] === 150 && fellThrough[2] === 100,
+    `resolveOpaqueBg must fall through to the fallback verbatim for a non-hex value -- got [${fellThrough}]`);
+}
 
 if (failures.length) {
   console.error(failures.map((message) => `FAIL ${message}`).join("\n"));
