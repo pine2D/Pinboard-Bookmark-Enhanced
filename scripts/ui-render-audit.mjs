@@ -1573,6 +1573,29 @@ async function driveGapMin(page, check) {
 }
 
 async function runOneCheck(page, theme, check, results, extBase) {
+  // F1 (final fix wave, Ruling 29, batch-end review F1): this audit runs
+  // HEADED (MV3 extensions require it -- the comment on the launch call
+  // below). On a real display a genuine OS-level cursor can be resting
+  // anywhere over the visible Chromium window at any moment, independent of
+  // anything Playwright dispatched -- Chromium reacts to that real pointer
+  // exactly like a synthetic one, so it can leave an element in `:hover`
+  // that no check here ever asked for. Every state OTHER than "hover"
+  // assumes the pointer is parked away from whatever it is about to read;
+  // without an explicit park at the very top of this function (before the
+  // early-return branches below, not just before the shared probe further
+  // down), a stray real cursor sitting over an element from a PRIOR check or
+  // family scan -- e.g. the seeded `.stag` chip -- can leave it hovered when
+  // a later "default"-state check reads its computed style. Reproduced: the
+  // batch-end review's `.stag|default|bgEqVar` FAIL read btn-hover's fill
+  // instead of chip-bg's, because the physical cursor happened to be
+  // resting on that exact screen pixel. "hover" is exempt here because it
+  // is about to move the pointer onto its OWN target two branches down;
+  // parking it first would be redundant work immediately undone -- the
+  // existing post-hover park (below) already resets it once that state's
+  // own read is done.
+  if (check.state !== "hover") {
+    await page.mouse.move(0, 0);
+  }
   if (check.state === "headerRowsFlush") {
     const { bad, worst } = await driveHeaderRows(page, check);
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
@@ -2289,6 +2312,11 @@ async function recordWeakTextHits(page, surface, theme, results, context) {
   if (liveTheme !== expected) {
     throw new Error(`SETUP: weakTextOnFill ${surface}/${context} expected documentElement.dataset.theme=${JSON.stringify(expected)} (theme=${JSON.stringify(theme)}) but found ${JSON.stringify(liveTheme)} -- theme drifted before the family-13 scan; re-apply themeToStorage(theme) and reload/re-sync before scanning`);
   }
+  // F1 (final fix wave, Ruling 29): same "once before each family scan
+  // pass" park runFamilySweep gives sweepProbe -- weakTextProbe is the
+  // family-13 equivalent, one evaluate() round-trip over every matched
+  // element on the page, with no pointer API of its own.
+  await page.mouse.move(0, 0);
   const { hits, scanned } = await page.evaluate(weakTextProbe, cfg);
   weakTextScanLog.push({ surface, theme, context, scanned });
   for (const h of hits) {
@@ -3849,6 +3877,22 @@ function closeReaderSurface(name) {
   }
 }
 
+// F1 (final fix wave, Ruling 29): "once before each family scan pass" --
+// every `add(await page.evaluate(sweepProbe, SWEEP_CFG), ...)` call below
+// reads getComputedStyle across every matched element on the current page in
+// ONE evaluate() round-trip; sweepProbe itself runs entirely in-page and has
+// no pointer API of its own to defend with. A real host cursor resting on
+// any one of those elements when the pass starts taints just that element's
+// hover-derived colours for the whole pass, the same failure mode
+// runOneCheck's own per-check park (above) closes for checklist-driven
+// checks. One park immediately before the evaluate() call, here rather than
+// duplicated at each of the ~13 call sites, is what "once before each pass"
+// means in practice.
+async function runFamilySweep(page) {
+  await page.mouse.move(0, 0);
+  return page.evaluate(sweepProbe, SWEEP_CFG);
+}
+
 async function runSweep(page, sw, extBase) {
   const hits = [];
   const add = (found, surface, context) => { for (const h of found) hits.push({ surface, context, ...h }); };
@@ -3888,33 +3932,33 @@ async function runSweep(page, sw, extBase) {
       const presetBtn = page.locator(".theme-preset-btn[data-theme='flexoki']").first();
       if (await presetBtn.count()) { await presetBtn.click(); await page.waitForTimeout(150); }
     }
-    add(await page.evaluate(sweepProbe, SWEEP_CFG), "options", tabId);
+    add(await runFamilySweep(page), "options", tabId);
   }
 
   // ---- library: vocab (list, detail pane, batch bar) + notes (list, detail pane). ----
   await page.goto(`${extBase}library.html?_ra=sweep#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
   await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS }).catch(() => {});
   await page.waitForTimeout(300);
-  add(await page.evaluate(sweepProbe, SWEEP_CFG), "library", "vocab-list");
+  add(await runFamilySweep(page), "library", "vocab-list");
   const vocabHead = page.locator("#vocab-list .vocab-card .notes-card-head").first();
   if (await vocabHead.count()) {
     await vocabHead.click(); await page.waitForTimeout(250);
-    add(await page.evaluate(sweepProbe, SWEEP_CFG), "library", "vocab-detail");
+    add(await runFamilySweep(page), "library", "vocab-detail");
   }
   // Ctrl+click on the row head, not a checkbox click: the per-row checkbox was
   // removed 2026-08-06 and selection is now a modified click on the row itself.
   if (await vocabHead.count()) {
     await vocabHead.click({ modifiers: ["Control"] }); await page.waitForTimeout(350);
-    add(await page.evaluate(sweepProbe, SWEEP_CFG), "library", "vocab-batch-bar");
+    add(await runFamilySweep(page), "library", "vocab-batch-bar");
   }
   await page.click("#lib-tab-notes");
   await page.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS }).catch(() => {});
   await page.waitForTimeout(250);
-  add(await page.evaluate(sweepProbe, SWEEP_CFG), "library", "notes-list");
+  add(await runFamilySweep(page), "library", "notes-list");
   const notesHit = page.locator("#notes-list .notes-hit-btn").first();
   if (await notesHit.count()) {
     await notesHit.click(); await page.waitForTimeout(250);
-    add(await page.evaluate(sweepProbe, SWEEP_CFG), "library", "notes-detail");
+    add(await runFamilySweep(page), "library", "notes-detail");
   }
   // Ctrl+click to open .notes-batch-bar.selecting (independent review F3):
   // the sweep used to only single-click a notes row, so .notes-batch-bar's
@@ -3924,7 +3968,7 @@ async function runSweep(page, sw, extBase) {
   // Same modifier-click contract as the vocab list above.
   if (await notesHit.count()) {
     await notesHit.click({ modifiers: ["Control"] }); await page.waitForTimeout(350);
-    add(await page.evaluate(sweepProbe, SWEEP_CFG), "library", "notes-batch-bar");
+    add(await runFamilySweep(page), "library", "notes-batch-bar");
   }
 
   // ---- md-preview: the reader's chrome, static AND interaction-only. The
@@ -3963,7 +4007,7 @@ async function runSweep(page, sw, extBase) {
     await page.goto(`${extBase}md-preview.html?k=render-audit-sweep2`, { waitUntil: "load", timeout: TIMEOUT_MS });
     await page.waitForTimeout(900);
   } else console.warn("[render-audit] reader: _pbpHlKey is not a function; the highlight section stays unseeded");
-  add(await page.evaluate(sweepProbe, SWEEP_CFG), "md-preview", "reader");
+  add(await runFamilySweep(page), "md-preview", "reader");
 
   // Each interaction-only surface is opened through the page's own opener,
   // probed as its own context, then closed. A surface that fails to render
@@ -3972,7 +4016,7 @@ async function runSweep(page, sw, extBase) {
     const ok = await page.evaluate(openReaderSurface, name).catch((e) => `threw: ${e.message}`);
     if (ok !== true) { console.warn(`[render-audit] reader surface NOT RENDERED: ${name} (${ok || "opener returned false"}) -- its controls were not measured`); continue; }
     await page.waitForTimeout(150);
-    add(await page.evaluate(sweepProbe, SWEEP_CFG), "md-preview", name);
+    add(await runFamilySweep(page), "md-preview", name);
     await page.evaluate(closeReaderSurface, name).catch(() => {});
   }
 
@@ -4005,7 +4049,7 @@ async function runSweep(page, sw, extBase) {
     return true;
   }, videoUrl).catch((e) => `threw: ${e.message}`);
   if (videoOk !== true) console.warn(`[render-audit] reader surface NOT RENDERED: video workbench (${videoOk}) -- its controls were not measured`);
-  else add(await page.evaluate(sweepProbe, SWEEP_CFG), "md-preview", "video");
+  else add(await runFamilySweep(page), "md-preview", "video");
 
   // ---- popup: default light + no-preset dark (since batch 2 D6 the latter
   // resolves to the flexoki-dark preset, same as options/library; kept as a
@@ -4016,7 +4060,7 @@ async function runSweep(page, sw, extBase) {
   await page.waitForTimeout(500);
   await page.evaluate(async () => { if (window.PPOffline) await window.PPOffline.refresh(); }).catch(() => {});
   await page.waitForSelector("#offline-queue-bar:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
-  add(await page.evaluate(sweepProbe, SWEEP_CFG), "popup", "light");
+  add(await runFamilySweep(page), "popup", "light");
   // Hidden-by-default states -- feedback card (with its fallback action),
   // URL warning and clean hint, presets and suggest rows, batch permission
   // card and progress bar, markdown strip, expanded offline queue -- shown
@@ -4049,14 +4093,14 @@ async function runSweep(page, sw, extBase) {
     console.warn("[render-audit] popup states: no .offline-queue-item rendered -- the offline queue seed is missing, .offline-queue-item > .actions button is NOT being measured");
   }
   await page.waitForTimeout(150);
-  add(await page.evaluate(sweepProbe, SWEEP_CFG), "popup", "states");
+  add(await runFamilySweep(page), "popup", "states");
 
   await setTheme(sw, "", "dark");
   await page.goto(`${extBase}popup.html?_ra=sweepdark`, { waitUntil: "load", timeout: TIMEOUT_MS });
   await page.waitForTimeout(500);
   await page.evaluate(async () => { if (window.PPOffline) await window.PPOffline.refresh(); }).catch(() => {});
   await page.waitForSelector("#offline-queue-bar:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
-  add(await page.evaluate(sweepProbe, SWEEP_CFG), "popup", "dark");
+  add(await runFamilySweep(page), "popup", "dark");
 
   // ---- popup, LOGGED OUT (popup button-family campaign, 2026-08-07). The
   // two passes above seed a token, so popup.js's `if (!settings.pinboardToken)
@@ -4072,7 +4116,7 @@ async function runSweep(page, sw, extBase) {
   await page.goto(`${extBase}popup.html?_ra=sweeplogin`, { waitUntil: "load", timeout: TIMEOUT_MS });
   await page.waitForSelector("#login-section:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
   await page.waitForTimeout(300);
-  add(await page.evaluate(sweepProbe, SWEEP_CFG), "popup", "login");
+  add(await runFamilySweep(page), "popup", "login");
   await sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF);
 
   return hits;
