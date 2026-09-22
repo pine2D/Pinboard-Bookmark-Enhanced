@@ -221,6 +221,74 @@ check(mdPreviewJs.includes('renderEmptyState(t("mdPreviewEmpty"), "mdPreviewClos
 check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/.test(optionsCss),
   "connection overview does not use the balanced three-column desktop grid");
 
+// Shared by the three weak-text-on-fill offender scans below (options/popup/
+// library) and the T3 review's own scratch reproduction (Ruling 16). The
+// ORIGINAL exemption was a bare `/:disabled\b/.test(selector)` substring
+// test, which is foolable two ways a real selector in this codebase already
+// uses dozens of times (`.btn:hover:not(:disabled)` etc., verified: `grep -c
+// ':not(:disabled)' popup.css options.css library.css` is non-zero in all
+// three):
+//   - `.x:not(:disabled)` matches an ENABLED element -- the opposite of the
+//     WCAG 1.4.3 exemption this is supposed to recognize -- but the
+//     substring ":disabled" is still textually present inside the `:not()`
+//     argument, so the old test wrongly exempted it.
+//   - `.x:disabled ~ .y` describes TWO elements: `.x` (disabled) and `.y`
+//     (the one this rule's declarations actually paint, and which is NOT
+//     itself disabled). The old test still matched the substring anywhere in
+//     the selector and wrongly exempted a rule that paints an enabled
+//     element.
+// Fixed to match scripts/ui-render-audit.mjs's own weakTextOnFill family
+// (T5): exempt only when `:disabled` is a pseudo-class on the selector's
+// FINAL compound (the segment after the last top-level combinator, which is
+// the element the rule's declarations actually paint) and not inside a
+// `:not(...)`/`:is(...)`/`:where(...)` argument.
+function selectorEndsWithDisabled(selector) {
+  // Drop every parenthesized argument (its parens included) before
+  // compound-splitting -- ':not(:disabled)' becomes ':not', which no longer
+  // contains the literal ':disabled' pseudo-class.
+  let depth = 0, stripped = "";
+  for (const ch of selector) {
+    if (ch === "(") { depth++; continue; }
+    if (ch === ")") { depth = Math.max(0, depth - 1); continue; }
+    if (depth === 0) stripped += ch;
+  }
+  // Split on the LAST top-level combinator (descendant space, or '>' / '+' /
+  // '~') to isolate the FINAL compound -- an earlier ':disabled' (an
+  // ancestor or previous sibling, e.g. '.x:disabled ~ .y') describes a
+  // DIFFERENT element than the one this rule paints.
+  const combinator = stripped.match(/(.*[\s>+~])([^\s>+~]+)\s*$/);
+  const finalCompound = combinator ? combinator[2] : stripped;
+  return /:disabled\b/.test(finalCompound);
+}
+
+// ---- Ruling 16 (T3 review): the two adversarial selector shapes above,
+// reproduced as scratch CSS (not the real popup/options/library source),
+// pairing a weak-text colour with a control fill on the SAME rule, run
+// through the exact same exempt-then-pair pipeline the three real checks
+// below use. Both must now be CAUGHT as offenders (not silently exempted) --
+// proving the fix end-to-end, not just asserting selectorEndsWithDisabled's
+// return value in isolation.
+{
+  const scratch = ".x:not(:disabled) { color: var(--opt-fg-hint); background: var(--opt-btn-bg); }\n"
+    + ".x:disabled ~ .y { color: var(--opt-fg-hint); background: var(--opt-btn-bg); }\n";
+  const rules = parseStyleRules(scratch);
+  const caught = [];
+  for (const rule of rules) {
+    if (rule.selectors.some((s) => selectorEndsWithDisabled(s))) continue; // the real exemption path
+    const decls = parseDeclarations(rule.body);
+    const colorDecl = decls.find((d) => d.property === "color");
+    const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
+    if (!colorDecl || !bgDecl) continue;
+    if (/--opt-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--opt-(btn-bg|btn-hover)\b/.test(bgDecl.value)) {
+      caught.push(rule.selectorText);
+    }
+  }
+  check(caught.length === 2 && caught.includes(".x:not(:disabled)") && caught.includes(".x:disabled ~ .y"),
+    "ui-contract-tests.mjs: the tightened :disabled exemption still lets " +
+    [".x:not(:disabled)", ".x:disabled ~ .y"].filter((s) => !caught.includes(s)).join(", ") +
+    " through as a false exemption -- ':not(:disabled)' matches an ENABLED element and ':disabled ~ .y' paints a DIFFERENT (non-disabled) element, neither is the WCAG 1.4.3 exemption");
+}
+
 // ---- weak-text-on-fill (T2, COMPONENTS.md §9.1 law 8): --opt-fg-hint /
 // --opt-fg-muted must never paint text that rests on a control fill
 // (--opt-btn-bg / --opt-btn-hover); the only sanctioned token for secondary
@@ -259,6 +327,13 @@ check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax
 
   const offenders = [];
   for (const rule of rules) {
+    // :disabled is the one documented WCAG 1.4.3 exemption (plan §0 /
+    // COMPONENTS.md's #submit-btn:disabled note) -- excluded via
+    // selectorEndsWithDisabled (Ruling 16), which options.css has no live
+    // consumer of today (verified: `grep -c 'fg-hint\|fg-muted' options.css`
+    // around any `:disabled` selector is 0) but is kept here for parity with
+    // the popup/library checks below and to stay correct if one is added.
+    if (rule.selectors.some((s) => selectorEndsWithDisabled(s))) continue;
     const decls = parseDeclarations(rule.body);
     const colorDecl = decls.find((d) => d.property === "color");
     const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
@@ -285,17 +360,16 @@ check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax
 //   - It cannot see the CASCADE. A higher-specificity `html[data-theme] ...`
 //     rule restating `color` on the SAME selector can silently win at
 //     runtime -- that is scripts/ui-render-audit.mjs's `weakTextOnFill`
-//     family's job (T5, not yet landed as of this commit), not this one's.
+//     family's job (T5), not this one's.
 //   - It cannot see INHERITANCE across rules. A selector with no `background`
 //     of its own is invisible to a same-rule pairing check. Check 2 below
 //     only catches a single rule declaring BOTH `color` and `background` on
 //     the same selector.
-// No render-audit-checklist.mjs row is added for this task: that file has no
-// existing family that pins a computed `color` to a token value (checked --
-// grepped for getPropertyValue("color") / colorEquals-shaped assertions,
-// zero hits), so a `.qbtn` row would be the first of a new kind rather than
-// an addition to an established pattern; T5's `weakTextOnFill` family is
-// where that render-probe coverage is planned to land.
+// No render-audit-checklist.mjs CHECKS row is added for this task: T5's
+// `weakTextOnFill` family (scripts/ui-render-audit.mjs) is a class-scan, not
+// a hand-enumerated selector list, so a `.qbtn` render-probe row would never
+// exist as its own checklist entry -- the family's own header comment there
+// documents its scope instead.
 {
   const hand = stripGeneratedRegions(popupCss);
   const rules = parseStyleRules(hand);
@@ -309,10 +383,12 @@ check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax
   const offendersPp = [];
   for (const rule of rules) {
     // :disabled is the one documented WCAG 1.4.3 exemption (plan §0 /
-    // COMPONENTS.md's #submit-btn:disabled note) -- excluded by the
-    // `disabled` state itself, not by selector name, matching T5's planned
-    // weakTextOnFill exemption rule.
-    if (rule.selectors.some((s) => /:disabled\b/.test(s))) continue;
+    // COMPONENTS.md's #submit-btn:disabled note) -- excluded via
+    // selectorEndsWithDisabled (Ruling 16: a bare `:disabled\b` substring
+    // test wrongly exempted `:not(:disabled)` and `:disabled ~ .y`, matching
+    // scripts/ui-render-audit.mjs's weakTextOnFill family's own exemption
+    // rule, which walks the live `disabled` IDL property instead).
+    if (rule.selectors.some((s) => selectorEndsWithDisabled(s))) continue;
     const decls = parseDeclarations(rule.body);
     const colorDecl = decls.find((d) => d.property === "color");
     const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
@@ -341,8 +417,8 @@ check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax
 //     on the SAME selector (library.css has none for .vocab-sort-btn today,
 //     verified -- `grep -c 'html\[data-theme\][^{]*vocab-sort' library.css`
 //     is 0) can silently win at runtime -- that is
-//     scripts/ui-render-audit.mjs's `weakTextOnFill` family's job (T5, not
-//     yet landed as of this commit), not this one's.
+//     scripts/ui-render-audit.mjs's `weakTextOnFill` family's job (T5), not
+//     this one's.
 //   - It cannot see INHERITANCE across rules. A selector with no `background`
 //     of its own is invisible to a same-rule pairing check -- exactly
 //     .vocab-sort-btn's OWN shape (background: transparent, resting on its
@@ -358,10 +434,11 @@ check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax
 //     on their own rule or any ancestor's -- and D6 itself did not ship this
 //     task (see this commit's message / task-4-report.md: `fg` failed the
 //     26% band on 2/15 blocks, so the plan's own stop line applied).
-// No render-audit-checklist.mjs row is added for this task: same reasoning
-// as the T3 popup check above (no existing family pins a computed `color` to
-// a token value); T5's `weakTextOnFill` family is where that render-probe
-// coverage is planned to land.
+// No render-audit-checklist.mjs CHECKS row is added for this task, same
+// reasoning as the T3 popup check above: T5's `weakTextOnFill` family is a
+// class-scan (including .vocab-sort-seg's unpressed cell AND the four D6
+// batch-band consumers this static scan's third blind spot names above),
+// not a hand-enumerated selector list.
 {
   const hand = stripGeneratedRegions(libraryCss);
   const rules = parseStyleRules(hand);
@@ -375,12 +452,13 @@ check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax
   const offendersLib = [];
   for (const rule of rules) {
     // :disabled is the one documented WCAG 1.4.3 exemption (plan §0 /
-    // COMPONENTS.md's #submit-btn:disabled note) -- excluded by the
-    // `disabled` state itself, not by selector name, matching T5's planned
-    // weakTextOnFill exemption rule. library.css has no disabled-state
-    // consumer of these tokens today; the exclusion is kept for parity with
-    // the T2/T3 checks and to stay correct if one is added later.
-    if (rule.selectors.some((s) => /:disabled\b/.test(s))) continue;
+    // COMPONENTS.md's #submit-btn:disabled note) -- excluded via
+    // selectorEndsWithDisabled (Ruling 16), matching scripts/ui-render-
+    // audit.mjs's weakTextOnFill family's own exemption rule. library.css
+    // has no disabled-state consumer of these tokens today; the exclusion is
+    // kept for parity with the T2/T3 checks and to stay correct if one is
+    // added later.
+    if (rule.selectors.some((s) => selectorEndsWithDisabled(s))) continue;
     const decls = parseDeclarations(rule.body);
     const colorDecl = decls.find((d) => d.property === "color");
     const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
