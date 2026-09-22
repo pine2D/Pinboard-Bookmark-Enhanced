@@ -832,6 +832,18 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   box-shadow: inset 2px 0 0 var(--lib-accent),
               inset 0 0 0 1px color-mix(in srgb, var(--lib-accent) 55%, transparent);
 }
+/* --lib-row-selected-fg (weak-text-on-fill batch, D6 follow-up / Ruling 17):
+   .notes-hit-note/.notes-hit-meta paint their own `color` below, which
+   blocks inheritance from .notes-hit-btn's `color` set above -- same reason
+   .notes-card-head needs its own row-selected-fg rule for the vocab list
+   (see that one near .vocab-card.selected). Scoped to .selected (the batch
+   band) ONLY: the plain [aria-current] state above already reads fg-muted
+   at AA against --lib-row-selected-bg on all 15 blocks and is untouched.
+   --lib-row-selected-fg is already derived against BOTH the rest (20%) and
+   hover (26%) band mixes (library-chrome.mjs's LIB_BATCH_BAND_MIX), so no
+   separate :hover rule is needed -- the token itself clears both. */
+.notes-hit.selected .notes-hit-note,
+.notes-hit.selected .notes-hit-meta { color: var(--lib-row-selected-fg); }
 /* The gridcell wrapper the row button sits in. Its only job is to carry the
    radius down: .notes-hit-btn takes `border-radius: inherit`, so a wrapper
    with no radius of its own would square off every row. */
@@ -2390,6 +2402,13 @@ html.motion-ready .notes-batch-bar.selecting {
               inset 0 0 0 1px color-mix(in srgb, var(--lib-accent) 55%, transparent);
 }
 .vocab-card.selected .notes-card-head { color: var(--lib-row-selected-fg); }
+/* Same reasoning as .notes-hit's pair above: .vocab-row-gloss/.notes-row-meta
+   (defined below) paint their own `color`, blocking inheritance from
+   .notes-card-head. Scoped to .selected (the batch band) ONLY -- the
+   [aria-current] rule above is not touched, its row-selected-bg fill
+   already clears AA with fg-muted. */
+.vocab-card.selected .vocab-row-gloss,
+.vocab-card.selected .notes-row-meta { color: var(--lib-row-selected-fg); }
 .vocab-row-headline {
   display: flex;
   flex-wrap: wrap;
