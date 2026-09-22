@@ -313,7 +313,9 @@ function dangerRules(ns) {
 // only; Task 9 decides whether it's in scope), so it's deliberately absent
 // from CHIP_TARGETS rather than guessed at here. `.vocab-status-chip` is
 // Appendix A3's open design question ("chip family or plain text?") — not
-// listed here for the same reason.
+// listed here for the same reason. `.stag` (popup suggest/AI tag chips,
+// D6/D7, taste-uplift batch3 Task 5) is a SEPARATE site from C11's
+// `.tag-item` bookkeeping chip and is now in scope on its own decision.
 //
 // CHIP_GEOM holds only the two values every chip target genuinely shares
 // (COMPONENTS.md §5.1 laws 1/3: vertical padding >= 2px, line-height pins the
@@ -337,6 +339,18 @@ export const CHIP_TARGETS = [
   // a row of tags where every one is accent-tinted has no selected state left
   // to show. Geometry is the family's: 2px/10px, 14px line box, radius-full.
   { ns: "opt", selector: ".tag-gov-chip-face", radius: "full", pressable: false, selectable: true, padH: 10, fontSize: "12px" },
+  // popup's suggested/AI tag chips (D6/D7, taste-uplift batch3 Task 5). Not
+  // `pressable`/`selectable`: `.stag` is a plain <button>, never carries
+  // `aria-pressed` (its "used" state is `.disabled` + a `.used` class, not a
+  // toggle), so the family's `[aria-pressed]` hover/focus/active variants
+  // would never match it -- those states stay hand-written in popup.css next
+  // to the rest of the roving-toolbar keyboard contract they share a DOM node
+  // with. padH 10 keeps CHIP_GEOM's 18px row (no border) at the pill's
+  // effective radius (D6: stays 18px, not the sm 20px rung); fontSize 12px
+  // preserves the chip's existing text size (§5.2 lets 11-12px float in the
+  // chip rung) -- the batch's only font-size change is the ordinal's 11px,
+  // which stays hand-written on `.stag-num`, never in this recipe.
+  { ns: "pp", selector: ".stag", radius: "full", pressable: false, padH: 10, fontSize: "12px" },
 ];
 
 function chipRules(ns) {

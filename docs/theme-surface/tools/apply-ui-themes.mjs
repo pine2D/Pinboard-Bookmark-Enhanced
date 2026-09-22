@@ -19,7 +19,11 @@ const END = "/* @generated:ui-themes end */";
 // region at just the placeholder comment — see composers/ui-components.mjs
 // for why renderComponents(ns, []) is the deliberate "machinery built, not
 // yet wired up" state this campaign ships in.
-const ACTIVE_COMPONENT_FAMILIES = { pp: ["btn", "btnIc", "danger", "form"], opt: ["btn", "btnIc", "danger", "chip", "form"], lib: ["btn", "btnIc", "danger", "chip", "form"] };
+// pp gained "chip" (D6/D7, taste-uplift batch3 Task 5): CHIP_TARGETS now
+// carries a popup-only `.stag` entry, so this surface needs the family wired
+// up too -- previously chip was inactive for pp because CHIP_TARGETS had no
+// pp entries at all (chipRules("pp") rendered zero rules either way).
+const ACTIVE_COMPONENT_FAMILIES = { pp: ["btn", "btnIc", "danger", "chip", "form"], opt: ["btn", "btnIc", "danger", "chip", "form"], lib: ["btn", "btnIc", "danger", "chip", "form"] };
 
 function loadPilots() {
   const by = {};

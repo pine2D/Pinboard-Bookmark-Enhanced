@@ -358,6 +358,17 @@ a:hover { text-decoration: underline; }
   box-shadow: inset 0 0 0 1px var(--pp-on-danger);
 }
 
+.stag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--pp-sp-1) 10px;
+  font-size: 12px;
+  line-height: 14px;
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-chip-bg);
+  color: var(--pp-chip-fg);
+}
+
 input[type="checkbox"], input[type="radio"] {
   accent-color: var(--pp-accent);
 }
@@ -958,32 +969,71 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    --pp-fg-hint from .last-used-hint above. */
 .tag-copied-flash { color: var(--pp-ok-fg) !important; }
 
-.suggest-area { line-height: 1.9; word-wrap: break-word; overflow-wrap: break-word; }
+.suggest-area { word-wrap: break-word; overflow-wrap: break-word; }
 .suggest-area.muted { padding-top: var(--pp-sp-1); }
+/* Chip flow (D6/D7, taste-uplift batch3 Task 5): the row that actually holds
+   .stag chips. #pinboard-suggest-tags wraps its chips in a .suggest-group per
+   label (popular/recommended); #ai-suggest-tags has no such wrapper -- its
+   chips sit directly under the .suggest-area div (popup-ai.js renderAITags)
+   -- so both are listed here. `gap` now owns chip-to-chip AND wrapped-row
+   spacing (replaces the old line-height:1.9 on .suggest-area above, which
+   was compensating for .stag's height when it was plain inline text, not a
+   chip with its own padding/line-height). */
+.suggest-group, #ai-suggest-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pp-sp-2); }
 .suggest-group { margin-bottom: var(--pp-sp-1); }
 .suggest-group:last-child { margin-bottom: 0; }
 .group-label { font-size: 11px; color: var(--pp-fg-hint); font-weight: 400; margin-right: var(--pp-sp-2); }
-.stag {
-  border: 0; background: none; padding: 0; font-family: inherit;
-  color: var(--pp-link); cursor: pointer; font-size: 12px; margin-right: var(--pp-sp-2); white-space: nowrap;
-  transition: color var(--pp-motion-state);
-}
-.stag:hover { text-decoration: underline; }
-.stag.used { color: var(--pp-fg-hint); text-decoration: line-through; pointer-events: none; }
+/* Geometry/fill/text (display, padding, font-size, line-height, radius,
+   background, color) now come from the chip recipe (ui-components.mjs
+   CHIP_TARGETS, popup-only entry) -- this hand region only adds what the
+   recipe doesn't know: font-family and border reset (buttons don't inherit
+   font-family and DO carry a native UA border -- neither is a chip-recipe
+   property, so keeping them here doesn't re-assert or fight anything the
+   recipe declares, it just covers a property the recipe never touches),
+   cursor, no-wrap, and the state-feedback layer the recipe's non-pressable
+   chips don't emit (.stag is a plain <button>, never [aria-pressed] -- its
+   "used" state is a disabled+class toggle, not an ARIA toggle -- so the
+   family's [aria-pressed] hover/focus/active variants would never match it;
+   those states stay hand-written here next to the rest of the roving-
+   toolbar keyboard contract they share a DOM node with). Chip-to-chip
+   spacing is the container's `gap` above now, not a per-chip margin. */
+.stag { border: 0; font-family: inherit; cursor: pointer; white-space: nowrap; transition: background var(--pp-motion-state), color var(--pp-motion-state); }
+.stag:hover { background: var(--pp-btn-hover); }
+/* AI-suggested chip text (Task 4, D9): --pp-ai-chip-fg is gated against BOTH
+   the chip's rest fill (chip-bg) and its hover fill (btn-hover, painted by
+   .stag:hover above), so one declaration covers both states -- no separate
+   :hover rule or color-mix() needed anymore. */
+.stag.ai { color: var(--pp-ai-chip-fg); }
+/* Soft Fill law 8 (COMPONENTS.md §9.1): fg-hint may not sit directly on a
+   control fill. Dropping the fill to transparent (falls through to the page
+   bg) instead of inventing an in-between "used" chip fill keeps this state on
+   the SAME audited fg-hint vs bg/bg2 pair every other hint text on this
+   surface already uses -- no new token, no new contrast math. Ordered AFTER
+   .stag.ai on purpose (same 0,2,0 specificity, source order decides): a used
+   AI chip must fall back to fg-hint too, not keep painting ai-chip-fg --
+   that token is only gated against chip-bg/btn-hover (Task 4), never against
+   the page bg this state's transparent fill exposes underneath. */
+.stag.used { background: transparent; color: var(--pp-fg-hint); text-decoration: line-through; pointer-events: none; }
 .stag:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
-.stag.ai { color: var(--pp-accent2); }
-.stag.ai:hover { color: color-mix(in srgb, var(--pp-accent2) 80%, #000); }
-/* Count badge inside a suggest chip: spacing via padding (not margin) so the
-   :hover underline runs continuously under "tag (N)" instead of being broken by
-   the margin gap. Scoped to .stag so the autocomplete dropdown's .ac-count
-   (a flex item that relies on margin-left) is unaffected. */
-.stag .ac-count { margin-left: 0; padding-left: var(--pp-sp-2); }
+/* Count badge now sits on the chip's own fill, so it takes the chip's paired
+   text token instead of the autocomplete dropdown's --pp-fg-hint (law 8 --
+   fg-hint isn't audited against chip-bg). The old margin/padding swap here
+   existed only to keep :hover's underline running continuously under
+   "tag (N)"; hover is a fill now, not an underline, so that's gone too --
+   the dropdown's own .ac-count margin-left applies unchanged. Scoped to
+   .stag so the dropdown's plain .ac-count is unaffected. */
+.stag .ac-count { color: var(--pp-chip-fg); }
+/* A used chip's whole label -- including its count -- reads as the
+   fg-hint/line-through state above, not the chip-fg the count would
+   otherwise carry. */
+.stag.used .ac-count { color: inherit; }
 /* Alt+N slot digit (pbpAssignAltNumBadges): the badge IS the keyboard mapping,
-   so it must ride the chip itself. Inherits the chip's link color (all 3 theme
-   layers) at reduced size; aria-hidden in JS -- the accessible equivalent is
-   aria-keyshortcuts on the button. Hidden once used: a struck-through chip
-   keeps its slot reserved but the digit no longer does anything. */
-.stag .stag-num { font-size: 11px; opacity: 0.7; padding-right: var(--pp-sp-1); vertical-align: 1px; }
+   so it must ride the chip itself. tabular-nums keeps digits 1-9 from
+   jittering the chip's width as slots reassign; aria-hidden in JS -- the
+   accessible equivalent is aria-keyshortcuts on the button. Hidden once used:
+   a struck-through chip keeps its slot reserved but the digit no longer does
+   anything. */
+.stag .stag-num { color: var(--pp-chip-fg); font-size: 11px; font-variant-numeric: tabular-nums; margin-right: var(--pp-sp-1); }
 .stag.used .stag-num { visibility: hidden; }
 .add-all-link { border: 0; background: none; padding: 0; font-family: inherit; color: var(--pp-fg-hint); font-size: 11px; cursor: pointer; }
 .add-all-link:hover { text-decoration: underline; color: var(--pp-fg-muted); }
@@ -2644,7 +2694,12 @@ html[data-theme] .field > input[type="text"]:focus, html[data-theme] .field > te
 html[data-theme] .tags-input-wrap { background: var(--pp-input-bg); }
 html[data-theme] .tags-input-wrap:focus-within { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 html[data-theme] .ac-item { color: var(--pp-fg); }
-html[data-theme] .stag.ai { color: var(--pp-accent2); }
+/* html[data-theme] .stag.ai deleted (D6/D7, Task 5): it duplicated the base
+   .stag.ai rule's value verbatim (--pp-accent2) at higher specificity
+   (0,3,0) vs (0,2,0) -- byte-redundant, not load-bearing. Updating the base
+   rule's token to --pp-ai-chip-fg without also deleting this one would have
+   made the higher-specificity themed copy win under every html[data-theme]
+   preset and silently keep painting the retired --pp-accent2 instead. */
 html[data-theme] .action-link { color: var(--pp-accent2); }
 html[data-theme] .regen-link { color: var(--pp-accent2); }
 html[data-theme] .regen-link + .regen-link { border-color: var(--pp-divider); }
