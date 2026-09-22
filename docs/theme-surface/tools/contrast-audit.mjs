@@ -12,9 +12,16 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, primaryHoverFill } from "../composers/_ui-derive.mjs";
+import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, primaryHoverFill, mix } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
+// LIB_BATCH_BAND_MIX: library.css paints a batch-selected row's fill as an
+// accent-over-bg color-mix at these two percentages (rest/hover), not a
+// static token -- the row-selected-fg vs batch-band checks below (weak-
+// text-on-fill batch, D6 follow-up / Ruling 17) compute that fill from the
+// SAME exported constant library-chrome.mjs's own derivation uses, so the
+// two can never drift apart (see that file's comment on the constant).
+import { LIB_BATCH_BAND_MIX } from "../composers/library-chrome.mjs";
 import { parseDeclarations, parseStyleRules } from "./css-syntax.mjs";
 
 // deltaE2000 moved to _ui-derive.mjs (Task 2, taste-uplift-batch2) so
@@ -1433,6 +1440,27 @@ function auditLibraryThemes(cssPath) {
       const rowFg = resolveColor(rowFgS, rowBg);
       if (rowFg) console.log(check("library", theme, "row-selected-fg vs row-selected-bg", cr(rowFg, rowBg), 4.5));
     }
+    // Batch-selected band pair (weak-text-on-fill batch, D6 follow-up /
+    // Ruling 17): .vocab-row-gloss/.notes-row-meta/.notes-hit-note/
+    // .notes-hit-meta read --lib-row-selected-fg in the .selected (batch)
+    // state, whose fill is NOT row-selected-bg above but an accent-over-bg
+    // color-mix at LIB_BATCH_BAND_MIX's two percentages (library.css's own
+    // --lib-band-mix / --lib-band-mix-hover :root tokens) -- computed here
+    // from the same exported constant the composer derived row-selected-fg
+    // against, so this can never silently drift from what was actually
+    // guaranteed. BLOCKING: row-selected-fg is derived to clear both bands
+    // by construction (library-chrome.mjs), so a FAIL here is a derivation
+    // bug, not a legitimate gap.
+    const accentS = grab("accent");
+    if (rowFgS && bg && accentS && accentS.startsWith("#")) {
+      const accentRgb = hexRgb(accentS);
+      for (const t of LIB_BATCH_BAND_MIX) {
+        const pct = Math.round(t * 100);
+        const bandBg = mix(bg, accentRgb, t).map(Math.round);
+        const rowFgOnBand = resolveColor(rowFgS, bandBg);
+        if (rowFgOnBand) console.log(check("library", theme, `row-selected-fg vs batch-band-${pct}`, cr(rowFgOnBand, bandBg), 4.5));
+      }
+    }
     // save/danger/warn are flat text colors on the page bg (unlike popup/options'
     // tinted warn-bg/banner-bg pairs — library has no such tinted-fill roles yet).
     for (const key of ["save", "danger", "warn"]) {
@@ -1573,6 +1601,43 @@ console.log("\n=== component pairs: default surfaces (:root) ===");
 auditComponentPairsDefault("options", "opt", resolve(ROOT, "options.css"), ":root", "default");
 auditComponentPairsDefault("library", "lib", resolve(ROOT, "library.css"), ":root", "default");
 auditComponentPairsDefault("popup", "pp", resolve(ROOT, "popup.css"), ":root", "default-light");
+
+// library's default-surface row-selected-fg trio (weak-text-on-fill batch,
+// D6 follow-up / Ruling 17): auditLibraryThemes above checks all 14 preset
+// blocks' "row-selected-fg vs row-selected-bg"/"vs batch-band-*" rows, but
+// its regex only matches `[data-theme="..."]` blocks -- the default (:root)
+// surface emits the same three roles (library.css's hand-written --lib-bg/
+// -accent/-row-selected-bg/-row-selected-fg, none of which DEFAULT_LIGHT
+// re-derives) and was never covered here, same class of gap
+// auditDefaultTextTiers exists to close for fg-hint/fg-muted. Not a
+// COMPONENT_PAIR_SPEC row (row-selected-fg isn't one -- see that registry's
+// own comment) and not fg-hint/fg-muted shaped, so it gets its own bespoke
+// block, the same pattern popup's default preset-fg trio below uses.
+// BLOCKING: same reasoning as the themed rows -- a FAIL here is a
+// derivation bug, not a legitimate gap.
+{
+  const text = readFileSync(resolve(ROOT, "library.css"), "utf8");
+  const dict = foldSelectorBlocks(text, ":root");
+  const rowBgS = dict["lib-row-selected-bg"], rowFgS = dict["lib-row-selected-fg"];
+  const bgS = dict["lib-bg"], accentS = dict["lib-accent"];
+  if (!rowBgS || !rowFgS || !bgS || !accentS) {
+    const line = "  library    default              row-selected-fg vs *".padEnd(48) +
+      "FAIL (missing --lib-row-selected-bg/-row-selected-fg/-bg/-accent)";
+    console.log(line);
+    violations.push(line);
+  } else if (isHex(rowBgS) && isHex(rowFgS) && isHex(bgS) && isHex(accentS)) {
+    const rowBg = hexRgb(rowBgS);
+    const rowFg = resolveColor(rowFgS, rowBg);
+    if (rowFg) console.log(check("library", "default", "row-selected-fg vs row-selected-bg", cr(rowFg, rowBg), 4.5));
+    const bg = hexRgb(bgS), accentRgb = hexRgb(accentS);
+    for (const t of LIB_BATCH_BAND_MIX) {
+      const pct = Math.round(t * 100);
+      const bandBg = mix(bg, accentRgb, t).map(Math.round);
+      const rowFgOnBand = resolveColor(rowFgS, bandBg);
+      if (rowFgOnBand) console.log(check("library", "default", `row-selected-fg vs batch-band-${pct}`, cr(rowFgOnBand, bandBg), 4.5));
+    }
+  }
+}
 
 // Default-surface .preset-btn text (design-uplift Task 13 review round):
 // the generic COMPONENT_PAIR_SPEC "preset-fg vs preset-bg"/"preset-fg vs

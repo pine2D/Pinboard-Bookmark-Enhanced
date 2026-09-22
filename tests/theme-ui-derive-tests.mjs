@@ -9,6 +9,7 @@ import {
   FILL_SEPARATE_MIN,
   finalizeUiControlRoles,
   hexToRgb,
+  mix,
   primaryHoverFill,
   PRIMARY_HOVER_FG_MIX,
   relLum,
@@ -19,7 +20,7 @@ import {
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
-import { composeLibraryThemeMap } from "../docs/theme-surface/composers/library-chrome.mjs";
+import { composeLibraryThemeMap, LIB_BATCH_BAND_MIX } from "../docs/theme-surface/composers/library-chrome.mjs";
 
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); };
@@ -551,6 +552,44 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
 // the captured RED output. Left as a comment, not code, because a
 // self-mutating test would have to un-import/re-import the module under
 // test at runtime, which this file's other tests do not do either.
+
+// --- row-selected-fg vs the batch-selection bands (weak-text-on-fill batch,
+// D6 follow-up / Ruling 17): library.css's .selected (batch) state paints
+// .vocab-row-gloss/.notes-row-meta/.notes-hit-note/.notes-hit-meta with
+// --lib-row-selected-fg, whose fill there is NOT --lib-row-selected-bg but
+// an accent-over-bg color-mix at LIB_BATCH_BAND_MIX's two percentages
+// (rest/hover). This is a category assertion computed INDEPENDENTLY of
+// contrast-audit.mjs's own new rows -- same pilot x mode walk as the
+// btn-fg-muted category test above, but the band mix and contrast are
+// recomputed here from _ui-derive.mjs's own `mix`/`contrast`, not by
+// importing or re-running the audit tool. ---
+{
+  const pilotCache2 = new Map();
+  const loadPilot2 = (slug) => {
+    if (!pilotCache2.has(slug)) {
+      pilotCache2.set(slug, JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${slug}.tokens.json`, import.meta.url), "utf8")));
+    }
+    return pilotCache2.get(slug);
+  };
+  let bandAssertionCount = 0;
+  for (const entry of POPUP_THEME_MAP) {
+    const tk = loadPilot2(entry.pilot);
+    const map = composeLibraryThemeMap(tk, entry.mode, entry.useDarkMode).map;
+    const bgRgb = hexToRgb(map.bg);
+    const accentRgb = hexToRgb(map.accent);
+    const fgSelRgb = hexToRgb(map["row-selected-fg"]);
+    for (const t of LIB_BATCH_BAND_MIX) {
+      const bandRgb = mix(bgRgb, accentRgb, t).map(Math.round);
+      const c = contrast(fgSelRgb, bandRgb);
+      bandAssertionCount++;
+      check(c >= 4.5,
+        `library theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} row-selected-fg=${map["row-selected-fg"]} vs batch-band-${Math.round(t * 100)} (bg=${map.bg} accent=${map.accent}) = ${c.toFixed(3)}, need 4.5`);
+    }
+  }
+  // Guard against the loop silently degenerating to zero iterations.
+  check(bandAssertionCount === POPUP_THEME_MAP.length * LIB_BATCH_BAND_MIX.length,
+    `expected ${POPUP_THEME_MAP.length * LIB_BATCH_BAND_MIX.length} (theme x band) assertions, ran ${bandAssertionCount}`);
+}
 
 if (failures.length) {
   console.error(failures.map((message) => `FAIL ${message}`).join("\n"));

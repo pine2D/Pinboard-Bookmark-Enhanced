@@ -12,7 +12,7 @@ import { POPUP_THEME_MAP } from "./popup-chrome.mjs";
 // runs in Node at build time and needs the literal percentage to do
 // arithmetic, not a browser-resolved custom property. Keep the two numbers in
 // step by hand; the render oracle's bandDistinct entry is what catches a drift.
-const LIB_BATCH_BAND_MIX = [0.20, 0.26];
+export const LIB_BATCH_BAND_MIX = [0.20, 0.26];
 
 // Default-surface (no preset selected) component-layer baseline — Task 5,
 // step ① of the composer color migration. Every value below is copied
