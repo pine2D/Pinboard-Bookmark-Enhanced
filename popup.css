@@ -1124,7 +1124,10 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
   gap: var(--pp-sp-2); /* the icon-beside-label gap the .btn family and .header-icons already use; this was the one sp-1 holdout */
   padding: var(--pp-sp-2) var(--pp-sp-2);
   font-size: 11px;
-  color: var(--pp-fg-muted);
+  /* --pp-btn-fg-muted, not --pp-fg-hint/--pp-fg-muted: this rests on the
+     button's own --pp-btn-bg fill, a role fg-muted is never AA-derived
+     against (COMPONENTS.md §9.1 law 8, weak-text-on-fill batch T3). */
+  color: var(--pp-btn-fg-muted);
   background: var(--pp-btn-bg);
   border: 1px solid var(--pp-btn-bd);
   border-radius: var(--pp-radius-md);
@@ -1150,8 +1153,14 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
   min-height: 26px;
 }
 .qbtn:hover {
+  /* --pp-btn-fg, not --pp-link: this is a button, not a link (D3(b),
+     weak-text-on-fill batch T3, 2026-09-22 product ruling). Hover text
+     deepens from --pp-btn-fg-muted to --pp-btn-fg as the fill deepens from
+     --pp-btn-bg to --pp-btn-hover -- no separate border-color declaration
+     exists on this rule to reconsider (border stays the rest state's
+     --pp-btn-bd throughout hover). */
   background: var(--pp-btn-hover);
-  color: var(--pp-link);
+  color: var(--pp-btn-fg);
 }
 /* One press language for the whole popup (user ruling A, 2026-08-07 -- and
    COMPONENTS.md §3's "同族跨表面只有一种按压"). This used to be a third one:
@@ -2652,8 +2661,13 @@ html[data-theme] .bottom-bar label { color: var(--pp-fg); }
 html[data-theme] .ac-new-hint { color: var(--pp-fg-hint); }
 html[data-theme] .ac-new-hint:hover { background: var(--pp-drop-hover); color: var(--pp-fg); }
 html[data-theme] .ac-hint-footer kbd { color: var(--pp-fg); background: var(--pp-bg); border-color: var(--pp-border); box-shadow: none; }
-html[data-theme] .qbtn { background: var(--pp-btn-bg); border-color: var(--pp-btn-bd); color: var(--pp-fg-muted); }
-html[data-theme] .qbtn:hover { background: var(--pp-btn-hover); color: var(--pp-link); }
+/* --pp-btn-fg-muted (rest) / --pp-btn-fg (hover), not --pp-fg-muted/--pp-link
+   -- mirrors the hand-written .qbtn / .qbtn:hover rules above; this override
+   outranks them on themed surfaces and must carry the same tokens or the
+   default surface alone would clear AA (COMPONENTS.md §9.1 law 8,
+   weak-text-on-fill batch T3, D3(b)). */
+html[data-theme] .qbtn { background: var(--pp-btn-bg); border-color: var(--pp-btn-bd); color: var(--pp-btn-fg-muted); }
+html[data-theme] .qbtn:hover { background: var(--pp-btn-hover); color: var(--pp-btn-fg); }
 html[data-theme] .qbtn.saving { background: var(--pp-offline-bg); border-color: var(--pp-offline-bd); color: var(--pp-offline-fg); }
 html[data-theme] .qbtn.saved { background: var(--pp-ok-bg); border-color: var(--pp-ok-bd); color: var(--pp-ok-fg); }
 html[data-theme] .existing-banner { background: var(--pp-banner-bg); border-color: var(--pp-banner-bd); color: var(--pp-banner-fg); }
@@ -2720,11 +2734,18 @@ html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Cons
    (color-mix(danger 85%, #000)); it keeps the fill and adds the inset
    on-danger ring the other two surfaces use. */
 /* .confirm-no now reads the same three role tokens options.css and
-   library.css use (fg-muted / border / btn-hover) instead of three literal
+   library.css use (fg / border / btn-hover) instead of three literal
    one-offs (--pp-confirm-no-fg #666, -border #ccc, -hover-bg #eee) that
    existed only for this button and were never contrast-derived against
    anything. */
-.confirm-popover .confirm-no { background: none; color: var(--pp-fg-muted); border-color: var(--pp-border); }
+/* color: --pp-fg, not --pp-fg-muted -- matches the themed override below
+   (html[data-theme] .confirm-popover .confirm-no) so the DEFAULT surface
+   stops being the only layer where this text fails: there is no separate
+   :hover color declaration, so this one value paints both rest (background:
+   none, no fill to fail against) and hover (background: --pp-btn-hover
+   below, a control fill fg-muted is not AA-derived against -- COMPONENTS.md
+   §9.1 law 8, weak-text-on-fill batch T3). */
+.confirm-popover .confirm-no { background: none; color: var(--pp-fg); border-color: var(--pp-border); }
 .confirm-popover .confirm-no:hover { background: var(--pp-btn-hover); }
 .confirm-popover button:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 @keyframes confirmFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
@@ -2757,6 +2778,13 @@ html[data-theme] .confirm-popover { color: var(--pp-fg); box-shadow: 0 2px 8px r
    (0,2,0) rule, so leaving it would have made --pp-danger/--pp-on-danger
    dead code on every preset. tests/ui-contract-tests.mjs now fails any
    hand-written rule that paints .confirm-yes on any of the three surfaces. */
+/* color now the same var(--pp-fg) as the DEFAULT-surface rule above
+   (weak-text-on-fill batch T3) -- genuinely redundant for `color` alone, but
+   this rule's `background: none` is NOT redundant: at (0,3,1) it outranks
+   .confirm-no:hover's own (0,3,0) background, and only this selector's own
+   :hover form below (0,4,1) is specific enough to still show the hover fill
+   on themed surfaces -- pre-existing behavior, left untouched (same shape as
+   options.css:2159's analogous comment). */
 html[data-theme] .confirm-popover .confirm-no { color: var(--pp-fg); border-color: var(--pp-border); background: none; }
 html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-hover); }
 
@@ -2816,7 +2844,14 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-h
   display: inline-grid;
   place-items: center;
   padding: 0;
-  color: var(--pp-link);
+  /* --pp-btn-fg-muted, not --pp-link: icon-only button (SVG via
+     currentColor), not a link, and this rests on the button's own
+     --pp-btn-bg fill (COMPONENTS.md §9.1 law 8, weak-text-on-fill batch T3,
+     D3(b)). The ≥4.5:1 gate btn-fg-muted carries over-delivers for an icon
+     glyph (icon-only controls are treated as ≥3:1 elsewhere in this file),
+     but the plan puts icon buttons on the same tokens as text buttons rather
+     than adding a third contrast tier. */
+  color: var(--pp-btn-fg-muted);
   background: var(--pp-btn-bg);
   border: 1px solid var(--pp-btn-bd);
   border-radius: var(--pp-radius-md);
@@ -2828,13 +2863,22 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-h
 /* `.md-strip` is specificity ballast (0,3,0): the themed RESTING rule
    `html[data-theme] .md-strip-btn` is (0,2,1) and outranked the (0,2,0) form,
    so the accent edge only ever showed on the default surface (2026-09-18
-   review; same defect class as the key-toggle hover above). */
-.md-strip .md-strip-btn:hover { background: var(--pp-btn-hover); border-color: var(--pp-accent); }
+   review; same defect class as the key-toggle hover above). Its (0,3,0) also
+   beats the themed rest rule's (0,2,1) for the new `color` declaration below,
+   so hover reads --pp-btn-fg on every surface without touching the themed
+   hover rule at all (weak-text-on-fill batch T3, D3(b): hover text deepens
+   to --pp-btn-fg as the fill deepens to --pp-btn-hover). */
+.md-strip .md-strip-btn:hover { background: var(--pp-btn-hover); border-color: var(--pp-accent); color: var(--pp-btn-fg); }
 .md-strip-btn:active:not(:disabled) { transform: scale(0.97); }
 .md-strip-btn:focus-visible { outline: none; border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 .md-strip-btn .btn-ic { display: inline-flex; }
 
-html[data-theme] .md-strip-btn { background: var(--pp-btn-bg); border-color: var(--pp-btn-bd); color: var(--pp-link); }
+/* --pp-btn-fg-muted, not --pp-link: mirrors the hand-written rest rule above
+   (weak-text-on-fill batch T3, D3(b)). No `color` needed on the themed
+   :hover form below -- the hand-written `.md-strip .md-strip-btn:hover`
+   rule's (0,3,0) already outranks this rest rule's (0,2,1) for `color`
+   regardless of theme, so hover stays --pp-btn-fg everywhere. */
+html[data-theme] .md-strip-btn { background: var(--pp-btn-bg); border-color: var(--pp-btn-bd); color: var(--pp-btn-fg-muted); }
 html[data-theme] .md-strip-btn:hover { background: var(--pp-btn-hover); }
 html[data-theme] .md-strip-btn:focus-visible { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 
