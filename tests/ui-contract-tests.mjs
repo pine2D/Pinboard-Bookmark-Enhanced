@@ -393,6 +393,42 @@ check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax
     "library.css: a hand-written rule pairs --lib-fg-hint/--lib-fg-muted/--lib-link directly with --lib-btn-bg/--lib-btn-hover on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offendersLib.join(", "));
 }
 
+// ---- weak-text-on-fill (D6 follow-up / Ruling 17): the batch-selected
+// (.selected) state's four text consumers named in the T4 comment above as
+// its THIRD blind spot -- .vocab-row-gloss / .notes-row-meta /
+// .notes-hit-note / .notes-hit-meta -- must read --lib-row-selected-fg
+// while sitting on the batch-selection accent band (a runtime color-mix()
+// set via a custom property on an ancestor, invisible to Check 1/2's
+// same-rule `background` scan above). D6 itself stopped short of this
+// (plan's own stop line: `fg` failed the 26% band on 2/15 blocks); Ruling
+// 17 ships it with the EXISTING --lib-row-selected-fg role instead, already
+// derived against both bands by construction (library-chrome.mjs's
+// LIB_BATCH_BAND_MIX; see contrast-audit.mjs's "row-selected-fg vs
+// batch-band-*" rows and tests/theme-ui-derive-tests.mjs's independent
+// category assertion for the derivation-side guarantee). This check is the
+// CSS-consumer-side guard: it does not re-derive contrast, only that the
+// four selectors' `.selected`-scoped rule actually reads the role. The
+// plain [aria-current] rules are untouched (fg-muted already clears AA
+// against --lib-row-selected-bg) and are deliberately NOT asserted here. ----
+{
+  const hand = stripGeneratedRegions(libraryCss);
+  const rules = parseStyleRules(hand);
+  const usesRowSelectedFg = (selector) => {
+    const rule = rules.find((r) => r.context.length === 0 && r.selectors.includes(selector));
+    return !!rule && parseDeclarations(rule.body)
+      .some((d) => d.property === "color" && d.value.includes("--lib-row-selected-fg"));
+  };
+  const batchSelectedConsumers = [
+    ".vocab-card.selected .vocab-row-gloss",
+    ".vocab-card.selected .notes-row-meta",
+    ".notes-hit.selected .notes-hit-note",
+    ".notes-hit.selected .notes-hit-meta",
+  ];
+  const missing = batchSelectedConsumers.filter((s) => !usesRowSelectedFg(s));
+  check(missing.length === 0,
+    "library.css: the batch-selected (.selected) state for .vocab-row-gloss/.notes-row-meta/.notes-hit-note/.notes-hit-meta no longer reads --lib-row-selected-fg -- weak text on the batch-selection accent band (COMPONENTS.md §9.1 law 8, D6 follow-up / Ruling 17); missing: " + missing.join(", "));
+}
+
 check(/id="vocab-no-account"[^>]*role="region"[^>]*aria-labelledby="vocab-no-account-title"/.test(libraryHtml) &&
   /id="vocab-signed-out-lookup"[^>]*data-i18n="libraryLookupOpen"/.test(libraryHtml),
   "signed-out Vocabulary state lacks a named region or localized narrow lookup route");
