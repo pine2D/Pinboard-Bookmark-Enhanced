@@ -498,7 +498,50 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 .context-help-host[data-help-role="section"] > .context-help > summary.context-help-toggle,
 .context-help-host[data-help-role="field"] > .context-help > summary.context-help-toggle,
 .context-help-host[data-help-role="group"] > .context-help > summary.context-help-toggle { align-self: baseline; }
-[data-help-script="alphabetic"][data-help-role="section"] { --context-help-optical-y: 1.875px; }
+/* alphabetic/section re-measured 2026-09-22: CI failed on the two raster
+   probes logged as "promptsHint" and "storageIntro", which read as distinct
+   HOSTS (the 12px hint paragraph vs the 15px title) -- they are not. Every
+   section-role host anchors the toggle to the same face, the h2.section-title
+   (options-help-render-audit.mjs capturePair: copyNode = anchor for any role
+   other than choice/action, and anchor is always the element immediately
+   before <details>, which for every context-help-host[data-help-role=section]
+   in options.html is an h2.section-title -- verified against all six: Backup
+   & Restore, Support Diagnostics, AI Provider, Prompts, Theme, Storage
+   Management). The failing probe's logged key is the data-i18n of the FIRST
+   .context-help-body paragraph *inside* the details (used only to label the
+   log line), not the measured node -- a red herring that made "Prompts" and
+   "Storage Management" look like a different host shape when they are two
+   instances of the exact same host/role/script combination as the other four.
+   The real split is per-STRING raster jitter at 15px/600: titles without a
+   descender (AI Provider, Theme) round to the positive edge of the ink box,
+   titles with one (Backup & Restore, Support Diagnostics, Prompts, Storage
+   Management) round to the negative edge, and those six probes already spread
+   3.5 physical px at DPR2 against a 4px-wide tolerance window -- confirmed by
+   sweeping the constant in 0.03125px steps (PBP_HELP_DEBUG-style per-probe
+   dump, not committed): every value shifts all six probes by the same amount
+   (the icon moves, the title ink doesn't), so the spread cannot be closed,
+   only re-centered. On CI, "Prompts" and "Storage Management" additionally
+   sit lower than this machine's FONTCONFIG_FILE=scripts/ci-fonts.conf
+   emulation reproduces (CI measured -2.5px on both; local ci-fonts measured
+   -2px/promptsHint and -1.5px/storageIntro at the old 1.875px constant) --
+   real CI's FreeType/hinting isn't bit-identical to this emulation, so the
+   constant needs slack on the low edge, not just a value that clears 0 here.
+   Re-centering to 2px (was 1.875px) was the widest available plateau: moving
+   in 0.0625px steps, [1.90px, 2.10px] all land on the same raster pixel for
+   every alphabetic/section probe under both configs. Measured en@2 ranges,
+   old -> new:
+     Windows fonts:  -1.5..1.5px -> -1..2px
+     ci-fonts.conf:  -2..1.5px   -> -1.5..2px
+   -1.5px is the target this plateau was chosen to hit (so CI's demonstrated
+   ~0.5-1px extra drop on this role still lands at or above the -2px tolerance
+   edge); +2px on both configs uses the remaining slack, right at the edge --
+   acceptable because every CI delta observed for this role during
+   investigation was LOWER than local ci-fonts, never higher, so the risk is
+   asymmetric toward the negative edge already covered. Re-measure with
+   PBP_HELP_RASTER_RANGES=1 under both font configs before nudging further;
+   the cjk/section constant below was not touched and needs no change (no
+   violation was observed there). */
+[data-help-script="alphabetic"][data-help-role="section"] { --context-help-optical-y: 2px; }
 [data-help-script="alphabetic"][data-help-role="field"] { --context-help-optical-y: 2.75px; }
 [data-help-script="alphabetic"][data-help-role="group"] { --context-help-optical-y: 2.5px; }
 [data-help-script="cjk"][data-help-role="section"] { --context-help-optical-y: 1.75px; }
