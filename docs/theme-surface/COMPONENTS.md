@@ -1102,6 +1102,26 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
    btn-hover` 两行，无 `onlyNs`），不改写任何既有手写消费者——已知违反本律的
    消费者迁移是后续批次的工作，不在本律生效的同一提交里。
 
+   **合法 token 补记（T5 review Ruling 16，2026-09-22）**：控件填充上除
+   `btn-fg` / `btn-fg-muted` 外，还有两个既有角色本就合法——不是本律的例外，
+   是本律生效前就已存在、且已被别的门覆盖的普通文字层级：
+   - **`fg`**：`contrast-audit` 的 `fg vs btn-bg` / `fg vs input-bg` /
+     `fg vs btn-hover` 三行（COMPONENT_PAIR_SPEC，taste-uplift batch2 task 7 +
+     final-fix C1）已经把 `fg` 对三个控件填充分别保到 4.5:1——`.confirm-no`
+     在 `--{ns}-btn-hover` 上画 `--{ns}-fg` 正是这个合法路径，不是需要迁移的
+     违规。
+   - **`--lib-row-selected-fg`**（library 独有）：D6 follow-up / Ruling 17
+     把批量选中带（`.selected` 状态）上的 `.vocab-row-gloss` /
+     `.notes-row-meta` / `.notes-hit-note` / `.notes-hit-meta` 从 `fg-muted`
+     迁到这个角色——它是专为「同时扛住 `row-selected-bg` 和两条批量选中带」
+     派生的（`fgToAAMulti(fg, [row-selected-bg, batch-band-20,
+     batch-band-26])`，library-chrome.mjs），`contrast-audit` 的
+     `row-selected-fg vs row-selected-bg` / `vs batch-band-20` / `vs
+     batch-band-26` 三行按主题块 + 默认块逐一验证。本律的 `btn-bg` /
+     `btn-hover` / `input-bg` / `chip-bg` 清单不包含批量选中带，`weakTextOnFill`
+     （render-audit family 13，T5）另行为 library 把这两条带加进它自己的
+     受控填充集合，与本条 token 合法性并列，不是重复。
+
 ### 9.2 圆角三律
 
 1. **圆角只许引用 radius token 阶梯**（`--{ns}-radius-{sm|md|lg|full}`）。不许字面量、
@@ -1221,6 +1241,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | `radiusScale` | 有 chrome 的盒子统一圆角 ∈ 本表面 radius token 的**实时**值（token 逐主题不同）或 pill；融合壳后代豁免 | `[render]` family 9 |
 | `textFloor` | 任何可见文字 computed font-size ≥ 11px（`sup`/`sub` 除外；阅读器正文不在 chrome 扫描内） | `[render]` family 10 |
 | `spacingScale` | 所有元素的 margin、以及**布局盒**（条/面板/弹层/行/列表）的 padding 与 gap，computed 值 ∈ 本表面 sp 刻度的**实时**值（`--opt-sp-N` / `--pp-sp-N` / `--lib-sp-N` / `--sp-N`）；`auto`/百分比/负值/≤1px hairline 不计。**控件与 chip 自身的 inset 是组件几何**（`.btn-sm` 2/8、chip padV 2、select 箭头位 26、key 字段眼睛位 32），由 controlRung / hitAreaMin / chip 律管，本律只查其 margin。页面壳（`main` / `.rail` / 空态）与派生对齐偏移（`.fg-indent` = 复选框 16 + 4、`.tab-group-label` = 页签内距 sp-5 + 2px 指示条）豁免。存量债在 `tests/render-audit-spacing-baseline.json`（只减不增：新增即 FAIL，删除放行并报 STALE；`--write-spacing-baseline` 是唯一写入口） | `[render]` family 11 |
+| `weakTextOnFill` | §9.1 律 8：任何带自身文字节点的元素、或 icon-only 按钮，computed `color` 若命中本主题**实时**的 `--{ns}-fg-hint` / `--{ns}-fg-muted` / `--{ns}-link`，则从该元素本身起沿祖先链上溯到最近一个非透明 `background-color`，该填充若命中本主题实时的 `--{ns}-btn-bg` / `--{ns}-btn-hover` / `--{ns}-input-bg` / `--{ns}-chip-bg`（library 另加两条批量选中带，值算自实时 `--lib-bg`/`--lib-accent` 与 composer 导出的 `LIB_BATCH_BAND_MIX`，不手抄 0.20/0.26）即判 FAIL。只测静息态——hover 不在门内（token 侧由 `contrast-audit` 的 `btn-fg-muted vs btn-hover` / `fg vs btn-hover` 行兜底）；唯一豁免 `:disabled`（按活的 `disabled` IDL 属性沿祖先链判定，不按选择器文本）。与 family 4-12 不同：颜色 token 逐主题不同，不是主题不变量，因此**不是**单趟 `--sweep` 覆盖全部主题，而是在 CHECKS 循环已打开的每个 (surface, theme) 页面内就地扫描（`recordWeakTextHits`，见 `runSimpleTheme`/`runLibraryTheme`）。扫描元素计数逐 surface 打印，用于把「0 FAIL」与「根本没扫到」分开 | `[render]` family 13 |
 
 ### 10.4 门与触发面
 
