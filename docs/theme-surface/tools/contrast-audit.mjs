@@ -248,6 +248,13 @@ const COMPONENT_PAIR_SPEC = [
   // (COMPONENTS §5.3) -- token-level, so checked unconditionally rather than
   // only for surfaces that currently render a pressable chip instance.
   ["chip-fg", "btn-hover", 4.5],
+  // ai-chip-fg (Task 4, taste-uplift-batch3, D8): popup-only text role for
+  // the AI-suggested chip family (.stag.ai), seeded from --pp-accent2
+  // instead of tag-fg -- same rest/hover pair shape as chip-fg's two rows
+  // just above (chip-bg at rest, btn-hover on the pressable swap), popup
+  // being the only surface with this role (["pp"]).
+  ["ai-chip-fg", "chip-bg", 4.5, ["pp"]],
+  ["ai-chip-fg", "btn-hover", 4.5, ["pp"]],
   ["danger-quiet-fg", "bg", 4.5],
   ["danger-quiet-fg", "panel", 4.5],
   ["danger-quiet-fg", "btn-bg", 4.5],

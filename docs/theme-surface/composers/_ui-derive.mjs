@@ -24,8 +24,15 @@ const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
 // pilot-configurable, the same as on-danger/chip-bg. Per-surface arrays
 // (rather than one shared COMMON_DERIVED_OUTPUT_ROLES) so popup is not
 // blocked from the input it legitimately accepts.
+// ai-chip-fg (Task 4, taste-uplift-batch3, D8) joins popup's own output pair
+// alongside preset-fg/spinner-fg: text painted on a chip fill for the
+// AI-suggested tag family (.stag.ai), seeded from --pp-accent2 (a raw,
+// ungated palette value shared with .action-link/.regen-link) instead of
+// tag-fg -- see popup-chrome.mjs's derivation, run right after chip-bg's own
+// tinted finalization below. Popup-only: options/library have no AI-purple
+// accent2 role or chip consumer for it.
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
-  popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg"]),
+  popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg"]),
   options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent"]),
   library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent"]),
 });

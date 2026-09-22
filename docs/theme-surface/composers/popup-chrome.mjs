@@ -40,6 +40,14 @@ const DEFAULT_LIGHT = {
                                  // at 5.20:1 / 4.72:1.
   "chip-bg": "#e2eafa",         // = --pp-tag-bg default (popup.css:53)
   "chip-fg": "#33589f",         // = --pp-tag-fg default (popup.css:54)
+  "ai-chip-fg": "#7b45c1",      // D8/D9, taste-uplift-batch3: this block has no emit path through
+                                 // finalizeUiControlRoles (DEFAULT_LIGHT is a hand-authored literal
+                                 // block, not run through the composer pipeline), so the value is
+                                 // hand-carried from the SAME shared function ai-chip-fg's themed
+                                 // derivation calls: fgToAAMulti(accent2 default #8b5cc9 [popup.css:43],
+                                 // [chip-bg above, btn-hover below]) — 5.02:1 / 4.66:1, both clear AA
+                                 // (raw accent2 measured only 3.97:1 / 4.38:1 against this surface's
+                                 // btn-bg/bg2 pre-derivation, Step 0).
   "danger-quiet-fg": "#bd3d3d", // WAS a verbatim copy of --pp-danger default (#c24343); re-derived
                                  // 2026-08-05 because Soft Fill's btn-bg (#eff0f2) is a darker fill
                                  // than the #ffffff this text used to sit on, dropping it to 4.41:1.
@@ -108,7 +116,7 @@ function emitPp(ui, mode) {
   const set = (k, val) => lines.push(`  --pp-${k}: ${val};`);
   for (const k of ["bg", "bg2", "fg", "fg-muted", "fg-hint", "link", "accent", "accent2",
     "border", "divider", "input-bg", "input-bd", "input-focus-bg", "tag-bg", "tag-fg", "tag-hover", "drop-hover",
-    "chip-bg", "chip-fg", "btn-bg", "btn-bd", "btn-hover", "btn-fg", "btn-fg-muted",
+    "chip-bg", "chip-fg", "ai-chip-fg", "btn-bg", "btn-bd", "btn-hover", "btn-fg", "btn-fg-muted",
     "banner-bg", "banner-bd", "banner-fg", "warn-bg", "warn-bd", "warn-fg",
     "ok-bg", "ok-bd", "ok-fg", "offline-bg", "offline-bd", "offline-fg",
     "danger", "danger-quiet-fg", "on-danger", "spinner-bg", "spinner-fg", "preset-bg", "preset-fg",
@@ -173,6 +181,24 @@ export function composePopupThemeMap(tk, mode, useDarkMode = false) {
     // (Task 4, taste-uplift-batch2).
     onAccentIsInput: true,
   });
+  // ai-chip-fg (Task 4, taste-uplift-batch3, D8): popup-only OUTPUT role
+  // (UI_DERIVED_OUTPUT_ROLES.popup, _ui-derive.mjs) for AI-suggested text
+  // painted on a chip fill (.stag.ai). --pp-accent2 is a raw, ungated
+  // palette value (link-visited) shared with .action-link/.regen-link and
+  // carries no AA guarantee of its own -- Step 0 measured it as low as
+  // 3.18:1 against --pp-btn-bg on several pilots. Same fgToAAMulti(seed,
+  // [chip-bg, btn-hover]) shape chip-fg gets just above (pressable chip's
+  // hover-fill swap), seeded from accent2 instead of tag-fg so the AI
+  // purple hue survives while text stays legible on both fills. MUST run
+  // AFTER finalizeUiControlRoles above: it reads ui["chip-bg"], the final
+  // fillDistinct()-tinted value, not the pre-tint tag-bg -- deriving
+  // against the wrong (pre-tint) fill would drift from what actually ships,
+  // the same ordering discipline chip-fg itself already follows inside the
+  // finalizer.
+  ui["ai-chip-fg"] = rgbToHex(fgToAAMulti(
+    hexToRgb(ui["accent2"]),
+    [hexToRgb(ui["chip-bg"]), hexToRgb(ui["btn-hover"])],
+  ));
   // preset-bd RETIRED (design-uplift, preset-row Variant A, 2026-08-04):
   // `.preset-btn` is borderless now (COMPONENTS.md Appendix C30), so no
   // rule anywhere reads --pp-preset-bd -- removed from emitPp's key list
