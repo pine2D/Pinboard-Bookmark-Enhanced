@@ -334,8 +334,9 @@ final-fix wave:
   tokens through a spacing adapter (below) — it does not let a theme make
   them vary either.
 - **Derived component-pair colors are not `ui` inputs.** The shared
-  `btn-fg`, `danger-quiet-fg`, `on-danger`, `chip-bg`, `chip-fg` roles and
-  popup-only `preset-fg` / `spinner-fg` are computed from the FINAL,
+  `btn-fg`, `btn-fg-muted`, `danger-quiet-fg`, `on-danger`, `chip-bg`,
+  `chip-fg` roles and popup-only `preset-fg` / `spinner-fg` are computed
+  from the FINAL,
   post-override map — as is `on-accent` on options and library (Task 4,
   taste-uplift-batch2): neither surface has ever declared this role, so
   there is no legacy pilot value to preserve, and `.btn.primary`'s text
@@ -372,9 +373,20 @@ final-fix wave:
   is known to fall below 4.5:1 on many themes today (options `fg-hint` vs
   `btn-bg` fails 9/14 themes, popup `fg-muted` vs `btn-bg` fails 6/14,
   popup `link` vs `btn-bg`/`btn-hover` fails 11/28 rows) — a pending
-  product decision, not yet fixed. Do not place hint/muted/link text on a
-  control fill, and do not assume a green `contrast-audit` run covers
-  that placement.
+  product decision, not yet fixed at these consumers. Do not place
+  hint/muted/link text on a control fill, and do not assume a green
+  `contrast-audit` run covers that placement. **`btn-fg-muted`
+  (weak-text-on-fill batch, D1/D2) is the sanctioned replacement token**:
+  `fgToAAMulti(fg-muted, [btn-bg, btn-hover])`, derived in
+  `finalizeUiControlRoles` right after `btn-fg`, gated by
+  `COMPONENT_PAIR_SPEC`'s own `btn-fg-muted` rows (all 3 surfaces, 14 themed
+  blocks + default, same shape as the `btn-fg` rows) — it is the ONLY legal
+  token for secondary/muted text painted on btn-bg or btn-hover
+  (COMPONENTS.md §9.1 law 8). The three consumers this paragraph's numbers
+  describe (options' `.connection-health-state`, popup's `.qbtn`, popup's
+  preset link colour) migrate to it in later work, not this role's own
+  introduction — the role and its gate exist first so that migration has
+  somewhere correct to land.
 - **FILL / EDGE input roles are SEEDS, not verbatim values.** Unlike the
   TEXT roles above, `btn-bg` / `input-bg` / `btn-hover` are starting
   points `fillSeparate()` pushes until they clear `FILL_SEPARATE_MIN`

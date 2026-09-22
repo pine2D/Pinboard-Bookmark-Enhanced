@@ -205,6 +205,7 @@ BLOCKING，因为 hover 底是 `color-mix(...)` 而非一对 token，`COMPONENT_
 | `background` | `--{ns}-btn-bg` | 既有 |
 | `background`（hover） | `--{ns}-btn-hover` | 既有 |
 | `color`（默认与 hover 共用一个值） | **`--{ns}-btn-fg`** | `fgToAAMulti(fg, [btn-bg, btn-hover])`——对**两个**背景同时 ≥4.5:1。只声明一次，hover 规则不重复声明。`fgToAAMulti` 现是 `library-chrome.mjs:11-23` 的本地函数，`_ui-derive.mjs` 只有 `fgToAA`/`bgToAA`/`pairToAA`；Task 5 把它上移并 export 后三表面共用 |
+| `color`（次级/弱化文字，静息与 hover 共用一个值） | **`--{ns}-btn-fg-muted`** | `fgToAAMulti(fg-muted, [btn-bg, btn-hover])`——同 `btn-fg` 那行的两宿主收敛写法，在 `finalizeUiControlRoles` 里紧跟 `btn-fg` 之后派生（weak-text-on-fill 批次，D1）。三表面均为**派生输出角色**（`UI_DERIVED_OUTPUT_ROLES`），`validate-contracts.mjs` 按 JSON pointer 阻断 `ui.<surface>.<mode>.btn-fg-muted` 覆盖。这是控件填充（`btn-bg`/`btn-hover`）上**唯一合法**的次级文字 token——`fg-hint`/`fg-muted`/`link` 禁止直接落在填充上（§9.1 律 8） |
 | `color`（`.btn.primary`，默认与 hover 共用一个值） | **`--{ns}-on-accent`**（options/library only） | `fgToAAMulti(palette["btn-fg"], [accent, primaryHoverFill(accent, fg)])`——对**两个**背景同时 ≥4.5:1：静息 `accent` 填充与 `.btn.primary:hover` 的 `color-mix(...)` 结果。`primaryHoverFill`/`PRIMARY_HOVER_FG_MIX`（`_ui-derive.mjs`）是这两个背景之一（hover 底）与 `ui-components.mjs` 发射的 `color-mix(...)` 百分比共用的唯一来源。只声明一次，hover 规则不重复声明——与 `btn-fg` 那行同一惯例，唯一差异是第二个宿主本身是 hover 才出现的合成色，不是一个另有其名的静息 token |
 | `border-color` | `--{ns}-border` | `borderToAA(border, [btn-bg, panel])`——对 `btn-bg` 与 `panel` 两个背景同时 ≥3:1（非文本对比，WCAG 1.4.11）。design-uplift Task 16 前只是文档要求，未接线到 contrast-audit；Task 16 补上派生与门（`_ui-derive.mjs` 的 `borderToAA`，仿 `fgToAAMulti` 的收敛写法） |
 | `outline`（focus） | `--{ns}-accent` | 对 `bg` 与 `panel` ≥3:1 |
@@ -1085,6 +1086,21 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
    标签会推开水平相邻的邻座」，options 侧栏是纵向堆叠的导航项，没有水平邻座；它
    仍从 `bold`（700）降到 600，只为与本批「唯一一层粗体」的裁决（章节标题 600）
    保持层级一致，不是本律要求的零位移豁免。
+
+8. **弱文字不落在控件填充上（weak-text-on-fill 批次，D2，2026-09-22）。**
+   `--{ns}-fg-hint` / `--{ns}-fg-muted` / `--{ns}-link` 不得直接落在控件填充
+   （`btn-bg` / `btn-hover` / `input-bg` / `chip-bg` 及其 `color-mix()`）上——
+   这三个是 TEXT 输入角色，各自的派生只对 `bg`/elevated 面等页面级宿主保 AA
+   （NEW_THEME.md「TEXT input roles」一节），对控件填充没有任何保证，静态门也
+   看不到（`fg-hint`/`fg-muted` 在 14 个主题块上完全不测填充这一档；`link` 这
+   份文件从不测）。填充上的**次级/弱化文字**唯一合法 token 是 `--{ns}-btn-fg-muted`
+   （本节 D1，`fgToAAMulti(fg-muted, [btn-bg, btn-hover])`，§1.3 token 对表新增
+   行）；填充上的**强调/主文字**用既有的 `--{ns}-btn-fg`。**唯一豁免是
+   `:disabled`**——`#submit-btn:disabled` 已按 §0（约 78–83 行）的显式豁免继续
+   画 `--pp-fg-hint`，WCAG 1.4.3 本就不要求禁用态达标，不因本律新增而改判。
+   本律只新增角色与门（`contrast-audit` 的 `btn-fg-muted vs btn-bg`/`vs
+   btn-hover` 两行，无 `onlyNs`），不改写任何既有手写消费者——已知违反本律的
+   消费者迁移是后续批次的工作，不在本律生效的同一提交里。
 
 ### 9.2 圆角三律
 
