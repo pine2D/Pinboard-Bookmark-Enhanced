@@ -256,7 +256,12 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 .options-search-result:hover { background: var(--opt-btn-hover); }
 .options-search-result:focus-visible { outline: none; border-color: var(--opt-focus-bd); box-shadow: var(--opt-focus-ring); }
 .options-search-result-label { font-size: 12px; line-height: 1.35; }
-.options-search-result-panel { color: var(--opt-fg-hint); font-size: 11px; }
+/* --opt-btn-fg-muted, not --opt-fg-hint: rests on .options-search-results'
+   --opt-panel, moves to .options-search-result's --opt-btn-hover on hover --
+   a control fill on the hover path, and fg-hint only guarantees AA against
+   bg/panel, not btn-hover (COMPONENTS.md §9.1 law 8). btn-fg-muted clears
+   panel too (measured, not assumed -- weak-text-on-fill batch T2). */
+.options-search-result-panel { color: var(--opt-btn-fg-muted); font-size: 11px; }
 .options-search-empty { padding: var(--opt-sp-4); color: var(--opt-fg-hint); font-size: 11px; }
 .tabs {
   display: flex; flex-direction: column; align-items: stretch;
@@ -885,7 +890,13 @@ input[type="checkbox"], input[type="radio"] {
 .connection-health-row:hover { background: var(--opt-btn-hover); }
 .connection-health-row:focus-visible { outline: none; border-color: var(--opt-focus-bd); box-shadow: var(--opt-focus-ring); }
 .connection-health-name { font-weight: 600; }
-.connection-health-state { color: var(--opt-fg-hint); font-size: 11px; text-align: right; }
+/* --opt-btn-fg-muted, not --opt-fg-hint: this label's fill is
+   .connection-health-row's --opt-btn-bg (--opt-btn-hover on hover) -- a
+   control fill, and fg-hint is only AA-derived against bg/panel
+   (COMPONENTS.md §9.1 law 8, weak-text-on-fill batch T2). .ok/.bad/.warn
+   below are untouched (save/danger/warn are not yet gated against btn-bg in
+   contrast-audit's COMPONENT_PAIR_SPEC -- reported, not silently gated here). */
+.connection-health-state { color: var(--opt-btn-fg-muted); font-size: 11px; text-align: right; }
 .connection-health-state.ok { color: var(--opt-save); }
 .connection-health-state.bad { color: var(--opt-danger); }
 .connection-health-state.warn { color: var(--opt-warn); }
@@ -2148,7 +2159,18 @@ html.motion-ready .confirm-popover.is-closing {
 /* .confirm-yes (solid danger tier, default light state) now comes from
    @generated:ui-components above (COMPONENTS.md §4.2) — only .confirm-no
    stays hand-written here. */
-.confirm-popover .confirm-no { background: none; color: var(--opt-fg-muted); border-color: var(--opt-border); }
+/* color: --opt-fg, not --opt-fg-muted -- matches the themed override two
+   rules down (html[data-theme] .confirm-popover .confirm-no) so the DEFAULT
+   surface stops being the only layer where this text fails: there is no
+   separate :hover color declaration, so this one value paints both rest
+   (background: none, no fill to fail against) and hover (background:
+   --opt-btn-hover below, a control fill fg-muted isn't AA-derived against --
+   COMPONENTS.md §9.1 law 8, weak-text-on-fill batch T2). The themed override's
+   `background: none` is NOT redundant with this rule (it also outranks
+   .confirm-no:hover's own background at (0,3,1) > (0,3,0), suppressing the
+   hover fill entirely in every themed preset -- pre-existing behavior, left
+   untouched) so that override stays. */
+.confirm-popover .confirm-no { background: none; color: var(--opt-fg); border-color: var(--opt-border); }
 .confirm-popover .confirm-no:hover { background: var(--opt-btn-hover); }
 .confirm-popover button:focus-visible { outline: 1px solid var(--opt-accent); outline-offset: 2px; box-shadow: var(--opt-focus-ring); }
 html[data-theme] .confirm-popover { color: var(--opt-fg); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
@@ -2212,9 +2234,20 @@ html.motion-ready .theme-name-popover.is-closing {
   background: var(--opt-accent); color: var(--opt-panel); border: 1px solid var(--opt-accent-hover);
 }
 .theme-name-popover .tnp-save:hover { background: var(--opt-accent-hover); }
+/* color: --opt-fg, not --opt-fg-muted -- matches the themed override below
+   (html[data-theme] .theme-name-popover .tnp-cancel) so the DEFAULT surface
+   stops being the only layer where this text fails on hover's --opt-btn-hover
+   fill (no separate :hover color declaration, so this one value also paints
+   rest, where background: none has no fill to fail against -- COMPONENTS.md
+   §9.1 law 8, weak-text-on-fill batch T2). Unlike .confirm-no above, the
+   themed override here restates nothing but this same `var(--opt-fg)` --
+   genuinely redundant now (same custom-property reference resolves
+   identically regardless of which rule's `color` declaration wins), but left
+   in place as harmless dead weight rather than risk a same-specificity
+   deletion for a purely cosmetic cleanup outside this task's scope. */
 .theme-name-popover .tnp-cancel {
   padding: var(--opt-sp-1) var(--opt-sp-4); font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm);
-  background: none; color: var(--opt-fg-muted); border: 1px solid var(--opt-btn-border);
+  background: none; color: var(--opt-fg); border: 1px solid var(--opt-btn-border);
 }
 .theme-name-popover .tnp-cancel:hover { background: var(--opt-btn-hover); }
 
@@ -2284,7 +2317,11 @@ html[data-theme] .overlay-byte-counter.over { color: var(--opt-overlimit-fg); }
   border-top: 1px solid var(--opt-border-section);
 }
 html[data-theme] .preset-preview-section summary { color: var(--opt-fg-muted); }
-html[data-theme] .preset-preview-section summary:hover { background: var(--opt-btn-hover); }
+/* --opt-btn-fg-muted on hover only: the hover fill is --opt-btn-hover, a
+   control fill fg-muted isn't AA-derived against (COMPONENTS.md §9.1 law 8).
+   Rest stays --opt-fg-muted above (it sits on --opt-panel, which fg-muted
+   IS derived against) -- weak-text-on-fill batch T2. */
+html[data-theme] .preset-preview-section summary:hover { background: var(--opt-btn-hover); color: var(--opt-btn-fg-muted); }
 html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var(--opt-fg); }
 
 /* ---- Reduced motion ----
