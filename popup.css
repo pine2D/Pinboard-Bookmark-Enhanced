@@ -1750,7 +1750,7 @@ html[data-theme="modern-card"] {
   --pp-tag-fg: #1967d2;
   --pp-tag-hover: #f1f3f4;
   --pp-drop-hover: #e8f0fe;
-  --pp-chip-bg: #e8f0fe;
+  --pp-chip-bg: #e6effe;
   --pp-chip-fg: #175ec0;
   --pp-btn-bg: #e7e7e9;
   --pp-btn-bd: #e7e7e9;
@@ -1804,8 +1804,8 @@ html[data-theme="nord-night"] {
   --pp-tag-fg: #aec89a;
   --pp-tag-hover: #434c5e;
   --pp-drop-hover: #3b4252;
-  --pp-chip-bg: transparent;
-  --pp-chip-fg: #aec89a;
+  --pp-chip-bg: #485868;
+  --pp-chip-fg: #bed3ae;
   --pp-btn-bg: #424959;
   --pp-btn-bd: #424959;
   --pp-btn-hover: #3b4252;
@@ -1859,7 +1859,7 @@ html[data-theme="terminal"] {
   --pp-tag-fg: #00cccc;
   --pp-tag-hover: #0f2a0f;
   --pp-drop-hover: #1a3a1a;
-  --pp-chip-bg: transparent;
+  --pp-chip-bg: #142914;
   --pp-chip-fg: #00cccc;
   --pp-btn-bg: #111111;
   --pp-btn-bd: var(--pp-border);
@@ -1915,7 +1915,7 @@ html[data-theme="paper-ink"] {
   --pp-tag-fg: #8b4513;
   --pp-tag-hover: #ede4d0;
   --pp-drop-hover: #f5f0e8;
-  --pp-chip-bg: transparent;
+  --pp-chip-bg: #cfd1d0;
   --pp-chip-fg: #8b4513;
   --pp-btn-bg: #eae5de;
   --pp-btn-bd: #eae5de;
@@ -1971,7 +1971,7 @@ html[data-theme="dracula"] {
   --pp-tag-fg: #50fa7b;
   --pp-tag-hover: #44475a;
   --pp-drop-hover: #21222c;
-  --pp-chip-bg: transparent;
+  --pp-chip-bg: #2e3b47;
   --pp-chip-fg: #50fa7b;
   --pp-btn-bg: #30313a;
   --pp-btn-bd: #30313a;
@@ -2026,7 +2026,7 @@ html[data-theme="flexoki-light"] {
   --pp-tag-fg: #664D01;
   --pp-tag-hover: #F6E2A0;
   --pp-drop-hover: #F2F0E5;
-  --pp-chip-bg: #FAEEC6;
+  --pp-chip-bg: #f1e5bf;
   --pp-chip-fg: #664d01;
   --pp-btn-bg: #e7e5da;
   --pp-btn-bd: #e7e5da;
@@ -2081,7 +2081,7 @@ html[data-theme="flexoki-dark"] {
   --pp-tag-fg: #D0A215;
   --pp-tag-hover: #503D02;
   --pp-drop-hover: #343331;
-  --pp-chip-bg: #3A2D04;
+  --pp-chip-bg: #3a2d04;
   --pp-chip-fg: #d0a215;
   --pp-btn-bg: #2f2e2d;
   --pp-btn-bd: #2f2e2d;
@@ -2136,8 +2136,8 @@ html[data-theme="solarized-light"] {
   --pp-tag-fg: #1e746d;
   --pp-tag-hover: #eee8d5;
   --pp-drop-hover: #eee8d5;
-  --pp-chip-bg: transparent;
-  --pp-chip-fg: #1e746d;
+  --pp-chip-bg: #d3dbd5;
+  --pp-chip-fg: #1a645e;
   --pp-btn-bg: #e2decd;
   --pp-btn-bd: #e2decd;
   --pp-btn-hover: #eee8d5;
@@ -2191,8 +2191,8 @@ html[data-theme="solarized-dark"] {
   --pp-tag-fg: #4aada3;
   --pp-tag-hover: #073642;
   --pp-drop-hover: #073642;
-  --pp-chip-bg: transparent;
-  --pp-chip-fg: #4aada3;
+  --pp-chip-bg: #0d465d;
+  --pp-chip-fg: #63bcb3;
   --pp-btn-bg: #103d48;
   --pp-btn-bd: #103d48;
   --pp-btn-hover: #073642;
@@ -2247,8 +2247,8 @@ html[data-theme="catppuccin-latte"] {
   --pp-tag-fg: #116e73;
   --pp-tag-hover: #ccd0da;
   --pp-drop-hover: #dce0e8;
-  --pp-chip-bg: #dce0e8;
-  --pp-chip-fg: #10666a;
+  --pp-chip-bg: #c7d2e8;
+  --pp-chip-fg: #0e5d61;
   --pp-btn-bg: #dbdee6;
   --pp-btn-bd: #dbdee6;
   --pp-btn-hover: #d0d4de;
@@ -2301,7 +2301,7 @@ html[data-theme="catppuccin-mocha"] {
   --pp-tag-fg: #94e2d5;
   --pp-tag-hover: #585b70;
   --pp-drop-hover: #313244;
-  --pp-chip-bg: #45475a;
+  --pp-chip-bg: #484b60;
   --pp-chip-fg: #94e2d5;
   --pp-btn-bg: #37394b;
   --pp-btn-bd: #37394b;
@@ -2355,8 +2355,8 @@ html[data-theme="gruvbox-dark"] {
   --pp-tag-fg: #b8bb26;
   --pp-tag-hover: #3c3836;
   --pp-drop-hover: #3c3836;
-  --pp-chip-bg: transparent;
-  --pp-chip-fg: #b8bb26;
+  --pp-chip-bg: #494d49;
+  --pp-chip-fg: #c0c328;
   --pp-btn-bg: #433f3b;
   --pp-btn-bd: #433f3b;
   --pp-btn-hover: #3c3836;
@@ -2410,7 +2410,7 @@ html[data-theme="rose-pine"] {
   --pp-tag-fg: #9ccfd8;
   --pp-tag-hover: #26233a;
   --pp-drop-hover: #26233a;
-  --pp-chip-bg: transparent;
+  --pp-chip-bg: #3a334c;
   --pp-chip-fg: #9ccfd8;
   --pp-btn-bg: #272536;
   --pp-btn-bd: #272536;

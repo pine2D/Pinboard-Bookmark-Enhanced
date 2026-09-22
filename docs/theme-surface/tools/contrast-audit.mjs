@@ -490,8 +490,11 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
   // Tier distinctness (COMPONENTS.md §1.2 tonal / §5.2 selectable): the chip
   // pair doubles as the tonal button fill and the checked-chip fill, both of
   // which sit beside controls resting on btn-bg. Perceptual distance, not
-  // contrast -- see deltaE2000's own note. options + library only: popup's
-  // chip-bg is `transparent` on 8/15 themes and has no tonal consumer yet.
+  // contrast -- see deltaE2000's own note. All 3 surfaces now (Task 4,
+  // taste-uplift-batch3, D9): popup's `ns !== "pp"` exclusion is gone --
+  // popup-chrome.mjs stopped passing chipMode: "verbatim", so chip-bg is
+  // tinted (never the literal "transparent") the same way options/library's
+  // already was.
   //
   // M1 (batch2 final-fix wave): both rows below now use the same
   // strict/themed-FAIL, non-strict/default-SKIP shape "on-accent vs
@@ -499,7 +502,7 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict) {
   // { ... }" guard printed NOTHING when a role failed to resolve, silently
   // no-opping a BLOCKING check instead of FAILing or SKIPping like every
   // other row in this file.
-  if (ns !== "pp") {
+  {
     const chip = resolveRole("chip-bg"), btn = resolveRole("btn-bg"), panel = resolveRole("panel");
     const tierLabel = "chip-bg ΔE btn-bg";
     if (!chip.rgb || !btn.rgb) {

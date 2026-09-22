@@ -155,15 +155,18 @@ export function composePopupThemeMap(tk, mode, useDarkMode = false) {
   Object.assign(ui, regularizeUiRadius(ui));
   const ppO = tk.ui?.popup?.[mode] ?? {};
   // Popup shares the control finalizer but names its panel and frame roles
-  // differently. Its chip fill intentionally stays the final tag-bg literal
-  // (including transparent), while options/library synthesize an opaque tint.
+  // differently. Its chip fill is tinted the same way options/library's is
+  // (Task 4, taste-uplift-batch3, D9) -- the chipMode: "verbatim" escape
+  // hatch this composer used to pass (chip-bg = the raw tag-bg literal,
+  // including the bare "transparent" 8/13 pilots declare) is gone; see
+  // _ui-derive.mjs's finalizeUiControlRoles for the single tinted path all
+  // 3 surfaces now share.
   ui["btn-bg"] ??= ui.bg2;
   ui["btn-hover"] ??= ui["drop-hover"];
   ui = finalizeUiControlRoles(ui, palette, ppO, {
     panelRole: "bg2",
     buttonBorderRole: "btn-bd",
     inputBorderRole: "input-bd",
-    chipMode: "verbatim",
     // on-accent stays popup's own INPUT role (already set unconditionally
     // above via `"on-accent": derived.bg`, then possibly overridden by
     // ppO) -- this only says "don't clobber it", never "always derive"

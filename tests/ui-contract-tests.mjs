@@ -4265,7 +4265,12 @@ check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code
     for (const m of css.matchAll(re)) if (m[1].trim() === "transparent") offenders.push(m[0].trim());
     return offenders;
   };
-  for (const [file, css, ns] of [["options.css", optionsCss, "opt"], ["library.css", libraryCss, "lib"]]) {
+  // popup.css joined this scan (Task 4, taste-uplift-batch3, D9): popup-
+  // chrome.mjs's chipMode switched from "verbatim" (chip-bg = raw tag-bg,
+  // literal "transparent" on 8/15 blocks) to "tinted" -- the same
+  // resolveChipBg -> fillSeparate -> fillDistinct path options/library
+  // already used, so .stag now gets the same never-invisible guarantee.
+  for (const [file, css, ns] of [["options.css", optionsCss, "opt"], ["library.css", libraryCss, "lib"], ["popup.css", popupCss, "pp"]]) {
     const offenders = chipBgLiteralTransparent(css, ns);
     check(offenders.length === 0,
       `${file}: --${ns}-chip-bg is the literal "transparent" for ${offenders.length} theme(s) -- .vocab-group-chip/.tag-gov-kind-badge would render with no pill background at all (${offenders.join(", ")})`);

@@ -465,7 +465,6 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
     panelRole = "panel",
     buttonBorderRole = "btn-border",
     inputBorderRole = "input-border",
-    chipMode = "tinted",
     // Task 4 (taste-uplift-batch2): on-accent is popup's INPUT role (its own
     // composer always supplies one before calling here, and a pilot may
     // override it -- NEW_THEME.md) but an OUTPUT role for options/library
@@ -478,9 +477,6 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
     // the on-danger-style `== null` gap-fill instead of an overwrite.
     onAccentIsInput = false,
   } = config;
-  if (chipMode !== "tinted" && chipMode !== "verbatim") {
-    throw new Error(`finalizeUiControlRoles: unsupported chipMode ${JSON.stringify(chipMode)}`);
-  }
 
   const map = { ...inputMap };
   const ovr = overrides ?? {};
@@ -576,31 +572,30 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
   ));
   map["on-danger"] = rgbToHex(fgToAA(hexToRgb(palette["btn-fg"]), dangerRgb));
 
-  if (chipMode === "verbatim") {
-    map["chip-bg"] = map["tag-bg"];
-    map["chip-fg"] = rgbToHex(fgToAAMulti(
-      hexToRgb(map["tag-fg"]),
-      [resolveOpaqueBg(map["tag-bg"], panelRgb), btnHoverRgb],
-    ));
-  } else {
-    const tagBg = map["tag-bg"] ?? palette["tag-bg"];
-    const tagFg = map["tag-fg"] ?? palette["tag-fg"];
-    const chipTinted = fillSeparate(
-      resolveChipBg(tagBg, hexToRgb(map.accent), panelRgb),
-      [panelRgb],
-      fgRgb,
-    );
-    // ...then apart from the resting control fill it sits beside (.btn.tonal
-    // next to .btn; a checked chip next to unchecked ones resting on btn-bg),
-    // WITHOUT undoing the panel separation fillSeparate just established
-    // above (I2, batch2 final-fix wave -- see fillDistinct's own comment).
-    const chipBgRgb = fillDistinct(chipTinted, [btnBgRgb], hexToRgb(map.accent), [panelRgb]);
-    map["chip-bg"] = rgbToHex(chipBgRgb);
-    map["chip-fg"] = rgbToHex(fgToAAMulti(
-      hexToRgb(tagFg),
-      [chipBgRgb, btnHoverRgb],
-    ));
-  }
+  // Tinted for all 3 surfaces (Task 4, taste-uplift-batch3, D9): popup used
+  // to pass chipMode: "verbatim" here, keeping chip-bg as the literal
+  // tag-bg (including the bare CSS keyword "transparent" on 8/13 pilots --
+  // .stag rendered with no fill at all wherever that happened). That branch,
+  // and the chipMode parameter selecting it, are gone now that
+  // popup-chrome.mjs stopped requesting it -- this is the ONLY path, same as
+  // options/library have used since Task 2 of taste-uplift-batch2.
+  const tagBg = map["tag-bg"] ?? palette["tag-bg"];
+  const tagFg = map["tag-fg"] ?? palette["tag-fg"];
+  const chipTinted = fillSeparate(
+    resolveChipBg(tagBg, hexToRgb(map.accent), panelRgb),
+    [panelRgb],
+    fgRgb,
+  );
+  // ...then apart from the resting control fill it sits beside (.btn.tonal
+  // next to .btn; a checked chip next to unchecked ones resting on btn-bg),
+  // WITHOUT undoing the panel separation fillSeparate just established
+  // above (I2, batch2 final-fix wave -- see fillDistinct's own comment).
+  const chipBgRgb = fillDistinct(chipTinted, [btnBgRgb], hexToRgb(map.accent), [panelRgb]);
+  map["chip-bg"] = rgbToHex(chipBgRgb);
+  map["chip-fg"] = rgbToHex(fgToAAMulti(
+    hexToRgb(tagFg),
+    [chipBgRgb, btnHoverRgb],
+  ));
 
   // Text/icon colour on a filled accent control (.btn.primary). Same
   // derivation as on-danger above -- a fixed "brand button text" foreground

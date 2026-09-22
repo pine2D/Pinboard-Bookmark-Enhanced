@@ -14,7 +14,6 @@ import {
   PRIMARY_HOVER_FG_MIX,
   relLum,
   resolveChipBg,
-  resolveOpaqueBg,
   rgbToHex,
   TIER_DISTINCT_MIN_DE,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
@@ -111,6 +110,13 @@ check(tagged["chip-bg"] === "#220000" && tagged["chip-bg"] !== palette["tag-bg"]
 check(ratio(tagged["chip-fg"], tagged["chip-bg"]) >= 4.5,
   "tinted chip foreground must be re-derived from the final tag foreground");
 
+// popup-shaped role names (bg2/btn-bd/input-bd), with a transparent tag-bg --
+// the exact shape that used to opt into chipMode: "verbatim" (chip-bg
+// preserved as the literal "transparent"). That escape hatch is gone (Task
+// 4, taste-uplift-batch3, D9): popup now shares the SAME tinted derivation
+// options/library already got from the "tagged" case above, so a
+// transparent tag-bg must resolve to a real, distinct, AA-clear fill here
+// too -- not the bare keyword.
 const popupBase = {
   ...base,
   bg2: base.panel,
@@ -122,14 +128,14 @@ const popup = finalizeUiControlRoles(popupBase, palette, {}, {
   panelRole: "bg2",
   buttonBorderRole: "btn-bd",
   inputBorderRole: "input-bd",
-  chipMode: "verbatim",
 });
-check(popup["chip-bg"] === "transparent",
-  "popup chip background must preserve the final tag background verbatim");
-const popupChipBg = resolveOpaqueBg(popup["chip-bg"], hexToRgb(popup.bg2));
-check(contrast(hexToRgb(popup["chip-fg"]), popupChipBg) >= 4.5 &&
+check(popup["chip-bg"] !== "transparent",
+  "popup chip background must be tinted, never the literal transparent tag-bg (D9, taste-uplift-batch3)");
+check(ratio(popup["chip-fg"], popup["chip-bg"]) >= 4.5 &&
   ratio(popup["chip-fg"], popup["btn-hover"]) >= 4.5,
-"popup chip foreground must clear AA against the composited tag fill and hover fill");
+"popup chip foreground must clear AA against its own tinted fill and the hover fill");
+check(deltaE2000(hexToRgb(popup["chip-bg"]), hexToRgb(popup["btn-bg"])) >= TIER_DISTINCT_MIN_DE,
+  "popup chip fill must stay perceptually distinct from the button fill (same tier-distinctness floor as options/library)");
 
 // --- on-accent: OUTPUT role for options/library, INPUT role for popup
 // (Task 4, taste-uplift-batch2 -- `.btn.primary`'s fill/text pair). Neither
