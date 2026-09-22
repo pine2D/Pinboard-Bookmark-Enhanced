@@ -1804,7 +1804,12 @@ html[data-theme="rose-pine"] .vocab-filter-row select {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--lib-fg-muted);
+  /* --lib-btn-fg-muted, not --lib-fg-muted: this cell's `background` is
+     `transparent`, so the resolved fill it actually rests on is whatever
+     .vocab-sort-seg's own --lib-btn-bg paints behind it -- a control fill
+     fg-muted is never AA-derived against (COMPONENTS.md §9.1 law 8,
+     weak-text-on-fill batch T4). */
+  color: var(--lib-btn-fg-muted);
 }
 /* Concentric outer corners (COMPONENTS.md §9.2 law 2, "内半径 = 外半径 − 内距"):
    independent review F1 (hit-area-debt) found that the shell's `overflow:
@@ -1842,14 +1847,29 @@ html[data-theme="rose-pine"] .vocab-filter-row select {
    above -- the pad reaches 25.5px effective height, 1px inside the allowed
    margin, not at its edge. */
 .vocab-sort-seg > .vocab-sort-btn::before { content: ""; position: absolute; inset: -1px 0; }
+/* background: --lib-btn-hover, not the old color-mix(--lib-fg 6%, --lib-btn-bg)
+   -- --lib-btn-fg-muted is only AA-derived against [--lib-btn-bg,
+   --lib-btn-hover] (T1/D1), not against an arbitrary fg%-into-btn-bg mix, and
+   measured (weak-text-on-fill batch T4 Step 0): this cell's own
+   --lib-btn-fg-muted failed the old 6% mix on 8/15 blocks (worst
+   nord-night 3.92:1). Reusing the existing hover token rather than inventing
+   a third fill (plan T4's own instruction, not D6 -- D6 is the separate
+   batch-selection-band item below) means hover here now reads the SAME fill
+   hover already uses everywhere else on this control family. */
 .vocab-sort-seg > .vocab-sort-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--lib-fg) 6%, var(--lib-btn-bg));
+  background: var(--lib-btn-hover);
 }
 /* §8 law 4: ghost feedback, transform cancelled (scale on a welded segment
    opens a gap at the seam). */
+/* background: --lib-btn-hover, not the old color-mix(--lib-fg 10%,
+   --lib-btn-bg) -- same reason as :hover above, and measured worse (12/15
+   blocks failed, worst nord-night 3.57:1). VISIBLE CHANGE: :active no longer
+   paints a fill one step darker than :hover -- both states now share
+   --lib-btn-hover's fill (transition-duration: 0s below still makes the
+   press read as instant, just no longer a deeper color). */
 .vocab-sort-seg > .vocab-sort-btn:active:not(:disabled) {
   transform: none;
-  background: color-mix(in srgb, var(--lib-fg) 10%, var(--lib-btn-bg));
+  background: var(--lib-btn-hover);
   transition-duration: 0s;
 }
 .vocab-sort-seg > .vocab-sort-btn[aria-pressed="true"] {
