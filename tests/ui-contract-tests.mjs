@@ -271,6 +271,60 @@ check(/\.connection-health\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax
     "options.css: a hand-written rule pairs --opt-fg-hint/--opt-fg-muted directly with --opt-btn-bg/--opt-btn-hover on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offenders.join(", "));
 }
 
+// ---- weak-text-on-fill (T3, COMPONENTS.md §9.1 law 8, D3(b)): --pp-fg-hint /
+// --pp-fg-muted / --pp-link must never paint text that rests on a control
+// fill (--pp-btn-bg / --pp-btn-hover). The only sanctioned tokens for text on
+// those fills are --pp-btn-fg-muted (secondary) and --pp-btn-fg (primary /
+// hover-deepened) -- .qbtn and .md-strip-btn are buttons, not links, so D3(b)
+// drops --pp-link from both rather than deriving a third `btn-link` role.
+// Same theme-factory CSS-syntax scanner as the T2 options check above (not a
+// text-grep regex) over the HAND-WRITTEN region only.
+//
+// STATED BLIND SPOTS (same shape as the T2 options check above): this is a
+// STATIC source scan, not a render probe.
+//   - It cannot see the CASCADE. A higher-specificity `html[data-theme] ...`
+//     rule restating `color` on the SAME selector can silently win at
+//     runtime -- that is scripts/ui-render-audit.mjs's `weakTextOnFill`
+//     family's job (T5, not yet landed as of this commit), not this one's.
+//   - It cannot see INHERITANCE across rules. A selector with no `background`
+//     of its own is invisible to a same-rule pairing check. Check 2 below
+//     only catches a single rule declaring BOTH `color` and `background` on
+//     the same selector.
+// No render-audit-checklist.mjs row is added for this task: that file has no
+// existing family that pins a computed `color` to a token value (checked --
+// grepped for getPropertyValue("color") / colorEquals-shaped assertions,
+// zero hits), so a `.qbtn` row would be the first of a new kind rather than
+// an addition to an established pattern; T5's `weakTextOnFill` family is
+// where that render-probe coverage is planned to land.
+{
+  const hand = stripGeneratedRegions(popupCss);
+  const rules = parseStyleRules(hand);
+
+  const qbtnRule = rules.find((r) => r.context.length === 0 && r.selectors.includes(".qbtn"));
+  const qbtnUsesBtnFgMuted = !!qbtnRule && parseDeclarations(qbtnRule.body)
+    .some((d) => d.property === "color" && d.value.includes("--pp-btn-fg-muted"));
+  check(qbtnUsesBtnFgMuted,
+    "popup.css: .qbtn's base rule no longer reads --pp-btn-fg-muted for its resting text color");
+
+  const offendersPp = [];
+  for (const rule of rules) {
+    // :disabled is the one documented WCAG 1.4.3 exemption (plan §0 /
+    // COMPONENTS.md's #submit-btn:disabled note) -- excluded by the
+    // `disabled` state itself, not by selector name, matching T5's planned
+    // weakTextOnFill exemption rule.
+    if (rule.selectors.some((s) => /:disabled\b/.test(s))) continue;
+    const decls = parseDeclarations(rule.body);
+    const colorDecl = decls.find((d) => d.property === "color");
+    const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
+    if (!colorDecl || !bgDecl) continue;
+    if (/--pp-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--pp-(btn-bg|btn-hover)\b/.test(bgDecl.value)) {
+      offendersPp.push(rule.selectorText);
+    }
+  }
+  check(offendersPp.length === 0,
+    "popup.css: a hand-written rule pairs --pp-fg-hint/--pp-fg-muted/--pp-link directly with --pp-btn-bg/--pp-btn-hover on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offendersPp.join(", "));
+}
+
 check(/id="vocab-no-account"[^>]*role="region"[^>]*aria-labelledby="vocab-no-account-title"/.test(libraryHtml) &&
   /id="vocab-signed-out-lookup"[^>]*data-i18n="libraryLookupOpen"/.test(libraryHtml),
   "signed-out Vocabulary state lacks a named region or localized narrow lookup route");
