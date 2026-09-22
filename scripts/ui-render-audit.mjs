@@ -2265,7 +2265,15 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
   // depend on some other CHECKS entry happening to need the same state.
   if (!(await page.$(".vocab-card.selected"))) {
     const head = page.locator("#vocab-list .vocab-card .notes-card-head").first();
-    if (await head.count()) { await head.click({ modifiers: ["Control"] }); await page.waitForTimeout(300); }
+    // F5(b), T5 review: this opener used to be fail-OPEN (`if (await head.
+    // count())`) -- a missing head silently skipped the click and the scan
+    // below ran against the UNSELECTED band, reporting a false "0 FAIL"
+    // instead of failing loudly the way every sibling opener in this file
+    // does (needsDetailOpen/needsBatchBarOpen above throw on the same miss).
+    if (!(await head.count())) {
+      throw new Error(`SETUP: no "#vocab-list .vocab-card .notes-card-head" to open the batch-selected band for weakTextOnFill (theme=${theme}) -- seed fixture broken or markup renamed`);
+    }
+    await head.click({ modifiers: ["Control"] }); await page.waitForTimeout(300);
   }
   await recordWeakTextHits(page, "library", theme, results, "vocab-batch");
 
@@ -2293,7 +2301,11 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
   // ---- weakTextOnFill (family 13, T5): the notes batch-selected band.
   if (!(await page.$(".notes-hit.selected"))) {
     const hit = page.locator("#notes-list .notes-hit-btn").first();
-    if (await hit.count()) { await hit.click({ modifiers: ["Control"] }); await page.waitForTimeout(300); }
+    // F5(b), T5 review: same fail-closed fix as the vocab band opener above.
+    if (!(await hit.count())) {
+      throw new Error(`SETUP: no "#notes-list .notes-hit-btn" to open the notes batch-selected band for weakTextOnFill (theme=${theme}) -- seed fixture broken or markup renamed`);
+    }
+    await hit.click({ modifiers: ["Control"] }); await page.waitForTimeout(300);
   }
   await recordWeakTextHits(page, "library", theme, results, "notes-batch");
 }
@@ -2303,9 +2315,12 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   // (options.js renderSavedThemes(), read once at init via syncGetLarge) --
   // seed it BEFORE the navigation below, the same way pinboardToken is
   // seeded elsewhere in this file. Idempotent across the per-theme loop that
-  // calls this function repeatedly, so no cleanup is needed.
-  if (surface === "options" && checks.some((c) => c.selector === ".saved-theme-btn")) {
-    await sw.evaluate(() => chrome.storage.local.set({ savedThemes: [{ name: "debt-sweep probe", css: "body{}" }] }));
+  // calls this function repeatedly, so no cleanup is needed. Unconditional
+  // for options (not just when a CHECKS entry needs it): family 13's own
+  // per-panel activation loop below also needs a saved theme to exist --
+  // its confirm-popover leg opens via `.saved-theme-del`.
+  if (surface === "options") {
+    await sw.evaluate(() => chrome.storage.local.set({ savedThemes: [{ name: "weakTextOnFill probe", css: "body{}" }] }));
   }
   await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
   await page.waitForTimeout(500); // settles the theme-early async storage.get correction
@@ -2475,17 +2490,116 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       for (const check of keyWrapChecks) await runOneCheck(page, theme, check, results);
     }
     for (const check of otherChecks) await runOneCheck(page, theme, check, results);
-    // ---- weakTextOnFill (family 13, T5): the Account tab's Connection
-    // Status disclosure. It is a plain closed `<details>` (options.html) --
-    // renderConnectionOverview() populates it regardless of `open`, but a
-    // closed disclosure computes display:none on its body, so nothing above
-    // opens it for its own sake. #tab-general first: the groups above may
-    // have left #tab-appearance or #tab-tags active by now, and the
-    // disclosure lives in #panel-general.
-    await page.click("#tab-general");
-    await page.click("#connection-overview-title");
-    await page.waitForSelector("#connection-health .connection-health-row", { timeout: TIMEOUT_MS }).catch(() => {});
-    await recordWeakTextHits(page, "options", theme, results, "rest");
+
+    // ---- weakTextOnFill (family 13, T5 fix wave F1+F5a): options' own
+    // activation loop, run AFTER the CHECKS groups above finish (their own
+    // per-group tab/click choreography is untouched). Two problems this
+    // replaces: (F1) the appearance-tab CHECKS group above clicks
+    // `.theme-preset-btn[data-theme='flexoki']` to reveal #preset-preview-
+    // section for OTHER checks -- that click's handler (options.js
+    // applyPreset -> applyOptionsPageTheme) is the SAME function "Extension
+    // pages follow the Pinboard theme preset" drives, so it ALSO re-derives
+    // documentElement.dataset.theme as a side effect, leaving only the
+    // themes whose own preset happened to be flexoki measuring a real
+    // palette (T5 review: 3/15). (F5a) `.panel{display:none}` (options.
+    // css:336) meant 12 of the 13 tab panels, and every popover, were never
+    // opened for this family's OWN sake -- it only ever scanned whichever
+    // panel the CHECKS groups above happened to leave active. Re-applying
+    // storage + a fresh navigation here (not a reload later, which would
+    // re-close every panel/popover this loop opens) guarantees a clean
+    // dataset.theme before ANY of this loop's own clicks run, independent
+    // of whatever the CHECKS groups above left the page in.
+    const { themePresetKey: _wtPresetKey, optTheme: _wtMode } = themeToStorage(theme);
+    await setTheme(sw, _wtPresetKey, _wtMode);
+    await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForTimeout(500);
+
+    const panelIds = await page.$$eval(".tab-btn", (els) => els.map((e) => e.id));
+    if (!panelIds.length) {
+      throw new Error(`SETUP: no ".tab-btn" elements on options.html (theme=${theme}) -- weakTextOnFill cannot reach any panel`);
+    }
+    for (const tabId of panelIds) {
+      await page.click(`#${tabId}`);
+      await page.waitForTimeout(150);
+      // Open every non-help disclosure in the now-active panel -- same
+      // opener runSweep uses (~:3321) so a border/chevron-adjacent weak-text
+      // bug inside a closed <details> (e.g. the vocabulary/tag-gov/Send-to
+      // sections) is reached the same way the geometry families already
+      // reach it. Contextual help stays closed (not the rest state).
+      await page.evaluate(() => { document.querySelectorAll(".panel.active details:not(.context-help)").forEach((d) => { d.open = true; }); });
+      await page.waitForTimeout(100);
+      await recordWeakTextHits(page, "options", theme, results, `panel:${tabId}`);
+
+      if (tabId === "tab-appearance") {
+        // #preset-preview-section (F1's drift trigger, see above) + the
+        // theme-name popover + a confirm popover all live on this one tab,
+        // so they're opened in sequence rather than re-navigating per leg.
+        const presetBtn = page.locator(".theme-preset-btn[data-theme='flexoki']").first();
+        if (!(await presetBtn.count())) {
+          throw new Error(`SETUP: no ".theme-preset-btn[data-theme='flexoki']" on ${tabId} (theme=${theme}) -- weakTextOnFill cannot reach #preset-preview-section`);
+        }
+        await presetBtn.click();
+        await page.waitForSelector("#preset-preview-section:not([style*='display: none'])", { timeout: TIMEOUT_MS });
+        // Restore documentElement.dataset.theme in-page (NOT a reload,
+        // which would re-close #preset-preview-section this click just
+        // opened) via the exact function the boot/reload path calls, so
+        // the result is byte-identical to what a real reload would
+        // produce. `follow: true` matches this fixture's untouched
+        // "Extension pages follow the Pinboard theme preset" default.
+        const restored = await page.evaluate(({ mode, presetKey }) => {
+          if (typeof pbpApplyOptionsEarlyTheme !== "function") return false;
+          pbpApplyOptionsEarlyTheme(mode, presetKey, true);
+          return true;
+        }, { mode: _wtMode, presetKey: _wtPresetKey });
+        if (!restored) {
+          throw new Error(`SETUP: pbpApplyOptionsEarlyTheme is not defined on options.html (theme=${theme}) -- cannot restore documentElement.dataset.theme after the preset-preview click`);
+        }
+        await page.waitForTimeout(50);
+        await recordWeakTextHits(page, "options", theme, results, "panel:tab-appearance:preset-preview");
+
+        // theme-name popover (`#save-custom-theme` -> `.theme-name-popover`).
+        await page.fill("#opt-custom-css", "body{}");
+        await page.click("#save-custom-theme");
+        await page.waitForSelector(".theme-name-popover", { timeout: TIMEOUT_MS });
+        await recordWeakTextHits(page, "options", theme, results, "panel:tab-appearance:theme-name-popover");
+        await page.evaluate(() => document.querySelector(".theme-name-popover .tnp-cancel")?.click());
+
+        // confirm popover (`.saved-theme-del` -> the shared showConfirmPopover()
+        // path -- savedThemes was seeded at the top of this function).
+        // `.saved-theme-del` is opacity:0/visibility:hidden at rest (options.css
+        // .saved-theme-wrap:hover/:focus-within reveals it, a hover-only delete
+        // affordance) -- a bare .click() fails Playwright's actionability check
+        // ("element is not visible"), so the wrap is hovered first, the same
+        // way a real pointer user would reveal it before clicking.
+        const delWrap = page.locator(".saved-theme-wrap").first();
+        if (!(await delWrap.count())) {
+          throw new Error(`SETUP: no ".saved-theme-wrap" on ${tabId} (theme=${theme}) -- weakTextOnFill cannot reach the options confirm popover`);
+        }
+        await delWrap.hover();
+        const delBtn = page.locator(".saved-theme-del").first();
+        if (!(await delBtn.count())) {
+          throw new Error(`SETUP: no ".saved-theme-del" on ${tabId} (theme=${theme}) -- weakTextOnFill cannot reach the options confirm popover`);
+        }
+        await delBtn.click();
+        await page.waitForSelector(".confirm-popover .confirm-yes", { timeout: TIMEOUT_MS });
+        await page.waitForTimeout(150);
+        await recordWeakTextHits(page, "options", theme, results, "panel:tab-appearance:confirm-popover");
+        await page.evaluate(() => document.querySelector(".confirm-popover .confirm-no")?.click());
+      }
+
+      if (tabId === "tab-general") {
+        // Account tab's Connection Status disclosure. It is a plain closed
+        // `<details>` (options.html) -- renderConnectionOverview() populates
+        // it regardless of `open`, but a closed disclosure computes
+        // display:none on its body, so the generic details-opener above
+        // (which only opens `details:not(.context-help)`) DOES reach it --
+        // this extra click/wait/scan exists because the panel-level scan
+        // above already ran BEFORE this leg's own content settled.
+        await page.click("#connection-overview-title");
+        await page.waitForSelector("#connection-health .connection-health-row", { timeout: TIMEOUT_MS }).catch(() => {});
+        await recordWeakTextHits(page, "options", theme, results, "panel:tab-general:connection-overview");
+      }
+    }
     return;
   }
   const confirmSet = new Set(confirmChecks);
@@ -2503,11 +2617,43 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   // focusout-dismiss behaviour.
   await page.evaluate(() => { document.getElementById("md-actions-strip")?.classList.remove("hidden"); });
   await recordWeakTextHits(page, "popup", theme, results, "rest");
+
+  // ---- weakTextOnFill (family 13, T5 fix wave F5a): the 11 hidden-by-
+  // default popup states runSweep already knows how to reveal (~:3468),
+  // reused here rather than re-invented -- modelled on that same class-
+  // toggle list since none of these 11 legs are mutually exclusive and the
+  // sweep already established that a simultaneous unhide is a faithful
+  // rendering of each one's own recipe (they carry their own button recipes
+  // -- .fc-btn, .md-strip-btn, .offline-queue-item > .actions button -- that
+  // the default popup never renders, and this family had zero coverage of
+  // any of them before this fix). The extra toggle click renders the
+  // offline-queue ROWS themselves (no class toggle can conjure them --
+  // popup-offline.js only builds them inside renderList(), same reasoning
+  // as runSweep's own comment on this exact click).
+  await page.evaluate(() => {
+    for (const id of ["existing-banner", "url-warning", "url-clean-hint", "presets-row", "suggest-row", "ai-error-card", "ai-error-fallback", "batch-permission", "batch-progress", "md-actions-strip", "offline-queue-list"]) {
+      document.getElementById(id)?.classList.remove("hidden");
+    }
+    const fb = document.getElementById("ai-error-fallback");
+    if (fb && !fb.textContent.trim()) fb.textContent = "Use fallback";
+  });
+  await page.evaluate(() => document.getElementById("offline-queue-toggle")?.click());
+  await page.waitForSelector(".offline-queue-item, .offline-queue-empty", { timeout: TIMEOUT_MS }).catch(() => {});
+  await page.waitForTimeout(150);
+  await recordWeakTextHits(page, "popup", theme, results, "hidden-legs");
+
+  // ---- weakTextOnFill (family 13, T5 fix wave F5a): the confirm popover.
+  // Opened UNCONDITIONALLY -- this family's own coverage must not depend on
+  // `checks` happening to carry a `.confirm-popover`-scoped CHECKS entry for
+  // this particular theme slice. Before this fix, family 13 never scanned
+  // this state on popup at all (only options' "rest" existed as a scan
+  // point, and even that ran before its own confirm popover ever opened).
+  await page.evaluate(() => { document.getElementById("main-section")?.classList.remove("hidden"); });
+  await page.click("#logout-link");
+  await page.waitForSelector(".confirm-popover .confirm-yes", { timeout: TIMEOUT_MS });
+  await page.waitForTimeout(150);
+  await recordWeakTextHits(page, "popup", theme, results, "confirm");
   if (confirmChecks.length) {
-    await page.evaluate(() => { document.getElementById("main-section")?.classList.remove("hidden"); });
-    await page.click("#logout-link");
-    await page.waitForSelector(".confirm-popover .confirm-yes", { timeout: TIMEOUT_MS });
-    await page.waitForTimeout(150);
     for (const check of confirmChecks) await runOneCheck(page, theme, check, results);
   }
 }
@@ -4038,6 +4184,23 @@ async function main() {
     const total = weakTextScanLog.reduce((sum, entry) => sum + entry.scanned, 0);
     console.log(`[render-audit] weakTextOnFill: ${total} element probe(s) this run${SHARD_TAG} (` +
       Object.entries(bySurface).map(([surface, count]) => `${surface}=${count}`).join(", ") + ")");
+    // T5 fix wave (F5a): per-(surface,context) breakdown, summed across every
+    // theme this process ran -- distinguishes "this specific panel/leg was
+    // opened and scanned on every theme" from "0 FAIL" at a coarser grain
+    // than the per-surface line above, which could hide a panel/leg that was
+    // silently never reached (a shape the F5 review finding named
+    // explicitly: 12 of 13 options panels used to never appear here at all).
+    const byContext = {};
+    for (const entry of weakTextScanLog) {
+      const key = `${entry.surface}/${entry.context}`;
+      byContext[key] = byContext[key] || { scanned: 0, themes: 0 };
+      byContext[key].scanned += entry.scanned;
+      byContext[key].themes += 1;
+    }
+    console.log(`[render-audit] weakTextOnFill per (surface, panel/leg) -- scanned total across ${SHARD_THEMES.length} theme(s) this process ran, and the (surface, theme) count that reached it:`);
+    for (const [key, v] of Object.entries(byContext).sort()) {
+      console.log(`  ${key}: scanned=${v.scanned} themes=${v.themes}`);
+    }
   } else {
     console.log(`[render-audit] weakTextOnFill: 0 element probes this run${SHARD_TAG} -- no (surface, theme) pair reached recordWeakTextHits`);
   }
