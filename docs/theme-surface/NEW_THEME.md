@@ -335,7 +335,8 @@ final-fix wave:
   them vary either.
 - **Derived component-pair colors are not `ui` inputs.** The shared
   `btn-fg`, `btn-fg-muted`, `danger-quiet-fg`, `on-danger`, `chip-bg`,
-  `chip-fg` roles and popup-only `preset-fg` / `spinner-fg` are computed
+  `chip-fg` roles and popup-only `preset-fg` / `spinner-fg` / `ai-chip-fg`
+  are computed
   from the FINAL,
   post-override map — as is `on-accent` on options and library (Task 4,
   taste-uplift-batch2): neither surface has ever declared this role, so
@@ -349,6 +350,16 @@ final-fix wave:
   supported inputs (`btn-bg`, `danger`, `tag-bg`, `tag-fg`, `preset-bg`,
   `spinner-bg`) and trust the finalizer; a new output escape hatch requires
   an explicit derivation-contract change plus tests.
+  `ai-chip-fg` (Task 4, taste-uplift-batch3, D8) is popup-only: text on the
+  AI-suggested chip family (`.stag.ai`), `fgToAAMulti(accent2, [chip-bg,
+  btn-hover])`, derived in `popup-chrome.mjs` right after `chip-bg`'s own
+  tinted finalization (it reads the FINAL chip-bg, not the pre-tint
+  tag-bg). Its gate is two `contrast-audit.mjs` `COMPONENT_PAIR_SPEC` rows
+  (`ai-chip-fg vs chip-bg`, `ai-chip-fg vs btn-hover`), each counted at 15
+  rows (14 themed blocks + the default surface) — stated by counted rows,
+  not by a hand-picked example, since that count is the only thing that
+  proves the gate ran against every block instead of silently skipping
+  some.
 - **TEXT input roles are taken VERBATIM (batch2 final-fix wave).** `fg`,
   `fg-hint`, `fg-muted`, and popup's `on-accent` are never adjusted by the
   derivation once a pilot overrides them — `_ui-derive.mjs`'s own gap-fill
