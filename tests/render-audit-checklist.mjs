@@ -223,6 +223,10 @@
 //                      must contain this token, e.g. "tabular-nums"
 //                      (`.stag-num`, D7 -- keeps 1-9 from jittering the
 //                      chip's width as Alt+N slots reassign).
+//   textDecorationLineContains -- string: computed `text-decoration-line`
+//                      must contain this token, e.g. "line-through" (T5 fix
+//                      round F6, `.stag.used` -- a struck-through chip, not
+//                      just a colour/fill swap).
 //   bgEqVar / colorEqVar -- role name (e.g. "chip-bg"/"chip-fg"/
 //                      "ai-chip-fg"): the element's computed background-
 //                      color / color must equal (±1 per RGB channel,
@@ -1379,6 +1383,22 @@ export const CHECKS = [
   // new (keeps 1-9 from jittering the chip's width as slots reassign).
   { surface: "popup", page: "popup.html", selector: ".stag .stag-num", state: "default",
     expect: { fontSizePx: { value: 11 }, fontVariantNumericContains: "tabular-nums", colorEqVar: "chip-fg" } },
+  // .stag.used (T5 fix round F6): the "already inserted" state (popup.css's
+  // Soft Fill law-8 comment directly above `.stag.used`) -- pinned via
+  // `classState` (the same synthetic addClass mechanism
+  // #submit-btn.saved-success above uses), NOT by re-selecting the runner's
+  // own seeded `.used` chip (scripts/ui-render-audit.mjs toggles `.used` on
+  // the LAST suggest chip before this file's CHECKS loop runs, purely to give
+  // family 13 (weakTextOnFill) a real used chip to scan). classState instead
+  // reapplies `.used` to the SAME first ("reading") chip the bare `.stag` row
+  // above already asserts a REST state for, so the two rows are directly
+  // comparable states of one element. bgEqVar doesn't apply to the fill:
+  // `.used`'s background is the literal keyword `transparent` (falls through
+  // to the page bg, not a resolved theme token), so backgroundAlphaMax stands
+  // in for "no fill" the same way `.context-help-toggle`'s hover row above
+  // uses it to assert "no filled shell".
+  { surface: "popup", page: "popup.html", selector: ".stag", state: "classState", addClass: ["used"],
+    expect: { backgroundAlphaMax: 0, colorEqVar: "fg-hint", textDecorationLineContains: "line-through" } },
 ];
 
 // Hand-copied literal `data-theme` values, verified at authoring time with:

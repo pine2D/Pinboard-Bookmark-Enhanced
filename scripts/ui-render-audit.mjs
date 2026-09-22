@@ -528,6 +528,11 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     found: true,
     disabled: !!el.disabled,
     color: cs.color,
+    // T5 fix round F6: `.stag.used` (popup.css) is a `text-decoration-line:
+    // line-through` state, not just a colour swap -- captured unconditionally
+    // (cheap, selector-independent) the same way fontSize/fontVariantNumeric
+    // are above.
+    textDecorationLine: cs.textDecorationLine,
     outlineColor: cs.outlineColor,
     outlineStyle: cs.outlineStyle,
     outlineWidth: parseFloat(cs.outlineWidth) || 0,
@@ -829,6 +834,16 @@ function evaluateCheck(check, raw, theme) {
     const want = exp.fontVariantNumericContains;
     const got = raw.fontVariantNumeric || "";
     out.push(verdict("fontVariantNumericContains", got.includes(want), got, want));
+  }
+  // textDecorationLineContains (T5 fix round F6): `.stag.used` (popup.css)
+  // renders a struck-through label -- `text-decoration-line` computes as a
+  // space-joined token list (e.g. "line-through" or, if it ever combined with
+  // underline, "underline line-through"), so this is a substring/contains
+  // check like fontVariantNumericContains above, not an equality check.
+  if ("textDecorationLineContains" in exp) {
+    const want = exp.textDecorationLineContains;
+    const got = raw.textDecorationLine || "";
+    out.push(verdict("textDecorationLineContains", got.includes(want), got, want));
   }
   // bgEqVar / colorEqVar (D6/D7, Task 5): a chip's fill/text isn't just "some
   // AA-passing pair" (textContrast already proves that) -- it must be THIS
@@ -1706,6 +1721,16 @@ async function runOneCheck(page, theme, check, results, extBase) {
   // no check sets both at once. colorEqVar gets its OWN extraColorVarName
   // slot (see probeSelector's header comment) -- a check (popup's `.stag`)
   // legitimately sets bgEqVar AND colorEqVar together, two DIFFERENT tokens.
+  // T5 fix round F5: the "no check sets both at once" invariant above was
+  // prose-only -- a check declaring BOTH textContrastMulti.extraBgSelectorVar
+  // and bgEqVar would have the `||` below silently pick one and starve the
+  // other of its own probe value. Enforced here instead of just documented.
+  if (check.expect.textContrastMulti?.extraBgSelectorVar && check.expect.bgEqVar) {
+    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
+      `check declares BOTH textContrastMulti.extraBgSelectorVar (${check.expect.textContrastMulti.extraBgSelectorVar}) ` +
+      `and bgEqVar (${check.expect.bgEqVar}) -- they share the same extraBgVarName probe slot ` +
+      `and only one would ever be read; split into two checklist entries instead.`);
+  }
   const extraBgSelectorVar = check.expect.textContrastMulti?.extraBgSelectorVar
     || check.expect.bgEqVar;
   const extraColorSelectorVar = check.expect.colorEqVar;
@@ -4291,8 +4316,9 @@ async function main() {
   // through to the real network and got a real 401 from the real Pinboard
   // API using this fixture's fake token), while context-level interception
   // catches it every time. Same shape as qa-drive.mjs's own comment on this
-  // exact surface ("popup 的 Pinboard 请求经 SW 代理...本环境实测 context.route
-  // 连 SW 请求也拦到" -- an observed behaviour, not a documented Playwright
+  // exact surface ("the popup's Pinboard requests go through the SW proxy;
+  // in this environment, context.route has been observed to intercept SW
+  // requests too" -- an observed behaviour, not a documented Playwright
   // guarantee, for extension-page/SW requests alike).
   await ctx.route(/\/v1\/posts\/suggest/, (route) => route.fulfill({
     status: 200,
