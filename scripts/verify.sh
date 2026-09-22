@@ -63,6 +63,12 @@ node "scripts/network-exits-check.mjs"
 echo "[ui-contract] checking static UI contracts"
 node "tests/ui-contract-tests.mjs"
 
+echo "[md-preview-contrast] checking md-preview.css's light-dark token contrast pairs"
+# md-preview is the one surface outside the theme factory (no @generated
+# regions, no per-preset blocks) -- contrast-audit.mjs never looks at it,
+# so this is its only static contrast gate.
+node "tests/md-preview-contrast-tests.mjs"
+
 echo "[ui-vocabulary] checking structural class tokens against the registry and the legacy baseline"
 node "scripts/ui-vocabulary-lint.mjs"
 node "tests/ui-vocabulary-tests.mjs"
