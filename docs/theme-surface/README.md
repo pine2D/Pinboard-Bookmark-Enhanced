@@ -426,18 +426,21 @@ array generically, so all six regions (three ui-themes + three
 ui-components) are covered without any per-region code in the audit itself.
 
 **Colors inside the recipe are still `var()` references into §9's tokens**
-— the component layer never invents its own palette. Five shared paired
-colors (`btn-fg`, `danger-quiet-fg`, `on-danger`, `chip-bg`, `chip-fg`) are
-computed by `_ui-derive.mjs#finalizeUiControlRoles` from the FINAL,
-post-`ui`-override map, so popup/options/library use one contrast and soft-fill
-algorithm. Popup then derives its surface-only `preset-fg` / `spinner-fg`, plus
-`ai-chip-fg` (Task 4, taste-uplift-batch3, D8) — text for the AI-suggested
-chip family (`.stag.ai`), seeded from `--pp-accent2` instead of `tag-fg`,
-derived right after `chip-bg`'s own tinted finalization so it reads the
-FINAL chip-bg, not the pre-tint `tag-bg`.
+— the component layer never invents its own palette. Six shared paired
+colors (`btn-fg`, `btn-fg-muted`, `danger-quiet-fg`, `on-danger`, `chip-bg`,
+`chip-fg` — `btn-fg-muted` joined the other five in taste-uplift-batch3's
+weak-text-on-fill work) are computed by `_ui-derive.mjs#finalizeUiControlRoles`
+from the FINAL, post-`ui`-override map, so popup/options/library use one
+contrast and soft-fill algorithm. Popup then derives its surface-only
+`preset-fg` / `spinner-fg`, plus `ai-chip-fg` (Task 4, taste-uplift-batch3,
+D8) — text for the AI-suggested chip family (`.stag.ai`), seeded from
+`--pp-accent2` instead of `tag-fg`, derived right after `chip-bg`'s own
+tinted finalization so it reads the FINAL chip-bg, not the pre-tint
+`tag-bg`.
 
-**These eight names are derived outputs, not authoring inputs.**
-`validate-contracts.mjs` rejects the five shared names on every surface and
+**These nine names are derived outputs, not authoring inputs, on popup**
+(the six shared names plus `preset-fg` / `spinner-fg` / `ai-chip-fg`).
+`validate-contracts.mjs` rejects the six shared names on every surface and
 also rejects `preset-fg` / `spinner-fg` / `ai-chip-fg` under `ui.popup.*`,
 naming the exact JSON pointer. This replaces the former silent-discard
 limitation with an executable contract. Change supported inputs (`btn-bg`,
@@ -445,6 +448,17 @@ limitation with an executable contract. Change supported inputs (`btn-bg`,
 let the finalizer produce a passing pair; adding a genuinely new output escape
 hatch requires changing
 the derivation contract and its tests rather than hiding it in a pilot.
+
+**`on-accent` is a seventh output on options/library, but an input on
+popup** — the one role name where the same contract is strict on two
+surfaces and not on the third (taste-uplift-batch2 Task 4). Options and
+library have never had a pilot-configurable `on-accent`, so
+`finalizeUiControlRoles` always derives it there and `validate-contracts.mjs`
+rejects `ui.options.*.on-accent` / `ui.library.*.on-accent` the same way it
+rejects the nine popup outputs above. Popup is different: `on-accent` is a
+long-standing authoring INPUT there (`#submit-btn`'s own precedent, 5/13
+pilots set `ui.popup.<mode>.on-accent`), never rejected, never derived by
+this pipeline.
 
 **Spacing adapter.** The recipe declares padding/gap in plain px semantics;
 `ui-components.mjs`'s `sp(ns, px)` maps each value to that surface's
