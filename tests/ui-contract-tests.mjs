@@ -5371,8 +5371,15 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
       sel.includes("[aria-pressed") || sel.includes(".active") || sel.includes(":checked"));
     if (!isPressedFamily) continue;
     const decls = parseDeclarations(rule.body);
-    const bg = decls.find((d) => d.property === "background");
-    if (!bg || bg.value !== "var(--btn-hover)") continue;
+    // Ruling 24 (T5 first commit, taste-uplift batch3): match `background` OR
+    // `background-color`, and match the token appearing ANYWHERE in the
+    // value (not just as the whole value) -- a future consumer painting
+    // `background-color: var(--btn-hover)` or combining it with another
+    // layer must not silently fall outside this gate.
+    const bg = decls.find((d) =>
+      (d.property === "background" || d.property === "background-color") &&
+      d.value.includes("var(--btn-hover)"));
+    if (!bg) continue;
     matchedSelectors.push(rule.selectorText);
     const color = decls.find((d) => d.property === "color");
     if (!color || color.value !== "light-dark(var(--link), var(--link-hover))") {
@@ -5412,14 +5419,12 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
 {
   const ITALIC_ALLOWLIST = {
     "library.css": {
-      ".xp-dict-pos": 'Free Dictionary API English only -- CC-CEDICT/ECDICT both write pos:"" (dict-pack.js:75,388)',
-      ".xp-dict-example": "Free Dictionary API English only -- CC-CEDICT/ECDICT both write examples:[] (dict-pack.js:75,388)",
-      ".xp-dict-sense-tag": "Free Dictionary API English only -- CC-CEDICT/ECDICT sense tags are absent/empty (dict-pack.js:75,388)",
+      ".xp-dict-pos": 'part-of-speech tags are English-normalised by the API across query languages (sampled ja/ko); local packs write pos:"" (dict-pack.js:75,388)',
+      ".xp-dict-sense-tag": "sense tags are English-normalised by the API across query languages (sampled ja/ko); local packs write them empty (dict-pack.js:75,388)",
     },
     "md-preview.css": {
-      ".xp-dict-pos": 'Free Dictionary API English only -- CC-CEDICT/ECDICT both write pos:"" (dict-pack.js:75,388)',
-      ".xp-dict-example": "Free Dictionary API English only -- CC-CEDICT/ECDICT both write examples:[] (dict-pack.js:75,388)",
-      ".xp-dict-sense-tag": "Free Dictionary API English only -- CC-CEDICT/ECDICT sense tags are absent/empty (dict-pack.js:75,388)",
+      ".xp-dict-pos": 'part-of-speech tags are English-normalised by the API across query languages (sampled ja/ko); local packs write pos:"" (dict-pack.js:75,388)',
+      ".xp-dict-sense-tag": "sense tags are English-normalised by the API across query languages (sampled ja/ko); local packs write them empty (dict-pack.js:75,388)",
       "#rendered-view em": "author's own emphasis in article/translation content (D5, user ruling), not synthesized UI chrome",
     },
   };
@@ -5430,7 +5435,13 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
     }
   }
 
-  const isItalicDecl = (d) => d.property === "font-style" && /^(italic|oblique)/i.test(d.value);
+  // Ruling 24 (T5 first commit, taste-uplift batch3): also catch the `font`
+  // shorthand -- `font: italic 12px sans-serif` sets the same computed
+  // font-style as a standalone `font-style: italic` declaration, and the
+  // longhand-only check above would silently miss it.
+  const isItalicDecl = (d) =>
+    (d.property === "font-style" && /^(italic|oblique)/i.test(d.value)) ||
+    (d.property === "font" && /\b(italic|oblique)\b/i.test(d.value));
   const italicFiles = [["popup.css", popupCss], ["options.css", optionsCss], ["library.css", libraryCss], ["md-preview.css", mdCss]];
   for (const [fileName, css] of italicFiles) {
     const allowed = ITALIC_ALLOWLIST[fileName] || {};

@@ -2099,7 +2099,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-match { color: var(--fg-muted); font-size: 0.8em; margin: 0 0 var(--sp-2); }
 .xp-dict-entry { margin: 0 0 var(--sp-2); }
 .xp-dict-ipa-line { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: baseline; }
-.xp-dict-pos { font-style: italic; color: var(--fg-muted); }   /* italic kept: Free Dictionary API English only -- CC-CEDICT/ECDICT both write pos:"" (dict-pack.js:75,388) */
+.xp-dict-pos { font-style: italic; color: var(--fg-muted); }   /* italic kept: part-of-speech is English-normalised by the API across query languages (sampled ja/ko); local packs write pos:"" (dict-pack.js:75,388) */
 .xp-dict-ipa-tag { font-size: 0.75em; color: var(--fg-muted); }
 .xp-dict-forms { font-size: 0.8em; color: var(--fg-muted); margin-top: var(--sp-1); }
 .xp-dict-senses { margin: var(--sp-2) 0 0; padding-left: 1.4em; }
@@ -2109,8 +2109,8 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
    the text flush with everything else in the card. Uses :only-child rather
    than :has() to stay off the slow-selector list. */
 .xp-dict-senses li:only-child { list-style: none; margin-left: -1.4em; }
-.xp-dict-example { font-size: 0.85em; color: var(--fg-muted); font-style: italic; }   /* italic kept: Free Dictionary API English only -- CC-CEDICT/ECDICT both write examples:[] (dict-pack.js:75,388) */
-.xp-dict-sense-tag { font-size: 0.85em; color: var(--fg-muted); font-style: italic; }   /* italic kept: Free Dictionary API English only -- CC-CEDICT/ECDICT sense tags are absent/[] (dict-pack.js:75,388) */
+.xp-dict-example { font-size: 0.85em; color: var(--fg-muted); }   /* upright: Free Dictionary API returns example sentences in the query language -- ja/ko are user-selectable and CJK examples are confirmed live, not Latin-only (dict-pack.js:75,388) */
+.xp-dict-sense-tag { font-size: 0.85em; color: var(--fg-muted); font-style: italic; }   /* italic kept: sense tags are English-normalised by the API across query languages (sampled ja/ko); local packs write them empty (dict-pack.js:75,388) */
 /* Stable containers inside .xp-dict-slot: the local pack writes the first, every
    online path writes the second. Empty until something lands in them. */
 .xp-dict-local:not(:empty) { margin-bottom: var(--sp-2); }
