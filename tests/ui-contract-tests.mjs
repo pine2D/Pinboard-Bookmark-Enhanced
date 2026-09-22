@@ -5393,6 +5393,68 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
     `md-preview.css: pressed-state background:var(--btn-hover) rule count drifted from the expected 11 (found ${matchedSelectors.length}) -- a consumer was added, removed, or changed its fill; update this gate's comment and expectation once the drift is intentional`);
 }
 
+// T3 (D5, taste-uplift batch3): browsers synthesize an oblique for CJK glyphs
+// (no true italic face exists in any CJK typeface most users have), so
+// `font-style: italic` on text that can ever contain CJK reads as a
+// rendering glitch, not emphasis -- the same reasoning that upright-ed
+// options.css's .tag-gov-reason earlier (~:2674, "CJK has no true italic").
+// This batch removed it from every remaining CJK-capable site across the
+// four UI surface CSS files. What is left MUST be on this allowlist, each
+// with a one-line reason the selector's text can never contain CJK (or, for
+// #rendered-view em, is author emphasis rather than synthesized UI chrome):
+// anything else declaring font-style: italic|oblique is either a missed
+// site from this batch or a future regression re-introducing one.
+{
+  const ITALIC_ALLOWLIST = {
+    "library.css": {
+      ".xp-dict-pos": 'Free Dictionary API English only -- CC-CEDICT/ECDICT both write pos:"" (dict-pack.js:75,388)',
+      ".xp-dict-example": "Free Dictionary API English only -- CC-CEDICT/ECDICT both write examples:[] (dict-pack.js:75,388)",
+      ".xp-dict-sense-tag": "Free Dictionary API English only -- CC-CEDICT/ECDICT sense tags are absent/empty (dict-pack.js:75,388)",
+    },
+    "md-preview.css": {
+      ".xp-dict-pos": 'Free Dictionary API English only -- CC-CEDICT/ECDICT both write pos:"" (dict-pack.js:75,388)',
+      ".xp-dict-example": "Free Dictionary API English only -- CC-CEDICT/ECDICT both write examples:[] (dict-pack.js:75,388)",
+      ".xp-dict-sense-tag": "Free Dictionary API English only -- CC-CEDICT/ECDICT sense tags are absent/empty (dict-pack.js:75,388)",
+      "#rendered-view em": "author's own emphasis in article/translation content (D5, user ruling), not synthesized UI chrome",
+    },
+  };
+  for (const reasons of Object.values(ITALIC_ALLOWLIST)) {
+    for (const [sel, reason] of Object.entries(reasons)) {
+      check(typeof reason === "string" && reason.length > 0,
+        `tests/ui-contract-tests.mjs: ITALIC_ALLOWLIST entry "${sel}" has no reason string`);
+    }
+  }
+
+  const isItalicDecl = (d) => d.property === "font-style" && /^(italic|oblique)/i.test(d.value);
+  const italicFiles = [["popup.css", popupCss], ["options.css", optionsCss], ["library.css", libraryCss], ["md-preview.css", mdCss]];
+  for (const [fileName, css] of italicFiles) {
+    const allowed = ITALIC_ALLOWLIST[fileName] || {};
+    for (const rule of parseStyleRules(css)) {
+      if (!parseDeclarations(rule.body).some(isItalicDecl)) continue;
+      for (const sel of rule.selectors) {
+        check(Object.prototype.hasOwnProperty.call(allowed, sel),
+          `${fileName}: "${sel}" declares font-style: italic/oblique but is not in the T3 ITALIC_ALLOWLIST (tests/ui-contract-tests.mjs) -- if this text can contain CJK, remove font-style instead (see options.css's .tag-gov-reason precedent); if it is genuinely Latin-only or author emphasis, add a reason string to the allowlist`);
+      }
+    }
+  }
+  // Coverage the other direction: an allowlisted selector that no longer
+  // declares italic anywhere is a stale entry (the site was upright-ed and
+  // the allowlist line was left behind), silently widening what the gate
+  // above would accept without anyone noticing.
+  for (const [fileName, css] of italicFiles) {
+    const allowed = ITALIC_ALLOWLIST[fileName];
+    if (!allowed) continue;
+    const present = new Set();
+    for (const rule of parseStyleRules(css)) {
+      if (!parseDeclarations(rule.body).some(isItalicDecl)) continue;
+      for (const sel of rule.selectors) present.add(sel);
+    }
+    const stale = Object.keys(allowed).filter((sel) => !present.has(sel));
+    check(stale.length === 0,
+      `${fileName}: T3 ITALIC_ALLOWLIST names selector(s) that no longer declare font-style: italic/oblique -- remove the stale entr${stale.length === 1 ? "y" : "ies"}: ${stale.join(", ")}`);
+  }
+}
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);
