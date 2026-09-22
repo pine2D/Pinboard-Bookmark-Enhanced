@@ -240,12 +240,74 @@
 //     side coverage is contrast-audit's `btn-fg-muted vs btn-hover` / `fg vs
 //     btn-hover` rows, which gate the ROLE regardless of which selector
 //     paints it.
-//   EXEMPT: `:disabled` only (WCAG 1.4.3), checked via the live `disabled`
-//     IDL property walked up the ancestor chain -- never by matching
-//     ":disabled" in a selector string, so a scratch selector like
-//     `.x:not(:disabled)` or `.x:disabled ~ .y` can't be mistaken for the
-//     real exemption (tests/ui-contract-tests.mjs tightened the analogous
-//     static-scan exemption to the same rule, Ruling 16).
+//   COVERAGE (T5 fix wave, F5a/F5b): this family runs its OWN activation
+//     loop, not just whatever CHECKS groups happen to open for other
+//     reasons. options: all 13 tab panels (every `.panel`, `.panel{display:
+//     none}` in options.css means 12 of them are otherwise never scanned),
+//     every non-help `<details>` inside the active panel, the appearance
+//     tab's preset-preview section, its theme-name popover
+//     (`#save-custom-theme` -> `.theme-name-popover`) and a confirm popover
+//     (`.saved-theme-del` -> `.confirm-popover`), and the Account tab's
+//     Connection Status disclosure. popup: the rest state, the 11 hidden-
+//     by-default legs scripts/ui-render-audit.mjs's runSweep already knows
+//     how to reveal (existing-banner/url-warning/url-clean-hint/presets-row/
+//     suggest-row/ai-error-card/ai-error-fallback/batch-permission/batch-
+//     progress/md-actions-strip/offline-queue-list, plus the offline-queue
+//     rows themselves), and the confirm popover. library: vocab rest state,
+//     the vocab batch-selected band, the notes batch-selected band (each
+//     opener is fail-CLOSED -- a missing target throws SETUP rather than
+//     silently scanning the wrong state). Every panel/leg opener throws
+//     `SETUP: ...` on a missing target instead of silently skipping (a
+//     shape a future selector rename could otherwise turn into a silent
+//     "0 FAIL"), and scripts/ui-render-audit.mjs prints scanned counts per
+//     (surface, theme, context) so "0 FAIL" can be told apart from "never
+//     opened".
+//   EXEMPTIONS -- every class is a TRIGGER, not an automatic drop: a hit is
+//     only exempted once the REAL painted ratio between the scanned colour
+//     and the resolved fill (reusing contrast-audit.mjs's own `cr`) clears
+//     4.5:1 for text or 3:1 for an icon-only affordance (the same floor
+//     COMPONENTS.md §9.1 uses for icons). A trigger that fails its ratio is
+//     still reported, annotated `[was-exempt-by ...]` so the near-miss is
+//     visible rather than looking like a plain scan miss.
+//     - `:disabled` (WCAG 1.4.3) -- the ONLY unconditional exemption, no
+//       ratio gate: checked via the live `disabled` IDL property walked up
+//       the ancestor chain, never by matching ":disabled" in a selector
+//       string, so a scratch selector like `.x:not(:disabled)` or
+//       `.x:disabled ~ .y` can't be mistaken for the real exemption (tests/
+//       ui-contract-tests.mjs tightened the analogous static-scan exemption
+//       to the same rule, Ruling 16).
+//     - identity -- the scanned colour ALSO equals one of the tokens
+//       COMPONENTS.md §9.1 law 8 itself sanctions as text-on-fill: `fg`,
+//       `btn-fg`, `btn-fg-muted`, and (library only) `--lib-row-selected-fg`.
+//       Every matching role name is recorded (not first-match-wins) so a
+//       collapse across more than one sanctioned token is labelled
+//       correctly.
+//     - selection-marker -- the scanned colour equals `accent` AND the
+//       element carries a selection-state marker (`aria-pressed="true"`,
+//       `aria-selected="true"`, `aria-current`, `.active`, `.selected`):
+//       accent painted on a pressed/selected control, not hint/muted/link
+//       misuse (library's pressed sort-seg cell is the reviewed, accepted
+//       instance of this shape).
+//     - safe-host -- the resolved fill is EXACTLY (no tolerance) one of the
+//       page-level surfaces fg-hint/fg-muted are independently guaranteed
+//       AA against on every themed block (contrast-audit.mjs's
+//       auditCssThemes/auditLibraryThemes): `bg`, `bg2`/`panel`, and, on
+//       options only, `pf-bg`/`code-bg` (D5) and, on popup only,
+//       `drop-hover` (options never declares `--opt-drop-hover`, so that
+//       role is not in its safe-host list at all). `link` is EXCLUDED from
+//       this exemption on popup/options -- neither surface has a "link vs
+//       <host>" row in contrast-audit.mjs, so there is no guarantee to fall
+//       back on; library keeps `link` eligible because its "link vs bg"/
+//       "link vs panel" rows genuinely cover it.
+//   OUT OF SCOPE (T5 fix wave, F5c -- not silently missed, deliberately not
+//     modelled): background-image/gradient fills; `::before`/`::after`
+//     fills; `::placeholder` text; alpha compositing (`parseColor` discards
+//     alpha -- a semi-transparent fill or text colour is not resolved
+//     against its true composited result); icon-only `<a>`/`<summary>`
+//     (the icon-only scan is scoped to `button, [role='button'], .btn,
+//     a.btn`) and icons inside a button that ALSO carries its own label
+//     text (the icon's colour is not independently probed there); any
+//     `color-mix()` fill other than library's two batch-selection bands.
 //   Options' target role set is fg-hint/fg-muted/link only -- COMPONENTS.md
 //     §9.1 law 8 does not name a fourth "fg-dim" role, and `--opt-fg-dim`
 //     was itself retired before this batch (taste-uplift batch2 Task 5); the
