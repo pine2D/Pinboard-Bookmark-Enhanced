@@ -187,6 +187,10 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     source.textContent === "Alpha article" && source.target === "_blank" &&
     source.rel.includes("noopener"),
     source && source.outerHTML);
+  check("a linked source carries exactly one decorative external-link icon",
+    source && source.querySelectorAll(".ext-icon").length === 1 &&
+    source.querySelector(".ext-icon").getAttribute("aria-hidden") === "true",
+    source && source.outerHTML);
   check("the detail quotes the full highlight",
     detail().querySelector(".notes-detail-quote").textContent === "second alpha highlight about beta",
     detail().querySelector(".notes-detail-quote").textContent);
@@ -246,6 +250,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     !detail().querySelector("a.notes-detail-source") &&
     detail().querySelector("span.notes-detail-source") &&
     detail().textContent.includes("notesUnknownHint"));
+  check("the non-interactive span fallback carries no external-link icon",
+    detail().querySelectorAll(".notes-detail-source .ext-icon").length === 0);
   rowEl("pbp_hl_evil#e1").querySelector(".notes-hit-btn").click();
   check("a javascript: source url never reaches an href",
     !detail().querySelector("a[href^='javascript']") && !detail().querySelector("a.notes-detail-source"),

@@ -1308,6 +1308,27 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     _pbpVocabRenderDetail(null);
   }
 
+  // ---- D4: context source links carry a decorative external-link icon ----
+  {
+    const wordWithLink = { id: "extlk1", term: "extlk", groups: [], contexts: [
+      { quote: "linked context", articleTitle: "Linked source", articleUrl: "https://example.com/a" },
+      { quote: "unlinked context", articleTitle: "No url source" },
+    ], note: "" };
+    _vocabRows = [wordWithLink];
+    _pbpVocabRenderDetail(wordWithLink);
+    const detail = $id("vocab-detail");
+    const openLink = detail.querySelector("a.notes-row-open");
+    check("a context with a safe article url gets exactly one decorative external-link icon",
+      openLink && openLink.querySelectorAll(".ext-icon").length === 1 &&
+      openLink.querySelector(".ext-icon").getAttribute("aria-hidden") === "true",
+      openLink && openLink.outerHTML);
+    check("a context without an article url renders no link and no icon",
+      detail.querySelectorAll(".vocab-detail-context").length === 2 &&
+      detail.querySelectorAll(".vocab-detail-context a.notes-row-open").length === 1,
+      detail.innerHTML.slice(0, 300));
+    _pbpVocabRenderDetail(null);
+  }
+
   // ---- switching entries resets the reading pane's scroll ----------------
   // The scroll container is #vocab-detail-pane, not the #vocab-detail div the
   // render replaces: replaceChildren is one atomic mutation, so the pane keeps

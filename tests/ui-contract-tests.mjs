@@ -592,6 +592,29 @@ function nonExemptSelectors(rule) {
     "library.css: the batch-selected (.selected) state for .vocab-row-gloss/.notes-row-meta/.notes-hit-note/.notes-hit-meta no longer reads --lib-row-selected-fg -- weak text on the batch-selection accent band (COMPONENTS.md §9.1 law 8, D6 follow-up / Ruling 17); missing: " + missing.join(", "));
 }
 
+// ---- D4 (batch3 T2): the notes/vocab source links read body fg at rest,
+// not the page link color -- a link-blue title over-signalled "this is the
+// important thing" when its only job is attribution. --lib-fg vs bg/panel is
+// already AA-gated for every library theme (contrast-audit.mjs's "* vs bg"
+// / "* vs panel" rows for the default text tier), so this swap needs no new
+// contrast gate -- only that the selector's own `color` declaration still
+// reads the role. Same shape as the row-selected-fg check above; the
+// negative lookahead keeps --lib-fg-hint/--lib-fg-muted from false-matching
+// as a substring of --lib-fg. ----------------------------------------------
+{
+  const hand = stripGeneratedRegions(libraryCss);
+  const rules = parseStyleRules(hand);
+  const usesLibFg = (selector) => {
+    const rule = rules.find((r) => r.context.length === 0 && r.selectors.includes(selector));
+    return !!rule && parseDeclarations(rule.body)
+      .some((d) => d.property === "color" && /--lib-fg(?![\w-])/.test(d.value));
+  };
+  const sourceLinkSelectors = [".notes-detail-source", ".notes-row-open"];
+  const missing = sourceLinkSelectors.filter((s) => !usesLibFg(s));
+  check(missing.length === 0,
+    "library.css: .notes-detail-source/.notes-row-open no longer read --lib-fg for their resting text color (D4: source links read as body text with hover-only underline, not the page link color) -- missing: " + missing.join(", "));
+}
+
 check(/id="vocab-no-account"[^>]*role="region"[^>]*aria-labelledby="vocab-no-account-title"/.test(libraryHtml) &&
   /id="vocab-signed-out-lookup"[^>]*data-i18n="libraryLookupOpen"/.test(libraryHtml),
   "signed-out Vocabulary state lacks a named region or localized narrow lookup route");
