@@ -206,6 +206,51 @@
 //                      redesign: the 2px accent selection ring that
 //                      replaced the old border-drawn check tick.
 //
+// weakTextOnFill (family 13, weak-text-on-fill batch T5, COMPONENTS.md
+// §9.1 law 8): no CHECKS entries carry this key -- like hitAreaMin (family
+// 4) and families 5-12, the runner class-scans instead of taking a hand-
+// enumerated selector list, so a new consumer is covered automatically
+// rather than needing a row added here. Unlike families 4-12 (theme-
+// invariant geometry, one sweep pass), this one IS per-theme: colour tokens
+// vary by theme, so scripts/ui-render-audit.mjs's weakTextProbe runs once
+// per (surface, theme) from inside the CHECKS loop's already-open page
+// (recordWeakTextHits' call sites in runSimpleTheme/runLibraryTheme) rather
+// than a second whole-matrix navigation pass.
+//   SCOPE: every element with a direct (own, non-descendant) text node, plus
+//     every icon-only button/`.btn`/`a.btn` (an SVG icon has no colour of
+//     its own -- it inherits `color` via `stroke="currentColor"`, so the
+//     host's computed `color` is what a text check would read anyway).
+//     computed `color` is compared against the ACTIVE theme's live
+//     `--{ns}-fg-hint` / `--{ns}-fg-muted` / `--{ns}-link` values (never a
+//     CSS-source literal); if it matches one of those TEXT roles, the
+//     nearest non-transparent `background-color` walking from the element
+//     itself up through its ancestors (some consumers, e.g. `.md-strip-btn`,
+//     paint their own background; others, e.g. `.connection-health-state`,
+//     inherit it from a parent) is compared against the same theme's live
+//     `--{ns}-btn-bg` / `--{ns}-btn-hover` / `--{ns}-input-bg` /
+//     `--{ns}-chip-bg` -- and, library only, its two batch-selection accent
+//     bands (D6 follow-up / Ruling 17), computed from the live
+//     `--lib-bg`/`--lib-accent` tokens and the composer's OWN exported
+//     `LIB_BATCH_BAND_MIX` percentages (never a hand-typed 0.20/0.26). A
+//     match on both sides is a FAIL.
+//   REST STATE ONLY -- hover is explicitly OUT of scope. This family covers
+//     the cascade shape a static same-selector scan (tests/ui-contract-
+//     tests.mjs) structurally cannot see (colour on one rule, the fill on an
+//     ancestor rule), not every state a control can be in; hover's token-
+//     side coverage is contrast-audit's `btn-fg-muted vs btn-hover` / `fg vs
+//     btn-hover` rows, which gate the ROLE regardless of which selector
+//     paints it.
+//   EXEMPT: `:disabled` only (WCAG 1.4.3), checked via the live `disabled`
+//     IDL property walked up the ancestor chain -- never by matching
+//     ":disabled" in a selector string, so a scratch selector like
+//     `.x:not(:disabled)` or `.x:disabled ~ .y` can't be mistaken for the
+//     real exemption (tests/ui-contract-tests.mjs tightened the analogous
+//     static-scan exemption to the same rule, Ruling 16).
+//   Options' target role set is fg-hint/fg-muted/link only -- COMPONENTS.md
+//     §9.1 law 8 does not name a fourth "fg-dim" role, and `--opt-fg-dim`
+//     was itself retired before this batch (taste-uplift batch2 Task 5); the
+//     plan's D4 mention of it does not correspond to a live token.
+//
 // Media-preference coverage stays in this hand-written oracle for the same
 // reason as CHECKS: deriving the selectors from the generated CSS would let
 // a broken recipe redefine its own expected output. The runner crosses the

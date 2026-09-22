@@ -80,6 +80,12 @@ import { cr, hexRgb, parseRgba, composite } from "../docs/theme-surface/tools/co
 // The chip family is defined once, in the composer; spacingScale reads it from
 // there (not from a hand-copied list) to know whose inset is component geometry.
 import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
+// weakTextOnFill (family 13) gates library's two batch-selection bands
+// alongside the four control fills; the band is a runtime color-mix(), not a
+// token, so its expected RGB has to be computed from the same percentages
+// library-chrome.mjs derives --lib-row-selected-fg against -- imported, never
+// hand-typed 0.20/0.26 in this file (see WEAK_TEXT_CFG.library below).
+import { LIB_BATCH_BAND_MIX } from "../docs/theme-surface/composers/library-chrome.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -1709,6 +1715,343 @@ function needsBatchBarOpen(selector) { return BATCH_BAR_SELECTORS.has(selector);
 // directly, which would exercise a path the actual UI never takes.
 function needsNoteDirty(selector) { return selector.includes("vocab-note-save"); }
 
+// ============================================================================
+// weakTextOnFill (family 13, weak-text-on-fill batch, T5). COMPONENTS.md
+// §9.1 law 8: --{ns}-fg-hint / --{ns}-fg-muted / --{ns}-link must never paint
+// text that rests on a control fill (--{ns}-btn-bg / --{ns}-btn-hover /
+// --{ns}-input-bg / --{ns}-chip-bg, or -- library only -- the batch-selection
+// accent bands). Unlike families 4-12 (theme-invariant geometry, one sweep
+// pass covers every preset), colour tokens are PER-THEME, so this runs once
+// per (surface, theme) from INSIDE the CHECKS loop's already-open page
+// (recordWeakTextHits' call sites in runSimpleTheme/runLibraryTheme below)
+// instead of paying for a second whole-matrix navigation pass. Rest state
+// only, incl. the popup/options/library hidden-state legs those two
+// functions already drive open for other checks (plus the two this family
+// needs for itself, `#md-actions-strip` and the Connection Status
+// disclosure) -- hover is explicitly OUT of scope (tests/render-audit-
+// checklist.mjs's family-13 entry says so; token-side hover coverage is
+// contrast-audit's `btn-fg-muted vs btn-hover` / `fg vs btn-hover` rows).
+//
+// Every target colour is resolved LIVE off getComputedStyle(document.
+// documentElement) -- never a CSS-source literal -- which is what lets this
+// catch the cascade shape a static same-selector scan (tests/ui-contract-
+// tests.mjs) structurally cannot see: `color` declared on one rule, the fill
+// on an ANCESTOR rule (the real bug shape every consumer this batch fixed
+// actually had -- .connection-health-state's own rule carries no
+// `background`, its parent .connection-health-row's --opt-btn-bg is what the
+// label actually sits on). The ancestor walk in weakTextProbe therefore
+// starts AT the scanned element itself (some consumers, e.g. .md-strip-btn,
+// paint their own background directly) and only then climbs parents,
+// stopping at the first non-transparent background-color it finds -- that is
+// "the fill", matched or not, exactly once.
+// `safeHostRoles` (T5 implementer, added after the pre-batch discrimination
+// run surfaced a real false-positive class -- see the T5 report): NEW_THEME.md's
+// "TEXT input roles" section states fg-hint/fg-muted (and, for options,
+// pf-bg/code-bg via T2's D5 gate; for options/popup, drop-hover) are
+// INDEPENDENTLY guaranteed >=4.5:1 against these page-level surfaces on
+// every themed block (contrast-audit.mjs's auditCssThemes/auditLibraryThemes
+// -- verified by reading those functions directly, not inferred). A render
+// probe can only compare RESOLVED PIXEL VALUES, not which named custom
+// property produced them -- and Soft Fill's fillSeparate() only promises
+// >=1.10:1 separation from the hosts it was actually TOLD about, so a
+// control fill can coincidentally resolve to the EXACT same hex as an
+// unrelated page surface it was never separated from (real example: popup's
+// nord-night resolves --pp-btn-hover and --pp-bg2 to the byte-identical
+// #3b4252 -- .header-bar's #user-info/.header-ic sit on --pp-bg2, not any
+// control fill, but the walk cannot tell the two apart once they're equal).
+// When the walked "nearest fill" ALSO equals one of these guaranteed-safe
+// surfaces, this occurrence is provably readable regardless of which token
+// name happens to produce that colour, so it is excluded here rather than
+// reported as a family-13 hit.
+const WEAK_TEXT_CFG = {
+  popup: {
+    prefix: "pp", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg"],
+    safeHostRoles: ["bg", "bg2", "drop-hover"],
+  },
+  // NOTE (T5 implementer): the plan's D4 mentions an options "fg-dim" role --
+  // verified against options.css: --opt-fg-dim was RETIRED before this batch
+  // (taste-uplift batch2 Task 5 moved its two consumers to --opt-fg; the only
+  // remaining trace is a comment explaining the retirement, `grep -c` for a
+  // live `--opt-fg-dim:` definition is 0). COMPONENTS.md §9.1 law 8 itself
+  // only names fg-hint/fg-muted/link, so this family checks exactly those
+  // three on options too -- not a narrowing, the role doesn't exist to check.
+  options: {
+    prefix: "opt", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg"],
+    safeHostRoles: ["bg", "panel", "pf-bg", "code-bg", "drop-hover"],
+  },
+  // library additionally gates its two batch-selection bands (D6 follow-up /
+  // Ruling 17): see the file-header import comment for why the percentages
+  // come from LIB_BATCH_BAND_MIX instead of being retyped here. library's
+  // fg-hint/fg-muted are gated (auditLibraryThemes) only against bg/panel --
+  // no drop-hover-equivalent (row-selected-bg) row exists for those two
+  // roles, only for row-selected-fg, a role outside this family's text set.
+  library: {
+    prefix: "lib", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg"],
+    batchBandMix: LIB_BATCH_BAND_MIX, bgRole: "bg", accentRole: "accent",
+    safeHostRoles: ["bg", "panel"],
+    // --lib-row-selected-fg is DERIVED specifically to clear both batch bands
+    // (D6 follow-up / Ruling 17, fgToAAMulti(fg, [row-selected-bg, band-20,
+    // band-26])) -- an element that reads it (.notes-row-title/.vocab-row-
+    // headline inherit it from .notes-card-head's `.selected` rule, verified
+    // real on terminal, whose whole palette collapses fg/accent/link/row-
+    // selected-fg to the same #33ff33) is correctly painted regardless of
+    // which OTHER role's current value it happens to also equal.
+    safeTextRoles: ["row-selected-fg"],
+  },
+};
+
+// Runs INSIDE the page (Playwright serializes this function's source, same
+// self-containment constraint as probeSelector/sweepProbe above -- no
+// references to anything outside its own body).
+function weakTextProbe(cfg) {
+  const hits = [];
+  let scanned = 0;
+
+  // Task spec identity: "parent > element (tag.classes or #id)" -- matches
+  // family 11 spacingScale's identOf (scripts/ui-render-audit.mjs's
+  // sweepProbe), no sibling index (a reordered sibling shouldn't mint a new
+  // identity). `.qbtn`'s label span has neither id nor class, so it falls
+  // through to a bare tag name -- the PARENT half of the identity is what
+  // makes that still legible (e.g. "#save-tabset-btn > span"), which the
+  // earlier same-element-only pathOf could not express.
+  function identOf(el) {
+    if (!el || el.nodeType !== 1) return "";
+    if (el.id) return "#" + el.id;
+    const cls = typeof el.className === "string" ? el.className.trim().split(/\s+/).filter(Boolean).join(".") : "";
+    return el.tagName.toLowerCase() + (cls ? "." + cls : "");
+  }
+  function pathOf(el) {
+    return `${identOf(el.parentElement)} > ${identOf(el)}`;
+  }
+  function visible(el) {
+    if (!(el instanceof Element)) return false;
+    if (typeof el.checkVisibility === "function") {
+      if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false;
+    } else {
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden") return false;
+    }
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+  // Exempt ONLY :disabled -- by the `disabled` PROPERTY (attribute-backed,
+  // but read as the live IDL attribute so it reflects the actual disabled
+  // state), not by matching ":disabled" in a selector string, and walked up
+  // the ancestor chain so text inside a disabled control (not just the
+  // control itself) is exempt too (COMPONENTS.md §9.1 law 8's sole exemption,
+  // WCAG 1.4.3).
+  function isDisabled(el) {
+    for (let node = el; node; node = node.parentElement) {
+      if (node.disabled === true) return true;
+    }
+    return false;
+  }
+  function parseColor(raw) {
+    const s = String(raw || "").trim();
+    if (!s || s === "transparent" || s === "none") return null;
+    let m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(s);
+    if (m) {
+      let hex = m[1];
+      if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+      const n = parseInt(hex, 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    m = /^rgba?\(([^)]+)\)$/i.exec(s);
+    if (m) {
+      const parts = m[1].split(",").map((p) => parseFloat(p));
+      if (parts.length >= 3) {
+        const alpha = parts.length >= 4 && Number.isFinite(parts[3]) ? parts[3] : 1;
+        if (alpha <= 0.001) return null; // fully transparent -- not a real text/fill paint
+        return [parts[0], parts[1], parts[2]];
+      }
+    }
+    // getComputedStyle serializes a color-mix() result (every `--row-bg`
+    // this batch's batch-selection band and `[aria-pressed="true"]`'s own
+    // fill both use) as `color(srgb r g b [/ a])` with 0..1 FRACTIONAL
+    // channels, not `rgb(...)` -- verified live (Playwright: `background:
+    // color-mix(in srgb, #89b4fa 12%, #37394b)` computes to
+    // "color(srgb 0.254275 0.281412 0.376471)"). Without this branch
+    // parseColor returned null for any color-mix() background, and the walk
+    // silently skipped past it to whatever plain-hex ancestor came next --
+    // misattributing a mixed fill's role to an unrelated shell one level up
+    // (caught live: #vocab-sort-time's own [aria-pressed="true"] mix was
+    // skipped this way, reporting its shell's plain --lib-btn-bg instead).
+    m = /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)$/i.exec(s);
+    if (m) {
+      const alpha = m[4] !== undefined ? parseFloat(m[4]) : 1;
+      if (!Number.isFinite(alpha) || alpha <= 0.001) return null;
+      return [parseFloat(m[1]) * 255, parseFloat(m[2]) * 255, parseFloat(m[3]) * 255];
+    }
+    return null;
+  }
+  function closeEnough(a, b, tol) {
+    return !!a && !!b && Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol;
+  }
+  // Small tolerance for color-mix()/serialization rounding drift (the batch
+  // bands below in particular), not a real colour difference -- three RGB
+  // levels is far under the ~12-level step FILL_SEPARATE_MIN 1.10 relies on
+  // being visible (COMPONENTS.md §9.1 law 2), so this can't paper over an
+  // actual distinct colour.
+  const TOL = 3;
+  function matchRole(rgb, targets) {
+    if (!rgb) return null;
+    for (const t of targets) if (closeEnough(rgb, t.rgb, TOL)) return t.role;
+    return null;
+  }
+
+  const rootCs = getComputedStyle(document.documentElement);
+  const readToken = (role) => parseColor(rootCs.getPropertyValue(`--${cfg.prefix}-${role}`));
+  const textTargets = cfg.textRoles.map((role) => ({ role, rgb: readToken(role) })).filter((t) => t.rgb);
+  const fillTargets = cfg.fillRoles.map((role) => ({ role, rgb: readToken(role) })).filter((t) => t.rgb);
+  if (cfg.batchBandMix && cfg.batchBandMix.length) {
+    const bg = readToken(cfg.bgRole || "bg");
+    const accent = readToken(cfg.accentRole || "accent");
+    if (bg && accent) {
+      // Linear blend in sRGB channel space -- matches CSS's
+      // `color-mix(in srgb, accent T%, bg)` (library.css's --row-bg), which
+      // is exactly what library-chrome.mjs's own `mix(a, b, t)` computes at
+      // build time for the same two bands (see the file-header import
+      // comment). `t` values come from cfg.batchBandMix, i.e. from the
+      // imported LIB_BATCH_BAND_MIX -- never a literal here.
+      for (const t of cfg.batchBandMix) {
+        const mixed = [0, 1, 2].map((i) => Math.round(bg[i] + (accent[i] - bg[i]) * t));
+        fillTargets.push({ role: `batch-band-${Math.round(t * 100)}`, rgb: mixed });
+      }
+    }
+  }
+  // Page-level surfaces fg-hint/fg-muted (and, for options, pf-bg/code-bg;
+  // for options/popup, drop-hover) are ALREADY guaranteed AA against on
+  // every themed block (contrast-audit.mjs's auditCssThemes/
+  // auditLibraryThemes -- see WEAK_TEXT_CFG's comment above). A coincidental
+  // colour collision between one of these and a control fill (verified real:
+  // popup nord-night's --pp-bg2 === --pp-btn-hover, byte-identical) must not
+  // be reported -- the text is provably readable there regardless of which
+  // token name resolves to that colour.
+  const safeHostTargets = (cfg.safeHostRoles || []).map((role) => ({ role, rgb: readToken(role) })).filter((t) => t.rgb);
+  // Text-side counterpart to safeHostTargets: a role NOT in cfg.textRoles
+  // whose current value the scanned colour might coincidentally equal, and
+  // which is independently guaranteed safe wherever it is actually used.
+  // `btn-fg`/`btn-fg-muted` are UNIVERSAL and UNCONDITIONAL on all three
+  // surfaces: they are the TWO tokens COMPONENTS.md §9.1 law 8 itself names
+  // as the only sanctioned text on a control fill (D1/D2), and their own
+  // derivation (fgToAAMulti(fg[-muted], [btn-bg, btn-hover])) starts FROM
+  // fg/fg-muted and stays IDENTITY to it whenever the raw value already
+  // clears both fills -- so a CORRECTLY migrated consumer (post-T1-T4:
+  // .qbtn, .md-strip-btn, .connection-health-state, the sort-seg cell) can
+  // still read back as "fg-muted"/"fg-hint" on many themes purely because
+  // the sanctioned replacement never had to move. Caught live: an earlier
+  // version of this family without this exemption FAILED the CURRENT
+  // (post-batch) tree on exactly these four already-fixed consumers, on
+  // every theme where btn-fg-muted collapsed onto fg-muted/fg-hint (T1's own
+  // report: 2/45 blocks; this run found more collapses than that static
+  // count once options'/library's per-block identity was checked live) --
+  // the fix is real, the false alarm was this family not yet knowing its own
+  // sanctioned tokens. library's --lib-row-selected-fg is unconditional for
+  // the same reason (D6 follow-up / Ruling 17); `accent` is conditional on
+  // isSelectionIndicator below -- `link`'s own derivation (fgToAAMulti(accent,
+  // [bg, bg2])) starts FROM accent and stays IDENTITY to it whenever accent
+  // already clears AA, so a GENUINE `--{ns}-link` consumer (e.g.
+  // .md-strip-btn, a real law-8-restricted usage) can equal accent's value
+  // too -- unconditionally exempting on that alone would hide real
+  // link-on-fill violations (caught live: an earlier unconditional version
+  // of this exemption dropped .md-strip-btn's true positive count on 9/13
+  // popup themes). Scoping the accent exemption to elements carrying a
+  // selection-state marker targets the one shape that's actually accent, not
+  // link: library's pressed sort-seg cell (`[aria-pressed="true"]`, a
+  // REVIEWED, accepted design -- T4's ledger: "pressed cell = accent, ...
+  // no STOP").
+  const safeTextTargets = ["btn-fg", "btn-fg-muted", ...(cfg.safeTextRoles || [])]
+    .map((role) => ({ role, rgb: readToken(role) })).filter((t) => t.rgb);
+  const accentRgb = readToken("accent");
+  function isSelectionIndicator(el) {
+    return el.getAttribute("aria-pressed") === "true"
+      || el.getAttribute("aria-selected") === "true"
+      || el.getAttribute("aria-current") != null
+      || el.classList.contains("active")
+      || el.classList.contains("selected");
+  }
+
+  // Tokens didn't resolve at all (a broken theme block, or a page that never
+  // set data-theme) -- nothing to compare against; report zero-scanned
+  // rather than silently "passing" every element on this page.
+  if (!textTargets.length || !fillTargets.length) return { hits, scanned };
+
+  const iconLabel = (el) => el.textContent.replace(/\u00D7/g, "").trim();
+  const seen = new Set();
+
+  function probe(el, label) {
+    if (!visible(el) || isDisabled(el)) return;
+    scanned++;
+    const colorRgb = parseColor(getComputedStyle(el).color);
+    if (matchRole(colorRgb, safeTextTargets)) return; // provably safe wherever used -- see the comment above safeTextTargets
+    if (accentRgb && isSelectionIndicator(el) && closeEnough(colorRgb, accentRgb, TOL)) return; // a selection indicator painted with accent, not hint/muted/link
+    const textRole = matchRole(colorRgb, textTargets);
+    if (!textRole) return;
+    let fillRole = null;
+    let fillRgb = null;
+    for (let node = el; node; node = node.parentElement) {
+      const rgb = parseColor(getComputedStyle(node).backgroundColor);
+      if (!rgb) continue;
+      fillRgb = rgb;
+      fillRole = matchRole(rgb, fillTargets); // nearest non-transparent bg, matched or not -- stop here either way
+      break;
+    }
+    if (!fillRole) return;
+    if (matchRole(fillRgb, safeHostTargets)) return; // provably safe -- see the comment above safeHostTargets
+    const path = pathOf(el);
+    const key = `${label}|${path}|${textRole}|${fillRole}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    hits.push({ path, label, textRole, fillRole });
+  }
+
+  // Direct (own, non-descendant) text nodes -- same convention as sweepProbe's
+  // textInset/textFloor families: a wrapper whose text lives in a nested
+  // child is scanned when THAT child is visited, not double-counted here.
+  for (const el of document.querySelectorAll("body *")) {
+    const hasDirectText = Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim().length > 0);
+    if (hasDirectText) probe(el, "text");
+  }
+  // Icon-only affordances (task spec: "include those too and label them") --
+  // an SVG icon has no colour of its own, it inherits `color` via
+  // stroke="currentColor" (PBP_ICONS, shared.js), so the HOST's computed
+  // `color` is exactly what a text check would read, just with no text node
+  // to hang it off. Skips anything with its own label text -- the direct-text
+  // scan above already covers that shape.
+  for (const el of document.querySelectorAll("button, [role='button'], .btn, a.btn")) {
+    if (iconLabel(el).length > 0) continue;
+    if (!el.querySelector("svg")) continue;
+    probe(el, "icon");
+  }
+
+  return { hits, scanned };
+}
+
+// Node-side accumulator, purely for the run's own visibility requirement
+// (task spec: "report count of scanned elements per surface so a future '0
+// FAIL' can be distinguished from 'scanned nothing'") -- printed once in
+// main() next to the media-preferences summary line.
+const weakTextScanLog = [];
+
+async function recordWeakTextHits(page, surface, theme, results, context) {
+  const cfg = WEAK_TEXT_CFG[surface];
+  if (!cfg) return;
+  const { hits, scanned } = await page.evaluate(weakTextProbe, cfg);
+  weakTextScanLog.push({ surface, theme, context, scanned });
+  for (const h of hits) {
+    results.push({
+      surface, theme,
+      selector: h.path,
+      state: `${context}|${h.label}`,
+      check: "weakTextOnFill",
+      status: "FAIL",
+      actual: `${h.textRole} on ${h.fillRole}`,
+      expected: "no fg-hint/fg-muted/link on btn-bg/btn-hover/input-bg/chip-bg (or the batch bands, library only) -- COMPONENTS.md §9.1 law 8",
+      note: null,
+    });
+  }
+}
+
 async function runLibraryTheme(page, extBase, theme, checks, results) {
   // Explicit #vocab hash (not bare navigation): _pbpLibInitialView() prefers
   // an explicit hash over the localStorage "last view" memory, so this can't
@@ -1729,6 +2072,12 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
   await page.goto(`${extBase}library.html?_ra=${encodeURIComponent(theme)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
   await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS }).catch(() => {});
   await page.waitForTimeout(300);
+
+  // ---- weakTextOnFill (family 13, T5): the vocab list's true rest state --
+  // no detail pane open, no row selected -- captured BEFORE anything below
+  // opens either for some OTHER check's sake. Covers .vocab-sort-seg's
+  // unpressed cell (D6/T4's real consumer).
+  await recordWeakTextHits(page, "library", theme, results, "vocab-rest");
 
   const vocabChecks = checks.filter((c) => libraryView(c.selector) === "vocab");
   const notesChecks = checks.filter((c) => libraryView(c.selector) === "notes");
@@ -1785,6 +2134,17 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
     }
   }
 
+  // ---- weakTextOnFill (family 13, T5): the batch-selected band (D6
+  // follow-up / Ruling 17). Forces the same `.selected` state
+  // needsBatchBarOpen() opens above for other checks, but UNCONDITIONALLY --
+  // this family's own coverage of .vocab-row-gloss/.notes-row-meta must not
+  // depend on some other CHECKS entry happening to need the same state.
+  if (!(await page.$(".vocab-card.selected"))) {
+    const head = page.locator("#vocab-list .vocab-card .notes-card-head").first();
+    if (await head.count()) { await head.click({ modifiers: ["Control"] }); await page.waitForTimeout(300); }
+  }
+  await recordWeakTextHits(page, "library", theme, results, "vocab-batch");
+
   if (notesChecks.length) {
     await page.click("#lib-tab-notes");
     await page.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS }).catch(() => {});
@@ -1797,7 +2157,21 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
       await hit.click(); await page.waitForTimeout(250);
     }
     for (const check of notesChecks) await runOneCheck(page, theme, check, results, extBase);
+  } else {
+    // weakTextOnFill still needs the notes tab even on a theme slice whose
+    // CHECKS happen to carry no notes-scoped entry -- this family's coverage
+    // must not depend on notesChecks staying non-empty.
+    await page.click("#lib-tab-notes");
+    await page.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS }).catch(() => {});
+    await page.waitForTimeout(250);
   }
+
+  // ---- weakTextOnFill (family 13, T5): the notes batch-selected band.
+  if (!(await page.$(".notes-hit.selected"))) {
+    const hit = page.locator("#notes-list .notes-hit-btn").first();
+    if (await hit.count()) { await hit.click({ modifiers: ["Control"] }); await page.waitForTimeout(300); }
+  }
+  await recordWeakTextHits(page, "library", theme, results, "notes-batch");
 }
 
 async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
@@ -1977,6 +2351,17 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       for (const check of keyWrapChecks) await runOneCheck(page, theme, check, results);
     }
     for (const check of otherChecks) await runOneCheck(page, theme, check, results);
+    // ---- weakTextOnFill (family 13, T5): the Account tab's Connection
+    // Status disclosure. It is a plain closed `<details>` (options.html) --
+    // renderConnectionOverview() populates it regardless of `open`, but a
+    // closed disclosure computes display:none on its body, so nothing above
+    // opens it for its own sake. #tab-general first: the groups above may
+    // have left #tab-appearance or #tab-tags active by now, and the
+    // disclosure lives in #panel-general.
+    await page.click("#tab-general");
+    await page.click("#connection-overview-title");
+    await page.waitForSelector("#connection-health .connection-health-row", { timeout: TIMEOUT_MS }).catch(() => {});
+    await recordWeakTextHits(page, "options", theme, results, "rest");
     return;
   }
   const confirmSet = new Set(confirmChecks);
@@ -1984,6 +2369,16 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     if (confirmSet.has(check)) continue;
     await runOneCheck(page, theme, check, results);
   }
+  // ---- weakTextOnFill (family 13, T5): popup's rest state. `.qbtn` needs no
+  // extra setup (it ships visible in the default form); `.md-strip-btn`'s
+  // `#md-actions-strip` ships `class="hidden"` until popup.js resolves the
+  // active tab's Markdown affordance, which this chrome-extension:// fixture
+  // page cannot do -- unhidden by hand, the same kind of fixture setup as the
+  // other `.hidden` removals earlier in this function. Runs BEFORE the
+  // confirm-popover open below so it can't be affected by that popover's
+  // focusout-dismiss behaviour.
+  await page.evaluate(() => { document.getElementById("md-actions-strip")?.classList.remove("hidden"); });
+  await recordWeakTextHits(page, "popup", theme, results, "rest");
   if (confirmChecks.length) {
     await page.evaluate(() => { document.getElementById("main-section")?.classList.remove("hidden"); });
     await page.click("#logout-link");
@@ -3509,6 +3904,19 @@ async function main() {
   // four are THEMES entries), a shard's slice of them under --shard.
   const mediaThemes = SHARD_THEMES.filter((t) => MEDIA_THEME_SET.has(t)).length;
   console.log(`[render-audit] media preferences: ${mediaProbeCount} probes across ${mediaThemes} themes x ${MEDIA_CHECKS.length} surfaces x ${MEDIA_SCENARIOS.length} scenarios${SHARD_TAG}`);
+  // weakTextOnFill (family 13): per-surface scanned counts so a future "0
+  // FAIL" can be told apart from "scanned nothing" (task spec) -- this
+  // process's own slice only, same denominator discipline as mediaThemes
+  // above.
+  if (weakTextScanLog.length) {
+    const bySurface = {};
+    for (const entry of weakTextScanLog) bySurface[entry.surface] = (bySurface[entry.surface] || 0) + entry.scanned;
+    const total = weakTextScanLog.reduce((sum, entry) => sum + entry.scanned, 0);
+    console.log(`[render-audit] weakTextOnFill: ${total} element probe(s) this run${SHARD_TAG} (` +
+      Object.entries(bySurface).map(([surface, count]) => `${surface}=${count}`).join(", ") + ")");
+  } else {
+    console.log(`[render-audit] weakTextOnFill: 0 element probes this run${SHARD_TAG} -- no (surface, theme) pair reached recordWeakTextHits`);
+  }
   if (JSON_OUT) {
     writeFileSync(JSON_OUT, JSON.stringify(results, null, 2) + "\n");
     console.log(`[render-audit] wrote ${results.length} result row(s) to ${JSON_OUT}`);
