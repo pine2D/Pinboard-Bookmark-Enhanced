@@ -1781,6 +1781,18 @@ document.addEventListener("DOMContentLoaded", async () => {
           inp.value = cfg[s.key] || s.default || ((s.options && s.options[0] && s.options[0].value) || "");
         } else {
           inp.value = cfg[s.key] || "";
+          // fg-url (COMPONENTS.md §6.1 field-width tiers, mirrored onto
+          // .et-field in options.css -- final fix wave, Ruling 29 F8):
+          // export-targets.js marks a setting's SEMANTIC kind through its
+          // `key`, not a `type: "url"`/`kind` field -- "parent" (Notion's
+          // parent-page reference: a notion.so URL, a dashed UUID, or a bare
+          // 32-hex id, all accepted by pbpNotionParseParentId) is the one
+          // field that reaches this branch. "url" (webhook's endpoint) never
+          // does -- it is ALSO `secret: true` and takes the branch above into
+          // .key-wrap instead, at its own 420px tier -- but is named here too
+          // so this stays correct if a future target ever adds a non-secret
+          // URL field.
+          if (s.key === "url" || s.key === "parent") inp.classList.add("fg-url");
         }
         if (s.placeholder) inp.placeholder = s.placeholder;
         wrap.appendChild(lab);

@@ -847,7 +847,9 @@ input:focus-visible + .tag-gov-chip-face {
   transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
 }
 .fg select {
-  max-width: 240px;
+  width: max-content;
+  min-width: 240px;
+  max-width: 100%;
 }
 .fg .key-wrap {
   max-width: 420px;
@@ -1106,21 +1108,26 @@ html.motion-ready .pf:not([hidden]) {
   cursor: pointer;
 }
 /* Field width by content kind (taste-uplift-batch3, T6/D2), mirroring the
-   generated .fg recipe's two narrowest tiers -- .et-field only ever renders
-   two DOM shapes (a bare text/select input, or the secret's .key-wrap;
-   options.js's renderExportTargets() builder, not this file, decides which),
-   so there is no third "short text" kind to mirror here the way .fg has
-   input[type=text]:not(.fg-url). The secret cap goes on the WRAPPER for the
-   same fused-control reason the generated .fg .key-wrap rule does (the eye
-   toggle is position:absolute inside .key-wrap, COMPONENTS.md §8); the text
-   cap covers vault/folder names AND the one true URL field (Notion's parent
-   page) alike -- options.js gives every .et-field text input the same DOM
-   shape, so there is no per-field hook to split them narrower without also
-   touching that builder, out of this task's scope. .et-field select is left
-   uncapped (out of scope; its two known consumers are short preset labels
-   that were never the width complaint). */
+   generated .fg recipe's tiers -- final fix wave (Ruling 29 F8) keys this on
+   export-targets.js METADATA instead of raw DOM shape, the same way .fg
+   itself distinguishes .fg-url from plain text. An earlier revision of this
+   comment claimed .et-field had only two width-relevant DOM shapes (a bare
+   text/select input, or the secret's .key-wrap) and so "no third short text
+   kind to mirror" -- that was false: Obsidian's vault/folder names ARE a
+   genuine third, short-text kind, they were just never split out. .et-field
+   now renders three: a secret's .key-wrap (unchanged, 420 -- same fused-
+   control reason as the generated .fg .key-wrap rule: the eye toggle is
+   position:absolute inside .key-wrap, COMPONENTS.md §8), a URL-shaped text
+   field (options.js's renderExportTargets adds class="fg-url" when a
+   setting's `key` is "url" or "parent" -- export-targets.js's own semantic
+   marker; Notion's `parent` -- a notion.so URL, dashed UUID, or bare 32-hex
+   id -- is the one field that reaches this branch today, since webhook's
+   `url` is ALSO `secret: true` and takes the .key-wrap branch instead), and
+   plain short free text (Obsidian's vault/folder names, 320 -- the same
+   tier options' own .fg input[type=text]:not(.fg-url) gets). */
 .et-field .key-wrap { max-width: 420px; }
-.et-field input[type="text"] { max-width: 520px; }
+.et-field input[type="text"].fg-url { max-width: 520px; }
+.et-field input[type="text"]:not(.fg-url) { max-width: 320px; }
 /* Reuses the same hover-border recipe as the generated .fg field family
    above (COMPONENTS.md §6.1's "et-field mirrors .fg" convention) instead of
    its own fixed literal (Task 12 review round 2, Minor) -- .et-field never

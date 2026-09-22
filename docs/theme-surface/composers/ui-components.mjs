@@ -467,16 +467,38 @@ function formRules(ns) {
         ["box-shadow", "none"],
         ["transition", `border-color ${motion(ns)} ease, background-color ${motion(ns)} ease, box-shadow ${motion(ns)} ease`],
       ]),
-      // Field width by CONTENT KIND (taste-uplift-batch3, T6/D2). `width:
-      // 100%` above stays -- these only ADD a ceiling, so a narrow viewport
-      // (the panel column already narrower than the cap) still gets the
+      // Field width by CONTENT KIND (taste-uplift-batch3, T6/D2; COMPONENTS.md
+      // §6.1's tier table). `width: 100%` above stays for four of the five
+      // kinds -- they only get an ADDED ceiling, so a narrow viewport (the
+      // panel column already narrower than the cap) still gets the
       // full-width field the base rule always gave it; the cap only ever
       // engages once the panel is wide enough to make a 750px+ field look
-      // like it's asking for an essay. Kinds and their ceilings (COMPONENTS.md
-      // §6, Step 0 measurement: the panel's plain-`.fg` content column
-      // measures 790px, the `.pf` provider-card column 764px, at a >=1040px
-      // viewport -- both far past every cap below):
-      //   select        240 -- a handful of words, never grows with input
+      // like it's asking for an essay (Step 0 measurement: the panel's plain
+      // `.fg` content column measures 790px, the `.pf` provider-card column
+      // 764px, at a >=1040px viewport -- both far past every cap below).
+      // Kinds and their tiers:
+      //   select        >=240, FLOOR not ceiling -- see the dedicated rule
+      //                        below, which does NOT keep the base `width:
+      //                        100%` (batch-end review F2 fix-forward: a
+      //                        <select> computes `overflow: visible` on its
+      //                        own box, so `text-overflow` is inert on it --
+      //                        a FIXED 240px width, the batch's first cut at
+      //                        this tier, hard-clipped the selected value
+      //                        with no ellipsis affordance at all once a
+      //                        locale's option text ran past ~204px usable
+      //                        space (#opt-md-image-policy ru ~495px,
+      //                        #translate-target-lang ru 324px, de/fr in
+      //                        between). A native <select> ordinarily sizes
+      //                        to its longest OPTION and never has this
+      //                        problem; `width: max-content` restores that
+      //                        native sizing behaviour instead of fighting
+      //                        it, `min-width: 240px` keeps the floor this
+      //                        tier always promised (a one-word select
+      //                        still reads as a deliberately-sized control,
+      //                        not a stray full-width one), and `max-width:
+      //                        100%` keeps the "never wider than the
+      //                        column" ceiling the other four kinds get for
+      //                        free from the unchanged base `width: 100%`.
       //   .key-wrap     420 -- password/API-key fields (fused with the eye
       //                        toggle, COMPONENTS.md §8) -- the cap sits on
       //                        the WRAPPER, not the input, so the eye button
@@ -494,7 +516,7 @@ function formRules(ns) {
       //                        duration in minutes)
       //   textarea      (unchanged, no cap) -- prompt templates are prose,
       //                        capping their width would just wrap more.
-      rule(`.fg select`, [["max-width", "240px"]]),
+      rule(`.fg select`, [["width", "max-content"], ["min-width", "240px"], ["max-width", "100%"]]),
       rule(`.fg .key-wrap`, [["max-width", "420px"]]),
       rule(`.fg input[type="text"].fg-url`, [["max-width", "520px"]]),
       rule(`.fg input[type="text"]:not(.fg-url)`, [["max-width", "320px"]]),

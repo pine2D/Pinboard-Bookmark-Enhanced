@@ -372,7 +372,11 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
   let compareRect = null;
   if (compareSelector) {
     const cmpEl = document.querySelector(compareSelector);
-    if (cmpEl) { const r = cmpEl.getBoundingClientRect(); compareRect = { height: r.height }; }
+    // `width` (F2, final fix wave, Ruling 29): widthLteWith reuses this same
+    // slot heightEqWith already populates -- both are "compare THIS
+    // element's geometry against another selector's" checks, so one probed
+    // rect serves either axis instead of a second comparison mechanism.
+    if (cmpEl) { const r = cmpEl.getBoundingClientRect(); compareRect = { height: r.height, width: r.width }; }
   }
   let extraBgRaw = null;
   if (extraBgVarName) {
@@ -826,22 +830,53 @@ function evaluateCheck(check, raw, theme) {
     if (hostZero) out.push(verdict("heightPx", false, null, value, zeroNote));
     else out.push(verdict("heightPx", Math.abs(raw.rect.height - value) <= tolerancePx, round2(raw.rect.height), value));
   }
-  // widthPx (T6, taste-uplift-batch3, D2): a content-kind field's measured
-  // width must not EXCEED its max-width tier (COMPONENTS.md §6, the
-  // composer's new per-kind ui-components.mjs rules) -- unlike heightPx
-  // above (a literal target value, |diff| <= tolerance, since a chip's
-  // height IS its geometry), this is a one-sided ceiling: `max-width` never
-  // forces a field WIDER than its container, so the same field legitimately
-  // renders narrower than `max` on a viewport too small for the cap to even
-  // engage (D2's "still 100% on narrow viewports" requirement) -- FAILing
-  // that would be asserting the wrong thing. No new probe slot needed: it
-  // reads the SAME raw.rect.width heightPx's raw.rect.height sibling
-  // already carries out of probeSelector, so there is no extraBgVarName/
-  // extraColorVarName-shaped ambiguity for this key to guard against.
+  // widthPx (T6, taste-uplift-batch3, D2, COMPONENTS.md §6.1): a content-kind
+  // field's measured width against its tier -- unlike heightPx above (a
+  // literal target value, |diff| <= tolerance, since a chip's height IS its
+  // geometry), `max` is a one-sided ceiling: `max-width` never forces a
+  // field WIDER than its container, so the same field legitimately renders
+  // narrower than `max` on a viewport too small for the cap to even engage
+  // (D2's "still 100% on narrow viewports" requirement) -- FAILing that
+  // would be asserting the wrong thing. `min` (final fix wave, Ruling 29
+  // F2) is the mirror-image floor: added for the select tier, which
+  // batch-end review F2 moved off a fixed 240px ceiling onto `width:
+  // max-content; min-width: 240px; max-width: 100%` (native sizing to the
+  // longest option, never clips) -- a select that somehow rendered NARROWER
+  // than its floor would be exactly as wrong as one that rendered past its
+  // ceiling, so this is FAIL not SKIP, same discipline as `max`. Either
+  // bound is optional; both may be given at once. No new probe slot needed
+  // for either: both read the SAME raw.rect.width heightPx's raw.rect.height
+  // sibling already carries out of probeSelector.
   if ("widthPx" in exp) {
-    const { max, tolerancePx = 0.5 } = exp.widthPx;
-    if (hostZero) out.push(verdict("widthPx", false, null, max, zeroNote));
-    else out.push(verdict("widthPx", raw.rect.width <= max + tolerancePx, round2(raw.rect.width), max));
+    const { min, max, tolerancePx = 0.5 } = exp.widthPx;
+    const label = min != null && max != null ? `${min}-${max}` : min != null ? `>=${min}` : `<=${max}`;
+    if (hostZero) out.push(verdict("widthPx", false, null, label, zeroNote));
+    else {
+      const w = raw.rect.width;
+      const notes = [];
+      if (min != null && w < min - tolerancePx) notes.push(`< min ${min}`);
+      if (max != null && w > max + tolerancePx) notes.push(`> max ${max}`);
+      out.push(verdict("widthPx", notes.length === 0, round2(w), label, notes.length ? notes.join("; ") : undefined));
+    }
+  }
+  // widthLteWith (F2, final fix wave, Ruling 29): the select tier's OTHER
+  // half of "≥240 and ≤ the field column width" -- the column width is not
+  // a literal (it depends on the panel/viewport), so it is read live off
+  // another selector's own rendered width, the same "compare THIS element's
+  // geometry against a second selector" shape heightEqWith already uses for
+  // height (probeSelector's compareRect, widened above to carry width too).
+  if ("widthLteWith" in exp) {
+    const { selector: cmpSel, tolerancePx = 0.5 } = exp.widthLteWith;
+    if (hostZero) out.push(verdict("widthLteWith", false, null, cmpSel, zeroNote));
+    else if (raw.compareRect == null) {
+      out.push(verdict("widthLteWith", false, null, cmpSel, `comparison selector not found: ${cmpSel}`));
+    } else if (raw.compareRect.width === 0) {
+      out.push(verdict("widthLteWith", false, null, cmpSel, `comparison element is zero-size: ${cmpSel}`));
+    } else {
+      const ok = raw.rect.width <= raw.compareRect.width + tolerancePx;
+      out.push(verdict("widthLteWith", ok, round2(raw.rect.width), round2(raw.compareRect.width),
+        ok ? undefined : `${round2(raw.rect.width)}px exceeds ${cmpSel}'s ${round2(raw.compareRect.width)}px`));
+    }
   }
   if ("fontSizePx" in exp) {
     const { value, tolerancePx = 0.5 } = exp.fontSizePx;
@@ -1771,12 +1806,22 @@ async function runOneCheck(page, theme, check, results, extBase) {
       `and bgEqVar (${check.expect.bgEqVar}) -- they share the same extraBgVarName probe slot ` +
       `and only one would ever be read; split into two checklist entries instead.`);
   }
+  // widthLteWith (F2, final fix wave, Ruling 29) shares heightEqWith's
+  // compareSelector probe slot the same way bgEqVar shares textContrastMulti's
+  // above -- guarded the same way, for the same reason: a check declaring
+  // both would silently starve one of a comparison rect it asked for.
+  if (check.expect.heightEqWith?.selector && check.expect.widthLteWith?.selector) {
+    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
+      `check declares BOTH heightEqWith.selector (${check.expect.heightEqWith.selector}) ` +
+      `and widthLteWith.selector (${check.expect.widthLteWith.selector}) -- they share the same ` +
+      `compareSelector probe slot and only one would ever be read; split into two checklist entries instead.`);
+  }
   const extraBgSelectorVar = check.expect.textContrastMulti?.extraBgSelectorVar
     || check.expect.bgEqVar;
   const extraColorSelectorVar = check.expect.colorEqVar;
   const raw = await page.evaluate(probeSelector, {
     selector: check.selector,
-    compareSelector: check.expect.heightEqWith?.selector || null,
+    compareSelector: check.expect.heightEqWith?.selector || check.expect.widthLteWith?.selector || null,
     extraBgVarName: extraBgSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBgSelectorVar}` : null,
     extraColorVarName: extraColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraColorSelectorVar}` : null,
     radiusVarName: check.expect.insetBand?.radiusVar ? `--${NS_BY_SURFACE[check.surface]}-${check.expect.insetBand.radiusVar}` : null,
@@ -2787,6 +2832,15 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // fresh page.goto() before touching anything.
     if (aiProviderChecks.length) {
       await page.click("#tab-ai");
+      // Inert (final fix wave, Ruling 29 F9): options.js listens on every
+      // form input for a 500ms-debounced autosave (:3337 "Listen on all
+      // form inputs for auto-save") -- this selectOption's `change` event
+      // schedules a write of `aiProvider: "openai"` into chrome.storage
+      // that eventually lands, same as a real user's own edit would. It is
+      // harmless here because the WHOLE profile it lands in is this run's
+      // own ephemeral `mkdtempSync()` userDataDir (main(), further down),
+      // torn down with `rmSync()` when the run ends -- no real account,
+      // real settings, or cross-run state is ever touched.
       await page.selectOption("#opt-ai-provider", "openai");
       await page.waitForSelector("#fields-openai:not([hidden])", { timeout: TIMEOUT_MS });
       await page.waitForSelector("#fields-openai #opt-openai-baseurl", { state: "visible", timeout: TIMEOUT_MS });

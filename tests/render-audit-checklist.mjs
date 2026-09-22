@@ -215,17 +215,30 @@
 //                      assert the number itself (COMPONENTS.md §5.1's 18px
 //                      chip rung, "no border" case), not just its two law
 //                      components.
-//   widthPx        -- { max, tolerancePx=0.5 }: getBoundingClientRect().width
-//                      <= max + tolerancePx. A CEILING, not heightPx's target
-//                      value -- `max-width` never forces a field wider than
-//                      its container, so the same field legitimately renders
-//                      narrower than `max` on a viewport too small for the
-//                      cap to engage; asserting |diff| <= tolerance would
-//                      wrongly fail that case. Options field-width-by-kind
-//                      (T6, taste-uplift-batch3, D2, COMPONENTS.md §6): one
-//                      representative id per content kind (select/key-wrap/
-//                      .fg-url/plain-text/number), each pinned to that
-//                      kind's ceiling from ui-components.mjs's formRules().
+//   widthPx        -- { min?, max?, tolerancePx=0.5 }: getBoundingClientRect()
+//                      .width against either or both bounds -- `max` is a
+//                      CEILING, not heightPx's target value (`max-width`
+//                      never forces a field wider than its container, so the
+//                      same field legitimately renders narrower than `max`
+//                      on a viewport too small for the cap to engage;
+//                      asserting |diff| <= tolerance would wrongly fail that
+//                      case); `min` (final fix wave, Ruling 29 F2) is the
+//                      mirror-image FLOOR, FAIL not SKIP the same as `max`.
+//                      Options field-width-by-kind (T6, taste-uplift-batch3,
+//                      D2, COMPONENTS.md §6.1): one representative id per
+//                      content kind (select/key-wrap/.fg-url/plain-text/
+//                      number), each pinned to that kind's tier from
+//                      ui-components.mjs's formRules().
+//   widthLteWith   -- { selector, tolerancePx=0.5 }: this element's
+//                      getBoundingClientRect().width <= the comparison
+//                      selector's width + tolerancePx. widthPx's `max` is a
+//                      literal; this is for a ceiling that is only known at
+//                      render time (final fix wave, Ruling 29 F2: the select
+//                      tier's "never wider than the field column" half,
+//                      where "the column" has no fixed px value). Same
+//                      two-selector shape as heightEqWith above, on the
+//                      width axis, and sharing its compareSelector probe
+//                      slot -- a check declaring both throws SETUP.
 //   fontSizePx     -- { value, tolerancePx=0.5 }: |computed font-size (px) -
 //                      value| <= tolerancePx. For a typography rule with no
 //                      geometry law of its own, e.g. `.stag-num`'s pinned
@@ -1412,7 +1425,7 @@ export const CHECKS = [
     expect: { backgroundAlphaMax: 0, colorEqVar: "fg-hint", textDecorationLineContains: "line-through" } },
 
   // ---- options field width by content kind (T6, taste-uplift-batch3, D2,
-  // COMPONENTS.md §6). Before this batch every `.fg` text/password/number/
+  // COMPONENTS.md §6.1). Before this batch every `.fg` text/password/number/
   // select field was a flat `width: 100%` -- at the >=1040px viewport this
   // audit runs at, that measured 790px for a plain `.fg` field and 764px
   // inside a provider `.pf` card (Step 0 measurement, task report), i.e. a
@@ -1425,10 +1438,26 @@ export const CHECKS = [
   // options branch (scripts/ui-render-audit.mjs) either visits by default
   // (general) or now switches to for this purpose (ai / ai-behavior).
   //
-  // select 240: bare `.fg select` matches the FIRST such element in DOM
+  // select >=240 and <= the field column (final fix wave, Ruling 29, F2):
+  // the composer's `.fg select` rule is `width: max-content; min-width:
+  // 240px; max-width: 100%` -- a floor, not the fixed ceiling this row used
+  // to assert (batch-end review F2: a 240px fixed width hard-clipped
+  // #opt-md-image-policy's ru option text with no ellipsis, since a
+  // <select> computes overflow:visible and text-overflow is inert on it).
+  // widthPx.min replaces widthPx.max: a select that somehow rendered
+  // NARROWER than its own floor would be as real a regression as one that
+  // grew wider. widthLteWith carries the OTHER half -- "never wider than
+  // the column" -- compared live against `.fg` (bare selector matches the
+  // FIRST `.fg` in DOM order, the Pinboard-token field on the General tab,
+  // :85 in options.html -- NOT #opt-lang's own literal parent `.fg` at
+  // :105, but both are plain block-level `.fg` wrappers with no width of
+  // their own inside the SAME active panel, so they render at the identical
+  // column width; a bare `.fg select` selector already leans on this same
+  // "first match in DOM order" convention for the geometry row itself, one
+  // paragraph up). Bare `.fg select` matches the FIRST such element in DOM
   // order, #opt-lang (general tab, active on a bare goto(), no extra setup).
   { surface: "options", page: "options.html", selector: ".fg select", state: "default",
-    expect: { widthPx: { max: 240 } } },
+    expect: { widthPx: { min: 240 }, widthLteWith: { selector: ".fg" } } },
   // .key-wrap 420 (password/API-key fields, fused with the eye toggle --
   // COMPONENTS.md §8 -- the cap sits on the WRAPPER so the toggle stays
   // fused to the input's own right edge, not the field's full-width box).
