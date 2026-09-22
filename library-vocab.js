@@ -676,7 +676,15 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
       link.href = safeHref;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      link.textContent = c.articleTitle || safeHref;
+      // Title text lives in its own span (library.css's .notes-row-open-text)
+      // so the ellipsis has a box it actually owns and the icon below stays
+      // a flex sibling that can never be laid out past the link's own width
+      // (2026-09-22 T2 fix round: an unbreakable long title used to carry
+      // the appended icon's real layout position ~500px past the pane).
+      const linkText = document.createElement("span");
+      linkText.className = "notes-row-open-text";
+      linkText.textContent = c.articleTitle || safeHref;
+      link.appendChild(linkText);
       // External-link mark, same idiom as options.js's .wayback-log-url:
       // static PBP_ICONS constant (already aria-hidden), never page content.
       link.insertAdjacentHTML("beforeend", PBP_ICONS.extOpen.replace('<svg ', '<svg class="ext-icon" '));

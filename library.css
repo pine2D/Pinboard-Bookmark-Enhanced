@@ -639,28 +639,50 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
 .notes-row-del { white-space: nowrap; }
 /* Source link under a context quote in the vocabulary detail pane (the only
    consumer left -- library-vocab.js builds it as a bare <a>).
-   `display: block` is the fix, not decoration. On a non-replaced INLINE box,
-   `max-width`, `overflow` and `text-overflow` are all inert per CSS 2.1 --
-   but the inherited `white-space: nowrap` is not, so the declarations below
-   read as "clip this to a width" while the browser rendered one unbreakable
-   line at full intrinsic width. Measured 351px past the pane's content edge
-   at a 900px viewport, which handed the whole detail pane a 327px horizontal
-   scroll (user report, real device).
-   The 160px cap went with it: it was sized for the old wide notes ROW this
-   class used to live on, and inside a 68ch reading column it would truncate
-   an article title to a fifth of the available measure. `max-width: 100%`
-   keeps the ellipsis honest against whatever the column actually is. */
+   `display: block` was the earlier fix for the earlier defect: on a
+   non-replaced INLINE box, `max-width`/`overflow`/`text-overflow` are inert
+   per CSS 2.1, but the inherited `white-space: nowrap` is not, so those
+   declarations used to read as "clip this to a width" while the browser
+   rendered one unbreakable line at full intrinsic width (351px past the
+   pane's content edge at 900px, 327px horizontal scroll -- user report,
+   real device). `display: block` + `overflow: hidden` fixed the LINK's own
+   box, but the appended `.ext-icon` <svg> is still real inline content
+   inside that one-line nowrap flow: `text-overflow: ellipsis` only clips
+   the *paint*, not layout, so the icon's laid-out position stayed pinned to
+   where an unclipped line would have put it -- 500px+ past the pane on a
+   long title, real geometry `getBoundingClientRect` reports even though
+   `overflow: hidden` keeps it off-screen (paneFit FAIL, 2026-09-22 T2 fix
+   round: 1 svg + 3 path hits, deterministic at 900px, `.vocab-detail-pane`'s
+   seeded fixture title is 105ch and deliberately unbreakable).
+   Fix at the cause, not the symptom: give the TEXT its own box
+   (`.notes-row-open-text`) so ellipsis has something it actually owns, and
+   make the icon a flex sibling that can never be laid out past the link's
+   own (correctly clipped) width. Same idiom already shipped in options.css's
+   `.wayback-log-url` / `.wayback-log-url-text`. The 160px cap noted in an
+   earlier revision of this comment is long gone: `max-width: 100%` on the
+   text span keeps the ellipsis honest against whatever the column is. */
 .notes-row-open {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lib-sp-1);
+  max-width: 100%;
+  min-width: 0;
+  color: var(--lib-fg);
+  text-decoration: none;
+}
+.notes-row-open-text {
+  min-width: 0;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--lib-fg);
-  text-decoration: none;
 }
-.notes-row-open:hover,
-.notes-row-open:focus-visible {
+/* text-decoration on the <a> does not reliably paint under a flex-item
+   descendant's text (propagation stops at the flex item boundary in the
+   text-decoration spec) -- scope the hover/focus underline to the text span
+   directly rather than trust it to propagate from the flex container. */
+.notes-row-open:hover .notes-row-open-text,
+.notes-row-open:focus-visible .notes-row-open-text {
   text-decoration: underline;
 }
 /* Same focus recipe as the dictionary pane's own in-pane links
@@ -676,13 +698,19 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
    label followed by an icon glyph, not a button. There is no `.btn
    .ext-icon` sibling rule on this surface (removed 2026-09-22, Ruling 23
    carry-over: zero .btn consumers in library.html/js -- grep-proven, both
-   .ext-icon consumers are the plain <a> links below). */
-.notes-detail-source .ext-icon,
-.notes-row-open .ext-icon {
+   .ext-icon consumers are the plain <a> links below). `.notes-row-open`'s
+   gap (above) now supplies its icon's spacing, so only the detail-source
+   sibling still needs its own margin-left. */
+.notes-detail-source .ext-icon {
   width: 10px;
   height: 10px;
   vertical-align: -1px;
   margin-left: var(--lib-sp-1);
+}
+.notes-row-open .ext-icon {
+  width: 10px;
+  height: 10px;
+  flex: none;
 }
 .notes-unknown-hint { font-size: 11px; color: var(--lib-fg-muted); margin: var(--lib-sp-2) 0 0 0; }
 .note-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: var(--lib-sp-1); }
@@ -959,6 +987,18 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   font-weight: bold;
   color: var(--lib-fg);
   text-decoration: none;
+  /* Flex item of .notes-detail-head above; default `min-width: auto` pins
+     the floor to the title's min-content size, which for an unbreakable run
+     (no spaces -- a URL-as-title, a hash) is its full intrinsic width, and
+     `flex-wrap: wrap` only moves whole ITEMS to a new line, it cannot break
+     inside one. Probed during the 2026-09-22 T2 fix round (paneFit): an
+     unbreakable synthetic title reproduced the same overflow class as
+     .notes-row-open's (704px paneScroll / 728px past the pane's right edge
+     at 900px) even though the seeded real fixture's spaced title never
+     trips it today. Same two declarations as the sibling .notes-item-quote
+     rule below already carries for the same reason. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 a.notes-detail-source:hover,
 a.notes-detail-source:focus-visible {
