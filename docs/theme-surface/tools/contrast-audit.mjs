@@ -227,6 +227,15 @@ const ROLE_ALIAS = {
 const COMPONENT_PAIR_SPEC = [
   ["btn-fg", "btn-bg", 4.5],
   ["btn-fg", "btn-hover", 4.5],
+  // Secondary/muted text painted on a control fill (weak-text-on-fill batch,
+  // D1/D2, COMPONENTS.md §9.1 law 8) -- the muted-tier analog of the btn-fg
+  // rows just above, same shape (all 3 surfaces, no onlyNs, covers both the
+  // 14 themed blocks AND the default surface the same way btn-fg is
+  // covered). `--{ns}-btn-fg-muted` is now the ONLY sanctioned token for
+  // secondary text on btn-bg/btn-hover -- fg-hint/fg-muted/link painted
+  // directly on either fill is what this role and law 8 exist to replace.
+  ["btn-fg-muted", "btn-bg", 4.5],
+  ["btn-fg-muted", "btn-hover", 4.5],
   ["chip-fg", "chip-bg", 4.5],
   // Pressable chip ([aria-pressed]) swaps its hover fill for btn-hover
   // (COMPONENTS §5.3) -- token-level, so checked unconditionally rather than

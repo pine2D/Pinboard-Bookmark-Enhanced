@@ -25,6 +25,10 @@ const DEFAULT_LIGHT = {
   "btn-fg": "#000000",          // measured: getComputedStyle(.btn).color on the unthemed default
                                  // page (library.css:119 declares no `color` — this is the browser's
                                  // ButtonText resolution, NOT a guess; see task-5-report.md).
+  "btn-fg-muted": "#5f6368",    // weak-text-on-fill batch, D1: fgToAAMulti(--lib-fg-muted default
+                                 // #5f6368 (library.css:23), [btn-bg, btn-hover] below) is IDENTITY
+                                 // here -- the raw value already clears both (5.12:1 / 4.62:1), unlike
+                                 // options/popup's defaults.
   "danger-quiet-fg": "#c5221f", // = --lib-danger default (library.css:26)
   "on-danger": "#ffffff",       // = .confirm-popover .confirm-yes color: var(--lib-panel, #fff)
                                  // default (library.css:207); already 5.80:1 on --lib-danger default,
@@ -153,7 +157,26 @@ function emitLib(ui, palette, overrides, radius, focus = {}, mode) {
   // contrast contract aligned with options without duplicating its algorithm.
   map = finalizeUiControlRoles(map, palette, overrides);
 
-  return [`  color-scheme: ${mode};`, ...Object.entries(map).map(([k, v]) => `  --lib-${k}: ${v};`)].join("\n");
+  // Returns the computed map alongside the rendered text (not just text) --
+  // same shape as options-chrome.mjs's emitOpt, for the same reason: a
+  // derivation test needs the real, final --lib-* map, not a hand-rebuilt
+  // approximation of it (weak-text-on-fill batch, Task 1).
+  return { map, text: [`  color-scheme: ${mode};`, ...Object.entries(map).map(([k, v]) => `  --lib-${k}: ${v};`)].join("\n") };
+}
+
+// Compute ONE theme's real, final --lib-* color map (post-derivation,
+// post-pilot-override, post-finalizer) from its raw pilot tokens JSON --
+// hoisted out of composeLibraryThemes' per-entry loop below (weak-text-on-
+// fill batch, Task 1, mirroring composeOptionsThemeMap -- options-chrome.mjs)
+// so a derivation test can exercise the exact pipeline that ships a theme's
+// CSS block for all 3 surfaces. No behavior change: composeLibraryThemes now
+// calls this instead of inlining the same four lines.
+export function composeLibraryThemeMap(tk, mode, useDarkMode = false) {
+  const merged = useDarkMode && tk.modes?.dark ? mergeTokens(tk, tk.modes.dark) : tk;
+  const palette = expandPalette(merged.palette);
+  const ui = deriveUiColors(palette, mode);
+  const focus = tk.ui?.popup?.[mode] ?? {};
+  return emitLib(ui, palette, tk.ui?.library?.[mode], merged.radius, focus, mode);
 }
 
 // tokensByPilot: { [pilotSlug]: parsedTokensJson }
@@ -162,11 +185,8 @@ export function composeLibraryThemes(tokensByPilot) {
   for (const entry of POPUP_THEME_MAP) {
     const tk = tokensByPilot[entry.pilot];
     if (!tk) throw new Error(`library-chrome: missing pilot ${entry.pilot} for ${entry.id}`);
-    const merged = entry.useDarkMode && tk.modes?.dark ? mergeTokens(tk, tk.modes.dark) : tk;
-    const palette = expandPalette(merged.palette);
-    const ui = deriveUiColors(palette, entry.mode);
-    const focus = tk.ui?.popup?.[entry.mode] ?? {};
-    blocks.push(`html[data-theme="${entry.id}"] {\n${emitLib(ui, palette, tk.ui?.library?.[entry.mode], merged.radius, focus, entry.mode)}\n}`);
+    const { text } = composeLibraryThemeMap(tk, entry.mode, entry.useDarkMode);
+    blocks.push(`html[data-theme="${entry.id}"] {\n${text}\n}`);
   }
   // Native-control scheme, default surface (no preset selected) -- Task 6.
   // library.html declares `<meta name="color-scheme" content="light dark">`

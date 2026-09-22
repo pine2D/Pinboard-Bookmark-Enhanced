@@ -34,6 +34,10 @@ const DEFAULT_LIGHT = {
                                  // themed derivation's fgToAAMulti(fg, [bg2, drop-hover]) candidate
                                  // IS --pp-fg and is already AA-clear against both, so this mirrors
                                  // that formula's (identity) result rather than guessing.
+  "btn-fg-muted": "#5d6269",    // weak-text-on-fill batch, D1: fgToAAMulti(--pp-fg-muted default
+                                 // #62676e, [btn-bg, btn-hover] below) -- raw fg-muted clears btn-bg
+                                 // (4.82:1) but not btn-hover (4.38:1), so this moves. #5d6269 ships
+                                 // at 5.20:1 / 4.72:1.
   "chip-bg": "#e2eafa",         // = --pp-tag-bg default (popup.css:53)
   "chip-fg": "#33589f",         // = --pp-tag-fg default (popup.css:54)
   "danger-quiet-fg": "#bd3d3d", // WAS a verbatim copy of --pp-danger default (#c24343); re-derived
@@ -104,7 +108,7 @@ function emitPp(ui, mode) {
   const set = (k, val) => lines.push(`  --pp-${k}: ${val};`);
   for (const k of ["bg", "bg2", "fg", "fg-muted", "fg-hint", "link", "accent", "accent2",
     "border", "divider", "input-bg", "input-bd", "input-focus-bg", "tag-bg", "tag-fg", "tag-hover", "drop-hover",
-    "chip-bg", "chip-fg", "btn-bg", "btn-bd", "btn-hover", "btn-fg",
+    "chip-bg", "chip-fg", "btn-bg", "btn-bd", "btn-hover", "btn-fg", "btn-fg-muted",
     "banner-bg", "banner-bd", "banner-fg", "warn-bg", "warn-bd", "warn-fg",
     "ok-bg", "ok-bd", "ok-fg", "offline-bg", "offline-bd", "offline-fg",
     "danger", "danger-quiet-fg", "on-danger", "spinner-bg", "spinner-fg", "preset-bg", "preset-fg",
@@ -118,88 +122,102 @@ function emitPp(ui, mode) {
   return lines.join("\n");
 }
 
+// Compute ONE theme's real, final --pp-* color map (post-derivation,
+// post-pilot-override, post-finalizer) from its raw pilot tokens JSON --
+// hoisted out of composePopupThemes' per-entry loop below (weak-text-on-fill
+// batch, Task 1, mirroring composeOptionsThemeMap's own extraction --
+// options-chrome.mjs) so a derivation test can exercise the exact pipeline
+// that ships a theme's CSS block for all 3 surfaces, instead of hand-
+// rebuilding an approximation that could silently drift from the real one.
+// No behavior change: composePopupThemes now calls this instead of inlining
+// the same body.
+export function composePopupThemeMap(tk, mode, useDarkMode = false) {
+  const merged = useDarkMode && tk.modes?.dark ? mergeTokens(tk, tk.modes.dark) : tk;
+  const palette = expandPalette(merged.palette);
+  // Pilot-level ui overrides (tokens.json `ui.popup.<mode>`) win over derivation:
+  // theme-specific refinements the palette derivation cannot express.
+  const derived = deriveUiColors(palette, mode);
+  // on-accent is emitted EXPLICITLY for every theme (default: the theme bg,
+  // the long-standing submit-button text derivation). It must not fall back
+  // through var() to :root's light-surface white: custom properties inherit,
+  // so a var(--pp-on-accent, ...) fallback in a shared rule is dead code —
+  // the exact mistake that turned every themed submit button white (2026-07).
+  // Radius is DERIVED now, not override-only. Before this, --pp-radius-* was
+  // emitted solely where a pilot restated it, so 9 of the 13 themes silently
+  // fell back to :root's generic 3/8/10 while their site CSS used the pilot's
+  // own scale. regularizeUiRadius runs last so an override cannot reintroduce
+  // an inversion (paper-ink shipped lg:3px under md:4px).
+  let ui = {
+    ...derived, "on-accent": derived.bg,
+    ...deriveUiRadius(merged.radius),
+    ...(tk.ui?.popup?.[mode] ?? {}),
+  };
+  Object.assign(ui, regularizeUiRadius(ui));
+  const ppO = tk.ui?.popup?.[mode] ?? {};
+  // Popup shares the control finalizer but names its panel and frame roles
+  // differently. Its chip fill intentionally stays the final tag-bg literal
+  // (including transparent), while options/library synthesize an opaque tint.
+  ui["btn-bg"] ??= ui.bg2;
+  ui["btn-hover"] ??= ui["drop-hover"];
+  ui = finalizeUiControlRoles(ui, palette, ppO, {
+    panelRole: "bg2",
+    buttonBorderRole: "btn-bd",
+    inputBorderRole: "input-bd",
+    chipMode: "verbatim",
+    // on-accent stays popup's own INPUT role (already set unconditionally
+    // above via `"on-accent": derived.bg`, then possibly overridden by
+    // ppO) -- this only says "don't clobber it", never "always derive"
+    // (Task 4, taste-uplift-batch2).
+    onAccentIsInput: true,
+  });
+  // preset-bd RETIRED (design-uplift, preset-row Variant A, 2026-08-04):
+  // `.preset-btn` is borderless now (COMPONENTS.md Appendix C30), so no
+  // rule anywhere reads --pp-preset-bd -- removed from emitPp's key list
+  // above rather than left as a defined-but-unconsumed token (the prior
+  // state this comment used to document: Task 16's border-weight
+  // back-and-forth, unified light-side per USER CHECKPOINT, superseded by
+  // the full redesign that removed the border entirely). deriveUiColors
+  // (_ui-derive.mjs) still computes ui["preset-bd"] internally -- shared
+  // by options/library-chrome.mjs too, not worth a bespoke per-surface
+  // return shape just to omit one field nobody reads once popup's own
+  // emission list drops it.
+  // preset-fg (design-uplift Task 13, USER RULING): deriveUiColors emits it
+  // as a raw palette copy (hx("accent")), with no AA guarantee against its
+  // own preset-bg -- contrast-audit's orphan guard caught 6/14 themes at
+  // 3.0-4.3:1 (modern-card/flexoki-dark/solarized-light/solarized-dark/
+  // catppuccin-latte/gruvbox-dark), the exact same "unaudited paired token"
+  // class Task 5/7 already fixed for btn-fg/chip-fg. preset-bg is always a
+  // plain hex (never "transparent" like tag-bg can be, verified across all
+  // 13 pilots), so no resolveOpaqueBg needed. drop-hover is included
+  // because .preset-btn:hover swaps its fill to --pp-drop-hover while
+  // keeping the same text color (popup.css's generic html[data-theme]
+  // .preset-btn:hover rule) -- today preset-bg and drop-hover are the same
+  // source value (both hx("accent-soft")) so this is currently a single
+  // effective constraint, but fgToAAMulti keeps the derivation correct if a
+  // future pilot ui.popup override ever splits them apart.
+  const presetBgRgb = hexToRgb(ui["preset-bg"]);
+  ui["preset-fg"] = rgbToHex(fgToAAMulti(hexToRgb(ui["preset-fg"]), [presetBgRgb, hexToRgb(ui["btn-hover"])]));
+  // spinner-fg (design-uplift Task 13, USER RULING): same raw-copy gap as
+  // preset-fg above, but the loading-spinner ring is a non-text UI
+  // indicator (WCAG 1.4.11's 3:1 floor, not the 4.5:1 text minimum) --
+  // 3/14 blocks measured below 3:1 (flexoki-dark 2.71, solarized-light
+  // 2.32, solarized-dark 2.63). spinner-bg is USUALLY a plain hex (border
+  // role) but terminal's is an 8-digit alpha hex (#33ff3340, a translucent
+  // glow) -- resolveOpaqueBg composites it against bg2 first (same
+  // treatment chip-bg's derivation already gives tag-bg's "transparent"
+  // case above), since hexToRgb() alone would silently misparse an 8-digit
+  // value as a 6-digit one.
+  ui["spinner-fg"] = rgbToHex(fgToAA(hexToRgb(ui["spinner-fg"]), resolveOpaqueBg(ui["spinner-bg"], hexToRgb(ui["btn-bg"])), 3));
+  return ui;
+}
+
 // tokensByPilot: { [pilotSlug]: parsedTokensJson }
 export function composePopupThemes(tokensByPilot) {
   const blocks = [];
   for (const entry of POPUP_THEME_MAP) {
     const tk = tokensByPilot[entry.pilot];
     if (!tk) throw new Error(`popup-chrome: missing pilot ${entry.pilot} for ${entry.id}`);
-    const merged = entry.useDarkMode && tk.modes?.dark ? mergeTokens(tk, tk.modes.dark) : tk;
-    const palette = expandPalette(merged.palette);
-    // Pilot-level ui overrides (tokens.json `ui.popup.<mode>`) win over derivation:
-    // theme-specific refinements the palette derivation cannot express.
-    const derived = deriveUiColors(palette, entry.mode);
-    // on-accent is emitted EXPLICITLY for every theme (default: the theme bg,
-    // the long-standing submit-button text derivation). It must not fall back
-    // through var() to :root's light-surface white: custom properties inherit,
-    // so a var(--pp-on-accent, ...) fallback in a shared rule is dead code —
-    // the exact mistake that turned every themed submit button white (2026-07).
-    // Radius is DERIVED now, not override-only. Before this, --pp-radius-* was
-    // emitted solely where a pilot restated it, so 9 of the 13 themes silently
-    // fell back to :root's generic 3/8/10 while their site CSS used the pilot's
-    // own scale. regularizeUiRadius runs last so an override cannot reintroduce
-    // an inversion (paper-ink shipped lg:3px under md:4px).
-    let ui = {
-      ...derived, "on-accent": derived.bg,
-      ...deriveUiRadius(merged.radius),
-      ...(tk.ui?.popup?.[entry.mode] ?? {}),
-    };
-    Object.assign(ui, regularizeUiRadius(ui));
-    const ppO = tk.ui?.popup?.[entry.mode] ?? {};
-    // Popup shares the control finalizer but names its panel and frame roles
-    // differently. Its chip fill intentionally stays the final tag-bg literal
-    // (including transparent), while options/library synthesize an opaque tint.
-    ui["btn-bg"] ??= ui.bg2;
-    ui["btn-hover"] ??= ui["drop-hover"];
-    ui = finalizeUiControlRoles(ui, palette, ppO, {
-      panelRole: "bg2",
-      buttonBorderRole: "btn-bd",
-      inputBorderRole: "input-bd",
-      chipMode: "verbatim",
-      // on-accent stays popup's own INPUT role (already set unconditionally
-      // above via `"on-accent": derived.bg`, then possibly overridden by
-      // ppO) -- this only says "don't clobber it", never "always derive"
-      // (Task 4, taste-uplift-batch2).
-      onAccentIsInput: true,
-    });
-    // preset-bd RETIRED (design-uplift, preset-row Variant A, 2026-08-04):
-    // `.preset-btn` is borderless now (COMPONENTS.md Appendix C30), so no
-    // rule anywhere reads --pp-preset-bd -- removed from emitPp's key list
-    // above rather than left as a defined-but-unconsumed token (the prior
-    // state this comment used to document: Task 16's border-weight
-    // back-and-forth, unified light-side per USER CHECKPOINT, superseded by
-    // the full redesign that removed the border entirely). deriveUiColors
-    // (_ui-derive.mjs) still computes ui["preset-bd"] internally -- shared
-    // by options/library-chrome.mjs too, not worth a bespoke per-surface
-    // return shape just to omit one field nobody reads once popup's own
-    // emission list drops it.
-    // preset-fg (design-uplift Task 13, USER RULING): deriveUiColors emits it
-    // as a raw palette copy (hx("accent")), with no AA guarantee against its
-    // own preset-bg -- contrast-audit's orphan guard caught 6/14 themes at
-    // 3.0-4.3:1 (modern-card/flexoki-dark/solarized-light/solarized-dark/
-    // catppuccin-latte/gruvbox-dark), the exact same "unaudited paired token"
-    // class Task 5/7 already fixed for btn-fg/chip-fg. preset-bg is always a
-    // plain hex (never "transparent" like tag-bg can be, verified across all
-    // 13 pilots), so no resolveOpaqueBg needed. drop-hover is included
-    // because .preset-btn:hover swaps its fill to --pp-drop-hover while
-    // keeping the same text color (popup.css's generic html[data-theme]
-    // .preset-btn:hover rule) -- today preset-bg and drop-hover are the same
-    // source value (both hx("accent-soft")) so this is currently a single
-    // effective constraint, but fgToAAMulti keeps the derivation correct if a
-    // future pilot ui.popup override ever splits them apart.
-    const presetBgRgb = hexToRgb(ui["preset-bg"]);
-    ui["preset-fg"] = rgbToHex(fgToAAMulti(hexToRgb(ui["preset-fg"]), [presetBgRgb, hexToRgb(ui["btn-hover"])]));
-    // spinner-fg (design-uplift Task 13, USER RULING): same raw-copy gap as
-    // preset-fg above, but the loading-spinner ring is a non-text UI
-    // indicator (WCAG 1.4.11's 3:1 floor, not the 4.5:1 text minimum) --
-    // 3/14 blocks measured below 3:1 (flexoki-dark 2.71, solarized-light
-    // 2.32, solarized-dark 2.63). spinner-bg is USUALLY a plain hex (border
-    // role) but terminal's is an 8-digit alpha hex (#33ff3340, a translucent
-    // glow) -- resolveOpaqueBg composites it against bg2 first (same
-    // treatment chip-bg's derivation already gives tag-bg's "transparent"
-    // case above), since hexToRgb() alone would silently misparse an 8-digit
-    // value as a 6-digit one.
-    ui["spinner-fg"] = rgbToHex(fgToAA(hexToRgb(ui["spinner-fg"]), resolveOpaqueBg(ui["spinner-bg"], hexToRgb(ui["btn-bg"])), 3));
+    const ui = composePopupThemeMap(tk, entry.mode, entry.useDarkMode);
     blocks.push(`html[data-theme="${entry.id}"] {\n${emitPp(ui, entry.mode)}\n}`);
   }
   // Default surface = the light baseline only: the popup's no-preset dark is

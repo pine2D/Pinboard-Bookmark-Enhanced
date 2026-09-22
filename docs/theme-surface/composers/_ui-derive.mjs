@@ -4,6 +4,7 @@
 
 const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
   "btn-fg",
+  "btn-fg-muted",
   "danger-quiet-fg",
   "on-danger",
   "chip-bg",
@@ -553,6 +554,22 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
   const dangerButtonHoverRgb = mix(btnBgRgb, dangerRgb, 0.08);
   map.border = rgbToHex(borderToAA(resolveOpaqueBg(map.border, btnBgRgb), [btnBgRgb, panelRgb]));
   map["btn-fg"] = rgbToHex(fgToAAMulti(fgRgb, [btnBgRgb, btnHoverRgb]));
+  // Secondary/muted text painted on a control fill (COMPONENTS.md §9.1 law 8,
+  // weak-text-on-fill batch, D1/D2): the same two-host shape as btn-fg just
+  // above, using the SAME btnBgRgb/btnHoverRgb locals -- both are already the
+  // POST-fillSeparate final fills by this point in the function (btnBgRgb was
+  // captured after btn-bg's own fillSeparate call near the top; btnHoverRgb a
+  // few lines above this one, after btn-hover's own fillSeparate). Unlike
+  // `fg`, `fg-muted` gets no gap-fill/refresh step of its own in this
+  // function -- NEW_THEME.md's "TEXT input roles are taken VERBATIM" means
+  // map["fg-muted"] is already the final, post-pilot-override value by the
+  // time a composer calls this function (the composer applies `ui.<surface>.
+  // <mode>` overrides before invoking finalizeUiControlRoles), so it is read
+  // directly, with no local refresh needed the way fgRgb needed one above.
+  // This is the ONLY sanctioned token for secondary text on btn-bg/btn-hover
+  // -- fg-hint/fg-muted/link painted directly on a control fill is exactly
+  // what §9.1 law 8 now forbids.
+  map["btn-fg-muted"] = rgbToHex(fgToAAMulti(hexToRgb(map["fg-muted"]), [btnBgRgb, btnHoverRgb]));
   map["danger-quiet-fg"] = rgbToHex(fgToAAMulti(
     dangerRgb,
     [bgRgb, panelRgb, btnBgRgb, dangerGhostHoverRgb, dangerButtonHoverRgb],

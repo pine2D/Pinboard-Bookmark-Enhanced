@@ -14,6 +14,10 @@ const DEFAULT_LIGHT = {
   "btn-fg": "#000000",          // measured: getComputedStyle(.btn).color on the unthemed default
                                  // page (options.css:341 declares no `color` — this is the browser's
                                  // ButtonText resolution, NOT a guess; see task-5-report.md).
+  "btn-fg-muted": "#616161",    // weak-text-on-fill batch, D1: fgToAAMulti(--opt-fg-muted default
+                                 // #666 (options.css:92), [btn-bg, btn-hover] below) -- raw fg-muted
+                                 // clears btn-bg (4.76:1) but not btn-hover (4.31:1), so this moves.
+                                 // #616161 ships at 5.13:1 / 4.65:1.
   "danger-quiet-fg": "#cc0000", // = --opt-danger default #c00 (options.css:74), 6-digit form
   "on-danger": "#ffffff",       // = .confirm-popover .confirm-yes `color` default (options.css:1329);
                                  // already 5.89:1 on --opt-danger default, clears AA unmodified.

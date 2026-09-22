@@ -2491,6 +2491,7 @@ html[data-theme="modern-card"] {
   --lib-btn-border: #e7e7e9;
   --lib-focus-bd: #3984e8;
   --lib-btn-fg: #1a1a2e;
+  --lib-btn-fg-muted: #5a5e63;
   --lib-danger-quiet-fg: #b6281f;
   --lib-on-danger: #ffffff;
   --lib-chip-bg: #e6effe;
@@ -2526,6 +2527,7 @@ html[data-theme="nord-night"] {
   --lib-btn-border: #424959;
   --lib-focus-bd: #75a0b0;
   --lib-btn-fg: #d8dee9;
+  --lib-btn-fg-muted: #a3bad1;
   --lib-danger-quiet-fg: #e3b9bc;
   --lib-on-danger: #293547;
   --lib-chip-bg: #485868;
@@ -2562,6 +2564,7 @@ html[data-theme="terminal"] {
   --lib-radius-lg: 4px;
   --lib-btn-border: var(--lib-border);
   --lib-btn-fg: #33ff33;
+  --lib-btn-fg-muted: #24b324;
   --lib-danger-quiet-fg: #ff3333;
   --lib-on-danger: #001f00;
   --lib-chip-bg: #142914;
@@ -2598,6 +2601,7 @@ html[data-theme="paper-ink"] {
   --lib-radius-lg: 4px;
   --lib-btn-border: #eae5de;
   --lib-btn-fg: #2c2c2c;
+  --lib-btn-fg-muted: #6b4c3b;
   --lib-danger-quiet-fg: #a73225;
   --lib-on-danger: #faf8f5;
   --lib-chip-bg: #cfd1d0;
@@ -2633,6 +2637,7 @@ html[data-theme="dracula"] {
   --lib-btn-border: #30313a;
   --lib-focus-bd: #6ba0b4;
   --lib-btn-fg: #f8f8f2;
+  --lib-btn-fg-muted: #bd93f9;
   --lib-danger-quiet-fg: #ff7e7e;
   --lib-on-danger: #282a36;
   --lib-chip-bg: #2e3b47;
@@ -2668,6 +2673,7 @@ html[data-theme="flexoki-light"] {
   --lib-btn-border: #e7e5da;
   --lib-focus-bd: #5a85b5;
   --lib-btn-fg: #100f0f;
+  --lib-btn-fg-muted: #65645f;
   --lib-danger-quiet-fg: #af3029;
   --lib-on-danger: #fffcf0;
   --lib-chip-bg: #d7dddd;
@@ -2703,6 +2709,7 @@ html[data-theme="flexoki-dark"] {
   --lib-btn-border: #2f2e2d;
   --lib-focus-bd: #417bad;
   --lib-btn-fg: #cecdc3;
+  --lib-btn-fg-muted: #a09e9a;
   --lib-danger-quiet-fg: #df837b;
   --lib-on-danger: #1c1b1a;
   --lib-chip-bg: #2c343b;
@@ -2738,6 +2745,7 @@ html[data-theme="solarized-light"] {
   --lib-btn-border: #e2decd;
   --lib-focus-bd: #2380c1;
   --lib-btn-fg: #506469;
+  --lib-btn-fg-muted: #506469;
   --lib-danger-quiet-fg: #b0211e;
   --lib-on-danger: #fdf6e3;
   --lib-chip-bg: #d3dbd5;
@@ -2774,6 +2782,7 @@ html[data-theme="solarized-dark"] {
   --lib-radius-lg: 4px;
   --lib-btn-border: #103d48;
   --lib-btn-fg: #94a3a4;
+  --lib-btn-fg-muted: #91a5ac;
   --lib-danger-quiet-fg: #ec918f;
   --lib-on-danger: #302403;
   --lib-chip-bg: #0d465d;
@@ -2809,6 +2818,7 @@ html[data-theme="catppuccin-latte"] {
   --lib-btn-border: #dbdee6;
   --lib-focus-bd: #3b78f3;
   --lib-btn-fg: #4c4f69;
+  --lib-btn-fg-muted: #555869;
   --lib-danger-quiet-fg: #ac0c2f;
   --lib-on-danger: #eff1f5;
   --lib-chip-bg: #c7d2e8;
@@ -2844,6 +2854,7 @@ html[data-theme="catppuccin-mocha"] {
   --lib-btn-border: #37394b;
   --lib-focus-bd: #6784b8;
   --lib-btn-fg: #cdd6f4;
+  --lib-btn-fg-muted: #a6adc8;
   --lib-danger-quiet-fg: #f494af;
   --lib-on-danger: #1e1e2e;
   --lib-chip-bg: #484b60;
@@ -2879,6 +2890,7 @@ html[data-theme="gruvbox-dark"] {
   --lib-btn-border: #433f3b;
   --lib-focus-bd: #749085;
   --lib-btn-fg: #ebdbb2;
+  --lib-btn-fg-muted: #b8ad9c;
   --lib-danger-quiet-fg: #fd9a8e;
   --lib-on-danger: #282828;
   --lib-chip-bg: #494d49;
@@ -2914,6 +2926,7 @@ html[data-theme="rose-pine"] {
   --lib-btn-border: #272536;
   --lib-focus-bd: #7d6c9a;
   --lib-btn-fg: #e0def4;
+  --lib-btn-fg-muted: #9b98b3;
   --lib-danger-quiet-fg: #eb6f92;
   --lib-on-danger: #191724;
   --lib-chip-bg: #3a334c;
@@ -2949,6 +2962,7 @@ html[data-theme="github-light"] {
   --lib-btn-border: #ececed;
   --lib-focus-bd: #3f88df;
   --lib-btn-fg: #1f2328;
+  --lib-btn-fg-muted: #5c636b;
   --lib-danger-quiet-fg: #bd1f2a;
   --lib-on-danger: #ffffff;
   --lib-chip-bg: #ddf4ff;
@@ -2958,6 +2972,7 @@ html[data-theme="github-light"] {
 :root {
   color-scheme: light;
   --lib-btn-fg: #000000;
+  --lib-btn-fg-muted: #5f6368;
   --lib-danger-quiet-fg: #c5221f;
   --lib-on-danger: #ffffff;
   --lib-on-accent: #ffffff;

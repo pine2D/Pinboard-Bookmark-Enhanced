@@ -1747,6 +1747,7 @@ html[data-theme="modern-card"] {
   --pp-btn-bd: #e7e7e9;
   --pp-btn-hover: #d5ddeb;
   --pp-btn-fg: #1a1a2e;
+  --pp-btn-fg-muted: #5a5e63;
   --pp-banner-bg: #e8f0fe;
   --pp-banner-bd: #a3c7f6;
   --pp-banner-fg: #1967d2;
@@ -1800,6 +1801,7 @@ html[data-theme="nord-night"] {
   --pp-btn-bd: #424959;
   --pp-btn-hover: #3b4252;
   --pp-btn-fg: #d8dee9;
+  --pp-btn-fg-muted: #a4bcd4;
   --pp-banner-bg: #394551;
   --pp-banner-bd: #526c7a;
   --pp-banner-fg: #88c0d0;
@@ -1854,6 +1856,7 @@ html[data-theme="terminal"] {
   --pp-btn-bd: var(--pp-border);
   --pp-btn-hover: #1a3a1a;
   --pp-btn-fg: #33ff33;
+  --pp-btn-fg-muted: #24b324;
   --pp-banner-bg: #062323;
   --pp-banner-bd: #0e6b6b;
   --pp-banner-fg: #00cccc;
@@ -1909,6 +1912,7 @@ html[data-theme="paper-ink"] {
   --pp-btn-bd: #eae5de;
   --pp-btn-hover: #f5f0e8;
   --pp-btn-fg: #2c2c2c;
+  --pp-btn-fg-muted: #6b4c3b;
   --pp-banner-bg: #dfe1e3;
   --pp-banner-bd: #7d8e9f;
   --pp-banner-fg: #1a3a5c;
@@ -1964,6 +1968,7 @@ html[data-theme="dracula"] {
   --pp-btn-bd: #30313a;
   --pp-btn-hover: #21222c;
   --pp-btn-fg: #f8f8f2;
+  --pp-btn-fg-muted: #bd93f9;
   --pp-banner-bg: #34414e;
   --pp-banner-bd: #507686;
   --pp-banner-fg: #8be9fd;
@@ -2018,6 +2023,7 @@ html[data-theme="flexoki-light"] {
   --pp-btn-bd: #e7e5da;
   --pp-btn-hover: #f2f0e5;
   --pp-btn-fg: #100f0f;
+  --pp-btn-fg-muted: #65645f;
   --pp-banner-bg: #E1ECEB;
   --pp-banner-bd: #ABCFE2;
   --pp-banner-fg: #205EA6;
@@ -2072,6 +2078,7 @@ html[data-theme="flexoki-dark"] {
   --pp-btn-bd: #2f2e2d;
   --pp-btn-hover: #363532;
   --pp-btn-fg: #cecdc3;
+  --pp-btn-fg-muted: #9f9d96;
   --pp-banner-bg: #12253B;
   --pp-banner-bd: #163B66;
   --pp-banner-fg: #66A0C8;
@@ -2126,6 +2133,7 @@ html[data-theme="solarized-light"] {
   --pp-btn-bd: #e2decd;
   --pp-btn-hover: #eee8d5;
   --pp-btn-fg: #506469;
+  --pp-btn-fg-muted: #506469;
   --pp-banner-bg: #e3e9e1;
   --pp-banner-bd: #a7cbdc;
   --pp-banner-fg: #1e6ca4;
@@ -2180,6 +2188,7 @@ html[data-theme="solarized-dark"] {
   --pp-btn-bd: #103d48;
   --pp-btn-hover: #073642;
   --pp-btn-fg: #98a6a6;
+  --pp-btn-fg-muted: #94a3a4;
   --pp-banner-bg: #073c52;
   --pp-banner-bd: #32749a;
   --pp-banner-fg: #5eabe2;
@@ -2235,6 +2244,7 @@ html[data-theme="catppuccin-latte"] {
   --pp-btn-bd: #dbdee6;
   --pp-btn-hover: #d0d4de;
   --pp-btn-fg: #4c4f69;
+  --pp-btn-fg-muted: #585a71;
   --pp-banner-bg: #d6e0f5;
   --pp-banner-bd: #9bb9f5;
   --pp-banner-fg: #1a5ad8;
@@ -2288,6 +2298,7 @@ html[data-theme="catppuccin-mocha"] {
   --pp-btn-bd: #37394b;
   --pp-btn-hover: #313244;
   --pp-btn-fg: #cdd6f4;
+  --pp-btn-fg-muted: #a6adc8;
   --pp-banner-bg: #313953;
   --pp-banner-bd: #5d77a6;
   --pp-banner-fg: #89b4fa;
@@ -2341,6 +2352,7 @@ html[data-theme="gruvbox-dark"] {
   --pp-btn-bd: #433f3b;
   --pp-btn-hover: #3c3836;
   --pp-btn-fg: #ebdbb2;
+  --pp-btn-fg-muted: #b8ad9c;
   --pp-banner-bg: #313533;
   --pp-banner-bd: #4c5a55;
   --pp-banner-fg: #83a598;
@@ -2395,6 +2407,7 @@ html[data-theme="rose-pine"] {
   --pp-btn-bd: #272536;
   --pp-btn-hover: #2f2c43;
   --pp-btn-fg: #e0def4;
+  --pp-btn-fg-muted: #9b98b3;
   --pp-banner-bg: #2e283b;
   --pp-banner-bd: #5d5172;
   --pp-banner-fg: #c4a7e7;
@@ -2448,6 +2461,7 @@ html[data-theme="github-light"] {
   --pp-btn-bd: #ececed;
   --pp-btn-hover: #d0e5f0;
   --pp-btn-fg: #1f2328;
+  --pp-btn-fg-muted: #5c636b;
   --pp-banner-bg: #ddf4ff;
   --pp-banner-bd: #bbdfff;
   --pp-banner-fg: #0969da;
@@ -2479,6 +2493,7 @@ html[data-theme="github-light"] {
 :root {
   color-scheme: light;
   --pp-btn-fg: #2a2d33;
+  --pp-btn-fg-muted: #5d6269;
   --pp-chip-bg: #e2eafa;
   --pp-chip-fg: #33589f;
   --pp-danger-quiet-fg: #bd3d3d;
