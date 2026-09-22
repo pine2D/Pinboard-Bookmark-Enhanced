@@ -908,8 +908,8 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .ac-item { padding: var(--pp-sp-2) var(--pp-sp-3); cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: space-between; }
 .ac-item:hover, .ac-item.selected { background: var(--pp-drop-hover); }
 .ac-count { color: var(--pp-fg-hint); font-size: 11px; margin-left: var(--pp-sp-2); flex-shrink: 0; }
-.ac-new-hint { color: var(--pp-fg-hint); font-style: italic; cursor: pointer; }
-.ac-new-hint:hover { background: var(--pp-drop-hover); color: var(--pp-fg); font-style: normal; }
+.ac-new-hint { color: var(--pp-fg-hint); cursor: pointer; }   /* upright: CJK has no true italic */
+.ac-new-hint:hover { background: var(--pp-drop-hover); color: var(--pp-fg); }
 .ac-new-icon { color: var(--pp-accent); font-style: normal; font-weight: bold; margin-right: var(--pp-sp-1); }
 .ac-hint-footer {
   flex: 0 0 auto;
@@ -954,7 +954,8 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .last-used-hint:hover { color: var(--pp-link); }
 .last-used-hint:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 .last-used-hint .lu-label { font-weight: 400; margin-right: var(--pp-sp-2); }
-.last-used-hint .lu-tags { font-style: italic; }
+/* .lu-tags: no rule of its own -- upright (CJK has no true italic), inheriting
+   --pp-fg-hint from .last-used-hint above. */
 .tag-copied-flash { color: var(--pp-ok-fg) !important; }
 
 .suggest-area { line-height: 1.9; word-wrap: break-word; overflow-wrap: break-word; }
@@ -987,7 +988,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .add-all-link { border: 0; background: none; padding: 0; font-family: inherit; color: var(--pp-fg-hint); font-size: 11px; cursor: pointer; }
 .add-all-link:hover { text-decoration: underline; color: var(--pp-fg-muted); }
 .add-all-link:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
-.muted { color: var(--pp-fg-hint); font-size: 11px; font-style: italic; }
+.muted { color: var(--pp-fg-hint); font-size: 11px; }   /* upright: CJK has no true italic */
 
 /* flex-wrap (F7, final review): three checkbox labels + #bottom-kb-hint can
    outrun 480px in pl/ru ("Alt+P/R/A przełącza..."); wrapping keeps every
@@ -1318,8 +1319,7 @@ html[data-theme] .batch-progress-text {
 /* Cache hint & regenerate */
 .cache-hint {
   font-size: 11px;
-  color: var(--pp-fg-hint);
-  font-style: italic;
+  color: var(--pp-fg-hint);   /* upright: CJK has no true italic */
   margin-left: var(--pp-sp-2);
 }
 .regen-link {
@@ -1725,7 +1725,7 @@ html[data-theme] .batch-progress-text {
 }
 .action-link.loading.slow .ai-progress-label::after {
   content: " — " attr(data-slow-hint);
-  font-style: italic;
+  /* upright: CJK has no true italic; inherits --pp-fg-hint from .ai-progress-label above */
   opacity: 0.8;
 }
 

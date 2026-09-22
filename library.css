@@ -883,9 +883,9 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   overflow-wrap: anywhere;
 }
 /* The " \2014 " separator before this span is a text node in the row (see
-   library-notes.js) -- the italic alone left quote and note running together
-   in the accessible name. */
-.notes-hit-note { font-style: italic; color: var(--lib-fg-muted); }
+   library-notes.js) -- CSS styling alone leaves quote and note running
+   together in the accessible name. */
+.notes-hit-note { color: var(--lib-fg-muted); }   /* upright: CJK has no true italic */
 .notes-hit-meta { display: flex; gap: var(--lib-sp-2); font-size: 11px; color: var(--lib-fg-muted); }
 
 /* Reading pane (Task 2 spec: 15px/1.65 prose, 68ch measure, controls back at
@@ -1367,22 +1367,24 @@ html[data-theme="rose-pine"] .xp-dict-lang {
 .xp-dict-match { color: var(--lib-fg-muted); font-size: 0.8em; margin: 0 0 var(--lib-sp-2); }
 .xp-dict-entry { margin: 0 0 var(--lib-sp-2); }
 .xp-dict-ipa-line { display: flex; flex-wrap: wrap; gap: var(--lib-sp-2); align-items: baseline; }
-.xp-dict-pos { font-style: italic; color: var(--lib-fg-muted); }
+.xp-dict-pos { font-style: italic; color: var(--lib-fg-muted); }   /* italic kept: Free Dictionary API English only -- CC-CEDICT/ECDICT both write pos:"" (dict-pack.js:75,388) */
 .xp-dict-ipa-tag { font-size: 0.75em; color: var(--lib-fg-muted); }
 .xp-dict-forms { font-size: 0.8em; color: var(--lib-fg-muted); margin-top: var(--lib-sp-1); }
 .xp-dict-senses { margin: var(--lib-sp-2) 0 0; padding-left: 1.4em; }
 .xp-dict-senses li { margin: var(--lib-sp-1) 0; }
 /* A lone sense needs no "1." -- see md-preview.css's twin rule for the reasoning. */
 .xp-dict-senses li:only-child { list-style: none; margin-left: -1.4em; }
-.xp-dict-example { font-size: 0.85em; color: var(--lib-fg-muted); font-style: italic; }
-.xp-dict-sense-tag { font-size: 0.85em; color: var(--lib-fg-muted); font-style: italic; }
+.xp-dict-example { font-size: 0.85em; color: var(--lib-fg-muted); font-style: italic; }   /* italic kept: Free Dictionary API English only -- CC-CEDICT/ECDICT both write examples:[] (dict-pack.js:75,388) */
+.xp-dict-sense-tag { font-size: 0.85em; color: var(--lib-fg-muted); font-style: italic; }   /* italic kept: Free Dictionary API English only -- CC-CEDICT/ECDICT sense tags are absent/[] (dict-pack.js:75,388) */
 /* Stable containers inside .xp-dict-slot: the local pack writes the first,
    every online path writes the second. Empty until something lands in them. */
 .xp-dict-local:not(:empty) { margin-bottom: var(--lib-sp-2); }
-.xp-dict-local-title { font-size: 0.8em; color: var(--lib-fg-muted); font-style: italic; }
+.xp-dict-local-title { font-size: 0.8em; color: var(--lib-fg-muted); }   /* upright: CJK has no true italic (dictZhBlockTitle renders "中文 · ECDICT") */
 .xp-dict-subsense { font-size: 0.95em; margin-top: var(--lib-sp-1); padding-left: 0.9em; }
 .xp-dict-rel { font-size: 0.85em; color: var(--lib-fg-muted); margin-top: var(--lib-sp-1); }
-.xp-dict-rel-label { font-style: italic; }
+/* .xp-dict-rel-label: no rule of its own -- upright (CJK has no true
+   italic), inheriting --lib-fg-muted from .xp-dict-rel above. Renders
+   dictSynonyms/dictAntonyms ("近义词"/"反义词" in zh-CN). */
 .xp-dict-src { font-size: 0.75em; color: var(--lib-fg-muted); margin-top: var(--lib-sp-2); }
 .xp-dict-src a { color: inherit; }
 .xp-dict-msg { color: var(--lib-fg-hint); padding: 4px 0; }

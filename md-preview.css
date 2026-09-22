@@ -992,6 +992,11 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 
 /* Strong & emphasis */
 #rendered-view strong { font-weight: 600; }
+/* italic kept (D5, taste-uplift batch3 T3, user ruling): this is the
+   author's own emphasis in article/translation content, not synthesized UI
+   chrome -- a synthetic CJK oblique here is the same rendering every other
+   browser and reader gives the source markup, so upright-ing it would make
+   this page diverge from how the emphasis reads everywhere else. */
 #rendered-view em { font-style: italic; }
 
 /* ---- Copy Feedback ---- */
@@ -2094,7 +2099,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-match { color: var(--fg-muted); font-size: 0.8em; margin: 0 0 var(--sp-2); }
 .xp-dict-entry { margin: 0 0 var(--sp-2); }
 .xp-dict-ipa-line { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: baseline; }
-.xp-dict-pos { font-style: italic; color: var(--fg-muted); }
+.xp-dict-pos { font-style: italic; color: var(--fg-muted); }   /* italic kept: Free Dictionary API English only -- CC-CEDICT/ECDICT both write pos:"" (dict-pack.js:75,388) */
 .xp-dict-ipa-tag { font-size: 0.75em; color: var(--fg-muted); }
 .xp-dict-forms { font-size: 0.8em; color: var(--fg-muted); margin-top: var(--sp-1); }
 .xp-dict-senses { margin: var(--sp-2) 0 0; padding-left: 1.4em; }
@@ -2104,15 +2109,17 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
    the text flush with everything else in the card. Uses :only-child rather
    than :has() to stay off the slow-selector list. */
 .xp-dict-senses li:only-child { list-style: none; margin-left: -1.4em; }
-.xp-dict-example { font-size: 0.85em; color: var(--fg-muted); font-style: italic; }
-.xp-dict-sense-tag { font-size: 0.85em; color: var(--fg-muted); font-style: italic; }
+.xp-dict-example { font-size: 0.85em; color: var(--fg-muted); font-style: italic; }   /* italic kept: Free Dictionary API English only -- CC-CEDICT/ECDICT both write examples:[] (dict-pack.js:75,388) */
+.xp-dict-sense-tag { font-size: 0.85em; color: var(--fg-muted); font-style: italic; }   /* italic kept: Free Dictionary API English only -- CC-CEDICT/ECDICT sense tags are absent/[] (dict-pack.js:75,388) */
 /* Stable containers inside .xp-dict-slot: the local pack writes the first, every
    online path writes the second. Empty until something lands in them. */
 .xp-dict-local:not(:empty) { margin-bottom: var(--sp-2); }
-.xp-dict-local-title { font-size: 0.8em; color: var(--fg-muted); font-style: italic; }
+.xp-dict-local-title { font-size: 0.8em; color: var(--fg-muted); }   /* upright: CJK has no true italic (dictZhBlockTitle renders "中文 · ECDICT") */
 .xp-dict-subsense { font-size: 0.95em; margin-top: var(--sp-1); padding-left: 0.9em; }
 .xp-dict-rel { font-size: 0.85em; color: var(--fg-muted); margin-top: var(--sp-1); }
-.xp-dict-rel-label { font-style: italic; }
+/* .xp-dict-rel-label: no rule of its own -- upright (CJK has no true
+   italic), inheriting --fg-muted from .xp-dict-rel above. Renders
+   dictSynonyms/dictAntonyms ("近义词"/"反义词" in zh-CN). */
 .xp-dict-src { font-size: 0.75em; color: var(--fg-muted); margin-top: var(--sp-2); }
 .xp-dict-src a { color: inherit; }
 .xp-dict-ctx { border-top: 1px solid var(--border); margin-top: var(--sp-2); padding-top: var(--sp-2); }
