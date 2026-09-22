@@ -231,7 +231,12 @@ const ROLE_ALIAS = {
 // is a differently-named token, where running the row against the default
 // surface does not just under-check, it checks the WRONG pair -- see the
 // preset-* rows below.
-const COMPONENT_PAIR_SPEC = [
+// Exported (final fix wave, Ruling 29 F3) so tests/theme-ui-derive-tests.mjs
+// can cross-check DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS below against this
+// registry directly, instead of the promise living only in prose. Safe to
+// import for this: main() (further down) is guarded by isDirectRun(), so
+// pulling this constant in does not also execute the whole static-CSS audit.
+export const COMPONENT_PAIR_SPEC = [
   ["btn-fg", "btn-bg", 4.5],
   ["btn-fg", "btn-hover", 4.5],
   // Secondary/muted text painted on a control fill (weak-text-on-fill batch,
@@ -462,7 +467,10 @@ const SURFACE_BY_NS = { pp: "popup", opt: "options", lib: "library" };
 // but stays an INPUT role on popup (`ui.popup.<mode>.on-accent`, 5/13
 // pilots use it, `#submit-btn`'s own long-standing precedent) -- the SAME
 // role name is strict on two surfaces and not on the third.
-function isOutputRoleForDefault(ns, role) {
+// Exported (final fix wave, Ruling 29 F3) for the same cross-check test --
+// this IS the predicate the default-block audit actually runs, so the test
+// calls it directly rather than re-deriving ns/surface translation itself.
+export function isOutputRoleForDefault(ns, role) {
   const roles = UI_DERIVED_OUTPUT_ROLES[SURFACE_BY_NS[ns]];
   return !!roles && roles.includes(role);
 }
@@ -476,7 +484,11 @@ function isOutputRoleForDefault(ns, role) {
 // cross-checks it (tests/theme-ui-derive-tests.mjs) -- isOutputRoleForDefault()
 // above, not this object, is what the audit actually runs on, so the two can
 // never drift into disagreeing about what's strict without a red test.
-const DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS = {
+// (Final fix wave, Ruling 29 F3: that cross-check test did not actually
+// exist until now -- this comment's promise was, until this fix, prose
+// only. Exported so the test can read it instead of re-typing a copy that
+// could silently drift from this one.)
+export const DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS = {
   bg: "hand-maintained base surface color, predates the derivation pipeline entirely",
   panel: "hand-maintained elevated-surface base token, same reasoning as bg",
   "btn-bg": "Soft Fill fill -- fillSeparate ADJUSTS a hand/pilot seed, it does not originate one; never added to UI_DERIVED_OUTPUT_ROLES",

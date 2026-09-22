@@ -21,6 +21,15 @@ import {
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
 import { composeLibraryThemeMap, LIB_BATCH_BAND_MIX } from "../docs/theme-surface/composers/library-chrome.mjs";
+// COMPONENT_PAIR_SPEC / DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS /
+// isOutputRoleForDefault (final fix wave, Ruling 29 F3): safe to import for
+// these -- contrast-audit.mjs's whole static-CSS audit lives inside main(),
+// guarded by isDirectRun(), so pulling these three in does not also run it.
+import {
+  COMPONENT_PAIR_SPEC,
+  DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS,
+  isOutputRoleForDefault,
+} from "../docs/theme-surface/tools/contrast-audit.mjs";
 
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); };
@@ -770,6 +779,58 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   const fellThrough = resolveOpaqueBg("transparent", [200, 150, 100]);
   check(fellThrough[0] === 200 && fellThrough[1] === 150 && fellThrough[2] === 100,
     `resolveOpaqueBg must fall through to the fallback verbatim for a non-hex value -- got [${fellThrough}]`);
+}
+
+// --- DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS cross-check (final fix wave,
+// Ruling 29 F3). contrast-audit.mjs's comment above that object has, since
+// Ruling 25, promised that this file cross-checks it against
+// COMPONENT_PAIR_SPEC -- until now that promise was prose only: nothing
+// actually ran the comparison, so a role could fall through BOTH
+// isOutputRoleForDefault() (not a UI_DERIVED_OUTPUT_ROLES member) and this
+// object (no reason entry) and the default-block audit would silently SKIP
+// it forever, exactly the class of gap Ruling 25 closed for the strict
+// path. themedOnly rows are excluded: contrast-audit.mjs's own
+// auditComponentPairs skips them entirely for the non-strict (default)
+// path (`if (themedOnly && !strict) continue;`, :565) because their
+// default-surface counterpart is a differently-named token -- they never
+// reach isOutputRoleForDefault()/this object's territory at all, so
+// requiring either here would be checking a promise contrast-audit.mjs
+// itself never makes.
+{
+  const NS_LIST = ["pp", "opt", "lib"];
+  const roleKeys = new Set(); // `${ns}|${role}`
+  for (const [fgRole, bgRole, , onlyNs, themedOnly] of COMPONENT_PAIR_SPEC) {
+    if (themedOnly) continue;
+    for (const ns of (onlyNs || NS_LIST)) {
+      roleKeys.add(`${ns}|${fgRole}`);
+      roleKeys.add(`${ns}|${bgRole}`);
+    }
+  }
+  const isCovered = (ns, role, reasons) =>
+    isOutputRoleForDefault(ns, role) || Object.prototype.hasOwnProperty.call(reasons, role);
+  for (const key of roleKeys) {
+    const [ns, role] = key.split("|");
+    check(isCovered(ns, role, DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS),
+      `DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS cross-check: role "${role}" (ns=${ns}) is a ` +
+      `COMPONENT_PAIR_SPEC member that applies to a default (:root) block, but is neither a ` +
+      `UI_DERIVED_OUTPUT_ROLES member (isOutputRoleForDefault) nor listed in ` +
+      `DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS -- contrast-audit.mjs's default-block audit will ` +
+      `silently SKIP it forever (Ruling 25's own failure mode, for a role this file never re-checked).`);
+  }
+
+  // Negative control: the assertion above must be capable of failing. Drop
+  // ONE real reason ("bg", chosen because it is not also a
+  // UI_DERIVED_OUTPUT_ROLES member on any surface) from a shallow copy and
+  // confirm the SAME coverage predicate the loop above uses now reads false
+  // for it -- proves this is not a vacuous check that would pass no matter
+  // what DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS contained.
+  const reasonsMissingBg = { ...DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS };
+  delete reasonsMissingBg.bg;
+  check(roleKeys.has("opt|bg"),
+    "negative control setup: \"opt|bg\" must be a role this cross-check actually visits, or the control below proves nothing");
+  check(isCovered("opt", "bg", reasonsMissingBg) === false,
+    "negative control: removing DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS.bg must make the coverage " +
+    "predicate return false for opt/bg (proves the cross-check above is not vacuous)");
 }
 
 if (failures.length) {
