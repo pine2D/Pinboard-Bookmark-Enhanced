@@ -18,7 +18,8 @@ import {
   TIER_DISTINCT_MIN_DE,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
-import { POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
+import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
+import { composeLibraryThemeMap } from "../docs/theme-surface/composers/library-chrome.mjs";
 
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); };
@@ -33,6 +34,7 @@ const base = {
   bg: "#ffffff",
   panel: "#ffffff",
   fg: "#111111",
+  "fg-muted": "#666666",
   accent: "#0055aa",
   danger: "#bb2222",
   border: "#eeeeee",
@@ -64,6 +66,7 @@ const githubLike = finalizeUiControlRoles({
   bg: "#f6f8fa",
   panel: "#ffffff",
   fg: "#1f2328",
+  "fg-muted": "#57606a",
   accent: "#0969da",
   danger: "#cf222e",
   border: "#d0d7de",
@@ -242,7 +245,7 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
 {
   const paletteJoint = { "btn-fg": "#ffffff", "tag-bg": "transparent", "tag-fg": "#775500" };
   const inputJoint = {
-    bg: "#f7f7f7", panel: "#ffffff", fg: "#222222", accent: "#d8ffff", danger: "#bb2222",
+    bg: "#f7f7f7", panel: "#ffffff", fg: "#222222", "fg-muted": "#666666", accent: "#d8ffff", danger: "#bb2222",
     border: "#dddddd", "btn-bg": "#efefef", "btn-hover": "#efefef", "input-bg": "#efefef",
   };
   const outJoint = finalizeUiControlRoles(structuredClone(inputJoint), paletteJoint);
@@ -272,7 +275,7 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
 {
   const paletteFb = { "btn-fg": "#ffffff", "tag-bg": "transparent", "tag-fg": "#775500" };
   const inputFb = {
-    bg: "#f7f7f7", panel: "#ffffff", fg: "#222222", accent: "#fffbd8", danger: "#bb2222",
+    bg: "#f7f7f7", panel: "#ffffff", fg: "#222222", "fg-muted": "#666666", accent: "#fffbd8", danger: "#bb2222",
     border: "#dddddd", "btn-bg": "#efefef", "btn-hover": "#efefef", "input-bg": "#efefef",
   };
   const outFb = finalizeUiControlRoles(structuredClone(inputFb), paletteFb);
@@ -437,7 +440,7 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
 {
   const palette2 = { "btn-fg": "#ffffff", "tag-bg": "transparent", "tag-fg": "#0055aa" };
   const input = {
-    bg: "#ffffff", panel: "#ffffff", fg: "#8a8a8a", accent: "#4477bb", danger: "#bb2222",
+    bg: "#ffffff", panel: "#ffffff", fg: "#8a8a8a", "fg-muted": "#999999", accent: "#4477bb", danger: "#bb2222",
     border: "#eeeeee", "btn-bg": "#e0e0e0", "btn-hover": "#e0e0e0", "input-bg": "#e0e0e0",
   };
   const result = finalizeUiControlRoles(structuredClone(input), palette2);
@@ -456,6 +459,98 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     `on-accent must be derived from the fg that actually ships (${result.fg}), not the pre-gap-fill fg (${input.fg}) -- ` +
     `got ${result["on-accent"]}, expected ${freshOnAccent} (the stale formula would have produced ${staleOnAccent})`);
 }
+
+// --- btn-fg-muted (weak-text-on-fill batch, Task 1, D1/D2): the muted-tier
+// analog of btn-fg -- COMPONENTS.md §9.1 law 8 makes it the ONLY sanctioned
+// token for secondary text on a control fill. Same fgToAAMulti([btn-bg,
+// btn-hover]) shape, same two-host requirement, mirroring how the on-accent
+// tests above cover options/library and popup identically (btn-fg-muted is
+// an OUTPUT role on ALL THREE surfaces, unlike on-accent). ---
+
+// (a) CATEGORY assertion: every pilot x mode POPUP_THEME_MAP actually
+// renders, across all 3 surfaces, must clear AA on btn-fg-muted vs BOTH
+// btn-bg and btn-hover. Walks the real pilot set (POPUP_THEME_MAP, the same
+// enumeration composeOptionsThemes/composePopupThemes/composeLibraryThemes
+// themselves iterate) through the real composer pipeline for each surface --
+// composeOptionsThemeMap already existed for exactly this reason;
+// composePopupThemeMap/composeLibraryThemeMap are new exports this task adds
+// (weak-text-on-fill batch, Task 1) so popup/library get the same coverage
+// options already had for on-accent/fg-hint/fg-muted above, instead of a
+// hand-rebuilt approximation of their pipelines.
+{
+  const pilotCache = new Map();
+  const loadPilot = (slug) => {
+    if (!pilotCache.has(slug)) {
+      pilotCache.set(slug, JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${slug}.tokens.json`, import.meta.url), "utf8")));
+    }
+    return pilotCache.get(slug);
+  };
+  let assertionCount = 0;
+  for (const entry of POPUP_THEME_MAP) {
+    const tk = loadPilot(entry.pilot);
+    const surfaceMaps = {
+      options: composeOptionsThemeMap(tk, entry.mode, entry.useDarkMode).map,
+      popup: composePopupThemeMap(tk, entry.mode, entry.useDarkMode),
+      library: composeLibraryThemeMap(tk, entry.mode, entry.useDarkMode).map,
+    };
+    for (const [surface, map] of Object.entries(surfaceMaps)) {
+      for (const hostRole of ["btn-bg", "btn-hover"]) {
+        const c = ratio(map["btn-fg-muted"], map[hostRole]);
+        assertionCount++;
+        check(c >= 4.5,
+          `${surface} theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} btn-fg-muted=${map["btn-fg-muted"]} vs ${hostRole}=${map[hostRole]} = ${c.toFixed(3)}, need 4.5`);
+      }
+    }
+  }
+  // Guard against the loop silently degenerating to zero iterations.
+  check(assertionCount === POPUP_THEME_MAP.length * 3 * 2,
+    `expected ${POPUP_THEME_MAP.length * 3 * 2} (theme x surface x host) assertions, ran ${assertionCount}`);
+}
+
+// (b) LITERAL-HEX check on one adversarial palette where the RAW fg-muted is
+// well below 4.5 on btn-hover (2.04:1) -- independently computed expectation
+// (#525252), not a second call of finalizeUiControlRoles/fgToAAMulti at
+// assertion time: the value below was computed once, out of band, by running
+// fgToAAMulti(hexToRgb("#8a8a8a"), [hexToRgb("#eeeeee"), hexToRgb("#c7c7c7")])
+// and is pinned here as a literal, the same way the composer files' own
+// "derived, not guessed" DEFAULT_LIGHT comments pin a golden hex rather than
+// re-deriving it live. `overrides: { fg: true, "btn-border": ... }` freezes
+// `fg`/`btn-bg` exactly at their input literals (bypassing the fg gap-fill
+// and the btn-bg fillSeparate step, both irrelevant to this role) so the
+// only unknown is whether the new derivation matches the pinned golden
+// value; btn-hover already clears FILL_SEPARATE_MIN against btn-bg raw
+// (1.46:1), so its own fillSeparate step is identity too -- both fills that
+// matter here ship byte-identical to their inputs, verified below.
+{
+  const fgMuted = "#8a8a8a", btnBg = "#eeeeee", btnHover = "#c7c7c7";
+  check(ratio(fgMuted, btnHover) < 4.5,
+    "sanity: this adversarial fg-muted must actually fail AA on btn-hover pre-derivation, or it has stopped discriminating anything");
+  const paletteHex = { "btn-fg": "#000000", "tag-bg": "transparent", "tag-fg": "#0055aa" };
+  const inputHex = {
+    bg: "#ffffff", panel: "#ffffff", fg: "#222222", "fg-muted": fgMuted,
+    accent: "#0055aa", danger: "#bb2222", border: "#dddddd",
+    "btn-bg": btnBg, "btn-hover": btnHover, "input-bg": "#ffffff",
+  };
+  const resultHex = finalizeUiControlRoles(structuredClone(inputHex), paletteHex, {
+    fg: true, "btn-border": "#000000", "input-border": "#000000",
+  });
+  check(resultHex["btn-bg"] === btnBg && resultHex["btn-hover"] === btnHover,
+    `sanity: the frozen overrides must keep btn-bg/btn-hover verbatim, got btn-bg=${resultHex["btn-bg"]} btn-hover=${resultHex["btn-hover"]}`);
+  const expectedHex = "#525252";
+  check(resultHex["btn-fg-muted"] === expectedHex,
+    `btn-fg-muted must match the independently precomputed golden value for this adversarial palette -- got ${resultHex["btn-fg-muted"]}, expected ${expectedHex}`);
+}
+
+// (c) DISCRIMINATION proof for (a)/(b) above -- NOT a permanent part of this
+// suite. Verified manually during authorship by temporarily narrowing
+// _ui-derive.mjs's `map["btn-fg-muted"] = rgbToHex(fgToAAMulti(hexToRgb(
+// map["fg-muted"]), [btnBgRgb, btnHoverRgb]))` to derive against `[btnBgRgb]`
+// only (dropping the btn-hover host): both the category loop above (a) and
+// the literal-hex check (b) went RED, then the file was restored
+// byte-for-byte and the suite went GREEN again -- see task-1-report.md for
+// the captured RED output. Left as a comment, not code, because a
+// self-mutating test would have to un-import/re-import the module under
+// test at runtime, which this file's other tests do not do either.
 
 if (failures.length) {
   console.error(failures.map((message) => `FAIL ${message}`).join("\n"));

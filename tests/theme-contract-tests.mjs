@@ -61,7 +61,7 @@ try {
   check(outputOf(mismatchedId).includes("filename stem"),
     `filename/meta.id diagnostic must explain the mismatch:\n${outputOf(mismatchedId)}`);
 
-  for (const [surface, role] of [["options", "btn-fg"], ["popup", "spinner-fg"]]) {
+  for (const [surface, role] of [["options", "btn-fg"], ["popup", "spinner-fg"], ["options", "btn-fg-muted"], ["popup", "btn-fg-muted"], ["library", "btn-fg-muted"]]) {
     const derivedOutputPilot = structuredClone(sourcePilot);
     derivedOutputPilot.ui ??= {};
     derivedOutputPilot.ui[surface] ??= {};
