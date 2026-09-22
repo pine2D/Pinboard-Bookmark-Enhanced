@@ -256,12 +256,18 @@
 //     rows themselves), and the confirm popover. library: vocab rest state,
 //     the vocab batch-selected band, the notes batch-selected band (each
 //     opener is fail-CLOSED -- a missing target throws SETUP rather than
-//     silently scanning the wrong state). Every panel/leg opener throws
-//     `SETUP: ...` on a missing target instead of silently skipping (a
-//     shape a future selector rename could otherwise turn into a silent
-//     "0 FAIL"), and scripts/ui-render-audit.mjs prints scanned counts per
-//     (surface, theme, context) so "0 FAIL" can be told apart from "never
-//     opened".
+//     silently scanning the wrong state). options' and library's panel/leg
+//     openers all throw `SETUP: ...` on a missing target instead of
+//     silently skipping (a shape a future selector rename could otherwise
+//     turn into a silent "0 FAIL"). popup's legs instead `console.warn`:
+//     ten of the eleven hidden-leg ids are static popup.html markup
+//     (always present, just CSS-hidden, so a missing target there can't
+//     actually happen), and the eleventh -- the offline-queue ROWS, the
+//     one leg actually built at runtime from seeded data -- warns when it
+//     fails to render, mirroring runSweep's own warn for the identical
+//     condition. scripts/ui-render-audit.mjs prints scanned counts per
+//     (surface, theme, context) either way, so "0 FAIL" can be told apart
+//     from "never opened".
 //   EXEMPTIONS -- every class is a TRIGGER, not an automatic drop: a hit is
 //     only exempted once the REAL painted ratio between the scanned colour
 //     and the resolved fill (reusing contrast-audit.mjs's own `cr`) clears

@@ -1715,6 +1715,15 @@ function needsBatchBarOpen(selector) { return BATCH_BAR_SELECTORS.has(selector);
 // directly, which would exercise a path the actual UI never takes.
 function needsNoteDirty(selector) { return selector.includes("vocab-note-save"); }
 
+// The 11 DOM ids for popup's hidden-by-default state legs (feedback
+// card + its fallback action, URL warning + clean hint, presets/suggest
+// rows, batch permission card + progress bar, markdown strip, offline queue
+// list). Used verbatim by both runSweep's own hidden-states pass and family
+// 13's (weakTextOnFill) popup leg opener below -- hoisted to a single
+// source so the two lists can't silently drift apart again (confirmed
+// byte-identical before this hoist).
+const POPUP_HIDDEN_LEG_IDS = ["existing-banner", "url-warning", "url-clean-hint", "presets-row", "suggest-row", "ai-error-card", "ai-error-fallback", "batch-permission", "batch-progress", "md-actions-strip", "offline-queue-list"];
+
 // ============================================================================
 // weakTextOnFill (family 13, weak-text-on-fill batch, T5). COMPONENTS.md
 // §9.1 law 8: --{ns}-fg-hint / --{ns}-fg-muted / --{ns}-link must never paint
@@ -1915,10 +1924,21 @@ function weakTextProbe(cfg) {
   // being visible (COMPONENTS.md §9.1 law 2), so this can't paper over an
   // actual distinct colour.
   const TOL = 3;
+  // First-match-wins used to report only whichever role happened to sit
+  // first in cfg.textRoles/cfg.fillRoles, mislabeling a FAIL when more than
+  // one role's live value collapses onto the scanned colour (e.g. a theme
+  // where fg-hint and input-bg resolve identical) -- `actual=` would then
+  // name a token the failing rule never even used. Collect EVERY matching
+  // role instead, same filter+map shape identityRoles already uses below,
+  // joined with "|" so textRole/fillRole stay single string values for the
+  // dedup key and the report line. Callers that test membership against a
+  // config list (safeHostExcludeTextRoles below) must split on "|" first --
+  // a plain `===`/`.has()` on the joined string would silently stop
+  // matching once more than one role is present.
   function matchRole(rgb, targets) {
     if (!rgb) return null;
-    for (const t of targets) if (closeEnough(rgb, t.rgb, TOL)) return t.role;
-    return null;
+    const matches = targets.filter((t) => closeEnough(rgb, t.rgb, TOL)).map((t) => t.role);
+    return matches.length ? matches.join("|") : null;
   }
 
   const rootCs = getComputedStyle(document.documentElement);
@@ -2071,8 +2091,12 @@ function weakTextProbe(cfg) {
     // F4: exact equality only (no +/-3 tolerance -- that was the mechanism
     // that let an unrelated fill borrow a nearby safe host's guarantee),
     // and `link` is categorically excluded on surfaces with no "link vs
-    // <host>" row (safeHostExcludeTextRoles, popup/options).
-    const safeHostRole = safeHostExcludeTextRoles.has(textRole)
+    // <host>" row (safeHostExcludeTextRoles, popup/options). textRole
+    // may now be a "|"-joined multi-role match, so this membership test
+    // splits it and excludes if ANY matched role is on the exclude list --
+    // a plain `.has(textRole)` would miss "link" once it's joined with
+    // another role (e.g. "fg-hint|link").
+    const safeHostRole = textRole.split("|").some((r) => safeHostExcludeTextRoles.has(r))
       ? null
       : (safeHostTargets.find((t) => exactEqual(fillRgb, t.rgb))?.role || null);
 
@@ -2619,10 +2643,11 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   await recordWeakTextHits(page, "popup", theme, results, "rest");
 
   // ---- weakTextOnFill (family 13, T5 fix wave F5a): the 11 hidden-by-
-  // default popup states runSweep already knows how to reveal (~:3468),
-  // reused here rather than re-invented -- modelled on that same class-
-  // toggle list since none of these 11 legs are mutually exclusive and the
-  // sweep already established that a simultaneous unhide is a faithful
+  // default popup states runSweep already knows how to reveal
+  // (POPUP_HIDDEN_LEG_IDS, shared with runSweep so the two lists can't
+  // drift), reused here rather than re-invented -- modelled on that same
+  // class-toggle list since none of these 11 legs are mutually exclusive and
+  // the sweep already established that a simultaneous unhide is a faithful
   // rendering of each one's own recipe (they carry their own button recipes
   // -- .fc-btn, .md-strip-btn, .offline-queue-item > .actions button -- that
   // the default popup never renders, and this family had zero coverage of
@@ -2630,15 +2655,25 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   // offline-queue ROWS themselves (no class toggle can conjure them --
   // popup-offline.js only builds them inside renderList(), same reasoning
   // as runSweep's own comment on this exact click).
-  await page.evaluate(() => {
-    for (const id of ["existing-banner", "url-warning", "url-clean-hint", "presets-row", "suggest-row", "ai-error-card", "ai-error-fallback", "batch-permission", "batch-progress", "md-actions-strip", "offline-queue-list"]) {
+  await page.evaluate((ids) => {
+    for (const id of ids) {
       document.getElementById(id)?.classList.remove("hidden");
     }
     const fb = document.getElementById("ai-error-fallback");
     if (fb && !fb.textContent.trim()) fb.textContent = "Use fallback";
-  });
+  }, POPUP_HIDDEN_LEG_IDS);
   await page.evaluate(() => document.getElementById("offline-queue-toggle")?.click());
   await page.waitForSelector(".offline-queue-item, .offline-queue-empty", { timeout: TIMEOUT_MS }).catch(() => {});
+  // Behavioural fix, not a throw -- the other 10 legs are static popup.html
+  // markup that's always present just CSS-hidden, but the queue ROWS are
+  // genuinely absent whenever the fixture's offline-queue seed data is
+  // missing, the same condition runSweep already warns about (below in this
+  // file). Mirrors runSweep's own console.warn for the identical check so a
+  // missing leg is visible in the log instead of silently scanning an empty
+  // list.
+  if (!(await page.$(".offline-queue-item"))) {
+    console.warn("[render-audit] weakTextOnFill popup hidden-legs: no .offline-queue-item rendered -- the offline queue seed is missing, .offline-queue-item's fill/text pair is NOT being scanned");
+  }
   await page.waitForTimeout(150);
   await recordWeakTextHits(page, "popup", theme, results, "hidden-legs");
 
@@ -3734,13 +3769,13 @@ async function runSweep(page, sw, extBase) {
   // gate geometry, and these blocks carry their own button recipes (.fc-btn,
   // .md-strip-btn, .offline-queue-item > .actions button) that the default
   // popup never renders.
-  await page.evaluate(() => {
-    for (const id of ["existing-banner", "url-warning", "url-clean-hint", "presets-row", "suggest-row", "ai-error-card", "ai-error-fallback", "batch-permission", "batch-progress", "md-actions-strip", "offline-queue-list"]) {
+  await page.evaluate((ids) => {
+    for (const id of ids) {
       document.getElementById(id)?.classList.remove("hidden");
     }
     const fb = document.getElementById("ai-error-fallback");
     if (fb && !fb.textContent.trim()) fb.textContent = "Use fallback";
-  });
+  }, POPUP_HIDDEN_LEG_IDS);
   // ...except the queue ROWS, which no class toggle can conjure: popup-offline.js
   // builds .offline-queue-item (and its two icon-only action buttons) only inside
   // renderList(), which runs on the toggle's click -- `expanded` starts false. The
