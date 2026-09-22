@@ -656,12 +656,27 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--lib-fg);
   text-decoration: none;
+}
+.notes-row-open:hover,
+.notes-row-open:focus-visible {
+  text-decoration: underline;
 }
 /* External-link mark on the row's "leaves the page" action (dot-notation
    selector, not a --lib token: sizing only, no themed color). */
 .btn .ext-icon { width: 11px; height: 11px; vertical-align: -1px; }
-.notes-row-open .ext-icon { margin-left: var(--lib-sp-0); }
+/* Same 10px mark as options' .wayback-log-url .ext-icon -- both are a link
+   label followed by an icon glyph, not a button. Scoped here (not folded
+   into .btn .ext-icon above) because these two are plain <a>/<span>, not
+   .btn. */
+.notes-detail-source .ext-icon,
+.notes-row-open .ext-icon {
+  width: 10px;
+  height: 10px;
+  vertical-align: -1px;
+  margin-left: var(--lib-sp-1);
+}
 .notes-unknown-hint { font-size: 11px; color: var(--lib-fg-muted); margin: var(--lib-sp-2) 0 0 0; }
 .note-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: var(--lib-sp-1); }
 .note-dot.c1 { background: var(--lib-note-c1, #facc15); }
@@ -927,7 +942,21 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 .lib-block { margin: var(--lib-sp-3) 0; }
 .lib-quote { padding-left: var(--lib-sp-3); border-left: 3px solid var(--lib-quote-bar, var(--lib-border)); }
 .notes-detail-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--lib-sp-2); margin-bottom: var(--lib-sp-3); }
-.notes-detail-source { font-weight: bold; }
+/* Read as body text at rest (D4: a link-blue title over-signalled "this is
+   the important thing" when its only job is attribution); underline only
+   surfaces on interaction. `.notes-detail-source` is also a bare <span> when
+   the page has no safe href (library-notes.js:670-688) -- the hover/focus
+   rule is scoped to the <a> case only so that non-interactive fallback never
+   gains an underline that would imply it's clickable. */
+.notes-detail-source {
+  font-weight: bold;
+  color: var(--lib-fg);
+  text-decoration: none;
+}
+a.notes-detail-source:hover,
+a.notes-detail-source:focus-visible {
+  text-decoration: underline;
+}
 .notes-detail-quote {
   margin: 0;
   --lib-quote-bar: var(--hl-color, var(--lib-note-c1)); /* .lib-quote paints its bar in the highlight's colour */

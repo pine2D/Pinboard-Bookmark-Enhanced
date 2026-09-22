@@ -677,6 +677,9 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.textContent = c.articleTitle || safeHref;
+      // External-link mark, same idiom as options.js's .wayback-log-url:
+      // static PBP_ICONS constant (already aria-hidden), never page content.
+      link.insertAdjacentHTML("beforeend", PBP_ICONS.extOpen.replace('<svg ', '<svg class="ext-icon" '));
       item.appendChild(link);
     }
     frag.appendChild(item);
