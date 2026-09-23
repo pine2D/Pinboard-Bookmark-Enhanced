@@ -726,6 +726,24 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
   类名只用 `switch` / `switch-text` / `switch-track`（已登记 `ui-vocabulary.json`）；禁止
   `switch-row` / `-toggle` / `-group` 这类包装名。popup 的单次表单态复选框、存储类别勾选、tag-gov 全选
   与备份分项勾选**不是**持久化设置，继续用原生复选框（D4）。
+  **附注（诚实记账，Ruling 37 fix round）——带帮助的开关行把 `details.context-help` 塞进
+  `label.switch`（§6.1）违反 HTML 内容模型**：`<label>` 的内容模型是 phrasing content，
+  `<details>` 是 flow content / interactive content，二者不相容，这段 DOM 本身不合法。仓库接受
+  这处违规，理由四条：(a) Chrome 按原样保留这段 DOM（不重排、不静默丢弃 `<details>`）；
+  (b) 真实点击 summary 或展开的答案都不会激活 label——`<details>` 是 interactive content，HTML
+  规定 label 对交互内容后代的点击不触发其关联控件（同 §6.1 结论，已实测验证）；(c) checkbox 的
+  可访问名由 `aria-labelledby` 钉死指向文字 span，不受这段嵌套影响，summary 作为 disclosure
+  triangle 独立暴露给辅助技术；(d) 本仓库没有任何 HTML validator 门（无 vnu / html-validate /
+  htmlhint），这处违规既不会被拦截，也从未被检查过——接受它是一个记录在案的选择，不是通过了什么门。
+  未来若需要合法 DOM，替代结构是 `div.switch > input + label.switch-text[for] + details +
+  label.switch-track[for]`（`div.switch` 不再是 label，文字与轨道各自用显式 `label[for]` 接管点击
+  语义）；改这条会牵动：composer 的 `.switch` 选择器族（`ui-components.mjs` `switchRules`，现在全部
+  锚在 `label.switch >`）、role/anchor 推断的三份独立实现（`options.js` 的
+  `pbpRefreshContextHelpScriptFamilies`、`scripts/options-help-render-audit.mjs` 的 role 推断
+  块、`tests/options-context-help-tests.html` 的 `helpAnchor`/角色校验测试，三处都假定 anchor 是
+  `<label>` 而非 `<div>`）、`tests/ui-contract-tests.mjs` 里固定 DOM 子节点顺序的字面量断言、以及
+  options 搜索索引（`options.js` 里 `node.matches("label")` 分支，假设控件的可寻址目标就是那个
+  label）。成本明显大于收益（一处未被任何门检查的 HTML 语义违规），暂不做。
 - 全宽字段（表单栈里独占一行）**不受同行对齐律约束**——它没有行伴。约束只在同一 flex 行内并排时生效。
 
 ---
@@ -1260,7 +1278,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `details.disclosure` + `.disclosure-body` | 唯一折叠原语；标题 = section-title 面 + 右侧 chevron；成员自带上边线，堆叠对称 12px；正文齐平，`> :last-child` 去下 margin |
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |
 | options | `.pf` | 带边框子面板（provider 卡）：padding sp-5，radius md |
-| options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`；flex、flex-start（轨道 `margin-left:auto` 到行尾）、gap sp-3；轨道 28×16 无边框 / 滑块 12 内缩 2 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked） |
+| options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`（可选第三个子元素 `details.context-help`，夹在 `.switch-text` 与 `.switch-track` 之间——带帮助的开关行用它，Ruling 36）；flex、flex-start（轨道 `margin-left:auto` 到行尾）、gap sp-3；轨道 28×16 无边框 / 滑块 12 内缩 2 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked、details-in-label 合法性附注） |
 | popup | `.row` / `.label` / `.field` | 表单行壳（flex，padding sp-2 sp-5，gap sp-4）/ 52px 标签槽 / 控件槽（flex:1，min-width:0） |
 | popup | `.suggest-area` | chip 流容器 |
 | popup | `.divider` | 表单与快捷区之间的分隔 |

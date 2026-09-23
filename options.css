@@ -479,7 +479,24 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 .context-help-host[data-help-role="choice"] > label.switch > input[type="checkbox"] { bottom: auto; max-height: 24px; }
 label.switch > .context-help { display: contents; }
 label.switch > .context-help::details-content { flex: 0 0 100%; order: 1; min-width: 0; }
-label.switch > .context-help > .context-help-body { margin-top: var(--opt-sp-2); cursor: auto; }
+/* Text -> answer wants the baseline 4px (.context-help-host > .context-help >
+   .context-help-body, sp-2 above), but the label's own sp-1 (2px) bottom
+   padding only ever applies after the LAST flex line (closed: after line 1;
+   open: after line 2 -- flexbox padding wraps the whole content box, not
+   each line), so the closed row's nominal 20px bottom edge sits 2px ABOVE
+   line 1's real content edge. A plain margin-top: sp-2 therefore measured a
+   4px gap from line 1's edge but only a 2px gap from that nominal 20px
+   reference (Ruling 37 fix round: the answer "sat 2px below the row box").
+   Step the margin up by one and pull the label's open height back down by
+   the same step with a matching negative margin-bottom -- the open label's
+   total height is unchanged (measured 57/73.5/40.5 before and after on
+   #opt-sync-enabled / #opt-sync-api-keys / #opt-backup-include-highlights),
+   only where line 2 sits inside it moves. */
+label.switch > .context-help > .context-help-body {
+  margin-top: var(--opt-sp-3);
+  margin-bottom: calc(var(--opt-sp-1) * -1);
+  cursor: auto;
+}
 /* Text -> help target = sp-1, the host grid's column-gap the radio rows (and
    every choice row before Ruling 36) get: the label's own gap is sp-3, so
    the target steps back by the difference. */
@@ -487,6 +504,16 @@ label.switch > .context-help > .context-help-body { margin-top: var(--opt-sp-2);
 /* Anything the host holds after such a label (the Wayback permission status)
    takes a full-width row of its own, as it did when it followed <details>. */
 .context-help-host[data-help-role="choice"] > label.switch ~ * { grid-column: 1 / -1; min-width: 0; margin-top: var(--opt-sp-2); }
+/* Known gap (Ruling 37 fix round, left as-is): before Ruling 36, an open
+   answer's next sibling got sp-4 (8px) from `.context-help-host >
+   .context-help[open] + *` below. Ruling 36 moved <details> INSIDE
+   label.switch, so that selector's required direct-child relationship no
+   longer holds for switch rows and this rule's sp-2 (4px) -- (0,3,1), the
+   winning specificity regardless of open state -- is what the Wayback
+   status line (and any other trailing sibling of a switch choice row)
+   measures whether the answer is open or closed. Restoring 8px only when
+   open needs either :has() (this row's own hard rule bars it) or a JS-set
+   state class; not worth either for a LOW-severity 4px difference. */
 .context-help-section { margin: var(--opt-sp-4) 0; }   /* same margins as .section-title, so divider -> title -> content match a plain heading */
 .context-help-section > .section-title { margin: 0; }
 .context-help-host > .context-help,
@@ -1029,6 +1056,7 @@ input[type="checkbox"], input[type="radio"] {
 .switch > input:disabled ~ .switch-track, .switch > input:disabled:checked ~ .switch-track {
   background: var(--opt-btn-bg);
   color: var(--opt-fg-hint);
+  box-shadow: inset 0 0 0 1px var(--opt-border);
   cursor: default;
 }
 .switch > input:disabled ~ .switch-text {

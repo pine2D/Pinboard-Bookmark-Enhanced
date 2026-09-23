@@ -701,9 +701,15 @@ function switchRules(ns) {
     // text. The second selector restates it at (0,4,1) so a disabled-AND-
     // checked switch loses the accent by specificity, not source order; the
     // thumb keeps its translated position, so state stays legible.
+    // The borderless recipe (B') dropped the track's frame, and btn-bg reads
+    // close to panel on several themes (1.00-1.23:1) -- disabled never
+    // receives focus, so an inset ring here cannot clash with the focus
+    // ring, and it restores the same >=3:1 edge the resting `border vs
+    // panel` contrast-audit row already gates (Ruling 37 fix round).
     rule(`.switch > input:disabled ~ .switch-track, .switch > input:disabled:checked ~ .switch-track`, [
       ["background", `var(--${ns}-btn-bg)`],
       ["color", `var(--${ns}-fg-hint)`],
+      ["box-shadow", `inset 0 0 0 1px var(--${ns}-border)`],
       ["cursor", "default"],
     ]),
     rule(`.switch > input:disabled ~ .switch-text`, [["color", `var(--${ns}-fg-hint)`]]),
