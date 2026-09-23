@@ -2820,11 +2820,11 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // folded into otherChecks.
     const aiProviderChecks = checks.filter((c) => c.selector === "#opt-openai-baseurl" || c.selector === "#opt-openai-model");
     const aiBehaviorChecks = checks.filter((c) => c.selector === "#opt-ai-cache-duration");
-    // `.switch` reference instance (taste-uplift batch4 T1): #opt-tag-sort-
-    // by-pop lives on #panel-tags, display:none until #tab-tags is clicked.
-    // Its own group (run after the field-width groups below) rather than
-    // folded into tagGovChecks, which also opens the low-count <details>.
-    const switchChecks = checks.filter((c) => c.selector.includes("#opt-tag-sort-by-pop"));
+    // `.switch` rows (taste-uplift batch4 T1 reference instance + T2's one
+    // row per DOM shape): the track rows (`#id ~ .switch-track`) and the
+    // input hit-rect rows (`hitRectMin`). They live on several tabs, so the
+    // group below resolves each row's own panel instead of hard-coding one.
+    const switchChecks = checks.filter((c) => c.selector.includes(".switch-track") || c.expect?.hitRectMin);
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
       && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c));
@@ -2903,9 +2903,33 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       for (const check of aiBehaviorChecks) await runOneCheck(page, theme, check, results);
     }
     if (switchChecks.length) {
-      await page.click("#tab-tags");
-      await page.waitForSelector("#opt-tag-sort-by-pop ~ .switch-track", { state: "visible", timeout: TIMEOUT_MS });
-      for (const check of switchChecks) await runOneCheck(page, theme, check, results);
+      // Fresh navigation with the theme re-applied first (taste-uplift batch4
+      // Ruling 30, T1 review N1): the appearance group above clicks the
+      // flexoki SITE preset, whose handler re-derives documentElement's
+      // data-theme, so a switch row measured on the page it leaves behind
+      // reads flexoki's palette for most themes. Same reset the
+      // weakTextOnFill loop below does for itself. seedChecked is untouched:
+      // runOneCheck still seeds and restores each row's input.
+      const { themePresetKey: _swPresetKey, optTheme: _swMode } = themeToStorage(theme);
+      await setTheme(sw, _swPresetKey, _swMode);
+      await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
+      await page.waitForTimeout(500);
+      for (const check of switchChecks) {
+        // The row's own tab (every settings panel is display:none until its
+        // tab is clicked), then any closed non-help <details> around it (the
+        // vocabulary tab's dict-echo row sits in a closed disclosure).
+        const tabId = await page.$eval(check.selector, (el) => el.closest(".panel")?.id.replace(/^panel-/, "tab-") || null)
+          .catch(() => null);
+        if (!tabId) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: .switch row has no owning .panel`);
+        await page.click(`#${tabId}`);
+        await page.$eval(check.selector, (el) => {
+          for (let d = el.closest("details"); d; d = d.parentElement?.closest("details")) {
+            if (!d.open && !d.classList.contains("context-help")) d.querySelector(":scope > summary")?.click();
+          }
+        });
+        await page.waitForSelector(check.selector, { state: "visible", timeout: TIMEOUT_MS });
+        await runOneCheck(page, theme, check, results);
+      }
     }
 
     // ---- weakTextOnFill (family 13, T5 fix wave F1+F5a): options' own
@@ -3389,8 +3413,10 @@ const SWEEP_CFG = {
   //     exactly where most chips live (.notes-row-meta, .tag-gov-group-row).
   //     `shells` (element itself, not subtree): page-level insets that are
   //     layout dimensions (rail width, content column, scrollbar gutter math).
-  //     `derivedOffsets`: leading-column alignment (options indent = checkbox
-  //     16 + gap 4; reader note = dot 8 + gap 6 + inset 4; reader section count
+  //     `derivedOffsets`: leading-column alignment (options indent = 20px:
+  //     once the rendered 13px checkbox + 6px sp-3 gap (19, kept at 20), a
+  //     hierarchy-only offset since the settings checkboxes became .switch
+  //     rows; reader note = dot 8 + gap 6 + inset 4; reader section count
   //     = 24px button + gap; options sidebar group label = tab inset sp-5 + the
   //     tab's 2px indicator border) -- computed from a sibling's width, so never
   //     a scale value by construction. `hairline`: 1px is border compensation.

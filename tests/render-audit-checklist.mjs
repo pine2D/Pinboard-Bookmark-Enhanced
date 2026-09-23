@@ -1524,6 +1524,46 @@ export const CHECKS = [
   // it 2px each way -- 24px tall on a 20px row.
   { surface: "options", page: "options.html", selector: "#opt-tag-sort-by-pop", state: "default",
     expect: { hitRectMin: { height: 24 } } },
+
+  // ---- `.switch` rows, one per DOM shape (taste-uplift batch4 T2; the
+  // reference instance above is shape D, `.fg > label`). Each shape reaches
+  // the track through different containers -- a 20px `.choice-row` box, a
+  // help-host grid cell, a padded `.fg-stack` sub-row -- so each pins the
+  // same 32x20 off-state track and the 24px input hit rect. Off is seeded
+  // explicitly (the ids below default off, but a storage default must not be
+  // what makes the row pass). The runner's switchChecks group opens each
+  // row's own tab after a fresh, theme-applied navigation.
+  // Shape A: a plain choice row (Popup tab, "Show search bar").
+  { surface: "options", page: "options.html", selector: "#opt-show-search ~ .switch-track", state: "default",
+    seedChecked: { input: "#opt-show-search", checked: false },
+    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+  { surface: "options", page: "options.html", selector: "#opt-show-search ~ .switch-track", state: "checked",
+    seedChecked: { input: "#opt-show-search", checked: true },
+    expect: { heightPx: { value: 20 }, bgEqVar: "accent" } },
+  { surface: "options", page: "options.html", selector: "#opt-show-search", state: "default",
+    expect: { hitRectMin: { height: 24 } } },
+  // Shape B: a choice row that is also a contextual-help host (and, here,
+  // indented) -- the label fills the grid's first column, the help target
+  // takes the trailing 24px one (Archive tab, "Also archive during batch save").
+  { surface: "options", page: "options.html", selector: "#opt-wayback-batch ~ .switch-track", state: "default",
+    seedChecked: { input: "#opt-wayback-batch", checked: false },
+    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+  { surface: "options", page: "options.html", selector: "#opt-wayback-batch", state: "default",
+    expect: { hitRectMin: { height: 24 } } },
+  // Shape E1: an indented `.fg-stack` sub-row (Popup tab, URL cleanup
+  // "Aggressive mode").
+  { surface: "options", page: "options.html", selector: "#opt-urlclean-aggressive ~ .switch-track", state: "default",
+    seedChecked: { input: "#opt-urlclean-aggressive", checked: false },
+    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+  { surface: "options", page: "options.html", selector: "#opt-urlclean-aggressive", state: "default",
+    expect: { hitRectMin: { height: 24 } } },
+  // Shape E2: a `.fg-stack` sub-row inside a group help host (Quick
+  // Actions tab, batch "Auto-generate AI tags for each tab").
+  { surface: "options", page: "options.html", selector: "#batch-ai-tags ~ .switch-track", state: "default",
+    seedChecked: { input: "#batch-ai-tags", checked: false },
+    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+  { surface: "options", page: "options.html", selector: "#batch-ai-tags", state: "default",
+    expect: { hitRectMin: { height: 24 } } },
 ];
 
 // Hand-copied literal `data-theme` values, verified at authoring time with:
