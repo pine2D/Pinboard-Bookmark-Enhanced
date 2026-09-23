@@ -1293,8 +1293,10 @@ html.motion-ready .backup-import-result:not([hidden]) {
    density tokens except: the 1px .pref-row hairline (border-width, not a
    spacing token), the 96px textarea min-height + its 13px/20px font/line
    (textareas sit outside the type scale on purpose, matching the pre-stage-0
-   fixed sizing), and the 96px number-field max-width (a content cap, not a
-   spacing value). */
+   fixed sizing), the 96px number-field max-width (a content cap, not a
+   spacing value), and the radio rung's 36px min-height
+   (.pref-group-radio .pref-row > label -- a literal, not --opt-row-min-h;
+   it does not shrink under the compact tier). */
 [data-ui-stage0] .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
 [data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-4); }
 [data-ui-stage0] .pref-row + .pref-row { border-top: 1px solid var(--opt-border-section); }
