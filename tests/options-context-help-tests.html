@@ -427,6 +427,26 @@ function test(name, fn) {
     assert(ownerGap < controlGap, `answer is closer to input (${controlGap}) than label (${ownerGap})`);
   });
 
+  // Fixwave round 2 (F4 regression): the stage-0 closed-state compensator
+  // `[data-ui-stage0] .context-help-host[data-help-role="field"] >
+  // .context-help:not([open]) + *` must stop matching once the details is
+  // open, so the app-wide `.context-help-host > .context-help[open] + *`
+  // rule (options.css ~720, a flat --opt-sp-4) is the only one left to paint
+  // the gap -- a FIXED 8px in both density tiers, unlike the closed-state
+  // gap two tests above this one, which tracks --opt-label-gap (8/4).
+  test("expanded popup-width help keeps the fixed 8px open-state gap in both density tiers", () => {
+    const { details } = parts("optPopupWidthHelp");
+    const next = details.nextElementSibling;
+    assert(next?.matches(".pref-group.pref-group-radio"), "popup-width fixture lost its radio group");
+    details.open = true;
+    const comfortableGap = parseFloat(frame.contentWindow.getComputedStyle(next).marginTop);
+    assert(Math.abs(comfortableGap - 8) < 0.5, "comfortable open-state gap=" + comfortableGap);
+    doc.documentElement.dataset.density = "compact";
+    const compactGap = parseFloat(frame.contentWindow.getComputedStyle(next).marginTop);
+    assert(Math.abs(compactGap - 8) < 0.5, "compact open-state gap=" + compactGap);
+    delete doc.documentElement.dataset.density;
+  });
+
   test("coherent choice groups use the compact stack rhythm", () => {
     const groups = [
       ["opt-sync-enabled", "opt-sync-api-keys"],

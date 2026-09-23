@@ -1321,8 +1321,15 @@ html.motion-ready .backup-import-result:not([hidden]) {
 /* .pref-group is its own row-grouping shape (checkboxes, radios) and was the
    one stage-0 block with no trailing margin of its own: an entry block or
    edit area right after one sat flush against it (fixwave F2). Section-end
-   trim still comes from the :last-child rule below. */
-[data-ui-stage0] .pref-group { margin-bottom: var(--opt-sp-6); }
+   trim still comes from the :last-child rule below. Scoped to DIRECT
+   children of .settings-section only (fixwave round 2): the popup-width
+   help host also wraps a `.pref-group.pref-group-radio`, one level deeper
+   inside its `.context-help-host` grid box -- that box is `display: grid`
+   (line ~456), so a margin on its grid-item child does NOT collapse into
+   the host's own edge the way a block child's margin would. An unscoped
+   rule inflated the radio group's own trailing edge by 16px, growing the
+   whole help-host block and the gap before the next section's title. */
+[data-ui-stage0] .settings-section > .pref-group { margin-bottom: var(--opt-sp-6); }
 [data-ui-stage0] .settings-section > :last-child { margin-bottom: 0; }
 /* Second, higher-specificity selector so this wins over the themed
    `html[data-theme] .fg label.bl { color: var(--opt-fg-muted) }` override
@@ -1345,7 +1352,16 @@ html[data-theme] [data-ui-stage0] .fg label.bl {
 html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > label.bl {
   margin-bottom: 0;
 }
-[data-ui-stage0] .context-help-host[data-help-role="field"] > .context-help + * { margin-top: var(--opt-label-gap); }
+/* :not([open]) (fixwave round 2): the unqualified `.context-help + *` this
+   rule started as (0,4,0) outranked the app-wide OPEN-state invariant,
+   `.context-help-host > .context-help[open] + * { margin-top: var(--opt-sp-4); }`
+   below (0,3,0), in every state -- so an expanded answer in the compact
+   tier read 4px (--opt-label-gap) instead of that rule's documented flat
+   8px. Scoping this rule to the CLOSED state only drops it out of the
+   selector match the moment the details opens, handing the open case back
+   to the app-wide rule unopposed; the closed case (this rule's actual job)
+   is unaffected -- :not([open]) only adds specificity. */
+[data-ui-stage0] .context-help-host[data-help-role="field"] > .context-help:not([open]) + * { margin-top: var(--opt-label-gap); }
 [data-ui-stage0] .hint { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 [data-ui-stage0] .fg input[type="number"] {
   height: var(--opt-control-h); padding: 0 var(--opt-control-pad-x); font-size: var(--opt-text-body);

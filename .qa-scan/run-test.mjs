@@ -67,7 +67,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/md-video-tests.html": 516,
   "tests/offline-queue-tests.html": 22,
   "tests/options-notes-tests.html": 36,
-  "tests/options-context-help-tests.html": 19,
+  "tests/options-context-help-tests.html": 20,
   "tests/options-reset-tests.html": 14,
   "tests/options-usability-tests.html": 50,
   "tests/options-vocab-tests.html": 78,
