@@ -752,19 +752,25 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     }
   });
 
-  await test("density map: terminal/gruvbox-dark compact, others absent", async () => {
+  await test("density map: parses and every value is a valid density tier", async () => {
     // options-theme-early.js is not loaded by this fixture (its top-level
     // code reaches for `location`/matchMedia state this suite doesn't stand
     // up) -- assert against the fetched source text instead of the live
     // constant, same pattern as the options.js/options.css fetch checks
-    // above.
+    // above. This fixture only guards the map's own shape (fixwave F4):
+    // the exact KEY SET is pinned against the pilots' ui.density field by
+    // tests/ui-contract-tests.mjs (expanded through PBP_OPTIONS_ADAPTIVE_MAP,
+    // fixwave F5), which is where a compact/comfortable pilot addition or
+    // removal belongs -- enumerating theme names here just duplicates that
+    // registry check and goes stale the moment a pilot's tier changes.
     const source = await fetch("../options-theme-early.js").then((response) => response.text());
     const match = source.match(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\(\{([^}]*)\}\)/);
     assert(match, "PBP_OPTIONS_DENSITY_MAP definition not found in options-theme-early.js");
     const map = new Function(`"use strict"; return {${match[1]}};`)();
-    assert(map.terminal === "compact" && map["gruvbox-dark"] === "compact" &&
-      !("modern-card" in map) && Object.keys(map).length === 2,
-      "density map does not match the stage-0 spec: " + JSON.stringify(map));
+    const entries = Object.entries(map);
+    assert(entries.length > 0, "density map is empty");
+    assert(entries.every(([, value]) => value === "compact" || value === "comfortable"),
+      "density map has a value outside {compact, comfortable}: " + JSON.stringify(map));
   });
 
   let diagnostics = null;

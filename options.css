@@ -1380,6 +1380,17 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
   width: 100%; max-width: none; min-height: 96px; font-size: 13px; line-height: 20px;
   padding: var(--opt-sp-4) var(--opt-control-pad-x); background-color: var(--opt-panel); border-color: var(--opt-border);
 }
+/* Fixwave F2: COMPONENTS.md §10.2's `.fg.entry-block` row promises "控件占满
+   内容列（max-width: none）" for the whole primitive, but only the textarea
+   rule above implemented it -- an entry-block text/select/key-wrap control
+   was still capped by the legacy .fg 320/420/520/240 width tiers a few rules
+   up. `input:not([type="number"])` carves out the number field, which keeps
+   its own 96px content cap (fieldWidthKind, COMPONENTS.md §6.3) instead of
+   stretching to the column. The Popup tab's two current entry-blocks (shortcut
+   display, popup-width radios) have no direct input/select/.key-wrap child, so
+   this rule has nothing to match yet -- it exists as stage 2's contract, not a
+   stage-0 render change. */
+[data-ui-stage0] .entry-block > :is(input:not([type="number"]), select, .key-wrap) { max-width: none; }
 
 /* ---- Provider fields ---- */
 /* Provider fieldset: a resting container, so its edge is the hairline section

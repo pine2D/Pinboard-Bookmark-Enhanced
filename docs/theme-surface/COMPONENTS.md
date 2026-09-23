@@ -102,8 +102,17 @@ YaHei/PingFang 时行盒比 Latin 高一截，同一颗按钮在 zh-CN 和 en �
 | 图标命中区 | 24 | 24 | 24 |
 | row | 由内容撑 | 由内容撑 | 由内容撑（`.notes-hit-btn` / `.notes-card-top` / `.notes-sib`，不属于 `.btn` 族） |
 
-行盒仍由 line-height 钉死；md = 6+6+20 或 4+4+20（compact 18）+ 边框。按钮族阶段 2 切换前维持旧阶，
+新阶（comfortable / compact 两列）不再靠 line-height 拼盒：直接钉 `height: var(--opt-control-h)`
+（`box-sizing: border-box`，全局 `*` 规则已置）、内容居中对齐——`[data-ui-stage0]` 新原语已实装这套机制
+（如 `.fg input[type="number"]`：`height: var(--opt-control-h); padding: 0 var(--opt-control-pad-x)`）。
+旧阶（26/20 列，迁移期）才是 padding + line-height + 边框拼出来的：md = 4+4+16 + 边框 2 = 26，
+sm = 2+2+14 + 边框 2 = 20（§1.2 结构配方的 padding/line-height 字面值）。按钮族阶段 2 切换前维持旧阶，
 `controlRung` 迁移期按 `[data-ui-stage0]` 双契约。
+
+旧阶两档各允许一段字号区间，不是单值：**md 阶** line-height 16px、padding-block 4px，字号
+12–13px（`.btn` 12 / `.fg input` `.fg select` 13，都落回 26）；**sm 阶** line-height 14px、
+padding-block 2px，字号 11–12px（`.btn-sm` 11 / 批量条内联字段收紧到 12 时仍落回 20）——
+§6.4「sm 阶允许 11–12px」引用的正是这一档，旧阶仍在生效期内，这两行不是历史记录。
 
 ### 1.2 结构配方
 
@@ -1271,12 +1280,12 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
 | options | `.fg` | 表单组；`margin-bottom: var(--opt-rhythm)`（12px）= 组间节律的唯一主人 |
-| options | `.fg-stack` | `.fg` 修饰：peer 选项堆叠；标题 `.bl` → 首项 6px；行距 2/4px（阶段 3 退役，被 §2.3 原语取代） |
-| options | `.fg-indent` | 从属项缩进 `--opt-indent: 20px`（原为 13px 复选框 + sp-3 的文字对齐值；batch4 设置项改 `.switch` 后没有框可让，只表达层级，值保持不变；刻度外故有名，阶段 3 退役，被 §2.3 原语取代） |
+| options | `.fg-stack` | `.fg` 修饰：peer 选项堆叠；标题 `.bl` → 首项 6px；行距 2/4px（阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代） |
+| options | `.fg-indent` | 从属项缩进 `--opt-indent: 20px`（原为 13px 复选框 + sp-3 的文字对齐值；batch4 设置项改 `.switch` 后没有框可让，只表达层级，值保持不变；刻度外故有名，阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代） |
 | options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；作 `.fg` 末子元素时 `margin-top: sp-3`；作兄弟时不带 margin |
 | options | `.hint` / `.hint-warn` | 11px 辅助文字；`.fg > .hint` 距控件 sp-1；组外 `margin: sp-1 0 rhythm` |
-| options | `.section-title` | h2，13px/700，上下 sp-4；配 `.divider`（sp-6 0，1px，阶段 3 退役，被 §2.3 原语取代） |
-| options | `.choice-row` | 复选/单选行标记；在 `.fg-stack` 内行距 sp-1（阶段 3 退役，被 §2.3 原语取代） |
+| options | `.section-title` | h2，15px/600，上下 sp-4；配 `.divider`（sp-6 0，1px，阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代）；`[data-ui-stage0]` 覆盖为 16px/600（字号走 `--opt-text-section`，行高 `--opt-lh-section` 24，margin 归零改 `0 0 --opt-sp-5`，见下一行 `section.settings-section`） |
+| options | `.choice-row` | 复选/单选行标记；在 `.fg-stack` 内行距 sp-1（阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代） |
 | options | `details.disclosure` + `.disclosure-body` | 唯一折叠原语；标题 = section-title 面 + 右侧 chevron；成员自带上边线，堆叠对称 12px；正文齐平，`> :last-child` 去下 margin |
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |
 | options | `.pf` | 带边框子面板（provider 卡）：padding sp-5，radius md |

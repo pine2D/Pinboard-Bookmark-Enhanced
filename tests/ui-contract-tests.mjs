@@ -201,22 +201,56 @@ check(/html\[data-density="compact"\]\s*\{[^}]*--opt-control-h:\s*28px;[^}]*--op
   "options.css compact density overrides are not scoped under html[data-density=\"compact\"]");
 {
   // Registry-driven, not enumerated: options-theme-early.js's
-  // PBP_OPTIONS_DENSITY_MAP must name exactly the pilots that declare
-  // ui.density === "compact" (COMPONENTS.md §11) -- no more, no less. A
-  // pilot missing from the map, or a map entry with no compact pilot
-  // backing it, both fail.
+  // PBP_OPTIONS_DENSITY_MAP must name exactly the DATA-THEME TARGETS that
+  // trace back to a pilot with ui.density === "compact" (COMPONENTS.md
+  // §11) -- no more, no less. Fixwave F5: a pilot slug and a density-map
+  // key live in different spaces. The density map's keys are runtime
+  // `data-theme` targets (`flexoki-light`/`flexoki-dark`), while a pilot
+  // is named by its file slug (`flexoki`) -- an UMBRELLA slug (a key of
+  // PBP_OPTIONS_ADAPTIVE_MAP) never appears as a `data-theme` value itself;
+  // pbpApplyOptionsEarlyTheme resolves it to one of its two expanded
+  // targets before ever touching the density map. Comparing the map's keys
+  // directly against pilot slugs (the pre-fixwave version of this check)
+  // was only coincidentally correct while every compact pilot happened to
+  // be non-umbrella (terminal, gruvbox-dark): an umbrella pilot declaring
+  // compact needs BOTH its light and dark targets in the map, and a check
+  // expecting the bare slug instead would reject the only implementation
+  // that actually works at runtime -- or, worse, pass a map that added the
+  // inert bare slug instead of the two real targets.
   const pilotDir = "docs/theme-surface/pilots";
-  const compactFromPilots = readdirSync(resolve(root, pilotDir))
+  const pilots = readdirSync(resolve(root, pilotDir))
     .filter((f) => f.endsWith(".tokens.json"))
-    .map((f) => [f.replace(/\.tokens\.json$/, ""), JSON.parse(read(`${pilotDir}/${f}`))])
-    .filter(([, t]) => t.ui && t.ui.density === "compact")
-    .map(([slug]) => slug).sort();
+    .map((f) => [f.replace(/\.tokens\.json$/, ""), JSON.parse(read(`${pilotDir}/${f}`))]);
+
+  const adaptiveMapSrc = optionsThemeEarlyJs.match(/PBP_OPTIONS_ADAPTIVE_MAP\s*=\s*(\{[^;]*\});/);
+  check(adaptiveMapSrc, "PBP_OPTIONS_ADAPTIVE_MAP definition not found in options-theme-early.js");
+  const adaptiveMap = adaptiveMapSrc ? runInNewContext("(" + adaptiveMapSrc[1] + ")", {}) : {};
+  // A slug that is an umbrella key expands to its [light, dark] targets;
+  // any other slug (including a non-umbrella slug that is ITSELF a valid
+  // data-theme value) is already its own target.
+  const expandTargets = (slug) => Object.prototype.hasOwnProperty.call(adaptiveMap, slug) ? adaptiveMap[slug] : [slug];
+
+  const compactFromPilots = [...new Set(
+    pilots.filter(([, t]) => t.ui && t.ui.density === "compact").flatMap(([slug]) => expandTargets(slug))
+  )].sort();
+
   const mapSrc = optionsThemeEarlyJs.match(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\((\{[^}]*\})\)/);
-  const compactFromMap = mapSrc
-    ? Object.entries(runInNewContext("(" + mapSrc[1] + ")", {})).filter(([, v]) => v === "compact").map(([k]) => k).sort()
-    : [];
+  const densityMap = mapSrc ? runInNewContext("(" + mapSrc[1] + ")", {}) : {};
+  const compactFromMap = Object.entries(densityMap).filter(([, v]) => v === "compact").map(([k]) => k).sort();
   check(compactFromPilots.length > 0 && JSON.stringify(compactFromPilots) === JSON.stringify(compactFromMap),
-    "options-theme-early.js density map does not equal the pilots' ui.density=\"compact\" set (both directions)");
+    "options-theme-early.js density map does not equal the pilots' ui.density=\"compact\" set, expanded through PBP_OPTIONS_ADAPTIVE_MAP (both directions)");
+
+  // Second assertion (fixwave F5): every KEY of the density map must be a
+  // reachable data-theme target -- either a non-umbrella pilot slug, or one
+  // of an umbrella pilot's two expanded targets. A key naming neither (a
+  // typo, a retired preset, a bare umbrella slug that was never expanded)
+  // would sit in the map inert: pbpApplyOptionsEarlyTheme's resolved
+  // `target` never equals it, so PBP_OPTIONS_DENSITY_MAP's lookup never
+  // matches and the density silently never applies.
+  const reachableTargets = new Set(pilots.flatMap(([slug]) => expandTargets(slug)));
+  const unreachable = Object.keys(densityMap).filter((key) => !reachableTargets.has(key));
+  check(unreachable.length === 0,
+    `options-theme-early.js density map has keys that are not reachable data-theme targets: ${unreachable.join(", ")}`);
 }
 
 check(/<form[^>]*id="login-form"[^>]*class="login-body"/.test(popupHtml) &&

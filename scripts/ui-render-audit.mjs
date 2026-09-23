@@ -1466,10 +1466,11 @@ async function driveRowStates(page, extBase, theme, selector, textSelector) {
   // two states' bands both read partway toward their target instead of
   // AT it -- bandDistinct's `minDelta` then measures whatever gap two
   // still-animating fills happen to have, which can land on exactly 0 when
-  // both samples are read from the same interpolation frame. `selector` IS
-  // the element the transition lives on (band-painting rules target it
-  // directly, not an ancestor row), so settling on it settles the read.
-  const settle = async () => { await page.mouse.move(0, 0); await settleAnimations(page, selector); };
+  // both samples are read from the same interpolation frame. settleAnimations
+  // waits page-wide (F1, stage-1 fix wave), so it settles this regardless of
+  // whether the band-painting rule targets `selector` directly or an
+  // ancestor row.
+  const settle = async () => { await page.mouse.move(0, 0); await settleAnimations(page); };
   await settle();
   const samples = [await read(selector, textSelector, "rest")];
   await head.click({ modifiers: ["Control"] }); await settle();
@@ -1703,25 +1704,53 @@ async function driveGapMin(page, check) {
 // rows' bands are both still animating toward, not yet at, their distinct
 // targets. Repro: PBP_RENDER_SHARDS=1 passes deterministically; the 4-shard
 // run flakes a handful of these, different rows/themes/surfaces each run.
-// Waiting on the scope's own Animation objects instead settles exactly when
-// the transition itself reports done, independent of host load.
+// Waiting on the live Animation objects instead settles exactly when the
+// transition itself reports done, independent of host load.
 //
-// `scope` is either a CSS selector (resolved with document.querySelector
-// inside the page -- the common case: the element being read IS the element
-// whose transition just fired) or an already-resolved Playwright
-// ElementHandle/JSHandle, for callers that need to settle a DIFFERENT
-// element than the one their selector names (settleSwitchTrack below: the
-// `.switch-track` transition lives on the row wrapping the checkbox
-// seedChecked flips, not on the checkbox itself). A missing/null element
-// falls back to document.body, so a stale selector or a `.closest()` miss
-// still resolves to SOME node's getAnimations() rather than throwing.
-async function settleAnimations(page, scope) {
-  await page.evaluate((scope) => new Promise((resolve) => {
+// F1 (stage-1 fix wave, 2026-09-23): the original shipped as a `scope`-
+// scanned `target.getAnimations({ subtree: true })`, which undercounted --
+// a hover can transition an ANCESTOR of the probed element, not just the
+// element itself (options.css's `.tag-gov-group-row:hover` repaints the
+// ROW's background via `--motion-state`; the hovered child never gets its
+// own Animation object), so a subtree-only scan can resolve while that
+// ancestor transition is still mid-fade. There is no `scope` any more --
+// document.getAnimations() (page-wide, the platform API's only page-wide
+// form) is the only way to catch those, and it also makes a missing/stale
+// scope moot: every caller settles the same page, always.
+//
+// Page-wide brings in animations that are never going to finish on their
+// own: popup.css's `.submit-bar button.loading::before` spinner and
+// `.tag-skel` shimmer, options.css's `tabBusyPulse`, are all
+// infinite-iteration, so their `.finished` promise never resolves -- waiting
+// on them page-wide would hang every check that runs while a loading/busy
+// indicator happens to be live anywhere on the page. `getComputedTiming()
+// .endTime === Infinity` marks those (per the Web Animations spec, a
+// finite-iteration animation always has a finite computed endTime) and they
+// are filtered out before the Promise.all, not waited on; `playState ===
+// "idle"` filters animations that exist as objects but never actually
+// started (an idle infinite animation still reports endTime === Infinity,
+// so both checks matter independently).
+//
+// The finite-only filter is the intended guard, but it is deliberately not
+// trusted alone: a filter is exactly the kind of thing a future finding
+// could show has a gap (an animation library that reports a misleading
+// endTime, a timing edge case), and "the page hangs forever" is a far worse
+// failure mode for an audit script than "one check waited 2s it didn't
+// need." The Promise.race against a 2000ms timeout is that second,
+// independent backstop -- it should never fire in practice, but if the
+// filter above ever misses a still-running infinite animation, this is what
+// turns a hang into a bounded 2s delay instead.
+async function settleAnimations(page) {
+  await page.evaluate(() => new Promise((resolve) => {
     const settle = () => {
-      const el = typeof scope === "string" ? document.querySelector(scope) : scope;
-      const target = el || document.body;
-      const anims = target.getAnimations({ subtree: true });
-      Promise.all(anims.map((a) => a.finished.catch(() => {}))).then(resolve);
+      const anims = document.getAnimations().filter((a) => {
+        if (a.playState === "idle") return false;
+        const timing = a.effect?.getComputedTiming();
+        return timing?.endTime !== Infinity;
+      });
+      const allFinished = Promise.all(anims.map((a) => a.finished.catch(() => {})));
+      const timeout = new Promise((r) => { setTimeout(r, 2000); });
+      Promise.race([allFinished, timeout]).then(resolve);
     };
     // The write that triggered this settle (property write, classList
     // mutation, scripted focus/blur, a dispatched click) has no user
@@ -1731,29 +1760,11 @@ async function settleAnimations(page, scope) {
     // getAnimations() is asked to look for one; a single rAF still raced it
     // under shard contention during this fix's own verification.
     requestAnimationFrame(() => requestAnimationFrame(settle));
-  }), scope);
+  }));
   // Belt-and-braces, not the settle mechanism itself: keeps this on the same
   // side of "definitely done" as a fixed wait, for any consumer that reads
   // state immediately after without its own probe delay.
   await page.waitForTimeout(50);
-}
-
-// Thin wrapper (see settleAnimations above for the mechanism this shares
-// with every other state-change settle in this file): seedChecked drives a
-// `.switch` checkbox's `.checked` property directly (see the header comment
-// on the seedChecked block below), which the `.switch-track` rule reacts to
-// via `transition: background <ns>-motion-state, color <ns>-motion-state`
-// (switchRules, docs/theme-surface/composers/ui-components.mjs) -- but that
-// rule lives on the row wrapping the checkbox, not the checkbox itself, so
-// this resolves the row first and hands settleAnimations an ElementHandle
-// instead of a selector.
-async function settleSwitchTrack(page, inputSelector) {
-  const row = await page.evaluateHandle((sel) => {
-    const el = document.querySelector(sel);
-    return el?.closest("label.switch") || el?.parentElement || null;
-  }, inputSelector);
-  await settleAnimations(page, row);
-  await row.dispose();
 }
 
 async function runOneCheck(page, theme, check, results, extBase) {
@@ -1800,7 +1811,12 @@ async function runOneCheck(page, theme, check, results, extBase) {
     }, { input, checked: !!checked });
     if (prev === null) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: seedChecked input not found or not a checkbox: ${input}`);
     seedRestore = { input, checked: prev };
-    await settleSwitchTrack(page, input);
+    // The `.switch-track` transition this settles lives on the row wrapping
+    // the checkbox, not the checkbox itself (switchRules,
+    // docs/theme-surface/composers/ui-components.mjs) -- settleAnimations
+    // waits page-wide (F1, stage-1 fix wave) so that no longer needs a
+    // resolved row handle.
+    await settleAnimations(page);
   }
   if (check.state === "headerRowsFlush") {
     const { bad, worst } = await driveHeaderRows(page, check);
@@ -1897,7 +1913,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // FAILs on flexoki-light/-dark, textContrast 1.47 on terminal, all
     // reading `.btn`'s background/text mid-fade). settleAnimations waits on
     // the transition's own finished promise instead of a guessed duration.
-    await settleAnimations(page, check.selector);
+    await settleAnimations(page);
     restBgStack = await page.evaluate(({ selector }) => {
       const el = document.querySelector(selector);
       if (!el) return null;
@@ -1912,7 +1928,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // `transition: background var(--pp-motion-state), ...` means a read
     // taken in the same task as classList.add() can land mid-interpolation
     // instead of at the transition's target value.
-    await settleAnimations(page, check.selector);
+    await settleAnimations(page);
   }
   if (check.state === "focusWithin") {
     if (!check.focusTarget) throw new Error(`focusWithin check on ${check.selector} has no focusTarget`);
@@ -1951,7 +1967,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
       return document.activeElement === t;
     }, { selector: check.selector, target: check.focusTarget });
     if (!focused) throw new Error(`SETUP: could not focus "${check.focusTarget}" inside ${check.selector} (theme=${theme})`);
-    await settleAnimations(page, check.selector);
+    await settleAnimations(page);
   } else if (check.state === "hover") {
     // Real mouse hover (not a class hack): Playwright dispatches actual
     // pointer events, so the live cascade's own `:hover` pseudo-class match
@@ -1962,7 +1978,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // transition background/color for --*-motion-state; an immediate read
     // can serialize the 0% frame as transparent oklab(), making a hover
     // assertion accidentally inspect the resting paint.
-    await settleAnimations(page, check.selector);
+    await settleAnimations(page);
   } else if (check.state !== "default" && check.state !== "classState" && check.state !== "checked") {
     throw new Error(`unsupported state "${check.state}" on ${check.selector} -- extend runOneCheck() before adding non-default states to the checklist`);
   }
@@ -2011,7 +2027,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
       const el = document.querySelector(input);
       if (el) el.checked = checked;
     }, seedRestore);
-    await settleSwitchTrack(page, seedRestore.input);
+    await settleAnimations(page);
   }
   if (check.state === "classState") {
     // Same discipline as the hover-pointer reset below: leaving the class on
@@ -2035,7 +2051,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // a real difference to any assertion comparing rest against focus, and a
     // fixed wait (260ms afterwards) was still a guess about how long the
     // transition takes to finish under shard contention.
-    await settleAnimations(page, check.selector);
+    await settleAnimations(page);
   }
   if (check.state === "hover") {
     // Reset the pointer to a dead corner right after reading the hover

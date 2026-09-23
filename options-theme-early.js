@@ -10,7 +10,9 @@ const _optionsRoot = document.documentElement;
 
 // Stage-0 density tiers (spec §2, ruling R3): terminal-flavoured presets are
 // compact, everything else (incl. the default surface) is comfortable and
-// carries no attribute. Becomes a pilot field (ui.density) in stage 1.
+// carries no attribute. Mirrors the pilots' ui.density (COMPONENTS.md §11);
+// keys are data-theme TARGETS (umbrella pilots expand through
+// PBP_OPTIONS_ADAPTIVE_MAP above); pinned by tests/ui-contract-tests.mjs.
 const PBP_OPTIONS_DENSITY_MAP = Object.freeze({ "terminal": "compact", "gruvbox-dark": "compact" });
 setTimeout(() => {
   if (!_optionsRoot.dataset.optionsReady) _optionsRoot.dataset.optionsReady = "fallback";

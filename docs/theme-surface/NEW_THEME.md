@@ -181,6 +181,20 @@ fails the test. See `COMPONENTS.md` §11 for the token values each tier
 resolves to. Density is orthogonal to theme: it never changes palette or
 radius, only geometry.
 
+`PBP_OPTIONS_DENSITY_MAP`'s keys are runtime `data-theme` **targets**, not
+pilot slugs: a non-umbrella pilot's slug is already its own target, but an
+UMBRELLA pilot (§5 below) declaring `ui.density: "compact"` makes BOTH of
+its expanded targets compact (e.g. `flexoki` compact would need both
+`flexoki-light` and `flexoki-dark` as map keys, never the bare `flexoki`
+slug) — the contract test expands each compact pilot through
+`PBP_OPTIONS_ADAPTIVE_MAP` before comparing, so declare it on the pilot and
+let the test tell you the map's exact key set rather than guessing it.
+`ui.density` is also unrelated to the site theme's own density knobs —
+`layout.mode: "dense"` (composers/dense.mjs's whole-page layout variant) and
+`patterns.density` (`compact` \| `roomy` row spacing, §3 below) both shape
+the pinboard.in site theme; `ui.density` only ever reaches the extension's
+own popup/options/library surfaces.
+
 ---
 
 ## 3 · `patterns` block
