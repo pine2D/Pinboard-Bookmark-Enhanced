@@ -432,8 +432,6 @@ function test(name, fn) {
       ["opt-sync-enabled", "opt-sync-api-keys"],
       ["opt-backup-include-highlights", "opt-backup-include-vocabulary", "opt-backup-include-secrets"],
       ["notify-quick-save", "notify-read-later", "notify-tab-set", "notify-batch-save", "notify-errors"],
-      ["opt-check-bookmark-status", "opt-auto-close", "offline-queue-enabled"],
-      ["opt-show-search", "opt-show-recent", "opt-show-badge", "opt-show-suggest-tags", "opt-show-ai-summary", "opt-show-ai-tags", "opt-show-quick-links", "opt-show-quick-row"],
       ["opt-private-default", "opt-private-incognito", "opt-readlater-default"],
       ["opt-auto-description", "opt-blockquote", "opt-include-referrer"],
       ["qs-auto-notes", "qs-blockquote"],
@@ -446,11 +444,29 @@ function test(name, fn) {
       ["opt-md-include-toc", "opt-md-include-hl"],
       ["opt-wayback-enabled", "opt-wayback-batch", "opt-wayback-skip-private"],
     ];
+    // Popup panel groups (2026-09-23-ui-system-stage0 Task 2): migrated to
+    // the stage-0 row model, [data-ui-stage0] .pref-row inside .pref-group.
+    // That density is deliberately NOT the legacy compact-stack rhythm (the
+    // row model's whole point is a different, token-driven geometry), so
+    // these two groups get their own containment check below instead of
+    // joining `groups` -- folding them back in would make the shared
+    // height/step uniformity assertion compare two intentionally different
+    // rhythms and fail on the gap between them, not on a real defect.
+    const stage0Groups = [
+      ["opt-check-bookmark-status", "opt-auto-close", "offline-queue-enabled"],
+      ["opt-show-search", "opt-show-recent", "opt-show-badge", "opt-show-suggest-tags", "opt-show-ai-summary", "opt-show-ai-tags", "opt-show-quick-links", "opt-show-quick-row"],
+    ];
     groups.forEach((ids) => {
       const rows = ids.map((id) => doc.getElementById(id)?.closest(".choice-row"));
       assert(rows.every(Boolean), ids[0] + " group has an unmarked row");
       const stack = rows[0].closest(".choice-stack.fg-stack");
       assert(stack && rows.every((row) => row.parentElement === stack), ids[0] + " group is not one compact stack");
+    });
+    stage0Groups.forEach((ids) => {
+      const rows = ids.map((id) => doc.getElementById(id)?.closest(".pref-row"));
+      assert(rows.every(Boolean), ids[0] + " group has an unmarked row");
+      const stack = rows[0].closest(".pref-group");
+      assert(stack && rows.every((row) => row.parentElement === stack), ids[0] + " group is not one pref-group");
     });
     // One rhythm for every stack, help-bearing rows included. The 24px help
     // target used to size its row (a help row was 24px tall against 20px for a
@@ -458,6 +474,7 @@ function test(name, fn) {
     // group -- stepped unevenly while the all-help AI group looked fine. The
     // toggle is out of flow now; assert the property, not the old number: every
     // row on the page is the same height and every step is the same size.
+    // Scoped to `groups` (legacy compact-stack rows only) for the reason above.
     const heights = new Map();
     const steps = [];
     groups.forEach((ids) => {

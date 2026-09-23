@@ -893,6 +893,38 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(document.getElementById("tag-gov-ignored-count").textContent === "tagGovIgnoredCount:3", "count text");
   });
 
+  // Stage-0 row model (2026-09-23-ui-system-stage0 Task 2): the real
+  // options.html's #panel-popup, fetched fresh per test so a failure in one
+  // assertion doesn't cascade into the other two. No live layout is needed
+  // (structural checks only), so a DOMParser document is enough -- no iframe.
+  async function stage0PopupPanel() {
+    const html = await (await fetch("../options.html")).text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    return doc.querySelector("#panel-popup[data-ui-stage0]");
+  }
+
+  await test("stage0: popup panel carries the prototype marker and no legacy row classes", async () => {
+    const proto = await stage0PopupPanel();
+    assert(!!proto, "panel-popup is missing the data-ui-stage0 marker");
+    assert(!proto.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
+      "panel-popup still carries a legacy row/stack class");
+  });
+
+  await test("stage0: every switch in the panel sits in a .pref-row inside a .pref-group", async () => {
+    const proto = await stage0PopupPanel();
+    const switches = [...proto.querySelectorAll("label.switch")];
+    assert(switches.length === 15, "expected 15 switches in the popup panel, got " + switches.length);
+    assert(switches.every((l) => l.parentElement.classList.contains("pref-row") && l.closest(".pref-group")),
+      "every switch must sit directly in a .pref-row inside a .pref-group");
+  });
+
+  await test("stage0: every .hint in the panel still resolves a .fg owner for the search index", async () => {
+    const proto = await stage0PopupPanel();
+    const hints = [...proto.querySelectorAll(".hint")];
+    assert(hints.length > 0, "expected at least one .hint in the popup panel");
+    assert(hints.every((h) => h.closest(".choice-row,.fg")), "every .hint must resolve a .choice-row or .fg owner");
+  });
+
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";
 })();
 </script></body></html>

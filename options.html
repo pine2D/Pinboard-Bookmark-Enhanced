@@ -229,61 +229,67 @@
     </div>
 
     <!-- Tab 2: Popup -->
-    <div id="panel-popup" class="panel" role="tabpanel" aria-labelledby="tab-popup">
-      <h2 class="section-title" id="sec-popup-behavior" data-i18n="secPopupBehavior">Popup Behavior</h2>
-      <div class="fg">
-        <label class="bl" data-i18n="labelOpenPopupShortcut">Open popup shortcut</label>
-        <p class="hint">
-          <span class="shortcut-current" data-command="_execute_action"></span>
-          <a href="chrome://extensions/shortcuts" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
-        </p>
-      </div>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-popup-behavior">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-check-bookmark-status" checked /> <span class="switch-text" data-i18n="optCheckBookmarkStatus">Show bookmark status via icon (check if current page is saved)</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-auto-close" checked /> <span class="switch-text" data-i18n="optAutoClose">Auto-close popup after save</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="offline-queue-enabled" checked /> <span class="switch-text" data-i18n="optOfflineQueue">Enable offline save queue</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-      <div class="fg fg-stack context-help-host" data-help-role="field" role="group" aria-labelledby="popup-width-label">
-        <label class="bl" id="popup-width-label" data-i18n="optPopupWidthTitle">Popup width</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="optPopupWidthHelp">Range: 420–720px (Chrome popup limit)</p>
-        </details>
-        <div><label><input type="radio" name="popup-width-preset" value="450" /> <span data-i18n="optPopupWidth450">Compact (450px)</span></label></div>
-        <div><label><input type="radio" name="popup-width-preset" value="550" /> <span data-i18n="optPopupWidth550">Standard (550px)</span></label></div>
-        <div><label><input type="radio" name="popup-width-preset" value="650" /> <span data-i18n="optPopupWidth650">Wide (650px)</span></label></div>
-        <div><label><input type="radio" name="popup-width-preset" value="custom" /> <span data-i18n="optPopupWidthCustom">Custom:</span>
-          <input type="number" id="opt-popup-width-custom" min="420" max="720" step="10" /> px
-        </label></div>
-      </div>
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="optUrlCleanTitle">URL tracking parameter cleanup</h2>
-      <div class="fg"><label class="switch"><input type="checkbox" id="opt-urlclean-enabled" checked /> <span class="switch-text" data-i18n="optUrlCleanEnabled">Auto-clean URL tracking parameters</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      <div class="fg fg-stack fg-indent">
-        <div><label class="switch"><input type="checkbox" id="opt-urlclean-on-open" checked /> <span class="switch-text" data-i18n="optUrlCleanOnOpen">Clean when popup opens (silent, with undo link)</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div><label class="switch"><input type="checkbox" id="opt-urlclean-on-paste" checked /> <span class="switch-text" data-i18n="optUrlCleanOnPaste">Clean when pasting URL (toast feedback)</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div><label class="switch"><input type="checkbox" id="opt-urlclean-aggressive" /> <span class="switch-text" data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref/si/igshid and similar</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-      <div class="fg">
-        <label class="bl" for="opt-urlclean-custom" data-i18n="optUrlCleanCustom">Custom parameters (one per line, appended to default list)</label>
-        <textarea id="opt-urlclean-custom" rows="3" maxlength="2000" placeholder="utm_other&#10;custom_track_id&#10;_branch_referrer" data-i18n-placeholder="optUrlCleanCustomPlaceholder"></textarea>
-      </div>
-      <div class="fg">
-        <label class="bl" for="opt-urlclean-exclude" data-i18n="optUrlCleanExclude">Parameters that are never cleaned (one per line, e.g. tag= to keep affiliate tags)</label>
-        <textarea id="opt-urlclean-exclude" rows="3" maxlength="2000" placeholder="tag&#10;ref&#10;si" data-i18n-placeholder="optUrlCleanExcludePlaceholder"></textarea>
-      </div>
-      <div class="divider"></div>
-      <h2 class="section-title" id="sec-popup-elements" data-i18n="secPopupElements">Popup Elements</h2>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-popup-elements">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-search" /> <span class="switch-text" data-i18n="optShowSearch">Show search bar in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-recent" /> <span class="switch-text" data-i18n="optShowRecent">Show recent bookmarks in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-badge" /> <span class="switch-text" data-i18n="optShowBadge">Show unread count badge on icon</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-suggest-tags" checked /> <span class="switch-text" data-i18n="optShowSuggestTags">Show Pinboard suggested tags in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-ai-summary" checked /> <span class="switch-text" data-i18n="optShowAiSummary">Show AI summary button in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-ai-tags" checked /> <span class="switch-text" data-i18n="optShowAiTags">Show AI tags row in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-quick-links" checked /> <span class="switch-text"><span data-i18n="optShowQuickLinks">Show quick links row</span> (<span data-i18n="qlSets">Sets</span> · <span data-i18n="qlNetwork">Network</span> · <span data-i18n="qlUnread">Unread</span> · <span data-i18n="qlNotes">Notes</span> · <span data-i18n="qlPopular">Popular</span>)</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-quick-row" checked /> <span class="switch-text" data-i18n="optShowQuickRow">Show quick action buttons (Save Tabs · Batch Save · Markdown)</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
+    <div id="panel-popup" class="panel" role="tabpanel" aria-labelledby="tab-popup" data-ui-stage0>
+      <section class="settings-section" aria-labelledby="sec-popup-behavior">
+        <h2 class="section-title" id="sec-popup-behavior" data-i18n="secPopupBehavior">Popup Behavior</h2>
+        <div class="fg entry-block">
+          <label class="bl" data-i18n="labelOpenPopupShortcut">Open popup shortcut</label>
+          <p class="hint">
+            <span class="shortcut-current" data-command="_execute_action"></span>
+            <a href="chrome://extensions/shortcuts" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+          </p>
+        </div>
+        <div class="pref-group" role="group" aria-labelledby="sec-popup-behavior">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-check-bookmark-status" checked /> <span class="switch-text" data-i18n="optCheckBookmarkStatus">Show bookmark status via icon (check if current page is saved)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-auto-close" checked /> <span class="switch-text" data-i18n="optAutoClose">Auto-close popup after save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="offline-queue-enabled" checked /> <span class="switch-text" data-i18n="optOfflineQueue">Enable offline save queue</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="field" role="group" aria-labelledby="popup-width-label">
+          <label class="bl" id="popup-width-label" data-i18n="optPopupWidthTitle">Popup width</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="optPopupWidthHelp">Range: 420–720px (Chrome popup limit)</p>
+          </details>
+          <div class="pref-group pref-group-radio">
+            <div class="pref-row"><label><input type="radio" name="popup-width-preset" value="450" /> <span data-i18n="optPopupWidth450">Compact (450px)</span></label></div>
+            <div class="pref-row"><label><input type="radio" name="popup-width-preset" value="550" /> <span data-i18n="optPopupWidth550">Standard (550px)</span></label></div>
+            <div class="pref-row"><label><input type="radio" name="popup-width-preset" value="650" /> <span data-i18n="optPopupWidth650">Wide (650px)</span></label></div>
+            <div class="pref-row"><label><input type="radio" name="popup-width-preset" value="custom" /> <span data-i18n="optPopupWidthCustom">Custom:</span>
+              <input type="number" id="opt-popup-width-custom" min="420" max="720" step="10" /> px
+            </label></div>
+          </div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="optUrlCleanTitle">URL tracking parameter cleanup</h2>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-urlclean-enabled" checked /> <span class="switch-text" data-i18n="optUrlCleanEnabled">Auto-clean URL tracking parameters</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row pref-row-sub"><label class="switch"><input type="checkbox" id="opt-urlclean-on-open" checked /> <span class="switch-text" data-i18n="optUrlCleanOnOpen">Clean when popup opens (silent, with undo link)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row pref-row-sub"><label class="switch"><input type="checkbox" id="opt-urlclean-on-paste" checked /> <span class="switch-text" data-i18n="optUrlCleanOnPaste">Clean when pasting URL (toast feedback)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row pref-row-sub"><label class="switch"><input type="checkbox" id="opt-urlclean-aggressive" /> <span class="switch-text" data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref/si/igshid and similar</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg edit-area">
+          <label class="bl" for="opt-urlclean-custom" data-i18n="optUrlCleanCustom">Custom parameters (one per line, appended to default list)</label>
+          <textarea id="opt-urlclean-custom" rows="3" maxlength="2000" placeholder="utm_other&#10;custom_track_id&#10;_branch_referrer" data-i18n-placeholder="optUrlCleanCustomPlaceholder"></textarea>
+        </div>
+        <div class="fg edit-area">
+          <label class="bl" for="opt-urlclean-exclude" data-i18n="optUrlCleanExclude">Parameters that are never cleaned (one per line, e.g. tag= to keep affiliate tags)</label>
+          <textarea id="opt-urlclean-exclude" rows="3" maxlength="2000" placeholder="tag&#10;ref&#10;si" data-i18n-placeholder="optUrlCleanExcludePlaceholder"></textarea>
+        </div>
+      </section>
+      <section class="settings-section" aria-labelledby="sec-popup-elements">
+        <h2 class="section-title" id="sec-popup-elements" data-i18n="secPopupElements">Popup Elements</h2>
+        <div class="pref-group" role="group" aria-labelledby="sec-popup-elements">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-show-search" /> <span class="switch-text" data-i18n="optShowSearch">Show search bar in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-show-recent" /> <span class="switch-text" data-i18n="optShowRecent">Show recent bookmarks in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-show-badge" /> <span class="switch-text" data-i18n="optShowBadge">Show unread count badge on icon</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-show-suggest-tags" checked /> <span class="switch-text" data-i18n="optShowSuggestTags">Show Pinboard suggested tags in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-show-ai-summary" checked /> <span class="switch-text" data-i18n="optShowAiSummary">Show AI summary button in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-show-ai-tags" checked /> <span class="switch-text" data-i18n="optShowAiTags">Show AI tags row in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-show-quick-links" checked /> <span class="switch-text"><span data-i18n="optShowQuickLinks">Show quick links row</span> (<span data-i18n="qlSets">Sets</span> · <span data-i18n="qlNetwork">Network</span> · <span data-i18n="qlUnread">Unread</span> · <span data-i18n="qlNotes">Notes</span> · <span data-i18n="qlPopular">Popular</span>)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-show-quick-row" checked /> <span class="switch-text" data-i18n="optShowQuickRow">Show quick action buttons (Save Tabs · Batch Save · Markdown)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+      </section>
     </div>
 
     <!-- Tab 3: Bookmarks -->
