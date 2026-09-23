@@ -2914,6 +2914,17 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       await setTheme(sw, _swPresetKey, _swMode);
       await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
       await page.waitForTimeout(500);
+      // Guard the re-apply itself (batch4 fix round, I1): the switch rows'
+      // bgEqVar resolves the token on the SAME page it measures, so a row
+      // measured on the flexoki page the appearance group leaves behind still
+      // passes -- recorded negative control: with the three re-apply lines
+      // above removed, shard 1/4 landed on flexoki-light/-dark for all four of
+      // its themes and still reported 120 OK. Only the page's own data-theme
+      // can tell, so check it before any row runs.
+      const _swLanded = await page.evaluate(() => document.documentElement.getAttribute("data-theme") || "");
+      if (_swLanded !== theme) {
+        throw new Error(`SETUP ERROR [options|${theme}|.switch group]: page is on data-theme=${JSON.stringify(_swLanded)} -- the theme re-apply did not take, so every switch row would measure another theme's palette`);
+      }
       for (const check of switchChecks) {
         // The row's own tab (every settings panel is display:none until its
         // tab is clicked), then any closed non-help <details> around it (the

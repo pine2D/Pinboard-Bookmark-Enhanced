@@ -1510,16 +1510,16 @@ export const CHECKS = [
   // tab (scripts/ui-render-audit.mjs's switchChecks group clicks #tab-tags).
   // Its storage default is ON (shared.js tagSortByPopEnabled: true), so both
   // fill rows seed `checked` explicitly instead of trusting the default.
-  // Off: the track is the 32x20 sm-rung box resting on the Soft Fill control
-  // fill (btn-bg).
+  // Off (B', Ruling 36): a borderless 28x16 track filled with the neutral
+  // --opt-border grey (contrast-audit gates `border vs panel >= 3`).
   { surface: "options", page: "options.html", selector: "#opt-tag-sort-by-pop ~ .switch-track", state: "default",
     seedChecked: { input: "#opt-tag-sort-by-pop", checked: false },
-    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+    expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   // On: the same track repaints to accent (contrast-audit gates `accent vs
   // panel >= 3` for the fill and `on-accent vs accent` for the thumb).
   { surface: "options", page: "options.html", selector: "#opt-tag-sort-by-pop ~ .switch-track", state: "checked",
     seedChecked: { input: "#opt-tag-sort-by-pop", checked: true },
-    expect: { heightPx: { value: 20 }, bgEqVar: "accent" } },
+    expect: { heightPx: { value: 16 }, bgEqVar: "accent" } },
   // Hit target: the transparent native input covers the row and overhangs
   // it 2px each way -- 24px tall on a 20px row.
   { surface: "options", page: "options.html", selector: "#opt-tag-sort-by-pop", state: "default",
@@ -1528,50 +1528,50 @@ export const CHECKS = [
   // ---- `.switch` rows, one per DOM shape (taste-uplift batch4 T2; the
   // reference instance above is shape D, `.fg > label`). Each shape reaches
   // the track through different containers -- a 20px `.choice-row` box, a
-  // help-host grid cell, a padded `.fg-stack` sub-row -- so each pins the
-  // same 32x20 off-state track and the 24px input hit rect. Off is seeded
+  // help-host label that also holds its help, a padded `.fg-stack` sub-row --
+  // so each pins the same 28x16 off-state track and the 24px input hit rect. Off is seeded
   // explicitly (the ids below default off, but a storage default must not be
   // what makes the row pass). The runner's switchChecks group opens each
   // row's own tab after a fresh, theme-applied navigation.
   // Shape A: a plain choice row (Popup tab, "Show search bar").
   { surface: "options", page: "options.html", selector: "#opt-show-search ~ .switch-track", state: "default",
     seedChecked: { input: "#opt-show-search", checked: false },
-    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+    expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#opt-show-search ~ .switch-track", state: "checked",
     seedChecked: { input: "#opt-show-search", checked: true },
-    expect: { heightPx: { value: 20 }, bgEqVar: "accent" } },
+    expect: { heightPx: { value: 16 }, bgEqVar: "accent" } },
   { surface: "options", page: "options.html", selector: "#opt-show-search", state: "default",
     expect: { hitRectMin: { height: 24 } } },
   // Shape C3 (census E-switch-census.md: choice row + help + indent): a
   // choice row that is also a contextual-help host, indented -- the label
-  // fills the grid's first column, the help target takes the trailing 24px
-  // one (Archive tab, "Also archive during batch save").
+  // spans the host and holds its own help between the copy and the track
+  // (Ruling 36; Archive tab, "Also archive during batch save").
   { surface: "options", page: "options.html", selector: "#opt-wayback-batch ~ .switch-track", state: "default",
     seedChecked: { input: "#opt-wayback-batch", checked: false },
-    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+    expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#opt-wayback-batch", state: "default",
     expect: { hitRectMin: { height: 24 } } },
   // Shape E1: an indented `.fg-stack` sub-row (Popup tab, URL cleanup
   // "Aggressive mode").
   { surface: "options", page: "options.html", selector: "#opt-urlclean-aggressive ~ .switch-track", state: "default",
     seedChecked: { input: "#opt-urlclean-aggressive", checked: false },
-    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+    expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#opt-urlclean-aggressive", state: "default",
     expect: { hitRectMin: { height: 24 } } },
   // Shape E2: a `.fg-stack` sub-row inside a group help host (Quick
   // Actions tab, batch "Auto-generate AI tags for each tab").
   { surface: "options", page: "options.html", selector: "#batch-ai-tags ~ .switch-track", state: "default",
     seedChecked: { input: "#batch-ai-tags", checked: false },
-    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+    expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#batch-ai-tags", state: "default",
     expect: { hitRectMin: { height: 24 } } },
   // Shape F1: a plain `.fg` that is a choice help host, no stack -- the label
-  // takes its 20px box and 2px padding from the help-host rule, not from
+  // takes its 20px min box and 2px padding from the help-host rule, not from
   // `.choice-row` (Appearance tab, "Extension pages follow the Pinboard theme
   // preset"). Its default is ON, hence the explicit off seed.
   { surface: "options", page: "options.html", selector: "#opt-popup-follow-theme ~ .switch-track", state: "default",
     seedChecked: { input: "#opt-popup-follow-theme", checked: false },
-    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+    expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#opt-popup-follow-theme", state: "default",
     expect: { hitRectMin: { height: 24 } } },
 ];
