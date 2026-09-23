@@ -1290,7 +1290,11 @@ html.motion-ready .backup-import-result:not([hidden]) {
    Scoped to the prototype container. Three shapes: preference rows
    (.pref-group > .pref-row), entry blocks (.fg.entry-block) and edit areas
    (.fg.edit-area), grouped by section.settings-section. Everything reads the
-   density tokens; nothing here is a literal px except the radio row rung. */
+   density tokens except: the 1px .pref-row hairline (border-width, not a
+   spacing token), the 96px textarea min-height + its 13px/20px font/line
+   (textareas sit outside the type scale on purpose, matching the pre-stage-0
+   fixed sizing), and the 96px number-field max-width (a content cap, not a
+   spacing value). */
 [data-ui-stage0] .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
 [data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-4); }
 [data-ui-stage0] .pref-row + .pref-row { border-top: 1px solid var(--opt-border-section); }
@@ -1301,13 +1305,20 @@ html.motion-ready .backup-import-result:not([hidden]) {
 }
 [data-ui-stage0] .pref-row > label.switch { min-height: var(--opt-row-min-h); }
 [data-ui-stage0] .pref-row .switch-text { font-size: var(--opt-text-body); line-height: var(--opt-lh-body); }
-[data-ui-stage0] .pref-row input:disabled + .switch-text { opacity: 0.45; }
 [data-ui-stage0] .pref-row-sub > label { padding-left: var(--opt-indent); }
 [data-ui-stage0] .pref-group-radio .pref-row + .pref-row { border-top: 0; }
 [data-ui-stage0] .pref-group-radio .pref-row > label { min-height: 36px; padding: var(--opt-sp-2) 0; gap: var(--opt-sp-4); }
 [data-ui-stage0] .entry-block, [data-ui-stage0] .edit-area { margin-bottom: var(--opt-sp-6); }
 [data-ui-stage0] .settings-section > :last-child { margin-bottom: 0; }
-[data-ui-stage0] .fg label.bl { font-size: var(--opt-text-body); line-height: var(--opt-lh-body); color: var(--opt-fg); margin-bottom: var(--opt-sp-4); }
+/* Second, higher-specificity selector so this wins over the themed
+   `html[data-theme] .fg label.bl { color: var(--opt-fg-muted) }` override
+   below (review round 1, finding 1): (0,3,1) alone loses to that rule's
+   (0,3,2) under every preset theme. (0,4,2) here beats it regardless of
+   source order. The label stays body colour under every theme (spec §2). */
+[data-ui-stage0] .fg label.bl,
+html[data-theme] [data-ui-stage0] .fg label.bl {
+  font-size: var(--opt-text-body); line-height: var(--opt-lh-body); color: var(--opt-fg); margin-bottom: var(--opt-sp-4);
+}
 [data-ui-stage0] .hint { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 [data-ui-stage0] .fg input[type="number"] {
   height: var(--opt-control-h); padding: 0 var(--opt-control-pad-x); font-size: var(--opt-text-body);

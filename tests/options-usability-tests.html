@@ -925,6 +925,20 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(hints.every((h) => h.closest(".choice-row,.fg")), "every .hint must resolve a .choice-row or .fg owner");
   });
 
+  // Review round 1, finding 1 (IMPORTANT): the base stage-0 rule
+  // `[data-ui-stage0] .fg label.bl { color: var(--opt-fg) }` is (0,3,1) and
+  // lost to the hand-written `html[data-theme] .fg label.bl { color:
+  // var(--opt-fg-muted) }` at (0,3,2) under every preset theme. The fix adds
+  // a second, higher-specificity selector on the same rule. This suite has
+  // no live theme to compute against (no options-theme-early.js, no
+  // data-theme on <html>), so the check is text-level against the CSS
+  // source -- same pattern as "density map" above.
+  await test("stage0: the label colour rule wins under a themed <html>", async () => {
+    const css = await fetch("../options.css").then((response) => response.text());
+    const winner = /html\[data-theme\]\s+\[data-ui-stage0\]\s+\.fg\s+label\.bl\b[^{]*\{[^}]*color:\s*var\(--opt-fg\)/;
+    assert(winner.test(css), "expected a html[data-theme] [data-ui-stage0] .fg label.bl rule declaring color: var(--opt-fg)");
+  });
+
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";
 })();
 </script></body></html>
