@@ -168,6 +168,19 @@ first. See "Contrast derivation" in `README.md`.
 
 `width`, `style`, `hairline`. Defaults: `1px solid <palette.border>`.
 
+### `ui.density` (optional)
+
+Enum `"comfortable"` | `"compact"`. Omit the key to get `comfortable`. Two
+shipped pilots currently opt into `compact`: `terminal` and `gruvbox-dark`.
+The value drives `options-theme-early.js`'s first-paint
+`html[data-density="compact"]` write; a contract test
+(`tests/ui-contract-tests.mjs`) pins that script's `PBP_OPTIONS_DENSITY_MAP`
+to the same set read from the pilots, so the two must stay in sync by hand —
+a pilot that declares `compact` without a matching map entry (or vice versa)
+fails the test. See `COMPONENTS.md` §11 for the token values each tier
+resolves to. Density is orthogonal to theme: it never changes palette or
+radius, only geometry.
+
 ---
 
 ## 3 · `patterns` block

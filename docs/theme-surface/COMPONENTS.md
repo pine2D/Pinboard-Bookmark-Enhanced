@@ -89,19 +89,21 @@
 **适用**：三表面。popup 2026-08-07 起也发射本节配方（§0 有退役记录）——但 popup 侧「适用」指的是
 **配方已发射**，某颗具体按钮吃不吃得到，取决于它有没有被迁到 `class="btn"`。
 
-### 1.1 高度阶梯（三个数，不再有第四个）
+### 1.1 高度阶梯（按密度档）
 
 行盒高度由 `line-height` 钉死，**不靠 `line-height: normal`**——`normal` 随字体族浮动，中文回退到
 YaHei/PingFang 时行盒比 Latin 高一截，同一颗按钮在 zh-CN 和 en 下高度不同。声明 line-height 之后，
 字号可以在阶内浮动而高度不变，这正是「同行控件对齐」得以成立的机制。
 
-| 阶 | 计算高度 | line-height | padding-block | border | 允许字号 | 用途 |
-|---|---|---|---|---|---|---|
-| **md** | **26px** | 16px | 4px | 1px | 12–13px | 页面主按钮、表单字段、与字段并排的控件 |
-| **sm** | **20px** | 14px | 2px | 1px | 11–12px | 密集工具条、列表行内动作、详情面板内联动作 |
-| **row** | 由内容撑 | 继承 | ≥4px | 0 | 继承 | 整行可点元素（`.notes-hit-btn` / `.notes-card-top` / `.notes-sib`），不属于 `.btn` 族 |
+| 阶 | comfortable | compact | 旧（迁移期，阶段 3 前仅原型外） |
+|---|---|---|---|
+| md（字段、主按钮） | 32 | 28 | 26 |
+| sm（工具条、行内动作） | 28 | 24 | 20 |
+| 图标命中区 | 24 | 24 | 24 |
+| row | 由内容撑 | 由内容撑 | 由内容撑（`.notes-hit-btn` / `.notes-card-top` / `.notes-sib`，不属于 `.btn` 族） |
 
-高度 = padding-block×2 + line-height + border×2。md = 4+4+16+1+1 = 26；sm = 2+2+14+1+1 = 20。
+行盒仍由 line-height 钉死；md = 6+6+20 或 4+4+20（compact 18）+ 边框。按钮族阶段 2 切换前维持旧阶，
+`controlRung` 迁移期按 `[data-ui-stage0]` 双契约。
 
 ### 1.2 结构配方
 
@@ -691,7 +693,7 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
 | `rowRungEq` | 同一 flex 行内并排的 `.btn` / `.btn-sm` / `input` / `select`，两两计算高度差 ≤1px | `[render]` |
 | `controlRung` | 字段与按钮同一把尺：计算高度 ∈ {26±1（md）, 20±1（sm）}，豁免清单见 §10.4 与 `SWEEP_CFG.rung.exempt`。**这里不另立 `fieldRung`**——字段没有自己的一把尺，2026-09-15 前门表列的那一行全仓无实现 | `[render]` family 6 |
 | `fieldPairedFg` | 声明 `background-color` 的字段规则所在组件族必须声明 `color` | `[static]` |
-| `fieldWidthKind` | 字段宽度按上表内容种类分档：select 用 `widthPx.min`（≥240）+ `widthLteWith`（≤ 同面板 `.fg` 列宽的实测值，非字面数）；`.key-wrap`/`.fg-url`/纯文本/number 用 `widthPx.max`（420/520/320/96，字面天花板——`max-width` 从不把字段撑得比容器宽，窄视口下正当地测得比 `max` 窄不算 FAIL）；textarea 不设约束。评估器是 `widthPx` / `widthLteWith`（`scripts/ui-render-audit.mjs`），断言在 `tests/render-audit-checklist.mjs` | `[render]` |
+| `fieldWidthKind` | 新原语（`.entry-block` / `.edit-area`）内控件占满内容列；数字输入 96；旧 `.fg` 的 320/420/520/240 分档保留到阶段 3 退役。评估器不变。 | `[render]` |
 
 ### 6.4 使用守则
 
@@ -1269,16 +1271,23 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
 | options | `.fg` | 表单组；`margin-bottom: var(--opt-rhythm)`（12px）= 组间节律的唯一主人 |
-| options | `.fg-stack` | `.fg` 修饰：peer 选项堆叠；标题 `.bl` → 首项 6px；行距 2/4px |
-| options | `.fg-indent` | 从属项缩进 `--opt-indent: 20px`（原为 13px 复选框 + sp-3 的文字对齐值；batch4 设置项改 `.switch` 后没有框可让，只表达层级，值保持不变；刻度外故有名） |
+| options | `.fg-stack` | `.fg` 修饰：peer 选项堆叠；标题 `.bl` → 首项 6px；行距 2/4px（阶段 3 退役，被 §2.3 原语取代） |
+| options | `.fg-indent` | 从属项缩进 `--opt-indent: 20px`（原为 13px 复选框 + sp-3 的文字对齐值；batch4 设置项改 `.switch` 后没有框可让，只表达层级，值保持不变；刻度外故有名，阶段 3 退役，被 §2.3 原语取代） |
 | options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；作 `.fg` 末子元素时 `margin-top: sp-3`；作兄弟时不带 margin |
 | options | `.hint` / `.hint-warn` | 11px 辅助文字；`.fg > .hint` 距控件 sp-1；组外 `margin: sp-1 0 rhythm` |
-| options | `.section-title` | h2，13px/700，上下 sp-4；配 `.divider`（sp-6 0，1px） |
-| options | `.choice-row` | 复选/单选行标记；在 `.fg-stack` 内行距 sp-1 |
+| options | `.section-title` | h2，13px/700，上下 sp-4；配 `.divider`（sp-6 0，1px，阶段 3 退役，被 §2.3 原语取代） |
+| options | `.choice-row` | 复选/单选行标记；在 `.fg-stack` 内行距 sp-1（阶段 3 退役，被 §2.3 原语取代） |
 | options | `details.disclosure` + `.disclosure-body` | 唯一折叠原语；标题 = section-title 面 + 右侧 chevron；成员自带上边线，堆叠对称 12px；正文齐平，`> :last-child` 去下 margin |
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |
 | options | `.pf` | 带边框子面板（provider 卡）：padding sp-5，radius md |
 | options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`（可选第三个子元素 `details.context-help`，夹在 `.switch-text` 与 `.switch-track` 之间——带帮助的开关行用它，Ruling 36）；flex、flex-start（轨道 `margin-left:auto` 到行尾）、gap sp-3；轨道 28×16 无边框 / 滑块 12 内缩 2 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked、details-in-label 合法性附注） |
+| options | `section.settings-section` | 分区容器；相邻分区 `margin-top: --opt-section-gap`；`> h2.section-title` 字号 `--opt-text-section`，`margin: 0 0 --opt-sp-5`（12） |
+| options | `.pref-group` | 偏好行列表；作分区直接子元素时 `margin-bottom: --opt-sp-6`；相邻 `.pref-row` 之间 1px `--opt-border-section` 分隔线（`.pref-group-radio` 无线） |
+| options | `.pref-row` | 一行 = `label`（flex、align center、gap sp-5、`min-height --opt-row-min-h`、`padding --opt-row-pad-y 0`、正文字号）；`.pref-row-sub` 左缩进 sp-7；**紧跟分区标题的首行去掉上内边距并把 min-height 减去一个 pad**（R9：标题→首行文字 = 12） |
+| options | `.pref-group-radio > .pref-row > label` | `min-height: control-h + sp-4`（40/36），`padding sp-2 0`，gap sp-4；数字输入内联 |
+| options | `.fg.entry-block` | 录入块：`label.bl`（正文字号、`--opt-fg` 色、`margin-bottom --opt-label-gap`）+ 控件占满内容列（`max-width: none`）+ 可选 `p.hint`；带帮助时 label 归 grid 宿主、`details:not([open]) + *` 承担 label-gap，展开态由全局 `[open] + *` 固定 8 |
+| options | `.fg.edit-area` | 编辑区：`label.bl` + textarea 占满（min-height 96、13px/20px、内距 sp-4 × control-pad-x） |
+| options | 控件外观 | 底 `--opt-panel`、边 `--opt-border`（≥3:1 门已有） |
 | popup | `.row` / `.label` / `.field` | 表单行壳（flex，padding sp-2 sp-5，gap sp-4）/ 52px 标签槽 / 控件槽（flex:1，min-width:0） |
 | popup | `.suggest-area` | chip 流容器 |
 | popup | `.divider` | 表单与快捷区之间的分隔 |
@@ -1312,10 +1321,10 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 
 | ID | 律 | 层 |
 |---|---|---|
-| `fgRhythm` | options `.fg` 内：`label.bl` → 控件 3–6px；任何动作行（`.fg-actions` / 裸按钮）上方 ≥4px | `[render]` family 5 |
+| `fgRhythm` | options 旧 `.fg` 内：`label.bl` → 控件 3–6px（维持至阶段 3）；任何动作行（`.fg-actions` / 裸按钮）上方 ≥4px；`[data-ui-stage0]` 新原语内 label → 控件 = `--opt-label-gap`（8/4，按密度） | `[render]` family 5 |
 | `noInlineSpacing` | 四个表面 HTML 不得出现 `style="…margin/padding/gap…"` | `[static]` layout-lint RULE 5 |
 | `vocabRegistered` | 结构类名必须在注册表或遗留基线；基线只减不增 | `[static]` ui-vocabulary-lint |
-| `controlRung` | 所有可见 `input/select/.btn`/融合壳 高度 ∈ {26±1, 20±1}；控件字面也是 px（md 13、次级 12、sm 11），em 只给正文；结构性豁免：页签 32、textarea、设置搜索框、链接态按钮、整行可点元素与状态卡、无边框色板药丸、融合内层 | `[render]` family 6 |
+| `controlRung` | 所有可见 `input/select/.btn`/融合壳 高度 ∈ {26±1, 20±1}；控件字面也是 px（md 13、次级 12、sm 11），em 只给正文；结构性豁免：页签 32、textarea、设置搜索框、链接态按钮、整行可点元素与状态卡、无边框色板药丸、融合内层；`[data-ui-stage0]` 新原语内 ∈ {control-h, control-h−4}±1 按密度（comfortable 32/28，compact 28/24） | `[render]` family 6 |
 | `headerFace` | 同表面分区标题集（options：h2 + `.disclosure > summary`；md-preview：`.rail-label` + `.rail-sec-head`）computed 面唯一 | `[render]` family 7 |
 | `actionRowGap` | 含按钮的 flex/grid 行 column-gap **= 8px**（`--opt-sp-4` / `--pp-sp-4` / `--lib-sp-2` / `--sp-2`），四表面同一值；space-between 行、页签、融合壳、图标簇、色板/chip 行、分段条豁免 | `[render]` family 8 |
 | `clusterGap` | 图标簇（library `.lib-cluster`、popup `.header-icons`、md-preview `.xp-window-actions`）column-gap **= 4px**，四表面同值；这三处是同一形状的三个名字，门锁形状、名字留在各表面 | `[render]` family 12 |
@@ -1332,6 +1341,27 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 - **扫描覆盖面**（2026-09-06 起）：sweep 不只扫静态页——阅读器会种 AI 配置、两个 Send-to 目标与按 URL 哈希键的高亮记录，然后逐个打开 explain 弹层（含词典视图、显示回答态的底栏按钮）、ask 面板、搜索/快捷键/字号弹层、高亮卡、发送菜单、确认弹层；popup 会显示默认隐藏的反馈卡、批量授权、进度条、Markdown 条、离线队列；视频工作台通过 `window.pbpVideoFixture`（md-video.js `prepareVideoSession` 的 QA 夹具入口，跳过授权与抓取）离线挂载后度量。任何「交互后才出现」的新界面都要在 `READER_SURFACES` 或 popup 状态腿里登记开启方式，否则它的控件不在门内（explain 底栏 36px 按钮就是这样漏掉的）。含 `×`（U+00D7）为唯一文字的按钮按图标键度量（命中区 ≥24）。
 - **CI 字体对齐**：CI 的 Ubuntu runner 只有 DejaVu / Liberation / Noto，本机 WSL 借到 Windows 字体，`line-height: normal` 的控件两端相差约 0.7px，恰好一边在容差内一边出界。push 前用 `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf"` 跑 sweep 或相关套件即可看到 CI 看到的几何；出界的修法永远是钉 px（height / min-height / line-height），不是改数字迁就某个字体。**这条不再是人肉仪式**（K107，2026-09-15）：`ui-render-audit.mjs` / `options-help-render-audit.mjs` 在 `FONTCONFIG_FILE` 已设置时会自跑 `checkFontconfigParity()`——校验路径是绝对路径、并用 `fc-match "Microsoft YaHei"` 确认真解析到 DejaVu Sans（conf 未加载时是 msyh.ttc）；不符即 FAIL 并点名配置路径。未设置该变量（CI 的默认路径）不触发，零行为变化。
 - 新增原语的流程：注册表登记 → 本节补一行契约 → CSS 写关系规则 → 门自然放行。顺序反过来（先写 CSS 再想名字）就是本节要消灭的路径。
+
+## 11. 密度档
+
+密度是第二根轴，与主题正交：主题只调色彩与外形（圆角），密度只管几何——字号、行高、控件高、内距、
+行间距，只有两档，由 pilot `ui.density` 声明。
+
+| 角色 / token | comfortable | compact | 出处 |
+|---|---|---|---|
+| `--opt-text-body` / `--opt-lh-body` | 14 / 20 | 13 / 18 | Firefox Acorn 15、Obsidian 15、Claude 14 → 取 14 |
+| `--opt-text-helper` / `--opt-lh-helper` | 12 / 18 | 12 / 16 | Obsidian 12 |
+| `--opt-text-section` / `--opt-lh-section` | 16 / 24 | 15 / 20 | Obsidian 16 |
+| `--opt-control-h` / `--opt-control-pad-x` | 32 / 12 | 28 / 10 | Firefox 32、Chrome 输入 32 |
+| `--opt-row-pad-y` / `--opt-row-min-h` | 12 / 44 | 8 / 36 | Chrome 设置行 ≥48、Obsidian 46 |
+| `--opt-label-gap` | 8 | 4 | Obsidian 8–12 |
+| `--opt-section-gap` | 32 | 24 | Obsidian 32 / Claude 24 |
+| 刻度 `--opt-sp-1..8` | 2/4/6/8/12/16/24/32 | 同 | 4px 网格；2/6 只用于组件内 inset |
+
+归属：pilot 字段 `ui.density`（枚举 `comfortable` | `compact`，缺省 comfortable）；当前 compact =
+`terminal`、`gruvbox-dark`。`html[data-density="compact"]` 由 options-theme-early.js 首帧写入；其映射表
+必须与 pilots 一致（契约测试从 pilots 读真值）。主题只调色彩与外形（圆角），密度不随主题自由定义，
+只有两档。
 
 ## 附录 A：人审清单（不可自动化的判断）
 
