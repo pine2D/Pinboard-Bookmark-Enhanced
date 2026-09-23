@@ -239,6 +239,23 @@
 //                      two-selector shape as heightEqWith above, on the
 //                      width axis, and sharing its compareSelector probe
 //                      slot -- a check declaring both throws SETUP.
+//   hitRectMin     -- { height?, width? }: getBoundingClientRect() of THIS
+//                      element must be at least these many px on each named
+//                      axis -- FAIL, never SKIP, on a zero-size or short
+//                      rect. hitAreaMin (family 4) only sweeps buttons; this
+//                      is the per-row form for a non-button hit target, first
+//                      used for the `.switch` primitive's transparent native
+//                      input, which overhangs its 20px row by 2px top and
+//                      bottom to reach the 24px floor (COMPONENTS.md §6.1).
+//   seedChecked    -- (row-level, not under `expect`) { input, checked }:
+//                      the runner sets `document.querySelector(input)
+//                      .checked` to this value before the probe (property
+//                      write, no change event -> no autosave) and restores
+//                      the original value afterwards. Lets one row pin a
+//                      checkbox-driven state such as the `.switch` track's
+//                      off/on fill without depending on the storage default.
+//                      state "checked" REQUIRES seedChecked.checked === true
+//                      (it is only a distinct results key for the on state).
 //   fontSizePx     -- { value, tolerancePx=0.5 }: |computed font-size (px) -
 //                      value| <= tolerancePx. For a typography rule with no
 //                      geometry law of its own, e.g. `.stag-num`'s pinned
@@ -1487,6 +1504,26 @@ export const CHECKS = [
   // the same kind; both get the identical `.fg input[type="number"]` rule.)
   { surface: "options", page: "options.html", selector: "#opt-ai-cache-duration", state: "default",
     expect: { widthPx: { max: 96 } } },
+
+  // ---- `.switch` primitive (taste-uplift batch4 T1, COMPONENTS.md §6.1 /
+  // §6.4 exception). Reference instance: #opt-tag-sort-by-pop on the Tags
+  // tab (scripts/ui-render-audit.mjs's switchChecks group clicks #tab-tags).
+  // Its storage default is ON (shared.js tagSortByPopEnabled: true), so both
+  // fill rows seed `checked` explicitly instead of trusting the default.
+  // Off: the track is the 32x20 sm-rung box resting on the Soft Fill control
+  // fill (btn-bg).
+  { surface: "options", page: "options.html", selector: "#opt-tag-sort-by-pop ~ .switch-track", state: "default",
+    seedChecked: { input: "#opt-tag-sort-by-pop", checked: false },
+    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+  // On: the same track repaints to accent (contrast-audit gates `accent vs
+  // panel >= 3` for the fill and `on-accent vs accent` for the thumb).
+  { surface: "options", page: "options.html", selector: "#opt-tag-sort-by-pop ~ .switch-track", state: "checked",
+    seedChecked: { input: "#opt-tag-sort-by-pop", checked: true },
+    expect: { heightPx: { value: 20 }, bgEqVar: "accent" } },
+  // Hit target: the transparent native input covers the row and overhangs
+  // it 2px each way -- 24px tall on a 20px row.
+  { surface: "options", page: "options.html", selector: "#opt-tag-sort-by-pop", state: "default",
+    expect: { hitRectMin: { height: 24 } } },
 ];
 
 // Hand-copied literal `data-theme` values, verified at authoring time with:

@@ -825,6 +825,23 @@ function evaluateCheck(check, raw, theme) {
   // only prove their rung indirectly via padVMin+padGteRadiusH below), but
   // COMPONENTS.md §5.1's "18px, no border" chip rung and .stag-num's
   // tabular-nums have no such proxy.
+  // hitRectMin (taste-uplift batch4 T1): a per-row minimum hit rect for a
+  // NON-button target (hitAreaMin's sweep only scans buttons) -- the
+  // `.switch` primitive's transparent native input. FAIL on a zero-size
+  // rect or a missing/unparsable bound, never SKIP.
+  if ("hitRectMin" in exp) {
+    const { height, width } = exp.hitRectMin || {};
+    const label = `h>=${height ?? "-"} w>=${width ?? "-"}`;
+    if (typeof height !== "number" && typeof width !== "number") {
+      out.push(verdict("hitRectMin", false, null, label, "hitRectMin needs a numeric height and/or width"));
+    } else if (hostZero) out.push(verdict("hitRectMin", false, null, label, zeroNote));
+    else {
+      const notes = [];
+      if (typeof height === "number" && !(raw.rect.height >= height - 0.01)) notes.push(`height ${round2(raw.rect.height)} < ${height}`);
+      if (typeof width === "number" && !(raw.rect.width >= width - 0.01)) notes.push(`width ${round2(raw.rect.width)} < ${width}`);
+      out.push(verdict("hitRectMin", notes.length === 0, `${round2(raw.rect.width)}x${round2(raw.rect.height)}`, label, notes.length ? notes.join("; ") : undefined));
+    }
+  }
   if ("heightPx" in exp) {
     const { value, tolerancePx = 1 } = exp.heightPx;
     if (hostZero) out.push(verdict("heightPx", false, null, value, zeroNote));
@@ -1631,6 +1648,28 @@ async function runOneCheck(page, theme, check, results, extBase) {
   if (check.state !== "hover") {
     await page.mouse.move(0, 0);
   }
+  // seedChecked (taste-uplift batch4 T1, render-audit-checklist.mjs header):
+  // pin a checkbox-driven state by writing the input's `.checked` property
+  // (no change event, so options.js's autosave never fires), settle past the
+  // track's --motion-state transition, and restore the original value once
+  // this check has read what it needs (see the restore after the probe).
+  let seedRestore = null;
+  if (check.state === "checked" && check.seedChecked?.checked !== true) {
+    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: state "checked" requires seedChecked: { input, checked: true }`);
+  }
+  if (check.seedChecked) {
+    const { input, checked } = check.seedChecked;
+    const prev = await page.evaluate(({ input, checked }) => {
+      const el = document.querySelector(input);
+      if (!el || el.type !== "checkbox") return null;
+      const was = el.checked;
+      el.checked = checked;
+      return was;
+    }, { input, checked: !!checked });
+    if (prev === null) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: seedChecked input not found or not a checkbox: ${input}`);
+    seedRestore = { input, checked: prev };
+    await page.waitForTimeout(260);
+  }
   if (check.state === "headerRowsFlush") {
     const { bad, worst } = await driveHeaderRows(page, check);
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
@@ -1788,7 +1827,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // can serialize the 0% frame as transparent oklab(), making a hover
     // assertion accidentally inspect the resting paint.
     await page.waitForTimeout(260);
-  } else if (check.state !== "default" && check.state !== "classState") {
+  } else if (check.state !== "default" && check.state !== "classState" && check.state !== "checked") {
     throw new Error(`unsupported state "${check.state}" on ${check.selector} -- extend runOneCheck() before adding non-default states to the checklist`);
   }
   // bgEqVar (D6/D7, Task 5): reuses the SAME extraBgVarName slot
@@ -1831,6 +1870,13 @@ async function runOneCheck(page, theme, check, results, extBase) {
   if (focusBaseline) raw.focusBaseline = focusBaseline;
   if (stabilityBaseline) raw.stabilityBaseline = stabilityBaseline;
   if (restBgStack) raw.restBgStack = restBgStack;
+  if (seedRestore) {
+    await page.evaluate(({ input, checked }) => {
+      const el = document.querySelector(input);
+      if (el) el.checked = checked;
+    }, seedRestore);
+    await page.waitForTimeout(260);
+  }
   if (check.state === "classState") {
     // Same discipline as the hover-pointer reset below: leaving the class on
     // would leak into the next check that reads this same element in its
@@ -2774,9 +2820,14 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // folded into otherChecks.
     const aiProviderChecks = checks.filter((c) => c.selector === "#opt-openai-baseurl" || c.selector === "#opt-openai-model");
     const aiBehaviorChecks = checks.filter((c) => c.selector === "#opt-ai-cache-duration");
+    // `.switch` reference instance (taste-uplift batch4 T1): #opt-tag-sort-
+    // by-pop lives on #panel-tags, display:none until #tab-tags is clicked.
+    // Its own group (run after the field-width groups below) rather than
+    // folded into tagGovChecks, which also opens the low-count <details>.
+    const switchChecks = checks.filter((c) => c.selector.includes("#opt-tag-sort-by-pop"));
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
-      && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c));
+      && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c));
     if (tagGovChecks.length) {
       // .tag-gov-chip-face lives on the "tags" tab (#panel-tags), not
       // #panel-general (the default active one on a bare goto()) -- its
@@ -2850,6 +2901,11 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       await page.click("#tab-ai-behavior");
       await page.waitForSelector("#opt-ai-cache-duration", { state: "visible", timeout: TIMEOUT_MS });
       for (const check of aiBehaviorChecks) await runOneCheck(page, theme, check, results);
+    }
+    if (switchChecks.length) {
+      await page.click("#tab-tags");
+      await page.waitForSelector("#opt-tag-sort-by-pop ~ .switch-track", { state: "visible", timeout: TIMEOUT_MS });
+      for (const check of switchChecks) await runOneCheck(page, theme, check, results);
     }
 
     // ---- weakTextOnFill (family 13, T5 fix wave F1+F5a): options' own
