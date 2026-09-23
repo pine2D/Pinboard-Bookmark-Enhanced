@@ -1676,6 +1676,46 @@ async function driveGapMin(page, check) {
   return result;
 }
 
+// settleSwitchTrack (flake fix, 2026-09-23): seedChecked drives a `.switch`
+// checkbox's `.checked` property directly (see the header comment on the
+// seedChecked block below), which the `.switch-track` rule reacts to via
+// `transition: background <ns>-motion-state, color <ns>-motion-state`
+// (switchRules, docs/theme-surface/composers/ui-components.mjs). The
+// previous discipline was a fixed `page.waitForTimeout(260)` -- long enough
+// on a single shard, but under scripts/verify.sh's up-to-4-parallel-shard
+// run the host's four Chromiums contend for the same CPU and the transition
+// can still be interpolating past 260ms wall-clock, so the very next
+// computed-style read (this check's own probe, or a later check's "default"
+// read of the same row after seedRestore un-checks it) lands mid-fade:
+// `rgb(123, 113, 172)` instead of the settled `--*-border` token, a few
+// units toward the accent. Repro: PBP_RENDER_SHARDS=1 passes 2370/2370
+// deterministically; the 4-shard run flakes a handful of
+// `.switch-track|default|bgEqVar` FAILs, different rows/themes each run.
+// Waiting on the row's own Animation objects instead settles exactly when
+// the transition itself reports done, independent of host load.
+async function settleSwitchTrack(page, inputSelector) {
+  await page.evaluate((sel) => new Promise((resolve) => {
+    const settle = () => {
+      const el = document.querySelector(sel);
+      const row = el?.closest("label.switch") || el?.parentElement || null;
+      const anims = row ? row.getAnimations({ subtree: true }) : [];
+      Promise.all(anims.map((a) => a.finished.catch(() => {}))).then(resolve);
+    };
+    // `.checked = ...` is a plain property write (no user gesture, no
+    // change event -- see the seedChecked comment below), so the transition
+    // its `:checked ~ .switch-track` selector match triggers may not be
+    // scheduled by style recalc in this same task yet. A double rAF lets
+    // recalc run and Chromium actually start the Animation before
+    // getAnimations() is asked to look for one; a single rAF still raced it
+    // under shard contention during this fix's own verification.
+    requestAnimationFrame(() => requestAnimationFrame(settle));
+  }), inputSelector);
+  // Belt-and-braces, not the settle mechanism itself: keeps this on the same
+  // side of "definitely done" as the code it replaces for any consumer that
+  // reads state immediately after without its own probe delay.
+  await page.waitForTimeout(50);
+}
+
 async function runOneCheck(page, theme, check, results, extBase) {
   // F1 (final fix wave, Ruling 29, batch-end review F1): this audit runs
   // HEADED (MV3 extensions require it -- the comment on the launch call
@@ -1720,7 +1760,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     }, { input, checked: !!checked });
     if (prev === null) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: seedChecked input not found or not a checkbox: ${input}`);
     seedRestore = { input, checked: prev };
-    await page.waitForTimeout(260);
+    await settleSwitchTrack(page, input);
   }
   if (check.state === "headerRowsFlush") {
     const { bad, worst } = await driveHeaderRows(page, check);
@@ -1927,7 +1967,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
       const el = document.querySelector(input);
       if (el) el.checked = checked;
     }, seedRestore);
-    await page.waitForTimeout(260);
+    await settleSwitchTrack(page, seedRestore.input);
   }
   if (check.state === "classState") {
     // Same discipline as the hover-pointer reset below: leaving the class on
