@@ -157,7 +157,17 @@ function test(name, fn) {
       assert(t.width >= 24 && t.height >= 24, key + " lost the 24px hit target");
       const icon = toggle.querySelector("svg")?.getBoundingClientRect();
       assert(icon && icon.width <= 14 && icon.height <= 14, key + " icon is too prominent");
-      const visualGap = icon.left - a.right;
+      // A choice row's label fills the row up to the help column (a .switch
+      // label ends with its track; the radios share that grid), so the icon
+      // sits a fixed distance after the label box, not after the copy's ink.
+      const anchorEnd = role === "choice" ? anchor.getBoundingClientRect().right : a.right;
+      const visualGap = icon.left - anchorEnd;
+      // ...and that label must reach the help column: a shrink-wrapped label
+      // parks the switch track mid-row, right after the copy.
+      if (role === "choice") {
+        const tail = host.getBoundingClientRect().right - anchorEnd;
+        if (tail < 24 || tail > 28) violations.push(key + " choice label stops " + tail + "px before the row end");
+      }
       if (visualGap < 6 || visualGap > 8) violations.push(key + " visual gap=" + visualGap);
       const iconStyle = frame.contentWindow.getComputedStyle(toggle.querySelector(".btn-ic"));
       const transformKey = role + "/" + script;

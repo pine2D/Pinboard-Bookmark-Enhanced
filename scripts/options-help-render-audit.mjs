@@ -102,6 +102,12 @@ const AUDIT_CSS = `
   [data-help-audit-scope] [data-help-audit-copy] {
     color: #000 !important;
   }
+  /* The blanket opacity reset above is for dimmed copy; a .switch row's native
+     input is transparent by contract (it overlays the whole label as the hit
+     area), and forcing it opaque paints a label-sized checkbox over the copy. */
+  [data-help-audit-scope] .switch > input {
+    opacity: 0 !important;
+  }
   [data-help-audit-scope] [data-help-audit-icon],
   [data-help-audit-scope] [data-help-audit-icon] * {
     color: #000 !important;

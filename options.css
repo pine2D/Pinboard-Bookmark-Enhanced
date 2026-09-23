@@ -43,9 +43,12 @@
   --opt-sp-7: 24px;
   /* Form-group vertical rhythm (.fg / .hint / helper blocks). */
   --opt-rhythm: var(--opt-sp-5);
-  /* Subordinate-choice indent: the parent checkbox (13px) plus the label's
-     sp-3 gap, so nested rows start under the parent's text. Derived from
-     control geometry, deliberately not a scale rung. */
+  /* Subordinate-choice indent. It was derived from the parent checkbox (13px)
+     plus the label's sp-3 gap so nested rows started under the parent's text;
+     with the settings toggles now .switch rows (text first, track at the row
+     end) there is no box to clear, and the value only encodes hierarchy --
+     kept at 20px so nesting depth reads the same as before. Deliberately not a
+     scale rung. */
   --opt-indent: 20px;
 
   /* Stacking ladder — values are the ones already shipping, named so the next
@@ -361,6 +364,11 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    context-help block). Blink floors the top half-leading, so an odd font
    height (DejaVu 15) sits 0.5px higher than a centred line box would; pinning
    every choice row keeps rows with and without a help toggle identical. */
+/* A .switch row's drawn track is 20px as well, so it fills this box exactly
+   and the row height is unchanged by the switch. The row's flex layout
+   (text start, track end) is the .switch recipe's own and is NOT repeated
+   here: the two AI-content-source radios are choice rows too, and
+   `justify-content: space-between` would push their copy to the row end. */
 .choice-row > label { height: 20px; }
 .choice-row > label > span { line-height: 16px; }
 /* The rule above also matches a .switch row's .switch-track span; that is
@@ -368,6 +376,12 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    literal stays as tests/ui-contract-tests.mjs pins it. */
 .fg-stack > div:last-child { margin-bottom: 0; }
 .fg-stack > div > label { padding: var(--opt-sp-1) 0; margin-bottom: 0; }
+/* The 2px block padding above grows a 16px text line to a 20px row. A plain
+   stacked .switch row (URL-clean and batch-AI sub-options) is already 20px --
+   the track's height -- so it drops the padding and keeps the old 20px row and
+   24px step. Choice rows keep theirs: the label's padding box is what the
+   help toggle's text baseline is calibrated against (context-help block). */
+.fg-stack > div:not(.choice-row) > label.switch { padding: 0; }
 .fg.fg-stack > .bl { margin-bottom: var(--opt-sp-3); }   /* label.bl or a div.bl title: 6px to the first option. (0,3,0) on purpose:
    the old `.fg-stack > label.bl` tied `.fg label.bl` at (0,2,1) and lost on source order, so the
    documented 6px never rendered -- every plain stack title measured 4px (2026-09-05 probe). */
@@ -423,6 +437,22 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
   margin: 0;
   justify-self: start;
 }
+/* A choice row's copy is a .switch label whose track sits at the row END, so
+   the label fills column 1 instead of shrink-wrapping (which parked the track
+   mid-row, right after the text) and the help target takes the trailing
+   24px column: text ... track | help. The two AI-content-source radios are
+   choice hosts in the same stack as a switch row; they take the same grid, so
+   the three help targets of that stack share one row-end column instead of
+   two sitting after short radio copy and one after the track. */
+.context-help-host[data-help-role="choice"] { grid-template-columns: minmax(0, 1fr) 24px; }
+.context-help-host[data-help-role="choice"] > label { justify-self: stretch; }
+/* The copy span is the host's baseline participant (see the context-help
+   block), so it sits flush with the label's content-box top. A stacked choice
+   row gets the 20px box with 2px block padding (.choice-row + .fg-stack
+   rules), which puts the 16px line box on the track's centre; the three
+   stand-alone choice hosts (.fg, no stack) take the same box so their text
+   is not 2px above the track. */
+.context-help-host[data-help-role="choice"] > label.switch { height: 20px; padding: var(--opt-sp-1) 0; }
 .context-help-section { margin: var(--opt-sp-4) 0; }   /* same margins as .section-title, so divider -> title -> content match a plain heading */
 .context-help-section > .section-title { margin: 0; }
 .context-help-host > .context-help,
@@ -1134,11 +1164,13 @@ html.motion-ready .backup-import-result:not([hidden]) {
    backup file does not carry), options.js's storage category list (a category
    measuring 0 bytes), and options.js's credential-sync toggle (settings sync
    off, which is every new profile's default). Dim reuses .btn:disabled's step
-   rather than inventing a second one. */
+   rather than inventing a second one. A choice row is now a .switch row whose
+   recipe already paints disabled copy --opt-fg-hint; `:not(.switch-text)`
+   keeps the opacity step off it so the text is not dimmed twice. */
 .backup-section-picker input:disabled + span,
 #storage-cats { margin-bottom: var(--opt-rhythm); }
 .storage-cats input:disabled + span,
-.choice-row input:disabled + span { opacity: 0.45; }
+.choice-row input:disabled + span:not(.switch-text) { opacity: 0.45; }
 .backup-section-picker input:disabled,
 .storage-cats input:disabled,
 .choice-row input:disabled { cursor: not-allowed; }
