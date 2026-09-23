@@ -619,6 +619,24 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); 
 长手属性**，让只设 `background-color` 的主题覆盖不至于抹掉箭头）与 `.fg textarea` 的等宽字体栈是页面级
 特例，**留在手写区**，不进生成区。
 
+**`.switch`（开关，options 专用；taste-uplift batch4 D3/D5/D6）**——§6.4 例外段是它存在的理由，
+配方单源在 `composers/ui-components.mjs` 的 `switchRules`（只对 `ns === "opt"` 发射）。结构：
+`label.switch > input[type=checkbox] + span.switch-text + span.switch-track`，开关在行尾（D2）。
+
+| 部件 | 几何 | token |
+|---|---|---|
+| `.switch`（label） | flex，`justify-content: space-between`，`align-items: center`，gap sp-3，`position: relative` | — |
+| `input`（第一个子元素） | `position: absolute; top/bottom: -2px; left/right: 0; opacity: 0`——铺满整行并上下各溢出 2px：20px 行上命中高 **24px**（§1.1 图标命中下限） | — |
+| `.switch-text` | `flex: 1 1 auto; min-width: 0` | 继承 |
+| `.switch-track` | **32×20**（sm 阶高），1px 边框，`--opt-radius-full` | off：`btn-bg` 底 + `border` 框；on：`accent` 底 + `accent` 框 |
+| 滑块（`.switch-track::before`） | **16×16** 圆，框内 1px 内缩；off→on 位移 **12px**（30 内宽 − 16 − 2×1） | `currentColor`：off `btn-fg`，on `on-accent`，disabled `fg-hint` |
+
+状态：hover 只改 off 轨道（`btn-hover`），on 不变；focus 画在轨道上（`borderless` 落位，见 §6.4 与
+§7.3）；disabled 轨道回 `btn-bg` + `border`、滑块与文字 `fg-hint`（WCAG 对 disabled 豁免），勾选且禁用时
+滑块保持右位，状态仍可读。滑块用 `currentColor`、轨道带 `color`，每条填充规则都在同一条规则里成对
+（§7.1）。对比度门：`btn-fg vs btn-bg`、`on-accent vs accent` 既有；`accent vs panel ≥ 3`（非文字）
+为本原语新增，options 15 块。
+
 **字段宽度按内容种类分档**（taste-uplift-batch3 T6/D2，Ruling 29 F2/F4）——`width: 100%` 基类对五种
 里的四种保持不变，只叠加一个上限（窄视口下面板列本就窄于上限时，字段仍拿基类给的全宽）：
 
@@ -680,6 +698,26 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); 
   `button, input, select, textarea`。新增控件类型时按所在文件的实际清单核对，别照抄另一个文件。
 - 不自绘 checkbox / radio。`accent-color` 一行解决主题跟随，自绘会同时丢掉原生焦点、键盘语义与
   高对比模式支持。
+- **`.switch` 例外**（2026-09-23 用户裁决 D1，batch4）。上一条原文：「不自绘 checkbox / radio。
+  `accent-color` 一行解决主题跟随，自绘会同时丢掉原生焦点、键盘语义与高对比模式支持。」`.switch`
+  是全仓**唯一**获准的自绘布尔控件，且只在守住下面四条契约时成立——每条对应上一条担心的一种丢失：
+  1. **原生 input 保留且可聚焦**：`<input type=checkbox>` 是 `label.switch` 的**第一个**子元素，只用
+     `opacity: 0` 隐藏并铺满整行（同 `.tag-gov-chip` 范式），**绝不 `display: none`**。→ 回答「丢键盘
+     语义」：Tab 仍落在真 checkbox 上，Space 仍切换 `checked`，表单、`change` 事件、自动保存、
+     `pbpOpenOptionsTarget` 聚焦与 `input:disabled + span` 变暗都照旧工作。
+  2. **焦点环画在轨道上**：`input:focus-visible ~ .switch-track` 取 `borderless` 落位（1px accent 芯 +
+     offset 2px + `--opt-focus-ring`，同 chip-face 与 `.fg` 复选框）。→ 回答「丢原生焦点」：真正持有
+     焦点的 input 是透明的，环必须转画到可见部件上，且与同页其它布尔控件同一套焦点语言。轨道的 1px
+     框在 on 态会变 accent（承载开/关语义），所以按 §7.3 第 2 条走 `borderless`，不重涂那圈框。
+  3. **forced-colors 回退**：`@media (forced-colors: active)` 下 input 恢复 `opacity: 1; position:
+     static`，轨道 `display: none`。→ 回答「丢高对比模式」：系统配色会把作者背景压平，自绘轨道的
+     开/关填充在那里不可读；此时交回系统绘制的原生复选框。
+  4. **不加 `aria-checked`**（也不加 `role="switch"`）。→ 回答「语义」：原生 checkbox 已向辅助技术
+     暴露勾选态，再叠一份 ARIA 状态只会与原生状态分叉；另外 ui-contract 的 `htmlCheckedDefault`
+     用 `/\bchecked\b/` 判默认勾选，`aria-checked="false"` 会被误判成默认开。
+  类名只用 `switch` / `switch-text` / `switch-track`（已登记 `ui-vocabulary.json`）；禁止
+  `switch-row` / `-toggle` / `-group` 这类包装名。popup 的单次表单态复选框、存储类别勾选、tag-gov 全选
+  与备份分项勾选**不是**持久化设置，继续用原生复选框（D4）。
 - 全宽字段（表单栈里独占一行）**不受同行对齐律约束**——它没有行伴。约束只在同一 flex 行内并排时生效。
 
 ---
@@ -1211,6 +1249,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `details.disclosure` + `.disclosure-body` | 唯一折叠原语；标题 = section-title 面 + 右侧 chevron；成员自带上边线，堆叠对称 12px；正文齐平，`> :last-child` 去下 margin |
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |
 | options | `.pf` | 带边框子面板（provider 卡）：padding sp-5，radius md |
+| options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`；flex、space-between、gap sp-3；轨道 32×20 / 滑块 16 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked） |
 | popup | `.row` / `.label` / `.field` | 表单行壳（flex，padding sp-2 sp-5，gap sp-4）/ 52px 标签槽 / 控件槽（flex:1，min-width:0） |
 | popup | `.suggest-area` | chip 流容器 |
 | popup | `.divider` | 表单与快捷区之间的分隔 |
