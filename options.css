@@ -63,6 +63,10 @@
   --opt-row-pad-y: var(--opt-sp-5);   /* 12 */
   --opt-row-min-h: 44px;
   --opt-section-gap: var(--opt-sp-8); /* 32 */
+  /* Label -> control gap (spec §2: 8 comfortable / 4 compact). Was a literal
+     --opt-sp-4 on the stage-0 label.bl rule in both tiers (fixwave F1) --
+     the compact fgRhythm contract expects 4, not 8. */
+  --opt-label-gap: var(--opt-sp-4);   /* 8 */
 
   /* Stacking ladder — values are the ones already shipping, named so the next
      overlay picks a rung instead of a magic number. Same semantics as popup's
@@ -195,6 +199,7 @@ html[data-density="compact"] {
   --opt-row-pad-y: var(--opt-sp-4);   /* 8 */
   --opt-row-min-h: 36px;
   --opt-section-gap: var(--opt-sp-7); /* 24 */
+  --opt-label-gap: var(--opt-sp-2);   /* 4 */
 }
 
 /* ---- Base ---- */
@@ -1293,10 +1298,12 @@ html.motion-ready .backup-import-result:not([hidden]) {
    density tokens except: the 1px .pref-row hairline (border-width, not a
    spacing token), the 96px textarea min-height + its 13px/20px font/line
    (textareas sit outside the type scale on purpose, matching the pre-stage-0
-   fixed sizing), the 96px number-field max-width (a content cap, not a
-   spacing value), and the radio rung's 36px min-height
-   (.pref-group-radio .pref-row > label -- a literal, not --opt-row-min-h;
-   it does not shrink under the compact tier). */
+   fixed sizing), and the 96px number-field max-width (a content cap, not a
+   spacing value). The radio rung's row height (.pref-group-radio .pref-row
+   > label) is calc(--opt-control-h + --opt-sp-4) -- 40 comfortable / 36
+   compact -- so the 32px number field row matches the plain radio rows
+   instead of sitting 4px taller (fixwave F5); it does shrink under the
+   compact tier, unlike --opt-row-min-h. */
 [data-ui-stage0] .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
 [data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-4); }
 [data-ui-stage0] .pref-row + .pref-row { border-top: 1px solid var(--opt-border-section); }
@@ -1309,8 +1316,13 @@ html.motion-ready .backup-import-result:not([hidden]) {
 [data-ui-stage0] .pref-row .switch-text { font-size: var(--opt-text-body); line-height: var(--opt-lh-body); }
 [data-ui-stage0] .pref-row-sub > label { padding-left: var(--opt-sp-7); }
 [data-ui-stage0] .pref-group-radio .pref-row + .pref-row { border-top: 0; }
-[data-ui-stage0] .pref-group-radio .pref-row > label { min-height: 36px; padding: var(--opt-sp-2) 0; gap: var(--opt-sp-4); }
+[data-ui-stage0] .pref-group-radio .pref-row > label { min-height: calc(var(--opt-control-h) + var(--opt-sp-4)); padding: var(--opt-sp-2) 0; gap: var(--opt-sp-4); }
 [data-ui-stage0] .entry-block, [data-ui-stage0] .edit-area { margin-bottom: var(--opt-sp-6); }
+/* .pref-group is its own row-grouping shape (checkboxes, radios) and was the
+   one stage-0 block with no trailing margin of its own: an entry block or
+   edit area right after one sat flush against it (fixwave F2). Section-end
+   trim still comes from the :last-child rule below. */
+[data-ui-stage0] .pref-group { margin-bottom: var(--opt-sp-6); }
 [data-ui-stage0] .settings-section > :last-child { margin-bottom: 0; }
 /* Second, higher-specificity selector so this wins over the themed
    `html[data-theme] .fg label.bl { color: var(--opt-fg-muted) }` override
@@ -1319,8 +1331,21 @@ html.motion-ready .backup-import-result:not([hidden]) {
    source order. The label stays body colour under every theme (spec §2). */
 [data-ui-stage0] .fg label.bl,
 html[data-theme] [data-ui-stage0] .fg label.bl {
-  font-size: var(--opt-text-body); line-height: var(--opt-lh-body); color: var(--opt-fg); margin-bottom: var(--opt-sp-4);
+  font-size: var(--opt-text-body); line-height: var(--opt-lh-body); color: var(--opt-fg); margin-bottom: var(--opt-label-gap);
 }
+/* Inside a help-host field (popup-width-label): the generic
+   `.context-help-host[data-help-role="field"] > label.bl { margin: 0; }`
+   above and this stage-0 rule share specificity (0,3,1); this rule, being
+   later in source, was winning for margin-bottom and pushing the label
+   1.5px off the "?" icon's grid-row centre (fixwave F4). Re-zero it here at
+   higher specificity, and move the label -> radio-group gap onto the
+   host's own `.context-help + *` sibling instead so it still reads
+   --opt-label-gap. */
+[data-ui-stage0] .context-help-host[data-help-role="field"] > label.bl,
+html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > label.bl {
+  margin-bottom: 0;
+}
+[data-ui-stage0] .context-help-host[data-help-role="field"] > .context-help + * { margin-top: var(--opt-label-gap); }
 [data-ui-stage0] .hint { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 [data-ui-stage0] .fg input[type="number"] {
   height: var(--opt-control-h); padding: 0 var(--opt-control-pad-x); font-size: var(--opt-text-body);

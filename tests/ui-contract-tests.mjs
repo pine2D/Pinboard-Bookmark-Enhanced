@@ -194,9 +194,10 @@ const popupTagsJs = read("popup-tags.js");
 // only guards the tokens/hook Task 2's row model will read by exact name.
 check(/--opt-sp-8:\s*32px;/.test(optionsCss) &&
   /--opt-control-h:\s*32px;/.test(optionsCss) &&
-  /--opt-row-min-h:\s*44px;/.test(optionsCss),
+  /--opt-row-min-h:\s*44px;/.test(optionsCss) &&
+  /--opt-label-gap:\s*var\(--opt-sp-4\);/.test(optionsCss),
   "options.css does not define the stage-0 density tokens on :root");
-check(/html\[data-density="compact"\]\s*\{[^}]*--opt-control-h:\s*28px;[^}]*\}/s.test(optionsCss),
+check(/html\[data-density="compact"\]\s*\{[^}]*--opt-control-h:\s*28px;[^}]*--opt-label-gap:\s*var\(--opt-sp-2\);[^}]*\}/s.test(optionsCss),
   "options.css compact density overrides are not scoped under html[data-density=\"compact\"]");
 check(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\(\{[^}]*"terminal":\s*"compact"[^}]*"gruvbox-dark":\s*"compact"/s.test(optionsThemeEarlyJs),
   "options-theme-early.js does not map terminal and gruvbox-dark to compact density");
