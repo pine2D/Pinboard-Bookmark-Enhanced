@@ -7,6 +7,11 @@ const PBP_OPTIONS_ADAPTIVE_MAP = {
 };
 
 const _optionsRoot = document.documentElement;
+
+// Stage-0 density tiers (spec §2, ruling R3): terminal-flavoured presets are
+// compact, everything else (incl. the default surface) is comfortable and
+// carries no attribute. Becomes a pilot field (ui.density) in stage 1.
+const PBP_OPTIONS_DENSITY_MAP = Object.freeze({ "terminal": "compact", "gruvbox-dark": "compact" });
 setTimeout(() => {
   if (!_optionsRoot.dataset.optionsReady) _optionsRoot.dataset.optionsReady = "fallback";
 }, 3000);
@@ -66,6 +71,13 @@ function pbpApplyOptionsEarlyTheme(mode, presetKey, follow) {
     if (_optionsRoot.dataset.theme !== target) _optionsRoot.dataset.theme = target;
   } else if ("theme" in _optionsRoot.dataset) {
     delete _optionsRoot.dataset.theme;
+  }
+  const density = target && Object.prototype.hasOwnProperty.call(PBP_OPTIONS_DENSITY_MAP, target)
+    ? PBP_OPTIONS_DENSITY_MAP[target] : "";
+  if (density) {
+    if (_optionsRoot.dataset.density !== density) _optionsRoot.dataset.density = density;
+  } else if ("density" in _optionsRoot.dataset) {
+    delete _optionsRoot.dataset.density;
   }
 }
 if (typeof window.matchMedia === "function") {

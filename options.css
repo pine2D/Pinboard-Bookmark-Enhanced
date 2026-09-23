@@ -51,6 +51,19 @@
      scale rung. */
   --opt-indent: 20px;
 
+  /* ---- Density (stage 0, spec 2026-09-23-ui-system-stage0-design §2) ----
+     Two tiers. comfortable is the default; compact is written as
+     html[data-density="compact"] by options-theme-early.js for terminal-
+     flavoured presets. Consumed only inside [data-ui-stage0] until stage 3. */
+  --opt-sp-8: 32px;
+  --opt-text-body: 14px;   --opt-lh-body: 20px;
+  --opt-text-helper: 12px; --opt-lh-helper: 18px;
+  --opt-text-section: 16px; --opt-lh-section: 24px;
+  --opt-control-h: 32px;   --opt-control-pad-x: 12px;
+  --opt-row-pad-y: var(--opt-sp-5);   /* 12 */
+  --opt-row-min-h: 44px;
+  --opt-section-gap: var(--opt-sp-8); /* 32 */
+
   /* Stacking ladder — values are the ones already shipping, named so the next
      overlay picks a rung instead of a magic number. Same semantics as popup's
      --pp-z-menu/--pp-z-popover; sticky is options-only (tag-gov footer). */
@@ -168,6 +181,20 @@
   --opt-preview-hover-bg: #f0f0f0;
   --opt-preview-content-bg: #f6f8fa;
   --opt-select-hover-bg: #f1f5f9;
+}
+
+/* Compact density tier (stage 0, spec §2, ruling R3): terminal-flavoured
+   presets only, written by options-theme-early.js's PBP_OPTIONS_DENSITY_MAP.
+   Fixed subset -- only the rungs this stage names; everything else keeps
+   inheriting the comfortable :root default. */
+html[data-density="compact"] {
+  --opt-text-body: 13px;   --opt-lh-body: 18px;
+  --opt-text-helper: 12px; --opt-lh-helper: 16px;
+  --opt-text-section: 15px; --opt-lh-section: 20px;
+  --opt-control-h: 28px;   --opt-control-pad-x: 10px;
+  --opt-row-pad-y: var(--opt-sp-4);   /* 8 */
+  --opt-row-min-h: 36px;
+  --opt-section-gap: var(--opt-sp-7); /* 24 */
 }
 
 /* ---- Base ---- */

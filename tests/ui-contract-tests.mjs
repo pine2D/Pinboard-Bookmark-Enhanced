@@ -188,6 +188,19 @@ const popupThemeEarlyJs = read("popup-theme-early.js");
 const mdPreviewThemeEarlyJs = read("md-preview-theme-early.js");
 const popupTagsJs = read("popup-tags.js");
 
+// Stage-0 density tokens (spec 2026-09-23-ui-system-stage0-design §2): the
+// comfortable tier lives on :root, compact overrides a fixed subset under
+// html[data-density="compact"]. Nothing consumes these yet (stage 3) — this
+// only guards the tokens/hook Task 2's row model will read by exact name.
+check(/--opt-sp-8:\s*32px;/.test(optionsCss) &&
+  /--opt-control-h:\s*32px;/.test(optionsCss) &&
+  /--opt-row-min-h:\s*44px;/.test(optionsCss),
+  "options.css does not define the stage-0 density tokens on :root");
+check(/html\[data-density="compact"\]\s*\{[^}]*--opt-control-h:\s*28px;[^}]*\}/s.test(optionsCss),
+  "options.css compact density overrides are not scoped under html[data-density=\"compact\"]");
+check(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\(\{[^}]*"terminal":\s*"compact"[^}]*"gruvbox-dark":\s*"compact"/s.test(optionsThemeEarlyJs),
+  "options-theme-early.js does not map terminal and gruvbox-dark to compact density");
+
 check(/<form[^>]*id="login-form"[^>]*class="login-body"/.test(popupHtml) &&
   /id="login-btn"[^>]*type="submit"[^>]*class="btn/.test(popupHtml) &&
   /id="login-error"[^>]*role="alert"[^>]*aria-live="assertive"/.test(popupHtml) &&

@@ -752,6 +752,21 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     }
   });
 
+  await test("density map: terminal/gruvbox-dark compact, others absent", async () => {
+    // options-theme-early.js is not loaded by this fixture (its top-level
+    // code reaches for `location`/matchMedia state this suite doesn't stand
+    // up) -- assert against the fetched source text instead of the live
+    // constant, same pattern as the options.js/options.css fetch checks
+    // above.
+    const source = await fetch("../options-theme-early.js").then((response) => response.text());
+    const match = source.match(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\(\{([^}]*)\}\)/);
+    assert(match, "PBP_OPTIONS_DENSITY_MAP definition not found in options-theme-early.js");
+    const map = new Function(`"use strict"; return {${match[1]}};`)();
+    assert(map.terminal === "compact" && map["gruvbox-dark"] === "compact" &&
+      !("modern-card" in map) && Object.keys(map).length === 2,
+      "density map does not match the stage-0 spec: " + JSON.stringify(map));
+  });
+
   let diagnostics = null;
   let serialized = "";
   await test("diagnostics expose useful version, feature, permission and storage categories", async () => {
