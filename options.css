@@ -1307,7 +1307,7 @@ html.motion-ready .backup-import-result:not([hidden]) {
 }
 [data-ui-stage0] .pref-row > label.switch { min-height: var(--opt-row-min-h); }
 [data-ui-stage0] .pref-row .switch-text { font-size: var(--opt-text-body); line-height: var(--opt-lh-body); }
-[data-ui-stage0] .pref-row-sub > label { padding-left: var(--opt-indent); }
+[data-ui-stage0] .pref-row-sub > label { padding-left: var(--opt-sp-7); }
 [data-ui-stage0] .pref-group-radio .pref-row + .pref-row { border-top: 0; }
 [data-ui-stage0] .pref-group-radio .pref-row > label { min-height: 36px; padding: var(--opt-sp-2) 0; gap: var(--opt-sp-4); }
 [data-ui-stage0] .entry-block, [data-ui-stage0] .edit-area { margin-bottom: var(--opt-sp-6); }

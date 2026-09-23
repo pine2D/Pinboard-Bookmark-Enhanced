@@ -560,6 +560,13 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     // proxy for native-control (scrollbar/spinner) rendering mode, which has
     // no pixel-level probe of its own (Task 6).
     rootColorScheme: getComputedStyle(document.documentElement).colorScheme,
+    // density (Task 3, ui-system-stage0-design §4): same live-read pattern as
+    // rootColorScheme above. A handful of stage-0 tokens (--opt-control-h /
+    // --opt-row-min-h / --opt-text-body) redefine under
+    // html[data-density="compact"], so a literal px spec that targets one of
+    // them has to know which tier is live to pick the right number (see
+    // resolvePxSpec in evaluateCheck below).
+    density: document.documentElement.dataset.density === "compact" ? "compact" : "comfortable",
     paddingLeft: parseFloat(cs.paddingLeft) || 0,
     paddingRight: parseFloat(cs.paddingRight) || 0,
     paddingTop: parseFloat(cs.paddingTop) || 0,
@@ -581,6 +588,15 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     radiusVarPx: radiusVarName ? (parseFloat(getComputedStyle(document.documentElement).getPropertyValue(radiusVarName)) || 0) : null,
     borderBottomColor: cs.borderBottomColor,
     borderBottomWidth: parseFloat(cs.borderBottomWidth) || 0,
+    // borderTopWidth / minHeight (Task 3, ui-system-stage0-design §4): the
+    // stage-0 pref-row hairline lives on border-TOP (borderBottomWidth above
+    // already serves the tab-underline check, a different element); minHeight
+    // backs minHeightPx, which must read the CSS min-height PROPERTY itself,
+    // not the rendered box height heightPx/hitRectMin already read off
+    // raw.rect -- a pref-row label pinned by min-height can still grow past
+    // the floor for a long/wrapped copy without failing that check.
+    borderTopWidth: parseFloat(cs.borderTopWidth) || 0,
+    minHeight: parseFloat(cs.minHeight) || 0,
     // heightPx / fontSizePx / fontVariantNumericContains (D6/D7, Task 5,
     // taste-uplift batch3): the chip family has no literal geometry/
     // typography assertion anywhere in this evaluator today -- every prior
@@ -618,6 +634,22 @@ function evaluateCheck(check, raw, theme) {
   // known-failures normally -- it is not a silent skip).
   const hostZero = raw.rect.width === 0 || raw.rect.height === 0;
   const zeroNote = "zero-size element (width or height is 0) -- not actually rendered/visible; fixture setup or a display:none regression";
+  // resolvePxSpec (Task 3, ui-system-stage0-design §4): a literal geometry
+  // spec is normally { value, tolerancePx } -- a fixed target regardless of
+  // theme, same discipline the file-header note above describes for every
+  // OTHER expect key. A few stage-0 rows are the one genuine exception: they
+  // read a CSS token that itself redefines under html[data-density="compact"]
+  // (--opt-control-h / --opt-row-min-h / --opt-text-body), so their spec
+  // carries { comfortable, compact, tolerancePx } instead and this picks the
+  // live tier off raw.density (probeSelector's own live read, same pattern
+  // colorSchemeMatchesTheme's raw.rootColorScheme already uses). A spec with
+  // `value` always wins -- existing heightPx/fontSizePx entries that predate
+  // this key are untouched.
+  function resolvePxSpec(spec, defaultTolerancePx) {
+    const tolerancePx = spec.tolerancePx ?? defaultTolerancePx;
+    const value = "value" in spec ? spec.value : (raw.density === "compact" ? spec.compact : spec.comfortable);
+    return { value, tolerancePx };
+  }
 
   if ("textContrast" in exp) {
     if (disabledSkip) out.push(skip("textContrast", exp.textContrast, "disabled (WCAG 1.4.3 exempt)"));
@@ -843,9 +875,29 @@ function evaluateCheck(check, raw, theme) {
     }
   }
   if ("heightPx" in exp) {
-    const { value, tolerancePx = 1 } = exp.heightPx;
+    const { value, tolerancePx } = resolvePxSpec(exp.heightPx, 1);
     if (hostZero) out.push(verdict("heightPx", false, null, value, zeroNote));
     else out.push(verdict("heightPx", Math.abs(raw.rect.height - value) <= tolerancePx, round2(raw.rect.height), value));
+  }
+  // minHeightPx (Task 3, ui-system-stage0-design §4): the CSS computed
+  // min-height PROPERTY itself, not the rendered box height heightPx reads
+  // off raw.rect above -- the stage-0 pref-row label is pinned by
+  // min-height, so a wrapped (long) label can still grow past the floor
+  // without failing this check the way a literal heightPx target would.
+  if ("minHeightPx" in exp) {
+    const { value, tolerancePx } = resolvePxSpec(exp.minHeightPx, 1);
+    if (hostZero) out.push(verdict("minHeightPx", false, null, value, zeroNote));
+    else out.push(verdict("minHeightPx", Math.abs(raw.minHeight - value) <= tolerancePx, round2(raw.minHeight), value));
+  }
+  // borderTopWidthPx (Task 3, ui-system-stage0-design §4): the stage-0
+  // pref-row hairline -- a literal 1px border-top on `.pref-row + .pref-row`
+  // siblings inside a non-radio .pref-group. Never a density token (options.
+  // css keeps it a flat `1px`, not var(--opt-*)), so this always resolves
+  // through resolvePxSpec's flat `value` path, same as heightPx above.
+  if ("borderTopWidthPx" in exp) {
+    const { value, tolerancePx } = resolvePxSpec(exp.borderTopWidthPx, 0.5);
+    if (hostZero) out.push(verdict("borderTopWidthPx", false, null, value, zeroNote));
+    else out.push(verdict("borderTopWidthPx", Math.abs(raw.borderTopWidth - value) <= tolerancePx, round2(raw.borderTopWidth), value));
   }
   // widthPx (T6, taste-uplift-batch3, D2, COMPONENTS.md §6.1): a content-kind
   // field's measured width against its tier -- unlike heightPx above (a
@@ -896,7 +948,7 @@ function evaluateCheck(check, raw, theme) {
     }
   }
   if ("fontSizePx" in exp) {
-    const { value, tolerancePx = 0.5 } = exp.fontSizePx;
+    const { value, tolerancePx } = resolvePxSpec(exp.fontSizePx, 0.5);
     out.push(verdict("fontSizePx", Math.abs(raw.fontSize - value) <= tolerancePx, round2(raw.fontSize), value));
   }
   if ("fontVariantNumericContains" in exp) {
@@ -2824,7 +2876,14 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // row per DOM shape): the track rows (`#id ~ .switch-track`) and the
     // input hit-rect rows (`hitRectMin`). They live on several tabs, so the
     // group below resolves each row's own panel instead of hard-coding one.
-    const switchChecks = checks.filter((c) => c.selector.includes(".switch-track") || c.expect?.hitRectMin);
+    // Widened (Task 3, ui-system-stage0-design §4) to also sweep in the
+    // stage-0 pref-row/number-field entries: every one of them lives inside
+    // #panel-popup, `display:none` until #tab-popup is clicked, and this
+    // group's per-check `.closest(".panel")` resolution already works for
+    // ANY selector, not just `.switch-track` ones, so no separate group is
+    // needed for them.
+    const switchChecks = checks.filter((c) => c.selector.includes(".switch-track") || c.expect?.hitRectMin
+      || c.selector.includes("[data-ui-stage0]") || c.selector === "#opt-popup-width-custom");
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
       && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c));
@@ -3345,9 +3404,15 @@ const SWEEP_CFG = {
   // 6. controlRung -- COMPONENTS.md §1.1 / §6.3: two control heights (md 26,
   //    sm 20) besides the 24px icon target (family 4 owns icon-only buttons).
   //    Exemptions are structural, each a family with its own rung, not a
-  //    per-instance allowlist:
+  //    per-instance allowlist. Dual contract inside [data-ui-stage0], see
+  //    stageZero below.
   rung: {
     values: [26, 20], tol: 1,
+    // Stage-0 dual contract (spec 2026-09-23-ui-system-stage0-design §4):
+    // controls inside the prototype container use the comfortable tier
+    // (32 md / 28 sm); compact tier is 28/24. Retired with the marker
+    // (CLAUDE.md temporary item, expiry 2026-12-31).
+    stageZero: { marker: "[data-ui-stage0]", values: { comfortable: [32, 28], compact: [28, 24] } },
     exempt: [
       "textarea",                                   // multi-line by nature
       "[role='tab']", ".tab-btn", ".lib-tab",       // tab family: 32px on both surfaces
@@ -3777,7 +3842,27 @@ function sweepProbe(cfg) {
       if (el.matches("button, .btn, a.btn") && !el.matches(shellSel) && !iconLabel(el)) continue; // icon-only (x counts as an icon): family 4
       if (!el.matches(shellSel) && el.closest(shellSel)) continue; // inner of a fused shell: the shell is measured
       const h = el.getBoundingClientRect().height;
-      if (!cfg.rung.values.some((v) => Math.abs(h - v) <= cfg.rung.tol)) {
+      // Stage-0 dual contract (spec 2026-09-23-ui-system-stage0-design §4,
+      // Task 3): a control inside the [data-ui-stage0] prototype container
+      // is on the comfortable/compact rung instead of this surface's normal
+      // one, picked off the SAME live html[data-density] attribute
+      // options-theme-early.js writes (Task 1) -- not a static literal, so
+      // the check stays correct whichever tier the active theme landed on.
+      // Buttons are the spec's OWN named exception (§6 "已知不做与风险":
+      // ".btn-sm 20 高...会与 32 高输入框并存，评判时忽略") -- the prototype
+      // deliberately leaves every button-family control on the surface's
+      // existing rung, so this only re-tiers the single-line input/select/
+      // shell branch of the `controls` query above, never a button/.btn/a.btn
+      // (verified live: #panel-popup's "Open Chrome Shortcut Settings" link
+      // is exactly this shape -- without the exclusion it read as a NEW
+      // controlRung FAIL at its normal ~19.33px sm height against the
+      // comfortable [32, 28] rung, a regression this dual contract must not
+      // introduce).
+      const isButtonFamily = el.matches("button, .btn, a.btn");
+      const inStageZero = !isButtonFamily && el.closest(cfg.rung.stageZero.marker);
+      const tier = document.documentElement.dataset.density === "compact" ? "compact" : "comfortable";
+      const allowedRungs = inStageZero ? cfg.rung.stageZero.values[tier] : cfg.rung.values;
+      if (!allowedRungs.some((v) => Math.abs(h - v) <= cfg.rung.tol)) {
         hits.push({ kind: "controlRung", path: pathOf(el), height: Math.round(h * 100) / 100, detail: `${Math.round(h)}px` });
       }
     }

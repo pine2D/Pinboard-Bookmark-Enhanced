@@ -205,16 +205,38 @@
 //                      any rendered ring). design-uplift preset-row
 //                      redesign: the 2px accent selection ring that
 //                      replaced the old border-drawn check tick.
-//   heightPx       -- { value, tolerancePx=1 }: |getBoundingClientRect().
-//                      height - value| <= tolerancePx. Added for popup's
-//                      `.stag` chip (D6/D7, Task 5): no prior chip entry
-//                      (.vocab-group-chip, .tag-gov-chip-face) needed a
-//                      literal height, since their rung was already proven
-//                      indirectly via padVMin+padGteRadiusH below -- this is
-//                      the direct form for when the checklist wants to
-//                      assert the number itself (COMPONENTS.md §5.1's 18px
-//                      chip rung, "no border" case), not just its two law
-//                      components.
+//   heightPx       -- { value, tolerancePx=1 } OR { comfortable, compact,
+//                      tolerancePx=1 }: |getBoundingClientRect().height -
+//                      value| <= tolerancePx. Added for popup's `.stag` chip
+//                      (D6/D7, Task 5): no prior chip entry (.vocab-group-
+//                      chip, .tag-gov-chip-face) needed a literal height,
+//                      since their rung was already proven indirectly via
+//                      padVMin+padGteRadiusH below -- this is the direct form
+//                      for when the checklist wants to assert the number
+//                      itself (COMPONENTS.md §5.1's 18px chip rung, "no
+//                      border" case), not just its two law components. The
+//                      { comfortable, compact } form (Task 3, ui-system-
+//                      stage0-design §4) is for the rare control whose target
+//                      itself redefines under html[data-density="compact"]
+//                      (e.g. #opt-popup-width-custom's --opt-control-h) --
+//                      the runner picks the live tier off probeSelector's own
+//                      `density` read, same pattern colorSchemeMatchesTheme
+//                      uses for raw.rootColorScheme. A bare `value` always
+//                      wins when present, so this is opt-in per entry.
+//   minHeightPx    -- same two shapes as heightPx, read against the CSS
+//                      computed min-height PROPERTY instead of the rendered
+//                      box height (Task 3, ui-system-stage0-design §4): the
+//                      stage-0 pref-row label is pinned by min-height, so a
+//                      wrapped (long) label can still grow past the floor
+//                      without failing this the way a literal heightPx
+//                      target would.
+//   borderTopWidthPx -- { value, tolerancePx=0.5 }: |computed border-top-
+//                      width (px) - value| <= tolerancePx (Task 3, ui-
+//                      system-stage0-design §4). The stage-0 pref-row
+//                      hairline -- a literal 1px `.pref-row + .pref-row`
+//                      border-top inside a non-radio .pref-group, never a
+//                      density token, so this key never takes the
+//                      { comfortable, compact } shape.
 //   widthPx        -- { min?, max?, tolerancePx=0.5 }: getBoundingClientRect()
 //                      .width against either or both bounds -- `max` is a
 //                      CEILING, not heightPx's target value (`max-width`
@@ -256,10 +278,12 @@
 //                      off/on fill without depending on the storage default.
 //                      state "checked" REQUIRES seedChecked.checked === true
 //                      (it is only a distinct results key for the on state).
-//   fontSizePx     -- { value, tolerancePx=0.5 }: |computed font-size (px) -
-//                      value| <= tolerancePx. For a typography rule with no
-//                      geometry law of its own, e.g. `.stag-num`'s pinned
-//                      11px ordinal (D7).
+//   fontSizePx     -- { value, tolerancePx=0.5 } OR { comfortable, compact,
+//                      tolerancePx=0.5 } (same two shapes as heightPx above,
+//                      Task 3): |computed font-size (px) - value| <=
+//                      tolerancePx. For a typography rule with no geometry
+//                      law of its own, e.g. `.stag-num`'s pinned 11px ordinal
+//                      (D7), or the stage-0 pref-row's --opt-text-body copy.
 //   fontVariantNumericContains -- string: computed `font-variant-numeric`
 //                      must contain this token, e.g. "tabular-nums"
 //                      (`.stag-num`, D7 -- keeps 1-9 from jittering the
@@ -1498,12 +1522,20 @@ export const CHECKS = [
   // lives on the AI Behavior tab; scripts/ui-render-audit.mjs's
   // aiBehaviorChecks group clicks that tab once for this row. (The OTHER
   // number field, #opt-popup-width-custom on the Popup tab, is the one this
-  // batch deleted an inline `style="width:80px"` from -- not picked as the
-  // representative here only because #opt-ai-cache-duration needed a new
-  // tab-click group regardless and this campaign didn't want a THIRD one for
-  // the same kind; both get the identical `.fg input[type="number"]` rule.)
+  // batch deleted an inline `style="width:80px"` from -- both get the
+  // identical `.fg input[type="number"]` rule, max-width 96.)
   { surface: "options", page: "options.html", selector: "#opt-ai-cache-duration", state: "default",
     expect: { widthPx: { max: 96 } } },
+  // #opt-popup-width-custom (Task 3, ui-system-stage0-design §4): now its own
+  // entry, not folded into the generic number-field row above -- it lives
+  // inside [data-ui-stage0] (Task 2's Popup-tab row model), inline in the
+  // custom radio's own label, and its height tracks --opt-control-h (32
+  // comfortable / 28 compact under html[data-density="compact"]) rather than
+  // the fixed rung every OTHER `.fg input[type=number]` renders at. max-width
+  // 96 is a literal (options.css's stage-0 header comment lists it as one of
+  // the three named exceptions), so it stays a flat widthPx bound.
+  { surface: "options", page: "options.html", selector: "#opt-popup-width-custom", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { max: 96 } } },
 
   // ---- `.switch` primitive (taste-uplift batch4 T1, COMPONENTS.md §6.1 /
   // §6.4 exception). Reference instance: #opt-tag-sort-by-pop on the Tags
@@ -1533,7 +1565,15 @@ export const CHECKS = [
   // explicitly (the ids below default off, but a storage default must not be
   // what makes the row pass). The runner's switchChecks group opens each
   // row's own tab after a fresh, theme-applied navigation.
-  // Shape A: a plain choice row (Popup tab, "Show search bar").
+  // Shape A (re-pinned, Task 3, ui-system-stage0-design §4): #opt-show-search
+  // was "a plain choice row" (`.choice-row`) before Task 2 rebuilt the Popup
+  // tab onto the stage-0 row model -- it now sits in a `.pref-row >
+  // label.switch`, the FIRST row of its `.pref-group` (no hairline). The
+  // container shape changed; the `.switch` primitive's own 28x16 track and
+  // 24px hit rect this entry proves did not, so it stays that census point
+  // under its new container instead of moving to a still-`.choice-row` id
+  // elsewhere -- the stage0-pref-row-min/-rule entries near the number-field
+  // block above separately cover the new row's own min-height/hairline/type.
   { surface: "options", page: "options.html", selector: "#opt-show-search ~ .switch-track", state: "default",
     seedChecked: { input: "#opt-show-search", checked: false },
     expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
@@ -1551,8 +1591,13 @@ export const CHECKS = [
     expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#opt-wayback-batch", state: "default",
     expect: { hitRectMin: { height: 24 } } },
-  // Shape E1: an indented `.fg-stack` sub-row (Popup tab, URL cleanup
-  // "Aggressive mode").
+  // Shape E1 (re-pinned, Task 3, ui-system-stage0-design §4): #opt-urlclean-
+  // aggressive was "an indented `.fg-stack` sub-row" before Task 2 -- it now
+  // sits in `.pref-row.pref-row-sub > label.switch`, a LATER row in its
+  // `.pref-group` (so it DOES carry the 1px hairline, unlike Shape A above)
+  // with its indent from `.pref-row-sub`'s own padding-left, not `.fg-stack`.
+  // Same reasoning as Shape A: the container shape changed, the track/hit-
+  // rect geometry did not, so this stays the indented-row census point.
   { surface: "options", page: "options.html", selector: "#opt-urlclean-aggressive ~ .switch-track", state: "default",
     seedChecked: { input: "#opt-urlclean-aggressive", checked: false },
     expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
@@ -1574,6 +1619,25 @@ export const CHECKS = [
     expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#opt-popup-follow-theme", state: "default",
     expect: { hitRectMin: { height: 24 } } },
+
+  // ---- Stage-0 pref-row family (Task 3, spec 2026-09-23-ui-system-stage0-
+  // design §4): the [data-ui-stage0] Popup panel's row model Task 2 built --
+  // every switch sits in `.pref-row > label.switch`, pinned at a 44px
+  // (comfortable) / 36px (compact) min-height; every row after the first in
+  // a non-radio `.pref-group` carries a literal 1px border-top hairline
+  // (never a density token). Complements, not replaces, the re-pinned Shape
+  // A/E1 entries above -- those prove the `.switch` TRACK survived the
+  // container rebuild, these prove the new container's own geometry. Bare
+  // selectors match the FIRST element in DOM order (the T6 field-width block
+  // above already leans on this convention): `.pref-row > label.switch`
+  // lands on #opt-check-bookmark-status's row (Popup Behavior section, first
+  // pref-group, first row -- no hairline there by construction); the
+  // hairline selector's `+` combinator skips that same first row and lands
+  // on the second (#opt-auto-close's row, same group).
+  { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .pref-row > label.switch', state: "default",
+    expect: { minHeightPx: { comfortable: 44, compact: 36 }, fontSizePx: { comfortable: 14, compact: 13 }, hitRectMin: { height: 24 } } },
+  { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .pref-group:not(.pref-group-radio) > .pref-row + .pref-row', state: "default",
+    expect: { borderTopWidthPx: { value: 1 } } },
 ];
 
 // Hand-copied literal `data-theme` values, verified at authoring time with:
