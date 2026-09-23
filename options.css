@@ -1176,12 +1176,15 @@ html.motion-ready .backup-import-result:not([hidden]) {
    recipe already paints disabled copy --opt-fg-hint; `:not(.switch-text)`
    keeps the opacity step off it so the text is not dimmed twice. */
 .backup-section-picker input:disabled + span,
-#storage-cats { margin-bottom: var(--opt-rhythm); }
 .storage-cats input:disabled + span,
 .choice-row input:disabled + span:not(.switch-text) { opacity: 0.45; }
 .backup-section-picker input:disabled,
 .storage-cats input:disabled,
 .choice-row input:disabled { cursor: not-allowed; }
+/* The storage category list's own group rhythm. It once shared a selector
+   list with the backup-picker dim above, so the picker's disabled copy got
+   this margin instead of the opacity step. */
+#storage-cats { margin-bottom: var(--opt-rhythm); }
 .backup-apply-row { min-width: 0; }
 .backup-import-result {
   display: grid;

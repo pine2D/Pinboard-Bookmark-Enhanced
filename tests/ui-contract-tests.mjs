@@ -3163,10 +3163,13 @@ check(/@media[^{]*\(max-height:[^)]*\)\s*\{[\s\S]*?\.options-nav\s*\{[^}]*positi
 // Disabled checkboxes had no visual state on this page: :disabled was only ever
 // styled on the .btn family. Every site that disables a checkbox uses the same
 // <label><input><span> row, so each container needs the adjacent-sibling dim.
+// The selector must sit in a rule that actually dims (declares opacity): the
+// backup picker's selector once survived here while sharing a list with the
+// #storage-cats margin rule, i.e. present in the file and never dimmed.
 {
   const disabledRow = ["backup-section-picker", "storage-cats", "choice-row"];
   const missing = disabledRow.filter((cls) =>
-    !new RegExp(`\\.${cls}[^{}]*input:disabled\\s*\\+\\s*span`).test(optionsCss));
+    !new RegExp(`\\.${cls}[^{}]*input:disabled\\s*\\+\\s*span[^{}]*\\{[^}]*opacity\\s*:`).test(optionsCss));
   check(missing.length === 0,
     `options.css: disabled checkbox rows keep full-contrast text in ${missing.map((c) => "." + c).join(", ")} -- the user cannot tick them and the page never says why`);
 }
