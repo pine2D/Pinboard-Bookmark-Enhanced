@@ -1457,7 +1457,19 @@ async function driveRowStates(page, extBase, theme, selector, textSelector) {
   // state it claims to be. (Found the hard way: "current" measured 4.45:1
   // text contrast, which is the hover mix, while the token derivation that
   // actually guarantees 4.5:1 targets the resting fill.)
-  const settle = async () => { await page.mouse.move(0, 0); await page.waitForTimeout(280); };
+  //
+  // The wait after that park used to be a fixed 280ms -- long enough on a
+  // single shard, but under scripts/verify.sh's 4-parallel-shard run the
+  // click-driven `background-color var(--motion-state)` transition on
+  // `.notes-card-top`/`.notes-hit-btn` (library.css, `html.motion-ready
+  // .notes-card-top` / `.notes-hit-btn`) can still be mid-fade at 280ms, so
+  // two states' bands both read partway toward their target instead of
+  // AT it -- bandDistinct's `minDelta` then measures whatever gap two
+  // still-animating fills happen to have, which can land on exactly 0 when
+  // both samples are read from the same interpolation frame. `selector` IS
+  // the element the transition lives on (band-painting rules target it
+  // directly, not an ancestor row), so settling on it settles the read.
+  const settle = async () => { await page.mouse.move(0, 0); await settleAnimations(page, selector); };
   await settle();
   const samples = [await read(selector, textSelector, "rest")];
   await head.click({ modifiers: ["Control"] }); await settle();
@@ -1676,44 +1688,72 @@ async function driveGapMin(page, check) {
   return result;
 }
 
-// settleSwitchTrack (flake fix, 2026-09-23): seedChecked drives a `.switch`
-// checkbox's `.checked` property directly (see the header comment on the
-// seedChecked block below), which the `.switch-track` rule reacts to via
-// `transition: background <ns>-motion-state, color <ns>-motion-state`
-// (switchRules, docs/theme-surface/composers/ui-components.mjs). The
-// previous discipline was a fixed `page.waitForTimeout(260)` -- long enough
-// on a single shard, but under scripts/verify.sh's up-to-4-parallel-shard
-// run the host's four Chromiums contend for the same CPU and the transition
-// can still be interpolating past 260ms wall-clock, so the very next
-// computed-style read (this check's own probe, or a later check's "default"
-// read of the same row after seedRestore un-checks it) lands mid-fade:
-// `rgb(123, 113, 172)` instead of the settled `--*-border` token, a few
-// units toward the accent. Repro: PBP_RENDER_SHARDS=1 passes 2370/2370
-// deterministically; the 4-shard run flakes a handful of
-// `.switch-track|default|bgEqVar` FAILs, different rows/themes each run.
-// Waiting on the row's own Animation objects instead settles exactly when
+// settleAnimations (flake fix, 2026-09-23; generalised from the original
+// switch-track-only settleSwitchTrack): ANY state write this runner makes
+// with no real user gesture behind it -- seedChecked's `.checked = ...`
+// property write, classState's classList.add/remove, driveRowStates' clicks
+// re-painting a row's selection band, a scripted .focus()/.blur() -- lands
+// its CSS transition on one of Chromium's OTHER 3-4 contending processes
+// under scripts/verify.sh's up-to-4-parallel-shard run. A fixed wait (260ms,
+// 280ms) is long enough on a lightly loaded single shard, but under shard
+// contention the transition can still be interpolating past it, so the very
+// next computed-style read lands mid-fade: a background that reads as
+// "unchanged" because the frame sampled is still close to its start value, a
+// contrast ratio caught mid-mix, or (bandDistinct) a delta of 0 because two
+// rows' bands are both still animating toward, not yet at, their distinct
+// targets. Repro: PBP_RENDER_SHARDS=1 passes deterministically; the 4-shard
+// run flakes a handful of these, different rows/themes/surfaces each run.
+// Waiting on the scope's own Animation objects instead settles exactly when
 // the transition itself reports done, independent of host load.
-async function settleSwitchTrack(page, inputSelector) {
-  await page.evaluate((sel) => new Promise((resolve) => {
+//
+// `scope` is either a CSS selector (resolved with document.querySelector
+// inside the page -- the common case: the element being read IS the element
+// whose transition just fired) or an already-resolved Playwright
+// ElementHandle/JSHandle, for callers that need to settle a DIFFERENT
+// element than the one their selector names (settleSwitchTrack below: the
+// `.switch-track` transition lives on the row wrapping the checkbox
+// seedChecked flips, not on the checkbox itself). A missing/null element
+// falls back to document.body, so a stale selector or a `.closest()` miss
+// still resolves to SOME node's getAnimations() rather than throwing.
+async function settleAnimations(page, scope) {
+  await page.evaluate((scope) => new Promise((resolve) => {
     const settle = () => {
-      const el = document.querySelector(sel);
-      const row = el?.closest("label.switch") || el?.parentElement || null;
-      const anims = row ? row.getAnimations({ subtree: true }) : [];
+      const el = typeof scope === "string" ? document.querySelector(scope) : scope;
+      const target = el || document.body;
+      const anims = target.getAnimations({ subtree: true });
       Promise.all(anims.map((a) => a.finished.catch(() => {}))).then(resolve);
     };
-    // `.checked = ...` is a plain property write (no user gesture, no
-    // change event -- see the seedChecked comment below), so the transition
-    // its `:checked ~ .switch-track` selector match triggers may not be
+    // The write that triggered this settle (property write, classList
+    // mutation, scripted focus/blur, a dispatched click) has no user
+    // gesture behind it, so the transition it triggers may not be
     // scheduled by style recalc in this same task yet. A double rAF lets
     // recalc run and Chromium actually start the Animation before
     // getAnimations() is asked to look for one; a single rAF still raced it
     // under shard contention during this fix's own verification.
     requestAnimationFrame(() => requestAnimationFrame(settle));
-  }), inputSelector);
+  }), scope);
   // Belt-and-braces, not the settle mechanism itself: keeps this on the same
-  // side of "definitely done" as the code it replaces for any consumer that
-  // reads state immediately after without its own probe delay.
+  // side of "definitely done" as a fixed wait, for any consumer that reads
+  // state immediately after without its own probe delay.
   await page.waitForTimeout(50);
+}
+
+// Thin wrapper (see settleAnimations above for the mechanism this shares
+// with every other state-change settle in this file): seedChecked drives a
+// `.switch` checkbox's `.checked` property directly (see the header comment
+// on the seedChecked block below), which the `.switch-track` rule reacts to
+// via `transition: background <ns>-motion-state, color <ns>-motion-state`
+// (switchRules, docs/theme-surface/composers/ui-components.mjs) -- but that
+// rule lives on the row wrapping the checkbox, not the checkbox itself, so
+// this resolves the row first and hands settleAnimations an ElementHandle
+// instead of a selector.
+async function settleSwitchTrack(page, inputSelector) {
+  const row = await page.evaluateHandle((sel) => {
+    const el = document.querySelector(sel);
+    return el?.closest("label.switch") || el?.parentElement || null;
+  }, inputSelector);
+  await settleAnimations(page, row);
+  await row.dispose();
 }
 
 async function runOneCheck(page, theme, check, results, extBase) {
@@ -1852,8 +1892,12 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // regression, and reading restBgStack in the same task as the mutation can
     // land mid-interpolation -- under 4 parallel shards this produced two
     // unreproducible bgChangedFromRest false reds (submit-btn, Task 15 and
-    // Task 16). Same 260ms discipline as the target-state read below (:1566).
-    await page.waitForTimeout(260);
+    // Task 16), and a fixed 260ms wait was not immune to the same race under
+    // heavier shard contention (2026-09-23: submit-btn bgChangedFromRest
+    // FAILs on flexoki-light/-dark, textContrast 1.47 on terminal, all
+    // reading `.btn`'s background/text mid-fade). settleAnimations waits on
+    // the transition's own finished promise instead of a guessed duration.
+    await settleAnimations(page, check.selector);
     restBgStack = await page.evaluate(({ selector }) => {
       const el = document.querySelector(selector);
       if (!el) return null;
@@ -1864,11 +1908,11 @@ async function runOneCheck(page, theme, check, results, extBase) {
     await page.evaluate(({ selector, cls }) => {
       document.querySelector(selector)?.classList.add(...cls);
     }, { selector: check.selector, cls: check.addClass });
-    // Same settle discipline as focusWithin below (:1405): `.btn`'s
+    // Same settle discipline as focusWithin below: `.btn`'s
     // `transition: background var(--pp-motion-state), ...` means a read
     // taken in the same task as classList.add() can land mid-interpolation
     // instead of at the transition's target value.
-    await page.waitForTimeout(260);
+    await settleAnimations(page, check.selector);
   }
   if (check.state === "focusWithin") {
     if (!check.focusTarget) throw new Error(`focusWithin check on ${check.selector} has no focusTarget`);
@@ -1907,7 +1951,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
       return document.activeElement === t;
     }, { selector: check.selector, target: check.focusTarget });
     if (!focused) throw new Error(`SETUP: could not focus "${check.focusTarget}" inside ${check.selector} (theme=${theme})`);
-    await page.waitForTimeout(260);
+    await settleAnimations(page, check.selector);
   } else if (check.state === "hover") {
     // Real mouse hover (not a class hack): Playwright dispatches actual
     // pointer events, so the live cascade's own `:hover` pseudo-class match
@@ -1918,7 +1962,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // transition background/color for --*-motion-state; an immediate read
     // can serialize the 0% frame as transparent oklab(), making a hover
     // assertion accidentally inspect the resting paint.
-    await page.waitForTimeout(260);
+    await settleAnimations(page, check.selector);
   } else if (check.state !== "default" && check.state !== "classState" && check.state !== "checked") {
     throw new Error(`unsupported state "${check.state}" on ${check.selector} -- extend runOneCheck() before adding non-default states to the checklist`);
   }
@@ -1983,13 +2027,15 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // default-state read on the same page, exactly the way a parked mouse
     // pointer leaks :hover (see the hover reset just below).
     await page.evaluate(() => document.activeElement?.blur());
-    // Must outlast the SAME transition the focus read waits 260ms for. At the
-    // old 120ms the next check's "unfocused baseline" was captured mid-fade:
-    // measured `rgba(51,255,51,0.004) 0 0 0.04px` and interpolated oklab()
-    // border colours, i.e. a shell that looked like it had reacted to focus
-    // when it had merely not finished un-reacting. That reads as a real
-    // difference to any assertion comparing rest against focus.
-    await page.waitForTimeout(260);
+    // Must settle past the SAME transition the focus read above waits on. At
+    // a fixed 120ms the next check's "unfocused baseline" was captured
+    // mid-fade: measured `rgba(51,255,51,0.004) 0 0 0.04px` and interpolated
+    // oklab() border colours, i.e. a shell that looked like it had reacted
+    // to focus when it had merely not finished un-reacting -- that reads as
+    // a real difference to any assertion comparing rest against focus, and a
+    // fixed wait (260ms afterwards) was still a guess about how long the
+    // transition takes to finish under shard contention.
+    await settleAnimations(page, check.selector);
   }
   if (check.state === "hover") {
     // Reset the pointer to a dead corner right after reading the hover
