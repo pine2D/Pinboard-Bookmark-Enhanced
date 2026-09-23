@@ -788,6 +788,9 @@ html[data-theme="<dark preset>"] { color-scheme: dark; }
 accent 焦点色，等于焦点一来就抹掉危险信号——所以它们走 `borderless`，语义边原样留着，
 1px accent 芯 + 辉光叠在外面。`.btn` 族的边框相反，是 Soft Fill 塌进填充里的中性 chrome
 （§9 律 1），涂它没有任何信息损失，所以走 `bordered`。
+**混合边**同样走 `borderless`：options 的 `.switch-track` 关态是 1px 中性 `--opt-border`、开态
+改涂 `--opt-accent`（边表达的是开关状态），涂成焦点色会让关态聚焦读作「已开」，所以环画在轨道外
+（`input:focus-visible ~ .switch-track`，§6.4 例外）。
 
 **`--{ns}-focus-ring` 一律原样 `var()` 消费，绝不展开成字面阴影。** 这条是硬的：辉光的
 **形状本身**是主题身份，不只是颜色——terminal 是 `0 0 6px 1px`（磷光模糊晕），paper-ink 是
