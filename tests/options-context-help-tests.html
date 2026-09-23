@@ -202,6 +202,46 @@ function test(name, fn) {
     });
   });
 
+  test("every help toggle owns its own hit area over neighbouring switches", () => {
+    // The 24px target overflows its 20px row by 2px each way, and a .switch
+    // row's native input is an absolute box stretched 2px past its row. Hit
+    // testing follows paint order, so a toggle that paints below the next
+    // row's input loses its lower edge to it: clicking there flips the switch
+    // instead of opening the help. Probe the centre, a point 2px above the
+    // bottom of the glyph (the part of the icon nearest the next row) and the
+    // target's last pixel row, which is where the overlap actually is once
+    // the icon is rendered: the lower 0.5-2px of the 24px box. Two help rows
+    // in a row overlap each other's targets by that same strip; the later one
+    // paints on top and that is harmless (both open help), so the edge probe
+    // only requires *a* help toggle, never a neighbouring control.
+    const toggles = [...doc.querySelectorAll("details.context-help > summary.context-help-toggle")];
+    assert(toggles.length >= 25, "too few help toggles: " + toggles.length);
+    const stolen = [];
+    // options.js reveals .container after init; the inert fixture never runs
+    // it, and visibility:hidden boxes are not hit-testable.
+    const container = doc.querySelector(".container");
+    const priorVisibility = container.style.visibility;
+    container.style.visibility = "visible";
+    toggles.forEach((toggle) => {
+      const details = toggle.parentElement;
+      const key = details.querySelector(".context-help-body[data-i18n]")?.dataset.i18n || "?";
+      reveal(details);
+      doc.querySelectorAll("details.context-help[open]").forEach((candidate) => { candidate.open = false; });
+      toggle.scrollIntoView({ block: "center" });
+      const t = toggle.getBoundingClientRect();
+      const icon = toggle.querySelector("svg")?.getBoundingClientRect();
+      assert(t.width && icon?.height, key + " toggle is not rendered");
+      const cx = t.left + t.width / 2;
+      [["centre", cx, t.top + t.height / 2, true], ["glyph bottom", cx, icon.bottom - 2, true], ["bottom edge", cx, t.bottom - 0.5, false]].forEach(([where, x, y, own]) => {
+        const hit = doc.elementFromPoint(x, y);
+        const owner = hit?.closest("summary.context-help-toggle");
+        if (own ? owner !== toggle : !owner) stolen.push(`${key} ${where} -> ${hit ? (hit.id || hit.tagName.toLowerCase() + "." + hit.className) : "nothing"}`);
+      });
+    });
+    container.style.visibility = priorVisibility;
+    assert(!stolen.length, stolen.slice(0, 12).join("; "));
+  });
+
   test("expanded help opens below and from the start of its owning row", () => {
     layoutCases.forEach(([key, type]) => {
       const { details, host, anchor, toggle, body } = parts(key);

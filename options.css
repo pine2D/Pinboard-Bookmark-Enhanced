@@ -473,7 +473,15 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 .context-help { margin: 0; }
 .context-help > summary.context-help-toggle {
   --target: 24px;
-  position: static;
+  /* Relative with no offset: the box stays exactly where the flow puts it,
+     but it now paints (and hit-tests) above in-flow and auto-z positioned
+     neighbours. The target overflows its 20px row by 2px each way, and the
+     next row's .switch > input is an absolute box stretched 2px past its own
+     row -- as a static box the toggle lost that overlap to the input below
+     it, so clicking the lower edge of a help button flipped the next
+     switch. */
+  position: relative;
+  z-index: 1;
   grid-column: 2;
   grid-row: 1;
   align-self: center;

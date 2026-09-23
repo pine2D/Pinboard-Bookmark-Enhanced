@@ -1542,9 +1542,10 @@ export const CHECKS = [
     expect: { heightPx: { value: 20 }, bgEqVar: "accent" } },
   { surface: "options", page: "options.html", selector: "#opt-show-search", state: "default",
     expect: { hitRectMin: { height: 24 } } },
-  // Shape B: a choice row that is also a contextual-help host (and, here,
-  // indented) -- the label fills the grid's first column, the help target
-  // takes the trailing 24px one (Archive tab, "Also archive during batch save").
+  // Shape C3 (census E-switch-census.md: choice row + help + indent): a
+  // choice row that is also a contextual-help host, indented -- the label
+  // fills the grid's first column, the help target takes the trailing 24px
+  // one (Archive tab, "Also archive during batch save").
   { surface: "options", page: "options.html", selector: "#opt-wayback-batch ~ .switch-track", state: "default",
     seedChecked: { input: "#opt-wayback-batch", checked: false },
     expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
@@ -1563,6 +1564,15 @@ export const CHECKS = [
     seedChecked: { input: "#batch-ai-tags", checked: false },
     expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
   { surface: "options", page: "options.html", selector: "#batch-ai-tags", state: "default",
+    expect: { hitRectMin: { height: 24 } } },
+  // Shape F1: a plain `.fg` that is a choice help host, no stack -- the label
+  // takes its 20px box and 2px padding from the help-host rule, not from
+  // `.choice-row` (Appearance tab, "Extension pages follow the Pinboard theme
+  // preset"). Its default is ON, hence the explicit off seed.
+  { surface: "options", page: "options.html", selector: "#opt-popup-follow-theme ~ .switch-track", state: "default",
+    seedChecked: { input: "#opt-popup-follow-theme", checked: false },
+    expect: { heightPx: { value: 20 }, widthPx: { min: 32, max: 32 }, bgEqVar: "btn-bg" } },
+  { surface: "options", page: "options.html", selector: "#opt-popup-follow-theme", state: "default",
     expect: { hitRectMin: { height: 24 } } },
 ];
 
