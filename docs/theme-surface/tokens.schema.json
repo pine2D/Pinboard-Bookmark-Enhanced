@@ -345,6 +345,11 @@
       "description": "Optional extension-UI input overrides applied after the initial palette derivation, per surface and mode. Supported inputs may then be normalized by the shared control finalizer (contrast, focus edge, soft-fill separation). Derived output roles are rejected by validate-contracts instead of being silently replaced. Use this channel for theme-specific refinements the palette derivation cannot express (e.g. official-scale status tints, per-theme radius steps).",
       "additionalProperties": false,
       "properties": {
+        "density": {
+          "type": "string",
+          "enum": ["comfortable", "compact"],
+          "description": "Extension-UI density tier (COMPONENTS.md §11). Omitted = comfortable."
+        },
         "popup": {
           "type": "object",
           "additionalProperties": false,

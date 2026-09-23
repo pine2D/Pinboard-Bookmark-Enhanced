@@ -199,8 +199,25 @@ check(/--opt-sp-8:\s*32px;/.test(optionsCss) &&
   "options.css does not define the stage-0 density tokens on :root");
 check(/html\[data-density="compact"\]\s*\{[^}]*--opt-control-h:\s*28px;[^}]*--opt-label-gap:\s*var\(--opt-sp-2\);[^}]*\}/s.test(optionsCss),
   "options.css compact density overrides are not scoped under html[data-density=\"compact\"]");
-check(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\(\{[^}]*"terminal":\s*"compact"[^}]*"gruvbox-dark":\s*"compact"/s.test(optionsThemeEarlyJs),
-  "options-theme-early.js does not map terminal and gruvbox-dark to compact density");
+{
+  // Registry-driven, not enumerated: options-theme-early.js's
+  // PBP_OPTIONS_DENSITY_MAP must name exactly the pilots that declare
+  // ui.density === "compact" (COMPONENTS.md §11) -- no more, no less. A
+  // pilot missing from the map, or a map entry with no compact pilot
+  // backing it, both fail.
+  const pilotDir = "docs/theme-surface/pilots";
+  const compactFromPilots = readdirSync(resolve(root, pilotDir))
+    .filter((f) => f.endsWith(".tokens.json"))
+    .map((f) => [f.replace(/\.tokens\.json$/, ""), JSON.parse(read(`${pilotDir}/${f}`))])
+    .filter(([, t]) => t.ui && t.ui.density === "compact")
+    .map(([slug]) => slug).sort();
+  const mapSrc = optionsThemeEarlyJs.match(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\((\{[^}]*\})\)/);
+  const compactFromMap = mapSrc
+    ? Object.entries(runInNewContext("(" + mapSrc[1] + ")", {})).filter(([, v]) => v === "compact").map(([k]) => k).sort()
+    : [];
+  check(compactFromPilots.length > 0 && JSON.stringify(compactFromPilots) === JSON.stringify(compactFromMap),
+    "options-theme-early.js density map does not equal the pilots' ui.density=\"compact\" set (both directions)");
+}
 
 check(/<form[^>]*id="login-form"[^>]*class="login-body"/.test(popupHtml) &&
   /id="login-btn"[^>]*type="submit"[^>]*class="btn/.test(popupHtml) &&
