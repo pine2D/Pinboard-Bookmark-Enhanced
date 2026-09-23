@@ -2841,6 +2841,16 @@ check(/const det = document\.createElement\("details"\);\s*det\.className = "dis
   && /const head = document\.createElement\("summary"\);/.test(optionsJs),
   "options.js: Send-to destination cards are not keyed details.disclosure sections");
 
+// batch4 T3: the Send-to enable ×5 toggle (options.js renderExportTargets) is
+// the one dynamically-built checkbox the static .switch census (D4) couldn't
+// see through options.html -- pin its DOM shape the same way the .stag
+// builder check above pins popup-tags.js: input FIRST (so collectExportTargets()'s
+// `el.type === "checkbox" ? el.checked : ...` and the generic
+// `input[type="checkbox"]` autosave binding keep working unchanged), then the
+// copy span, then the drawn track, appended to the label in that order.
+check(/enableLabel\.className = "switch";[\s\S]{0,200}cb\.type = "checkbox";[\s\S]{0,300}sp\.className = "switch-text";[\s\S]{0,300}track\.className = "switch-track";[\s\S]{0,200}enableLabel\.appendChild\(cb\); enableLabel\.appendChild\(sp\); enableLabel\.appendChild\(track\);/.test(optionsJs),
+  "options.js: Send-to enable toggle is not rendered as label.switch > input + span.switch-text + span.switch-track");
+
 const helperSource = optionsJs.slice(0, optionsJs.indexOf('document.addEventListener("DOMContentLoaded"'));
 const permissionHelpers = Function(helperSource + "; return { pbpExactOriginPermissionSnapshot, pbpRevokeLegacyAllSitesPermission }; ")();
 check(permissionHelpers.pbpExactOriginPermissionSnapshot([

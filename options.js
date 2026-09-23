@@ -1743,14 +1743,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       card.className = "disclosure-body export-target-card";
       card.id = "et-" + id;
 
+      // .switch DOM contract (D5, batch4): input FIRST (focusable, opacity-hidden
+      // -- keeps `.checked` reads in collectExportTargets() and the generic
+      // input[type="checkbox"] autosave binding working unchanged), then the
+      // copy span, then the drawn track. No id -- these are keyed by data-et,
+      // not id, same as before.
       const enableLabel = document.createElement("label");
+      enableLabel.className = "switch";
       const cb = document.createElement("input");
       cb.type = "checkbox";
       cb.dataset.et = id + ".enabled";
       cb.checked = !!cfg.enabled;
       const sp = document.createElement("span");
+      sp.className = "switch-text";
       sp.textContent = t("mdSendEnableTo").replace("{name}", row.label);
-      enableLabel.appendChild(cb); enableLabel.appendChild(document.createTextNode(" ")); enableLabel.appendChild(sp);
+      const track = document.createElement("span");
+      track.className = "switch-track";
+      enableLabel.appendChild(cb); enableLabel.appendChild(sp); enableLabel.appendChild(track);
       card.appendChild(enableLabel);
 
       (row.settings || []).forEach((s) => {
