@@ -1627,17 +1627,28 @@ export const CHECKS = [
   // a non-radio `.pref-group` carries a literal 1px border-top hairline
   // (never a density token). Complements, not replaces, the re-pinned Shape
   // A/E1 entries above -- those prove the `.switch` TRACK survived the
-  // container rebuild, these prove the new container's own geometry. Bare
-  // selectors match the FIRST element in DOM order (the T6 field-width block
-  // above already leans on this convention): `.pref-row > label.switch`
-  // lands on #opt-check-bookmark-status's row (Popup Behavior section, first
-  // pref-group, first row -- no hairline there by construction); the
-  // hairline selector's `+` combinator skips that same first row and lands
-  // on the second (#opt-auto-close's row, same group).
-  { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .pref-row > label.switch', state: "default",
+  // container rebuild, these prove the new container's own geometry.
+  // R9 (Task 3, spec 2026-09-23-ui-system-stage1-design §2.3/§3): a pref-row
+  // that directly follows its section title drops its top padding and one
+  // pad of min-height (32/28), so title -> first copy reads the same 12px
+  // as an entry-block label. That reduced first row can no longer stand in
+  // for "any" pref-row's min-height, so the entry below re-points off the
+  // bare `.pref-row > label.switch` (which the audit's first-match rule
+  // would now land on the shrunk row) onto `.pref-row + .pref-row >
+  // label.switch` instead -- first match in DOM order is #opt-auto-close's
+  // row (Popup Behavior section, same group, still the ordinary un-shrunk
+  // 44/36 height). The hairline entry right after it already used the same
+  // `+` combinator, so its own first match (also #opt-auto-close's row) is
+  // untouched by R9. The new stage0-pref-row-first entry covers the shrunk
+  // first-row shape itself: first match is #opt-show-search's row (Popup
+  // Elements section, the first `.pref-row` right under
+  // `h2#sec-popup-elements`).
+  { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .pref-group:not(.pref-group-radio) > .pref-row + .pref-row > label.switch', state: "default",
     expect: { minHeightPx: { comfortable: 44, compact: 36 }, fontSizePx: { comfortable: 14, compact: 13 }, hitRectMin: { height: 24 } } },
   { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .pref-group:not(.pref-group-radio) > .pref-row + .pref-row', state: "default",
     expect: { borderTopWidthPx: { value: 1 } } },
+  { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .settings-section > h2.section-title + .pref-group > .pref-row:first-child > label.switch', state: "default",
+    expect: { minHeightPx: { comfortable: 32, compact: 28 }, hitRectMin: { height: 24 } } },
 ];
 
 // Hand-copied literal `data-theme` values, verified at authoring time with:

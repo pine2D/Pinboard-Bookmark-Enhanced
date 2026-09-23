@@ -447,6 +447,23 @@ function test(name, fn) {
     delete doc.documentElement.dataset.density;
   });
 
+  // R9 (Task 3, spec 2026-09-23-ui-system-stage1-design §2.3/§3): a pref-row
+  // that directly follows its section title drops its top padding so
+  // title -> first copy reads the same 12px as title -> entry-block label,
+  // in both density tiers.
+  test("stage0: section title to first pref-row copy is 12px in both tiers", () => {
+    const h2 = doc.querySelector("#sec-popup-elements");
+    assert(h2 && h2.nextElementSibling && h2.nextElementSibling.classList.contains("pref-group"), "popup-elements title must be followed by its .pref-group");
+    const first = h2.nextElementSibling.querySelector(".pref-row:first-child > label");
+    for (const tier of ["", "compact"]) {
+      if (tier) doc.documentElement.dataset.density = tier; else delete doc.documentElement.dataset.density;
+      const mb = parseFloat(frame.contentWindow.getComputedStyle(h2).marginBottom);
+      const pt = parseFloat(frame.contentWindow.getComputedStyle(first).paddingTop);
+      assert(mb === 12 && pt === 0, `tier=${tier || "comfortable"} h2 mb=${mb} first pt=${pt}`);
+    }
+    delete doc.documentElement.dataset.density;
+  });
+
   test("coherent choice groups use the compact stack rhythm", () => {
     const groups = [
       ["opt-sync-enabled", "opt-sync-api-keys"],

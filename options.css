@@ -1305,7 +1305,7 @@ html.motion-ready .backup-import-result:not([hidden]) {
    instead of sitting 4px taller (fixwave F5); it does shrink under the
    compact tier, unlike --opt-row-min-h. */
 [data-ui-stage0] .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
-[data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-4); }
+[data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-5); }
 [data-ui-stage0] .pref-row + .pref-row { border-top: 1px solid var(--opt-border-section); }
 [data-ui-stage0] .pref-row > label {
   display: flex; align-items: center; gap: var(--opt-sp-5);
@@ -1318,6 +1318,15 @@ html.motion-ready .backup-import-result:not([hidden]) {
 [data-ui-stage0] .pref-group-radio .pref-row + .pref-row { border-top: 0; }
 [data-ui-stage0] .pref-group-radio .pref-row > label { min-height: calc(var(--opt-control-h) + var(--opt-sp-4)); padding: var(--opt-sp-2) 0; gap: var(--opt-sp-4); }
 [data-ui-stage0] .entry-block, [data-ui-stage0] .edit-area { margin-bottom: var(--opt-sp-6); }
+/* R9 (2026-09-23): a preference row that directly follows its section title
+   drops its top padding and one pad of min-height, so title -> first copy is
+   the same 12px as title -> entry-block label. Radio groups never sit right
+   under a title (they live inside the popup-width entry block), so the
+   selector stops at the direct child of the section. */
+[data-ui-stage0] .settings-section > h2.section-title + .pref-group > .pref-row:first-child > label {
+  padding-top: 0;
+  min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
+}
 /* .pref-group is its own row-grouping shape (checkboxes, radios) and was the
    one stage-0 block with no trailing margin of its own: an entry block or
    edit area right after one sat flush against it (fixwave F2). Section-end
