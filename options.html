@@ -119,13 +119,13 @@
       <div class="divider"></div>
       <h2 class="section-title" id="sec-sync" data-i18n="secSync">Data Sync</h2>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-sync">
-      <div class="choice-row context-help-host" data-help-role="choice"><label><input type="checkbox" id="opt-sync-enabled" /> <span data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-enabled" /> <span class="switch-text" data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="optSyncHint">This checkbox applies to this device only. Settings are shared between the devices where you turn it on; devices with it off keep their own local settings.</p>
         </details>
       </div>
-      <div class="choice-row context-help-host" data-help-role="choice"><label><input type="checkbox" id="opt-sync-api-keys" /> <span data-i18n="syncApiKeysLabel">Sync credentials for this Google account</span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-api-keys" /> <span class="switch-text" data-i18n="syncApiKeysLabel">Sync credentials for this Google account</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="syncApiKeysHint">This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted.</p>
@@ -143,19 +143,19 @@
         </details>
       </div>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-backup-restore">
-      <div class="choice-row context-help-host" data-help-role="choice"><label><input type="checkbox" id="opt-backup-include-highlights" checked /> <span data-i18n="backupIncludeHighlightsLabel">Include highlights and notes in backups</span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-highlights" checked /> <span class="switch-text" data-i18n="backupIncludeHighlightsLabel">Include highlights and notes in backups</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="backupIncludeHighlightsHint">Includes page URLs, titles, selected text, notes, colors, and timestamps.</p>
         </details>
       </div>
-      <div class="choice-row context-help-host" data-help-role="choice"><label><input type="checkbox" id="opt-backup-include-vocabulary" checked /> <span data-i18n="backupIncludeVocabularyLabel">Include vocabulary in backups</span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-vocabulary" checked /> <span class="switch-text" data-i18n="backupIncludeVocabularyLabel">Include vocabulary in backups</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="backupIncludeVocabularyHint">Includes vocabulary only for the current Pinboard account.</p>
         </details>
       </div>
-      <div class="choice-row"><label><input type="checkbox" id="opt-backup-include-secrets" aria-describedby="backup-secrets-warning" /> <span data-i18n="backupIncludeSecretsLabel">Include API keys and tokens in backups</span></label></div>
+      <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-backup-include-secrets" aria-describedby="backup-secrets-warning" /> <span class="switch-text" data-i18n="backupIncludeSecretsLabel">Include API keys and tokens in backups</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Writes every credential to the file in plain text: your Pinboard token, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password.</p>
       <div class="backup-actions fg-actions">
@@ -201,11 +201,11 @@
       <div class="divider"></div>
       <h2 class="section-title" id="sec-notifications" data-i18n="secNotifications">Notifications</h2>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-notifications">
-        <div class="choice-row"><label><input type="checkbox" id="notify-quick-save" checked /> <span data-i18n="notifyQuickSave">Quick save</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="notify-read-later" checked /> <span data-i18n="notifyReadLater">Read Later save</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="notify-tab-set" checked /> <span data-i18n="notifyTabSet">Tab Set save</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="notify-batch-save" checked /> <span data-i18n="notifyBatchSave">Batch save</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="notify-errors" checked /> <span data-i18n="notifyErrors">Error notifications</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-quick-save" checked /> <span class="switch-text" data-i18n="notifyQuickSave">Quick save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-read-later" checked /> <span class="switch-text" data-i18n="notifyReadLater">Read Later save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-tab-set" checked /> <span class="switch-text" data-i18n="notifyTabSet">Tab Set save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-batch-save" checked /> <span class="switch-text" data-i18n="notifyBatchSave">Batch save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-errors" checked /> <span class="switch-text" data-i18n="notifyErrors">Error notifications</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
 
       <div class="divider"></div>
@@ -239,9 +239,9 @@
         </p>
       </div>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-popup-behavior">
-        <div class="choice-row"><label><input type="checkbox" id="opt-check-bookmark-status" checked /> <span data-i18n="optCheckBookmarkStatus">Show bookmark status via icon (check if current page is saved)</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-auto-close" checked /> <span data-i18n="optAutoClose">Auto-close popup after save</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="offline-queue-enabled" checked /> <span data-i18n="optOfflineQueue">Enable offline save queue</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-check-bookmark-status" checked /> <span class="switch-text" data-i18n="optCheckBookmarkStatus">Show bookmark status via icon (check if current page is saved)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-auto-close" checked /> <span class="switch-text" data-i18n="optAutoClose">Auto-close popup after save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="offline-queue-enabled" checked /> <span class="switch-text" data-i18n="optOfflineQueue">Enable offline save queue</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <div class="fg fg-stack context-help-host" data-help-role="field" role="group" aria-labelledby="popup-width-label">
         <label class="bl" id="popup-width-label" data-i18n="optPopupWidthTitle">Popup width</label>
@@ -258,11 +258,11 @@
       </div>
       <div class="divider"></div>
       <h2 class="section-title" data-i18n="optUrlCleanTitle">URL tracking parameter cleanup</h2>
-      <div class="fg"><label><input type="checkbox" id="opt-urlclean-enabled" checked /> <span data-i18n="optUrlCleanEnabled">Auto-clean URL tracking parameters</span></label></div>
+      <div class="fg"><label class="switch"><input type="checkbox" id="opt-urlclean-enabled" checked /> <span class="switch-text" data-i18n="optUrlCleanEnabled">Auto-clean URL tracking parameters</span><span class="switch-track" aria-hidden="true"></span></label></div>
       <div class="fg fg-stack fg-indent">
-        <div><label><input type="checkbox" id="opt-urlclean-on-open" checked /> <span data-i18n="optUrlCleanOnOpen">Clean when popup opens (silent, with undo link)</span></label></div>
-        <div><label><input type="checkbox" id="opt-urlclean-on-paste" checked /> <span data-i18n="optUrlCleanOnPaste">Clean when pasting URL (toast feedback)</span></label></div>
-        <div><label><input type="checkbox" id="opt-urlclean-aggressive" /> <span data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref/si/igshid and similar</span></label></div>
+        <div><label class="switch"><input type="checkbox" id="opt-urlclean-on-open" checked /> <span class="switch-text" data-i18n="optUrlCleanOnOpen">Clean when popup opens (silent, with undo link)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div><label class="switch"><input type="checkbox" id="opt-urlclean-on-paste" checked /> <span class="switch-text" data-i18n="optUrlCleanOnPaste">Clean when pasting URL (toast feedback)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div><label class="switch"><input type="checkbox" id="opt-urlclean-aggressive" /> <span class="switch-text" data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref/si/igshid and similar</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <div class="fg">
         <label class="bl" for="opt-urlclean-custom" data-i18n="optUrlCleanCustom">Custom parameters (one per line, appended to default list)</label>
@@ -275,14 +275,14 @@
       <div class="divider"></div>
       <h2 class="section-title" id="sec-popup-elements" data-i18n="secPopupElements">Popup Elements</h2>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-popup-elements">
-        <div class="choice-row"><label><input type="checkbox" id="opt-show-search" /> <span data-i18n="optShowSearch">Show search bar in popup</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-show-recent" /> <span data-i18n="optShowRecent">Show recent bookmarks in popup</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-show-badge" /> <span data-i18n="optShowBadge">Show unread count badge on icon</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-show-suggest-tags" checked /> <span data-i18n="optShowSuggestTags">Show Pinboard suggested tags in popup</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-show-ai-summary" checked /> <span data-i18n="optShowAiSummary">Show AI summary button in popup</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-show-ai-tags" checked /> <span data-i18n="optShowAiTags">Show AI tags row in popup</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-show-quick-links" checked /> <span data-i18n="optShowQuickLinks">Show quick links row</span> (<span data-i18n="qlSets">Sets</span> · <span data-i18n="qlNetwork">Network</span> · <span data-i18n="qlUnread">Unread</span> · <span data-i18n="qlNotes">Notes</span> · <span data-i18n="qlPopular">Popular</span>)</label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-show-quick-row" checked /> <span data-i18n="optShowQuickRow">Show quick action buttons (Save Tabs · Batch Save · Markdown)</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-search" /> <span class="switch-text" data-i18n="optShowSearch">Show search bar in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-recent" /> <span class="switch-text" data-i18n="optShowRecent">Show recent bookmarks in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-badge" /> <span class="switch-text" data-i18n="optShowBadge">Show unread count badge on icon</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-suggest-tags" checked /> <span class="switch-text" data-i18n="optShowSuggestTags">Show Pinboard suggested tags in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-ai-summary" checked /> <span class="switch-text" data-i18n="optShowAiSummary">Show AI summary button in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-ai-tags" checked /> <span class="switch-text" data-i18n="optShowAiTags">Show AI tags row in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-quick-links" checked /> <span class="switch-text"><span data-i18n="optShowQuickLinks">Show quick links row</span> (<span data-i18n="qlSets">Sets</span> · <span data-i18n="qlNetwork">Network</span> · <span data-i18n="qlUnread">Unread</span> · <span data-i18n="qlNotes">Notes</span> · <span data-i18n="qlPopular">Popular</span>)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-show-quick-row" checked /> <span class="switch-text" data-i18n="optShowQuickRow">Show quick action buttons (Save Tabs · Batch Save · Markdown)</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
     </div>
 
@@ -290,9 +290,9 @@
     <div id="panel-bookmarks" class="panel" role="tabpanel" aria-labelledby="tab-bookmarks">
       <h2 class="section-title" id="sec-save-defaults" data-i18n="secSaveDefaults">Save Defaults</h2>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-save-defaults">
-        <div class="choice-row"><label><input type="checkbox" id="opt-private-default" /> <span data-i18n="optPrivateDefault">Private by default</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-private-incognito" checked /> <span data-i18n="optPrivateIncognito">Private in Incognito</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-readlater-default" /> <span data-i18n="optReadlaterDefault">Read Later by default</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-private-default" /> <span class="switch-text" data-i18n="optPrivateDefault">Private by default</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-private-incognito" checked /> <span class="switch-text" data-i18n="optPrivateIncognito">Private in Incognito</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-readlater-default" /> <span class="switch-text" data-i18n="optReadlaterDefault">Read Later by default</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <div class="fg fg-stack" role="group" aria-labelledby="bgsave-mode-label">
         <label class="bl" id="bgsave-mode-label" data-i18n="optBgSaveMode">Background save mode</label>
@@ -303,13 +303,13 @@
       <div class="divider"></div>
       <h2 class="section-title" id="sec-notes-behavior" data-i18n="secNotesBehavior">Notes Behavior</h2>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-notes-behavior">
-        <div class="choice-row"><label><input type="checkbox" id="opt-auto-description" checked /> <span data-i18n="optAutoDescription">Auto-fill meta description into notes</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-blockquote" checked /> <span data-i18n="optBlockquote">Wrap selected text with &lt;blockquote&gt;</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-include-referrer" /> <span data-i18n="optIncludeReferrer">Include referrer in Notes</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-auto-description" checked /> <span class="switch-text" data-i18n="optAutoDescription">Auto-fill meta description into notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-blockquote" checked /> <span class="switch-text" data-i18n="optBlockquote">Wrap selected text with &lt;blockquote&gt;</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-include-referrer" /> <span class="switch-text" data-i18n="optIncludeReferrer">Include referrer in Notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <div class="divider"></div>
       <h2 class="section-title" data-i18n="secTags">Tags</h2>
-      <div class="fg"><label><input type="checkbox" id="opt-respect-tag-case" checked /> <span data-i18n="optRespectTagCase">Respect existing tag case (match most-used casing)</span></label></div>
+      <div class="fg"><label class="switch"><input type="checkbox" id="opt-respect-tag-case" checked /> <span class="switch-text" data-i18n="optRespectTagCase">Respect existing tag case (match most-used casing)</span><span class="switch-track" aria-hidden="true"></span></label></div>
       <div class="fg fg-stack context-help-host" data-help-role="field" role="group" aria-labelledby="tag-sync-label">
         <label class="bl" id="tag-sync-label" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
         <details class="context-help">
@@ -335,37 +335,37 @@
       <h2 class="section-title" data-i18n="secQuickSave">Quick Save</h2>
       <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="quick_save"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
       <div class="fg fg-stack choice-stack">
-        <div class="choice-row"><label><input type="checkbox" id="qs-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="qs-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="qs-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Auto-add page description to notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="qs-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <div class="fg">
         <label class="bl" for="qs-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
         <input type="text" id="qs-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
       </div>
       <div class="fg fg-stack choice-stack">
-        <div class="choice-row"><label><input type="checkbox" id="qs-ai-tags" /> <span data-i18n="qsAiTags">Auto-generate AI tags</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="qs-ai-summary" /> <span data-i18n="qsAiSummary">Auto-generate AI summary in notes</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="qs-ai-tags" /> <span class="switch-text" data-i18n="qsAiTags">Auto-generate AI tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="qs-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary in notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
 
       <div class="divider"></div>
       <h2 class="section-title" data-i18n="secReadLater">Read Later</h2>
       <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="read_later"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
       <div class="fg fg-stack choice-stack">
-        <div class="choice-row"><label><input type="checkbox" id="rl-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="rl-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="rl-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Auto-add page description to notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="rl-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <div class="fg">
         <label class="bl" for="rl-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
         <input type="text" id="rl-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
       </div>
       <div class="fg fg-stack choice-stack">
-        <div class="choice-row"><label><input type="checkbox" id="rl-ai-tags" /> <span data-i18n="qsAiTags">Auto-generate AI tags</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="rl-ai-summary" /> <span data-i18n="qsAiSummary">Auto-generate AI summary in notes</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="rl-ai-tags" /> <span class="switch-text" data-i18n="qsAiTags">Auto-generate AI tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="rl-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary in notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
 
       <div class="divider"></div>
       <h2 class="section-title" data-i18n="secBatchSave">Batch Save</h2>
-      <div class="fg"><label><input type="checkbox" id="opt-batch-tag-enabled" checked /> <span data-i18n="batchAutoAddTags">Auto-add tags</span></label></div>
+      <div class="fg"><label class="switch"><input type="checkbox" id="opt-batch-tag-enabled" checked /> <span class="switch-text" data-i18n="batchAutoAddTags">Auto-add tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
       <div class="fg context-help-host" data-help-role="field">
         <label class="bl" for="opt-batch-tag" data-i18n="batchTagsLabel">Tags (comma-separated)</label>
         <details class="context-help">
@@ -374,15 +374,15 @@
         </details>
         <input type="text" id="opt-batch-tag" value="batch_saved" />
       </div>
-      <div class="fg"><label><input type="checkbox" id="batch-skip-existing" /> <span data-i18n="batchSkipExisting">Skip already bookmarked URLs</span></label></div>
+      <div class="fg"><label class="switch"><input type="checkbox" id="batch-skip-existing" /> <span class="switch-text" data-i18n="batchSkipExisting">Skip already bookmarked URLs</span><span class="switch-track" aria-hidden="true"></span></label></div>
       <div class="fg fg-stack context-help-host" data-help-role="group" role="group" aria-labelledby="batch-ai-title">
         <div class="bl context-help-anchor" id="batch-ai-title" data-i18n="tabGroupAI">AI</div>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="batchAiHint">AI runs one call per tab and may be slow. On first use, Batch asks only for the listed tab sites and current AI provider.</p>
         </details>
-        <div><label><input type="checkbox" id="batch-ai-tags" /> <span data-i18n="batchAiTags">Auto-generate AI tags for each tab</span></label></div>
-        <div><label><input type="checkbox" id="batch-ai-summary" /> <span data-i18n="batchAiSummary">Auto-generate AI summary for each tab</span></label></div>
+        <div><label class="switch"><input type="checkbox" id="batch-ai-tags" /> <span class="switch-text" data-i18n="batchAiTags">Auto-generate AI tags for each tab</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div><label class="switch"><input type="checkbox" id="batch-ai-summary" /> <span class="switch-text" data-i18n="batchAiSummary">Auto-generate AI summary for each tab</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <div class="fg" id="batch-legacy-permission" hidden>
         <div>
@@ -630,7 +630,7 @@
         </details>
       </div>
       <div class="choice-row context-help-host" data-help-role="choice">
-        <label><input type="checkbox" id="opt-ai-use-transcript" checked /> <span data-i18n="optAiUseTranscript">Use video captions as the AI content source</span></label>
+        <label class="switch"><input type="checkbox" id="opt-ai-use-transcript" checked /> <span class="switch-text" data-i18n="optAiUseTranscript">Use video captions as the AI content source</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="optAiUseTranscriptHint">On YouTube and bilibili video pages, AI tags and summaries read the subtitles instead of the page text. Active only after you have granted subtitle access; it never prompts on its own.</p>
@@ -640,7 +640,7 @@
 
       <div class="divider"></div>
       <h2 class="section-title" data-i18n="secAiBehavior">AI Behavior</h2>
-      <div class="fg"><label><input type="checkbox" id="opt-ai-auto-tags" /> <span data-i18n="optAiAutoTags">Auto-generate AI tags on popup open</span></label></div>
+      <div class="fg"><label class="switch"><input type="checkbox" id="opt-ai-auto-tags" /> <span class="switch-text" data-i18n="optAiAutoTags">Auto-generate AI tags on popup open</span><span class="switch-track" aria-hidden="true"></span></label></div>
       <div class="fg">
         <label class="bl" for="opt-ai-tag-lang" data-i18n="labelAiTagLang">AI Tag Language</label>
         <select id="opt-ai-tag-lang">
@@ -726,7 +726,7 @@
       <h2 class="section-title" data-i18n="secPreviewAi">Preview Page AI</h2>
 
       <div class="fg">
-        <label><input type="checkbox" id="opt-preview-ai-enabled" checked /> <span data-i18n="previewAiEnabled">Enable AI features on the preview page</span></label>
+        <label class="switch"><input type="checkbox" id="opt-preview-ai-enabled" checked /> <span class="switch-text" data-i18n="previewAiEnabled">Enable AI features on the preview page</span><span class="switch-track" aria-hidden="true"></span></label>
       </div>
 
       <!-- Unhidden by renderConnectionOverview (options.js) when the indented
@@ -782,7 +782,7 @@
       </div>
 
       <div class="fg context-help-host fg-indent" data-help-role="choice">
-        <label><input type="checkbox" id="opt-preview-skim" /> <span data-i18n="skimEnable">Generate an AI key-points summary on the preview page</span></label>
+        <label class="switch"><input type="checkbox" id="opt-preview-skim" /> <span class="switch-text" data-i18n="skimEnable">Generate an AI key-points summary on the preview page</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="skimEnableHint">Shows 3-5 key points at the top of the preview page. Each generation uses AI tokens; results are cached per article.</p>
@@ -811,13 +811,13 @@
       </div>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-video-preview">
       <div class="choice-row">
-        <label><input type="checkbox" id="opt-md-video-dark" /> <span data-i18n="optVideoDarkScheme">Open video pages in dark</span></label>
+        <label class="switch"><input type="checkbox" id="opt-md-video-dark" /> <span class="switch-text" data-i18n="optVideoDarkScheme">Open video pages in dark</span><span class="switch-track" aria-hidden="true"></span></label>
       </div>
       <div class="choice-row">
-        <label><input type="checkbox" id="opt-md-video-pause-lookup" checked /> <span data-i18n="optVideoPauseOnLookup">Pause the player while looking a word up</span></label>
+        <label class="switch"><input type="checkbox" id="opt-md-video-pause-lookup" checked /> <span class="switch-text" data-i18n="optVideoPauseOnLookup">Pause the player while looking a word up</span><span class="switch-track" aria-hidden="true"></span></label>
       </div>
       <div class="choice-row context-help-host" data-help-role="choice">
-        <label><input type="checkbox" id="opt-md-video-use-login" checked /> <span data-i18n="optVideoUseLogin">Send YouTube login cookies with subtitle requests</span></label>
+        <label class="switch"><input type="checkbox" id="opt-md-video-use-login" checked /> <span class="switch-text" data-i18n="optVideoUseLogin">Send YouTube login cookies with subtitle requests</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" id="opt-md-video-use-login-hint" data-i18n="optVideoUseLoginHint">Only affects the fallback request the reader sends itself when no www.youtube.com tab is open; with a YouTube tab open, captions are read through that tab and its own session. On by default.</p>
@@ -848,7 +848,7 @@
       <details class="disclosure" data-acc-key="vocab-reading">
         <summary data-i18n="vocabReadingSection">Reading hints</summary>
         <div class="disclosure-body">
-          <div class="fg context-help-host" data-help-role="choice"><label><input type="checkbox" id="dict-echo-enabled" checked /> <span data-i18n="dictEchoToggle">Underline saved words while reading</span></label>
+          <div class="fg context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="dict-echo-enabled" checked /> <span class="switch-text" data-i18n="dictEchoToggle">Underline saved words while reading</span><span class="switch-track" aria-hidden="true"></span></label>
             <details class="context-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
               <p class="hint context-help-body" data-i18n="dictEchoHint">Dotted underlines mark words already in your vocabulary. Click one to open the dictionary.</p>
@@ -940,8 +940,8 @@
     <div id="panel-markdown" class="panel" role="tabpanel" aria-labelledby="tab-markdown">
       <h2 class="section-title" id="sec-md-export" data-i18n="secMdExport">Markdown Export Defaults</h2>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-md-export">
-        <div class="choice-row"><label><input type="checkbox" id="opt-md-frontmatter" checked /> <span data-i18n="mdExportFrontmatter">Add YAML frontmatter to exported Markdown</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-md-extended-meta" checked /> <span data-i18n="mdExportExtendedMeta">Include extended metadata (author, published, site, image, word count)</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-md-frontmatter" checked /> <span class="switch-text" data-i18n="mdExportFrontmatter">Add YAML frontmatter to exported Markdown</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-md-extended-meta" checked /> <span class="switch-text" data-i18n="mdExportExtendedMeta">Include extended metadata (author, published, site, image, word count)</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <div class="fg context-help-host" data-help-role="field">
         <label class="bl" for="opt-md-image-policy" data-i18n="mdExportImagePolicy">Image handling</label>
@@ -956,8 +956,8 @@
         </select>
       </div>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-md-export">
-        <div class="choice-row"><label><input type="checkbox" id="opt-md-include-toc" /> <span data-i18n="mdExportIncludeToc">Include table of contents</span></label></div>
-        <div class="choice-row"><label><input type="checkbox" id="opt-md-include-hl" checked /> <span data-i18n="mdOptIncludeHl">Include highlights</span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-md-include-toc" /> <span class="switch-text" data-i18n="mdExportIncludeToc">Include table of contents</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-md-include-hl" checked /> <span class="switch-text" data-i18n="mdOptIncludeHl">Include highlights</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
 
       <div class="divider"></div>
@@ -1032,7 +1032,7 @@
     <div id="panel-archive" class="panel" role="tabpanel" aria-labelledby="tab-archive">
       <h2 class="section-title" id="sec-wayback" data-i18n="secWayback">Wayback Machine Archiving</h2>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-wayback">
-      <div class="choice-row context-help-host" data-help-role="choice"><label><input type="checkbox" id="opt-wayback-enabled" /> <span data-i18n="optWayback">Archive saved pages to the Wayback Machine</span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-wayback-enabled" /> <span class="switch-text" data-i18n="optWayback">Archive saved pages to the Wayback Machine</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="optWaybackHint">After each save, ask the Internet Archive to snapshot the page (best effort, never blocks saving). Sends the saved URL to archive.org; off by default.</p>
@@ -1046,7 +1046,7 @@
         <span id="wayback-perm-status" class="hint hint-warn wayback-perm-status" role="status" aria-live="polite"></span>
       </div>
       <div class="choice-row context-help-host fg-indent" data-help-role="choice">
-        <label><input type="checkbox" id="opt-wayback-batch" /> <span data-i18n="optWaybackBatch">Also archive during batch save</span></label>
+        <label class="switch"><input type="checkbox" id="opt-wayback-batch" /> <span class="switch-text" data-i18n="optWaybackBatch">Also archive during batch save</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="optWaybackBatchHint">Batch saves can fire many archive requests at once; anonymous quota is limited.</p>
@@ -1056,7 +1056,7 @@
            it (nothing is submitted to archive.org while archiving is off), so
            it carries the same indent instead of sitting at the parent's own
            level. -->
-      <div class="choice-row fg-indent"><label><input type="checkbox" id="opt-wayback-skip-private" checked /> <span data-i18n="waybackSkipPrivate">Never archive bookmarks you save as private</span></label></div>
+      <div class="choice-row fg-indent"><label class="switch"><input type="checkbox" id="opt-wayback-skip-private" checked /> <span class="switch-text" data-i18n="waybackSkipPrivate">Never archive bookmarks you save as private</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
       <div class="divider"></div>
       <div class="fg context-help-host" data-help-role="field">
@@ -1108,7 +1108,7 @@
       </div>
 
       <div class="fg context-help-host" data-help-role="choice">
-        <label><input type="checkbox" id="opt-popup-follow-theme" checked /> <span data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span></label>
+        <label class="switch"><input type="checkbox" id="opt-popup-follow-theme" checked /> <span class="switch-text" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span><span class="switch-track" aria-hidden="true"></span></label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">When on, the popup, this settings page and the notes &amp; vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette.</p>
