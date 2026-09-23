@@ -159,8 +159,11 @@ async function preparePage(page, locale) {
       slot.innerHTML = icon;
     });
     document.querySelectorAll("details.context-help").forEach((details) => {
-      const host = details.parentElement;
-      const anchor = details.previousElementSibling;
+      // A .switch choice row carries its help INSIDE the label (Ruling 36):
+      // there the label is the anchor and its parent the host.
+      const inLabel = details.parentElement?.matches("label");
+      const host = inLabel ? details.parentElement.parentElement : details.parentElement;
+      const anchor = inLabel ? details.parentElement : details.previousElementSibling;
       const copyNode = host?.dataset.helpRole === "choice"
         ? (anchor?.querySelector("span[data-i18n]") || anchor)
         : host?.dataset.helpRole === "action"
@@ -177,8 +180,9 @@ async function preparePage(page, locale) {
 
 async function inventory(page) {
   return page.evaluate(() => [...document.querySelectorAll("details.context-help")].map((details, index) => {
-    const host = details.parentElement;
-    const anchor = details.previousElementSibling;
+    const inLabel = details.parentElement?.matches("label");
+    const host = inLabel ? details.parentElement.parentElement : details.parentElement;
+    const anchor = inLabel ? details.parentElement : details.previousElementSibling;
     const inferredRole = host?.classList.contains("context-help-action-row") ? "action"
       : host?.classList.contains("context-help-section") ? "section"
       : anchor?.matches("label") && anchor.querySelector('input[type="checkbox"],input[type="radio"]') ? "choice"
@@ -205,8 +209,9 @@ async function capturePair(page, item) {
         node.removeAttribute("data-help-audit-panel");
       });
     const details = document.querySelectorAll("details.context-help")[index];
-    const host = details?.parentElement;
-    const anchor = details?.previousElementSibling;
+    const inLabel = details?.parentElement?.matches("label");
+    const host = inLabel ? details.parentElement.parentElement : details?.parentElement;
+    const anchor = inLabel ? details.parentElement : details?.previousElementSibling;
     if (!host || !anchor) return null;
     const panel = host.closest(".panel");
     panel?.setAttribute("data-help-audit-panel", "");

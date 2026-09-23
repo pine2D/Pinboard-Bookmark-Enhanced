@@ -36,10 +36,16 @@ function test(name, fn) {
   doc.querySelectorAll(".context-help-toggle .btn-ic").forEach((slot) => {
     slot.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>';
   });
+  // A .switch choice row carries its help INSIDE the label, between the copy
+  // and the track (Ruling 36): there the label is the anchor and the label's
+  // parent the host. Every other help sits in its host after its anchor.
+  const helpInLabel = (details) => !!details?.parentElement?.matches("label");
+  const helpHost = (details) => helpInLabel(details) ? details.parentElement.parentElement : details?.parentElement;
+  const helpAnchor = (details) => helpInLabel(details) ? details.parentElement : details?.previousElementSibling;
   const zhMessages = await fetch("../_locales/zh_CN/messages.json").then((response) => response.json());
   doc.querySelectorAll("details.context-help").forEach((details) => {
     const body = details.querySelector(".context-help-body[data-i18n]");
-    const anchor = details.previousElementSibling;
+    const anchor = helpAnchor(details);
     const anchorCopy = anchor?.matches("[data-i18n]")
       ? anchor
       : anchor?.querySelector("[data-i18n]");
@@ -50,7 +56,7 @@ function test(name, fn) {
       const message = zhMessages[node.dataset.i18n]?.message;
       if (typeof message === "string") node.textContent = message;
     });
-    const host = details.parentElement;
+    const host = helpHost(details);
     const copyNode = host?.dataset.helpRole === "choice"
       ? (anchor?.querySelector("span[data-i18n]") || anchor)
       : host?.dataset.helpRole === "action"
@@ -90,10 +96,22 @@ function test(name, fn) {
     return {
       body,
       details,
-      host: details.parentElement,
-      anchor: details.previousElementSibling,
+      host: helpHost(details),
+      anchor: helpAnchor(details),
       toggle: details.querySelector(":scope > summary.context-help-toggle"),
     };
+  }
+
+  // The anchor's own row. An in-label help's answer opens INSIDE the label, so
+  // the label box grows with it; its first line (padding box around the copy
+  // line) is the row the answer must hang under.
+  function anchorRowRect(anchor) {
+    const rect = anchor.getBoundingClientRect();
+    const copy = anchor.matches("label.switch") && anchor.querySelector(":scope > details.context-help")
+      ? anchor.querySelector(":scope > .switch-text") : null;
+    if (!copy) return rect;
+    const bottom = copy.getBoundingClientRect().bottom + parseFloat(frame.contentWindow.getComputedStyle(anchor).paddingBottom);
+    return { top: rect.top, left: rect.left, right: rect.right, bottom, width: rect.width, height: bottom - rect.top };
   }
 
   function textInkRect(anchor) {
@@ -112,8 +130,8 @@ function test(name, fn) {
     const disclosures = [...doc.querySelectorAll("details.context-help:not(.context-help-inline)")];
     assert(disclosures.length >= 25, "too few contextual disclosures: " + disclosures.length);
     disclosures.forEach((details) => {
-      const host = details.parentElement;
-      const anchor = details.previousElementSibling;
+      const host = helpHost(details);
+      const anchor = helpAnchor(details);
       const key = details.querySelector(".context-help-body")?.dataset.i18n || "unknown";
       assert(host?.classList.contains("context-help-host"), key + " left its contextual-help host");
       assert(anchor?.matches("label,.section-title,.bl,.context-help-anchor"), key + " has no adjacent text anchor");
@@ -130,8 +148,8 @@ function test(name, fn) {
     disclosures.forEach((details) => {
       const body = details.querySelector(".context-help-body");
       const key = body?.dataset.i18n || "unknown";
-      const host = details.parentElement;
-      const anchor = details.previousElementSibling;
+      const host = helpHost(details);
+      const anchor = helpAnchor(details);
       const toggle = details.querySelector(":scope > summary.context-help-toggle");
       const role = host?.dataset.helpRole;
       const script = host?.dataset.helpScript;
@@ -157,17 +175,7 @@ function test(name, fn) {
       assert(t.width >= 24 && t.height >= 24, key + " lost the 24px hit target");
       const icon = toggle.querySelector("svg")?.getBoundingClientRect();
       assert(icon && icon.width <= 14 && icon.height <= 14, key + " icon is too prominent");
-      // A choice row's label fills the row up to the help column (a .switch
-      // label ends with its track; the radios share that grid), so the icon
-      // sits a fixed distance after the label box, not after the copy's ink.
-      const anchorEnd = role === "choice" ? anchor.getBoundingClientRect().right : a.right;
-      const visualGap = icon.left - anchorEnd;
-      // ...and that label must reach the help column: a shrink-wrapped label
-      // parks the switch track mid-row, right after the copy.
-      if (role === "choice") {
-        const tail = host.getBoundingClientRect().right - anchorEnd;
-        if (tail < 24 || tail > 28) violations.push(key + " choice label stops " + tail + "px before the row end");
-      }
+      const visualGap = icon.left - a.right;
       if (visualGap < 6 || visualGap > 8) violations.push(key + " visual gap=" + visualGap);
       const iconStyle = frame.contentWindow.getComputedStyle(toggle.querySelector(".btn-ic"));
       const transformKey = role + "/" + script;
@@ -242,12 +250,46 @@ function test(name, fn) {
     assert(!stolen.length, stolen.slice(0, 12).join("; "));
   });
 
+  test("help inside a switch label opens without toggling the switch", () => {
+    // A .switch choice row's <details> sits INSIDE its label (Ruling 36).
+    // HTML: a label does not activate its control for clicks on interactive
+    // content descendants, and <details> is interactive content -- so the
+    // summary and the answer must open/hold the help and leave the checkbox
+    // alone. Positive control per row: a click on the copy DOES toggle, so a
+    // probe that could never see a toggle cannot pass.
+    const inLabel = [...doc.querySelectorAll("label.switch > details.context-help")];
+    assert(inLabel.length >= 10, "too few in-label help rows: " + inLabel.length);
+    const failures = [];
+    inLabel.forEach((details) => {
+      const label = details.parentElement;
+      const input = label.querySelector(":scope > input[type=checkbox]");
+      const copy = label.querySelector(":scope > .switch-text");
+      const summary = details.querySelector(":scope > summary.context-help-toggle");
+      const body = details.querySelector(".context-help-body");
+      const key = body?.dataset.i18n || input?.id || "?";
+      reveal(details);
+      details.open = false;
+      const initial = input.checked;
+      summary.click();
+      if (input.checked !== initial) failures.push(key + " summary click toggled the switch");
+      if (!details.open) failures.push(key + " summary click did not open the help");
+      body.click();
+      if (input.checked !== initial) failures.push(key + " answer click toggled the switch");
+      copy.click();
+      if (input.checked === initial) failures.push(key + " copy click did not toggle (probe is blind)");
+      input.checked = initial;
+      details.open = false;
+      if (input.getAttribute("aria-labelledby") !== copy.id || !copy.id) failures.push(key + " input is not labelled by its copy span alone");
+    });
+    assert(!failures.length, failures.slice(0, 12).join("; "));
+  });
+
   test("expanded help opens below and from the start of its owning row", () => {
     layoutCases.forEach(([key, type]) => {
       const { details, host, anchor, toggle, body } = parts(key);
       details.open = true;
       const h = host.getBoundingClientRect();
-      const a = anchor.getBoundingClientRect();
+      const a = anchorRowRect(anchor);
       const t = toggle.getBoundingClientRect();
       const b = body.getBoundingClientRect();
       // The 24px help target is positioned into its cell and must not size the
@@ -273,7 +315,7 @@ function test(name, fn) {
         if (candidate !== details) candidate.open = false;
       });
       details.open = true;
-      const hostRect = details.parentElement.getBoundingClientRect();
+      const hostRect = helpHost(details).getBoundingClientRect();
       const bodyRect = body.getBoundingClientRect();
       assert(
         bodyRect.width >= hostRect.width - 2,

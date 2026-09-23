@@ -622,6 +622,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); 
 **`.switch`（开关，options 专用；taste-uplift batch4 D3/D5/D6）**——§6.4 例外段是它存在的理由，
 配方单源在 `composers/ui-components.mjs` 的 `switchRules`（只对 `ns === "opt"` 发射）。结构：
 `label.switch > input[type=checkbox] + span.switch-text + span.switch-track`，开关在行尾（D2）。
+带帮助的开关行（11 行）把 `details.context-help` 放进 label、夹在 `.switch-text` 与 `.switch-track` 之间
+（Ruling 36：帮助图标紧跟文字，不贴轨道）；input 以 `aria-labelledby` 指向文字 span（`<inputid>-label`），
+可访问名只含文字。HTML 规定 label 对交互内容后代（`<details>`）的点击不激活控件，所以点 summary 或展开的
+答案都不会翻转开关；展开的答案占 label 的第二条 flex 行（`flex-wrap`），input 只覆盖第一行。
 
 | 部件 | 几何 | token |
 |---|---|---|

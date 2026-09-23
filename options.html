@@ -119,17 +119,17 @@
       <div class="divider"></div>
       <h2 class="section-title" id="sec-sync" data-i18n="secSync">Data Sync</h2>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-sync">
-      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-enabled" /> <span class="switch-text" data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span><span class="switch-track" aria-hidden="true"></span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-enabled" aria-labelledby="opt-sync-enabled-label" /> <span class="switch-text" id="opt-sync-enabled-label" data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="optSyncHint">This checkbox applies to this device only. Settings are shared between the devices where you turn it on; devices with it off keep their own local settings.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
       </div>
-      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-api-keys" /> <span class="switch-text" data-i18n="syncApiKeysLabel">Sync credentials for this Google account</span><span class="switch-track" aria-hidden="true"></span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-api-keys" aria-labelledby="opt-sync-api-keys-label" /> <span class="switch-text" id="opt-sync-api-keys-label" data-i18n="syncApiKeysLabel">Sync credentials for this Google account</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="syncApiKeysHint">This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
       </div>
       </div>
       <p id="opt-sync-local-only" class="sync-local-only" role="status" aria-live="polite" hidden></p>
@@ -143,17 +143,17 @@
         </details>
       </div>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-backup-restore">
-      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-highlights" checked /> <span class="switch-text" data-i18n="backupIncludeHighlightsLabel">Include highlights and notes in backups</span><span class="switch-track" aria-hidden="true"></span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-highlights" aria-labelledby="opt-backup-include-highlights-label" checked /> <span class="switch-text" id="opt-backup-include-highlights-label" data-i18n="backupIncludeHighlightsLabel">Include highlights and notes in backups</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="backupIncludeHighlightsHint">Includes page URLs, titles, selected text, notes, colors, and timestamps.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
       </div>
-      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-vocabulary" checked /> <span class="switch-text" data-i18n="backupIncludeVocabularyLabel">Include vocabulary in backups</span><span class="switch-track" aria-hidden="true"></span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-vocabulary" aria-labelledby="opt-backup-include-vocabulary-label" checked /> <span class="switch-text" id="opt-backup-include-vocabulary-label" data-i18n="backupIncludeVocabularyLabel">Include vocabulary in backups</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="backupIncludeVocabularyHint">Includes vocabulary only for the current Pinboard account.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
       </div>
       <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-backup-include-secrets" aria-describedby="backup-secrets-warning" /> <span class="switch-text" data-i18n="backupIncludeSecretsLabel">Include API keys and tokens in backups</span><span class="switch-track" aria-hidden="true"></span></label></div>
       </div>
@@ -630,11 +630,11 @@
         </details>
       </div>
       <div class="choice-row context-help-host" data-help-role="choice">
-        <label class="switch"><input type="checkbox" id="opt-ai-use-transcript" checked /> <span class="switch-text" data-i18n="optAiUseTranscript">Use video captions as the AI content source</span><span class="switch-track" aria-hidden="true"></span></label>
+        <label class="switch"><input type="checkbox" id="opt-ai-use-transcript" aria-labelledby="opt-ai-use-transcript-label" checked /> <span class="switch-text" id="opt-ai-use-transcript-label" data-i18n="optAiUseTranscript">Use video captions as the AI content source</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="optAiUseTranscriptHint">On YouTube and bilibili video pages, AI tags and summaries read the subtitles instead of the page text. Active only after you have granted subtitle access; it never prompts on its own.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
       </div>
       </div>
 
@@ -782,11 +782,11 @@
       </div>
 
       <div class="fg context-help-host fg-indent" data-help-role="choice">
-        <label class="switch"><input type="checkbox" id="opt-preview-skim" /> <span class="switch-text" data-i18n="skimEnable">Generate an AI key-points summary on the preview page</span><span class="switch-track" aria-hidden="true"></span></label>
+        <label class="switch"><input type="checkbox" id="opt-preview-skim" aria-labelledby="opt-preview-skim-label" /> <span class="switch-text" id="opt-preview-skim-label" data-i18n="skimEnable">Generate an AI key-points summary on the preview page</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="skimEnableHint">Shows 3-5 key points at the top of the preview page. Each generation uses AI tokens; results are cached per article.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
       </div>
 
       <div class="fg">
@@ -817,11 +817,11 @@
         <label class="switch"><input type="checkbox" id="opt-md-video-pause-lookup" checked /> <span class="switch-text" data-i18n="optVideoPauseOnLookup">Pause the player while looking a word up</span><span class="switch-track" aria-hidden="true"></span></label>
       </div>
       <div class="choice-row context-help-host" data-help-role="choice">
-        <label class="switch"><input type="checkbox" id="opt-md-video-use-login" checked /> <span class="switch-text" data-i18n="optVideoUseLogin">Send YouTube login cookies with subtitle requests</span><span class="switch-track" aria-hidden="true"></span></label>
+        <label class="switch"><input type="checkbox" id="opt-md-video-use-login" aria-labelledby="opt-md-video-use-login-label" checked /> <span class="switch-text" id="opt-md-video-use-login-label" data-i18n="optVideoUseLogin">Send YouTube login cookies with subtitle requests</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" id="opt-md-video-use-login-hint" data-i18n="optVideoUseLoginHint">Only affects the fallback request the reader sends itself when no www.youtube.com tab is open; with a YouTube tab open, captions are read through that tab and its own session. On by default.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
       </div>
       </div>
 
@@ -848,11 +848,11 @@
       <details class="disclosure" data-acc-key="vocab-reading">
         <summary data-i18n="vocabReadingSection">Reading hints</summary>
         <div class="disclosure-body">
-          <div class="fg context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="dict-echo-enabled" checked /> <span class="switch-text" data-i18n="dictEchoToggle">Underline saved words while reading</span><span class="switch-track" aria-hidden="true"></span></label>
+          <div class="fg context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="dict-echo-enabled" aria-labelledby="dict-echo-enabled-label" checked /> <span class="switch-text" id="dict-echo-enabled-label" data-i18n="dictEchoToggle">Underline saved words while reading</span>
             <details class="context-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
               <p class="hint context-help-body" data-i18n="dictEchoHint">Dotted underlines mark words already in your vocabulary. Click one to open the dictionary.</p>
-            </details>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
           </div>
         </div>
       </details>
@@ -1032,11 +1032,11 @@
     <div id="panel-archive" class="panel" role="tabpanel" aria-labelledby="tab-archive">
       <h2 class="section-title" id="sec-wayback" data-i18n="secWayback">Wayback Machine Archiving</h2>
       <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-wayback">
-      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-wayback-enabled" /> <span class="switch-text" data-i18n="optWayback">Archive saved pages to the Wayback Machine</span><span class="switch-track" aria-hidden="true"></span></label>
+      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-wayback-enabled" aria-labelledby="opt-wayback-enabled-label" /> <span class="switch-text" id="opt-wayback-enabled-label" data-i18n="optWayback">Archive saved pages to the Wayback Machine</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="optWaybackHint">After each save, ask the Internet Archive to snapshot the page (best effort, never blocks saving). Sends the saved URL to archive.org; off by default.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
         <!-- After the <details>, so `.context-help-host > .context-help ~ *`
              gives it a full-width row of its own under the checkbox that
              requests the permission (it used to sit three blocks lower, past
@@ -1046,11 +1046,11 @@
         <span id="wayback-perm-status" class="hint hint-warn wayback-perm-status" role="status" aria-live="polite"></span>
       </div>
       <div class="choice-row context-help-host fg-indent" data-help-role="choice">
-        <label class="switch"><input type="checkbox" id="opt-wayback-batch" /> <span class="switch-text" data-i18n="optWaybackBatch">Also archive during batch save</span><span class="switch-track" aria-hidden="true"></span></label>
+        <label class="switch"><input type="checkbox" id="opt-wayback-batch" aria-labelledby="opt-wayback-batch-label" /> <span class="switch-text" id="opt-wayback-batch-label" data-i18n="optWaybackBatch">Also archive during batch save</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="optWaybackBatchHint">Batch saves can fire many archive requests at once; anonymous quota is limited.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
       </div>
       <!-- Subordinate to #opt-wayback-enabled exactly like the batch row above
            it (nothing is submitted to archive.org while archiving is off), so
@@ -1108,11 +1108,11 @@
       </div>
 
       <div class="fg context-help-host" data-help-role="choice">
-        <label class="switch"><input type="checkbox" id="opt-popup-follow-theme" checked /> <span class="switch-text" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span><span class="switch-track" aria-hidden="true"></span></label>
+        <label class="switch"><input type="checkbox" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">When on, the popup, this settings page and the notes &amp; vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette.</p>
-        </details>
+        </details><span class="switch-track" aria-hidden="true"></span></label>
       </div>
 
       <div class="divider"></div>

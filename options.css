@@ -437,22 +437,49 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
   margin: 0;
   justify-self: start;
 }
-/* A choice row's copy is a .switch label whose track sits at the row END, so
-   the label fills column 1 instead of shrink-wrapping (which parked the track
-   mid-row, right after the text) and the help target takes the trailing
-   24px column: text ... track | help. The two AI-content-source radios are
-   choice hosts in the same stack as a switch row; they take the same grid, so
-   the three help targets of that stack share one row-end column instead of
-   two sitting after short radio copy and one after the track. */
-.context-help-host[data-help-role="choice"] { grid-template-columns: minmax(0, 1fr) 24px; }
-.context-help-host[data-help-role="choice"] > label { justify-self: stretch; }
-/* The copy span is the host's baseline participant (see the context-help
-   block), so it sits flush with the label's content-box top. A stacked choice
-   row gets the 20px box with 2px block padding (.choice-row + .fg-stack
-   rules), which puts the 16px line box on the track's centre; the three
-   stand-alone choice hosts (.fg, no stack) take the same box so their text
-   is not 2px above the track. */
-.context-help-host[data-help-role="choice"] > label.switch { height: 20px; padding: var(--opt-sp-1) 0; }
+/* Choice hosts use the shared grid: the copy label shrink-wraps in column 1
+   and the help target follows it in column 2, right after the copy -- where
+   the two AI-content-source RADIO rows keep it.
+   A .switch choice row carries its help INSIDE the label instead (Ruling 36:
+   the icon belongs after the text, not beside the track): details.context-help
+   sits between .switch-text and .switch-track, so the icon follows the copy
+   and the recipe's `margin-left: auto` still parks the track at the row end.
+   That label spans the whole host and may grow past 20px: it wraps, and an
+   open answer (the details' ::details-content) takes a full-width second flex
+   line. Closed, the second line is empty and zero-height (row-gap 0), so the
+   row stays 20px -- 2px block padding around a 16px line box, the same box
+   the stacked choice rows use and the one the help toggle's baseline is
+   calibrated against (context-help block). The copy's line box is pinned to
+   16px here too: on the .fg hosts (no .choice-row) it was `normal`, which is
+   taller than 16px under some font stacks and would now grow the row instead
+   of overflowing a fixed 20px box. Per HTML, <details> is interactive
+   content, so a click on the summary or the answer does not activate the
+   label (the checkbox does not toggle). */
+.context-help-host[data-help-role="choice"] > label.switch {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  flex-wrap: wrap;
+  row-gap: 0;
+  height: auto;
+  min-height: 20px;
+  padding: var(--opt-sp-1) 0;
+}
+.context-help-host[data-help-role="choice"] > label.switch > .switch-text { line-height: 16px; }
+/* The native input covers the first line only (the 20px row plus the
+   recipe's 2px overhang each way): an open answer below it is copy to read,
+   not part of the switch's hit target. max-height, not height, so the
+   forced-colors fallback (static input, height:auto) is left untouched. */
+.context-help-host[data-help-role="choice"] > label.switch > input[type="checkbox"] { bottom: auto; max-height: 24px; }
+label.switch > .context-help { display: contents; }
+label.switch > .context-help::details-content { flex: 0 0 100%; order: 1; min-width: 0; }
+label.switch > .context-help > .context-help-body { margin-top: var(--opt-sp-2); cursor: auto; }
+/* Text -> help target = sp-1, the host grid's column-gap the radio rows (and
+   every choice row before Ruling 36) get: the label's own gap is sp-3, so
+   the target steps back by the difference. */
+.context-help-host[data-help-role="choice"] > label.switch > .context-help > summary.context-help-toggle { margin-left: calc(var(--opt-sp-1) - var(--opt-sp-3)); }
+/* Anything the host holds after such a label (the Wayback permission status)
+   takes a full-width row of its own, as it did when it followed <details>. */
+.context-help-host[data-help-role="choice"] > label.switch ~ * { grid-column: 1 / -1; min-width: 0; margin-top: var(--opt-sp-2); }
 .context-help-section { margin: var(--opt-sp-4) 0; }   /* same margins as .section-title, so divider -> title -> content match a plain heading */
 .context-help-section > .section-title { margin: 0; }
 .context-help-host > .context-help,
@@ -606,7 +633,8 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    not drop onto the text baseline. The copy span -- plain or .switch-text --
    is still the one baseline participant. */
 .context-help-host[data-help-role="choice"] > label > span:not(.switch-track) { align-self: baseline; }
-.context-help-host[data-help-role="choice"] > .context-help > summary.context-help-toggle { align-self: baseline; }
+.context-help-host[data-help-role="choice"] > .context-help > summary.context-help-toggle,
+.context-help-host[data-help-role="choice"] > label.switch > .context-help > summary.context-help-toggle { align-self: baseline; }
 [data-help-script="alphabetic"][data-help-role="choice"] { --context-help-optical-y: 2.375px; }
 [data-help-script="cjk"][data-help-role="choice"] { --context-help-optical-y: 2.125px; }
 .context-help-toggle .btn-ic {

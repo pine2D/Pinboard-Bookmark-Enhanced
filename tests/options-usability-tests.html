@@ -17,6 +17,8 @@
   <div class="fg choice-stack">
     <div class="choice-row"><label for="sync-first">First sync choice</label><input id="sync-first" /><p class="hint">First sync explanation</p></div>
     <div class="choice-row"><label for="sync-second">Second sync choice</label><input id="sync-second" /><p class="hint">Second sync explanation</p></div>
+    <!-- A .switch choice row with its help INSIDE the label (Ruling 36). -->
+    <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="switch-inlabel" aria-labelledby="switch-inlabel-label" /> <span class="switch-text" id="switch-inlabel-label">Wvxq inline help switch</span><details class="context-help"><summary class="context-help-toggle" aria-label="More information"></summary><p class="hint context-help-body">Wvxq inline help answer</p></details><span class="switch-track" aria-hidden="true"></span></label></div>
   </div>
   <!-- The one collapse mechanism the real page buries settings in: keyed
        native details.disclosure sections, closed. The second one nests a
@@ -256,6 +258,15 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     const index = pbpBuildSettingsSearchIndex(document);
     const second = index.find((entry) => entry.text.includes("Second sync explanation"));
     assert(second?.targetId === "sync-second", "grouped hint targeted " + (second?.targetId || "nothing"));
+  });
+
+  await test("a switch label holding its own help indexes only its copy; both rows target the switch", async () => {
+    const index = pbpBuildSettingsSearchIndex(document);
+    const copy = index.filter((entry) => entry.text.includes("Wvxq inline help switch"));
+    assert(copy.length === 1 && copy[0].text === "Wvxq inline help switch" && copy[0].targetId === "switch-inlabel",
+      "label row: " + JSON.stringify(copy));
+    const answer = index.find((entry) => entry.text === "Wvxq inline help answer");
+    assert(answer?.targetId === "switch-inlabel", "answer row targeted " + (answer?.targetId || "nothing"));
   });
 
   await test("settings search returns panel-aware matches and caps empty queries", async () => {

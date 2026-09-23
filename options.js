@@ -1,7 +1,9 @@
 function pbpRefreshContextHelpScriptFamilies(root = document) {
   root.querySelectorAll("[data-help-role]").forEach((host) => {
-    const details = host.querySelector(":scope > details.context-help");
-    const anchor = details?.previousElementSibling;
+    // A .switch choice row carries its help INSIDE the label (between the
+    // copy and the track), so the label itself is the anchor there.
+    const details = host.querySelector(":scope > details.context-help, :scope > label > details.context-help");
+    const anchor = details?.parentElement?.matches("label") ? details.parentElement : details?.previousElementSibling;
     const copyNode = host.dataset.helpRole === "choice"
       ? (anchor?.querySelector("span[data-i18n]") || anchor)
       : host.dataset.helpRole === "action"
@@ -432,7 +434,16 @@ function pbpBuildSettingsSearchIndex(root = document) {
       // for the reader: changing a setting autosaves it.
       const named = target ? (typeof root.getElementById === "function" ? root.getElementById(target) : document.getElementById(target)) : null;
       if (named?.closest("[hidden]")) { target = panelFallbackId(); weak = true; }
-      add(node.textContent, target, isSectionName, weak);
+      // A .switch choice row's label also holds its context-help <details>
+      // (Ruling 36); the answer is indexed as its own .hint row, so the
+      // label's row keeps just the label copy.
+      let text = node.textContent;
+      if (node.matches("label") && node.querySelector("details.context-help")) {
+        const copy = node.cloneNode(true);
+        copy.querySelectorAll("details.context-help").forEach((help) => help.remove());
+        text = copy.textContent;
+      }
+      add(text, target, isSectionName, weak);
     }
   }
   return entries;
