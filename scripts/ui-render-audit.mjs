@@ -3408,11 +3408,15 @@ const SWEEP_CFG = {
   //    stageZero below.
   rung: {
     values: [26, 20], tol: 1,
-    // Stage-0 dual contract (spec 2026-09-23-ui-system-stage0-design §4):
+    // Stage-0 dual contract (spec 2026-09-23-ui-system-stage0-design §2/§4):
     // controls inside the prototype container use the comfortable tier
-    // (32 md / 28 sm); compact tier is 28/24. Retired with the marker
-    // (CLAUDE.md temporary item, expiry 2026-12-31).
-    stageZero: { marker: "[data-ui-stage0]", values: { comfortable: [32, 28], compact: [28, 24] } },
+    // (32 md / 28 sm); compact tier is 28/24. `labelGap` (Task 3 follow-up
+    // ruling) is the SAME dual contract for family 5's fgRhythm label->
+    // control relationship (spec §2's "标签→控件" row: 8 comfortable / 4
+    // compact) -- one `marker`/tier read shared by both families, not two
+    // separate definitions. Both retire together with the marker (CLAUDE.md
+    // temporary item, expiry 2026-12-31).
+    stageZero: { marker: "[data-ui-stage0]", values: { comfortable: [32, 28], compact: [28, 24] }, labelGap: { comfortable: 8, compact: 4 } },
     exempt: [
       "textarea",                                   // multi-line by nature
       "[role='tab']", ".tab-btn", ".lib-tab",       // tab family: 32px on both surfaces
@@ -3498,8 +3502,13 @@ const SWEEP_CFG = {
   //     a scale value by construction. `hairline`: 1px is border compensation.
   spacingScale: {
     prefix: { options: "--opt-sp-", popup: "--pp-sp-", library: "--lib-sp-", "md-preview": "--sp-" },
-    names: ["0", "1", "2", "3", "4", "5", "6", "7"], // sp-0 = the library/reader hairline rung (2px)
-    tokens: { options: [2, 4, 6, 8, 12, 16, 24], popup: [2, 4, 6, 8, 12, 16, 24], library: [2, 4, 8, 12, 16, 24], "md-preview": [2, 4, 8, 12, 16, 24] },
+    // sp-0 = the library/reader hairline rung (2px); "8" (Task 3, ui-system-
+    // stage0-design §2/§4) is options-only (--opt-sp-8: 32px, the stage-0
+    // section gap) -- harmless to probe on the other three surfaces since
+    // they have no --{prefix}sp-8 custom property, so the live-scale read
+    // below just comes back NaN and gets filtered out for them.
+    names: ["0", "1", "2", "3", "4", "5", "6", "7", "8"],
+    tokens: { options: [2, 4, 6, 8, 12, 16, 24, 32], popup: [2, 4, 6, 8, 12, 16, 24], library: [2, 4, 8, 12, 16, 24], "md-preview": [2, 4, 8, 12, 16, 24] },
     tol: 0.5,
     hairline: 1, // <= 1px is a border/optical compensation, not a rhythm value
     margins: ["margin-top", "margin-right", "margin-bottom", "margin-left"],
@@ -3795,6 +3804,13 @@ function sweepProbe(cfg) {
   // because the 24px help target sized its grid row. Gated like family 4
   // (one pass, theme-invariant geometry). Scoped to the .fg family, which
   // only options has, so it is a no-op on popup/library.
+  //
+  // label->control carries the SAME stage-0 dual contract as controlRung
+  // (spec §2/§4, Task 3 follow-up ruling): inside [data-ui-stage0] the
+  // target is an EXACT 8px (comfortable) / 4px (compact) rather than this
+  // surface's normal 3..6 range -- reuses cfg.rung.stageZero (marker + tier
+  // read + tolerance) rather than a second definition. control/hint->action
+  // is untouched; the prototype has no action row inside a stage-0 .fg yet.
   {
     const isControl = (el) => el.matches("input, select, textarea, .key-wrap");
     const isAction = (el) => el.matches(".fg-actions, button, .btn");
@@ -3803,6 +3819,14 @@ function sweepProbe(cfg) {
       return rb.top < ra.bottom - 0.5 ? null : Math.round((rb.top - ra.bottom) * 100) / 100; // null = side by side
     };
     const push = (el, rel, gap) => hits.push({ kind: "fgRhythm", path: pathOf(el), rel, gap });
+    const sz = cfg.rung.stageZero;
+    const labelControlOffScale = (b, gap) => {
+      if (b.closest(sz.marker)) {
+        const tier = document.documentElement.dataset.density === "compact" ? "compact" : "comfortable";
+        return Math.abs(gap - sz.labelGap[tier]) > cfg.rung.tol;
+      }
+      return gap < cfg.rhythmLabelMin || gap > cfg.rhythmLabelMax;
+    };
     for (const fg of document.querySelectorAll(".fg")) {
       if (!visible(fg)) continue;
       const kids = Array.from(fg.children).filter(visible);
@@ -3810,7 +3834,7 @@ function sweepProbe(cfg) {
         const a = kids[i - 1], b = kids[i];
         const gap = stackedGap(a, b);
         if (gap === null) continue;
-        if (a.matches("label.bl, .bl") && isControl(b) && (gap < cfg.rhythmLabelMin || gap > cfg.rhythmLabelMax)) push(b, "label-control", gap);
+        if (a.matches("label.bl, .bl") && isControl(b) && labelControlOffScale(b, gap)) push(b, "label-control", gap);
         if (isAction(b) && !isAction(a) && gap < cfg.rhythmActionMin) push(b, "action", gap);
       }
     }
