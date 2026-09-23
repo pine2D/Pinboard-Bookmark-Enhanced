@@ -602,20 +602,35 @@ function formRules(ns) {
 // same shape as the .tag-gov-chip-face recipe above. No aria-checked: the
 // native checkbox already exposes checked state.
 //
-// Geometry (D3, COMPONENTS.md §1.1 sm rung): track 32x20 with a 1px frame,
-// thumb 16 inset 1px inside that frame, travel 12px (30px padding box - 16
-// - 2x1px inset). The input overhangs the label by 2px top and bottom, so
-// on a 20px row the hit target is 24px tall (§1.1 icon-hit floor). These
-// are component-geometry literals, not spacing; the one spacing value (the
-// text-track gap) goes through sp().
+// Geometry (B' -- user ruling 36, after the density study; supersedes
+// D3's 32x20 framed track): track 28x16, BORDERLESS, thumb 12 inset 2px on
+// every side, travel 12px (28 - 12 - 2x2px inset). Borderless because the
+// old 1px frame + 1px inset split rounded unevenly on high-DPR device
+// pixels and read as a thumb sitting high; a single 2px inset has no split.
+// The label keeps a 20px min-height (the sm rung the old track height used
+// to impose), and the input overhangs it by 2px top and bottom, so on a
+// 20px row the hit target is 24px tall (§1.1 icon-hit floor). These are component-
+// geometry literals, not spacing; the one spacing value (the text-help
+// gap) goes through sp().
 //
-// Colour (D6): off = the Soft Fill control pair (btn-bg fill + 1px border
-// frame, btn-fg thumb -- `btn-fg vs btn-bg` is already gated); on = accent
-// fill, on-accent thumb (`on-accent vs accent` gated; the fill itself vs the
-// panel is gated by contrast-audit's `accent vs panel` 3:1 row). The thumb
-// paints `currentColor` and the TRACK carries `color`, so every fill rule
-// pairs with a colour in the same rule (§7.1 paired-consumption law) and a
-// state only ever has to swap the track's two properties.
+// Layout: the text and any inline help toggle (details.context-help moved
+// INSIDE the label, between text and track) pack from the start; the
+// track takes `margin-left: auto`, an alignment margin (not a spacing
+// literal), so it lands at the row end whatever sits before it.
+//
+// Colour (state -> token -> contrast-audit row that backs it):
+//   off track   bg --opt-border   on the panel   `border vs panel` >=3 (min 3.20 terminal)
+//   off thumb   --opt-panel       on the track   same pair, symmetric (min 3.20)
+//   on track    bg --opt-accent   on the panel   `accent vs panel` >=3 (min 3.53 solarized-dark)
+//   on thumb    --opt-on-accent   on the track   `on-accent vs accent` >=4.5 (min 4.51 modern-card)
+//   disabled    btn-bg track, fg-hint thumb + text (WCAG 1.4.3/1.4.11 exempt)
+// Hover changes nothing but the cursor: fill and thumb position are the
+// state cues, and a hover tint on a border-grey track would need a new
+// derived role with no gate behind it. The thumb shadow is alpha black, so
+// it is theme-agnostic (a lift cue, not a colour pair). The thumb paints
+// `currentColor` and the TRACK carries `color`, so every fill rule pairs
+// with a colour in the same rule (§7.1 paired-consumption law) and a state
+// only ever has to swap the track's two properties.
 function switchRules(ns) {
   if (ns !== "opt") return [];
   const INPUT = ".switch > input[type=\"checkbox\"]";
@@ -623,7 +638,10 @@ function switchRules(ns) {
     rule(".switch", [
       ["display", "flex"],
       ["align-items", "center"],
-      ["justify-content", "space-between"],
+      ["justify-content", "flex-start"],
+      // The row keeps the sm rung the old 20px track used to set on its own:
+      // a 16px track no longer props a one-line row up to 20px.
+      ["min-height", "20px"],
       ["gap", sp(ns, 6)],
       ["position", "relative"],
       ["cursor", "pointer"],
@@ -641,38 +659,33 @@ function switchRules(ns) {
       ["cursor", "pointer"],
     ]),
     rule(".switch > input[type=\"checkbox\"]:disabled", [["cursor", "default"]]),
-    rule(".switch-text", [["flex", "1 1 auto"], ["min-width", "0"]]),
+    rule(".switch-text", [["flex", "0 1 auto"], ["min-width", "0"]]),
     rule(".switch-track", [
       ["position", "relative"],
       ["flex", "none"],
-      ["width", "32px"],
-      ["height", "20px"],
-      ["border", `1px solid var(--${ns}-border)`],
+      ["margin-left", "auto"],
+      ["width", "28px"],
+      ["height", "16px"],
+      ["border", "0"],
       ["border-radius", `var(--${ns}-radius-full)`],
-      ["background", `var(--${ns}-btn-bg)`],
-      ["color", `var(--${ns}-btn-fg)`],
-      ["transition", `background ${motion(ns)}, border-color ${motion(ns)}, color ${motion(ns)}`],
+      ["background", `var(--${ns}-border)`],
+      ["color", `var(--${ns}-panel)`],
+      ["transition", `background ${motion(ns)}, color ${motion(ns)}`],
     ]),
     rule(".switch-track::before", [
       ["content", "\"\""],
       ["position", "absolute"],
-      ["top", "1px"],
-      ["left", "1px"],
-      ["width", "16px"],
-      ["height", "16px"],
+      ["top", "2px"],
+      ["left", "2px"],
+      ["width", "12px"],
+      ["height", "12px"],
       ["border-radius", `var(--${ns}-radius-full)`],
       ["background", "currentColor"],
+      ["box-shadow", "0 1px 2px rgba(0, 0, 0, 0.28), 0 0 0 0.5px rgba(0, 0, 0, 0.06)"],
       ["transition", `transform ${motion(ns)}`],
-    ], { pairColorWith: ".switch-track" }),
-    // Off-state hover only (D6): an on track keeps its accent under the
-    // pointer. :not(:checked) keeps this from competing with the checked
-    // rule below at all, instead of out-ranking it.
-    rule(`.switch > input:hover:not(:checked):not(:disabled) ~ .switch-track`, [
-      ["background", `var(--${ns}-btn-hover)`],
     ], { pairColorWith: ".switch-track" }),
     rule(`.switch > input:checked ~ .switch-track`, [
       ["background", `var(--${ns}-accent)`],
-      ["border-color", `var(--${ns}-accent)`],
       ["color", `var(--${ns}-on-accent)`],
     ]),
     rule(`.switch > input:checked ~ .switch-track::before`, [["transform", "translateX(12px)"]]),
@@ -690,7 +703,6 @@ function switchRules(ns) {
     // thumb keeps its translated position, so state stays legible.
     rule(`.switch > input:disabled ~ .switch-track, .switch > input:disabled:checked ~ .switch-track`, [
       ["background", `var(--${ns}-btn-bg)`],
-      ["border-color", `var(--${ns}-border)`],
       ["color", `var(--${ns}-fg-hint)`],
       ["cursor", "default"],
     ]),

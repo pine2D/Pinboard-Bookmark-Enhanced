@@ -625,17 +625,21 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); 
 
 | 部件 | 几何 | token |
 |---|---|---|
-| `.switch`（label） | flex，`justify-content: space-between`，`align-items: center`，gap sp-3，`position: relative` | — |
+| `.switch`（label） | flex，`justify-content: flex-start`，`align-items: center`，gap sp-3，`min-height: 20px`（行保持 sm 阶，旧 20px 轨道原本替行撑起的高度），`position: relative` | — |
 | `input`（第一个子元素） | `position: absolute; top/bottom: -2px; left/right: 0; opacity: 0`——铺满整行并上下各溢出 2px：20px 行上命中高 **24px**（§1.1 图标命中下限） | — |
-| `.switch-text` | `flex: 1 1 auto; min-width: 0` | 继承 |
-| `.switch-track` | **32×20**（sm 阶高），1px 边框，`--opt-radius-full` | off：`btn-bg` 底 + `border` 框；on：`accent` 底 + `accent` 框 |
-| 滑块（`.switch-track::before`） | **16×16** 圆，框内 1px 内缩；off→on 位移 **12px**（30 内宽 − 16 − 2×1） | `currentColor`：off `btn-fg`，on `on-accent`，disabled `fg-hint` |
+| `.switch-text` | `flex: 0 1 auto; min-width: 0`（收缩包裹，行内帮助图标紧跟其后） | 继承 |
+| `.switch-track` | **28×16**，**无边框**，`--opt-radius-full`，`margin-left: auto`（对齐用的 auto 外边距，把轨道推到行尾，不是间距字面量） | off：`border` 底；on：`accent` 底；disabled：`btn-bg` 底 |
+| 滑块（`.switch-track::before`） | **12×12** 圆，四边 **2px** 内缩；off→on 位移 **12px**（28 − 12 − 2×2）；阴影 `0 1px 2px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06)`（alpha 黑，与主题无关，只作浮起提示） | `currentColor`：off `panel`，on `on-accent`，disabled `fg-hint` |
 
-状态：hover 只改 off 轨道（`btn-hover`），on 不变；focus 画在轨道上（`borderless` 落位，见 §6.4 与
-§7.3）；disabled 轨道回 `btn-bg` + `border`、滑块与文字 `fg-hint`（WCAG 对 disabled 豁免），勾选且禁用时
-滑块保持右位，状态仍可读。滑块用 `currentColor`、轨道带 `color`，每条填充规则都在同一条规则里成对
-（§7.1）。对比度门：`btn-fg vs btn-bg`、`on-accent vs accent` 既有；`accent vs panel ≥ 3`（非文字）
-为本原语新增，options 15 块。
+几何取 B′（2026-09-23 密度研究后用户裁决 Ruling 36，取代 D3 的 32×20 带框轨道）：去掉 1px 边框，
+因为「1px 边框 + 1px 内缩」在高 DPR 设备像素上取整不对称，滑块读作偏上；单一 2px 内缩没有这层拆分。
+状态：hover 只改光标（状态信号是填充与滑块位置；给边框灰轨道加 hover 色需要一个没有门禁的新派生
+角色）；focus 画在轨道上（`borderless` 落位，见 §6.4 与 §7.3）；disabled 轨道回 `btn-bg`、滑块与文字
+`fg-hint`（WCAG 对 disabled 豁免），勾选且禁用时滑块保持右位，状态仍可读。滑块用 `currentColor`、轨道带
+`color`，每条填充规则都在同一条规则里成对（§7.1）。对比度门（状态 → token → 行）：off 轨道 `border`
+对面板 → `border vs panel ≥ 3`（最低 terminal 3.20）；off 滑块 `panel` 在 `border` 轨道上 → 同一对（对称）；
+on 轨道 `accent` 对面板 → `accent vs panel ≥ 3`（本原语新增，options 15 块，最低 solarized-dark 3.53）；
+on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
 
 **字段宽度按内容种类分档**（taste-uplift-batch3 T6/D2，Ruling 29 F2/F4）——`width: 100%` 基类对五种
 里的四种保持不变，只叠加一个上限（窄视口下面板列本就窄于上限时，字段仍拿基类给的全宽）：
@@ -788,9 +792,9 @@ html[data-theme="<dark preset>"] { color-scheme: dark; }
 accent 焦点色，等于焦点一来就抹掉危险信号——所以它们走 `borderless`，语义边原样留着，
 1px accent 芯 + 辉光叠在外面。`.btn` 族的边框相反，是 Soft Fill 塌进填充里的中性 chrome
 （§9 律 1），涂它没有任何信息损失，所以走 `bordered`。
-**混合边**同样走 `borderless`：options 的 `.switch-track` 关态是 1px 中性 `--opt-border`、开态
-改涂 `--opt-accent`（边表达的是开关状态），涂成焦点色会让关态聚焦读作「已开」，所以环画在轨道外
-（`input:focus-visible ~ .switch-track`，§6.4 例外）。
+**无边框填充态**同样走 `borderless`：options 的 `.switch-track`（B′ 起无边框）关态填中性 `--opt-border`、
+开态填 `--opt-accent`（填充表达的是开关状态），没有可改涂的边，涂填充会让关态聚焦读作「已开」，所以环画在
+轨道外（`input:focus-visible ~ .switch-track`，§6.4 例外）。
 
 **`--{ns}-focus-ring` 一律原样 `var()` 消费，绝不展开成字面阴影。** 这条是硬的：辉光的
 **形状本身**是主题身份，不只是颜色——terminal 是 `0 0 6px 1px`（磷光模糊晕），paper-ink 是
@@ -1252,7 +1256,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `details.disclosure` + `.disclosure-body` | 唯一折叠原语；标题 = section-title 面 + 右侧 chevron；成员自带上边线，堆叠对称 12px；正文齐平，`> :last-child` 去下 margin |
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |
 | options | `.pf` | 带边框子面板（provider 卡）：padding sp-5，radius md |
-| options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`；flex、space-between、gap sp-3；轨道 32×20 / 滑块 16 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked） |
+| options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`；flex、flex-start（轨道 `margin-left:auto` 到行尾）、gap sp-3；轨道 28×16 无边框 / 滑块 12 内缩 2 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked） |
 | popup | `.row` / `.label` / `.field` | 表单行壳（flex，padding sp-2 sp-5，gap sp-4）/ 52px 标签槽 / 控件槽（flex:1，min-width:0） |
 | popup | `.suggest-area` | chip 流容器 |
 | popup | `.divider` | 表单与快捷区之间的分隔 |
