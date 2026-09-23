@@ -23,7 +23,10 @@ const END = "/* @generated:ui-themes end */";
 // carries a popup-only `.stag` entry, so this surface needs the family wired
 // up too -- previously chip was inactive for pp because CHIP_TARGETS had no
 // pp entries at all (chipRules("pp") rendered zero rules either way).
-const ACTIVE_COMPONENT_FAMILIES = { pp: ["btn", "btnIc", "danger", "chip", "form"], opt: ["btn", "btnIc", "danger", "chip", "form"], lib: ["btn", "btnIc", "danger", "chip", "form"] };
+// opt gained "switch" (taste-uplift batch4 T1): the .switch primitive is
+// options-only (switchRules returns [] for pp/lib), so only this surface
+// lists it.
+const ACTIVE_COMPONENT_FAMILIES = { pp: ["btn", "btnIc", "danger", "chip", "form"], opt: ["btn", "btnIc", "danger", "chip", "form", "switch"], lib: ["btn", "btnIc", "danger", "chip", "form"] };
 
 function loadPilots() {
   const by = {};

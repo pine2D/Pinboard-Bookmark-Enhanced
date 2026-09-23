@@ -142,7 +142,10 @@
         "fg-stack",
         "hint",
         "pf",
-        "section-title"
+        "section-title",
+        "switch",
+        "switch-text",
+        "switch-track"
       ],
       "regions": [
         "auto-save-hint",

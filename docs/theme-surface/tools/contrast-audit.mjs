@@ -226,6 +226,10 @@ const ROLE_ALIAS = {
 // of "pp"/"opt"/"lib") when the role only exists on one surface -- without
 // it, a role missing from another surface's tokenDict would FAIL there
 // (strict mode) instead of correctly not applying at all.
+// The optional 6th element (defaultStrict) makes a MISSING role FAIL on the
+// default (:root / html.dark) blocks too, where it would otherwise SKIP for
+// a role listed in DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS (see the
+// accent-vs-panel row for the one user).
 // The optional 5th element (themedOnly) restricts a row to the themed
 // [data-theme] blocks. It exists for roles whose DEFAULT-surface counterpart
 // is a differently-named token, where running the row against the default
@@ -272,6 +276,19 @@ export const COMPONENT_PAIR_SPEC = [
   // "pp:on-accent" entry is retired alongside it (COMPONENT_PAIR_ROLES now
   // covers it automatically), same "graduated" pattern warn-fg used below.
   ["on-accent", "accent", 4.5],
+  // `.switch` on-state track vs the panel it sits on (taste-uplift batch4
+  // D7): the checked track is a solid accent fill with no other frame, so
+  // the fill itself is what tells "on" apart from the surface -- WCAG
+  // 1.4.11's 3:1 non-text floor, same class as spinner-fg/border below.
+  // Options only: `.switch` is an options-only primitive (ui-components.mjs
+  // switchRules). Measured before landing (2026-09-23, shipped options.css):
+  // 15/15 blocks pass, lowest solarized-dark 3.53:1, flexoki-dark 3.79:1.
+  // 6th element `defaultStrict`: accent and panel are both documented-
+  // optional roles on a default block (DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS)
+  // and would only SKIP there if missing; this row is the switch's ONLY
+  // on-state gate, so a default block that stops declaring either role FAILs
+  // instead of silently dropping the check.
+  ["accent", "panel", 3, ["opt"], false, true],
   // warn-fg/warn-bg (debt-sweep 2026-08-08, independent review F1): both
   // come out of the same pairToAA(destroy, bg, mode) call in
   // deriveUiColors (_ui-derive.mjs) -- the foreground's lightness is
@@ -572,7 +589,7 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
   const rowMustFail = (strictFlag, missingRoles) =>
     strictFlag || (isDefaultSurface && missingRoles.some((r) => isOutputRoleForDefault(ns, r)));
 
-  for (const [fgRole, bgRole, min, onlyNs, themedOnly] of COMPONENT_PAIR_SPEC) {
+  for (const [fgRole, bgRole, min, onlyNs, themedOnly, defaultStrict] of COMPONENT_PAIR_SPEC) {
     if (onlyNs && !onlyNs.includes(ns)) continue; // role doesn't exist on this surface -- not a gap, just N/A
     if (themedOnly && !strict) continue; // themed-layer role; the default surface names the same pair differently
 
@@ -582,7 +599,7 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
       const missingRoles = [];
       if (!fg.rgb) missingRoles.push(fgRole);
       if (!bg.rgb) missingRoles.push(bgRole);
-      const rowStrict = rowMustFail(strict, missingRoles);
+      const rowStrict = rowMustFail(strict || !!defaultStrict, missingRoles);
       const why = fg.note || bg.note;
       const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + label.padEnd(28) + " " + (rowStrict ? "FAIL (" + why + ")" : "SKIP (" + why + ")");
       console.log(line);

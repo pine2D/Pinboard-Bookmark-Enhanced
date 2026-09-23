@@ -85,15 +85,28 @@ const motion = ns => MOTION[ns];
 // inferred from the selector string) when a rule's color legitimately comes
 // from a DIFFERENT rule in the same recipe that the same element also
 // matches (e.g. .btn.ghost has no color of its own — it inherits .btn's).
-function rule(selector, decls, { pairColorWith = null } = {}) {
-  return { selector, decls, pairColorWith };
+//
+// `media` wraps the rule in one grouping at-rule (the .switch family's
+// forced-colors fallback is the only user). Consecutive rules sharing the
+// same `media` string are emitted inside ONE @media block, so the rendered
+// region reads like hand-written CSS rather than one @media per rule.
+function rule(selector, decls, { pairColorWith = null, media = null } = {}) {
+  return { selector, decls, pairColorWith, media };
 }
-function stringifyRule({ selector, decls }) {
-  const body = decls.map(([prop, value]) => `  ${prop}: ${value};`).join("\n");
-  return `${selector} {\n${body}\n}`;
+function stringifyRule({ selector, decls }, indent = "") {
+  const body = decls.map(([prop, value]) => `${indent}  ${prop}: ${value};`).join("\n");
+  return `${indent}${selector} {\n${body}\n${indent}}`;
 }
 function stringifyRules(rules) {
-  return rules.map(stringifyRule).join("\n");
+  const out = [];
+  for (let i = 0; i < rules.length;) {
+    const media = rules[i].media;
+    if (!media) { out.push(stringifyRule(rules[i])); i++; continue; }
+    const group = [];
+    while (i < rules.length && rules[i].media === media) group.push(rules[i++]);
+    out.push(`@media ${media} {\n${group.map(r => stringifyRule(r, "  ")).join("\n")}\n}`);
+  }
+  return out.join("\n");
 }
 
 // -----------------------------------------------------------------------
@@ -575,7 +588,129 @@ function formRules(ns) {
 }
 
 // -----------------------------------------------------------------------
-const FAMILY_BUILDERS = { btn: btnRules, btnIc: btnIcRules, danger: dangerRules, chip: chipRules, form: formRules };
+// §6.4 `.switch` exception: the one drawn boolean control (taste-uplift
+// batch4, D1/D3/D5/D6). OPTIONS ONLY -- the switch replaces persistent
+// settings checkboxes, and only options has those (popup's three form-state
+// checkboxes and library's none are out of scope, batch4 plan D4).
+//
+// DOM contract (D5): label.switch > input[type=checkbox] + span.switch-text
+// + span.switch-track. The native input stays the FIRST child and is never
+// display:none -- it is laid over the whole label at opacity 0, so it keeps
+// focus, Space-to-toggle, form semantics and the `input:disabled + span`
+// dimming (which lands on .switch-text, the input's next sibling). The
+// track is drawn from sibling state (`input:<state> ~ .switch-track`), the
+// same shape as the .tag-gov-chip-face recipe above. No aria-checked: the
+// native checkbox already exposes checked state.
+//
+// Geometry (D3, COMPONENTS.md §1.1 sm rung): track 32x20 with a 1px frame,
+// thumb 16 inset 1px inside that frame, travel 12px (30px padding box - 16
+// - 2x1px inset). The input overhangs the label by 2px top and bottom, so
+// on a 20px row the hit target is 24px tall (§1.1 icon-hit floor). These
+// are component-geometry literals, not spacing; the one spacing value (the
+// text-track gap) goes through sp().
+//
+// Colour (D6): off = the Soft Fill control pair (btn-bg fill + 1px border
+// frame, btn-fg thumb -- `btn-fg vs btn-bg` is already gated); on = accent
+// fill, on-accent thumb (`on-accent vs accent` gated; the fill itself vs the
+// panel is gated by contrast-audit's `accent vs panel` 3:1 row). The thumb
+// paints `currentColor` and the TRACK carries `color`, so every fill rule
+// pairs with a colour in the same rule (§7.1 paired-consumption law) and a
+// state only ever has to swap the track's two properties.
+function switchRules(ns) {
+  if (ns !== "opt") return [];
+  const INPUT = ".switch > input[type=\"checkbox\"]";
+  return [
+    rule(".switch", [
+      ["display", "flex"],
+      ["align-items", "center"],
+      ["justify-content", "space-between"],
+      ["gap", sp(ns, 6)],
+      ["position", "relative"],
+      ["cursor", "pointer"],
+    ]),
+    rule(INPUT, [
+      ["position", "absolute"],
+      ["top", "-2px"],
+      ["bottom", "-2px"],
+      ["left", "0"],
+      ["right", "0"],
+      ["width", "100%"],
+      ["height", "calc(100% + 4px)"],
+      ["margin", "0"],
+      ["opacity", "0"],
+      ["cursor", "pointer"],
+    ]),
+    rule(".switch > input[type=\"checkbox\"]:disabled", [["cursor", "default"]]),
+    rule(".switch-text", [["flex", "1 1 auto"], ["min-width", "0"]]),
+    rule(".switch-track", [
+      ["position", "relative"],
+      ["flex", "none"],
+      ["width", "32px"],
+      ["height", "20px"],
+      ["border", `1px solid var(--${ns}-border)`],
+      ["border-radius", `var(--${ns}-radius-full)`],
+      ["background", `var(--${ns}-btn-bg)`],
+      ["color", `var(--${ns}-btn-fg)`],
+      ["transition", `background ${motion(ns)}, border-color ${motion(ns)}, color ${motion(ns)}`],
+    ]),
+    rule(".switch-track::before", [
+      ["content", "\"\""],
+      ["position", "absolute"],
+      ["top", "1px"],
+      ["left", "1px"],
+      ["width", "16px"],
+      ["height", "16px"],
+      ["border-radius", `var(--${ns}-radius-full)`],
+      ["background", "currentColor"],
+      ["transition", `transform ${motion(ns)}`],
+    ], { pairColorWith: ".switch-track" }),
+    // Off-state hover only (D6): an on track keeps its accent under the
+    // pointer. :not(:checked) keeps this from competing with the checked
+    // rule below at all, instead of out-ranking it.
+    rule(`.switch > input:hover:not(:checked):not(:disabled) ~ .switch-track`, [
+      ["background", `var(--${ns}-btn-hover)`],
+    ], { pairColorWith: ".switch-track" }),
+    rule(`.switch > input:checked ~ .switch-track`, [
+      ["background", `var(--${ns}-accent)`],
+      ["border-color", `var(--${ns}-accent)`],
+      ["color", `var(--${ns}-on-accent)`],
+    ]),
+    rule(`.switch > input:checked ~ .switch-track::before`, [["transform", "translateX(12px)"]]),
+    // §7.3 `borderless` placement, identical to .tag-gov-chip-face and the
+    // .fg checkbox: the ring is drawn on the TRACK because the input that
+    // actually holds focus is transparent.
+    rule(`.switch > input:focus-visible ~ .switch-track`, [
+      ["outline", `1px solid var(--${ns}-accent)`],
+      ["outline-offset", "2px"],
+      ["box-shadow", `var(--${ns}-focus-ring)`],
+    ]),
+    // Disabled (WCAG 1.4.3/1.4.11 exempt): neutral fill, hint-tier thumb and
+    // text. The second selector restates it at (0,4,1) so a disabled-AND-
+    // checked switch loses the accent by specificity, not source order; the
+    // thumb keeps its translated position, so state stays legible.
+    rule(`.switch > input:disabled ~ .switch-track, .switch > input:disabled:checked ~ .switch-track`, [
+      ["background", `var(--${ns}-btn-bg)`],
+      ["border-color", `var(--${ns}-border)`],
+      ["color", `var(--${ns}-fg-hint)`],
+      ["cursor", "default"],
+    ]),
+    rule(`.switch > input:disabled ~ .switch-text`, [["color", `var(--${ns}-fg-hint)`]]),
+    // Forced colors (Windows High Contrast): author backgrounds are flattened
+    // to system colours, so a drawn track would lose its on/off fill. Hand
+    // the job back to the native checkbox -- visible, in flow, system-drawn
+    // -- and drop the track.
+    rule(INPUT, [
+      ["position", "static"],
+      ["width", "auto"],
+      ["height", "auto"],
+      ["opacity", "1"],
+    ], { media: "(forced-colors: active)" }),
+    rule(".switch-track", [["display", "none"]], { media: "(forced-colors: active)" }),
+  ];
+}
+
+// -----------------------------------------------------------------------
+const FAMILY_BUILDERS = { btn: btnRules, btnIc: btnIcRules, danger: dangerRules, chip: chipRules, form: formRules, switch: switchRules };
 export const FAMILIES = Object.keys(FAMILY_BUILDERS);
 
 // Rules for one (ns, family) — exported so recipe-lint can run its static
