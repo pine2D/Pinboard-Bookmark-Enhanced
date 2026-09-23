@@ -363,6 +363,9 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    every choice row keeps rows with and without a help toggle identical. */
 .choice-row > label { height: 20px; }
 .choice-row > label > span { line-height: 16px; }
+/* The rule above also matches a .switch row's .switch-track span; that is
+   inert (the track is an empty box with an explicit 20px height), so the
+   literal stays as tests/ui-contract-tests.mjs pins it. */
 .fg-stack > div:last-child { margin-bottom: 0; }
 .fg-stack > div > label { padding: var(--opt-sp-1) 0; margin-bottom: 0; }
 .fg.fg-stack > .bl { margin-bottom: var(--opt-sp-3); }   /* label.bl or a div.bl title: 6px to the first option. (0,3,0) on purpose:
@@ -560,7 +563,11 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    under WenQuanYi, so a centred constant had 0.25 physical px of headroom at
    DPR 2 (2026-09-06); the baseline absorbs that too. */
 .context-help-host[data-help-role="choice"] { align-items: baseline; }
-.context-help-host[data-help-role="choice"] > label > span { align-self: baseline; }
+/* `:not(.switch-track)`: a .switch row's drawn track is also a direct span
+   of the label; it must stay centred (the .switch recipe's align-items),
+   not drop onto the text baseline. The copy span -- plain or .switch-text --
+   is still the one baseline participant. */
+.context-help-host[data-help-role="choice"] > label > span:not(.switch-track) { align-self: baseline; }
 .context-help-host[data-help-role="choice"] > .context-help > summary.context-help-toggle { align-self: baseline; }
 [data-help-script="alphabetic"][data-help-role="choice"] { --context-help-optical-y: 2.375px; }
 [data-help-script="cjk"][data-help-role="choice"] { --context-help-optical-y: 2.125px; }
