@@ -214,10 +214,17 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 #opt-global-alert { grid-column: 1 / -1; grid-row: 2; margin: 0 0 var(--opt-sp-5); }
 
 /* ---- Tabs ---- */
+/* z-index: a sticky box is a stacking context of its own, so at z auto the
+   search dropdown inside it (z menu) could not rise above anything painted
+   later in the main column -- every positioned box there (a .switch row's
+   absolute input spans the whole row) covered the right part of each result,
+   and a click on it toggled the setting underneath. The static breakpoints
+   below ignore it. */
 .options-nav {
   grid-column: 1; grid-row: 3;
   align-self: start;
   position: sticky; top: 24px;
+  z-index: var(--opt-z-sticky);
 }
 /* The sidebar is 679px tall (measured: search + 13 tabs + 5 group labels +
    Reset This Tab) and it is the page, not the sidebar, that scrolls. A sticky

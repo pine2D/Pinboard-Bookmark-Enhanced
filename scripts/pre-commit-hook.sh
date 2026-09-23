@@ -13,13 +13,16 @@
 #               files, their JS, shared.js, md-preview.css and the vocabulary
 #               registry/baseline. Only sub-second static gates run here
 #               (layout-lint inline spacing, ui-vocabulary structural classes),
-#               plus ui-contract when HTML / md-preview.css changed. Before
+#               plus ui-contract when HTML / md-preview.css / a surface's own
+#               JS changed (ui-contract pins JS-side builders too -- e.g. the
+#               Send-to .switch builder in options.js -- which a JS-only commit
+#               used to reach only in verify/CI). Before
 #               2026-09-05 an HTML-only commit ran ZERO gates -- 70 such commits
 #               since July are how 23 inline styles and 27 ad-hoc wrapper
 #               classes reached the settings page.
 STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
 THEME_RE='^(docs/theme-surface/(pilots/[^/]+\.tokens\.json|composers/[^/]+\.mjs|tools/[^/]+\.mjs|tools/override-debt-baseline\.json|manifest\.json|tokens\.schema\.json)|pinboard-themes\.js|popup\.css|options\.css|library\.css)$'
-UI_HTML_RE='^((popup|options|library|md-preview)\.html|md-preview\.css)$'
+UI_HTML_RE='^((popup|options|library|md-preview)\.html|md-preview\.css|(popup|options|library)(-[a-z-]+)?\.js)$'
 UI_VOCAB_RE='^((popup|options|library|md-preview)\.html|(popup|options|library)(-[a-z-]+)?\.js|md-[a-z-]+\.js|shared\.js|docs/theme-surface/ui-vocabulary\.json|scripts/ui-vocabulary-baseline\.json|scripts/ui-vocabulary-lint\.mjs)$'
 CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$THEME_RE")
@@ -118,7 +121,7 @@ fi
 # ---- UI consumer group: fast static gates on the markup/JS side ----
 cd "$REPO_ROOT" || exit 1
 if [ -n "$UI_HTML_CHANGED" ] && [ -z "$CHANGED" ]; then
-  echo "[ui-consumer] surface HTML / reader CSS changed — running the static design-language gates"
+  echo "[ui-consumer] surface HTML / reader CSS / surface JS changed — running the static design-language gates"
   echo "$UI_HTML_CHANGED" | sed 's/^/  /'
   echo "[layout-lint] checking inline spacing on the four UI surfaces"
   if ! node "$REPO_ROOT/docs/theme-surface/tools/layout-lint.mjs"; then

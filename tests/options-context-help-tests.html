@@ -250,6 +250,56 @@ function test(name, fn) {
     assert(!stolen.length, stolen.slice(0, 12).join("; "));
   });
 
+  test("the settings search dropdown paints above every panel's rows", () => {
+    // .options-nav is sticky, hence a stacking context: without its own
+    // z-index the dropdown inside it paints under positioned boxes later in
+    // the main column (a .switch row's input spans its whole row), so the
+    // right part of a result hit the setting underneath. Probe every panel
+    // as the active one, at 90% of each visible result's width.
+    const container = doc.querySelector(".container");
+    const priorVisibility = container.style.visibility;
+    container.style.visibility = "visible";
+    doc.querySelectorAll("details.context-help[open]").forEach((candidate) => { candidate.open = false; });
+    const host = doc.getElementById("options-search-results");
+    assert(host && host.closest(".options-nav"), "search results left the sticky nav");
+    frame.contentWindow.scrollTo(0, 0);
+    host.hidden = false;
+    for (let i = 0; i < 10; i++) {
+      const button = doc.createElement("button");
+      button.type = "button";
+      button.className = "options-search-result";
+      const label = doc.createElement("span");
+      label.className = "options-search-result-label";
+      label.textContent = "Show result " + i;
+      const panelName = doc.createElement("span");
+      panelName.className = "options-search-result-panel";
+      panelName.textContent = "Popup";
+      button.append(label, panelName);
+      host.appendChild(button);
+    }
+    const stolen = [];
+    let probes = 0;
+    const hostRect = host.getBoundingClientRect();
+    doc.querySelectorAll(".panel").forEach((panel) => {
+      doc.querySelectorAll(".panel").forEach((candidate) => candidate.classList.toggle("active", candidate === panel));
+      host.querySelectorAll(".options-search-result").forEach((result) => {
+        const r = result.getBoundingClientRect();
+        const y = r.top + r.height / 2;
+        if (y < hostRect.top || y > hostRect.bottom) return;
+        probes++;
+        const hit = doc.elementFromPoint(r.left + r.width * 0.9, y);
+        if (hit?.closest(".options-search-result") !== result) {
+          stolen.push(`${panel.id} ${result.textContent.slice(0, 13)} -> ${hit ? (hit.id || hit.tagName.toLowerCase() + "." + hit.className) : "nothing"}`);
+        }
+      });
+    });
+    host.replaceChildren();
+    host.hidden = true;
+    container.style.visibility = priorVisibility;
+    assert(probes >= 60, "too few dropdown probes: " + probes);
+    assert(!stolen.length, stolen.length + " stolen: " + stolen.slice(0, 8).join("; "));
+  });
+
   test("help inside a switch label opens without toggling the switch", () => {
     // A .switch choice row's <details> sits INSIDE its label (Ruling 36).
     // HTML: a label does not activate its control for clicks on interactive
