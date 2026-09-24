@@ -2758,6 +2758,45 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
   await recordWeakTextHits(page, "library", theme, results, "notes-batch");
 }
 
+// The provider <select> is a listbox-enhanced value carrier (hidden;
+// COMPONENTS.md §6.4 exception 2) -- drive it the way a user does: open the
+// combobox button, click the option. The option click writes select.value
+// and dispatches the same bubbling change event options.js's autosave
+// listener is on, exactly like a real edit. Shared by both the aiProvider
+// group's openai switch and its own gemini restore (Task 4 fix wave,
+// Controller ruling C follow-up): one implementation, one place to fix if
+// the listbox markup ever changes.
+//
+// `sw` (optional): pass the extension's service-worker handle when the
+// caller is about to page.goto() afterward and needs the pick to actually be
+// on disk first, not just reflected in this page's own DOM. options.js's
+// autosave is debounced 500ms after the "change" event (scheduleAutoSave);
+// the click's synchronous change-listener flips #fields-<value>'s `hidden`
+// attribute immediately (which is all the `waitForSelector` below proves),
+// but the chrome.storage.local write does not land until that timer fires --
+// and a page.goto() shortly after tears down the page's JS (and its pending
+// setTimeout) before the write happens if nothing waits for it. Caught
+// empirically (this task's fix-round verification): a fixed page.waitForTimeout
+// guess raced this under shard load and produced the exact same "provider
+// still isn't gemini after reload" SETUP ERROR the switchChecks guard below
+// was added to catch, so this polls the ACTUAL persisted value via the
+// service worker instead of guessing a delay.
+async function selectProviderViaListbox(page, value, sw) {
+  await page.click("#opt-ai-provider-btn");
+  await page.click(`#opt-ai-provider-list [role="option"][data-value="${value}"]`);
+  await settleAnimations(page);
+  await page.waitForSelector(`#fields-${value}`, { state: "visible", timeout: TIMEOUT_MS });
+  if (!sw) return;
+  const deadline = Date.now() + TIMEOUT_MS;
+  let persisted;
+  do {
+    persisted = await sw.evaluate(async () => (await chrome.storage.local.get(["aiProvider"])).aiProvider);
+    if (persisted === value) return;
+    await page.waitForTimeout(50);
+  } while (Date.now() < deadline);
+  throw new Error(`SETUP ERROR [options|.switch group]: aiProvider autosave never persisted ${JSON.stringify(value)} to chrome.storage.local (last seen ${JSON.stringify(persisted)}) -- a page.goto() right after this would read the stale value`);
+}
+
 async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   // .saved-theme-btn only renders once storage has at least one entry
   // (options.js renderSavedThemes(), read once at init via syncGetLarge) --
@@ -3021,16 +3060,37 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // Widened again (Task 4, ui-system-stage2, Controller ruling C):
     // #test-gemini needs the SAME "resolve the owning tab, fresh page
     // reload first" treatment this group already gives every other tab-
-    // scoped row -- it lives in #fields-gemini (#panel-ai), which the LATER
-    // aiProviderChecks group above hides by switching the provider to
-    // openai; this group's own fresh page.goto() (below) restores the
-    // gemini default before #test-gemini's row runs. #opt-ai-provider-btn/
-    // #translate-target-lang-btn would already match via their own
-    // hitRectMin (named explicitly here anyway, for a reader who is not
-    // tracing that incidental overlap); the two `state: "open"` popover rows
-    // share #opt-ai-provider-btn's own #panel-ai resolution (bare
-    // `.listbox-pop`/`.listbox-opt` selectors match it first in DOM order)
-    // and skip this loop's own visibility wait below (see that comment).
+    // scoped row -- it lives in #fields-gemini (#panel-ai), which the
+    // EARLIER aiProviderChecks group (above, but its own execution block
+    // runs before this one -- see below) hides by switching the provider to
+    // openai through the listbox. That switch autosaves `aiProvider:
+    // "openai"` into chrome.storage; a bare `page.goto()` does NOT reset
+    // chrome.storage (only this run's own `mkdtempSync()` profile teardown
+    // does, at the very end), so a fresh reload alone does NOT restore the
+    // gemini default -- options.js's `updateProviderFields()` reads whatever
+    // is already in storage at init. Regression (shards 0/1, this task):
+    // this comment used to claim the reload itself restored gemini, which
+    // was never true; the fix is that the aiProviderChecks execution block
+    // now explicitly restores gemini (`selectProviderViaListbox(page,
+    // "gemini", sw)`) right after its own checks run, so by the time this
+    // group's goto() below fires, gemini is already the persisted default
+    // again. That restore call passes `sw` for a second reason found DURING
+    // this same fix's own verification: the autosave that persists the
+    // click is debounced 500ms, so a restore-then-immediately-goto() without
+    // waiting for the actual write can still lose the race under shard load
+    // (the goto() tears down the page's pending setTimeout before it fires)
+    // -- `selectProviderViaListbox` polls chrome.storage.local through the
+    // service worker until the write is actually on disk, not just clicked.
+    // The guard right after that goto() (`#fields-gemini` must be
+    // visible) fails fast with a SETUP ERROR instead of a silent 15s
+    // per-row timeout if some future group breaks this invariant again.
+    // #opt-ai-provider-btn/#translate-target-lang-btn would already match
+    // via their own hitRectMin (named explicitly here anyway, for a reader
+    // who is not tracing that incidental overlap); the two `state: "open"`
+    // popover rows share #opt-ai-provider-btn's own #panel-ai resolution
+    // (bare `.listbox-pop`/`.listbox-opt` selectors match it first in DOM
+    // order) and skip this loop's own visibility wait below (see that
+    // comment).
     const switchChecks = checks.filter((c) => c.selector.includes(".switch-track") || c.expect?.hitRectMin
       || c.selector.includes("[data-ui-stage0]") || c.selector === "#opt-popup-width-custom"
       || c.selector === "#test-gemini" || c.selector === "#opt-ai-provider-btn"
@@ -3102,15 +3162,31 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // own ephemeral `mkdtempSync()` userDataDir (main(), further down),
       // torn down with `rmSync()` when the run ends -- no real account,
       // real settings, or cross-run state is ever touched.
-      // The provider <select> is a listbox-enhanced value carrier (hidden;
-      // COMPONENTS.md §6.4 exception 2), so drive it the way a user does:
-      // open the combobox button, click the option. The option click writes
-      // select.value and dispatches the same bubbling change event.
-      await page.click("#opt-ai-provider-btn");
-      await page.click('#opt-ai-provider-list [role="option"][data-value="openai"]');
-      await page.waitForSelector("#fields-openai:not([hidden])", { timeout: TIMEOUT_MS });
+      // Drive it the way a user does (selectProviderViaListbox): open the
+      // combobox button, click the option.
+      await selectProviderViaListbox(page, "openai");
       await page.waitForSelector("#fields-openai #opt-openai-baseurl", { state: "visible", timeout: TIMEOUT_MS });
       for (const check of aiProviderChecks) await runOneCheck(page, theme, check, results);
+      // Restore the default (Task 4 fix wave, Controller ruling C follow-up):
+      // this group's own selectOption above autosaves `aiProvider: "openai"`
+      // into the SAME persistent Playwright profile every later group in this
+      // theme's pass runs on. Nothing after this point re-navigates with a
+      // fresh storage seed until the switchChecks/weakTextOnFill goto()s
+      // further down, and page.goto() does NOT reset chrome.storage -- it is
+      // only the extension's OWN JS (updateProviderFields(), read once at
+      // options.js init) that decides #fields-gemini's `hidden` attribute
+      // from whatever `aiProvider` is already in storage. Left unrestored,
+      // the switchChecks group's #test-gemini row (which counts on the
+      // gemini default to make #fields-gemini visible after its own reload)
+      // waits the full TIMEOUT_MS for a selector that has genuinely become
+      // unreachable and then dies -- this is what broke shards 0/1 when Task
+      // 4 widened switchChecks to include #test-gemini without accounting
+      // for this group running first and switching the provider away. Pass
+      // `sw` here (not on the openai switch above): the switchChecks group a
+      // few lines down does its OWN page.goto() shortly after this, so this
+      // is the one call whose autosave genuinely needs to be on disk before
+      // the next navigation, not just reflected in this page's live DOM.
+      await selectProviderViaListbox(page, "gemini", sw);
     }
     if (aiBehaviorChecks.length) {
       await page.click("#tab-ai-behavior");
@@ -3139,6 +3215,23 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       const _swLanded = await page.evaluate(() => document.documentElement.getAttribute("data-theme") || "");
       if (_swLanded !== theme) {
         throw new Error(`SETUP ERROR [options|${theme}|.switch group]: page is on data-theme=${JSON.stringify(_swLanded)} -- the theme re-apply did not take, so every switch row would measure another theme's palette`);
+      }
+      // Guard the provider default too (this task's fix, Task 4 regression):
+      // #test-gemini (in switchChecks, above) needs #fields-gemini visible,
+      // which needs `aiProvider` in chrome.storage to still be "gemini" --
+      // the aiProviderChecks group earlier in this same theme pass restores
+      // it explicitly, but a bare `page.goto()` does NOT reset storage on
+      // its own (see the comment on switchChecks' definition above), so a
+      // future group that switches the provider and forgets to restore it
+      // would otherwise fail silently here: every switchChecks row up to
+      // #test-gemini would pass, then #test-gemini's own visibility wait
+      // would burn the full TIMEOUT_MS before dying. Read the `hidden`
+      // attribute directly (not page.waitForSelector) so this doesn't
+      // depend on #tab-ai being the active panel yet -- the next block's
+      // per-check tab click handles that.
+      const _swGeminiHidden = await page.$eval("#fields-gemini", (el) => el.hidden).catch(() => true);
+      if (_swGeminiHidden) {
+        throw new Error(`SETUP ERROR [options|${theme}|.switch group]: provider is not gemini after reload -- an earlier group left the provider persisted in chrome.storage`);
       }
       for (const check of switchChecks) {
         // The row's own tab (every settings panel is display:none until its
