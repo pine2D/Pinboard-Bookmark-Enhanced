@@ -67,6 +67,9 @@
      --opt-sp-4 on the stage-0 label.bl rule in both tiers (fixwave F1) --
      the compact fgRhythm contract expects 4, not 8. */
   --opt-label-gap: var(--opt-sp-4);   /* 8 */
+  /* Provider sub-panel padding (spec 2026-09-24-ui-system-stage2-design §2:
+     ".pf" contract). 16 comfortable / 12 compact. */
+  --opt-panel-pad: var(--opt-sp-6);   /* 16 */
 
   /* Stacking ladder — values are the ones already shipping, named so the next
      overlay picks a rung instead of a magic number. Same semantics as popup's
@@ -200,6 +203,7 @@ html[data-density="compact"] {
   --opt-row-min-h: 36px;
   --opt-section-gap: var(--opt-sp-7); /* 24 */
   --opt-label-gap: var(--opt-sp-2);   /* 4 */
+  --opt-panel-pad: var(--opt-sp-5);   /* 12 */
 }
 
 /* ---- Base ---- */
@@ -907,6 +911,18 @@ html[data-theme] .opt-error {
 .btn.primary:focus-visible {
   border-color: var(--opt-focus-bd);
 }
+[data-ui-stage0] .btn:not(.context-help-toggle) {
+  height: var(--opt-control-h);
+  padding: 0 var(--opt-control-pad-x);
+  font-size: var(--opt-text-body);
+  line-height: calc(var(--opt-control-h) - 2px);
+}
+[data-ui-stage0] .btn-sm:not(.context-help-toggle) {
+  height: calc(var(--opt-control-h) - 4px);
+  padding: 0 var(--opt-sp-4);
+  font-size: 13px;
+  line-height: calc(var(--opt-control-h) - 6px);
+}
 
 .btn-ic {
   display: inline-flex;
@@ -1391,6 +1407,14 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    this rule has nothing to match yet -- it exists as stage 2's contract, not a
    stage-0 render change. */
 [data-ui-stage0] .entry-block > :is(input:not([type="number"]), select, .key-wrap) { max-width: none; }
+
+/* Provider sub-panel and action rows on the stage-0 rhythm (spec stage2 §2). */
+[data-ui-stage0] .pf { margin-top: var(--opt-sp-6); padding: var(--opt-panel-pad); }
+[data-ui-stage0] .pf > h3 { font-size: var(--opt-text-body); line-height: var(--opt-lh-body); font-weight: 600; color: var(--opt-fg); margin: 0 0 var(--opt-label-gap); }
+[data-ui-stage0] .settings-section > .pf:last-child { margin-bottom: 0; }
+[data-ui-stage0] .fg > .fg-actions { margin-top: var(--opt-label-gap); }
+[data-ui-stage0] .fg + .fg-actions, [data-ui-stage0] .pf > .fg-actions { margin-top: var(--opt-sp-6); }
+[data-ui-stage0] .save-status { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 
 /* ---- Provider fields ---- */
 /* Provider fieldset: a resting container, so its edge is the hairline section

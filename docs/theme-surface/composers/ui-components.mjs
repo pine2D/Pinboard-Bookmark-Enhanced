@@ -226,6 +226,25 @@ function btnRules(ns) {
       ], { pairColorWith: ".btn.primary" }),
       rule(".btn.primary:focus-visible", [["border-color", `var(--${ns}-focus-bd)`]], { pairColorWith: ".btn.primary" }),
     ]),
+    // Stage-0 density rung (COMPONENTS.md §1.1 two tiers, spec 2026-09-24
+    // stage2 §2): inside the prototype container the button family reads the
+    // density tokens; the help toggle keeps its 24px icon target and stays on
+    // the legacy sm rung. Emitted for options only -- popup/library migrate in
+    // stage 3/4.
+    ...(ns === "opt" ? [
+      rule("[data-ui-stage0] .btn:not(.context-help-toggle)", [
+        ["height", "var(--opt-control-h)"],
+        ["padding", "0 var(--opt-control-pad-x)"],
+        ["font-size", "var(--opt-text-body)"],
+        ["line-height", "calc(var(--opt-control-h) - 2px)"],
+      ]),
+      rule("[data-ui-stage0] .btn-sm:not(.context-help-toggle)", [
+        ["height", "calc(var(--opt-control-h) - 4px)"],
+        ["padding", `0 ${sp(ns, 8)}`],
+        ["font-size", "13px"],
+        ["line-height", "calc(var(--opt-control-h) - 6px)"],
+      ]),
+    ] : []),
   ];
 }
 

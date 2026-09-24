@@ -107,7 +107,9 @@ YaHei/PingFang 时行盒比 Latin 高一截，同一颗按钮在 zh-CN 和 en �
 （如 `.fg input[type="number"]`：`height: var(--opt-control-h); padding: 0 var(--opt-control-pad-x)`）。
 旧阶（26/20 列，迁移期）才是 padding + line-height + 边框拼出来的：md = 4+4+16 + 边框 2 = 26，
 sm = 2+2+14 + 边框 2 = 20（§1.2 结构配方的 padding/line-height 字面值）。按钮族阶段 2 切换前维持旧阶，
-`controlRung` 迁移期按 `[data-ui-stage0]` 双契约。
+`controlRung` 迁移期按 `[data-ui-stage0]` 双契约。stage2 Task 1 起 `btnRules(ns)` 在 `ns === "opt"`
+内发射 `[data-ui-stage0] .btn:not(.context-help-toggle)` / `.btn-sm:not(.context-help-toggle)`：
+原型区内的按钮族已切新阶，`.context-help-toggle` 除外（仍走旧 sm 阶，保留 24px 命中区）。
 
 旧阶两档各允许一段字号区间，不是单值：**md 阶** line-height 16px、padding-block 4px，字号
 12–13px（`.btn` 12 / `.fg input` `.fg select` 13，都落回 26）；**sm 阶** line-height 14px、

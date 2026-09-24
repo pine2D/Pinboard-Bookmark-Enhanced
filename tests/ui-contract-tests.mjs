@@ -199,6 +199,14 @@ check(/--opt-sp-8:\s*32px;/.test(optionsCss) &&
   "options.css does not define the stage-0 density tokens on :root");
 check(/html\[data-density="compact"\]\s*\{[^}]*--opt-control-h:\s*28px;[^}]*--opt-label-gap:\s*var\(--opt-sp-2\);[^}]*\}/s.test(optionsCss),
   "options.css compact density overrides are not scoped under html[data-density=\"compact\"]");
+// Stage-0 button rung + sub-panel rhythm (spec 2026-09-24-ui-system-stage2-design
+// §2, task 1): the panel padding token has both density tiers, and the composer
+// emits the density-height button rung inside the prototype container.
+check(/--opt-panel-pad:\s*var\(--opt-sp-6\)/.test(optionsCss) &&
+  /html\[data-density="compact"\]\s*\{[^}]*--opt-panel-pad:\s*var\(--opt-sp-5\)/s.test(optionsCss),
+  "options.css defines --opt-panel-pad in both tiers");
+check(/\[data-ui-stage0\] \.btn:not\(\.context-help-toggle\)\s*\{[^}]*height:\s*var\(--opt-control-h\)/s.test(optionsCss),
+  "generated ui-components emits the stage-0 density button rung");
 {
   // Registry-driven, not enumerated: options-theme-early.js's
   // PBP_OPTIONS_DENSITY_MAP must name exactly the DATA-THEME TARGETS that
