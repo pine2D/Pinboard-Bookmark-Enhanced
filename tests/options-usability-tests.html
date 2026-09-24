@@ -990,8 +990,13 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // switches (opt-batch-tag-enabled, batch-skip-existing) + 2 more inside the
   // batch-AI group host = 12; ai-behavior has 1 switch inside its mixed
   // choice-stack (opt-ai-use-transcript) + 1 bare `.fg` switch
-  // (opt-ai-auto-tags) = 2.
-  const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 12], ["ai-behavior", 2]];
+  // (opt-ai-auto-tags) = 2; archive (Task 2) has 3 in the one wayback
+  // choice-stack (opt-wayback-enabled/-batch/-skip-private) = 3, every one a
+  // `.pref-row` -- reader does NOT join this loop (below): its
+  // opt-preview-skim switch is a controller-ruled `.entry-block-sub`, not a
+  // `.pref-row`, so the loop's blanket "every switch sits in a .pref-row"
+  // assertion does not fit it.
+  const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 12], ["ai-behavior", 2], ["archive", 3]];
 
   for (const [id, switchCount] of STAGE3A_PANELS) {
     await test(`stage3a: ${id} panel carries the marker and no legacy row classes`, async () => {
@@ -1036,6 +1041,79 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       const select = panel.querySelector(`#${id}`);
       assert(select && select.hasAttribute("data-listbox"), id + " is missing data-listbox");
     });
+  });
+
+  // Stage-3a Task 2 (2026-09-24-ui-system-stage3a): reader + archive move
+  // onto the same row model. Reader does not join the STAGE3A_PANELS loop
+  // above (its opt-preview-skim switch is a controller-ruled
+  // `.entry-block-sub`, not a `.pref-row`), so it gets its own marker/switch-
+  // count/hint-ownership tests below, adapted for that one exception.
+  await test("stage3a: reader panel carries the marker and no legacy row classes", async () => {
+    const panel = await stage3aPanel("reader");
+    assert(!!panel, "panel-reader is missing the data-ui-stage0 marker");
+    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
+      "panel-reader still carries a legacy row/stack class");
+  });
+
+  await test("stage3a: every switch in the reader panel sits in a .pref-row or entry-block-sub", async () => {
+    const panel = await stage3aPanel("reader");
+    assert(!!panel, "panel-reader is missing the data-ui-stage0 marker");
+    const switches = [...panel.querySelectorAll("label.switch")];
+    assert(switches.length === 5, "expected 5 switches in panel-reader, got " + switches.length);
+    assert(switches.every((l) => l.closest(".pref-row") || l.closest(".entry-block-sub")),
+      "every switch in panel-reader must sit inside a .pref-row or an .entry-block-sub");
+  });
+
+  await test("stage3a: every .hint in the reader panel still resolves a .fg or .pref-row owner", async () => {
+    const panel = await stage3aPanel("reader");
+    assert(!!panel, "panel-reader is missing the data-ui-stage0 marker");
+    // #preview-ai-unavailable is the one deliberate exception (its own
+    // assertion below): a controller-ruled direct child of the section,
+    // sibling to the .pref-group it warns about, not owned by any .fg/
+    // .pref-row -- excluded here the same way .context-help-body already is.
+    const hints = [...panel.querySelectorAll(".hint:not(.context-help-body):not(#preview-ai-unavailable)")];
+    assert(hints.length > 0, "expected at least one .hint in panel-reader");
+    assert(hints.every((h) => h.closest(".fg, .pref-row")),
+      "every .hint in panel-reader must resolve a .fg or .pref-row owner");
+  });
+
+  await test("stage3a: reader subordinate entry blocks use entry-block-sub", async () => {
+    const panel = await stage3aPanel("reader");
+    assert(!!panel, "panel-reader is missing the data-ui-stage0 marker");
+    assert(panel.querySelectorAll(".fg.entry-block.entry-block-sub").length === 4,
+      "expected 4 .fg.entry-block.entry-block-sub blocks in panel-reader, got " +
+      panel.querySelectorAll(".fg.entry-block.entry-block-sub").length);
+  });
+
+  await test("stage3a: reader unavailable hint stays a direct child of its section", async () => {
+    const panel = await stage3aPanel("reader");
+    assert(!!panel, "panel-reader is missing the data-ui-stage0 marker");
+    const hint = panel.querySelector("#preview-ai-unavailable");
+    assert(!!hint && hint.parentElement.matches("section.settings-section"),
+      "preview-ai-unavailable must be a direct child of a section.settings-section");
+  });
+
+  await test("stage3a: reader's selection-trigger select is a listbox target", async () => {
+    const panel = await stage3aPanel("reader");
+    assert(!!panel, "panel-reader is missing the data-ui-stage0 marker");
+    const select = panel.querySelector("#opt-selection-trigger");
+    assert(select && select.hasAttribute("data-listbox"), "opt-selection-trigger is missing data-listbox");
+  });
+
+  await test("stage3a: archive subordinate rows use pref-row-sub", async () => {
+    const panel = await stage3aPanel("archive");
+    assert(!!panel, "panel-archive is missing the data-ui-stage0 marker");
+    assert(panel.querySelectorAll(".pref-row.pref-row-sub").length === 2,
+      "expected 2 .pref-row.pref-row-sub rows in panel-archive, got " +
+      panel.querySelectorAll(".pref-row.pref-row-sub").length);
+  });
+
+  await test("stage3a: wayback log clear button uses the hidden attribute, not inline style", async () => {
+    const panel = await stage3aPanel("archive");
+    assert(!!panel, "panel-archive is missing the data-ui-stage0 marker");
+    const clearBtn = panel.querySelector("#wayback-log-clear");
+    assert(!!clearBtn && clearBtn.hasAttribute("hidden") && !clearBtn.getAttribute("style"),
+      "wayback-log-clear must use the hidden attribute, not an inline display:none style");
   });
 
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";

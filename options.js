@@ -5261,7 +5261,7 @@ async function renderWaybackLog() {
 
   // Show the Clear button only when there's something to clear
   const clearBtn = $id("wayback-log-clear");
-  if (clearBtn) clearBtn.style.display = log.length ? "" : "none";
+  if (clearBtn) clearBtn.hidden = !log.length;
 
   // Unknown owner: leave the panel blank rather than assert "no requests yet",
   // which would be a claim about a log we could not scope. Storage reads fail

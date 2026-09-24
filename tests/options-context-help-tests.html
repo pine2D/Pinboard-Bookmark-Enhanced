@@ -379,9 +379,22 @@ function test(name, fn) {
       details.open = true;
       const hostRect = helpHost(details).getBoundingClientRect();
       const bodyRect = body.getBoundingClientRect();
+      // Stage-3a Task 2: an indented row (.entry-block-sub's padding-left on
+      // the host div for a field host, or the choice-role fix's padding-left
+      // on `> label.switch` for a choice host -- two different elements,
+      // neither of which is uniformly "the host") shifts the answer's LEFT
+      // edge in by that indent without moving the row's RIGHT edge. A raw
+      // width comparison against the host's own border-box (unaware of which
+      // element actually carries the indent) reads a false failure for any
+      // indented row. The right edge is the one point every shape -- indented
+      // or not, host-padded or label-padded -- agrees on, so comparing right
+      // edges instead is the true generalization of "fills its row": it holds
+      // for a plain unindented host (body starts flush left, so equal right
+      // edges implies equal width, same as the old check) AND for an indented
+      // one (body starts further right, but must still reach the same edge).
       assert(
-        bodyRect.width >= hostRect.width - 2,
-        key + " answer width=" + bodyRect.width + ", host width=" + hostRect.width,
+        Math.abs(bodyRect.right - hostRect.right) <= 2,
+        key + " answer right=" + bodyRect.right + ", host right=" + hostRect.right,
       );
     });
   });
@@ -481,14 +494,13 @@ function test(name, fn) {
       ["opt-sync-enabled", "opt-sync-api-keys"],
       ["opt-backup-include-highlights", "opt-backup-include-vocabulary", "opt-backup-include-secrets"],
       ["notify-quick-save", "notify-read-later", "notify-tab-set", "notify-batch-save", "notify-errors"],
-      ["opt-md-video-dark", "opt-md-video-pause-lookup", "opt-md-video-use-login"],
       ["opt-md-frontmatter", "opt-md-extended-meta"],
       ["opt-md-include-toc", "opt-md-include-hl"],
-      ["opt-wayback-enabled", "opt-wayback-batch", "opt-wayback-skip-private"],
     ];
-    // Popup panel groups (2026-09-23-ui-system-stage0 Task 2) and the
+    // Popup panel groups (2026-09-23-ui-system-stage0 Task 2), the
     // bookmarks/quick/ai-behavior groups (2026-09-24-ui-system-stage3a Task
-    // 1): migrated to the stage-0 row model, [data-ui-stage0] .pref-row
+    // 1), and the reader/archive groups (2026-09-24-ui-system-stage3a Task
+    // 2): migrated to the stage-0 row model, [data-ui-stage0] .pref-row
     // inside .pref-group. That density is deliberately NOT the legacy
     // compact-stack rhythm (the row model's whole point is a different,
     // token-driven geometry), so these groups get their own containment
@@ -506,6 +518,8 @@ function test(name, fn) {
       ["rl-auto-notes", "rl-blockquote"],
       ["rl-ai-tags", "rl-ai-summary"],
       ["opt-ai-src-local", "opt-ai-src-jina", "opt-ai-use-transcript"],
+      ["opt-md-video-dark", "opt-md-video-pause-lookup", "opt-md-video-use-login"],
+      ["opt-wayback-enabled", "opt-wayback-batch", "opt-wayback-skip-private"],
     ];
     groups.forEach((ids) => {
       const rows = ids.map((id) => doc.getElementById(id)?.closest(".choice-row"));

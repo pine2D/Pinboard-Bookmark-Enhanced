@@ -1329,6 +1329,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `.pref-row` | 一行 = `label`（flex、align center、gap sp-5、`min-height --opt-row-min-h`、`padding --opt-row-pad-y 0`、正文字号）；`.pref-row-sub` 左缩进 sp-7；**紧跟分区标题的首行去掉上内边距并把 min-height 减去一个 pad**（R9：标题→首行文字 = 12） |
 | options | `.pref-group-radio > .pref-row > label` | `min-height: control-h + sp-4`（40/36），`padding sp-2 0`，gap sp-4；数字输入内联 |
 | options | `.fg.entry-block` | 录入块：`label.bl`（正文字号、`--opt-fg` 色、`margin-bottom --opt-label-gap`）+ 控件占满内容列（`max-width: none`），唯 select 例外（枚举类控件按内容定宽：`width: max-content; min-width: 240px; max-width: 100%`，阶段 2 的列表框按钮同此）+ 可选 `p.hint`；带帮助时 label 归 grid 宿主、`details:not([open]) + *` 承担 label-gap，展开态由全局 `[open] + *` 固定 8 |
+| options | `.entry-block-sub` | 从属录入块，左缩进 sp-7，与 `.pref-row-sub` 同值 |
 | options | `.fg.edit-area` | 编辑区：`label.bl` + textarea 占满（min-height 96、13px/20px、内距 sp-4 × control-pad-x） |
 | options | 控件外观 | 底 `--opt-panel`、边 `--opt-border`（≥3:1 门已有） |
 | popup | `.row` / `.label` / `.field` | 表单行壳（flex，padding sp-2 sp-5，gap sp-4）/ 52px 标签槽 / 控件槽（flex:1，min-width:0） |

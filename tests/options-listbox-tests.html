@@ -345,9 +345,18 @@ function pbpTestChromeStub(enMessages) {
     itemsOf(lang()).find((li) => li.dataset.value === "custom").click();
     assert(lang().value === "custom", "value=" + lang().value);
     assert(!custom.classList.contains("hidden"), "custom input still hidden");
-    // It keeps the select's old placement: on the listbox's line, after it.
+    // Stage-3a Task 2: #panel-reader now carries [data-ui-stage0], so this
+    // input (a direct child of the .entry-block the listbox also lives in)
+    // is reached by the existing `[data-ui-stage0] .entry-block > input
+    // max-width: none` rule (options.css) -- the same "controls fill the
+    // content column" rule every OTHER entry-block text field already
+    // follows. It no longer keeps the select's old "beside it" placement
+    // (that relied on a 320px max-width this rule now removes); it stacks
+    // below instead, spaced by `.fg > .listbox + input { margin-top: sp-3 }`,
+    // flush with the listbox button's own left edge.
     assert(custom.getClientRects().length > 0, "custom input has no layout box");
-    assert(custom.getBoundingClientRect().left >= btnOf(lang()).getBoundingClientRect().right, "custom input is not after the listbox");
+    assert(custom.getBoundingClientRect().top >= btnOf(lang()).getBoundingClientRect().bottom, "custom input is not below the listbox");
+    assert(Math.abs(custom.getBoundingClientRect().left - btnOf(lang()).getBoundingClientRect().left) <= 1, "custom input does not share the listbox button's left edge");
     btnOf(lang()).click();
     itemsOf(lang()).find((li) => li.dataset.value === "auto").click();
     assert(custom.classList.contains("hidden"), "custom input not re-hidden");

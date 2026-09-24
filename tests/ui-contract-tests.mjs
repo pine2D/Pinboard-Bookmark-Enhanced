@@ -1206,7 +1206,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   check(/id="batch-legacy-permission"[^>]*hidden/.test(optionsHtml) &&
     /batchLegacy = \$id\("batch-legacy-permission"\)[\s\S]{0,300}batchLegacy\.hidden = !has/.test(optionsJs),
     "options: the legacy all-sites maintenance block still occupies space when no broad grant exists");
-  const waybackHost = optionsHtml.indexOf('class="fg wayback-log-host"');
+  const waybackHost = optionsHtml.indexOf('class="fg entry-block wayback-log-host"');
   const waybackHeading = optionsHtml.indexOf('class="wayback-log-heading"', waybackHost);
   const waybackHelp = optionsHtml.indexOf('class="context-help-host wayback-log-help"', waybackHeading);
   const waybackTitle = optionsHtml.indexOf('data-i18n="archiveLogTitle"', waybackHelp);
