@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 23;
+const TOTAL = 24;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -545,6 +545,53 @@ function pbpTestChromeStub(enMessages) {
     const pop = popOf(provider());
     assert(!listOf(provider()).hasAttribute("data-flip"), "data-flip set on the scroll layer");
     assert(win.getComputedStyle(pop).position === "absolute" && win.getComputedStyle(listOf(provider())).position === "static", "positioning not owned by the shell");
+  });
+
+  // Fixwave stage2 product-bug fix: options.js debounces autosave 500ms
+  // (scheduleAutoSave) with no teardown flush, so a change made <500ms
+  // before the tab closed/hid was silently discarded. options.js now flushes
+  // a pending timer on document visibilitychange->hidden (and window
+  // pagehide) by cancelling it and calling saveAllSafely() right away. This
+  // drives the change through the REAL listbox click path (same as the
+  // "provider change through the listbox" test above), so it exercises
+  // bindAutoSave's actual `change` listener on the underlying <select>, not
+  // a synthetic shortcut.
+  test("visibilitychange(hidden) flushes a pending debounced autosave before the 500ms timer would fire", async () => {
+    showPanel("panel-ai");
+    // Let any earlier test's own real `change` event finish its autosave
+    // first, so this test's spy only ever sees ITS OWN save.
+    await sleep(600);
+    setValue(provider(), "gemini");
+    const localStore = win.chrome.storage.local;
+    const syncStore = win.chrome.storage.sync;
+    const origLocalSet = localStore.set;
+    const origSyncSet = syncStore.set;
+    let setCalls = 0;
+    localStore.set = (...args) => { setCalls++; return origLocalSet.apply(localStore, args); };
+    syncStore.set = (...args) => { setCalls++; return origSyncSet.apply(syncStore, args); };
+    try {
+      btnOf(provider()).click();
+      const target = itemsOf(provider()).find((li) => li.dataset.value === "openai");
+      target.click();
+      assert(provider().value === "openai", "value=" + provider().value);
+      // scheduleAutoSave() only arms a setTimeout; nothing has awaited yet,
+      // so storage.set cannot have been reached synchronously off the click.
+      assert(setCalls === 0, "storage.set fired synchronously off the change -- scheduleAutoSave should debounce, not save inline");
+      // Simulate the tab being hidden mid-debounce (switch away / close).
+      Object.defineProperty(doc, "visibilityState", { value: "hidden", configurable: true });
+      doc.dispatchEvent(new win.Event("visibilitychange"));
+      // The flush's own chain (pbpQueueOptionsSave -> saveAll ->
+      // persistSettings' awaited secret-routing read -> storage.set) still
+      // needs a handful of real microtask/lock ticks -- assert it lands well
+      // inside a couple hundred ms, not that it is instantaneous, and well
+      // short of the 500ms debounce window it pre-empted.
+      for (let i = 0; i < 20 && setCalls === 0; i++) await sleep(10);
+      assert(setCalls > 0, "storage.set was not reached within ~200ms of the hidden flush (fix regressed or the flush never fired)");
+    } finally {
+      localStore.set = origLocalSet;
+      syncStore.set = origSyncSet;
+      delete doc.visibilityState;
+    }
   });
 
   for (const [name, fn] of queue) {

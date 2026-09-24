@@ -3368,9 +3368,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     saveTimer = setTimeout(saveAllSafely, 500);
   }
 
-  // Listen on all form inputs for auto-save. The page has no manual Save and no
-  // beforeunload flush, so an unbound control silently discards whatever was
-  // typed into it -- and renderExportTargets() throws away and rebuilds every
+  // Flush a pending debounced save when the page is about to go away (fixwave
+  // stage2 product bug: a change made <500ms before the tab closed/hid was
+  // silently lost -- there was no teardown hook at all). Cancel the timer and
+  // issue the save right now instead of waiting out the rest of the debounce.
+  //
+  // This does NOT call all the way down to a guaranteed-synchronous
+  // chrome.storage.*.set() -- there isn't one to call. persistSettings
+  // (shared.js) does its own real async round-trips first (an awaited
+  // chrome.storage.local.get/pbpReadSecretSyncStateUnlocked() read for the
+  // secret-routing flags, then per-key chunked syncSetLarge() writes for
+  // PBP_CHUNKED_SETTING_KEYS) before it ever reaches a batch set(). Re-deriving
+  // a second, "fast" write path that skips that pipeline would have to
+  // duplicate its secret-routing split (API keys / export-target tokens must
+  // never reach the wrong storage area) and its sync-quota chunking -- exactly
+  // the kind of drift-prone second writer the storage boundary rules (CLAUDE.md)
+  // warn about. So the fix is the same shape as this codebase's existing
+  // teardown flush for exactly this problem, md-translate.js's ZH-0 §5
+  // `_pbpTrFlushCache`: visibilitychange->hidden fires while the page is still
+  // alive and is the honest best-effort point (the guarantee is "far less is
+  // lost", not "zero loss" -- calling saveAllSafely() immediately still races
+  // persistSettings' awaits against the page's actual teardown, it just starts
+  // that race at 0ms instead of up to 500ms late). pagehide is wired the same
+  // way as a second chance for a navigation that fires it without a preceding
+  // hidden transition; per that same ZH-0 precedent pagehide is not the
+  // primary flush point (async work "rarely completes before teardown" once
+  // pagehide is already firing), so this is belt-and-suspenders, not the
+  // guarantee -- visibilitychange->hidden is expected to have already fired
+  // and issued the save in the common (tab close / tab switch) case.
+  function flushPendingAutoSave() {
+    if (saveTimer === null) return;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    saveAllSafely();
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushPendingAutoSave();
+  });
+  window.addEventListener("pagehide", flushPendingAutoSave);
+
+  // Listen on all form inputs for auto-save. The page has no manual Save
+  // button, so an unbound control silently discards whatever was typed into
+  // it -- and renderExportTargets() throws away and rebuilds every
   // Send-to card, which left the Notion token / Webhook URL / Obsidian vault
   // entered after a panel reset bound to nothing. Hence re-entrant: called once
   // for the page and again at the end of each render, with a dataset marker so
