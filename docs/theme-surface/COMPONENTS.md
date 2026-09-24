@@ -822,11 +822,23 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
   Source 两个 radio 行）：这里 `<details class="context-help">` 保持 label 的兄弟（不像 `.switch`
   的 Ruling 36 那样塞进 label 内部），所以宿主的三栏 grid（`auto 24px minmax(0,1fr)`）仍要用第 2
   栏给帮助图标定位——这要求 label 自身保持收缩到纯文案宽度，不能让 `.pick-mark` 参与进正常流去撑宽
-  它（否则图标被推离文案 ~32px）。手写覆盖把该宿主内 `label.pick` 改回 `position: static`、
-  `.pick-mark` 改 `position: absolute; right: 0`（相对宿主自身——它已是 `position: relative`）：
+  它（否则图标被推离文案 ~32px）。手写覆盖把该宿主内 `label.pick` 改回 `position: static`：
   mark 因此落到与同组 `.switch` 轨道一致的「行尾」位置（spec §2），文案→图标的视觉间距也恢复到
-  6–8px（`tests/options-context-help-tests.html` 钉着这条）；隐藏 radio 的命中区随之扩到整行，
-  与其它三组 `.pick` 行（本就整行可点，靠 block 级 `label` 默认宽度）保持一致，不是回退。
+  6–8px（`tests/options-context-help-tests.html` 钉着这条）。
+  **fix round 1（首版有真实 bug，已修）**：首版让隐藏 radio 的 `inset: 0` 与 mark 的 `top: 50%`
+  都相对宿主自身（已是 `position: relative`），宽度上没问题（宿主本就等于整行宽），但高度上错了——
+  宿主是 `display: grid`，答案展开时 `.context-help::details-content` 占 `grid-row: 2`，宿主整体
+  变高，`inset: 0` 跟着长高：点击或选中已展开的答案文字会被这个看不见的 radio 吞掉、误触发切换。
+  `top: 50%` 同理会漂到宿主新的纵向中点，mark 掉出第一行。改为：两者都钉一个自定义属性
+  `--pick-row1-h`（默认 `--opt-row-min-h`，R9 首行——即 `opt-ai-src-local` 这一行——时改
+  `calc(--opt-row-min-h - --opt-row-pad-y)`，与 R9 自身同式）；radio 用 `bottom: auto; height:
+  var(--pick-row1-h)`（forced-colors 下跳过，交回原生控件的 `auto`），mark 用 `top: 0` +
+  `translateY(calc((--pick-row1-h - 20px) / 2))`。两者都从宿主的 `top: 0` 起算——那始终是 row 1
+  的顶边，答案展开与否都不变——而不是依赖宿主当前的总高度，因此天然不随展开/收起漂移。隐藏 radio 的
+  命中区仍是整行宽（只是行高钉死在 row 1），与其它三组 `.pick` 行（本就整行可点，靠 block 级
+  `label` 默认宽度）保持一致，不是回退。回归测试：`tests/options-context-help-tests.html` 的
+  "open help answer stays hit-testable and the radio/mark stay pinned to row 1"
+  （`elementFromPoint` 命中测试 + 展开前后 mark/label 矩形比对，闭合态与展开态都测）。
 - 全宽字段（表单栈里独占一行）**不受同行对齐律约束**——它没有行伴。约束只在同一 flex 行内并排时生效。
 
 ---
@@ -1363,12 +1375,11 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `.pf` | 带边框子面板（provider 卡）：legacy（`[data-ui-stage0]` 外）padding sp-5，radius md，`margin-top sp-4`；**在 `[data-ui-stage0]` 内**（stage2 §2）：padding `--opt-panel-pad`（16 comfortable/12 compact）、`margin-top sp-6`（16）；`> h3` 字号/行高 `--opt-text-body`/`--opt-lh-body`、字重 600、色 `--opt-fg`（不落回 legacy 的 `--opt-fg-soft` 未主题态 / `--opt-fg-muted` 主题态两段式）、`margin: 0 0 --opt-label-gap` |
 | options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`（可选第三个子元素 `details.context-help`，夹在 `.switch-text` 与 `.switch-track` 之间——带帮助的开关行用它，Ruling 36）；flex、flex-start（轨道 `margin-left:auto` 到行尾）、gap sp-3；轨道 28×16 无边框 / 滑块 12 内缩 2 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked、details-in-label 合法性附注） |
 | options | `.listbox` (+ `.listbox-btn` / `.listbox-value` / `.listbox-sizer` / `.listbox-pop` / `.listbox-list` / `.listbox-opt`) | 唯一自绘 select（§6.4 例外 2）：`select[data-listbox][hidden]` 之后的 `div.listbox`；宽度沿用 select 例外（`width: max-content; min-width: 240px; max-width: 100%`），max-content 取最长选项（`.listbox-sizer` 零高网格行），按钮占满 `.listbox`、高 `--opt-control-h`（32/28）；弹层外壳 `.listbox-pop` absolute、`top: 100% + sp-1`（`data-flip=up` 时贴上方）、`z-index: --opt-z-popover`、圆角 lg、边框阴影、`overflow: hidden`；滚动层 `.listbox-list` `max-height: min(320px, 100dvh − 32px)`、`overflow: auto`、内距 sp-2；选项高 `--opt-control-h`、内距 `0 sp-4`、圆角 sm；跟随输入框的关系规则 `.fg > .listbox + input { margin-top: sp-3 }` 接替 `.fg > select + input` |
-| options | `.pick` (+ `.pick-text` / `.pick-mark` / `.pick-box`) | 单选组勾选行（§6.4 例外 3，stage3b Task 1）：`label.pick > input[type=radio\|checkbox] + .pick-text (+ 可选行内控件) + .pick-mark`；行几何与 `.switch` 相同（`--opt-row-min-h` 44/36、`--opt-row-pad-y`、`.pref-row` 分隔线，`.pref-group-radio` 不再单独变体）；flex、gap sp-5（12px）、mark `margin-left:auto` 到行尾；mark 20×20，圆形（radio）/ `.pick-box` 修饰符 4px 圆角方形（Task 2）；选中 `background/border-color: --opt-accent`，勾线 `::after` CSS 边框转 45° 画 L 形（不用字面字符）；焦点环画在 mark（同 `.switch-track`）、forced-colors 回退原生控件、无 `aria-checked`；行内非 radio/checkbox 控件（popup-width 自定义数字框）`position:relative;z-index:1` 盖过隐藏 input 的 `inset:0`；`.context-help-host[data-help-role="choice"]` 宿主（details 仍是 label 兄弟）有专属覆盖：label 改 `position:static`、mark 改 `position:absolute;right:0` 相对宿主，见 §6.4 例外 3 附注 |
+| options | `.pick` (+ `.pick-text` / `.pick-mark` / `.pick-box`) | 单选组勾选行（§6.4 例外 3，stage3b Task 1）：`label.pick > input[type=radio\|checkbox] + .pick-text (+ 可选行内控件) + .pick-mark`；行几何与 `.switch` 相同（`--opt-row-min-h` 44/36、`--opt-row-pad-y`、`.pref-row` 分隔线，`.pref-group-radio` 不再单独变体）；flex、gap sp-5（12px）、mark `margin-left:auto` 到行尾；mark 20×20，圆形（radio）/ `.pick-box` 修饰符 4px 圆角方形（Task 2）；选中 `background/border-color: --opt-accent`，勾线 `::after` CSS 边框转 45° 画 L 形（不用字面字符）；焦点环画在 mark（同 `.switch-track`）、forced-colors 回退原生控件、无 `aria-checked`；行内非 radio/checkbox 控件（popup-width 自定义数字框）`position:relative;z-index:1` 盖过隐藏 input 的 `inset:0`；`.context-help-host[data-help-role="choice"]` 宿主（details 仍是 label 兄弟）有专属覆盖（fix round 1）：label 仍 `position:static`（宿主自身 `position:relative` 兜底定位上下文）；隐藏 input 与 mark 都钉在一个自定义属性 `--pick-row1-h` 上（= `--opt-row-min-h`，R9 首行时改 `calc(--opt-row-min-h - --opt-row-pad-y)`，见 `.pref-row` 行 R9 附注）——input `bottom:auto;height:var(--pick-row1-h)`（forced-colors 下不生效，交回原生控件的 `auto`）、mark `top:0` + `translateY(calc((--pick-row1-h - 20px)/2))`，二者都从宿主的 `top:0`（= row 1 顶边，答案展开也不变）起算，而不是 `inset:0`/`50%`：`.context-help::details-content` 展开时占 `grid-row:2`、把宿主整体撑高，若 input/mark 仍随宿主总高伸缩，命中区会吞掉展开的答案文本、mark 也会往宿主新的纵向中点漂移，详见 §6.4 例外 3 附注 |
 | options | `section.settings-section` | 分区容器；相邻分区 `margin-top: --opt-section-gap`；`> h2.section-title` 字号 `--opt-text-section`，`margin: 0 0 --opt-sp-5`（12） |
-| options | `.pref-group` | 偏好行列表；作分区直接子元素时 `margin-bottom: --opt-sp-6`；相邻 `.pref-row` 之间 1px `--opt-border-section` 分隔线（`.pref-group-radio` 无线）；混合选项组（单选与开关共存、不具备 `.pref-group-radio`）内的单选行仍沿用圆点→文案 `--opt-sp-4`（8px）间距，`[data-ui-stage0] .pref-group:not(.pref-group-radio) > .pref-row > label:not(.switch) { gap: --opt-sp-4 }`——`label:not(.switch)` 把范围锁在单选上，组内的开关行保留自己的 choice-role 6px 覆盖不受影响 |
-| options | `.pref-row` | 一行 = `label`（flex、align center、gap sp-5、`min-height --opt-row-min-h`、`padding --opt-row-pad-y 0`、正文字号）；`.pref-row-sub` 左缩进 sp-7；**紧跟分区标题的首行去掉上内边距并把 min-height 减去一个 pad**（R9：标题→首行文字 = 12） |
+| options | `.pref-group` | 偏好行列表；作分区直接子元素时 `margin-bottom: --opt-sp-6`；相邻 `.pref-row` 之间 1px `--opt-border-section` 分隔线；`.pref-group-radio`（单选专用分组标记类）自 stage3b Task 1 起不再携带独立几何（旧"无线 40/36 行"变体与混合组 8px 圆点间距覆盖均已删除）——组内单选行与开关行同走 `.pref-row > label.pick`/`label.switch` 的同一套行几何，该类只剩选择器/测试识别用途 |
+| options | `.pref-row` | 一行 = `label`（flex、align center、gap sp-5、`min-height --opt-row-min-h`、`padding --opt-row-pad-y 0`、正文字号）；`.pref-row-sub` 左缩进 sp-7；**紧跟分区标题的首行去掉上内边距并把 min-height 减去一个 pad**（R9：标题→首行文字 = 12；不限于 `.fg.entry-block` 里的开关/单选组——ai-content-source 的两个 `.pick` 行是 `.settings-section > .pref-group` 的直接子行，R9 同样命中其首行 `opt-ai-src-local`，`.pick` 的 choice-host 覆盖`--pick-row1-h` 与之同式） |
 | options | `.pref-row.context-help-host[data-help-role="choice"]` | 帮助宿主落在 `.pref-row` 内的开关/单选行：四条限定覆盖对抗遗留 `.context-help-host[data-help-role="choice"] > label.switch` 配方的 shorthand——`column-gap: --opt-sp-3` + `row-gap: 0`（还原开关自身 6px 文案→图标间距；`row-gap` 必须显式清零，写成 `gap` shorthand 会把遗留的 `row-gap: 0` 一并重置为 6px，在闭合、空的 `::details-content` 折叠行上长出一条幽灵行）、`.switch-text` 行高归 `--opt-lh-body`、`padding-top`/`padding-bottom` 归 `--opt-row-pad-y`、`.pref-row-sub` 时再加 `padding-left: --opt-sp-7`。契约：闭合态行高与同层级 plain `.pref-row` 相等（含"紧跟标题的首行"矮一档的场合，±1px 容差）；展开态答案占满行宽，文案→答案间距固定 6px（`--opt-sp-3`，两个密度档同值，不随 pref-row 自身 12/8px 的行内间距变化）。 |
-| options | `.pref-group-radio > .pref-row > label` | `min-height: control-h + sp-4`（40/36），`padding sp-2 0`，gap sp-4；数字输入内联 |
 | options | `.fg.entry-block` | 录入块：`label.bl`（正文字号、`--opt-fg` 色、`margin-bottom --opt-label-gap`）+ 控件占满内容列（`max-width: none`），唯 select 例外（枚举类控件按内容定宽：`width: max-content; min-width: 240px; max-width: 100%`，阶段 2 的列表框按钮同此）+ 可选 `p.hint`；带帮助时 label 归 grid 宿主、`details:not([open]) + *` 承担 label-gap，展开态由全局 `[open] + *` 固定 8 |
 | options | `.entry-block-sub` | 从属录入块，左缩进 sp-7，与 `.pref-row-sub` 同值 |
 | options | `.fg.edit-area` | 编辑区：`label.bl` + textarea 占满（min-height 96、13px/20px、内距 sp-4 × control-pad-x） |

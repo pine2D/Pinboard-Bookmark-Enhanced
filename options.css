@@ -550,17 +550,50 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    edge" spot the group's one `.switch` row parks its track at (spec §2:
    "mark 与 track 都在行尾，行高一致"). `position: static` on the label
    also stops it being the hidden native radio's containing block, so that
-   `inset: 0` reaches the same host box the mark now targets -- the radio's
-   hit area grows to the FULL row this way, matching how a plain (non-help)
-   `.pick` row already behaves via ordinary block-level width, not a
-   regression. */
-.context-help-host[data-help-role="choice"] > label.pick { position: static; }
+   `inset: 0` reaches the same host box the mark now targets.
+   Fix round 1 (reported): pointing the radio's `inset: 0` and the mark's
+   `top: 50%` at the HOST instead of the label was correct for WIDTH (the
+   host is exactly the row's full width, open or closed) but wrong for
+   HEIGHT -- the host is `display: grid` with the open answer occupying a
+   SECOND row (`.control-help::details-content { grid-row: 2 }` below), so
+   its own box grows taller once opened. `inset: 0` grew with it: the
+   invisible radio covered the open answer too, and clicking or selecting
+   its text silently re-picked this option instead. `top: 50%` drifted for
+   the same reason -- the mark chased the now-taller host's new vertical
+   centre downward, off row 1 entirely.
+   Fix: give both an EXPLICIT row-1-only box instead of `inset: 0` / `50%`
+   of a box that can grow. Row 1's real height is `--opt-row-min-h`
+   normally, or R9's reduced `calc(--opt-row-min-h - --opt-row-pad-y)` for
+   this group's FIRST row specifically (`opt-ai-src-local`'s -- R9's own
+   selector reaches this host too, see the updated comment on that rule);
+   `--pick-row1-h` holds whichever applies so the radio height rule and the
+   mark's centring calc below both read one value instead of duplicating
+   the condition. Both are anchored from `top: 0`, which is row 1's own top
+   edge on this grid REGARDLESS of whether row 2 (the open answer) exists,
+   so neither needs to know the host's current total height at all. The
+   radio's height override is skipped under forced-colors (Windows High
+   Contrast): the composer's own fallback there already restores the
+   native control to its natural `width: auto; height: auto` box, and this
+   rule's specificity would otherwise win and re-clip it back down. */
+.context-help-host[data-help-role="choice"] > label.pick {
+  position: static;
+  --pick-row1-h: var(--opt-row-min-h);
+}
+[data-ui-stage0] .settings-section > h2.section-title + .pref-group > .pref-row.context-help-host[data-help-role="choice"]:first-child > label.pick {
+  --pick-row1-h: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
+}
+@media (forced-colors: none) {
+  .context-help-host[data-help-role="choice"] > label.pick > input[type="radio"] {
+    bottom: auto;
+    height: var(--pick-row1-h);
+  }
+}
 .context-help-host[data-help-role="choice"] > label.pick > .pick-mark {
   position: absolute;
-  top: 50%;
+  top: 0;
   right: 0;
   margin-left: 0;
-  transform: translateY(-50%);
+  transform: translateY(calc((var(--pick-row1-h) - 20px) / 2));
 }
 /* Choice hosts use the shared grid: the copy label shrink-wraps in column 1
    and the help target follows it in column 2, right after the copy -- where
@@ -1539,9 +1572,16 @@ html.motion-ready .backup-import-result:not([hidden]) {
 [data-ui-stage0] .entry-block, [data-ui-stage0] .edit-area { margin-bottom: var(--opt-sp-6); }
 /* R9 (2026-09-23): a preference row that directly follows its section title
    drops its top padding and one pad of min-height, so title -> first copy is
-   the same 12px as title -> entry-block label. Radio groups never sit right
-   under a title (they live inside the popup-width entry block), so the
-   selector stops at the direct child of the section. */
+   the same 12px as title -> entry-block label. bgsave-mode's/tag-sync-
+   mode's/popup-width's `.pref-group-radio` radio groups never sit right
+   under a title (they live one level deeper, inside a `.fg.entry-block`),
+   so this rule doesn't reach them -- but stage-3b Task 1's ai-content-source
+   `.pick` rows DO (`.settings-section > .pref-group > .pref-row:first-child`,
+   no entry-block wrapper in between), and its first row (`opt-ai-src-local`)
+   is genuinely affected: the choice-host override above (`--pick-row1-h`,
+   fix round 1) matches this SAME `calc(--opt-row-min-h - --opt-row-pad-y)`
+   formula for exactly that reason, so the hidden radio's row-1 hit area and
+   the mark's vertical centring track that row's real (reduced) height. */
 [data-ui-stage0] .settings-section > h2.section-title + .pref-group > .pref-row:first-child > label {
   padding-top: 0;
   min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));

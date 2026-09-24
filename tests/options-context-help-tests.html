@@ -377,6 +377,65 @@ function test(name, fn) {
     assert(input.checked && !other.checked, "restoring the original radio selection failed");
   });
 
+  // Fix round 1 (IMPORTANT finding 1): the test above only proves
+  // `.click()` called directly on the answer paragraph doesn't forward to
+  // the radio -- that is guaranteed by HTML's labeled-control activation
+  // behaviour regardless of any CSS bug (the answer is inside `<details>`,
+  // interactive content, a label never forwards clicks on interactive-
+  // content descendants) and would pass even with the original regression
+  // in place. The regression was a HIT-TESTING bug: options.css used to
+  // point the hidden radio's `inset: 0` at `.context-help-host`, whose own
+  // box grows a second grid row once the answer opens -- so a REAL click
+  // at the answer's on-screen position hit-tested to the invisible radio
+  // UNDER it, not the answer, and selected this option instead of letting
+  // the click reach the text. `elementFromPoint` does real paint-order hit
+  // testing (unlike `.click()` called on a specific node, which bypasses
+  // hit-testing entirely and would pass either way -- same reasoning as
+  // the popup-width number-input hit-test in
+  // tests/options-listbox-tests.html). Also pins the row-1-only geometry
+  // fix's other half: the mark must stay within row 1's own vertical
+  // extent once the host grows, not drift toward the (taller) host's new
+  // centre.
+  test("open help answer stays hit-testable and the radio/mark stay pinned to row 1", () => {
+    const { details, host, toggle, body } = parts("aiContentSourceJinaHint");
+    const input = doc.getElementById("opt-ai-src-jina");
+    const label = input.closest("label.pick");
+    const mark = label.querySelector(".pick-mark");
+    assert(input && label && mark, "ai-content-source Jina fixture incomplete");
+    const container = doc.querySelector(".container");
+    const priorVisibility = container.style.visibility;
+    container.style.visibility = "visible";
+    try {
+      const closedLabelRect = label.getBoundingClientRect();
+      const closedMarkRect = mark.getBoundingClientRect();
+      assert(closedMarkRect.top >= closedLabelRect.top - 0.5 && closedMarkRect.bottom <= closedLabelRect.bottom + 0.5,
+        `mark sits outside row 1 while closed: mark=${JSON.stringify(closedMarkRect)} row1=${JSON.stringify(closedLabelRect)}`);
+      details.open = true;
+      toggle.scrollIntoView({ block: "center" });
+      const openLabelRect = label.getBoundingClientRect();
+      const openMarkRect = mark.getBoundingClientRect();
+      assert(Math.abs(openLabelRect.top - closedLabelRect.top) < 0.5 && Math.abs(openLabelRect.height - closedLabelRect.height) < 0.5,
+        `row 1 itself grew when the answer opened: closed=${JSON.stringify(closedLabelRect)} open=${JSON.stringify(openLabelRect)}`);
+      assert(openMarkRect.top >= openLabelRect.top - 0.5 && openMarkRect.bottom <= openLabelRect.bottom + 0.5,
+        `mark drifted out of row 1 once the answer opened: mark=${JSON.stringify(openMarkRect)} row1=${JSON.stringify(openLabelRect)}`);
+      assert(Math.abs(openMarkRect.top - closedMarkRect.top) < 0.5,
+        `mark's own position moved when the answer opened: closed=${JSON.stringify(closedMarkRect)} open=${JSON.stringify(openMarkRect)}`);
+      const bodyRect = body.getBoundingClientRect();
+      const midX = bodyRect.left + bodyRect.width / 2;
+      const midY = bodyRect.top + bodyRect.height / 2;
+      const hit = doc.elementFromPoint(midX, midY);
+      assert(hit !== input, `the open answer's text midpoint hit the hidden radio, not the answer: ${hit?.tagName}.${hit?.className}`);
+      assert(hit === body || body.contains(hit) || details.contains(hit),
+        `the open answer's text midpoint hit something outside the answer/details: ${hit ? hit.tagName + "." + hit.className : "nothing"}`);
+      const beforeChecked = input.checked;
+      hit.click();
+      assert(input.checked === beforeChecked, "clicking the open answer's real hit target changed the radio's checked state");
+    } finally {
+      container.style.visibility = priorVisibility;
+      details.open = false;
+    }
+  });
+
   // Stage-3b Task 1 (2026-09-24-ui-system-stage3b) retired the rule this
   // test used to pin (options.css's mixed-group `label:not(.switch) { gap:
   // var(--opt-sp-4) }`, stage-3a Task 3's "Controller ruling 2" -- see the

@@ -702,7 +702,7 @@ function pbpTestChromeStub(enMessages) {
     assert(doc.activeElement === merge, "opt-bgsave-merge did not take native focus");
   });
 
-  test("clicking a .pick-mark selects its radio", () => {
+  test("clicking a .pick-mark selects its radio and dispatches change", () => {
     showPanel("panel-bookmarks");
     const merge = doc.getElementById("opt-bgsave-merge");
     const overwrite = doc.getElementById("opt-bgsave-overwrite");
@@ -711,9 +711,26 @@ function pbpTestChromeStub(enMessages) {
     overwrite.checked = false;
     const mark = overwrite.closest("label.pick")?.querySelector(".pick-mark");
     assert(mark, "opt-bgsave-overwrite's label.pick has no .pick-mark");
-    mark.click();
-    assert(overwrite.checked === true, "clicking .pick-mark did not select opt-bgsave-overwrite");
-    assert(merge.checked === false, "clicking .pick-mark left the previous radio checked too");
+    // Fix round 1 (LOW finding 2): a click's native label-forwarding
+    // activation behaviour (proven working by the assertions below) fires
+    // a REAL `change` on the radio itself, which then bubbles -- spy on
+    // the group's own `.pref-group-radio` container, the ancestor
+    // options.js's autosave listener is actually bound to, not just on the
+    // radio directly (a listener on the radio alone would pass even if
+    // bubbling were broken further up).
+    const group = overwrite.closest(".pref-group-radio");
+    assert(group, "opt-bgsave-overwrite lost its .pref-group-radio ancestor");
+    let changeEvents = 0;
+    const onChange = () => { changeEvents++; };
+    group.addEventListener("change", onChange);
+    try {
+      mark.click();
+      assert(overwrite.checked === true, "clicking .pick-mark did not select opt-bgsave-overwrite");
+      assert(merge.checked === false, "clicking .pick-mark left the previous radio checked too");
+      assert(changeEvents === 1, "clicking .pick-mark did not dispatch exactly one change event on .pref-group-radio, got " + changeEvents);
+    } finally {
+      group.removeEventListener("change", onChange);
+    }
     merge.checked = true;
     overwrite.checked = false;
   });
