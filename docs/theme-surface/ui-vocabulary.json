@@ -147,6 +147,8 @@
         "listbox-btn",
         "listbox-list",
         "listbox-opt",
+        "listbox-pop",
+        "listbox-sizer",
         "listbox-value",
         "pf",
         "pref-group",

@@ -9,8 +9,14 @@
 //   div.listbox
 //     button.listbox-btn#<id>-btn[role=combobox]
 //       span.listbox-value + span.btn-ic (PBP_ICONS.chevronDown)
-//     ul.listbox-list#<id>-list[role=listbox][hidden]
-//       li.listbox-opt#<id>-opt-<i>[role=option][aria-selected]
+//       span.listbox-sizer[aria-hidden]  <- longest option text, zero height:
+//                                           max-content = widest option, as a
+//                                           native select sizes itself
+//     div.listbox-pop[hidden]        <- popover shell: border, radius, shadow,
+//                                       overflow hidden (clips the scrollbar
+//                                       into the rounded corners)
+//       ul.listbox-list#<id>-list[role=listbox]   <- the scroll layer
+//         li.listbox-opt#<id>-opt-<i>[role=option][aria-selected]
 //
 // Behaviour is the WAI-ARIA APG "select-only combobox": focus never leaves the
 // button, aria-activedescendant names the active option. A pick writes
@@ -74,7 +80,7 @@
     if (!li) { state.btn.removeAttribute("aria-activedescendant"); return; }
     li.setAttribute("data-active", "");
     state.btn.setAttribute("aria-activedescendant", li.id);
-    if (!state.list.hidden && typeof li.scrollIntoView === "function") li.scrollIntoView({ block: "nearest" });
+    if (!state.pop.hidden && typeof li.scrollIntoView === "function") li.scrollIntoView({ block: "nearest" });
   }
 
   function sync(state) {
@@ -100,8 +106,11 @@
       else li.removeAttribute("aria-disabled");
     }
     value.textContent = optionText(select.selectedOptions[0]);
+    let longest = "";
+    for (const opt of opts) { const text = optionText(opt); if (text.length > longest.length) longest = text; }
+    if (state.sizer.textContent !== longest) state.sizer.textContent = longest;
     state.btn.disabled = select.disabled;
-    if (!list.hidden) setActive(state, Math.min(state.active, opts.length - 1));
+    if (!state.pop.hidden) setActive(state, Math.min(state.active, opts.length - 1));
   }
 
   function onOutside(state, ev) {
@@ -109,18 +118,18 @@
   }
 
   function open(state, activeIndex) {
-    if (!state.list.hidden) return;
-    const { list, btn } = state;
-    list.removeAttribute("data-flip");
-    list.hidden = false;
+    if (!state.pop.hidden) return;
+    const { pop, btn } = state;
+    pop.removeAttribute("data-flip");
+    pop.hidden = false;
     btn.setAttribute("aria-expanded", "true");
     // Flip above when the list would overrun the viewport bottom and the room
     // above is larger. Measured once per open; the attribute, not an inline
     // style, carries the result (the CSS owns the geometry).
-    const listRect = list.getBoundingClientRect();
+    const listRect = pop.getBoundingClientRect();
     const btnRect = btn.getBoundingClientRect();
     const viewH = window.innerHeight || document.documentElement.clientHeight;
-    if (listRect.bottom > viewH && btnRect.top > viewH - btnRect.bottom) list.setAttribute("data-flip", "up");
+    if (listRect.bottom > viewH && btnRect.top > viewH - btnRect.bottom) pop.setAttribute("data-flip", "up");
     const current = state.select.selectedIndex;
     const start = Number.isInteger(activeIndex) ? activeIndex
       : (isEnabled(state, current) ? current : firstEnabled(state));
@@ -130,14 +139,16 @@
   }
 
   function close(state) {
-    if (state.list.hidden) return;
+    if (state.pop.hidden) return;
     document.removeEventListener("pointerdown", state.outside, true);
     const items = state.list.children;
     if (items[state.active]) items[state.active].removeAttribute("data-active");
-    state.list.hidden = true;
-    state.list.removeAttribute("data-flip");
+    state.pop.hidden = true;
+    state.pop.removeAttribute("data-flip");
     state.btn.setAttribute("aria-expanded", "false");
     state.btn.removeAttribute("aria-activedescendant");
+    clearTimeout(state.typedTimer);
+    state.typedTimer = 0;
     state.typed = "";
   }
 
@@ -177,7 +188,7 @@
 
   function onKeydown(state, ev) {
     const { key, altKey, ctrlKey, metaKey } = ev;
-    const isOpen = !state.list.hidden;
+    const isOpen = !state.pop.hidden;
     const printable = key.length === 1 && !ctrlKey && !metaKey && !altKey;
     if (!isOpen) {
       if (key === "ArrowDown" || key === "ArrowUp" || key === "Enter" || key === " ") {
@@ -250,13 +261,19 @@
     ic.className = "btn-ic";
     ic.setAttribute("aria-hidden", "true");
     ic.innerHTML = chevron();   // static PBP_ICONS constant, never page content
-    btn.append(value, ic);
+    const sizer = document.createElement("span");
+    sizer.className = "listbox-sizer";
+    sizer.setAttribute("aria-hidden", "true");
+    btn.append(value, ic, sizer);
+    const pop = document.createElement("div");
+    pop.className = "listbox-pop";
+    pop.hidden = true;
     const list = document.createElement("ul");
     list.className = "listbox-list";
     list.id = `${id}-list`;
     list.setAttribute("role", "listbox");
     list.setAttribute("tabindex", "-1");
-    list.hidden = true;
+    pop.appendChild(list);
 
     // Name: the select's own aria-labelledby wins; otherwise the label[for]
     // that pointed at the select (re-pointed at the button below).
@@ -272,20 +289,24 @@
     }
     if (label) label.htmlFor = btn.id;
 
-    root.append(btn, list);
+    root.append(btn, pop);
     select.after(root);
     select.hidden = true;
 
-    const state = { select, root, btn, list, value, active: -1, typed: "", typedTimer: 0, outside: null };
+    const state = { select, root, btn, pop, list, value, sizer, active: -1, typed: "", typedTimer: 0, outside: null };
     state.outside = (ev) => onOutside(state, ev);
 
     btn.addEventListener("click", () => {
-      if (state.list.hidden) open(state); else close(state);
+      if (state.pop.hidden) open(state); else close(state);
     });
+    // A label click only focuses, as it does for a native select; without
+    // this the label's activation behaviour clicks the button and opens the
+    // list. (An open list is closed first by the outside pointerdown.)
+    if (label) label.addEventListener("click", (ev) => { ev.preventDefault(); btn.focus(); });
     btn.addEventListener("keydown", (ev) => onKeydown(state, ev));
     btn.addEventListener("blur", () => close(state));
     // Keep focus on the button while the pointer works the list.
-    list.addEventListener("mousedown", (ev) => ev.preventDefault());
+    pop.addEventListener("mousedown", (ev) => ev.preventDefault());
     list.addEventListener("click", (ev) => {
       const li = ev.target.closest?.(".listbox-opt");
       if (!li || !list.contains(li)) return;

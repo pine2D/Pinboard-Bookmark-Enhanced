@@ -767,7 +767,8 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
      `updateProviderFields()` 两处）；`applyI18n()` 的 `pbp:i18n-applied` 事件触发全部重取选项文本。
   2. **按钮 `role=combobox`**（`button.listbox-btn#<id>-btn`，`aria-haspopup=listbox`、`aria-expanded`、
      `aria-controls=<id>-list`、`aria-labelledby` 取 select 原有值或原 `label[for]` 的 id；原
-     `label[for]` 改指按钮）；列表 `ul.listbox-list[role=listbox]`，选项 `li.listbox-opt[role=option]
+     `label[for]` 改指按钮，且 label 点击只聚焦按钮、不展开，同原生 select）；弹层 = 外壳
+     `div.listbox-pop[hidden]` 包滚动层 `ul.listbox-list[role=listbox]`，选项 `li.listbox-opt[role=option]
      #<id>-opt-<i>[aria-selected]`，禁用项 `aria-disabled`。焦点始终在按钮上，活动项走
      `aria-activedescendant`。**不加 `aria-checked`** 之类第二份状态：选中态只有 `aria-selected`。
   3. **APG select-only 键盘集**：↓/↑/Enter/Space/Home/End/字母打开；开着时 ↑↓ 不越界、跳过禁用项，
@@ -778,11 +779,15 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
   5. **forced-colors**：按钮与列表边框 `ButtonText`，选中项 `Highlight`/`HighlightText`，活动项
      `Highlight` 轮廓，禁用项 `GrayText`。`prefers-reduced-motion` 下无过渡。
   外观只用已验证的 token 对：按钮 = `--opt-panel` 底 + `--opt-border` 边 + 圆角 md + 高
-  `--opt-control-h`；列表 = `--opt-panel` / `--opt-border` / 圆角 lg / `--opt-shadow-md` / 内距 sp-2；
+  `--opt-control-h`，宽度 = 最长选项（按钮内 `aria-hidden` 的 `span.listbox-sizer` 放最长选项文字、
+  零高第二网格行撑列宽，换值不跳宽，同原生 select）；弹层分两层：外壳 `.listbox-pop` 持
+  `--opt-panel` 底 / `--opt-border` 边 / 圆角 lg / `--opt-shadow-md` / `overflow: hidden`（把滚动条
+  裁进圆角——用户截图里右侧方角的根治），滚动层 `.listbox-list` 只持 `overflow: auto` / max-height /
+  内距 sp-2，不画边框阴影；
   活动项 `--opt-btn-hover` + `--opt-btn-fg`，选中项 `--opt-accent` + `--opt-on-accent`，禁用项
-  `--opt-fg-hint`。定位：`position: absolute` 于 `.listbox` 内、`top: 100% + sp-1`、
-  `z-index: --opt-z-popover`，打开时测一次，视口下方放不下且上方更宽时加 `data-flip="up"`（属性，
-  不写内联 style）。不用 `:has()`、不用 Shadow DOM。其余 select 仍走原生 picker（阶段 3 再议）。
+  `--opt-fg-hint`。定位（在外壳上）：`position: absolute` 于 `.listbox` 内、`top: 100% + sp-1`、
+  `z-index: --opt-z-popover`，打开时测一次，视口下方放不下且上方更宽时给外壳加 `data-flip="up"`
+  （属性，不写内联 style）。不用 `:has()`、不用 Shadow DOM。其余 select 仍走原生 picker（阶段 3 再议）。
 - 全宽字段（表单栈里独占一行）**不受同行对齐律约束**——它没有行伴。约束只在同一 flex 行内并排时生效。
 
 ---
@@ -1318,7 +1323,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |
 | options | `.pf` | 带边框子面板（provider 卡）：padding sp-5，radius md |
 | options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`（可选第三个子元素 `details.context-help`，夹在 `.switch-text` 与 `.switch-track` 之间——带帮助的开关行用它，Ruling 36）；flex、flex-start（轨道 `margin-left:auto` 到行尾）、gap sp-3；轨道 28×16 无边框 / 滑块 12 内缩 2 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked、details-in-label 合法性附注） |
-| options | `.listbox` (+ `.listbox-btn` / `.listbox-value` / `.listbox-list` / `.listbox-opt`) | 唯一自绘 select（§6.4 例外 2）：`select[data-listbox][hidden]` 之后的 `div.listbox`；宽度沿用 select 例外（`width: max-content; min-width: 240px; max-width: 100%`），按钮占满 `.listbox`、高 `--opt-control-h`（32/28）；列表 absolute、`top: 100% + sp-1`（`data-flip=up` 时贴上方）、`z-index: --opt-z-popover`、`max-height: min(320px, 100dvh − 32px)`、内距 sp-2、圆角 lg；选项高 `--opt-control-h`、内距 `0 sp-4`、圆角 sm；跟随输入框的关系规则 `.fg > .listbox + input { margin-top: sp-3 }` 接替 `.fg > select + input` |
+| options | `.listbox` (+ `.listbox-btn` / `.listbox-value` / `.listbox-sizer` / `.listbox-pop` / `.listbox-list` / `.listbox-opt`) | 唯一自绘 select（§6.4 例外 2）：`select[data-listbox][hidden]` 之后的 `div.listbox`；宽度沿用 select 例外（`width: max-content; min-width: 240px; max-width: 100%`），max-content 取最长选项（`.listbox-sizer` 零高网格行），按钮占满 `.listbox`、高 `--opt-control-h`（32/28）；弹层外壳 `.listbox-pop` absolute、`top: 100% + sp-1`（`data-flip=up` 时贴上方）、`z-index: --opt-z-popover`、圆角 lg、边框阴影、`overflow: hidden`；滚动层 `.listbox-list` `max-height: min(320px, 100dvh − 32px)`、`overflow: auto`、内距 sp-2；选项高 `--opt-control-h`、内距 `0 sp-4`、圆角 sm；跟随输入框的关系规则 `.fg > .listbox + input { margin-top: sp-3 }` 接替 `.fg > select + input` |
 | options | `section.settings-section` | 分区容器；相邻分区 `margin-top: --opt-section-gap`；`> h2.section-title` 字号 `--opt-text-section`，`margin: 0 0 --opt-sp-5`（12） |
 | options | `.pref-group` | 偏好行列表；作分区直接子元素时 `margin-bottom: --opt-sp-6`；相邻 `.pref-row` 之间 1px `--opt-border-section` 分隔线（`.pref-group-radio` 无线） |
 | options | `.pref-row` | 一行 = `label`（flex、align center、gap sp-5、`min-height --opt-row-min-h`、`padding --opt-row-pad-y 0`、正文字号）；`.pref-row-sub` 左缩进 sp-7；**紧跟分区标题的首行去掉上内边距并把 min-height 减去一个 pad**（R9：标题→首行文字 = 12） |

@@ -321,14 +321,26 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    primary-button pair), disabled = fg-hint on panel. No :has(), no inline
    styles: the flip is the data-flip attribute the script sets on open. ---- */
 .listbox { position: relative; display: inline-block; width: max-content; min-width: 240px; max-width: 100%; }
-.listbox-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-fg); background: var(--opt-panel); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-md); cursor: pointer; text-align: left; }
+.listbox-btn { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 0 var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-fg); background: var(--opt-panel); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-md); cursor: pointer; text-align: left; }
 .listbox-btn:hover { border-color: var(--opt-focus-bd); }
 .listbox-btn:focus-visible { outline: none; border-color: var(--opt-focus-bd); box-shadow: var(--opt-focus-ring); }
 .listbox-btn .btn-ic { flex: none; width: 16px; height: 16px; color: var(--opt-fg-muted); }
 .listbox-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.listbox-list { position: absolute; left: 0; top: calc(100% + var(--opt-sp-1)); z-index: var(--opt-z-popover); min-width: 100%; max-height: min(320px, calc(100dvh - 32px)); overflow: auto; margin: 0; padding: var(--opt-sp-2); list-style: none; background: var(--opt-panel); color: var(--opt-fg); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-lg); box-shadow: var(--opt-shadow-md); }
-.listbox-list[data-flip="up"] { top: auto; bottom: calc(100% + var(--opt-sp-1)); }
-.listbox-list[hidden] { display: none; }
+/* Width stability: with only the value in the button, max-content would
+   track the CURRENT value and the field would jump on every pick. The sizer
+   carries the longest option's text (set by sync()) in a zero-height second
+   grid row under the value column, so that column's max-content -- and the
+   button's -- is the widest option, which is how a native select sizes. */
+.listbox-value { grid-row: 1; grid-column: 1; }
+.listbox-btn .btn-ic { grid-row: 1; grid-column: 2; }
+.listbox-sizer { grid-row: 2; grid-column: 1; display: block; visibility: hidden; height: 0; overflow: hidden; white-space: nowrap; }
+/* Popover = shell + scroll layer (spec stage2 §3): the shell owns the
+   rounded border, shadow and overflow:hidden, so the scroll layer's
+   scrollbar is clipped into the rounded corners instead of squaring them. */
+.listbox-pop { position: absolute; left: 0; top: calc(100% + var(--opt-sp-1)); z-index: var(--opt-z-popover); min-width: 100%; overflow: hidden; background: var(--opt-panel); color: var(--opt-fg); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-lg); box-shadow: var(--opt-shadow-md); }
+.listbox-pop[data-flip="up"] { top: auto; bottom: calc(100% + var(--opt-sp-1)); }
+.listbox-pop[hidden] { display: none; }
+.listbox-list { max-height: min(320px, calc(100dvh - 32px)); overflow: auto; margin: 0; padding: var(--opt-sp-2); list-style: none; }
 .listbox-opt { display: flex; align-items: center; height: var(--opt-control-h); padding: 0 var(--opt-sp-4); border-radius: var(--opt-radius-sm); font-size: var(--opt-text-body); white-space: nowrap; cursor: pointer; }
 .listbox-opt[data-active] { background: var(--opt-btn-hover); color: var(--opt-btn-fg); }
 .listbox-opt[aria-selected="true"] { background: var(--opt-accent); color: var(--opt-on-accent); }
@@ -338,7 +350,7 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 .fg > .listbox + input { margin-top: var(--opt-sp-3); }
 @media (prefers-reduced-motion: no-preference) { .listbox-btn { transition: border-color var(--motion-state) ease, box-shadow var(--motion-state) ease; } }
 @media (forced-colors: active) {
-  .listbox-btn, .listbox-list { border-color: ButtonText; }
+  .listbox-btn, .listbox-pop { border-color: ButtonText; }
   .listbox-opt[data-active] { outline: 1px solid Highlight; outline-offset: -1px; }
   .listbox-opt[aria-selected="true"] { background: Highlight; color: HighlightText; }
   .listbox-opt[aria-disabled="true"] { color: GrayText; }

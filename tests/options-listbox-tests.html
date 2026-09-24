@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 15;
+const TOTAL = 23;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -115,6 +115,7 @@ function pbpTestChromeStub(enMessages) {
   const lang = () => doc.getElementById("translate-target-lang");
   const btnOf = (select) => doc.getElementById(select.id + "-btn");
   const listOf = (select) => doc.getElementById(select.id + "-list");
+  const popOf = (select) => listOf(select)?.parentElement;
   const itemsOf = (select) => [...(listOf(select)?.querySelectorAll('[role="option"]') || [])];
   const activeIndex = (select) => {
     const id = btnOf(select)?.getAttribute("aria-activedescendant") || "";
@@ -148,7 +149,10 @@ function pbpTestChromeStub(enMessages) {
       assert(btn.getAttribute("aria-haspopup") === "listbox", select.id + " aria-haspopup");
       assert(btn.getAttribute("aria-expanded") === "false", select.id + " starts expanded");
       assert(btn.getAttribute("aria-controls") === select.id + "-list", select.id + " aria-controls");
-      assert(list && list.getAttribute("role") === "listbox" && list.hidden, select.id + " list missing or open");
+      assert(list && list.getAttribute("role") === "listbox", select.id + " list missing");
+      const pop = popOf(select);
+      assert(pop?.classList.contains("listbox-pop") && pop.parentElement === select.nextElementSibling, select.id + " list is not inside the .listbox-pop shell");
+      assert(pop.hidden, select.id + " popover starts open");
       assert(list.getAttribute("tabindex") === "-1", select.id + " list tabindex");
       const items = itemsOf(select);
       assert(items.length === select.options.length, select.id + " option count " + items.length + " vs " + select.options.length);
@@ -186,11 +190,11 @@ function pbpTestChromeStub(enMessages) {
     const btn = btnOf(provider());
     btn.click();
     assert(btn.getAttribute("aria-expanded") === "true", "click did not open");
-    assert(!listOf(provider()).hidden, "list still hidden");
+    assert(!popOf(provider()).hidden, "list still hidden");
     assert(activeIndex(provider()) === 2, "active index " + activeIndex(provider()) + " (want the selected 2)");
     assert(itemsOf(provider())[2].hasAttribute("data-active"), "active item not marked data-active");
     btn.click();
-    assert(btn.getAttribute("aria-expanded") === "false" && listOf(provider()).hidden, "second click did not close");
+    assert(btn.getAttribute("aria-expanded") === "false" && popOf(provider()).hidden, "second click did not close");
     assert(!btn.hasAttribute("aria-activedescendant"), "aria-activedescendant left set while closed");
     setValue(provider(), "gemini");
   });
@@ -256,7 +260,7 @@ function pbpTestChromeStub(enMessages) {
     assert(ev.defaultPrevented, "Enter not consumed");
     assert(provider().value === "claude", "value=" + provider().value);
     assert(changes === 1, "change events seen at document: " + changes);
-    assert(listOf(provider()).hidden && btn.getAttribute("aria-expanded") === "false", "list still open");
+    assert(popOf(provider()).hidden && btn.getAttribute("aria-expanded") === "false", "list still open");
     assert(doc.activeElement === btn, "focus left the button: " + doc.activeElement?.id);
     assert(btn.querySelector(".listbox-value").textContent === provider().selectedOptions[0].textContent.trim(), "button text not updated");
     setValue(provider(), "gemini");
@@ -269,7 +273,7 @@ function pbpTestChromeStub(enMessages) {
     key(btn, "ArrowDown"); key(btn, "End");
     const ev = key(btn, "Escape");
     assert(ev.defaultPrevented, "Escape not consumed while open");
-    assert(listOf(provider()).hidden, "Escape did not close");
+    assert(popOf(provider()).hidden, "Escape did not close");
     assert(provider().value === "gemini", "Escape changed the value to " + provider().value);
     const idle = key(btn, "Escape");
     assert(!idle.defaultPrevented, "Escape swallowed while closed");
@@ -283,7 +287,7 @@ function pbpTestChromeStub(enMessages) {
     key(btn, "ArrowDown"); key(btn, "ArrowDown");
     const ev = key(btn, "Tab");
     assert(!ev.defaultPrevented, "Tab default prevented (focus trap)");
-    assert(listOf(provider()).hidden && btn.getAttribute("aria-expanded") === "false", "Tab did not close");
+    assert(popOf(provider()).hidden && btn.getAttribute("aria-expanded") === "false", "Tab did not close");
     assert(provider().value === "openai", "Tab should commit the active option, value=" + provider().value);
     const idle = key(btn, "Tab");
     assert(!idle.defaultPrevented, "Tab default prevented while closed");
@@ -295,14 +299,14 @@ function pbpTestChromeStub(enMessages) {
     setValue(provider(), "gemini");
     const btn = btnOf(provider());
     btn.click();
-    assert(!listOf(provider()).hidden, "did not open");
+    assert(!popOf(provider()).hidden, "did not open");
     const inside = itemsOf(provider())[3];
     inside.dispatchEvent(new win.PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
-    assert(!listOf(provider()).hidden, "pointerdown inside the list closed it");
+    assert(!popOf(provider()).hidden, "pointerdown inside the list closed it");
     const outside = doc.getElementById("sec-ai-provider");
     outside.dispatchEvent(new win.PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
     outside.click();
-    assert(listOf(provider()).hidden && btn.getAttribute("aria-expanded") === "false", "outside click did not close");
+    assert(popOf(provider()).hidden && btn.getAttribute("aria-expanded") === "false", "outside click did not close");
     assert(provider().value === "gemini", "outside click changed the value");
   });
 
@@ -317,7 +321,7 @@ function pbpTestChromeStub(enMessages) {
     assert(provider().value === "openai", "value=" + provider().value);
     assert(doc.getElementById("fields-openai").hidden === false, "fields-openai still hidden");
     assert(doc.getElementById("fields-gemini").hidden === true, "fields-gemini still shown");
-    assert(listOf(provider()).hidden, "option click did not close the list");
+    assert(popOf(provider()).hidden, "option click did not close the list");
     btnOf(provider()).click();
     itemsOf(provider()).find((li) => li.dataset.value === "gemini").click();
     assert(doc.getElementById("fields-gemini").hidden === false, "switching back did not restore gemini");
@@ -398,7 +402,7 @@ function pbpTestChromeStub(enMessages) {
     showPanel("panel-ai");
     setValue(provider(), "gemini");
     const btn = btnOf(provider());
-    const list = listOf(provider());
+    const list = popOf(provider());
     const oldHeight = frame.style.height;
     try {
       win.scrollTo(0, 0);
@@ -422,6 +426,125 @@ function pbpTestChromeStub(enMessages) {
       close(provider());
       frame.style.height = oldHeight;
     }
+  });
+
+
+  test("popover is a clipping shell around the scroll layer", () => {
+    showPanel("panel-ai");
+    const btn = btnOf(provider());
+    btn.click();
+    try {
+      const pop = popOf(provider());
+      const list = listOf(provider());
+      const popCs = win.getComputedStyle(pop);
+      const listCs = win.getComputedStyle(list);
+      assert(popCs.overflowY === "hidden" && popCs.overflowX === "hidden", "shell overflow=" + popCs.overflow);
+      assert(listCs.overflowY === "auto", "scroll layer overflow-y=" + listCs.overflowY);
+      assert(parseFloat(popCs.borderTopLeftRadius) > 0 && popCs.boxShadow !== "none", "shell lacks radius/shadow");
+      assert(parseFloat(listCs.borderTopWidth) === 0 && listCs.boxShadow === "none", "scroll layer draws its own border/shadow");
+      assert(list.scrollHeight > list.clientHeight, "fixture: provider list does not scroll");
+      assert(btn.getAttribute("aria-controls") === list.id, "aria-controls does not name the listbox element");
+    } finally { close(provider()); }
+  });
+
+  test("button width follows the longest option, not the current value", async () => {
+    showPanel("panel-reader");
+    const select = lang();
+    const longest = [...select.options].reduce((a, o) => (o.textContent.trim().length > a.textContent.trim().length ? o : a));
+    setValue(select, longest.value);
+    await nextFrame();
+    const wide = btnOf(select).offsetWidth;
+    setValue(select, "en");
+    await nextFrame();
+    const narrow = btnOf(select).offsetWidth;
+    assert(wide === narrow, "button width jumped " + wide + " -> " + narrow);
+    const sizer = btnOf(select).querySelector(".listbox-sizer");
+    assert(sizer && sizer.getAttribute("aria-hidden") === "true" && sizer.textContent === longest.textContent.trim(), "sizer missing or not the longest option");
+    const probe = doc.createElement("span");
+    probe.style.cssText = "position:absolute;white-space:nowrap;font:inherit;font-size:" + win.getComputedStyle(btnOf(select)).fontSize;
+    probe.textContent = longest.textContent.trim();
+    btnOf(select).appendChild(probe);
+    const need = probe.getBoundingClientRect().width;
+    probe.remove();
+    assert(btnOf(select).querySelector(".listbox-value").getBoundingClientRect().width + 0.5 >= need, "value column narrower than the longest option");
+    setValue(select, "auto");
+  });
+
+  test("label click only focuses the button; with the list open it closes and does not reopen", () => {
+    showPanel("panel-reader");
+    const btn = btnOf(lang());
+    const label = doc.getElementById("translate-target-lang-label");
+    doc.body.focus();
+    label.click();
+    assert(btn.getAttribute("aria-expanded") === "false", "label click opened the list");
+    assert(doc.activeElement === btn, "label click did not focus the button: " + doc.activeElement?.id);
+    btn.click();
+    assert(btn.getAttribute("aria-expanded") === "true", "did not open");
+    label.dispatchEvent(new win.PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    label.click();
+    assert(btn.getAttribute("aria-expanded") === "false" && popOf(lang()).hidden, "label click left the list open / reopened it");
+    assert(doc.activeElement === btn, "focus left the button");
+  });
+
+  test("Space selects the active option and closes", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    btn.focus();
+    const opening = key(btn, " ");
+    assert(opening.defaultPrevented && btn.getAttribute("aria-expanded") === "true", "Space did not open");
+    key(btn, "ArrowDown");
+    const ev = key(btn, " ");
+    assert(ev.defaultPrevented, "Space not consumed");
+    assert(provider().value === "openai" && popOf(provider()).hidden, "Space did not commit+close, value=" + provider().value);
+    setValue(provider(), "gemini");
+  });
+
+  test("Alt+ArrowDown opens without moving; Alt+ArrowUp selects and closes", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "claude");
+    const btn = btnOf(provider());
+    key(btn, "ArrowDown", { altKey: true });
+    assert(btn.getAttribute("aria-expanded") === "true", "Alt+ArrowDown did not open");
+    assert(activeIndex(provider()) === 2, "Alt+ArrowDown moved the active option to " + activeIndex(provider()));
+    key(btn, "ArrowDown");
+    const ev = key(btn, "ArrowUp", { altKey: true });
+    assert(ev.defaultPrevented, "Alt+ArrowUp not consumed");
+    assert(provider().value === "deepseek" && popOf(provider()).hidden, "Alt+ArrowUp did not commit+close, value=" + provider().value);
+    setValue(provider(), "gemini");
+  });
+
+  test("type-ahead: repeating one letter cycles through its matches and wraps", async () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    key(btn, "ArrowDown");
+    const at = () => itemsOf(provider())[activeIndex(provider())]?.dataset.value;
+    const seen = [];
+    for (let i = 0; i < 4; i++) { await sleep(600); key(btn, "o"); seen.push(at()); }
+    assert(seen.join(",") === "openai,openrouter,ollama,openai", "cycle was " + seen.join(","));
+    close(provider());
+    await sleep(600);
+  });
+
+  test("close clears the type-ahead buffer", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    key(btn, "ArrowDown");
+    key(btn, "o");
+    key(btn, "Escape");
+    key(btn, "ArrowDown");
+    key(btn, "m");
+    const v = itemsOf(provider())[activeIndex(provider())]?.dataset.value;
+    assert(v === "minimax", "buffer survived close: 'm' after reopen landed on " + v);
+    close(provider());
+  });
+
+  test("the popover shell carries the flip, the list stays inside it", () => {
+    const pop = popOf(provider());
+    assert(!listOf(provider()).hasAttribute("data-flip"), "data-flip set on the scroll layer");
+    assert(win.getComputedStyle(pop).position === "absolute" && win.getComputedStyle(listOf(provider())).position === "static", "positioning not owned by the shell");
   });
 
   for (const [name, fn] of queue) {
