@@ -945,6 +945,35 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(winner.test(css), "expected a html[data-theme] [data-ui-stage0] .fg label.bl rule declaring color: var(--opt-fg)");
   });
 
+  // Stage-2 row model (2026-09-24-ui-system-stage2 Task 2): the real
+  // options.html's #panel-ai, fetched fresh per test (same fetch+DOMParser
+  // pattern as stage0PopupPanel above -- structural checks only, no live
+  // layout needed).
+  async function stage2AiPanel() {
+    const html = await (await fetch("../options.html")).text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    return doc.querySelector("#panel-ai[data-ui-stage0]");
+  }
+
+  await test("stage2: AI panel carries the marker and has no legacy divider", async () => {
+    const ai = await stage2AiPanel();
+    assert(!!ai && !ai.querySelector(".divider"), "panel-ai is missing data-ui-stage0 or still carries a .divider");
+  });
+
+  await test("stage2: every .fg inside the AI panel is an entry block", async () => {
+    const ai = await stage2AiPanel();
+    assert(!!ai, "panel-ai is missing the data-ui-stage0 marker");
+    assert([...ai.querySelectorAll(".fg")].every((f) => f.classList.contains("entry-block")),
+      "every .fg inside the AI panel must carry entry-block");
+  });
+
+  await test("stage2: provider panels keep their ids and count", async () => {
+    const ai = await stage2AiPanel();
+    assert(!!ai, "panel-ai is missing the data-ui-stage0 marker");
+    assert(ai.querySelectorAll(".pf[id^='fields-']").length === 15 && !!ai.querySelector("#opt-ai-provider"),
+      "expected 15 .pf[id^=fields-] panels and #opt-ai-provider to survive the rewrite");
+  });
+
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";
 })();
 </script></body></html>

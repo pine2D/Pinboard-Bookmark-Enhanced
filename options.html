@@ -401,220 +401,222 @@
     </div>
 
     <!-- Tab 5: AI -->
-    <div id="panel-ai" class="panel" role="tabpanel" aria-labelledby="tab-ai">
-      <div class="context-help-host context-help-section" data-help-role="section">
-        <h2 class="section-title" id="sec-ai-provider" data-i18n="secAiProvider">AI Provider</h2>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="freeTierTitle">Which providers offer free API access?</p>
-          <p class="hint context-help-body" data-i18n="freeTierResourcesPrefix">Free tiers change too often to list here. These community lists keep up; your actual quota is whatever your provider's console shows:</p>
-          <p class="hint context-help-body">
-            <a href="https://github.com/cheahjs/free-llm-api-resources" target="_blank" rel="noopener">cheahjs/free-llm-api-resources</a>
-            ·
-            <a href="https://github.com/mnfst/awesome-free-llm-apis" target="_blank" rel="noopener">mnfst/awesome-free-llm-apis</a>
-          </p>
-        </details>
-      </div>
-      <div class="fg">
-        <select id="opt-ai-provider" aria-labelledby="sec-ai-provider">
-          <option value="gemini" data-i18n="provGemini">Google Gemini</option>
-          <option value="openai" data-i18n="provOpenai">OpenAI (ChatGPT)</option>
-          <option value="claude" data-i18n="provClaude">Anthropic Claude</option>
-          <option value="deepseek" data-i18n="provDeepseek">DeepSeek</option>
-          <option value="qwen" data-i18n="provQwen">Qwen</option>
-          <option value="minimax" data-i18n="provMinimax">MiniMax</option>
-          <option value="openrouter" data-i18n="provOpenrouter">OpenRouter</option>
-          <option value="groq" data-i18n="provGroq">Groq</option>
-          <option value="mistral" data-i18n="provMistral">Mistral AI</option>
-          <option value="cohere" data-i18n="provCohere">Cohere</option>
-          <option value="siliconflow" data-i18n="provSiliconflow">SiliconFlow</option>
-          <option value="zhipu" data-i18n="provZhipu">Zhipu</option>
-          <option value="kimi" data-i18n="provKimi">Kimi</option>
-          <option value="ollama" data-i18n="provOllama">Ollama (Local)</option>
-          <option value="custom" data-i18n="provCustom">Custom OpenAI-compatible</option>
-        </select>
-      </div>
-
-      <!-- Gemini -->
-      <div class="pf" id="fields-gemini">
-        <h3 data-i18n="provGemini">Google Gemini</h3>
-        <div class="fg"><label class="bl" for="opt-gemini-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-gemini-key" placeholder="AIzaSy…" /><button type="button" class="key-toggle" data-target="opt-gemini-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-gemini-model" data-i18n="labelModel">Model</label><input type="text" id="opt-gemini-model" value="gemini-3.5-flash-lite" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-gemini" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-gemini-status" role="status" aria-live="polite"></span>
+    <div id="panel-ai" class="panel" role="tabpanel" aria-labelledby="tab-ai" data-ui-stage0>
+      <section class="settings-section">
+        <div class="context-help-host context-help-section" data-help-role="section">
+          <h2 class="section-title" id="sec-ai-provider" data-i18n="secAiProvider">AI Provider</h2>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="freeTierTitle">Which providers offer free API access?</p>
+            <p class="hint context-help-body" data-i18n="freeTierResourcesPrefix">Free tiers change too often to list here. These community lists keep up; your actual quota is whatever your provider's console shows:</p>
+            <p class="hint context-help-body">
+              <a href="https://github.com/cheahjs/free-llm-api-resources" target="_blank" rel="noopener">cheahjs/free-llm-api-resources</a>
+              ·
+              <a href="https://github.com/mnfst/awesome-free-llm-apis" target="_blank" rel="noopener">mnfst/awesome-free-llm-apis</a>
+            </p>
+          </details>
         </div>
-      </div>
-
-      <!-- OpenAI -->
-      <div class="pf" hidden id="fields-openai">
-        <h3 data-i18n="provOpenai">OpenAI (ChatGPT)</h3>
-        <div class="fg"><label class="bl" for="opt-openai-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-openai-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-openai-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-openai-model" data-i18n="labelModel">Model</label><input type="text" id="opt-openai-model" value="gpt-5.4-nano" /></div>
-        <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-openai-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintOpenAIBaseUrl">Change for proxy or compatible endpoint</p></details><input type="text" class="fg-url" id="opt-openai-baseurl" value="https://api.openai.com/v1" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-openai" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-openai-status" role="status" aria-live="polite"></span>
+        <div class="fg entry-block">
+          <select id="opt-ai-provider" aria-labelledby="sec-ai-provider">
+            <option value="gemini" data-i18n="provGemini">Google Gemini</option>
+            <option value="openai" data-i18n="provOpenai">OpenAI (ChatGPT)</option>
+            <option value="claude" data-i18n="provClaude">Anthropic Claude</option>
+            <option value="deepseek" data-i18n="provDeepseek">DeepSeek</option>
+            <option value="qwen" data-i18n="provQwen">Qwen</option>
+            <option value="minimax" data-i18n="provMinimax">MiniMax</option>
+            <option value="openrouter" data-i18n="provOpenrouter">OpenRouter</option>
+            <option value="groq" data-i18n="provGroq">Groq</option>
+            <option value="mistral" data-i18n="provMistral">Mistral AI</option>
+            <option value="cohere" data-i18n="provCohere">Cohere</option>
+            <option value="siliconflow" data-i18n="provSiliconflow">SiliconFlow</option>
+            <option value="zhipu" data-i18n="provZhipu">Zhipu</option>
+            <option value="kimi" data-i18n="provKimi">Kimi</option>
+            <option value="ollama" data-i18n="provOllama">Ollama (Local)</option>
+            <option value="custom" data-i18n="provCustom">Custom OpenAI-compatible</option>
+          </select>
         </div>
-      </div>
 
-      <!-- Claude -->
-      <div class="pf" hidden id="fields-claude">
-        <h3 data-i18n="provClaude">Anthropic Claude</h3>
-        <div class="fg"><label class="bl" for="opt-claude-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-claude-key" placeholder="sk-ant-…" /><button type="button" class="key-toggle" data-target="opt-claude-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-claude-model" data-i18n="labelModel">Model</label><input type="text" id="opt-claude-model" value="claude-haiku-4-5" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-claude" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-claude-status" role="status" aria-live="polite"></span>
+        <!-- Gemini -->
+        <div class="pf" id="fields-gemini">
+          <h3 data-i18n="provGemini">Google Gemini</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-gemini-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-gemini-key" placeholder="AIzaSy…" /><button type="button" class="key-toggle" data-target="opt-gemini-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-gemini-model" data-i18n="labelModel">Model</label><input type="text" id="opt-gemini-model" value="gemini-3.5-flash-lite" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-gemini" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-gemini-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- DeepSeek -->
-      <div class="pf" hidden id="fields-deepseek">
-        <h3 data-i18n="provDeepseek">DeepSeek</h3>
-        <div class="fg"><label class="bl" for="opt-deepseek-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-deepseek-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-deepseek-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-deepseek-model" data-i18n="labelModel">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-v4-flash" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-deepseek" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-deepseek-status" role="status" aria-live="polite"></span>
+        <!-- OpenAI -->
+        <div class="pf" hidden id="fields-openai">
+          <h3 data-i18n="provOpenai">OpenAI (ChatGPT)</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-openai-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-openai-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-openai-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-openai-model" data-i18n="labelModel">Model</label><input type="text" id="opt-openai-model" value="gpt-5.4-nano" /></div>
+          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-openai-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintOpenAIBaseUrl">Change for proxy or compatible endpoint</p></details><input type="text" class="fg-url" id="opt-openai-baseurl" value="https://api.openai.com/v1" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-openai" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-openai-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- Qwen -->
-      <div class="pf" hidden id="fields-qwen">
-        <h3 data-i18n="provQwen">Qwen</h3>
-        <div class="fg"><label class="bl" for="opt-qwen-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-qwen-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-qwen-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-qwen-model" data-i18n="labelModel">Model</label><input type="text" id="opt-qwen-model" value="qwen-flash" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-qwen" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-qwen-status" role="status" aria-live="polite"></span>
+        <!-- Claude -->
+        <div class="pf" hidden id="fields-claude">
+          <h3 data-i18n="provClaude">Anthropic Claude</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-claude-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-claude-key" placeholder="sk-ant-…" /><button type="button" class="key-toggle" data-target="opt-claude-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-claude-model" data-i18n="labelModel">Model</label><input type="text" id="opt-claude-model" value="claude-haiku-4-5" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-claude" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-claude-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- MiniMax -->
-      <div class="pf" hidden id="fields-minimax">
-        <h3 data-i18n="provMinimax">MiniMax</h3>
-        <div class="fg"><label class="bl" for="opt-minimax-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-minimax-key" /><button type="button" class="key-toggle" data-target="opt-minimax-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-minimax-model" data-i18n="labelModel">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-M2" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-minimax" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-minimax-status" role="status" aria-live="polite"></span>
+        <!-- DeepSeek -->
+        <div class="pf" hidden id="fields-deepseek">
+          <h3 data-i18n="provDeepseek">DeepSeek</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-deepseek-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-deepseek-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-deepseek-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-deepseek-model" data-i18n="labelModel">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-v4-flash" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-deepseek" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-deepseek-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- OpenRouter -->
-      <div class="pf" hidden id="fields-openrouter">
-        <h3 data-i18n="provOpenrouter">OpenRouter</h3>
-        <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-openrouter-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="openrouterTagline">Access 100+ models from one API.</p></details><span class="key-wrap"><input type="password" id="opt-openrouter-key" placeholder="sk-or-…" /><button type="button" class="key-toggle" data-target="opt-openrouter-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://openrouter.ai/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-openrouter-model" data-i18n="labelModel">Model</label><input type="text" id="opt-openrouter-model" value="openai/gpt-oss-20b" /><p class="hint"><span data-i18n="browseModelsAt">Browse models at</span> <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a></p></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-openrouter" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-openrouter-status" role="status" aria-live="polite"></span>
+        <!-- Qwen -->
+        <div class="pf" hidden id="fields-qwen">
+          <h3 data-i18n="provQwen">Qwen</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-qwen-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-qwen-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-qwen-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-qwen-model" data-i18n="labelModel">Model</label><input type="text" id="opt-qwen-model" value="qwen-flash" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-qwen" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-qwen-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- Groq -->
-      <div class="pf" hidden id="fields-groq">
-        <h3 data-i18n="provGroq">Groq</h3>
-        <div class="fg"><label class="bl" for="opt-groq-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-groq-key" placeholder="gsk_…" /><button type="button" class="key-toggle" data-target="opt-groq-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.groq.com/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-groq-model" data-i18n="labelModel">Model</label><input type="text" id="opt-groq-model" value="openai/gpt-oss-20b" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-groq" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-groq-status" role="status" aria-live="polite"></span>
+        <!-- MiniMax -->
+        <div class="pf" hidden id="fields-minimax">
+          <h3 data-i18n="provMinimax">MiniMax</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-minimax-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-minimax-key" /><button type="button" class="key-toggle" data-target="opt-minimax-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-minimax-model" data-i18n="labelModel">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-M2" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-minimax" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-minimax-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- Mistral -->
-      <div class="pf" hidden id="fields-mistral">
-        <h3 data-i18n="provMistral">Mistral AI</h3>
-        <div class="fg"><label class="bl" for="opt-mistral-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-mistral-key" /><button type="button" class="key-toggle" data-target="opt-mistral-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.mistral.ai/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-mistral-model" data-i18n="labelModel">Model</label><input type="text" id="opt-mistral-model" value="mistral-small-latest" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-mistral" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-mistral-status" role="status" aria-live="polite"></span>
+        <!-- OpenRouter -->
+        <div class="pf" hidden id="fields-openrouter">
+          <h3 data-i18n="provOpenrouter">OpenRouter</h3>
+          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-openrouter-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="openrouterTagline">Access 100+ models from one API.</p></details><span class="key-wrap"><input type="password" id="opt-openrouter-key" placeholder="sk-or-…" /><button type="button" class="key-toggle" data-target="opt-openrouter-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://openrouter.ai/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-openrouter-model" data-i18n="labelModel">Model</label><input type="text" id="opt-openrouter-model" value="openai/gpt-oss-20b" /><p class="hint"><span data-i18n="browseModelsAt">Browse models at</span> <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a></p></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-openrouter" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-openrouter-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- Cohere -->
-      <div class="pf" hidden id="fields-cohere">
-        <h3 data-i18n="provCohere">Cohere</h3>
-        <div class="fg"><label class="bl" for="opt-cohere-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-cohere-key" /><button type="button" class="key-toggle" data-target="opt-cohere-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://dashboard.cohere.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-cohere-model" data-i18n="labelModel">Model</label><input type="text" id="opt-cohere-model" value="command-r7b-12-2024" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-cohere" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-cohere-status" role="status" aria-live="polite"></span>
+        <!-- Groq -->
+        <div class="pf" hidden id="fields-groq">
+          <h3 data-i18n="provGroq">Groq</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-groq-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-groq-key" placeholder="gsk_…" /><button type="button" class="key-toggle" data-target="opt-groq-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.groq.com/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-groq-model" data-i18n="labelModel">Model</label><input type="text" id="opt-groq-model" value="openai/gpt-oss-20b" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-groq" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-groq-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- SiliconFlow -->
-      <div class="pf" hidden id="fields-siliconflow">
-        <h3 data-i18n="provSiliconflow">SiliconFlow</h3>
-        <div class="fg"><label class="bl" for="opt-siliconflow-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-siliconflow-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-siliconflow-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://cloud.siliconflow.cn/account/ak" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-siliconflow-model" data-i18n="labelModel">Model</label><input type="text" id="opt-siliconflow-model" value="Qwen/Qwen3-8B" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-siliconflow" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-siliconflow-status" role="status" aria-live="polite"></span>
+        <!-- Mistral -->
+        <div class="pf" hidden id="fields-mistral">
+          <h3 data-i18n="provMistral">Mistral AI</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-mistral-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-mistral-key" /><button type="button" class="key-toggle" data-target="opt-mistral-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.mistral.ai/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-mistral-model" data-i18n="labelModel">Model</label><input type="text" id="opt-mistral-model" value="mistral-small-latest" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-mistral" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-mistral-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- Zhipu -->
-      <div class="pf" hidden id="fields-zhipu">
-        <h3 data-i18n="provZhipu">Zhipu</h3>
-        <div class="fg"><label class="bl" for="opt-zhipu-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-zhipu-key" /><button type="button" class="key-toggle" data-target="opt-zhipu-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-zhipu-model" data-i18n="labelModel">Model</label><input type="text" id="opt-zhipu-model" value="glm-4.7-flash" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-zhipu" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-zhipu-status" role="status" aria-live="polite"></span>
+        <!-- Cohere -->
+        <div class="pf" hidden id="fields-cohere">
+          <h3 data-i18n="provCohere">Cohere</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-cohere-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-cohere-key" /><button type="button" class="key-toggle" data-target="opt-cohere-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://dashboard.cohere.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-cohere-model" data-i18n="labelModel">Model</label><input type="text" id="opt-cohere-model" value="command-r7b-12-2024" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-cohere" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-cohere-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- Kimi -->
-      <div class="pf" hidden id="fields-kimi">
-        <h3 data-i18n="provKimi">Kimi</h3>
-        <div class="fg"><label class="bl" for="opt-kimi-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-kimi-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-kimi-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.moonshot.cn/console/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" for="opt-kimi-model" data-i18n="labelModel">Model</label><input type="text" id="opt-kimi-model" value="kimi-k2.6" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-kimi" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-kimi-status" role="status" aria-live="polite"></span>
+        <!-- SiliconFlow -->
+        <div class="pf" hidden id="fields-siliconflow">
+          <h3 data-i18n="provSiliconflow">SiliconFlow</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-siliconflow-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-siliconflow-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-siliconflow-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://cloud.siliconflow.cn/account/ak" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-siliconflow-model" data-i18n="labelModel">Model</label><input type="text" id="opt-siliconflow-model" value="Qwen/Qwen3-8B" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-siliconflow" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-siliconflow-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- Ollama -->
-      <div class="pf" hidden id="fields-ollama">
-        <h3 data-i18n="provOllama">Ollama (Local)</h3>
-        <div class="fg"><label class="bl" for="opt-ollama-baseurl" data-i18n="labelBaseUrl">Base URL</label><input type="text" class="fg-url" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
-        <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-ollama-model" data-i18n="labelModel">Model</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintOllamaModel">Run <code>ollama pull llama3.2</code> first</p></details><input type="text" id="opt-ollama-model" value="llama3.2" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-ollama" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-ollama-status" role="status" aria-live="polite"></span>
+        <!-- Zhipu -->
+        <div class="pf" hidden id="fields-zhipu">
+          <h3 data-i18n="provZhipu">Zhipu</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-zhipu-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-zhipu-key" /><button type="button" class="key-toggle" data-target="opt-zhipu-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-zhipu-model" data-i18n="labelModel">Model</label><input type="text" id="opt-zhipu-model" value="glm-4.7-flash" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-zhipu" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-zhipu-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <!-- Custom -->
-      <div class="pf" hidden id="fields-custom">
-        <h3 data-i18n="provCustom">Custom OpenAI-compatible</h3>
-        <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-custom-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomBaseUrl">Must support <code>/chat/completions</code> endpoint</p></details><input type="text" class="fg-url" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /></div>
-        <div class="fg context-help-host" data-help-role="field"><label class="bl" for="opt-custom-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomKey">Leave empty if not required</p></details><span class="key-wrap"><input type="password" id="opt-custom-key" /><button type="button" class="key-toggle" data-target="opt-custom-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span></div>
-        <div class="fg"><label class="bl" for="opt-custom-model" data-i18n="labelModel">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-custom" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-custom-status" role="status" aria-live="polite"></span>
+        <!-- Kimi -->
+        <div class="pf" hidden id="fields-kimi">
+          <h3 data-i18n="provKimi">Kimi</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-kimi-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-kimi-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-kimi-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.moonshot.cn/console/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-kimi-model" data-i18n="labelModel">Model</label><input type="text" id="opt-kimi-model" value="kimi-k2.6" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-kimi" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-kimi-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
 
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="secJinaReader">Jina Reader</h2>
-      <div class="fg context-help-host" data-help-role="field">
-        <label class="bl" for="opt-jina-key" data-i18n="jinaApiKeyLabel">API Key (optional)</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="jinaFreeTierHint">Free tier: 20 RPM. Add key for higher quota.</p>
-        </details>
-        <span class="key-wrap"><input type="password" id="opt-jina-key" placeholder="jina_xxxx (leave empty for free tier)" data-i18n-placeholder="jinaApiKeyPlaceholder" />
-        <button type="button" class="key-toggle" data-target="opt-jina-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
-        <p class="hint"><a href="https://jina.ai/reader#pricing" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p>
-      </div>
+        <!-- Ollama -->
+        <div class="pf" hidden id="fields-ollama">
+          <h3 data-i18n="provOllama">Ollama (Local)</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-ollama-baseurl" data-i18n="labelBaseUrl">Base URL</label><input type="text" class="fg-url" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
+          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-ollama-model" data-i18n="labelModel">Model</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintOllamaModel">Run <code>ollama pull llama3.2</code> first</p></details><input type="text" id="opt-ollama-model" value="llama3.2" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-ollama" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-ollama-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
 
+        <!-- Custom -->
+        <div class="pf" hidden id="fields-custom">
+          <h3 data-i18n="provCustom">Custom OpenAI-compatible</h3>
+          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-custom-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomBaseUrl">Must support <code>/chat/completions</code> endpoint</p></details><input type="text" class="fg-url" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /></div>
+          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-custom-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomKey">Leave empty if not required</p></details><span class="key-wrap"><input type="password" id="opt-custom-key" /><button type="button" class="key-toggle" data-target="opt-custom-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span></div>
+          <div class="fg entry-block"><label class="bl" for="opt-custom-model" data-i18n="labelModel">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-custom" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-custom-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secJinaReader">Jina Reader</h2>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="opt-jina-key" data-i18n="jinaApiKeyLabel">API Key (optional)</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="jinaFreeTierHint">Free tier: 20 RPM. Add key for higher quota.</p>
+          </details>
+          <span class="key-wrap"><input type="password" id="opt-jina-key" placeholder="jina_xxxx (leave empty for free tier)" data-i18n-placeholder="jinaApiKeyPlaceholder" />
+          <button type="button" class="key-toggle" data-target="opt-jina-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+          <p class="hint"><a href="https://jina.ai/reader#pricing" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p>
+        </div>
+      </section>
     </div>
 
     <!-- Tab: AI Behavior -->
