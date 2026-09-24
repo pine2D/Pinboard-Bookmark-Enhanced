@@ -646,6 +646,50 @@ function test(name, fn) {
     const keyWrapMaxWidth = frame.contentWindow.getComputedStyle(keyWrap).maxWidth;
     assert(selectMaxWidth === "100%", "provider select max-width=" + selectMaxWidth);
     assert(keyWrapMaxWidth === "none", "gemini key-wrap max-width=" + keyWrapMaxWidth);
+    // Fixwave stage2: `[data-ui-stage0] .fg .key-wrap :is(input[type="text"],
+    // input[type="password"]) { padding-right: 32px }` was restated at
+    // (0,4,1) so it no longer depends on staying textually after the
+    // (0,3,1) field-type rule that resets padding-right to
+    // --opt-control-pad-x. Assert the resolved value directly on the input,
+    // not just that the rule text exists.
+    const keyInput = doc.getElementById("opt-gemini-key");
+    const keyInputPaddingRight = frame.contentWindow.getComputedStyle(keyInput).paddingRight;
+    assert(keyInputPaddingRight === "32px", "opt-gemini-key padding-right=" + keyInputPaddingRight);
+  });
+
+  // Fixwave stage2, item 1: `[data-ui-stage0] .pf > h3` (0,2,1) was losing
+  // to the themed `html[data-theme] .pf h3 { color: var(--opt-fg-muted) }`
+  // (0,2,2) override under every preset -- the sub-panel title rendered
+  // muted instead of body colour the moment a theme was active. Restated at
+  // (0,3,2) via a twin `html[data-theme] [data-ui-stage0] .pf > h3`
+  // selector (same shape as the `.fg label.bl` fix). Verify against a live
+  // computed style, not just selector text, under an actual preset theme.
+  test("stage2: themed .pf > h3 keeps body colour, not the muted override", () => {
+    doc.documentElement.setAttribute("data-theme", "modern-card");
+    try {
+      const h3 = doc.querySelector("#fields-gemini > h3");
+      assert(h3, "missing #fields-gemini > h3");
+      const win = frame.contentWindow;
+      const h3Color = win.getComputedStyle(h3).color;
+      const expectedFg = win.getComputedStyle(doc.documentElement).getPropertyValue("--opt-fg").trim();
+      const mutedFg = win.getComputedStyle(doc.documentElement).getPropertyValue("--opt-fg-muted").trim();
+      assert(expectedFg && mutedFg && expectedFg !== mutedFg, "modern-card --opt-fg/--opt-fg-muted fixture tokens missing or identical");
+      // Resolve both custom properties to actual color() computed values via a
+      // scratch element so the comparison isn't a raw-string vs used-value
+      // mismatch (e.g. "#112a45" vs "rgb(17, 42, 69)").
+      const probe = doc.createElement("div");
+      probe.style.display = "none";
+      doc.body.appendChild(probe);
+      probe.style.color = "var(--opt-fg)";
+      const resolvedFg = win.getComputedStyle(probe).color;
+      probe.style.color = "var(--opt-fg-muted)";
+      const resolvedMuted = win.getComputedStyle(probe).color;
+      probe.remove();
+      assert(h3Color === resolvedFg, "#fields-gemini > h3 color=" + h3Color + " expected --opt-fg=" + resolvedFg);
+      assert(h3Color !== resolvedMuted, "#fields-gemini > h3 color regressed to --opt-fg-muted=" + resolvedMuted);
+    } finally {
+      doc.documentElement.removeAttribute("data-theme");
+    }
   });
 })().catch((error) => {
   for (let i = results.children.length; i < 16; i++) report("fixture setup", error);

@@ -1605,9 +1605,13 @@ export const CHECKS = [
   // density tier as the button). Bare selectors match the PROVIDER's
   // popover/option first in DOM order (#opt-ai-provider sits before
   // #translate-target-lang in options.html) -- the one this state opens.
+  // borderRadiusPx (fixwave stage2): the popover shell's corner radius must
+  // track this surface's live --opt-radius-lg rung (COMPONENTS.md §9), not a
+  // literal px -- same theme-aware comparison insetBand.radiusVar already
+  // uses for a list row's inset band, applied directly to the shell itself.
   { surface: "options", page: "options.html", selector: ".listbox-pop", state: "open",
     open: { click: "#opt-ai-provider-btn" },
-    expect: { borderTopWidthPx: { value: 1 } } },
+    expect: { borderTopWidthPx: { value: 1 }, borderRadiusPx: { radiusVar: "radius-lg" } } },
   { surface: "options", page: "options.html", selector: ".listbox-opt", state: "open",
     open: { click: "#opt-ai-provider-btn" },
     expect: { heightPx: { comfortable: 32, compact: 28 } } },

@@ -241,7 +241,12 @@ function btnRules(ns) {
       rule("[data-ui-stage0] .btn-sm:not(.context-help-toggle)", [
         ["height", "calc(var(--opt-control-h) - 4px)"],
         ["padding", `0 ${sp(ns, 8)}`],
-        ["font-size", "13px"],
+        // Density-tracking, not a fixed 13px: comfortable body is 14px so
+        // this reads 13px there (one step under the primary .btn face);
+        // compact body is 13px so this reads 12px, still one step under --
+        // the old literal 13px only matched the compact tier and left
+        // .btn-sm the SAME size as .btn under comfortable density.
+        ["font-size", "calc(var(--opt-text-body) - 1px)"],
         ["line-height", "calc(var(--opt-control-h) - 6px)"],
       ]),
     ] : []),

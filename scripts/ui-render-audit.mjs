@@ -899,6 +899,21 @@ function evaluateCheck(check, raw, theme) {
     if (hostZero) out.push(verdict("borderTopWidthPx", false, null, value, zeroNote));
     else out.push(verdict("borderTopWidthPx", Math.abs(raw.borderTopWidth - value) <= tolerancePx, round2(raw.borderTopWidth), value));
   }
+  // borderRadiusPx (fixwave stage2, R4 `.listbox-pop` OPEN row): a chromed
+  // popover's corner radius must track the surface's OWN `--{ns}-radius-*`
+  // rung live, not a literal px -- the 13 presets don't share one radius
+  // scale (COMPONENTS.md §9), so a hardcoded target would false-fail on
+  // every theme but the one it was measured against. Reuses insetBand's
+  // radiusVarName/radiusVarPx probe slot (see the SETUP ERROR guard above
+  // this function's call site) rather than adding a second one -- same
+  // token, same live <html> read, just compared directly instead of as
+  // part of an inset-band note.
+  if ("borderRadiusPx" in exp) {
+    const { radiusVar, tolerancePx = 0.5 } = exp.borderRadiusPx;
+    if (hostZero) out.push(verdict("borderRadiusPx", false, null, null, zeroNote));
+    else if (raw.radiusVarPx == null) out.push(verdict("borderRadiusPx", false, round2(raw.borderRadius), null, `--${radiusVar} did not resolve on <html>`));
+    else out.push(verdict("borderRadiusPx", Math.abs(raw.borderRadius - raw.radiusVarPx) <= tolerancePx, round2(raw.borderRadius), round2(raw.radiusVarPx)));
+  }
   // widthPx (T6, taste-uplift-batch3, D2, COMPONENTS.md §6.1): a content-kind
   // field's measured width against its tier -- unlike heightPx above (a
   // literal target value, |diff| <= tolerance, since a chip's height IS its
@@ -2030,15 +2045,24 @@ async function runOneCheck(page, theme, check, results, extBase) {
       `and widthLteWith.selector (${check.expect.widthLteWith.selector}) -- they share the same ` +
       `compareSelector probe slot and only one would ever be read; split into two checklist entries instead.`);
   }
+  // borderRadiusPx shares insetBand.radiusVar's radiusVarName/radiusVarPx
+  // probe slot (added fixwave stage2) -- same guard shape as the two above.
+  if (check.expect.insetBand?.radiusVar && check.expect.borderRadiusPx?.radiusVar) {
+    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
+      `check declares BOTH insetBand.radiusVar (${check.expect.insetBand.radiusVar}) ` +
+      `and borderRadiusPx.radiusVar (${check.expect.borderRadiusPx.radiusVar}) -- they share the same ` +
+      `radiusVarName probe slot and only one would ever be read; split into two checklist entries instead.`);
+  }
   const extraBgSelectorVar = check.expect.textContrastMulti?.extraBgSelectorVar
     || check.expect.bgEqVar;
   const extraColorSelectorVar = check.expect.colorEqVar;
+  const radiusVar = check.expect.insetBand?.radiusVar || check.expect.borderRadiusPx?.radiusVar;
   const raw = await page.evaluate(probeSelector, {
     selector: check.selector,
     compareSelector: check.expect.heightEqWith?.selector || check.expect.widthLteWith?.selector || null,
     extraBgVarName: extraBgSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBgSelectorVar}` : null,
     extraColorVarName: extraColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraColorSelectorVar}` : null,
-    radiusVarName: check.expect.insetBand?.radiusVar ? `--${NS_BY_SURFACE[check.surface]}-${check.expect.insetBand.radiusVar}` : null,
+    radiusVarName: radiusVar ? `--${NS_BY_SURFACE[check.surface]}-${radiusVar}` : null,
     childSelectors: check.expect.fusedChildrenFlat?.children || check.expect.fusedStateStableChildren || check.expect.edgeClickable?.children || null,
     focusTargetSelector: check.state === "focusWithin" ? check.focusTarget : null,
   });

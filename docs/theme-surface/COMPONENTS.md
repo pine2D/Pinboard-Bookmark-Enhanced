@@ -249,7 +249,7 @@ composer 一旦开始发射 `color: var(--opt-btn-fg)`，它们会逐条覆盖�
 
 | ID | 断言 | 层 |
 |---|---|---|
-| `btnRung` | `.btn` 计算高度 = 26±1px；`.btn.btn-sm` = 20±1px | `[render]` |
+| `btnRung` | `.btn` 计算高度 = 26±1px；`.btn.btn-sm` = 20±1px；**在 `[data-ui-stage0]` 内**（options，stage2 密度轨）：`.btn` 32 comfortable/28 compact，`.btn-sm` 28/24 —— 迁移到 stage 3 前，二者并存，容器外仍读上面的 legacy 26/20 | `[render]` |
 | `btnPairedFg` | 配方里任何声明 `background` 的按钮规则，其组件族基类必须声明 `color` | `[static]` |
 | `textContrast` | 按钮文字色 vs 实际合成背景 ≥4.5:1（`:disabled` 除外，WCAG 1.4.3 豁免禁用控件） | `[render]` |
 | `iconContrast` | 按钮内 SVG 描边色 vs 实际合成背景 ≥3:1（WCAG 1.4.11） | `[render]` |
@@ -1315,13 +1315,13 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `.fg` | 表单组；`margin-bottom: var(--opt-rhythm)`（12px）= 组间节律的唯一主人 |
 | options | `.fg-stack` | `.fg` 修饰：peer 选项堆叠；标题 `.bl` → 首项 6px；行距 2/4px（阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代） |
 | options | `.fg-indent` | 从属项缩进 `--opt-indent: 20px`（原为 13px 复选框 + sp-3 的文字对齐值；batch4 设置项改 `.switch` 后没有框可让，只表达层级，值保持不变；刻度外故有名，阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代） |
-| options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；作 `.fg` 末子元素时 `margin-top: sp-3`；作兄弟时不带 margin |
+| options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；legacy（`[data-ui-stage0]` 外）：作 `.fg` 末子元素时 `margin-top: sp-3`，作兄弟时不带 margin；**在 `[data-ui-stage0]` 内**（stage2 §2）：作 `.fg` 末子元素时 `margin-top: --opt-label-gap`（8/4，按密度），作 `.fg` 的兄弟或 `.pf` 的子元素时 `margin-top: sp-6`（16） |
 | options | `.hint` / `.hint-warn` | 11px 辅助文字；`.fg > .hint` 距控件 sp-1；组外 `margin: sp-1 0 rhythm` |
 | options | `.section-title` | h2，15px/600，上下 sp-4；配 `.divider`（sp-6 0，1px，阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代）；`[data-ui-stage0]` 覆盖为 16px/600（字号走 `--opt-text-section`，行高 `--opt-lh-section` 24，margin 归零改 `0 0 --opt-sp-5`，见下一行 `section.settings-section`） |
 | options | `.choice-row` | 复选/单选行标记；在 `.fg-stack` 内行距 sp-1（阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代） |
 | options | `details.disclosure` + `.disclosure-body` | 唯一折叠原语；标题 = section-title 面 + 右侧 chevron；成员自带上边线，堆叠对称 12px；正文齐平，`> :last-child` 去下 margin |
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |
-| options | `.pf` | 带边框子面板（provider 卡）：padding sp-5，radius md |
+| options | `.pf` | 带边框子面板（provider 卡）：legacy（`[data-ui-stage0]` 外）padding sp-5，radius md，`margin-top sp-4`；**在 `[data-ui-stage0]` 内**（stage2 §2）：padding `--opt-panel-pad`（16 comfortable/12 compact）、`margin-top sp-6`（16）；`> h3` 字号/行高 `--opt-text-body`/`--opt-lh-body`、字重 600、色 `--opt-fg`（不落回 legacy 的 `--opt-fg-soft` 未主题态 / `--opt-fg-muted` 主题态两段式）、`margin: 0 0 --opt-label-gap` |
 | options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`（可选第三个子元素 `details.context-help`，夹在 `.switch-text` 与 `.switch-track` 之间——带帮助的开关行用它，Ruling 36）；flex、flex-start（轨道 `margin-left:auto` 到行尾）、gap sp-3；轨道 28×16 无边框 / 滑块 12 内缩 2 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked、details-in-label 合法性附注） |
 | options | `.listbox` (+ `.listbox-btn` / `.listbox-value` / `.listbox-sizer` / `.listbox-pop` / `.listbox-list` / `.listbox-opt`) | 唯一自绘 select（§6.4 例外 2）：`select[data-listbox][hidden]` 之后的 `div.listbox`；宽度沿用 select 例外（`width: max-content; min-width: 240px; max-width: 100%`），max-content 取最长选项（`.listbox-sizer` 零高网格行），按钮占满 `.listbox`、高 `--opt-control-h`（32/28）；弹层外壳 `.listbox-pop` absolute、`top: 100% + sp-1`（`data-flip=up` 时贴上方）、`z-index: --opt-z-popover`、圆角 lg、边框阴影、`overflow: hidden`；滚动层 `.listbox-list` `max-height: min(320px, 100dvh − 32px)`、`overflow: auto`、内距 sp-2；选项高 `--opt-control-h`、内距 `0 sp-4`、圆角 sm；跟随输入框的关系规则 `.fg > .listbox + input { margin-top: sp-3 }` 接替 `.fg > select + input` |
 | options | `section.settings-section` | 分区容器；相邻分区 `margin-top: --opt-section-gap`；`> h2.section-title` 字号 `--opt-text-section`，`margin: 0 0 --opt-sp-5`（12） |
