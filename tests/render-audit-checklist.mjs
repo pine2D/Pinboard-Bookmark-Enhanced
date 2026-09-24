@@ -278,6 +278,21 @@
 //                      off/on fill without depending on the storage default.
 //                      state "checked" REQUIRES seedChecked.checked === true
 //                      (it is only a distinct results key for the on state).
+//   open           -- (row-level, not under `expect`, used with state: "open",
+//                      Task 4, ui-system-stage2, Controller ruling C):
+//                      { click: selector }. The runner scripts .focus() onto
+//                      `click`'s target then presses a REAL keyboard Space
+//                      (page.keyboard.press("Space")) -- not a raw .click() --
+//                      so the state this reveals is reached through the
+//                      SAME code path a keyboard user's Tab + Space takes
+//                      (a `select-only combobox`'s onKeydown " " branch,
+//                      options-listbox.js), a materially different path from
+//                      a mouse click listener. Throws a SETUP ERROR if the
+//                      target cannot be focused or the press did not flip
+//                      its `aria-expanded` to "true". Closed again (Escape)
+//                      once the probe has read what it needs, same
+//                      leave-no-state-behind discipline as hover's pointer
+//                      reset and focusWithin's blur.
 //   fontSizePx     -- { value, tolerancePx=0.5 } OR { comfortable, compact,
 //                      tolerancePx=0.5 } (same two shapes as heightPx above,
 //                      Task 3): |computed font-size (px) - value| <=
@@ -1508,16 +1523,94 @@ export const CHECKS = [
   // adding a third one.
   { surface: "options", page: "options.html", selector: ".key-wrap", state: "default",
     expect: { widthPx: { max: 420 } } },
-  // .fg-url 520 (the three baseurl endpoints) and plain input[type=text] 320
-  // (everything else typed free text) both live on the AI Providers tab;
+  // .fg-url (the three baseurl endpoints) and plain input[type=text] (the
+  // Model field) both live on the AI Providers tab, inside #panel-ai;
   // #opt-openai-baseurl/#opt-openai-model specifically live inside
   // #fields-openai, which is `hidden` until the provider select is switched
   // to openai (options.js's updateProviderFields) -- scripts/ui-render-
-  // audit.mjs's aiProviderChecks group does that switch once for both rows.
+  // audit.mjs's aiProviderChecks group does that switch once for these rows.
+  // Task 4 (ui-system-stage2, Controller ruling C): #panel-ai now carries
+  // [data-ui-stage0] (Task 2), whose `.entry-block > :is(input:not([type=
+  // number]), .key-wrap) { max-width: none }` rule (options.css) matches
+  // BOTH of these at the SAME specificity as the generic per-kind tier rule
+  // (`.fg input[type=text].fg-url`/`.fg input[type=text]:not(.fg-url)`) the
+  // two literal ceilings below used to assert against -- source order hands
+  // the win to the stage-0 rule, so both fields now fill their `.fg` column
+  // instead of capping at a fixed px width, and the old `widthPx.max` rows
+  // read FAIL across every theme (measured baseline: both render at
+  // 757.33px, the #fields-openai `.pf`'s content width at this audit's
+  // >=1040px viewport). Re-pinned to widthLteWith the field's OWN `.fg`
+  // column (`.fg:has(#id)`, unique per id -- there is exactly one `.fg`
+  // ancestor here, not a nested one) instead of a literal: the SAME "never
+  // wider than the column" half `.fg select` above already asserts, just
+  // against this row's own column rather than the shared General-tab
+  // landmark -- this `.fg` sits inside a `.pf` provider sub-panel, a
+  // DIFFERENTLY-padded (narrower) column than the General tab's, so reusing
+  // the bare `.fg` selector here would compare against the wrong column.
   { surface: "options", page: "options.html", selector: "#opt-openai-baseurl", state: "default",
-    expect: { widthPx: { max: 520 } } },
+    expect: { widthLteWith: { selector: ".fg:has(#opt-openai-baseurl)" } } },
   { surface: "options", page: "options.html", selector: "#opt-openai-model", state: "default",
-    expect: { widthPx: { max: 320 } } },
+    expect: { widthLteWith: { selector: ".fg:has(#opt-openai-model)" } } },
+  // The provider API-key `.key-wrap` (Task 4): the SAME stage-0 max-width:
+  // none rule reaches `.key-wrap` too (it is the OTHER branch of the same
+  // `:is()` list) -- #opt-openai-key's wrap is the representative instance,
+  // scoped to #fields-openai so this row cannot collide with the bare
+  // `.key-wrap` selector the General-tab row above already claims (first-
+  // match-in-DOM-order would otherwise still land on #opt-pinboard-token,
+  // never this one). The eye toggle stays fused to the input's own right
+  // edge (COMPONENTS.md §8) regardless of which column width the wrap grows
+  // to -- options.css's stage-0 CSS step re-declares `padding-right: 32px`
+  // for `.key-wrap input` at the same specificity, source-order-last.
+  { surface: "options", page: "options.html", selector: "#fields-openai .key-wrap", state: "default",
+    expect: { widthLteWith: { selector: ".fg:has(#opt-openai-key)" } } },
+
+  // ---- `.listbox` primitive (R4, ui-system-stage2 spec §3, COMPONENTS.md
+  // §6.4 exception 2): the one drawn <select> this codebase allows. Two
+  // consumers -- #opt-ai-provider (this tab) and #translate-target-lang
+  // (Reader tab, OUTSIDE [data-ui-stage0] -- the density tier still applies
+  // there, see scripts/ui-render-audit.mjs's rung.densityComponents: a
+  // `.listbox-btn` reads `var(--opt-control-h)` unconditionally, not gated
+  // by the marker). The native <select> is `hidden` by the enhancer
+  // (options-listbox.js), so a width/height row against the OLD select id
+  // would read a zero-size element -- both rows below target the visible
+  // `button.listbox-btn` instead. widthPx.min 240 + widthLteWith mirror the
+  // `.fg select` exception row above (content-sized, never full-width);
+  // hitRectMin proves the 24px hit floor on a control that is NOT icon-only
+  // (family 4's automatic sweep only covers icon-only buttons).
+  { surface: "options", page: "options.html", selector: "#opt-ai-provider-btn", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { min: 240 },
+      widthLteWith: { selector: ".fg:has(#opt-ai-provider-btn)" }, hitRectMin: { height: 24 } } },
+  { surface: "options", page: "options.html", selector: "#translate-target-lang-btn", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { min: 240 },
+      widthLteWith: { selector: ".fg:has(#translate-target-lang-btn)" }, hitRectMin: { height: 24 } } },
+  // #test-gemini (Task 4): the FIRST `.btn.btn-sm` action inside #panel-ai,
+  // reachable without switching the provider away from its gemini default --
+  // scripts/ui-render-audit.mjs routes this row through the switchChecks
+  // group (fresh page reload first, so gemini's default selection is
+  // restored regardless of what the LATER aiProviderChecks group did to a
+  // PRIOR theme's page). Proves the stage-0 `.btn-sm:not(.context-help-
+  // toggle)` composer rung (calc(--opt-control-h - 4px) = 28 comfortable /
+  // 24 compact) reaches a provider sub-panel's own action row, not just the
+  // rows Task 2/3 already covered.
+  { surface: "options", page: "options.html", selector: "#test-gemini", state: "default",
+    expect: { heightPx: { comfortable: 28, compact: 24 } } },
+  // Open state (Controller ruling C): a real keyboard Space press on the
+  // focused #opt-ai-provider-btn (scripts/ui-render-audit.mjs's new "open"
+  // state, next to the seedChecked machinery) exercises options-listbox.js's
+  // onKeydown " " branch -- a DIFFERENT code path from the mouse click the
+  // aiProviderChecks group's own provider switch already drives -- keeping a
+  // real-keyboard assertion in the gate, not only a mouse one. Both rows
+  // below share that one open popover: `.listbox-pop`'s border (spec §3's
+  // popover chrome) and `.listbox-opt`'s row height (control-h, the same
+  // density tier as the button). Bare selectors match the PROVIDER's
+  // popover/option first in DOM order (#opt-ai-provider sits before
+  // #translate-target-lang in options.html) -- the one this state opens.
+  { surface: "options", page: "options.html", selector: ".listbox-pop", state: "open",
+    open: { click: "#opt-ai-provider-btn" },
+    expect: { borderTopWidthPx: { value: 1 } } },
+  { surface: "options", page: "options.html", selector: ".listbox-opt", state: "open",
+    open: { click: "#opt-ai-provider-btn" },
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
   // input[type=number] 96 (a handful of digits). #opt-ai-cache-duration
   // lives on the AI Behavior tab; scripts/ui-render-audit.mjs's
   // aiBehaviorChecks group clicks that tab once for this row. (The OTHER

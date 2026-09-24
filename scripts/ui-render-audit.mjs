@@ -1979,6 +1979,29 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // can serialize the 0% frame as transparent oklab(), making a hover
     // assertion accidentally inspect the resting paint.
     await settleAnimations(page);
+  } else if (check.state === "open") {
+    // "open" (Task 4, ui-system-stage2, Controller ruling C): a reusable
+    // click-then-measure state for anything that stays hidden/zero-size
+    // until revealed, driven via a REAL keyboard Space press on the focused
+    // `open.click` target rather than a raw `.click()` -- this doubles as a
+    // real-keyboard-path gate (the listbox's WAI-ARIA "select-only
+    // combobox" contract, options-listbox.js's onKeydown " " branch) rather
+    // than only exercising the mouse click listener the way `page.click()`
+    // would. Script-focus + one real key is the same idiom focusWithin uses
+    // above.
+    if (!check.open?.click) throw new Error(`"open" state on ${check.selector} has no open.click target`);
+    const { click: openTarget } = check.open;
+    const focused = await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return false;
+      el.focus();
+      return document.activeElement === el;
+    }, openTarget);
+    if (!focused) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: could not focus open.click target ${openTarget}`);
+    await page.keyboard.press("Space");
+    await settleAnimations(page);
+    const opened = await page.evaluate((sel) => document.querySelector(sel)?.getAttribute("aria-expanded") === "true", openTarget);
+    if (!opened) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: pressing Space on ${openTarget} did not open it (aria-expanded stayed false)`);
   } else if (check.state !== "default" && check.state !== "classState" && check.state !== "checked") {
     throw new Error(`unsupported state "${check.state}" on ${check.selector} -- extend runOneCheck() before adding non-default states to the checklist`);
   }
@@ -2036,6 +2059,14 @@ async function runOneCheck(page, theme, check, results, extBase) {
     await page.evaluate(({ selector, cls }) => {
       document.querySelector(selector)?.classList.remove(...cls);
     }, { selector: check.selector, cls: check.addClass });
+  }
+  if (check.state === "open") {
+    // Close it again (real Escape, the same key options-listbox.js's
+    // onKeydown already handles) so a left-open popover does not leak into
+    // whatever the NEXT check on this page reads -- same leave-no-state-
+    // behind discipline as classState/focusWithin/hover around this block.
+    await page.keyboard.press("Escape");
+    await settleAnimations(page);
   }
   if (check.state === "focusWithin") {
     // Blur before the next check reads anything: a left-over :focus-within on
@@ -2971,8 +3002,11 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // all, not just a tab click. #opt-ai-cache-duration (number tier) lives
     // on the separate #panel-ai-behavior tab, reached with a plain click.
     // Both run in their OWN groups below (like keyWrapChecks above), not
-    // folded into otherChecks.
-    const aiProviderChecks = checks.filter((c) => c.selector === "#opt-openai-baseurl" || c.selector === "#opt-openai-model");
+    // folded into otherChecks. Widened (Task 4, ui-system-stage2, Controller
+    // ruling C): the re-pinned #fields-openai .key-wrap row needs the SAME
+    // "provider switched to openai" precondition as the two above.
+    const aiProviderChecks = checks.filter((c) => c.selector === "#opt-openai-baseurl" || c.selector === "#opt-openai-model"
+      || c.selector === "#fields-openai .key-wrap");
     const aiBehaviorChecks = checks.filter((c) => c.selector === "#opt-ai-cache-duration");
     // `.switch` rows (taste-uplift batch4 T1 reference instance + T2's one
     // row per DOM shape): the track rows (`#id ~ .switch-track`) and the
@@ -2984,8 +3018,23 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // group's per-check `.closest(".panel")` resolution already works for
     // ANY selector, not just `.switch-track` ones, so no separate group is
     // needed for them.
+    // Widened again (Task 4, ui-system-stage2, Controller ruling C):
+    // #test-gemini needs the SAME "resolve the owning tab, fresh page
+    // reload first" treatment this group already gives every other tab-
+    // scoped row -- it lives in #fields-gemini (#panel-ai), which the LATER
+    // aiProviderChecks group above hides by switching the provider to
+    // openai; this group's own fresh page.goto() (below) restores the
+    // gemini default before #test-gemini's row runs. #opt-ai-provider-btn/
+    // #translate-target-lang-btn would already match via their own
+    // hitRectMin (named explicitly here anyway, for a reader who is not
+    // tracing that incidental overlap); the two `state: "open"` popover rows
+    // share #opt-ai-provider-btn's own #panel-ai resolution (bare
+    // `.listbox-pop`/`.listbox-opt` selectors match it first in DOM order)
+    // and skip this loop's own visibility wait below (see that comment).
     const switchChecks = checks.filter((c) => c.selector.includes(".switch-track") || c.expect?.hitRectMin
-      || c.selector.includes("[data-ui-stage0]") || c.selector === "#opt-popup-width-custom");
+      || c.selector.includes("[data-ui-stage0]") || c.selector === "#opt-popup-width-custom"
+      || c.selector === "#test-gemini" || c.selector === "#opt-ai-provider-btn"
+      || c.selector === "#translate-target-lang-btn" || c.selector === ".listbox-pop" || c.selector === ".listbox-opt");
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
       && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c));
@@ -3104,7 +3153,14 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
             if (!d.open && !d.classList.contains("context-help")) d.querySelector(":scope > summary")?.click();
           }
         });
-        await page.waitForSelector(check.selector, { state: "visible", timeout: TIMEOUT_MS });
+        // `state: "open"` rows (Task 4, ui-system-stage2, Controller ruling
+        // C) target `.listbox-pop`/`.listbox-opt`, which are still `hidden`
+        // at this point -- runOneCheck's OWN "open" handling reveals them
+        // with a real keyboard Space press, so waiting for visibility HERE
+        // would time out on every one of them before that press ever runs.
+        if (check.state !== "open") {
+          await page.waitForSelector(check.selector, { state: "visible", timeout: TIMEOUT_MS });
+        }
         await runOneCheck(page, theme, check, results);
       }
     }
@@ -3524,6 +3580,16 @@ const SWEEP_CFG = {
     // separate definitions. Both retire together with the marker (CLAUDE.md
     // temporary item, expiry 2026-12-31).
     stageZero: { marker: "[data-ui-stage0]", values: { comfortable: [32, 28], compact: [28, 24] }, labelGap: { comfortable: 8, compact: 4 } },
+    // densityComponents (Task 4, ui-system-stage2, Controller ruling B):
+    // `.listbox-btn` / `.listbox-opt` read `var(--opt-control-h)` directly
+    // (options.css, unconditional -- not gated by [data-ui-stage0]), so they
+    // are density-tiered wherever they render, not only inside the stage-0
+    // prototype container. `#translate-target-lang-btn` sits on the Reader
+    // tab, OUTSIDE the marker, but still must be judged against the live
+    // comfortable/compact tier -- html[data-density] is a page-wide
+    // attribute (options-theme-early.js), not scoped to the marker. Matched
+    // by class regardless of tag (button vs li).
+    densityComponents: [".listbox-btn", ".listbox-opt"],
     exempt: [
       "textarea",                                   // multi-line by nature
       "[role='tab']", ".tab-btn", ".lib-tab",       // tab family: 32px on both surfaces
@@ -3965,7 +4031,7 @@ function sweepProbe(cfg) {
   {
     const surface = (location.pathname.match(/\/(popup|options|library|md-preview)\.html$/) || [])[1] || "unknown";
     const excluded = (el) => cfg.excludeWithin && el.closest(cfg.excludeWithin);
-    const controls = [...document.querySelectorAll(`button, .btn, a.btn, input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]), select, ${cfg.rung.shells}`)];
+    const controls = [...document.querySelectorAll(`button, .btn, a.btn, input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]), select, ${cfg.rung.shells}, ${cfg.rung.densityComponents.join(", ")}`)];
     const shellSel = cfg.rung.shells;
     for (const el of controls) {
       if (!visible(el) || excluded(el)) continue;
@@ -3979,18 +4045,26 @@ function sweepProbe(cfg) {
       // one, picked off the SAME live html[data-density] attribute
       // options-theme-early.js writes (Task 1) -- not a static literal, so
       // the check stays correct whichever tier the active theme landed on.
-      // Buttons are the spec's OWN named exception (§6 "已知不做与风险":
-      // ".btn-sm 20 高...会与 32 高输入框并存，评判时忽略") -- the prototype
-      // deliberately leaves every button-family control on the surface's
-      // existing rung, so this only re-tiers the single-line input/select/
-      // shell branch of the `controls` query above, never a button/.btn/a.btn
-      // (verified live: #panel-popup's "Open Chrome Shortcut Settings" link
-      // is exactly this shape -- without the exclusion it read as a NEW
-      // controlRung FAIL at its normal ~19.33px sm height against the
-      // comfortable [32, 28] rung, a regression this dual contract must not
-      // introduce).
-      const isButtonFamily = el.matches("button, .btn, a.btn");
-      const inStageZero = !isButtonFamily && el.closest(cfg.rung.stageZero.marker);
+      // Task 4 (ui-system-stage2, Controller ruling B): the button-family
+      // exclusion that used to sit here is retired -- the spec's stage-0
+      // rung now DOES cover `.btn`/`.btn-sm` (composer rules, options.css),
+      // so a button inside the marker must be judged against the SAME
+      // comfortable/compact tier as every other control there instead of
+      // being left on the surface's normal 26/20 rung. `.context-help-toggle`
+      // and every other icon-only button never reach this point at all (the
+      // `!iconLabel(el)` skip a few lines up, family 4's own territory).
+      // `#panel-popup`'s "Open Chrome Shortcut Settings" link (`a.btn.btn-sm`,
+      // no id) is NOT exempt -- it is the exact case the old exclusion's
+      // comment warned about, and it is now CORRECTLY re-tiered instead:
+      // task-4 baseline measured it failing at 28px against the old flat
+      // rung (26±1/20±1); after this change it reads 28px against the
+      // comfortable tier's `.btn-sm` value (28), which is the fix, not a
+      // regression. `densityComponents` (`.listbox-btn`/`.listbox-opt`) are
+      // on the same tier wherever they render, marker or not (see the
+      // config comment above) -- `#translate-target-lang-btn` lives on the
+      // Reader tab, outside the marker, but still reads the live tier.
+      const isDensityComponent = cfg.rung.densityComponents.some((sel) => el.matches(sel));
+      const inStageZero = isDensityComponent || el.closest(cfg.rung.stageZero.marker);
       const tier = document.documentElement.dataset.density === "compact" ? "compact" : "comfortable";
       const allowedRungs = inStageZero ? cfg.rung.stageZero.values[tier] : cfg.rung.values;
       if (!allowedRungs.some((v) => Math.abs(h - v) <= cfg.rung.tol)) {
