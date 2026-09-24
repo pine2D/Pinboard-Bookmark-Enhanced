@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 24;
+const TOTAL = 25;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -136,13 +136,17 @@ function pbpTestChromeStub(enMessages) {
   const close = (select) => { if (btnOf(select)?.getAttribute("aria-expanded") === "true") key(btnOf(select), "Escape"); };
 
   test("enhances every data-listbox select and hides the natives", () => {
-    // Stage-3a (Task 1) widened the panel of data-listbox selects from two to
+    // Stage-3a Task 1 widened the panel of data-listbox selects from two to
     // five (opt-ai-tag-lang, opt-ai-summary-lang, opt-ai-tag-separator joined
-    // opt-ai-provider/translate-target-lang) -- count select[data-listbox]
-    // generically instead of pinning the old total, so a future panel adding
-    // more listbox selects does not have to touch this assertion again.
+    // opt-ai-provider/translate-target-lang); Task 2 added opt-selection-
+    // trigger (Reader tab), the sixth and -- per the stage-3a design doc's
+    // scope table (3b covers general/markdown/tags/appearance/vocab/storage,
+    // the remaining panels with a <select>) -- LAST one this stage adds. Pin
+    // the exact total now (spec §3, Controller ruling 4) rather than the
+    // prior open-ended `>= 5`: a future stage that adds another listbox
+    // select is expected to touch this assertion, the same way this task did.
     const targets = [...doc.querySelectorAll("select[data-listbox]")];
-    assert(targets.length >= 5, "expected at least 5 data-listbox selects, got " + targets.length);
+    assert(targets.length === 6, "expected exactly 6 data-listbox selects, got " + targets.length);
     const wrappers = doc.querySelectorAll(".listbox");
     assert(wrappers.length === targets.length,
       "expected " + targets.length + " .listbox wrappers (one per data-listbox select), got " + wrappers.length);
@@ -371,9 +375,9 @@ function pbpTestChromeStub(enMessages) {
     assert(btnOf(provider()).querySelector(".listbox-value").textContent === "Kimi", "button text=" + btnOf(provider()).textContent);
     assert(itemsOf(provider()).length === count, "repeated sync changed the option count");
     assert(doc.querySelectorAll("#opt-ai-provider-btn").length === 1, "repeated sync duplicated the button");
-    // Total .listbox count follows the live select[data-listbox] count (stage-3a
-    // widened this from 2 to 5) -- re-enhancing an already-enhanced select must
-    // not add to it.
+    // Total .listbox count follows the live select[data-listbox] count
+    // (stage-3a widened this from 2 to 6 across Tasks 1-2) -- re-enhancing an
+    // already-enhanced select must not add to it.
     const totalListboxes = doc.querySelectorAll("select[data-listbox]").length;
     assert(win.pbpEnhanceListbox(provider()) && doc.querySelectorAll(".listbox").length === totalListboxes,
       "re-enhance created a second wrapper");
@@ -614,6 +618,41 @@ function pbpTestChromeStub(enMessages) {
       syncStore.set = origSyncSet;
       delete doc.visibilityState;
     }
+  });
+
+  // Stage-3a (Task 3, ui-system-stage3a-design §3, Controller ruling 4b): the
+  // AI tag separator select (#panel-ai-behavior) is a `.row-inline` listbox
+  // (label and control side by side, spec §2) rather than its own `.fg`
+  // block like every OTHER listbox this file drives -- clicking an option
+  // must still update `select.value` and dispatch a real `change` (the event
+  // options.js's autosave listener is bound to), the same underlying path
+  // options-listbox.js's chooseOption always takes (~line 163-164: `new
+  // Event("input"/"change", { bubbles: true })`), proven generically for the
+  // provider/translate selects elsewhere in this file but never yet pinned
+  // for this one. Spy via addEventListener BEFORE the click, so the count
+  // can only be 0 or 1 -- a listener attached after the click would risk
+  // missing a synchronous dispatch entirely and passing on a false 0.
+  test("AI tag separator change through the listbox updates select.value and dispatches change", () => {
+    showPanel("panel-ai-behavior");
+    const select = doc.getElementById("opt-ai-tag-separator");
+    assert(select?.hasAttribute("data-listbox"), "opt-ai-tag-separator lost data-listbox");
+    setValue(select, "-");
+    let changeEvents = 0;
+    const onChange = () => { changeEvents++; };
+    select.addEventListener("change", onChange);
+    try {
+      const btn = btnOf(select);
+      btn.click();
+      const target = itemsOf(select).find((li) => li.dataset.value === "_");
+      assert(target, "underscore option missing from the enhanced list");
+      target.click();
+      assert(select.value === "_", "select.value=" + select.value);
+      assert(changeEvents === 1, "change event count=" + changeEvents);
+      assert(popOf(select).hidden, "listbox did not close after the click");
+    } finally {
+      select.removeEventListener("change", onChange);
+    }
+    setValue(select, "-");
   });
 
   for (const [name, fn] of queue) {

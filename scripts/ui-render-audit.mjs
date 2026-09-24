@@ -899,6 +899,17 @@ function evaluateCheck(check, raw, theme) {
     if (hostZero) out.push(verdict("borderTopWidthPx", false, null, value, zeroNote));
     else out.push(verdict("borderTopWidthPx", Math.abs(raw.borderTopWidth - value) <= tolerancePx, round2(raw.borderTopWidth), value));
   }
+  // paddingLeftPx (Task 3, ui-system-stage3a-design §3): the stage-0 indent
+  // mechanism -- .pref-row-sub/.entry-block-sub read a fixed --opt-sp-7 (24px)
+  // left padding, never a density token (options.css keeps the SAME indent
+  // in both tiers), so this always resolves through resolvePxSpec's flat
+  // `value` path, same as borderTopWidthPx above. Reads raw.paddingLeft,
+  // already captured unconditionally by probeSelector for every check.
+  if ("paddingLeftPx" in exp) {
+    const { value, tolerancePx } = resolvePxSpec(exp.paddingLeftPx, 0.5);
+    if (hostZero) out.push(verdict("paddingLeftPx", false, null, value, zeroNote));
+    else out.push(verdict("paddingLeftPx", Math.abs(raw.paddingLeft - value) <= tolerancePx, round2(raw.paddingLeft), value));
+  }
   // borderRadiusPx (fixwave stage2, R4 `.listbox-pop` OPEN row): a chromed
   // popover's corner radius must track the surface's OWN `--{ns}-radius-*`
   // rung live, not a literal px -- the 13 presets don't share one radius

@@ -1395,6 +1395,19 @@ html.motion-ready .backup-import-result:not([hidden]) {
 [data-ui-stage0] .entry-block-sub { padding-left: var(--opt-sp-7); }
 [data-ui-stage0] .pref-group-radio .pref-row + .pref-row { border-top: 0; }
 [data-ui-stage0] .pref-group-radio .pref-row > label { min-height: calc(var(--opt-control-h) + var(--opt-sp-4)); padding: var(--opt-sp-2) 0; gap: var(--opt-sp-4); }
+/* Stage-3a (Task 3, ui-system-stage3a-design §3, Controller ruling 2): a
+   radio row can also live inside a MIXED `.pref-group` that is not itself
+   `.pref-group-radio` -- the AI Content Source group (#panel-ai-behavior)
+   mixes two radios with a switch under one shared help-host role, so it
+   never qualifies for the dedicated all-radio primitive above. Without this
+   rule such a radio's dot -> copy gap fell back to the base `.pref-row >
+   label` gap (--opt-sp-5, 12px, rule ~1380) instead of the 8px
+   (--opt-sp-4) a radio's dot is calibrated against everywhere else on the
+   page (.pref-group-radio rows above, and every pre-stage-0 `.choice-row`
+   radio). `label:not(.switch)` scopes this to the radio labels only -- the
+   group's one switch row (#opt-ai-use-transcript) keeps the standard 12px
+   .pref-row gap like every other switch choice host. */
+[data-ui-stage0] .pref-group:not(.pref-group-radio) > .pref-row > label:not(.switch) { gap: var(--opt-sp-4); }
 [data-ui-stage0] .entry-block, [data-ui-stage0] .edit-area { margin-bottom: var(--opt-sp-6); }
 /* R9 (2026-09-23): a preference row that directly follows its section title
    drops its top padding and one pad of min-height, so title -> first copy is
@@ -1608,6 +1621,34 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    the shorthand's other three sides (top/right/bottom padding) are left to
    the base rule. */
 [data-ui-stage0] .pref-row-sub.context-help-host[data-help-role="choice"] > label.switch { padding-left: var(--opt-sp-7); }
+/* Stage-3a (Task 3, 2026-09-24-ui-system-stage3a, Controller ruling 3d): the
+   "shorthand's other three sides ... left to the base rule" gap the comment
+   directly above this rule documents. The legacy `padding: var(--opt-sp-1) 0`
+   shorthand (~line 555, specificity (0,3,1)) also wins padding-top/-bottom
+   over the row model's own `[data-ui-stage0] .pref-row > label { padding:
+   var(--opt-row-pad-y) 0 }` (~line 1380, only (0,2,1)) for EVERY choice-role
+   switch host inside a stage-0 pref-row, not just the indented one above --
+   #opt-ai-use-transcript (AI Behavior), #opt-md-video-use-login (Reader),
+   #opt-wayback-enabled and #opt-wayback-batch (Archive) all match
+   `.pref-row.context-help-host[data-help-role="choice"] > label.switch`
+   regardless of `.pref-row-sub`. CLOSED, this is invisible: min-height
+   (--opt-row-min-h, which DOES win its own (0,3,1) tie via source order)
+   already forces the row to 44/36px well past the wrong 2px-padded content's
+   24px, so every closed row measured fine. OPEN, the flex-wrap second line
+   (the answer) makes content the actual driver instead of min-height, and
+   the wrong 2px padding shows up as a genuinely shorter row than a plain
+   sibling `.pref-row` -- measured on #opt-wayback-batch open (Playwright,
+   comfortable tier): 24px (2+2 padding + 20px line) instead of the 44px a
+   sibling plain row renders at (2*var(--opt-row-pad-y) + the same 20px line
+   = 44, by the row model's own design -- --opt-row-min-h IS exactly that
+   sum). Re-declares the two longhands the choice-role switch shape needs
+   back, at (0,5,1) -- the SAME specificity as the `padding-left` rule
+   directly above this one (both add `.context-help-host[data-help-role=
+   "choice"]` on top of the row-shape class), comfortably ahead of the
+   (0,3,1) legacy shorthand it must outrank. */
+[data-ui-stage0] .pref-row.context-help-host[data-help-role="choice"] > label.switch {
+  padding-top: var(--opt-row-pad-y); padding-bottom: var(--opt-row-pad-y);
+}
 /* Task 4 (ui-system-stage2, Controller ruling A): the AI panel's text/
    password fields (#opt-<provider>-key/-model, #opt-<provider>-baseurl)
    were still rendering the legacy ~26px unstyled fill -- stage 0 only ever

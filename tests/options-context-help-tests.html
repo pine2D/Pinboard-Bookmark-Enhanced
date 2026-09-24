@@ -346,6 +346,93 @@ function test(name, fn) {
     assert(!failures.length, failures.slice(0, 12).join("; "));
   });
 
+  // Stage-3a (Task 3, ui-system-stage3a-design §3, Controller ruling 3a): a
+  // radio choice host's <details> is the label's SIBLING (spec §2: "radio：
+  // details 是 label 的兄弟"), a DIFFERENT DOM shape from the switch case the
+  // sweep just above already covers (details sits INSIDE label.switch there).
+  // #opt-ai-use-transcript (the group's one switch row) is already exercised
+  // by that generic `label.switch > details.context-help` sweep -- it needs
+  // no separate assertion here. #opt-ai-src-local is the first radio choice
+  // host on the page (#panel-ai-behavior's mixed "AI Content Source" group),
+  // so this is new coverage, not a duplicate of the switch test above.
+  test("help beside a radio choice row opens without changing the selected radio", () => {
+    const { details, host, toggle, body } = parts("aiContentSourceLocalHint");
+    const input = doc.getElementById("opt-ai-src-local");
+    const other = doc.getElementById("opt-ai-src-jina");
+    assert(input && other, "AI content-source radio fixture incomplete");
+    assert(host?.classList.contains("pref-row"), "opt-ai-src-local help host left the pref-row model");
+    const initial = input.checked;
+    details.open = false;
+    toggle.click();
+    assert(input.checked === initial, "toggle click changed the radio");
+    assert(details.open, "toggle click did not open the help");
+    body.click();
+    assert(input.checked === initial, "answer click changed the radio");
+    details.open = false;
+    // Positive control: a click on the OTHER radio's own label DOES move the
+    // selection, so a probe that could never see a change cannot pass.
+    other.click();
+    assert(other.checked && !input.checked, "sibling radio click did not select it (probe is blind)");
+    input.click();
+    assert(input.checked && !other.checked, "restoring the original radio selection failed");
+  });
+
+  // Stage-3a (Task 3, ui-system-stage3a-design §3, Controller ruling 3b):
+  // options.css ~1582 (`[data-ui-stage0] .pref-row.context-help-host
+  // [data-help-role="choice"] > label.switch > .switch-text { line-height:
+  // var(--opt-lh-body) }`) overrides the legacy `.context-help-host
+  // [data-help-role="choice"] > label.switch > .switch-text { line-height:
+  // 16px }` (~line 564) for a choice help host that lives inside a stage-0
+  // pref-row -- matching every sibling `.pref-row .switch-text` instead of
+  // the flat 20px .choice-row line box that rule was written for. Assert the
+  // resolved value directly, in both density tiers (--opt-lh-body is 20
+  // comfortable / 18 compact, options.css ~59/198).
+  test("pref-row choice host's switch-text keeps the row line-height in both density tiers", () => {
+    const { anchor } = parts("optAiUseTranscriptHint");
+    const copy = anchor?.querySelector(":scope > .switch-text");
+    assert(copy, "opt-ai-use-transcript lost its .switch-text");
+    const win = frame.contentWindow;
+    const readLh = () => parseFloat(win.getComputedStyle(copy).lineHeight);
+    const readVar = () => parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue("--opt-lh-body"));
+    const comfortable = readLh();
+    const comfortableVar = readVar();
+    assert(Math.abs(comfortable - comfortableVar) < 0.5, "comfortable line-height=" + comfortable + ", expected --opt-lh-body=" + comfortableVar);
+    doc.documentElement.dataset.density = "compact";
+    const compact = readLh();
+    const compactVar = readVar();
+    assert(Math.abs(compact - compactVar) < 0.5, "compact line-height=" + compact + ", expected --opt-lh-body=" + compactVar);
+    assert(compact < comfortable, "compact line-height did not shrink from the comfortable tier");
+    delete doc.documentElement.dataset.density;
+  });
+
+  // Stage-3a (Task 3, ui-system-stage3a-design §3, Controller ruling 3d): the
+  // unscoped `.context-help-host[data-help-role="choice"] > label.switch`
+  // rule (~line 555) sets a `padding: var(--opt-sp-1) 0` SHORTHAND at
+  // specificity (0,3,1) for every choice-role switch label on the page --
+  // including one that also lives inside a stage-0 `.pref-row` (this task's
+  // #opt-wayback-batch, Archive tab), where the row model wants
+  // `padding: var(--opt-row-pad-y) 0` instead (12px comfortable / 8px
+  // compact, `[data-ui-stage0] .pref-row > label`, ~line 1380 -- only
+  // (0,2,1), so it LOSES the padding-top/bottom tug-of-war to the legacy
+  // rule regardless of source order). anchorRowRect (this file's own helper,
+  // used by the "expanded help opens below..." test above) isolates the
+  // label's OWN first line from the open answer's second flex line, so this
+  // compares that first-line box height, open, against a plain sibling
+  // `.pref-row` label that carries no help at all (#opt-wayback-skip-private,
+  // the very next row) -- the row-model invariant every plain row already
+  // proves elsewhere ("coherent choice groups use the compact stack rhythm").
+  test("opening the archive batch choice host's help does not shrink its row below a plain sibling row", () => {
+    const { details, anchor } = parts("optWaybackBatchHint");
+    const sibling = doc.getElementById("opt-wayback-skip-private")?.closest("label.switch");
+    assert(sibling, "wayback fixture lost its plain sibling row");
+    const siblingHeight = sibling.getBoundingClientRect().height;
+    details.open = true;
+    const openHeight = anchorRowRect(anchor).height;
+    assert(Math.abs(openHeight - siblingHeight) <= 1,
+      "open row height=" + openHeight + ", plain sibling row height=" + siblingHeight);
+    details.open = false;
+  });
+
   test("expanded help opens below and from the start of its owning row", () => {
     layoutCases.forEach(([key, type]) => {
       const { details, host, anchor, toggle, body } = parts(key);

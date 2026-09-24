@@ -237,6 +237,16 @@
 //                      border-top inside a non-radio .pref-group, never a
 //                      density token, so this key never takes the
 //                      { comfortable, compact } shape.
+//   paddingLeftPx  -- { value, tolerancePx=0.5 } OR { comfortable, compact,
+//                      tolerancePx=0.5 } (same two shapes as heightPx above,
+//                      Task 3, ui-system-stage3a-design §3): |computed
+//                      padding-left (px) - value| <= tolerancePx. Added for
+//                      the stage-0 indent mechanism -- `.pref-row-sub`'s
+//                      `> label` and `.entry-block-sub` both read the SAME
+//                      fixed --opt-sp-7 (24px) in both density tiers (unlike
+//                      heightPx's control-height rows, the indent is not a
+//                      density token), so every consumer of this key so far
+//                      uses the flat `value` shape.
 //   widthPx        -- { min?, max?, tolerancePx=0.5 }: getBoundingClientRect()
 //                      .width against either or both bounds -- `max` is a
 //                      CEILING, not heightPx's target value (`max-width`
@@ -1615,24 +1625,47 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: ".listbox-opt", state: "open",
     open: { click: "#opt-ai-provider-btn" },
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
-  // input[type=number] 96 (a handful of digits). #opt-ai-cache-duration
-  // lives on the AI Behavior tab; scripts/ui-render-audit.mjs's
-  // aiBehaviorChecks group clicks that tab once for this row. (The OTHER
-  // number field, #opt-popup-width-custom on the Popup tab, is the one this
-  // batch deleted an inline `style="width:80px"` from -- both get the
-  // identical `.fg input[type="number"]` rule, max-width 96.)
+  // input[type=number] 96 (a handful of digits). #opt-ai-cache-duration lives
+  // on the AI Behavior tab; scripts/ui-render-audit.mjs's aiBehaviorChecks
+  // group clicks that tab once for this row. #opt-popup-width-custom (Popup
+  // tab) is the one this batch deleted an inline `style="width:80px"` from --
+  // both get the identical `.fg input[type="number"]` rule, max-width 96.
+  // Re-pinned (Task 3, ui-system-stage3a-design §3, Controller ruling 1):
+  // #panel-ai-behavior joined [data-ui-stage0] in this task's Task 1, so
+  // #opt-ai-cache-duration now ALSO renders through the same
+  // `[data-ui-stage0] .fg input[type=number]` height rule #opt-popup-width-
+  // custom already proved below -- height tracks --opt-control-h (32
+  // comfortable / 28 compact) instead of the fixed rung every non-stage-0
+  // `.fg input[type=number]` renders at. Both rows now share the identical
+  // expect shape; kept as two entries (one per tab, not folded into one)
+  // since each still needs its own tab click to exist at all.
   { surface: "options", page: "options.html", selector: "#opt-ai-cache-duration", state: "default",
-    expect: { widthPx: { max: 96 } } },
-  // #opt-popup-width-custom (Task 3, ui-system-stage0-design §4): now its own
-  // entry, not folded into the generic number-field row above -- it lives
+    expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { max: 96 } } },
+  // #opt-popup-width-custom (Task 3, ui-system-stage0-design §4): lives
   // inside [data-ui-stage0] (Task 2's Popup-tab row model), inline in the
-  // custom radio's own label, and its height tracks --opt-control-h (32
-  // comfortable / 28 compact under html[data-density="compact"]) rather than
-  // the fixed rung every OTHER `.fg input[type=number]` renders at. max-width
-  // 96 is a literal (options.css's stage-0 header comment lists it as one of
-  // the three named exceptions), so it stays a flat widthPx bound.
+  // custom radio's own label. max-width 96 is a literal (options.css's
+  // stage-0 header comment lists it as one of the three named exceptions),
+  // so it stays a flat widthPx bound.
   { surface: "options", page: "options.html", selector: "#opt-popup-width-custom", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { max: 96 } } },
+  // Stage-3a (Task 3, ui-system-stage3a-design §3, Controller ruling 1): the
+  // subordinate-indent census points -- one per DOM shape the spec's §2
+  // "从属录入块"/"choice 帮助宿主进偏好行" rules introduced. Both read the SAME
+  // fixed --opt-sp-7 (24px), never a density token (options.css keeps one
+  // indent value in both tiers), unlike every heightPx row above.
+  // `.entry-block-sub` shape: the block itself carries the padding (Reader's
+  // "Model override (optional)" field, a plain entry-block-sub with no
+  // context-help of its own -- picking a help-free instance isolates the
+  // indent from the separate choice/field help-host padding-left overrides
+  // a few lines below this file's [data-ui-stage0] CSS block).
+  { surface: "options", page: "options.html", selector: "[data-ui-stage0] .fg:has(#opt-preview-ai-model)", state: "default",
+    expect: { paddingLeftPx: { value: 24 } } },
+  // `.pref-row-sub > label` shape: the indent lives on the label, not the row
+  // div (unlike entry-block-sub above) -- #opt-urlclean-aggressive is Shape
+  // E1 below (Bookmarks tab, no help host), so this reuses that same census
+  // point rather than adding a new id just for this assertion.
+  { surface: "options", page: "options.html", selector: "[data-ui-stage0] .pref-row-sub > label:has(#opt-urlclean-aggressive)", state: "default",
+    expect: { paddingLeftPx: { value: 24 } } },
 
   // ---- `.switch` primitive (taste-uplift batch4 T1, COMPONENTS.md §6.1 /
   // §6.4 exception). Reference instance: #opt-tag-sort-by-pop on the Tags
@@ -1700,8 +1733,14 @@ export const CHECKS = [
     expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#opt-urlclean-aggressive", state: "default",
     expect: { hitRectMin: { height: 24 } } },
-  // Shape E2: a `.fg-stack` sub-row inside a group help host (Quick
-  // Actions tab, batch "Auto-generate AI tags for each tab").
+  // Shape E2 (re-pinned, Task 3, ui-system-stage3a-design §3, controller
+  // ruling 1 "keep the track rows"): #batch-ai-tags was "a `.fg-stack`
+  // sub-row inside a group help host" before Task 1 rebuilt the Quick tab
+  // onto the stage-0 row model -- it now sits in a plain `.pref-row >
+  // label.switch` (no help host, no indent, the FIRST row of its
+  // `.pref-group`), same reasoning as Shape A/E1 above: the container shape
+  // changed, the track/hit-rect geometry this row censuses did not, so the
+  // assertion values are untouched and only this comment is corrected.
   { surface: "options", page: "options.html", selector: "#batch-ai-tags ~ .switch-track", state: "default",
     seedChecked: { input: "#batch-ai-tags", checked: false },
     expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
