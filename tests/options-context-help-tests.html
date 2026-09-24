@@ -481,6 +481,24 @@ function test(name, fn) {
       ["opt-sync-enabled", "opt-sync-api-keys"],
       ["opt-backup-include-highlights", "opt-backup-include-vocabulary", "opt-backup-include-secrets"],
       ["notify-quick-save", "notify-read-later", "notify-tab-set", "notify-batch-save", "notify-errors"],
+      ["opt-md-video-dark", "opt-md-video-pause-lookup", "opt-md-video-use-login"],
+      ["opt-md-frontmatter", "opt-md-extended-meta"],
+      ["opt-md-include-toc", "opt-md-include-hl"],
+      ["opt-wayback-enabled", "opt-wayback-batch", "opt-wayback-skip-private"],
+    ];
+    // Popup panel groups (2026-09-23-ui-system-stage0 Task 2) and the
+    // bookmarks/quick/ai-behavior groups (2026-09-24-ui-system-stage3a Task
+    // 1): migrated to the stage-0 row model, [data-ui-stage0] .pref-row
+    // inside .pref-group. That density is deliberately NOT the legacy
+    // compact-stack rhythm (the row model's whole point is a different,
+    // token-driven geometry), so these groups get their own containment
+    // check below instead of joining `groups` -- folding them back in would
+    // make the shared height/step uniformity assertion compare two
+    // intentionally different rhythms and fail on the gap between them, not
+    // on a real defect.
+    const stage0Groups = [
+      ["opt-check-bookmark-status", "opt-auto-close", "offline-queue-enabled"],
+      ["opt-show-search", "opt-show-recent", "opt-show-badge", "opt-show-suggest-tags", "opt-show-ai-summary", "opt-show-ai-tags", "opt-show-quick-links", "opt-show-quick-row"],
       ["opt-private-default", "opt-private-incognito", "opt-readlater-default"],
       ["opt-auto-description", "opt-blockquote", "opt-include-referrer"],
       ["qs-auto-notes", "qs-blockquote"],
@@ -488,22 +506,6 @@ function test(name, fn) {
       ["rl-auto-notes", "rl-blockquote"],
       ["rl-ai-tags", "rl-ai-summary"],
       ["opt-ai-src-local", "opt-ai-src-jina", "opt-ai-use-transcript"],
-      ["opt-md-video-dark", "opt-md-video-pause-lookup", "opt-md-video-use-login"],
-      ["opt-md-frontmatter", "opt-md-extended-meta"],
-      ["opt-md-include-toc", "opt-md-include-hl"],
-      ["opt-wayback-enabled", "opt-wayback-batch", "opt-wayback-skip-private"],
-    ];
-    // Popup panel groups (2026-09-23-ui-system-stage0 Task 2): migrated to
-    // the stage-0 row model, [data-ui-stage0] .pref-row inside .pref-group.
-    // That density is deliberately NOT the legacy compact-stack rhythm (the
-    // row model's whole point is a different, token-driven geometry), so
-    // these two groups get their own containment check below instead of
-    // joining `groups` -- folding them back in would make the shared
-    // height/step uniformity assertion compare two intentionally different
-    // rhythms and fail on the gap between them, not on a real defect.
-    const stage0Groups = [
-      ["opt-check-bookmark-status", "opt-auto-close", "offline-queue-enabled"],
-      ["opt-show-search", "opt-show-recent", "opt-show-badge", "opt-show-suggest-tags", "opt-show-ai-summary", "opt-show-ai-tags", "opt-show-quick-links", "opt-show-quick-row"],
     ];
     groups.forEach((ids) => {
       const rows = ids.map((id) => doc.getElementById(id)?.closest(".choice-row"));

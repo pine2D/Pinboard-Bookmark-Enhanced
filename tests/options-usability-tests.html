@@ -974,6 +974,70 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       "expected 15 .pf[id^=fields-] panels and #opt-ai-provider to survive the rewrite");
   });
 
+  // Stage-3a row model (2026-09-24-ui-system-stage3a Task 1): bookmarks,
+  // quick-save and AI-behaviour panels move onto the same [data-ui-stage0]
+  // row model. Same fetch+DOMParser pattern as stage0PopupPanel/stage2AiPanel
+  // above -- structural checks only, no live layout needed.
+  async function stage3aPanel(id) {
+    const html = await (await fetch("../options.html")).text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    return doc.querySelector(`#panel-${id}[data-ui-stage0]`);
+  }
+
+  // Re-counted against the live DOM (not just the survey): bookmarks has 6
+  // switches in the two choice-stacks + 1 bare `.fg > label.switch`
+  // (opt-respect-tag-case) = 7; quick has 4 choice-stacks of 2 + 2 bare `.fg`
+  // switches (opt-batch-tag-enabled, batch-skip-existing) + 2 more inside the
+  // batch-AI group host = 12; ai-behavior has 1 switch inside its mixed
+  // choice-stack (opt-ai-use-transcript) + 1 bare `.fg` switch
+  // (opt-ai-auto-tags) = 2.
+  const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 12], ["ai-behavior", 2]];
+
+  for (const [id, switchCount] of STAGE3A_PANELS) {
+    await test(`stage3a: ${id} panel carries the marker and no legacy row classes`, async () => {
+      const panel = await stage3aPanel(id);
+      assert(!!panel, `panel-${id} is missing the data-ui-stage0 marker`);
+      assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
+        `panel-${id} still carries a legacy row/stack class`);
+    });
+
+    await test(`stage3a: every switch in the ${id} panel sits in a .pref-row`, async () => {
+      const panel = await stage3aPanel(id);
+      assert(!!panel, `panel-${id} is missing the data-ui-stage0 marker`);
+      const switches = [...panel.querySelectorAll("label.switch")];
+      assert(switches.length === switchCount,
+        `expected ${switchCount} switches in panel-${id}, got ${switches.length}`);
+      assert(switches.every((l) => l.closest(".pref-row")),
+        `every switch in panel-${id} must sit inside a .pref-row`);
+    });
+
+    await test(`stage3a: every .hint in the ${id} panel still resolves a .fg or .pref-row owner`, async () => {
+      const panel = await stage3aPanel(id);
+      assert(!!panel, `panel-${id} is missing the data-ui-stage0 marker`);
+      const hints = [...panel.querySelectorAll(".hint:not(.context-help-body)")];
+      assert(hints.every((h) => h.closest(".fg, .pref-row")),
+        `every .hint in panel-${id} must resolve a .fg or .pref-row owner`);
+    });
+  }
+
+  await test("stage3a: bookmarks radio groups sit inside .pref-group-radio", async () => {
+    const panel = await stage3aPanel("bookmarks");
+    assert(!!panel, "panel-bookmarks is missing the data-ui-stage0 marker");
+    const radios = [...panel.querySelectorAll('input[type="radio"]')];
+    assert(radios.length === 6, "expected 6 radios in panel-bookmarks, got " + radios.length);
+    assert(radios.every((r) => r.closest(".pref-group-radio > .pref-row")),
+      "every bookmarks radio must sit in a .pref-row inside a .pref-group-radio");
+  });
+
+  await test("stage3a: ai-behavior selects are listbox targets", async () => {
+    const panel = await stage3aPanel("ai-behavior");
+    assert(!!panel, "panel-ai-behavior is missing the data-ui-stage0 marker");
+    ["opt-ai-tag-lang", "opt-ai-summary-lang", "opt-ai-tag-separator"].forEach((id) => {
+      const select = panel.querySelector(`#${id}`);
+      assert(select && select.hasAttribute("data-listbox"), id + " is missing data-listbox");
+    });
+  });
+
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";
 })();
 </script></body></html>

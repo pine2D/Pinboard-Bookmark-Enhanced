@@ -135,10 +135,18 @@ function pbpTestChromeStub(enMessages) {
   };
   const close = (select) => { if (btnOf(select)?.getAttribute("aria-expanded") === "true") key(btnOf(select), "Escape"); };
 
-  test("enhances the two data-listbox selects and hides the natives", () => {
+  test("enhances every data-listbox select and hides the natives", () => {
+    // Stage-3a (Task 1) widened the panel of data-listbox selects from two to
+    // five (opt-ai-tag-lang, opt-ai-summary-lang, opt-ai-tag-separator joined
+    // opt-ai-provider/translate-target-lang) -- count select[data-listbox]
+    // generically instead of pinning the old total, so a future panel adding
+    // more listbox selects does not have to touch this assertion again.
+    const targets = [...doc.querySelectorAll("select[data-listbox]")];
+    assert(targets.length >= 5, "expected at least 5 data-listbox selects, got " + targets.length);
     const wrappers = doc.querySelectorAll(".listbox");
-    assert(wrappers.length === 2, "expected exactly two .listbox wrappers, got " + wrappers.length);
-    for (const select of [provider(), lang()]) {
+    assert(wrappers.length === targets.length,
+      "expected " + targets.length + " .listbox wrappers (one per data-listbox select), got " + wrappers.length);
+    for (const select of targets) {
       assert(select && select.hasAttribute("data-listbox"), (select?.id || "?") + " lost data-listbox");
       assert(select.hidden === true, select.id + " native select is not hidden");
       assert(select.isConnected, select.id + " native select was removed");
@@ -354,7 +362,12 @@ function pbpTestChromeStub(enMessages) {
     assert(btnOf(provider()).querySelector(".listbox-value").textContent === "Kimi", "button text=" + btnOf(provider()).textContent);
     assert(itemsOf(provider()).length === count, "repeated sync changed the option count");
     assert(doc.querySelectorAll("#opt-ai-provider-btn").length === 1, "repeated sync duplicated the button");
-    assert(win.pbpEnhanceListbox(provider()) && doc.querySelectorAll(".listbox").length === 2, "re-enhance created a second wrapper");
+    // Total .listbox count follows the live select[data-listbox] count (stage-3a
+    // widened this from 2 to 5) -- re-enhancing an already-enhanced select must
+    // not add to it.
+    const totalListboxes = doc.querySelectorAll("select[data-listbox]").length;
+    assert(win.pbpEnhanceListbox(provider()) && doc.querySelectorAll(".listbox").length === totalListboxes,
+      "re-enhance created a second wrapper");
     const bare = doc.createElement("select");
     win.pbpListboxSync(bare); // no-op, must not throw
     setValue(provider(), "gemini");

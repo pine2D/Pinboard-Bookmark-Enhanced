@@ -293,111 +293,133 @@
     </div>
 
     <!-- Tab 3: Bookmarks -->
-    <div id="panel-bookmarks" class="panel" role="tabpanel" aria-labelledby="tab-bookmarks">
-      <h2 class="section-title" id="sec-save-defaults" data-i18n="secSaveDefaults">Save Defaults</h2>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-save-defaults">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-private-default" /> <span class="switch-text" data-i18n="optPrivateDefault">Private by default</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-private-incognito" checked /> <span class="switch-text" data-i18n="optPrivateIncognito">Private in Incognito</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-readlater-default" /> <span class="switch-text" data-i18n="optReadlaterDefault">Read Later by default</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-      <div class="fg fg-stack" role="group" aria-labelledby="bgsave-mode-label">
-        <label class="bl" id="bgsave-mode-label" data-i18n="optBgSaveMode">Background save mode</label>
-        <div><label><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" /> <span data-i18n="optBgSaveModeMerge">Merge (default, combines new tags with existing)</span></label></div>
-        <div><label><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" /> <span data-i18n="optBgSaveModeSkip">Skip (if URL already saved, do nothing)</span></label></div>
-        <div><label><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" /> <span data-i18n="optBgSaveModeOverwrite">Overwrite (replace all tags, no merge)</span></label></div>
-      </div>
-      <div class="divider"></div>
-      <h2 class="section-title" id="sec-notes-behavior" data-i18n="secNotesBehavior">Notes Behavior</h2>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-notes-behavior">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-auto-description" checked /> <span class="switch-text" data-i18n="optAutoDescription">Auto-fill meta description into notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-blockquote" checked /> <span class="switch-text" data-i18n="optBlockquote">Wrap selected text with &lt;blockquote&gt;</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-include-referrer" /> <span class="switch-text" data-i18n="optIncludeReferrer">Include referrer in Notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="secTags">Tags</h2>
-      <div class="fg"><label class="switch"><input type="checkbox" id="opt-respect-tag-case" checked /> <span class="switch-text" data-i18n="optRespectTagCase">Respect existing tag case (match most-used casing)</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      <div class="fg fg-stack context-help-host" data-help-role="field" role="group" aria-labelledby="tag-sync-label">
-        <label class="bl" id="tag-sync-label" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="tagSyncHint">Controls how your existing Pinboard tag cloud is pulled into the popup for autocomplete. Tags are read-only; nothing is uploaded back to Pinboard.</p>
-        </details>
-        <div><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked /> <span data-i18n="tagSyncCached">Cached (default, refreshes after 10 min)</span></label></div>
-        <div><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" /> <span data-i18n="tagSyncFresh">Live (fetches on every popup, slower)</span></label></div>
-        <div><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" /> <span data-i18n="tagSyncPrewarmed">Prewarmed (background fetch every 15 min, instant popup)</span></label></div>
-      </div>
-      <div class="fg context-help-host" data-help-role="field">
-        <label class="bl" for="opt-tag-presets" data-i18n="labelTagPresets">Tag Presets</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="tagPresetsHint">Format: <code>Name: tag1, tag2, tag3</code>. Each preset appears as a quick-add button in the popup.</p>
-        </details>
-        <textarea id="opt-tag-presets" rows="4" placeholder="One preset per line:&#10;Work: project, review, report&#10;Dev: programming, tutorial, tool" data-i18n-placeholder="tagPresetsPlaceholder"></textarea>
-      </div>
+    <div id="panel-bookmarks" class="panel" role="tabpanel" aria-labelledby="tab-bookmarks" data-ui-stage0>
+      <section class="settings-section">
+        <h2 class="section-title" id="sec-save-defaults" data-i18n="secSaveDefaults">Save Defaults</h2>
+        <div class="pref-group" role="group" aria-labelledby="sec-save-defaults">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-private-default" /> <span class="switch-text" data-i18n="optPrivateDefault">Private by default</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-private-incognito" checked /> <span class="switch-text" data-i18n="optPrivateIncognito">Private in Incognito</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-readlater-default" /> <span class="switch-text" data-i18n="optReadlaterDefault">Read Later by default</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg entry-block" role="group" aria-labelledby="bgsave-mode-label">
+          <label class="bl" id="bgsave-mode-label" data-i18n="optBgSaveMode">Background save mode</label>
+          <div class="pref-group pref-group-radio">
+            <div class="pref-row"><label><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" /> <span data-i18n="optBgSaveModeMerge">Merge (default, combines new tags with existing)</span></label></div>
+            <div class="pref-row"><label><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" /> <span data-i18n="optBgSaveModeSkip">Skip (if URL already saved, do nothing)</span></label></div>
+            <div class="pref-row"><label><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" /> <span data-i18n="optBgSaveModeOverwrite">Overwrite (replace all tags, no merge)</span></label></div>
+          </div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" id="sec-notes-behavior" data-i18n="secNotesBehavior">Notes Behavior</h2>
+        <div class="pref-group" role="group" aria-labelledby="sec-notes-behavior">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-auto-description" checked /> <span class="switch-text" data-i18n="optAutoDescription">Auto-fill meta description into notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-blockquote" checked /> <span class="switch-text" data-i18n="optBlockquote">Wrap selected text with &lt;blockquote&gt;</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-include-referrer" /> <span class="switch-text" data-i18n="optIncludeReferrer">Include referrer in Notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secTags">Tags</h2>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-respect-tag-case" checked /> <span class="switch-text" data-i18n="optRespectTagCase">Respect existing tag case (match most-used casing)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="field" role="group" aria-labelledby="tag-sync-label">
+          <label class="bl" id="tag-sync-label" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="tagSyncHint">Controls how your existing Pinboard tag cloud is pulled into the popup for autocomplete. Tags are read-only; nothing is uploaded back to Pinboard.</p>
+          </details>
+          <div class="pref-group pref-group-radio">
+            <div class="pref-row"><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked /> <span data-i18n="tagSyncCached">Cached (default, refreshes after 10 min)</span></label></div>
+            <div class="pref-row"><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" /> <span data-i18n="tagSyncFresh">Live (fetches on every popup, slower)</span></label></div>
+            <div class="pref-row"><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" /> <span data-i18n="tagSyncPrewarmed">Prewarmed (background fetch every 15 min, instant popup)</span></label></div>
+          </div>
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="opt-tag-presets" data-i18n="labelTagPresets">Tag Presets</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="tagPresetsHint">Format: <code>Name: tag1, tag2, tag3</code>. Each preset appears as a quick-add button in the popup.</p>
+          </details>
+          <textarea id="opt-tag-presets" rows="4" placeholder="One preset per line:&#10;Work: project, review, report&#10;Dev: programming, tutorial, tool" data-i18n-placeholder="tagPresetsPlaceholder"></textarea>
+        </div>
+      </section>
     </div>
 
     <!-- Tab 4: Quick Actions -->
-    <div id="panel-quick" class="panel" role="tabpanel" aria-labelledby="tab-quick">
-      <h2 class="section-title" data-i18n="secQuickSave">Quick Save</h2>
-      <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="quick_save"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
-      <div class="fg fg-stack choice-stack">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="qs-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Auto-add page description to notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="qs-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-      <div class="fg">
-        <label class="bl" for="qs-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
-        <input type="text" id="qs-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
-      </div>
-      <div class="fg fg-stack choice-stack">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="qs-ai-tags" /> <span class="switch-text" data-i18n="qsAiTags">Auto-generate AI tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="qs-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary in notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="secReadLater">Read Later</h2>
-      <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="read_later"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
-      <div class="fg fg-stack choice-stack">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="rl-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Auto-add page description to notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="rl-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-      <div class="fg">
-        <label class="bl" for="rl-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
-        <input type="text" id="rl-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
-      </div>
-      <div class="fg fg-stack choice-stack">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="rl-ai-tags" /> <span class="switch-text" data-i18n="qsAiTags">Auto-generate AI tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="rl-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary in notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="secBatchSave">Batch Save</h2>
-      <div class="fg"><label class="switch"><input type="checkbox" id="opt-batch-tag-enabled" checked /> <span class="switch-text" data-i18n="batchAutoAddTags">Auto-add tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      <div class="fg context-help-host" data-help-role="field">
-        <label class="bl" for="opt-batch-tag" data-i18n="batchTagsLabel">Tags (comma-separated)</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="batchTagsHint">Multiple tags separated by commas. E.g. <code>batch_saved, research</code></p>
-        </details>
-        <input type="text" id="opt-batch-tag" value="batch_saved" />
-      </div>
-      <div class="fg"><label class="switch"><input type="checkbox" id="batch-skip-existing" /> <span class="switch-text" data-i18n="batchSkipExisting">Skip already bookmarked URLs</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      <div class="fg fg-stack context-help-host" data-help-role="group" role="group" aria-labelledby="batch-ai-title">
-        <div class="bl context-help-anchor" id="batch-ai-title" data-i18n="tabGroupAI">AI</div>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="batchAiHint">AI runs one call per tab and may be slow. On first use, Batch asks only for the listed tab sites and current AI provider.</p>
-        </details>
-        <div><label class="switch"><input type="checkbox" id="batch-ai-tags" /> <span class="switch-text" data-i18n="batchAiTags">Auto-generate AI tags for each tab</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div><label class="switch"><input type="checkbox" id="batch-ai-summary" /> <span class="switch-text" data-i18n="batchAiSummary">Auto-generate AI summary for each tab</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-      <div class="fg" id="batch-legacy-permission" hidden>
-        <div>
-          <span data-i18n="batchPermLabel">Legacy all-sites permission:</span>
-          <span id="batch-perm-status" class="hint" role="status" aria-live="polite"></span>
+    <div id="panel-quick" class="panel" role="tabpanel" aria-labelledby="tab-quick" data-ui-stage0>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secQuickSave">Quick Save</h2>
+        <div class="fg entry-block">
+          <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="quick_save"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
         </div>
-        <p class="hint" data-i18n="batchRevokeHint">Older versions could grant access to every site. New Batch runs request only the listed sites; this button removes the legacy broad grant.</p>
-        <div class="fg-actions"><button class="btn btn-sm" id="batch-revoke-perm" data-i18n="batchRevokeBtn">Revoke legacy all-sites access</button></div>
-      </div>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="qs-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Auto-add page description to notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="qs-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg entry-block">
+          <label class="bl" for="qs-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
+          <input type="text" id="qs-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="qs-ai-tags" /> <span class="switch-text" data-i18n="qsAiTags">Auto-generate AI tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="qs-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary in notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secReadLater">Read Later</h2>
+        <div class="fg entry-block">
+          <p class="hint"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="read_later"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
+        </div>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="rl-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Auto-add page description to notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="rl-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg entry-block">
+          <label class="bl" for="rl-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
+          <input type="text" id="rl-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="rl-ai-tags" /> <span class="switch-text" data-i18n="qsAiTags">Auto-generate AI tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="rl-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary in notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secBatchSave">Batch Save</h2>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-batch-tag-enabled" checked /> <span class="switch-text" data-i18n="batchAutoAddTags">Auto-add tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="opt-batch-tag" data-i18n="batchTagsLabel">Tags (comma-separated)</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="batchTagsHint">Multiple tags separated by commas. E.g. <code>batch_saved, research</code></p>
+          </details>
+          <input type="text" id="opt-batch-tag" value="batch_saved" />
+        </div>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="batch-skip-existing" /> <span class="switch-text" data-i18n="batchSkipExisting">Skip already bookmarked URLs</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="group" role="group" aria-labelledby="batch-ai-title">
+          <div class="bl context-help-anchor" id="batch-ai-title" data-i18n="tabGroupAI">AI</div>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="batchAiHint">AI runs one call per tab and may be slow. On first use, Batch asks only for the listed tab sites and current AI provider.</p>
+          </details>
+          <div class="pref-group">
+            <div class="pref-row"><label class="switch"><input type="checkbox" id="batch-ai-tags" /> <span class="switch-text" data-i18n="batchAiTags">Auto-generate AI tags for each tab</span><span class="switch-track" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="switch"><input type="checkbox" id="batch-ai-summary" /> <span class="switch-text" data-i18n="batchAiSummary">Auto-generate AI summary for each tab</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          </div>
+        </div>
+        <div class="fg entry-block" id="batch-legacy-permission" hidden>
+          <div>
+            <span data-i18n="batchPermLabel">Legacy all-sites permission:</span>
+            <span id="batch-perm-status" class="hint" role="status" aria-live="polite"></span>
+          </div>
+          <p class="hint" data-i18n="batchRevokeHint">Older versions could grant access to every site. New Batch runs request only the listed sites; this button removes the legacy broad grant.</p>
+          <div class="fg-actions"><button class="btn btn-sm" id="batch-revoke-perm" data-i18n="batchRevokeBtn">Revoke legacy all-sites access</button></div>
+        </div>
+      </section>
     </div>
 
     <!-- Tab 5: AI -->
@@ -620,113 +642,117 @@
     </div>
 
     <!-- Tab: AI Behavior -->
-    <div id="panel-ai-behavior" class="panel" role="tabpanel" aria-labelledby="tab-ai-behavior">
-      <h2 class="section-title" id="sec-ai-content-source" data-i18n="secAiContentSource">AI Content Source</h2>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-ai-content-source">
-      <div class="choice-row context-help-host" data-help-role="choice">
-        <label><input type="radio" name="ai-content-source" id="opt-ai-src-local" value="local" checked /> <span data-i18n="aiContentSourceLocal">Local (Defuddle)</span></label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="aiContentSourceLocalHint">Extract the main content of the page locally (offline, fast).</p>
-        </details>
-      </div>
-      <div class="choice-row context-help-host" data-help-role="choice">
-        <label><input type="radio" name="ai-content-source" id="opt-ai-src-jina" value="jina" /> <span data-i18n="aiContentSourceJina">Jina Reader</span></label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="aiContentSourceJinaHint">Fetch cleaned Markdown via Jina Reader API (requires network; API key optional for higher quota).</p>
-        </details>
-      </div>
-      <div class="choice-row context-help-host" data-help-role="choice">
-        <label class="switch"><input type="checkbox" id="opt-ai-use-transcript" aria-labelledby="opt-ai-use-transcript-label" checked /> <span class="switch-text" id="opt-ai-use-transcript-label" data-i18n="optAiUseTranscript">Use video captions as the AI content source</span>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="optAiUseTranscriptHint">On YouTube and bilibili video pages, AI tags and summaries read the subtitles instead of the page text. Active only after you have granted subtitle access; it never prompts on its own.</p>
-        </details><span class="switch-track" aria-hidden="true"></span></label>
-      </div>
-      </div>
-
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="secAiBehavior">AI Behavior</h2>
-      <div class="fg"><label class="switch"><input type="checkbox" id="opt-ai-auto-tags" /> <span class="switch-text" data-i18n="optAiAutoTags">Auto-generate AI tags on popup open</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      <div class="fg">
-        <label class="bl" for="opt-ai-tag-lang" data-i18n="labelAiTagLang">AI Tag Language</label>
-        <select id="opt-ai-tag-lang">
-          <option value="auto" data-i18n="aiLangAuto">Auto (same as content)</option>
-          <option value="en" data-i18n="langEn" selected>English</option>
-          <option value="ja" data-i18n="langJa">日本語</option>
-          <option value="ko" data-i18n="langKo">한국어</option>
-          <option value="de" data-i18n="langDe">Deutsch</option>
-          <option value="fr" data-i18n="langFr">Français</option>
-          <option value="es" data-i18n="langEs">Español</option>
-          <option value="ru" data-i18n="langRu">Русский</option>
-          <option value="zh" data-i18n="langZh">中文（简体）</option>
-          <option value="zh-TW" data-i18n="langZhTW">中文（台灣）</option>
-          <option value="zh-HK" data-i18n="langZhHK">中文（香港）</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label class="bl" for="opt-ai-summary-lang" data-i18n="labelAiSummaryLang">AI Summary Language</label>
-        <select id="opt-ai-summary-lang">
-          <option value="auto" data-i18n="aiLangAuto">Auto (same as content)</option>
-          <option value="en" data-i18n="langEn">English</option>
-          <option value="ja" data-i18n="langJa">日本語</option>
-          <option value="ko" data-i18n="langKo">한국어</option>
-          <option value="de" data-i18n="langDe">Deutsch</option>
-          <option value="fr" data-i18n="langFr">Français</option>
-          <option value="es" data-i18n="langEs">Español</option>
-          <option value="ru" data-i18n="langRu">Русский</option>
-          <option value="zh" data-i18n="langZh">中文（简体）</option>
-          <option value="zh-TW" data-i18n="langZhTW">中文（台灣）</option>
-          <option value="zh-HK" data-i18n="langZhHK">中文（香港）</option>
-        </select>
-      </div>
-      <div class="fg context-help-host" data-help-role="field">
-        <label class="bl" for="opt-ai-cache-duration" data-i18n="labelAiCache">AI Cache Duration for Tags, Summaries &amp; Page Fetches (minutes)</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="aiCacheHint">Cached per URL, shares a 200-entry LRU pool. Set 0 to disable.</p>
-        </details>
-        <input type="number" id="opt-ai-cache-duration" value="60" min="0" max="10080" step="15" />
-      </div>
-      <div class="fg">
-        <div class="row-inline">
-          <label class="bl" for="opt-ai-tag-separator" data-i18n="labelTagSeparator">Multi-word tag separator</label>
-          <select id="opt-ai-tag-separator">
-            <option value="-" data-i18n="sepHyphen">hyphen (machine-learning)</option>
-            <option value="_" data-i18n="sepUnderscore">underscore (machine_learning)</option>
+    <div id="panel-ai-behavior" class="panel" role="tabpanel" aria-labelledby="tab-ai-behavior" data-ui-stage0>
+      <section class="settings-section">
+        <h2 class="section-title" id="sec-ai-content-source" data-i18n="secAiContentSource">AI Content Source</h2>
+        <div class="pref-group" role="group" aria-labelledby="sec-ai-content-source">
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label><input type="radio" name="ai-content-source" id="opt-ai-src-local" value="local" checked /> <span data-i18n="aiContentSourceLocal">Local (Defuddle)</span></label>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="aiContentSourceLocalHint">Extract the main content of the page locally (offline, fast).</p>
+            </details>
+          </div>
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label><input type="radio" name="ai-content-source" id="opt-ai-src-jina" value="jina" /> <span data-i18n="aiContentSourceJina">Jina Reader</span></label>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="aiContentSourceJinaHint">Fetch cleaned Markdown via Jina Reader API (requires network; API key optional for higher quota).</p>
+            </details>
+          </div>
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" id="opt-ai-use-transcript" aria-labelledby="opt-ai-use-transcript-label" checked /> <span class="switch-text" id="opt-ai-use-transcript-label" data-i18n="optAiUseTranscript">Use video captions as the AI content source</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="optAiUseTranscriptHint">On YouTube and bilibili video pages, AI tags and summaries read the subtitles instead of the page text. Active only after you have granted subtitle access; it never prompts on its own.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secAiBehavior">AI Behavior</h2>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-ai-auto-tags" /> <span class="switch-text" data-i18n="optAiAutoTags">Auto-generate AI tags on popup open</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg entry-block">
+          <label class="bl" for="opt-ai-tag-lang" data-i18n="labelAiTagLang">AI Tag Language</label>
+          <select id="opt-ai-tag-lang" data-listbox>
+            <option value="auto" data-i18n="aiLangAuto">Auto (same as content)</option>
+            <option value="en" data-i18n="langEn" selected>English</option>
+            <option value="ja" data-i18n="langJa">日本語</option>
+            <option value="ko" data-i18n="langKo">한국어</option>
+            <option value="de" data-i18n="langDe">Deutsch</option>
+            <option value="fr" data-i18n="langFr">Français</option>
+            <option value="es" data-i18n="langEs">Español</option>
+            <option value="ru" data-i18n="langRu">Русский</option>
+            <option value="zh" data-i18n="langZh">中文（简体）</option>
+            <option value="zh-TW" data-i18n="langZhTW">中文（台灣）</option>
+            <option value="zh-HK" data-i18n="langZhHK">中文（香港）</option>
           </select>
         </div>
-      </div>
+        <div class="fg entry-block">
+          <label class="bl" for="opt-ai-summary-lang" data-i18n="labelAiSummaryLang">AI Summary Language</label>
+          <select id="opt-ai-summary-lang" data-listbox>
+            <option value="auto" data-i18n="aiLangAuto">Auto (same as content)</option>
+            <option value="en" data-i18n="langEn">English</option>
+            <option value="ja" data-i18n="langJa">日本語</option>
+            <option value="ko" data-i18n="langKo">한국어</option>
+            <option value="de" data-i18n="langDe">Deutsch</option>
+            <option value="fr" data-i18n="langFr">Français</option>
+            <option value="es" data-i18n="langEs">Español</option>
+            <option value="ru" data-i18n="langRu">Русский</option>
+            <option value="zh" data-i18n="langZh">中文（简体）</option>
+            <option value="zh-TW" data-i18n="langZhTW">中文（台灣）</option>
+            <option value="zh-HK" data-i18n="langZhHK">中文（香港）</option>
+          </select>
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="opt-ai-cache-duration" data-i18n="labelAiCache">AI Cache Duration for Tags, Summaries &amp; Page Fetches (minutes)</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="aiCacheHint">Cached per URL, shares a 200-entry LRU pool. Set 0 to disable.</p>
+          </details>
+          <input type="number" id="opt-ai-cache-duration" value="60" min="0" max="10080" step="15" />
+        </div>
+        <div class="fg entry-block">
+          <div class="row-inline">
+            <label class="bl" for="opt-ai-tag-separator" data-i18n="labelTagSeparator">Multi-word tag separator</label>
+            <select id="opt-ai-tag-separator" data-listbox>
+              <option value="-" data-i18n="sepHyphen">hyphen (machine-learning)</option>
+              <option value="_" data-i18n="sepUnderscore">underscore (machine_learning)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <div class="context-help-host context-help-section" data-help-role="section">
+          <h2 class="section-title" data-i18n="secPrompts">Prompts</h2>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="promptsHint">Customize the prompts sent to the AI. Use placeholders: <code>{{title}}</code> <code>{{url}}</code> <code>{{content}}</code> <code>{{description}}</code> <code>{{lang_instruction}}</code> <code>{{separator_instruction}}</code>. Leave empty to use defaults.</p>
+          </details>
+        </div>
 
-      <div class="divider"></div>
-      <div class="context-help-host context-help-section" data-help-role="section">
-        <h2 class="section-title" data-i18n="secPrompts">Prompts</h2>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="promptsHint">Customize the prompts sent to the AI. Use placeholders: <code>{{title}}</code> <code>{{url}}</code> <code>{{content}}</code> <code>{{description}}</code> <code>{{lang_instruction}}</code> <code>{{separator_instruction}}</code>. Leave empty to use defaults.</p>
-        </details>
-      </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="opt-custom-tag-prompt" data-i18n="labelTagPrompt">AI Tags Prompt</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="tagPromptHint">Leave empty to use the default prompt shown in this field. Must instruct AI to return <code>["tag1","tag2"]</code> format.</p>
+          </details>
+          <textarea id="opt-custom-tag-prompt" rows="8"></textarea>
+          <div class="fg-actions"><button class="btn btn-sm ghost" id="reset-tag-prompt" data-i18n="resetToDefault">Reset to default</button></div>
+        </div>
 
-      <div class="fg context-help-host" data-help-role="field">
-        <label class="bl" for="opt-custom-tag-prompt" data-i18n="labelTagPrompt">AI Tags Prompt</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="tagPromptHint">Leave empty to use the default prompt shown in this field. Must instruct AI to return <code>["tag1","tag2"]</code> format.</p>
-        </details>
-        <textarea id="opt-custom-tag-prompt" rows="8"></textarea>
-        <div class="fg-actions"><button class="btn btn-sm ghost" id="reset-tag-prompt" data-i18n="resetToDefault">Reset to default</button></div>
-      </div>
-
-      <div class="fg context-help-host" data-help-role="field">
-        <label class="bl" for="opt-custom-summary-prompt" data-i18n="labelSummaryPrompt">AI Summary Prompt</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="summaryPromptHint">Leave empty to use the default prompt shown in this field. Use <code>{{lang_instruction}}</code> for auto language.</p>
-        </details>
-        <textarea id="opt-custom-summary-prompt" rows="8"></textarea>
-        <div class="fg-actions"><button class="btn btn-sm ghost" id="reset-summary-prompt" data-i18n="resetToDefault">Reset to default</button></div>
-      </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="opt-custom-summary-prompt" data-i18n="labelSummaryPrompt">AI Summary Prompt</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="summaryPromptHint">Leave empty to use the default prompt shown in this field. Use <code>{{lang_instruction}}</code> for auto language.</p>
+          </details>
+          <textarea id="opt-custom-summary-prompt" rows="8"></textarea>
+          <div class="fg-actions"><button class="btn btn-sm ghost" id="reset-summary-prompt" data-i18n="resetToDefault">Reset to default</button></div>
+        </div>
+      </section>
     </div>
 
     <!-- Tab: Reader -->

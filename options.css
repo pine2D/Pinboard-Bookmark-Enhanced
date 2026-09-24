@@ -1504,9 +1504,86 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    tolerance on both ends -- re-measure with PBP_HELP_RASTER_RANGES=1 under
    both scripts/options-help-render-audit.mjs (local fonts) and
    FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
-   scripts/options-help-render-audit.mjs before nudging further. */
-[data-ui-stage0] .context-help-host[data-help-role="section"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 1px)); }
+   scripts/options-help-render-audit.mjs before nudging further.
+   SUPERSEDED for the section role by the 2026-09-24-ui-system-stage3a Task 1
+   recalibration directly below -- the "section (freeTierTitle only, ...)"
+   sub-bullet above is stale the moment a second section-role host joins the
+   [data-ui-stage0] bucket, which is exactly what happened. */
+/* Stage-3a (Task 1, 2026-09-24-ui-system-stage3a), controller-authorized
+   recalibration: this constant is a PROTOTYPE-scoped ([data-ui-stage0])
+   additive correction introduced by stage-2 Task 4 above, not the shared
+   --context-help-optical-y base constant -- recalibrating it is this task's
+   call, unlike the shared per-script/role constants (~line 665 onward),
+   which stay untouched. Moving #panel-ai-behavior's "Prompts" heading
+   (promptsHint's h2.section-title) inside [data-ui-stage0] promotes it from
+   the surface-wide 15px to --opt-text-section (16px) and puts it in the SAME
+   section/alphabetic/stage0 raster bucket as #panel-ai's "AI Provider"
+   (freeTierTitle) -- the "every contextual help host declares one semantic
+   typography role" test in tests/options-context-help-tests.html enforces
+   ONE shared transform per (role, script, stage0-ness) bucket, so the two
+   hosts must share whatever value this rule declares; a per-instance split
+   is not an option. The prior -1px (calibrated solely against freeTierTitle,
+   see the paragraph above) put promptsHint 0.5px past tolerance at en@2
+   (measured -2.5px, tolerance +-2). Both hosts follow the SAME per-string
+   ink-jitter pattern already documented above: "AI Provider" has no
+   descender (rounds to the positive edge), "Prompts" does (rounds to the
+   negative edge) -- named explicitly among the "titles with one" in the
+   shared-constant calibration note (~line 709). Swept every 0.125px step
+   from -1px to -0.375px (PBP_HELP_RASTER_RANGES=1-style per-host dump, not
+   committed) and hit a hard raster-ink quantization boundary between
+   -0.6px and -0.625px where NO continuous middle ground exists: below it
+   freeTierTitle=+2 / promptsHint=-1.5 (physical px, en@2, both font
+   configs); at/above it freeTierTitle=+1.5 / promptsHint=-2 -- i.e. every
+   candidate value ties at max|delta|=2, one host or the other exactly at the
+   +-2 edge with zero margin. Chose -0.5px (the -2..2 side, not -1.5..2)
+   because the shared-constant calibration note directly above this block
+   already documents an ASYMMETRIC real-CI risk for this exact descender
+   class: "CI measured -2.5px on both [promptsHint and storageIntro] ... real
+   CI's FreeType/hinting isn't bit-identical to this emulation, so the
+   constant needs slack on the low edge" -- so the 0.5px of margin goes on
+   promptsHint's negative side (the side with documented extra real-CI risk),
+   leaving freeTierTitle (no such documented risk, positive side) sitting
+   exactly at the edge instead. Measured en@2/zh-CN@2 deltas at -0.5px, both
+   font configs (physical px, PBP_HELP_RASTER_RANGES=1):
+     freeTierTitle: en 2 (both configs) ; zh-CN 1/1.5 (local/CI)
+     promptsHint:   en -1.5 (both configs) ; zh-CN 1/1.5 (local/CI)
+   Both within [-2, 2]; freeTierTitle sits exactly on the positive edge (0
+   margin, positive side only -- no documented extra CI risk there) and
+   promptsHint keeps 0.5px of margin on the negative side. The other four
+   (non-stage0) alphabetic/section hosts on the page -- backupPlaintextDisclosure,
+   diagnosticsHint, optThemeHint, storageIntro -- are unaffected (this rule is
+   [data-ui-stage0]-scoped and none of those four panels carry the marker);
+   optThemeHint's own pre-existing en@2 delta of exactly 2px (governed solely
+   by the shared base constant, unrelated to this rule) was already at that
+   same edge before this task and is untouched by it. Re-measure with
+   PBP_HELP_RASTER_RANGES=1 under both font configs before nudging further,
+   and re-derive this constant (not the shared base one) if a later stage-3a
+   task adds a third section-role host inside [data-ui-stage0]
+   (#panel-reader/#panel-archive both have a context-help-section host,
+   per the stage-3a design doc's remaining panel list). */
+[data-ui-stage0] .context-help-host[data-help-role="section"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.5px)); }
 [data-ui-stage0] .context-help-host[data-help-role="field"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
+/* Stage-3a (Task 1, 2026-09-24-ui-system-stage3a): choice help hosts inside
+   preference rows. The legacy `.context-help-host[data-help-role="choice"] >
+   label.switch > .switch-text { line-height: 16px }` (~line 564) pins the
+   copy to the 20px .choice-row line box that model used; the pref-row model
+   the host now sits in (bookmarks/quick's no-help choice rows never carried
+   this role, so only the AI-behaviour panel's three choice hosts are
+   affected) reads the density line-height instead, matching every sibling
+   .pref-row's .switch-text (rule ~1386). */
+[data-ui-stage0] .pref-row.context-help-host[data-help-role="choice"] > label.switch > .switch-text { line-height: var(--opt-lh-body); }
+/* `[data-ui-stage0] .pref-row > label` (rule ~1380) sets gap: --opt-sp-5
+   (12px), outranking .switch's own base gap: --opt-sp-3 (6px, ~line 1099)
+   for this switch too. The choice-host's copy -> help-icon offset (~line
+   593, `margin-left: calc(--opt-sp-1 - --opt-sp-3)`) is calibrated against
+   that 6px base gap for every OTHER choice-role switch host on the page
+   (dict-echo-enabled, opt-wayback-enabled, opt-sync-enabled, ...), all still
+   outside [data-ui-stage0]; inside the marker the wider row gap grew the
+   text -> icon visual gap from ~7px to ~13px (context-help raster gate).
+   Restore the switch's own copy -> icon spacing for this host only -- it does
+   not touch .switch-track's own end-of-row position (driven by
+   margin-left: auto on the track, independent of the label's gap). */
+[data-ui-stage0] .pref-row.context-help-host[data-help-role="choice"] > label.switch { gap: var(--opt-sp-3); }
 /* Task 4 (ui-system-stage2, Controller ruling A): the AI panel's text/
    password fields (#opt-<provider>-key/-model, #opt-<provider>-baseurl)
    were still rendering the legacy ~26px unstyled fill -- stage 0 only ever
