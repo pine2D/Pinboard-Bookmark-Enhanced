@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Options Listbox Tests</title>
+<style>
+.case.pass{color:#0a0}.case.fail{color:#c00;font-weight:bold}
+#fixture{position:absolute;left:-10000px;top:0;width:1200px;height:900px;border:0}
+</style>
+</head><body>
+<div id="results"></div>
+<iframe id="fixture" title="Options listbox fixture"></iframe>
+<script>
+// The listbox primitive (spec stage2 §3, COMPONENTS.md §6.4 exception 2) is
+// exercised on the REAL options page: options.html is loaded into an iframe
+// with every one of its own <script> tags kept (a <base> points them at the
+// repo root), so i18n.js, shared.js, options-listbox.js and options.js all
+// boot exactly as they do in the extension. The only thing the fixture adds
+// is a chrome.* stub (empty storage, no permissions, English messages from
+// _locales/en) injected ahead of options-theme-early.js. That is what makes
+// the two integration cases real: the provider .pf reveal and the translate
+// "custom" input are options.js's own change listeners, not test doubles.
+const TOTAL = 15;
+const results = document.getElementById("results");
+function report(name, error) {
+  const row = document.createElement("div");
+  row.className = "case " + (error ? "fail" : "pass");
+  row.textContent = (error ? "X " : "OK ") + name + (error ? " :: " + error.message : "");
+  results.appendChild(row);
+}
+function assert(condition, message) { if (!condition) throw new Error(message); }
+const queue = [];
+function test(name, fn) { queue.push([name, fn]); }
+
+// Serialised into the fixture as source text, so it must be self-contained.
+function pbpTestChromeStub(enMessages) {
+  const event = () => ({ addListener() {}, removeListener() {}, hasListener() { return false; } });
+  const done = (args, value) => {
+    const cb = args.length && typeof args[args.length - 1] === "function" ? args[args.length - 1] : null;
+    if (cb) { setTimeout(() => cb(value), 0); return undefined; }
+    return Promise.resolve(value);
+  };
+  const store = () => {
+    const data = {};
+    return {
+      get(keys, ...rest) {
+        let out = {};
+        if (keys == null) out = { ...data };
+        else if (typeof keys === "string") { if (keys in data) out[keys] = data[keys]; }
+        else if (Array.isArray(keys)) keys.forEach((k) => { if (k in data) out[k] = data[k]; });
+        else if (typeof keys === "object") Object.keys(keys).forEach((k) => { out[k] = k in data ? data[k] : keys[k]; });
+        return done(rest.length ? rest : (typeof keys === "function" ? [keys] : []), out);
+      },
+      set(items, ...rest) { Object.assign(data, items || {}); return done(rest, undefined); },
+      remove(keys, ...rest) { [].concat(keys).forEach((k) => delete data[k]); return done(rest, undefined); },
+      clear(...rest) { Object.keys(data).forEach((k) => delete data[k]); return done(rest, undefined); },
+      getBytesInUse(...rest) { return done(rest, 0); },
+      onChanged: event(),
+      QUOTA_BYTES: 102400, QUOTA_BYTES_PER_ITEM: 8192,
+    };
+  };
+  // Anything the page reaches that is not spelled out below is a callable,
+  // resolve-to-undefined namespace, and every on* member is an event object.
+  const loose = (base) => new Proxy(base, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      if (typeof prop !== "string" || prop === "then") return undefined;
+      if (prop === "lastError") return undefined;
+      if (/^on[A-Z]/.test(prop)) return (target[prop] = event());
+      const fn = (...args) => done(args, undefined);
+      return (target[prop] = loose(fn));
+    },
+  });
+  const message = (key) => (enMessages[key] && enMessages[key].message) || "";
+  return loose({
+    runtime: loose({
+      id: "pbp-listbox-fixture",
+      getManifest: () => ({ version: "0.0.0", manifest_version: 3, permissions: [], optional_permissions: [], optional_host_permissions: [], host_permissions: [], oauth2: {} }),
+      getURL: (path) => path,
+      sendMessage: (...args) => done(args, undefined),
+      connect: () => ({ onMessage: event(), onDisconnect: event(), postMessage() {}, disconnect() {} }),
+      onMessage: event(),
+    }),
+    storage: loose({ local: store(), sync: store(), session: store(), onChanged: event() }),
+    i18n: loose({ getMessage: message, getUILanguage: () => "en" }),
+    permissions: loose({
+      contains: (...args) => done(args, false),
+      getAll: (...args) => done(args, { origins: [], permissions: [] }),
+      request: (...args) => done(args, false),
+      remove: (...args) => done(args, true),
+    }),
+    tabs: loose({ query: (...args) => done(args, []) }),
+  });
+}
+
+(async () => {
+  const source = await fetch("../options.html").then((response) => response.text());
+  const enMessages = await fetch("../_locales/en/messages.json").then((response) => response.json());
+  const zhMessages = await fetch("../_locales/zh_CN/messages.json").then((response) => response.json());
+  const stub = "<script>window.chrome = (" + pbpTestChromeStub.toString() + ")(" +
+    JSON.stringify(enMessages).replace(/<\//g, "<\\/") + ");<\/script>";
+  const booted = source.replace("<head>", "<head><base href=\"../\">" + stub);
+  const frame = document.getElementById("fixture");
+  const loaded = new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+  frame.srcdoc = booted;
+  await loaded;
+  const win = frame.contentWindow;
+  const doc = frame.contentDocument;
+  const nextFrame = () => new Promise((resolve) => win.requestAnimationFrame(() => resolve()));
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  // options.js's DOMContentLoaded handler is async (storage round trips);
+  // let it and the enhancer's queued rAF sync settle.
+  for (let i = 0; i < 20 && !doc.getElementById("opt-ai-provider-btn"); i++) await sleep(50);
+  await sleep(200);
+  await nextFrame(); await nextFrame();
+
+  const provider = () => doc.getElementById("opt-ai-provider");
+  const lang = () => doc.getElementById("translate-target-lang");
+  const btnOf = (select) => doc.getElementById(select.id + "-btn");
+  const listOf = (select) => doc.getElementById(select.id + "-list");
+  const itemsOf = (select) => [...(listOf(select)?.querySelectorAll('[role="option"]') || [])];
+  const activeIndex = (select) => {
+    const id = btnOf(select)?.getAttribute("aria-activedescendant") || "";
+    return itemsOf(select).findIndex((li) => li.id === id);
+  };
+  const key = (target, k, init = {}) => {
+    const ev = new win.KeyboardEvent("keydown", Object.assign({ key: k, bubbles: true, cancelable: true }, init));
+    target.dispatchEvent(ev);
+    return ev;
+  };
+  const showPanel = (id) => {
+    doc.querySelectorAll(".panel").forEach((panel) => panel.classList.toggle("active", panel.id === id));
+  };
+  const setValue = (select, value) => {
+    select.value = value;
+    win.pbpListboxSync?.(select);
+  };
+  const close = (select) => { if (btnOf(select)?.getAttribute("aria-expanded") === "true") key(btnOf(select), "Escape"); };
+
+  test("enhances the two data-listbox selects and hides the natives", () => {
+    const wrappers = doc.querySelectorAll(".listbox");
+    assert(wrappers.length === 2, "expected exactly two .listbox wrappers, got " + wrappers.length);
+    for (const select of [provider(), lang()]) {
+      assert(select && select.hasAttribute("data-listbox"), (select?.id || "?") + " lost data-listbox");
+      assert(select.hidden === true, select.id + " native select is not hidden");
+      assert(select.isConnected, select.id + " native select was removed");
+      const btn = btnOf(select);
+      const list = listOf(select);
+      assert(btn && btn.tagName === "BUTTON" && btn.getAttribute("type") === "button", select.id + " has no button");
+      assert(btn.getAttribute("role") === "combobox", select.id + " button role=" + btn.getAttribute("role"));
+      assert(btn.getAttribute("aria-haspopup") === "listbox", select.id + " aria-haspopup");
+      assert(btn.getAttribute("aria-expanded") === "false", select.id + " starts expanded");
+      assert(btn.getAttribute("aria-controls") === select.id + "-list", select.id + " aria-controls");
+      assert(list && list.getAttribute("role") === "listbox" && list.hidden, select.id + " list missing or open");
+      assert(list.getAttribute("tabindex") === "-1", select.id + " list tabindex");
+      const items = itemsOf(select);
+      assert(items.length === select.options.length, select.id + " option count " + items.length + " vs " + select.options.length);
+      items.forEach((li, i) => {
+        assert(li.id === select.id + "-opt-" + i, "option id " + li.id);
+        assert(li.dataset.value === select.options[i].value, "option data-value " + li.dataset.value);
+      });
+      assert(btn.querySelector(".listbox-value"), select.id + " no .listbox-value");
+      assert(btn.querySelector("svg path[d='m6 9 6 6 6-6']"), select.id + " chevron is not the Lucide chevron-down SVG");
+      assert(select.nextElementSibling?.classList.contains("listbox"), select.id + " wrapper is not right after the select");
+    }
+    assert(btnOf(provider()).getAttribute("aria-labelledby") === "sec-ai-provider", "provider aria-labelledby not copied");
+    assert(doc.getElementById("translate-target-lang-label").htmlFor === "translate-target-lang-btn", "translate label[for] not re-pointed to the button");
+    assert(btnOf(lang()).getAttribute("aria-labelledby") === "translate-target-lang-label", "translate button not labelled by its label");
+    const ids = [...doc.querySelectorAll("[id]")].map((el) => el.id);
+    assert(ids.length === new Set(ids).size, "duplicate ids after enhancement");
+    const others = [...doc.querySelectorAll("select:not([data-listbox])")].filter((s) => s.hidden);
+    assert(others.length === 0, "a select without data-listbox was hidden: " + others.map((s) => s.id).join(","));
+  });
+
+  test("button shows the selected option's text", () => {
+    setValue(provider(), "gemini");
+    assert(btnOf(provider()).querySelector(".listbox-value").textContent === provider().selectedOptions[0].textContent.trim(),
+      "provider button text=" + btnOf(provider()).textContent);
+    setValue(lang(), "ja");
+    assert(btnOf(lang()).querySelector(".listbox-value").textContent === "日本語", "translate button text=" + btnOf(lang()).textContent);
+    const sel = itemsOf(lang()).filter((li) => li.getAttribute("aria-selected") === "true");
+    assert(sel.length === 1 && sel[0].dataset.value === "ja", "aria-selected not on exactly the current option");
+    setValue(lang(), "auto");
+  });
+
+  test("click opens; aria-expanded true; active = selected", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "claude");
+    const btn = btnOf(provider());
+    btn.click();
+    assert(btn.getAttribute("aria-expanded") === "true", "click did not open");
+    assert(!listOf(provider()).hidden, "list still hidden");
+    assert(activeIndex(provider()) === 2, "active index " + activeIndex(provider()) + " (want the selected 2)");
+    assert(itemsOf(provider())[2].hasAttribute("data-active"), "active item not marked data-active");
+    btn.click();
+    assert(btn.getAttribute("aria-expanded") === "false" && listOf(provider()).hidden, "second click did not close");
+    assert(!btn.hasAttribute("aria-activedescendant"), "aria-activedescendant left set while closed");
+    setValue(provider(), "gemini");
+  });
+
+  test("ArrowDown opens and moves active; Home/End; PageDown/PageUp clamp", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    const last = provider().options.length - 1;
+    const ev = key(btn, "ArrowDown");
+    assert(ev.defaultPrevented, "ArrowDown not consumed");
+    assert(btn.getAttribute("aria-expanded") === "true", "ArrowDown did not open");
+    assert(activeIndex(provider()) === 0, "open should land on the selected option, got " + activeIndex(provider()));
+    key(btn, "ArrowDown");
+    assert(activeIndex(provider()) === 1, "ArrowDown did not move, got " + activeIndex(provider()));
+    key(btn, "ArrowUp"); key(btn, "ArrowUp");
+    assert(activeIndex(provider()) === 0, "ArrowUp did not clamp at 0, got " + activeIndex(provider()));
+    key(btn, "End");
+    assert(activeIndex(provider()) === last, "End -> " + activeIndex(provider()));
+    key(btn, "ArrowDown");
+    assert(activeIndex(provider()) === last, "ArrowDown did not clamp at the end");
+    key(btn, "PageUp");
+    assert(activeIndex(provider()) === last - 10, "PageUp -> " + activeIndex(provider()));
+    key(btn, "PageUp");
+    assert(activeIndex(provider()) === 0, "PageUp did not clamp at 0, got " + activeIndex(provider()));
+    key(btn, "PageDown");
+    assert(activeIndex(provider()) === 10, "PageDown -> " + activeIndex(provider()));
+    key(btn, "PageDown");
+    assert(activeIndex(provider()) === last, "PageDown did not clamp at the end");
+    key(btn, "Home");
+    assert(activeIndex(provider()) === 0, "Home -> " + activeIndex(provider()));
+    assert(provider().value === "gemini", "navigation alone changed the value");
+    close(provider());
+  });
+
+  test("type-ahead jumps to the first option starting with the typed letters", async () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    key(btn, "ArrowDown");
+    key(btn, "o"); key(btn, "l");
+    assert(itemsOf(provider())[activeIndex(provider())]?.dataset.value === "ollama", "'ol' landed on " + itemsOf(provider())[activeIndex(provider())]?.dataset.value);
+    await sleep(650);
+    key(btn, "m");
+    assert(itemsOf(provider())[activeIndex(provider())]?.dataset.value === "minimax", "'m' after the buffer expired landed on " + itemsOf(provider())[activeIndex(provider())]?.dataset.value);
+    key(btn, "m");
+    await sleep(650);
+    assert(provider().value === "gemini", "type-ahead changed the value");
+    close(provider());
+  });
+
+  test("Enter selects: select.value updated, change bubbled, list closed, focus on button", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    btn.focus();
+    let changes = 0;
+    const onChange = (ev) => { if (ev.target === provider()) changes++; };
+    doc.addEventListener("change", onChange);
+    key(btn, "ArrowDown"); key(btn, "ArrowDown"); key(btn, "ArrowDown");
+    const ev = key(btn, "Enter");
+    doc.removeEventListener("change", onChange);
+    assert(ev.defaultPrevented, "Enter not consumed");
+    assert(provider().value === "claude", "value=" + provider().value);
+    assert(changes === 1, "change events seen at document: " + changes);
+    assert(listOf(provider()).hidden && btn.getAttribute("aria-expanded") === "false", "list still open");
+    assert(doc.activeElement === btn, "focus left the button: " + doc.activeElement?.id);
+    assert(btn.querySelector(".listbox-value").textContent === provider().selectedOptions[0].textContent.trim(), "button text not updated");
+    setValue(provider(), "gemini");
+  });
+
+  test("Escape closes without changing value", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    key(btn, "ArrowDown"); key(btn, "End");
+    const ev = key(btn, "Escape");
+    assert(ev.defaultPrevented, "Escape not consumed while open");
+    assert(listOf(provider()).hidden, "Escape did not close");
+    assert(provider().value === "gemini", "Escape changed the value to " + provider().value);
+    const idle = key(btn, "Escape");
+    assert(!idle.defaultPrevented, "Escape swallowed while closed");
+  });
+
+  test("Tab closes and does not trap focus", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    btn.focus();
+    key(btn, "ArrowDown"); key(btn, "ArrowDown");
+    const ev = key(btn, "Tab");
+    assert(!ev.defaultPrevented, "Tab default prevented (focus trap)");
+    assert(listOf(provider()).hidden && btn.getAttribute("aria-expanded") === "false", "Tab did not close");
+    assert(provider().value === "openai", "Tab should commit the active option, value=" + provider().value);
+    const idle = key(btn, "Tab");
+    assert(!idle.defaultPrevented, "Tab default prevented while closed");
+    setValue(provider(), "gemini");
+  });
+
+  test("outside click closes", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    btn.click();
+    assert(!listOf(provider()).hidden, "did not open");
+    const inside = itemsOf(provider())[3];
+    inside.dispatchEvent(new win.PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    assert(!listOf(provider()).hidden, "pointerdown inside the list closed it");
+    const outside = doc.getElementById("sec-ai-provider");
+    outside.dispatchEvent(new win.PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    outside.click();
+    assert(listOf(provider()).hidden && btn.getAttribute("aria-expanded") === "false", "outside click did not close");
+    assert(provider().value === "gemini", "outside click changed the value");
+  });
+
+  test("provider change through the listbox reveals the matching .pf", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    provider().dispatchEvent(new win.Event("change", { bubbles: true }));
+    assert(doc.getElementById("fields-gemini").hidden === false, "precondition: gemini fields hidden");
+    btnOf(provider()).click();
+    const openai = itemsOf(provider()).find((li) => li.dataset.value === "openai");
+    openai.click();
+    assert(provider().value === "openai", "value=" + provider().value);
+    assert(doc.getElementById("fields-openai").hidden === false, "fields-openai still hidden");
+    assert(doc.getElementById("fields-gemini").hidden === true, "fields-gemini still shown");
+    assert(listOf(provider()).hidden, "option click did not close the list");
+    btnOf(provider()).click();
+    itemsOf(provider()).find((li) => li.dataset.value === "gemini").click();
+    assert(doc.getElementById("fields-gemini").hidden === false, "switching back did not restore gemini");
+  });
+
+  test("translate 'custom' through the listbox reveals the free-text input", () => {
+    showPanel("panel-reader");
+    setValue(lang(), "auto");
+    lang().dispatchEvent(new win.Event("change", { bubbles: true }));
+    const custom = doc.getElementById("translate-target-lang-custom");
+    assert(custom.classList.contains("hidden"), "precondition: custom input visible");
+    btnOf(lang()).click();
+    itemsOf(lang()).find((li) => li.dataset.value === "custom").click();
+    assert(lang().value === "custom", "value=" + lang().value);
+    assert(!custom.classList.contains("hidden"), "custom input still hidden");
+    // It keeps the select's old placement: on the listbox's line, after it.
+    assert(custom.getClientRects().length > 0, "custom input has no layout box");
+    assert(custom.getBoundingClientRect().left >= btnOf(lang()).getBoundingClientRect().right, "custom input is not after the listbox");
+    btnOf(lang()).click();
+    itemsOf(lang()).find((li) => li.dataset.value === "auto").click();
+    assert(custom.classList.contains("hidden"), "custom input not re-hidden");
+  });
+
+  test("programmatic value + pbpListboxSync updates the button text", () => {
+    assert(typeof win.pbpListboxSync === "function" && typeof win.pbpEnhanceListbox === "function", "exports missing");
+    const count = itemsOf(provider()).length;
+    provider().value = "kimi";
+    win.pbpListboxSync(provider());
+    win.pbpListboxSync(provider());
+    assert(btnOf(provider()).querySelector(".listbox-value").textContent === "Kimi", "button text=" + btnOf(provider()).textContent);
+    assert(itemsOf(provider()).length === count, "repeated sync changed the option count");
+    assert(doc.querySelectorAll("#opt-ai-provider-btn").length === 1, "repeated sync duplicated the button");
+    assert(win.pbpEnhanceListbox(provider()) && doc.querySelectorAll(".listbox").length === 2, "re-enhance created a second wrapper");
+    const bare = doc.createElement("select");
+    win.pbpListboxSync(bare); // no-op, must not throw
+    setValue(provider(), "gemini");
+  });
+
+  test("applyI18n(zh_CN) then sync re-reads option text", async () => {
+    setValue(provider(), "claude");
+    new win.Function("m", "_i18nMessages = m; _i18nMessagesLang = 'zh_CN';")(zhMessages);
+    win.applyI18n();
+    const want = zhMessages.provClaude.message;
+    assert(btnOf(provider()).querySelector(".listbox-value").textContent === want, "button text after zh applyI18n=" + btnOf(provider()).textContent);
+    assert(itemsOf(provider())[2].textContent === want, "option text after zh applyI18n=" + itemsOf(provider())[2].textContent);
+    const autoLi = itemsOf(lang())[0];
+    assert(autoLi.textContent === zhMessages.translateLangAuto.message, "translate auto option not re-read: " + autoLi.textContent);
+    new win.Function("_i18nMessages = null; _i18nMessagesLang = null;")();
+    win.applyI18n();
+    assert(itemsOf(provider())[2].textContent === enMessages.provClaude.message, "English not restored");
+    setValue(provider(), "gemini");
+  });
+
+  test("disabled option is skipped by arrow navigation and not selectable", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    provider().options[1].disabled = true;
+    win.pbpListboxSync(provider());
+    try {
+      assert(itemsOf(provider())[1].getAttribute("aria-disabled") === "true", "disabled option lacks aria-disabled");
+      const btn = btnOf(provider());
+      key(btn, "ArrowDown");
+      key(btn, "ArrowDown");
+      assert(activeIndex(provider()) === 2, "ArrowDown did not skip the disabled option, got " + activeIndex(provider()));
+      key(btn, "ArrowUp");
+      assert(activeIndex(provider()) === 0, "ArrowUp did not skip the disabled option, got " + activeIndex(provider()));
+      itemsOf(provider())[1].click();
+      assert(provider().value === "gemini", "clicking the disabled option selected it");
+      close(provider());
+    } finally {
+      provider().options[1].disabled = false;
+      win.pbpListboxSync(provider());
+    }
+    assert(!itemsOf(provider())[1].hasAttribute("aria-disabled"), "aria-disabled not cleared on re-enable");
+  });
+
+  test("list flips above when viewport space below is short", async () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    const list = listOf(provider());
+    const oldHeight = frame.style.height;
+    try {
+      win.scrollTo(0, 0);
+      await nextFrame();
+      // Open with room below: no flip.
+      btn.click();
+      assert(!list.hidden, "did not open");
+      assert(list.getAttribute("data-flip") !== "up", "flipped with room below");
+      assert(list.getBoundingClientRect().top >= btn.getBoundingClientRect().bottom, "list not below the button");
+      btn.click();
+      // Viewport ending 48px under the button: flip up.
+      frame.style.height = Math.round(btn.getBoundingClientRect().bottom + 48) + "px";
+      await nextFrame();
+      assert(win.innerHeight - btn.getBoundingClientRect().bottom < 60, "fixture: viewport not shortened");
+      btn.click();
+      assert(list.getAttribute("data-flip") === "up", "did not flip (data-flip=" + list.getAttribute("data-flip") + ")");
+      assert(list.getBoundingClientRect().bottom <= btn.getBoundingClientRect().top, "flipped list not above the button");
+      btn.click();
+      assert(!list.hasAttribute("data-flip") || list.hidden, "flip state left inconsistent");
+    } finally {
+      close(provider());
+      frame.style.height = oldHeight;
+    }
+  });
+
+  for (const [name, fn] of queue) {
+    try { await fn(); report(name); } catch (error) { report(name, error); }
+  }
+})().catch((error) => {
+  for (let i = results.children.length; i < TOTAL; i++) report("fixture setup", error);
+});
+</script>
+</body></html>

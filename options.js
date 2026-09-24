@@ -1971,6 +1971,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const customEl = $id("translate-target-lang-custom");
     if (!sel || !customEl) return;
     customEl.classList.toggle("hidden", sel.value !== "custom");
+    window.pbpListboxSync?.(sel);
   }
 
   // Resolution contract for the persisted translateTargetLang (read by
@@ -2901,6 +2902,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (el) el.hidden = p !== selected; // native hidden: .pf reveal transition keys off [hidden]
     });
     syncPreviewModelToProvider(selected);
+    window.pbpListboxSync?.($id("opt-ai-provider"));
   }
   updateProviderFields();
   $id("opt-ai-provider").addEventListener("change", updateProviderFields);

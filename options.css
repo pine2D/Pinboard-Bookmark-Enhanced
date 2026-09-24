@@ -309,6 +309,40 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    panel too (measured, not assumed -- weak-text-on-fill batch T2). */
 .options-search-result-panel { color: var(--opt-btn-fg-muted); font-size: 11px; }
 .options-search-empty { padding: var(--opt-sp-4); color: var(--opt-fg-hint); font-size: 11px; }
+/* ---- Listbox (COMPONENTS.md §6.4 exception 2, spec stage2 §3): the native
+   <select> stays as the value carrier and is hidden; the combobox button is
+   the field, the popover list is the picker (options-listbox.js). Sibling of
+   the search dropdown above: same panel / border / shadow chrome, one z rung
+   higher (popover, not menu) because it can open over the sticky nav column.
+   Width follows the select exception (§10.2 .fg.entry-block row): content-
+   sized, 240px floor, never wider than the column; the button fills it.
+   Colours are token pairs already verified per theme: active = btn-hover +
+   btn-fg (the control hover pair), selected = accent + on-accent (the
+   primary-button pair), disabled = fg-hint on panel. No :has(), no inline
+   styles: the flip is the data-flip attribute the script sets on open. ---- */
+.listbox { position: relative; display: inline-block; width: max-content; min-width: 240px; max-width: 100%; }
+.listbox-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-fg); background: var(--opt-panel); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-md); cursor: pointer; text-align: left; }
+.listbox-btn:hover { border-color: var(--opt-focus-bd); }
+.listbox-btn:focus-visible { outline: none; border-color: var(--opt-focus-bd); box-shadow: var(--opt-focus-ring); }
+.listbox-btn .btn-ic { flex: none; width: 16px; height: 16px; color: var(--opt-fg-muted); }
+.listbox-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.listbox-list { position: absolute; left: 0; top: calc(100% + var(--opt-sp-1)); z-index: var(--opt-z-popover); min-width: 100%; max-height: min(320px, calc(100dvh - 32px)); overflow: auto; margin: 0; padding: var(--opt-sp-2); list-style: none; background: var(--opt-panel); color: var(--opt-fg); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-lg); box-shadow: var(--opt-shadow-md); }
+.listbox-list[data-flip="up"] { top: auto; bottom: calc(100% + var(--opt-sp-1)); }
+.listbox-list[hidden] { display: none; }
+.listbox-opt { display: flex; align-items: center; height: var(--opt-control-h); padding: 0 var(--opt-sp-4); border-radius: var(--opt-radius-sm); font-size: var(--opt-text-body); white-space: nowrap; cursor: pointer; }
+.listbox-opt[data-active] { background: var(--opt-btn-hover); color: var(--opt-btn-fg); }
+.listbox-opt[aria-selected="true"] { background: var(--opt-accent); color: var(--opt-on-accent); }
+.listbox-opt[aria-disabled="true"] { color: var(--opt-fg-hint); cursor: default; }
+/* The translate select's follow-up free-text input: the relationship rule
+   `.fg > select + input` no longer matches once the listbox sits between. */
+.fg > .listbox + input { margin-top: var(--opt-sp-3); }
+@media (prefers-reduced-motion: no-preference) { .listbox-btn { transition: border-color var(--motion-state) ease, box-shadow var(--motion-state) ease; } }
+@media (forced-colors: active) {
+  .listbox-btn, .listbox-list { border-color: ButtonText; }
+  .listbox-opt[data-active] { outline: 1px solid Highlight; outline-offset: -1px; }
+  .listbox-opt[aria-selected="true"] { background: Highlight; color: HighlightText; }
+  .listbox-opt[aria-disabled="true"] { color: GrayText; }
+}
 .tabs {
   display: flex; flex-direction: column; align-items: stretch;
   gap: var(--opt-sp-1);

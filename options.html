@@ -417,7 +417,7 @@
           </details>
         </div>
         <div class="fg entry-block">
-          <select id="opt-ai-provider" aria-labelledby="sec-ai-provider">
+          <select id="opt-ai-provider" aria-labelledby="sec-ai-provider" data-listbox>
             <option value="gemini" data-i18n="provGemini">Google Gemini</option>
             <option value="openai" data-i18n="provOpenai">OpenAI (ChatGPT)</option>
             <option value="claude" data-i18n="provClaude">Anthropic Claude</option>
@@ -754,7 +754,7 @@
 
       <div class="fg fg-indent">
         <label class="bl" id="translate-target-lang-label" for="translate-target-lang" data-i18n="translateTargetLangLabel">Translation target language</label>
-        <select id="translate-target-lang">
+        <select id="translate-target-lang" data-listbox>
           <option value="auto" data-i18n="translateLangAuto">Auto (follow interface language)</option>
           <option value="en">English</option>
           <option value="zh-Hans">简体中文</option>
@@ -1213,6 +1213,7 @@
   <script defer src="options-backup.js"></script>
   <script defer src="tag-gov.js"></script>
   <script defer src="export-targets.js"></script>
+  <script defer src="options-listbox.js"></script>
   <script defer src="options.js"></script>
   <script defer src="md-dict.js"></script>
   <script defer src="anki-connect.js"></script>

@@ -3053,7 +3053,12 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // own ephemeral `mkdtempSync()` userDataDir (main(), further down),
       // torn down with `rmSync()` when the run ends -- no real account,
       // real settings, or cross-run state is ever touched.
-      await page.selectOption("#opt-ai-provider", "openai");
+      // The provider <select> is a listbox-enhanced value carrier (hidden;
+      // COMPONENTS.md §6.4 exception 2), so drive it the way a user does:
+      // open the combobox button, click the option. The option click writes
+      // select.value and dispatches the same bubbling change event.
+      await page.click("#opt-ai-provider-btn");
+      await page.click('#opt-ai-provider-list [role="option"][data-value="openai"]');
       await page.waitForSelector("#fields-openai:not([hidden])", { timeout: TIMEOUT_MS });
       await page.waitForSelector("#fields-openai #opt-openai-baseurl", { state: "visible", timeout: TIMEOUT_MS });
       for (const check of aiProviderChecks) await runOneCheck(page, theme, check, results);
