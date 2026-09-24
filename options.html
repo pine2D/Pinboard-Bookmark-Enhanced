@@ -80,136 +80,142 @@
     </div>
 
     <!-- Tab 1: General -->
-    <div id="panel-general" class="panel active" role="tabpanel" aria-labelledby="tab-general">
-      <h2 class="section-title" data-i18n="secPinboardAccount">Pinboard Account</h2>
-      <div class="fg">
-        <label class="bl" for="opt-pinboard-token" data-i18n="labelApiToken">API Token</label>
-        <span class="key-wrap"><input type="password" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" autocomplete="off" spellcheck="false" />
-        <button type="button" class="key-toggle" data-target="opt-pinboard-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
-        <span id="token-format-warn" class="field-warn" data-i18n="loginInvalidFormat">Invalid format. Use username:TOKEN</span>
-        <p class="hint"><span data-i18n="hintApiToken">From</span> <a href="https://pinboard.in/settings/password" target="_blank" rel="noopener">pinboard.in/settings/password</a></p>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="test-pinboard-token" data-i18n="testConnection">Test Connection</button>
-          <span class="save-status" id="test-pinboard-status" role="status" aria-live="polite"></span>
+    <div id="panel-general" class="panel active" role="tabpanel" aria-labelledby="tab-general" data-ui-stage0>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secPinboardAccount">Pinboard Account</h2>
+        <div class="fg entry-block">
+          <label class="bl" for="opt-pinboard-token" data-i18n="labelApiToken">API Token</label>
+          <span class="key-wrap"><input type="password" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" autocomplete="off" spellcheck="false" />
+          <button type="button" class="key-toggle" data-target="opt-pinboard-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+          <span id="token-format-warn" class="field-warn" data-i18n="loginInvalidFormat">Invalid format. Use username:TOKEN</span>
+          <p class="hint"><span data-i18n="hintApiToken">From</span> <a href="https://pinboard.in/settings/password" target="_blank" rel="noopener">pinboard.in/settings/password</a></p>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-pinboard-token" data-i18n="testConnection">Test Connection</button>
+            <span class="save-status" id="test-pinboard-status" role="status" aria-live="polite"></span>
+          </div>
         </div>
-      </div>
-      <details class="disclosure" id="acc-connection-overview" data-acc-key="connection-overview">
-        <summary id="connection-overview-title" data-i18n="connectionOverviewTitle">Connection Status</summary>
-        <div class="disclosure-body">
-          <p class="hint" data-i18n="connectionOverviewHint">Status is based on configuration, granted permissions, and your latest manual tests. Opening Settings never contacts these services or requests permission.</p>
-          <div id="connection-health" class="connection-health" role="region" aria-labelledby="connection-overview-title"></div>
-        </div>
-      </details>
-      <div class="divider"></div>
-      <h2 class="section-title" id="sec-language" data-i18n="secLanguage">Language</h2>
-      <div class="fg">
-        <select id="opt-lang" aria-labelledby="sec-language">
-          <option value="auto" data-i18n="langAuto">Auto (follow browser)</option>
-          <option value="en">English</option>
-          <option value="ja">日本語</option>
-          <option value="pl">Polski</option>
-          <option value="de">Deutsch</option>
-          <option value="fr">Français</option>
-          <option value="zh_TW">中文（台灣）</option>
-          <option value="zh_HK">中文（香港）</option>
-          <option value="zh_CN">中文（简体）</option>
-          <option value="ru">Русский</option>
-        </select>
-      </div>
-      <div class="divider"></div>
-      <h2 class="section-title" id="sec-sync" data-i18n="secSync">Data Sync</h2>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-sync">
-      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-enabled" aria-labelledby="opt-sync-enabled-label" /> <span class="switch-text" id="opt-sync-enabled-label" data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="optSyncHint">This checkbox applies to this device only. Settings are shared between the devices where you turn it on; devices with it off keep their own local settings.</p>
-        </details><span class="switch-track" aria-hidden="true"></span></label>
-      </div>
-      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-api-keys" aria-labelledby="opt-sync-api-keys-label" /> <span class="switch-text" id="opt-sync-api-keys-label" data-i18n="syncApiKeysLabel">Sync credentials for this Google account</span>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="syncApiKeysHint">This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted.</p>
-        </details><span class="switch-track" aria-hidden="true"></span></label>
-      </div>
-      </div>
-      <p id="opt-sync-local-only" class="sync-local-only" role="status" aria-live="polite" hidden></p>
-      <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
-      <div class="divider"></div>
-      <div class="context-help-host context-help-section" data-help-role="section">
-        <h2 class="section-title" id="sec-backup-restore" data-i18n="secBackupRestore">Backup &amp; Restore</h2>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="backupPlaintextDisclosure">Backup files are plain JSON. They may contain settings, highlights, page URLs, vocabulary, and context excerpts.</p>
+        <details class="disclosure" id="acc-connection-overview" data-acc-key="connection-overview">
+          <summary id="connection-overview-title" data-i18n="connectionOverviewTitle">Connection Status</summary>
+          <div class="disclosure-body">
+            <p class="hint" data-i18n="connectionOverviewHint">Status is based on configuration, granted permissions, and your latest manual tests. Opening Settings never contacts these services or requests permission.</p>
+            <div id="connection-health" class="connection-health" role="region" aria-labelledby="connection-overview-title"></div>
+          </div>
         </details>
-      </div>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-backup-restore">
-      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-highlights" aria-labelledby="opt-backup-include-highlights-label" checked /> <span class="switch-text" id="opt-backup-include-highlights-label" data-i18n="backupIncludeHighlightsLabel">Include highlights and notes in backups</span>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="backupIncludeHighlightsHint">Includes page URLs, titles, selected text, notes, colors, and timestamps.</p>
-        </details><span class="switch-track" aria-hidden="true"></span></label>
-      </div>
-      <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-vocabulary" aria-labelledby="opt-backup-include-vocabulary-label" checked /> <span class="switch-text" id="opt-backup-include-vocabulary-label" data-i18n="backupIncludeVocabularyLabel">Include vocabulary in backups</span>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="backupIncludeVocabularyHint">Includes vocabulary only for the current Pinboard account.</p>
-        </details><span class="switch-track" aria-hidden="true"></span></label>
-      </div>
-      <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-backup-include-secrets" aria-describedby="backup-secrets-warning" /> <span class="switch-text" data-i18n="backupIncludeSecretsLabel">Include API keys and tokens in backups</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-      <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Writes every credential to the file in plain text: your Pinboard token, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password.</p>
-      <div class="backup-actions fg-actions">
-        <button class="btn" id="export-settings" data-i18n="exportSettings">Export Settings</button>
-        <button type="button" class="btn" id="import-settings" title="Import settings from JSON file" data-i18n="importSettings" data-i18n-title="importSettingsTitle">Import Settings</button>
-        <input type="file" id="import-settings-file" accept=".json" hidden />
-        <span class="save-status" id="import-status" role="status" aria-live="polite"></span>
-      </div>
-      <span class="save-status backup-export-note" id="backup-export-note" role="status" aria-live="polite"></span>
-      <section class="backup-import-preview" id="backup-import-preview" aria-labelledby="backup-preview-title" hidden>
-        <h3 id="backup-preview-title" data-i18n="backupPreviewTitle">Import preview</h3>
-        <p id="backup-preview-meta"></p>
-        <dl class="backup-preview-counts">
-          <div><dt data-i18n="backupSectionSettings">Settings</dt><dd id="backup-preview-settings"></dd></div>
-          <div><dt data-i18n="backupSectionThemes">Themes</dt><dd id="backup-preview-themes"></dd></div>
-          <div><dt data-i18n="backupSectionHighlights">Highlights and notes</dt><dd id="backup-preview-highlights"></dd></div>
-          <div><dt data-i18n="backupSectionVocabulary">Vocabulary</dt><dd id="backup-preview-vocabulary"></dd></div>
-          <div><dt data-i18n="backupSectionSecrets">API keys and tokens</dt><dd id="backup-preview-secrets"></dd></div>
-          <div><dt data-i18n="backupPreviewLanguageLabel">Languages</dt><dd id="backup-preview-languages"></dd></div>
-        </dl>
-        <p class="hint" id="backup-preview-semantics" data-i18n="backupPreviewSemantics">Restoring replaces your custom themes and, on the pages in this file, this account's highlights and notes. Settings and vocabulary are merged, with the file winning where they differ.</p>
-        <p class="hint hint-warn backup-preview-warning" id="backup-preview-warning" role="status" aria-live="polite"></p>
-        <fieldset class="backup-section-picker">
-          <legend data-i18n="backupChooseSections">Choose what to import</legend>
-          <label><input type="checkbox" id="backup-section-settings" /> <span data-i18n="backupSectionSettings">Settings</span></label>
-          <label><input type="checkbox" id="backup-section-themes" /> <span data-i18n="backupSectionThemes">Themes</span></label>
-          <label><input type="checkbox" id="backup-section-highlights" /> <span data-i18n="backupSectionHighlights">Highlights and notes</span></label>
-          <label><input type="checkbox" id="backup-section-vocabulary" /> <span data-i18n="backupSectionVocabulary">Vocabulary</span></label>
-          <label><input type="checkbox" id="backup-section-secrets" /> <span data-i18n="backupSectionSecrets">API keys and tokens</span></label>
-        </fieldset>
-        <div class="backup-apply-row fg-actions">
-          <button type="button" class="btn primary" id="backup-import-apply" data-i18n="backupApplySelected">Apply selected</button>
-          <span id="backup-import-progress" role="status" aria-live="polite"></span>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" id="sec-language" data-i18n="secLanguage">Language</h2>
+        <div class="fg entry-block">
+          <select id="opt-lang" aria-labelledby="sec-language" data-listbox>
+            <option value="auto" data-i18n="langAuto">Auto (follow browser)</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="pl">Polski</option>
+            <option value="de">Deutsch</option>
+            <option value="fr">Français</option>
+            <option value="zh_TW">中文（台灣）</option>
+            <option value="zh_HK">中文（香港）</option>
+            <option value="zh_CN">中文（简体）</option>
+            <option value="ru">Русский</option>
+          </select>
         </div>
       </section>
-      <div class="backup-import-result" id="backup-import-result" role="status" aria-live="polite" hidden>
-        <div><span data-i18n="backupSectionSettings">Settings</span><span id="backup-result-settings"></span></div>
-        <div><span data-i18n="backupSectionThemes">Themes</span><span id="backup-result-themes"></span></div>
-        <div><span data-i18n="backupSectionHighlights">Highlights and notes</span><span id="backup-result-highlights"></span></div>
-        <div><span data-i18n="backupSectionVocabulary">Vocabulary</span><span id="backup-result-vocabulary"></span></div>
-        <div><span data-i18n="backupSectionSecrets">API keys and tokens</span><span id="backup-result-secrets"></span></div>
-      </div>
-      <div class="divider"></div>
-      <h2 class="section-title" id="sec-notifications" data-i18n="secNotifications">Notifications</h2>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-notifications">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-quick-save" checked /> <span class="switch-text" data-i18n="notifyQuickSave">Quick save</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-read-later" checked /> <span class="switch-text" data-i18n="notifyReadLater">Read Later save</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-tab-set" checked /> <span class="switch-text" data-i18n="notifyTabSet">Tab Set save</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-batch-save" checked /> <span class="switch-text" data-i18n="notifyBatchSave">Batch save</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="notify-errors" checked /> <span class="switch-text" data-i18n="notifyErrors">Error notifications</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-
-      <div class="divider"></div>
-      <section class="support-diagnostics" aria-labelledby="support-diagnostics-title">
+      <section class="settings-section">
+        <h2 class="section-title" id="sec-sync" data-i18n="secSync">Data Sync</h2>
+        <div class="pref-group" role="group" aria-labelledby="sec-sync">
+        <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-enabled" aria-labelledby="opt-sync-enabled-label" /> <span class="switch-text" id="opt-sync-enabled-label" data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="optSyncHint">This checkbox applies to this device only. Settings are shared between the devices where you turn it on; devices with it off keep their own local settings.</p>
+          </details><span class="switch-track" aria-hidden="true"></span></label>
+        </div>
+        <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-api-keys" aria-labelledby="opt-sync-api-keys-label" /> <span class="switch-text" id="opt-sync-api-keys-label" data-i18n="syncApiKeysLabel">Sync credentials for this Google account</span>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="syncApiKeysHint">This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted.</p>
+          </details><span class="switch-track" aria-hidden="true"></span></label>
+        </div>
+        </div>
+        <p id="opt-sync-local-only" class="sync-local-only" role="status" aria-live="polite" hidden></p>
+        <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
+      </section>
+      <section class="settings-section">
+        <div class="context-help-host context-help-section" data-help-role="section">
+          <h2 class="section-title" id="sec-backup-restore" data-i18n="secBackupRestore">Backup &amp; Restore</h2>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="backupPlaintextDisclosure">Backup files are plain JSON. They may contain settings, highlights, page URLs, vocabulary, and context excerpts.</p>
+          </details>
+        </div>
+        <div class="pref-group" role="group" aria-labelledby="sec-backup-restore">
+        <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-highlights" aria-labelledby="opt-backup-include-highlights-label" checked /> <span class="switch-text" id="opt-backup-include-highlights-label" data-i18n="backupIncludeHighlightsLabel">Include highlights and notes in backups</span>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="backupIncludeHighlightsHint">Includes page URLs, titles, selected text, notes, colors, and timestamps.</p>
+          </details><span class="switch-track" aria-hidden="true"></span></label>
+        </div>
+        <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-backup-include-vocabulary" aria-labelledby="opt-backup-include-vocabulary-label" checked /> <span class="switch-text" id="opt-backup-include-vocabulary-label" data-i18n="backupIncludeVocabularyLabel">Include vocabulary in backups</span>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="backupIncludeVocabularyHint">Includes vocabulary only for the current Pinboard account.</p>
+          </details><span class="switch-track" aria-hidden="true"></span></label>
+        </div>
+        <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-backup-include-secrets" aria-describedby="backup-secrets-warning" /> <span class="switch-text" data-i18n="backupIncludeSecretsLabel">Include API keys and tokens in backups</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Writes every credential to the file in plain text: your Pinboard token, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password.</p>
+        <div class="backup-actions fg-actions">
+          <button class="btn" id="export-settings" data-i18n="exportSettings">Export Settings</button>
+          <button type="button" class="btn" id="import-settings" title="Import settings from JSON file" data-i18n="importSettings" data-i18n-title="importSettingsTitle">Import Settings</button>
+          <input type="file" id="import-settings-file" accept=".json" hidden />
+          <span class="save-status" id="import-status" role="status" aria-live="polite"></span>
+        </div>
+        <span class="save-status backup-export-note" id="backup-export-note" role="status" aria-live="polite"></span>
+        <section class="backup-import-preview" id="backup-import-preview" aria-labelledby="backup-preview-title" hidden>
+          <h3 id="backup-preview-title" data-i18n="backupPreviewTitle">Import preview</h3>
+          <p id="backup-preview-meta"></p>
+          <dl class="backup-preview-counts">
+            <div><dt data-i18n="backupSectionSettings">Settings</dt><dd id="backup-preview-settings"></dd></div>
+            <div><dt data-i18n="backupSectionThemes">Themes</dt><dd id="backup-preview-themes"></dd></div>
+            <div><dt data-i18n="backupSectionHighlights">Highlights and notes</dt><dd id="backup-preview-highlights"></dd></div>
+            <div><dt data-i18n="backupSectionVocabulary">Vocabulary</dt><dd id="backup-preview-vocabulary"></dd></div>
+            <div><dt data-i18n="backupSectionSecrets">API keys and tokens</dt><dd id="backup-preview-secrets"></dd></div>
+            <div><dt data-i18n="backupPreviewLanguageLabel">Languages</dt><dd id="backup-preview-languages"></dd></div>
+          </dl>
+          <p class="hint" id="backup-preview-semantics" data-i18n="backupPreviewSemantics">Restoring replaces your custom themes and, on the pages in this file, this account's highlights and notes. Settings and vocabulary are merged, with the file winning where they differ.</p>
+          <p class="hint hint-warn backup-preview-warning" id="backup-preview-warning" role="status" aria-live="polite"></p>
+          <fieldset class="backup-section-picker">
+            <legend data-i18n="backupChooseSections">Choose what to import</legend>
+            <div class="pref-group">
+              <div class="pref-row"><label class="pick pick-box"><input type="checkbox" id="backup-section-settings" /> <span class="pick-text" data-i18n="backupSectionSettings">Settings</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+              <div class="pref-row"><label class="pick pick-box"><input type="checkbox" id="backup-section-themes" /> <span class="pick-text" data-i18n="backupSectionThemes">Themes</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+              <div class="pref-row"><label class="pick pick-box"><input type="checkbox" id="backup-section-highlights" /> <span class="pick-text" data-i18n="backupSectionHighlights">Highlights and notes</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+              <div class="pref-row"><label class="pick pick-box"><input type="checkbox" id="backup-section-vocabulary" /> <span class="pick-text" data-i18n="backupSectionVocabulary">Vocabulary</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+              <div class="pref-row"><label class="pick pick-box"><input type="checkbox" id="backup-section-secrets" /> <span class="pick-text" data-i18n="backupSectionSecrets">API keys and tokens</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            </div>
+          </fieldset>
+          <div class="backup-apply-row fg-actions">
+            <button type="button" class="btn primary" id="backup-import-apply" data-i18n="backupApplySelected">Apply selected</button>
+            <span id="backup-import-progress" role="status" aria-live="polite"></span>
+          </div>
+        </section>
+        <div class="backup-import-result" id="backup-import-result" role="status" aria-live="polite" hidden>
+          <div><span data-i18n="backupSectionSettings">Settings</span><span id="backup-result-settings"></span></div>
+          <div><span data-i18n="backupSectionThemes">Themes</span><span id="backup-result-themes"></span></div>
+          <div><span data-i18n="backupSectionHighlights">Highlights and notes</span><span id="backup-result-highlights"></span></div>
+          <div><span data-i18n="backupSectionVocabulary">Vocabulary</span><span id="backup-result-vocabulary"></span></div>
+          <div><span data-i18n="backupSectionSecrets">API keys and tokens</span><span id="backup-result-secrets"></span></div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" id="sec-notifications" data-i18n="secNotifications">Notifications</h2>
+        <div class="pref-group" role="group" aria-labelledby="sec-notifications">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="notify-quick-save" checked /> <span class="switch-text" data-i18n="notifyQuickSave">Quick save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="notify-read-later" checked /> <span class="switch-text" data-i18n="notifyReadLater">Read Later save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="notify-tab-set" checked /> <span class="switch-text" data-i18n="notifyTabSet">Tab Set save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="notify-batch-save" checked /> <span class="switch-text" data-i18n="notifyBatchSave">Batch save</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="notify-errors" checked /> <span class="switch-text" data-i18n="notifyErrors">Error notifications</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+      </section>
+      <section class="support-diagnostics settings-section" aria-labelledby="support-diagnostics-title">
         <div class="context-help-host context-help-section" data-help-role="section">
           <h2 class="section-title" id="support-diagnostics-title" data-i18n="diagnosticsTitle">Support Diagnostics</h2>
           <details class="context-help">
@@ -1222,19 +1228,21 @@
     </div>
 
     <!-- Tab 7: Storage -->
-    <div id="panel-storage" class="panel" role="tabpanel" aria-labelledby="tab-storage">
-      <div class="context-help-host context-help-section" data-help-role="section">
-        <h2 class="section-title" data-i18n="secStorage">Storage Management</h2>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="storageIntro">Reclaim local cache space. These caches rebuild automatically after clearing. Your settings, credentials, pending saves and in-progress data are never touched.</p>
-        </details>
-      </div>
-      <div id="storage-cats" class="storage-cats"></div>
-      <div class="fg fg-actions">
-        <button type="button" class="btn" id="storage-clear-btn" data-i18n="storageClear">Clear selected</button>
-        <span id="storage-status" class="et-test-status hidden" role="status" aria-live="polite"></span>
-      </div>
+    <div id="panel-storage" class="panel" role="tabpanel" aria-labelledby="tab-storage" data-ui-stage0>
+      <section class="settings-section">
+        <div class="context-help-host context-help-section" data-help-role="section">
+          <h2 class="section-title" data-i18n="secStorage">Storage Management</h2>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="storageIntro">Reclaim local cache space. These caches rebuild automatically after clearing. Your settings, credentials, pending saves and in-progress data are never touched.</p>
+          </details>
+        </div>
+        <div id="storage-cats" class="storage-cats"></div>
+        <div class="fg fg-actions">
+          <button type="button" class="btn" id="storage-clear-btn" data-i18n="storageClear">Clear selected</button>
+          <span id="storage-status" class="et-test-status hidden" role="status" aria-live="polite"></span>
+        </div>
+      </section>
     </div>
   </div>
   <script defer src="i18n.js"></script>

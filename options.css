@@ -1475,20 +1475,18 @@ html.motion-ready .backup-import-result:not([hidden]) {
 /* Disabled checkbox rows. :disabled was styled only on the .btn family, so a row
    the user cannot tick kept full-contrast text and (inside .fg) a pointer
    cursor -- worst in the import preview, the one screen where the user is
-   deciding what to import. Three sites disable a checkbox, all with the same
-   <label><input><span> shape, so the adjacent sibling lands with no JS change
-   and no :has() (hot path): options-backup.js renderPreview (a section the
-   backup file does not carry), options.js's storage category list (a category
-   measuring 0 bytes), and options.js's credential-sync toggle (settings sync
-   off, which is every new profile's default). Dim reuses .btn:disabled's step
-   rather than inventing a second one. A choice row is now a .switch row whose
-   recipe already paints disabled copy --opt-fg-hint; `:not(.switch-text)`
-   keeps the opacity step off it so the text is not dimmed twice. */
-.backup-section-picker input:disabled + span,
-.storage-cats input:disabled + span,
+   deciding what to import. Stage-3b Task 2 moved the two consumers this rule
+   used to cover -- options-backup.js renderPreview's per-section checkboxes
+   (backup-section-picker) and options.js's storage category list
+   (storage-cats, a category measuring 0 bytes) -- onto `.pick.pick-box`
+   (COMPONENTS.md §6.4 exception 3), whose own composer contract already
+   paints a disabled row's text/mark `--opt-fg-hint` and its cursor `default`;
+   leaving those two selectors here would have double-dimmed (and wrongly
+   cursor:not-allowed'd) them. `.choice-row` stays for any bare
+   `<label><input><span>` disabled checkbox that is not (yet) `.switch`/
+   `.pick`; `:not(.switch-text)` keeps `.switch`'s own composer-painted
+   disabled dimming from being doubled too. */
 .choice-row input:disabled + span:not(.switch-text) { opacity: 0.45; }
-.backup-section-picker input:disabled,
-.storage-cats input:disabled,
 .choice-row input:disabled { cursor: not-allowed; }
 /* The storage category list's own group rhythm. It once shared a selector
    list with the backup-picker dim above, so the picker's disabled copy got
@@ -1527,6 +1525,25 @@ html.motion-ready .backup-import-result:not([hidden]) {
    .pref-row uses, not a radio-specific rung. */
 [data-ui-stage0] .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
 [data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-5); }
+/* Stage-3b Task 2 (2026-09-24-ui-system-stage3b): `.disclosure > summary`'s
+   own base rule (~line 2079) is a literal `font-size: 15px`, written to
+   read "the same face as .section-title" (its own doc comment, ~line 2059)
+   -- true everywhere on the page until now, since no `.disclosure` had ever
+   shared a stage-0 panel with an `h2.section-title` sibling (general's
+   #acc-connection-overview is the first: every other `.disclosure` still
+   lives in an unmigrated panel -- vocab's five, tags' tag-gov-lowcount).
+   Once panel-general's h2s took the stage-0 bump above (16px comfortable /
+   15px compact) while this disclosure's own summary stayed pinned at the
+   surface-wide literal 15px, "General" and "Connection Status" -- two
+   headings in the SAME section -- started reading at two different sizes
+   (render-audit family 7 headerFace caught it: #connection-overview-title
+   16px-majority vs its own 15px). Restoring the "same face" invariant here,
+   the same way every other stage-0 typography override in this block does
+   it -- by the marker, not by panel id, so vocab's/tags' disclosures pick
+   this up for free once THEY migrate. line-height matches for the same
+   reason (not itself part of the headerFace check, but the same "one heading
+   face" intent this whole rule restores). */
+[data-ui-stage0] .disclosure > summary { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); }
 /* Fixwave (final review, Low finding): the legacy `.context-help-section
    { margin: var(--opt-sp-4) 0 }` (~line 607) was written to match a PLAIN
    `.section-title`'s own margin (both sp-4, 8px) so a section that opens

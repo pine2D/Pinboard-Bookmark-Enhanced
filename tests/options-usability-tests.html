@@ -1062,6 +1062,63 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     }
   });
 
+  // Stage-3b Task 2 (2026-09-24-ui-system-stage3b): general + storage move
+  // onto the row model. General's 10 switches: Data Sync (2) + Backup &
+  // Restore (3: highlights/vocabulary/secrets) + Notifications (5) --
+  // counted straight from the brief, re-verified against the live markup.
+  await test("stage3b: general panel carries the marker and no legacy row classes", async () => {
+    const panel = await stage0Panel("general");
+    assert(!!panel, "panel-general is missing the data-ui-stage0 marker");
+    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
+      "panel-general still carries a legacy row/stack class");
+  });
+
+  await test("stage3b: every switch in the general panel sits in a .pref-row", async () => {
+    const panel = await stage0Panel("general");
+    assert(!!panel, "panel-general is missing the data-ui-stage0 marker");
+    const switches = [...panel.querySelectorAll("label.switch")];
+    assert(switches.length === 10, "expected 10 switches in panel-general, got " + switches.length);
+    assert(switches.every((l) => l.parentElement.classList.contains("pref-row") && l.closest(".pref-group")),
+      "every switch in panel-general must sit directly in a .pref-row inside a .pref-group");
+  });
+
+  await test("stage3b: general panel's language select is a listbox target", async () => {
+    const panel = await stage0Panel("general");
+    assert(!!panel, "panel-general is missing the data-ui-stage0 marker");
+    const select = panel.querySelector("#opt-lang");
+    assert(select && select.hasAttribute("data-listbox"), "opt-lang is missing data-listbox");
+  });
+
+  await test("stage3b: backup section picker checkboxes use label.pick.pick-box", async () => {
+    const panel = await stage0Panel("general");
+    assert(!!panel, "panel-general is missing the data-ui-stage0 marker");
+    const fieldset = panel.querySelector("fieldset.backup-section-picker");
+    assert(!!fieldset && fieldset.querySelector("legend"), "backup-section-picker lost its fieldset/legend");
+    const checkboxes = [...fieldset.querySelectorAll('input[type="checkbox"]')];
+    const picks = [...fieldset.querySelectorAll("label.pick.pick-box")];
+    assert(checkboxes.length === 5, "expected 5 checkboxes in the backup section picker, got " + checkboxes.length);
+    assert(picks.length === checkboxes.length,
+      "expected one label.pick.pick-box per checkbox, got " + picks.length + " for " + checkboxes.length + " checkboxes");
+    picks.forEach((l) => {
+      assert(l.closest(".pref-row") && l.closest(".pref-group"), "backup picker label.pick must sit in a .pref-row inside a .pref-group");
+      assert(l.querySelector('input[type="checkbox"]') && l.querySelector(".pick-text") && l.querySelector(".pick-mark"),
+        "backup picker label.pick is missing its input/pick-text/pick-mark");
+    });
+  });
+
+  await test("stage3b: storage panel carries the marker and keeps its static shape", async () => {
+    const panel = await stage0Panel("storage");
+    assert(!!panel, "panel-storage is missing the data-ui-stage0 marker");
+    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
+      "panel-storage still carries a legacy row/stack class");
+    const section = panel.querySelector("section.settings-section");
+    assert(!!section, "panel-storage's content is not wrapped in a section.settings-section");
+    assert(!!section.querySelector("#storage-cats.storage-cats"), "panel-storage lost its #storage-cats mount point");
+    const actions = section.querySelector(".fg.fg-actions");
+    assert(!!actions && actions.querySelector("#storage-clear-btn") && actions.querySelector("#storage-status"),
+      "panel-storage's .fg.fg-actions lost its clear button/status slot");
+  });
+
   await test("stage3a: ai-behavior selects are listbox targets", async () => {
     const panel = await stage0Panel("ai-behavior");
     assert(!!panel, "panel-ai-behavior is missing the data-ui-stage0 marker");

@@ -3157,10 +3157,16 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // #opt-ai-provider-btn/#translate-target-lang-btn would already match
     // via their own hitRectMin (named explicitly here anyway, for a reader
     // who is not tracing that incidental overlap); the two `state: "open"`
-    // popover rows share #opt-ai-provider-btn's own #panel-ai resolution
-    // (bare `.listbox-pop`/`.listbox-opt` selectors match it first in DOM
-    // order) and skip this loop's own visibility wait below (see that
-    // comment).
+    // popover rows resolve #panel-ai the same way every other row here does
+    // (`.closest(".panel")` off their own selector) and skip this loop's own
+    // visibility wait below (see that comment). Stage-3b Task 2: those two
+    // rows' selectors are anchored to #opt-ai-provider's own IDs
+    // (`#opt-ai-provider-btn + .listbox-pop`, `#opt-ai-provider-list
+    // .listbox-opt`, tests/render-audit-checklist.mjs), not the bare
+    // `.listbox-pop`/`.listbox-opt` classes a "first in DOM order" match
+    // used to rely on -- #opt-lang (General tab, ahead of AI Providers in
+    // options.html) became a second `data-listbox` consumer and would
+    // otherwise have matched first, resolving #panel-general instead.
     // `.pick-mark` (stage-3b Task 1) widened this the same way `.switch-
     // track` is already generic here, not via a per-selector name like the
     // #opt-popup-width-custom/#test-gemini entries below: `#panel-bookmarks`
@@ -3179,7 +3185,13 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       || c.expect?.hitRectMin
       || c.selector.includes("[data-ui-stage0]") || c.selector === "#opt-popup-width-custom"
       || c.selector === "#test-gemini" || c.selector === "#opt-ai-provider-btn"
-      || c.selector === "#translate-target-lang-btn" || c.selector === ".listbox-pop" || c.selector === ".listbox-opt");
+      || c.selector === "#translate-target-lang-btn"
+      // Stage-3b Task 2: substring match (not exact-string), same reasoning
+      // as .switch-track/.pick-mark above -- the two `state: "open"` popover
+      // rows now carry #opt-ai-provider-anchored selectors
+      // (`#opt-ai-provider-btn + .listbox-pop`, `#opt-ai-provider-list
+      // .listbox-opt`), not the bare class strings this used to `===` against.
+      || c.selector.includes(".listbox-pop") || c.selector.includes(".listbox-opt"));
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
       && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c));

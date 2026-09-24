@@ -1513,12 +1513,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     let total = 0;
+    // Task 2 (2026-09-24-ui-system-stage3b): the row model's .pick.pick-box
+    // (COMPONENTS.md §6.4 exception 3) replaces the bare <label><input><span>
+    // checkbox row -- one .pref-group per render, one .pref-row per category,
+    // same checked/disabled logic as before.
+    const group = document.createElement("div");
+    group.className = "pref-group";
     STORAGE_CATS.forEach((c) => {
       const m = measured[c.id] || { keys: [], bytes: 0 };
       total += m.bytes;
       const row = document.createElement("div");
-      row.className = "fg";
+      row.className = "pref-row";
       const label = document.createElement("label");
+      label.className = "pick pick-box";
       const cb = document.createElement("input");
       cb.type = "checkbox";
       cb.className = "storage-cat-cb";
@@ -1528,13 +1535,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       cb.checked = c.defaultOn && m.keys.length > 0;
       cb.disabled = m.keys.length === 0;
       const span = document.createElement("span");
+      span.className = "pick-text";
       span.textContent = `${t(c.labelKey)} — ${pbpFormatBytes(m.bytes)} (${m.keys.length})`;
+      const mark = document.createElement("span");
+      mark.className = "pick-mark";
+      mark.setAttribute("aria-hidden", "true");
       label.appendChild(cb);
       label.appendChild(document.createTextNode(" "));
       label.appendChild(span);
+      label.appendChild(mark);
       row.appendChild(label);
-      host.appendChild(row);
+      group.appendChild(row);
     });
+    host.appendChild(group);
     const totalP = document.createElement("p");
     totalP.className = "hint";
     totalP.textContent = t("storageReclaimable", pbpFormatBytes(total));

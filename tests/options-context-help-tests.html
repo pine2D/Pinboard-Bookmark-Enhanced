@@ -66,7 +66,7 @@ function test(name, fn) {
   });
 
   const layoutCases = [
-    ["optSyncHint", "field"],
+    ["optSyncHint", "choice"],
     ["storageIntro", "section"],
     ["batchAiHint", "group"],
     ["saveAsThemeHint", "action"],
@@ -545,8 +545,30 @@ function test(name, fn) {
       // before this rule: 12.67px vs 4px, on every help-bearing field.
       assert(Math.abs(a.top - h.top) <= 1, type + "/" + key + " anchor sits " + (a.top - h.top) + "px below its row top (toggle inflates the row)");
       assert(t.top < a.bottom && t.bottom > a.top, type + "/" + key + " toggle left its anchor's row");
-      const rowBottom = a.bottom;
-      assert(b.top >= rowBottom && b.top - rowBottom <= 4, type + "/" + key + " top gap=" + (b.top - rowBottom));
+      // Stage-3b Task 2 (2026-09-24-ui-system-stage3b): optSyncHint is the
+      // first `layoutCases` entry whose anchor is a `label.switch` with the
+      // help INSIDE the label (Ruling 36) AND whose row is R9's "first row
+      // right after its section title" reduction target (padding-top:0,
+      // padding-bottom stays --opt-row-pad-y -- COMPONENTS.md §10.2, R9).
+      // `anchorRowRect`'s `a.bottom` deliberately adds the anchor's own
+      // padding-bottom back onto the copy line's own bottom, which recovers
+      // the row's true CLOSED box edge for every symmetric-padding row (the
+      // only shape this helper had ever measured until now, e.g. the wayback
+      // "row doesn't shrink" check's `.height` use a few tests above) -- but
+      // once top and bottom padding differ, that box edge is no longer where
+      // the open answer actually starts: the second flex line (row-gap: 0)
+      // begins right after the copy line itself, offset only by
+      // `.context-help-body`'s own calibrated 6px margin-top (the SAME value
+      // used everywhere else for a choice host's open-answer gap, e.g.
+      // aiCacheHint's "label-to-answer gap" a few tests below, 4-8px). A
+      // "choice" case therefore measures the gap against the copy line's own
+      // bottom instead of the row's box edge, with that same 4-8px window;
+      // every other role keeps the original box-edge math and its tighter 4px
+      // ceiling (calibrated for their own, different open-answer recipe).
+      const copy = anchor.matches("label.switch") ? anchor.querySelector(":scope > .switch-text") : null;
+      const rowBottom = type === "choice" && copy ? copy.getBoundingClientRect().bottom : a.bottom;
+      const tolerance = type === "choice" ? 8 : 4;
+      assert(b.top >= rowBottom && b.top - rowBottom <= tolerance, type + "/" + key + " top gap=" + (b.top - rowBottom));
       assert(Math.abs(b.left - h.left) <= 1, type + "/" + key + " left delta=" + (b.left - h.left));
     });
   });
@@ -611,14 +633,29 @@ function test(name, fn) {
     assert(!stretched.length, "stretched: " + stretched.join("; "));
   });
 
-  test("expanded field help contributes only one gap before the next setting", () => {
+  // optSyncHint is a "choice" role (a self-contained `.pref-row`: just
+  // `label.switch` + its nested `<details>`, nothing else in the row after
+  // the answer) -- the ONE shape where "the next setting" genuinely means
+  // the very next sibling row, unlike a field host (whose own control
+  // typically follows its own help inside the SAME host). Stage-3b Task 2
+  // moved this row off the old flat `.choice-row` (no padding, ~20px tall)
+  // onto the stage-0 `.pref-row` model (44/36px, --opt-row-pad-y top+bottom
+  // padding on EVERY row), so two stacked full rows with the first one's
+  // help open naturally read a wider ink-to-ink gap than the old model ever
+  // produced -- not a double-margin regression (traced by hand: no gap
+  // ADDS to another, the number is exactly `.context-help-body`'s own 6px
+  // open-answer margin plus the next row's own --opt-row-pad-y top padding
+  // and both lines' font-metric ink insets), so "only one gap" now reads as
+  // "still exactly this one combination, not a THIRD contributor stacked on
+  // top of it".
+  test("expanded choice help contributes only one gap before the next setting", () => {
     const { details, host, body } = parts("optSyncHint");
     const next = host.nextElementSibling;
     const nextLabel = next?.querySelector(":scope > label");
     assert(next?.classList.contains("context-help-host") && nextLabel, "sync fixture has no following setting");
     details.open = true;
     const gap = textInkRect(nextLabel).top - textInkRect(body).bottom;
-    assert(gap >= 6 && gap <= 10, "sync answer-to-next visual gap=" + gap);
+    assert(gap >= 20 && gap <= 32, "sync answer-to-next visual gap=" + gap);
   });
 
   test("expanded field help is visually owned by its label, not its input", () => {
@@ -813,9 +850,6 @@ function test(name, fn) {
 
   test("coherent choice groups use the compact stack rhythm", () => {
     const groups = [
-      ["opt-sync-enabled", "opt-sync-api-keys"],
-      ["opt-backup-include-highlights", "opt-backup-include-vocabulary", "opt-backup-include-secrets"],
-      ["notify-quick-save", "notify-read-later", "notify-tab-set", "notify-batch-save", "notify-errors"],
       ["opt-md-frontmatter", "opt-md-extended-meta"],
       ["opt-md-include-toc", "opt-md-include-hl"],
     ];
@@ -829,7 +863,8 @@ function test(name, fn) {
     // check below instead of joining `groups` -- folding them back in would
     // make the shared height/step uniformity assertion compare two
     // intentionally different rhythms and fail on the gap between them, not
-    // on a real defect.
+    // on a real defect. General's sync/backup/notifications groups
+    // (2026-09-24-ui-system-stage3b Task 2) joined this bucket too.
     const stage0Groups = [
       ["opt-check-bookmark-status", "opt-auto-close", "offline-queue-enabled"],
       ["opt-show-search", "opt-show-recent", "opt-show-badge", "opt-show-suggest-tags", "opt-show-ai-summary", "opt-show-ai-tags", "opt-show-quick-links", "opt-show-quick-row"],
@@ -842,6 +877,9 @@ function test(name, fn) {
       ["opt-ai-src-local", "opt-ai-src-jina", "opt-ai-use-transcript"],
       ["opt-md-video-dark", "opt-md-video-pause-lookup", "opt-md-video-use-login"],
       ["opt-wayback-enabled", "opt-wayback-batch", "opt-wayback-skip-private"],
+      ["opt-sync-enabled", "opt-sync-api-keys"],
+      ["opt-backup-include-highlights", "opt-backup-include-vocabulary", "opt-backup-include-secrets"],
+      ["notify-quick-save", "notify-read-later", "notify-tab-set", "notify-batch-save", "notify-errors"],
     ];
     groups.forEach((ids) => {
       const rows = ids.map((id) => doc.getElementById(id)?.closest(".choice-row"));
@@ -905,22 +943,24 @@ function test(name, fn) {
     assert(body.contains(health) && body.contains(hint), "connection overview content escaped its disclosure body");
   });
 
-  test("connection overview presents one separator before Language", () => {
-    const section = doc.getElementById("acc-connection-overview");
-    const language = doc.getElementById("sec-language");
-    assert(section && language, "connection overview separator fixture incomplete");
-    const separators = [];
-    const sectionStyle = getComputedStyle(section);
-    if (parseFloat(sectionStyle.borderBottomWidth) > 0 && sectionStyle.borderBottomStyle !== "none") {
-      separators.push(section.getBoundingClientRect().bottom);
-    }
-    for (let node = section.nextElementSibling; node && node !== language; node = node.nextElementSibling) {
-      const style = getComputedStyle(node);
-      if (parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle !== "none") {
-        separators.push(node.getBoundingClientRect().top);
-      }
-    }
-    assert(separators.length === 1, "connection overview renders " + separators.length + " separators before Language");
+  // Stage-3b Task 2 (2026-09-24-ui-system-stage3b): panel-general dropped its
+  // `.divider` elements (spec §3, matching every other migrated panel) --
+  // "Pinboard Account" (which owns the connection overview) and "Language"
+  // are now two separate `section.settings-section` blocks, spaced by the
+  // row model's own `[data-ui-stage0] .settings-section + .settings-section`
+  // margin-top (--opt-section-gap) instead of a literal border line. Retitled
+  // and rewritten from "presents one separator" (which asserted the OLD
+  // divider's border-line count) to assert the boundary that replaced it.
+  test("Pinboard Account and Language are separate sections joined by the row model's margin gap, not a divider", () => {
+    const panel = doc.getElementById("panel-general");
+    doc.querySelectorAll(".panel").forEach((candidate) => candidate.classList.toggle("active", candidate === panel));
+    const accountSection = doc.getElementById("acc-connection-overview")?.closest("section.settings-section");
+    const languageSection = doc.getElementById("sec-language")?.closest("section.settings-section");
+    assert(accountSection && languageSection && accountSection !== languageSection,
+      "connection overview and Language must sit in separate settings-section blocks");
+    assert(!panel.querySelector(".divider"), "panel-general still carries a legacy divider");
+    const gap = languageSection.getBoundingClientRect().top - accountSection.getBoundingClientRect().bottom;
+    assert(gap >= 30 && gap <= 34, "Pinboard Account -> Language section gap=" + gap);
   });
 
   test("batch AI help opens below an explicit group title", () => {
@@ -948,15 +988,22 @@ function test(name, fn) {
     assert(legacy && !legacy.closest("details.context-help"), "conditional legacy guidance is hidden twice");
   });
 
+  // Stage-3b Task 2: the `.divider` that used to follow #backup-import-result
+  // (and gate this test's whole premise -- an empty status must not add its
+  // OWN gap on top of the divider's) is gone; "Backup & Restore" is now one
+  // `section.settings-section` and "Notifications" the next, joined by the
+  // row model's margin gap instead. The empty-status collapse this test
+  // exists for is unrelated to that boundary and still holds on its own.
   test("empty backup status does not reserve a blank row", () => {
     parts("backupPlaintextDisclosure");
     const note = doc.getElementById("backup-export-note");
-    const actions = doc.querySelector(".backup-actions");
-    const divider = doc.getElementById("backup-import-result")?.nextElementSibling;
-    assert(note && actions && divider?.classList.contains("divider"), "backup layout fixture incomplete");
+    const backupSection = doc.getElementById("backup-import-result")?.closest("section.settings-section");
+    const notificationsSection = doc.getElementById("sec-notifications")?.closest("section.settings-section");
+    assert(note && backupSection && notificationsSection && backupSection !== notificationsSection,
+      "backup layout fixture incomplete");
     assert(note.getBoundingClientRect().height === 0, "empty status height=" + note.getBoundingClientRect().height);
-    const gap = divider.getBoundingClientRect().top - actions.getBoundingClientRect().bottom;
-    assert(gap >= 12 && gap <= 20, "actions-to-divider gap=" + gap);
+    const gap = notificationsSection.getBoundingClientRect().top - backupSection.getBoundingClientRect().bottom;
+    assert(gap >= 30 && gap <= 34, "backup section -> notifications section gap=" + gap);
   });
 
   test("other empty standalone status blocks collapse until populated", () => {

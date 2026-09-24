@@ -3234,18 +3234,21 @@ check(/@media[^{]*\(max-height:[^)]*\)\s*\{[\s\S]*?\.options-nav\s*\{[^}]*positi
   "options.css: .options-nav is sticky with no height escape hatch -- on a viewport shorter than the sidebar (1080p at 150% zoom is ~633px) the last tabs and Reset This Tab are unreachable");
 
 // Disabled checkboxes had no visual state on this page: :disabled was only ever
-// styled on the .btn family. Every site that disables a checkbox uses the same
-// <label><input><span> row, so each container needs the adjacent-sibling dim.
-// The selector must sit in a rule that actually dims (declares opacity): the
-// backup picker's selector once survived here while sharing a list with the
-// #storage-cats margin rule, i.e. present in the file and never dimmed.
-{
-  const disabledRow = ["backup-section-picker", "storage-cats", "choice-row"];
-  const missing = disabledRow.filter((cls) =>
-    !new RegExp(`\\.${cls}[^{}]*input:disabled\\s*\\+\\s*span[^{}]*\\{[^}]*opacity\\s*:`).test(optionsCss));
-  check(missing.length === 0,
-    `options.css: disabled checkbox rows keep full-contrast text in ${missing.map((c) => "." + c).join(", ")} -- the user cannot tick them and the page never says why`);
-}
+// styled on the .btn family. Stage-3b Task 2 moved backup-section-picker's and
+// storage-cats' disabled rows onto the .pick.pick-box primitive (COMPONENTS.md
+// §6.4 exception 3): its own composer rule dims both the text AND the mark via
+// `color` (not the older opacity-on-adjacent-span trick), so both containers
+// now share one selector instead of each needing their own. `.choice-row`
+// still uses the older shape -- a bare <label><input><span> row that is not
+// (yet) .switch/.pick -- so it keeps the adjacent-sibling dim. Each selector
+// must sit in a rule that actually dims (declares color/opacity), not just be
+// present in the file (the backup picker's selector once survived here while
+// sharing a list with the #storage-cats margin rule, i.e. present and never
+// dimmed).
+check(/\.choice-row[^{}]*input:disabled\s*\+\s*span[^{}]*\{[^}]*opacity\s*:/.test(optionsCss),
+  "options.css: .choice-row disabled checkbox rows keep full-contrast text -- the user cannot tick them and the page never says why");
+check(/\.pick\s*>\s*input:disabled\s*~\s*\.pick-text[^{}]*\{[^}]*color\s*:/.test(optionsCss),
+  "options.css: .pick disabled checkbox rows (backup-section-picker, storage-cats) keep full-contrast text -- the user cannot tick them and the page never says why");
 
 function runOptionsEarly({ mode = "auto", preset = "", dark = false, syncMirror, chrome } = {}) {
   // dataset is a Proxy that counts real mutations (K33): the write-only-on-

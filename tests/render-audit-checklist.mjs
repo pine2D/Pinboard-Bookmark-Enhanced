@@ -1532,26 +1532,39 @@ export const CHECKS = [
   // widthPx.min replaces widthPx.max: a select that somehow rendered
   // NARROWER than its own floor would be as real a regression as one that
   // grew wider. widthLteWith carries the OTHER half -- "never wider than
-  // the column" -- compared live against `.fg` (bare selector matches the
-  // FIRST `.fg` in DOM order, the Pinboard-token field on the General tab,
-  // :85 in options.html -- NOT #opt-lang's own literal parent `.fg` at
-  // :105, but both are plain block-level `.fg` wrappers with no width of
-  // their own inside the SAME active panel, so they render at the identical
-  // column width; a bare `.fg select` selector already leans on this same
-  // "first match in DOM order" convention for the geometry row itself, one
-  // paragraph up). Bare `.fg select` matches the FIRST such element in DOM
-  // order, #opt-lang (general tab, active on a bare goto(), no extra setup).
-  { surface: "options", page: "options.html", selector: ".fg select", state: "default",
-    expect: { widthPx: { min: 240 }, widthLteWith: { selector: ".fg" } } },
-  // .key-wrap 420 (password/API-key fields, fused with the eye toggle --
-  // COMPONENTS.md §8 -- the cap sits on the WRAPPER so the toggle stays
-  // fused to the input's own right edge, not the field's full-width box).
-  // Bare `.key-wrap` matches #opt-pinboard-token's wrap (general tab) --
-  // same selector string the two fusedStateStable entries above already use,
-  // so this reuses that group's existing `#tab-general` click rather than
-  // adding a third one.
+  // the column" -- compared live against its own `.fg`.
+  // Stage-3b Task 2 (2026-09-24-ui-system-stage3b): this row used to be a
+  // bare `.fg select`, leaning on "#opt-lang is the first `<select>` inside
+  // a `.fg` in DOM order" -- true only while #opt-lang was still a plain
+  // native select. This task turned #opt-lang into the row model's OWN
+  // second `data-listbox` consumer (spec §3): options-listbox.js hides the
+  // native `<select>` (`select.hidden = true`) and builds `#opt-lang-btn`
+  // as its visible replacement, so the bare selector kept matching the now-
+  // invisible native element and read a zero-size FAIL (`.fg select|
+  // widthPx actual=null`) on every theme. Re-pointed to `#opt-ai-provider-
+  // btn`'s own established shape (below) -- `#opt-lang-btn` reached via
+  // `otherChecks`'s existing "#tab-general is the default active panel"
+  // convention, same as the row it replaces, no new tab-click group needed.
+  { surface: "options", page: "options.html", selector: "#opt-lang-btn", state: "default",
+    expect: { widthPx: { min: 240 }, widthLteWith: { selector: ".fg:has(#opt-lang-btn)" } } },
+  // .key-wrap <= its own column (password/API-key fields, fused with the eye
+  // toggle -- COMPONENTS.md §8 -- the cap sits on the WRAPPER so the toggle
+  // stays fused to the input's own right edge, not the field's full-width
+  // box). Bare `.key-wrap` matches #opt-pinboard-token's wrap (general tab)
+  // -- same selector string the two fusedStateStable entries above already
+  // use, so this reuses that group's existing `#tab-general` click rather
+  // than adding a third one.
+  // Stage-3b Task 2: re-pinned from a literal `widthPx.max: 420` to
+  // `widthLteWith` against its own `.fg` column -- the SAME re-pin Task 4
+  // (ui-system-stage2, Controller ruling C, comment below) already gave
+  // #fields-openai's key-wrap, for the identical reason: panel-general
+  // taking `[data-ui-stage0]` promoted #opt-pinboard-token's `.fg` to `.fg
+  // entry-block` (spec §3), and `.entry-block > :is(input:not([type=
+  // number]), .key-wrap) { max-width: none }` now reaches it too, so it
+  // fills its column (measured: 790.67px on this audit's >=1040px viewport)
+  // instead of capping at the old literal 420px ceiling.
   { surface: "options", page: "options.html", selector: ".key-wrap", state: "default",
-    expect: { widthPx: { max: 420 } } },
+    expect: { widthLteWith: { selector: ".fg:has(#opt-pinboard-token)" } } },
   // .fg-url (the three baseurl endpoints) and plain input[type=text] (the
   // Model field) both live on the AI Providers tab, inside #panel-ai;
   // #opt-openai-baseurl/#opt-openai-model specifically live inside
@@ -1631,17 +1644,35 @@ export const CHECKS = [
   // real-keyboard assertion in the gate, not only a mouse one. Both rows
   // below share that one open popover: `.listbox-pop`'s border (spec §3's
   // popover chrome) and `.listbox-opt`'s row height (control-h, the same
-  // density tier as the button). Bare selectors match the PROVIDER's
-  // popover/option first in DOM order (#opt-ai-provider sits before
-  // #translate-target-lang in options.html) -- the one this state opens.
+  // density tier as the button).
   // borderRadiusPx (fixwave stage2): the popover shell's corner radius must
   // track this surface's live --opt-radius-lg rung (COMPONENTS.md §9), not a
   // literal px -- same theme-aware comparison insetBand.radiusVar already
   // uses for a list row's inset band, applied directly to the shell itself.
-  { surface: "options", page: "options.html", selector: ".listbox-pop", state: "open",
+  // Stage-3b Task 2 (2026-09-24-ui-system-stage3b): selectors anchored off
+  // #opt-ai-provider's own IDs instead of the bare `.listbox-pop`/
+  // `.listbox-opt` classes (a `document.querySelector()`/`$eval()` "first in
+  // DOM order" match used to land on #opt-ai-provider's popover/option
+  // because it was the only `data-listbox` select ahead of
+  // #translate-target-lang in options.html). Adding #opt-lang as a second
+  // `data-listbox` select on the General tab, which precedes AI Providers in
+  // the document, gave the page a SECOND `.listbox-pop`/`.listbox-opt` pair
+  // that now sorts first -- the bare selectors silently matched #opt-lang's
+  // own (closed) popover instead, so both the runner's tab-resolution
+  // (`el.closest(".panel")`) AND runOneCheck's final measurement read the
+  // wrong element (reproduced twice: "could not focus open.click target
+  // #opt-ai-provider-btn", since the runner switched to #tab-general -- the
+  // panel #opt-lang's popover actually belongs to -- instead of #tab-ai).
+  // `#opt-ai-provider-btn + .listbox-pop` (root.append(btn, pop) in
+  // options-listbox.js makes pop the button's own next sibling) and
+  // `#opt-ai-provider-list .listbox-opt` (`list.id = \`${id}-list\``, same
+  // file) are both anchored to #opt-ai-provider's own unique IDs, so they
+  // stay correct no matter how many more `.listbox-pop`/`.listbox-opt`
+  // instances later tabs add.
+  { surface: "options", page: "options.html", selector: "#opt-ai-provider-btn + .listbox-pop", state: "open",
     open: { click: "#opt-ai-provider-btn" },
     expect: { borderTopWidthPx: { value: 1 }, borderRadiusPx: { radiusVar: "radius-lg" } } },
-  { surface: "options", page: "options.html", selector: ".listbox-opt", state: "open",
+  { surface: "options", page: "options.html", selector: "#opt-ai-provider-list .listbox-opt", state: "open",
     open: { click: "#opt-ai-provider-btn" },
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
   // input[type=number] 96 (a handful of digits). #opt-ai-cache-duration lives

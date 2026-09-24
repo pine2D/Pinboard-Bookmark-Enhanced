@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 28;
+const TOTAL = 29;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -757,6 +757,65 @@ function pbpTestChromeStub(enMessages) {
     assert(hit === customInput || customInput.contains(hit),
       "a click at the number input's centre hits " + (hit ? (hit.tagName + (hit.id ? "#" + hit.id : "")) : "nothing") +
       " instead of opt-popup-width-custom -- the hidden radio's inset:0 must not cover the inline number input");
+  });
+
+  // Stage-3b Task 2 (2026-09-24-ui-system-stage3b): renderStoragePanel now
+  // emits .pref-group > .pref-row > label.pick.pick-box (COMPONENTS.md §6.4
+  // exception 3) instead of a bare <label><input><span> row. It runs lazily,
+  // off activateTab's storage-tab branch (options.js), not on boot -- a real
+  // click on #tab-storage, not showPanel (which only flips .panel.active and
+  // never reaches that branch). pbpMeasureLocalStorage (shared.js) awaits
+  // ONLY chrome.storage.local.get(null); the fixture's stub already
+  // implements that, so no stub extension was needed -- seeding three of the
+  // four PBP_RECLAIM_CATEGORIES (jina/urls/misc, shared.js) with one real key
+  // each is enough to render every category (the fourth, tags, stays empty on
+  // purpose: it is the disabled-row case below).
+  test("storage builder emits pref-group > pref-row > label.pick.pick-box rows, with disabled categories unselectable", async () => {
+    await win.chrome.storage.local.set({
+      "jina_md_https://example.com/": "cached markdown",
+      cached_existing_urls: ["https://example.com/"],
+      pbp_ai_usage: { count: 3 },
+    });
+    // activateTab (options.js) also calls history.replaceState with the
+    // panel's own #hash -- fine on the real extension page, but this fixture
+    // is an about:srcdoc document (no matching http(s) location), so the
+    // engine throws a same-origin SecurityError that would otherwise surface
+    // as an unrelated PAGEERROR. Swallow just that one call for this click;
+    // nothing else in this test depends on the URL hash.
+    const originalReplaceState = win.history.replaceState.bind(win.history);
+    win.history.replaceState = () => {};
+    try {
+      doc.getElementById("tab-storage").click();
+    } finally {
+      win.history.replaceState = originalReplaceState;
+    }
+    const host = doc.getElementById("storage-cats");
+    assert(host, "storage-cats host missing");
+    for (let i = 0; i < 40 && !host.querySelector(".pref-group"); i++) await sleep(50);
+    const group = host.querySelector(".pref-group");
+    assert(group, "renderStoragePanel never emitted a .pref-group");
+    const rows = [...group.querySelectorAll(":scope > .pref-row")];
+    assert(rows.length === 4, "expected 4 storage category rows (jina/urls/tags/misc), got " + rows.length);
+    const picks = [...group.querySelectorAll(":scope > .pref-row > label.pick.pick-box")];
+    assert(picks.length === rows.length,
+      "every storage category .pref-row must have a label.pick.pick-box child, got " + picks.length + " of " + rows.length);
+    picks.forEach((l) => {
+      assert(l.querySelector("input.storage-cat-cb[data-cat]"), "storage pick row is missing its input.storage-cat-cb[data-cat]");
+      assert(l.querySelector(".pick-text") && l.querySelector('.pick-mark[aria-hidden="true"]'),
+        "storage pick row is missing its .pick-text/.pick-mark");
+    });
+    // STORAGE_CATS (options.js) has jina/urls/misc defaultOn:true, tags
+    // defaultOn:false -- seeded with data, the three defaultOn categories
+    // must come up checked (cb.checked = c.defaultOn && m.keys.length > 0).
+    const checked = group.querySelectorAll(".storage-cat-cb:checked");
+    assert(checked.length === 3, "expected 3 default-on categories checked (jina/urls/misc, seeded with data), got " + checked.length);
+    const disabledCb = group.querySelector('.storage-cat-cb[data-cat="tags"]');
+    assert(disabledCb && disabledCb.disabled, "the empty tags category (0 matching keys) must render disabled");
+    assert(!disabledCb.checked, "a disabled category must not start checked");
+    disabledCb.closest("label.pick").click();
+    assert(!disabledCb.checked, "clicking a disabled pick-box row must not select it (native disabled semantics)");
+    const total = host.querySelector(":scope > p.hint");
+    assert(total && total === host.lastElementChild, "the total .hint must stay the last child of #storage-cats, after the .pref-group");
   });
 
   for (const [name, fn] of queue) {
