@@ -1376,6 +1376,18 @@ html.motion-ready .backup-import-result:not([hidden]) {
    compact tier, unlike --opt-row-min-h. */
 [data-ui-stage0] .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
 [data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-5); }
+/* Fixwave (final review, Low finding): the legacy `.context-help-section
+   { margin: var(--opt-sp-4) 0 }` (~line 607) was written to match a PLAIN
+   `.section-title`'s own margin (both sp-4, 8px) so a section that opens
+   with contextual help reads the same title -> content gap as one that
+   doesn't. Stage 0 changed the plain title's own rule to `margin: 0 0
+   var(--opt-sp-5)` (12px bottom, zero top -- rule directly above), so a
+   `.context-help-section` inside a stage-0 panel (#panel-ai's "AI
+   Provider", #panel-ai-behavior's "Prompts") fell 4px out of step with
+   every plain section title on the same page: title -> first control read
+   8px instead of the row model's 12. Mirror the same override here so the
+   two title shapes stay in lockstep inside the marker. */
+[data-ui-stage0] .context-help-section { margin: 0 0 var(--opt-sp-5); }
 [data-ui-stage0] .pref-row + .pref-row { border-top: 1px solid var(--opt-border-section); }
 [data-ui-stage0] .pref-row > label {
   display: flex; align-items: center; gap: var(--opt-sp-5);
@@ -1435,11 +1447,40 @@ html.motion-ready .backup-import-result:not([hidden]) {
    `html[data-theme] .fg label.bl { color: var(--opt-fg-muted) }` override
    below (review round 1, finding 1): (0,3,1) alone loses to that rule's
    (0,3,2) under every preset theme. (0,4,2) here beats it regardless of
-   source order. The label stays body colour under every theme (spec §2). */
-[data-ui-stage0] .fg label.bl,
-html[data-theme] [data-ui-stage0] .fg label.bl {
+   source order. The label stays body colour under every theme (spec §2).
+   Fixwave (final review, Low finding): `label.bl` only ever matched a
+   <label> element, so a `div.bl` GROUP TITLE (Quick's "AI" batch heading
+   `#batch-ai-title`, Archive's "Recent archive requests" wayback-log
+   heading -- both `.context-help-host[data-help-role="group"] > .bl`, a
+   div by design since a group title owns no single control to label) never
+   picked up this rule inside a stage-0 panel and stayed at the surface's
+   legacy 13px/body-colour instead of the row model's --opt-text-body (14)/
+   --opt-lh-body. `:is(label, div)` widens the match without changing this
+   rule's specificity (both are plain type selectors, (0,0,1) either way),
+   so nothing else on the page shifts. Every group-role anchor's own zero
+   margin (`.context-help-host[data-help-role="group"] > .bl`, ~line 528)
+   needs a scoped bump right below to keep winning now that this rule also
+   sets margin-bottom on that element. */
+[data-ui-stage0] .fg :is(label, div).bl,
+html[data-theme] [data-ui-stage0] .fg :is(label, div).bl {
   font-size: var(--opt-text-body); line-height: var(--opt-lh-body); color: var(--opt-fg); margin-bottom: var(--opt-label-gap);
 }
+/* The rule above is (0,3,1) ([data-ui-stage0] + .fg + .bl classes, one
+   :is()-contributed type selector) -- now that it also matches `div.bl`, it
+   outranks `.context-help-host[data-help-role="group"] > .bl { margin: 0 }`
+   (~line 528, (0,3,0)) regardless of source order for EVERY group-role
+   anchor, not just the one this was first caught on (wayback's "Recent
+   archive requests" heading, whose Clear button sits on the same flex row
+   as the title, not below it): #batch-ai-title (Quick's "AI" batch group)
+   is ALSO a group-role anchor and regressed the same way, moving its
+   answer 8px further from the row it opens under than the "opens below and
+   from the start of its owning row" invariant allows (round-1 catch: the
+   grid host's row-1 track height grows with its item's margin-box, pushing
+   row 2 -- the open answer -- down by the same amount). One more
+   class/attribute (repeating the group-role host selector instead of the
+   bare `.bl`) reaches (0,4,0), which beats (0,3,1) on the class/attribute
+   count alone, for every current and future group-role host in one rule. */
+[data-ui-stage0] .context-help-host[data-help-role="group"] > .bl { margin-bottom: 0; }
 /* Inside a help-host field (popup-width-label): the generic
    `.context-help-host[data-help-role="field"] > label.bl { margin: 0; }`
    above and this stage-0 rule share specificity (0,3,1); this rule, being
@@ -1584,6 +1625,26 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    per the stage-3a design doc's remaining panel list). */
 [data-ui-stage0] .context-help-host[data-help-role="section"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.5px)); }
 [data-ui-stage0] .context-help-host[data-help-role="field"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
+/* Fixwave (F4 follow-up, caught by the help-raster gate, not the final
+   review list): widening `.fg label.bl` to `.fg :is(label, div).bl` above
+   raises #batch-ai-title (Quick's "AI" batch group, the one group-role
+   anchor inside a stage-0 panel) from the surface's inherited 13px to
+   --opt-text-body (14px comfortable/13px compact) -- the SAME face change
+   the field-role correction directly above exists for, since both roles
+   share that one widened rule. Group-role text is always the ASCII string
+   "AI" regardless of locale (data-i18n="tabGroupAI"), so only the
+   alphabetic bucket has a stage-0 data point; measured en/zh-CN@2 deltas
+   (physical px, PBP_HELP_RASTER_RANGES=1, both font configs identical):
+   before this rule, 2.5 (at the shared base constant alone, exceeding the
+   +-2 tolerance); at -0.75px, -1.5..1 across both locales -- comfortably
+   inside tolerance under both the local and CI font configs. Chose the
+   field role's own -0.75px rather than re-deriving a separate value: both
+   hosts render the identical font-size/line-height face under this rule,
+   so the same correction applies for the same reason. Re-measure under
+   both `scripts/options-help-render-audit.mjs` and
+   `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
+   scripts/options-help-render-audit.mjs` before nudging further. */
+[data-ui-stage0] .context-help-host[data-help-role="group"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
 /* Stage-3a (Task 1, 2026-09-24-ui-system-stage3a): choice help hosts inside
    preference rows. The legacy `.context-help-host[data-help-role="choice"] >
    label.switch > .switch-text { line-height: 16px }` (~line 564) pins the
@@ -1604,8 +1665,23 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    ~13px (context-help raster gate). Restore the switch's own copy -> icon
    spacing for this host only -- it does not touch .switch-track's own
    end-of-row position (driven by margin-left: auto on the track, independent
-   of the label's gap). */
-[data-ui-stage0] .pref-row.context-help-host[data-help-role="choice"] > label.switch { gap: var(--opt-sp-3); }
+   of the label's gap).
+   Fixwave (final review, Important finding 1): `gap` is a SHORTHAND for
+   BOTH column-gap and row-gap. The legacy host's own `row-gap: 0` (~line
+   555) was declared for the exact same reason spelled out there -- the
+   label wraps (flex-wrap) around an open answer, and a CLOSED answer is
+   still an empty, zero-height second flex line, so any non-zero row-gap
+   inserts a phantom gap ABOVE that empty line even though nothing visible
+   sits below it. Writing this override as the `gap` shorthand silently
+   reset that row-gap back to 6px (the same --opt-sp-3 this rule restores
+   for column-gap), so every choice-role switch host inside a stage-0
+   pref-row grew a 6px phantom row: closed height 50px instead of 44
+   (38 instead of 32 for the row directly under a section title), and the
+   open answer's copy -> body gap 12px instead of the calibrated 6
+   (label.switch > .context-help > .context-help-body's own margin-top,
+   ~line 583). Declare column-gap and row-gap as separate longhands so
+   fixing one can never again silently move the other. */
+[data-ui-stage0] .pref-row.context-help-host[data-help-role="choice"] > label.switch { column-gap: var(--opt-sp-3); row-gap: 0; }
 /* Stage-3a (Task 2, 2026-09-24-ui-system-stage3a): Archive's "Also archive
    during batch save" (#opt-wayback-batch) is the first `.pref-row-sub` that
    is ALSO a choice-role help host -- a combination Task 1's migrated panels

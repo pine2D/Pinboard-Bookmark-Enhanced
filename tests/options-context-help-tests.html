@@ -626,6 +626,144 @@ function test(name, fn) {
     delete doc.documentElement.dataset.density;
   });
 
+  // Fixwave (final review, Important finding 1): the choice-host `gap:
+  // var(--opt-sp-3)` SHORTHAND (options.css ~1608) reset the legacy
+  // `row-gap: 0` (~line 555) to 6px -- a closed, empty `::details-content`
+  // wrap line picked that 6px up as a phantom second row, so a closed
+  // choice-host pref-row measured 50px (38 for the row directly under a
+  // section title) instead of the row model's own 44/32. A plain sibling
+  // `.pref-row`'s height is driven by min-height alone (no help host, no
+  // wrap line), so it is the correct control for "does this row still match
+  // the row model" -- picked to share the SAME first-under-title status as
+  // its paired host (#opt-wayback-enabled is the one host of the four that
+  // is the first pref-row under its section title, per the R9 rule above;
+  // the other three are not).
+  test("fixwave: closed choice-host pref-rows match a plain row's height in both density tiers", () => {
+    const cases = [
+      ["opt-ai-use-transcript", "opt-private-incognito"],
+      ["opt-md-video-use-login", "opt-md-video-pause-lookup"],
+      ["opt-wayback-batch", "opt-wayback-skip-private"],
+      ["opt-wayback-enabled", "opt-private-default"],
+    ];
+    const violations = [];
+    cases.forEach(([hostId, siblingId]) => {
+      const label = doc.getElementById(hostId)?.closest("label.switch");
+      const host = label?.closest(".pref-row");
+      const sibling = doc.getElementById(siblingId)?.closest(".pref-row");
+      assert(label && host && sibling, hostId + "/" + siblingId + " fixture incomplete");
+      const details = label.querySelector(":scope > details.context-help");
+      if (details) details.open = false;
+      const hostPanel = host.closest(".panel");
+      const siblingPanel = sibling.closest(".panel");
+      doc.querySelectorAll(".panel").forEach((candidate) => {
+        candidate.classList.toggle("active", candidate === hostPanel || candidate === siblingPanel);
+      });
+      ["", "compact"].forEach((tier) => {
+        if (tier) doc.documentElement.dataset.density = tier; else delete doc.documentElement.dataset.density;
+        const hostHeight = host.getBoundingClientRect().height;
+        const siblingHeight = sibling.getBoundingClientRect().height;
+        if (Math.abs(hostHeight - siblingHeight) > 1) {
+          violations.push(`tier=${tier || "comfortable"} ${hostId}=${hostHeight} vs ${siblingId}=${siblingHeight}`);
+        }
+      });
+      delete doc.documentElement.dataset.density;
+    });
+    assert(!violations.length, violations.join("; "));
+  });
+
+  // Fixwave (final review, Important finding 1, continued): with row-gap
+  // restored to 0, the only thing left to size the gap between the closed
+  // label's own line and an OPEN answer's flex-wrap line is `label.switch >
+  // .context-help > .context-help-body`'s own `margin-top: var(--opt-sp-3)`
+  // (~line 583) -- a flat 6px in both density tiers (--opt-sp-3 is not
+  // redefined under the compact tier, options.css ~39/199). Before the fix
+  // the phantom row-gap doubled this to 12.
+  test("fixwave: open choice-host copy-to-answer gap is 6px for stage-0 pref-row switches", () => {
+    const hostIds = ["opt-ai-use-transcript", "opt-md-video-use-login", "opt-wayback-enabled", "opt-wayback-batch"];
+    const violations = [];
+    hostIds.forEach((id) => {
+      const input = doc.getElementById(id);
+      const label = input?.closest("label.switch");
+      const host = label?.closest(".pref-row");
+      const details = label?.querySelector(":scope > details.context-help");
+      const copy = label?.querySelector(":scope > .switch-text");
+      const body = details?.querySelector(".context-help-body");
+      assert(label && host && details && copy && body, id + " fixture incomplete");
+      reveal(details);
+      ["", "compact"].forEach((tier) => {
+        if (tier) doc.documentElement.dataset.density = tier; else delete doc.documentElement.dataset.density;
+        details.open = true;
+        const gap = body.getBoundingClientRect().top - copy.getBoundingClientRect().bottom;
+        if (Math.abs(gap - 6) > 0.5) violations.push(`tier=${tier || "comfortable"} ${id} gap=${gap}`);
+        details.open = false;
+      });
+      delete doc.documentElement.dataset.density;
+    });
+    assert(!violations.length, violations.join("; "));
+  });
+
+  // Fixwave (final review, Low finding): `.context-help-section` inside a
+  // stage-0 panel now mirrors the plain `.section-title`'s own margin (0 top,
+  // sp-5/12px bottom, options.css ~607/1379) instead of the surface-wide
+  // sp-4/8px both sides -- #panel-ai's "AI Provider" host is the first
+  // section-role host on the page, sitting directly above the provider
+  // <select>'s .fg.entry-block (no margin-top of its own, ~line 440/1717).
+  test("stage0: AI Provider section-help host to the provider select is 12px in both tiers", () => {
+    const host = doc.getElementById("sec-ai-provider")?.closest(".context-help-host.context-help-section");
+    const next = host?.nextElementSibling;
+    assert(host && next?.matches(".fg.entry-block") && next.querySelector("#opt-ai-provider"), "AI Provider section-help fixture incomplete");
+    const panel = host.closest(".panel");
+    doc.querySelectorAll(".panel").forEach((candidate) => candidate.classList.toggle("active", candidate === panel));
+    for (const tier of ["", "compact"]) {
+      if (tier) doc.documentElement.dataset.density = tier; else delete doc.documentElement.dataset.density;
+      const gap = next.getBoundingClientRect().top - host.getBoundingClientRect().bottom;
+      assert(Math.abs(gap - 12) < 0.5, `tier=${tier || "comfortable"} AI Provider section->select gap=${gap}`);
+    }
+    delete doc.documentElement.dataset.density;
+  });
+
+  // Fixwave (final review, Low finding): `[data-ui-stage0] .fg label.bl`
+  // only ever matched a <label>, so a `div.bl` GROUP TITLE (Quick's "AI"
+  // batch heading) stayed at the surface's legacy 13px/body-inherited
+  // styling instead of the row model's --opt-text-body/--opt-lh-body face.
+  // Widened to `.fg :is(label, div).bl` (options.css ~1451..1465).
+  test("fixwave: batch AI group title matches the widened .fg :is(label, div).bl rule", () => {
+    const title = doc.getElementById("batch-ai-title");
+    assert(title && title.classList.contains("bl") && title.tagName === "DIV", "batch-ai-title fixture incomplete");
+    const win = frame.contentWindow;
+    const readVar = (name) => parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue(name));
+    const probe = doc.createElement("div");
+    probe.style.display = "none";
+    doc.body.appendChild(probe);
+    probe.style.color = "var(--opt-fg)";
+    const resolvedFg = win.getComputedStyle(probe).color;
+    probe.remove();
+    const comfortableFs = parseFloat(win.getComputedStyle(title).fontSize);
+    assert(Math.abs(comfortableFs - 14) < 0.5, "comfortable font-size=" + comfortableFs);
+    assert(Math.abs(comfortableFs - readVar("--opt-text-body")) < 0.5, "font-size does not track --opt-text-body");
+    assert(win.getComputedStyle(title).color === resolvedFg, "batch-ai-title color is not --opt-fg");
+    doc.documentElement.dataset.density = "compact";
+    const compactFs = parseFloat(win.getComputedStyle(title).fontSize);
+    assert(Math.abs(compactFs - readVar("--opt-text-body")) < 0.5, "compact font-size does not track --opt-text-body");
+    assert(compactFs < comfortableFs, "compact font-size did not shrink from the comfortable tier");
+    delete doc.documentElement.dataset.density;
+  });
+
+  // Fixwave (final review, Low finding, continued): the widened rule above
+  // also matches every group-role anchor's `div.bl`, including the wayback
+  // log heading's -- whose Clear button sits beside it on the same flex
+  // row, not below it, so it needs its inherited zero margin
+  // (`.context-help-host[data-help-role="group"] > .bl`, ~line 528) to keep
+  // winning. options.css restates that selector at (0,4,0) to beat the
+  // widened rule's (0,3,1). Assert the resolved value, not the selector
+  // text.
+  test("fixwave: wayback log heading title keeps its zero margin-bottom exception", () => {
+    const title = doc.querySelector(".wayback-log-host .wayback-log-heading .bl");
+    assert(title && title.tagName === "DIV", "wayback log heading title fixture incomplete");
+    const mb = parseFloat(frame.contentWindow.getComputedStyle(title).marginBottom);
+    assert(mb === 0, "wayback log heading title margin-bottom=" + mb);
+  });
+
   test("coherent choice groups use the compact stack rhythm", () => {
     const groups = [
       ["opt-sync-enabled", "opt-sync-api-keys"],

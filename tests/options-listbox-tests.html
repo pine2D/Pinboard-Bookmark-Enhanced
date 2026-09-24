@@ -139,15 +139,18 @@ function pbpTestChromeStub(enMessages) {
     // Stage-3a Task 1 widened the panel of data-listbox selects from two to
     // five (opt-ai-tag-lang, opt-ai-summary-lang, opt-ai-tag-separator joined
     // opt-ai-provider/translate-target-lang); Task 2 added opt-selection-
-    // trigger (Reader tab), the sixth and -- per the stage-3a design doc's
-    // scope table (3b covers general/markdown/tags/appearance/vocab/storage,
-    // the remaining panels with a <select>) -- LAST one this stage adds. Pin
-    // the exact total now (spec §3, Controller ruling 4) rather than the
-    // prior open-ended `>= 5`: a future stage that adds another listbox
-    // select is expected to touch this assertion, the same way this task did.
+    // trigger (Reader tab), a sixth. Fixwave (final review, test-churn note):
+    // pinning the raw total (`=== 6`) meant every later stage that migrates
+    // one more <select> onto data-listbox had to touch this assertion just
+    // to keep it passing, with no behavioural payoff -- the actual invariant
+    // this test protects is "every data-listbox select got wrapped, none
+    // were skipped or double-wrapped", which `wrappers.length ===
+    // targets.length` already states directly, plus a non-empty floor so an
+    // accidental zero-match selector still fails loudly instead of vacuously
+    // passing.
     const targets = [...doc.querySelectorAll("select[data-listbox]")];
-    assert(targets.length === 6, "expected exactly 6 data-listbox selects, got " + targets.length);
     const wrappers = doc.querySelectorAll(".listbox");
+    assert(targets.length > 0, "expected at least one data-listbox select, got 0");
     assert(wrappers.length === targets.length,
       "expected " + targets.length + " .listbox wrappers (one per data-listbox select), got " + wrappers.length);
     for (const select of targets) {

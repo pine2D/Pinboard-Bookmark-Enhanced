@@ -816,12 +816,19 @@
           <textarea id="opt-translate-glossary" rows="5" placeholder="LLM=Large Language Model&#10;Pinboard=" data-i18n-placeholder="translateGlossaryPlaceholder"></textarea>
         </div>
 
-        <div class="fg entry-block entry-block-sub context-help-host" data-help-role="choice">
-          <label class="switch"><input type="checkbox" id="opt-preview-skim" aria-labelledby="opt-preview-skim-label" /> <span class="switch-text" id="opt-preview-skim-label" data-i18n="skimEnable">Generate an AI key-points summary on the preview page</span>
-          <details class="context-help">
-            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="skimEnableHint">Shows 3-5 key points at the top of the preview page. Each generation uses AI tokens; results are cached per article.</p>
-          </details><span class="switch-track" aria-hidden="true"></span></label>
+        <!-- Fixwave (final review, Medium finding): rewrapped from the legacy
+             `.fg.entry-block.entry-block-sub` shape into the row model, same
+             shape as Archive's #opt-wayback-batch (a `.pref-row-sub` choice
+             host inside its own `.pref-group`) instead of a 20px choice-row
+             line box. Inner label/details/track markup is untouched. -->
+        <div class="pref-group">
+          <div class="pref-row pref-row-sub context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" id="opt-preview-skim" aria-labelledby="opt-preview-skim-label" /> <span class="switch-text" id="opt-preview-skim-label" data-i18n="skimEnable">Generate an AI key-points summary on the preview page</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="skimEnableHint">Shows 3-5 key points at the top of the preview page. Each generation uses AI tokens; results are cached per article.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
         </div>
 
         <div class="fg entry-block">
