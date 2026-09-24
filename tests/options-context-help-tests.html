@@ -178,10 +178,22 @@ function test(name, fn) {
       const visualGap = icon.left - a.right;
       if (visualGap < 6 || visualGap > 8) violations.push(key + " visual gap=" + visualGap);
       const iconStyle = frame.contentWindow.getComputedStyle(toggle.querySelector(".btn-ic"));
-      const transformKey = role + "/" + script;
+      // [data-ui-stage0] hosts (Task 4 fix round 1, ui-system-stage2) render
+      // their section-title/label.bl anchor at a DIFFERENT font size than
+      // every other host of the same role (--opt-text-section/-body vs the
+      // surface's 15px/12px base) -- optical-y is an em-relative correction,
+      // so it MUST differ between the two sizes (options.css documents the
+      // measured before/after deltas next to the stage-0-scoped rule). This
+      // is the same "one shared invariant, two density tiers" shape the
+      // stage0-prefixed tests below already use for other stage-0 recipes,
+      // not a per-instance escape hatch -- the key still enforces that EVERY
+      // host within a tier (stage-0 or not) shares one transform, just as
+      // TWO separate tiers instead of one.
+      const inStageZero = !!host?.closest("[data-ui-stage0]");
+      const transformKey = role + "/" + script + (inStageZero ? "/stage0" : "");
       const priorTransform = transformByRole.get(transformKey);
       if (priorTransform && priorTransform !== iconStyle.transform) {
-        violations.push(`${key} role=${role} script=${script} transform=${iconStyle.transform}, expected=${priorTransform}`);
+        violations.push(`${key} role=${role} script=${script}${inStageZero ? " (stage0)" : ""} transform=${iconStyle.transform}, expected=${priorTransform}`);
       } else {
         transformByRole.set(transformKey, iconStyle.transform);
       }

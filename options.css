@@ -1434,6 +1434,71 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    is unaffected -- :not([open]) only adds specificity. */
 [data-ui-stage0] .context-help-host[data-help-role="field"] > .context-help:not([open]) + * { margin-top: var(--opt-label-gap); }
 [data-ui-stage0] .hint { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
+/* Task 4 fix round 1 (ui-system-stage2): keep the section/field help toggles
+   on their text baseline under [data-ui-stage0]. The shared
+   --context-help-optical-y constants (per script x role, above the
+   @generated:ui-components region) are calibrated for the SURFACE-WIDE
+   `.section-title` (15px/600) and `.fg label.bl` (12px) faces -- do not
+   touch them, every OTHER section/field host on the page (5 more section
+   titles, ~12 more field labels) still renders at those sizes and is
+   already within tolerance there. Stage 0 raises BOTH faces inside the
+   marker (`.section-title` -> --opt-text-section 16px, `.fg label.bl` ->
+   --opt-text-body 14px) without re-deriving the optical-y fraction for the
+   new size, which is what actually broke: #panel-ai's "AI Provider" title
+   (freeTierTitle's anchor) and 6 of #panel-ai/#panel-popup's field labels.
+   Re-pinned instead as an ADDITIVE stage-0-only correction layered onto the
+   existing per-script constant via calc(), so the surface-wide calibration
+   is untouched and only a marker-scoped `.btn-ic` transform changes.
+   Tried `margin-top` on `summary.context-help-toggle` first (per the
+   original fix-round instruction) and measured ZERO effect at any value,
+   including deliberately absurd ones (20px, display:none as a match
+   sanity-check -- the selector matches fine). Root cause: the toggle's own
+   recipe (`.context-help > summary.context-help-toggle` above) gives it a
+   ZERO-height margin box (`margin: calc(--target/-2) 0`, i.e. -12px both
+   blocks) specifically so grid baseline alignment (`align-self: baseline`,
+   role section/field/group) can center a 24px target on the anchor's line
+   without touching row height. A box with no real text baseline synthesizes
+   one from its BOTTOM margin edge (CSS Box Alignment); the aligner then
+   solves for the box's own top position so that edge lands on the shared
+   baseline. Overriding only margin-top changes the margin-box height by the
+   same amount it changes where the top must sit to keep the bottom edge
+   fixed -- the two terms cancel exactly (worked the algebra: content-top =
+   baseline - margin-box-height + margin-top, and margin-box-height already
+   contains that same margin-top, so it drops out). margin-BOTTOM would
+   actually move it (confirmed by the same algebra) but a translateY on the
+   icon is the existing, already-proven mechanism one line below this block,
+   costs no layout risk (row height provably unaffected, unlike touching a
+   margin baseline synthesizes from), and needed no new custom property.
+   One offset per role, not per host (no host-variant split): the ~3px
+   physical-px-at-DPR2 spread WITHIN a role (e.g. field host deltas: 0 for
+   "API Key"/"Popup width" labels which have a descender, 2.5-3 for "Base
+   URL"/"Model" labels which do not) is the SAME per-string ink-jitter
+   phenomenon already documented above for alphabetic/section titles
+   with/without a descender -- not a structural "grid-hosted vs not"
+   difference; optPopupWidthHelp's host carries extra `role="group"
+   aria-labelledby` attributes but is DOM-identical in the parts that
+   matter (label.bl sibling immediately before .context-help). One shift
+   per role, chosen to center the WITHIN-role spread, clears every instance.
+   Measured en@2/zh-CN@2 deltas, both font configs identical for English,
+   zh-CN 0.5px apart (physical px; before -> after this block, PBP_HELP_
+   RASTER_RANGES=1):
+     section (freeTierTitle only, both configs identical for cjk too):
+       en 3 -> 1 ; zh-CN 2/2.5 (local/CI) -> 0/0.5
+     field (7 hosts inside [data-ui-stage0]; worst -> best per config):
+       en   hintOllamaModel 3->1.5, hintOpenAIBaseUrl/hintCustomBaseUrl
+            2.5->1, optPopupWidthHelp/jinaFreeTierHint 0.5->-1,
+            openrouterTagline/hintCustomKey 0->-1.5
+       zh-CN (local/CI) hintOllamaModel/hintOpenAIBaseUrl/hintCustomBaseUrl
+            1.5/2 -> 0/0.5, optPopupWidthHelp 1.5/2 -> 0/0.5,
+            jinaFreeTierHint 0.5/1 -> -1/-0.5,
+            openrouterTagline/hintCustomKey 0/0 -> -1.5/-1.5
+   Every value lands within [-1.5, 1.5], a full 0.5px inside the +-2
+   tolerance on both ends -- re-measure with PBP_HELP_RASTER_RANGES=1 under
+   both scripts/options-help-render-audit.mjs (local fonts) and
+   FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
+   scripts/options-help-render-audit.mjs before nudging further. */
+[data-ui-stage0] .context-help-host[data-help-role="section"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 1px)); }
+[data-ui-stage0] .context-help-host[data-help-role="field"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
 /* Task 4 (ui-system-stage2, Controller ruling A): the AI panel's text/
    password fields (#opt-<provider>-key/-model, #opt-<provider>-baseurl)
    were still rendering the legacy ~26px unstyled fill -- stage 0 only ever
