@@ -1030,6 +1030,38 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       "every bookmarks radio must sit in a .pref-row inside a .pref-group-radio");
   });
 
+  // Stage-3b Task 1 (2026-09-24-ui-system-stage3b): the four radio groups
+  // (bookmarks' bgsave-mode + tag-sync-mode, popup's popup-width-preset,
+  // ai-behavior's ai-content-source) move from a bare `<label><input
+  // type=radio>...</label>` onto the `.pick` primitive (COMPONENTS.md §6.4
+  // exception 3, same DOM shape as .switch: hidden native input first, a
+  // CSS-drawn state-cue span last). Counts come straight from the task
+  // brief; the first/last-child check is the contract half of "the native
+  // input is still the value carrier options.js reads" -- input first means
+  // it is reachable by :first-child-style DOM order for anything that walks
+  // the label looking for its control, and .pick-mark last means the mark
+  // is what a sighted user's eye lands on at the row's trailing edge (same
+  // reading order as .switch-track).
+  await test("stage3b: bookmarks/popup/ai-behavior radio groups use label.pick", async () => {
+    const bookmarks = await stage0Panel("bookmarks");
+    const popup = await stage0Panel("popup");
+    const aiBehavior = await stage0Panel("ai-behavior");
+    assert(!!bookmarks && !!popup && !!aiBehavior,
+      "one of bookmarks/popup/ai-behavior is missing the data-ui-stage0 marker");
+    const bmPicks = [...bookmarks.querySelectorAll("label.pick")];
+    const popupPicks = [...popup.querySelectorAll("label.pick")];
+    const aiPicks = [...aiBehavior.querySelectorAll("label.pick")];
+    assert(bmPicks.length === 6, "expected 6 label.pick in panel-bookmarks, got " + bmPicks.length);
+    assert(popupPicks.length === 4, "expected 4 label.pick in panel-popup, got " + popupPicks.length);
+    assert(aiPicks.length === 2, "expected 2 label.pick in panel-ai-behavior, got " + aiPicks.length);
+    for (const l of [...bmPicks, ...popupPicks, ...aiPicks]) {
+      assert(l.firstElementChild?.matches('input[type="radio"]'),
+        "label.pick's first child element must be the radio input, got " + (l.firstElementChild?.outerHTML || "none"));
+      assert(l.lastElementChild?.matches(".pick-mark"),
+        "label.pick's last child element must be .pick-mark, got " + (l.lastElementChild?.outerHTML || "none"));
+    }
+  });
+
   await test("stage3a: ai-behavior selects are listbox targets", async () => {
     const panel = await stage0Panel("ai-behavior");
     assert(!!panel, "panel-ai-behavior is missing the data-ui-stage0 marker");

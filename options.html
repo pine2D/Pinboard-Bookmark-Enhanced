@@ -251,12 +251,12 @@
             <p class="hint context-help-body" data-i18n="optPopupWidthHelp">Range: 420–720px (Chrome popup limit)</p>
           </details>
           <div class="pref-group pref-group-radio">
-            <div class="pref-row"><label><input type="radio" name="popup-width-preset" value="450" /> <span data-i18n="optPopupWidth450">Compact (450px)</span></label></div>
-            <div class="pref-row"><label><input type="radio" name="popup-width-preset" value="550" /> <span data-i18n="optPopupWidth550">Standard (550px)</span></label></div>
-            <div class="pref-row"><label><input type="radio" name="popup-width-preset" value="650" /> <span data-i18n="optPopupWidth650">Wide (650px)</span></label></div>
-            <div class="pref-row"><label><input type="radio" name="popup-width-preset" value="custom" /> <span data-i18n="optPopupWidthCustom">Custom:</span>
+            <div class="pref-row"><label class="pick"><input type="radio" name="popup-width-preset" value="450" /> <span class="pick-text" data-i18n="optPopupWidth450">Compact (450px)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="popup-width-preset" value="550" /> <span class="pick-text" data-i18n="optPopupWidth550">Standard (550px)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="popup-width-preset" value="650" /> <span class="pick-text" data-i18n="optPopupWidth650">Wide (650px)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="popup-width-preset" value="custom" /> <span class="pick-text" data-i18n="optPopupWidthCustom">Custom:</span>
               <input type="number" id="opt-popup-width-custom" min="420" max="720" step="10" /> px
-            </label></div>
+              <span class="pick-mark" aria-hidden="true"></span></label></div>
           </div>
         </div>
       </section>
@@ -304,9 +304,9 @@
         <div class="fg entry-block" role="group" aria-labelledby="bgsave-mode-label">
           <label class="bl" id="bgsave-mode-label" data-i18n="optBgSaveMode">Background save mode</label>
           <div class="pref-group pref-group-radio">
-            <div class="pref-row"><label><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" /> <span data-i18n="optBgSaveModeMerge">Merge (default, combines new tags with existing)</span></label></div>
-            <div class="pref-row"><label><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" /> <span data-i18n="optBgSaveModeSkip">Skip (if URL already saved, do nothing)</span></label></div>
-            <div class="pref-row"><label><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" /> <span data-i18n="optBgSaveModeOverwrite">Overwrite (replace all tags, no merge)</span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" /> <span class="pick-text" data-i18n="optBgSaveModeMerge">Merge (default, combines new tags with existing)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" /> <span class="pick-text" data-i18n="optBgSaveModeSkip">Skip (if URL already saved, do nothing)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" /> <span class="pick-text" data-i18n="optBgSaveModeOverwrite">Overwrite (replace all tags, no merge)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
           </div>
         </div>
       </section>
@@ -330,9 +330,9 @@
             <p class="hint context-help-body" data-i18n="tagSyncHint">Controls how your existing Pinboard tag cloud is pulled into the popup for autocomplete. Tags are read-only; nothing is uploaded back to Pinboard.</p>
           </details>
           <div class="pref-group pref-group-radio">
-            <div class="pref-row"><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked /> <span data-i18n="tagSyncCached">Cached (default, refreshes after 10 min)</span></label></div>
-            <div class="pref-row"><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" /> <span data-i18n="tagSyncFresh">Live (fetches on every popup, slower)</span></label></div>
-            <div class="pref-row"><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" /> <span data-i18n="tagSyncPrewarmed">Prewarmed (background fetch every 15 min, instant popup)</span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked /> <span class="pick-text" data-i18n="tagSyncCached">Cached (default, refreshes after 10 min)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" /> <span class="pick-text" data-i18n="tagSyncFresh">Live (fetches on every popup, slower)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" /> <span class="pick-text" data-i18n="tagSyncPrewarmed">Prewarmed (background fetch every 15 min, instant popup)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
           </div>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
@@ -647,14 +647,14 @@
         <h2 class="section-title" id="sec-ai-content-source" data-i18n="secAiContentSource">AI Content Source</h2>
         <div class="pref-group" role="group" aria-labelledby="sec-ai-content-source">
           <div class="pref-row context-help-host" data-help-role="choice">
-            <label><input type="radio" name="ai-content-source" id="opt-ai-src-local" value="local" checked /> <span data-i18n="aiContentSourceLocal">Local (Defuddle)</span></label>
+            <label class="pick"><input type="radio" name="ai-content-source" id="opt-ai-src-local" value="local" checked /> <span class="pick-text" data-i18n="aiContentSourceLocal">Local (Defuddle)</span><span class="pick-mark" aria-hidden="true"></span></label>
             <details class="context-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
               <p class="hint context-help-body" data-i18n="aiContentSourceLocalHint">Extract the main content of the page locally (offline, fast).</p>
             </details>
           </div>
           <div class="pref-row context-help-host" data-help-role="choice">
-            <label><input type="radio" name="ai-content-source" id="opt-ai-src-jina" value="jina" /> <span data-i18n="aiContentSourceJina">Jina Reader</span></label>
+            <label class="pick"><input type="radio" name="ai-content-source" id="opt-ai-src-jina" value="jina" /> <span class="pick-text" data-i18n="aiContentSourceJina">Jina Reader</span><span class="pick-mark" aria-hidden="true"></span></label>
             <details class="context-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
               <p class="hint context-help-body" data-i18n="aiContentSourceJinaHint">Fetch cleaned Markdown via Jina Reader API (requires network; API key optional for higher quota).</p>

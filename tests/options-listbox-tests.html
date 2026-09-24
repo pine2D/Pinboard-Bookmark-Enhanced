@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 25;
+const TOTAL = 28;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -656,6 +656,90 @@ function pbpTestChromeStub(enMessages) {
       select.removeEventListener("change", onChange);
     }
     setValue(select, "-");
+  });
+
+  // Stage-3b Task 1 (2026-09-24-ui-system-stage3b): the `.pick` primitive
+  // (COMPONENTS.md §6.4 exception 3) hides the native radio the same way
+  // `.switch` hides its checkbox -- the visible "state cue" moves onto a
+  // CSS-drawn `.pick-mark`, but the input itself stays a real, focusable,
+  // un-disabled control inside its native `name` group, so arrow-key
+  // navigation between a group's options is native browser behaviour
+  // (spec §2), not anything this extension's JS implements. These three
+  // cases prove the new markup did not accidentally break that native
+  // wiring (a covering element stealing focus, a stray `tabindex=-1`, the
+  // inline number input being unreachable under the hidden radio's
+  // `inset: 0`) rather than testing browser internals.
+  // Verified empirically before writing this test (probe script against a
+  // bare `<label><input type=radio>` fixture, same Playwright/Chromium this
+  // suite runs under): a page-dispatched synthetic `KeyboardEvent("keydown",
+  // {key:"ArrowDown"})` does NOT move Chromium's native radio-group
+  // selection (defaultPrevented stays false -- nothing intercepted it, the
+  // browser's own default action for arrow-key group navigation simply
+  // requires a TRUSTED, OS-level key event and silently no-ops otherwise),
+  // even though `.click()` DOES trigger the native label-forwarding default
+  // action for an untrusted event (proven by the next test). This is
+  // unrelated to options-listbox.js's OWN keydown handling elsewhere in this
+  // file working fine with synthetic events -- that is a page JS listener,
+  // which runs for any dispatched event regardless of trust; radio-group
+  // arrow navigation is UA-internal, gated on isTrusted. So the only thing a
+  // page-dispatched keydown can prove here is that focus reaches the native
+  // input and that .pick's markup did not silently pull it out of its native
+  // `name` group or tab order -- the actual cross-option move is real
+  // browser behaviour this harness cannot drive (Playwright's own
+  // `page.keyboard.press`, which DOES send trusted input, is not exposed to
+  // in-page test code and run-test.mjs runs every suite through one generic,
+  // no-per-suite-automation driver -- see its header).
+  test("bgsave-mode's .pick radios stay a native, keyboard-operable name group", () => {
+    showPanel("panel-bookmarks");
+    const radios = [...doc.querySelectorAll('.pref-group-radio input[name="bgsave-mode"]')];
+    assert(radios.length === 3, "expected 3 bgsave-mode radios, got " + radios.length);
+    assert(radios.every((r) => r.type === "radio" && !r.disabled && r.tabIndex !== -1),
+      "a bgsave-mode radio lost its native radio type, is disabled, or was pulled out of tab order");
+    assert(new Set(radios.map((r) => r.name)).size === 1,
+      "bgsave-mode radios no longer share one native name group");
+    const merge = doc.getElementById("opt-bgsave-merge");
+    merge.focus();
+    assert(doc.activeElement === merge, "opt-bgsave-merge did not take native focus");
+  });
+
+  test("clicking a .pick-mark selects its radio", () => {
+    showPanel("panel-bookmarks");
+    const merge = doc.getElementById("opt-bgsave-merge");
+    const overwrite = doc.getElementById("opt-bgsave-overwrite");
+    assert(merge && overwrite, "bgsave-mode radios missing");
+    merge.checked = true;
+    overwrite.checked = false;
+    const mark = overwrite.closest("label.pick")?.querySelector(".pick-mark");
+    assert(mark, "opt-bgsave-overwrite's label.pick has no .pick-mark");
+    mark.click();
+    assert(overwrite.checked === true, "clicking .pick-mark did not select opt-bgsave-overwrite");
+    assert(merge.checked === false, "clicking .pick-mark left the previous radio checked too");
+    merge.checked = true;
+    overwrite.checked = false;
+  });
+
+  // NOT a test of "focusing must not select the custom preset" -- options.js
+  // (~line 2491, selectCustomRadio) INTENTIONALLY selects the custom radio
+  // on the number input's own focus/input events, a pre-existing UX pattern
+  // this task doesn't touch. What .pick's `position:relative;z-index:1` on
+  // the inline control actually has to fix is hit-testing: the hidden radio
+  // is `inset:0` over the WHOLE row (same technique as .switch's input), so
+  // without the z-index lift a real click landing where the user visually
+  // sees the number input would hit-test to the invisible radio instead and
+  // never reach the field at all. elementFromPoint does real paint-order hit
+  // testing (unlike .focus()/.click() called directly on a node, which
+  // bypass hit-testing entirely and would pass even with the bug) -- it is
+  // the one DOM API available to page JS that actually exercises this.
+  test("popup-width custom row's number input wins real-click hit-testing over the hidden radio", () => {
+    showPanel("panel-popup");
+    const customInput = doc.getElementById("opt-popup-width-custom");
+    assert(customInput, "opt-popup-width-custom missing");
+    const rect = customInput.getBoundingClientRect();
+    assert(rect.width > 0 && rect.height > 0, "opt-popup-width-custom has no layout box (panel not visible?)");
+    const hit = doc.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    assert(hit === customInput || customInput.contains(hit),
+      "a click at the number input's centre hits " + (hit ? (hit.tagName + (hit.id ? "#" + hit.id : "")) : "nothing") +
+      " instead of opt-popup-width-custom -- the hidden radio's inset:0 must not cover the inline number input");
   });
 
   for (const [name, fn] of queue) {

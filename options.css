@@ -534,6 +534,34 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
   margin: 0;
   justify-self: start;
 }
+/* Radio choice rows (label.pick, stage-3b Task 1) keep <details> a SIBLING
+   of the label (unlike Ruling 36's switch case, which nests it INSIDE the
+   label instead -- see the block below) -- that keeps the grid's column-2
+   24px slot doing the icon-placement work it always did, so column 1 (this
+   label) has to stay shrink-wrapped to JUST its text, exactly as the bare
+   `<label>` this replaced was. Left alone, `.pick-mark` (a normal, in-flow
+   flex child with `margin-left: auto`) would inflate that shrink-wrapped
+   width by its own 20px plus the row's 12px gap, pushing the help icon
+   ~32px further right than the text it must sit right next to (measured:
+   the required 6-8px text-to-icon gap became 39px). Pulling the mark out of
+   flow restores the label's pre-.pick width, and -- since `label.pick`
+   itself is no longer the mark's positioned ancestor -- lets it dock
+   against the HOST's own right edge instead, the same "row's trailing
+   edge" spot the group's one `.switch` row parks its track at (spec §2:
+   "mark 与 track 都在行尾，行高一致"). `position: static` on the label
+   also stops it being the hidden native radio's containing block, so that
+   `inset: 0` reaches the same host box the mark now targets -- the radio's
+   hit area grows to the FULL row this way, matching how a plain (non-help)
+   `.pick` row already behaves via ordinary block-level width, not a
+   regression. */
+.context-help-host[data-help-role="choice"] > label.pick { position: static; }
+.context-help-host[data-help-role="choice"] > label.pick > .pick-mark {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  margin-left: 0;
+  transform: translateY(-50%);
+}
 /* Choice hosts use the shared grid: the copy label shrink-wraps in column 1
    and the help target follows it in column 2, right after the copy -- where
    the two AI-content-source RADIO rows keep it.
@@ -1175,6 +1203,91 @@ input[type="checkbox"], input[type="radio"] {
     display: none;
   }
 }
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: var(--opt-sp-5);
+  position: relative;
+  cursor: pointer;
+  min-height: var(--opt-row-min-h);
+}
+.pick > input[type="radio"], .pick > input[type="checkbox"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.pick-text {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.pick > input:not([type="radio"]):not([type="checkbox"]) {
+  position: relative;
+  z-index: 1;
+}
+.pick-mark {
+  margin-left: auto;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--opt-radius-full);
+  border: 1px solid var(--opt-border);
+  background: transparent;
+  color: var(--opt-on-accent);
+  position: relative;
+  transition: background var(--motion-state), border-color var(--motion-state);
+}
+.pick-box > .pick-mark {
+  border-radius: var(--opt-radius-sm);
+}
+.pick-mark::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  opacity: 0;
+}
+.pick > input:checked ~ .pick-mark {
+  background: var(--opt-accent);
+  border-color: var(--opt-accent);
+}
+.pick > input:checked ~ .pick-mark::after {
+  opacity: 1;
+}
+.pick:hover > .pick-mark {
+  border-color: var(--opt-fg-muted);
+}
+.pick > input:focus-visible ~ .pick-mark {
+  outline: none;
+  box-shadow: var(--opt-focus-ring);
+}
+.pick > input:disabled ~ .pick-text, .pick > input:disabled ~ .pick-mark {
+  color: var(--opt-fg-hint);
+  border-color: var(--opt-fg-hint);
+}
+.pick > input:disabled {
+  cursor: default;
+}
+@media (forced-colors: active) {
+  .pick > input[type="radio"], .pick > input[type="checkbox"] {
+    position: static;
+    width: auto;
+    height: auto;
+    opacity: 1;
+  }
+  .pick-mark {
+    display: none;
+  }
+}
 /* @generated:ui-components end (options) */
 /* Hand-maintained field exceptions (COMPONENTS.md §6.1): same specificity
    as the generated selectors above, positioned AFTER the generated region
@@ -1369,11 +1482,16 @@ html.motion-ready .backup-import-result:not([hidden]) {
    spacing token), the 96px textarea min-height + its 13px/20px font/line
    (textareas sit outside the type scale on purpose, matching the pre-stage-0
    fixed sizing), and the 96px number-field max-width (a content cap, not a
-   spacing value). The radio rung's row height (.pref-group-radio .pref-row
-   > label) is calc(--opt-control-h + --opt-sp-4) -- 40 comfortable / 36
-   compact -- so the 32px number field row matches the plain radio rows
-   instead of sitting 4px taller (fixwave F5); it does shrink under the
-   compact tier, unlike --opt-row-min-h. */
+   spacing value). Stage-3b Task 1 retired the radio rung's own no-hairline
+   40/36 row-height variant (.pref-group-radio .pref-row > label, fixwave
+   F5's calc(--opt-control-h + --opt-sp-4)): a `.pick` radio row is now a
+   PLAIN preference row -- same --opt-row-min-h (44/36), same hairline,
+   same --opt-row-pad-y padding as every switch row -- because the `.pick`
+   primitive (COMPONENTS.md §6.4 exception 3) carries its own 20x20 mark
+   instead of borrowing the row height to fit a taller native dot. The
+   popup-width custom row's 32px number field still matches its row's
+   height; it just does so via the SAME plain-row geometry every other
+   .pref-row uses, not a radio-specific rung. */
 [data-ui-stage0] .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
 [data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-5); }
 /* Fixwave (final review, Low finding): the legacy `.context-help-section
@@ -1405,21 +1523,19 @@ html.motion-ready .backup-import-result:not([hidden]) {
    since an entry block's label already sits flush at the block's own edge
    (no equivalent flex row to indent inside). */
 [data-ui-stage0] .entry-block-sub { padding-left: var(--opt-sp-7); }
-[data-ui-stage0] .pref-group-radio .pref-row + .pref-row { border-top: 0; }
-[data-ui-stage0] .pref-group-radio .pref-row > label { min-height: calc(var(--opt-control-h) + var(--opt-sp-4)); padding: var(--opt-sp-2) 0; gap: var(--opt-sp-4); }
-/* Stage-3a (Task 3, ui-system-stage3a-design §3, Controller ruling 2): a
-   radio row can also live inside a MIXED `.pref-group` that is not itself
-   `.pref-group-radio` -- the AI Content Source group (#panel-ai-behavior)
-   mixes two radios with a switch under one shared help-host role, so it
-   never qualifies for the dedicated all-radio primitive above. Without this
-   rule such a radio's dot -> copy gap fell back to the base `.pref-row >
-   label` gap (--opt-sp-5, 12px, rule ~1380) instead of the 8px
-   (--opt-sp-4) a radio's dot is calibrated against everywhere else on the
-   page (.pref-group-radio rows above, and every pre-stage-0 `.choice-row`
-   radio). `label:not(.switch)` scopes this to the radio labels only -- the
-   group's one switch row (#opt-ai-use-transcript) keeps the standard 12px
-   .pref-row gap like every other switch choice host. */
-[data-ui-stage0] .pref-group:not(.pref-group-radio) > .pref-row > label:not(.switch) { gap: var(--opt-sp-4); }
+/* Stage-3b Task 1 (2026-09-24-ui-system-stage3b) retired the two rules that
+   used to live here: `.pref-group-radio`'s own no-hairline 40/36
+   row-height variant, and the mixed-group `label:not(.switch) { gap:
+   --opt-sp-4 }` patch stage-3a Task 3 added for the AI Content Source
+   group's two radio rows (that patch's "Controller ruling 2" no longer
+   applies -- there is no dot-copy gap left to correct once radio rows are
+   `label.pick`, which declares its own 12px gap, COMPONENTS.md §6.4
+   exception 3). Both rules existed only to make a bare `<input
+   type=radio>` dot read like it belonged next to the `.switch` family; a
+   drawn `.pick-mark` needs neither -- a radio row is now the SAME row
+   geometry as a switch row, full stop. `.pref-group-radio` itself stays on
+   the three markup groups (tests/registry reference the class) -- it just
+   carries no geometry of its own any more. */
 [data-ui-stage0] .entry-block, [data-ui-stage0] .edit-area { margin-bottom: var(--opt-sp-6); }
 /* R9 (2026-09-23): a preference row that directly follows its section title
    drops its top padding and one pad of min-height, so title -> first copy is

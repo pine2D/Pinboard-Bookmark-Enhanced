@@ -377,39 +377,27 @@ function test(name, fn) {
     assert(input.checked && !other.checked, "restoring the original radio selection failed");
   });
 
-  // Stage-3a (Task 3, ui-system-stage3a-design §3, Controller ruling 2, fix
-  // round 1): the CSS-only half of Controller ruling 2 shipped without its
-  // own render-level assertion -- options.css's `[data-ui-stage0]
-  // .pref-group:not(.pref-group-radio) > .pref-row > label:not(.switch) {
-  // gap: var(--opt-sp-4) }` needs a pin, the same way every other stage-0
-  // geometry fix in this file gets one. #opt-ai-src-local is the first (and,
-  // on this page, only) radio row inside a MIXED `.pref-group` --
-  // #panel-ai-behavior's "AI Content Source" group also holds one switch row
-  // (#opt-ai-use-transcript), so it never qualifies for the dedicated
-  // `.pref-group-radio` primitive and would otherwise fall back to the base
-  // `.pref-row > label` gap (12px, --opt-sp-5). --opt-sp-4/--opt-sp-5 are
-  // literal 8px/12px in BOTH density tiers (options.css ~42/43 -- unlike
-  // --opt-row-pad-y, the raw sp-N scale itself is never redefined under
+  // Stage-3b Task 1 (2026-09-24-ui-system-stage3b) retired the rule this
+  // test used to pin (options.css's mixed-group `label:not(.switch) { gap:
+  // var(--opt-sp-4) }`, stage-3a Task 3's "Controller ruling 2" -- see the
+  // retirement comment left in its place, options.css ~1493). AI Content
+  // Source's radio rows are `label.pick` now, which declares its OWN 12px
+  // gap (--opt-sp-5, COMPONENTS.md §6.4 exception 3) -- the same value the
+  // base `[data-ui-stage0] .pref-row > label` rule already gives every
+  // other row, so a radio row and a switch row read identically once
+  // again. Repointed (not deleted) to keep the coverage this file's other
+  // geometry pins have: the negative control below still needs to prove
+  // #opt-ai-use-transcript's own PRE-EXISTING (Task 1) choice-role 6px
+  // override (`.pref-row.context-help-host[data-help-role="choice"] >
+  // label.switch { gap: var(--opt-sp-3) }`, ~line 1608) is unaffected by
+  // this task, so it stays a two-row comparison rather than a single
+  // assertion. --opt-sp-3/--opt-sp-5 are literal 6px/12px in BOTH density
+  // tiers (the raw sp-N scale itself is never redefined under
   // html[data-density="compact"], only the semantic tokens built FROM it
-  // are), so 8px is one flat expected number, re-read after switching tiers,
-  // not two separate expected shapes.
-  //
-  // Negative control (measured, not guessed): #opt-ai-use-transcript is
-  // NOT a plain switch row -- it is ALSO a choice-role help host, and
-  // options.css's PRE-EXISTING (Task 1) `[data-ui-stage0] .pref-row.
-  // context-help-host[data-help-role="choice"] > label.switch { gap: var(
-  // --opt-sp-3) }` (~line 1608, "Restore the switch's own copy -> icon
-  // spacing for this host only") already re-pins its gap to 6px, a more
-  // specific rule than the base 12px `.pref-row > label` this file's first
-  // draft assumed the switch row would fall back to. The correct negative
-  // control is therefore "still 6px, unaffected by ruling 2's new rule" --
-  // NOT "12px": what this control actually needs to prove is that
-  // `label:not(.switch)` keeps ruling 2's 8px away from the switch row, not
-  // that the switch row has no gap override of its own (it does, for an
-  // unrelated reason). Asserting 12px here would have been asserting a
-  // fact this page's own CSS already contradicts elsewhere.
-  test("radio row label gap inside a plain preference group is 8px in both density tiers", () => {
-    const radioLabel = doc.getElementById("opt-ai-src-local")?.closest("label");
+  // are), so these are flat expected numbers, re-read after switching
+  // tiers, not two separate expected shapes.
+  test("radio row label gap inside a plain preference group is 12px in both density tiers", () => {
+    const radioLabel = doc.getElementById("opt-ai-src-local")?.closest("label.pick");
     const switchLabel = doc.getElementById("opt-ai-use-transcript")?.closest("label.switch");
     assert(radioLabel && switchLabel, "AI content-source group fixture incomplete");
     assert(!radioLabel.classList.contains("switch"), "opt-ai-src-local unexpectedly matches label.switch");
@@ -417,13 +405,13 @@ function test(name, fn) {
     const readGap = (el) => parseFloat(win.getComputedStyle(el).columnGap);
     const comfortableRadio = readGap(radioLabel);
     const comfortableSwitch = readGap(switchLabel);
-    assert(Math.abs(comfortableRadio - 8) < 0.5, "comfortable radio label gap=" + comfortableRadio);
-    assert(Math.abs(comfortableSwitch - 6) < 0.5, "comfortable switch label gap=" + comfortableSwitch + " (expected its own choice-role 6px override, unaffected by the radio-gap fix)");
+    assert(Math.abs(comfortableRadio - 12) < 0.5, "comfortable radio label gap=" + comfortableRadio);
+    assert(Math.abs(comfortableSwitch - 6) < 0.5, "comfortable switch label gap=" + comfortableSwitch + " (expected its own choice-role 6px override, unaffected by .pick)");
     doc.documentElement.dataset.density = "compact";
     const compactRadio = readGap(radioLabel);
     const compactSwitch = readGap(switchLabel);
-    assert(Math.abs(compactRadio - 8) < 0.5, "compact radio label gap=" + compactRadio);
-    assert(Math.abs(compactSwitch - 6) < 0.5, "compact switch label gap=" + compactSwitch + " (expected its own choice-role 6px override, unaffected by the radio-gap fix)");
+    assert(Math.abs(compactRadio - 12) < 0.5, "compact radio label gap=" + compactRadio);
+    assert(Math.abs(compactSwitch - 6) < 0.5, "compact switch label gap=" + compactSwitch + " (expected its own choice-role 6px override, unaffected by .pick)");
     delete doc.documentElement.dataset.density;
   });
 

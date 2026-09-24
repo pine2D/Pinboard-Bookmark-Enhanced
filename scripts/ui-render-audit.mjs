@@ -249,7 +249,7 @@ function skip(check, expected, note) { return { check, status: "SKIP", actual: n
 // between the two silently made colorEqVar compare against whichever token
 // bgEqVar/textContrastMulti had already claimed (caught live: `.stag`'s
 // colorEqVar read chip-BG's value while labelled chip-fg in the verdict).
-function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVarName, radiusVarName, childSelectors, focusTargetSelector }) {
+function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVarName, extraBorderColorVarName, radiusVarName, childSelectors, focusTargetSelector }) {
   const el = document.querySelector(selector);
   if (!el) return { found: false };
   const cs = getComputedStyle(el);
@@ -385,6 +385,16 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
   let extraColorRaw = null;
   if (extraColorVarName) {
     extraColorRaw = getComputedStyle(document.documentElement).getPropertyValue(extraColorVarName).trim() || null;
+  }
+  // extraBorderColorRaw (stage3b Task 1, mirrors extraBgRaw/extraColorRaw
+  // exactly): borderColorEqVar needs its OWN slot for the same reason
+  // colorEqVar got one, not bgEqVar's -- a border-color-role token
+  // (`.pick-mark`'s resting --opt-border ring) is neither a background nor
+  // a text-color read, and a future check that wanted borderColorEqVar
+  // alongside bgEqVar/colorEqVar on the same element must not starve either.
+  let extraBorderColorRaw = null;
+  if (extraBorderColorVarName) {
+    extraBorderColorRaw = getComputedStyle(document.documentElement).getPropertyValue(extraBorderColorVarName).trim() || null;
   }
   // Effective hit-area box (COMPONENTS.md §1.5's ::before hit-area expansion
   // recipe, e.g. .row-del-x / #vocab-invert-selection): getBoundingClientRect()
@@ -554,6 +564,7 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     compareRect,
     extraBgRaw,
     extraColorRaw,
+    extraBorderColorRaw,
     textInset,
     containmentChildren,
     // Unconditional (cheap, selector-independent) -- colorSchemeMatchesTheme's
@@ -1019,6 +1030,22 @@ function evaluateCheck(check, raw, theme) {
     const got = parseSolidColor(raw.color);
     const note = !want ? `--${exp.colorEqVar} token unresolved (raw=${JSON.stringify(raw.extraColorRaw)})` : undefined;
     out.push(verdict("colorEqVar", colorsEqual(want, got), raw.color, `var(--...-${exp.colorEqVar})=${raw.extraColorRaw}`, note));
+  }
+  // borderColorEqVar (stage3b Task 1, mirrors bgEqVar/colorEqVar): a
+  // `.pick-mark`'s resting ring must be THIS theme's --{ns}-border token,
+  // verbatim -- not a coincidentally-similar grey. raw.borderColors is the 4
+  // sides joined "top|right|bottom|left" (unconditional, existing probe
+  // field); .pick-mark's border is uniform on all sides (composer's
+  // `border: 1px solid var(--{ns}-border)`, one declaration, no per-side
+  // override anywhere in the recipe or in options.css), so the first side
+  // stands in for all four rather than adding a second raw shape just for
+  // this one check.
+  if ("borderColorEqVar" in exp) {
+    const want = parseSolidColor(raw.extraBorderColorRaw);
+    const gotRaw = (raw.borderColors || "").split("|")[0];
+    const got = parseSolidColor(gotRaw);
+    const note = !want ? `--${exp.borderColorEqVar} token unresolved (raw=${JSON.stringify(raw.extraBorderColorRaw)})` : undefined;
+    out.push(verdict("borderColorEqVar", colorsEqual(want, got), gotRaw, `var(--...-${exp.borderColorEqVar})=${raw.extraBorderColorRaw}`, note));
   }
   if ("hitAreaMin" in exp) {
     if (hostZero) out.push(verdict("hitAreaMin", false, null, exp.hitAreaMin, zeroNote));
@@ -1828,14 +1855,20 @@ async function runOneCheck(page, theme, check, results, extBase) {
   }
   if (check.seedChecked) {
     const { input, checked } = check.seedChecked;
+    // type: "radio" too (stage-3b Task 1, .pick) -- writing `.checked = true`
+    // on a radio input is the SAME spec-defined DOM side effect as a real
+    // user click for the rest of its native `name` group (every OTHER radio
+    // sharing that name is automatically un-checked, no `change` event
+    // needed either), so a `.pick-mark` checked-state seed needs nothing
+    // beyond what this already does for a checkbox-backed `.switch-track`.
     const prev = await page.evaluate(({ input, checked }) => {
       const el = document.querySelector(input);
-      if (!el || el.type !== "checkbox") return null;
+      if (!el || (el.type !== "checkbox" && el.type !== "radio")) return null;
       const was = el.checked;
       el.checked = checked;
       return was;
     }, { input, checked: !!checked });
-    if (prev === null) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: seedChecked input not found or not a checkbox: ${input}`);
+    if (prev === null) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: seedChecked input not found or not a checkbox/radio: ${input}`);
     seedRestore = { input, checked: prev };
     // The `.switch-track` transition this settles lives on the row wrapping
     // the checkbox, not the checkbox itself (switchRules,
@@ -2067,12 +2100,14 @@ async function runOneCheck(page, theme, check, results, extBase) {
   const extraBgSelectorVar = check.expect.textContrastMulti?.extraBgSelectorVar
     || check.expect.bgEqVar;
   const extraColorSelectorVar = check.expect.colorEqVar;
+  const extraBorderColorSelectorVar = check.expect.borderColorEqVar;
   const radiusVar = check.expect.insetBand?.radiusVar || check.expect.borderRadiusPx?.radiusVar;
   const raw = await page.evaluate(probeSelector, {
     selector: check.selector,
     compareSelector: check.expect.heightEqWith?.selector || check.expect.widthLteWith?.selector || null,
     extraBgVarName: extraBgSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBgSelectorVar}` : null,
     extraColorVarName: extraColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraColorSelectorVar}` : null,
+    extraBorderColorVarName: extraBorderColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBorderColorSelectorVar}` : null,
     radiusVarName: radiusVar ? `--${NS_BY_SURFACE[check.surface]}-${radiusVar}` : null,
     childSelectors: check.expect.fusedChildrenFlat?.children || check.expect.fusedStateStableChildren || check.expect.edgeClickable?.children || null,
     focusTargetSelector: check.state === "focusWithin" ? check.focusTarget : null,
@@ -3126,7 +3161,22 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // (bare `.listbox-pop`/`.listbox-opt` selectors match it first in DOM
     // order) and skip this loop's own visibility wait below (see that
     // comment).
-    const switchChecks = checks.filter((c) => c.selector.includes(".switch-track") || c.expect?.hitRectMin
+    // `.pick-mark` (stage-3b Task 1) widened this the same way `.switch-
+    // track` is already generic here, not via a per-selector name like the
+    // #opt-popup-width-custom/#test-gemini entries below: `#panel-bookmarks`
+    // is `display:none` until #tab-bookmarks is clicked, same as every
+    // other non-default tab, and otherChecks (the plain loop further down)
+    // does NOT switch tabs -- it assumes whatever #tab-general leaves
+    // active. A colour-only check (bgEqVar/borderColorEqVar) reads
+    // getComputedStyle() fine either way (style still resolves under
+    // display:none), so a bgEqVar-only row would have silently "passed"
+    // against an invisible element with no layout box at all; only the
+    // widthPx/heightPx checks on the SAME element actually caught this
+    // (measured: 30 FAILs, all `actual=null` -- confirmed BEFORE this line
+    // existed, by running the checklist's two new pick-mark entries without
+    // it).
+    const switchChecks = checks.filter((c) => c.selector.includes(".switch-track") || c.selector.includes(".pick-mark")
+      || c.expect?.hitRectMin
       || c.selector.includes("[data-ui-stage0]") || c.selector === "#opt-popup-width-custom"
       || c.selector === "#test-gemini" || c.selector === "#opt-ai-provider-btn"
       || c.selector === "#translate-target-lang-btn" || c.selector === ".listbox-pop" || c.selector === ".listbox-opt");

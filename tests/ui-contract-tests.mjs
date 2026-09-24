@@ -5557,6 +5557,21 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Stage-3b Task 1 (2026-09-24-ui-system-stage3b): the .pick primitive
+// (COMPONENTS.md §6.4 exception 3) hides its native radio/checkbox input the
+// same way .switch hides its checkbox -- opacity: 0, absolutely covering the
+// row -- so options.js's existing `input[name=...]:checked` reads and
+// `change` listeners keep working on the four migrated radio groups (bgsave-
+// mode, tag-sync-mode, popup-width-preset, ai-content-source) without any JS
+// changes, while a CSS-drawn `.pick-mark` (composer pickRules, ui-
+// components.mjs) carries the visible state cue. Pin the generated rule
+// directly (contract, not usability/render-audit) so a sync-all regression
+// that dropped the opacity hide surfaces here instead of only showing up as
+// "radio rows render a native dot AND a drawn mark" during a real audit.
+check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[^}]*opacity:\s*0;[^}]*\}/.test(optionsCss),
+  'options.css: .pick > input[type="radio"|"checkbox"] does not hide the native control with opacity: 0 (composer pickRules, ui-components.mjs)');
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);

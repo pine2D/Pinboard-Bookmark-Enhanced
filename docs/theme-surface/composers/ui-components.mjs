@@ -752,7 +752,141 @@ function switchRules(ns) {
 }
 
 // -----------------------------------------------------------------------
-const FAMILY_BUILDERS = { btn: btnRules, btnIc: btnIcRules, danger: dangerRules, chip: chipRules, form: formRules, switch: switchRules };
+// Pick row (COMPONENTS.md §6.4 exception 3, stage-3b Task 1, R11): options-
+// only primitive for radio groups -- and, via the `.pick-box` modifier, a
+// checkbox list Task 2 wires up -- built on the same "hidden native input
+// covers the row, a CSS-drawn face carries the visible state cue" technique
+// as `.switch` above. Unlike `.switch` (fill = the whole state cue), the
+// mark stays a ring at rest and only fills + draws an L-shaped checkmark
+// border when checked -- the user picked this shape (scratchpad design "B",
+// docs/superpowers/.../scratchpad/radio/index.html) specifically because
+// bookmarks' bgsave-mode/tag-sync-mode rows, popup-width's custom-number
+// row, and ai-content-source's help-annotated rows all carry copy too long
+// for a segmented control, and ai-content-source shares a `.pref-group` with
+// a `.switch` row and needs the same row height.
+//
+// DOM (options.js reads it unchanged -- same `input[name=...]:checked` +
+// `change`-listener + reset-flow contract the plain `<input type=radio>`
+// labels had before this task):
+//   label.pick
+//     input[type=radio|checkbox]  <- opacity-hidden, absolutely covers the
+//                                    row (same technique as .switch's
+//                                    input), still focusable/keyboard-
+//                                    operable (arrow-key group navigation
+//                                    is native UA behaviour, not anything
+//                                    this recipe or options.js implements)
+//     span.pick-text              <- copy; may be followed by an inline
+//                                    control (popup-width's custom number
+//                                    input, lifted onto its own stacking
+//                                    context below) before the mark
+//     span.pick-mark              <- 20x20 face; circle at rest (radio) or
+//                                    `.pick-box`'s rounded square (checkbox)
+//
+// Colour: the paired-color law (§7.1) needs a `color` declaration wherever
+// a rule backgrounds something. `.pick-mark`'s resting `background:
+// transparent` self-pairs with a `color: --opt-on-accent` declared on that
+// SAME rule -- unused while resting (the ring's visible edge is `border`,
+// not `color`), but it is what `.pick-mark::after`'s checkmark border draws
+// via `currentColor`, inherited down from the mark exactly the way
+// `.switch-track`'s `color` feeds `.switch-track::before`'s `background:
+// currentColor` thumb above. The checked-state rule then only has to touch
+// `background`/`border-color` (pairColorWith points back at the base rule,
+// which still declares that `color`) -- color itself never needs to change
+// between states, since the checkmark is invisible (opacity 0) until
+// checked regardless of what colour it would be.
+function pickRules(ns) {
+  if (ns !== "opt") return [];
+  const INPUT = ".pick > input[type=\"radio\"], .pick > input[type=\"checkbox\"]";
+  return [
+    rule(".pick", [
+      ["display", "flex"],
+      ["align-items", "center"],
+      ["gap", sp(ns, 12)],
+      ["position", "relative"],
+      ["cursor", "pointer"],
+      ["min-height", "var(--opt-row-min-h)"],
+    ]),
+    rule(INPUT, [
+      ["position", "absolute"],
+      ["inset", "0"],
+      ["width", "100%"],
+      ["height", "100%"],
+      ["margin", "0"],
+      ["opacity", "0"],
+      ["cursor", "pointer"],
+    ]),
+    rule(".pick-text", [["flex", "0 1 auto"], ["min-width", "0"]]),
+    // The popup-width custom row's inline number input sits after
+    // .pick-text, still inside the label. A <label> only forwards a click
+    // to its associated control when the click's target is the label
+    // itself or a non-interactive descendant (HTML labeled-control
+    // activation behaviour) -- a nested labelable element like this number
+    // input is never forwarded, spec-guaranteed regardless of the rule
+    // below. What the rule below fixes is hit-testing: the hidden radio's
+    // `inset: 0` covers the WHOLE row including the number input's own box,
+    // so without lifting the input onto its own stacking context, a real
+    // click aimed at the field would hit-test to the invisible radio
+    // instead and never reach the field at all.
+    rule(".pick > input:not([type=\"radio\"]):not([type=\"checkbox\"])", [
+      ["position", "relative"],
+      ["z-index", "1"],
+    ]),
+    rule(".pick-mark", [
+      ["margin-left", "auto"],
+      ["flex", "none"],
+      ["width", "20px"],
+      ["height", "20px"],
+      ["border-radius", `var(--${ns}-radius-full)`],
+      ["border", `1px solid ${v(ns, "border")}`],
+      ["background", "transparent"],
+      ["color", `var(--${ns}-on-accent)`],
+      ["position", "relative"],
+      ["transition", `background ${motion(ns)}, border-color ${motion(ns)}`],
+    ]),
+    rule(".pick-box > .pick-mark", [["border-radius", `var(--${ns}-radius-sm)`]]),
+    rule(".pick-mark::after", [
+      ["content", "\"\""],
+      ["position", "absolute"],
+      ["left", "6px"],
+      ["top", "2px"],
+      ["width", "5px"],
+      ["height", "10px"],
+      ["border", "solid currentColor"],
+      ["border-width", "0 2px 2px 0"],
+      ["transform", "rotate(45deg)"],
+      ["opacity", "0"],
+    ]),
+    rule(".pick > input:checked ~ .pick-mark", [
+      ["background", `var(--${ns}-accent)`],
+      ["border-color", `var(--${ns}-accent)`],
+    ], { pairColorWith: ".pick-mark" }),
+    rule(".pick > input:checked ~ .pick-mark::after", [["opacity", "1"]]),
+    rule(".pick:hover > .pick-mark", [["border-color", `var(--${ns}-fg-muted)`]]),
+    rule(".pick > input:focus-visible ~ .pick-mark", [
+      ["outline", "none"],
+      ["box-shadow", `var(--${ns}-focus-ring)`],
+    ]),
+    rule(".pick > input:disabled ~ .pick-text, .pick > input:disabled ~ .pick-mark", [
+      ["color", `var(--${ns}-fg-hint)`],
+      ["border-color", `var(--${ns}-fg-hint)`],
+    ]),
+    rule(".pick > input:disabled", [["cursor", "default"]]),
+    // Forced colors (Windows High Contrast): same handoff as .switch --
+    // author backgrounds are flattened, so a drawn mark would lose its
+    // on/off fill. Hand the job back to the native radio/checkbox --
+    // visible, in flow, system-drawn -- and drop the mark.
+    rule(INPUT, [
+      ["position", "static"],
+      ["width", "auto"],
+      ["height", "auto"],
+      ["opacity", "1"],
+    ], { media: "(forced-colors: active)" }),
+    rule(".pick-mark", [["display", "none"]], { media: "(forced-colors: active)" }),
+  ];
+}
+
+// -----------------------------------------------------------------------
+const FAMILY_BUILDERS = { btn: btnRules, btnIc: btnIcRules, danger: dangerRules, chip: chipRules, form: formRules, switch: switchRules, pick: pickRules };
 export const FAMILIES = Object.keys(FAMILY_BUILDERS);
 
 // Rules for one (ns, family) — exported so recipe-lint can run its static

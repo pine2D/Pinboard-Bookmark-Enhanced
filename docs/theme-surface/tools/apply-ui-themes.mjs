@@ -26,7 +26,10 @@ const END = "/* @generated:ui-themes end */";
 // opt gained "switch" (taste-uplift batch4 T1): the .switch primitive is
 // options-only (switchRules returns [] for pp/lib), so only this surface
 // lists it.
-const ACTIVE_COMPONENT_FAMILIES = { pp: ["btn", "btnIc", "danger", "chip", "form"], opt: ["btn", "btnIc", "danger", "chip", "form", "switch"], lib: ["btn", "btnIc", "danger", "chip", "form"] };
+// opt gained "pick" (stage-3b Task 1, 2026-09-24-ui-system-stage3b): the
+// .pick primitive is options-only too (pickRules returns [] for pp/lib),
+// same reason -- radio groups only exist in options' four migrated groups.
+const ACTIVE_COMPONENT_FAMILIES = { pp: ["btn", "btnIc", "danger", "chip", "form"], opt: ["btn", "btnIc", "danger", "chip", "form", "switch", "pick"], lib: ["btn", "btnIc", "danger", "chip", "form"] };
 
 function loadPilots() {
   const by = {};

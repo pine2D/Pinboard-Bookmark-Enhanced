@@ -284,10 +284,16 @@
 //                      .checked` to this value before the probe (property
 //                      write, no change event -> no autosave) and restores
 //                      the original value afterwards. Lets one row pin a
-//                      checkbox-driven state such as the `.switch` track's
-//                      off/on fill without depending on the storage default.
-//                      state "checked" REQUIRES seedChecked.checked === true
-//                      (it is only a distinct results key for the on state).
+//                      checkbox- OR radio-driven state (stage-3b Task 1
+//                      widened this from checkbox-only for `.pick`'s
+//                      radio-backed mark -- writing `.checked = true` on a
+//                      radio input is the same spec-defined DOM side effect
+//                      as a real click for the rest of its native `name`
+//                      group) such as the `.switch` track's or `.pick`
+//                      mark's off/on fill, without depending on the storage
+//                      default. state "checked" REQUIRES
+//                      seedChecked.checked === true (it is only a distinct
+//                      results key for the on state).
 //   open           -- (row-level, not under `expect`, used with state: "open",
 //                      Task 4, ui-system-stage2, Controller ruling C):
 //                      { click: selector }. The runner scripts .focus() onto
@@ -339,6 +345,19 @@
 //                      consumers -- chip-bg/chip-fg/ai-chip-fg are all
 //                      already contrast-audit-gated token PAIRS, so this
 //                      checks token IDENTITY on top of that, render-side.
+//   borderColorEqVar -- role name (e.g. "border"): mirrors bgEqVar/colorEqVar,
+//                      just against the computed border-color instead of
+//                      background-color/color -- the element's border must
+//                      equal (±1/channel) the active theme's `--{ns}-{role}`
+//                      token. Own probe slot (extraBorderColorVarName), same
+//                      reason colorEqVar didn't share bgEqVar's: a check
+//                      could legitimately want both bgEqVar and
+//                      borderColorEqVar on the same element (a mark's fill
+//                      AND its ring) against two different tokens. Compares
+//                      the FIRST of the computed top|right|bottom|left
+//                      border-color quad (added stage-3b Task 1, `.pick-mark`
+//                      -- its border is uniform on every side, so one side
+//                      stands in for all four rather than a second raw shape).
 //
 // weakTextOnFill (family 13, weak-text-on-fill batch T5, COMPONENTS.md
 // §9.1 law 8): no CHECKS entries carry this key -- like hitAreaMin (family
@@ -1785,6 +1804,33 @@ export const CHECKS = [
     expect: { borderTopWidthPx: { value: 1 } } },
   { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .settings-section > h2.section-title + .pref-group > .pref-row:first-child > label.switch', state: "default",
     expect: { minHeightPx: { comfortable: 32, compact: 28 }, hitRectMin: { height: 24 } } },
+
+  // ---- Stage-3b Task 1 pick family (spec 2026-09-24-ui-system-stage3b-
+  // design §2, COMPONENTS.md §6.4 exception 3): the four radio groups
+  // (bookmarks' bgsave-mode/tag-sync-mode, popup-width-preset,
+  // ai-content-source) that moved from a bare `<label><input type=radio>`
+  // onto `label.pick > input + .pick-text + .pick-mark`. bgsave-mode is the
+  // representative group -- first `.pref-row > label.pick` in DOM order
+  // inside #panel-bookmarks is opt-bgsave-merge's row, same first-match
+  // discipline the switch family above already relies on.
+  { surface: "options", page: "options.html", selector: "#panel-bookmarks .pref-row > label.pick", state: "default",
+    expect: { minHeightPx: { comfortable: 44, compact: 36 }, hitRectMin: { height: 24 } } },
+  // Unchecked mark: transparent fill (no bgEqVar to prove -- there IS no
+  // background token at rest, only the ring), 20x20, --opt-border ring.
+  // seedChecked pins it explicitly (same discipline as every switch-track
+  // "default" entry above, not a hope that boot-time defaults leave it
+  // this way) -- opt-bgsave-skip is never the page's default selection, so
+  // this is also the negative control for the checked entry below.
+  { surface: "options", page: "options.html", selector: "#opt-bgsave-skip ~ .pick-mark", state: "default",
+    seedChecked: { input: "#opt-bgsave-skip", checked: false },
+    expect: { widthPx: { min: 20, max: 20 }, heightPx: { value: 20 }, borderColorEqVar: "border" } },
+  // Checked mark: accent fill. opt-bgsave-merge IS the page's real default
+  // (SETTINGS_DEFAULTS bgSaveMode: "merge"), seeded anyway for the same
+  // determinism reason -- a prior check in the same run must not be able to
+  // leave this ambiguous.
+  { surface: "options", page: "options.html", selector: "#opt-bgsave-merge ~ .pick-mark", state: "checked",
+    seedChecked: { input: "#opt-bgsave-merge", checked: true },
+    expect: { bgEqVar: "accent" } },
 ];
 
 // Hand-copied literal `data-theme` values, verified at authoring time with:

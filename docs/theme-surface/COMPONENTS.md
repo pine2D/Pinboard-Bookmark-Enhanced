@@ -788,6 +788,45 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
   `--opt-fg-hint`。定位（在外壳上）：`position: absolute` 于 `.listbox` 内、`top: 100% + sp-1`、
   `z-index: --opt-z-popover`，打开时测一次，视口下方放不下且上方更宽时给外壳加 `data-flip="up"`
   （属性，不写内联 style）。不用 `:has()`、不用 Shadow DOM。其余 select 仍走原生 picker（阶段 3 再议）。
+- **例外 3：`.pick`**（stage3b Task 1，spec `2026-09-24-ui-system-stage3b-design.md` §2，R11
+  用户裁决「勾选行」）。单选组（未来经 `.pick-box` 变体覆盖多选列表，Task 2）是全仓**第三个**获准的
+  自绘布尔控件，与 `.switch` 同一族技巧（隐藏原生 input 覆盖整行、状态用绘制部件表意），成立条件同样
+  四条，每条对应「不自绘」担心的一种丢失：
+  1. **原生 input 保留且可聚焦**：`<input type=radio|checkbox>` 是 `label.pick` 的**第一个**子元素，
+     `opacity: 0` 隐藏并 `inset: 0` 铺满整行（同 `.switch` 范式）。→ Tab/方向键仍落在真 radio 上，
+     组内箭头键切换是**原生 radio-group 行为**，不是任何 JS 实现；`change` 冒泡、`options.js` 的
+     `input[name=...]:checked` 读取、reset 流程全部零改动。
+  2. **焦点环画在 mark 上**：`input:focus-visible ~ .pick-mark { outline: none; box-shadow:
+     --opt-focus-ring }`，同 `.switch-track` 的 borderless 落位。
+  3. **forced-colors 回退**：`@media (forced-colors: active)` 下 input 恢复 `opacity: 1; position:
+     static`，`.pick-mark { display: none }`，交回系统绘制的原生控件。
+  4. **不加 `aria-checked`**：原生 radio/checkbox 已经暴露勾选态。
+  DOM：`label.pick`（`input` 首位 → `span.pick-text` 文案，可跟一个行内控件（popup-width 自定义行的
+  `input[type=number]`）→ `span.pick-mark[aria-hidden=true]` 末位，20×20，圆形（radio）或
+  `.pick-box` 修饰符给 4px 圆角方形（Task 2 的 checkbox 列表用）)。选中态：`background: --opt-accent`
+  + `border-color: --opt-accent`；未选中：1px `--opt-border` 描边、透明底；勾用 `.pick-mark::after`
+  的 CSS 边框旋转 45°画出 L 形，不用字面字符。行几何与 `.switch` 完全相同（`--opt-row-min-h`
+  44/36、`--opt-row-pad-y`、相邻 1px `--opt-border-section` 分隔线）——`.pref-group-radio` 不再是
+  「无线 40/36 行」变体，那条旧规则已删除（options.css，同 commit 留有退役说明）；选中行文案不加粗。
+  行内非 radio/checkbox 控件（popup-width 自定义数字框）取 `position: relative; z-index: 1`，
+  盖过隐藏 radio 的 `inset: 0`，否则真实点击会命中不可见的 radio 而非该控件（HTML label
+  的「点击已是交互内容后代不转发激活」语义本身与这点无关——它保证了点对了目标之后不会误触发
+  label 的关联控件——但先要让命中测试真的落在该控件上）。类名只用 `pick` / `pick-text` /
+  `pick-mark` / `pick-box`（已登记 `ui-vocabulary.json`）。
+  **配方内部的成对消费律附注**：`.pick-mark` 的静态态 `background: transparent` 靠同一条规则里的
+  `color: --opt-on-accent` 自证（未选中时视觉上不使用，是选中态 `::after` 勾线经 `currentColor`
+  继承的那个值——`.switch-track` 的 `color`→`.switch-track::before` 的 `background: currentColor`
+  同一关系，只是这里换成 `border`）；圆角一律走 `--opt-radius-full`（圆）/ `--opt-radius-sm`
+  （`.pick-box`）token，不写 `50%`/`4px` 字面量（§9.2 roundness law 1，recipe-lint 强制）。
+  **已知的宿主级例外**（`.context-help-host[data-help-role="choice"] > label.pick`，AI Content
+  Source 两个 radio 行）：这里 `<details class="context-help">` 保持 label 的兄弟（不像 `.switch`
+  的 Ruling 36 那样塞进 label 内部），所以宿主的三栏 grid（`auto 24px minmax(0,1fr)`）仍要用第 2
+  栏给帮助图标定位——这要求 label 自身保持收缩到纯文案宽度，不能让 `.pick-mark` 参与进正常流去撑宽
+  它（否则图标被推离文案 ~32px）。手写覆盖把该宿主内 `label.pick` 改回 `position: static`、
+  `.pick-mark` 改 `position: absolute; right: 0`（相对宿主自身——它已是 `position: relative`）：
+  mark 因此落到与同组 `.switch` 轨道一致的「行尾」位置（spec §2），文案→图标的视觉间距也恢复到
+  6–8px（`tests/options-context-help-tests.html` 钉着这条）；隐藏 radio 的命中区随之扩到整行，
+  与其它三组 `.pick` 行（本就整行可点，靠 block 级 `label` 默认宽度）保持一致，不是回退。
 - 全宽字段（表单栈里独占一行）**不受同行对齐律约束**——它没有行伴。约束只在同一 flex 行内并排时生效。
 
 ---
@@ -1324,6 +1363,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `.pf` | 带边框子面板（provider 卡）：legacy（`[data-ui-stage0]` 外）padding sp-5，radius md，`margin-top sp-4`；**在 `[data-ui-stage0]` 内**（stage2 §2）：padding `--opt-panel-pad`（16 comfortable/12 compact）、`margin-top sp-6`（16）；`> h3` 字号/行高 `--opt-text-body`/`--opt-lh-body`、字重 600、色 `--opt-fg`（不落回 legacy 的 `--opt-fg-soft` 未主题态 / `--opt-fg-muted` 主题态两段式）、`margin: 0 0 --opt-label-gap` |
 | options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`（可选第三个子元素 `details.context-help`，夹在 `.switch-text` 与 `.switch-track` 之间——带帮助的开关行用它，Ruling 36）；flex、flex-start（轨道 `margin-left:auto` 到行尾）、gap sp-3；轨道 28×16 无边框 / 滑块 12 内缩 2 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked、details-in-label 合法性附注） |
 | options | `.listbox` (+ `.listbox-btn` / `.listbox-value` / `.listbox-sizer` / `.listbox-pop` / `.listbox-list` / `.listbox-opt`) | 唯一自绘 select（§6.4 例外 2）：`select[data-listbox][hidden]` 之后的 `div.listbox`；宽度沿用 select 例外（`width: max-content; min-width: 240px; max-width: 100%`），max-content 取最长选项（`.listbox-sizer` 零高网格行），按钮占满 `.listbox`、高 `--opt-control-h`（32/28）；弹层外壳 `.listbox-pop` absolute、`top: 100% + sp-1`（`data-flip=up` 时贴上方）、`z-index: --opt-z-popover`、圆角 lg、边框阴影、`overflow: hidden`；滚动层 `.listbox-list` `max-height: min(320px, 100dvh − 32px)`、`overflow: auto`、内距 sp-2；选项高 `--opt-control-h`、内距 `0 sp-4`、圆角 sm；跟随输入框的关系规则 `.fg > .listbox + input { margin-top: sp-3 }` 接替 `.fg > select + input` |
+| options | `.pick` (+ `.pick-text` / `.pick-mark` / `.pick-box`) | 单选组勾选行（§6.4 例外 3，stage3b Task 1）：`label.pick > input[type=radio\|checkbox] + .pick-text (+ 可选行内控件) + .pick-mark`；行几何与 `.switch` 相同（`--opt-row-min-h` 44/36、`--opt-row-pad-y`、`.pref-row` 分隔线，`.pref-group-radio` 不再单独变体）；flex、gap sp-5（12px）、mark `margin-left:auto` 到行尾；mark 20×20，圆形（radio）/ `.pick-box` 修饰符 4px 圆角方形（Task 2）；选中 `background/border-color: --opt-accent`，勾线 `::after` CSS 边框转 45° 画 L 形（不用字面字符）；焦点环画在 mark（同 `.switch-track`）、forced-colors 回退原生控件、无 `aria-checked`；行内非 radio/checkbox 控件（popup-width 自定义数字框）`position:relative;z-index:1` 盖过隐藏 input 的 `inset:0`；`.context-help-host[data-help-role="choice"]` 宿主（details 仍是 label 兄弟）有专属覆盖：label 改 `position:static`、mark 改 `position:absolute;right:0` 相对宿主，见 §6.4 例外 3 附注 |
 | options | `section.settings-section` | 分区容器；相邻分区 `margin-top: --opt-section-gap`；`> h2.section-title` 字号 `--opt-text-section`，`margin: 0 0 --opt-sp-5`（12） |
 | options | `.pref-group` | 偏好行列表；作分区直接子元素时 `margin-bottom: --opt-sp-6`；相邻 `.pref-row` 之间 1px `--opt-border-section` 分隔线（`.pref-group-radio` 无线）；混合选项组（单选与开关共存、不具备 `.pref-group-radio`）内的单选行仍沿用圆点→文案 `--opt-sp-4`（8px）间距，`[data-ui-stage0] .pref-group:not(.pref-group-radio) > .pref-row > label:not(.switch) { gap: --opt-sp-4 }`——`label:not(.switch)` 把范围锁在单选上，组内的开关行保留自己的 choice-role 6px 覆盖不受影响 |
 | options | `.pref-row` | 一行 = `label`（flex、align center、gap sp-5、`min-height --opt-row-min-h`、`padding --opt-row-pad-y 0`、正文字号）；`.pref-row-sub` 左缩进 sp-7；**紧跟分区标题的首行去掉上内边距并把 min-height 减去一个 pad**（R9：标题→首行文字 = 12） |
