@@ -1565,6 +1565,25 @@ export const CHECKS = [
   // instead of capping at the old literal 420px ceiling.
   { surface: "options", page: "options.html", selector: ".key-wrap", state: "default",
     expect: { widthLteWith: { selector: ".fg:has(#opt-pinboard-token)" } } },
+  // Fix round 1 (review MINOR finding 2): the two re-pins above moved the
+  // ONLY checklist rows that exercised the LEGACY (non-stage-0) `.fg select
+  // { width: max-content; min-width: 240px; max-width: 100% }` and `.fg
+  // .key-wrap { max-width: 420px }` rules -- both still live, unconditional
+  // CSS (options.css), and both still govern every field on the four panels
+  // this stage hasn't reached yet (markdown/tags/appearance/vocab). Without
+  // its own row, a regression to either rule would pass silently until one
+  // of those panels' own migration task adds coverage. One id-anchored
+  // representative each, both reachable via the existing per-check tab-
+  // resolution `switchChecks` loop already uses (widened below to include
+  // them) -- no new tab-click group needed. Re-pinned to a stage-0-specific
+  // selector by whichever task migrates #opt-theme's panel (appearance) or
+  // #dict-anki-key's panel (vocab), the same way this task just re-pinned
+  // #opt-lang/#opt-pinboard-token's rows once THEY left the legacy rule's
+  // reach.
+  { surface: "options", page: "options.html", selector: "#opt-theme", state: "default",
+    expect: { widthPx: { min: 240 }, widthLteWith: { selector: ".fg:has(#opt-theme)" } } },
+  { surface: "options", page: "options.html", selector: ".key-wrap:has(#dict-anki-key)", state: "default",
+    expect: { widthPx: { max: 420 } } },
   // .fg-url (the three baseurl endpoints) and plain input[type=text] (the
   // Model field) both live on the AI Providers tab, inside #panel-ai;
   // #opt-openai-baseurl/#opt-openai-model specifically live inside

@@ -412,7 +412,16 @@ function pbpBuildSettingsSearchIndex(root = document) {
       }
       else if (node.matches("button")) target = node.id;
       else if (labelledButton) target = labelledButton.id;
-      else if (node.matches(".hint")) target = node.closest(".choice-row,.fg")?.querySelector("input,select,textarea,button")?.id || "";
+      // Stage-3b Task 2 fix round 1: `.choice-row`/`.fg` alone stopped
+      // resolving once 3a/3b migrated a choice-help host's row onto the row
+      // model (`.pref-row` inside a `.pref-group`, COMPONENTS.md's stage-0
+      // row shapes) -- a hint's `closest()` returned no ancestor at all, so
+      // `target` stayed "" all the way through (unlike the catch-all `else`
+      // branch a few lines down, this one has no `if (!target)` fallback),
+      // and the jump landed on the panel instead of the switch it explains.
+      // `.pref-row`/`.pref-group` added alongside the two legacy shapes,
+      // which stay for panel-markdown's still-unmigrated `.choice-row` rows.
+      else if (node.matches(".hint")) target = node.closest(".choice-row, .fg, .pref-row, .pref-group")?.querySelector("input,select,textarea,button")?.id || "";
       else {
         target = node.id || "";
         if (!target) { target = panelFallbackId(); weak = true; }

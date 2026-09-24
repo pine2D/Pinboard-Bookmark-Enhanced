@@ -3191,7 +3191,16 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // rows now carry #opt-ai-provider-anchored selectors
       // (`#opt-ai-provider-btn + .listbox-pop`, `#opt-ai-provider-list
       // .listbox-opt`), not the bare class strings this used to `===` against.
-      || c.selector.includes(".listbox-pop") || c.selector.includes(".listbox-opt"));
+      || c.selector.includes(".listbox-pop") || c.selector.includes(".listbox-opt")
+      // Fix round 1 (review MINOR finding 2): the two legacy-`.fg select`/
+      // `.key-wrap` coverage rows (#opt-theme on Appearance, the vocab
+      // AnkiConnect key on the Vocabulary tab, inside a closed disclosure --
+      // this loop's own details-opener a few lines down handles that for
+      // free). Neither matches `keyWrapChecks`'s exact `".key-wrap"` string
+      // (that group clicks #tab-general, the wrong panel for the vocab row),
+      // so both need their own explicit name here instead, same as
+      // #opt-popup-width-custom/#test-gemini above.
+      || c.selector === "#opt-theme" || c.selector.includes(".key-wrap:has("));
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
       && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c));

@@ -230,12 +230,45 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     } finally { mergeBtn.remove(); }
   });
 
+  // Stage-3b Task 2 fix round 1 (IMPORTANT finding 1): the .hint branch's
+  // `closest(".choice-row,.fg")` stopped resolving once 3a/3b migrated a
+  // choice-help host's row onto the row model (.pref-row inside .pref-group,
+  // COMPONENTS.md's stage-0 row shapes) -- the ancestor walk found neither
+  // legacy class and `target` stayed "" all the way through (this branch has
+  // no `if (!target)` fallback, unlike the catch-all `else` a few lines
+  // down), so the jump landed on the panel instead of the switch/radio the
+  // hint explains. Fixed in pbpBuildSettingsSearchIndex (options.js) by
+  // adding `.pref-row, .pref-group` to the closest() list. Six hints below,
+  // spanning three panels and two migration stages (general: this task;
+  // ai-behavior/archive: stage-3a), all hit the identical bug -- fetched
+  // fresh against the REAL options.html (not this file's synthetic fixture
+  // above) so the assertion exercises the actual production shape, not a
+  // hand-drawn stand-in of it.
+  await test("search index resolves pref-row choice-host hints to their switch/radio id, not empty", async () => {
+    const html = await (await fetch("../options.html")).text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const index = pbpBuildSettingsSearchIndex(doc);
+    const cases = [
+      ["This checkbox applies to this device only", "opt-sync-enabled"],
+      ["This is one account-wide choice", "opt-sync-api-keys"],
+      ["Includes page URLs, titles, selected text", "opt-backup-include-highlights"],
+      ["Includes vocabulary only for the current Pinboard account", "opt-backup-include-vocabulary"],
+      ["read the subtitles instead of the page text", "opt-ai-use-transcript"],
+      ["Sends the saved URL to archive.org", "opt-wayback-enabled"],
+    ];
+    cases.forEach(([snippet, id]) => {
+      const entry = index.find((e) => e.text.includes(snippet));
+      assert(entry, `no search index entry for a hint containing "${snippet}"`);
+      assert(entry.targetId === id, `hint "${snippet}" resolved targetId=${JSON.stringify(entry.targetId)}, expected "${id}"`);
+    });
+  });
+
   await test("a live readout (#tag-gov-overview) marked data-search-skip never becomes a dead search row", async () => {
     // Regression: it changed from <p class="fg"> to <p class="hint">, which
-    // the .hint branch resolves a target from via .closest(".choice-row,.fg")
-    // -- neither ancestor exists here, so it used to enter the index with an
-    // empty targetId, e.g. "27 tags · 3,412 uses · Ignored: 2 · Reset
-    // ignored list" pointing nowhere.
+    // the .hint branch resolves a target from via .closest(".choice-row,
+    // .fg, .pref-row, .pref-group") -- none of those ancestors exist here,
+    // so it used to enter the index with an empty targetId, e.g. "27 tags ·
+    // 3,412 uses · Ignored: 2 · Reset ignored list" pointing nowhere.
     const index = pbpBuildSettingsSearchIndex(document);
     assert(!index.some((entry) => entry.text.includes("Reset ignored list") && !entry.targetId),
       "the overview readout produced a dead (targetId-less) search row");

@@ -1526,9 +1526,10 @@ html.motion-ready .backup-import-result:not([hidden]) {
 [data-ui-stage0] .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
 [data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-5); }
 /* Stage-3b Task 2 (2026-09-24-ui-system-stage3b): `.disclosure > summary`'s
-   own base rule (~line 2079) is a literal `font-size: 15px`, written to
-   read "the same face as .section-title" (its own doc comment, ~line 2059)
-   -- true everywhere on the page until now, since no `.disclosure` had ever
+   own base rule (below, "---- Collapsible section (.disclosure) ----") is a
+   literal `font-size: 15px`, written to read "the same face as
+   .section-title" (that same section's own doc comment) -- true everywhere
+   on the page until now, since no `.disclosure` had ever
    shared a stage-0 panel with an `h2.section-title` sibling (general's
    #acc-connection-overview is the first: every other `.disclosure` still
    lives in an unmigrated panel -- vocab's five, tags' tag-gov-lowcount).

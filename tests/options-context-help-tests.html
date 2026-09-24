@@ -642,20 +642,49 @@ function test(name, fn) {
   // onto the stage-0 `.pref-row` model (44/36px, --opt-row-pad-y top+bottom
   // padding on EVERY row), so two stacked full rows with the first one's
   // help open naturally read a wider ink-to-ink gap than the old model ever
-  // produced -- not a double-margin regression (traced by hand: no gap
-  // ADDS to another, the number is exactly `.context-help-body`'s own 6px
-  // open-answer margin plus the next row's own --opt-row-pad-y top padding
-  // and both lines' font-metric ink insets), so "only one gap" now reads as
-  // "still exactly this one combination, not a THIRD contributor stacked on
-  // top of it".
+  // produced -- not a double-margin regression (traced by hand: no gap ADDS
+  // to another, it's exactly this one combination).
+  //
+  // Fix round 1 (NIT finding 4): pinned to the row model's own tokens
+  // instead of an empirically-eyeballed flat 20-32 window, box-level
+  // component read live per density tier (not hardcoded, so this tracks the
+  // tokens if they ever change):
+  //   2 * --opt-row-pad-y (the open row's own padding-bottom AND the next
+  //     row's padding-top -- the SAME token, paid twice, one on each side
+  //     of the hairline)
+  //   - --opt-sp-1 (`.context-help-body`'s own `margin-bottom: calc(
+  //     --opt-sp-1 * -1)`, the "pull the label's open height back down"
+  //     compensator a few rules above `label.switch > .context-help >
+  //     .context-help-body` -- it SHRINKS the box-level gap, hence minus)
+  //   + 1 (the `.pref-row + .pref-row` hairline border-top, a literal px,
+  //     not a spacing token -- COMPONENTS.md's stage-0 row model doc
+  //     comment carves this one out explicitly)
+  // textInkRect measures GLYPH ink, not box edges, so a residual rides on
+  // top of that box-level number: the open answer's own descent below its
+  // baseline plus the next line's ascent above its cap height -- NEITHER is
+  // a design token (font metrics, not CSS), empirically 2px (compact) to
+  // 3px (comfortable) on this audit's real fonts. `+0..+4` covers both
+  // measured residuals with headroom, everything below the formula is
+  // exact.
   test("expanded choice help contributes only one gap before the next setting", () => {
+    const readVar = (name) => parseFloat(frame.contentWindow.getComputedStyle(doc.documentElement).getPropertyValue(name));
     const { details, host, body } = parts("optSyncHint");
     const next = host.nextElementSibling;
     const nextLabel = next?.querySelector(":scope > label");
     assert(next?.classList.contains("context-help-host") && nextLabel, "sync fixture has no following setting");
-    details.open = true;
-    const gap = textInkRect(nextLabel).top - textInkRect(body).bottom;
-    assert(gap >= 20 && gap <= 32, "sync answer-to-next visual gap=" + gap);
+    [null, "compact"].forEach((density) => {
+      if (density) doc.documentElement.dataset.density = density; else delete doc.documentElement.dataset.density;
+      const rowPadY = readVar("--opt-row-pad-y");
+      const sp1 = readVar("--opt-sp-1");
+      const structural = (2 * rowPadY) - sp1 + 1;
+      details.open = true;
+      const gap = textInkRect(nextLabel).top - textInkRect(body).bottom;
+      assert(gap >= structural && gap <= structural + 4,
+        `${density || "comfortable"} sync answer-to-next visual gap=${gap}, expected ${structural}..${structural + 4} ` +
+        `(2*row-pad-y ${rowPadY} - sp-1 ${sp1} + 1px hairline, +0..4 font-ink residual)`);
+      details.open = false;
+    });
+    delete doc.documentElement.dataset.density;
   });
 
   test("expanded field help is visually owned by its label, not its input", () => {
