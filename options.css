@@ -1398,15 +1398,24 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
 }
 /* Fixwave F2: COMPONENTS.md §10.2's `.fg.entry-block` row promises "控件占满
    内容列（max-width: none）" for the whole primitive, but only the textarea
-   rule above implemented it -- an entry-block text/select/key-wrap control
-   was still capped by the legacy .fg 320/420/520/240 width tiers a few rules
-   up. `input:not([type="number"])` carves out the number field, which keeps
-   its own 96px content cap (fieldWidthKind, COMPONENTS.md §6.3) instead of
-   stretching to the column. The Popup tab's two current entry-blocks (shortcut
-   display, popup-width radios) have no direct input/select/.key-wrap child, so
-   this rule has nothing to match yet -- it exists as stage 2's contract, not a
-   stage-0 render change. */
-[data-ui-stage0] .entry-block > :is(input:not([type="number"]), select, .key-wrap) { max-width: none; }
+   rule above implemented it -- an entry-block text/key-wrap control was still
+   capped by the legacy .fg 320/420/520/240 width tiers a few rules up.
+   `input:not([type="number"])` carves out the number field, which keeps its
+   own 96px content cap (fieldWidthKind, COMPONENTS.md §6.3) instead of
+   stretching to the column. `select` is deliberately NOT in this :is() list:
+   COMPONENTS.md §10.2 keeps the select exception inside entry blocks too --
+   enumerated controls stay content-sized (`.fg select`'s width: max-content /
+   min-width: 240px / max-width: 100%, spec stage2 §2), they don't fill the
+   column. Stage-2 review round 1 caught this the hard way: with
+   `#opt-ai-provider`'s wrapper promoted to `.fg.entry-block`, `select` sitting
+   in this list (0,3,1) outranked `.fg select`'s max-width: 100% (0,1,1) and
+   let the provider select overflow the column on long option strings. In
+   stage 2, the listbox button (`.listbox-btn`, R4) inherits the same
+   content-sized policy once it lands. The Popup tab's two current
+   entry-blocks (shortcut display, popup-width radios) have no direct
+   input/.key-wrap child, so this rule had nothing to match under stage 0 --
+   it started rendering with stage 2's provider-panel entry blocks. */
+[data-ui-stage0] .entry-block > :is(input:not([type="number"]), .key-wrap) { max-width: none; }
 
 /* Provider sub-panel and action rows on the stage-0 rhythm (spec stage2 §2). */
 [data-ui-stage0] .pf { margin-top: var(--opt-sp-6); padding: var(--opt-panel-pad); }

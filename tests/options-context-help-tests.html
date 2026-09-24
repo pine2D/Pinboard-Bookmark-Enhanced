@@ -617,6 +617,24 @@ function test(name, fn) {
       assert(node.getBoundingClientRect().height === 0, "#" + id + " height=" + node.getBoundingClientRect().height);
     });
   });
+
+  // Stage-2 review round 1 (Medium cascade finding): #opt-ai-provider's
+  // wrapper is now .fg.entry-block, and the stage-1 entry-block rule
+  // (`[data-ui-stage0] .entry-block > :is(input:not([type="number"]),
+  // .key-wrap) { max-width: none }`) must NOT include `select` in that list --
+  // selects keep the legacy `.fg select` content-sized policy (max-content /
+  // min-width 240px / max-width 100%, spec stage2 §2) even inside an entry
+  // block. `.key-wrap` is the opposite case: it DOES fill the column.
+  test("stage2: the entry-block width policy keeps select content-sized but fills key-wrap", () => {
+    const select = doc.getElementById("opt-ai-provider");
+    const keyWrap = doc.getElementById("opt-gemini-key")?.closest(".key-wrap");
+    assert(select?.closest(".entry-block"), "opt-ai-provider lost its entry-block wrapper");
+    assert(keyWrap?.closest(".entry-block"), "opt-gemini-key's key-wrap lost its entry-block wrapper");
+    const selectMaxWidth = frame.contentWindow.getComputedStyle(select).maxWidth;
+    const keyWrapMaxWidth = frame.contentWindow.getComputedStyle(keyWrap).maxWidth;
+    assert(selectMaxWidth === "100%", "provider select max-width=" + selectMaxWidth);
+    assert(keyWrapMaxWidth === "none", "gemini key-wrap max-width=" + keyWrapMaxWidth);
+  });
 })().catch((error) => {
   for (let i = results.children.length; i < 16; i++) report("fixture setup", error);
 });
