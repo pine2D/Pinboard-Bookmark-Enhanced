@@ -1152,6 +1152,71 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       "panel-storage's .fg.fg-actions lost its clear button/status slot");
   });
 
+  // Stage-3b Task 3 (2026-09-24-ui-system-stage3b): markdown + tags move onto
+  // the row model. Markdown's 4 switches: two 2-switch .pref-groups
+  // (frontmatter/extended-meta, then toc/include-hl) around the image-policy
+  // listbox field, counted straight from the live markup.
+  await test("stage3b: markdown panel carries the marker and no legacy row classes", async () => {
+    const panel = await stage0Panel("markdown");
+    assert(!!panel, "panel-markdown is missing the data-ui-stage0 marker");
+    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
+      "panel-markdown still carries a legacy row/stack class");
+  });
+
+  await test("stage3b: every switch in the markdown panel sits in a .pref-row inside a .pref-group", async () => {
+    const panel = await stage0Panel("markdown");
+    assert(!!panel, "panel-markdown is missing the data-ui-stage0 marker");
+    const switches = [...panel.querySelectorAll("label.switch")];
+    assert(switches.length === 4, "expected 4 switches in panel-markdown, got " + switches.length);
+    assert(switches.every((l) => l.parentElement.classList.contains("pref-row") && l.closest(".pref-group")),
+      "every switch in panel-markdown must sit directly in a .pref-row inside a .pref-group");
+  });
+
+  await test("stage3b: markdown panel's image-policy select is a listbox target", async () => {
+    const panel = await stage0Panel("markdown");
+    assert(!!panel, "panel-markdown is missing the data-ui-stage0 marker");
+    const select = panel.querySelector("#opt-md-image-policy");
+    assert(select && select.hasAttribute("data-listbox"), "opt-md-image-policy is missing data-listbox");
+  });
+
+  await test("stage3b: markdown panel wraps Export Defaults and Send-to in their own sections", async () => {
+    const panel = await stage0Panel("markdown");
+    assert(!!panel, "panel-markdown is missing the data-ui-stage0 marker");
+    const sections = [...panel.querySelectorAll(":scope > section.settings-section")];
+    assert(sections.length === 2, "expected 2 top-level sections in panel-markdown, got " + sections.length);
+    assert(!!sections[1].querySelector("#export-targets"), "#export-targets is not inside the Send-to section");
+  });
+
+  // Tags: only #opt-tag-sort-by-pop (Pinboard.in Tag Pages) is a static
+  // switch outside the tag-gov component family, which this task leaves
+  // untouched (spec §3).
+  await test("stage3b: tags panel carries the marker and no legacy row classes", async () => {
+    const panel = await stage0Panel("tags");
+    assert(!!panel, "panel-tags is missing the data-ui-stage0 marker");
+    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
+      "panel-tags still carries a legacy row/stack class");
+  });
+
+  await test("stage3b: opt-tag-sort-by-pop sits in a .pref-row inside a .pref-group", async () => {
+    const panel = await stage0Panel("tags");
+    assert(!!panel, "panel-tags is missing the data-ui-stage0 marker");
+    const switches = [...panel.querySelectorAll("label.switch")];
+    assert(switches.length === 1, "expected 1 switch in panel-tags, got " + switches.length);
+    assert(switches[0].parentElement.classList.contains("pref-row") && switches[0].closest(".pref-group"),
+      "opt-tag-sort-by-pop must sit directly in a .pref-row inside a .pref-group");
+    assert(switches[0].querySelector("#opt-tag-sort-by-pop"), "the lone switch is not opt-tag-sort-by-pop");
+  });
+
+  await test("stage3b: tags panel keeps the tag-gov component family and its disclosure untouched", async () => {
+    const panel = await stage0Panel("tags");
+    assert(!!panel, "panel-tags is missing the data-ui-stage0 marker");
+    const lowcount = panel.querySelector("#tag-gov-lowcount.disclosure");
+    assert(!!lowcount, "panel-tags lost #tag-gov-lowcount.disclosure");
+    assert(!!lowcount.querySelector("#tag-gov-lowcount-list"), "panel-tags lost #tag-gov-lowcount-list");
+    assert(!!panel.querySelector("#tag-gov-progress[hidden]"), "panel-tags lost #tag-gov-progress or its hidden attribute");
+    assert(!!panel.querySelector(".tag-gov-head > .fg-actions"), "panel-tags' top .fg-actions button row must stay unchanged");
+  });
+
   await test("stage3a: ai-behavior selects are listbox targets", async () => {
     const panel = await stage0Panel("ai-behavior");
     assert(!!panel, "panel-ai-behavior is missing the data-ui-stage0 marker");

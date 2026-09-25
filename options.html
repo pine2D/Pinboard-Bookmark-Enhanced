@@ -982,95 +982,101 @@
     </div>
 
     <!-- Tab: Markdown -->
-    <div id="panel-markdown" class="panel" role="tabpanel" aria-labelledby="tab-markdown">
-      <h2 class="section-title" id="sec-md-export" data-i18n="secMdExport">Markdown Export Defaults</h2>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-md-export">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-md-frontmatter" checked /> <span class="switch-text" data-i18n="mdExportFrontmatter">Add YAML frontmatter to exported Markdown</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-md-extended-meta" checked /> <span class="switch-text" data-i18n="mdExportExtendedMeta">Include extended metadata (author, published, site, image, word count)</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-      <div class="fg context-help-host" data-help-role="field">
-        <label class="bl" for="opt-md-image-policy" data-i18n="mdExportImagePolicy">Image handling</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="mdExportImagePolicyHint">Applied when copying or downloading Markdown from the preview page. Can be overridden per export.</p>
-        </details>
-        <select id="opt-md-image-policy">
-          <option value="keep" data-i18n="mdImagePolicyKeep">Keep images (absolutize relative links)</option>
-          <option value="alt" data-i18n="mdImagePolicyAlt">Alt text only</option>
-          <option value="strip" data-i18n="mdImagePolicyStrip">Strip images</option>
-        </select>
-      </div>
-      <div class="fg fg-stack choice-stack" role="group" aria-labelledby="sec-md-export">
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-md-include-toc" /> <span class="switch-text" data-i18n="mdExportIncludeToc">Include table of contents</span><span class="switch-track" aria-hidden="true"></span></label></div>
-        <div class="choice-row"><label class="switch"><input type="checkbox" id="opt-md-include-hl" checked /> <span class="switch-text" data-i18n="mdOptIncludeHl">Include highlights</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      </div>
-
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="secSendDestinations">Send-to Destinations</h2>
-      <div id="export-targets"></div>
+    <div id="panel-markdown" class="panel" role="tabpanel" aria-labelledby="tab-markdown" data-ui-stage0>
+      <section class="settings-section">
+        <h2 class="section-title" id="sec-md-export" data-i18n="secMdExport">Markdown Export Defaults</h2>
+        <div class="pref-group" role="group" aria-labelledby="sec-md-export">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-md-frontmatter" checked /> <span class="switch-text" data-i18n="mdExportFrontmatter">Add YAML frontmatter to exported Markdown</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-md-extended-meta" checked /> <span class="switch-text" data-i18n="mdExportExtendedMeta">Include extended metadata (author, published, site, image, word count)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="opt-md-image-policy" data-i18n="mdExportImagePolicy">Image handling</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="mdExportImagePolicyHint">Applied when copying or downloading Markdown from the preview page. Can be overridden per export.</p>
+          </details>
+          <select id="opt-md-image-policy" data-listbox>
+            <option value="keep" data-i18n="mdImagePolicyKeep">Keep images (absolutize relative links)</option>
+            <option value="alt" data-i18n="mdImagePolicyAlt">Alt text only</option>
+            <option value="strip" data-i18n="mdImagePolicyStrip">Strip images</option>
+          </select>
+        </div>
+        <div class="pref-group" role="group" aria-labelledby="sec-md-export">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-md-include-toc" /> <span class="switch-text" data-i18n="mdExportIncludeToc">Include table of contents</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-md-include-hl" checked /> <span class="switch-text" data-i18n="mdOptIncludeHl">Include highlights</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secSendDestinations">Send-to Destinations</h2>
+        <div id="export-targets"></div>
+      </section>
     </div>
 
     <!-- Tab: Tags -->
-    <div id="panel-tags" class="panel" role="tabpanel" aria-labelledby="tab-tags">
-      <!-- Governance first: it is what this tab is for. The pinboard.in sort
-           option is a one-checkbox setting and sits at the end. -->
-      <div class="tag-gov-head">
-        <h2 class="section-title" data-i18n="tagGovGroupsTitle">Similar Tag Groups</h2>
-        <div class="fg-actions">
-          <button class="btn btn-sm" id="tag-gov-ai-btn" type="button"><span class="btn-ic" data-ic="robot"></span><span data-i18n="tagGovAiBtn">AI deep analysis</span></button>
-          <button class="btn btn-sm ghost" id="tag-gov-refresh" type="button"><span class="btn-ic" data-ic="refresh"></span><span data-i18n="tagGovRefresh">Refresh</span></button>
-        </div>
-      </div>
-      <!-- data-search-skip: a live readout ("27 tags · 3,412 uses · Ignored: 2"),
-           not a heading or a label for a control -- pbpBuildSettingsSearchIndex
-           would otherwise index it as a junk row with no jump target (it isn't
-           wrapped in .choice-row/.fg, the only containers the .hint branch
-           resolves a target from) now that this is a <p class="hint"> instead
-           of a <p class="fg">. -->
-      <p class="hint" id="tag-gov-overview" data-search-skip>
-        <span id="tag-gov-stats">…</span><span id="tag-gov-ignored" hidden> · <span id="tag-gov-ignored-count"></span> ·
-        <span class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored" data-i18n="tagGovResetIgnored">Reset ignored list</a></span></span>
-      </p>
-      <p class="hint" data-i18n="tagGovIrreversibleWarn">Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change, for manual reference only.</p>
-      <div id="tag-gov-ai-status" class="hint"></div>
-      <div id="tag-gov-groups"></div>
-      <!-- No <h2> above this disclosure: its own <summary> is the section
-           header (the .disclosure primitive: section-title face + chevron; its
-           own top rule replaces a .divider). The heading used to be spelled
-           twice -- an <h2> and the <summary>, both carrying tagGovLowCountTitle
-           -- so the panel read the same line twice, 30px apart, and the
-           settings-search index had to dedupe them by text. The count lives in
-           its own span: renderLowCountTags used to overwrite the whole
-           <summary> text with title + " (" + n + ")", which also threw away
-           the data-i18n node a later language switch needs. -->
-      <details id="tag-gov-lowcount" class="disclosure">
-        <summary><span id="tag-gov-lowcount-title" data-i18n="tagGovLowCountTitle">Low-count tags (1 use or fewer)</span> <span id="tag-gov-lowcount-count" class="tag-gov-count"></span></summary>
-        <div class="disclosure-body">
-          <div id="tag-gov-lowcount-list"></div>
-          <div class="fg">
-            <div class="fg-actions">
-              <label><input type="checkbox" id="tag-gov-select-all" /> <span data-i18n="tagGovSelectAll">Select all</span></label>
-              <span class="hint" id="tag-gov-selected-count"></span>
-              <button class="btn btn-sm danger tag-gov-delete-btn" id="tag-gov-delete-selected" type="button" data-i18n="tagGovDeleteSelected" disabled>Delete selected</button>
-            </div>
+    <div id="panel-tags" class="panel" role="tabpanel" aria-labelledby="tab-tags" data-ui-stage0>
+      <section class="settings-section">
+        <!-- Governance first: it is what this tab is for. The pinboard.in sort
+             option is a one-checkbox setting and sits at the end. -->
+        <div class="tag-gov-head">
+          <h2 class="section-title" data-i18n="tagGovGroupsTitle">Similar Tag Groups</h2>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="tag-gov-ai-btn" type="button"><span class="btn-ic" data-ic="robot"></span><span data-i18n="tagGovAiBtn">AI deep analysis</span></button>
+            <button class="btn btn-sm ghost" id="tag-gov-refresh" type="button"><span class="btn-ic" data-ic="refresh"></span><span data-i18n="tagGovRefresh">Refresh</span></button>
           </div>
         </div>
-      </details>
-      <div id="tag-gov-progress" hidden>
-        <div id="tag-gov-progress-bar" class="progress-bar" role="progressbar" aria-labelledby="tag-gov-progress-text" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div id="tag-gov-progress-fill" class="progress-fill"></div>
+        <!-- data-search-skip: a live readout ("27 tags · 3,412 uses · Ignored: 2"),
+             not a heading or a label for a control -- pbpBuildSettingsSearchIndex
+             would otherwise index it as a junk row with no jump target (it isn't
+             wrapped in .choice-row/.fg, the only containers the .hint branch
+             resolves a target from) now that this is a <p class="hint"> instead
+             of a <p class="fg">. -->
+        <p class="hint" id="tag-gov-overview" data-search-skip>
+          <span id="tag-gov-stats">…</span><span id="tag-gov-ignored" hidden> · <span id="tag-gov-ignored-count"></span> ·
+          <span class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored" data-i18n="tagGovResetIgnored">Reset ignored list</a></span></span>
+        </p>
+        <p class="hint" data-i18n="tagGovIrreversibleWarn">Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change, for manual reference only.</p>
+        <div id="tag-gov-ai-status" class="hint"></div>
+        <div id="tag-gov-groups"></div>
+        <!-- No <h2> above this disclosure: its own <summary> is the section
+             header (the .disclosure primitive: section-title face + chevron; its
+             own top rule replaces a .divider). The heading used to be spelled
+             twice -- an <h2> and the <summary>, both carrying tagGovLowCountTitle
+             -- so the panel read the same line twice, 30px apart, and the
+             settings-search index had to dedupe them by text. The count lives in
+             its own span: renderLowCountTags used to overwrite the whole
+             <summary> text with title + " (" + n + ")", which also threw away
+             the data-i18n node a later language switch needs. -->
+        <details id="tag-gov-lowcount" class="disclosure">
+          <summary><span id="tag-gov-lowcount-title" data-i18n="tagGovLowCountTitle">Low-count tags (1 use or fewer)</span> <span id="tag-gov-lowcount-count" class="tag-gov-count"></span></summary>
+          <div class="disclosure-body">
+            <div id="tag-gov-lowcount-list"></div>
+            <div class="fg">
+              <div class="fg-actions">
+                <label><input type="checkbox" id="tag-gov-select-all" /> <span data-i18n="tagGovSelectAll">Select all</span></label>
+                <span class="hint" id="tag-gov-selected-count"></span>
+                <button class="btn btn-sm danger tag-gov-delete-btn" id="tag-gov-delete-selected" type="button" data-i18n="tagGovDeleteSelected" disabled>Delete selected</button>
+              </div>
+            </div>
+          </div>
+        </details>
+        <div id="tag-gov-progress" hidden>
+          <div id="tag-gov-progress-bar" class="progress-bar" role="progressbar" aria-labelledby="tag-gov-progress-text" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="tag-gov-progress-fill" class="progress-fill"></div>
+          </div>
+          <div class="tag-gov-progress-foot">
+            <div id="tag-gov-progress-text" role="status" aria-live="polite"></div>
+            <button id="tag-gov-progress-btn" class="btn btn-sm" type="button" hidden></button>
+          </div>
         </div>
-        <div class="tag-gov-progress-foot">
-          <div id="tag-gov-progress-text" role="status" aria-live="polite"></div>
-          <button id="tag-gov-progress-btn" class="btn btn-sm" type="button" hidden></button>
+        <div id="tag-gov-problems" class="hidden"></div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secPinboardTagPages">Pinboard.in Tag Pages</h2>
+        <div class="pref-group">
+          <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-tag-sort-by-pop" checked /> <span class="switch-text" data-i18n="optTagSortByPop">Add a popularity sort control on tag pages</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
-      </div>
-      <div id="tag-gov-problems" class="hidden"></div>
-
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="secPinboardTagPages">Pinboard.in Tag Pages</h2>
-      <div class="fg"><label class="switch"><input type="checkbox" id="opt-tag-sort-by-pop" checked /> <span class="switch-text" data-i18n="optTagSortByPop">Add a popularity sort control on tag pages</span><span class="switch-track" aria-hidden="true"></span></label></div>
-      <p class="hint" id="tag-gov-bundles-warn" data-i18n="tagGovBundlesWarn">Tag bundles on pinboard.in are not updated by renames; review them manually after merging.</p>
+        <p class="hint" id="tag-gov-bundles-warn" data-i18n="tagGovBundlesWarn">Tag bundles on pinboard.in are not updated by renames; review them manually after merging.</p>
+      </section>
     </div>
 
     <!-- Tab: Archive -->

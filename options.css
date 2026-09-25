@@ -1966,6 +1966,11 @@ html[data-theme] [data-ui-stage0] .pf > h3 {
 [data-ui-stage0] .settings-section > .pf:last-child { margin-bottom: 0; }
 [data-ui-stage0] .fg > .fg-actions { margin-top: var(--opt-label-gap); }
 [data-ui-stage0] .fg + .fg-actions, [data-ui-stage0] .pf > .fg-actions { margin-top: var(--opt-sp-6); }
+/* Send-to card Test row (options.js renderExportTargets): its previous sibling is
+   the .et-onboarding disclosure when a target ships onboarding copy, so the
+   `.fg + .fg-actions` rule above misses it. Pin the action-row gap on the row
+   itself so sibling order cannot zero it (fgRhythm gate: >=4px above an action row). */
+[data-ui-stage0] .fg-actions.et-test { margin-top: var(--opt-sp-6); }
 [data-ui-stage0] .save-status { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 
 /* ---- Provider fields ---- */

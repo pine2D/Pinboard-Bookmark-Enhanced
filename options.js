@@ -1780,7 +1780,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       // -- keeps `.checked` reads in collectExportTargets() and the generic
       // input[type="checkbox"] autosave binding working unchanged), then the
       // copy span, then the drawn track. No id -- these are keyed by data-et,
-      // not id, same as before.
+      // not id, same as before. Stage-3b Task 3: the label.switch itself sits
+      // in a .pref-row inside a .pref-group (COMPONENTS.md stage-0 row shape),
+      // same wrapping every other switch on this row model gets.
+      const enableGroup = document.createElement("div");
+      enableGroup.className = "pref-group";
+      const enableRow = document.createElement("div");
+      enableRow.className = "pref-row";
       const enableLabel = document.createElement("label");
       enableLabel.className = "switch";
       const cb = document.createElement("input");
@@ -1793,12 +1799,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       const track = document.createElement("span");
       track.className = "switch-track";
       enableLabel.appendChild(cb); enableLabel.appendChild(sp); enableLabel.appendChild(track);
-      card.appendChild(enableLabel);
+      enableRow.appendChild(enableLabel);
+      enableGroup.appendChild(enableRow);
+      card.appendChild(enableGroup);
 
       (row.settings || []).forEach((s) => {
         if (s.type !== "text" && s.type !== "secret" && s.type !== "select") return;
         const wrap = document.createElement("div");
-        wrap.className = "et-field";
+        // .et-field kept for 3c retirement (spec §3); .fg.entry-block is the
+        // row-model field shape every other panel's text/select field now
+        // takes.
+        wrap.className = "fg entry-block et-field";
         const lab = document.createElement("label");
         lab.className = "bl";
         lab.textContent = t(s.label);
@@ -1806,6 +1817,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (s.type !== "select") {
           inp.type = s.type === "secret" ? "password" : "text";
           inp.autocomplete = "off";
+        } else {
+          // Stage-3b Task 3: a Send-to select field (currently only Obsidian's
+          // "route") takes the same drawn listbox every other <select> on this
+          // page does. Enhanced further down, once `det` is in the live DOM --
+          // options-listbox.js's enhance() re-points a `label[for]` by
+          // querying `document`, which only finds connected elements.
+          inp.setAttribute("data-listbox", "");
         }
         inp.id = id + "-" + s.key;
         lab.htmlFor = inp.id;
@@ -1902,7 +1920,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       if (row.precheckRequest) {
         const testWrap = document.createElement("div");
-        testWrap.className = "et-field et-test";
+        // .fg-actions is the row-model button-row shape (spec §3); .et-test
+        // kept for 3c retirement alongside .et-field.
+        testWrap.className = "fg-actions et-test";
         const testBtn = document.createElement("button");
         testBtn.type = "button";
         testBtn.className = "btn btn-sm";
@@ -1960,6 +1980,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       det.appendChild(head); det.appendChild(card);
       host.appendChild(det);
+      // Enhance any select-type field's listbox now that `det` is connected
+      // to the document -- options-listbox.js's enhance() re-points a
+      // `label[for]` by querying `document`, which only finds connected
+      // elements, so this cannot run any earlier in the loop body.
+      card.querySelectorAll("select[data-listbox]").forEach((sel) => window.pbpEnhanceListbox?.(sel));
     });
     pbpAccRestore(host);
     // These cards are built AFTER the page-level setupSecretToggles() pass, and

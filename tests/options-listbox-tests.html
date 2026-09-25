@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 29;
+const TOTAL = 32;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -816,6 +816,101 @@ function pbpTestChromeStub(enMessages) {
     assert(!disabledCb.checked, "clicking a disabled pick-box row must not select it (native disabled semantics)");
     const total = host.querySelector(":scope > p.hint");
     assert(total && total === host.lastElementChild, "the total .hint must stay the last child of #storage-cats, after the .pref-group");
+  });
+
+  // Stage-3b Task 3 (2026-09-24-ui-system-stage3b): renderExportTargets now
+  // emits the row-model shapes (spec §3) for every Send-to card -- the enable
+  // switch as .pref-group > .pref-row > label.switch, each text/secret/select
+  // field as .fg.entry-block.et-field (et-field kept for 3c retirement). It
+  // runs unconditionally at load (options.js ~line 2422, not gated behind a
+  // tab click like the storage builder above), so by the time this file's own
+  // opt-ai-provider-btn settle wait has finished, #export-targets is already
+  // populated -- no extra tab click or poll loop needed here.
+  test("export-targets: one disclosure per registered target, each with a pref-row > label.switch enable toggle", () => {
+    const host = doc.getElementById("export-targets");
+    assert(host, "export-targets host missing");
+    const ids = ["obsidian", "notion", "notebooklm", "github", "webhook"];
+    const cards = [...host.querySelectorAll(":scope > details.disclosure")];
+    assert(cards.length === ids.length, "expected " + ids.length + " export-target cards, got " + cards.length);
+    cards.forEach((det, i) => {
+      assert(det.dataset.accKey === "et-" + ids[i], "card " + i + " acc-key=" + det.dataset.accKey);
+      const enableInput = det.querySelector(".pref-row > label.switch > input[data-et$='.enabled']");
+      assert(enableInput && enableInput.dataset.et === ids[i] + ".enabled",
+        ids[i] + " is missing its .pref-row > label.switch enable input");
+      assert(enableInput.closest(".pref-row").parentElement.matches(".pref-group"),
+        ids[i] + "'s enable .pref-row is not inside a .pref-group");
+      // notebooklm (spec: url-scheme, viaClipboard, zero network) is the one
+      // registered target with an empty `settings` array -- every other
+      // target has at least one text/secret/select field.
+      const fields = det.querySelectorAll(".fg.entry-block.et-field");
+      if (ids[i] === "notebooklm") {
+        assert(fields.length === 0, "notebooklm has no settings and should render 0 .fg.entry-block.et-field, got " + fields.length);
+      } else {
+        assert(fields.length >= 1, ids[i] + " expected >=1 .fg.entry-block.et-field, got " + fields.length);
+      }
+    });
+    // precheckRequest-bearing targets (notion/github per export-targets.js) get
+    // a Test row; obsidian/notebooklm (url-scheme) and webhook (no precheck)
+    // do not.
+    const testRow = host.querySelector("#et-github .fg-actions.et-test");
+    assert(testRow && testRow.querySelector("button") && testRow.querySelector(".et-test-status"),
+      "github card is missing its .fg-actions.et-test row");
+    assert(!host.querySelector("#et-webhook .et-test"), "webhook has no precheckRequest and must not render a Test row");
+    assert(!host.querySelector("#et-obsidian .et-test"), "obsidian has no precheckRequest and must not render a Test row");
+  });
+
+  test("export-targets: Obsidian's route select is enhanced into a listbox like every other select on the page", () => {
+    const select = doc.getElementById("obsidian-route");
+    assert(select && select.hasAttribute("data-listbox"), "obsidian-route is missing data-listbox");
+    assert(select.hidden === true, "obsidian-route native select is not hidden (not enhanced)");
+    const btn = btnOf(select);
+    assert(btn && btn.tagName === "BUTTON" && btn.getAttribute("role") === "combobox",
+      "obsidian-route was not enhanced into a listbox button");
+    assert(itemsOf(select).length === select.options.length, "obsidian-route listbox option count mismatch");
+    // Stage-3b Task 3 brings the page's total from 7 (stage-3a/Task-2 statics:
+    // opt-lang, opt-ai-provider, opt-ai-tag-lang, opt-ai-summary-lang,
+    // opt-ai-tag-separator, translate-target-lang, opt-selection-trigger) to
+    // 9: +1 static (#opt-md-image-policy, markdown panel) +1 dynamic
+    // (obsidian-route, the one select-type Send-to field, enhanced from
+    // inside renderExportTargets once its card is connected).
+    const targets = [...doc.querySelectorAll("select[data-listbox]")];
+    assert(targets.length === 9, "expected 9 data-listbox selects on the page, got " + targets.length);
+    assert(doc.querySelectorAll(".listbox").length === targets.length,
+      "expected one .listbox wrapper per data-listbox select, got " + doc.querySelectorAll(".listbox").length + " for " + targets.length);
+  });
+
+  // The collector (collectExportTargets) is closure-private to options.js's
+  // IIFE -- only window.pbpOptionsFlushAutoSave is exposed. Toggle a real
+  // switch through native label-forwarding (same technique the .pick-mark
+  // click test above uses), force the debounced autosave to run right away,
+  // and read the toggle back off the actual chrome.storage.local.set payload
+  // -- the fixture's default routing (optSyncEnabled unset -> false) keeps
+  // exportTargets in the plain `batch` write (persistSettings, shared.js),
+  // not split into a separate secrets call, so one intercepted .set() call
+  // carries it.
+  test("export-targets: toggling an enable switch autosaves exportTargets.<id>.enabled", async () => {
+    showPanel("panel-markdown");
+    const cb = doc.querySelector('#export-targets input[data-et="webhook.enabled"]');
+    assert(cb, "webhook.enabled input missing");
+    const before = cb.checked;
+    const label = cb.closest("label.switch");
+    assert(label, "webhook.enabled input is not inside a label.switch");
+    const localStore = win.chrome.storage.local;
+    const origSet = localStore.set;
+    let lastBatch = null;
+    localStore.set = (...args) => { lastBatch = args[0]; return origSet.apply(localStore, args); };
+    try {
+      label.click();
+      assert(cb.checked === !before, "clicking label.switch did not toggle webhook.enabled, checked=" + cb.checked);
+      await win.pbpOptionsFlushAutoSave();
+      assert(lastBatch && lastBatch.exportTargets && lastBatch.exportTargets.webhook,
+        "autosave did not write an exportTargets.webhook entry: " + JSON.stringify(lastBatch && lastBatch.exportTargets));
+      assert(lastBatch.exportTargets.webhook.enabled === !before,
+        "saved exportTargets.webhook.enabled=" + lastBatch.exportTargets.webhook.enabled + ", want " + !before);
+    } finally {
+      localStore.set = origSet;
+      if (cb.checked !== before) { label.click(); await win.pbpOptionsFlushAutoSave(); }
+    }
   });
 
   for (const [name, fn] of queue) {
