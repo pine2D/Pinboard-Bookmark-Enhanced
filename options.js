@@ -3620,7 +3620,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const previewSection = $id("preset-preview-section");
     if (!previewEl || !previewSection) return;
     if (!currentPresetKey) {
-      previewSection.style.display = "none";
+      previewSection.hidden = true;
       previewEl.textContent = "";
       return;
     }
@@ -3633,7 +3633,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Fall back to parent (e.g., flexoki ships one CSS that toggles via .pbp-dark)
     }
     const theme = PINBOARD_THEMES[themeKey];
-    previewSection.style.display = "";
+    previewSection.hidden = false;
     previewEl.textContent = theme ? theme.css : "";
   }
 
@@ -3658,6 +3658,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyOptionsPageTheme(currentPresetKey, $id("opt-theme").value);
     renderPresetPreview();
     scheduleAutoSave();
+    // Appearance panel reset (PANEL_DEFAULTS.appearance.after) assigns
+    // #opt-theme's value directly via applyPanelReset before calling this
+    // function -- a programmatic write that fires no 'change', so the
+    // listbox button would keep showing the pre-reset label. Preset-button
+    // clicks reach here too and never touch #opt-theme's value; the sync is
+    // then a harmless no-op, same convention as updateProviderFields().
+    window.pbpListboxSync?.($id("opt-theme"));
   }
 
   document.querySelectorAll(".theme-preset-btn").forEach(btn => {
@@ -3766,7 +3773,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const container = $id("saved-themes-list");
     const section = $id("saved-themes-section");
     while (container.firstChild) container.removeChild(container.firstChild);
-    section.style.display = savedThemes.length ? "" : "none";
+    section.hidden = !savedThemes.length;
     const currentCSS = $id("opt-custom-css").value;
     savedThemes.forEach((theme) => {
       const wrap = document.createElement("span");

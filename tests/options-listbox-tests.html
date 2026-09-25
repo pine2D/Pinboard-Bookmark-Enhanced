@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 32;
+const TOTAL = 35;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -387,6 +387,49 @@ function pbpTestChromeStub(enMessages) {
     const bare = doc.createElement("select");
     win.pbpListboxSync(bare); // no-op, must not throw
     setValue(provider(), "gemini");
+  });
+
+  // Stage-3b Task 4 (2026-09-24-ui-system-stage3b): the appearance panel's
+  // #opt-theme select joins data-listbox. Its own 'change' listener
+  // (options.js) re-applies the options-page theme (pbpApplyOptionsEarlyTheme
+  // via applyOptionsPageTheme) and re-renders the preset preview -- if that
+  // path threw, run-test.mjs's pageerror listener would fail this whole
+  // suite, so simply exercising the pick through the listbox UI is itself
+  // the "runs without throwing" assertion; the value/dataset checks below
+  // confirm it actually ran rather than merely not-erroring.
+  test("opt-theme choice through the listbox re-applies the options-page theme without throwing", () => {
+    showPanel("panel-appearance");
+    const sel = doc.getElementById("opt-theme");
+    btnOf(sel).click();
+    itemsOf(sel).find((li) => li.dataset.value === "dark").click();
+    assert(sel.value === "dark", "value=" + sel.value);
+    assert(popOf(sel).hidden, "option click did not close the list");
+    // No saved theme preset is active in this fixture, so Dark forces the
+    // adaptive default preset's dark variant (options-theme-early.js); Light
+    // clears data-theme entirely. Both are deterministic regardless of the
+    // host's own OS colour scheme, since a non-"auto" mode short-circuits
+    // prefersDark.
+    assert(doc.documentElement.dataset.theme === "flexoki-dark", "dataset.theme=" + doc.documentElement.dataset.theme);
+    btnOf(sel).click();
+    itemsOf(sel).find((li) => li.dataset.value === "light").click();
+    assert(sel.value === "light", "value=" + sel.value);
+    assert(!("theme" in doc.documentElement.dataset), "dataset.theme did not clear for Light, got " + doc.documentElement.dataset.theme);
+    // Restore auto so later tests/screens see the default.
+    btnOf(sel).click();
+    itemsOf(sel).find((li) => li.dataset.value === "auto").click();
+  });
+
+  test("opt-theme: programmatic value + pbpListboxSync updates the button text", () => {
+    const sel = doc.getElementById("opt-theme");
+    const before = sel.value;
+    const other = before === "dark" ? "light" : "dark";
+    sel.value = other;
+    win.pbpListboxSync(sel);
+    const expectedText = [...sel.options].find((o) => o.value === other).textContent.trim();
+    assert(btnOf(sel).querySelector(".listbox-value").textContent === expectedText,
+      "button text=" + btnOf(sel).querySelector(".listbox-value").textContent + ", want " + expectedText);
+    sel.value = before;
+    win.pbpListboxSync(sel);
   });
 
   test("applyI18n(zh_CN) then sync re-reads option text", async () => {
@@ -906,14 +949,15 @@ function pbpTestChromeStub(enMessages) {
     assert(!labelledBy || doc.getElementById(labelledBy) === routeLabel, "obsidian-route button aria-labelledby=" + labelledBy + " does not resolve to its label");
     const policyBtn = btnOf(doc.getElementById("opt-md-image-policy"));
     assert(policyBtn && policyBtn.getAttribute("role") === "combobox", "#opt-md-image-policy was not enhanced into a listbox");
-    // Stage-3b Task 3 brings the page's total from 7 (stage-3a/Task-2 statics:
+    // Stage-3b Task 3 brought the page's total from 7 (stage-3a/Task-2 statics:
     // opt-lang, opt-ai-provider, opt-ai-tag-lang, opt-ai-summary-lang,
     // opt-ai-tag-separator, translate-target-lang, opt-selection-trigger) to
     // 9: +1 static (#opt-md-image-policy, markdown panel) +1 dynamic
     // (obsidian-route, the one select-type Send-to field, enhanced from
-    // inside renderExportTargets once its card is connected).
+    // inside renderExportTargets once its card is connected). Stage-3b Task 4
+    // (appearance) adds #opt-theme, a tenth.
     const targets = [...doc.querySelectorAll("select[data-listbox]")];
-    assert(targets.length === 9, "expected 9 data-listbox selects on the page, got " + targets.length);
+    assert(targets.length === 10, "expected 10 data-listbox selects on the page, got " + targets.length);
     assert(doc.querySelectorAll(".listbox").length === targets.length,
       "expected one .listbox wrapper per data-listbox select, got " + doc.querySelectorAll(".listbox").length + " for " + targets.length);
   });

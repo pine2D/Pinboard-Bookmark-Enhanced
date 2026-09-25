@@ -3193,14 +3193,17 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // .listbox-opt`), not the bare class strings this used to `===` against.
       || c.selector.includes(".listbox-pop") || c.selector.includes(".listbox-opt")
       // Fix round 1 (review MINOR finding 2): the two legacy-`.fg select`/
-      // `.key-wrap` coverage rows (#opt-theme on Appearance, the vocab
+      // `.key-wrap` coverage rows (Appearance's theme select, the vocab
       // AnkiConnect key on the Vocabulary tab, inside a closed disclosure --
       // this loop's own details-opener a few lines down handles that for
       // free). Neither matches `keyWrapChecks`'s exact `".key-wrap"` string
       // (that group clicks #tab-general, the wrong panel for the vocab row),
       // so both need their own explicit name here instead, same as
-      // #opt-popup-width-custom/#test-gemini above.
-      || c.selector === "#opt-theme" || c.selector.includes(".key-wrap:has("));
+      // #opt-popup-width-custom/#test-gemini above. Stage-3b Task 4 re-
+      // pinned the checklist row's own selector from `#opt-theme` to
+      // `#opt-theme-btn` (options-listbox.js hides the native select once
+      // Appearance gains [data-ui-stage0]) -- updated here too, same string.
+      || c.selector === "#opt-theme-btn" || c.selector.includes(".key-wrap:has("));
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
       && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c));
@@ -3223,20 +3226,20 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       for (const check of tagGovChecks) await runOneCheck(page, theme, check, results);
     }
     if (presetPreviewChecks.length || presetRowChecks.length || savedThemeChecks.length) {
-      // #preset-preview-section is `style="display:none"` (options.html)
-      // until options.js's renderPresetPreview() sees a non-empty
-      // currentPresetKey -- click a site-theme preset button on the
-      // "appearance" tab (same tab panel the summary lives on) to reveal
-      // it. This is a DIFFERENT preset system from the THEMES loop this
-      // runner is already iterating (that one is the extension UI's own
-      // popup/options/library chrome; this is the pinboard.in SITE theme
-      // picker) -- picking "flexoki" here is unrelated to and doesn't
-      // fight with whichever THEMES entry is currently active. The same
-      // click also satisfies presetRowChecks: it's what puts .active on a
-      // .theme-preset-btn in the first place.
+      // #preset-preview-section carries the `hidden` attribute (options.html;
+      // stage-3b Task 4 moved it off `style="display:none"`, spec §3) until
+      // options.js's renderPresetPreview() sees a non-empty currentPresetKey
+      // -- click a site-theme preset button on the "appearance" tab (same
+      // tab panel the summary lives on) to reveal it. This is a DIFFERENT
+      // preset system from the THEMES loop this runner is already iterating
+      // (that one is the extension UI's own popup/options/library chrome;
+      // this is the pinboard.in SITE theme picker) -- picking "flexoki" here
+      // is unrelated to and doesn't fight with whichever THEMES entry is
+      // currently active. The same click also satisfies presetRowChecks:
+      // it's what puts .active on a .theme-preset-btn in the first place.
       await page.click("#tab-appearance");
       await page.click(".theme-preset-btn[data-theme='flexoki']");
-      await page.waitForSelector("#preset-preview-section:not([style*='display: none'])", { timeout: TIMEOUT_MS });
+      await page.waitForSelector("#preset-preview-section:not([hidden])", { timeout: TIMEOUT_MS });
       for (const check of presetPreviewChecks) await runOneCheck(page, theme, check, results);
       for (const check of presetRowChecks) await runOneCheck(page, theme, check, results);
       if (savedThemeChecks.length) {
@@ -3412,7 +3415,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
           throw new Error(`SETUP: no ".theme-preset-btn[data-theme='flexoki']" on ${tabId} (theme=${theme}) -- weakTextOnFill cannot reach #preset-preview-section`);
         }
         await presetBtn.click();
-        await page.waitForSelector("#preset-preview-section:not([style*='display: none'])", { timeout: TIMEOUT_MS });
+        await page.waitForSelector("#preset-preview-section:not([hidden])", { timeout: TIMEOUT_MS });
         // Restore documentElement.dataset.theme in-page (NOT a reload,
         // which would re-close #preset-preview-section this click just
         // opened) via the exact function the boot/reload path calls, so
@@ -4561,10 +4564,11 @@ async function runSweep(page, sw, extBase) {
     await page.evaluate(() => { document.querySelectorAll(".panel.active details:not(.context-help)").forEach((d) => { d.open = true; }); });
     await page.waitForTimeout(100);
     if (tabId === "tab-appearance") {
-      // #preset-preview-section is `style="display:none"` until a site-theme
-      // preset is picked (options.js renderPresetPreview) -- click one so
-      // this disclosure (and its chevron/padding) actually renders for the
-      // sweep, same reasoning as the vocab detail-pane/batch-bar opens below.
+      // #preset-preview-section carries the `hidden` attribute until a
+      // site-theme preset is picked (options.js renderPresetPreview) --
+      // click one so this disclosure (and its chevron/padding) actually
+      // renders for the sweep, same reasoning as the vocab detail-pane/
+      // batch-bar opens below.
       const presetBtn = page.locator(".theme-preset-btn[data-theme='flexoki']").first();
       if (await presetBtn.count()) { await presetBtn.click(); await page.waitForTimeout(150); }
     }

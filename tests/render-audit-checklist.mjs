@@ -1565,25 +1565,29 @@ export const CHECKS = [
   // instead of capping at the old literal 420px ceiling.
   { surface: "options", page: "options.html", selector: ".key-wrap", state: "default",
     expect: { widthLteWith: { selector: ".fg:has(#opt-pinboard-token)" } } },
-  // Fix round 1 (review MINOR finding 2): the two re-pins above moved the
-  // ONLY checklist rows that exercised the LEGACY (non-stage-0) `.fg select
-  // { width: max-content; min-width: 240px; max-width: 100% }` and `.fg
-  // .key-wrap { max-width: 420px }` rules -- both still live, unconditional
-  // CSS (options.css), and both still govern every field on the four panels
-  // this stage hasn't reached yet (markdown/tags/appearance/vocab). Without
-  // its own row, a regression to either rule would pass silently until one
-  // of those panels' own migration task adds coverage. One id-anchored
-  // representative each, both reachable via the existing per-check tab-
-  // resolution `switchChecks` loop already uses (widened below to include
-  // them) -- no new tab-click group needed. Re-pinned to a stage-0-specific
-  // selector by whichever task migrates #opt-theme's panel (appearance) or
-  // #dict-anki-key's panel (vocab), the same way this task just re-pinned
-  // #opt-lang/#opt-pinboard-token's rows once THEY left the legacy rule's
-  // reach.
-  { surface: "options", page: "options.html", selector: "#opt-theme", state: "default",
-    expect: { widthPx: { min: 240 }, widthLteWith: { selector: ".fg:has(#opt-theme)" } } },
+  // Fix round 1 (review MINOR finding 2) re-pinned the two rows below once
+  // for the LEGACY (non-stage-0) `.fg select { width: max-content; min-
+  // width: 240px; max-width: 100% }` / `.fg .key-wrap { max-width: 420px }`
+  // rules, leaving a note for "whichever task migrates #opt-theme's panel
+  // (appearance) or #dict-anki-key's panel (vocab)" to finish the job.
+  // Stage-3b Task 4 is that task: both panels now carry [data-ui-stage0],
+  // so `.entry-block > :is(input:not([type=number]), .key-wrap) {
+  // max-width: none }` reaches both fields the same way it already reached
+  // #opt-lang/#opt-pinboard-token (Task 2) and #fields-openai's key-wrap
+  // (Task 4, ui-system-stage2) -- same re-pin, same reason, done here for
+  // the last two representative ids.
+  // #opt-theme -> #opt-theme-btn (options-listbox.js hides the native
+  // <select> and builds the button as its visible replacement, the same
+  // swap #opt-lang got above): widthPx.min:240 still holds (the stage-0
+  // rule only lifts max-width, not the select-exception's own floor);
+  // widthLteWith now compares against the button's own `.fg` column.
+  { surface: "options", page: "options.html", selector: "#opt-theme-btn", state: "default",
+    expect: { widthPx: { min: 240 }, widthLteWith: { selector: ".fg:has(#opt-theme-btn)" } } },
+  // #dict-anki-key's key-wrap: same re-pin as #opt-pinboard-token's and
+  // #fields-openai's key-wrap above -- a fixed max gives way to "never
+  // wider than its own column" now that the wrap fills it.
   { surface: "options", page: "options.html", selector: ".key-wrap:has(#dict-anki-key)", state: "default",
-    expect: { widthPx: { max: 420 } } },
+    expect: { widthLteWith: { selector: ".fg:has(#dict-anki-key)" } } },
   // .fg-url (the three baseurl endpoints) and plain input[type=text] (the
   // Model field) both live on the AI Providers tab, inside #panel-ai;
   // #opt-openai-baseurl/#opt-openai-model specifically live inside

@@ -882,103 +882,102 @@
     </div>
 
     <!-- Tab: Vocabulary -->
-    <div id="panel-vocab" class="panel" role="tabpanel" aria-labelledby="tab-vocab">
-      <h2 class="section-title" data-i18n="dictVocabSection">Vocabulary</h2>
-      <div class="vocab-entry-row">
-        <a class="btn btn-sm" id="vocab-open-library" href="library.html#vocab" target="_blank" rel="noopener">
-          <span class="btn-ic" data-ic="bookMarked"></span><span data-i18n="libraryOpen">Open notes and vocabulary</span>
-        </a>
-      </div>
-
-      <details class="disclosure" data-acc-key="vocab-reading">
-        <summary data-i18n="vocabReadingSection">Reading hints</summary>
-        <div class="disclosure-body">
-          <div class="fg context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="dict-echo-enabled" aria-labelledby="dict-echo-enabled-label" checked /> <span class="switch-text" id="dict-echo-enabled-label" data-i18n="dictEchoToggle">Underline saved words while reading</span>
-            <details class="context-help">
-              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" data-i18n="dictEchoHint">Dotted underlines mark words already in your vocabulary. Click one to open the dictionary.</p>
-            </details><span class="switch-track" aria-hidden="true"></span></label>
-          </div>
+    <div id="panel-vocab" class="panel" role="tabpanel" aria-labelledby="tab-vocab" data-ui-stage0>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="dictVocabSection">Vocabulary</h2>
+        <div class="vocab-entry-row">
+          <a class="btn btn-sm" id="vocab-open-library" href="library.html#vocab" target="_blank" rel="noopener">
+            <span class="btn-ic" data-ic="bookMarked"></span><span data-i18n="libraryOpen">Open notes and vocabulary</span>
+          </a>
         </div>
-      </details>
-
-      <details class="disclosure" data-acc-key="vocab-google-drive" open>
-        <summary data-i18n="vocabDriveSection">Google Drive vocabulary sync</summary>
-        <div class="disclosure-body" id="vocab-drive-body">
-          <p class="hint vocab-drive-copy" data-i18n="vocabDriveScope">Syncs vocabulary for the current Pinboard account only. Settings and API keys are not synced.</p>
-          <p class="hint vocab-drive-copy" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">The extension stores a plaintext copy in its private appDataFolder on your Google Drive. The copy is not end-to-end encrypted and may include words, definitions, notes, source URLs, article titles, and context excerpts.</p>
-          <p id="vocab-drive-state" class="save-status vocab-drive-state" role="status" aria-live="polite" data-i18n="vocabDriveUnavailable">Google Drive vocabulary sync is not available in this build because OAuth activation is still pending.</p>
-          <dl id="vocab-drive-fields" class="vocab-drive-fields" hidden>
-            <dt data-i18n="vocabDriveAccountLabel">Google account</dt><dd id="vocab-drive-account"></dd>
-            <dt data-i18n="vocabDriveOwnerLabel">Pinboard account</dt><dd id="vocab-drive-owner"></dd>
-            <dt data-i18n="vocabDriveLastSuccessLabel">Last successful sync</dt><dd id="vocab-drive-last-success"></dd>
-            <dt data-i18n="vocabDrivePendingWordsLabel">Pending words</dt><dd id="vocab-drive-pending-words"></dd>
-            <dt data-i18n="vocabDrivePendingBatchesLabel">Pending batches</dt><dd id="vocab-drive-pending-batches"></dd>
-          </dl>
-          <p id="vocab-drive-error" class="field-error" role="status" aria-live="polite"></p>
-          <div class="vocab-drive-notice-row" hidden>
-            <p id="vocab-drive-notices" class="vocab-drive-notices" role="status" aria-live="polite"></p>
-            <button type="button" class="btn btn-sm ghost vocab-drive-notice-dismiss" id="vocab-drive-clear-notices" title="Dismiss conflict notice" aria-label="Dismiss conflict notice" data-i18n-title="vocabDriveNoticesClear" data-i18n-aria="vocabDriveNoticesClear"><span class="btn-ic" data-ic="cross"></span></button>
+        <details class="disclosure" data-acc-key="vocab-reading">
+          <summary data-i18n="vocabReadingSection">Reading hints</summary>
+          <div class="disclosure-body">
+            <div class="pref-group">
+              <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="dict-echo-enabled" aria-labelledby="dict-echo-enabled-label" checked /> <span class="switch-text" id="dict-echo-enabled-label" data-i18n="dictEchoToggle">Underline saved words while reading</span>
+                <details class="context-help">
+                  <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+                  <p class="hint context-help-body" data-i18n="dictEchoHint">Dotted underlines mark words already in your vocabulary. Click one to open the dictionary.</p>
+                </details><span class="switch-track" aria-hidden="true"></span></label>
+              </div>
+            </div>
           </div>
-          <div class="vocab-drive-actions" id="vocab-drive-actions" hidden>
-            <button type="button" class="btn btn-sm" id="vocab-drive-connect" data-i18n="vocabDriveConnect" hidden>Connect Google Drive</button>
-            <button type="button" class="btn btn-sm" id="vocab-drive-sync" data-i18n="vocabDriveSyncNow" hidden>Sync now</button>
-            <button type="button" class="btn btn-sm" id="vocab-drive-disconnect" data-i18n="vocabDriveDisconnect" hidden>Disconnect this device</button>
-            <span class="save-status" id="vocab-drive-action-status" role="status" aria-live="polite"></span>
+        </details>
+        <details class="disclosure" data-acc-key="vocab-google-drive" open>
+          <summary data-i18n="vocabDriveSection">Google Drive vocabulary sync</summary>
+          <div class="disclosure-body" id="vocab-drive-body">
+            <p class="hint vocab-drive-copy" data-i18n="vocabDriveScope">Syncs vocabulary for the current Pinboard account only. Settings and API keys are not synced.</p>
+            <p class="hint vocab-drive-copy" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">The extension stores a plaintext copy in its private appDataFolder on your Google Drive. The copy is not end-to-end encrypted and may include words, definitions, notes, source URLs, article titles, and context excerpts.</p>
+            <p id="vocab-drive-state" class="save-status vocab-drive-state" role="status" aria-live="polite" data-i18n="vocabDriveUnavailable">Google Drive vocabulary sync is not available in this build because OAuth activation is still pending.</p>
+            <dl id="vocab-drive-fields" class="vocab-drive-fields" hidden>
+              <dt data-i18n="vocabDriveAccountLabel">Google account</dt><dd id="vocab-drive-account"></dd>
+              <dt data-i18n="vocabDriveOwnerLabel">Pinboard account</dt><dd id="vocab-drive-owner"></dd>
+              <dt data-i18n="vocabDriveLastSuccessLabel">Last successful sync</dt><dd id="vocab-drive-last-success"></dd>
+              <dt data-i18n="vocabDrivePendingWordsLabel">Pending words</dt><dd id="vocab-drive-pending-words"></dd>
+              <dt data-i18n="vocabDrivePendingBatchesLabel">Pending batches</dt><dd id="vocab-drive-pending-batches"></dd>
+            </dl>
+            <p id="vocab-drive-error" class="field-error" role="status" aria-live="polite"></p>
+            <div class="vocab-drive-notice-row" hidden>
+              <p id="vocab-drive-notices" class="vocab-drive-notices" role="status" aria-live="polite"></p>
+              <button type="button" class="btn btn-sm ghost vocab-drive-notice-dismiss" id="vocab-drive-clear-notices" title="Dismiss conflict notice" aria-label="Dismiss conflict notice" data-i18n-title="vocabDriveNoticesClear" data-i18n-aria="vocabDriveNoticesClear"><span class="btn-ic" data-ic="cross"></span></button>
+            </div>
+            <div class="vocab-drive-actions" id="vocab-drive-actions" hidden>
+              <button type="button" class="btn btn-sm" id="vocab-drive-connect" data-i18n="vocabDriveConnect" hidden>Connect Google Drive</button>
+              <button type="button" class="btn btn-sm" id="vocab-drive-sync" data-i18n="vocabDriveSyncNow" hidden>Sync now</button>
+              <button type="button" class="btn btn-sm" id="vocab-drive-disconnect" data-i18n="vocabDriveDisconnect" hidden>Disconnect this device</button>
+              <span class="save-status" id="vocab-drive-action-status" role="status" aria-live="polite"></span>
+            </div>
           </div>
-        </div>
-      </details>
-
-      <details class="disclosure" data-acc-key="vocab-learning">
-        <summary data-i18n="vocabLearningSection">Export and integrations</summary>
-        <div class="disclosure-body">
-          <div class="fg"><label class="bl" for="dict-anki-deck" data-i18n="dictAnkiDeckLabel">Anki deck</label>
-            <input type="text" id="dict-anki-deck" placeholder="Pinboard Vocab" /></div>
-          <div class="fg"><label class="bl" for="dict-anki-port" data-i18n="dictAnkiPortLabel">AnkiConnect port</label>
-            <input type="text" id="dict-anki-port" placeholder="8765" spellcheck="false" /></div>
-          <div class="fg"><label class="bl" for="dict-anki-key" data-i18n="dictAnkiKeyLabel">AnkiConnect API key (optional)</label><span class="key-wrap"><input type="password" id="dict-anki-key" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-anki-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
-            <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-anki-test-btn" data-i18n="dictAnkiTest">Test AnkiConnect</button><span class="save-status" id="vocab-anki-test-status" role="status" aria-live="polite"></span></div></div>
-          <div class="fg context-help-host" data-help-role="field"><label class="bl" for="dict-eudic-token" data-i18n="dictEudicTokenLabel">Eudic OpenAPI authorization</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="dictEudicSupportedHint">Eudic supports only English, French, German, and Spanish (en/fr/de/es); other words are skipped.</p></details><span class="key-wrap"><input type="password" id="dict-eudic-token" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-eudic-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://my.eudic.net/OpenAPI/Authorization" target="_blank" rel="noopener noreferrer" data-i18n="dictEudicTokenHint">Copy the full authorization value from Eudic</a></p>
-            <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-eudic-test-btn" data-i18n="dictEudicTest">Test Eudic connection</button><span class="save-status" id="vocab-eudic-test-status" role="status" aria-live="polite"></span></div></div>
-          <div class="vocab-toolbar">
-            <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportTsv">Export all (.tsv)</button>
-            <button type="button" class="btn btn-sm" id="vocab-anki-btn" data-i18n="dictAnkiSend">Send all to Anki</button>
-            <button type="button" class="btn btn-sm" id="vocab-eudic-btn" data-i18n="dictEudicSend" hidden>Send all supported words to Eudic</button>
-            <span class="save-status" id="vocab-status" role="status" aria-live="polite"></span>
+        </details>
+        <details class="disclosure" data-acc-key="vocab-learning">
+          <summary data-i18n="vocabLearningSection">Export and integrations</summary>
+          <div class="disclosure-body">
+            <div class="fg entry-block"><label class="bl" for="dict-anki-deck" data-i18n="dictAnkiDeckLabel">Anki deck</label>
+              <input type="text" id="dict-anki-deck" placeholder="Pinboard Vocab" /></div>
+            <div class="fg entry-block"><label class="bl" for="dict-anki-port" data-i18n="dictAnkiPortLabel">AnkiConnect port</label>
+              <input type="text" id="dict-anki-port" placeholder="8765" spellcheck="false" /></div>
+            <div class="fg entry-block"><label class="bl" for="dict-anki-key" data-i18n="dictAnkiKeyLabel">AnkiConnect API key (optional)</label><span class="key-wrap"><input type="password" id="dict-anki-key" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-anki-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-anki-test-btn" data-i18n="dictAnkiTest">Test AnkiConnect</button><span class="save-status" id="vocab-anki-test-status" role="status" aria-live="polite"></span></div></div>
+            <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="dict-eudic-token" data-i18n="dictEudicTokenLabel">Eudic OpenAPI authorization</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="dictEudicSupportedHint">Eudic supports only English, French, German, and Spanish (en/fr/de/es); other words are skipped.</p></details><span class="key-wrap"><input type="password" id="dict-eudic-token" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-eudic-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://my.eudic.net/OpenAPI/Authorization" target="_blank" rel="noopener noreferrer" data-i18n="dictEudicTokenHint">Copy the full authorization value from Eudic</a></p>
+              <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-eudic-test-btn" data-i18n="dictEudicTest">Test Eudic connection</button><span class="save-status" id="vocab-eudic-test-status" role="status" aria-live="polite"></span></div></div>
+            <div class="vocab-toolbar">
+              <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportTsv">Export all (.tsv)</button>
+              <button type="button" class="btn btn-sm" id="vocab-anki-btn" data-i18n="dictAnkiSend">Send all to Anki</button>
+              <button type="button" class="btn btn-sm" id="vocab-eudic-btn" data-i18n="dictEudicSend" hidden>Send all supported words to Eudic</button>
+              <span class="save-status" id="vocab-status" role="status" aria-live="polite"></span>
+            </div>
           </div>
-        </div>
-      </details>
-
-      <details class="disclosure" data-acc-key="vocab-ecdict-pack">
-        <summary data-i18n="ecdictSection">Offline English–Chinese dictionary</summary>
-        <div class="disclosure-body">
-          <p class="hint" data-i18n="ecdictHint">Adds Chinese definitions above the English entry when you look up an English word. The English entry still loads as usual.</p>
-          <p class="hint" data-i18n="ecdictFormatNote">Expects a CSV file whose first line is the column header and includes word, translation, tag, collins, oxford, frq and bnc. Prebuilt dictionary packages such as mdx, eudic, stardict, mobi and sqlite are different formats and cannot be imported. This project does not provide, recommend or verify a source for the data, and is not affiliated with it. You supply the file and are responsible for its licence.</p>
-          <p class="save-status" id="ecdict-pack-status" role="status" aria-live="polite"></p>
-          <div class="vocab-toolbar">
-            <button type="button" class="btn btn-sm" id="ecdict-pack-import" data-i18n="ecdictImportFile">Import file</button>
-            <button type="button" class="btn btn-sm danger" id="ecdict-pack-delete" data-i18n="delete" hidden>Delete</button>
-            <span class="save-status" id="ecdict-pack-action-status" role="status" aria-live="polite"></span>
+        </details>
+        <details class="disclosure" data-acc-key="vocab-ecdict-pack">
+          <summary data-i18n="ecdictSection">Offline English–Chinese dictionary</summary>
+          <div class="disclosure-body">
+            <p class="hint" data-i18n="ecdictHint">Adds Chinese definitions above the English entry when you look up an English word. The English entry still loads as usual.</p>
+            <p class="hint" data-i18n="ecdictFormatNote">Expects a CSV file whose first line is the column header and includes word, translation, tag, collins, oxford, frq and bnc. Prebuilt dictionary packages such as mdx, eudic, stardict, mobi and sqlite are different formats and cannot be imported. This project does not provide, recommend or verify a source for the data, and is not affiliated with it. You supply the file and are responsible for its licence.</p>
+            <p class="save-status" id="ecdict-pack-status" role="status" aria-live="polite"></p>
+            <div class="vocab-toolbar">
+              <button type="button" class="btn btn-sm" id="ecdict-pack-import" data-i18n="ecdictImportFile">Import file</button>
+              <button type="button" class="btn btn-sm danger" id="ecdict-pack-delete" data-i18n="delete" hidden>Delete</button>
+              <span class="save-status" id="ecdict-pack-action-status" role="status" aria-live="polite"></span>
+            </div>
+            <input type="file" id="ecdict-pack-file" accept=".csv,.txt,.gz,.zip" hidden />
           </div>
-          <input type="file" id="ecdict-pack-file" accept=".csv,.txt,.gz,.zip" hidden />
-        </div>
-      </details>
-
-      <details class="disclosure" data-acc-key="vocab-dictionary-pack">
-        <summary data-i18n="dictPackSection">Offline Chinese–English dictionary</summary>
-        <div class="disclosure-body">
-          <p class="hint" data-i18n="dictPackHint">CC-CEDICT looks up Simplified or Traditional Chinese terms and returns English definitions.</p>
-          <p class="hint" data-i18n="dictPackImportHint">Import a CC-CEDICT .txt, .txt.gz, or .zip file.</p>
-          <p class="save-status" id="dict-pack-status" role="status" aria-live="polite"></p>
-          <div class="vocab-toolbar">
-            <button type="button" class="btn btn-sm" id="dict-pack-open"><svg class="ext-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg><span data-i18n="dictPackOpen">Open download page</span></button>
-            <button type="button" class="btn btn-sm" id="dict-pack-import" data-i18n="dictPackImport">Import file</button>
-            <button type="button" class="btn btn-sm danger" id="dict-pack-delete" data-i18n="delete" hidden>Delete</button>
-            <span class="save-status" id="dict-pack-action-status" role="status" aria-live="polite"></span>
+        </details>
+        <details class="disclosure" data-acc-key="vocab-dictionary-pack">
+          <summary data-i18n="dictPackSection">Offline Chinese–English dictionary</summary>
+          <div class="disclosure-body">
+            <p class="hint" data-i18n="dictPackHint">CC-CEDICT looks up Simplified or Traditional Chinese terms and returns English definitions.</p>
+            <p class="hint" data-i18n="dictPackImportHint">Import a CC-CEDICT .txt, .txt.gz, or .zip file.</p>
+            <p class="save-status" id="dict-pack-status" role="status" aria-live="polite"></p>
+            <div class="vocab-toolbar">
+              <button type="button" class="btn btn-sm" id="dict-pack-open"><svg class="ext-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg><span data-i18n="dictPackOpen">Open download page</span></button>
+              <button type="button" class="btn btn-sm" id="dict-pack-import" data-i18n="dictPackImport">Import file</button>
+              <button type="button" class="btn btn-sm danger" id="dict-pack-delete" data-i18n="delete" hidden>Delete</button>
+              <span class="save-status" id="dict-pack-action-status" role="status" aria-live="polite"></span>
+            </div>
+            <input type="file" id="dict-pack-file" accept=".txt,.txt.gz,.gz,.zip" hidden />
           </div>
-          <input type="file" id="dict-pack-file" accept=".txt,.txt.gz,.gz,.zip" hidden />
-        </div>
-      </details>
+        </details>
+      </section>
     </div>
 
     <!-- Tab: Markdown -->
@@ -1144,93 +1143,96 @@
     </div>
 
     <!-- Tab 6: Appearance -->
-    <div id="panel-appearance" class="panel" role="tabpanel" aria-labelledby="tab-appearance">
-      <div class="context-help-host context-help-section" data-help-role="section">
-        <h2 class="section-title" id="sec-theme" data-i18n="secTheme">Theme</h2>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" id="opt-theme-hint" data-i18n="optThemeHint">Switches the popup, this settings page, the notes &amp; vocabulary page and the reader between light and dark. Presets with a built-in scheme (Dracula, for example) override it on the pages that follow the preset; the reader can override it per device from its "Aa" panel.</p>
-        </details>
-      </div>
-      <div class="fg">
-        <select id="opt-theme" aria-labelledby="sec-theme">
-          <option value="auto" data-i18n="themeAuto">Auto (follow system)</option>
-          <option value="light" data-i18n="themeLight">Light</option>
-          <option value="dark" data-i18n="themeDark">Dark</option>
-        </select>
-      </div>
-
-      <div class="fg context-help-host" data-help-role="choice">
-        <label class="switch"><input type="checkbox" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">When on, the popup, this settings page and the notes &amp; vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette.</p>
-        </details><span class="switch-track" aria-hidden="true"></span></label>
-      </div>
-
-      <div class="divider"></div>
-      <h2 class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</h2>
-      <div class="fg">
-        <label class="bl" for="opt-custom-font" data-i18n="labelCustomFont">Custom Font</label>
-        <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans SC', 'Fira Code', sans-serif" data-i18n-placeholder="customFontPlaceholder" />
-      </div>
-      <div class="fg">
-        <label class="bl" data-i18n="labelThemePresets">Theme Presets</label>
-        <div class="theme-presets-group" role="group" aria-labelledby="theme-group-none">
-          <span id="theme-group-none" class="sr-only" data-i18n="themeGroupNone">None</span>
-          <button class="btn btn-sm theme-preset-btn" data-theme="" data-i18n="themeGroupNone" aria-pressed="false">None</button>
-        </div>
-        <div class="theme-presets-group" role="group" aria-labelledby="theme-group-adaptive">
-          <span id="theme-group-adaptive" class="theme-group-label" data-i18n="themeGroupAdaptive">Adaptive</span>
-          <button class="btn btn-sm theme-preset-btn" data-theme="flexoki" aria-pressed="false">Flexoki</button>
-          <button class="btn btn-sm theme-preset-btn" data-theme="solarized" aria-pressed="false">Solarized</button>
-          <button class="btn btn-sm theme-preset-btn" data-theme="catppuccin" aria-pressed="false">Catppuccin</button>
-        </div>
-        <div class="theme-presets-group" role="group" aria-labelledby="theme-group-light">
-          <span id="theme-group-light" class="theme-group-label" data-i18n="themeGroupLight">Light</span>
-          <button class="btn btn-sm theme-preset-btn" data-theme="modern-card" aria-pressed="false">Modern Card</button>
-          <button class="btn btn-sm theme-preset-btn" data-theme="paper-ink" aria-pressed="false">Paper &amp; Ink</button>
-          <button class="btn btn-sm theme-preset-btn" data-theme="github-light" aria-pressed="false">GitHub Light</button>
-        </div>
-        <div class="theme-presets-group" role="group" aria-labelledby="theme-group-dark">
-          <span id="theme-group-dark" class="theme-group-label" data-i18n="themeGroupDark">Dark</span>
-          <button class="btn btn-sm theme-preset-btn" data-theme="nord-night" aria-pressed="false">Nord Night</button>
-          <button class="btn btn-sm theme-preset-btn" data-theme="terminal" aria-pressed="false">Terminal</button>
-          <button class="btn btn-sm theme-preset-btn" data-theme="dracula" aria-pressed="false">Dracula</button>
-          <button class="btn btn-sm theme-preset-btn" data-theme="gruvbox-dark" aria-pressed="false">Gruvbox Dark</button>
-          <button class="btn btn-sm theme-preset-btn" data-theme="rose-pine" aria-pressed="false">Rosé Pine</button>
-        </div>
-      </div>
-      <div class="fg" id="saved-themes-section" style="display:none">
-        <label class="bl" data-i18n="labelSavedThemes">Saved Themes</label>
-        <div id="saved-themes-list" class="theme-presets-group"></div>
-      </div>
-      <div class="fg context-help-host" data-help-role="field">
-        <label class="bl" for="opt-custom-css" data-i18n="labelCustomCSSOverlay">Custom CSS Overlay</label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="customCSSOverlayHelp">Your CSS is appended on top of the selected preset. Leave empty to use the preset only; rules written here override the preset's rules of the same name.</p>
-        </details>
-        <textarea id="opt-custom-css" rows="12" placeholder="/* Override rules go here */&#10;body { line-height: 1.6; }&#10;.bookmark_title { font-size: 14px; }" data-i18n-placeholder="customCSSPlaceholder"></textarea>
-        <div class="overlay-meta-row">
-          <span id="overlay-byte-counter" class="overlay-byte-counter">0 B / 50 KB</span>
-        </div>
-        <div class="context-help-action-row" data-help-role="action">
-          <span class="save-theme-wrap">
-            <button class="btn btn-sm" id="save-custom-theme" data-i18n="saveAsTheme" data-i18n-title="saveAsThemeDisabledHint" title="Modify Custom CSS first to save as theme" disabled>Save as theme</button>
-          </span>
-          <details class="context-help context-help-inline">
+    <div id="panel-appearance" class="panel" role="tabpanel" aria-labelledby="tab-appearance" data-ui-stage0>
+      <section class="settings-section">
+        <div class="context-help-host context-help-section" data-help-role="section">
+          <h2 class="section-title" id="sec-theme" data-i18n="secTheme">Theme</h2>
+          <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="saveAsThemeHint">Modify Custom CSS to enable saving it as a reusable theme.</p>
+            <p class="hint context-help-body" id="opt-theme-hint" data-i18n="optThemeHint">Switches the popup, this settings page, the notes &amp; vocabulary page and the reader between light and dark. Presets with a built-in scheme (Dracula, for example) override it on the pages that follow the preset; the reader can override it per device from its "Aa" panel.</p>
           </details>
         </div>
-      </div>
+        <div class="fg entry-block">
+          <select id="opt-theme" aria-labelledby="sec-theme" data-listbox>
+            <option value="auto" data-i18n="themeAuto">Auto (follow system)</option>
+            <option value="light" data-i18n="themeLight">Light</option>
+            <option value="dark" data-i18n="themeDark">Dark</option>
+          </select>
+        </div>
 
-      <details id="preset-preview-section" class="preset-preview-section" style="display:none">
-        <summary data-i18n="presetPreviewToggle">View current preset CSS (read-only)</summary>
-        <pre id="preset-preview-content" class="preset-preview-content"></pre>
-      </details>
+        <div class="pref-group">
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">When on, the popup, this settings page and the notes &amp; vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h2 class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</h2>
+        <div class="fg entry-block">
+          <label class="bl" for="opt-custom-font" data-i18n="labelCustomFont">Custom Font</label>
+          <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans SC', 'Fira Code', sans-serif" data-i18n-placeholder="customFontPlaceholder" />
+        </div>
+        <div class="fg">
+          <label class="bl" data-i18n="labelThemePresets">Theme Presets</label>
+          <div class="theme-presets-group" role="group" aria-labelledby="theme-group-none">
+            <span id="theme-group-none" class="sr-only" data-i18n="themeGroupNone">None</span>
+            <button class="btn btn-sm theme-preset-btn" data-theme="" data-i18n="themeGroupNone" aria-pressed="false">None</button>
+          </div>
+          <div class="theme-presets-group" role="group" aria-labelledby="theme-group-adaptive">
+            <span id="theme-group-adaptive" class="theme-group-label" data-i18n="themeGroupAdaptive">Adaptive</span>
+            <button class="btn btn-sm theme-preset-btn" data-theme="flexoki" aria-pressed="false">Flexoki</button>
+            <button class="btn btn-sm theme-preset-btn" data-theme="solarized" aria-pressed="false">Solarized</button>
+            <button class="btn btn-sm theme-preset-btn" data-theme="catppuccin" aria-pressed="false">Catppuccin</button>
+          </div>
+          <div class="theme-presets-group" role="group" aria-labelledby="theme-group-light">
+            <span id="theme-group-light" class="theme-group-label" data-i18n="themeGroupLight">Light</span>
+            <button class="btn btn-sm theme-preset-btn" data-theme="modern-card" aria-pressed="false">Modern Card</button>
+            <button class="btn btn-sm theme-preset-btn" data-theme="paper-ink" aria-pressed="false">Paper &amp; Ink</button>
+            <button class="btn btn-sm theme-preset-btn" data-theme="github-light" aria-pressed="false">GitHub Light</button>
+          </div>
+          <div class="theme-presets-group" role="group" aria-labelledby="theme-group-dark">
+            <span id="theme-group-dark" class="theme-group-label" data-i18n="themeGroupDark">Dark</span>
+            <button class="btn btn-sm theme-preset-btn" data-theme="nord-night" aria-pressed="false">Nord Night</button>
+            <button class="btn btn-sm theme-preset-btn" data-theme="terminal" aria-pressed="false">Terminal</button>
+            <button class="btn btn-sm theme-preset-btn" data-theme="dracula" aria-pressed="false">Dracula</button>
+            <button class="btn btn-sm theme-preset-btn" data-theme="gruvbox-dark" aria-pressed="false">Gruvbox Dark</button>
+            <button class="btn btn-sm theme-preset-btn" data-theme="rose-pine" aria-pressed="false">Rosé Pine</button>
+          </div>
+        </div>
+        <div class="fg" id="saved-themes-section" hidden>
+          <label class="bl" data-i18n="labelSavedThemes">Saved Themes</label>
+          <div id="saved-themes-list" class="theme-presets-group"></div>
+        </div>
+        <div class="fg edit-area context-help-host" data-help-role="field">
+          <label class="bl" for="opt-custom-css" data-i18n="labelCustomCSSOverlay">Custom CSS Overlay</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="customCSSOverlayHelp">Your CSS is appended on top of the selected preset. Leave empty to use the preset only; rules written here override the preset's rules of the same name.</p>
+          </details>
+          <textarea id="opt-custom-css" rows="12" placeholder="/* Override rules go here */&#10;body { line-height: 1.6; }&#10;.bookmark_title { font-size: 14px; }" data-i18n-placeholder="customCSSPlaceholder"></textarea>
+          <div class="overlay-meta-row">
+            <span id="overlay-byte-counter" class="overlay-byte-counter">0 B / 50 KB</span>
+          </div>
+          <div class="context-help-action-row" data-help-role="action">
+            <span class="save-theme-wrap">
+              <button class="btn btn-sm" id="save-custom-theme" data-i18n="saveAsTheme" data-i18n-title="saveAsThemeDisabledHint" title="Modify Custom CSS first to save as theme" disabled>Save as theme</button>
+            </span>
+            <details class="context-help context-help-inline">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="saveAsThemeHint">Modify Custom CSS to enable saving it as a reusable theme.</p>
+            </details>
+          </div>
+        </div>
 
+        <details id="preset-preview-section" class="preset-preview-section" hidden>
+          <summary data-i18n="presetPreviewToggle">View current preset CSS (read-only)</summary>
+          <pre id="preset-preview-content" class="preset-preview-content"></pre>
+        </details>
+      </section>
     </div>
 
     <!-- Tab 7: Storage -->

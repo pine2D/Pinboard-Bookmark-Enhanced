@@ -1217,6 +1217,117 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(!!panel.querySelector(".tag-gov-head > .fg-actions"), "panel-tags' top .fg-actions button row must stay unchanged");
   });
 
+  // Stage-3b Task 4 (2026-09-24-ui-system-stage3b): appearance + vocab, the
+  // last two panels, move onto the row model. Appearance has exactly one
+  // switch (opt-popup-follow-theme) -- the theme presets are buttons, not a
+  // persisted boolean -- and two top-level sections (Theme, then Pinboard.in
+  // Custom Style) after the removed .divider between them.
+  await test("stage3b: appearance panel carries the marker and no legacy row classes", async () => {
+    const panel = await stage0Panel("appearance");
+    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
+    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
+      "panel-appearance still carries a legacy row/stack class");
+  });
+
+  await test("stage3b: opt-popup-follow-theme sits in a .pref-row inside a .pref-group", async () => {
+    const panel = await stage0Panel("appearance");
+    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
+    const switches = [...panel.querySelectorAll("label.switch")];
+    assert(switches.length === 1, "expected 1 switch in panel-appearance, got " + switches.length);
+    assert(switches[0].closest(".pref-row") && switches[0].closest(".pref-group"),
+      "opt-popup-follow-theme must sit inside a .pref-row inside a .pref-group");
+    assert(switches[0].querySelector("#opt-popup-follow-theme"), "the lone switch is not opt-popup-follow-theme");
+  });
+
+  await test("stage3b: appearance panel's theme select is a listbox target", async () => {
+    const panel = await stage0Panel("appearance");
+    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
+    const select = panel.querySelector("#opt-theme");
+    assert(select && select.hasAttribute("data-listbox"), "opt-theme is missing data-listbox");
+  });
+
+  await test("stage3b: appearance panel wraps Theme and Custom Style in their own sections", async () => {
+    const panel = await stage0Panel("appearance");
+    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
+    const sections = [...panel.querySelectorAll(":scope > section.settings-section")];
+    assert(sections.length === 2, "expected 2 top-level sections in panel-appearance, got " + sections.length);
+    assert(!!sections[0].querySelector("#opt-theme"), "#opt-theme is not inside the Theme section");
+    assert(!!sections[1].querySelector("#opt-custom-css"), "#opt-custom-css is not inside the Custom Style section");
+  });
+
+  await test("stage3b: appearance panel's saved-themes and preset-preview sections use the hidden attribute, not inline style", async () => {
+    const panel = await stage0Panel("appearance");
+    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
+    const saved = panel.querySelector("#saved-themes-section");
+    assert(!!saved && saved.hasAttribute("hidden") && !saved.getAttribute("style"),
+      "saved-themes-section must use the hidden attribute, not an inline display:none style");
+    const preview = panel.querySelector("#preset-preview-section");
+    assert(!!preview && preview.hasAttribute("hidden") && !preview.getAttribute("style"),
+      "preset-preview-section must use the hidden attribute, not an inline display:none style");
+    assert(preview.tagName === "DETAILS" && !preview.classList.contains("disclosure"),
+      "preset-preview-section stays a plain <details>, not a .disclosure");
+  });
+
+  // Vocab is a single h2/section (spec §3): the reading-hints choice host
+  // becomes a plain .pref-group > .pref-row (1 switch total), and the four
+  // .fg fields inside the "Export and integrations" disclosure (Anki
+  // deck/port/key, Eudic token) become .fg.entry-block, key-wraps included.
+  // The Drive disclosure's <dl>/<p> and every .vocab-toolbar stay untouched.
+  await test("stage3b: vocab panel carries the marker and no legacy row classes", async () => {
+    const panel = await stage0Panel("vocab");
+    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
+    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
+      "panel-vocab still carries a legacy row/stack class");
+  });
+
+  await test("stage3b: dict-echo-enabled sits in a .pref-row inside a .pref-group", async () => {
+    const panel = await stage0Panel("vocab");
+    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
+    const switches = [...panel.querySelectorAll("label.switch")];
+    assert(switches.length === 1, "expected 1 switch in panel-vocab, got " + switches.length);
+    assert(switches[0].closest(".pref-row") && switches[0].closest(".pref-group"),
+      "dict-echo-enabled must sit inside a .pref-row inside a .pref-group");
+    assert(switches[0].querySelector("#dict-echo-enabled"), "the lone switch is not dict-echo-enabled");
+  });
+
+  await test("stage3b: vocab panel wraps its content in a single section", async () => {
+    const panel = await stage0Panel("vocab");
+    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
+    const sections = [...panel.querySelectorAll(":scope > section.settings-section")];
+    assert(sections.length === 1, "expected 1 top-level section in panel-vocab, got " + sections.length);
+    assert(sections[0].querySelectorAll(":scope > details.disclosure").length === 5,
+      "expected all 5 vocab disclosures inside the one section");
+  });
+
+  await test("stage3b: vocab's Export and integrations disclosure moves its .fg fields onto entry-block", async () => {
+    const panel = await stage0Panel("vocab");
+    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
+    const learning = panel.querySelector('details.disclosure[data-acc-key="vocab-learning"]');
+    assert(!!learning, "panel-vocab lost the vocab-learning disclosure");
+    const blocks = [...learning.querySelectorAll(".fg")];
+    assert(blocks.length === 4, "expected 4 .fg fields in the vocab-learning disclosure, got " + blocks.length);
+    assert(blocks.every((f) => f.classList.contains("entry-block")),
+      "every .fg field inside vocab-learning must carry entry-block");
+    const ankiKey = panel.querySelector("#dict-anki-key");
+    assert(!!ankiKey && !!ankiKey.closest(".fg.entry-block") && !!ankiKey.closest(".key-wrap"),
+      "dict-anki-key must stay a .key-wrap field inside its .fg.entry-block");
+    const eudicToken = panel.querySelector("#dict-eudic-token");
+    assert(!!eudicToken && !!eudicToken.closest(".fg.entry-block") && !!eudicToken.closest(".key-wrap"),
+      "dict-eudic-token must stay a .key-wrap field inside its .fg.entry-block");
+    assert(!!learning.querySelector(".vocab-toolbar"), "vocab-learning lost its .vocab-toolbar");
+    assert(learning.querySelector(".vocab-toolbar").closest(".fg") === null,
+      ".vocab-toolbar must stay outside any .fg (spec: .fg-actions/.vocab-toolbar untouched)");
+  });
+
+  await test("stage3b: vocab's Google Drive disclosure keeps its dl fields and toolbar untouched", async () => {
+    const panel = await stage0Panel("vocab");
+    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
+    const drive = panel.querySelector('details.disclosure[data-acc-key="vocab-google-drive"]');
+    assert(!!drive, "panel-vocab lost the vocab-google-drive disclosure");
+    assert(!!drive.querySelector("dl#vocab-drive-fields[hidden]"), "vocab-drive-fields dl or its hidden attribute is missing");
+    assert(!drive.querySelector(".fg"), "vocab-google-drive must not gain any .fg wrapper");
+  });
+
   await test("stage3a: ai-behavior selects are listbox targets", async () => {
     const panel = await stage0Panel("ai-behavior");
     assert(!!panel, "panel-ai-behavior is missing the data-ui-stage0 marker");
