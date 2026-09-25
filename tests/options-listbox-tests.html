@@ -1039,6 +1039,91 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // tab click like the storage builder above), so by the time this file's own
   // opt-ai-provider-btn settle wait has finished, #export-targets is already
   // populated -- no extra tab click or poll loop needed here.
+  // Final whole-stage review S2: the render-audit rows pin ONE representative
+  // row per panel, so a regression on the other rows passes every gate -- S1
+  // (R9 missing the title-in-help-host and #storage-cats shapes: 24/20px
+  // against 12/8px) is the proof. Class-level check instead: every stage-0
+  // pref-row label, every pick-mark and every title-led group on the page,
+  // in both density tiers, measured on the real options.css.
+  test("stage-0 row geometry holds for every pref-row, pick-mark and title-led group, in both densities", async () => {
+    const win = frame.contentWindow;
+    const q = (v) => Math.round(parseFloat(v) * 4) / 4;
+    const activeBefore = doc.querySelector(".panel.active")?.id;
+    const opened = [];
+    // Open the disclosures (vocab's five, the Send-to cards) so their rows have
+    // layout -- but NOT the context-help answers: an open answer sits between
+    // a section title and its first row and would inflate the R9 gap.
+    doc.querySelectorAll("[data-ui-stage0] details.disclosure:not([open])").forEach((d) => { d.open = true; opened.push(d); });
+    const problems = [];
+    let rows = 0, marks = 0, groups = 0;
+    try {
+      for (const density of ["comfortable", "compact"]) {
+        if (density === "compact") doc.documentElement.dataset.density = "compact"; else delete doc.documentElement.dataset.density;
+        const cs = win.getComputedStyle(doc.documentElement);
+        const rowMin = q(cs.getPropertyValue("--opt-row-min-h")), padY = q(cs.getPropertyValue("--opt-row-pad-y"));
+        assert(rowMin > 0 && padY > 0, density + ": density tokens unreadable (" + rowMin + "/" + padY + ")");
+        for (const panel of doc.querySelectorAll(".panel[data-ui-stage0]")) {
+          showPanel(panel.id);
+          // The block that leads a section: a .pref-group directly, or Storage's
+          // JS-built group inside #storage-cats.
+          const leadGroup = (block) => block?.matches(".pref-group") ? block : (block?.matches(".storage-cats") ? block.querySelector(":scope > .pref-group") : null);
+          const titleOf = (section) => section.querySelector(":scope > h2.section-title, :scope > .context-help-section > h2.section-title");
+          const isR9 = (label) => {
+            const row = label.parentElement, group = row.parentElement;
+            if (!row.matches(".pref-row:first-child") || !group.matches(".pref-group")) return false;
+            const block = group.parentElement.matches(".storage-cats") ? group.parentElement : group;
+            const section = block.parentElement;
+            return section.matches(".settings-section") && !!block.previousElementSibling
+              && block.previousElementSibling.matches("h2.section-title, .context-help-section") && titleOf(section) !== null;
+          };
+          panel.querySelectorAll("[data-ui-stage0] .pref-row > label").forEach((label) => {
+            if (!label.offsetParent) return;   // rows inside [hidden] hosts have no layout
+            rows++;
+            const want = isR9(label) ? rowMin - padY : rowMin;
+            const got = q(win.getComputedStyle(label).minHeight);
+            if (got !== want) problems.push(density + " " + panel.id + " " + (label.querySelector("input")?.id || label.textContent.trim().slice(0, 24)) + ": min-height " + got + " != " + want + (isR9(label) ? " (R9 row)" : ""));
+            const mark = label.querySelector(".pick-mark");
+            if (mark) {
+              marks++;
+              const r = mark.getBoundingClientRect();
+              if (Math.abs(r.width - 20) > 0.5 || Math.abs(r.height - 20) > 0.5) problems.push(density + " " + panel.id + " pick-mark " + r.width + "x" + r.height + " != 20x20");
+            }
+          });
+          // R9's definition: title -> first copy of a title-led group equals
+          // title -> label of a title-led entry block. Compare, don't hardcode.
+          const gaps = { group: [], entry: [] };
+          panel.querySelectorAll(".settings-section").forEach((section) => {
+            const h2 = titleOf(section);
+            if (!h2 || !h2.offsetParent) return;
+            const block = [...section.children].find((el) => !el.matches("h2.section-title, .context-help-section"));
+            const group = leadGroup(block);
+            if (group) {
+              const copy = group.querySelector(":scope > .pref-row:first-child > label > .switch-text, :scope > .pref-row:first-child > label > .pick-text");
+              if (copy && copy.offsetParent) { groups++; gaps.group.push([section.id || h2.textContent.trim(), q(copy.getBoundingClientRect().top - h2.getBoundingClientRect().bottom)]); }
+            } else if (block?.matches(".fg.entry-block")) {
+              const bl = block.querySelector(":scope > .bl");
+              if (bl && bl.offsetParent) gaps.entry.push([section.id || h2.textContent.trim(), q(bl.getBoundingClientRect().top - h2.getBoundingClientRect().bottom)]);
+            }
+          });
+          if (gaps.group.length && gaps.entry.length) {
+            const ref = gaps.entry[0][1];
+            gaps.group.forEach(([name, g]) => { if (Math.abs(g - ref) > 1.5) problems.push(density + " " + panel.id + " title->first copy " + g + "px in '" + name + "' vs title->entry label " + ref + "px (R9)"); });
+          }
+          if (gaps.group.length > 1) {
+            const g0 = gaps.group[0][1];
+            gaps.group.forEach(([name, g]) => { if (Math.abs(g - g0) > 1.5) problems.push(density + " " + panel.id + " title-led groups disagree: '" + name + "' " + g + "px vs '" + gaps.group[0][0] + "' " + g0 + "px"); });
+          }
+        }
+      }
+    } finally {
+      delete doc.documentElement.dataset.density;
+      opened.forEach((d) => { d.open = false; });
+      if (activeBefore) showPanel(activeBefore);
+    }
+    assert(rows >= 60 && marks >= 10 && groups >= 8, "class check is vacuous: rows=" + rows + " marks=" + marks + " title-led groups=" + groups);
+    assert(problems.length === 0, problems.length + " geometry violation(s):\n  " + problems.join("\n  "));
+  });
+
   test("export-targets: one disclosure per registered target, each with a pref-row > label.switch enable toggle", () => {
     const host = doc.getElementById("export-targets");
     assert(host, "export-targets host missing");

@@ -35,7 +35,7 @@
   const TYPEAHEAD_MS = 500;
   const PAGE_STEP = 10;
   const states = new WeakMap();   // select -> state
-  const enhanced = new Set();     // for the i18n re-sync; two entries on this page
+  const enhanced = new Set();     // for the i18n re-sync; ten selects on this page, pruned of detached states on enhance and re-sync
 
   function chevron() {
     return typeof PBP_ICONS !== "undefined" && PBP_ICONS.chevronDown ? PBP_ICONS.chevronDown : "";
@@ -329,7 +329,12 @@
     return state;
   }
 
-  window.pbpEnhanceListbox = (select) => (enhance(select) ? true : false);
+  window.pbpEnhanceListbox = (select) => {
+    // Builders re-enhance after rebuilding their markup; drop the previous
+    // run's detached states here too, not only on the next language switch.
+    enhanced.forEach((state) => { if (!state.select.isConnected) enhanced.delete(state); });
+    return enhance(select) ? true : false;
+  };
   window.pbpListboxSync = (select) => {
     const state = select && states.get(select);
     if (state) sync(state);

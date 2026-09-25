@@ -579,9 +579,9 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
   position: static;
   --pick-row1-h: var(--opt-row-min-h);
 }
-[data-ui-stage0] .settings-section > h2.section-title + .pref-group > .pref-row.context-help-host[data-help-role="choice"]:first-child > label.pick {
-  --pick-row1-h: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
-}
+/* The R9 (title-led first row) value of --pick-row1-h is declared by the R9
+   rule itself (stage-0 block, "R9 (2026-09-23)") so the two selectors cannot
+   drift apart (final whole-stage review S1). */
 @media (forced-colors: none) {
   .context-help-host[data-help-role="choice"] > label.pick > input[type="radio"] {
     bottom: auto;
@@ -1482,9 +1482,8 @@ html.motion-ready .backup-import-result:not([hidden]) {
    (COMPONENTS.md §6.4 exception 3), whose own composer contract already
    paints a disabled row's text/mark `--opt-fg-hint` and its cursor `default`;
    leaving those two selectors here would have double-dimmed (and wrongly
-   cursor:not-allowed'd) them. `.choice-row` stays for any bare
-   `<label><input><span>` disabled checkbox that is not (yet) `.switch`/
-   `.pick`; `:not(.switch-text)` keeps `.switch`'s own composer-painted
+   cursor:not-allowed'd) them. `.choice-row` has no markup consumer left
+   after stage 3b (it retires with the legacy shapes in 3c); `:not(.switch-text)` keeps `.switch`'s own composer-painted
    disabled dimming from being doubled too. */
 .choice-row input:disabled + span:not(.switch-text) { opacity: 0.45; }
 .choice-row input:disabled { cursor: not-allowed; }
@@ -1531,8 +1530,8 @@ html.motion-ready .backup-import-result:not([hidden]) {
    .section-title" (that same section's own doc comment) -- true everywhere
    on the page until now, since no `.disclosure` had ever
    shared a stage-0 panel with an `h2.section-title` sibling (general's
-   #acc-connection-overview is the first: every other `.disclosure` still
-   lives in an unmigrated panel -- vocab's five, tags' tag-gov-lowcount).
+   #acc-connection-overview was the first; since stage 3b every panel is
+   migrated and vocab's five and tags' tag-gov-lowcount take it too).
    Once panel-general's h2s took the stage-0 bump above (16px comfortable /
    15px compact) while this disclosure's own summary stayed pinned at the
    surface-wide literal 15px, "General" and "Connection Status" -- two
@@ -1590,19 +1589,26 @@ html.motion-ready .backup-import-result:not([hidden]) {
 [data-ui-stage0] .entry-block, [data-ui-stage0] .edit-area { margin-bottom: var(--opt-sp-6); }
 /* R9 (2026-09-23): a preference row that directly follows its section title
    drops its top padding and one pad of min-height, so title -> first copy is
-   the same 12px as title -> entry-block label. bgsave-mode's/tag-sync-
-   mode's/popup-width's `.pref-group-radio` radio groups never sit right
-   under a title (they live one level deeper, inside a `.fg.entry-block`),
-   so this rule doesn't reach them -- but stage-3b Task 1's ai-content-source
-   `.pick` rows DO (`.settings-section > .pref-group > .pref-row:first-child`,
-   no entry-block wrapper in between), and its first row (`opt-ai-src-local`)
-   is genuinely affected: the choice-host override above (`--pick-row1-h`,
-   fix round 1) matches this SAME `calc(--opt-row-min-h - --opt-row-pad-y)`
-   formula for exactly that reason, so the hidden radio's row-1 hit area and
-   the mark's vertical centring track that row's real (reduced) height. */
-[data-ui-stage0] .settings-section > h2.section-title + .pref-group > .pref-row:first-child > label {
+   the same 12px as title -> entry-block label. Two title shapes lead a
+   `.pref-group`: a bare `h2.section-title`, and an h2 wrapped in a
+   `.context-help-section` host (General's Backup & Restore); Storage's
+   JS-built group additionally sits inside `#storage-cats`. The final
+   whole-stage review (S1) found the rule only knew the bare-h2 shape, leaving
+   those two sections at 24/20px against 12/8px everywhere else -- both
+   shapes and the storage wrapper are covered below, and
+   tests/options-listbox-tests.html asserts the class (every title-led group
+   on the page, both densities) rather than one representative row.
+   bgsave-mode's/tag-sync-mode's/popup-width's `.pref-group-radio` groups
+   live one level deeper (inside a `.fg.entry-block`) so this rule does not
+   reach them; stage-3b Task 1's ai-content-source `.pick` rows DO, and the
+   hidden radio's row-1 hit area / the mark's centring track that reduced
+   height through --pick-row1-h, declared HERE (one selector to keep in step;
+   the (0,3,1) default above loses to this rule). */
+[data-ui-stage0] .settings-section > :is(h2.section-title, .context-help-section) + .pref-group > .pref-row:first-child > label,
+[data-ui-stage0] .settings-section > :is(h2.section-title, .context-help-section) + .storage-cats > .pref-group > .pref-row:first-child > label {
   padding-top: 0;
   min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
+  --pick-row1-h: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
 }
 /* .pref-group is its own row-grouping shape (checkboxes, radios) and was the
    one stage-0 block with no trailing margin of its own: an entry block or

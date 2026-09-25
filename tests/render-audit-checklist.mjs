@@ -1946,7 +1946,16 @@ export const CHECKS = [
   // checkboxes) sits behind an actual JSON-import preview render with no
   // reachable trigger in this harness's page setup, so it is not pinned here
   // -- flagged for the controller rather than forced (task-5-report.md).
+  // The FIRST storage row is a title-led R9 row (the group sits right under
+  // the Storage Management title, inside `#storage-cats`; final whole-stage
+  // review S1 widened R9 to that wrapper), so its label carries
+  // `--opt-row-min-h - --opt-row-pad-y` = 32/28 -- this row is the pin for
+  // S1's storage half. The second category row is the plain 44/36 pick-box
+  // geometry the bookmarks row proves; anchored by position so a first-match
+  // shift cannot silently swap the two contracts.
   { surface: "options", page: "options.html", selector: "#storage-cats .pref-row > label.pick.pick-box", state: "default",
+    expect: { minHeightPx: { comfortable: 32, compact: 28 }, hitRectMin: { height: 24 } } },
+  { surface: "options", page: "options.html", selector: "#storage-cats .pref-row:nth-child(2) > label.pick.pick-box", state: "default",
     expect: { minHeightPx: { comfortable: 44, compact: 36 }, hitRectMin: { height: 24 } } },
 ];
 
