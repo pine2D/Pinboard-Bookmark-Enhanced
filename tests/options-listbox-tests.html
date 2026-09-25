@@ -856,7 +856,35 @@ function pbpTestChromeStub(enMessages) {
     assert(testRow && testRow.querySelector("button") && testRow.querySelector(".et-test-status"),
       "github card is missing its .fg-actions.et-test row");
     assert(!host.querySelector("#et-webhook .et-test"), "webhook has no precheckRequest and must not render a Test row");
+    const notionRow = host.querySelector("#et-notion .fg-actions.et-test");
+    assert(notionRow && notionRow.querySelector("button") && notionRow.querySelector(".et-test-status"),
+      "notion card is missing its .fg-actions.et-test row");
     assert(!host.querySelector("#et-obsidian .et-test"), "obsidian has no precheckRequest and must not render a Test row");
+  });
+
+  // Stage-3b Task 3 review B1: inside [data-ui-stage0] the .key-wrap lost its
+  // 420px cap while the text input inside kept the legacy 320px .et-field
+  // tier, so the absolutely positioned eye toggle drifted ~446px off the
+  // input. Gate the fused-control geometry on the real builder output.
+  test("export-targets: webhook's secret url field keeps the eye toggle fused to its input", () => {
+    showPanel("panel-markdown");
+    const inp = doc.querySelector('#et-webhook input[data-et="webhook.url"]');
+    assert(inp, "webhook.url input missing");
+    const det = inp.closest("details");
+    const wasOpen = det ? det.open : true;
+    if (det) det.open = true;
+    try {
+      const wrap = inp.closest(".key-wrap");
+      const toggle = wrap && wrap.querySelector(".key-toggle");
+      assert(wrap && toggle, "webhook.url is not a .key-wrap secret field");
+      const ir = inp.getBoundingClientRect(), tr = toggle.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+      assert(ir.width > 0, "webhook.url input has no layout (card not open?)");
+      assert(Math.abs(wr.width - ir.width) <= 1, "webhook.url input (" + ir.width + "px) does not fill its .key-wrap (" + wr.width + "px)");
+      assert(tr.left >= ir.left && tr.right <= ir.right + 1,
+        "webhook.url eye toggle sits outside its input: input=[" + ir.left + "," + ir.right + "] toggle=[" + tr.left + "," + tr.right + "]");
+    } finally {
+      if (det) det.open = wasOpen;
+    }
   });
 
   test("export-targets: Obsidian's route select is enhanced into a listbox like every other select on the page", () => {
@@ -867,6 +895,17 @@ function pbpTestChromeStub(enMessages) {
     assert(btn && btn.tagName === "BUTTON" && btn.getAttribute("role") === "combobox",
       "obsidian-route was not enhanced into a listbox button");
     assert(itemsOf(select).length === select.options.length, "obsidian-route listbox option count mismatch");
+    // Enhancement has to run once the card is connected: enhance() re-points
+    // the field's label[for] by querying `document`, which cannot see a
+    // detached card. Assert the re-point itself -- a call moved before the
+    // append would still hide the select and build the button.
+    assert(!doc.querySelector('label[for="obsidian-route"]'), "obsidian-route label still points at the hidden select (enhanced before connect?)");
+    const routeLabel = doc.querySelector('label[for="' + btn.id + '"]');
+    assert(routeLabel, "obsidian-route label was not re-pointed at the listbox button");
+    const labelledBy = btn.getAttribute("aria-labelledby");
+    assert(!labelledBy || doc.getElementById(labelledBy) === routeLabel, "obsidian-route button aria-labelledby=" + labelledBy + " does not resolve to its label");
+    const policyBtn = btnOf(doc.getElementById("opt-md-image-policy"));
+    assert(policyBtn && policyBtn.getAttribute("role") === "combobox", "#opt-md-image-policy was not enhanced into a listbox");
     // Stage-3b Task 3 brings the page's total from 7 (stage-3a/Task-2 statics:
     // opt-lang, opt-ai-provider, opt-ai-tag-lang, opt-ai-summary-lang,
     // opt-ai-tag-separator, translate-target-lang, opt-selection-trigger) to

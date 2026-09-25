@@ -419,8 +419,9 @@ function pbpBuildSettingsSearchIndex(root = document) {
       // `target` stayed "" all the way through (unlike the catch-all `else`
       // branch a few lines down, this one has no `if (!target)` fallback),
       // and the jump landed on the panel instead of the switch it explains.
-      // `.pref-row`/`.pref-group` added alongside the two legacy shapes,
-      // which stay for panel-markdown's still-unmigrated `.choice-row` rows.
+      // `.pref-row`/`.pref-group` added alongside the two legacy shapes;
+      // no `.choice-row` rows remain after stage-3b Task 3 and the legacy
+      // pair retires with the rest of the old shapes in 3c.
       else if (node.matches(".hint")) target = node.closest(".choice-row, .fg, .pref-row, .pref-group")?.querySelector("input,select,textarea,button")?.id || "";
       else {
         target = node.id || "";
@@ -1849,7 +1850,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           // 32-hex id, all accepted by pbpNotionParseParentId) is the one
           // field that reaches this branch. "url" (webhook's endpoint) never
           // does -- it is ALSO `secret: true` and takes the branch above into
-          // .key-wrap instead, at its own 420px tier -- but is named here too
+          // .key-wrap instead (the legacy 420px tier outside the stage-0 marker;
+          // full content column inside it) -- but is named here too
           // so this stays correct if a future target ever adds a non-secret
           // URL field.
           if (s.key === "url" || s.key === "parent") inp.classList.add("fg-url");

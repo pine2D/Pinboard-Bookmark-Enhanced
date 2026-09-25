@@ -335,7 +335,12 @@
     if (state) sync(state);
   };
 
-  document.addEventListener("pbp:i18n-applied", () => { enhanced.forEach(sync); });
+  // Builders that rebuild their markup (options.js renderExportTargets on a
+  // panel reset) leave the previous run's state -- and its detached DOM --
+  // in the Set; drop those here instead of re-syncing them forever.
+  document.addEventListener("pbp:i18n-applied", () => {
+    enhanced.forEach((state) => { if (state.select.isConnected) sync(state); else enhanced.delete(state); });
+  });
   document.addEventListener("DOMContentLoaded", () => {
     const targets = [...document.querySelectorAll("select[data-listbox]")];
     targets.forEach(enhance);
