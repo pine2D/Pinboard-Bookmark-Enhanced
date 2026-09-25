@@ -1822,7 +1822,7 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
 /* Stage-0 "action" role host: Appearance's Custom CSS Overlay "Save as
    theme" inline help (`.context-help-action-row`, NOT `.context-help-host`
    -- a distinct wrapper: a button wrapper and the help toggle side by side
-   in one flex row). Task 4 put #panel-appearance under the marker, which
+   in one grid row, `auto 24px minmax(0,1fr)`). Task 4 put #panel-appearance under the marker, which
    grew the button text 11 -> 13px (line-height 26); at that size the glyphs
    sit ~2 CSS px lower under the local fonts than under the CI fonts, so no
    single vertical offset on the icon alone can centre it for both font

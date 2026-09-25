@@ -1174,7 +1174,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     /\.choice-row > label > span \{ line-height: 16px; \}/.test(optionsCss) &&
     !/(?<!\[data-ui-stage0\] \.context-help-action-row)\[data-help-role="action"\][^{]*\{[^}]*align-(?:items|self):\s*baseline/.test(optionsCss) &&
     /\[data-ui-stage0\] \.context-help-action-row\[data-help-role="action"\] > \.save-theme-wrap,\s*\[data-ui-stage0\] \.context-help-action-row\[data-help-role="action"\] > \.context-help > summary\.context-help-toggle \{ align-self: baseline; \}/.test(optionsCss),
-    "options.css: contextual help lost its anchoring split (copy roles on the text baseline via the label span, the action row centred)");
+    "options.css: contextual help lost its anchoring split (copy roles on the text baseline via the label span, the base action row centred, the [data-ui-stage0] action row on the button-text baseline)");
   check(/const det = summary && summary\.closest\("details"\);[\s\S]{0,500}details\.context-help\[open\]/.test(optionsJs),
     "options.js: contextual help lost the native-details motion gate or one-open-per-panel behavior");
   check(/const det = e\.target\.matches\?\.\("details\[data-acc-key\]"\) \? e\.target : null/.test(optionsJs) &&
