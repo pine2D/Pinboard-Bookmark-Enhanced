@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 35;
+const TOTAL = 38;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -30,15 +30,23 @@ const queue = [];
 function test(name, fn) { queue.push([name, fn]); }
 
 // Serialised into the fixture as source text, so it must be self-contained.
-function pbpTestChromeStub(enMessages) {
+function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
+  storageDelayMs = storageDelayMs || 0;
   const event = () => ({ addListener() {}, removeListener() {}, hasListener() { return false; } });
+  // storageDelayMs (stage-3b Task 5, S1 load-order test): every OTHER caller
+  // of this stub passes it as 0, which keeps the exact prior behaviour
+  // (setTimeout(0) for callback style, a bare Promise.resolve for the
+  // promise style -- no macrotask at all). Only the dedicated load-order
+  // test below passes a real delay, to push chrome.storage's resolution
+  // past options-listbox.js's own one-shot DOMContentLoaded rAF sync.
   const done = (args, value) => {
     const cb = args.length && typeof args[args.length - 1] === "function" ? args[args.length - 1] : null;
-    if (cb) { setTimeout(() => cb(value), 0); return undefined; }
+    if (cb) { setTimeout(() => cb(value), storageDelayMs); return undefined; }
+    if (storageDelayMs > 0) return new Promise((resolve) => setTimeout(() => resolve(value), storageDelayMs));
     return Promise.resolve(value);
   };
-  const store = () => {
-    const data = {};
+  const store = (seed) => {
+    const data = Object.assign({}, seed || {});
     return {
       get(keys, ...rest) {
         let out = {};
@@ -78,7 +86,9 @@ function pbpTestChromeStub(enMessages) {
       connect: () => ({ onMessage: event(), onDisconnect: event(), postMessage() {}, disconnect() {} }),
       onMessage: event(),
     }),
-    storage: loose({ local: store(), sync: store(), session: store(), onChanged: event() }),
+    // localSeed only matters for the S1 load-order fixture below -- settings
+    // in this fixture always route to local (optSyncEnabled is unset/false).
+    storage: loose({ local: store(localSeed), sync: store(), session: store(), onChanged: event() }),
     i18n: loose({ getMessage: message, getUILanguage: () => "en" }),
     permissions: loose({
       contains: (...args) => done(args, false),
@@ -103,6 +113,14 @@ function pbpTestChromeStub(enMessages) {
   await loaded;
   const win = frame.contentWindow;
   const doc = frame.contentDocument;
+  // activateTab() (options.js) ends every real tab click with
+  // history.replaceState(null, "", "#" + panel) -- harmless on a normal
+  // page, but this fixture's `about:srcdoc` document has no URL a history
+  // entry can be built against, so the native call throws (stage-3b Task 5's
+  // new reset-flow tests are the first ones here to click a real .tab-btn
+  // instead of the showPanel() class-toggle helper below). A no-op stub is
+  // simplest: nothing in this suite reads location.hash back.
+  win.history.replaceState = () => {};
   const nextFrame = () => new Promise((resolve) => win.requestAnimationFrame(() => resolve()));
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   // options.js's DOMContentLoaded handler is async (storage round trips);
@@ -113,6 +131,17 @@ function pbpTestChromeStub(enMessages) {
 
   const provider = () => doc.getElementById("opt-ai-provider");
   const lang = () => doc.getElementById("translate-target-lang");
+  // showConfirmPopover's dismiss() (shared.js) defers actual DOM removal to a
+  // CSS transitionend/timeout when `motion-ready` is on <html> -- clearing
+  // `_activeConfirmPopover` synchronously but leaving the OLD popover element
+  // in the document for ~150ms. Two reset-flow tests run back to back (no
+  // real user pause between them) can therefore both have a `.confirm-
+  // popover` present at once; a bare `document.querySelector` would grab the
+  // stale FIRST one in document order (still-closing, already dismissed --
+  // its own re-click re-runs the PREVIOUS test's onConfirm, not this one's).
+  // Always take the last one, i.e. the one this test's own reset-panel-btn
+  // click just opened.
+  const confirmYes = () => { const p = doc.querySelectorAll(".confirm-popover .confirm-yes"); return p[p.length - 1] || null; };
   const btnOf = (select) => doc.getElementById(select.id + "-btn");
   const listOf = (select) => doc.getElementById(select.id + "-list");
   const popOf = (select) => listOf(select)?.parentElement;
@@ -419,17 +448,154 @@ function pbpTestChromeStub(enMessages) {
     itemsOf(sel).find((li) => li.dataset.value === "auto").click();
   });
 
-  test("opt-theme: programmatic value + pbpListboxSync updates the button text", () => {
+  // Replaces the old "opt-theme: programmatic value + pbpListboxSync updates
+  // the button text" case (redundant with "programmatic value +
+  // pbpListboxSync updates the button text" above, which already proves the
+  // exact same mechanic on provider()) -- stage-3b Task 5. This drives the
+  // REAL "Reset This Tab" flow instead of calling pbpListboxSync directly, so
+  // it actually exercises applyPreset()'s own end-of-function sync call
+  // (options.js ~3667) rather than the generic mechanic a different test
+  // already covers.
+  test("appearance reset re-syncs #opt-theme's listbox button", async () => {
+    doc.getElementById("tab-appearance").click();
     const sel = doc.getElementById("opt-theme");
-    const before = sel.value;
-    const other = before === "dark" ? "light" : "dark";
-    sel.value = other;
-    win.pbpListboxSync(sel);
-    const expectedText = [...sel.options].find((o) => o.value === other).textContent.trim();
-    assert(btnOf(sel).querySelector(".listbox-value").textContent === expectedText,
-      "button text=" + btnOf(sel).querySelector(".listbox-value").textContent + ", want " + expectedText);
-    sel.value = before;
-    win.pbpListboxSync(sel);
+    // Synced to "dark" FIRST (not a bare .value= write): the button must
+    // provably show "Dark" before the reset, or a reset that never re-syncs
+    // anything would coincidentally still show the right text afterward --
+    // "auto" is #opt-theme's OWN unsynced initial state, so a bare .value=
+    // "dark" here would leave the button showing "Auto" pre-reset, which
+    // happens to already equal the post-reset text.
+    setValue(sel, "dark");
+    doc.getElementById("reset-panel-btn").click();
+    confirmYes()?.click();
+    for (let i = 0; i < 20 && sel.value !== "auto"; i++) await sleep(25);
+    assert(sel.value === "auto", "reset did not restore opt-theme's default, value=" + sel.value);
+    const opt = [...sel.options].find((o) => o.value === sel.value);
+    const got = btnOf(sel).querySelector(".listbox-value").textContent;
+    assert(got === opt.textContent.trim(), "button text=" + got + ", want " + opt.textContent.trim());
+  });
+
+  // Stage-3b Task 5 (2026-09-24-ui-system-stage3b): the three ai-behavior
+  // listbox selects reset to their PANEL_DEFAULTS value (options.js ~1671)
+  // through the same applyPanelReset() direct-.value-assignment path
+  // #opt-theme uses -- no 'change' event, so nothing re-synced their button
+  // text until this task's generic post-reset sync (options.js, the
+  // reset-panel-btn click handler). Removing that generic sync call fails
+  // all three assertions below.
+  test("ai-behavior reset re-syncs its three listbox buttons", async () => {
+    doc.getElementById("tab-ai-behavior").click();
+    const tagLang = doc.getElementById("opt-ai-tag-lang");
+    const sumLang = doc.getElementById("opt-ai-summary-lang");
+    const sep = doc.getElementById("opt-ai-tag-separator");
+    // Synced to non-default values FIRST (setValue, not a bare .value=): the
+    // buttons must provably show the wrong text before the reset, otherwise
+    // a reset that never re-syncs anything could coincidentally still read
+    // correctly afterward (each field's own initial/unsynced state already
+    // equals its own reset default).
+    setValue(tagLang, "ja"); setValue(sumLang, "ja"); setValue(sep, "_");
+    doc.getElementById("reset-panel-btn").click();
+    confirmYes()?.click();
+    for (let i = 0; i < 20 && tagLang.value !== "en"; i++) await sleep(25);
+    assert(tagLang.value === "en" && sumLang.value === "auto" && sep.value === "-",
+      "reset did not restore ai-behavior defaults: " + tagLang.value + "/" + sumLang.value + "/" + sep.value);
+    [tagLang, sumLang, sep].forEach((sel) => {
+      const opt = [...sel.options].find((o) => o.value === sel.value);
+      const got = btnOf(sel).querySelector(".listbox-value").textContent;
+      assert(got === opt.textContent.trim(), sel.id + " button text=" + got + ", want " + opt.textContent.trim());
+    });
+  });
+
+  // Stage-3b Task 5: same reset-sync gap, markdown panel's image-policy
+  // select. renderExportTargets() also re-runs on this panel's reset (to
+  // carry the Send-to cards' credentials over pbpExportTargetsResetSeed), so
+  // this doubles as proof that a rebuilt-and-re-enhanced select AND a
+  // plain-.value-reset select both end up correctly synced by the same
+  // generic call.
+  test("markdown reset re-syncs #opt-md-image-policy's listbox button", async () => {
+    doc.getElementById("tab-markdown").click();
+    const sel = doc.getElementById("opt-md-image-policy");
+    // Synced to "strip" FIRST (setValue, not a bare .value= write) so the
+    // button provably shows the wrong text before the reset -- see the
+    // appearance/ai-behavior tests above for why a bare .value= write alone
+    // would not discriminate a working sync from a no-op one here.
+    setValue(sel, "strip");
+    doc.getElementById("reset-panel-btn").click();
+    confirmYes()?.click();
+    for (let i = 0; i < 20 && sel.value !== "keep"; i++) await sleep(25);
+    assert(sel.value === "keep", "reset did not restore opt-md-image-policy's default, value=" + sel.value);
+    const opt = [...sel.options].find((o) => o.value === sel.value);
+    const got = btnOf(sel).querySelector(".listbox-value").textContent;
+    assert(got === opt.textContent.trim(), "button text=" + got + ", want " + opt.textContent.trim());
+  });
+
+  // Stage-3b Task 5, S1 pin: options-listbox.js's own DOMContentLoaded
+  // handler enhances every data-listbox select then, one rAF later, re-syncs
+  // all of them once -- specifically to "absorb" options.js's OWN async
+  // settings-load writes (chrome.storage round trip). That single rAF is a
+  // race, not a guarantee: this boots a SECOND, independent fixture whose
+  // storage reads resolve on a real macrotask well after any one rAF tick,
+  // and proves every listbox button is still correctly synced once the page
+  // settles -- pinned by this task's dedicated post-load sync call (options.js,
+  // right after the settings fieldMap loop's last select write), not by the
+  // timing of options-listbox.js's own boot-time pass.
+  test("cold load with a late (macrotask) storage resolution leaves every listbox synced (S1)", async () => {
+    const frame2 = document.createElement("iframe");
+    frame2.id = "fixture2";
+    frame2.title = "Options listbox late-storage fixture";
+    frame2.style.cssText = "position:absolute;left:-10000px;top:0;width:1200px;height:900px;border:0";
+    document.body.appendChild(frame2);
+    try {
+      // Seeded away from every field's own static HTML default (opt-lang's
+      // first option is "auto", opt-theme's is "auto", opt-md-image-policy's
+      // is "keep", the two AI-behavior language selects default to "en"/
+      // "auto", the separator to "-") -- otherwise the settings load would
+      // leave every select's .value UNCHANGED from what it already was at
+      // boot, and the race this test targets (a stale button after the
+      // VALUE actually changes) would never have anything to catch.
+      const localSeed = {
+        optLang: "zh_CN", optTheme: "dark", mdExportImagePolicy: "strip",
+        aiTagLang: "fr", aiSummaryLang: "de", aiTagSeparator: "_",
+      };
+      // 40ms, not 0: real (empirically traced) boot makes ~8-10 SEQUENTIAL
+      // chrome.storage.local.get() round trips before the one big call that
+      // actually drives the settings fieldMap loop (an early optSyncEnabled
+      // probe, an early optLang locale probe that alone can trigger its own
+      // applyI18n() re-sync, an early theme probe, a couple of provider/
+      // credential probes, ...) -- each one awaited in turn, so the delay is
+      // cumulative. 40ms per hop is comfortably >> one requestAnimationFrame
+      // tick (~16ms, all options-listbox.js's own boot sync gets), so even
+      // the FIRST hop alone already loses that race; the full chain lands
+      // the real settings load at roughly the 800ms mark below.
+      const stub2 = "<script>window.chrome = (" + pbpTestChromeStub.toString() + ")(" +
+        JSON.stringify(enMessages).replace(/<\//g, "<\\/") + ", 40, " +
+        JSON.stringify(localSeed) + ");<\/script>";
+      const booted2 = source.replace("<head>", "<head><base href=\"../\">" + stub2);
+      const loaded2 = new Promise((resolve) => frame2.addEventListener("load", resolve, { once: true }));
+      frame2.srcdoc = booted2;
+      await loaded2;
+      const doc2 = frame2.contentDocument;
+      // Comfortably past the traced ~800ms settle point above.
+      await sleep(1500);
+      // Guard against a silently vacuous pass: if the seeded settings never
+      // actually landed (e.g. a future boot-order change adds yet another
+      // sequential storage round trip past this wait), every select would
+      // still sit on its own static HTML default and every button would
+      // trivially "match" it without this task's fix doing any work.
+      assert(doc2.getElementById("opt-lang").value === "zh_CN",
+        "seeded settings never landed -- opt-lang=" + doc2.getElementById("opt-lang").value + " (test cannot discriminate)");
+      const mismatches = [];
+      doc2.querySelectorAll("select[data-listbox]").forEach((sel) => {
+        const btn = doc2.getElementById(sel.id + "-btn");
+        if (!btn) { mismatches.push(sel.id + " (no enhanced button)"); return; }
+        const opt = sel.selectedOptions[0] || [...sel.options].find((o) => o.value === sel.value);
+        const want = opt ? opt.textContent.trim() : "";
+        const got = btn.querySelector(".listbox-value")?.textContent || "";
+        if (got !== want) mismatches.push(sel.id + ': got "' + got + '", want "' + want + '"');
+      });
+      assert(mismatches.length === 0, "stale listbox button(s) after a late storage resolve: " + mismatches.join("; "));
+    } finally {
+      frame2.remove();
+    }
   });
 
   test("applyI18n(zh_CN) then sync re-reads option text", async () => {

@@ -2131,6 +2131,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Must run BEFORE saveAll() so collectExportTargets() sees the reset
         // cards, not stale ones.
         if (panel === "markdown") renderExportTargets(pbpExportTargetsResetSeed(collectExportTargets()));
+        // S1 fix (stage-3b Task 5): applyPanelReset assigns .value directly
+        // (no 'change' event) to whichever selects a panel's defaults
+        // include -- opt-lang (general), the three ai-behavior selects,
+        // opt-md-image-policy (markdown, already rebuilt fresh by the
+        // renderExportTargets() call above, so this is a harmless repeat
+        // sync for it). Generic and unconditional, same discipline as the
+        // syncTranslateLangCustomState()/updateProviderFields() calls right
+        // below: cheap and idempotent on the panels that carry none.
+        document.querySelectorAll("select[data-listbox]").forEach((sel) => window.pbpListboxSync?.(sel));
         saveAllSafely();
         if (typeof def.after === "function") def.after();
         // applyPanelReset assigns .value directly, which fires no 'change', so
@@ -2434,6 +2443,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Markdown export image policy select
   const mdImgSel = $id("opt-md-image-policy");
   if (mdImgSel) mdImgSel.value = s.mdExportImagePolicy || "keep";
+  // S1 fix (stage-3b Task 5): every direct `.value =` write above (opt-lang,
+  // opt-theme, the three ai-behavior selects, this one) fires no 'change'
+  // event, so a listbox button enhanced before this async settings load
+  // resolves would otherwise keep showing whatever it displayed at
+  // options-listbox.js's own one-shot DOMContentLoaded rAF sync (which race-
+  // condition-loses whenever chrome.storage.local.get resolves on a later
+  // macrotask than that rAF). One generic re-sync right after the load
+  // path's last select write closes the race for every current and future
+  // data-listbox select, the same way applyPreset()'s own #opt-theme-only
+  // sync already closes it for the appearance-reset path below.
+  document.querySelectorAll("select[data-listbox]").forEach((sel) => window.pbpListboxSync?.(sel));
   // Video preview (research T6.1 / T3.5)
   const vidLang = $id("opt-md-video-lang");
   // Shown canonical (Codex review F19): a legacy raw value such as " EN-us,
