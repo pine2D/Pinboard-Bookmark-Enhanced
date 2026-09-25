@@ -1885,6 +1885,69 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: "#opt-bgsave-merge ~ .pick-mark", state: "checked",
     seedChecked: { input: "#opt-bgsave-merge", checked: true },
     expect: { bgEqVar: "accent" } },
+
+  // ---- Stage-3b Task 5 (2026-09-24-ui-system-stage3b): gate-closing rows
+  // for storage/vocab/markdown/general, plus the two remaining new listbox
+  // buttons (`#opt-theme-btn` above is already pinned by Task 4). Before this
+  // task NOTHING in this file asserted heightPx on a plain `.fg.entry-block
+  // input[type=text|password]` -- every existing 32/28 heightPx row is
+  // either a `.listbox-btn` or an `input[type=number]`, both of which have
+  // their OWN dedicated options.css rule; the shared `[data-ui-stage0] .fg
+  // :is(input[type="text"], input[type="password"], input[type="number"])
+  // { height: var(--opt-control-h) }` rule (options.css) had zero live
+  // coverage for its text/password branch until now.
+
+  // #opt-md-image-policy-btn: the markdown panel's own listbox button
+  // (options-listbox.js hides the native <select>, same swap #opt-lang/
+  // #opt-theme already got) -- same shape as #opt-ai-provider-btn/
+  // #translate-target-lang-btn above.
+  { surface: "options", page: "options.html", selector: "#opt-md-image-policy-btn", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { min: 240 },
+      widthLteWith: { selector: ".fg:has(#opt-md-image-policy-btn)" }, hitRectMin: { height: 24 } } },
+  // #obsidian-vault: markdown's entry-block field representative (a Send-to
+  // card text field, `div.fg.entry-block.et-field`, inside the closed
+  // "Obsidian" disclosure -- scripts/ui-render-audit.mjs's switchChecks group
+  // reaches it the same way it already reaches #dict-anki-key's disclosure).
+  { surface: "options", page: "options.html", selector: "#obsidian-vault", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  // #obsidian-route-btn: the one select-type Send-to field (export-
+  // targets.js's `route` setting), enhanced into a listbox by
+  // options.js's renderExportTargets() once its card is connected -- proves
+  // a JS-BUILT (not static-HTML) select gets the same listbox-button
+  // geometry as every static one above.
+  { surface: "options", page: "options.html", selector: "#obsidian-route-btn", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { min: 240 },
+      widthLteWith: { selector: ".fg:has(#obsidian-route-btn)" }, hitRectMin: { height: 24 } } },
+  // #dict-anki-deck: vocab's entry-block field representative (Vocabulary
+  // tab, "Export and integrations" disclosure -- same closed-disclosure
+  // shape as #dict-anki-key's already-covered `.key-wrap` one panel field
+  // over).
+  { surface: "options", page: "options.html", selector: "#dict-anki-deck", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  // #opt-pinboard-token: general's entry-block field representative -- an
+  // input[type=password] (the OTHER branch of the shared :is() rule
+  // #obsidian-vault/#dict-anki-deck prove the input[type=text] branch of).
+  // Reached via otherChecks: General is the default active tab, and
+  // keyWrapChecks (immediately above in the runner, `.key-wrap` bare
+  // selector -- this same field's OWN wrapper) already clicks `#tab-general`
+  // right before otherChecks runs, same convention `#opt-lang-btn` relies on.
+  { surface: "options", page: "options.html", selector: "#opt-pinboard-token", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  // Storage's `.pick.pick-box` category rows (renderStoragePanel(), Task 2 of
+  // this same 3b batch): first `.pref-row > label.pick.pick-box` in DOM order
+  // inside `#storage-cats`, same first-match discipline the bookmarks `.pick`
+  // row above already relies on. Row geometry comes from the SAME generic
+  // `[data-ui-stage0] .pref-row > label { min-height: var(--opt-row-min-h) }`
+  // rule `#panel-bookmarks .pref-row > label.pick` proves -- this is coverage
+  // for a SECOND pick-box family (storage's cache categories) on a THIRD
+  // panel, not a new CSS rule. Storage/vocab/markdown have no other
+  // `.pick.pick-box` family (spec 2026-09-24-ui-system-stage3b-design §3);
+  // general's own one (the backup-import preview's `#backup-section-*`
+  // checkboxes) sits behind an actual JSON-import preview render with no
+  // reachable trigger in this harness's page setup, so it is not pinned here
+  // -- flagged for the controller rather than forced (task-5-report.md).
+  { surface: "options", page: "options.html", selector: "#storage-cats .pref-row > label.pick.pick-box", state: "default",
+    expect: { minHeightPx: { comfortable: 44, compact: 36 }, hitRectMin: { height: 24 } } },
 ];
 
 // Hand-copied literal `data-theme` values, verified at authoring time with:

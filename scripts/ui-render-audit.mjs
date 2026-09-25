@@ -3181,7 +3181,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // (measured: 30 FAILs, all `actual=null` -- confirmed BEFORE this line
     // existed, by running the checklist's two new pick-mark entries without
     // it).
-    const switchChecks = checks.filter((c) => c.selector.includes(".switch-track") || c.selector.includes(".pick-mark")
+    const switchChecks = checks.filter((c) => (c.selector.includes(".switch-track") || c.selector.includes(".pick-mark")
       || c.expect?.hitRectMin
       || c.selector.includes("[data-ui-stage0]") || c.selector === "#opt-popup-width-custom"
       || c.selector === "#test-gemini" || c.selector === "#opt-ai-provider-btn"
@@ -3203,10 +3203,45 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // pinned the checklist row's own selector from `#opt-theme` to
       // `#opt-theme-btn` (options-listbox.js hides the native select once
       // Appearance gains [data-ui-stage0]) -- updated here too, same string.
-      || c.selector === "#opt-theme-btn" || c.selector.includes(".key-wrap:has("));
+      || c.selector === "#opt-theme-btn" || c.selector.includes(".key-wrap:has(")
+      // Stage-3b Task 5 gate-closing rows: #opt-md-image-policy-btn (Markdown
+      // tab, no disclosure) and #obsidian-route-btn/#obsidian-vault (same tab,
+      // inside the closed "Obsidian" Send-to disclosure -- this loop's own
+      // details-opener a few lines down reaches it the same way it already
+      // reaches #dict-anki-key's disclosure) are all STATIC or built-at-load
+      // elements (renderExportTargets() runs once, unconditionally, during
+      // the initial settings load -- not lazily on tab activation), so they
+      // exist in the DOM regardless of which tab is active and can use this
+      // group's generic `.closest(".panel")` tab resolution exactly like
+      // #opt-theme-btn/.key-wrap:has(...) above. #dict-anki-deck is the same
+      // shape as #dict-anki-key one line up: a static entry-block field
+      // inside the Vocabulary tab's closed "Export and integrations"
+      // disclosure.
+      || c.selector === "#opt-md-image-policy-btn" || c.selector === "#obsidian-route-btn"
+      || c.selector === "#obsidian-vault" || c.selector === "#dict-anki-deck")
+      // The paren just above scopes the whole OR-chain so this final `&&`
+      // excludes storagePickChecks' own rows from ALL of it, not just the
+      // last OR term -- `#storage-cats .pref-row > label.pick.pick-box`
+      // carries `hitRectMin` in its own `expect`, which would otherwise also
+      // match the blanket `c.expect?.hitRectMin` OR near the top and land it
+      // in BOTH groups (fix round 1: reproduced as "SETUP ERROR: .switch row
+      // has no owning .panel" -- this group's fresh page.goto() + `.closest(
+      // ".panel")` resolution ran on a page where #tab-storage had not been
+      // clicked yet, so `#storage-cats` was still its initial empty div).
+      // storagePickChecks (defined below) is the one group that reaches it.
+      && !c.selector.startsWith("#storage-cats"));
+    // storagePickChecks (Stage-3b Task 5): the Storage tab's `.pick.pick-box`
+    // category rows are JS-built INTO an initially-empty `#storage-cats` div
+    // by renderStoragePanel(), which only runs once `#tab-storage` is
+    // clicked (options.js's activateTab()) -- unlike the switchChecks rows
+    // above, there is no element for `.closest(".panel")` to resolve until
+    // after that click, so this needs its own group (same shape as
+    // tagGovChecks/keyWrapChecks above), not a switchChecks filter entry.
+    const storagePickChecks = checks.filter((c) => c.selector.startsWith("#storage-cats"));
     const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
-      && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c));
+      && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c)
+      && !storagePickChecks.includes(c));
     if (tagGovChecks.length) {
       // .tag-gov-chip-face lives on the "tags" tab (#panel-tags), not
       // #panel-general (the default active one on a bare goto()) -- its
@@ -3253,6 +3288,25 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       for (const check of keyWrapChecks) await runOneCheck(page, theme, check, results);
     }
     for (const check of otherChecks) await runOneCheck(page, theme, check, results);
+    // storagePickChecks runs AFTER otherChecks, not between keyWrapChecks and
+    // it (Stage-3b Task 5 fix round 1): otherChecks assumes whatever tab the
+    // PRECEDING group left active (keyWrapChecks' own #tab-general click,
+    // per the convention #opt-lang-btn/.key-wrap/#opt-pinboard-token above
+    // all rely on) -- clicking #tab-storage in between broke that for every
+    // remaining otherChecks row (reproduced: a generic `.context-help >
+    // summary.context-help-toggle` hover row resolved its selector's FIRST
+    // DOM match on the now-inactive General tab and hung the full 30s hover
+    // timeout). This group belongs with aiProviderChecks/aiBehaviorChecks/
+    // switchChecks below instead, which is exactly why THEY already run
+    // after otherChecks too.
+    if (storagePickChecks.length) {
+      await page.click("#tab-storage");
+      // renderStoragePanel() is async (awaits pbpMeasureLocalStorage()) --
+      // wait for the FIRST real `.pref-row` it appends, not just the (already
+      // present, always-empty-until-then) `#storage-cats` host div.
+      await page.waitForSelector("#storage-cats .pref-row", { state: "visible", timeout: TIMEOUT_MS });
+      for (const check of storagePickChecks) await runOneCheck(page, theme, check, results);
+    }
 
     // T6 field-width groups (taste-uplift-batch3, D2). Run AFTER otherChecks
     // (not interleaved with the tagGov/presetPreview/keyWrap dance above,

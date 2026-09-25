@@ -1819,6 +1819,27 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
    scripts/options-help-render-audit.mjs` before nudging further. */
 [data-ui-stage0] .context-help-host[data-help-role="group"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
+/* Stage-3b Task 5 investigated the page's one "action" role host
+   (Appearance's Custom CSS Overlay "Save as theme" inline help,
+   `.context-help-action-row`, NOT `.context-help-host` -- a distinct wrapper
+   shape from section/field/group above) but added NO stage-0 rule for it: it
+   sits inside a stage-0 panel for the first time (Task 4 gave
+   #panel-appearance the marker) and now fails the raster gate under BOTH
+   font configs, but in two DIFFERENT, MUTUALLY EXCLUSIVE ways that a single
+   per-script correction cannot reconcile (measured with
+   PBP_HELP_RASTER_RANGES=1, @2, the already-committed base state with no
+   correction of any kind):
+     local fonts: en/alphabetic FAILS at -2.5px; zh-CN/cjk passes at -2px
+       (borderline, right at the +-2 tolerance edge).
+     FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" fonts: en/alphabetic PASSES
+       at 1.5px; zh-CN/cjk FAILS at 2.5px.
+   Any [data-help-script="alphabetic"]-scoped shift that fixes local's -2.5
+   (needs roughly +1.5px) pushes CI's already-passing +1.5 to +4.5 and
+   re-fails it the other way; the cjk side shows the same local/CI reversal a
+   script over. This is exactly the "single value cannot cover every host"
+   case ui-system-stage3b-design.md §4 calls out -- left for 3c's shared
+   optical-y recalibration (which reruns under both font configs by design),
+   not forced here. Re-run both commands above before touching this block. */
 /* Stage-3a (Task 1, 2026-09-24-ui-system-stage3a): choice help hosts inside
    preference rows. The legacy `.context-help-host[data-help-role="choice"] >
    label.switch > .switch-text { line-height: 16px }` (~line 564) pins the
@@ -1982,8 +2003,11 @@ html[data-theme] [data-ui-stage0] .pf > h3 {
 [data-ui-stage0] .et-field.entry-block :is(input[type="text"], input[type="password"]) { max-width: none; }
 /* Enable row -> first field: `.settings-section > .pref-group`'s sp-6 does
    not reach inside .export-target-card, leaving only .et-field's sp-4 (8px
-   against the 16px between consecutive fields). */
-[data-ui-stage0] .export-target-card > .pref-group { margin-bottom: var(--opt-sp-6); }
+   against the 16px between consecutive fields). `:not(:last-child)` (stage-3b
+   Task 5 housekeeping) matches every OTHER stage-0 pref-group spacer in this
+   file -- a card whose enable switch is the only `.pref-group` (no fields
+   below it) must not carry a trailing margin nothing follows. */
+[data-ui-stage0] .export-target-card > .pref-group:not(:last-child) { margin-bottom: var(--opt-sp-6); }
 [data-ui-stage0] .save-status { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 
 /* ---- Provider fields ---- */
