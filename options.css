@@ -1819,27 +1819,27 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
    scripts/options-help-render-audit.mjs` before nudging further. */
 [data-ui-stage0] .context-help-host[data-help-role="group"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
-/* Stage-3b Task 5 investigated the page's one "action" role host
-   (Appearance's Custom CSS Overlay "Save as theme" inline help,
-   `.context-help-action-row`, NOT `.context-help-host` -- a distinct wrapper
-   shape from section/field/group above) but added NO stage-0 rule for it: it
-   sits inside a stage-0 panel for the first time (Task 4 gave
-   #panel-appearance the marker) and now fails the raster gate under BOTH
-   font configs, but in two DIFFERENT, MUTUALLY EXCLUSIVE ways that a single
-   per-script correction cannot reconcile (measured with
-   PBP_HELP_RASTER_RANGES=1, @2, the already-committed base state with no
-   correction of any kind):
-     local fonts: en/alphabetic FAILS at -2.5px; zh-CN/cjk passes at -2px
-       (borderline, right at the +-2 tolerance edge).
-     FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" fonts: en/alphabetic PASSES
-       at 1.5px; zh-CN/cjk FAILS at 2.5px.
-   Any [data-help-script="alphabetic"]-scoped shift that fixes local's -2.5
-   (needs roughly +1.5px) pushes CI's already-passing +1.5 to +4.5 and
-   re-fails it the other way; the cjk side shows the same local/CI reversal a
-   script over. This is exactly the "single value cannot cover every host"
-   case ui-system-stage3b-design.md §4 calls out -- left for 3c's shared
-   optical-y recalibration (which reruns under both font configs by design),
-   not forced here. Re-run both commands above before touching this block. */
+/* Stage-0 "action" role host: Appearance's Custom CSS Overlay "Save as
+   theme" inline help (`.context-help-action-row`, NOT `.context-help-host`
+   -- a distinct wrapper: a button wrapper and the help toggle side by side
+   in one flex row). Task 4 put #panel-appearance under the marker, which
+   grew the button text 11 -> 13px (line-height 26); at that size the glyphs
+   sit ~2 CSS px lower under the local fonts than under the CI fonts, so no
+   single vertical offset on the icon alone can centre it for both font
+   configs (Task 5 measured local en -2.5 / zh -2, CI en +1.5 / zh +2.5 with
+   no correction). Fix (Task 5 review, verified under both configs in a
+   worktree): let the button wrapper and the toggle share a BASELINE
+   instead of centring in the row, then nudge the icon +3px. Worst action
+   delta becomes +-1 physical px (tolerance +-2) under both font configs and
+   both densities; every other role is unchanged, the row height is
+   unchanged and the 24px toggle rises at most 2.5px into the 6px gap above
+   it. The shared --context-help-optical-y constants stay untouched.
+   Re-measure with `node scripts/options-help-render-audit.mjs` AND
+   `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
+   scripts/options-help-render-audit.mjs` before nudging further. */
+[data-ui-stage0] .context-help-action-row[data-help-role="action"] > .save-theme-wrap,
+[data-ui-stage0] .context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle { align-self: baseline; }
+[data-ui-stage0] .context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) + 3px)); }
 /* Stage-3a (Task 1, 2026-09-24-ui-system-stage3a): choice help hosts inside
    preference rows. The legacy `.context-help-host[data-help-role="choice"] >
    label.switch > .switch-text { line-height: 16px }` (~line 564) pins the

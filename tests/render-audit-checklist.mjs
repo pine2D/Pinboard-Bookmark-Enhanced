@@ -1546,7 +1546,7 @@ export const CHECKS = [
   // `otherChecks`'s existing "#tab-general is the default active panel"
   // convention, same as the row it replaces, no new tab-click group needed.
   { surface: "options", page: "options.html", selector: "#opt-lang-btn", state: "default",
-    expect: { widthPx: { min: 240 }, widthLteWith: { selector: ".fg:has(#opt-lang-btn)" } } },
+    expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { min: 240 }, widthLteWith: { selector: ".fg:has(#opt-lang-btn)" } } },
   // .key-wrap <= its own column (password/API-key fields, fused with the eye
   // toggle -- COMPONENTS.md §8 -- the cap sits on the WRAPPER so the toggle
   // stays fused to the input's own right edge, not the field's full-width
@@ -1582,7 +1582,7 @@ export const CHECKS = [
   // rule only lifts max-width, not the select-exception's own floor);
   // widthLteWith now compares against the button's own `.fg` column.
   { surface: "options", page: "options.html", selector: "#opt-theme-btn", state: "default",
-    expect: { widthPx: { min: 240 }, widthLteWith: { selector: ".fg:has(#opt-theme-btn)" } } },
+    expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { min: 240 }, widthLteWith: { selector: ".fg:has(#opt-theme-btn)" } } },
   // #dict-anki-key's key-wrap: same re-pin as #opt-pinboard-token's and
   // #fields-openai's key-wrap above -- a fixed max gives way to "never
   // wider than its own column" now that the wrap fills it.

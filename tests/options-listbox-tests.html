@@ -574,8 +574,12 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       frame2.srcdoc = booted2;
       await loaded2;
       const doc2 = frame2.contentDocument;
-      // Comfortably past the traced ~800ms settle point above.
-      await sleep(1500);
+      // Poll for the seeded settings to land (the traced settle point is
+      // ~800ms; the cap below is 5s) instead of a fixed wait that either
+      // wastes time or races a slower machine, then give the load path one
+      // more tick to run its post-load listbox sync.
+      for (let i = 0; i < 100 && doc2.getElementById("opt-lang").value !== "zh_CN"; i++) await sleep(50);
+      await sleep(50);
       // Guard against a silently vacuous pass: if the seeded settings never
       // actually landed (e.g. a future boot-order change adds yet another
       // sequential storage round trip past this wait), every select would
