@@ -1049,6 +1049,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     const win = frame.contentWindow;
     const q = (v) => Math.round(parseFloat(v) * 4) / 4;
     const activeBefore = doc.querySelector(".panel.active")?.id;
+    const densityBefore = doc.documentElement.dataset.density;
     const opened = [];
     // Open the disclosures (vocab's five, the Send-to cards) so their rows have
     // layout -- but NOT the context-help answers: an open answer sits between
@@ -1082,6 +1083,10 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
             const want = isR9(label) ? rowMin - padY : rowMin;
             const got = q(win.getComputedStyle(label).minHeight);
             if (got !== want) problems.push(density + " " + panel.id + " " + (label.querySelector("input")?.id || label.textContent.trim().slice(0, 24)) + ": min-height " + got + " != " + want + (isR9(label) ? " (R9 row)" : ""));
+            // R9 is two declarations; a padding-top regression alone would leave
+            // min-height right and only show up as a gap on panels that have no
+            // entry-block reference below -- pin it directly.
+            if (isR9(label) && q(win.getComputedStyle(label).paddingTop) !== 0) problems.push(density + " " + panel.id + " " + (label.querySelector("input")?.id || "?") + ": R9 row padding-top " + win.getComputedStyle(label).paddingTop + " != 0px");
             const mark = label.querySelector(".pick-mark");
             if (mark) {
               marks++;
@@ -1116,7 +1121,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
         }
       }
     } finally {
-      delete doc.documentElement.dataset.density;
+      if (densityBefore === undefined) delete doc.documentElement.dataset.density; else doc.documentElement.dataset.density = densityBefore;
       opened.forEach((d) => { d.open = false; });
       if (activeBefore) showPanel(activeBefore);
     }
