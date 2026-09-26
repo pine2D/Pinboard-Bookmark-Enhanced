@@ -512,6 +512,8 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
   }
 }
 .notes-count { color: var(--lib-fg-muted); font-size: 12px; white-space: nowrap; }
+/* Keep live counts steady when filtering, selecting, or updating words. */
+.notes-count, .vocab-stats, .vocab-stat-chip { font-variant-numeric: tabular-nums; }
 .vocab-list-pane.vocab-signed-out > :not(.vocab-account-empty) { display: none !important; }
 .vocab-account-empty { margin: var(--lib-sp-3); padding: var(--lib-sp-4); text-align: left; }
 .vocab-account-empty h2 { margin: 0 0 var(--lib-sp-2); color: var(--lib-fg); font-size: 15px; }
@@ -2079,6 +2081,7 @@ html[data-theme="rose-pine"] .vocab-filter-row select {
 .vocab-ctx-text > .notes-count {
   min-width: 0;
   white-space: normal;
+  overflow-wrap: anywhere;
   font-weight: 500;
   color: var(--lib-fg);
 }
@@ -2526,7 +2529,8 @@ html.motion-ready .notes-batch-bar.selecting {
 .lib-header, .lib-main { visibility: hidden; }
 html[data-options-ready] .lib-header, html[data-options-ready] .lib-main { visibility: visible; }
 .lib-header {
-  display: flex; align-items: center; gap: var(--lib-sp-4);
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--lib-sp-1) var(--lib-sp-4);
   padding-block: var(--lib-sp-3);
   /* Canvas gutter, identical to .lib-main's so the header's title/tabs line
      up with the workbench beneath. The BACKGROUND and the bottom rule still
@@ -2539,8 +2543,10 @@ html[data-options-ready] .lib-header, html[data-options-ready] .lib-main { visib
   background: var(--lib-panel);
   position: sticky; top: 0; z-index: 10;
 }
-.lib-header h1 { font-size: 16px; margin: 0; }
-.lib-tabs { display: flex; gap: var(--lib-sp-3); }
+.lib-header h1 { font-size: 16px; margin: 0; min-width: 0; overflow-wrap: anywhere; text-wrap: balance; }
+/* Wrap the navigation as a unit instead of squeezing localized tab labels
+   into two lines inside the fixed 32px control rung. */
+.lib-tabs { display: flex; flex-wrap: wrap; gap: var(--lib-sp-1) var(--lib-sp-3); }
 /* Real tabs, not buttons wearing tab labels (USER CHECKPOINT 2026-08-05, grid
    review: "现状是带壳按钮，不像 tab"). No shell, no fill, no radius -- a tab is
    a label plus a selection edge. The selected edge is a 2px accent underline
@@ -2556,6 +2562,7 @@ html[data-options-ready] .lib-header, html[data-options-ready] .lib-main { visib
 .lib-tab {
   border: 0; border-bottom: 2px solid transparent; background: transparent;
   color: var(--lib-fg-muted); font-size: 13px; font-family: inherit; cursor: pointer;
+  white-space: nowrap;
   /* sp-2 block padding = the 32px tab height options' .tab-btn already has (one
      tab family across surfaces); no inline padding so the accent underline is
      exactly the label's width. Was 6px 2px, both off the 4-rung scale. */

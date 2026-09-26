@@ -117,6 +117,13 @@ popup / options / library 三个扩展表面是短命单次渲染、无暖 shape
 - 测量陷阱：暖态（chrome-dbg / 已打开页面）测不到冷首屏，只能在用户真实机器冷启动验证；卡顿计入 Rendering / Recalc+Layout 而 Paint 很小，第二次操作就快 = 一次性冷成本；idle 预热会阻塞主线程，不可取——根治慢字体回退本身。判断字体存在用 `document.fonts.check('16px "字体名"', '中')` 或 DevTools Rendered Fonts / `CSS.getPlatformFontsForNode`，别用测 ASCII 宽度的探针（对 CJK 字体误报）。
 - 热路径避免 `:has()` 等慢选择器；超长面板可考虑 `content-visibility:auto`。
 
+## 设计精修工作流
+
+- 项目级设计技能位于 `.agents/skills/`（按现有约定不入 Git、不进入扩展 ZIP）：[make-interfaces-feel-better](https://github.com/jakubkrehel/make-interfaces-feel-better/tree/35545ea1512ad59fa463e6b1f95ca9c052981fe6) 与 [Impeccable](https://github.com/pbakaus/impeccable/tree/9d715cc4f5564a990ca8345abfdd5df6dc9b41c8)。前者安装源为 `skills/make-interfaces-feel-better`，后者为 `.agents/skills/impeccable`；新 checkout 需单独安装。
+- 采用 Impeccable 的 Operate 模式审视 popup/options/library，Read 模式审视阅读器；先检查实际界面的任务路径、层级和边界状态，再按 polish 工作流修正，最后用 make-interfaces-feel-better 检查排版、状态、图标、动效与性能。已有主题与 `COMPONENTS.md` 是设计依据。
+- 优先复用 `scripts/qa-drive.mjs` 的隔离夹具和截图，对涉及的窄窗口、长文案、九种语言及明暗主题做真实渲染检查；改完执行对应编辑期 lint、主题工厂只读检查与渲染门。检测器结果须结合截图判断，不因通用建议改动已裁决的设计。
+- 本项目的快 CJK 字体栈、Lucide stroke 2、控件阶梯、主题 token 与冷启动要求优先于技能的通用字体、40/44px 命中区、按压缩放或装饰动效建议。高频操作保留即时反馈；不引入运行时依赖、远程字体或首屏入场动画。
+
 ## 测试与夹具
 
 - tests/ 全部 file:// 直开、不依赖构建；改逻辑同时跑对应测试页。
