@@ -56,7 +56,16 @@ function parseArgs(argv) {
 }
 
 const { before, after, rules, diffDir } = parseArgs(process.argv.slice(2));
-const pngsIn = (dir) => new Set(readdirSync(dir).filter((f) => /^p-.+-dpr1-zh\.png$/.test(f)));
+function pngsIn(dir, label) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch (e) {
+    console.error(`[panel-diff] cannot read ${label} directory ${dir}: ${e.message}`);
+    process.exit(2);
+  }
+  return new Set(entries.filter((f) => /^p-.+-dpr1-zh\.png$/.test(f)));
+}
 const panelOf = (f) => /^p-(.+)-(default|terminal)-dpr1-zh\.png$/.exec(f)?.[1] || null;
 const sidecar = (dir, f, ext) => {
   const p = join(dir, f.replace(/\.png$/, ext));
@@ -64,8 +73,14 @@ const sidecar = (dir, f, ext) => {
 };
 
 function compareStyles(f, a, b) {
-  if (!a || !b) return 0;
   const lines = [];
+  // A missing sidecar is itself advisory-worthy: it means this shot has no
+  // state/style evidence at all, which must be visible, not silently 0.
+  if (!a || !b) {
+    lines.push(`NO STYLES SIDECAR: ${!a ? "before" : "after"} side missing ${f.replace(/\.png$/, ".styles.json")}`);
+    lines.forEach((l) => console.log(`  [advisory] ${f}: ${l}`));
+    return lines.length;
+  }
   for (const k of new Set([...Object.keys(a.elements), ...Object.keys(b.elements)])) {
     const x = a.elements[k];
     const y = b.elements[k];
@@ -74,11 +89,22 @@ function compareStyles(f, a, b) {
       if (JSON.stringify(x[p]) !== JSON.stringify(y[p])) lines.push(`STYLE ${k} ${p}: ${JSON.stringify(x[p])} -> ${JSON.stringify(y[p])}`);
     }
   }
-  for (const [sel, st] of Object.entries(a.states || {})) {
+  // Iterate the UNION of both sides' probed selectors, and treat an absent
+  // key the same as an explicit {missing:true} -- otherwise a probe that
+  // exists only on one side (e.g. it went from missing to present, or vice
+  // versa) compares against `undefined` sub-objects and silently yields 0.
+  for (const sel of new Set([...Object.keys(a.states || {}), ...Object.keys(b.states || {})])) {
+    const stA = a.states?.[sel];
+    const stB = b.states?.[sel];
+    const missingA = !stA || stA.missing === true;
+    const missingB = !stB || stB.missing === true;
+    if (missingA !== missingB) { lines.push(`STATE ${sel} missing: ${missingA} -> ${missingB}`); continue; }
+    if (missingA && missingB) continue;
     for (const phase of ["rest", "hover", "focus"]) {
-      for (const p of Object.keys(st[phase] || {})) {
-        const v2 = b.states?.[sel]?.[phase]?.[p];
-        if (st[phase][p] !== v2) lines.push(`STATE ${sel} ${phase} ${p}: ${st[phase][p]} -> ${v2}`);
+      for (const p of new Set([...Object.keys(stA[phase] || {}), ...Object.keys(stB[phase] || {})])) {
+        const v1 = stA[phase]?.[p];
+        const v2 = stB[phase]?.[p];
+        if (v1 !== v2) lines.push(`STATE ${sel} ${phase} ${p}: ${v1} -> ${v2}`);
       }
     }
   }
@@ -87,8 +113,12 @@ function compareStyles(f, a, b) {
   return lines.length;
 }
 
-const A = pngsIn(before);
-const B = pngsIn(after);
+const A = pngsIn(before, "before");
+const B = pngsIn(after, "after");
+if (A.size === 0) {
+  console.error(`[panel-diff] no p-*-dpr1-zh.png in beforeDir ${before} -- nothing to compare`);
+  process.exit(2);
+}
 let failing = 0;
 let advisories = 0;
 for (const f of [...A].filter((x) => !B.has(x))) { console.log(`[panel-diff] FAIL missing in after: ${f}`); failing++; }

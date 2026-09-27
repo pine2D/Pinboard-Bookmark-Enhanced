@@ -129,7 +129,12 @@ async function setTheme(page, theme) {
 
 async function reveal(page, panel) {
   await page.evaluate((id) => {
-    document.querySelectorAll(`#panel-${id} details.disclosure`).forEach((d) => { d.open = true; });
+    // Open every non-help disclosure, not just `.disclosure` -- the Send-to
+    // builder's "how to set up" details (`.et-onboarding`) is a second kind
+    // of non-help disclosure (options.js ~1913) and its `.hint` body must be
+    // visible in the gate too. `.context-help` answers stay closed (an open
+    // answer would inflate the section gap); `[hidden]` sections are inert.
+    document.querySelectorAll(`#panel-${id} details:not(.context-help)`).forEach((d) => { d.open = true; });
   }, panel);
   if (panel === "storage") {
     await page.waitForFunction(() => (document.getElementById("storage-cats")?.children.length || 0) > 0, null, { timeout: TIMEOUT_MS });
@@ -141,7 +146,15 @@ async function reveal(page, panel) {
   await page.evaluate((sels) => {
     sels.forEach((s) => document.querySelectorAll(s).forEach((el) => { el.style.visibility = "hidden"; }));
   }, VOLATILE_SELECTORS);
-  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
+  // Skip infinite animations (e.g. `.tab-btn.tab-busy::after`'s pulse) --
+  // awaiting their `finished` promise never resolves -- and cap the wait so
+  // a stray after-state can't hang the shoot forever.
+  await page.evaluate(() => {
+    const fin = document.getAnimations()
+      .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+      .map((a) => a.finished.catch(() => {}));
+    return Promise.race([Promise.all(fin), new Promise((r) => setTimeout(r, 5000))]);
+  });
   await page.mouse.move(0, 0);
   await page.waitForTimeout(200);
 }
