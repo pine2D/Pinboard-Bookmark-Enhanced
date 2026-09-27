@@ -16,6 +16,37 @@
 //     rest/hover/focus probes on six controls) feed scripts/panel-pixel-diff.mjs.
 // Dev-only: scripts/ is outside release.sh's packaging.
 //
+// Stability hardening (fix round 1, controller ruling): the host's real
+// device scale factor (150% here) let Chromium rasterize hairline borders at
+// a fractional physical pixel (e.g. 0.667px), which the compositor can then
+// round differently between two otherwise-identical runs -- the root cause
+// of an intermittent single-row diff on one archive/terminal capture.
+// `--force-device-scale-factor=1` (below, launch args) pins the physical
+// pixel grid; in the reviewer's 36 extra runs this gave 0/56 mismatches
+// under 4-way concurrency, while forcing software rendering (swiftshader /
+// GPU raster off) made it WORSE (14/56, ±1 LSB corner noise) -- do not
+// reach for swiftshader here. Each panel is additionally shot TWICE per
+// (theme, panel) and compared byte-for-byte before either PNG is written
+// (see shootStable(): a third, discarded WARM-UP capture precedes the two
+// compared ones -- the very first screenshot after a DOM mutation reliably
+// rasterizes with different AA than a repeat of the same settled frame,
+// text-dense panels only, found while building this hardening); a same-run
+// mismatch after warm-up means the render is still non-deterministic on
+// this host and the script fails loudly (`UNSTABLE <panel> <theme>`, exit
+// 3) instead of silently writing a coin-flip capture -- the gate must
+// never depend on the caller happening to re-run it until it passes.
+//
+// A `--panels` subset is a diagnostic convenience, NOT a substitute
+// baseline/candidate pair: every panel is shot into the SAME live page
+// instance in sequence (one `ctx`/`page` for the whole run, see main()),
+// and some per-panel state is cumulative across that sequence (disclosure
+// open/closed persists per data-acc-key in localStorage, tag fixtures are
+// seeded once up front, etc.) -- shooting a subset, or the same subset in a
+// different order, can visit panels in a different relative sequence than a
+// full run and is not guaranteed pixel-identical to the corresponding shots
+// from a full `--panels`-less run. Only diff a full run against another
+// full run (this is what the baseline/candidate pair always is).
+//
 // Usage:
 //   node scripts/options-panel-shots.mjs <outDir> [--rects "<sel>,<sel>"] [--panels a,b] [--themes default,terminal]
 import { createRequire } from "node:module";
@@ -85,7 +116,7 @@ async function launch() {
       `--disable-extensions-except=${ROOT}`, `--load-extension=${ROOT}`, "--lang=zh-CN",
       "--no-first-run", "--no-default-browser-check", "--disable-default-apps",
       "--disable-background-networking", "--disable-component-update", "--disable-sync",
-      "--metrics-recording-only", "--no-pings",
+      "--metrics-recording-only", "--no-pings", "--force-device-scale-factor=1",
       "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1",
     ],
   });
@@ -230,11 +261,35 @@ async function probeStates(page, panel) {
   return states;
 }
 
+// Shoots the same panel twice in a row and returns the PNG buffer only if
+// the two captures are byte-for-byte identical -- a same-run mismatch means
+// the render is not yet settled/deterministic on this host (see the header
+// comment) and must fail the whole gate rather than silently pick a winner.
+// A throwaway WARM-UP capture comes first, discarded: the very first
+// screenshot Playwright takes right after a DOM mutation (theme switch +
+// reveal()) reliably rasterizes with different AA than a repeat capture of
+// the identical, now-settled frame -- confirmed on #panel-general/terminal
+// (dense CJK text, ~50,000/920,040 px differing, every run, until a warm-up
+// shot is taken first) even with `--force-device-scale-factor=1` and zero
+// running animations. Once warmed up, repeat captures were byte-identical
+// across dozens of runs with no extra delay needed. Sparser panels (e.g.
+// archive) never showed this without a warm-up either, so it costs nothing
+// there; it is what makes the two REAL comparison shots below trustworthy
+// on every panel, not just the sparse ones.
+async function shootStable(page, panelSel) {
+  const locator = page.locator(panelSel);
+  await locator.screenshot({ animations: "disabled" }); // warm-up, discarded
+  const a = await locator.screenshot({ animations: "disabled" });
+  const b = await locator.screenshot({ animations: "disabled" });
+  return Buffer.compare(a, b) === 0 ? a : null;
+}
+
 async function main() {
   const opt = parseArgs(process.argv.slice(2));
   mkdirSync(opt.dir, { recursive: true });
   const { ctx, profile } = await launch();
   let written = 0;
+  let unstable = 0;
   try {
     const worker = await getWorker(ctx);
     const extId = new URL(worker.url()).hostname;
@@ -252,7 +307,13 @@ async function main() {
         await reveal(page, panel);
         const stem = join(opt.dir, `p-${panel}-${theme}-dpr1-zh`);
         const panelSel = `#panel-${panel}`;
-        await page.locator(panelSel).screenshot({ path: `${stem}.png`, animations: "disabled" });
+        const png = await shootStable(page, panelSel);
+        if (!png) {
+          console.error(`UNSTABLE ${panel} ${theme}`);
+          unstable++;
+          continue; // keep scanning so one run reports every unstable panel
+        }
+        writeFileSync(`${stem}.png`, png);
         const rects = await page.evaluate(snapshotRects, { panelSel, sels: opt.rects });
         writeFileSync(`${stem}.rects.json`, JSON.stringify({ panel, theme, rects }, null, 1) + "\n");
         const elements = await page.evaluate(snapshotStyles, { panelSel, props: STYLE_PROPS });
@@ -267,6 +328,10 @@ async function main() {
     rmSync(profile, { recursive: true, force: true });
   }
   console.log(`[shots] done: ${written} panel shot(s) in ${opt.dir}`);
+  if (unstable > 0) {
+    console.error(`[shots] ${unstable} panel(s) failed the same-run stability check -- see UNSTABLE lines above`);
+    process.exit(3);
+  }
 }
 
 main().catch((e) => { console.error("[shots] fatal:", e.stack || e.message); process.exit(1); });
