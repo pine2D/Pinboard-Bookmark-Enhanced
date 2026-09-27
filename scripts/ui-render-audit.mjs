@@ -3922,13 +3922,11 @@ const SWEEP_CFG = {
   //     exactly where most chips live (.notes-row-meta, .tag-gov-group-row).
   //     `shells` (element itself, not subtree): page-level insets that are
   //     layout dimensions (rail width, content column, scrollbar gutter math).
-  //     `derivedOffsets`: leading-column alignment (options indent = 20px:
-  //     once the rendered 13px checkbox + 6px sp-3 gap (19, kept at 20), a
-  //     hierarchy-only offset since the settings checkboxes became .switch
-  //     rows; reader note = dot 8 + gap 6 + inset 4; reader section count
-  //     = 24px button + gap; options sidebar group label = tab inset sp-5 + the
-  //     tab's 2px indicator border) -- computed from a sibling's width, so never
-  //     a scale value by construction. `hairline`: 1px is border compensation.
+  //     `derivedOffsets`: leading-column alignment (reader note = dot 8 + gap
+  //     6 + inset 4; reader section count = 24px button + gap; options sidebar
+  //     group label = tab inset sp-5 + the tab's 2px indicator border) --
+  //     computed from a sibling's width, so never a scale value by
+  //     construction. `hairline`: 1px is border compensation.
   spacingScale: {
     prefix: { options: "--opt-sp-", popup: "--pp-sp-", library: "--lib-sp-", "md-preview": "--sp-" },
     // sp-0 = the library/reader hairline rung (2px); "8" (Task 3, ui-system-
@@ -3948,7 +3946,7 @@ const SWEEP_CFG = {
       ".token-badge", ".bookmark-badge", ".kbd-help-chip", ".hl-item-lang", ".ask-chip", // reader chips/badges (md-preview is not composed)
     ].join(", "),
     shells: ["html", "body", "main", ".rail", ".empty-state", ".preview-loading"],
-    derivedOffsets: [".fg-indent", ".hl-item-note", "#hl-rail-section .rail-sec-count", ".tab-group-label"],
+    derivedOffsets: [".hl-item-note", "#hl-rail-section .rail-sec-count", ".tab-group-label"],
   },
 };
 

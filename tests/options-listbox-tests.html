@@ -1034,7 +1034,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // Stage-3b Task 3 (2026-09-24-ui-system-stage3b): renderExportTargets now
   // emits the row-model shapes (spec §3) for every Send-to card -- the enable
   // switch as .pref-group > .pref-row > label.switch, each text/secret/select
-  // field as .fg.entry-block.et-field (et-field kept for 3c retirement). It
+  // field as .fg.entry-block. It
   // runs unconditionally at load (options.js ~line 2422, not gated behind a
   // tab click like the storage builder above), so by the time this file's own
   // opt-ai-provider-btn settle wait has finished, #export-targets is already
@@ -1145,29 +1145,29 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       // notebooklm (spec: url-scheme, viaClipboard, zero network) is the one
       // registered target with an empty `settings` array -- every other
       // target has at least one text/secret/select field.
-      const fields = det.querySelectorAll(".fg.entry-block.et-field");
+      const fields = det.querySelectorAll(".fg.entry-block");
       if (ids[i] === "notebooklm") {
-        assert(fields.length === 0, "notebooklm has no settings and should render 0 .fg.entry-block.et-field, got " + fields.length);
+        assert(fields.length === 0, "notebooklm has no settings and should render 0 .fg.entry-block, got " + fields.length);
       } else {
-        assert(fields.length >= 1, ids[i] + " expected >=1 .fg.entry-block.et-field, got " + fields.length);
+        assert(fields.length >= 1, ids[i] + " expected >=1 .fg.entry-block, got " + fields.length);
       }
     });
     // precheckRequest-bearing targets (notion/github per export-targets.js) get
     // a Test row; obsidian/notebooklm (url-scheme) and webhook (no precheck)
     // do not.
-    const testRow = host.querySelector("#et-github .fg-actions.et-test");
+    const testRow = host.querySelector("#et-github > .fg-actions");
     assert(testRow && testRow.querySelector("button") && testRow.querySelector(".et-test-status"),
-      "github card is missing its .fg-actions.et-test row");
-    assert(!host.querySelector("#et-webhook .et-test"), "webhook has no precheckRequest and must not render a Test row");
-    const notionRow = host.querySelector("#et-notion .fg-actions.et-test");
+      "github card is missing its .fg-actions row");
+    assert(!host.querySelector("#et-webhook > .fg-actions"), "webhook has no precheckRequest and must not render a Test row");
+    const notionRow = host.querySelector("#et-notion > .fg-actions");
     assert(notionRow && notionRow.querySelector("button") && notionRow.querySelector(".et-test-status"),
-      "notion card is missing its .fg-actions.et-test row");
-    assert(!host.querySelector("#et-obsidian .et-test"), "obsidian has no precheckRequest and must not render a Test row");
+      "notion card is missing its .fg-actions row");
+    assert(!host.querySelector("#et-obsidian > .fg-actions"), "obsidian has no precheckRequest and must not render a Test row");
   });
 
   // Stage-3b Task 3 review B1: inside [data-ui-stage0] the .key-wrap lost its
-  // 420px cap while the text input inside kept the legacy 320px .et-field
-  // tier, so the absolutely positioned eye toggle drifted ~446px off the
+  // 420px cap while the text input inside kept the legacy 320px tier, so the
+  // absolutely positioned eye toggle drifted ~446px off the
   // input. Gate the fused-control geometry on the real builder output.
   test("export-targets: webhook's secret url field keeps the eye toggle fused to its input", () => {
     showPanel("panel-markdown");

@@ -1171,7 +1171,6 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     new RegExp(`\\.context-help-host\\[data-help-role="${role}"\\][^{]*\\{[^}]*align-items:\\s*baseline`).test(optionsCss) &&
     new RegExp(`\\.context-help-host\\[data-help-role="${role}"\\] > \\.context-help > summary\\.context-help-toggle[^{]*\\{[^}]*align-self:\\s*baseline`).test(optionsCss)) &&
     /\.context-help-host\[data-help-role="choice"\] > label > span[^{]*\{[^}]*align-self:\s*baseline/.test(optionsCss) &&
-    /\.choice-row > label > span \{ line-height: 16px; \}/.test(optionsCss) &&
     !/(?<!\[data-ui-stage0\] \.context-help-action-row)\[data-help-role="action"\][^{]*\{[^}]*align-(?:items|self):\s*baseline/.test(optionsCss) &&
     /\[data-ui-stage0\] \.context-help-action-row\[data-help-role="action"\] > \.save-theme-wrap,\s*\[data-ui-stage0\] \.context-help-action-row\[data-help-role="action"\] > \.context-help > summary\.context-help-toggle \{ align-self: baseline; \}/.test(optionsCss),
     "options.css: contextual help lost its anchoring split (copy roles on the text baseline via the label span, the base action row centred, the [data-ui-stage0] action row on the button-text baseline)");
@@ -3243,15 +3242,10 @@ check(/@media[^{]*\(max-height:[^)]*\)\s*\{[\s\S]*?\.options-nav\s*\{[^}]*positi
 // storage-cats' disabled rows onto the .pick.pick-box primitive (COMPONENTS.md
 // §6.4 exception 3): its own composer rule dims both the text AND the mark via
 // `color` (not the older opacity-on-adjacent-span trick), so both containers
-// now share one selector instead of each needing their own. `.choice-row`
-// still uses the older shape -- a bare <label><input><span> row that is not
-// (yet) .switch/.pick -- so it keeps the adjacent-sibling dim. Each selector
-// must sit in a rule that actually dims (declares color/opacity), not just be
-// present in the file (the backup picker's selector once survived here while
-// sharing a list with the #storage-cats margin rule, i.e. present and never
-// dimmed).
-check(/\.choice-row[^{}]*input:disabled\s*\+\s*span[^{}]*\{[^}]*opacity\s*:/.test(optionsCss),
-  "options.css: .choice-row disabled checkbox rows keep full-contrast text -- the user cannot tick them and the page never says why");
+// now share one selector. The selector must sit in a rule that actually dims
+// (declares color/opacity), not just be present in the file (the backup
+// picker's selector once survived here while sharing a list with the
+// #storage-cats margin rule, i.e. present and never dimmed).
 check(/\.pick\s*>\s*input:disabled\s*~\s*\.pick-text[^{}]*\{[^}]*color\s*:/.test(optionsCss),
   "options.css: .pick disabled checkbox rows (backup-section-picker, storage-cats) keep full-contrast text -- the user cannot tick them and the page never says why");
 

@@ -75,20 +75,6 @@ groupsEmptyProbe.className="tag-gov-empty-probe";
 groupsEmptyProbe.textContent="no groups";
 groups.appendChild(groupsEmptyProbe);
 
-// Export target settings render their own .et-field controls outside .fg.
-const etCard=document.createElement("div");
-etCard.className="export-target-card";
-const etField=document.createElement("div");
-etField.className="et-field";
-const etSelect=document.createElement("select");
-const etOption=document.createElement("option");
-etOption.value="new";
-etOption.textContent="New note";
-etSelect.appendChild(etOption);
-etField.appendChild(etSelect);
-etCard.appendChild(etField);
-document.getElementById("fixture").appendChild(etCard);
-
 test("low-count chips flow and wrap instead of sitting in grid columns", () => {
   const cs = getComputedStyle(flow);
   if (cs.display !== "flex" || cs.flexWrap !== "wrap") throw new Error("expected a wrapping flex flow, got " + cs.display + "/" + cs.flexWrap);
@@ -168,21 +154,6 @@ test("non-card child sits inside the queue frame's own padding, not styled as a 
   if (probeStyle.display === "grid") throw new Error("non-card child must not use the group-row grid layout, got " + probeStyle.display);
   if (parseFloat(probeStyle.borderTopLeftRadius) !== 0) throw new Error("non-card child must not carry the group-row's hover-band radius, got " + probeStyle.borderTopLeftRadius);
   if (parseFloat(probeStyle.paddingLeft) < 4) throw new Error("non-card child must be inset from the frame via its own padding, got " + probeStyle.paddingLeft);
-});
-
-test("export-target select uses the styled field treatment", () => {
-  const cs = getComputedStyle(etSelect);
-  const appearance = cs.appearance || cs.webkitAppearance;
-  if (etSelect.offsetWidth < 600) throw new Error("expected full-width select, got " + etSelect.offsetWidth);
-  // Styled = anything but UA default chrome. Two valid values since the
-  // dropdown-design round: "base-select" on engines with customizable
-  // select (Chrome 135+, the @supports path -- in-page styled picker) and
-  // "none" on engines without it (the appearance:none fallback). Both keep
-  // the drawn CSS chevron asserted below.
-  if (appearance !== "none" && appearance !== "base-select") {
-    throw new Error("expected appearance none|base-select, got " + appearance);
-  }
-  if (!cs.backgroundImage || cs.backgroundImage === "none") throw new Error("expected CSS chevron background");
 });
 
 // --- J2: tag drag-handle uses CSS grip dots, no U+22EE glyph ---

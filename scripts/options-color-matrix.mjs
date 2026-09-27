@@ -51,7 +51,6 @@ const PROBES = [
   [".free-tier-help", false],
   [".free-tier-help summary", false],
   [".opt-error", false],
-  [".divider", false],
   [".save-status", false],
   [".save-status.bad", false],
   [".field-warn", false],
@@ -60,7 +59,6 @@ const PROBES = [
   [".pf h3", false],
   [".et-onboarding", false],
   [".et-onboarding summary", false],
-  ['.et-field select', true],
   [".auto-save-hint", false],
   [".auto-save-hint.saved", false],
   [".theme-group-label", false],
@@ -208,18 +206,10 @@ async function dump() {
     const counterEl = document.querySelector(".overlay-byte-counter");
     if (counterEl) counterEl.classList.add("warn");
 
-    // .et-test-status.{ok,err,warn} and .et-field select never coexist on
-    // the one real #storage-status node (only one state class at a time,
-    // and it's a <span>, not the customizable-select markup) -- append
-    // throwaway sibling probes instead of fighting that node for double
-    // duty. .et-onboarding is NOT static markup in options.html -- it's a
-    // live consumer, built by options.js's renderExportTargets() (~line 700)
-    // for every PBP_EXPORT_TARGETS row that sets `onboarding` (currently
-    // Gist and Webhook). renderExportTargets() runs unconditionally during
-    // normal settings load, so the real page this script drives against
-    // already has real .et-onboarding markup by the time these PROBES entries
-    // run -- no synthetic injection needed here, unlike the two throwaway
-    // spans below.
+    // .et-test-status.{ok,err,warn} never coexist on the one real
+    // #storage-status node (only one state class at a time, and it's a
+    // <span>) -- append throwaway sibling probes instead of fighting that
+    // node for double duty.
     const etTestOk = document.createElement("span");
     etTestOk.className = "et-test-status ok";
     body.appendChild(etTestOk);
@@ -232,10 +222,6 @@ async function dump() {
     const overCounter = document.createElement("span");
     overCounter.className = "overlay-byte-counter over";
     body.appendChild(overCounter);
-    const etFieldSelect = document.createElement("div");
-    etFieldSelect.className = "et-field";
-    etFieldSelect.innerHTML = "<select><option>a</option></select>";
-    body.appendChild(etFieldSelect);
   });
 
   const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));

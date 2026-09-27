@@ -412,17 +412,10 @@ function pbpBuildSettingsSearchIndex(root = document) {
       }
       else if (node.matches("button")) target = node.id;
       else if (labelledButton) target = labelledButton.id;
-      // Stage-3b Task 2 fix round 1: `.choice-row`/`.fg` alone stopped
-      // resolving once 3a/3b migrated a choice-help host's row onto the row
-      // model (`.pref-row` inside a `.pref-group`, COMPONENTS.md's stage-0
-      // row shapes) -- a hint's `closest()` returned no ancestor at all, so
-      // `target` stayed "" all the way through (unlike the catch-all `else`
-      // branch a few lines down, this one has no `if (!target)` fallback),
-      // and the jump landed on the panel instead of the switch it explains.
-      // `.pref-row`/`.pref-group` added alongside the two legacy shapes;
-      // no `.choice-row` rows remain after stage-3b Task 3 and the legacy
-      // pair retires with the rest of the old shapes in 3c.
-      else if (node.matches(".hint")) target = node.closest(".choice-row, .fg, .pref-row, .pref-group")?.querySelector("input,select,textarea,button")?.id || "";
+      // A hint resolves the control it explains through its row-model owner:
+      // an entry block (.fg) or a preference row/group (.pref-row/.pref-group,
+      // where 3a/3b moved every choice-help host).
+      else if (node.matches(".hint")) target = node.closest(".fg, .pref-row, .pref-group")?.querySelector("input,select,textarea,button")?.id || "";
       else {
         target = node.id || "";
         if (!target) { target = panelFallbackId(); weak = true; }
@@ -1807,10 +1800,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       (row.settings || []).forEach((s) => {
         if (s.type !== "text" && s.type !== "secret" && s.type !== "select") return;
         const wrap = document.createElement("div");
-        // .et-field kept for 3c retirement (spec §3); .fg.entry-block is the
-        // row-model field shape every other panel's text/select field now
-        // takes.
-        wrap.className = "fg entry-block et-field";
+        // .fg.entry-block is the row-model field shape.
+        wrap.className = "fg entry-block";
         const lab = document.createElement("label");
         lab.className = "bl";
         lab.textContent = t(s.label);
@@ -1842,8 +1833,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           inp.value = cfg[s.key] || s.default || ((s.options && s.options[0] && s.options[0].value) || "");
         } else {
           inp.value = cfg[s.key] || "";
-          // fg-url (COMPONENTS.md §6.1 field-width tiers, mirrored onto
-          // .et-field in options.css -- final fix wave, Ruling 29 F8):
+          // fg-url is a semantic kind marker; width follows the entry-block
+          // contract (COMPONENTS.md §6.3), not a tier of its own.
           // export-targets.js marks a setting's SEMANTIC kind through its
           // `key`, not a `type: "url"`/`kind` field -- "parent" (Notion's
           // parent-page reference: a notion.so URL, a dashed UUID, or a bare
@@ -1922,9 +1913,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       if (row.precheckRequest) {
         const testWrap = document.createElement("div");
-        // .fg-actions is the row-model button-row shape (spec §3); .et-test
-        // kept for 3c retirement alongside .et-field.
-        testWrap.className = "fg-actions et-test";
+        // .fg-actions is the row-model button-row shape.
+        testWrap.className = "fg-actions";
         const testBtn = document.createElement("button");
         testBtn.type = "button";
         testBtn.className = "btn btn-sm";

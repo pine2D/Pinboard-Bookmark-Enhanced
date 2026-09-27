@@ -1126,11 +1126,6 @@
     },
     {
       "surface": "options",
-      "token": "choice-stack",
-      "structural": true
-    },
-    {
-      "surface": "options",
       "token": "context-help-link",
       "structural": false
     },
@@ -1146,17 +1141,7 @@
     },
     {
       "surface": "options",
-      "token": "et-field",
-      "structural": false
-    },
-    {
-      "surface": "options",
       "token": "et-onboarding",
-      "structural": false
-    },
-    {
-      "surface": "options",
-      "token": "et-test",
       "structural": false
     },
     {

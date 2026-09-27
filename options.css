@@ -43,13 +43,6 @@
   --opt-sp-7: 24px;
   /* Form-group vertical rhythm (.fg / .hint / helper blocks). */
   --opt-rhythm: var(--opt-sp-5);
-  /* Subordinate-choice indent. It was derived from the parent checkbox (13px)
-     plus the label's sp-3 gap so nested rows started under the parent's text;
-     with the settings toggles now .switch rows (text first, track at the row
-     end) there is no box to clear, and the value only encodes hierarchy --
-     kept at 20px so nesting depth reads the same as before. Deliberately not a
-     scale rung. */
-  --opt-indent: 20px;
 
   /* ---- Density (stage 0, spec 2026-09-23-ui-system-stage0-design §2) ----
      Two tiers. comfortable is the default; compact is written as
@@ -439,52 +432,6 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 /* ---- Form groups ---- */
 .fg { margin-bottom: var(--opt-rhythm); }
 .fg label { display: flex; align-items: center; gap: var(--opt-sp-3); font-size: 13px; cursor: pointer; margin-bottom: var(--opt-sp-2); }
-/* Stacked sub-options. Three-tier spacing:
-   - title (label.bl) → first option: 6px (group separation)
-   - option ↔ option: 4px margin + 2px×2 label padding = ~8px visual
-   - dense peer choices (.choice-row): 2px margin + label padding = ~6px visual
-   - last option → hint: 6px (footer breathing)
-   - rows containing an inline <input> (e.g. popup-width custom): a touch more
-     vertical margin to balance the taller control. */
-.fg-stack > div { margin-bottom: var(--opt-sp-2); }
-.fg-stack > .choice-row { margin-bottom: var(--opt-sp-1); }
-/* A choice row was as tall as its label's line box, and `line-height: normal`
-   is a FONT metric: on CI (Ubuntu, DejaVu Sans + a CJK fallback for the zh_CN
-   labels the layout test applies) the rows holding CJK text came out 23px
-   against 19px for Latin ones, while Windows fonts happened to agree. Pin the
-   LABEL BOX to the sm rung -- not the label's line-height: a 20px line-height
-   on the label moved that ink and threw the raster audit off under CI fonts.
-   The copy SPAN's line box is pinned to the label's 16px content height: on
-   the Windows fonts that equals the font's own line box (zero movement), on
-   CI it stops the CJK fallback from growing the line box to 23px, and it lets
-   the span take part in baseline alignment for the help toggle (see the
-   context-help block). Blink floors the top half-leading, so an odd font
-   height (DejaVu 15) sits 0.5px higher than a centred line box would; pinning
-   every choice row keeps rows with and without a help toggle identical. */
-/* A .switch row's drawn track is 16px (B'), so it sits centred inside this
-   box and the row height is unchanged by the switch. The row's flex layout
-   (text start, track end) is the .switch recipe's own and is NOT repeated
-   here: the two AI-content-source radios are choice rows too, and
-   `justify-content: space-between` would push their copy to the row end. */
-.choice-row > label { height: 20px; }
-.choice-row > label > span { line-height: 16px; }
-/* The rule above also matches a .switch row's .switch-track span; that is
-   inert (the track is an empty box with an explicit 16px height), so the
-   literal stays as tests/ui-contract-tests.mjs pins it. */
-.fg-stack > div:last-child { margin-bottom: 0; }
-.fg-stack > div > label { padding: var(--opt-sp-1) 0; margin-bottom: 0; }
-/* The 2px block padding above grows a 16px text line to a 20px row. A plain
-   stacked .switch row (URL-clean and batch-AI sub-options) is already 20px --
-   the track's height -- so it drops the padding and keeps the old 20px row and
-   24px step. Choice rows keep theirs: the label's padding box is what the
-   help toggle's text baseline is calibrated against (context-help block). */
-.fg-stack > div:not(.choice-row) > label.switch { padding: 0; }
-.fg.fg-stack > .bl { margin-bottom: var(--opt-sp-3); }   /* label.bl or a div.bl title: 6px to the first option. (0,3,0) on purpose:
-   the old `.fg-stack > label.bl` tied `.fg label.bl` at (0,2,1) and lost on source order, so the
-   documented 6px never rendered -- every plain stack title measured 4px (2026-09-05 probe). */
-.fg.fg-stack > .hint { margin-top: var(--opt-sp-3); }
-.fg-stack > div:has(input[type="number"]),
-.fg-stack > div:has(input[type="text"]) { margin-top: var(--opt-sp-2); margin-bottom: var(--opt-sp-3); }
 .fg label.bl { display: block; font-weight: 400; margin-bottom: var(--opt-sp-2); cursor: default; font-size: 12px; color: var(--opt-fg-soft); }
 /* A form group has exactly four vertical relationships, and each has ONE owner:
    group -> group (.fg margin-bottom, 12px), label -> control (label.bl
@@ -500,7 +447,6 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    2026-09 spacing complaints kept finding. */
 .fg-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--opt-sp-4); }
 .fg > .fg-actions { margin-top: var(--opt-sp-3); }
-.fg-indent { margin-left: var(--opt-indent); }
 /* A follow-up field revealed under a <select> (translate: custom language). */
 .fg > select + input { margin-top: var(--opt-sp-3); }
 /* Contextual help keeps native <details> motion, but its visible pieces are
@@ -608,7 +554,8 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    row stays 20px -- 2px block padding around a 16px line box, the same box
    the stacked choice rows use and the one the help toggle's baseline is
    calibrated against (context-help block). The copy's line box is pinned to
-   16px here too: on the .fg hosts (no .choice-row) it was `normal`, which is
+   16px here too: on the .fg hosts -- the same fixed-line-box idea a pref-row
+   label's `--opt-lh-body` line embodies -- it was `normal`, which is
    taller than 16px under some font stacks and would now grow the row instead
    of overflowing a fixed 20px box. Per HTML, <details> is interactive
    content, so a click on the summary or the answer does not activate the
@@ -806,7 +753,7 @@ label.switch > .context-help > .context-help-body {
    checkbox has no text baseline (it is synthesised from its bottom edge, a
    constant that never tracks the font). So the copy span alone opts into
    baseline alignment, which makes the label's baseline the text's. Its line
-   box already equals the label's 16px content height (.choice-row rule), so
+   box already equals the pref-row label's `--opt-lh-body` line, so
    "flush with the cross-start edge" (what baseline participants get) is where
    the centred line box already was: no movement, and the checkbox keeps its
    centred placement. CJK choice copy sat ~1.25 CSS px lower under YaHei than
@@ -831,7 +778,6 @@ label.switch > .context-help > .context-help-body {
   margin: 0;
 }
 .context-help-host > .context-help + * { margin-top: var(--opt-sp-2); }   /* closed: = .fg label.bl margin-bottom */
-.fg-stack.context-help-host > .context-help + * { margin-top: var(--opt-sp-3); }   /* closed: = .fg-stack > .bl margin-bottom */
 /* Open: the answer hangs 4px under its label and keeps 8px from the control it
    precedes, so it reads as owned by the label, not the input (the test page
    pins both bands). Source order after the group rule: same specificity. */
@@ -847,10 +793,10 @@ label.switch > .context-help > .context-help-body {
 /* Base field recipe (width/padding/border/radius/background-color/font-size/
    font-family/appearance/box-shadow/transition), hover border-color, focus/
    focus-visible and the checkbox/radio accent-color all now come from
-   @generated:ui-components below (COMPONENTS.md §6). Its three hand-
-   maintained exceptions (the .fg-stack number-field override, the <select>
-   chevron, the textarea monospace stack -- §6.1 names the latter two
-   explicitly) live physically AFTER that generated region ends, not here:
+   @generated:ui-components below (COMPONENTS.md §6). Its two hand-
+   maintained exceptions (the <select> chevron, the textarea monospace
+   stack -- §6.1 names both explicitly) live physically AFTER that generated
+   region ends, not here:
    same specificity as the generated selectors they override, so they need
    later source order to win -- see the block right after
    `@generated:ui-components end` below. */
@@ -951,7 +897,6 @@ html[data-theme] .opt-error {
   border-color: color-mix(in srgb, var(--opt-danger) 35%, var(--opt-border));
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--opt-danger) 75%, transparent);
 }
-.divider { border-top: 1px solid var(--opt-border-section); margin: var(--opt-sp-6) 0; }
 /* @generated:ui-components start (options) */
 .btn {
   display: inline-flex;
@@ -1322,14 +1267,6 @@ input[type="checkbox"], input[type="radio"] {
   }
 }
 /* @generated:ui-components end (options) */
-/* Hand-maintained field exceptions (COMPONENTS.md §6.1): same specificity
-   as the generated selectors above, positioned AFTER the generated region
-   on purpose so they win by source order for the properties they override
-   -- moved here from up near `.fg-stack`'s other rules after a real
-   regression (Playwright-verified: SF Mono/11px silently lost to the
-   generated recipe's font-family:inherit/13px when this lived BEFORE the
-   generated region instead). */
-.fg-stack input[type="number"] { padding: 1px var(--opt-sp-3); font-size: 12px; height: auto; line-height: 1.4; }
 /* Custom chevron for <select> — native arrow removed by appearance:none. Use
    background-image / background-repeat / background-position as LONGHANDS so themed
    overrides that only set background-color preserve the chevron. */
@@ -1472,21 +1409,7 @@ html.motion-ready .backup-import-result:not([hidden]) {
 }
 .backup-section-picker legend { padding: 0 var(--opt-sp-2); color: var(--opt-fg-muted); }
 .backup-section-picker label { min-width: 0; }
-/* Disabled checkbox rows. :disabled was styled only on the .btn family, so a row
-   the user cannot tick kept full-contrast text and (inside .fg) a pointer
-   cursor -- worst in the import preview, the one screen where the user is
-   deciding what to import. Stage-3b Task 2 moved the two consumers this rule
-   used to cover -- options-backup.js renderPreview's per-section checkboxes
-   (backup-section-picker) and options.js's storage category list
-   (storage-cats, a category measuring 0 bytes) -- onto `.pick.pick-box`
-   (COMPONENTS.md §6.4 exception 3), whose own composer contract already
-   paints a disabled row's text/mark `--opt-fg-hint` and its cursor `default`;
-   leaving those two selectors here would have double-dimmed (and wrongly
-   cursor:not-allowed'd) them. `.choice-row` has no markup consumer left
-   after stage 3b (it retires with the legacy shapes in 3c); `:not(.switch-text)` keeps `.switch`'s own composer-painted
-   disabled dimming from being doubled too. */
-.choice-row input:disabled + span:not(.switch-text) { opacity: 0.45; }
-.choice-row input:disabled { cursor: not-allowed; }
+/* Stage-3b moved the backup picker and storage-cats onto `.pick.pick-box`, whose own composer rules handle the disabled dimming. */
 /* The storage category list's own group rhythm. It once shared a selector
    list with the backup-picker dim above, so the picker's disabled copy got
    this margin instead of the opacity step. */
@@ -1849,7 +1772,7 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
 /* Stage-3a (Task 1, 2026-09-24-ui-system-stage3a): choice help hosts inside
    preference rows. The legacy `.context-help-host[data-help-role="choice"] >
    label.switch > .switch-text { line-height: 16px }` (~line 564) pins the
-   copy to the 20px .choice-row line box that model used; the pref-row model
+   copy to the legacy 16px pin; the pref-row model
    the host now sits in (bookmarks/quick's no-help choice rows never carried
    this role, so only the AI-behaviour panel's three choice hosts are
    affected) reads the density line-height instead, matching every sibling
@@ -1891,7 +1814,7 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    (~line 555) sets a `padding` SHORTHAND at specificity (0,3,1), which beats
    `.pref-row-sub > label`'s `padding-left` at (0,2,1) regardless of source
    order -- the row model's indent mechanism (padding-left on the label, not
-   margin-left on the row, unlike the legacy .fg-indent it replaces) would
+   margin-left on the row, unlike the retired fixed-indent class) would
    otherwise be silently zeroed out for this one row, undoing the deliberate
    "carries the same indent" design intent the HTML comment above it states.
    Re-declares just the one longhand this host needs at higher specificity;
@@ -1977,6 +1900,19 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    input/.key-wrap child, so this rule had nothing to match under stage 0 --
    it started rendering with stage 2's provider-panel entry blocks. */
 [data-ui-stage0] .entry-block > :is(input:not([type="number"]), .key-wrap) { max-width: none; }
+/* Task 1 (ui-system-stage3c retirement): the rule above reaches a bare
+   entry-block input or the .key-wrap div itself, but not an input ONE level
+   deeper inside that key-wrap -- and a key-wrap's own input can be
+   type="text" (a setting that is `secret: true` but not `type: "secret"`;
+   webhook's url is the one such field, export-targets.js) as well as the
+   usual type="password". A text-typed key-wrap input still falls to the
+   generic `.fg input[type="text"]:not(.fg-url)` 320px tier a few rules up
+   while its key-wrap sibling has already been un-capped to fill the column,
+   floating the eye toggle (pinned to the key-wrap's own right edge, not the
+   input's) off the narrower input -- the bug a now-retired Send-to-only
+   field recipe used to prevent (stage-3b Task 3 review B1). (0,4,1) beats
+   the (0,3,1) tier outright, so source order does not matter here. */
+[data-ui-stage0] .entry-block > .key-wrap > :is(input[type="text"], input[type="password"]) { max-width: none; }
 
 /* Provider sub-panel and action rows on the stage-0 rhythm (spec stage2 §2). */
 [data-ui-stage0] .pf { margin-top: var(--opt-sp-6); padding: var(--opt-panel-pad); }
@@ -1997,19 +1933,9 @@ html[data-theme] [data-ui-stage0] .pf > h3 {
    the .et-onboarding disclosure when a target ships onboarding copy, so the
    `.fg + .fg-actions` rule above misses it. Pin the action-row gap on the row
    itself so sibling order cannot zero it (fgRhythm gate: >=4px above an action row). */
-[data-ui-stage0] .fg-actions.et-test { margin-top: var(--opt-sp-6); }
-/* Send-to card fields take the entry-block width contract (COMPONENTS.md
-   §6.3: controls fill the content column). The legacy .et-field tiers
-   further down (320 / 520 / .key-wrap 420) share (0,3,1) with the stage-0
-   entry-block rule and come later in source, so they kept winning inside
-   the marker -- and the stage-0 rule had already un-capped .key-wrap while
-   the text input inside it stayed at 320, floating the eye toggle ~446px
-   off webhook's url field (stage-3b Task 3 review B1). (0,4,1) so source
-   order cannot decide it; the tiers themselves retire in 3c. */
-[data-ui-stage0] .et-field.entry-block :is(input[type="text"], input[type="password"]) { max-width: none; }
+[data-ui-stage0] .export-target-card > .fg-actions { margin-top: var(--opt-sp-6); }
 /* Enable row -> first field: `.settings-section > .pref-group`'s sp-6 does
-   not reach inside .export-target-card, leaving only .et-field's sp-4 (8px
-   against the 16px between consecutive fields). `:not(:last-child)` (stage-3b
+   not reach inside .export-target-card. `:not(:last-child)` (stage-3b
    Task 5 housekeeping) matches every OTHER stage-0 pref-group spacer in this
    file -- a card whose enable switch is the only `.pref-group` (no fields
    below it) must not carry a trailing margin nothing follows. */
@@ -2038,90 +1964,11 @@ html.motion-ready .pf:not([hidden]) {
 .pf h3 { font-size: 12px; color: var(--opt-fg-soft); margin-bottom: var(--opt-sp-4); font-weight: 600; }
 
 /* ---- Markdown export targets (Send-to destination cards) ---- */
-.et-field { margin-top: var(--opt-sp-4); }
 .et-onboarding { margin-top: var(--opt-sp-4); font-size: 12px; color: var(--opt-fg-soft); }
 .et-onboarding summary { cursor: pointer; padding: var(--opt-sp-2) 0; color: var(--opt-accent); user-select: none; }
 .et-onboarding summary:hover { text-decoration: underline; }
 .et-onboarding[open] summary { margin-bottom: var(--opt-sp-2); }
 .et-onboarding .hint { margin: 0; }
-/* ponytail: mirrors .fg input[type="text/password"] rules (lines above) for et-field context */
-.et-field input[type="text"],
-.et-field input[type="password"],
-.et-field select {
-  width: 100%; padding: var(--opt-sp-2) var(--opt-sp-4); line-height: 16px; /* md rung in px like the .fg field recipe: 4+16+4+2 = 26 under any font (a DejaVu fallback gave 24.67 with `normal`) */ border: 1px solid var(--opt-input-border);
-  border-radius: var(--opt-radius-md);
-  background-color: var(--opt-input-bg); font-size: 13px; font-family: inherit;
-  -webkit-appearance: none; appearance: none; box-shadow: none;
-  transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
-}
-.et-field select {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  padding-right: 26px;
-  cursor: pointer;
-}
-/* Field width by content kind (taste-uplift-batch3, T6/D2), mirroring the
-   generated .fg recipe's tiers -- final fix wave (Ruling 29 F8) keys this on
-   export-targets.js METADATA instead of raw DOM shape, the same way .fg
-   itself distinguishes .fg-url from plain text. An earlier revision of this
-   comment claimed .et-field had only two width-relevant DOM shapes (a bare
-   text/select input, or the secret's .key-wrap) and so "no third short text
-   kind to mirror" -- that was false: Obsidian's vault/folder names ARE a
-   genuine third, short-text kind, they were just never split out. .et-field
-   now renders three: a secret's .key-wrap (unchanged, 420 -- same fused-
-   control reason as the generated .fg .key-wrap rule: the eye toggle is
-   position:absolute inside .key-wrap, COMPONENTS.md §8), a URL-shaped text
-   field (options.js's renderExportTargets adds class="fg-url" when a
-   setting's `key` is "url" or "parent" -- export-targets.js's own semantic
-   marker; Notion's `parent` -- a notion.so URL, dashed UUID, or bare 32-hex
-   id -- is the one field that reaches this branch today, since webhook's
-   `url` is ALSO `secret: true` and takes the .key-wrap branch instead), and
-   plain short free text (Obsidian's vault/folder names, 320 -- the same
-   tier options' own .fg input[type=text]:not(.fg-url) gets).
-   Inside [data-ui-stage0] (stage-3b Task 3) all three tiers are overridden by
-   the entry-block width contract -- see the stage-0 block's
-   `.et-field.entry-block` rule; they retire with .et-field in 3c. */
-.et-field .key-wrap { max-width: 420px; }
-.et-field input[type="text"].fg-url { max-width: 520px; }
-.et-field input[type="text"]:not(.fg-url) { max-width: 320px; }
-/* Reuses the same hover-border recipe as the generated .fg field family
-   above (COMPONENTS.md §6.1's "et-field mirrors .fg" convention) instead of
-   its own fixed literal (Task 12 review round 2, Minor) -- .et-field never
-   shared the generated selector list (it predates the ui-components region),
-   so this was drifting into its own one-off gray with no per-theme role.
-   .et-field select is deliberately NOT in this selector group (round 3
-   correction): a same-specificity `.fg select:hover:not(:focus),
-   .et-field select:hover:not(:focus)` rule further down the file (the
-   customizable-select block) already owns that element's hover border via
-   --opt-input-border and, being later in source, always wins the tie --
-   including it here was dead code that only ever painted for the two
-   <input> selectors. */
-.et-field input[type="text"]:hover:not(:focus),
-.et-field input[type="password"]:hover:not(:focus) { border-color: color-mix(in srgb, var(--opt-input-border) 55%, var(--opt-fg)); }
-.et-field input[type="text"]:focus,
-.et-field input[type="password"]:focus,
-.et-field select:focus { outline: none; border-color: var(--opt-focus-bd); }
-.et-field input[type="text"]:focus-visible,
-.et-field input[type="password"]:focus-visible,
-.et-field select:focus-visible { box-shadow: var(--opt-focus-ring); }
-html[data-theme] .et-field input[type="text"],
-html[data-theme] .et-field input[type="password"],
-html[data-theme] .et-field select {
-  color: var(--opt-fg);
-}
-/* Second form, not a leftover: the base hover rule now shares the generated
-   .fg field family's color-mix hover-border formula (Task 12 review round 2,
-   Minor); themed states still swap to the flat --opt-fg-muted role instead,
-   same as they always have. .et-field select is NOT in this group (round 3
-   correction, same root cause as the base rule above): this selector text
-   is byte-identical to one branch of the later `html[data-theme] .fg
-   select:hover:not(:focus), html[data-theme] .et-field
-   select:hover:not(:focus) { ...border-color: var(--opt-input-border); }`
-   rule in the customizable-select block, same specificity, later source ->
-   that rule always won for .et-field select, this one was dead for it. */
-html[data-theme] .et-field input[type="text"]:hover:not(:focus),
-html[data-theme] .et-field input[type="password"]:hover:not(:focus) { border-color: var(--opt-fg-muted); }
 
 /* ---- Accordion ---- */
 
@@ -2134,9 +1981,7 @@ html[data-theme] .et-field input[type="password"]:hover:not(:focus) { border-col
    face as .section-title) plus the right-edge chevron below; the body is
    flush with the panel like every other section body. Rows stack as a list:
    each member owns its top rule, so between two closed rows the gap is
-   summary padding (12) + rule + padding (12), symmetric. A lone member
-   sitting between h2 sections gets a .divider AFTER it in markup (its own
-   top rule already separates it from what precedes it).
+   summary padding (12) + rule + padding (12), symmetric.
    The former custom JS accordion (a div/button/body triad: a second
    mechanism with its own motion, persistence branch and 16px body indent)
    was retired 2026-09-05; the sync gate in tests/ui-contract-tests.mjs keeps
@@ -2989,14 +2834,6 @@ html[data-theme="solarized-dark"] .fg select,
 html[data-theme="catppuccin-mocha"] .fg select,
 html[data-theme="gruvbox-dark"] .fg select,
 html[data-theme="rose-pine"] .fg select,
-html[data-theme="nord-night"] .et-field select,
-html[data-theme="terminal"] .et-field select,
-html[data-theme="dracula"] .et-field select,
-html[data-theme="flexoki-dark"] .et-field select,
-html[data-theme="solarized-dark"] .et-field select,
-html[data-theme="catppuccin-mocha"] .et-field select,
-html[data-theme="gruvbox-dark"] .et-field select,
-html[data-theme="rose-pine"] .et-field select,
 html[data-theme="nord-night"] .mobile-tab-picker select,
 html[data-theme="terminal"] .mobile-tab-picker select,
 html[data-theme="dracula"] .mobile-tab-picker select,
@@ -3026,7 +2863,7 @@ html[data-theme="rose-pine"] .mobile-tab-picker select {
    defines (+ :root literals for the no-preset light state); the no-preset
    DARK state always resolves to data-theme="flexoki-dark"
    (options-theme-early.js:25), so there is no unthemed-dark gap. */
-.fg select, .et-field select {
+.fg select {
   border-radius: var(--opt-radius-md);
   /* Same block padding and text inset as the generated field recipe, so a
      <select> lands on the md rung (4+16+4+2 = 26px) beside its inputs. The old
@@ -3034,14 +2871,14 @@ html[data-theme="rose-pine"] .mobile-tab-picker select {
      in than the input above it (2026-09-05 cross-surface probe). */
   padding: var(--opt-sp-2) 26px var(--opt-sp-2) var(--opt-sp-4);
 }
-.fg select:hover:not(:focus), .et-field select:hover:not(:focus) {
+.fg select:hover:not(:focus) {
   background-color: var(--opt-select-hover-bg);
   border-color: var(--opt-input-border);
 }
-html[data-theme] .fg select, html[data-theme] .et-field select {
+html[data-theme] .fg select {
   background-color: var(--opt-btn-bg);
 }
-html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select:hover:not(:focus) {
+html[data-theme] .fg select:hover:not(:focus) {
   background-color: var(--opt-btn-hover);
   border-color: var(--opt-input-border);
 }
@@ -3069,14 +2906,14 @@ html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select
      (non-base-select) <select> never had this failure mode: the UA always
      single-lines and clips its own selected-value display regardless of
      width. Restores that same clipping behavior for the opt-in flex layout. */
-  .fg select, .et-field select, .mobile-tab-picker select {
+  .fg select, .mobile-tab-picker select {
     appearance: base-select;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .fg select::picker-icon, .et-field select::picker-icon, .mobile-tab-picker select::picker-icon { display: none; }
-  .fg select::picker(select), .et-field select::picker(select), .mobile-tab-picker select::picker(select) {
+  .fg select::picker-icon, .mobile-tab-picker select::picker-icon { display: none; }
+  .fg select::picker(select), .mobile-tab-picker select::picker(select) {
     appearance: base-select;
     margin-top: var(--opt-sp-2);
     background: var(--opt-bg);
@@ -3096,23 +2933,23 @@ html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select
     scrollbar-width: thin;
     scrollbar-color: var(--opt-fg-muted) var(--opt-panel);
   }
-  .fg option, .et-field option, .mobile-tab-picker option {
+  .fg option, .mobile-tab-picker option {
     padding: var(--opt-sp-4) var(--opt-sp-4);
     border-radius: var(--opt-radius-md);
     font-size: 13px;
     cursor: pointer;
   }
-  .fg option:hover, .et-field option:hover, .mobile-tab-picker option:hover {
+  .fg option:hover, .mobile-tab-picker option:hover {
     background: var(--opt-option-hover-bg); /* theme-agnostic row hover, same value as md-preview's --row-hover fallback */
   }
-  .fg option:focus-visible, .et-field option:focus-visible, .mobile-tab-picker option:focus-visible {
+  .fg option:focus-visible, .mobile-tab-picker option:focus-visible {
     background: var(--opt-option-hover-bg);
     outline: 2px solid var(--opt-focus-bd);
     outline-offset: -2px;
     box-shadow: none;
   }
-  .fg option::checkmark, .et-field option::checkmark, .mobile-tab-picker option::checkmark { display: none; }
-  .fg option:checked, .et-field option:checked, .mobile-tab-picker option:checked {
+  .fg option::checkmark, .mobile-tab-picker option::checkmark { display: none; }
+  .fg option:checked, .mobile-tab-picker option:checked {
     background: color-mix(in srgb, var(--opt-accent) 18%, transparent);
     font-weight: 600;
   }
@@ -3122,7 +2959,6 @@ html[data-theme] .hint code { color: var(--opt-fg-muted); }
    unthemed reads --opt-fg-soft, themed reads --opt-fg-muted. */
 html[data-theme] .pf h3 { color: var(--opt-fg-muted); }
 html[data-theme] .et-onboarding { color: var(--opt-fg-muted); }
-.et-test { display: flex; align-items: center; gap: var(--opt-sp-4); }
 .et-test-status { font-size: 12px; }
 .et-test-status.ok { color: var(--opt-save); }
 .et-test-status.err { color: var(--opt-danger); }
@@ -3910,7 +3746,7 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     min-height: 34px;
     padding: var(--opt-sp-3) 26px var(--opt-sp-3) var(--opt-sp-5);
     border: 1px solid var(--opt-input-border);
-    /* Dropdown-design round: joins the .fg/.et-field select family (7px
+    /* Dropdown-design round: joins the .fg select family (7px
        radius, drawn chevron, btn-bg surface). It used to keep the UA arrow;
        the @supports picker block above hides ::picker-icon for ALL selects,
        so without its own drawn chevron this control would lose its arrow

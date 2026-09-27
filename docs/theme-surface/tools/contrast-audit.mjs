@@ -383,7 +383,7 @@ export const COMPONENT_PAIR_SPEC = [
   // `bg` (an unrelated per-theme `fg vs bg` row lives in auditCssThemes).
   // But `fg` genuinely paints TEXT directly on both fills on every
   // surface -- options'/library's/popup's `.theme-name-popover input[type
-  // =text]` / `.et-field input` / `.login-body input` / `.search-field`
+  // =text]` / `.login-body input` / `.search-field`
   // (`color: fg; background: input-bg`) and `.connection-health-row` /
   // `.vocab-sort-seg` / `.qbtn`-family containers (`color: fg; background:
   // btn-bg`) -- so this is real coverage, not a speculative row. Caught

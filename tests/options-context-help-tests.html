@@ -957,7 +957,6 @@ function test(name, fn) {
     const languageSection = doc.getElementById("sec-language")?.closest("section.settings-section");
     assert(accountSection && languageSection && accountSection !== languageSection,
       "connection overview and Language must sit in separate settings-section blocks");
-    assert(!panel.querySelector(".divider"), "panel-general still carries a legacy divider");
     const gap = languageSection.getBoundingClientRect().top - accountSection.getBoundingClientRect().bottom;
     assert(gap >= 30 && gap <= 34, "Pinboard Account -> Language section gap=" + gap);
   });

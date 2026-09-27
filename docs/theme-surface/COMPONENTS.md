@@ -360,8 +360,8 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
   方块字 ≈0.38em；文案字面钉 px 所以常量也是 px）——行内墨迹相对行盒的位置是字体的升降部拆分，Segoe UI 与
   DejaVu 差约 1 CSS px 且没有 CSS 单位能表达它，中心锚定的常量只能拟合其中一家（2026-09-06 栅格门实测）。
   `choice` 的 label 是 flex 行且首项是 checkbox，flex 容器的基线默认取首项（checkbox 没有文字基线，按底边合成、
-  不随字体动），所以由文案 span 单独 `align-self: baseline` 参与基线对齐，label 的基线即成为文字基线；所有 `.choice-row` 文案 span 的
-  `line-height` 钉成 label 的 16px 内容高（Windows 字体下等于其自然行盒，零位移；CI 字体下阻止 CJK 回退把行盒撑到 23px），文字与 checkbox 均不动。
+  不随字体动），所以由文案 span 单独 `align-self: baseline` 参与基线对齐，label 的基线即成为文字基线；所有 choice 文案 span 的
+  `line-height` 取 pref-row 行的 `--opt-lh-body`，文字与 checkbox 均不动。
   **只有 `action`**（按钮行，无文字基线可借）保持 `align-self: center`，常量取两家字体区间的中值。
   summary 的 margin box 仍是零高，两种锚定都不参与行高。
   校准时用 `PBP_HELP_RASTER_RANGES=1` 让栅格门在通过时也打印各角色区间，本机与 `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf"`
@@ -1185,7 +1185,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | `.progress-bar` / `.batch-progress` | options / popup | **已合规** | 非交互，律 2/4 不适用；`overflow: hidden` 裁角的现成先例 |
 | chip + 单个 `×` 钮（`.vocab-group-chip.removable`、`.tag-item`） | library / popup | **不适用** | 只有一个交互件（药丸本身不可聚焦），不满足"两个及以上" |
 | `.saved-theme-wrap` | options | **不适用** | 删除钮是浮在药丸外的角标，不共享边 |
-| 容器类（`.vocab-batch-bar` / `#vocab-lookup-bar` / `.confirm-popover` ×3 / `.theme-name-popover` / `.md-strip` / `.tabs` / 预设行 / `.vocab-batch-cluster` / `.et-field` / `.quick-row` / `.notes-toolbar` / `.vocab-filter-toolbar` …） | 三表面 | **不适用** | 子控件之间有可见间隙（§8.1） |
+| 容器类（`.vocab-batch-bar` / `#vocab-lookup-bar` / `.confirm-popover` ×3 / `.theme-name-popover` / `.md-strip` / `.tabs` / 预设行 / `.vocab-batch-cluster` / `.quick-row` / `.notes-toolbar` / `.vocab-filter-toolbar` …） | 三表面 | **不适用** | 子控件之间有可见间隙（§8.1） |
 
 ### 8.6 使用守则
 
@@ -1364,12 +1364,9 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
 | options | `.fg` | 表单组；`margin-bottom: var(--opt-rhythm)`（12px）= 组间节律的唯一主人 |
-| options | `.fg-stack` | `.fg` 修饰：peer 选项堆叠；标题 `.bl` → 首项 6px；行距 2/4px（阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代） |
-| options | `.fg-indent` | 从属项缩进 `--opt-indent: 20px`（原为 13px 复选框 + sp-3 的文字对齐值；batch4 设置项改 `.switch` 后没有框可让，只表达层级，值保持不变；刻度外故有名，阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代） |
-| options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；legacy（`[data-ui-stage0]` 外）：作 `.fg` 末子元素时 `margin-top: sp-3`，作兄弟时不带 margin；**在 `[data-ui-stage0]` 内**（stage2 §2）：作 `.fg` 末子元素时 `margin-top: --opt-label-gap`（8/4，按密度），作 `.fg` 的兄弟或 `.pf` 的子元素时 `margin-top: sp-6`（16） |
+| options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；legacy（`[data-ui-stage0]` 外）：作 `.fg` 末子元素时 `margin-top: sp-3`，作兄弟时不带 margin；**在 `[data-ui-stage0]` 内**（stage2 §2）：作 `.fg` 末子元素时 `margin-top: --opt-label-gap`（8/4，按密度），作 `.fg` 的兄弟或 `.pf` 的子元素时 `margin-top: sp-6`（16）。Send-to 卡片测试行 `.export-target-card > .fg-actions` `margin-top: sp-6` |
 | options | `.hint` / `.hint-warn` | 11px 辅助文字；`.fg > .hint` 距控件 sp-1；组外 `margin: sp-1 0 rhythm` |
-| options | `.section-title` | h2，15px/600，上下 sp-4；配 `.divider`（sp-6 0，1px，阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代）；`[data-ui-stage0]` 覆盖为 16px/600（字号走 `--opt-text-section`，行高 `--opt-lh-section` 24，margin 归零改 `0 0 --opt-sp-5`，见下一行 `section.settings-section`） |
-| options | `.choice-row` | 复选/单选行标记；在 `.fg-stack` 内行距 sp-1（阶段 3 退役，被本表 settings-section / pref-* / entry-block / edit-area 行取代） |
+| options | `.section-title` | h2，15px/600，上下 sp-4；`[data-ui-stage0]` 覆盖为 16px/600（字号走 `--opt-text-section`，行高 `--opt-lh-section` 24，margin 归零改 `0 0 --opt-sp-5`，见下一行 `section.settings-section`） |
 | options | `details.disclosure` + `.disclosure-body` | 唯一折叠原语；标题 = section-title 面 + 右侧 chevron；成员自带上边线，堆叠对称 12px；正文齐平，`> :last-child` 去下 margin；`[data-ui-stage0] .disclosure > summary` 同 `.section-title` 一样覆盖为 16px/600（字号走 `--opt-text-section`，行高 `--opt-lh-section`，stage3b Task 2：连接概览 disclosure 与 general 的 h2 首次共处一个 stage-0 面板暴露出二者字号不一致，render-audit family 7 headerFace 抓到） |
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |
 | options | `.pf` | 带边框子面板（provider 卡）：legacy（`[data-ui-stage0]` 外）padding sp-5，radius md，`margin-top sp-4`；**在 `[data-ui-stage0]` 内**（stage2 §2）：padding `--opt-panel-pad`（16 comfortable/12 compact）、`margin-top sp-6`（16）；`> h3` 字号/行高 `--opt-text-body`/`--opt-lh-body`、字重 600、色 `--opt-fg`（不落回 legacy 的 `--opt-fg-soft` 未主题态 / `--opt-fg-muted` 主题态两段式）、`margin: 0 0 --opt-label-gap` |
@@ -1380,7 +1377,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `.pref-group` | 偏好行列表；作分区直接子元素时 `margin-bottom: --opt-sp-6`；相邻 `.pref-row` 之间 1px `--opt-border-section` 分隔线；`.pref-group-radio`（单选专用分组标记类）自 stage3b Task 1 起不再携带独立几何（旧"无线 40/36 行"变体与混合组 8px 圆点间距覆盖均已删除）——组内单选行与开关行同走 `.pref-row > label.pick`/`label.switch` 的同一套行几何，该类只剩选择器/测试识别用途 |
 | options | `.pref-row` | 一行 = `label`（flex、align center、gap sp-5、`min-height --opt-row-min-h`、`padding --opt-row-pad-y 0`、正文字号）；`.pref-row-sub` 左缩进 sp-7；**紧跟分区标题的首行去掉上内边距并把 min-height 减去一个 pad**（R9：标题→首行文字 = 12；不限于 `.fg.entry-block` 里的开关/单选组——ai-content-source 的两个 `.pick` 行是 `.settings-section > .pref-group` 的直接子行，R9 同样命中其首行 `opt-ai-src-local`，`.pick` 的 choice-host 覆盖`--pick-row1-h` 与之同式） |
 | options | `.pref-row.context-help-host[data-help-role="choice"]` | 帮助宿主落在 `.pref-row` 内的开关/单选行：四条限定覆盖对抗遗留 `.context-help-host[data-help-role="choice"] > label.switch` 配方的 shorthand——`column-gap: --opt-sp-3` + `row-gap: 0`（还原开关自身 6px 文案→图标间距；`row-gap` 必须显式清零，写成 `gap` shorthand 会把遗留的 `row-gap: 0` 一并重置为 6px，在闭合、空的 `::details-content` 折叠行上长出一条幽灵行）、`.switch-text` 行高归 `--opt-lh-body`、`padding-top`/`padding-bottom` 归 `--opt-row-pad-y`、`.pref-row-sub` 时再加 `padding-left: --opt-sp-7`。契约：闭合态行高与同层级 plain `.pref-row` 相等（含"紧跟标题的首行"矮一档的场合，±1px 容差）；展开态答案占满行宽，文案→答案间距固定 6px（`--opt-sp-3`，两个密度档同值，不随 pref-row 自身 12/8px 的行内间距变化）。 |
-| options | `.fg.entry-block` | 录入块：`label.bl`（正文字号、`--opt-fg` 色、`margin-bottom --opt-label-gap`）+ 控件占满内容列（`max-width: none`），唯 select 例外（枚举类控件按内容定宽：`width: max-content; min-width: 240px; max-width: 100%`，阶段 2 的列表框按钮同此）+ 可选 `p.hint`；带帮助时 label 归 grid 宿主、`details:not([open]) + *` 承担 label-gap，展开态由全局 `[open] + *` 固定 8 |
+| options | `.fg.entry-block` | 录入块：`label.bl`（正文字号、`--opt-fg` 色、`margin-bottom --opt-label-gap`）+ 控件占满内容列（`max-width: none`），唯 select 例外（枚举类控件按内容定宽：`width: max-content; min-width: 240px; max-width: 100%`，阶段 2 的列表框按钮同此）+ 可选 `p.hint`；带帮助时 label 归 grid 宿主、`details:not([open]) + *` 承担 label-gap，展开态由全局 `[open] + *` 固定 8。Send-to 卡片字段（options.js `renderExportTargets`）即录入块，无 `.et-field` 修饰、无宽度分档 |
 | options | `.entry-block-sub` | 从属录入块，左缩进 sp-7，与 `.pref-row-sub` 同值 |
 | options | `.fg.edit-area` | 编辑区：`label.bl` + textarea 占满（min-height 96、13px/20px、内距 sp-4 × control-pad-x） |
 | options | 控件外观 | 底 `--opt-panel`、边 `--opt-border`（≥3:1 门已有） |
@@ -1426,7 +1423,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | `clusterGap` | 图标簇（library `.lib-cluster`、popup `.header-icons`、md-preview `.xp-window-actions`）column-gap **= 4px**，四表面同值；这三处是同一形状的三个名字，门锁形状、名字留在各表面 | `[render]` family 12 |
 | `radiusScale` | 有 chrome 的盒子统一圆角 ∈ 本表面 radius token 的**实时**值（token 逐主题不同）或 pill；融合壳后代豁免 | `[render]` family 9 |
 | `textFloor` | 任何可见文字 computed font-size ≥ 11px（`sup`/`sub` 除外；阅读器正文不在 chrome 扫描内） | `[render]` family 10 |
-| `spacingScale` | 所有元素的 margin、以及**布局盒**（条/面板/弹层/行/列表）的 padding 与 gap，computed 值 ∈ 本表面 sp 刻度的**实时**值（`--opt-sp-N` / `--pp-sp-N` / `--lib-sp-N` / `--sp-N`）；`auto`/百分比/负值/≤1px hairline 不计。**控件与 chip 自身的 inset 是组件几何**（`.btn-sm` 2/8、chip padV 2、select 箭头位 26、key 字段眼睛位 32），由 controlRung / hitAreaMin / chip 律管，本律只查其 margin。页面壳（`main` / `.rail` / 空态）与派生对齐偏移（`.fg-indent` = `--opt-indent: 20px`，原为复选框 13 + sp-3 6 ≈ 20 的对齐值，batch4 `.switch` 后只表达层级、值不动、`.tab-group-label` = 页签内距 sp-5 + 2px 指示条）豁免。存量债在 `tests/render-audit-spacing-baseline.json`（只减不增：新增即 FAIL，删除放行并报 STALE；`--write-spacing-baseline` 是唯一写入口） | `[render]` family 11 |
+| `spacingScale` | 所有元素的 margin、以及**布局盒**（条/面板/弹层/行/列表）的 padding 与 gap，computed 值 ∈ 本表面 sp 刻度的**实时**值（`--opt-sp-N` / `--pp-sp-N` / `--lib-sp-N` / `--sp-N`）；`auto`/百分比/负值/≤1px hairline 不计。**控件与 chip 自身的 inset 是组件几何**（`.btn-sm` 2/8、chip padV 2、select 箭头位 26、key 字段眼睛位 32），由 controlRung / hitAreaMin / chip 律管，本律只查其 margin。页面壳（`main` / `.rail` / 空态）与派生对齐偏移（`.tab-group-label` = 页签内距 sp-5 + 2px 指示条）豁免。存量债在 `tests/render-audit-spacing-baseline.json`（只减不增：新增即 FAIL，删除放行并报 STALE；`--write-spacing-baseline` 是唯一写入口） | `[render]` family 11 |
 | `weakTextOnFill` | §9.1 律 8：任何带自身文字节点的元素、或 icon-only 按钮，computed `color` 若命中本主题**实时**的 `--{ns}-fg-hint` / `--{ns}-fg-muted` / `--{ns}-link`，则从该元素本身起沿祖先链上溯到最近一个非透明 `background-color`，该填充若命中本主题实时的 `--{ns}-btn-bg` / `--{ns}-btn-hover` / `--{ns}-input-bg` / `--{ns}-chip-bg`（library 另加两条批量选中带，值算自实时 `--lib-bg`/`--lib-accent` 与 composer 导出的 `LIB_BATCH_BAND_MIX`，不手抄 0.20/0.26）即判 FAIL。只测静息态——hover 不在门内（token 侧由 `contrast-audit` 的 `btn-fg-muted vs btn-hover` / `fg vs btn-hover` 行兜底）。**豁免清单**（T5 fix wave 起，每一类都是「触发」而非自动豁免——命中还须清同一道**实测配色比**门槛：文字 4.5:1、icon-only 3:1，用本文件自带的 `cr` 现测 colorRgb/fillRgb，不借用任何角色名义上的保证；未清门槛照样落 FAIL，附 `[was-exempt-by …]` 标注）：①`:disabled`——唯一**无条件**豁免（WCAG 1.4.3，按活的 `disabled` IDL 属性沿祖先链判定，不按选择器文本）；②identity——实测色同时命中 `fg` / `btn-fg` / `btn-fg-muted`（三表面通用）或 `--lib-row-selected-fg`（library 独有）之一，命中角色全部列出（非 first-match-wins）；③selection-marker——实测色 = `accent` 且元素带选中态标记（`aria-pressed="true"` / `aria-selected="true"` / `aria-current` / `.active` / `.selected`）；④safe-host——落点填充**逐字节相等**（无 ±3 容差）于本主题已由 `contrast-audit` 保证 `fg-hint`/`fg-muted` 达 4.5:1 的页面级宿主（`bg`、`bg2`/`panel`；options 另加 `pf-bg`/`code-bg`；popup 另加 `drop-hover`——options 从未声明 `--opt-drop-hover`，不在其安全宿主表内）；popup/options 的 `link` 排除在此豁免外（两表面均无 `link vs <host>` 行，无保证可借；library 因有 `link vs bg`/`link vs panel` 行而保留）。**覆盖面**（不再只测 CHECKS 顺手打开的状态）：options 逐一点开全部 13 个 tab 面板 + 面板内每个非帮助 `<details>` + appearance 页的预设预览/主题命名弹层/确认弹层 + Account 页连接状态折叠；popup 复用 `runSweep` 已知的 11 条隐藏态开关 + 确认弹层；library 的批量选中带开关一律 fail-closed（缺目标即 `throw SETUP`，不再静默扫错状态）。与 family 4-12 不同：颜色 token 逐主题不同，不是主题不变量，因此**不是**单趟 `--sweep` 覆盖全部主题，而是在每个 (surface, theme) 页面内、由本 family 自己的点开顺序就地扫描（`recordWeakTextHits`，见 `runSimpleTheme`/`runLibraryTheme`）。扫描元素计数逐 (surface, theme, context) 打印，用于把「0 FAIL」与「根本没扫到」分开。**范围外**（故意不建模，非疏漏）：背景图/渐变填充、`::before`/`::after` 填充、`::placeholder` 文字、alpha 合成（`parseColor` 丢弃 alpha）、`<a>`/`<summary>` 的 icon-only 与带自身标签文字的按钮内图标、library 两条批量选中带以外的任何 `color-mix()` 填充 | `[render]` family 13 |
 
 ### 10.4 门与触发面

@@ -14,11 +14,11 @@
   <h2>Pinboard Account</h2>
   <div class="fg"><label for="secret-token">API Token</label><input id="secret-token" value="alice:TOP_SECRET" /></div>
   <p class="hint">Use Chrome Sync on this device</p>
-  <div class="fg choice-stack">
-    <div class="choice-row"><label for="sync-first">First sync choice</label><input id="sync-first" /><p class="hint">First sync explanation</p></div>
-    <div class="choice-row"><label for="sync-second">Second sync choice</label><input id="sync-second" /><p class="hint">Second sync explanation</p></div>
+  <div class="pref-group">
+    <div class="pref-row"><label for="sync-first">First sync choice</label><input id="sync-first" /><p class="hint">First sync explanation</p></div>
+    <div class="pref-row"><label for="sync-second">Second sync choice</label><input id="sync-second" /><p class="hint">Second sync explanation</p></div>
     <!-- A .switch choice row with its help INSIDE the label (Ruling 36). -->
-    <div class="choice-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="switch-inlabel" aria-labelledby="switch-inlabel-label" /> <span class="switch-text" id="switch-inlabel-label">Wvxq inline help switch</span><details class="context-help"><summary class="context-help-toggle" aria-label="More information"></summary><p class="hint context-help-body">Wvxq inline help answer</p></details><span class="switch-track" aria-hidden="true"></span></label></div>
+    <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="switch-inlabel" aria-labelledby="switch-inlabel-label" /> <span class="switch-text" id="switch-inlabel-label">Wvxq inline help switch</span><details class="context-help"><summary class="context-help-toggle" aria-label="More information"></summary><p class="hint context-help-body">Wvxq inline help answer</p></details><span class="switch-track" aria-hidden="true"></span></label></div>
   </div>
   <!-- The one collapse mechanism the real page buries settings in: keyed
        native details.disclosure sections, closed. The second one nests a
@@ -265,8 +265,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
 
   await test("a live readout (#tag-gov-overview) marked data-search-skip never becomes a dead search row", async () => {
     // Regression: it changed from <p class="fg"> to <p class="hint">, which
-    // the .hint branch resolves a target from via .closest(".choice-row,
-    // .fg, .pref-row, .pref-group") -- none of those ancestors exist here,
+    // the .hint branch resolves a target from via .closest(".fg, .pref-row,
+    // .pref-group") -- none of those ancestors exist here,
     // so it used to enter the index with an empty targetId, e.g. "27 tags ·
     // 3,412 uses · Ignored: 2 · Reset ignored list" pointing nowhere.
     const index = pbpBuildSettingsSearchIndex(document);
@@ -949,8 +949,6 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("stage0: popup panel carries the prototype marker and no legacy row classes", async () => {
     const proto = await stage0Panel("popup");
     assert(!!proto, "panel-popup is missing the data-ui-stage0 marker");
-    assert(!proto.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
-      "panel-popup still carries a legacy row/stack class");
   });
 
   await test("stage0: every switch in the panel sits in a .pref-row inside a .pref-group", async () => {
@@ -965,7 +963,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     const proto = await stage0Panel("popup");
     const hints = [...proto.querySelectorAll(".hint")];
     assert(hints.length > 0, "expected at least one .hint in the popup panel");
-    assert(hints.every((h) => h.closest(".choice-row,.fg")), "every .hint must resolve a .choice-row or .fg owner");
+    assert(hints.every((h) => h.closest(".fg")), "every .hint must resolve a .fg owner");
   });
 
   // Review round 1, finding 1 (IMPORTANT): the base stage-0 rule
@@ -988,7 +986,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
 
   await test("stage2: AI panel carries the marker and has no legacy divider", async () => {
     const ai = await stage0Panel("ai");
-    assert(!!ai && !ai.querySelector(".divider"), "panel-ai is missing data-ui-stage0 or still carries a .divider");
+    assert(!!ai, "panel-ai is missing the data-ui-stage0 marker");
   });
 
   await test("stage2: every .fg inside the AI panel is an entry block", async () => {
@@ -1026,8 +1024,6 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     await test(`stage3a: ${id} panel carries the marker and no legacy row classes`, async () => {
       const panel = await stage0Panel(id);
       assert(!!panel, `panel-${id} is missing the data-ui-stage0 marker`);
-      assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
-        `panel-${id} still carries a legacy row/stack class`);
     });
 
     await test(`stage3a: every switch in the ${id} panel sits in a .pref-row`, async () => {
@@ -1102,8 +1098,6 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("stage3b: general panel carries the marker and no legacy row classes", async () => {
     const panel = await stage0Panel("general");
     assert(!!panel, "panel-general is missing the data-ui-stage0 marker");
-    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
-      "panel-general still carries a legacy row/stack class");
   });
 
   await test("stage3b: every switch in the general panel sits in a .pref-row", async () => {
@@ -1142,8 +1136,6 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("stage3b: storage panel carries the marker and keeps its static shape", async () => {
     const panel = await stage0Panel("storage");
     assert(!!panel, "panel-storage is missing the data-ui-stage0 marker");
-    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
-      "panel-storage still carries a legacy row/stack class");
     const section = panel.querySelector("section.settings-section");
     assert(!!section, "panel-storage's content is not wrapped in a section.settings-section");
     assert(!!section.querySelector("#storage-cats.storage-cats"), "panel-storage lost its #storage-cats mount point");
@@ -1159,8 +1151,6 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("stage3b: markdown panel carries the marker and no legacy row classes", async () => {
     const panel = await stage0Panel("markdown");
     assert(!!panel, "panel-markdown is missing the data-ui-stage0 marker");
-    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
-      "panel-markdown still carries a legacy row/stack class");
   });
 
   await test("stage3b: every switch in the markdown panel sits in a .pref-row inside a .pref-group", async () => {
@@ -1193,8 +1183,6 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("stage3b: tags panel carries the marker and no legacy row classes", async () => {
     const panel = await stage0Panel("tags");
     assert(!!panel, "panel-tags is missing the data-ui-stage0 marker");
-    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
-      "panel-tags still carries a legacy row/stack class");
   });
 
   await test("stage3b: opt-tag-sort-by-pop sits in a .pref-row inside a .pref-group", async () => {
@@ -1225,8 +1213,6 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("stage3b: appearance panel carries the marker and no legacy row classes", async () => {
     const panel = await stage0Panel("appearance");
     assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
-    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
-      "panel-appearance still carries a legacy row/stack class");
   });
 
   await test("stage3b: opt-popup-follow-theme sits in a .pref-row inside a .pref-group", async () => {
@@ -1276,8 +1262,6 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("stage3b: vocab panel carries the marker and no legacy row classes", async () => {
     const panel = await stage0Panel("vocab");
     assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
-    assert(!panel.querySelector(".choice-row, .fg-stack, .choice-stack, .fg-indent, .divider"),
-      "panel-vocab still carries a legacy row/stack class");
   });
 
   await test("stage3b: dict-echo-enabled sits in a .pref-row inside a .pref-group", async () => {
