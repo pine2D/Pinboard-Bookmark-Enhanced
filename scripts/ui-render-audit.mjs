@@ -3294,15 +3294,32 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // fixture's untouched "Extension pages follow the Pinboard theme
       // preset" default) as weakTextOnFill's own restore below. Every group
       // from here on (keyWrap/other/storagePick/aiProvider/aiBehavior/
-      // switch) trusts the live page to already be on THIS theme.
+      // switch) trusts the live page to already be on THIS theme -- so,
+      // like weakTextOnFill's own `liveTheme` check and the `.switch` group's
+      // `_swLanded` check further down, this reads BOTH attributes back and
+      // fails setup loudly on a mismatch instead of letting a drifted page
+      // silently reach the checks below with a comfortable/wrong-theme face
+      // (fix round 1: the render-audit run this task's own densityTier check
+      // caught had exactly this drift going undetected here).
       const { themePresetKey: _ptPresetKey, optTheme: _ptMode } = themeToStorage(theme);
-      const _ptRestored = await page.evaluate(({ mode, presetKey }) => {
-        if (typeof pbpApplyOptionsEarlyTheme !== "function") return false;
+      const _ptLanded = await page.evaluate(({ mode, presetKey }) => {
+        if (typeof pbpApplyOptionsEarlyTheme !== "function") return null;
         pbpApplyOptionsEarlyTheme(mode, presetKey, true);
-        return true;
+        return {
+          theme: document.documentElement.dataset.theme || null,
+          density: document.documentElement.dataset.density || null,
+        };
       }, { mode: _ptMode, presetKey: _ptPresetKey });
-      if (!_ptRestored) {
-        throw new Error(`SETUP: pbpApplyOptionsEarlyTheme is not defined on options.html (theme=${theme}) -- cannot restore documentElement.dataset.theme after the preset-preview click`);
+      if (!_ptLanded) {
+        throw new Error(`SETUP ERROR [options|${theme}|preset-preview group]: pbpApplyOptionsEarlyTheme is not defined on options.html -- cannot restore documentElement.dataset.theme after the preset-preview click`);
+      }
+      const _ptExpectedTheme = expectedDatasetTheme(theme);
+      if (_ptLanded.theme !== _ptExpectedTheme) {
+        throw new Error(`SETUP ERROR [options|${theme}|preset-preview group]: restore left documentElement.dataset.theme=${JSON.stringify(_ptLanded.theme)}, expected=${JSON.stringify(_ptExpectedTheme)} -- the theme re-apply did not take, so every group after this one would measure another theme's palette`);
+      }
+      const _ptExpectedDensity = OPTIONS_DENSITY.densityOf(theme) === "compact" ? "compact" : null;
+      if (_ptLanded.density !== _ptExpectedDensity) {
+        throw new Error(`SETUP ERROR [options|${theme}|preset-preview group]: restore left documentElement.dataset.density=${JSON.stringify(_ptLanded.density)}, expected=${JSON.stringify(_ptExpectedDensity)} -- the theme re-apply did not restore density, so every density-tiered check after this one would measure the wrong tier`);
       }
     }
     if (keyWrapChecks.length) {

@@ -226,8 +226,11 @@ check(/\[data-ui-stage0\] \.btn:not\(\.context-help-toggle\)\s*\{[^}]*height:\s*
   // expecting the bare slug instead would reject the only implementation
   // that actually works at runtime -- or, worse, pass a map that added the
   // inert bare slug instead of the two real targets.
+  // readOptionsDensity throws (a SETUP failure, not a check() row) if the
+  // adaptive map or any pilot's ui.density cannot be trusted -- fix round 1,
+  // task-2-review: letting that propagate here beats degrading to an empty
+  // table and silently passing the two checks below on nothing.
   const density = readOptionsDensity(root);
-  check(density.adaptiveMapFound, "PBP_OPTIONS_ADAPTIVE_MAP definition not found in options-theme-early.js");
   const compactFromPilots = density.compactTargets;
 
   const mapSrc = optionsThemeEarlyJs.match(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\((\{[^}]*\})\)/);
