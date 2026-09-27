@@ -362,7 +362,7 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
   `choice` 的 label 是 flex 行且首项是 checkbox，flex 容器的基线默认取首项（checkbox 没有文字基线，按底边合成、
   不随字体动），所以由文案 span 单独 `align-self: baseline` 参与基线对齐，label 的基线即成为文字基线；所有 choice 文案 span 的
   `line-height` 取 pref-row 行的 `--opt-lh-body`，文字与 checkbox 均不动。
-  **只有 `action`**（按钮行，无文字基线可借）保持 `align-self: center`，常量取两家字体区间的中值。
+  **`action`**（按钮行）的 wrapper 与 toggle 取按钮文字基线，容器仍居中；常量是基线→光学中心。
   summary 的 margin box 仍是零高，两种锚定都不参与行高。
   校准时用 `PBP_HELP_RASTER_RANGES=1` 让栅格门在通过时也打印各角色区间，本机与 `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf"`
   各跑一次，取两者都落在容差内的值。

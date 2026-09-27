@@ -86,9 +86,12 @@ import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs"
 // library-chrome.mjs derives --lib-row-selected-fg against -- imported, never
 // hand-typed 0.20/0.26 in this file (see WEAK_TEXT_CFG.library below).
 import { LIB_BATCH_BAND_MIX } from "../docs/theme-surface/composers/library-chrome.mjs";
+// Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
+import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
+const OPTIONS_DENSITY = readOptionsDensity(ROOT);
 const KNOWN_FAILURES_PATH = resolve(ROOT, "tests", "render-audit-known-failures.json");
 const TIMEOUT_MS = 15000;
 
@@ -645,20 +648,19 @@ function evaluateCheck(check, raw, theme) {
   // known-failures normally -- it is not a silent skip).
   const hostZero = raw.rect.width === 0 || raw.rect.height === 0;
   const zeroNote = "zero-size element (width or height is 0) -- not actually rendered/visible; fixture setup or a display:none regression";
-  // resolvePxSpec (Task 3, ui-system-stage0-design §4): a literal geometry
-  // spec is normally { value, tolerancePx } -- a fixed target regardless of
-  // theme, same discipline the file-header note above describes for every
-  // OTHER expect key. A few stage-0 rows are the one genuine exception: they
-  // read a CSS token that itself redefines under html[data-density="compact"]
-  // (--opt-control-h / --opt-row-min-h / --opt-text-body), so their spec
-  // carries { comfortable, compact, tolerancePx } instead and this picks the
-  // live tier off raw.density (probeSelector's own live read, same pattern
-  // colorSchemeMatchesTheme's raw.rootColorScheme already uses). A spec with
-  // `value` always wins -- existing heightPx/fontSizePx entries that predate
-  // this key are untouched.
+  // Density-tiered specs ({ comfortable, compact }): the tier is the theme's
+  // pilot ui.density (options only; every other surface is single-tier). The
+  // page's own html[data-density] must agree -- a disagreement is its own FAIL
+  // row, not silently absorbed by reading the page.
+  const densityTier = check.surface === "options" ? OPTIONS_DENSITY.densityOf(theme) : "comfortable";
+  const usesDensitySpec = Object.values(exp).some((s) => s && typeof s === "object" && "comfortable" in s && "compact" in s);
+  if (usesDensitySpec && check.surface === "options" && raw.density !== densityTier) {
+    out.push(verdict("densityTier", false, raw.density, densityTier,
+      "html[data-density] disagrees with the pilots' ui.density for this theme (PBP_OPTIONS_DENSITY_MAP drift, or a setup step re-derived the theme)"));
+  }
   function resolvePxSpec(spec, defaultTolerancePx) {
     const tolerancePx = spec.tolerancePx ?? defaultTolerancePx;
-    const value = "value" in spec ? spec.value : (raw.density === "compact" ? spec.compact : spec.comfortable);
+    const value = "value" in spec ? spec.value : spec[densityTier];
     return { value, tolerancePx };
   }
 
@@ -3268,9 +3270,13 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // tab panel the summary lives on) to reveal it. This is a DIFFERENT
       // preset system from the THEMES loop this runner is already iterating
       // (that one is the extension UI's own popup/options/library chrome;
-      // this is the pinboard.in SITE theme picker) -- picking "flexoki" here
-      // is unrelated to and doesn't fight with whichever THEMES entry is
-      // currently active. The same click also satisfies presetRowChecks:
+      // this is the pinboard.in SITE theme picker) -- but "Extension pages
+      // follow the Pinboard theme preset" means clicking it ALSO re-derives
+      // documentElement.dataset.theme (and its density, options-theme-
+      // early.js's own PBP_OPTIONS_DENSITY_MAP[target]) onto "flexoki" as a
+      // side effect (the exact drift weakTextOnFill's own restore, further
+      // down, documents as "F1") -- restored below before any later group
+      // measures the page. The same click also satisfies presetRowChecks:
       // it's what puts .active on a .theme-preset-btn in the first place.
       await page.click("#tab-appearance");
       await page.click(".theme-preset-btn[data-theme='flexoki']");
@@ -3280,6 +3286,23 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       if (savedThemeChecks.length) {
         await page.waitForSelector(".saved-theme-btn", { timeout: TIMEOUT_MS });
         for (const check of savedThemeChecks) await runOneCheck(page, theme, check, results);
+      }
+      // Restore documentElement.dataset.theme (and its density) in-page --
+      // NOT a reload, which would cost every remaining group's own tab
+      // click again for no benefit -- via the exact function the boot/
+      // reload path calls, same technique and same `follow: true` (this
+      // fixture's untouched "Extension pages follow the Pinboard theme
+      // preset" default) as weakTextOnFill's own restore below. Every group
+      // from here on (keyWrap/other/storagePick/aiProvider/aiBehavior/
+      // switch) trusts the live page to already be on THIS theme.
+      const { themePresetKey: _ptPresetKey, optTheme: _ptMode } = themeToStorage(theme);
+      const _ptRestored = await page.evaluate(({ mode, presetKey }) => {
+        if (typeof pbpApplyOptionsEarlyTheme !== "function") return false;
+        pbpApplyOptionsEarlyTheme(mode, presetKey, true);
+        return true;
+      }, { mode: _ptMode, presetKey: _ptPresetKey });
+      if (!_ptRestored) {
+        throw new Error(`SETUP: pbpApplyOptionsEarlyTheme is not defined on options.html (theme=${theme}) -- cannot restore documentElement.dataset.theme after the preset-preview click`);
       }
     }
     if (keyWrapChecks.length) {
@@ -3816,6 +3839,10 @@ const SWEEP_CFG = {
   // metrics and vary by platform, which is why textInset stays a discovery
   // family rather than a gate.
   textInsetH: 4, textInsetV: { sm: 1.5, md: 2, other: 2 }, rowTolerance: 1, rhythmLabelMin: 3, rhythmLabelMax: 6, rhythmActionMin: 4,
+  // The sweep pass runs once, on the deterministic default theme runSweep's
+  // options/library legs set up (setTheme(sw, "", "light")) -- a fixed tier,
+  // not a per-theme lookup, is correct here.
+  densityTier: OPTIONS_DENSITY.densityOf(""), // runSweep's options legs run on setTheme(sw, "", "light")
   // Families 6-9 (design-language gates, 2026-09-05). Geometry is a theme
   // invariant, so one light pass per surface covers every preset.
   // Prose in the reader is typography, not chrome: excluded wholesale.
@@ -3823,22 +3850,18 @@ const SWEEP_CFG = {
   // 6. controlRung -- COMPONENTS.md §1.1 / §6.3: two control heights (md 26,
   //    sm 20) besides the 24px icon target (family 4 owns icon-only buttons).
   //    Exemptions are structural, each a family with its own rung, not a
-  //    per-instance allowlist. Dual contract inside [data-ui-stage0], see
-  //    stageZero below.
+  //    per-instance allowlist. Options controls read the density rung, see
+  //    rung.density.
   rung: {
     values: [26, 20], tol: 1,
-    // Stage-0 dual contract (spec 2026-09-23-ui-system-stage0-design §2/§4):
-    // controls inside the prototype container use the comfortable tier
-    // (32 md / 28 sm); compact tier is 28/24. `labelGap` (Task 3 follow-up
-    // ruling) is the SAME dual contract for family 5's fgRhythm label->
-    // control relationship (spec §2's "标签→控件" row: 8 comfortable / 4
-    // compact) -- one `marker`/tier read shared by both families, not two
-    // separate definitions. Both retire together with the marker (CLAUDE.md
-    // temporary item, expiry 2026-12-31).
-    stageZero: { marker: "[data-ui-stage0]", values: { comfortable: [32, 28], compact: [28, 24] }, labelGap: { comfortable: 8, compact: 4 } },
+    // Options density rung (COMPONENTS.md §1.1 comfortable/compact columns).
+    // Since stage 3c every control on the options surface is on it; the
+    // tier comes from the pilots via densityTier below. `labelGap` is family
+    // 5's label->control contract for the same tier (8 / 4).
+    density: { surface: "options", values: { comfortable: [32, 28], compact: [28, 24] }, labelGap: { comfortable: 8, compact: 4 } },
     // densityComponents (Task 4, ui-system-stage2, Controller ruling B):
     // `.listbox-btn` / `.listbox-opt` read `var(--opt-control-h)` directly
-    // (options.css, unconditional -- not gated by [data-ui-stage0]), so they
+    // (options.css, unconditional -- wherever they render), so they
     // are density-tiered wherever they render, not only inside the stage-0
     // prototype container. `#translate-target-lang-btn` sits on the Reader
     // tab, OUTSIDE the marker, but still must be judged against the live
@@ -4232,12 +4255,9 @@ function sweepProbe(cfg) {
   // (one pass, theme-invariant geometry). Scoped to the .fg family, which
   // only options has, so it is a no-op on popup/library.
   //
-  // label->control carries the SAME stage-0 dual contract as controlRung
-  // (spec §2/§4, Task 3 follow-up ruling): inside [data-ui-stage0] the
-  // target is an EXACT 8px (comfortable) / 4px (compact) rather than this
-  // surface's normal 3..6 range -- reuses cfg.rung.stageZero (marker + tier
-  // read + tolerance) rather than a second definition. control/hint->action
-  // is untouched; the prototype has no action row inside a stage-0 .fg yet.
+  // label->control on options is an EXACT --opt-label-gap for the theme's
+  // density tier (8 comfortable / 4 compact); .fg exists only on options, the
+  // 3..6 range stays for any future non-options .fg consumer.
   {
     const isControl = (el) => el.matches("input, select, textarea, .key-wrap");
     const isAction = (el) => el.matches(".fg-actions, button, .btn");
@@ -4246,14 +4266,10 @@ function sweepProbe(cfg) {
       return rb.top < ra.bottom - 0.5 ? null : Math.round((rb.top - ra.bottom) * 100) / 100; // null = side by side
     };
     const push = (el, rel, gap) => hits.push({ kind: "fgRhythm", path: pathOf(el), rel, gap });
-    const sz = cfg.rung.stageZero;
-    const labelControlOffScale = (b, gap) => {
-      if (b.closest(sz.marker)) {
-        const tier = document.documentElement.dataset.density === "compact" ? "compact" : "comfortable";
-        return Math.abs(gap - sz.labelGap[tier]) > cfg.rung.tol;
-      }
-      return gap < cfg.rhythmLabelMin || gap > cfg.rhythmLabelMax;
-    };
+    const onDensitySurface = location.pathname.endsWith(`/${cfg.rung.density.surface}.html`);
+    const labelControlOffScale = (gap) => (onDensitySurface
+      ? Math.abs(gap - cfg.rung.density.labelGap[cfg.densityTier]) > cfg.rung.tol
+      : gap < cfg.rhythmLabelMin || gap > cfg.rhythmLabelMax);
     for (const fg of document.querySelectorAll(".fg")) {
       if (!visible(fg)) continue;
       const kids = Array.from(fg.children).filter(visible);
@@ -4261,7 +4277,7 @@ function sweepProbe(cfg) {
         const a = kids[i - 1], b = kids[i];
         const gap = stackedGap(a, b);
         if (gap === null) continue;
-        if (a.matches("label.bl, .bl") && isControl(b) && labelControlOffScale(b, gap)) push(b, "label-control", gap);
+        if (a.matches("label.bl, .bl") && isControl(b) && labelControlOffScale(gap)) push(b, "label-control", gap);
         if (isAction(b) && !isAction(a) && gap < cfg.rhythmActionMin) push(b, "action", gap);
       }
     }
@@ -4293,34 +4309,12 @@ function sweepProbe(cfg) {
       if (el.matches("button, .btn, a.btn") && !el.matches(shellSel) && !iconLabel(el)) continue; // icon-only (x counts as an icon): family 4
       if (!el.matches(shellSel) && el.closest(shellSel)) continue; // inner of a fused shell: the shell is measured
       const h = el.getBoundingClientRect().height;
-      // Stage-0 dual contract (spec 2026-09-23-ui-system-stage0-design §4,
-      // Task 3): a control inside the [data-ui-stage0] prototype container
-      // is on the comfortable/compact rung instead of this surface's normal
-      // one, picked off the SAME live html[data-density] attribute
-      // options-theme-early.js writes (Task 1) -- not a static literal, so
-      // the check stays correct whichever tier the active theme landed on.
-      // Task 4 (ui-system-stage2, Controller ruling B): the button-family
-      // exclusion that used to sit here is retired -- the spec's stage-0
-      // rung now DOES cover `.btn`/`.btn-sm` (composer rules, options.css),
-      // so a button inside the marker must be judged against the SAME
-      // comfortable/compact tier as every other control there instead of
-      // being left on the surface's normal 26/20 rung. `.context-help-toggle`
-      // and every other icon-only button never reach this point at all (the
-      // `!iconLabel(el)` skip a few lines up, family 4's own territory).
-      // `#panel-popup`'s "Open Chrome Shortcut Settings" link (`a.btn.btn-sm`,
-      // no id) is NOT exempt -- it is the exact case the old exclusion's
-      // comment warned about, and it is now CORRECTLY re-tiered instead:
-      // task-4 baseline measured it failing at 28px against the old flat
-      // rung (26±1/20±1); after this change it reads 28px against the
-      // comfortable tier's `.btn-sm` value (28), which is the fix, not a
-      // regression. `densityComponents` (`.listbox-btn`/`.listbox-opt`) are
-      // on the same tier wherever they render, marker or not (see the
-      // config comment above) -- `#translate-target-lang-btn` lives on the
-      // Reader tab, outside the marker, but still reads the live tier.
+      // Options (every panel, stage 3c) and the density components wherever
+      // they render sit on the comfortable/compact rung of the theme's pilot
+      // density; popup/library/md-preview stay on 26/20.
       const isDensityComponent = cfg.rung.densityComponents.some((sel) => el.matches(sel));
-      const inStageZero = isDensityComponent || el.closest(cfg.rung.stageZero.marker);
-      const tier = document.documentElement.dataset.density === "compact" ? "compact" : "comfortable";
-      const allowedRungs = inStageZero ? cfg.rung.stageZero.values[tier] : cfg.rung.values;
+      const onDensityRung = isDensityComponent || surface === cfg.rung.density.surface;
+      const allowedRungs = onDensityRung ? cfg.rung.density.values[cfg.densityTier] : cfg.rung.values;
       if (!allowedRungs.some((v) => Math.abs(h - v) <= cfg.rung.tol)) {
         hits.push({ kind: "controlRung", path: pathOf(el), height: Math.round(h * 100) / 100, detail: `${Math.round(h)}px` });
       }

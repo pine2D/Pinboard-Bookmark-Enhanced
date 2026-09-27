@@ -671,11 +671,12 @@ label.switch > .context-help > .context-help-body {
    "API Key" label without per-setting exceptions. The 24px summary target
    itself never moves, so focus and pointer geometry stay stable. */
 [data-help-role] { --context-help-optical-y: 0px; }
-/* Centre-anchored role (the action row: a button, no text baseline to
-   borrow): one constant per script, sitting at the midpoint of the two font
-   stacks the raster audit runs under (Segoe UI / Microsoft YaHei on the
-   Windows host, DejaVu / WenQuanYi Zen Hei on CI via scripts/ci-fonts.conf).
-   Re-measure with PBP_HELP_RASTER_RANGES=1 before touching it. */
+/* Action role: the toggle rides the button-text baseline (rule above the
+   choice block); the constant is baseline -> optical centre, one value per
+   script, sitting at the midpoint of the two font stacks the raster audit
+   runs under (Segoe UI / Microsoft YaHei on the Windows host, DejaVu /
+   WenQuanYi Zen Hei on CI via scripts/ci-fonts.conf). Re-measure with
+   PBP_HELP_RASTER_RANGES=1 before touching it. */
 [data-help-script="alphabetic"][data-help-role="action"] { --context-help-optical-y: -1.5px; }
 [data-help-script="cjk"][data-help-role="action"] { --context-help-optical-y: -1px; }
 /* Text-only hosts (section / field / group) anchor the toggle to the copy's
@@ -698,6 +699,13 @@ label.switch > .context-help > .context-help-body {
 .context-help-host[data-help-role="section"] > .context-help > summary.context-help-toggle,
 .context-help-host[data-help-role="field"] > .context-help > summary.context-help-toggle,
 .context-help-host[data-help-role="group"] > .context-help > summary.context-help-toggle { align-self: baseline; }
+/* Action row (Appearance "Save as theme"): a button, no text of its own to
+   anchor on, but at the row model's 13px button face the local/CI fonts
+   split its glyph ascent by ~2 CSS px, so centring cannot fit both (stage-3b
+   Task 5). The wrapper and the toggle share the BUTTON TEXT baseline instead;
+   the row container itself stays centre-aligned. */
+.context-help-action-row[data-help-role="action"] > .save-theme-wrap,
+.context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle { align-self: baseline; }
 /* alphabetic/section re-measured 2026-09-22: CI failed on the two raster
    probes logged as "promptsHint" and "storageIntro", which read as distinct
    HOSTS (the 12px hint paragraph vs the 15px title) -- they are not. Every
@@ -1757,7 +1765,7 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    single vertical offset on the icon alone can centre it for both font
    configs (Task 5 measured local en -2.5 / zh -2, CI en +1.5 / zh +2.5 with
    no correction). Fix (Task 5 review, verified under both configs in a
-   worktree): let the button wrapper and the toggle share a BASELINE
+   worktree): (the baseline rule now lives in the base context-help block)
    instead of centring in the row, then nudge the icon +3px. Worst action
    delta becomes +-1 physical px (tolerance +-2) under both font configs and
    both densities; every other role is unchanged, the row height is
@@ -1766,8 +1774,6 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    Re-measure with `node scripts/options-help-render-audit.mjs` AND
    `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
    scripts/options-help-render-audit.mjs` before nudging further. */
-[data-ui-stage0] .context-help-action-row[data-help-role="action"] > .save-theme-wrap,
-[data-ui-stage0] .context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle { align-self: baseline; }
 [data-ui-stage0] .context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) + 3px)); }
 /* Stage-3a (Task 1, 2026-09-24-ui-system-stage3a): choice help hosts inside
    preference rows. The legacy `.context-help-host[data-help-role="choice"] >

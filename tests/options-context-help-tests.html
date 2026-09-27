@@ -178,22 +178,13 @@ function test(name, fn) {
       const visualGap = icon.left - a.right;
       if (visualGap < 6 || visualGap > 8) violations.push(key + " visual gap=" + visualGap);
       const iconStyle = frame.contentWindow.getComputedStyle(toggle.querySelector(".btn-ic"));
-      // [data-ui-stage0] hosts (Task 4 fix round 1, ui-system-stage2) render
-      // their section-title/label.bl anchor at a DIFFERENT font size than
-      // every other host of the same role (--opt-text-section/-body vs the
-      // surface's 15px/12px base) -- optical-y is an em-relative correction,
-      // so it MUST differ between the two sizes (options.css documents the
-      // measured before/after deltas next to the stage-0-scoped rule). This
-      // is the same "one shared invariant, two density tiers" shape the
-      // stage0-prefixed tests below already use for other stage-0 recipes,
-      // not a per-instance escape hatch -- the key still enforces that EVERY
-      // host within a tier (stage-0 or not) shares one transform, just as
-      // TWO separate tiers instead of one.
-      const inStageZero = !!host?.closest("[data-ui-stage0]");
-      const transformKey = role + "/" + script + (inStageZero ? "/stage0" : "");
+      // One transform per (role, script) bucket for every host on the page:
+      // since stage 3c every host renders its anchor at the row model's
+      // --opt-text-section / --opt-text-body face.
+      const transformKey = role + "/" + script;
       const priorTransform = transformByRole.get(transformKey);
       if (priorTransform && priorTransform !== iconStyle.transform) {
-        violations.push(`${key} role=${role} script=${script}${inStageZero ? " (stage0)" : ""} transform=${iconStyle.transform}, expected=${priorTransform}`);
+        violations.push(`${key} role=${role} script=${script} transform=${iconStyle.transform}, expected=${priorTransform}`);
       } else {
         transformByRole.set(transformKey, iconStyle.transform);
       }
@@ -878,23 +869,8 @@ function test(name, fn) {
   });
 
   test("coherent choice groups are single pref-groups on the row model", () => {
-    // Popup panel groups (2026-09-23-ui-system-stage0 Task 2), the
-    // bookmarks/quick/ai-behavior groups (2026-09-24-ui-system-stage3a Task
-    // 1), and the reader/archive groups (2026-09-24-ui-system-stage3a Task
-    // 2): migrated to the stage-0 row model, [data-ui-stage0] .pref-row
-    // inside .pref-group. That density is deliberately NOT the legacy
-    // compact-stack rhythm (the row model's whole point is a different,
-    // token-driven geometry), so these groups get their own containment
-    // check below instead of joining `groups` -- folding them back in would
-    // make the shared height/step uniformity assertion compare two
-    // intentionally different rhythms and fail on the gap between them, not
-    // on a real defect. General's sync/backup/notifications groups
-    // (2026-09-24-ui-system-stage3b Task 2) joined this bucket too, and
-    // Markdown's two groups (stage3b Task 3) were the last legacy compact
-    // stacks -- with them migrated, the legacy `groups` list and its
-    // height/step uniformity assertion had no consumer left and were deleted
-    // (an empty list would have asserted on Math.max() of nothing).
-    const stage0Groups = [
+    // Every coherent choice group is one `.pref-group` of `.pref-row`s.
+    const groups = [
       ["opt-check-bookmark-status", "opt-auto-close", "offline-queue-enabled"],
       ["opt-show-search", "opt-show-recent", "opt-show-badge", "opt-show-suggest-tags", "opt-show-ai-summary", "opt-show-ai-tags", "opt-show-quick-links", "opt-show-quick-row"],
       ["opt-private-default", "opt-private-incognito", "opt-readlater-default"],
@@ -912,7 +888,7 @@ function test(name, fn) {
       ["opt-md-frontmatter", "opt-md-extended-meta"],
       ["opt-md-include-toc", "opt-md-include-hl"],
     ];
-    stage0Groups.forEach((ids) => {
+    groups.forEach((ids) => {
       const rows = ids.map((id) => doc.getElementById(id)?.closest(".pref-row"));
       assert(rows.every(Boolean), ids[0] + " group has an unmarked row");
       const stack = rows[0].closest(".pref-group");

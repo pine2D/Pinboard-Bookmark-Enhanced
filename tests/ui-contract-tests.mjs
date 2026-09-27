@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import { parseStyleRules, parseDeclarations } from "../docs/theme-surface/tools/css-syntax.mjs";
+import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
@@ -225,22 +226,9 @@ check(/\[data-ui-stage0\] \.btn:not\(\.context-help-toggle\)\s*\{[^}]*height:\s*
   // expecting the bare slug instead would reject the only implementation
   // that actually works at runtime -- or, worse, pass a map that added the
   // inert bare slug instead of the two real targets.
-  const pilotDir = "docs/theme-surface/pilots";
-  const pilots = readdirSync(resolve(root, pilotDir))
-    .filter((f) => f.endsWith(".tokens.json"))
-    .map((f) => [f.replace(/\.tokens\.json$/, ""), JSON.parse(read(`${pilotDir}/${f}`))]);
-
-  const adaptiveMapSrc = optionsThemeEarlyJs.match(/PBP_OPTIONS_ADAPTIVE_MAP\s*=\s*(\{[^;]*\});/);
-  check(adaptiveMapSrc, "PBP_OPTIONS_ADAPTIVE_MAP definition not found in options-theme-early.js");
-  const adaptiveMap = adaptiveMapSrc ? runInNewContext("(" + adaptiveMapSrc[1] + ")", {}) : {};
-  // A slug that is an umbrella key expands to its [light, dark] targets;
-  // any other slug (including a non-umbrella slug that is ITSELF a valid
-  // data-theme value) is already its own target.
-  const expandTargets = (slug) => Object.prototype.hasOwnProperty.call(adaptiveMap, slug) ? adaptiveMap[slug] : [slug];
-
-  const compactFromPilots = [...new Set(
-    pilots.filter(([, t]) => t.ui && t.ui.density === "compact").flatMap(([slug]) => expandTargets(slug))
-  )].sort();
+  const density = readOptionsDensity(root);
+  check(density.adaptiveMapFound, "PBP_OPTIONS_ADAPTIVE_MAP definition not found in options-theme-early.js");
+  const compactFromPilots = density.compactTargets;
 
   const mapSrc = optionsThemeEarlyJs.match(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\((\{[^}]*\})\)/);
   const densityMap = mapSrc ? runInNewContext("(" + mapSrc[1] + ")", {}) : {};
@@ -255,8 +243,7 @@ check(/\[data-ui-stage0\] \.btn:not\(\.context-help-toggle\)\s*\{[^}]*height:\s*
   // would sit in the map inert: pbpApplyOptionsEarlyTheme's resolved
   // `target` never equals it, so PBP_OPTIONS_DENSITY_MAP's lookup never
   // matches and the density silently never applies.
-  const reachableTargets = new Set(pilots.flatMap(([slug]) => expandTargets(slug)));
-  const unreachable = Object.keys(densityMap).filter((key) => !reachableTargets.has(key));
+  const unreachable = Object.keys(densityMap).filter((key) => !density.reachableTargets.has(key));
   check(unreachable.length === 0,
     `options-theme-early.js density map has keys that are not reachable data-theme targets: ${unreachable.join(", ")}`);
 }
@@ -1161,19 +1148,15 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   // Hosts with copy anchor the toggle to the copy baseline (font ascent/descent
   // splits differ between the Windows and CI font stacks; a centred constant fits
   // only one of them); the choice label exposes its text baseline through the
-  // copy span opting into baseline alignment; the action row (a button) stays
-  // centred in its base rule. Inside [data-ui-stage0] (stage-3b Task 5) the
-  // action row is the exception to that exception: its button text grew to
-  // 13px there and the same local/CI ascent split reached it, so the marker-
-  // scoped rule anchors wrapper and toggle on the button text baseline --
-  // required below; 3c promotes it to the base rule when the marker retires.
+  // copy span opting into baseline alignment; the action row's wrapper and toggle
+  // share the button-text baseline while the row container itself stays centred.
   check(["section", "field", "group", "choice"].every((role) =>
     new RegExp(`\\.context-help-host\\[data-help-role="${role}"\\][^{]*\\{[^}]*align-items:\\s*baseline`).test(optionsCss) &&
     new RegExp(`\\.context-help-host\\[data-help-role="${role}"\\] > \\.context-help > summary\\.context-help-toggle[^{]*\\{[^}]*align-self:\\s*baseline`).test(optionsCss)) &&
     /\.context-help-host\[data-help-role="choice"\] > label > span[^{]*\{[^}]*align-self:\s*baseline/.test(optionsCss) &&
-    !/(?<!\[data-ui-stage0\] \.context-help-action-row)\[data-help-role="action"\][^{]*\{[^}]*align-(?:items|self):\s*baseline/.test(optionsCss) &&
-    /\[data-ui-stage0\] \.context-help-action-row\[data-help-role="action"\] > \.save-theme-wrap,\s*\[data-ui-stage0\] \.context-help-action-row\[data-help-role="action"\] > \.context-help > summary\.context-help-toggle \{ align-self: baseline; \}/.test(optionsCss),
-    "options.css: contextual help lost its anchoring split (copy roles on the text baseline via the label span, the base action row centred, the [data-ui-stage0] action row on the button-text baseline)");
+    !/\[data-help-role="action"\][^{]*\{[^}]*align-items:\s*baseline/.test(optionsCss) &&
+    /(?:^|\n)\.context-help-action-row\[data-help-role="action"\] > \.save-theme-wrap,\s*\.context-help-action-row\[data-help-role="action"\] > \.context-help > summary\.context-help-toggle \{ align-self: baseline; \}/.test(optionsCss),
+    "options.css: contextual help lost its anchoring split (copy roles on the text baseline via the label span, the action row's wrapper and toggle on the button-text baseline, its container centred)");
   check(/const det = summary && summary\.closest\("details"\);[\s\S]{0,500}details\.context-help\[open\]/.test(optionsJs),
     "options.js: contextual help lost the native-details motion gate or one-open-per-panel behavior");
   check(/const det = e\.target\.matches\?\.\("details\[data-acc-key\]"\) \? e\.target : null/.test(optionsJs) &&
