@@ -1903,15 +1903,21 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
 /* Task 1 (ui-system-stage3c retirement): the rule above reaches a bare
    entry-block input or the .key-wrap div itself, but not an input ONE level
    deeper inside that key-wrap -- and a key-wrap's own input can be
-   type="text" (a setting that is `secret: true` but not `type: "secret"`;
-   webhook's url is the one such field, export-targets.js) as well as the
-   usual type="password". A text-typed key-wrap input still falls to the
-   generic `.fg input[type="text"]:not(.fg-url)` 320px tier a few rules up
-   while its key-wrap sibling has already been un-capped to fill the column,
-   floating the eye toggle (pinned to the key-wrap's own right edge, not the
-   input's) off the narrower input -- the bug a now-retired Send-to-only
-   field recipe used to prevent (stage-3b Task 3 review B1). (0,4,1) beats
-   the (0,3,1) tier outright, so source order does not matter here. */
+   type="text" as well as the usual type="password": setupSecretToggles()
+   (shared.js) flips EVERY key-wrap input's type to "text" while its eye
+   toggle has it revealed, and a setting can also be declared `secret: true`
+   with `type: "text"` from the start (webhook's url, export-targets.js). A
+   text-typed key-wrap input still falls to the generic `.fg input[type=
+   "text"]:not(.fg-url)` 320px tier a few rules up while its key-wrap sibling
+   has already been un-capped to fill the column, floating the eye toggle
+   (pinned to the key-wrap's own right edge, not the input's) off the
+   narrower input -- the bug a now-retired Send-to-only field recipe used to
+   prevent (stage-3b Task 3 review B1). This rule covers every revealed key
+   field on the page (AI provider keys, the Pinboard token, wayback's S3
+   keys, every Send-to secret), not just webhook's. (0,4,1) beats the
+   (0,3,1) tier outright, so source order does not matter here. Stage 3c
+   Task 3 deletes this rule together with the generated `.fg` 320/520/420
+   width caps (spec §3.1). */
 [data-ui-stage0] .entry-block > .key-wrap > :is(input[type="text"], input[type="password"]) { max-width: none; }
 
 /* Provider sub-panel and action rows on the stage-0 rhythm (spec stage2 §2). */
