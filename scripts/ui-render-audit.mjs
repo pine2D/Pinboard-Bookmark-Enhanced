@@ -1908,14 +1908,22 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // A TRUSTED ArrowDown on a native radio group (stage-3b final review N2):
     // the .pick recipe hides the radio with opacity 0 but must not break
     // native group navigation. Restored with a trusted ArrowUp (and a click
-    // back if the group started elsewhere) so the autosave lands where it began.
+    // back if the group started elsewhere) so the DOM lands where it began --
+    // but every trusted key also fires a real `change` event, which options.js
+    // arms on a 500ms debounce (scheduleAutoSave). This row runs inside the
+    // shared tab loop with no reload between rows, so a pending save (and its
+    // "Saved" toast) would otherwise fire ~500ms later under whatever row is
+    // measured next (final review S3). Flush it explicitly via the same
+    // window.pbpOptionsFlushAutoSave() hook the listbox tests use, then verify
+    // the flush actually landed the ORIGINAL value in storage rather than just
+    // trusting the restore click.
     const expectChecked = check.expect.arrowDown.checked;
     const prior = await page.evaluate((sel) => {
       const el = document.querySelector(sel);
       if (!el || el.type !== "radio" || !el.name) return null;
-      const was = [...document.querySelectorAll(`input[type="radio"][name="${CSS.escape(el.name)}"]`)].find((r) => r.checked)?.id || null;
+      const checkedEl = [...document.querySelectorAll(`input[type="radio"][name="${CSS.escape(el.name)}"]`)].find((r) => r.checked);
       el.focus();
-      return { focused: document.activeElement === el, was };
+      return { focused: document.activeElement === el, was: checkedEl?.id || null, wasValue: checkedEl?.value ?? null };
     }, check.selector);
     if (!prior?.focused) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: could not focus the radio`);
     await page.keyboard.press("ArrowDown");
@@ -1927,6 +1935,27 @@ async function runOneCheck(page, theme, check, results, extBase) {
       if (was && !document.getElementById(was)?.checked) document.getElementById(was)?.click();
       document.activeElement?.blur();
     }, prior.was);
+    await page.evaluate(() => window.pbpOptionsFlushAutoSave?.());
+    await settleAnimations(page);
+    if (prior.wasValue !== null) {
+      // bgSaveMode is deliberately absent from storage until its own writer
+      // sets it (shared.js's PRIME_EXCLUDED_KEYS) -- a flush whose collected
+      // form value matches the already-persisted baseline can legitimately
+      // leave the key unwritten (pbpSaveOptionsSnapshot only persists the
+      // delta), so `undefined` here is not a restore failure, it is "still
+      // the default merge". Every real consumer (background.js's tri-state
+      // whitelists, options.js's own `|| 'merge'`) applies the same fallback.
+      const persisted = await page.evaluate(async () => {
+        const local = await chrome.storage.local.get(["bgSaveMode"]);
+        if (local.bgSaveMode !== undefined) return local.bgSaveMode;
+        const synced = await chrome.storage.sync.get(["bgSaveMode"]);
+        return synced.bgSaveMode;
+      });
+      const effective = persisted ?? "merge";
+      if (effective !== prior.wasValue) {
+        throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: bgsave-mode restore did not persist -- chrome.storage effectively has ${JSON.stringify(effective)} (raw ${JSON.stringify(persisted)}), expected the pre-row value ${JSON.stringify(prior.wasValue)}`);
+      }
+    }
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("arrowDown", got, got ? expectChecked : "(not checked)", expectChecked) });
     return;

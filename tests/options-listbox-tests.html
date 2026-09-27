@@ -1044,7 +1044,9 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       const mark = label?.querySelector(":scope > .pick-mark");
       const btn = doc.getElementById("tag-gov-delete-selected");
       assert(label && row && mark && btn, "select-all pick-box fixture incomplete");
-      assert(win.getComputedStyle(label).minHeight === "0px", "select-all keeps the pref-row min-height: " + win.getComputedStyle(label).minHeight);
+      assert(win.getComputedStyle(label).minHeight === "24px", "select-all keeps the 24px hit-target floor, not the pref-row min-height: " + win.getComputedStyle(label).minHeight);
+      assert(Math.abs(parseFloat(win.getComputedStyle(label).columnGap) - 12) <= 0.5, "select-all keeps the .pick family's 12px text->mark gap: " + win.getComputedStyle(label).columnGap);
+      assert(Math.abs(parseFloat(win.getComputedStyle(label).marginRight) - 16) <= 0.5, "select-all separates its mark from the next .fg-actions child by 16px: " + win.getComputedStyle(label).marginRight);
       const lr = label.getBoundingClientRect(), rr = row.getBoundingClientRect(), br = btn.getBoundingClientRect(), mr = mark.getBoundingClientRect(), ir = input.getBoundingClientRect();
       assert(Math.abs(mr.width - 20) <= 0.5 && Math.abs(mr.height - 20) <= 0.5, "pick-mark " + mr.width + "x" + mr.height + " != 20x20");
       assert(Math.abs(rr.height - br.height) <= 0.5, "action row grew past its button: row=" + rr.height + " button=" + br.height);

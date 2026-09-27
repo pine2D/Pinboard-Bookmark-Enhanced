@@ -1523,8 +1523,8 @@ html.motion-ready .backup-import-result:not([hidden]) {
    `.context-help-section` host (General's Backup & Restore); Storage's
    JS-built group additionally sits inside `#storage-cats`. The final
    whole-stage review (S1) found the rule only knew the bare-h2 shape, leaving
-   those two sections at 24/20px against 12/8px everywhere else -- both
-   shapes and the storage wrapper are covered below, and
+   those two sections at 24/20px against 12px (both densities) everywhere
+   else -- both shapes and the storage wrapper are covered below, and
    tests/options-listbox-tests.html asserts the class (every title-led group
    on the page, both densities) rather than one representative row.
    bgsave-mode's/tag-sync-mode's/popup-width's `.pref-group-radio` groups
@@ -1688,8 +1688,24 @@ html[data-theme] .pf > h3 {
 .fg > .fg-actions { margin-top: var(--opt-label-gap); }
 /* A .pick inside a button row (tag-gov's Select all, stage 3c): the row's
    height belongs to its buttons' rung, not to the pref-row floor the .pick
-   recipe carries for list rows. */
-.fg-actions > label.pick { min-height: 0; }
+   recipe carries for list rows, but the hidden checkbox still needs a real
+   hit-target floor -- min-height: 24px (COMPONENTS.md §1.4), verified live
+   to stay under the sibling "Delete selected" button's own height in BOTH
+   density tiers (comfortable 28px, compact 24px -- the `.btn-sm:not(...)`
+   rung, `calc(--opt-control-h - 4px)`, tracks `--opt-control-h` 32/28).
+   `.fg label` (options.css :434, specificity 0,1,1) outranks the generated
+   `.pick { gap: sp(12) }` (0,1,0) inside a .fg-actions row -- restated at
+   (0,2,1) so this pick-box keeps the family's 12px text->mark gap instead
+   of `.fg label`'s own 6px. That SAME `.fg label` rule also carries a 4px
+   margin-bottom (--opt-sp-2) meant for a stacked-field label, harmless
+   while this label was shorter than the button but enough to push the row
+   past the button's own height in compact once the hit-target floor made
+   the label 24px tall (24 + 4 margin > compact's 24px button); zeroed here.
+   margin-right pushes the mark an extra 16px clear of the next .fg-actions
+   child (the "已选 N 个" readout) on top of the row's own 8px flex gap, so
+   the mark still reads as belonging to "全选" rather than the count
+   (task-5-review S2, fix round 1). */
+.fg-actions > label.pick { min-height: 24px; margin-bottom: 0; gap: var(--opt-sp-5); margin-right: var(--opt-sp-6); }
 .fg + .fg-actions, .pf > .fg-actions { margin-top: var(--opt-sp-6); }
 /* Send-to card Test row (options.js renderExportTargets): its previous sibling is
    the .et-onboarding disclosure when a target ships onboarding copy, so the
