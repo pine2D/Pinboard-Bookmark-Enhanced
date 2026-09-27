@@ -843,9 +843,18 @@ function pickRules(ns) {
       ["outline", "none"],
       ["box-shadow", `var(--${ns}-focus-ring)`],
     ]),
-    rule(".pick > input:disabled ~ .pick-text, .pick > input:disabled ~ .pick-mark", [
+    // Disabled: the unchecked mark dims its border; a disabled-AND-checked mark
+    // (no producer today -- options-backup.js and renderStoragePanel force
+    // checked=false when disabled) fills with the hint role and a bg tick
+    // instead of drawing a hint tick on an accent fill.
+    rule(".pick > input:disabled ~ .pick-text, .pick > input:disabled:not(:checked) ~ .pick-mark", [
       ["color", `var(--${ns}-fg-hint)`],
       ["border-color", `var(--${ns}-fg-hint)`],
+    ]),
+    rule(".pick > input:disabled:checked ~ .pick-mark", [
+      ["background", `var(--${ns}-fg-hint)`],
+      ["border-color", `var(--${ns}-fg-hint)`],
+      ["color", `var(--${ns}-bg)`],
     ]),
     rule(".pick > input:disabled", [["cursor", "default"]]),
     // Forced colors (Windows High Contrast): same handoff as .switch --

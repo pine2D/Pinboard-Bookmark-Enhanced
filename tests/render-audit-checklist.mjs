@@ -260,7 +260,12 @@
 //                      D2, COMPONENTS.md §6.1): one representative id per
 //                      content kind (select/key-wrap/.fg-url/plain-text/
 //                      number), each pinned to that kind's tier from
-//                      ui-components.mjs's formRules().
+//                      ui-components.mjs's formRules() (the key-wrap/.fg-url/
+//                      plain-text width TIERS -- the legacy 320/420/520
+//                      ladder -- were retired in stage 3c; see the
+//                      widthLteWith re-pins below. select's own min-240
+//                      floor and number's own max-96 cap were never part of
+//                      that ladder and are still live).
 //   widthLteWith   -- { selector, tolerancePx=0.5 }: this element's
 //                      getBoundingClientRect().width <= the comparison
 //                      selector's width + tolerancePx. widthPx's `max` is a
@@ -315,6 +320,9 @@
 //                      once the probe has read what it needs, same
 //                      leave-no-state-behind discipline as hover's pointer
 //                      reset and focusWithin's blur.
+//   arrowDown      -- { checked: "<selector>" }: after focusing the row's
+//                      radio and a trusted ArrowDown, <selector> must be
+//                      checked (state "arrowDown").
 //   fontSizePx     -- { value, tolerancePx=0.5 } OR { comfortable, compact,
 //                      tolerancePx=0.5 } (same two shapes as heightPx above,
 //                      Task 3): |computed font-size (px) - value| <=
@@ -1604,9 +1612,10 @@ export const CHECKS = [
   // the row model (Task 2), whose `.entry-block > :is(input:not([type=
   // number]), .key-wrap) { max-width: none }` rule (options.css) matches
   // BOTH of these at the SAME specificity as the generic per-kind tier rule
-  // (`.fg input[type=text].fg-url`/`.fg input[type=text]:not(.fg-url)`) the
-  // two literal ceilings below used to assert against -- source order hands
-  // the win to the stage-0 rule, so both fields now fill their `.fg` column
+  // (`.fg input[type=text].fg-url`/`.fg input[type=text]:not(.fg-url)`,
+  // retired in stage 3c -- neither selector exists in options.css any more)
+  // the two literal ceilings below used to assert against -- source order
+  // hands the win to the stage-0 rule, so both fields now fill their `.fg` column
   // instead of capping at a fixed px width, and the old `widthPx.max` rows
   // read FAIL across every theme (measured baseline: both render at
   // 757.33px, the #fields-openai `.pf`'s content width at this audit's
@@ -1891,6 +1900,11 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: "#opt-bgsave-merge ~ .pick-mark", state: "checked",
     seedChecked: { input: "#opt-bgsave-merge", checked: true },
     expect: { bgEqVar: "accent" } },
+  // Stage 3c (N2): a trusted ArrowDown inside the bgsave-mode .pick group
+  // moves the checked radio -- the hidden-native-input recipe keeps native
+  // radio-group keyboard navigation.
+  { surface: "options", page: "options.html", selector: "#opt-bgsave-merge", state: "arrowDown", tab: "bookmarks",
+    expect: { arrowDown: { checked: "#opt-bgsave-skip" } } },
 
   // ---- Stage-3b Task 5 (2026-09-24-ui-system-stage3b): gate-closing rows
   // for storage/vocab/markdown/general, plus the two remaining new listbox

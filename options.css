@@ -440,12 +440,11 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    toolbar row on the page is a .fg-actions: as the LAST CHILD of a .fg it
    sits --opt-label-gap under the control it acts on, as a sibling of a .fg
    or a child of .pf it sits --opt-sp-6 below (both in the row-model block).
-   The flex
-   gap already separates a button from its status line, so .save-status carries
-   no margin of its own. Before this rule the relationship had no owner: one
-   row was an inline style, one a bare button after the group, one a wrapper
-   with no margin at all -- the three "same button, different gap" shapes the
-   2026-09 spacing complaints kept finding. */
+   The flex gap already separates a button from its status line, so
+   .save-status carries no margin of its own. Before this rule the
+   relationship had no owner: one row was an inline style, one a bare button
+   after the group, one a wrapper with no margin at all -- the three "same
+   button, different gap" shapes the 2026-09 spacing complaints kept finding. */
 .fg-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--opt-sp-4); }
 /* A follow-up field revealed under a <select> (translate: custom language). */
 .fg > select + input { margin-top: var(--opt-sp-3); }
@@ -671,10 +670,11 @@ label.switch > .context-help > .context-help-body {
    runs under (Segoe UI / Microsoft YaHei on the Windows host, DejaVu /
    WenQuanYi Zen Hei on CI via scripts/ci-fonts.conf). Folded in stage-3c
    Task 4 from a separate +3px row-model correction that used to live next to
-   the .btn-ic recipe (~line 790) as its own translateY(calc(...)) rule -- see
-   the calibration record below, just above the section/field/group constants
-   (~line 762), for the fold arithmetic and measured ranges shared by every
-   constant in this block. Re-measure with PBP_HELP_RASTER_RANGES=1 before
+   the `.context-help-toggle .btn-ic` recipe below as its own
+   translateY(calc(...)) rule -- see the calibration record below, just above
+   the section/field/group constants below, for the fold arithmetic and
+   measured ranges shared by every constant in this block. Re-measure with
+   PBP_HELP_RASTER_RANGES=1 before
    touching it. */
 [data-help-script="alphabetic"][data-help-role="action"] { --context-help-optical-y: 1.5px; }
 [data-help-script="cjk"][data-help-role="action"] { --context-help-optical-y: 2px; }
@@ -707,12 +707,14 @@ label.switch > .context-help > .context-help-body {
 .context-help-action-row[data-help-role="action"] > .save-theme-wrap,
 .context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle { align-self: baseline; }
 /* Stage-3c Task 4 calibration record (fold-by-construction). Through
-   stage 3b these constants -- the six below plus action's two at ~line 679 --
-   carried the SURFACE-WIDE fraction fitted to the smaller pre-row-model face
-   (title 15px/600, field/group copy 12px). A separate per-role
+   stage 3b these constants -- the six below plus action's two constants
+   above ([data-help-role="action"]) -- carried the SURFACE-WIDE fraction
+   fitted to the smaller pre-row-model face (title 15px/600, field/group
+   copy 12px). A separate per-role
    translateY(calc(var(--context-help-optical-y) +/- Npx)) rule next to the
-   .btn-ic recipe (~line 790) additively corrected each role for the WIDER
-   row-model face (--opt-text-section 16px/600, --opt-text-body 14px) that
+   `.context-help-toggle .btn-ic` recipe below additively corrected each
+   role for the WIDER row-model face (--opt-text-section 16px/600,
+   --opt-text-body 14px) that
    every host on the page has used since stage 3c finished migrating panels
    into the row model and stage 2/3 dropped the [data-ui-stage0] marker that
    used to scope that correction. Task 4 folds the addend into the constant
@@ -730,15 +732,16 @@ label.switch > .context-help > .context-help-body {
    worst:
      action/alphabetic:  DPR2 -0.5..-0.5 | worst 1 local, 1 CI
      action/cjk:         DPR2  0..0      | worst 0.5 local, 0.5 CI
-     section/alphabetic: DPR2 -1.5..2    | worst 1.5 local, 2 CI
+     section/alphabetic: DPR2 -1.5..2    | worst 1.5 local, 2 CI (DPR2 itself hits +2 in BOTH configs -- "worst" here is DPR 1/1.25/1.5 only, see the line above)
      section/cjk:        DPR2  0.5..1    | worst 0.5 local, 1 CI
      field/alphabetic:   DPR2 -1.5..1.5  | worst 2 local, 1 CI
      field/cjk:          DPR2 -1..0      | worst 1.5 local, 0.5 CI
      group/alphabetic:   DPR2 -1.5..1    | worst 2 local, 1.5 CI
      group/cjk:          DPR2 -0.5..-0.5 | worst 0.5 local, 0 CI
-   Three folded values sit exactly on the +-2px tolerance edge in one config
-   (section/alphabetic CI, field/alphabetic local, group/alphabetic local) --
-   each was swept +-0.125px per the design doc's decision rule
+   Three folded values sit exactly on the +-2px tolerance edge (section/
+   alphabetic in BOTH configs, at DPR2 -- see the row above; field/alphabetic
+   local; group/alphabetic local) -- each was swept +-0.125px per the design
+   doc's decision rule
    (docs/superpowers/specs/2026-09-27-ui-system-stage3c-design.md §4.1) before
    being kept as-is:
      section/alphabetic: 1.375 FAILS (CI storageIntro -2.5px); 1.625 FAILS
@@ -753,8 +756,12 @@ label.switch > .context-help > .context-help-body {
        candidate clears <=1.5 on both configs at once.
    All eight constants therefore keep the folded value; none needed the
    pixel-gate's `--allow "*:.context-help-toggle"` escape hatch. Choice's two
-   constants (~line 788) are untouched -- their correction was never split
-   into a separate rule, so there was nothing to fold. Re-measure with
+   constants (the `[data-help-role="choice"]` pair below) are untouched --
+   their correction was never split into a separate rule, so there was
+   nothing to fold. Choice sits at the same +-2px edge too (en@2/alphabetic/
+   choice local -0.5..2, zh-CN@2/alphabetic/choice local 2, zh-CN@2/cjk/
+   choice CI 1..2) -- historical, not touched this stage; a future
+   recalibration should sweep it the same way as the six above. Re-measure with
    `node scripts/options-help-render-audit.mjs` and
    `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
    scripts/options-help-render-audit.mjs` (add PBP_HELP_RASTER_RANGES=1 for
@@ -1257,9 +1264,14 @@ input[type="checkbox"], input[type="radio"] {
   outline: none;
   box-shadow: var(--opt-focus-ring);
 }
-.pick > input:disabled ~ .pick-text, .pick > input:disabled ~ .pick-mark {
+.pick > input:disabled ~ .pick-text, .pick > input:disabled:not(:checked) ~ .pick-mark {
   color: var(--opt-fg-hint);
   border-color: var(--opt-fg-hint);
+}
+.pick > input:disabled:checked ~ .pick-mark {
+  background: var(--opt-fg-hint);
+  border-color: var(--opt-fg-hint);
+  color: var(--opt-bg);
 }
 .pick > input:disabled {
   cursor: default;
@@ -1456,37 +1468,22 @@ html.motion-ready .backup-import-result:not([hidden]) {
    .pref-row uses, not a radio-specific rung. */
 .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
 .section-title { display: block; font-size: var(--opt-text-section); line-height: var(--opt-lh-section); font-weight: 600; color: var(--opt-fg); margin: 0 0 var(--opt-sp-5); }
-/* Stage-3b Task 2 (2026-09-24-ui-system-stage3b): `.disclosure > summary`'s
-   own base rule (below, "---- Collapsible section (.disclosure) ----") is a
-   literal `font-size: 15px`, written to read "the same face as
-   .section-title" (that same section's own doc comment) -- true everywhere
-   on the page until now, since no `.disclosure` had ever
-   shared a stage-0 panel with an `h2.section-title` sibling (general's
-   #acc-connection-overview was the first; since stage 3b every panel is
-   migrated and vocab's five and tags' tag-gov-lowcount take it too).
-   Once panel-general's h2s took the stage-0 bump above (16px comfortable /
-   15px compact) while this disclosure's own summary stayed pinned at the
-   surface-wide literal 15px, "General" and "Connection Status" -- two
-   headings in the SAME section -- started reading at two different sizes
-   (render-audit family 7 headerFace caught it: #connection-overview-title
-   16px-majority vs its own 15px). Restoring the "same face" invariant here,
-   the same way every other stage-0 typography override in this block does
-   it -- by the marker, not by panel id, so vocab's/tags' disclosures pick
-   this up for free once THEY migrate. line-height matches for the same
-   reason (not itself part of the headerFace check, but the same "one heading
-   face" intent this whole rule restores). */
+/* `.disclosure > summary` reads the section-title face (--opt-text-section /
+   --opt-lh-section), the same face every h2.section-title on the page uses,
+   so a disclosure and a heading in the same section never read at two sizes
+   (render-audit family 7 headerFace). */
 .disclosure > summary { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); }
 /* Fixwave (final review, Low finding): the legacy `.context-help-section
-   { margin: var(--opt-sp-4) 0 }` (~line 607) was written to match a PLAIN
-   `.section-title`'s own margin (both sp-4, 8px) so a section that opens
-   with contextual help reads the same title -> content gap as one that
-   doesn't. Stage 0 changed the plain title's own rule to `margin: 0 0
+   { margin: var(--opt-sp-4) 0 }` matched a PLAIN `.section-title`'s own
+   pre-row-model margin (both sp-4, 8px), so a section that opened with
+   contextual help read the same title -> content gap as one that didn't.
+   The row model changed the plain title's own rule to `margin: 0 0
    var(--opt-sp-5)` (12px bottom, zero top -- rule directly above), so a
-   `.context-help-section` inside a stage-0 panel (#panel-ai's "AI
+   `.context-help-section` (#panel-ai's "AI
    Provider", #panel-ai-behavior's "Prompts") fell 4px out of step with
    every plain section title on the same page: title -> first control read
-   8px instead of the row model's 12. Mirror the same override here so the
-   two title shapes stay in lockstep inside the marker. */
+   8px instead of the row model's 12. Mirror the same margin here so the
+   two title shapes stay in lockstep. */
 .context-help-section { margin: 0 0 var(--opt-sp-5); }
 .pref-row + .pref-row { border-top: 1px solid var(--opt-border-section); }
 .pref-row > label {
@@ -1689,6 +1686,10 @@ html[data-theme] .pf > h3 {
 }
 .settings-section > .pf:last-child { margin-bottom: 0; }
 .fg > .fg-actions { margin-top: var(--opt-label-gap); }
+/* A .pick inside a button row (tag-gov's Select all, stage 3c): the row's
+   height belongs to its buttons' rung, not to the pref-row floor the .pick
+   recipe carries for list rows. */
+.fg-actions > label.pick { min-height: 0; }
 .fg + .fg-actions, .pf > .fg-actions { margin-top: var(--opt-sp-6); }
 /* Send-to card Test row (options.js renderExportTargets): its previous sibling is
    the .et-onboarding disclosure when a target ships onboarding copy, so the

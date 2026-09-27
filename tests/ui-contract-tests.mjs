@@ -5560,6 +5560,15 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
 check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[^}]*opacity:\s*0;[^}]*\}/.test(optionsCss),
   'options.css: .pick > input[type="radio"|"checkbox"] does not hide the native control with opacity: 0 (composer pickRules, ui-components.mjs)');
 
+// Stage-3c hand-off N1: a disabled-AND-checked .pick mark (no producer today
+// -- options-backup.js and renderStoragePanel force checked=false when
+// disabled) must fill with the hint role and a bg tick, not draw a hint tick
+// on an accent fill -- and the old single rule that lumped disabled-checked
+// in with disabled-unchecked must be gone.
+check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--opt-fg-hint\);[^}]*color: var\(--opt-bg\);/.test(optionsCss) &&
+  !/\.pick > input:disabled ~ \.pick-mark\b/.test(optionsCss),
+  "options.css: a disabled+checked .pick mark must fill with --opt-fg-hint and a --opt-bg tick (composer pickRules), not a hint tick on the accent fill");
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);

@@ -1904,6 +1904,33 @@ async function runOneCheck(page, theme, check, results, extBase) {
       ...verdict("gapMin", ok, result.error ? null : result.gap, min, result.error) });
     return;
   }
+  if (check.state === "arrowDown") {
+    // A TRUSTED ArrowDown on a native radio group (stage-3b final review N2):
+    // the .pick recipe hides the radio with opacity 0 but must not break
+    // native group navigation. Restored with a trusted ArrowUp (and a click
+    // back if the group started elsewhere) so the autosave lands where it began.
+    const expectChecked = check.expect.arrowDown.checked;
+    const prior = await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el || el.type !== "radio" || !el.name) return null;
+      const was = [...document.querySelectorAll(`input[type="radio"][name="${CSS.escape(el.name)}"]`)].find((r) => r.checked)?.id || null;
+      el.focus();
+      return { focused: document.activeElement === el, was };
+    }, check.selector);
+    if (!prior?.focused) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: could not focus the radio`);
+    await page.keyboard.press("ArrowDown");
+    await settleAnimations(page);
+    const got = await page.evaluate((sel) => document.querySelector(sel)?.checked === true, expectChecked);
+    await page.keyboard.press("ArrowUp");
+    await settleAnimations(page);
+    await page.evaluate((was) => {
+      if (was && !document.getElementById(was)?.checked) document.getElementById(was)?.click();
+      document.activeElement?.blur();
+    }, prior.was);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("arrowDown", got, got ? expectChecked : "(not checked)", expectChecked) });
+    return;
+  }
   if (check.state === "rowStates") {
     if (!extBase) throw new Error(`rowStates check on ${check.selector} reached a runner that has no extBase`);
     const samples = await driveRowStates(page, extBase, theme, check.selector, check.expect.bandDistinct?.textSelector || null);
@@ -3115,7 +3142,8 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // explicitly rather than depending on group order.
     const keyWrapChecks = untabbed.filter((c) => c.selector === ".key-wrap");
     // T6 field-width checks (taste-uplift-batch3, D2). #opt-openai-baseurl
-    // (.fg-url tier) and #opt-openai-model (plain-text tier) both live in
+    // (.fg-url tier, retired in stage 3c) and #opt-openai-model (plain-text
+    // tier, retired in stage 3c) both live in
     // #fields-openai (#panel-ai), which is `hidden` by default -- the
     // provider select defaults to gemini (options.js's updateProviderFields)
     // -- so both need the provider switched to openai before they exist at

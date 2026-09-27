@@ -1031,6 +1031,29 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     assert(total && total === host.lastElementChild, "the total .hint must stay the last child of #storage-cats, after the .pref-group");
   });
 
+  test("tag-gov select-all pick-box keeps its action row at the button's height", () => {
+    showPanel("panel-tags");
+    const det = doc.getElementById("tag-gov-lowcount");
+    const wasOpen = det.open;
+    det.open = true;
+    try {
+      const win = frame.contentWindow;
+      const input = doc.getElementById("tag-gov-select-all");
+      const label = input?.closest("label.pick.pick-box");
+      const row = label?.closest(".fg-actions");
+      const mark = label?.querySelector(":scope > .pick-mark");
+      const btn = doc.getElementById("tag-gov-delete-selected");
+      assert(label && row && mark && btn, "select-all pick-box fixture incomplete");
+      assert(win.getComputedStyle(label).minHeight === "0px", "select-all keeps the pref-row min-height: " + win.getComputedStyle(label).minHeight);
+      const lr = label.getBoundingClientRect(), rr = row.getBoundingClientRect(), br = btn.getBoundingClientRect(), mr = mark.getBoundingClientRect(), ir = input.getBoundingClientRect();
+      assert(Math.abs(mr.width - 20) <= 0.5 && Math.abs(mr.height - 20) <= 0.5, "pick-mark " + mr.width + "x" + mr.height + " != 20x20");
+      assert(Math.abs(rr.height - br.height) <= 0.5, "action row grew past its button: row=" + rr.height + " button=" + br.height);
+      assert(Math.abs(ir.width - lr.width) <= 0.5 && Math.abs(ir.height - lr.height) <= 0.5, "hidden checkbox does not cover the whole label");
+    } finally {
+      det.open = wasOpen;
+    }
+  });
+
   // Stage-3b Task 3 (2026-09-24-ui-system-stage3b): renderExportTargets now
   // emits the row-model shapes (spec §3) for every Send-to card -- the enable
   // switch as .pref-group > .pref-row > label.switch, each text/secret/select
@@ -1045,7 +1068,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // against 12px (both densities)) is the proof. Class-level check instead:
   // every row-model pref-row label, every pick-mark and every title-led group on the page,
   // in both density tiers, measured on the real options.css.
-  test("stage-0 row geometry holds for every pref-row, pick-mark and title-led group, in both densities", async () => {
+  test("row-model geometry holds for every pref-row, pick-mark and title-led group, in both densities", async () => {
     const win = frame.contentWindow;
     const q = (v) => Math.round(parseFloat(v) * 4) / 4;
     const activeBefore = doc.querySelector(".panel.active")?.id;

@@ -1112,7 +1112,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     });
   });
 
-  await test("stage3b: storage panel carries the marker and keeps its static shape", async () => {
+  await test("stage3b: storage panel keeps its row-model shape", async () => {
     const panel = await panelDoc("storage");
     assert(!!panel, "panel-storage is missing");
     const section = panel.querySelector("section.settings-section");
@@ -1172,6 +1172,17 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(!!lowcount.querySelector("#tag-gov-lowcount-list"), "panel-tags lost #tag-gov-lowcount-list");
     assert(!!panel.querySelector("#tag-gov-progress[hidden]"), "panel-tags lost #tag-gov-progress or its hidden attribute");
     assert(!!panel.querySelector(".tag-gov-head > .fg-actions"), "panel-tags' top .fg-actions button row must stay unchanged");
+  });
+
+  await test("stage3c: tag-gov select-all is a label.pick.pick-box in its action row", async () => {
+    const panel = await panelDoc("tags");
+    const input = panel?.querySelector("#tag-gov-select-all");
+    const label = input?.parentElement;
+    assert(label?.matches("label.pick.pick-box"), "tag-gov-select-all is not wrapped in label.pick.pick-box");
+    assert(label.firstElementChild === input && input.type === "checkbox", "the checkbox must be the label's first child");
+    assert(label.querySelector(':scope > .pick-text[data-i18n="tagGovSelectAll"]'), "select-all lost its .pick-text copy");
+    assert(label.lastElementChild?.matches('.pick-mark[aria-hidden="true"]'), "label.pick's last child must be .pick-mark");
+    assert(label.parentElement?.matches(".fg-actions"), "select-all left its .fg-actions row");
   });
 
   // Stage-3b Task 4 (2026-09-24-ui-system-stage3b): appearance + vocab, the

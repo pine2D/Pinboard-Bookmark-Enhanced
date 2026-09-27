@@ -388,42 +388,44 @@ function test(name, fn) {
   // extent once the host grows, not drift toward the (taller) host's new
   // centre.
   test("open help answer stays hit-testable and the radio/mark stay pinned to row 1", () => {
-    const { details, host, toggle, body } = parts("aiContentSourceJinaHint");
-    const input = doc.getElementById("opt-ai-src-jina");
-    const label = input.closest("label.pick");
-    const mark = label.querySelector(".pick-mark");
-    assert(input && label && mark, "ai-content-source Jina fixture incomplete");
-    const container = doc.querySelector(".container");
-    const priorVisibility = container.style.visibility;
-    container.style.visibility = "visible";
-    try {
-      const closedLabelRect = label.getBoundingClientRect();
-      const closedMarkRect = mark.getBoundingClientRect();
-      assert(closedMarkRect.top >= closedLabelRect.top - 0.5 && closedMarkRect.bottom <= closedLabelRect.bottom + 0.5,
-        `mark sits outside row 1 while closed: mark=${JSON.stringify(closedMarkRect)} row1=${JSON.stringify(closedLabelRect)}`);
-      details.open = true;
-      toggle.scrollIntoView({ block: "center" });
-      const openLabelRect = label.getBoundingClientRect();
-      const openMarkRect = mark.getBoundingClientRect();
-      assert(Math.abs(openLabelRect.top - closedLabelRect.top) < 0.5 && Math.abs(openLabelRect.height - closedLabelRect.height) < 0.5,
-        `row 1 itself grew when the answer opened: closed=${JSON.stringify(closedLabelRect)} open=${JSON.stringify(openLabelRect)}`);
-      assert(openMarkRect.top >= openLabelRect.top - 0.5 && openMarkRect.bottom <= openLabelRect.bottom + 0.5,
-        `mark drifted out of row 1 once the answer opened: mark=${JSON.stringify(openMarkRect)} row1=${JSON.stringify(openLabelRect)}`);
-      assert(Math.abs(openMarkRect.top - closedMarkRect.top) < 0.5,
-        `mark's own position moved when the answer opened: closed=${JSON.stringify(closedMarkRect)} open=${JSON.stringify(openMarkRect)}`);
-      const bodyRect = body.getBoundingClientRect();
-      const midX = bodyRect.left + bodyRect.width / 2;
-      const midY = bodyRect.top + bodyRect.height / 2;
-      const hit = doc.elementFromPoint(midX, midY);
-      assert(hit !== input, `the open answer's text midpoint hit the hidden radio, not the answer: ${hit?.tagName}.${hit?.className}`);
-      assert(hit === body || body.contains(hit) || details.contains(hit),
-        `the open answer's text midpoint hit something outside the answer/details: ${hit ? hit.tagName + "." + hit.className : "nothing"}`);
-      const beforeChecked = input.checked;
-      hit.click();
-      assert(input.checked === beforeChecked, "clicking the open answer's real hit target changed the radio's checked state");
-    } finally {
-      container.style.visibility = priorVisibility;
-      details.open = false;
+    for (const [id, key] of [["opt-ai-src-local", "aiContentSourceLocalHint"], ["opt-ai-src-jina", "aiContentSourceJinaHint"]]) {
+      const { details, toggle, body } = parts(key);
+      const input = doc.getElementById(id);
+      const label = input?.closest("label.pick");
+      const mark = label?.querySelector(".pick-mark");
+      assert(input && label && mark, id + " fixture incomplete");
+      const container = doc.querySelector(".container");
+      const priorVisibility = container.style.visibility;
+      container.style.visibility = "visible";
+      try {
+        const closedLabelRect = label.getBoundingClientRect();
+        const closedMarkRect = mark.getBoundingClientRect();
+        assert(closedMarkRect.top >= closedLabelRect.top - 0.5 && closedMarkRect.bottom <= closedLabelRect.bottom + 0.5,
+          `${id}: mark sits outside row 1 while closed: mark=${JSON.stringify(closedMarkRect)} row1=${JSON.stringify(closedLabelRect)}`);
+        details.open = true;
+        toggle.scrollIntoView({ block: "center" });
+        const openLabelRect = label.getBoundingClientRect();
+        const openMarkRect = mark.getBoundingClientRect();
+        assert(Math.abs(openLabelRect.top - closedLabelRect.top) < 0.5 && Math.abs(openLabelRect.height - closedLabelRect.height) < 0.5,
+          `${id}: row 1 itself grew when the answer opened: closed=${JSON.stringify(closedLabelRect)} open=${JSON.stringify(openLabelRect)}`);
+        assert(openMarkRect.top >= openLabelRect.top - 0.5 && openMarkRect.bottom <= openLabelRect.bottom + 0.5,
+          `${id}: mark drifted out of row 1 once the answer opened: mark=${JSON.stringify(openMarkRect)} row1=${JSON.stringify(openLabelRect)}`);
+        assert(Math.abs(openMarkRect.top - closedMarkRect.top) < 0.5,
+          `${id}: mark's own position moved when the answer opened: closed=${JSON.stringify(closedMarkRect)} open=${JSON.stringify(openMarkRect)}`);
+        const bodyRect = body.getBoundingClientRect();
+        const midX = bodyRect.left + bodyRect.width / 2;
+        const midY = bodyRect.top + bodyRect.height / 2;
+        const hit = doc.elementFromPoint(midX, midY);
+        assert(hit !== input, `${id}: the open answer's text midpoint hit the hidden radio, not the answer: ${hit?.tagName}.${hit?.className}`);
+        assert(hit === body || body.contains(hit) || details.contains(hit),
+          `${id}: the open answer's text midpoint hit something outside the answer/details: ${hit ? hit.tagName + "." + hit.className : "nothing"}`);
+        const beforeChecked = input.checked;
+        hit.click();
+        assert(input.checked === beforeChecked, `${id}: clicking the open answer's real hit target changed the radio's checked state`);
+      } finally {
+        container.style.visibility = priorVisibility;
+        details.open = false;
+      }
     }
   });
 
