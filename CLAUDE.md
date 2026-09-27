@@ -1,7 +1,7 @@
 # Pinboard Bookmark Enhanced 项目配置
 
 作者：pine2D
-更新：2026-08-26
+更新：2026-09-27
 
 > 本文件只保留每个会话都需要的跨领域约定。子系统深水区规则在 `.claude/rules/`（按 paths 匹配自动加载，见文末索引表）；机器可验证的铁律已由 pre-commit / verify.sh / release 硬门强制——prose 是提醒，lint 是底线。
 
@@ -159,7 +159,6 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
 - **`pbpScrubLegacySyncWebhookUrls` 可退役（到期日 2026-12-31）**：background.js 的一次性 scrub（2026-08-29 上线，flag `_webhookSyncScrubDone`）——keys-off 用户遗留在 chrome.storage.sync 的明文 webhook capability URL 先救进 local 再全剥。到期直接删函数与调用行；届时 `pbpStripExportTargetTokensOnly`（shared.js）若 migrate 路径仍在用则保留，其注释同步改。
 - **`migrateGithubModelsRetirement` 可退役（到期日 2026-10-15）**：GitHub Models 服务 2026-07-30 整体退役（端点 HTTP 410），provider 已于 2026-08-29 下线；background.js 的该迁移负责重置存量用户的 `aiProvider` 并清理两个 storage area 里的 `githubModelsApiKey`/`githubModelsModel`。按 WebDAV 先例（10 个版本/33 天）到期直接删函数与调用行即可，无接线门。
 - **`migrateRetiredProviderModels` 可退役（到期日 2026-10-31）**：background.js 的一次性改写（2026-09-07 上线，flag `_retiredModelDefaultsDone`、常量 `PBP_RETIRED_MODEL_FLAG` / `PBP_RETIRED_MODEL_DEFAULTS`）——Groq 的 `llama-3.1-8b-instant`（上游 2026-08-16 关停）与 OpenRouter 的 `openai/gpt-oss-20b:free`（0 个服务端点）两个出厂默认已被 `primeSettings()` 落盘到每个存量安装，只换字面量修不到它们；迁移在两个 storage area 里把**恰好等于旧默认值**的 `groqModel` / `openrouterModel` 改写为 `openai/gpt-oss-20b`，用户自填值一律不动。按 WebDAV 先例到期直接删常量、函数与调用行即可，无接线门；`tests/background-lifecycle-tests.html` 的 5 条断言与 run-test.mjs 计数同步撤。
-- **`[data-ui-stage0]` 双契约可退役（到期日 2026-12-31）**：设置页弹窗面板原型容器；scripts/ui-render-audit.mjs 的 `rung.stageZero`（controlRung 的控件高度双契约，及复用同一 marker/tier 的 fgRhythm 标签→控件间距双契约）与 options.css 的 `[data-ui-stage0]` 块只在其内生效。阶段 3 全量迁移完成后删除标记、把两处双契约都收敛为按密度单契约。Task 4（stage2）起 `rung.stageZero` 覆盖范围含按钮家族（`.btn`/`.btn-sm`，`.context-help-toggle` 仍豁免）；`rung.densityComponents`（`.listbox-btn`/`.listbox-opt`）不依赖此 marker，退役时不受影响。另一消费方：`tests/options-context-help-tests.html` 的图标 transform 校准按 `role + "/" + script + "/stage0"` 分组键区分 stage-0 与非 stage-0 宿主（`inStageZero`），退役时一并把该分组键收窄成不带 `/stage0` 后缀的单一形态。第三个消费方：`tests/ui-contract-tests.mjs` 的 contextual-help「锚定分裂」契约对 `[data-ui-stage0] .context-help-action-row` 的基线对齐规则放行并要求其存在（stage-3b Task 5：标记内按钮文字 13px 后 action 行也出现本地/CI 字体升部分裂，居中常数无解），退役时把该基线对齐提升为 action 行的基础规则并删掉放行分支。
 
 ## 与 Claude Code 协作
 

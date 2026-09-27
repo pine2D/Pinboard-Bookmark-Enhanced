@@ -381,13 +381,13 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     itemsOf(lang()).find((li) => li.dataset.value === "custom").click();
     assert(lang().value === "custom", "value=" + lang().value);
     assert(!custom.classList.contains("hidden"), "custom input still hidden");
-    // Stage-3a Task 2: #panel-reader now carries [data-ui-stage0], so this
+    // Stage-3a Task 2: #panel-reader joined the row model, so this
     // input (a direct child of the .entry-block the listbox also lives in)
-    // is reached by the existing `[data-ui-stage0] .entry-block > input
+    // is reached by the existing row-model `.entry-block > input
     // max-width: none` rule (options.css) -- the same "controls fill the
     // content column" rule every OTHER entry-block text field already
     // follows. It no longer keeps the select's old "beside it" placement
-    // (that relied on a 320px max-width this rule now removes); it stacks
+    // (that relied on a 320px max-width, retired in stage 3c); it stacks
     // below instead, spaced by `.fg > .listbox + input { margin-top: sp-3 }`,
     // flush with the listbox button's own left edge.
     assert(custom.getClientRects().length > 0, "custom input has no layout box");
@@ -1042,8 +1042,8 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // Final whole-stage review S2: the render-audit rows pin ONE representative
   // row per panel, so a regression on the other rows passes every gate -- S1
   // (R9 missing the title-in-help-host and #storage-cats shapes: 24/20px
-  // against 12/8px) is the proof. Class-level check instead: every stage-0
-  // pref-row label, every pick-mark and every title-led group on the page,
+  // against 12px (both densities)) is the proof. Class-level check instead:
+  // every row-model pref-row label, every pick-mark and every title-led group on the page,
   // in both density tiers, measured on the real options.css.
   test("stage-0 row geometry holds for every pref-row, pick-mark and title-led group, in both densities", async () => {
     const win = frame.contentWindow;
@@ -1054,7 +1054,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     // Open the disclosures (vocab's five, the Send-to cards) so their rows have
     // layout -- but NOT the context-help answers: an open answer sits between
     // a section title and its first row and would inflate the R9 gap.
-    doc.querySelectorAll("[data-ui-stage0] details.disclosure:not([open])").forEach((d) => { d.open = true; opened.push(d); });
+    doc.querySelectorAll(".panel details.disclosure:not([open])").forEach((d) => { d.open = true; opened.push(d); });
     const problems = [];
     let rows = 0, marks = 0, groups = 0;
     try {
@@ -1063,7 +1063,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
         const cs = win.getComputedStyle(doc.documentElement);
         const rowMin = q(cs.getPropertyValue("--opt-row-min-h")), padY = q(cs.getPropertyValue("--opt-row-pad-y"));
         assert(rowMin > 0 && padY > 0, density + ": density tokens unreadable (" + rowMin + "/" + padY + ")");
-        for (const panel of doc.querySelectorAll(".panel[data-ui-stage0]")) {
+        for (const panel of doc.querySelectorAll(".panel")) {
           showPanel(panel.id);
           // The block that leads a section: a .pref-group directly, or Storage's
           // JS-built group inside #storage-cats.
@@ -1077,7 +1077,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
             return section.matches(".settings-section") && !!block.previousElementSibling
               && block.previousElementSibling.matches("h2.section-title, .context-help-section") && titleOf(section) !== null;
           };
-          panel.querySelectorAll("[data-ui-stage0] .pref-row > label").forEach((label) => {
+          panel.querySelectorAll(".pref-row > label").forEach((label) => {
             if (!label.offsetParent) return;   // rows inside [hidden] hosts have no layout
             rows++;
             const want = isR9(label) ? rowMin - padY : rowMin;
@@ -1165,10 +1165,10 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     assert(!host.querySelector("#et-obsidian > .fg-actions"), "obsidian has no precheckRequest and must not render a Test row");
   });
 
-  // Stage-3b Task 3 review B1: inside [data-ui-stage0] the .key-wrap lost its
+  // Stage-3b Task 3 review B1: inside the row model the .key-wrap lost its
   // 420px cap while the text input inside kept the legacy 320px tier, so the
   // absolutely positioned eye toggle drifted ~446px off the
-  // input. Gate the fused-control geometry on the real builder output.
+  // input (both caps retired in stage 3c). Gate the fused-control geometry on the real builder output.
   test("export-targets: webhook's secret url field keeps the eye toggle fused to its input", () => {
     showPanel("panel-markdown");
     const inp = doc.querySelector('#et-webhook input[data-et="webhook.url"]');

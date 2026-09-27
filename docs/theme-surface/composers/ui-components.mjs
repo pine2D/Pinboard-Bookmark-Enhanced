@@ -226,19 +226,18 @@ function btnRules(ns) {
       ], { pairColorWith: ".btn.primary" }),
       rule(".btn.primary:focus-visible", [["border-color", `var(--${ns}-focus-bd)`]], { pairColorWith: ".btn.primary" }),
     ]),
-    // Stage-0 density rung (COMPONENTS.md §1.1 two tiers, spec 2026-09-24
-    // stage2 §2): inside the prototype container the button family reads the
-    // density tokens; the help toggle keeps its 24px icon target and stays on
-    // the legacy sm rung. Emitted for options only -- popup/library migrate in
-    // stage 3/4.
+    // Options density rung (COMPONENTS.md §1.1 two tiers): the options button
+    // family reads the density tokens; the help toggle keeps its 24px icon
+    // target and the legacy sm rung. Emitted for options only -- popup/library
+    // migrate in stage 4.
     ...(ns === "opt" ? [
-      rule("[data-ui-stage0] .btn:not(.context-help-toggle)", [
+      rule(".btn:not(.context-help-toggle)", [
         ["height", "var(--opt-control-h)"],
         ["padding", "0 var(--opt-control-pad-x)"],
         ["font-size", "var(--opt-text-body)"],
         ["line-height", "calc(var(--opt-control-h) - 2px)"],
       ]),
-      rule("[data-ui-stage0] .btn-sm:not(.context-help-toggle)", [
+      rule(".btn-sm:not(.context-help-toggle)", [
         ["height", "calc(var(--opt-control-h) - 4px)"],
         ["padding", `0 ${sp(ns, 8)}`],
         // Density-tracking, not a fixed 13px: comfortable body is 14px so
@@ -505,15 +504,9 @@ function formRules(ns) {
         ["transition", `border-color ${motion(ns)} ease, background-color ${motion(ns)} ease, box-shadow ${motion(ns)} ease`],
       ]),
       // Field width by CONTENT KIND (taste-uplift-batch3, T6/D2; COMPONENTS.md
-      // §6.1's tier table). `width: 100%` above stays for four of the five
-      // kinds -- they only get an ADDED ceiling, so a narrow viewport (the
-      // panel column already narrower than the cap) still gets the
-      // full-width field the base rule always gave it; the cap only ever
-      // engages once the panel is wide enough to make a 750px+ field look
-      // like it's asking for an essay (Step 0 measurement: the panel's plain
-      // `.fg` content column measures 790px, the `.pf` provider-card column
-      // 764px, at a >=1040px viewport -- both far past every cap below).
-      // Kinds and their tiers:
+      // §6.1's tier table). Stage 3c: every options text/secret field is an
+      // entry block that fills its column; the 420/520/320 caps retired.
+      // What is left is three kinds:
       //   select        >=240, FLOOR not ceiling -- see the dedicated rule
       //                        below, which does NOT keep the base `width:
       //                        100%` (batch-end review F2 fix-forward: a
@@ -534,29 +527,13 @@ function formRules(ns) {
       //                        still reads as a deliberately-sized control,
       //                        not a stray full-width one), and `max-width:
       //                        100%` keeps the "never wider than the
-      //                        column" ceiling the other four kinds get for
+      //                        column" ceiling the other kinds get for
       //                        free from the unchanged base `width: 100%`.
-      //   .key-wrap     420 -- password/API-key fields (fused with the eye
-      //                        toggle, COMPONENTS.md §8) -- the cap sits on
-      //                        the WRAPPER, not the input, so the eye button
-      //                        (position: absolute; right: 2px, relative to
-      //                        .key-wrap) stays fused to the input's own
-      //                        right edge instead of the field's box.
-      //   .fg-url       520 -- the three baseurl endpoints (options.html
-      //                        adds this class; deliberately not `type=url`,
-      //                        which would add browser validation semantics
-      //                        this field never asked for)
-      //   input[text]   320 -- everything else typed free text (model-name
-      //                        overrides, custom tag separators, shortcuts)
-      //                        that isn't marked .fg-url
       //   input[number]  96 -- a handful of digits (popup width, cache
       //                        duration in minutes)
       //   textarea      (unchanged, no cap) -- prompt templates are prose,
       //                        capping their width would just wrap more.
       rule(`.fg select`, [["width", "max-content"], ["min-width", "240px"], ["max-width", "100%"]]),
-      rule(`.fg .key-wrap`, [["max-width", "420px"]]),
-      rule(`.fg input[type="text"].fg-url`, [["max-width", "520px"]]),
-      rule(`.fg input[type="text"]:not(.fg-url)`, [["max-width", "320px"]]),
       rule(`.fg input[type="number"]`, [["max-width", "96px"]]),
       rule(`.fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus)`, [
         ["border-color", `color-mix(in srgb, ${v(ns, "input-border")} 55%, var(--${ns}-fg))`],

@@ -2697,6 +2697,7 @@ async function recordWeakTextHits(page, surface, theme, results, context) {
 }
 
 async function runLibraryTheme(page, extBase, theme, checks, results) {
+  if (checks.some((c) => c.tab)) throw new Error("SETUP ERROR [library]: checklist `tab:` is options-only");
   // Explicit #vocab hash (not bare navigation): _pbpLibInitialView() prefers
   // an explicit hash over the localStorage "last view" memory, so this can't
   // be dragged into "notes" by a previous theme iteration's tab click.
@@ -3068,7 +3069,15 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   const confirmChecks = surface === "popup"
     ? checks.filter((c) => c.selector.startsWith(".confirm-popover"))
     : [];
+  if (surface !== "options" && checks.some((c) => c.tab)) {
+    throw new Error(`SETUP ERROR [${surface}]: checklist \`tab:\` is options-only`);
+  }
   if (surface === "options") {
+    // Rows that name their own tab (checklist `tab:` field, stage 3c) run in
+    // the tab-resolving group below and nowhere else; every other group keeps
+    // its selector-derived membership.
+    const tabChecks = checks.filter((c) => c.tab);
+    const untabbed = checks.filter((c) => !c.tab);
     // Two tab-scoped groups, each needs ITS OWN tab active when its checks
     // actually run -- NOT two independent "switch tab" steps that both fire
     // before one shared loop at the end (a real regression this file's own
@@ -3083,28 +3092,28 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // substring -- widened alongside it (Ruling 8) so an ID-based tag-gov
     // check is still bucketed onto the "tags" tab instead of falling through
     // to otherChecks, which by the time it runs has #tab-general active.
-    const tagGovChecks = checks.filter((c) => c.selector.includes(".tag-gov-") || c.selector.includes("#tag-gov-"));
+    const tagGovChecks = untabbed.filter((c) => c.selector.includes(".tag-gov-") || c.selector.includes("#tag-gov-"));
     // presetRowChecks (design-uplift, preset-row redesign, 2026-08-04):
     // .theme-preset-btn.active only exists once SOME preset is selected --
     // reuses the exact same "click flexoki on the appearance tab" step
     // presetPreviewChecks already needs (both groups just need any preset
     // active; there is nothing flexoki-specific about either check), so
     // it's folded into that same click rather than a second one.
-    const presetRowChecks = checks.filter((c) => c.selector === ".theme-preset-btn.active");
-    const presetPreviewChecks = checks.filter((c) => c.selector.startsWith("#preset-preview-section"));
+    const presetRowChecks = untabbed.filter((c) => c.selector === ".theme-preset-btn.active");
+    const presetPreviewChecks = untabbed.filter((c) => c.selector.startsWith("#preset-preview-section"));
     // .saved-theme-btn (debt-sweep 2026-08-07): same #panel-appearance tab as
     // the preset-row group above, so it reuses that group's #tab-appearance
     // click rather than a third one. Storage was seeded before goto() (see
     // runSimpleTheme's top), so the button already exists once the tab is
     // active -- no extra click of its own needed.
-    const savedThemeChecks = checks.filter((c) => c.selector === ".saved-theme-btn");
+    const savedThemeChecks = untabbed.filter((c) => c.selector === ".saved-theme-btn");
     // .key-wrap lives in #panel-general. It is visible on a bare goto(), but
     // the tagGov and preset groups above BOTH click their way to another tab
     // first, so by the time otherChecks runs the general panel is
     // display:none and its controls cannot even take focus (a §8 focusWithin
     // check fails at setup, which is how this was found). Click back
     // explicitly rather than depending on group order.
-    const keyWrapChecks = checks.filter((c) => c.selector === ".key-wrap");
+    const keyWrapChecks = untabbed.filter((c) => c.selector === ".key-wrap");
     // T6 field-width checks (taste-uplift-batch3, D2). #opt-openai-baseurl
     // (.fg-url tier) and #opt-openai-model (plain-text tier) both live in
     // #fields-openai (#panel-ai), which is `hidden` by default -- the
@@ -3116,19 +3125,17 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // folded into otherChecks. Widened (Task 4, ui-system-stage2, Controller
     // ruling C): the re-pinned #fields-openai .key-wrap row needs the SAME
     // "provider switched to openai" precondition as the two above.
-    const aiProviderChecks = checks.filter((c) => c.selector === "#opt-openai-baseurl" || c.selector === "#opt-openai-model"
+    const aiProviderChecks = untabbed.filter((c) => c.selector === "#opt-openai-baseurl" || c.selector === "#opt-openai-model"
       || c.selector === "#fields-openai .key-wrap");
-    const aiBehaviorChecks = checks.filter((c) => c.selector === "#opt-ai-cache-duration");
+    const aiBehaviorChecks = untabbed.filter((c) => c.selector === "#opt-ai-cache-duration");
     // `.switch` rows (taste-uplift batch4 T1 reference instance + T2's one
     // row per DOM shape): the track rows (`#id ~ .switch-track`) and the
     // input hit-rect rows (`hitRectMin`). They live on several tabs, so the
     // group below resolves each row's own panel instead of hard-coding one.
-    // Widened (Task 3, ui-system-stage0-design §4) to also sweep in the
-    // stage-0 pref-row/number-field entries: every one of them lives inside
-    // #panel-popup, `display:none` until #tab-popup is clicked, and this
-    // group's per-check `.closest(".panel")` resolution already works for
-    // ANY selector, not just `.switch-track` ones, so no separate group is
-    // needed for them.
+    // The row-model pref-row entries (ui-system-stage0-design §4) used to be
+    // swept in here by a marker-substring match; since stage 3c they name
+    // their tab in the checklist (`tab:`) and run in the same loop through
+    // `tabChecks` instead. #opt-popup-width-custom stays named below.
     // Widened again (Task 4, ui-system-stage2, Controller ruling C):
     // #test-gemini needs the SAME "resolve the owning tab, fresh page
     // reload first" treatment this group already gives every other tab-
@@ -3183,9 +3190,9 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // (measured: 30 FAILs, all `actual=null` -- confirmed BEFORE this line
     // existed, by running the checklist's two new pick-mark entries without
     // it).
-    const switchChecks = checks.filter((c) => (c.selector.includes(".switch-track") || c.selector.includes(".pick-mark")
+    const switchChecks = untabbed.filter((c) => (c.selector.includes(".switch-track") || c.selector.includes(".pick-mark")
       || c.expect?.hitRectMin
-      || c.selector.includes("[data-ui-stage0]") || c.selector === "#opt-popup-width-custom"
+      || c.selector === "#opt-popup-width-custom"
       || c.selector === "#test-gemini" || c.selector === "#opt-ai-provider-btn"
       || c.selector === "#translate-target-lang-btn"
       // Stage-3b Task 2: substring match (not exact-string), same reasoning
@@ -3194,18 +3201,14 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // (`#opt-ai-provider-btn + .listbox-pop`, `#opt-ai-provider-list
       // .listbox-opt`), not the bare class strings this used to `===` against.
       || c.selector.includes(".listbox-pop") || c.selector.includes(".listbox-opt")
-      // Fix round 1 (review MINOR finding 2): the two legacy-`.fg select`/
-      // `.key-wrap` coverage rows (Appearance's theme select, the vocab
-      // AnkiConnect key on the Vocabulary tab, inside a closed disclosure --
-      // this loop's own details-opener a few lines down handles that for
-      // free). Neither matches `keyWrapChecks`'s exact `".key-wrap"` string
-      // (that group clicks #tab-general, the wrong panel for the vocab row),
-      // so both need their own explicit name here instead, same as
-      // #opt-popup-width-custom/#test-gemini above. Stage-3b Task 4 re-
-      // pinned the checklist row's own selector from `#opt-theme` to
-      // `#opt-theme-btn` (options-listbox.js hides the native select once
-      // Appearance gains [data-ui-stage0]) -- updated here too, same string.
-      || c.selector === "#opt-theme-btn" || c.selector.includes(".key-wrap:has(")
+      // Fix round 1 (review MINOR finding 2): Appearance's theme select
+      // coverage row. Stage-3b Task 4 re-pinned the checklist row's own
+      // selector from `#opt-theme` to `#opt-theme-btn` (options-listbox.js
+      // hides the native select and builds the button in its place). The
+      // vocab AnkiConnect key row that used to be sniffed here by a
+      // `.key-wrap:has(` substring now names its tab in the checklist
+      // (`tab: "vocab"`, stage 3c).
+      || c.selector === "#opt-theme-btn"
       // Stage-3b Task 5 gate-closing rows: #opt-md-image-policy-btn (Markdown
       // tab, no disclosure) and #obsidian-route-btn/#obsidian-vault (same tab,
       // inside the closed "Obsidian" Send-to disclosure -- this loop's own
@@ -3220,30 +3223,10 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // inside the Vocabulary tab's closed "Export and integrations"
       // disclosure.
       || c.selector === "#opt-md-image-policy-btn" || c.selector === "#obsidian-route-btn"
-      || c.selector === "#obsidian-vault" || c.selector === "#dict-anki-deck")
-      // The paren just above scopes the whole OR-chain so this final `&&`
-      // excludes storagePickChecks' own rows from ALL of it, not just the
-      // last OR term -- `#storage-cats .pref-row > label.pick.pick-box`
-      // carries `hitRectMin` in its own `expect`, which would otherwise also
-      // match the blanket `c.expect?.hitRectMin` OR near the top and land it
-      // in BOTH groups (fix round 1: reproduced as "SETUP ERROR: .switch row
-      // has no owning .panel" -- this group's fresh page.goto() + `.closest(
-      // ".panel")` resolution ran on a page where #tab-storage had not been
-      // clicked yet, so `#storage-cats` was still its initial empty div).
-      // storagePickChecks (defined below) is the one group that reaches it.
-      && !c.selector.startsWith("#storage-cats"));
-    // storagePickChecks (Stage-3b Task 5): the Storage tab's `.pick.pick-box`
-    // category rows are JS-built INTO an initially-empty `#storage-cats` div
-    // by renderStoragePanel(), which only runs once `#tab-storage` is
-    // clicked (options.js's activateTab()) -- unlike the switchChecks rows
-    // above, there is no element for `.closest(".panel")` to resolve until
-    // after that click, so this needs its own group (same shape as
-    // tagGovChecks/keyWrapChecks above), not a switchChecks filter entry.
-    const storagePickChecks = checks.filter((c) => c.selector.startsWith("#storage-cats"));
-    const otherChecks = checks.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
+      || c.selector === "#obsidian-vault" || c.selector === "#dict-anki-deck"));
+    const otherChecks = untabbed.filter((c) => !tagGovChecks.includes(c) && !presetPreviewChecks.includes(c)
       && !presetRowChecks.includes(c) && !savedThemeChecks.includes(c) && !keyWrapChecks.includes(c)
-      && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c)
-      && !storagePickChecks.includes(c));
+      && !aiProviderChecks.includes(c) && !aiBehaviorChecks.includes(c) && !switchChecks.includes(c));
     if (tagGovChecks.length) {
       // .tag-gov-chip-face lives on the "tags" tab (#panel-tags), not
       // #panel-general (the default active one on a bare goto()) -- its
@@ -3293,8 +3276,8 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // reload path calls, same technique and same `follow: true` (this
       // fixture's untouched "Extension pages follow the Pinboard theme
       // preset" default) as weakTextOnFill's own restore below. Every group
-      // from here on (keyWrap/other/storagePick/aiProvider/aiBehavior/
-      // switch) trusts the live page to already be on THIS theme -- so,
+      // from here on (keyWrap/other/aiProvider/aiBehavior/switch+tab)
+      // trusts the live page to already be on THIS theme -- so,
       // like weakTextOnFill's own `liveTheme` check and the `.switch` group's
       // `_swLanded` check further down, this reads BOTH attributes back and
       // fails setup loudly on a mismatch instead of letting a drifted page
@@ -3328,25 +3311,6 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       for (const check of keyWrapChecks) await runOneCheck(page, theme, check, results);
     }
     for (const check of otherChecks) await runOneCheck(page, theme, check, results);
-    // storagePickChecks runs AFTER otherChecks, not between keyWrapChecks and
-    // it (Stage-3b Task 5 fix round 1): otherChecks assumes whatever tab the
-    // PRECEDING group left active (keyWrapChecks' own #tab-general click,
-    // per the convention #opt-lang-btn/.key-wrap/#opt-pinboard-token above
-    // all rely on) -- clicking #tab-storage in between broke that for every
-    // remaining otherChecks row (reproduced: a generic `.context-help >
-    // summary.context-help-toggle` hover row resolved its selector's FIRST
-    // DOM match on the now-inactive General tab and hung the full 30s hover
-    // timeout). This group belongs with aiProviderChecks/aiBehaviorChecks/
-    // switchChecks below instead, which is exactly why THEY already run
-    // after otherChecks too.
-    if (storagePickChecks.length) {
-      await page.click("#tab-storage");
-      // renderStoragePanel() is async (awaits pbpMeasureLocalStorage()) --
-      // wait for the FIRST real `.pref-row` it appends, not just the (already
-      // present, always-empty-until-then) `#storage-cats` host div.
-      await page.waitForSelector("#storage-cats .pref-row", { state: "visible", timeout: TIMEOUT_MS });
-      for (const check of storagePickChecks) await runOneCheck(page, theme, check, results);
-    }
 
     // T6 field-width groups (taste-uplift-batch3, D2). Run AFTER otherChecks
     // (not interleaved with the tagGov/presetPreview/keyWrap dance above,
@@ -3396,7 +3360,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       await page.waitForSelector("#opt-ai-cache-duration", { state: "visible", timeout: TIMEOUT_MS });
       for (const check of aiBehaviorChecks) await runOneCheck(page, theme, check, results);
     }
-    if (switchChecks.length) {
+    if (switchChecks.length || tabChecks.length) {
       // Fresh navigation with the theme re-applied first (taste-uplift batch4
       // Ruling 30, T1 review N1): the appearance group above clicks the
       // flexoki SITE preset, whose handler re-derives documentElement's
@@ -3436,14 +3400,18 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       if (_swGeminiHidden) {
         throw new Error(`SETUP ERROR [options|${theme}|.switch group]: provider is not gemini after reload -- an earlier group left the provider persisted in chrome.storage`);
       }
-      for (const check of switchChecks) {
+      for (const check of [...switchChecks, ...tabChecks]) {
         // The row's own tab (every settings panel is display:none until its
-        // tab is clicked), then any closed non-help <details> around it (the
-        // vocabulary tab's dict-echo row sits in a closed disclosure).
-        const tabId = await page.$eval(check.selector, (el) => el.closest(".panel")?.id.replace(/^panel-/, "tab-") || null)
-          .catch(() => null);
-        if (!tabId) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: .switch row has no owning .panel`);
+        // tab is clicked) -- named by the checklist's `tab:` field, or
+        // derived from the selector's owning .panel -- then any closed
+        // non-help <details> around it (the vocabulary tab's dict-echo row
+        // sits in a closed disclosure).
+        const tabId = check.tab ? `tab-${check.tab}`
+          : await page.$eval(check.selector, (el) => el.closest(".panel")?.id.replace(/^panel-/, "tab-") || null).catch(() => null);
+        if (!tabId || !(await page.$(`#${tabId}`))) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: no owning tab (${check.tab ? `tab: "${check.tab}"` : ".closest(.panel)"})`);
         await page.click(`#${tabId}`);
+        // JS-built rows (Storage's #storage-cats) exist only after the click.
+        await page.waitForSelector(check.selector, { state: "attached", timeout: TIMEOUT_MS });
         await page.$eval(check.selector, (el) => {
           for (let d = el.closest("details"); d; d = d.parentElement?.closest("details")) {
             if (!d.open && !d.classList.contains("context-help")) d.querySelector(":scope > summary")?.click();
@@ -3879,12 +3847,9 @@ const SWEEP_CFG = {
     // densityComponents (Task 4, ui-system-stage2, Controller ruling B):
     // `.listbox-btn` / `.listbox-opt` read `var(--opt-control-h)` directly
     // (options.css, unconditional -- wherever they render), so they
-    // are density-tiered wherever they render, not only inside the stage-0
-    // prototype container. `#translate-target-lang-btn` sits on the Reader
-    // tab, OUTSIDE the marker, but still must be judged against the live
-    // comfortable/compact tier -- html[data-density] is a page-wide
-    // attribute (options-theme-early.js), not scoped to the marker. Matched
-    // by class regardless of tag (button vs li).
+    // are density-tiered wherever they render (html[data-density] is a
+    // page-wide attribute, options-theme-early.js). Matched by class
+    // regardless of tag (button vs li).
     densityComponents: [".listbox-btn", ".listbox-opt"],
     exempt: [
       "textarea",                                   // multi-line by nature

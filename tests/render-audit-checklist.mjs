@@ -294,6 +294,12 @@
 //                      default. state "checked" REQUIRES
 //                      seedChecked.checked === true (it is only a distinct
 //                      results key for the on state).
+//   tab            -- optional (options only): the tab id whose panel owns the
+//                      row (e.g. "storage" -> #tab-storage). The runner clicks
+//                      it, waits for the selector to attach (JS-built rows),
+//                      opens enclosing non-help <details>, then measures.
+//                      Absent: the runner derives the tab from the selector
+//                      the way it always has. New rows always set it.
 //   open           -- (row-level, not under `expect`, used with state: "open",
 //                      Task 4, ui-system-stage2, Controller ruling C):
 //                      { click: selector }. The runner scripts .focus() onto
@@ -1558,7 +1564,7 @@ export const CHECKS = [
   // `widthLteWith` against its own `.fg` column -- the SAME re-pin Task 4
   // (ui-system-stage2, Controller ruling C, comment below) already gave
   // #fields-openai's key-wrap, for the identical reason: panel-general
-  // taking `[data-ui-stage0]` promoted #opt-pinboard-token's `.fg` to `.fg
+  // joining the row model promoted #opt-pinboard-token's `.fg` to `.fg
   // entry-block` (spec §3), and `.entry-block > :is(input:not([type=
   // number]), .key-wrap) { max-width: none }` now reaches it too, so it
   // fills its column (measured: 790.67px on this audit's >=1040px viewport)
@@ -1570,7 +1576,7 @@ export const CHECKS = [
   // width: 240px; max-width: 100% }` / `.fg .key-wrap { max-width: 420px }`
   // rules, leaving a note for "whichever task migrates #opt-theme's panel
   // (appearance) or #dict-anki-key's panel (vocab)" to finish the job.
-  // Stage-3b Task 4 is that task: both panels now carry [data-ui-stage0],
+  // Stage-3b Task 4 is that task: both panels are now in the row model,
   // so `.entry-block > :is(input:not([type=number]), .key-wrap) {
   // max-width: none }` reaches both fields the same way it already reached
   // #opt-lang/#opt-pinboard-token (Task 2) and #fields-openai's key-wrap
@@ -1586,7 +1592,7 @@ export const CHECKS = [
   // #dict-anki-key's key-wrap: same re-pin as #opt-pinboard-token's and
   // #fields-openai's key-wrap above -- a fixed max gives way to "never
   // wider than its own column" now that the wrap fills it.
-  { surface: "options", page: "options.html", selector: ".key-wrap:has(#dict-anki-key)", state: "default",
+  { surface: "options", page: "options.html", selector: ".key-wrap:has(#dict-anki-key)", tab: "vocab", state: "default",
     expect: { widthLteWith: { selector: ".fg:has(#dict-anki-key)" } } },
   // .fg-url (the three baseurl endpoints) and plain input[type=text] (the
   // Model field) both live on the AI Providers tab, inside #panel-ai;
@@ -1594,8 +1600,8 @@ export const CHECKS = [
   // #fields-openai, which is `hidden` until the provider select is switched
   // to openai (options.js's updateProviderFields) -- scripts/ui-render-
   // audit.mjs's aiProviderChecks group does that switch once for these rows.
-  // Task 4 (ui-system-stage2, Controller ruling C): #panel-ai now carries
-  // [data-ui-stage0] (Task 2), whose `.entry-block > :is(input:not([type=
+  // Task 4 (ui-system-stage2, Controller ruling C): #panel-ai is now in
+  // the row model (Task 2), whose `.entry-block > :is(input:not([type=
   // number]), .key-wrap) { max-width: none }` rule (options.css) matches
   // BOTH of these at the SAME specificity as the generic per-kind tier rule
   // (`.fg input[type=text].fg-url`/`.fg input[type=text]:not(.fg-url)`) the
@@ -1632,7 +1638,7 @@ export const CHECKS = [
   // ---- `.listbox` primitive (R4, ui-system-stage2 spec §3, COMPONENTS.md
   // §6.4 exception 2): the one drawn <select> this codebase allows. Two
   // consumers -- #opt-ai-provider (this tab) and #translate-target-lang
-  // (Reader tab, OUTSIDE [data-ui-stage0] -- the density tier still applies
+  // (Reader tab -- the density tier applies
   // there, see scripts/ui-render-audit.mjs's rung.densityComponents: a
   // `.listbox-btn` reads `var(--opt-control-h)` unconditionally, not gated
   // by the marker). The native <select> is `hidden` by the enhancer
@@ -1704,9 +1710,9 @@ export const CHECKS = [
   // tab) is the one this batch deleted an inline `style="width:80px"` from --
   // both get the identical `.fg input[type="number"]` rule, max-width 96.
   // Re-pinned (Task 3, ui-system-stage3a-design §3, Controller ruling 1):
-  // #panel-ai-behavior joined [data-ui-stage0] in this task's Task 1, so
+  // #panel-ai-behavior joined the row model in this task's Task 1, so
   // #opt-ai-cache-duration now ALSO renders through the same
-  // `[data-ui-stage0] .fg input[type=number]` height rule #opt-popup-width-
+  // row-model `.fg input[type=number]` height rule #opt-popup-width-
   // custom already proved below -- height tracks --opt-control-h (32
   // comfortable / 28 compact) instead of the fixed rung every non-stage-0
   // `.fg input[type=number]` renders at. Both rows now share the identical
@@ -1715,7 +1721,7 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: "#opt-ai-cache-duration", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { max: 96 } } },
   // #opt-popup-width-custom (Task 3, ui-system-stage0-design §4): lives
-  // inside [data-ui-stage0] (Task 2's Popup-tab row model), inline in the
+  // inside the row model (Task 2's Popup-tab row model), inline in the
   // custom radio's own label. max-width 96 is a literal (options.css's
   // stage-0 header comment lists it as one of the three named exceptions),
   // so it stays a flat widthPx bound.
@@ -1730,14 +1736,14 @@ export const CHECKS = [
   // "Model override (optional)" field, a plain entry-block-sub with no
   // context-help of its own -- picking a help-free instance isolates the
   // indent from the separate choice/field help-host padding-left overrides
-  // a few lines below this file's [data-ui-stage0] CSS block).
-  { surface: "options", page: "options.html", selector: "[data-ui-stage0] .fg:has(#opt-preview-ai-model)", state: "default",
+  // in options.css's row-model block).
+  { surface: "options", page: "options.html", selector: ".fg:has(#opt-preview-ai-model)", tab: "reader", state: "default",
     expect: { paddingLeftPx: { value: 24 } } },
   // `.pref-row-sub > label` shape: the indent lives on the label, not the row
   // div (unlike entry-block-sub above) -- #opt-urlclean-aggressive is Shape
-  // E1 below (Bookmarks tab, no help host), so this reuses that same census
+  // E1 below (Popup tab, no help host), so this reuses that same census
   // point rather than adding a new id just for this assertion.
-  { surface: "options", page: "options.html", selector: "[data-ui-stage0] .pref-row-sub > label:has(#opt-urlclean-aggressive)", state: "default",
+  { surface: "options", page: "options.html", selector: ".pref-row-sub > label:has(#opt-urlclean-aggressive)", tab: "popup", state: "default",
     expect: { paddingLeftPx: { value: 24 } } },
 
   // ---- `.switch` primitive (taste-uplift batch4 T1, COMPONENTS.md §6.1 /
@@ -1830,7 +1836,7 @@ export const CHECKS = [
     expect: { hitRectMin: { height: 24 } } },
 
   // ---- Stage-0 pref-row family (Task 3, spec 2026-09-23-ui-system-stage0-
-  // design §4): the [data-ui-stage0] Popup panel's row model Task 2 built --
+  // design §4): the row model (every panel since stage 3c) Task 2 built --
   // every switch sits in `.pref-row > label.switch`, pinned at a 44px
   // (comfortable) / 36px (compact) min-height; every row after the first in
   // a non-radio `.pref-group` carries a literal 1px border-top hairline
@@ -1852,11 +1858,11 @@ export const CHECKS = [
   // first-row shape itself: first match is #opt-show-search's row (Popup
   // Elements section, the first `.pref-row` right under
   // `h2#sec-popup-elements`).
-  { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .pref-group:not(.pref-group-radio) > .pref-row + .pref-row > label.switch', state: "default",
+  { surface: "options", page: "options.html", selector: '#panel-popup .pref-group:not(.pref-group-radio) > .pref-row + .pref-row > label.switch', tab: "popup", state: "default",
     expect: { minHeightPx: { comfortable: 44, compact: 36 }, fontSizePx: { comfortable: 14, compact: 13 }, hitRectMin: { height: 24 } } },
-  { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .pref-group:not(.pref-group-radio) > .pref-row + .pref-row', state: "default",
+  { surface: "options", page: "options.html", selector: '#panel-popup .pref-group:not(.pref-group-radio) > .pref-row + .pref-row', tab: "popup", state: "default",
     expect: { borderTopWidthPx: { value: 1 } } },
-  { surface: "options", page: "options.html", selector: '#panel-popup[data-ui-stage0] .settings-section > h2.section-title + .pref-group > .pref-row:first-child > label.switch', state: "default",
+  { surface: "options", page: "options.html", selector: '#panel-popup .settings-section > h2.section-title + .pref-group > .pref-row:first-child > label.switch', tab: "popup", state: "default",
     expect: { minHeightPx: { comfortable: 32, compact: 28 }, hitRectMin: { height: 24 } } },
 
   // ---- Stage-3b Task 1 pick family (spec 2026-09-24-ui-system-stage3b-
@@ -1892,7 +1898,7 @@ export const CHECKS = [
   // task NOTHING in this file asserted heightPx on a plain `.fg.entry-block
   // input[type=text|password]` -- every existing 32/28 heightPx row is
   // either a `.listbox-btn` or an `input[type=number]`, both of which have
-  // their OWN dedicated options.css rule; the shared `[data-ui-stage0] .fg
+  // their OWN dedicated options.css rule; the shared row-model `.fg
   // :is(input[type="text"], input[type="password"], input[type="number"])
   // { height: var(--opt-control-h) }` rule (options.css) had zero live
   // coverage for its text/password branch until now.
@@ -1937,7 +1943,7 @@ export const CHECKS = [
   // this same 3b batch): first `.pref-row > label.pick.pick-box` in DOM order
   // inside `#storage-cats`, same first-match discipline the bookmarks `.pick`
   // row above already relies on. Row geometry comes from the SAME generic
-  // `[data-ui-stage0] .pref-row > label { min-height: var(--opt-row-min-h) }`
+  // row-model `.pref-row > label { min-height: var(--opt-row-min-h) }`
   // rule `#panel-bookmarks .pref-row > label.pick` proves -- this is coverage
   // for a SECOND pick-box family (storage's cache categories) on a THIRD
   // panel, not a new CSS rule. Storage/vocab/markdown have no other
@@ -1953,9 +1959,9 @@ export const CHECKS = [
   // S1's storage half. The second category row is the plain 44/36 pick-box
   // geometry the bookmarks row proves; anchored by position so a first-match
   // shift cannot silently swap the two contracts.
-  { surface: "options", page: "options.html", selector: "#storage-cats .pref-row > label.pick.pick-box", state: "default",
+  { surface: "options", page: "options.html", selector: "#storage-cats .pref-row > label.pick.pick-box", tab: "storage", state: "default",
     expect: { minHeightPx: { comfortable: 32, compact: 28 }, hitRectMin: { height: 24 } } },
-  { surface: "options", page: "options.html", selector: "#storage-cats .pref-row:nth-child(2) > label.pick.pick-box", state: "default",
+  { surface: "options", page: "options.html", selector: "#storage-cats .pref-row:nth-child(2) > label.pick.pick-box", tab: "storage", state: "default",
     expect: { minHeightPx: { comfortable: 44, compact: 36 }, hitRectMin: { height: 24 } } },
 ];
 

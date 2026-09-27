@@ -433,7 +433,7 @@ function test(name, fn) {
   // retirement comment left in its place, options.css ~1493). AI Content
   // Source's radio rows are `label.pick` now, which declares its OWN 12px
   // gap (--opt-sp-5, COMPONENTS.md §6.4 exception 3) -- the same value the
-  // base `[data-ui-stage0] .pref-row > label` rule already gives every
+  // row model's `.pref-row > label` rule already gives every
   // other row, so a radio row and a switch row read identically once
   // again. Repointed (not deleted) to keep the coverage this file's other
   // geometry pins have: the negative control below still needs to prove
@@ -466,13 +466,11 @@ function test(name, fn) {
   });
 
   // Stage-3a (Task 3, ui-system-stage3a-design §3, Controller ruling 3b):
-  // options.css ~1582 (`[data-ui-stage0] .pref-row.context-help-host
-  // [data-help-role="choice"] > label.switch > .switch-text { line-height:
-  // var(--opt-lh-body) }`) overrides the legacy `.context-help-host
-  // [data-help-role="choice"] > label.switch > .switch-text { line-height:
-  // 16px }` (~line 564) for a choice help host that lives inside a stage-0
-  // pref-row -- matching every sibling `.pref-row .switch-text` instead of
-  // the flat 20px .choice-row line box that rule was written for. Assert the
+  // a choice help host that lives inside a pref-row reads the row model's
+  // `.pref-row .switch-text { line-height: var(--opt-lh-body) }` -- matching
+  // every sibling row -- not the legacy 16px choice-host pin (both that pin
+  // and the scoped override that beat it were deleted in stage 3c, when
+  // every choice switch host became a pref-row). Assert the
   // resolved value directly, in both density tiers (--opt-lh-body is 20
   // comfortable / 18 compact, options.css ~59/198).
   test("pref-row choice host's switch-text keeps the row line-height in both density tiers", () => {
@@ -500,9 +498,8 @@ function test(name, fn) {
   // including one that also lives inside a stage-0 `.pref-row` (this task's
   // #opt-wayback-batch, Archive tab), where the row model wants
   // `padding: var(--opt-row-pad-y) 0` instead (12px comfortable / 8px
-  // compact, `[data-ui-stage0] .pref-row > label`, ~line 1380 -- only
-  // (0,2,1), so it LOSES the padding-top/bottom tug-of-war to the legacy
-  // rule regardless of source order). anchorRowRect (this file's own helper,
+  // compact, `.pref-row > label`; since stage 3c the legacy choice-host
+  // padding is gone, so nothing competes with it any more). anchorRowRect (this file's own helper,
   // used by the "expanded help opens below..." test above) isolates the
   // label's OWN first line from the open answer's second flex line, so this
   // compares that first-line box height, open, against a plain sibling
@@ -694,7 +691,7 @@ function test(name, fn) {
   });
 
   // Fixwave round 2 (F4 regression): the stage-0 closed-state compensator
-  // `[data-ui-stage0] .context-help-host[data-help-role="field"] >
+  // `.context-help-host[data-help-role="field"] >
   // .context-help:not([open]) + *` must stop matching once the details is
   // open, so the app-wide `.context-help-host > .context-help[open] + *`
   // rule (options.css ~720, a flat --opt-sp-4) is the only one left to paint
@@ -826,7 +823,7 @@ function test(name, fn) {
     delete doc.documentElement.dataset.density;
   });
 
-  // Fixwave (final review, Low finding): `[data-ui-stage0] .fg label.bl`
+  // Fixwave (final review, Low finding): the row model's `.fg label.bl`
   // only ever matched a <label>, so a `div.bl` GROUP TITLE (Quick's "AI"
   // batch heading) stayed at the surface's legacy 13px/body-inherited
   // styling instead of the row model's --opt-text-body/--opt-lh-body face.
@@ -922,7 +919,7 @@ function test(name, fn) {
   // `.divider` elements (spec §3, matching every other migrated panel) --
   // "Pinboard Account" (which owns the connection overview) and "Language"
   // are now two separate `section.settings-section` blocks, spaced by the
-  // row model's own `[data-ui-stage0] .settings-section + .settings-section`
+  // row model's own `.settings-section + .settings-section`
   // margin-top (--opt-section-gap) instead of a literal border line. Retitled
   // and rewritten from "presents one separator" (which asserted the OLD
   // divider's border-line count) to assert the boundary that replaced it.
@@ -991,7 +988,7 @@ function test(name, fn) {
 
   // Stage-2 review round 1 (Medium cascade finding): #opt-ai-provider's
   // wrapper is now .fg.entry-block, and the stage-1 entry-block rule
-  // (`[data-ui-stage0] .entry-block > :is(input:not([type="number"]),
+  // (`.entry-block > :is(input:not([type="number"]),
   // .key-wrap) { max-width: none }`) must NOT include `select` in that list --
   // selects keep the legacy `.fg select` content-sized policy (max-content /
   // min-width 240px / max-width 100%, spec stage2 §2) even inside an entry
@@ -1005,10 +1002,10 @@ function test(name, fn) {
     const keyWrapMaxWidth = frame.contentWindow.getComputedStyle(keyWrap).maxWidth;
     assert(selectMaxWidth === "100%", "provider select max-width=" + selectMaxWidth);
     assert(keyWrapMaxWidth === "none", "gemini key-wrap max-width=" + keyWrapMaxWidth);
-    // Fixwave stage2: `[data-ui-stage0] .fg .key-wrap :is(input[type="text"],
-    // input[type="password"]) { padding-right: 32px }` was restated at
-    // (0,4,1) so it no longer depends on staying textually after the
-    // (0,3,1) field-type rule that resets padding-right to
+    // Fixwave stage2: `.fg .key-wrap :is(input[type="text"],
+    // input[type="password"]) { padding-right: 32px }` was restated one
+    // class higher so it no longer depends on staying textually after the
+    // field-type rule that resets padding-right to
     // --opt-control-pad-x. Assert the resolved value directly on the input,
     // not just that the rule text exists.
     const keyInput = doc.getElementById("opt-gemini-key");
@@ -1016,12 +1013,12 @@ function test(name, fn) {
     assert(keyInputPaddingRight === "32px", "opt-gemini-key padding-right=" + keyInputPaddingRight);
   });
 
-  // Fixwave stage2, item 1: `[data-ui-stage0] .pf > h3` (0,2,1) was losing
-  // to the themed `html[data-theme] .pf h3 { color: var(--opt-fg-muted) }`
-  // (0,2,2) override under every preset -- the sub-panel title rendered
-  // muted instead of body colour the moment a theme was active. Restated at
-  // (0,3,2) via a twin `html[data-theme] [data-ui-stage0] .pf > h3`
-  // selector (same shape as the `.fg label.bl` fix). Verify against a live
+  // Fixwave stage2, item 1: the row model's `.pf > h3` was losing to a
+  // themed `html[data-theme] .pf h3 { color: var(--opt-fg-muted) }` override
+  // under every preset -- the sub-panel title rendered muted instead of body
+  // colour the moment a theme was active. It carries a twin
+  // `html[data-theme] .pf > h3` selector (same shape as the `.fg label.bl`
+  // fix); stage 3c deleted the muted override itself. Verify against a live
   // computed style, not just selector text, under an actual preset theme.
   test("stage2: themed .pf > h3 keeps body colour, not the muted override", () => {
     doc.documentElement.setAttribute("data-theme", "modern-card");

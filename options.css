@@ -47,7 +47,7 @@
   /* ---- Density (stage 0, spec 2026-09-23-ui-system-stage0-design §2) ----
      Two tiers. comfortable is the default; compact is written as
      html[data-density="compact"] by options-theme-early.js for terminal-
-     flavoured presets. Consumed only inside [data-ui-stage0] until stage 3. */
+     flavoured presets. Consumed by the row model (every panel since stage 3c). */
   --opt-sp-8: 32px;
   --opt-text-body: 14px;   --opt-lh-body: 20px;
   --opt-text-helper: 12px; --opt-lh-helper: 18px;
@@ -432,21 +432,21 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 /* ---- Form groups ---- */
 .fg { margin-bottom: var(--opt-rhythm); }
 .fg label { display: flex; align-items: center; gap: var(--opt-sp-3); font-size: 13px; cursor: pointer; margin-bottom: var(--opt-sp-2); }
-.fg label.bl { display: block; font-weight: 400; margin-bottom: var(--opt-sp-2); cursor: default; font-size: 12px; color: var(--opt-fg-soft); }
+.fg label.bl { display: block; font-weight: 400; cursor: default; }
 /* A form group has exactly four vertical relationships, and each has ONE owner:
    group -> group (.fg margin-bottom, 12px), label -> control (label.bl
-   margin-bottom, 4px), control -> hint (.fg > .hint, 2px) and control -> action
-   row (below, 6px). Every "Test connection" / "Reset to default" / toolbar row
-   on the page is a .fg-actions: as the LAST CHILD of a .fg it sits sp-3 under
-   the control it acts on; as a SIBLING of .fg blocks it inherits the group
-   rhythm from the preceding group's margin-bottom and adds nothing. The flex
+   margin-bottom, --opt-label-gap), control -> hint (.fg > .hint, 2px) and
+   control -> action row. Every "Test connection" / "Reset to default" /
+   toolbar row on the page is a .fg-actions: as the LAST CHILD of a .fg it
+   sits --opt-label-gap under the control it acts on, as a sibling of a .fg
+   or a child of .pf it sits --opt-sp-6 below (both in the row-model block).
+   The flex
    gap already separates a button from its status line, so .save-status carries
    no margin of its own. Before this rule the relationship had no owner: one
    row was an inline style, one a bare button after the group, one a wrapper
    with no margin at all -- the three "same button, different gap" shapes the
    2026-09 spacing complaints kept finding. */
 .fg-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--opt-sp-4); }
-.fg > .fg-actions { margin-top: var(--opt-sp-3); }
 /* A follow-up field revealed under a <select> (translate: custom language). */
 .fg > select + input { margin-top: var(--opt-sp-3); }
 /* Contextual help keeps native <details> motion, but its visible pieces are
@@ -548,28 +548,23 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    the icon belongs after the text, not beside the track): details.context-help
    sits between .switch-text and .switch-track, so the icon follows the copy
    and the recipe's `margin-left: auto` still parks the track at the row end.
-   That label spans the whole host and may grow past 20px: it wraps, and an
-   open answer (the details' ::details-content) takes a full-width second flex
-   line. Closed, the second line is empty and zero-height (row-gap 0), so the
-   row stays 20px -- 2px block padding around a 16px line box, the same box
-   the stacked choice rows use and the one the help toggle's baseline is
-   calibrated against (context-help block). The copy's line box is pinned to
-   16px here too: on the .fg hosts -- the same fixed-line-box idea a pref-row
-   label's `--opt-lh-body` line embodies -- it was `normal`, which is
-   taller than 16px under some font stacks and would now grow the row instead
-   of overflowing a fixed 20px box. Per HTML, <details> is interactive
-   content, so a click on the summary or the answer does not activate the
-   label (the checkbox does not toggle). */
+   That label spans the whole host and wraps: an open answer (the details'
+   ::details-content) takes a full-width second flex line. Closed, the second
+   line is empty and zero-height (row-gap 0, declared here because the row
+   model's `gap` shorthand would otherwise give it a phantom row). Every
+   choice switch host is a preference row (stage 3c), so the rest of the
+   row's geometry -- min-height, block padding, the sub-row indent and the
+   copy's line box -- comes entirely from `.pref-row > label` and its
+   `.pref-row .switch-text` / `.pref-row-sub > label` companions; this rule
+   only adds the grid placement and the wrap. Per HTML, <details> is
+   interactive content, so a click on the summary or the answer does not
+   activate the label (the checkbox does not toggle). */
 .context-help-host[data-help-role="choice"] > label.switch {
   grid-column: 1 / -1;
   justify-self: stretch;
   flex-wrap: wrap;
   row-gap: 0;
-  height: auto;
-  min-height: 20px;
-  padding: var(--opt-sp-1) 0;
 }
-.context-help-host[data-help-role="choice"] > label.switch > .switch-text { line-height: 16px; }
 /* The native input covers the first line only (the 20px row plus the
    recipe's 2px overhang each way): an open answer below it is copy to read,
    not part of the switch's hit target. max-height, not height, so the
@@ -612,7 +607,6 @@ label.switch > .context-help > .context-help-body {
    measures whether the answer is open or closed. Restoring 8px only when
    open needs either :has() (this row's own hard rule bars it) or a JS-set
    state class; not worth either for a LOW-severity 4px difference. */
-.context-help-section { margin: var(--opt-sp-4) 0; }   /* same margins as .section-title, so divider -> title -> content match a plain heading */
 .context-help-section > .section-title { margin: 0; }
 .context-help-host > .context-help,
 .context-help-action-row > .context-help { display: contents; }
@@ -840,7 +834,7 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
 /* line-height 1.5: multi-line hint prose (several run long in de/ru, and CJK
    wants looser leading than the UA ~1.15 default). Scoped here, NOT on body --
    the tab/nav/card rhythm is hand-tuned around the UA default. */
-.hint { font-size: 11px; line-height: 1.5; color: var(--opt-fg-hint); margin: var(--opt-sp-1) 0 var(--opt-rhythm); }
+.hint { color: var(--opt-fg-hint); margin: var(--opt-sp-1) 0 var(--opt-rhythm); }
 .fg > .hint { margin: var(--opt-sp-1) 0 0; }   /* inside a form group: tight to its control; the group's own margin-bottom (10px) provides separation */
 .fg + .hint { margin-top: -6px; }  /* a hint owned by the preceding group: pull close (net ~4px gap above, 10px below) */
 .shortcut-current + .btn { margin-left: var(--opt-sp-4); }   /* "Shortcut: <keys> [Open Chrome Shortcut Settings]" lines */
@@ -979,13 +973,13 @@ html[data-theme] .opt-error {
 .btn.primary:focus-visible {
   border-color: var(--opt-focus-bd);
 }
-[data-ui-stage0] .btn:not(.context-help-toggle) {
+.btn:not(.context-help-toggle) {
   height: var(--opt-control-h);
   padding: 0 var(--opt-control-pad-x);
   font-size: var(--opt-text-body);
   line-height: calc(var(--opt-control-h) - 2px);
 }
-[data-ui-stage0] .btn-sm:not(.context-help-toggle) {
+.btn-sm:not(.context-help-toggle) {
   height: calc(var(--opt-control-h) - 4px);
   padding: 0 var(--opt-sp-4);
   font-size: calc(var(--opt-text-body) - 1px);
@@ -1073,15 +1067,6 @@ input:focus-visible + .tag-gov-chip-face {
   width: max-content;
   min-width: 240px;
   max-width: 100%;
-}
-.fg .key-wrap {
-  max-width: 420px;
-}
-.fg input[type="text"].fg-url {
-  max-width: 520px;
-}
-.fg input[type="text"]:not(.fg-url) {
-  max-width: 320px;
 }
 .fg input[type="number"] {
   max-width: 96px;
@@ -1297,8 +1282,8 @@ input[type="checkbox"], input[type="radio"] {
         Appearance's custom-CSS) fall through to the trailing `monospace` generic → Fixed-width
         CJK = Sarasa again. Must also name fast CJK fonts (YaHei/PingFang) BEFORE `monospace`.
    This is why fixing only the Latin half left Bookmark/Appearance still stalling. */
-.fg textarea { resize: vertical; min-height: 80px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 11px; line-height: 1.5; }
-.save-status { font-size: 12px; color: var(--opt-save); }
+.fg textarea { resize: vertical; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
+.save-status { color: var(--opt-save); }
 /* Connectivity tests used to pin their three states with inline styles
    (#888/#080/#c00), which no theme can override -- #c00 measured 1.71:1 on
    Nord Night. The states are classes now: setStatusIcon() owns .ok/.bad,
@@ -1433,10 +1418,10 @@ html.motion-ready .backup-import-result:not([hidden]) {
 }
 .field-warn { display:none; font-size: 12px; color: var(--opt-warn); margin-top: var(--opt-sp-2); }
 .field-warn.visible { display: block; }
-.section-title { display: block; font-size: 15px; font-weight: 600; color: var(--opt-fg); margin-bottom: var(--opt-sp-4); margin-top: var(--opt-sp-4); }
 
-/* ---- Stage-0 row model (spec 2026-09-23-ui-system-stage0-design §3) ----
-   Scoped to the prototype container. Three shapes: preference rows
+/* ---- Row model (spec 2026-09-23-ui-system-stage0-design §3) ----
+   The row model (every panel since stage 3c; it began as a stage-0 prototype
+   scoped to a marker attribute, retired in stage 3c). Three shapes: preference rows
    (.pref-group > .pref-row), entry blocks (.fg.entry-block) and edit areas
    (.fg.edit-area), grouped by section.settings-section. Everything reads the
    density tokens except: the 1px .pref-row hairline (border-width, not a
@@ -1453,8 +1438,8 @@ html.motion-ready .backup-import-result:not([hidden]) {
    popup-width custom row's 32px number field still matches its row's
    height; it just does so via the SAME plain-row geometry every other
    .pref-row uses, not a radio-specific rung. */
-[data-ui-stage0] .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
-[data-ui-stage0] .section-title { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); margin: 0 0 var(--opt-sp-5); }
+.settings-section + .settings-section { margin-top: var(--opt-section-gap); }
+.section-title { display: block; font-size: var(--opt-text-section); line-height: var(--opt-lh-section); font-weight: 600; color: var(--opt-fg); margin: 0 0 var(--opt-sp-5); }
 /* Stage-3b Task 2 (2026-09-24-ui-system-stage3b): `.disclosure > summary`'s
    own base rule (below, "---- Collapsible section (.disclosure) ----") is a
    literal `font-size: 15px`, written to read "the same face as
@@ -1474,7 +1459,7 @@ html.motion-ready .backup-import-result:not([hidden]) {
    this up for free once THEY migrate. line-height matches for the same
    reason (not itself part of the headerFace check, but the same "one heading
    face" intent this whole rule restores). */
-[data-ui-stage0] .disclosure > summary { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); }
+.disclosure > summary { font-size: var(--opt-text-section); line-height: var(--opt-lh-section); }
 /* Fixwave (final review, Low finding): the legacy `.context-help-section
    { margin: var(--opt-sp-4) 0 }` (~line 607) was written to match a PLAIN
    `.section-title`'s own margin (both sp-4, 8px) so a section that opens
@@ -1486,16 +1471,16 @@ html.motion-ready .backup-import-result:not([hidden]) {
    every plain section title on the same page: title -> first control read
    8px instead of the row model's 12. Mirror the same override here so the
    two title shapes stay in lockstep inside the marker. */
-[data-ui-stage0] .context-help-section { margin: 0 0 var(--opt-sp-5); }
-[data-ui-stage0] .pref-row + .pref-row { border-top: 1px solid var(--opt-border-section); }
-[data-ui-stage0] .pref-row > label {
+.context-help-section { margin: 0 0 var(--opt-sp-5); }
+.pref-row + .pref-row { border-top: 1px solid var(--opt-border-section); }
+.pref-row > label {
   display: flex; align-items: center; gap: var(--opt-sp-5);
   min-height: var(--opt-row-min-h); padding: var(--opt-row-pad-y) 0; margin: 0;
   font-size: var(--opt-text-body); line-height: var(--opt-lh-body);
 }
-[data-ui-stage0] .pref-row > label.switch { min-height: var(--opt-row-min-h); }
-[data-ui-stage0] .pref-row .switch-text { font-size: var(--opt-text-body); line-height: var(--opt-lh-body); }
-[data-ui-stage0] .pref-row-sub > label { padding-left: var(--opt-sp-7); }
+.pref-row > label.switch { min-height: var(--opt-row-min-h); }
+.pref-row .switch-text { font-size: var(--opt-text-body); line-height: var(--opt-lh-body); }
+.pref-row-sub > label { padding-left: var(--opt-sp-7); }
 /* Stage-3a (Task 2, 2026-09-24-ui-system-stage3a): subordinate entry block --
    an .fg.entry-block whose control is dependent on a sibling switch/field
    above it (Reader's four indented model-override/translate/glossary/skim
@@ -1503,7 +1488,7 @@ html.motion-ready .backup-import-result:not([hidden]) {
    --opt-sp-7), applied to the block itself rather than to a child label,
    since an entry block's label already sits flush at the block's own edge
    (no equivalent flex row to indent inside). */
-[data-ui-stage0] .entry-block-sub { padding-left: var(--opt-sp-7); }
+.entry-block-sub { padding-left: var(--opt-sp-7); }
 /* Stage-3b Task 1 (2026-09-24-ui-system-stage3b) retired the two rules that
    used to live here: `.pref-group-radio`'s own no-hairline 40/36
    row-height variant, and the mixed-group `label:not(.switch) { gap:
@@ -1517,7 +1502,7 @@ html.motion-ready .backup-import-result:not([hidden]) {
    geometry as a switch row, full stop. `.pref-group-radio` itself stays on
    the three markup groups (tests/registry reference the class) -- it just
    carries no geometry of its own any more. */
-[data-ui-stage0] .entry-block, [data-ui-stage0] .edit-area { margin-bottom: var(--opt-sp-6); }
+.entry-block, .edit-area { margin-bottom: var(--opt-sp-6); }
 /* R9 (2026-09-23): a preference row that directly follows its section title
    drops its top padding and one pad of min-height, so title -> first copy is
    the same 12px as title -> entry-block label. Two title shapes lead a
@@ -1535,8 +1520,8 @@ html.motion-ready .backup-import-result:not([hidden]) {
    hidden radio's row-1 hit area / the mark's centring track that reduced
    height through --pick-row1-h, declared HERE (one selector to keep in step;
    the (0,3,1) default above loses to this rule). */
-[data-ui-stage0] .settings-section > :is(h2.section-title, .context-help-section) + .pref-group > .pref-row:first-child > label,
-[data-ui-stage0] .settings-section > :is(h2.section-title, .context-help-section) + .storage-cats > .pref-group > .pref-row:first-child > label {
+.settings-section > :is(h2.section-title, .context-help-section) + .pref-group > .pref-row:first-child > label,
+.settings-section > :is(h2.section-title, .context-help-section) + .storage-cats > .pref-group > .pref-row:first-child > label {
   padding-top: 0;
   min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
   --pick-row1-h: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
@@ -1552,56 +1537,38 @@ html.motion-ready .backup-import-result:not([hidden]) {
    the host's own edge the way a block child's margin would. An unscoped
    rule inflated the radio group's own trailing edge by 16px, growing the
    whole help-host block and the gap before the next section's title. */
-[data-ui-stage0] .settings-section > .pref-group { margin-bottom: var(--opt-sp-6); }
-[data-ui-stage0] .settings-section > :last-child { margin-bottom: 0; }
-/* Second, higher-specificity selector so this wins over the themed
-   `html[data-theme] .fg label.bl { color: var(--opt-fg-muted) }` override
-   below (review round 1, finding 1): (0,3,1) alone loses to that rule's
-   (0,3,2) under every preset theme. (0,4,2) here beats it regardless of
-   source order. The label stays body colour under every theme (spec §2).
+.settings-section > .pref-group { margin-bottom: var(--opt-sp-6); }
+.settings-section > :last-child { margin-bottom: 0; }
+/* The field label face: body size/line-height/colour and the label ->
+   control gap. The `html[data-theme]` twin keeps the label body colour
+   under every preset theme (spec §2) against `html[data-theme] .fg label
+   { color }` and any other themed label rule; the old themed muted-colour
+   override for `.fg label.bl` was deleted in stage 3c.
    Fixwave (final review, Low finding): `label.bl` only ever matched a
    <label> element, so a `div.bl` GROUP TITLE (Quick's "AI" batch heading
    `#batch-ai-title`, Archive's "Recent archive requests" wayback-log
    heading -- both `.context-help-host[data-help-role="group"] > .bl`, a
    div by design since a group title owns no single control to label) never
-   picked up this rule inside a stage-0 panel and stayed at the surface's
+   picked up this rule and stayed at the surface's
    legacy 13px/body-colour instead of the row model's --opt-text-body (14)/
    --opt-lh-body. `:is(label, div)` widens the match without changing this
    rule's specificity (both are plain type selectors, (0,0,1) either way),
-   so nothing else on the page shifts. Every group-role anchor's own zero
-   margin (`.context-help-host[data-help-role="group"] > .bl`, ~line 528)
-   needs a scoped bump right below to keep winning now that this rule also
-   sets margin-bottom on that element. */
-[data-ui-stage0] .fg :is(label, div).bl,
-html[data-theme] [data-ui-stage0] .fg :is(label, div).bl {
+   so nothing else on the page shifts. A group-role anchor keeps its zero
+   margin from `.context-help-host[data-help-role="group"] > .bl` (context-
+   help block, (0,3,0) over this rule's (0,2,1)). */
+.fg :is(label, div).bl,
+html[data-theme] .fg :is(label, div).bl {
   font-size: var(--opt-text-body); line-height: var(--opt-lh-body); color: var(--opt-fg); margin-bottom: var(--opt-label-gap);
 }
-/* The rule above is (0,3,1) ([data-ui-stage0] + .fg + .bl classes, one
-   :is()-contributed type selector) -- now that it also matches `div.bl`, it
-   outranks `.context-help-host[data-help-role="group"] > .bl { margin: 0 }`
-   (~line 528, (0,3,0)) regardless of source order for EVERY group-role
-   anchor, not just the one this was first caught on (wayback's "Recent
-   archive requests" heading, whose Clear button sits on the same flex row
-   as the title, not below it): #batch-ai-title (Quick's "AI" batch group)
-   is ALSO a group-role anchor and regressed the same way, moving its
-   answer 8px further from the row it opens under than the "opens below and
-   from the start of its owning row" invariant allows (round-1 catch: the
-   grid host's row-1 track height grows with its item's margin-box, pushing
-   row 2 -- the open answer -- down by the same amount). One more
-   class/attribute (repeating the group-role host selector instead of the
-   bare `.bl`) reaches (0,4,0), which beats (0,3,1) on the class/attribute
-   count alone, for every current and future group-role host in one rule. */
-[data-ui-stage0] .context-help-host[data-help-role="group"] > .bl { margin-bottom: 0; }
-/* Inside a help-host field (popup-width-label): the generic
+/* Inside a help-host field (popup-width-label): the themed twin of the
+   label rule above ((0,3,2)) outranks the generic
    `.context-help-host[data-help-role="field"] > label.bl { margin: 0; }`
-   above and this stage-0 rule share specificity (0,3,1); this rule, being
-   later in source, was winning for margin-bottom and pushing the label
-   1.5px off the "?" icon's grid-row centre (fixwave F4). Re-zero it here at
-   higher specificity, and move the label -> radio-group gap onto the
-   host's own `.context-help + *` sibling instead so it still reads
-   --opt-label-gap. */
-[data-ui-stage0] .context-help-host[data-help-role="field"] > label.bl,
-html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > label.bl {
+   ((0,3,1)) for margin-bottom and would push the label 1.5px off the "?"
+   icon's grid-row centre (fixwave F4). Re-zero it here with a matching
+   twin, and move the label -> radio-group gap onto the host's own
+   `.context-help + *` sibling instead so it still reads --opt-label-gap. */
+.context-help-host[data-help-role="field"] > label.bl,
+html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
   margin-bottom: 0;
 }
 /* :not([open]) (fixwave round 2): the unqualified `.context-help + *` this
@@ -1613,10 +1580,10 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    selector match the moment the details opens, handing the open case back
    to the app-wide rule unopposed; the closed case (this rule's actual job)
    is unaffected -- :not([open]) only adds specificity. */
-[data-ui-stage0] .context-help-host[data-help-role="field"] > .context-help:not([open]) + * { margin-top: var(--opt-label-gap); }
-[data-ui-stage0] .hint { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
+.context-help-host[data-help-role="field"] > .context-help:not([open]) + * { margin-top: var(--opt-label-gap); }
+.hint { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 /* Task 4 fix round 1 (ui-system-stage2): keep the section/field help toggles
-   on their text baseline under [data-ui-stage0]. The shared
+   on their text baseline in the row model (every panel since stage 3c). The shared
    --context-help-optical-y constants (per script x role, above the
    @generated:ui-components region) are calibrated for the SURFACE-WIDE
    `.section-title` (15px/600) and `.fg label.bl` (12px) faces -- do not
@@ -1665,7 +1632,7 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    RASTER_RANGES=1):
      section (freeTierTitle only, both configs identical for cjk too):
        en 3 -> 1 ; zh-CN 2/2.5 (local/CI) -> 0/0.5
-     field (7 hosts inside [data-ui-stage0]; worst -> best per config):
+     field (7 row-model hosts at the time; worst -> best per config):
        en   hintOllamaModel 3->1.5, hintOpenAIBaseUrl/hintCustomBaseUrl
             2.5->1, optPopupWidthHelp/jinaFreeTierHint 0.5->-1,
             openrouterTagline/hintCustomKey 0->-1.5
@@ -1681,14 +1648,14 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    SUPERSEDED for the section role by the 2026-09-24-ui-system-stage3a Task 1
    recalibration directly below -- the "section (freeTierTitle only, ...)"
    sub-bullet above is stale the moment a second section-role host joins the
-   [data-ui-stage0] bucket, which is exactly what happened. */
+   row-model bucket, which is exactly what happened. */
 /* Stage-3a (Task 1, 2026-09-24-ui-system-stage3a), controller-authorized
-   recalibration: this constant is a PROTOTYPE-scoped ([data-ui-stage0])
+   recalibration: this constant is a row-model-scoped (then prototype-marker-scoped)
    additive correction introduced by stage-2 Task 4 above, not the shared
    --context-help-optical-y base constant -- recalibrating it is this task's
    call, unlike the shared per-script/role constants (~line 665 onward),
    which stay untouched. Moving #panel-ai-behavior's "Prompts" heading
-   (promptsHint's h2.section-title) inside [data-ui-stage0] promotes it from
+   (promptsHint's h2.section-title) into the row model promotes it from
    the surface-wide 15px to --opt-text-section (16px) and puts it in the SAME
    section/alphabetic/stage0 raster bucket as #panel-ai's "AI Provider"
    (freeTierTitle) -- the "every contextual help host declares one semantic
@@ -1725,17 +1692,17 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    promptsHint keeps 0.5px of margin on the negative side. The other four
    (non-stage0) alphabetic/section hosts on the page -- backupPlaintextDisclosure,
    diagnosticsHint, optThemeHint, storageIntro -- are unaffected (this rule is
-   [data-ui-stage0]-scoped and none of those four panels carry the marker);
+   row-model-scoped and none of those four panels were in the row model yet);
    optThemeHint's own pre-existing en@2 delta of exactly 2px (governed solely
    by the shared base constant, unrelated to this rule) was already at that
    same edge before this task and is untouched by it. Re-measure with
    PBP_HELP_RASTER_RANGES=1 under both font configs before nudging further,
    and re-derive this constant (not the shared base one) if a later stage-3a
-   task adds a third section-role host inside [data-ui-stage0]
+   task adds a third section-role host to the row model
    (#panel-reader/#panel-archive both have a context-help-section host,
    per the stage-3a design doc's remaining panel list). */
-[data-ui-stage0] .context-help-host[data-help-role="section"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.5px)); }
-[data-ui-stage0] .context-help-host[data-help-role="field"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
+.context-help-host[data-help-role="section"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.5px)); }
+.context-help-host[data-help-role="field"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
 /* Fixwave (F4 follow-up, caught by the help-raster gate, not the final
    review list): widening `.fg label.bl` to `.fg :is(label, div).bl` above
    raises #batch-ai-title (Quick's "AI" batch group, the one group-role
@@ -1755,7 +1722,7 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    both `scripts/options-help-render-audit.mjs` and
    `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
    scripts/options-help-render-audit.mjs` before nudging further. */
-[data-ui-stage0] .context-help-host[data-help-role="group"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
+.context-help-host[data-help-role="group"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) - 0.75px)); }
 /* Stage-0 "action" role host: Appearance's Custom CSS Overlay "Save as
    theme" inline help (`.context-help-action-row`, NOT `.context-help-host`
    -- a distinct wrapper: a button wrapper and the help toggle side by side
@@ -1774,87 +1741,29 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    Re-measure with `node scripts/options-help-render-audit.mjs` AND
    `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
    scripts/options-help-render-audit.mjs` before nudging further. */
-[data-ui-stage0] .context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) + 3px)); }
-/* Stage-3a (Task 1, 2026-09-24-ui-system-stage3a): choice help hosts inside
-   preference rows. The legacy `.context-help-host[data-help-role="choice"] >
-   label.switch > .switch-text { line-height: 16px }` (~line 564) pins the
-   copy to the legacy 16px pin; the pref-row model
-   the host now sits in (bookmarks/quick's no-help choice rows never carried
-   this role, so only the AI-behaviour panel's three choice hosts are
-   affected) reads the density line-height instead, matching every sibling
-   .pref-row's .switch-text (rule ~1386). */
-[data-ui-stage0] .pref-row.context-help-host[data-help-role="choice"] > label.switch > .switch-text { line-height: var(--opt-lh-body); }
-/* `[data-ui-stage0] .pref-row > label` (rule ~1380) sets gap: --opt-sp-5
-   (12px), outranking .switch's own base gap: --opt-sp-3 (6px, ~line 1099)
-   for this switch too. The choice-host's copy -> help-icon offset (~line
-   593, `margin-left: calc(--opt-sp-1 - --opt-sp-3)`) is calibrated against
-   that 6px base gap for every OTHER choice-role switch host on the page
-   (dict-echo-enabled, opt-sync-enabled, ...), still outside [data-ui-stage0]
-   (opt-wayback-enabled joined this bucket in stage-3a Task 2, below); inside
-   the marker the wider row gap grew the text -> icon visual gap from ~7px to
-   ~13px (context-help raster gate). Restore the switch's own copy -> icon
-   spacing for this host only -- it does not touch .switch-track's own
-   end-of-row position (driven by margin-left: auto on the track, independent
-   of the label's gap).
+.context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle .btn-ic { transform: translateY(calc(var(--context-help-optical-y) + 3px)); }
+/* `.pref-row > label` (the row model) sets gap: --opt-sp-5 (12px),
+   outranking .switch's own base gap: --opt-sp-3 (6px) for a choice-role
+   switch too. The choice-host's copy -> help-icon offset (context-help
+   block, `margin-left: calc(--opt-sp-1 - --opt-sp-3)`) is calibrated against
+   that 6px base gap, so the wider row gap grew the text -> icon visual gap
+   from ~7px to ~13px (context-help raster gate). Restore the switch's own
+   copy -> icon spacing for these hosts only -- it does not touch
+   .switch-track's own end-of-row position (driven by margin-left: auto on
+   the track, independent of the label's gap).
    Fixwave (final review, Important finding 1): `gap` is a SHORTHAND for
-   BOTH column-gap and row-gap. The legacy host's own `row-gap: 0` (~line
-   555) was declared for the exact same reason spelled out there -- the
-   label wraps (flex-wrap) around an open answer, and a CLOSED answer is
-   still an empty, zero-height second flex line, so any non-zero row-gap
-   inserts a phantom gap ABOVE that empty line even though nothing visible
-   sits below it. Writing this override as the `gap` shorthand silently
-   reset that row-gap back to 6px (the same --opt-sp-3 this rule restores
-   for column-gap), so every choice-role switch host inside a stage-0
-   pref-row grew a 6px phantom row: closed height 50px instead of 44
-   (38 instead of 32 for the row directly under a section title), and the
-   open answer's copy -> body gap 12px instead of the calibrated 6
-   (label.switch > .context-help > .context-help-body's own margin-top,
-   ~line 583). Declare column-gap and row-gap as separate longhands so
+   BOTH column-gap and row-gap. The host's own `row-gap: 0` (context-help
+   block) was declared because the label wraps (flex-wrap) around an open
+   answer, and a CLOSED answer is still an empty, zero-height second flex
+   line, so any non-zero row-gap inserts a phantom gap ABOVE that empty line
+   even though nothing visible sits below it. Writing this override as the
+   `gap` shorthand silently reset that row-gap back to 6px, so every
+   choice-role switch host grew a 6px phantom row: closed height 50px
+   instead of 44 (38 instead of 32 for the row directly under a section
+   title), and the open answer's copy -> body gap 12px instead of the
+   calibrated 6. Declare column-gap and row-gap as separate longhands so
    fixing one can never again silently move the other. */
-[data-ui-stage0] .pref-row.context-help-host[data-help-role="choice"] > label.switch { column-gap: var(--opt-sp-3); row-gap: 0; }
-/* Stage-3a (Task 2, 2026-09-24-ui-system-stage3a): Archive's "Also archive
-   during batch save" (#opt-wayback-batch) is the first `.pref-row-sub` that
-   is ALSO a choice-role help host -- a combination Task 1's migrated panels
-   never produced (their choice-help rows are never indented). The unscoped
-   base rule `.context-help-host[data-help-role="choice"] > label.switch`
-   (~line 555) sets a `padding` SHORTHAND at specificity (0,3,1), which beats
-   `.pref-row-sub > label`'s `padding-left` at (0,2,1) regardless of source
-   order -- the row model's indent mechanism (padding-left on the label, not
-   margin-left on the row, unlike the retired fixed-indent class) would
-   otherwise be silently zeroed out for this one row, undoing the deliberate
-   "carries the same indent" design intent the HTML comment above it states.
-   Re-declares just the one longhand this host needs at higher specificity;
-   the shorthand's other three sides (top/right/bottom padding) are left to
-   the base rule. */
-[data-ui-stage0] .pref-row-sub.context-help-host[data-help-role="choice"] > label.switch { padding-left: var(--opt-sp-7); }
-/* Stage-3a (Task 3, 2026-09-24-ui-system-stage3a, Controller ruling 3d): the
-   "shorthand's other three sides ... left to the base rule" gap the comment
-   directly above this rule documents. The legacy `padding: var(--opt-sp-1) 0`
-   shorthand (~line 555, specificity (0,3,1)) also wins padding-top/-bottom
-   over the row model's own `[data-ui-stage0] .pref-row > label { padding:
-   var(--opt-row-pad-y) 0 }` (~line 1380, only (0,2,1)) for EVERY choice-role
-   switch host inside a stage-0 pref-row, not just the indented one above --
-   #opt-ai-use-transcript (AI Behavior), #opt-md-video-use-login (Reader),
-   #opt-wayback-enabled and #opt-wayback-batch (Archive) all match
-   `.pref-row.context-help-host[data-help-role="choice"] > label.switch`
-   regardless of `.pref-row-sub`. CLOSED, this is invisible: min-height
-   (--opt-row-min-h, which DOES win its own (0,3,1) tie via source order)
-   already forces the row to 44/36px well past the wrong 2px-padded content's
-   24px, so every closed row measured fine. OPEN, the flex-wrap second line
-   (the answer) makes content the actual driver instead of min-height, and
-   the wrong 2px padding shows up as a genuinely shorter row than a plain
-   sibling `.pref-row` -- measured on #opt-wayback-batch open (Playwright,
-   comfortable tier): 24px (2+2 padding + 20px line) instead of the 44px a
-   sibling plain row renders at (2*var(--opt-row-pad-y) + the same 20px line
-   = 44, by the row model's own design -- --opt-row-min-h IS exactly that
-   sum). Re-declares the two longhands the choice-role switch shape needs
-   back, at (0,5,1) -- the SAME specificity as the `padding-left` rule
-   directly above this one (both add `.context-help-host[data-help-role=
-   "choice"]` on top of the row-shape class), comfortably ahead of the
-   (0,3,1) legacy shorthand it must outrank. */
-[data-ui-stage0] .pref-row.context-help-host[data-help-role="choice"] > label.switch {
-  padding-top: var(--opt-row-pad-y); padding-bottom: var(--opt-row-pad-y);
-}
+.pref-row.context-help-host[data-help-role="choice"] > label.switch { column-gap: var(--opt-sp-3); row-gap: 0; }
 /* Task 4 (ui-system-stage2, Controller ruling A): the AI panel's text/
    password fields (#opt-<provider>-key/-model, #opt-<provider>-baseurl)
    were still rendering the legacy ~26px unstyled fill -- stage 0 only ever
@@ -1864,10 +1773,17 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    purpose (COMPONENTS.md's content-sized select exception, spec stage2 §2 --
    they get their own width/height rules, not this fixed control-h block).
    max-width stays number-only, a separate declaration right below. */
-[data-ui-stage0] .fg :is(input[type="text"], input[type="password"], input[type="number"]) {
+.fg :is(input[type="text"], input[type="password"], input[type="number"]) {
   height: var(--opt-control-h); padding: 0 var(--opt-control-pad-x); font-size: var(--opt-text-body);
   background-color: var(--opt-panel); border-color: var(--opt-border);
 }
+/* Field interaction states follow COMPONENTS.md §6.1 (stage 3c, user ruling
+   A): rest --opt-border, hover the generated color-mix step (its (0,3,1)
+   `:hover:not(:focus)` already outranks the rule above), focus
+   --opt-focus-bd + ring. The generated `.fg input:focus` border sits at
+   (0,2,1) -- the same as the rule above, which comes later -- so the focus
+   border is restated here one pseudo-class higher. */
+.fg :is(input[type="text"], input[type="password"], input[type="number"]):focus { border-color: var(--opt-focus-bd); }
 /* The padding shorthand above resets padding-right to --opt-control-pad-x on
    EVERY matched input, including a `.key-wrap`'s -- clobbering the 32px gap
    `.fg .key-wrap input { padding-right: 32px; }` (COMPONENTS.md §8) reserves
@@ -1878,18 +1794,17 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    needs back, everywhere else untouched. A key-wrap only ever holds a text
    or password input (COMPONENTS.md §8), so the :is() list omits
    type="number" on purpose, same population as the rule above. */
-[data-ui-stage0] .fg .key-wrap :is(input[type="text"], input[type="password"]) { padding-right: 32px; }
-[data-ui-stage0] .fg input[type="number"] {
-  max-width: 96px;
-}
-[data-ui-stage0] .fg textarea {
+.fg .key-wrap :is(input[type="text"], input[type="password"]) { padding-right: 32px; }
+.fg textarea {
   width: 100%; max-width: none; min-height: 96px; font-size: 13px; line-height: 20px;
   padding: var(--opt-sp-4) var(--opt-control-pad-x); background-color: var(--opt-panel); border-color: var(--opt-border);
 }
 /* Fixwave F2: COMPONENTS.md §10.2's `.fg.entry-block` row promises "控件占满
    内容列（max-width: none）" for the whole primitive, but only the textarea
    rule above implemented it -- an entry-block text/key-wrap control was still
-   capped by the legacy .fg 320/420/520/240 width tiers a few rules up.
+   capped by the legacy .fg 320/420/520 width tiers (generated region; those
+   caps retired in stage 3c, so today this rule states the fill-the-column
+   contract rather than beating a cap).
    `input:not([type="number"])` carves out the number field, which keeps its
    own 96px content cap (fieldWidthKind, COMPONENTS.md §6.3) instead of
    stretching to the column. `select` is deliberately NOT in this :is() list:
@@ -1905,54 +1820,32 @@ html[data-theme] [data-ui-stage0] .context-help-host[data-help-role="field"] > l
    entry-blocks (shortcut display, popup-width radios) have no direct
    input/.key-wrap child, so this rule had nothing to match under stage 0 --
    it started rendering with stage 2's provider-panel entry blocks. */
-[data-ui-stage0] .entry-block > :is(input:not([type="number"]), .key-wrap) { max-width: none; }
-/* Task 1 (ui-system-stage3c retirement): the rule above reaches a bare
-   entry-block input or the .key-wrap div itself, but not an input ONE level
-   deeper inside that key-wrap -- and a key-wrap's own input can be
-   type="text" as well as the usual type="password": setupSecretToggles()
-   (shared.js) flips EVERY key-wrap input's type to "text" while its eye
-   toggle has it revealed, and a setting can also be declared `secret: true`
-   with `type: "text"` from the start (webhook's url, export-targets.js). A
-   text-typed key-wrap input still falls to the generic `.fg input[type=
-   "text"]:not(.fg-url)` 320px tier a few rules up while its key-wrap sibling
-   has already been un-capped to fill the column, floating the eye toggle
-   (pinned to the key-wrap's own right edge, not the input's) off the
-   narrower input -- the bug a now-retired Send-to-only field recipe used to
-   prevent (stage-3b Task 3 review B1). This rule covers every revealed key
-   field on the page (AI provider keys, the Pinboard token, wayback's S3
-   keys, every Send-to secret), not just webhook's. (0,4,1) beats the
-   (0,3,1) tier outright, so source order does not matter here. Stage 3c
-   Task 3 deletes this rule together with the generated `.fg` 320/520/420
-   width caps (spec §3.1). */
-[data-ui-stage0] .entry-block > .key-wrap > :is(input[type="text"], input[type="password"]) { max-width: none; }
+.entry-block > :is(input:not([type="number"]), .key-wrap) { max-width: none; }
 
-/* Provider sub-panel and action rows on the stage-0 rhythm (spec stage2 §2). */
-[data-ui-stage0] .pf { margin-top: var(--opt-sp-6); padding: var(--opt-panel-pad); }
-/* Second, higher-specificity selector so this wins over the themed
-   `html[data-theme] .pf h3 { color: var(--opt-fg-muted) }` override below
-   (fixwave stage2, same shape as the `.fg label.bl` fix above): (0,2,1)
-   alone loses to that rule's (0,2,2) under every preset theme. (0,3,2) here
-   beats it regardless of source order, so the sub-panel title stays body
-   colour under stage 0 in every theme. */
-[data-ui-stage0] .pf > h3,
-html[data-theme] [data-ui-stage0] .pf > h3 {
+/* Provider sub-panel and action rows on the row-model rhythm (spec stage2 §2). */
+.pf { margin-top: var(--opt-sp-6); padding: var(--opt-panel-pad); }
+/* The provider sub-panel title: body face, 600, body colour. The
+   `html[data-theme]` twin keeps it body colour under every preset theme;
+   the old themed muted-colour `.pf h3` override was deleted in stage 3c. */
+.pf > h3,
+html[data-theme] .pf > h3 {
   font-size: var(--opt-text-body); line-height: var(--opt-lh-body); font-weight: 600; color: var(--opt-fg); margin: 0 0 var(--opt-label-gap);
 }
-[data-ui-stage0] .settings-section > .pf:last-child { margin-bottom: 0; }
-[data-ui-stage0] .fg > .fg-actions { margin-top: var(--opt-label-gap); }
-[data-ui-stage0] .fg + .fg-actions, [data-ui-stage0] .pf > .fg-actions { margin-top: var(--opt-sp-6); }
+.settings-section > .pf:last-child { margin-bottom: 0; }
+.fg > .fg-actions { margin-top: var(--opt-label-gap); }
+.fg + .fg-actions, .pf > .fg-actions { margin-top: var(--opt-sp-6); }
 /* Send-to card Test row (options.js renderExportTargets): its previous sibling is
    the .et-onboarding disclosure when a target ships onboarding copy, so the
    `.fg + .fg-actions` rule above misses it. Pin the action-row gap on the row
    itself so sibling order cannot zero it (fgRhythm gate: >=4px above an action row). */
-[data-ui-stage0] .export-target-card > .fg-actions { margin-top: var(--opt-sp-6); }
+.export-target-card > .fg-actions { margin-top: var(--opt-sp-6); }
 /* Enable row -> first field: `.settings-section > .pref-group`'s sp-6 does
    not reach inside .export-target-card. `:not(:last-child)` (stage-3b
    Task 5 housekeeping) matches every OTHER stage-0 pref-group spacer in this
    file -- a card whose enable switch is the only `.pref-group` (no fields
    below it) must not carry a trailing margin nothing follows. */
-[data-ui-stage0] .export-target-card > .pref-group:not(:last-child) { margin-bottom: var(--opt-sp-6); }
-[data-ui-stage0] .save-status { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
+.export-target-card > .pref-group:not(:last-child) { margin-bottom: var(--opt-sp-6); }
+.save-status { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 
 /* ---- Provider fields ---- */
 /* Provider fieldset: a resting container, so its edge is the hairline section
@@ -1961,7 +1854,7 @@ html[data-theme] [data-ui-stage0] .pf > h3 {
    override to --opt-border, which painted a near-black box on modern-card
    (user report 2026-09-18). --opt-border-section is defined per theme, so one
    rule serves the default surface and every preset. */
-.pf { margin-top: var(--opt-sp-4); padding: var(--opt-sp-5); background: var(--opt-pf-bg); border: 1px solid var(--opt-border-section); border-radius: var(--opt-radius-md); }
+.pf { background: var(--opt-pf-bg); border: 1px solid var(--opt-border-section); border-radius: var(--opt-radius-md); }
 .pf[hidden] { display: none; }
 /* Same reveal recipe as .backup-import-preview, but the transition lives
    inside :not([hidden]): provider switches swap two panels at once, and an
@@ -1973,7 +1866,6 @@ html.motion-ready .pf:not([hidden]) {
               display var(--motion-pop) allow-discrete;
   @starting-style { opacity: 0; translate: 0 -4px; }
 }
-.pf h3 { font-size: 12px; color: var(--opt-fg-soft); margin-bottom: var(--opt-sp-4); font-weight: 600; }
 
 /* ---- Markdown export targets (Send-to destination cards) ---- */
 .et-onboarding { margin-top: var(--opt-sp-4); font-size: 12px; color: var(--opt-fg-soft); }
@@ -2011,7 +1903,6 @@ html.motion-ready .pf:not([hidden]) {
   margin: 0 calc(-1 * var(--opt-sp-3));
   border-radius: var(--opt-radius-sm);
   color: var(--opt-fg);
-  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: color var(--motion-state), background-color var(--motion-state);
@@ -2830,10 +2721,6 @@ html[data-theme] .tab-btn.active { border-left-color: var(--opt-accent, var(--op
    #e0e0e0 hairline. Zero effect on desktop (border-left-width is 0 there). */
 html[data-theme] .reset-tab-btn { border-left-color: var(--opt-border-section, var(--opt-border)); }
 html[data-theme] .fg label { color: var(--opt-fg); }
-/* .fg label.bl: deliberate second form, not a leftover fallback -- unthemed
-   uses --opt-fg-soft (#555, one step darker than --opt-fg-muted) but every
-   themed state reads the plain --opt-fg-muted role instead. */
-html[data-theme] .fg label.bl { color: var(--opt-fg-muted); }
 /* Dark-bg themes: lighter chevron stroke so the arrow reads against dark input
    fill. Covers all 8 color-scheme:dark presets (gruvbox-dark / rose-pine were
    missing from this list -- pre-existing gap, closed in the dropdown-design
@@ -2967,9 +2854,8 @@ html[data-theme] .fg select:hover:not(:focus) {
   }
 }
 html[data-theme] .hint code { color: var(--opt-fg-muted); }
-/* .pf h3 / .et-onboarding: second form, same shape as .fg label.bl above --
-   unthemed reads --opt-fg-soft, themed reads --opt-fg-muted. */
-html[data-theme] .pf h3 { color: var(--opt-fg-muted); }
+/* .et-onboarding: deliberate second form -- unthemed reads --opt-fg-soft,
+   themed reads --opt-fg-muted. */
 html[data-theme] .et-onboarding { color: var(--opt-fg-muted); }
 .et-test-status { font-size: 12px; }
 .et-test-status.ok { color: var(--opt-save); }
@@ -3113,7 +2999,7 @@ html.motion-ready .theme-name-popover.is-closing {
 }
 .theme-name-popover label { font-size: 12px; color: var(--opt-fg-soft); margin: 0; }
 .theme-name-popover input[type="text"] {
-  font-size: 12px; padding: var(--opt-sp-2) var(--opt-sp-3); border: 1px solid var(--opt-input-border); border-radius: var(--opt-radius-sm); width: 100%; box-sizing: border-box;
+  border-radius: var(--opt-radius-sm); width: 100%; box-sizing: border-box;
 }
 /* §7.3 field recipe. This input used to carry a bespoke third focus shape --
    a hardcoded `0 0 0 2px rgba(68,119,187,0.2)` ring that ignored
@@ -3371,7 +3257,6 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
 .wayback-log-retry:disabled { opacity: .4; cursor: default; }
 .wayback-perm-status {
   display: block;
-  font-size: 11px;
   color: var(--opt-fg-muted);
   margin: var(--opt-sp-1) 0 var(--opt-rhythm);
 }

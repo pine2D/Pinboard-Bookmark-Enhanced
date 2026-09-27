@@ -932,27 +932,21 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(document.getElementById("tag-gov-ignored-count").textContent === "tagGovIgnoredCount:3", "count text");
   });
 
-  // Stage-0/2/3a panel lookup (fixwave, final review test-churn note): one
-  // shared helper for every stage-0/2/3a panel assertion below (popup, ai,
-  // and the per-STAGE3A_PANELS-id lookups further down all used to be three
-  // near-identical fetch+DOMParser copies -- stage0PopupPanel, stage2AiPanel,
-  // stage3aPanel(id)). Fetched fresh per call so a failure in one assertion
-  // doesn't cascade into another, and a later stage that migrates one more
-  // panel only ever touches this one line. No live layout is needed
-  // (structural checks only), so a DOMParser document is enough -- no iframe.
-  async function stage0Panel(id) {
+  // Panel lookup (fixwave, final review test-churn note): one shared helper
+  // for every row-model panel assertion below (every panel since stage 3c;
+  // the three near-identical fetch+DOMParser copies it replaced were
+  // stage0PopupPanel, stage2AiPanel and stage3aPanel(id)). Fetched fresh per
+  // call so a failure in one assertion doesn't cascade into another. No
+  // live layout is needed (structural checks only), so a DOMParser document
+  // is enough -- no iframe.
+  async function panelDoc(id) {
     const html = await (await fetch("../options.html")).text();
     const doc = new DOMParser().parseFromString(html, "text/html");
-    return doc.querySelector(`#panel-${id}[data-ui-stage0]`);
+    return doc.querySelector(`#panel-${id}`);
   }
 
-  await test("stage0: popup panel carries the prototype marker and no legacy row classes", async () => {
-    const proto = await stage0Panel("popup");
-    assert(!!proto, "panel-popup is missing the data-ui-stage0 marker");
-  });
-
   await test("stage0: every switch in the panel sits in a .pref-row inside a .pref-group", async () => {
-    const proto = await stage0Panel("popup");
+    const proto = await panelDoc("popup");
     const switches = [...proto.querySelectorAll("label.switch")];
     assert(switches.length === 15, "expected 15 switches in the popup panel, got " + switches.length);
     assert(switches.every((l) => l.parentElement.classList.contains("pref-row") && l.closest(".pref-group")),
@@ -960,17 +954,17 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage0: every .hint in the panel still resolves a .fg owner for the search index", async () => {
-    const proto = await stage0Panel("popup");
+    const proto = await panelDoc("popup");
     const hints = [...proto.querySelectorAll(".hint")];
     assert(hints.length > 0, "expected at least one .hint in the popup panel");
     assert(hints.every((h) => h.closest(".fg")), "every .hint must resolve a .fg owner");
   });
 
-  // Review round 1, finding 1 (IMPORTANT): the base stage-0 rule
-  // `[data-ui-stage0] .fg label.bl { color: var(--opt-fg) }` is (0,3,1) and
-  // lost to the hand-written `html[data-theme] .fg label.bl { color:
-  // var(--opt-fg-muted) }` at (0,3,2) under every preset theme. The fix adds
-  // a second, higher-specificity selector on the same rule. This suite has
+  // Review round 1, finding 1 (IMPORTANT): the row model's label rule
+  // `.fg label.bl { color: var(--opt-fg) }` alone would lose to a themed
+  // `html[data-theme] .fg label...` colour rule under every preset theme
+  // (stage 3c deleted the old muted-colour one, but `html[data-theme] .fg
+  // label` still exists). The rule carries an `html[data-theme]` twin. This suite has
   // no live theme to compute against (no options-theme-early.js, no
   // data-theme on <html>), so the check is text-level against the CSS
   // source -- same pattern as "density map" above. The selector body between
@@ -980,25 +974,20 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // wins under a theme", not the exact selector text.
   await test("stage0: the label colour rule wins under a themed <html>", async () => {
     const css = await fetch("../options.css").then((response) => response.text());
-    const winner = /html\[data-theme\]\s+\[data-ui-stage0\]\s+\.fg\s+[^{]*label[^{]*\.bl\b[^{]*\{[^}]*color:\s*var\(--opt-fg\)/;
-    assert(winner.test(css), "expected a html[data-theme] [data-ui-stage0] .fg ...label....bl rule declaring color: var(--opt-fg)");
-  });
-
-  await test("stage2: AI panel carries the marker and has no legacy divider", async () => {
-    const ai = await stage0Panel("ai");
-    assert(!!ai, "panel-ai is missing the data-ui-stage0 marker");
+    const winner = /html\[data-theme\]\s+\.fg\s+[^{]*label[^{]*\.bl\b[^{]*\{[^}]*color:\s*var\(--opt-fg\)/;
+    assert(winner.test(css), "expected a html[data-theme] .fg ...label....bl rule declaring color: var(--opt-fg)");
   });
 
   await test("stage2: every .fg inside the AI panel is an entry block", async () => {
-    const ai = await stage0Panel("ai");
-    assert(!!ai, "panel-ai is missing the data-ui-stage0 marker");
+    const ai = await panelDoc("ai");
+    assert(!!ai, "panel-ai is missing");
     assert([...ai.querySelectorAll(".fg")].every((f) => f.classList.contains("entry-block")),
       "every .fg inside the AI panel must carry entry-block");
   });
 
   await test("stage2: provider panels keep their ids and count", async () => {
-    const ai = await stage0Panel("ai");
-    assert(!!ai, "panel-ai is missing the data-ui-stage0 marker");
+    const ai = await panelDoc("ai");
+    assert(!!ai, "panel-ai is missing");
     assert(ai.querySelectorAll(".pf[id^='fields-']").length === 15 && !!ai.querySelector("#opt-ai-provider"),
       "expected 15 .pf[id^=fields-] panels and #opt-ai-provider to survive the rewrite");
   });
@@ -1021,14 +1010,9 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 12], ["ai-behavior", 2], ["archive", 3], ["reader", 5]];
 
   for (const [id, switchCount] of STAGE3A_PANELS) {
-    await test(`stage3a: ${id} panel carries the marker and no legacy row classes`, async () => {
-      const panel = await stage0Panel(id);
-      assert(!!panel, `panel-${id} is missing the data-ui-stage0 marker`);
-    });
-
     await test(`stage3a: every switch in the ${id} panel sits in a .pref-row`, async () => {
-      const panel = await stage0Panel(id);
-      assert(!!panel, `panel-${id} is missing the data-ui-stage0 marker`);
+      const panel = await panelDoc(id);
+      assert(!!panel, `panel-${id} is missing`);
       const switches = [...panel.querySelectorAll("label.switch")];
       assert(switches.length === switchCount,
         `expected ${switchCount} switches in panel-${id}, got ${switches.length}`);
@@ -1037,8 +1021,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     });
 
     await test(`stage3a: every .hint in the ${id} panel still resolves a .fg or .pref-row owner`, async () => {
-      const panel = await stage0Panel(id);
-      assert(!!panel, `panel-${id} is missing the data-ui-stage0 marker`);
+      const panel = await panelDoc(id);
+      assert(!!panel, `panel-${id} is missing`);
       // #preview-ai-unavailable (Reader only) is a deliberate exception: a
       // controller-ruled direct child of the section, sibling to the
       // .pref-group it warns about, not owned by any .fg/.pref-row --
@@ -1051,8 +1035,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   }
 
   await test("stage3a: bookmarks radio groups sit inside .pref-group-radio", async () => {
-    const panel = await stage0Panel("bookmarks");
-    assert(!!panel, "panel-bookmarks is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("bookmarks");
+    assert(!!panel, "panel-bookmarks is missing");
     const radios = [...panel.querySelectorAll('input[type="radio"]')];
     assert(radios.length === 6, "expected 6 radios in panel-bookmarks, got " + radios.length);
     assert(radios.every((r) => r.closest(".pref-group-radio > .pref-row")),
@@ -1072,11 +1056,11 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // is what a sighted user's eye lands on at the row's trailing edge (same
   // reading order as .switch-track).
   await test("stage3b: bookmarks/popup/ai-behavior radio groups use label.pick", async () => {
-    const bookmarks = await stage0Panel("bookmarks");
-    const popup = await stage0Panel("popup");
-    const aiBehavior = await stage0Panel("ai-behavior");
+    const bookmarks = await panelDoc("bookmarks");
+    const popup = await panelDoc("popup");
+    const aiBehavior = await panelDoc("ai-behavior");
     assert(!!bookmarks && !!popup && !!aiBehavior,
-      "one of bookmarks/popup/ai-behavior is missing the data-ui-stage0 marker");
+      "one of bookmarks/popup/ai-behavior is missing");
     const bmPicks = [...bookmarks.querySelectorAll("label.pick")];
     const popupPicks = [...popup.querySelectorAll("label.pick")];
     const aiPicks = [...aiBehavior.querySelectorAll("label.pick")];
@@ -1095,14 +1079,9 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // onto the row model. General's 10 switches: Data Sync (2) + Backup &
   // Restore (3: highlights/vocabulary/secrets) + Notifications (5) --
   // counted straight from the brief, re-verified against the live markup.
-  await test("stage3b: general panel carries the marker and no legacy row classes", async () => {
-    const panel = await stage0Panel("general");
-    assert(!!panel, "panel-general is missing the data-ui-stage0 marker");
-  });
-
   await test("stage3b: every switch in the general panel sits in a .pref-row", async () => {
-    const panel = await stage0Panel("general");
-    assert(!!panel, "panel-general is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("general");
+    assert(!!panel, "panel-general is missing");
     const switches = [...panel.querySelectorAll("label.switch")];
     assert(switches.length === 10, "expected 10 switches in panel-general, got " + switches.length);
     assert(switches.every((l) => l.parentElement.classList.contains("pref-row") && l.closest(".pref-group")),
@@ -1110,15 +1089,15 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3b: general panel's language select is a listbox target", async () => {
-    const panel = await stage0Panel("general");
-    assert(!!panel, "panel-general is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("general");
+    assert(!!panel, "panel-general is missing");
     const select = panel.querySelector("#opt-lang");
     assert(select && select.hasAttribute("data-listbox"), "opt-lang is missing data-listbox");
   });
 
   await test("stage3b: backup section picker checkboxes use label.pick.pick-box", async () => {
-    const panel = await stage0Panel("general");
-    assert(!!panel, "panel-general is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("general");
+    assert(!!panel, "panel-general is missing");
     const fieldset = panel.querySelector("fieldset.backup-section-picker");
     assert(!!fieldset && fieldset.querySelector("legend"), "backup-section-picker lost its fieldset/legend");
     const checkboxes = [...fieldset.querySelectorAll('input[type="checkbox"]')];
@@ -1134,8 +1113,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3b: storage panel carries the marker and keeps its static shape", async () => {
-    const panel = await stage0Panel("storage");
-    assert(!!panel, "panel-storage is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("storage");
+    assert(!!panel, "panel-storage is missing");
     const section = panel.querySelector("section.settings-section");
     assert(!!section, "panel-storage's content is not wrapped in a section.settings-section");
     assert(!!section.querySelector("#storage-cats.storage-cats"), "panel-storage lost its #storage-cats mount point");
@@ -1148,14 +1127,9 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // the row model. Markdown's 4 switches: two 2-switch .pref-groups
   // (frontmatter/extended-meta, then toc/include-hl) around the image-policy
   // listbox field, counted straight from the live markup.
-  await test("stage3b: markdown panel carries the marker and no legacy row classes", async () => {
-    const panel = await stage0Panel("markdown");
-    assert(!!panel, "panel-markdown is missing the data-ui-stage0 marker");
-  });
-
   await test("stage3b: every switch in the markdown panel sits in a .pref-row inside a .pref-group", async () => {
-    const panel = await stage0Panel("markdown");
-    assert(!!panel, "panel-markdown is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("markdown");
+    assert(!!panel, "panel-markdown is missing");
     const switches = [...panel.querySelectorAll("label.switch")];
     assert(switches.length === 4, "expected 4 switches in panel-markdown, got " + switches.length);
     assert(switches.every((l) => l.parentElement.classList.contains("pref-row") && l.closest(".pref-group")),
@@ -1163,15 +1137,15 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3b: markdown panel's image-policy select is a listbox target", async () => {
-    const panel = await stage0Panel("markdown");
-    assert(!!panel, "panel-markdown is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("markdown");
+    assert(!!panel, "panel-markdown is missing");
     const select = panel.querySelector("#opt-md-image-policy");
     assert(select && select.hasAttribute("data-listbox"), "opt-md-image-policy is missing data-listbox");
   });
 
   await test("stage3b: markdown panel wraps Export Defaults and Send-to in their own sections", async () => {
-    const panel = await stage0Panel("markdown");
-    assert(!!panel, "panel-markdown is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("markdown");
+    assert(!!panel, "panel-markdown is missing");
     const sections = [...panel.querySelectorAll(":scope > section.settings-section")];
     assert(sections.length === 2, "expected 2 top-level sections in panel-markdown, got " + sections.length);
     assert(!!sections[1].querySelector("#export-targets"), "#export-targets is not inside the Send-to section");
@@ -1180,14 +1154,9 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // Tags: only #opt-tag-sort-by-pop (Pinboard.in Tag Pages) is a static
   // switch outside the tag-gov component family, which this task leaves
   // untouched (spec §3).
-  await test("stage3b: tags panel carries the marker and no legacy row classes", async () => {
-    const panel = await stage0Panel("tags");
-    assert(!!panel, "panel-tags is missing the data-ui-stage0 marker");
-  });
-
   await test("stage3b: opt-tag-sort-by-pop sits in a .pref-row inside a .pref-group", async () => {
-    const panel = await stage0Panel("tags");
-    assert(!!panel, "panel-tags is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("tags");
+    assert(!!panel, "panel-tags is missing");
     const switches = [...panel.querySelectorAll("label.switch")];
     assert(switches.length === 1, "expected 1 switch in panel-tags, got " + switches.length);
     assert(switches[0].parentElement.classList.contains("pref-row") && switches[0].closest(".pref-group"),
@@ -1196,8 +1165,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3b: tags panel keeps the tag-gov component family and its disclosure untouched", async () => {
-    const panel = await stage0Panel("tags");
-    assert(!!panel, "panel-tags is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("tags");
+    assert(!!panel, "panel-tags is missing");
     const lowcount = panel.querySelector("#tag-gov-lowcount.disclosure");
     assert(!!lowcount, "panel-tags lost #tag-gov-lowcount.disclosure");
     assert(!!lowcount.querySelector("#tag-gov-lowcount-list"), "panel-tags lost #tag-gov-lowcount-list");
@@ -1210,14 +1179,9 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // switch (opt-popup-follow-theme) -- the theme presets are buttons, not a
   // persisted boolean -- and two top-level sections (Theme, then Pinboard.in
   // Custom Style) after the removed .divider between them.
-  await test("stage3b: appearance panel carries the marker and no legacy row classes", async () => {
-    const panel = await stage0Panel("appearance");
-    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
-  });
-
   await test("stage3b: opt-popup-follow-theme sits in a .pref-row inside a .pref-group", async () => {
-    const panel = await stage0Panel("appearance");
-    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("appearance");
+    assert(!!panel, "panel-appearance is missing");
     const switches = [...panel.querySelectorAll("label.switch")];
     assert(switches.length === 1, "expected 1 switch in panel-appearance, got " + switches.length);
     assert(switches[0].closest(".pref-row") && switches[0].closest(".pref-group"),
@@ -1226,15 +1190,15 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3b: appearance panel's theme select is a listbox target", async () => {
-    const panel = await stage0Panel("appearance");
-    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("appearance");
+    assert(!!panel, "panel-appearance is missing");
     const select = panel.querySelector("#opt-theme");
     assert(select && select.hasAttribute("data-listbox"), "opt-theme is missing data-listbox");
   });
 
   await test("stage3b: appearance panel wraps Theme and Custom Style in their own sections", async () => {
-    const panel = await stage0Panel("appearance");
-    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("appearance");
+    assert(!!panel, "panel-appearance is missing");
     const sections = [...panel.querySelectorAll(":scope > section.settings-section")];
     assert(sections.length === 2, "expected 2 top-level sections in panel-appearance, got " + sections.length);
     assert(!!sections[0].querySelector("#opt-theme"), "#opt-theme is not inside the Theme section");
@@ -1242,8 +1206,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3b: appearance panel's saved-themes and preset-preview sections use the hidden attribute, not inline style", async () => {
-    const panel = await stage0Panel("appearance");
-    assert(!!panel, "panel-appearance is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("appearance");
+    assert(!!panel, "panel-appearance is missing");
     const saved = panel.querySelector("#saved-themes-section");
     assert(!!saved && saved.hasAttribute("hidden") && !saved.getAttribute("style"),
       "saved-themes-section must use the hidden attribute, not an inline display:none style");
@@ -1259,14 +1223,9 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // .fg fields inside the "Export and integrations" disclosure (Anki
   // deck/port/key, Eudic token) become .fg.entry-block, key-wraps included.
   // The Drive disclosure's <dl>/<p> and every .vocab-toolbar stay untouched.
-  await test("stage3b: vocab panel carries the marker and no legacy row classes", async () => {
-    const panel = await stage0Panel("vocab");
-    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
-  });
-
   await test("stage3b: dict-echo-enabled sits in a .pref-row inside a .pref-group", async () => {
-    const panel = await stage0Panel("vocab");
-    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("vocab");
+    assert(!!panel, "panel-vocab is missing");
     const switches = [...panel.querySelectorAll("label.switch")];
     assert(switches.length === 1, "expected 1 switch in panel-vocab, got " + switches.length);
     assert(switches[0].closest(".pref-row") && switches[0].closest(".pref-group"),
@@ -1275,8 +1234,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3b: vocab panel wraps its content in a single section", async () => {
-    const panel = await stage0Panel("vocab");
-    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("vocab");
+    assert(!!panel, "panel-vocab is missing");
     const sections = [...panel.querySelectorAll(":scope > section.settings-section")];
     assert(sections.length === 1, "expected 1 top-level section in panel-vocab, got " + sections.length);
     assert(sections[0].querySelectorAll(":scope > details.disclosure").length === 5,
@@ -1284,8 +1243,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3b: vocab's Export and integrations disclosure moves its .fg fields onto entry-block", async () => {
-    const panel = await stage0Panel("vocab");
-    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("vocab");
+    assert(!!panel, "panel-vocab is missing");
     const learning = panel.querySelector('details.disclosure[data-acc-key="vocab-learning"]');
     assert(!!learning, "panel-vocab lost the vocab-learning disclosure");
     const blocks = [...learning.querySelectorAll(".fg")];
@@ -1304,8 +1263,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3b: vocab's Google Drive disclosure keeps its dl fields and toolbar untouched", async () => {
-    const panel = await stage0Panel("vocab");
-    assert(!!panel, "panel-vocab is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("vocab");
+    assert(!!panel, "panel-vocab is missing");
     const drive = panel.querySelector('details.disclosure[data-acc-key="vocab-google-drive"]');
     assert(!!drive, "panel-vocab lost the vocab-google-drive disclosure");
     assert(!!drive.querySelector("dl#vocab-drive-fields[hidden]"), "vocab-drive-fields dl or its hidden attribute is missing");
@@ -1313,8 +1272,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("stage3a: ai-behavior selects are listbox targets", async () => {
-    const panel = await stage0Panel("ai-behavior");
-    assert(!!panel, "panel-ai-behavior is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("ai-behavior");
+    assert(!!panel, "panel-ai-behavior is missing");
     ["opt-ai-tag-lang", "opt-ai-summary-lang", "opt-ai-tag-separator"].forEach((id) => {
       const select = panel.querySelector(`#${id}`);
       assert(select && select.hasAttribute("data-listbox"), id + " is missing data-listbox");
@@ -1327,39 +1286,39 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // non-shared assertions (subordinate-block count, the one unavailable-hint
   // exception, and its listbox target).
   await test("stage3a: reader subordinate entry blocks use entry-block-sub", async () => {
-    const panel = await stage0Panel("reader");
-    assert(!!panel, "panel-reader is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("reader");
+    assert(!!panel, "panel-reader is missing");
     assert(panel.querySelectorAll(".fg.entry-block.entry-block-sub").length === 3,
       "expected 3 .fg.entry-block.entry-block-sub blocks in panel-reader, got " +
       panel.querySelectorAll(".fg.entry-block.entry-block-sub").length);
   });
 
   await test("stage3a: reader unavailable hint stays a direct child of its section", async () => {
-    const panel = await stage0Panel("reader");
-    assert(!!panel, "panel-reader is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("reader");
+    assert(!!panel, "panel-reader is missing");
     const hint = panel.querySelector("#preview-ai-unavailable");
     assert(!!hint && hint.parentElement.matches("section.settings-section"),
       "preview-ai-unavailable must be a direct child of a section.settings-section");
   });
 
   await test("stage3a: reader's selection-trigger select is a listbox target", async () => {
-    const panel = await stage0Panel("reader");
-    assert(!!panel, "panel-reader is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("reader");
+    assert(!!panel, "panel-reader is missing");
     const select = panel.querySelector("#opt-selection-trigger");
     assert(select && select.hasAttribute("data-listbox"), "opt-selection-trigger is missing data-listbox");
   });
 
   await test("stage3a: archive subordinate rows use pref-row-sub", async () => {
-    const panel = await stage0Panel("archive");
-    assert(!!panel, "panel-archive is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("archive");
+    assert(!!panel, "panel-archive is missing");
     assert(panel.querySelectorAll(".pref-row.pref-row-sub").length === 2,
       "expected 2 .pref-row.pref-row-sub rows in panel-archive, got " +
       panel.querySelectorAll(".pref-row.pref-row-sub").length);
   });
 
   await test("stage3a: wayback log clear button uses the hidden attribute, not inline style", async () => {
-    const panel = await stage0Panel("archive");
-    assert(!!panel, "panel-archive is missing the data-ui-stage0 marker");
+    const panel = await panelDoc("archive");
+    assert(!!panel, "panel-archive is missing");
     const clearBtn = panel.querySelector("#wayback-log-clear");
     assert(!!clearBtn && clearBtn.hasAttribute("hidden") && !clearBtn.getAttribute("style"),
       "wayback-log-clear must use the hidden attribute, not an inline display:none style");
