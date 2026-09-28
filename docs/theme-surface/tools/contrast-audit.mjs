@@ -464,6 +464,13 @@ export const COMPONENT_PAIR_SPEC = [
   // Typed text sits on the rest and the (deeper) hover fill.
   ["fg", "field-bg", 4.5, ["opt"]],
   ["fg", "field-bg-hover", 4.5, ["opt"]],
+  // The sidebar search box (options.css `.options-search input[type="search"]`)
+  // is a value box outside .fg: it keeps --opt-input-bg as its fill at rest,
+  // on hover and on focus (only its border changes on focus), but paints its
+  // placeholder with --opt-field-placeholder. That ink is derived against the
+  // field fills, not input-bg -- the two differ on flexoki-light -- so gate the
+  // pair the search box actually renders.
+  ["field-placeholder", "input-bg", 4.5, ["opt"]],
 ];
 
 // Generic `--name: value;` extractor over an arbitrary block body -- the

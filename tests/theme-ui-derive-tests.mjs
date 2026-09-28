@@ -844,7 +844,7 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     return false;
   };
   check(!("field-bg" in finalizeUiControlRoles(base, palette)),
-    "finalizeUiControlRoles must not emit field-* roles unless config.fieldRoles is set (popup/library stay byte-identical)");
+    "finalizeUiControlRoles with the default config (fieldRoles unset) must not emit field-* roles -- the composer-level popup/library walk below checks that those surfaces really call it that way");
   // The shared `base` fixture has no fg-hint / pf-bg: add both, so the smoke
   // check below proves nine REAL values, not placeholders read off
   // hexToRgb(undefined) (which silently parses as #000000).
@@ -862,9 +862,21 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   const REQUIRED = ["fg", "fg-hint", "panel", "input-bg", "border", "focus-bd", "accent"];
   check(throwsNaming(() => deriveFieldRoles({}), REQUIRED),
     "deriveFieldRoles over an empty map must throw listing every missing required input (fg, fg-hint, panel, input-bg, border, focus-bd, accent)");
-  const { "pf-bg": _droppedPf, ...lightNoPf } = light;
-  check(JSON.stringify(deriveFieldRoles(lightNoPf)) === JSON.stringify(deriveFieldRoles({ ...light, "pf-bg": light.panel })),
-    "deriveFieldRoles without pf-bg must fall back to the panel as the second host");
+  // pf-bg fallback. The fixture has to be one where the host actually steers
+  // an output, or the check is vacuous: on a light fixture a #000000 host
+  // (what hexToRgb(undefined) silently yields once the fallback is gone)
+  // constrains nothing, so "no pf-bg" and "pf-bg = panel" agree either way.
+  // Here the fill is framed and dark: a black pf-bg host leaves the rest fill
+  // only 1.08:1 from it (unseparated -> no hover fill step), while against the
+  // panel it sits at 1.28:1 (separated -> the hover fill deepens).
+  const pfFx = { fg: "#e0e0e0", "fg-hint": "#a0a0a0", panel: "#262626", "input-bg": "#0d0d0d", border: "#5a5a5a",
+    "focus-bd": "#7aa2f7", accent: "#7aa2f7" };
+  const pfFrame = "#444444";
+  const pfAsPanel = JSON.stringify(deriveFieldRoles({ ...pfFx, "pf-bg": pfFx.panel }, pfFrame));
+  check(JSON.stringify(deriveFieldRoles({ ...pfFx, "pf-bg": "#000000" }, pfFrame)) !== pfAsPanel,
+    "pf-bg fallback precondition: a #000000 pf-bg host must change this fixture's output, or the fallback check below proves nothing");
+  check(JSON.stringify(deriveFieldRoles(pfFx, pfFrame)) === pfAsPanel,
+    "deriveFieldRoles without pf-bg must fall back to the panel as the second host (not to hexToRgb(undefined) = #000000)");
 
   const f = deriveFieldRoles(light);
   const hosts = [light.panel, light["pf-bg"]];
@@ -897,6 +909,16 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
 
   const byRef = deriveFieldRoles(light, "var(--opt-border)");
   check(byRef["field-border"] === "#858585", "a var(--opt-<role>) frame must resolve through the map, not collapse to the fill");
+  // A frame the deriver cannot resolve must throw, never collapse silently into
+  // the fill (resolveOpaqueBg reads anything unparseable as transparent).
+  // input-border is not a required input, so the required-input check cannot
+  // pre-empt the missing-var-target throw here.
+  check(!("input-border" in light) && throwsNaming(() => deriveFieldRoles(light, "var(--opt-input-border)"), ["input-border"]),
+    "a var(--opt-<role>) frame whose role is absent from the map must throw and name the role");
+  for (const bad of ["rgba(0,0,0,.5)", "var(--opt-border, #ccc)", "red"]) {
+    check(throwsNaming(() => deriveFieldRoles(light, bad), [bad]),
+      `an unparseable framed value (${bad}) must throw with the value in the message, not collapse into the fill`);
+  }
 
   const weakFocus = deriveFieldRoles({ ...light, "focus-bd": "#c8d6ea" });
   check(weakFocus["field-border-focus"] !== "#c8d6ea" && ratio(weakFocus["field-border-focus"], weakFocus["field-bg"]) >= 3,
@@ -926,6 +948,30 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   check(walked === POPUP_THEME_MAP.length && walked === 14, `field-family pipeline walk visited ${walked} themes, expected 14`);
 }
 
+// --- The field family is options-only: popup and library must not grow it.
+// Checked at the composer level (the maps each surface actually emits, for
+// every theme) and in the shipped CSS, so turning fieldRoles on in
+// popup-chrome.mjs / library-chrome.mjs fails here even while every other
+// gate stays green. ---
+{
+  let walked = 0;
+  for (const entry of POPUP_THEME_MAP) {
+    const tk = JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${entry.pilot}.tokens.json`, import.meta.url), "utf8"));
+    const popupMap = composePopupThemeMap(tk, entry.mode, entry.useDarkMode);
+    const libraryMap = composeLibraryThemeMap(tk, entry.mode, entry.useDarkMode).map;
+    walked++;
+    check(Object.keys(popupMap).length > 0 && !Object.keys(popupMap).some((k) => k.startsWith("field-")),
+      `${entry.id}: the popup map carries field-* roles (the B+ field family is options-only)`);
+    check(Object.keys(libraryMap).length > 0 && !Object.keys(libraryMap).some((k) => k.startsWith("field-")),
+      `${entry.id}: the library map carries field-* roles (the B+ field family is options-only)`);
+  }
+  check(walked === 14, `options-only field-family walk visited ${walked} themes, expected 14`);
+  const popupCss = readFileSync(new URL("../popup.css", import.meta.url), "utf8");
+  const libraryCss = readFileSync(new URL("../library.css", import.meta.url), "utf8");
+  check(popupCss.includes("--pp-") && !popupCss.includes("--pp-field-"), "popup.css declares or consumes --pp-field-* (the B+ field family is options-only)");
+  check(libraryCss.includes("--lib-") && !libraryCss.includes("--lib-field-"), "library.css declares or consumes --lib-field-* (the B+ field family is options-only)");
+}
+
 // --- The default :root literals (options-chrome.mjs DEFAULT_LIGHT) are the
 // deriver's output over the folded shipped :root blocks, not hand picks. ---
 {
@@ -937,7 +983,7 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   const want = deriveFieldRoles(dict);
   for (const role of FIELD_ROLES) {
     check(dict[role] === want[role],
-      `default :root --opt-${role}=${dict[role]} is not deriveFieldRoles(folded :root)=${want[role]} -- DEFAULT_LIGHT drifted from its hand :root inputs (fg / fg-hint / pf-bg / focus-bd / accent)`);
+      `default :root --opt-${role}=${dict[role]} is not deriveFieldRoles(folded :root)=${want[role]} -- DEFAULT_LIGHT drifted from its hand :root inputs (fg / fg-hint / pf-bg / focus-bd / accent), or FIELD_EDGE_HOVER_FG_MIX / the deriver changed -- re-run sync-all and update DEFAULT_LIGHT and ANCHORS`);
   }
 }
 
@@ -971,7 +1017,7 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     FIELD_ROLES.forEach((role, i) => {
       const got = (body?.match(new RegExp(`--opt-${role}:\\s*([^;]+);`)) || [])[1]?.trim();
       compared++;
-      check(near(got, values[i]), `${selector} --opt-${role}=${got} drifted from the anchor ${values[i]} (+-1/channel)`);
+      check(near(got, values[i]), `${selector} --opt-${role}=${got} drifted from the anchor ${values[i]} (+-1/channel) -- a wiring/emit/hand-edit drift, or FIELD_EDGE_HOVER_FG_MIX / the deriver changed -- re-run sync-all and update DEFAULT_LIGHT and ANCHORS`);
     });
   }
   check(compared === 45, `field anchor block made ${compared} comparisons, expected 45 (5 themes x 9 roles)`);

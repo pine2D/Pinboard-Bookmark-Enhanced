@@ -281,6 +281,13 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
   font-size: 12px; -webkit-appearance: none; appearance: none;
 }
 .options-search input[type="search"]:focus-visible { outline: none; border-color: var(--opt-focus-bd); box-shadow: var(--opt-focus-ring); }
+/* The sidebar search box is a value box outside .fg: its fill and frame stay
+   --opt-input-bg / --opt-input-border (spec 2026-09-28-ui-fields-bplus-design
+   §3), but its placeholder takes the field family's secondary ink -- the UA
+   default (#757575) fell to 1.87:1 on nord-night. contrast-audit gates
+   --opt-field-placeholder against --opt-input-bg, the only fill this box
+   paints (rest, hover and focus alike). */
+.options-search input[type="search"]::placeholder { color: var(--opt-field-placeholder); }
 .options-search-results {
   position: absolute; z-index: var(--opt-z-menu); top: calc(100% + var(--opt-sp-2)); left: 0;
   width: min(360px, calc(100vw - 32px)); max-height: 320px; overflow: auto;

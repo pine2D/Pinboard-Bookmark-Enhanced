@@ -481,10 +481,18 @@ export const PRIMARY_HOVER_FG_MIX = 0.12;
 export const primaryHoverFill = (accentRgb, fgRgb) => mix(accentRgb, fgRgb, PRIMARY_HOVER_FG_MIX);
 
 // Hover step of the field's bottom edge: mix(edge, fg, this). Spec §2 names it
-// a tunable constant -- the user's real-device fallback is .45 -> .25 if the
-// hover edge reads too heavy. Any value in (0, 1] keeps hover strictly
-// stronger than rest (mixing toward fg only ever raises contrast against the
-// fills and the surfaces behind them).
+// a tunable constant. The constraint it must meet is not just "move toward
+// fg": the hover edge has to read strictly stronger than the rest edge ON THE
+// FILL EACH IS PAINTED ON -- ratio(edge-hover, field-bg-hover) > ratio(edge,
+// field-bg) -- and the hover fill is itself one step deeper than the rest
+// fill, which eats into the edge's contrast. A small mix loses that race.
+// Measured over the 15 shipped blocks (14 themes + default :root), the lowest
+// value that holds everywhere is ~.27 (every .01 step from .27 to 1 passes);
+// .25 fails solarized-light (3.5395 < 3.5452). The user's real-device
+// fallback, if .45 reads too heavy, is therefore .30 (controller ruling R2).
+// Changing it moves every field-edge-hover: re-run sync-all and update the
+// DEFAULT_LIGHT literal (options-chrome.mjs) and the anchor table in
+// tests/theme-ui-derive-tests.mjs.
 export const FIELD_EDGE_HOVER_FG_MIX = 0.45;
 
 // Inputs deriveFieldRoles cannot do without. hexToRgb(undefined) does not
@@ -525,7 +533,13 @@ const FIELD_REQUIRED_INPUTS = Object.freeze(["fg", "fg-hint", "panel", "input-bg
 // Every value is hex-rounded before it feeds the next step, the same
 // "verify on what ships" discipline as the other derivers in this file.
 // Throws, naming every missing role, when a FIELD_REQUIRED_INPUTS entry (or
-// the role a `var(--opt-<role>)` frame points at) is absent from `map`.
+// the role a `var(--opt-<role>)` frame points at) is absent from `map`; and
+// throws, quoting the value, when a framed border is anything but #rgb /
+// #rrggbb / #rrggbbaa or exactly `var(--<ns>-<role>)` resolving to one of
+// those -- resolveOpaqueBg reads any other spelling (rgba(), a var() with a
+// fallback, a named colour) as transparent, which would silently collapse the
+// pilot's frame into the fill.
+const FIELD_FRAME_HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 export function deriveFieldRoles(map, framedBorder = null) {
   const present = (v) => typeof v === "string" && v.trim() !== "";
   const missing = FIELD_REQUIRED_INPUTS.filter((r) => !present(map[r]));
@@ -540,6 +554,10 @@ export function deriveFieldRoles(map, framedBorder = null) {
     throw new Error(`deriveFieldRoles: framed border ${framedBorder} references missing role(s): ${roleRef[1]}`);
   }
   const frameRaw = roleRef ? map[roleRef[1]] : framedBorder;
+  if (framed && !(typeof frameRaw === "string" && FIELD_FRAME_HEX_RE.test(frameRaw.trim()))) {
+    const resolved = roleRef ? ` (resolved to ${JSON.stringify(frameRaw)})` : "";
+    throw new Error(`deriveFieldRoles: framed border ${JSON.stringify(framedBorder)}${resolved} is not #rgb / #rrggbb / #rrggbbaa or exactly var(--<ns>-<role>)`);
+  }
 
   const bgHex = rgbToHex(framed ? hexToRgb(map["input-bg"]) : fillSeparate(hexToRgb(map["input-bg"]), hosts, fg));
   const bg = hexToRgb(bgHex);

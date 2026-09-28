@@ -487,10 +487,11 @@ function chipRules(ns) {
 // Colour half of the B+ field family (spec 2026-09-28-ui-fields-bplus-design
 // §3): fill / frame / hover / focus / placeholder read the --opt-field-*
 // roles (_ui-derive.mjs deriveFieldRoles). The SHAPE half -- the >=3:1 bottom
-// edge and the md/md/sm/sm radius -- is hand-written in options.css's row-
-// model block: it applies to text entry and the listbox only, never to the
-// native <select> fallback, and recipe-lint's radiusToken law (one token per
-// border-radius) is right to keep a four-value radius out of this recipe.
+// edge and the md/md/sm/sm radius -- is hand-written in options.css: the
+// row-model block for text entry, the .listbox-btn rule block for the
+// listbox. It never applies to the native <select> fallback, and
+// recipe-lint's radiusToken law (one token per border-radius) is right to
+// keep a four-value radius out of this recipe.
 function formRules(ns) {
   const FIELD_SEL = `.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea`;
   const out = [];

@@ -109,7 +109,7 @@ const DEFAULT_LIGHT = {
   "field-bg-focus": "#eaeaea",      // = field-bg (focus never repaints the fill)
   "field-border-focus": "#5d88c2",  // = focus-bd, 3.03:1 on field-bg
   "field-edge": "#7b7b7b",          // border #858585 pushed to 3:1 vs the hover fill (3.18)
-  "field-edge-hover": "#5b5b5b",    // mix(edge, fg, 0.45)
+  "field-edge-hover": "#5b5b5b",    // mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX)
   "field-placeholder": "#616161",   // fg-hint #666666 pushed to 4.5:1 vs the hover fill (4.65)
 };
 
