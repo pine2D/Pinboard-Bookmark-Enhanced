@@ -1665,12 +1665,15 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
    "type here" indicator (Chrome settings cr-input / Material Filled) and a
    flat bottom: md top corners, sm bottom corners. The edge follows the state:
    field-edge -> field-edge-hover -> the focus border on all four sides.
-   Specificity is load-bearing: rest (0,2,1) sits after the generated border
-   shorthand (0,2,1) and wins on source order; the generated hover (0,3,1)
-   and focus (0,2,1, later than the generated base) rewrite every side, so the
-   hover (0,4,1) and focus (0,3,1) rules below restate the bottom side one
-   pseudo-class higher. The native <select> fallback is OUT of this list on
-   purpose: fill only, no edge (§6.4). */
+   Specificity is load-bearing. Rest (0,2,1) sits after the generated border
+   shorthand (0,2,1) and wins the bottom side on source order. The generated
+   hover (0,3,1) rewrites every side, so the hover rule below restates the
+   bottom side at (0,4,1). The generated focus is only (0,2,1) and sits BEFORE
+   this block, so on focus the rest rule here wins the bottom side back (the
+   rest edge would sit under a focus frame); the focus rule below restates it
+   at (0,3,1) to beat this rest rule, not the generated focus. The native
+   <select> fallback is OUT of this list on purpose: fill only, no edge
+   (§6.4). */
 .fg :is(input[type="text"], input[type="password"], input[type="number"], textarea) {
   border-bottom-color: var(--opt-field-edge);
   border-radius: var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm);
@@ -2054,7 +2057,14 @@ html.motion-ready #preset-preview-section > summary::after {
    2px width + 1px offset = 3px into a 2px gutter). An inner ring cutting
    across the container's chrome is the same defect shape the group row was
    rejected for, one order of magnitude smaller. */
-.key-wrap:focus-within input { background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
+/* (0,4,1), and after the B+ shape block's hover rule (also (0,4,1)) in source
+   order: with the EYE focused and the pointer over the input, the unit's
+   focus frame must beat the generated hover (0,3,1) and the hand hover
+   (0,4,1) on fill, all four sides and the bottom edge -- at the old (0,2,1)
+   both hovers repainted the frame while the ring stayed. Every .key-wrap
+   sits in a .fg and holds a text or password input (options.html + the
+   export-target builder in options.js). */
+.fg .key-wrap:focus-within :is(input[type="text"], input[type="password"]) { background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
 /* Hover is where the eye may show a fill -- a pointer affordance, and not a
    state the rest/focus invariant covers. */
 .key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg)); border-radius: var(--opt-radius-sm); }
@@ -2798,23 +2808,22 @@ html[data-theme="rose-pine"] .mobile-tab-picker select {
 /* ---- Select controls adopt the md-preview dropdown design (dropdown-design
    round, user request). Two layers, matching md-preview.css .exp-img-row
    select + its ::picker block (shipped bbd8eb1):
-   1. CLOSED control: rounded button-like surface (7px radius, roomier
-      padding, hover swaps the SURFACE not just the border) -- deliberately
-      distinct from the flat text inputs it used to be grouped with. Selects
-      are pick-one buttons, inputs are type-here fields; the two families
-      diverging is the point of the redesign. width:100% stays -- the rows
-      are single-column form rows, a shrink-to-content control would ragged
-      the column edge.
+   1. CLOSED control: the same field fill as the text inputs -- a B+ value
+      box painted by the generated field recipe (--opt-field-bg, hover
+      --opt-field-bg-hover, focus frame --opt-field-border-focus). It differs
+      from a text input by carrying NO bottom edge (a pick-one control, not a
+      type-here field; spec 2026-09-28-ui-fields-bplus-design §3 / §6.4),
+      uniform md corners and a drawn chevron. Width is content-sized (the
+      generated .fg select rule: max-content, 240px floor, never past the
+      column).
    2. OPEN list (@supports block below): Chrome 135+ customizable select
       renders the option popup in-page so it can carry the same surface /
       border / radius / shadow / row-hover recipe as md-preview's .send-menu,
       instead of the UA popup that ignores the theme tokens entirely.
-   Colors ride only the 17 tokens every one of the 14 data-theme presets
-   defines (+ :root literals for the no-preset light state); the no-preset
+   Colors ride only tokens every data-theme preset defines (the generated
+   ui-themes blocks, + :root for the no-preset light state); the no-preset
    DARK state always resolves to data-theme="flexoki-dark"
-   (options-theme-early.js:25), so there is no unthemed-dark gap.
-   Fill and hover fill now come from the generated field recipe
-   (--opt-field-bg / -bg-hover): fill only, no bottom edge (B+ §6.4). */
+   (options-theme-early.js:25), so there is no unthemed-dark gap. */
 .fg select {
   border-radius: var(--opt-radius-md);
   /* Same block padding and text inset as the generated field recipe, so a
@@ -3084,17 +3093,16 @@ html.motion-ready .theme-name-popover.is-closing {
 
 html[data-theme] .theme-name-popover { box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
 html[data-theme] .theme-name-popover label { color: var(--opt-fg); }
-/* `border-color: var(--opt-border)` removed from the rule below: it repeated
-   the base rule's own `border: 1px solid var(--opt-border)` (zero diff at
-   rest) but sat at (0,3,2) and therefore also won during :focus, where the
-   base's (0,3,1) focus rule was trying to paint --opt-focus-bd. Net effect
-   before this change: under all 13 presets this input's border never
-   reacted to focus at all -- a latent bug that predates the §7.3 pass and
-   was only visible once the focus half started using a token worth seeing.
-   The bespoke `:focus-visible` twin is gone with it: --opt-focus-ring is
-   already per-theme, so a second hand-mixed ring here only overrode the
-   themed value with a flatter one. */
-html[data-theme] .theme-name-popover input[type="text"] { background: var(--opt-field-bg); color: var(--opt-fg); }
+/* No themed twin for the popover's text input any more. It dates from when
+   the base rule hard-coded `border: 1px solid #ccc` on a UA-white input, so
+   presets had to repaint fill/frame/text. The input sits inside
+   .fg.edit-area (.save-theme-wrap is its only host), so the generated field
+   recipe paints it per theme at rest / hover / focus; a static
+   `html[data-theme]` twin at (0,3,2) only froze the fill against the
+   generated (0,3,1) hover (B+ fix round 1). Its `color: var(--opt-fg)`
+   repeated the recipe's own colour. Earlier removals, still binding: its
+   `border-color` (won during :focus, so the border never reacted) and a
+   hand-mixed `:focus-visible` ring (--opt-focus-ring is already per-theme). */
 html[data-theme] .theme-name-popover .tnp-overwrite { color: var(--opt-fg); }
 html[data-theme] .theme-name-popover .tnp-save { background: var(--opt-fg); border-color: var(--opt-fg); }
 html[data-theme] .theme-name-popover .tnp-save:hover { background: var(--opt-fg); box-shadow: inset 0 0 0 1px var(--opt-panel); }

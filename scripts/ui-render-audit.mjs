@@ -563,6 +563,12 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     outlineOffset: parseFloat(cs.outlineOffset) || 0,
     boxShadow: cs.boxShadow,
     borderColors: [cs.borderTopColor, cs.borderRightColor, cs.borderBottomColor, cs.borderLeftColor].join("|"),
+    // Same top|right|bottom|left quad for width and style (B+ field family
+    // fix round 1): Chromium keeps a side's computed colour when that side is
+    // not painted (width 0 / style none|hidden), so the colour quad alone
+    // cannot tell a painted edge from an absent one.
+    borderSideWidths: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth].join("|"),
+    borderSideStyles: [cs.borderTopStyle, cs.borderRightStyle, cs.borderBottomStyle, cs.borderLeftStyle].join("|"),
     children,
     focusedSelf,
     stability,
@@ -1050,32 +1056,54 @@ function evaluateCheck(check, raw, theme) {
   // override anywhere in the recipe or in options.css), so the first side
   // stands in for all four rather than adding a second raw shape just for
   // this one check.
+  //
+  // B+ field family (2026-09-28): on a row that ALSO pins edgeColorEqVar (a
+  // value box, whose bottom side is the edge), the frame is every OTHER side
+  // -- top, right AND left (indices 0, 1, 3) must all equal the token, so a
+  // side-only repaint (the stage-0 frame back as border-left/right-color)
+  // cannot hide behind a correct top side. Without edgeColorEqVar the old
+  // first-side reading stands (uniform rings such as .pick-mark).
+  const sideColors = (raw.borderColors || "").split("|");
+  const sideWidths = (raw.borderSideWidths || "").split("|").map((w) => parseFloat(w));
+  const sideStyles = (raw.borderSideStyles || "").split("|");
+  // A side is PAINTED when its computed width is non-zero and its style is
+  // not none/hidden (both of those compute width 0, but the colour survives
+  // -- fix round 1). Non-zero, not ">= 1px": Chromium snaps a border to whole
+  // device pixels, and this headed WSLg host (display scale 1.5, emulated
+  // devicePixelRatio 1) computes a 1px border as 0.666667px; any painted
+  // border keeps at least one device pixel, an unpainted one computes 0.
+  const sidePainted = (i) => sideWidths[i] > 0 && !!sideStyles[i] && !/^(?:none|hidden)$/.test(sideStyles[i]);
+  const sideDesc = (i) => `${sideColors[i]} ${sideWidths[i]}px ${sideStyles[i]}`;
   if ("borderColorEqVar" in exp) {
     const want = parseSolidColor(raw.extraBorderColorRaw);
-    const gotRaw = (raw.borderColors || "").split("|")[0];
-    const got = parseSolidColor(gotRaw);
+    const idx = "edgeColorEqVar" in exp ? [0, 1, 3] : [0];
+    const gotRaw = idx.map((i) => sideColors[i]).join("|");
+    const ok = idx.every((i) => colorsEqual(want, parseSolidColor(sideColors[i])));
     const note = !want ? `--${exp.borderColorEqVar} token unresolved (raw=${JSON.stringify(raw.extraBorderColorRaw)})` : undefined;
-    out.push(verdict("borderColorEqVar", colorsEqual(want, got), gotRaw, `var(--...-${exp.borderColorEqVar})=${raw.extraBorderColorRaw}`, note));
+    out.push(verdict("borderColorEqVar", ok, gotRaw,
+      `${idx.length === 1 ? "" : "top|right|left = "}var(--...-${exp.borderColorEqVar})=${raw.extraBorderColorRaw}`, note));
   }
   // edgeColorEqVar (B+ field family 2026-09-28, COMPONENTS.md §9.1 law 9): the
   // value box's BOTTOM side (index 2 of raw.borderColors' top|right|bottom|
-  // left quad) must equal this theme's --{ns}-{role} token, +-1/channel.
+  // left quad) must equal this theme's --{ns}-{role} token, +-1/channel, AND
+  // be painted (width > 0, style not none/hidden) -- an unpainted bottom
+  // keeps its computed colour, so colour alone would pass a missing edge.
   if ("edgeColorEqVar" in exp) {
     const want = parseSolidColor(raw.extraEdgeColorRaw);
-    const gotRaw = (raw.borderColors || "").split("|")[2];
-    const got = parseSolidColor(gotRaw);
+    const got = parseSolidColor(sideColors[2]);
     const note = !want ? `--${exp.edgeColorEqVar} token unresolved (raw=${JSON.stringify(raw.extraEdgeColorRaw)})` : undefined;
-    out.push(verdict("edgeColorEqVar", colorsEqual(want, got), gotRaw, `var(--...-${exp.edgeColorEqVar})=${raw.extraEdgeColorRaw}`, note));
+    out.push(verdict("edgeColorEqVar", colorsEqual(want, got) && sidePainted(2), sideDesc(2),
+      `painted (width > 0, not none/hidden) var(--...-${exp.edgeColorEqVar})=${raw.extraEdgeColorRaw}`, note));
   }
-  // borderSidesEqVar: ALL FOUR sides equal the token -- a focused value box
-  // paints one focus colour all the way round (spec §3: the edge follows
-  // focus). Shares borderColorEqVar's probe slot; a row may not set both.
+  // borderSidesEqVar: ALL FOUR sides equal the token and are painted -- a
+  // focused value box paints one focus colour all the way round (spec §3: the
+  // edge follows focus). Shares borderColorEqVar's probe slot; a row may not
+  // set both.
   if ("borderSidesEqVar" in exp) {
     const want = parseSolidColor(raw.extraBorderColorRaw);
-    const sides = (raw.borderColors || "").split("|");
-    const ok = !!want && sides.length === 4 && sides.every((s) => colorsEqual(want, parseSolidColor(s)));
+    const ok = !!want && sideColors.length === 4 && [0, 1, 2, 3].every((i) => colorsEqual(want, parseSolidColor(sideColors[i])) && sidePainted(i));
     const note = !want ? `--${exp.borderSidesEqVar} token unresolved (raw=${JSON.stringify(raw.extraBorderColorRaw)})` : undefined;
-    out.push(verdict("borderSidesEqVar", ok, raw.borderColors, `4 x var(--...-${exp.borderSidesEqVar})=${raw.extraBorderColorRaw}`, note));
+    out.push(verdict("borderSidesEqVar", ok, [0, 1, 2, 3].map(sideDesc).join("|"), `4 x painted var(--...-${exp.borderSidesEqVar})=${raw.extraBorderColorRaw}`, note));
   }
   if ("hitAreaMin" in exp) {
     if (hostZero) out.push(verdict("hitAreaMin", false, null, exp.hitAreaMin, zeroNote));
@@ -2795,7 +2823,8 @@ async function recordWeakTextHits(page, surface, theme, results, context) {
 // list on purpose, so a field that escapes the family is caught) plus the
 // drawn listbox button, the one non-text value box carrying the edge. Each is
 // measured with the real pointer, parked (rest) and hovered, after finishing
-// its own transitions. Pass = the edge clears 3:1 against the control's own
+// its own transitions. Pass = the edge is painted (width > 0, style not
+// none/hidden) and clears 3:1 against the control's own
 // fill (inner) AND the backdrop behind it (outer) at rest AND on hover, and
 // hover is strictly higher contrast than rest on both sides (never lighter,
 // never a no-op). One OK/FAIL row per (theme, control).
@@ -2831,6 +2860,12 @@ async function readFieldPaint(el) {
     visible: r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none",
     disabled: !!el.disabled,
     edge: cs.borderBottomColor, own: cs.backgroundColor, chain,
+    // The edge must be PAINTED, not only coloured (fix round 1): with
+    // border-bottom-width 0 or style none/hidden Chromium still reports the
+    // token as border-bottom-color, and the contrast math below would pass
+    // a box with no boundary at all. Painted = width > 0 (Chromium snaps a
+    // 1px border to whole device pixels: 0.666667px on this headed host).
+    edgeW: parseFloat(cs.borderBottomWidth) || 0, edgeStyle: cs.borderBottomStyle,
   };
 }
 
@@ -2869,14 +2904,16 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
     const hover = await h.evaluate(readFieldPaint);
     await page.mouse.move(0, 0);
     const r = ratios(rest), v = ratios(hover);
-    const ok = r.inner >= 3 && r.outer >= 3 && v.inner >= 3 && v.outer >= 3 && v.inner > r.inner && v.outer > r.outer;
+    const painted = (p) => p.edgeW > 0 && !/^(?:none|hidden)$/.test(p.edgeStyle || "none");
+    const ok = painted(rest) && painted(hover) &&
+      r.inner >= 3 && r.outer >= 3 && v.inner >= 3 && v.outer >= 3 && v.inner > r.inner && v.outer > r.outer;
     scanned++;
     kindsSeen[rest.kind] = (kindsSeen[rest.kind] || 0) + 1;
     results.push({
       surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
       status: ok ? "OK" : "FAIL",
-      actual: `edge inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.edge} -> hover ${hover.edge})`,
-      expected: "bottom edge >=3:1 against the control's fill and its backdrop at rest and on hover, hover strictly higher on both (COMPONENTS.md §6.1/§9.1 law 9: edge -> edge-hover = mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX))",
+      actual: `edge inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.edge} ${rest.edgeW}px ${rest.edgeStyle} -> hover ${hover.edge} ${hover.edgeW}px ${hover.edgeStyle})`,
+      expected: "a painted bottom edge (width > 0, style not none/hidden) >=3:1 against the control's fill and its backdrop at rest and on hover, hover strictly higher on both (COMPONENTS.md §6.1/§9.1 law 9: edge -> edge-hover = mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX))",
       note: null,
     });
   }
@@ -5022,6 +5059,14 @@ async function runSweep(page, sw, extBase) {
 
   console.log("[radiusScale] split top/bottom pairs measured: " + ["options", "library", "md-preview", "popup"]
     .map((s) => `${s}=${splitPairs[s]?.measured || 0} (${splitPairs[s]?.paths.size || 0} unique)`).join(" "));
+  // Non-vacuity (family 9, fix round 1), in the style of family 14's
+  // missingKinds guard: every options value box is md md sm sm, so a sweep
+  // that measured no split pair on options means the branch went vacuous
+  // (a broken pair guard, exemptWithin or visibility swallowing .fg fields).
+  if (!(splitPairs.options?.measured > 0)) {
+    throw new Error("SETUP ERROR: radiusScale (family 9) measured 0 top/bottom split-radius boxes on options -- the split branch is vacuous. " +
+      "Options value boxes are md md sm sm (spec 2026-09-28-ui-fields-bplus-design §3); if the design changes to uniform corners, update this guard.");
+  }
   return hits;
 }
 

@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
-import { parseStyleRules, parseDeclarations, declarationValueMap } from "../docs/theme-surface/tools/css-syntax.mjs";
+import { parseStyleRules, parseDeclarations, declarationValueMap, splitSelectorList } from "../docs/theme-surface/tools/css-syntax.mjs";
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -1608,6 +1608,156 @@ function forcedColorsBodyRanges(css) {
   }
   return ranges;
 }
+// ---- B+ value-box selector model (fix round 1; shared by §7.3's field core
+// and the Task 2 value-box scans below). A selector is judged by its SUBJECT
+// compound -- the text after the last top-level combinator -- and every
+// :is()/:where() argument inside that compound is judged on its own. An
+// exclusion ([type="checkbox"], <option>, a pseudo-element) therefore counts
+// only when it is the subject's OWN condition: `.fg input:not([type=
+// "checkbox"])` is still a text box, and `.fg :is(input[type="checkbox"],
+// textarea)` still reaches the textarea. Value boxes addressed by id count
+// too: the ids come from the text-entry controls options.html ships, plus
+// each data-listbox select's runtime `<id>-btn` button (options-listbox.js).
+// Search inputs are left out on purpose: the sidebar search box IS a value
+// box, but it stays on --opt-input-bg / --opt-input-border by design (spec
+// 2026-09-28-ui-fields-bplus-design §3), so these field-family scans skip it.
+const TEXT_ENTRY_TYPES = new Set(["text", "password", "number", "url", "email", "tel"]);
+function closeOfBracket(sel, i) {
+  const open = sel[i], close = open === "(" ? ")" : "]";
+  let depth = 0, quote = null;
+  for (let j = i; j < sel.length; j += 1) {
+    const ch = sel[j];
+    if (quote) { if (ch === "\\") j += 1; else if (ch === quote) quote = null; continue; }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === open) depth += 1;
+    else if (ch === close && --depth === 0) return j;
+  }
+  return sel.length - 1;
+}
+function subjectOf(sel) {
+  let start = 0;
+  for (let i = 0; i < sel.length; i += 1) {
+    const ch = sel[i];
+    if (ch === "(" || ch === "[") { i = closeOfBracket(sel, i); continue; }
+    if (ch === " " || ch === ">" || ch === "+" || ch === "~") start = i + 1;
+  }
+  return sel.slice(start).trim();
+}
+function subjectAlternatives(compound) {
+  for (let i = 0; i < compound.length; i += 1) {
+    if (compound[i] === "[") { i = closeOfBracket(compound, i); continue; }
+    const fn = compound.startsWith(":is(", i) ? 4 : compound.startsWith(":where(", i) ? 7 : 0;
+    if (fn) {
+      const close = closeOfBracket(compound, i + fn - 1);
+      const head = compound.slice(0, i), tail = compound.slice(close + 1);
+      return splitSelectorList(compound.slice(i + fn, close))
+        .flatMap((arg) => subjectAlternatives(head + subjectOf(arg) + tail));
+    }
+    if (compound[i] === "(") i = closeOfBracket(compound, i); // :not(...) & co. stay intact
+  }
+  return [compound];
+}
+function classifyCompound(compound) {
+  let own = "";
+  for (let i = 0; i < compound.length; i += 1) {
+    if (compound[i] === "(") { i = closeOfBracket(compound, i); continue; } // drop :not(...) etc. arguments
+    if (compound[i] === "[") { const close = closeOfBracket(compound, i); own += compound.slice(i, close + 1); i = close; continue; }
+    own += compound[i];
+  }
+  const bare = own.replace(/\[[^\]]*\]/g, "");
+  return {
+    tag: ((/^([a-zA-Z][\w-]*)/.exec(own) || [])[1] || "").toLowerCase() || null,
+    type: ((/\[\s*type\s*=\s*["']?([\w-]+)["']?\s*(?:[iIsS]\s*)?\]/.exec(own) || [])[1] || "").toLowerCase() || null,
+    ids: [...bare.matchAll(/#([\w-]+)/g)].map((m) => m[1]),
+    classes: [...bare.matchAll(/\.([\w-]+)/g)].map((m) => m[1]),
+    pseudoElement: /::|:(?:before|after|first-line|first-letter)\b/.test(bare),
+  };
+}
+const OPTIONS_VALUE_BOX_IDS = (() => {
+  const ids = new Set(), selectIds = new Set();
+  for (const m of optionsHtml.matchAll(/<(input|textarea|select)\b([^>]*)>/gi)) {
+    const tag = m[1].toLowerCase(), attrs = m[2];
+    const id = (/\bid="([^"]+)"/.exec(attrs) || [])[1];
+    if (!id) continue;
+    if (tag === "input" && !TEXT_ENTRY_TYPES.has(((/\btype="([^"]+)"/.exec(attrs) || [])[1] || "text").toLowerCase())) continue;
+    ids.add(id);
+    if (tag === "select") {
+      selectIds.add(id);
+      if (/\sdata-listbox\b/.test(attrs)) ids.add(`${id}-btn`);
+    }
+  }
+  return { ids, selectIds };
+})();
+check(OPTIONS_VALUE_BOX_IDS.ids.has("dict-anki-deck") && OPTIONS_VALUE_BOX_IDS.ids.has("opt-custom-css") && OPTIONS_VALUE_BOX_IDS.ids.has("opt-lang-btn") &&
+  OPTIONS_VALUE_BOX_IDS.selectIds.has("mobile-tab-select") && !OPTIONS_VALUE_BOX_IDS.ids.has("options-search-input") && OPTIONS_VALUE_BOX_IDS.ids.size > 60,
+  "ui-contract-tests.mjs: the options.html value-box id harvest drifted (expected text/password/number inputs, textareas, selects and their -btn listbox buttons; search excluded) -- got " + OPTIONS_VALUE_BOX_IDS.ids.size + " ids");
+function isValueBoxCompound(compound) {
+  const c = classifyCompound(compound);
+  if (c.pseudoElement || c.tag === "option") return false;
+  if (c.ids.some((id) => OPTIONS_VALUE_BOX_IDS.ids.has(id)) || c.classes.includes("listbox-btn")) return true;
+  if (c.tag === "textarea" || c.tag === "select") return true;
+  return c.tag === "input" && (c.type === null || TEXT_ENTRY_TYPES.has(c.type));
+}
+function isValueBoxSelector(sel) { return subjectAlternatives(subjectOf(sel)).some(isValueBoxCompound); }
+function isNativeSelectSelector(sel) {
+  return subjectAlternatives(subjectOf(sel)).some((compound) => {
+    const c = classifyCompound(compound);
+    return !c.pseudoElement && (c.tag === "select" || c.ids.some((id) => OPTIONS_VALUE_BOX_IDS.selectIds.has(id)));
+  });
+}
+// §7.3's --opt-field-border-focus core belongs to value boxes and to the
+// key-wrap eye that sits on a value box's fill -- nothing else (GI-5). Every
+// selector of the rule's list must qualify.
+function acceptsFieldFocusCore(selectorText) {
+  const list = splitSelectorList(selectorText);
+  return list.length > 0 && list.every((sel) => isValueBoxSelector(sel) ||
+    subjectAlternatives(subjectOf(sel)).some((compound) => { const c = classifyCompound(compound); return !c.pseudoElement && c.classes.includes("key-toggle"); }));
+}
+// Specificity [a, b, c] of one complex selector; :is()/:not()/:has() take
+// their most specific argument, :where() adds nothing.
+function cmpSpecificity(x, y) { return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; }
+function selectorSpecificity(sel) {
+  let a = 0, b = 0, c = 0;
+  const identEnd = (i) => { while (i < sel.length && /[\w-]/.test(sel[i])) i += 1; return i; };
+  for (let i = 0; i < sel.length;) {
+    const ch = sel[i];
+    if (ch === "#") { a += 1; i = identEnd(i + 1); }
+    else if (ch === ".") { b += 1; i = identEnd(i + 1); }
+    else if (ch === "[") { b += 1; i = closeOfBracket(sel, i) + 1; }
+    else if (ch === ":" && sel[i + 1] === ":") { c += 1; i = identEnd(i + 2); if (sel[i] === "(") i = closeOfBracket(sel, i) + 1; }
+    else if (ch === ":") {
+      const end = identEnd(i + 1), name = sel.slice(i + 1, end).toLowerCase();
+      i = end;
+      if (sel[i] === "(") {
+        const close = closeOfBracket(sel, i), arg = sel.slice(i + 1, close);
+        i = close + 1;
+        if (name === "where") continue;
+        if (["is", "not", "has", "matches"].includes(name)) {
+          const best = splitSelectorList(arg).map(selectorSpecificity).reduce((m, x) => (cmpSpecificity(x, m) > 0 ? x : m), [0, 0, 0]);
+          a += best[0]; b += best[1]; c += best[2];
+        } else b += 1;
+      } else if (["before", "after", "first-line", "first-letter"].includes(name)) c += 1;
+      else b += 1;
+    } else if (/[a-zA-Z]/.test(ch)) { c += 1; i = identEnd(i); }
+    else i += 1;
+  }
+  return [a, b, c];
+}
+// The model itself must discriminate, or every scan built on it is blind.
+check(isValueBoxSelector('.fg input:not([type="checkbox"])') && isValueBoxSelector('.fg :is(input[type="checkbox"], textarea)') &&
+  isValueBoxSelector("#dict-anki-deck") && isValueBoxSelector("#opt-lang-btn:hover") && isValueBoxSelector('.entry-block input[type="text"]') &&
+  !isValueBoxSelector('.fg input[type="checkbox"]') && !isValueBoxSelector(".fg select::picker(select)") && !isValueBoxSelector(".fg option") &&
+  !isValueBoxSelector(".listbox-btn .btn-ic") && !isValueBoxSelector('.options-search input[type="search"]') &&
+  !isValueBoxSelector("input:hover:not(:disabled) + .tag-gov-chip-face") && !isValueBoxSelector(".fg input::placeholder") &&
+  isNativeSelectSelector(".mobile-tab-picker select:hover:not(:focus)") && isNativeSelectSelector("#mobile-tab-select") && !isNativeSelectSelector(".listbox-btn") &&
+  acceptsFieldFocusCore(".key-toggle:focus-visible") && !acceptsFieldFocusCore(".btn:focus-visible") &&
+  !acceptsFieldFocusCore(".listbox-btn:focus-visible, .btn:focus-visible") &&
+  cmpSpecificity(selectorSpecificity('html[data-theme] .theme-name-popover input[type="text"]'), [0, 3, 2]) === 0 &&
+  cmpSpecificity(selectorSpecificity('.fg :is(input[type="text"], textarea):hover:not(:focus)'), [0, 4, 1]) === 0 &&
+  cmpSpecificity(selectorSpecificity(".fg input:hover:not(:focus)"), [0, 3, 1]) === 0 &&
+  cmpSpecificity(selectorSpecificity("#opt-custom-css.over-limit"), [1, 1, 0]) === 0 &&
+  cmpSpecificity(selectorSpecificity(".x:where(.a .b) p::before"), [0, 1, 2]) === 0,
+  "ui-contract-tests.mjs: the B+ value-box selector model (subject compound / :is() arguments / ids / specificity) no longer discriminates");
 // The scan is a function (P12, B+ field family 2026-09-28) so its widening
 // below can be run against synthetic CSS, not only the shipped files.
 function focusShapeOffenders(css, ns) {
@@ -1626,15 +1776,18 @@ function focusShapeOffenders(css, ns) {
   // B+ field family (2026-09-28): a value box's bordered core is its own derived
   // focus border, --opt-field-border-focus (= focus-bd wherever that clears 3:1
   // on the field fill; re-derived where it does not -- flexoki-light). Accepted
-  // as a `bordered` core on options only. P7: the key-wrap eye draws its inset
-  // ring ON the field fill, so on options the inset core accepts it too.
-  const BORDERED_CORES = ns === "opt" ? [BD, "var(--opt-field-border-focus)"] : [BD];
-  const INSET_CORES = ns === "opt" ? [BD, "var(--opt-field-border-focus)"] : [BD];
-  const coreRe = new RegExp(`border-color:\\s*(?:${BORDERED_CORES.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`);
+  // as a `bordered` core on options only, and only on a VALUE-BOX selector
+  // (fix round 1, GI-5: flexoki-light's value is derived against the field
+  // fill, not a button's). P7: the key-wrap eye draws its inset ring ON the
+  // field fill, so on options its inset core accepts it too.
+  const FIELD_CORE = "var(--opt-field-border-focus)";
+  const coresFor = (selector) => (ns === "opt" && acceptsFieldFocusCore(selector) ? [BD, FIELD_CORE] : [BD]);
+  const coreReFor = (cores) => new RegExp(`border-color:\\s*(?:${cores.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`);
   const bad = [];
   for (const { selector, body, forcedColors } of rules) {
     if (!/:focus-visible/.test(selector)) continue;
     if (FOCUS_SHAPE_EXEMPT.ring.some(re => re.test(selector))) continue;
+    const BORDERED_CORES = coresFor(selector), INSET_CORES = BORDERED_CORES, coreRe = coreReFor(BORDERED_CORES);
     const s = parseFocusShape(body);
     const drawsOutline = s.style && s.style !== "none" && s.width > 0;
     const suppressesOutline = s.outlineTouched && (s.style === "none" || s.width === 0);
@@ -1692,32 +1845,44 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
   check(bad.length === 0,
     `${file}: hand-written focus rule(s) do not match any §7.3 placement (bordered / borderless / inset):\n    ${bad.join("\n    ")}`);
 }
-// P12 discrimination for the B+ widening, on synthetic CSS: options accepts
-// --opt-field-border-focus as a bordered core (on the rule itself or on the
-// :focus partner of a glow-only rule) and as an inset core; the popup and
-// library namespaces still reject the same spelling in their own namespace;
-// a non-focus core (--opt-border) plus the ring is still rejected.
+// P12 discrimination for the B+ widening, on synthetic CSS (value-box
+// selectors throughout, so a rejection below is about the CORE, not the
+// selector): options accepts --opt-field-border-focus as a bordered core (on
+// the rule itself or on the :focus partner of a glow-only rule) and as an
+// inset core (the key-wrap eye). The popup and library namespaces reject it
+// -- both the options LITERAL var(--opt-field-border-focus) (the real leak
+// shape: a popup/library rule borrowing the options token, fix round 1 T2-Q1)
+// and their own namespaced spelling. A non-focus core (--opt-border) plus the
+// ring is still rejected, and so is the field core on a non-value-box
+// selector (fix round 1 GI-5: .btn).
 {
-  const accepted = (ns) => `.a:focus-visible { outline: none; border-color: var(--${ns}-field-border-focus); box-shadow: var(--${ns}-focus-ring); }
-.b:focus { outline: none; border-color: var(--${ns}-field-border-focus); }
-.b:focus-visible { box-shadow: var(--${ns}-focus-ring); }
-.c:focus-visible { outline: 2px solid var(--${ns}-field-border-focus); outline-offset: -2px; box-shadow: none; }
+  const focusCss = (ns, core) => `.fg input[type="text"]:focus-visible { outline: none; border-color: ${core}; box-shadow: var(--${ns}-focus-ring); }
+.theme-name-popover input[type="text"]:focus { outline: none; border-color: ${core}; }
+.theme-name-popover input[type="text"]:focus-visible { box-shadow: var(--${ns}-focus-ring); }
+.key-toggle:focus-visible { outline: 2px solid ${core}; outline-offset: -2px; box-shadow: none; }
 `;
-  const optBad = focusShapeOffenders(accepted("opt"), "opt");
+  const WANT = ['.fg input[type="text"]:focus-visible', '.theme-name-popover input[type="text"]:focus-visible', ".key-toggle:focus-visible"];
+  const allRejected = (bad) => bad.length === 3 && WANT.every((sel, i) => bad[i].startsWith(sel + " "));
+  const optBad = focusShapeOffenders(focusCss("opt", "var(--opt-field-border-focus)"), "opt");
   check(optBad.length === 0,
-    "ui-contract-tests.mjs: §7.3 no longer accepts var(--opt-field-border-focus) as the options bordered / glow-partner / inset core (B+ P7/P12): " + optBad.join(" | "));
+    "ui-contract-tests.mjs: §7.3 no longer accepts var(--opt-field-border-focus) as the options bordered / glow-partner / inset core on value boxes (B+ P7/P12): " + optBad.join(" | "));
   for (const ns of ["pp", "lib"]) {
-    const nsBad = focusShapeOffenders(accepted(ns), ns);
-    check(nsBad.length === 3 && [".a:", ".b:", ".c:"].every((sel, i) => nsBad[i].startsWith(sel)),
-      `ui-contract-tests.mjs: the §7.3 field-border-focus widening leaked into the ${ns} namespace (expected .a/.b/.c all rejected) -- got [${nsBad.join(" | ")}]`);
+    for (const core of ["var(--opt-field-border-focus)", `var(--${ns}-field-border-focus)`]) {
+      const nsBad = focusShapeOffenders(focusCss(ns, core), ns);
+      check(allRejected(nsBad),
+        `ui-contract-tests.mjs: the §7.3 field-border-focus widening leaked into the ${ns} namespace with core ${core} (expected all three value-box rules rejected) -- got [${nsBad.join(" | ")}]`);
+    }
   }
-  const frameBad = focusShapeOffenders(`.d:focus-visible { outline: none; border-color: var(--opt-border); box-shadow: var(--opt-focus-ring); }
-.e:focus { outline: none; border-color: var(--opt-border); }
-.e:focus-visible { box-shadow: var(--opt-focus-ring); }
-.f:focus-visible { outline: 2px solid var(--opt-border); outline-offset: -2px; box-shadow: none; }
+  const frameBad = focusShapeOffenders(focusCss("opt", "var(--opt-border)"), "opt");
+  check(allRejected(frameBad),
+    "ui-contract-tests.mjs: §7.3 accepts a non-focus core (--opt-border + ring) on options value boxes -- got [" + frameBad.join(" | ") + "]");
+  const btnBad = focusShapeOffenders(`.btn:focus-visible { outline: none; border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
+.tab-btn:focus { outline: none; border-color: var(--opt-field-border-focus); }
+.tab-btn:focus-visible { box-shadow: var(--opt-focus-ring); }
+.pick-mark:focus-visible { outline: 2px solid var(--opt-field-border-focus); outline-offset: -2px; box-shadow: none; }
 `, "opt");
-  check(frameBad.length === 3 && [".d:", ".e:", ".f:"].every((sel, i) => frameBad[i].startsWith(sel)),
-    "ui-contract-tests.mjs: §7.3 accepts a non-focus core (--opt-border + ring) on options -- got [" + frameBad.join(" | ") + "]");
+  check(btnBad.length === 3 && [".btn:focus-visible ", ".tab-btn:focus-visible ", ".pick-mark:focus-visible "].every((sel, i) => btnBad[i].startsWith(sel)),
+    "ui-contract-tests.mjs: §7.3 accepts var(--opt-field-border-focus) on a non-value-box selector (GI-5: the field core is for value boxes and the key-wrap eye only) -- got [" + btnBad.join(" | ") + "]");
 }
 // The two same-specificity deletions this sweep made must stay deleted --
 // both were measured, not eyeballed (CLAUDE.md's two-way cascade rule).
@@ -5646,57 +5811,141 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "options.css: a hand-written row-model rule repaints text fields again (the stage-0 panel/--opt-border override or the stage-3c border-55% hover mix) -- superseded by the B+ field family");
 }
 
-// ---- B+ field family, Task 2: every HAND-WRITTEN colour declaration on a
-// value box (a .fg / .key-wrap text control or select, the listbox button,
-// the narrow-screen tab picker, the theme-name popover input) reads the
-// --opt-field-* family -- the class form of "the stage-0 panel/--opt-border
-// override stays gone" (CLAUDE.md: assert the category, not the instance).
-// Exempt: forced-colors blocks (system colours by design), the ::picker(select)
-// popover and <option> rows (floating surfaces, §9.1 law 4), checkbox/radio/
-// file/search inputs (not value boxes).
+// ---- B+ field family, Task 2 (+ fix round 1): every HAND-WRITTEN colour
+// declaration on a value box reads the --opt-field-* family -- the class form
+// of "the stage-0 panel/--opt-border override stays gone" (CLAUDE.md: assert
+// the category, not the instance). "Value box" is the selector model above
+// (subject compound, each :is() argument on its own, ids harvested from
+// options.html), so a .fg / .key-wrap / .entry-block text control, textarea
+// or select, the listbox button, the narrow-screen tab picker, the theme-name
+// popover input and an #id rule on any of them are all in. Beyond colour the
+// scan also rejects (fix round 1): a rule that unpaints the bottom edge
+// (width 0 / style none|hidden / transparent bottom colour, in any longhand
+// or shorthand spelling), a hand-written --opt-field-* custom property (a
+// local re-point of the family; the generated ui-themes blocks own them),
+// and a static value-box rule at or above the generated hover's (0,3,1)
+// specificity that paints fill or frame -- it would freeze the hover/focus
+// fills (the removed `html[data-theme] .theme-name-popover input` twin).
+// Exempt: forced-colors blocks (system colours by design), ::picker(select)
+// and <option> subjects (floating surfaces, §9.1 law 4), checkbox/radio/file
+// inputs, search inputs (see the model's note), and VALUE_BOX_EXEMPT by name.
 {
-  const isValueBox = (s) => {
-    if (/::picker|\boption\b|type="(?:checkbox|radio|file|search)"/.test(s)) return false;
-    return /\.(?:fg|key-wrap)\b[^,]*\b(?:input|textarea|select)\b/.test(s)
-      || /\.listbox-btn(?![\w-])(?!\s+\.)/.test(s)
-      || /\.mobile-tab-picker select\b/.test(s)
-      || /\.theme-name-popover input\b/.test(s);
-  };
+  const VALUE_BOX_EXEMPT = [
+    // The byte-over-limit ERROR state of the custom-CSS box repaints its whole
+    // frame, bottom edge included, in --opt-danger on purpose (options.js
+    // toggles .over-limit); an error state outranks the field family.
+    { selector: "#opt-custom-css.over-limit", property: "border-color", value: "var(--opt-danger)" },
+  ];
+  const isExempt = (sel, d) => VALUE_BOX_EXEMPT.some((e) => e.selector === sel && e.property === d.property && e.value === d.value.trim());
   // P11: every colour-bearing fill / border property by PATTERN (all four
   // physical sides, the logical inline/block sides and their -start/-end,
   // shorthand and -color longhand), not a hand-kept list a new spelling
   // (border-left, border-inline-end-color) would walk around.
   const COLOUR_PROP_RE = /^(?:background(?:-color)?|border(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?(?:-color)?)$/;
+  const STATE_RE = /:(?:hover|focus|focus-visible|focus-within|active|disabled|checked|invalid|user-invalid|placeholder-shown|autofill)\b/;
+  const valueTokens = (value) => {
+    const out = [];
+    let cur = "", depth = 0;
+    for (const ch of value.replace(/!important\s*$/i, "").trim()) {
+      if (ch === "(") depth += 1;
+      else if (ch === ")") depth -= 1;
+      if (/\s/.test(ch) && depth === 0) { if (cur) out.push(cur); cur = ""; } else cur += ch;
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const ZERO_W = (t) => /^0(?:\.0*)?(?:px|em|rem|%)?$/i.test(t || "");
+  const NO_STYLE = (t) => /^(?:none|hidden)$/i.test(t || "");
+  const NO_COLOUR = (t) => /^transparent$/i.test(t || "");
+  const bottomOf = (ts) => (ts.length >= 3 ? ts[2] : ts[0]);  // 1-4 value box shorthands
+  const blockEndOf = (ts) => (ts.length >= 2 ? ts[1] : ts[0]); // 1-2 value logical block pairs
+  // GI-1: does this declaration leave the bottom edge unpainted?
+  const unpaintsBottom = (prop, value) => {
+    const ts = valueTokens(value);
+    if (!ts.length) return false;
+    switch (prop) {
+      case "border": case "border-bottom": case "border-block": case "border-block-end":
+        return ts.some((t) => ZERO_W(t) || NO_STYLE(t) || NO_COLOUR(t));
+      case "border-bottom-width": case "border-block-end-width": return ZERO_W(ts[0]);
+      case "border-bottom-style": case "border-block-end-style": return NO_STYLE(ts[0]);
+      case "border-bottom-color": case "border-block-end-color": return NO_COLOUR(ts[0]);
+      case "border-width": return ZERO_W(bottomOf(ts));
+      case "border-style": return NO_STYLE(bottomOf(ts));
+      case "border-color": return NO_COLOUR(bottomOf(ts));
+      case "border-block-width": return ZERO_W(blockEndOf(ts));
+      case "border-block-style": return NO_STYLE(blockEndOf(ts));
+      case "border-block-color": return NO_COLOUR(blockEndOf(ts));
+      default: return false;
+    }
+  };
   const offenders = (css) => {
     const out = [];
     for (const rule of parseStyleRules(css)) {
+      const decls = parseDeclarations(rule.body);
+      for (const d of decls) {
+        if (d.property.startsWith("--opt-field-")) out.push(`${rule.selectorText} { ${d.property}: ${d.value} } -- re-points the field family`);
+      }
       if (rule.context.some((c) => /forced-colors/.test(c))) continue;
-      const boxes = rule.selectors.filter(isValueBox);
+      const boxes = rule.selectors.filter(isValueBoxSelector);
       if (!boxes.length) continue;
-      for (const d of parseDeclarations(rule.body)) {
+      const live = decls.filter((d) => !boxes.every((sel) => isExempt(sel, d)));
+      for (const d of live) {
+        if (unpaintsBottom(d.property, d.value)) { out.push(`${boxes.join(", ")} { ${d.property}: ${d.value} } -- unpaints the bottom edge`); continue; }
         if (!COLOUR_PROP_RE.test(d.property)) continue;
         if (/^(?:none|transparent|inherit|currentcolor|0)$/i.test(d.value.trim())) continue;
         const refs = [...d.value.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map((m) => m[1]);
         const literal = /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|color-mix\(/i.test(d.value);
         if (literal || !refs.length || refs.some((r) => !r.startsWith("--opt-field-"))) out.push(`${boxes.join(", ")} { ${d.property}: ${d.value} }`);
       }
+      const frozen = boxes.filter((sel) => !STATE_RE.test(sel) && cmpSpecificity(selectorSpecificity(sel), [0, 3, 1]) >= 0);
+      const paints = live.filter((d) => COLOUR_PROP_RE.test(d.property));
+      if (frozen.length && paints.length) {
+        out.push(`${frozen.join(", ")} { ${paints.map((d) => d.property).join(", ")} } -- a static rule at >= (0,3,1) freezes the generated hover/focus fills`);
+      }
     }
     return out;
   };
   const bad = offenders(stripGeneratedRegions(optionsCss).replace(/\/\*[\s\S]*?\*\//g, ""));
   check(bad.length === 0,
-    "options.css: a hand-written value-box rule paints with a non-field token (B+: every value box reads --opt-field-*): " + bad.join(" | "));
-  // Discrimination: the scan must catch the stage-0 frame, the old focus-bd
-  // hover and a single-side spelling of the frame (P11), and must skip the
-  // ::picker popover and a field-token edge.
-  const caught = offenders('.fg input[type="text"] { border-color: var(--opt-border); }\n'
-    + ".listbox-btn:hover { border-color: var(--opt-focus-bd); }\n"
-    + '.fg input[type="text"] { border-left: 1px solid var(--opt-border); }\n'
-    + ".fg select::picker(select) { border: 1px solid var(--opt-border); }\n"
-    + ".fg textarea { border-bottom-color: var(--opt-field-edge); }\n");
-  check(caught.length === 3 && caught[0].startsWith('.fg input[type="text"] { border-color') && caught[1].startsWith(".listbox-btn:hover")
-    && caught[2].startsWith('.fg input[type="text"] { border-left'),
-    "ui-contract-tests.mjs: the value-box colour scan no longer discriminates -- caught=[" + caught.join(" | ") + "]");
+    "options.css: a hand-written value-box rule leaves the B+ field family (non-field colour / unpainted bottom edge / --opt-field-* re-point / state freeze): " + bad.join(" | "));
+  // Discrimination, one synthetic rule at a time: [css, must be caught].
+  // Fix round 1 added the second group; the Task 2 scan (subject-blind
+  // substring exclusion, class-shaped selectors only, colour props only)
+  // missed every one of them.
+  const VALUE_BOX_CASES = [
+    ['.fg input[type="text"] { border-color: var(--opt-border); }', true],
+    [".listbox-btn:hover { border-color: var(--opt-focus-bd); }", true],
+    ['.fg input[type="text"] { border-left: 1px solid var(--opt-border); }', true],
+    [".fg select::picker(select) { border: 1px solid var(--opt-border); }", false],
+    [".fg textarea { border-bottom-color: var(--opt-field-edge); }", false],
+    // fix round 1
+    ['.fg input:not([type="checkbox"]) { background: var(--opt-panel); }', true],
+    ['.fg :is(input[type="checkbox"], textarea) { border-color: var(--opt-border); }', true],
+    ["#dict-anki-deck { border-color: var(--opt-border); }", true],
+    ["#opt-lang-btn:hover { background: var(--opt-btn-hover); }", true],
+    ['.entry-block input[type="text"] { background-color: var(--opt-panel); }', true],
+    ['.fg input[type="text"] { --opt-field-bg: var(--opt-panel); }', true],
+    ['.fg :is(input[type="text"], textarea) { border-bottom-width: 0; }', true],
+    [".listbox-btn { border-bottom-style: none; }", true],
+    [".fg textarea { border-width: 1px 1px 0; }", true],
+    ['.fg input[type="password"] { border: 0; }', true],
+    [".fg textarea { border-style: solid solid hidden; }", true],
+    ['.fg input[type="text"] { border-block-end: none; }', true],
+    ['.fg input[type="text"] { border-bottom-color: transparent; }', true],
+    ['html[data-theme] .theme-name-popover input[type="text"] { background: var(--opt-field-bg); }', true],
+    ["#opt-custom-css.over-limit { border-color: var(--opt-border); }", true],
+    ["#opt-custom-css.over-limit { background: var(--opt-panel); }", true],
+    // must stay clean
+    ["#opt-custom-css.over-limit { border-color: var(--opt-danger) !important; }", false],
+    ['.fg input[type="checkbox"] { background: var(--opt-accent); }', false],
+    ['.options-search input[type="search"] { background: var(--opt-input-bg); }', false],
+    [".fg option:hover { background: var(--opt-option-hover-bg); }", false],
+    ['.fg input[type="text"]:hover:not(:focus) { background-color: var(--opt-field-bg-hover); }', false],
+    [".fg textarea { border-width: 1px; }", false],
+  ];
+  const misjudged = VALUE_BOX_CASES.filter(([css, want]) => (offenders(css).length > 0) !== want);
+  check(misjudged.length === 0,
+    "ui-contract-tests.mjs: the value-box scan no longer discriminates -- misjudged: " + misjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
 
   const hand = stripGeneratedRegions(optionsCss);
   const S = '.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea)';
@@ -5718,19 +5967,54 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // field's own focus border (flexoki-light: --opt-focus-bd is 2.73:1 there).
   check(declarationValueMap(hand, ".key-toggle:focus-visible").get("outline") === "2px solid var(--opt-field-border-focus)",
     "options.css: .key-toggle:focus-visible must draw its inset ring in --opt-field-border-focus (it sits on the field fill; B+ P7)");
+  // Fix round 1 (T2-CAS-3): with the EYE focused and the pointer over the
+  // input, the key-wrap unit's focus frame must beat every hover rule that
+  // can paint a key-wrap input -- generated or hand-written -- on fill and
+  // frame: strictly higher specificity, or equal and later in source.
+  {
+    const FW = '.fg .key-wrap:focus-within :is(input[type="text"], input[type="password"])';
+    const all = parseStyleRules(optionsCss.replace(/\/\*[\s\S]*?\*\//g, ""));
+    const fw = all.filter((r) => r.context.length === 0 && r.selectors.includes(FW));
+    const fwDecls = new Map(fw.flatMap((r) => parseDeclarations(r.body).map((d) => [d.property, d.value])));
+    check(fw.length === 1 && fwDecls.get("background-color") === "var(--opt-field-bg-focus)" &&
+      fwDecls.get("border-color") === "var(--opt-field-border-focus)" && fwDecls.get("box-shadow") === "var(--opt-focus-ring)",
+      `options.css: the key-wrap focus frame rule \`${FW}\` is missing or no longer paints bg-focus + field-border-focus (all four sides) + the ring`);
+    const PAINT_RE = /^(?:background(?:-color)?|border(?:-(?:top|right|bottom|left))?(?:-color)?)$/;
+    const reachesKeyWrapInput = (sel) => /:hover/.test(sel) && subjectAlternatives(subjectOf(sel)).some((compound) => {
+      const c = classifyCompound(compound);
+      return !c.pseudoElement && c.tag === "input" && (c.type === null || c.type === "text" || c.type === "password");
+    });
+    const hovers = all.filter((r) => !r.context.some((c) => /forced-colors/.test(c)) && r.selectors.some(reachesKeyWrapInput) &&
+      parseDeclarations(r.body).some((d) => PAINT_RE.test(d.property)));
+    check(hovers.length >= 2,
+      "ui-contract-tests.mjs: found fewer than 2 hover rules painting a key-wrap input (the generated .fg input hover + the B+ shape hover) -- the focus-within precedence check would be vacuous");
+    const fwSpec = selectorSpecificity(FW);
+    const winners = fw.length !== 1 ? [] : hovers.filter((r) => r.selectors.filter(reachesKeyWrapInput).some((sel) => {
+      const c = cmpSpecificity(fwSpec, selectorSpecificity(sel));
+      return c < 0 || (c === 0 && r.sourceOrder > fw[0].sourceOrder);
+    }));
+    check(winners.length === 0,
+      "options.css: a hover rule out-ranks the key-wrap focus frame (eye focused + pointer over the input shows hover paint): " + winners.map((r) => `${r.selectorText} (line ${r.lineNum})`).join(" | "));
+  }
   // Fill-only (spec §3): no hand rule gives the native <select> fallback or
-  // the mobile tab picker a bottom edge -- neither by a bottom-side property
-  // (physical or logical, shorthand or -color) nor by an all-sides frame in
-  // an --opt-field-edge* token (P11). Selector test accepts `select` as a
-  // type selector anywhere after .fg / .mobile-tab-picker (also inside :is()).
+  // the mobile tab picker (any native select, by type or by options.html id)
+  // a bottom edge -- not by a bottom-side property (physical or logical;
+  // colour, width or style), not by ANY value that references an
+  // --opt-field-edge* token (border, border-block, border-color lists...),
+  // and not by a multi-value border-color / border-block-color whose bottom
+  // differs from its top (GI-4).
   const selectEdges = (css) => {
     const out = [];
     for (const r of parseStyleRules(css)) {
-      const sels = r.selectors.filter((s) => /(?:\.fg|\.mobile-tab-picker)\b[^{]*?(?:^|[\s(,>+~])select\b/.test(s) && !/::picker|\boption\b/.test(s));
+      const sels = r.selectors.filter(isNativeSelectSelector);
       if (!sels.length) continue;
       for (const d of parseDeclarations(r.body)) {
-        if (/^border-(?:bottom|block-end)(?:-color)?$/.test(d.property) ||
-          ((d.property === "border-color" || d.property === "border") && /--opt-field-edge/.test(d.value))) out.push(`${sels.join(", ")} { ${d.property}: ${d.value} }`);
+        const ts = valueTokens(d.value);
+        const splitBottom = (d.property === "border-color" && ts.length >= 3 && ts[2] !== ts[0]) ||
+          (d.property === "border-block-color" && ts.length >= 2 && ts[1] !== ts[0]);
+        if (/^border-(?:bottom|block-end)(?:-(?:color|width|style))?$/.test(d.property) || /--opt-field-edge/.test(d.value) || splitBottom) {
+          out.push(`${sels.join(", ")} { ${d.property}: ${d.value} }`);
+        }
       }
     }
     return out;
@@ -5738,14 +6022,24 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const selEdge = selectEdges(hand);
   check(selEdge.length === 0,
     "options.css: the native <select> fallback / mobile tab picker must stay fill-only (no bottom edge, spec §3): " + selEdge.join(" | "));
-  const edgeCaught = selectEdges(".fg select { border-bottom: 1px solid var(--opt-field-edge); }\n"
-    + ".mobile-tab-picker select:hover:not(:focus) { border-color: var(--opt-field-edge-hover); }\n"
-    + '.fg :is(input[type="text"], select) { border-block-end-color: var(--opt-field-edge); }\n'
-    + ".fg select { background-color: var(--opt-field-bg); border: 1px solid var(--opt-field-border); }\n"
-    + ".fg select::picker(select) { border-bottom: 1px solid var(--opt-border); }\n");
-  check(edgeCaught.length === 3 && edgeCaught[0].startsWith(".fg select { border-bottom:") &&
-    edgeCaught[1].startsWith(".mobile-tab-picker select:hover") && edgeCaught[2].startsWith(".fg :is("),
-    "ui-contract-tests.mjs: the select fill-only check no longer discriminates -- caught=[" + edgeCaught.join(" | ") + "]");
+  const SELECT_CASES = [
+    [".fg select { border-bottom: 1px solid var(--opt-field-edge); }", true],
+    [".mobile-tab-picker select:hover:not(:focus) { border-color: var(--opt-field-edge-hover); }", true],
+    ['.fg :is(input[type="text"], select) { border-block-end-color: var(--opt-field-edge); }', true],
+    [".fg select { border-block: 1px solid var(--opt-field-edge); }", true],
+    [".fg select { border-color: var(--opt-field-border) var(--opt-field-border) var(--opt-field-edge); }", true],
+    [".fg select { border-color: var(--opt-field-border) var(--opt-field-border) var(--opt-field-border-focus); }", true],
+    [".fg select { border-block-color: var(--opt-field-border) var(--opt-field-border-focus); }", true],
+    ["#mobile-tab-select { box-shadow: inset 0 -1px 0 var(--opt-field-edge); }", true],
+    [".fg select { border-bottom-width: 2px; }", true],
+    [".fg select { background-color: var(--opt-field-bg); border: 1px solid var(--opt-field-border); }", false],
+    [".fg select { border-color: var(--opt-field-border-hover); }", false],
+    [".fg select::picker(select) { border-bottom: 1px solid var(--opt-border); }", false],
+    [".listbox-btn { border-bottom-color: var(--opt-field-edge); }", false],
+  ];
+  const selMisjudged = SELECT_CASES.filter(([css, want]) => (selectEdges(css).length > 0) !== want);
+  check(selMisjudged.length === 0,
+    "ui-contract-tests.mjs: the select fill-only check no longer discriminates -- misjudged: " + selMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
 }
 
 if (fail.length) {

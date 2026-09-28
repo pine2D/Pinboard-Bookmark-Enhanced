@@ -372,18 +372,28 @@
 //                      border-color quad (added stage-3b Task 1, `.pick-mark`
 //                      -- its border is uniform on every side, so one side
 //                      stands in for all four rather than a second raw shape).
+//                      EXCEPT on a row that also sets edgeColorEqVar (a B+
+//                      value box, whose bottom side is the edge): there the
+//                      frame is every other side, and top, right AND left
+//                      (indices 0, 1, 3) must all equal the token -- a
+//                      side-only repaint cannot hide behind a correct top.
 //   edgeColorEqVar   -- role name (e.g. "field-edge"): the element's BOTTOM
 //                      border-color (index 2 of the computed top|right|bottom|
 //                      left quad) must equal (+-1/channel) the active theme's
-//                      `--{ns}-{role}`. Own probe slot (extraEdgeColorVarName),
-//                      so one row can pin bgEqVar + borderColorEqVar (top) +
-//                      edgeColorEqVar (bottom) -- a B+ value box's three rest
-//                      paints (spec 2026-09-28-ui-fields-bplus-design §3).
+//                      `--{ns}-{role}`, AND the bottom side must be painted
+//                      (computed width > 0 -- Chromium snaps a 1px border to
+//                      whole device pixels, 0.666667px on a 1.5-scaled host --
+//                      and style not none/hidden; Chromium keeps the colour
+//                      of an unpainted side). Own probe slot
+//                      (extraEdgeColorVarName), so one row can pin bgEqVar +
+//                      borderColorEqVar (top/right/left) + edgeColorEqVar
+//                      (bottom) -- a B+ value box's three rest paints (spec
+//                      2026-09-28-ui-fields-bplus-design §3).
 //   borderSidesEqVar -- role name: ALL FOUR computed border sides equal the
-//                      token (a focused value box paints one focus colour all
-//                      round; the edge must follow focus). Shares
-//                      borderColorEqVar's probe slot -- a row may not set both
-//                      (SETUP ERROR).
+//                      token and are painted (a focused value box paints one
+//                      focus colour all round; the edge must follow focus).
+//                      Shares borderColorEqVar's probe slot -- a row may not
+//                      set both (SETUP ERROR).
 //
 // weakTextOnFill (family 13, weak-text-on-fill batch T5, COMPONENTS.md
 // §9.1 law 8): no CHECKS entries carry this key -- like hitAreaMin (family
