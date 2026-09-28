@@ -2752,6 +2752,110 @@ async function recordWeakTextHits(page, surface, theme, results, context) {
   }
 }
 
+// ---- fieldHoverContrast (family 14, stage 3c final review B1). COMPONENTS.md
+// §6.1/§6.2: an options field rests on --opt-border and its hover border is
+// "slightly darker" -- it mixes the SAME base 55% toward --opt-fg. B1 was the
+// class of defect where the hover step mixed a DIFFERENT base than the rest
+// state painted (the generated recipe's --opt-input-border vs the row model's
+// --opt-border): on 12/15 themes hover got lighter and on 8 it fell under 3:1.
+// No other gate saw it: the pixel gate is rest-state only, contrast-audit
+// pairs the generated hover with input-border/input-bg (not what the row
+// model paints), and no CHECKS row hovers a field. So this is a CLASS sweep,
+// not per-theme checklist rows: on every theme, every panel, every visible
+// enabled text-entry control inside the active panel (any text-entry input
+// type or textarea -- a population wider than the CSS rule's own :is() list
+// on purpose, so a field that escapes the row model's rest/hover pair is
+// caught instead of silently not measured), measured twice with the real
+// pointer: parked (rest) and hovered. Each read finishes the element's own
+// running transitions first (border-color transitions for --motion-state;
+// an unfinished one reads back as an interpolated oklab() frame, i.e. the
+// rest paint). Pass = the painted hover border clears 3:1 (WCAG 1.4.11)
+// against BOTH sides of the border -- the field's own fill (inner) and the
+// backdrop behind the field (outer) -- AND is strictly higher contrast than
+// the rest border on both sides (hover never lighter, never a no-op:
+// ruling A's "slightly darker"). One OK/FAIL row per (theme, field).
+const FIELD_HOVER_SEL = [
+  "input:not([type])", 'input[type="text"]', 'input[type="password"]', 'input[type="number"]',
+  'input[type="search"]', 'input[type="url"]', 'input[type="email"]', 'input[type="tel"]', "textarea",
+].map((s) => `.panel.active ${s}`).join(", ");
+// The four kinds the row model actually ships; every theme must reach at
+// least one of each or the sweep is vacuous for that kind (SETUP ERROR).
+const FIELD_HOVER_REQUIRED_KINDS = ['input[type="text"]', 'input[type="password"]', 'input[type="number"]', "textarea"];
+const fieldHoverScanLog = [];
+
+// Runs INSIDE the page (element handle evaluate) -- self-contained.
+async function readFieldPaint(el) {
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  el.getAnimations().forEach((a) => { try { a.finish(); } catch { /* infinite/idle: nothing to finish */ } });
+  const r = el.getBoundingClientRect();
+  const cs = getComputedStyle(el);
+  const chain = [];
+  for (let n = el.parentElement; n; n = n.parentElement) chain.push(getComputedStyle(n).backgroundColor);
+  const tag = el.tagName.toLowerCase();
+  const kind = tag === "textarea" ? "textarea" : (el.hasAttribute("type") ? `input[type="${el.getAttribute("type")}"]` : "input:not([type])");
+  let path = el.id ? `#${el.id}` : null;
+  if (!path) {
+    const parts = [];
+    for (let n = el; n && !n.classList?.contains("panel"); n = n.parentElement) parts.unshift(`${n.tagName.toLowerCase()}:${[...n.parentElement.children].indexOf(n) + 1}`);
+    path = `${el.closest(".panel")?.id || "?"}>${parts.join(">")}`;
+  }
+  return {
+    path, kind,
+    visible: r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none",
+    disabled: !!el.disabled,
+    border: cs.borderTopColor, own: cs.backgroundColor, chain,
+  };
+}
+
+async function recordFieldHoverContrast(page, theme, results, context, kindsSeen) {
+  const liveTheme = await page.evaluate(() => document.documentElement.dataset.theme || null);
+  const expected = expectedDatasetTheme(theme);
+  if (liveTheme !== expected) {
+    throw new Error(`SETUP: fieldHoverContrast options/${context} expected documentElement.dataset.theme=${JSON.stringify(expected)} (theme=${JSON.stringify(theme)}) but found ${JSON.stringify(liveTheme)} -- theme drifted before the family-14 scan`);
+  }
+  const parse = (raw, what, path) => {
+    const p = parseRgba(String(raw || ""));
+    if (!p) throw new Error(`SETUP: fieldHoverContrast ${path} (theme=${theme}) ${what} ${JSON.stringify(raw)} is not a parseable colour -- the contrast math would silently skip it`);
+    return p;
+  };
+  const stackOf = (raws, path) => {
+    let base = [255, 255, 255];
+    for (let i = raws.length - 1; i >= 0; i--) {
+      const p = parse(raws[i], "background", path);
+      if (p[3] > 0) base = composite(p.slice(0, 3), p[3], base);
+    }
+    return base;
+  };
+  const ratios = (paint) => {
+    const inner = stackOf([paint.own, ...paint.chain], paint.path);
+    const outer = stackOf(paint.chain, paint.path);
+    const b = parse(paint.border, "border-top-color", paint.path);
+    const painted = composite(b.slice(0, 3), b[3], inner);
+    return { inner: cr(painted, inner), outer: cr(painted, outer) };
+  };
+  let scanned = 0;
+  for (const h of await page.$$(FIELD_HOVER_SEL)) {
+    await page.mouse.move(0, 0);
+    const rest = await h.evaluate(readFieldPaint);
+    if (!rest.visible || rest.disabled) continue; // inert/hidden: no pointer state to test (WCAG 1.4.11 exempts inactive components)
+    await h.hover({ timeout: TIMEOUT_MS });
+    const hover = await h.evaluate(readFieldPaint);
+    await page.mouse.move(0, 0);
+    const r = ratios(rest), v = ratios(hover);
+    const ok = v.inner >= 3 && v.outer >= 3 && v.inner > r.inner && v.outer > r.outer;
+    scanned++;
+    kindsSeen[rest.kind] = (kindsSeen[rest.kind] || 0) + 1;
+    results.push({
+      surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
+      status: ok ? "OK" : "FAIL",
+      actual: `inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.border} -> hover ${hover.border})`,
+      expected: "hover border >=3:1 against the field fill and its backdrop, and higher contrast than rest on both (COMPONENTS.md §6.1/§6.2: hover mixes the rest base 55% toward fg)",
+      note: null,
+    });
+  }
+  fieldHoverScanLog.push({ theme, context, scanned });
+}
+
 async function runLibraryTheme(page, extBase, theme, checks, results) {
   if (checks.some((c) => c.tab)) throw new Error("SETUP ERROR [library]: checklist `tab:` is options-only");
   // Explicit #vocab hash (not bare navigation): _pbpLibInitialView() prefers
@@ -3513,6 +3617,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     if (!panelIds.length) {
       throw new Error(`SETUP: no ".tab-btn" elements on options.html (theme=${theme}) -- weakTextOnFill cannot reach any panel`);
     }
+    const fieldHoverKinds = {};
     for (const tabId of panelIds) {
       await page.click(`#${tabId}`);
       await page.waitForTimeout(150);
@@ -3524,6 +3629,10 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       await page.evaluate(() => { document.querySelectorAll(".panel.active details:not(.context-help)").forEach((d) => { d.open = true; }); });
       await page.waitForTimeout(100);
       await recordWeakTextHits(page, "options", theme, results, `panel:${tabId}`);
+      // fieldHoverContrast (family 14) rides the same clean navigation and
+      // the same opened panel, BEFORE this tab's own legs below (the
+      // appearance leg's preset click repaints dataset.theme).
+      await recordFieldHoverContrast(page, theme, results, `panel:${tabId}`, fieldHoverKinds);
 
       if (tabId === "tab-appearance") {
         // #preset-preview-section (F1's drift trigger, see above) + the
@@ -3594,6 +3703,14 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
         await page.waitForSelector("#connection-health .connection-health-row", { timeout: TIMEOUT_MS }).catch(() => {});
         await recordWeakTextHits(page, "options", theme, results, "panel:tab-general:connection-overview");
       }
+    }
+    // Non-vacuity (family 14): a population selector that stops matching, a
+    // panel that never opens or a fixture that hides every field would
+    // otherwise pass as "0 FAIL". Every kind the row model ships must have
+    // been hovered at least once on THIS theme.
+    const missingKinds = FIELD_HOVER_REQUIRED_KINDS.filter((k) => !fieldHoverKinds[k]);
+    if (missingKinds.length) {
+      throw new Error(`SETUP: fieldHoverContrast reached no visible enabled ${missingKinds.join(" / ")} on any options panel (theme=${JSON.stringify(theme)}; kinds seen ${JSON.stringify(fieldHoverKinds)}) -- the sweep would be vacuous for that kind`);
     }
     return;
   }
@@ -5290,6 +5407,12 @@ async function main() {
     }
   } else {
     console.log(`[render-audit] weakTextOnFill: 0 element probes this run${SHARD_TAG} -- no (surface, theme) pair reached recordWeakTextHits`);
+  }
+  // fieldHoverContrast (family 14): same "scanned nothing vs 0 FAIL" line.
+  {
+    const total = fieldHoverScanLog.reduce((sum, entry) => sum + entry.scanned, 0);
+    const themes = new Set(fieldHoverScanLog.map((entry) => entry.theme)).size;
+    console.log(`[render-audit] fieldHoverContrast: ${total} field hover probe(s) across ${themes} options theme(s) this run${SHARD_TAG}`);
   }
   if (JSON_OUT) {
     writeFileSync(JSON_OUT, JSON.stringify(results, null, 2) + "\n");

@@ -715,9 +715,9 @@ label.switch > .context-help > .context-help-body {
    `.context-help-toggle .btn-ic` recipe below additively corrected each
    role for the WIDER row-model face (--opt-text-section 16px/600,
    --opt-text-body 14px) that
-   every host on the page has used since stage 3c finished migrating panels
-   into the row model and stage 2/3 dropped the [data-ui-stage0] marker that
-   used to scope that correction. Task 4 folds the addend into the constant
+   every host on the page has used since stage 3b moved every panel onto the
+   row model and stage 3c retired the prototype marker that used to scope
+   that correction. Task 4 folds the addend into the constant
    itself -- new value = old shared constant + the deleted rule's addend --
    so the rendered icon position is pixel-identical by construction (verified:
    PBP_HELP_RASTER_RANGES=1 output is byte-identical before and after the fold
@@ -1566,9 +1566,18 @@ html.motion-ready .backup-import-result:not([hidden]) {
    legacy 13px/body-colour instead of the row model's --opt-text-body (14)/
    --opt-lh-body. `:is(label, div)` widens the match without changing this
    rule's specificity (both are plain type selectors, (0,0,1) either way),
-   so nothing else on the page shifts. A group-role anchor keeps its zero
-   margin from `.context-help-host[data-help-role="group"] > .bl` (context-
-   help block, (0,3,0) over this rule's (0,2,1)). */
+   so nothing else on the page shifts. A group-role anchor's zero margin
+   from `.context-help-host[data-help-role="group"] > .bl` (context-help
+   block, (0,3,0)) only wins over the UNTHEMED selector of this rule
+   ((0,2,1)). Under every preset theme this rule's own `html[data-theme]`
+   selector ((0,3,2)) outranks it -- and `.wayback-log-heading .bl
+   { margin-bottom: 0 }` ((0,2,0)) too -- so a group title
+   (`#batch-ai-title`, the wayback log heading) keeps --opt-label-gap (8px comfortable, 4px compact, e.g.
+   terminal) whenever a preset is active. That is a KNOWN, PARKED defect
+   (pre-existing since stage 0; stage 3c final review S2), left in place
+   for the user's call -- the fix would be a themed-only pixel change,
+   `html[data-theme] .context-help-host[data-help-role="group"] > .bl {
+   margin-bottom: 0 }`. */
 .fg :is(label, div).bl,
 html[data-theme] .fg :is(label, div).bl {
   font-size: var(--opt-text-body); line-height: var(--opt-lh-body); color: var(--opt-fg); margin-bottom: var(--opt-label-gap);
@@ -1631,12 +1640,28 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
   background-color: var(--opt-panel); border-color: var(--opt-border);
 }
 /* Field interaction states follow COMPONENTS.md §6.1 (stage 3c, user ruling
-   A): rest --opt-border, hover the generated color-mix step (its (0,3,1)
-   `:hover:not(:focus)` already outranks the rule above), focus
-   --opt-focus-bd + ring. The generated `.fg input:focus` border sits at
-   (0,2,1) -- the same as the rule above, which comes later -- so the focus
-   border is restated here one pseudo-class higher. */
+   A): rest --opt-border, hover slightly darker, focus --opt-focus-bd + ring.
+   The generated `.fg input:focus` border sits at (0,2,1) -- the same as the
+   rule above, which comes later -- so the focus border is restated here one
+   pseudo-class higher.
+   Hover mixes the SAME base the rest state paints (stage 3c final review
+   B1): the generated hover step mixes --opt-input-border, the recipe's own
+   rest token, but the row model rests on --opt-border -- on 12 of 15
+   themes that mix came out LIGHTER than the rest border (hover washed the
+   border out) and on 8 it fell under 3:1 against the field or its backdrop
+   (default 3.69 -> 2.88). --opt-fg is the highest-contrast colour on the
+   panel in every theme, so moving 45% toward it raises the border's
+   contrast on all 15 (measured; the gate named below re-proves it).
+   textarea sits INSIDE the :is() on purpose: :is() takes its most specific
+   argument, so every branch -- textarea included -- is (0,4,1) and beats
+   the generated (0,3,1) hover without depending on source order.
+   Gate: ui-render-audit's fieldHoverContrast sweep (family 14: every
+   theme, every visible field of this population, hover >= 3:1 and strictly
+   above rest). */
 .fg :is(input[type="text"], input[type="password"], input[type="number"]):focus { border-color: var(--opt-focus-bd); }
+.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea):hover:not(:focus) {
+  border-color: color-mix(in srgb, var(--opt-border) 55%, var(--opt-fg));
+}
 /* The padding shorthand above resets padding-right to --opt-control-pad-x on
    EVERY matched input, including a `.key-wrap`'s -- clobbering the 32px gap
    `.fg .key-wrap input { padding-right: 32px; }` (COMPONENTS.md §8) reserves

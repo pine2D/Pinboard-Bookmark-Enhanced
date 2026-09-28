@@ -72,6 +72,75 @@ const sidecar = (dir, f, ext) => {
   return existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : null;
 };
 
+// Colour serialization is not canonical across the two sides: the same
+// computed colour of a color-mix()-derived border can read back as `rgb(...)`
+// in one run and `oklab(...)` / `color(srgb ...)` in the other (a transition
+// that interpolated in oklab and landed on its end value, or a mix that was
+// resolved at a different point), which used to surface as advisory lines
+// whose two sides are the same paint. Every colour function in a value is
+// rewritten to one canonical `rgba(r,g,b,a)` with 8-bit channels AND 8-bit
+// alpha before comparing -- in place, so compound values (box-shadow, the
+// `|`-joined ::before/::after signature) normalize their colour tokens and
+// keep everything else verbatim. Unrecognized colour syntaxes (lab(), lch(),
+// named colours, ...) are left as-is and still compare textually. The
+// ORIGINAL strings are what the advisory prints; only the comparison uses
+// the canonical form.
+const COLOR_FN_RE = /\b(rgba?|color|oklab|oklch)\(([^()]*)\)/gi;
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const to8 = (v) => Math.round(clamp01(v) * 255);
+const srgbEncode = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+function parseNum(tok, pctScale) {
+  if (tok === "none") return 0;
+  if (tok.endsWith("%")) return (parseFloat(tok) / 100) * pctScale;
+  const n = parseFloat(tok);
+  return Number.isFinite(n) ? n : NaN;
+}
+function oklabToSrgb(L, a, b) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+  ].map(srgbEncode);
+}
+// Returns [r,g,b,a] in 0..255 or null when the function/arguments are not
+// one of the handled forms.
+function colorFnToRgba8(fn, args) {
+  const f = fn.toLowerCase();
+  const [chan, alphaPart] = args.split("/").map((x) => x && x.trim());
+  const parts = chan.split(/[\s,]+/).filter(Boolean);
+  let alpha = 1;
+  if (alphaPart !== undefined) alpha = parseNum(alphaPart, 1);
+  let rgb01;
+  if (f === "rgb" || f === "rgba") {
+    if (parts.length === 4 && alphaPart === undefined) alpha = parseNum(parts.pop(), 1);
+    if (parts.length !== 3) return null;
+    rgb01 = parts.map((t) => parseNum(t, 255) / 255);
+  } else if (f === "color") {
+    if (parts[0]?.toLowerCase() !== "srgb" || parts.length !== 4) return null;
+    rgb01 = parts.slice(1).map((t) => parseNum(t, 1));
+  } else if (f === "oklab") {
+    if (parts.length !== 3) return null;
+    rgb01 = oklabToSrgb(parseNum(parts[0], 1), parseNum(parts[1], 0.4), parseNum(parts[2], 0.4));
+  } else if (f === "oklch") {
+    if (parts.length !== 3) return null;
+    const L = parseNum(parts[0], 1), C = parseNum(parts[1], 0.4), H = (parseFloat(parts[2]) * Math.PI) / 180;
+    rgb01 = oklabToSrgb(L, C * Math.cos(H || 0), C * Math.sin(H || 0));
+  } else return null;
+  if ([...rgb01, alpha].some((v) => !Number.isFinite(v))) return null;
+  return [...rgb01.map(to8), to8(alpha)];
+}
+function canonColors(v) {
+  if (typeof v !== "string") return v;
+  return v.replace(COLOR_FN_RE, (whole, fn, args) => {
+    const t = colorFnToRgba8(fn, args);
+    return t ? `rgba(${t.join(",")})` : whole;
+  });
+}
+const sameValue = (x, y) => JSON.stringify(canonColors(x)) === JSON.stringify(canonColors(y));
+
 function compareStyles(f, a, b) {
   const lines = [];
   // A missing sidecar is itself advisory-worthy: it means this shot has no
@@ -86,7 +155,7 @@ function compareStyles(f, a, b) {
     const y = b.elements[k];
     if (!x || !y) { lines.push(`STYLE ${x ? "-" : "+"} ${k}`); continue; }
     for (const p of new Set([...Object.keys(x), ...Object.keys(y)])) {
-      if (JSON.stringify(x[p]) !== JSON.stringify(y[p])) lines.push(`STYLE ${k} ${p}: ${JSON.stringify(x[p])} -> ${JSON.stringify(y[p])}`);
+      if (!sameValue(x[p], y[p])) lines.push(`STYLE ${k} ${p}: ${JSON.stringify(x[p])} -> ${JSON.stringify(y[p])}`);
     }
   }
   // Iterate the UNION of both sides' probed selectors, and treat an absent
@@ -104,7 +173,7 @@ function compareStyles(f, a, b) {
       for (const p of new Set([...Object.keys(stA[phase] || {}), ...Object.keys(stB[phase] || {})])) {
         const v1 = stA[phase]?.[p];
         const v2 = stB[phase]?.[p];
-        if (v1 !== v2) lines.push(`STATE ${sel} ${phase} ${p}: ${v1} -> ${v2}`);
+        if (!sameValue(v1, v2)) lines.push(`STATE ${sel} ${phase} ${p}: ${v1} -> ${v2}`);
       }
     }
   }

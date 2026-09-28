@@ -1031,27 +1031,42 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     assert(total && total === host.lastElementChild, "the total .hint must stay the last child of #storage-cats, after the .pref-group");
   });
 
-  test("tag-gov select-all pick-box keeps its action row at the button's height", () => {
+  // Both density tiers (stage 3c final review S3): the regression this guards
+  // -- the pick growing the action row past its button (443 -> 447 during
+  // fix round 1) -- only reproduced in COMPACT, where the sm button is 24px
+  // and the label's own 24px floor leaves zero slack; comfortable's 28px
+  // button hides it. Density is switched on <html> the same way the class-
+  // level row-model geometry test below does, and restored afterwards.
+  test("tag-gov select-all pick-box keeps its action row at the button's height, in both densities", () => {
     showPanel("panel-tags");
     const det = doc.getElementById("tag-gov-lowcount");
     const wasOpen = det.open;
+    const densityBefore = doc.documentElement.dataset.density;
     det.open = true;
+    const rowMinH = {};
     try {
       const win = frame.contentWindow;
-      const input = doc.getElementById("tag-gov-select-all");
-      const label = input?.closest("label.pick.pick-box");
-      const row = label?.closest(".fg-actions");
-      const mark = label?.querySelector(":scope > .pick-mark");
-      const btn = doc.getElementById("tag-gov-delete-selected");
-      assert(label && row && mark && btn, "select-all pick-box fixture incomplete");
-      assert(win.getComputedStyle(label).minHeight === "24px", "select-all keeps the 24px hit-target floor, not the pref-row min-height: " + win.getComputedStyle(label).minHeight);
-      assert(Math.abs(parseFloat(win.getComputedStyle(label).columnGap) - 12) <= 0.5, "select-all keeps the .pick family's 12px text->mark gap: " + win.getComputedStyle(label).columnGap);
-      assert(Math.abs(parseFloat(win.getComputedStyle(label).marginRight) - 16) <= 0.5, "select-all separates its mark from the next .fg-actions child by 16px: " + win.getComputedStyle(label).marginRight);
-      const lr = label.getBoundingClientRect(), rr = row.getBoundingClientRect(), br = btn.getBoundingClientRect(), mr = mark.getBoundingClientRect(), ir = input.getBoundingClientRect();
-      assert(Math.abs(mr.width - 20) <= 0.5 && Math.abs(mr.height - 20) <= 0.5, "pick-mark " + mr.width + "x" + mr.height + " != 20x20");
-      assert(Math.abs(rr.height - br.height) <= 0.5, "action row grew past its button: row=" + rr.height + " button=" + br.height);
-      assert(Math.abs(ir.width - lr.width) <= 0.5 && Math.abs(ir.height - lr.height) <= 0.5, "hidden checkbox does not cover the whole label");
+      for (const density of ["comfortable", "compact"]) {
+        if (density === "compact") doc.documentElement.dataset.density = "compact"; else delete doc.documentElement.dataset.density;
+        rowMinH[density] = win.getComputedStyle(doc.documentElement).getPropertyValue("--opt-row-min-h").trim();
+        const input = doc.getElementById("tag-gov-select-all");
+        const label = input?.closest("label.pick.pick-box");
+        const row = label?.closest(".fg-actions");
+        const mark = label?.querySelector(":scope > .pick-mark");
+        const btn = doc.getElementById("tag-gov-delete-selected");
+        assert(label && row && mark && btn, density + ": select-all pick-box fixture incomplete");
+        assert(win.getComputedStyle(label).minHeight === "24px", density + ": select-all keeps the 24px hit-target floor, not the pref-row min-height: " + win.getComputedStyle(label).minHeight);
+        assert(Math.abs(parseFloat(win.getComputedStyle(label).columnGap) - 12) <= 0.5, density + ": select-all keeps the .pick family's 12px text->mark gap: " + win.getComputedStyle(label).columnGap);
+        assert(Math.abs(parseFloat(win.getComputedStyle(label).marginRight) - 16) <= 0.5, density + ": select-all separates its mark from the next .fg-actions child by 16px: " + win.getComputedStyle(label).marginRight);
+        const lr = label.getBoundingClientRect(), rr = row.getBoundingClientRect(), br = btn.getBoundingClientRect(), mr = mark.getBoundingClientRect(), ir = input.getBoundingClientRect();
+        assert(Math.abs(mr.width - 20) <= 0.5 && Math.abs(mr.height - 20) <= 0.5, density + ": pick-mark " + mr.width + "x" + mr.height + " != 20x20");
+        assert(Math.abs(rr.height - br.height) <= 0.5, density + ": action row grew past its button: row=" + rr.height + " button=" + br.height);
+        assert(Math.abs(ir.width - lr.width) <= 0.5 && Math.abs(ir.height - lr.height) <= 0.5, density + ": hidden checkbox does not cover the whole label");
+      }
+      // Non-vacuity: the compact pass really measured the compact tier.
+      assert(rowMinH.comfortable && rowMinH.compact && rowMinH.comfortable !== rowMinH.compact, "density switch did not take: --opt-row-min-h " + JSON.stringify(rowMinH));
     } finally {
+      if (densityBefore === undefined) delete doc.documentElement.dataset.density; else doc.documentElement.dataset.density = densityBefore;
       det.open = wasOpen;
     }
   });

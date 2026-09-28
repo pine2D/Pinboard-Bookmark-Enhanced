@@ -632,6 +632,27 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); 
 长手属性**，让只设 `background-color` 的主题覆盖不至于抹掉箭头）与 `.fg textarea` 的等宽字体栈是页面级
 特例，**留在手写区**，不进生成区。
 
+**hover 的混合基 = 静息态实际绘制的边框 token**（阶段 3c 终审 B1）。上面配方里的 hover 混
+`--{ns}-input-border`，是因为配方自己的静息边框就是它。options 的文本/密钥/数字字段与 textarea 走行模型
+（§10.2「控件外观」），静息边框改成了 `--opt-border`（手写区），所以 hover 也必须换成同一个基色，在手写区
+与静息规则相邻：
+
+```css
+.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea):hover:not(:focus) {
+  border-color: color-mix(in srgb, var(--opt-border) 55%, var(--opt-fg));
+}
+```
+
+textarea 放进 `:is()` 是有意为之：`:is()` 取参数中最高的特异性，所以每个分支（包括 textarea）都是
+(0,4,1)，不靠源序就能压过生成的 (0,3,1)。如果沿用配方混 `--opt-input-border`，15 套主题里有 12 套的混色
+比静息边框还浅，hover 反而把边框洗淡，其中 8 套（含默认）hover 时对字段底色或背后底色掉到 3:1 以下
+（默认 3.69 → 2.88）。`--opt-fg` 在每套主题里都是对面板对比度最高的颜色，向它混合后 15 套全部提高（实测 +0.85 到 +3.78）。
+`.fg select` 不在此列：它的静息仍是配方的 `input-border`，hover 由手写 `.fg select:hover:not(:focus)`
+固定边框、只换底色。门：`scripts/ui-render-audit.mjs` family 14 `fieldHoverContrast`。它在每套主题、
+每个面板上，用真实指针悬停所有可见且可用的文本输入控件，要求 hover 边框对字段底色和字段背后的底色都
+≥3:1，并且两侧对比度都**严格高于**静息态。阶段 4 如果 popup/library 也把静息边框改成结构色
+`--*-border`，应当在 composer 层按表面参数化 hover 的混合基，而不是逐表面手补。
+
 **`.switch`（开关，options 专用；taste-uplift batch4 D3/D5/D6）**——§6.4 例外段是它存在的理由，
 配方单源在 `composers/ui-components.mjs` 的 `switchRules`（只对 `ns === "opt"` 发射）。结构：
 `label.switch > input[type=checkbox] + span.switch-text + span.switch-track`，开关在行尾（D2）。
@@ -674,6 +695,7 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
 | `color` | `--{ns}-fg` | 对 `input-bg` ≥4.5:1 |
 | `border-color` | `--{ns}-input-border` | 对 `input-bg` 与页面底 ≥3:1 |
 | `border-color`（hover） | `color-mix(input-border 55%, fg)` | 不开新 token；对 `input-bg` ≥3:1 |
+| `border-color`（hover，options 行模型字段） | `color-mix(border 55%, fg)`：混合基与静息态的 `--opt-border` 相同（§6.1 末段） | 对字段底（`--opt-panel`）和字段背后的底色都 ≥3:1，且两侧都严格高于静息态（render-audit family 14 `fieldHoverContrast`，覆盖 15 套主题） |
 | `border-color`（focus） | `--{ns}-focus-bd` | 既有 |
 | `box-shadow`（focus） | `--{ns}-focus-ring` | 既有 |
 | `accent-color` | `--{ns}-accent` | 既有 |
@@ -1376,7 +1398,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `.fg.entry-block` | 录入块：`label.bl`（正文字号、`--opt-fg` 色、`margin-bottom --opt-label-gap`）+ 控件占满内容列（`max-width: none`），唯 select 例外（枚举类控件按内容定宽：`width: max-content; min-width: 240px; max-width: 100%`，阶段 2 的列表框按钮同此）+ 可选 `p.hint`；带帮助时 label 归 grid 宿主、`details:not([open]) + *` 承担 label-gap，展开态由全局 `[open] + *` 固定 8。Send-to 卡片字段（options.js `renderExportTargets`）即录入块，无 `.et-field` 修饰、无宽度分档 |
 | options | `.entry-block-sub` | 从属录入块，左缩进 sp-7，与 `.pref-row-sub` 同值 |
 | options | `.fg.edit-area` | 编辑区：`label.bl` + textarea 占满（min-height 96、13px/20px、内距 sp-4 × control-pad-x） |
-| options | 控件外观 | 底 `--opt-panel`、边 `--opt-border`（≥3:1 门已有） |
+| options | 控件外观 | 底 `--opt-panel`、边 `--opt-border`（≥3:1 门已有）；字段 hover 边框 `color-mix(border 55%, fg)`，与静息同一混合基（§6.1 末段、§6.2） |
 | popup | `.row` / `.label` / `.field` | 表单行壳（flex，padding sp-2 sp-5，gap sp-4）/ 52px 标签槽 / 控件槽（flex:1，min-width:0） |
 | popup | `.suggest-area` | chip 流容器 |
 | popup | `.divider` | 表单与快捷区之间的分隔 |
