@@ -11,6 +11,23 @@ const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
   "chip-fg",
 ]);
 
+// B+ field family (spec docs/superpowers/specs/2026-09-28-ui-fields-bplus-design.md
+// §2): nine options-only OUTPUT roles, derived by deriveFieldRoles() at the end
+// of finalizeUiControlRoles when the caller passes `fieldRoles: true`
+// (options-chrome.mjs only -- popup/library emit none of them). Listed in
+// UI_DERIVED_OUTPUT_ROLES.options so validate-contracts.mjs rejects a pilot
+// writing any of them. The same membership makes contrast-audit.mjs's default
+// (:root) block audit FAIL instead of SKIP when a role is missing -- but only
+// for roles that appear in one of its COMPONENT_PAIR_SPEC rows
+// (isOutputRoleForDefault is asked per pair row). field-border and
+// field-border-hover appear in none, so the default block's copy of all nine
+// is pinned by tests/theme-ui-derive-tests.mjs instead (the folded-:root
+// re-derivation and the 5-theme anchor block).
+export const FIELD_ROLES = Object.freeze([
+  "field-bg", "field-border", "field-bg-hover", "field-border-hover",
+  "field-bg-focus", "field-border-focus", "field-edge", "field-edge-hover", "field-placeholder",
+]);
+
 // Authoring contract shared with validate-contracts.mjs. These roles are
 // outputs of the final post-override contrast pass, not supported ui.* inputs:
 // accepting them would make a pilot look configurable while silently replacing
@@ -33,7 +50,7 @@ const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
 // accent2 role or chip consumer for it.
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
   popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg"]),
-  options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent"]),
+  options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES]),
   library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent"]),
 });
 
@@ -463,6 +480,93 @@ export function fillDistinct(fill, others, toward, hosts = [], minDE = TIER_DIST
 export const PRIMARY_HOVER_FG_MIX = 0.12;
 export const primaryHoverFill = (accentRgb, fgRgb) => mix(accentRgb, fgRgb, PRIMARY_HOVER_FG_MIX);
 
+// Hover step of the field's bottom edge: mix(edge, fg, this). Spec §2 names it
+// a tunable constant -- the user's real-device fallback is .45 -> .25 if the
+// hover edge reads too heavy. Any value in (0, 1] keeps hover strictly
+// stronger than rest (mixing toward fg only ever raises contrast against the
+// fills and the surfaces behind them).
+export const FIELD_EDGE_HOVER_FG_MIX = 0.45;
+
+// Inputs deriveFieldRoles cannot do without. hexToRgb(undefined) does not
+// throw -- it silently parses as #000000 -- so a map missing one of these
+// would ship plausible-looking 6-digit hex derived from black. pf-bg is the
+// one optional host: absent, the provider sub-panel is the panel itself.
+const FIELD_REQUIRED_INPUTS = Object.freeze(["fg", "fg-hint", "panel", "input-bg", "border", "focus-bd", "accent"]);
+
+// B+ field family (spec 2026-09-28-ui-fields-bplus-design §2; COMPONENTS.md
+// §6.2 / §9.1 law 9). A value box is announced by its Soft Fill; its WCAG
+// 1.4.11 boundary is ONE 1px bottom edge (Chrome settings cr-input, Material
+// Filled) -- the other three sides collapse into the fill (§9.1 law 1) or
+// carry the pilot's frame.
+//
+// - fill: the post-finalize input-bg, re-separated against EVERY surface a
+//   field sits on -- the panel AND the provider sub-panel (.pf, --opt-pf-bg).
+//   input-bg itself was only separated against [panel, bg]; flexoki-light's
+//   pf-bg override (#E6E4D9) left it at 1.01:1 inside the AI provider cards.
+//   Identity everywhere else. A framed theme (pilot `input-border` declared,
+//   §9.5) keeps its pilot fill verbatim, same exemption the finalizer applies.
+// - frame: = fill (collapsed); framed = the pilot frame composited over the
+//   fill (terminal's translucent #33ff3340 -> #1a4d1a) or resolved through a
+//   `var(--opt-<role>)` reference (NEW_THEME.md §9.5's recommended spelling).
+// - hover: the fill deepens one FILL_SEPARATE_MIN step -- but only where the
+//   resting fill is itself a perceivable plane (>= FILL_SEPARATE_MIN against
+//   every host). An unseparated framed fill (terminal 1.00, rose-pine 1.09)
+//   keeps its fill on hover and the FRAME deepens instead: "a framed control
+//   does not need its fill to carry affordance" (§9.5), applied to hover.
+//   This branch is what reproduces the research anchors (terminal edge
+//   #267326, hover edge 6.75:1).
+// - focus: fill unchanged (fusedStateStable relies on it); border = focus-bd,
+//   re-derived with focusBdToAA only where it drops under 3:1 on this fill.
+// - edge: the structural border pushed to >= 3:1 against the fill, the hover
+//   fill, the panel and pf-bg; edge-hover = mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX).
+// - placeholder: the field's secondary ink (placeholder text, the key-wrap eye,
+//   the listbox chevron): fg-hint pushed to >= 4.5:1 on the rest and hover
+//   fills (the focus fill is the rest fill).
+// Every value is hex-rounded before it feeds the next step, the same
+// "verify on what ships" discipline as the other derivers in this file.
+// Throws, naming every missing role, when a FIELD_REQUIRED_INPUTS entry (or
+// the role a `var(--opt-<role>)` frame points at) is absent from `map`.
+export function deriveFieldRoles(map, framedBorder = null) {
+  const present = (v) => typeof v === "string" && v.trim() !== "";
+  const missing = FIELD_REQUIRED_INPUTS.filter((r) => !present(map[r]));
+  if (missing.length) {
+    throw new Error(`deriveFieldRoles: missing required input role(s): ${missing.join(", ")}`);
+  }
+  const fg = hexToRgb(map.fg);
+  const hosts = [hexToRgb(map.panel), hexToRgb(present(map["pf-bg"]) ? map["pf-bg"] : map.panel)];
+  const framed = framedBorder != null;
+  const roleRef = typeof framedBorder === "string" && /^var\(--[a-z]+-([a-z0-9-]+)\)$/.exec(framedBorder.trim());
+  if (roleRef && !present(map[roleRef[1]])) {
+    throw new Error(`deriveFieldRoles: framed border ${framedBorder} references missing role(s): ${roleRef[1]}`);
+  }
+  const frameRaw = roleRef ? map[roleRef[1]] : framedBorder;
+
+  const bgHex = rgbToHex(framed ? hexToRgb(map["input-bg"]) : fillSeparate(hexToRgb(map["input-bg"]), hosts, fg));
+  const bg = hexToRgb(bgHex);
+  const borderHex = framed ? rgbToHex(resolveOpaqueBg(frameRaw, bg)) : bgHex;
+  const border = hexToRgb(borderHex);
+  const separated = hosts.every((h) => contrast(bg, h) >= FILL_SEPARATE_MIN);
+  const bgHoverHex = separated ? rgbToHex(fillSeparate(bg, [bg], fg)) : bgHex;
+  const bgHover = hexToRgb(bgHoverHex);
+  const borderHoverHex = framed ? rgbToHex(fillSeparate(border, [border], fg)) : bgHoverHex;
+  const focusBd = hexToRgb(map["focus-bd"]);
+  const borderFocusHex = rgbToHex(contrast(focusBd, bg) >= 3 ? focusBd : focusBdToAA(hexToRgb(map.accent), bg, [bg]));
+  const edgeHex = rgbToHex(fgToAAMulti(resolveOpaqueBg(map.border, bg), [bg, bgHover, ...hosts], 3));
+  const edgeHoverHex = rgbToHex(mix(hexToRgb(edgeHex), fg, FIELD_EDGE_HOVER_FG_MIX));
+  const placeholderHex = rgbToHex(fgToAAMulti(hexToRgb(map["fg-hint"]), [bg, bgHover], 4.5));
+  return {
+    "field-bg": bgHex,
+    "field-border": borderHex,
+    "field-bg-hover": bgHoverHex,
+    "field-border-hover": borderHoverHex,
+    "field-bg-focus": bgHex,
+    "field-border-focus": borderFocusHex,
+    "field-edge": edgeHex,
+    "field-edge-hover": edgeHoverHex,
+    "field-placeholder": placeholderHex,
+  };
+}
+
 // Final post-override pass shared by popup/options/library. It owns only the
 // roles whose validity depends on several final control fills; surface-specific
 // status roles and popup's preset/spinner pairs remain in their composers.
@@ -483,6 +587,9 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
     // true so its own pre-set/overridden value is left untouched, mirroring
     // the on-danger-style `== null` gap-fill instead of an overwrite.
     onAccentIsInput = false,
+    // B+ field family (deriveFieldRoles above): options only. popup/library
+    // leave it false so their generated regions stay byte-identical.
+    fieldRoles = false,
   } = config;
 
   const map = { ...inputMap };
@@ -626,6 +733,7 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
     const onAccentHoverRgb = primaryHoverFill(accentRgb, fgRgb);
     map["on-accent"] = rgbToHex(fgToAAMulti(hexToRgb(palette["btn-fg"]), [accentRgb, onAccentHoverRgb]));
   }
+  if (fieldRoles) Object.assign(map, deriveFieldRoles(map, ovr[inputBorderRole] ?? null));
   return map;
 }
 

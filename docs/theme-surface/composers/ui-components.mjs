@@ -483,6 +483,14 @@ function chipRules(ns) {
 // `.fg select`'s chevron background-image and `.fg textarea`'s monospace
 // stack are explicitly page-level hand-maintained exceptions (§6.1), never
 // emitted here.
+//
+// Colour half of the B+ field family (spec 2026-09-28-ui-fields-bplus-design
+// §3): fill / frame / hover / focus / placeholder read the --opt-field-*
+// roles (_ui-derive.mjs deriveFieldRoles). The SHAPE half -- the >=3:1 bottom
+// edge and the md/md/sm/sm radius -- is hand-written in options.css's row-
+// model block: it applies to text entry and the listbox only, never to the
+// native <select> fallback, and recipe-lint's radiusToken law (one token per
+// border-radius) is right to keep a four-value radius out of this recipe.
 function formRules(ns) {
   const FIELD_SEL = `.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea`;
   const out = [];
@@ -494,9 +502,9 @@ function formRules(ns) {
         ["font-size", "13px"],
         ["line-height", "16px"],
         ["font-family", "inherit"],
-        ["border", `1px solid ${v(ns, "input-border")}`],
+        ["border", `1px solid var(--${ns}-field-border)`],
         ["border-radius", `var(--${ns}-radius-md)`],
-        ["background-color", `var(--${ns}-input-bg)`],
+        ["background-color", `var(--${ns}-field-bg)`],
         ["color", `var(--${ns}-fg)`],
         ["-webkit-appearance", "none"],
         ["appearance", "none"],
@@ -536,13 +544,23 @@ function formRules(ns) {
       rule(`.fg select`, [["width", "max-content"], ["min-width", "240px"], ["max-width", "100%"]]),
       rule(`.fg input[type="number"]`, [["max-width", "96px"]]),
       rule(`.fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus)`, [
-        ["border-color", `color-mix(in srgb, ${v(ns, "input-border")} 55%, var(--${ns}-fg))`],
+        ["background-color", `var(--${ns}-field-bg-hover)`],
+        ["border-color", `var(--${ns}-field-border-hover)`],
       ], { pairColorWith: FIELD_SEL }),
       rule(`.fg input:focus, .fg select:focus, .fg textarea:focus`, [
-        ["outline", "none"], ["border-color", `var(--${ns}-focus-bd)`],
+        ["outline", "none"],
+        ["background-color", `var(--${ns}-field-bg-focus)`],
+        ["border-color", `var(--${ns}-field-border-focus)`],
       ], { pairColorWith: FIELD_SEL }),
       rule(`.fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible`, [
         ["box-shadow", `var(--${ns}-focus-ring)`],
+      ]),
+      // Placeholder ink (spec §3): the UA default (#757575) never followed the
+      // theme -- 2.18:1 on nord-night's old panel-coloured fields, 1.87:1 on
+      // its field-bg. --opt-field-placeholder is derived >= 4.5:1 on the rest
+      // and hover fills.
+      rule(`.fg input::placeholder, .fg textarea::placeholder`, [
+        ["color", `var(--${ns}-field-placeholder)`],
       ]),
     );
   }

@@ -816,8 +816,9 @@ label.switch > .context-help > .context-help-body {
 .wayback-log-help { flex: 1; min-width: 0; }
 .wayback-log-heading .bl { margin-bottom: 0; }
 /* Base field recipe (width/padding/border/radius/background-color/font-size/
-   font-family/appearance/box-shadow/transition), hover border-color, focus/
-   focus-visible and the checkbox/radio accent-color all now come from
+   font-family/appearance/box-shadow/transition), hover / focus fills and
+   borders, focus-visible, the placeholder ink and the checkbox/radio
+   accent-color all now come from
    @generated:ui-components below (COMPONENTS.md §6). Its two hand-
    maintained exceptions (the <select> chevron, the textarea monospace
    stack -- §6.1 names both explicitly) live physically AFTER that generated
@@ -1077,9 +1078,9 @@ input:focus-visible + .tag-gov-chip-face {
   font-size: 13px;
   line-height: 16px;
   font-family: inherit;
-  border: 1px solid var(--opt-input-border);
+  border: 1px solid var(--opt-field-border);
   border-radius: var(--opt-radius-md);
-  background-color: var(--opt-input-bg);
+  background-color: var(--opt-field-bg);
   color: var(--opt-fg);
   -webkit-appearance: none;
   appearance: none;
@@ -1095,14 +1096,19 @@ input:focus-visible + .tag-gov-chip-face {
   max-width: 96px;
 }
 .fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus) {
-  border-color: color-mix(in srgb, var(--opt-input-border) 55%, var(--opt-fg));
+  background-color: var(--opt-field-bg-hover);
+  border-color: var(--opt-field-border-hover);
 }
 .fg input:focus, .fg select:focus, .fg textarea:focus {
   outline: none;
-  border-color: var(--opt-focus-bd);
+  background-color: var(--opt-field-bg-focus);
+  border-color: var(--opt-field-border-focus);
 }
 .fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible {
   box-shadow: var(--opt-focus-ring);
+}
+.fg input::placeholder, .fg textarea::placeholder {
+  color: var(--opt-field-placeholder);
 }
 input[type="checkbox"], input[type="radio"] {
   accent-color: var(--opt-accent);
@@ -1637,31 +1643,13 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
    max-width stays number-only, a separate declaration right below. */
 .fg :is(input[type="text"], input[type="password"], input[type="number"]) {
   height: var(--opt-control-h); padding: 0 var(--opt-control-pad-x); font-size: var(--opt-text-body);
-  background-color: var(--opt-panel); border-color: var(--opt-border);
 }
-/* Field interaction states follow COMPONENTS.md §6.1 (stage 3c, user ruling
-   A): rest --opt-border, hover slightly darker, focus --opt-focus-bd + ring.
-   The generated `.fg input:focus` border sits at (0,2,1) -- the same as the
-   rule above, which comes later -- so the focus border is restated here one
-   pseudo-class higher.
-   Hover mixes the SAME base the rest state paints (stage 3c final review
-   B1): the generated hover step mixes --opt-input-border, the recipe's own
-   rest token, but the row model rests on --opt-border -- on 12 of 15
-   themes that mix came out LIGHTER than the rest border (hover washed the
-   border out) and on 8 it fell under 3:1 against the field or its backdrop
-   (default 3.69 -> 2.88). --opt-fg is the highest-contrast colour on the
-   panel in every theme, so moving 45% toward it raises the border's
-   contrast on all 15 (measured; the gate named below re-proves it).
-   textarea sits INSIDE the :is() on purpose: :is() takes its most specific
-   argument, so every branch -- textarea included -- is (0,4,1) and beats
-   the generated (0,3,1) hover without depending on source order.
-   Gate: ui-render-audit's fieldHoverContrast sweep (family 14: every
-   theme, every visible field of this population, hover >= 3:1 and strictly
-   above rest). */
-.fg :is(input[type="text"], input[type="password"], input[type="number"]):focus { border-color: var(--opt-focus-bd); }
-.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea):hover:not(:focus) {
-  border-color: color-mix(in srgb, var(--opt-border) 55%, var(--opt-fg));
-}
+/* Field colours -- rest / hover / focus fills and borders, placeholder ink --
+   are the generated .fg recipe's --opt-field-* family (@generated:ui-components
+   above; roles derived by composers/_ui-derive.mjs deriveFieldRoles). The
+   stage-0 panel-fill + --opt-border frame override and the stage-3c hover mix
+   that used to live here are retired (spec 2026-09-28-ui-fields-bplus-design
+   §3); their rulings are superseded in the ledger. */
 /* The padding shorthand above resets padding-right to --opt-control-pad-x on
    EVERY matched input, including a `.key-wrap`'s -- clobbering the 32px gap
    `.fg .key-wrap input { padding-right: 32px; }` (COMPONENTS.md §8) reserves
@@ -1675,7 +1663,7 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
 .fg .key-wrap :is(input[type="text"], input[type="password"]) { padding-right: 32px; }
 .fg textarea {
   width: 100%; max-width: none; min-height: 96px; font-size: 13px; line-height: 20px;
-  padding: var(--opt-sp-4) var(--opt-control-pad-x); background-color: var(--opt-panel); border-color: var(--opt-border);
+  padding: var(--opt-sp-4) var(--opt-control-pad-x);
 }
 /* Fixwave F2: COMPONENTS.md §10.2's `.fg.entry-block` row promises "控件占满
    内容列（max-width: none）" for the whole primitive, but only the textarea
@@ -2038,7 +2026,7 @@ html.motion-ready #preset-preview-section > summary::after {
    2px width + 1px offset = 3px into a 2px gutter). An inner ring cutting
    across the container's chrome is the same defect shape the group row was
    rejected for, one order of magnitude smaller. */
-.key-wrap:focus-within input { border-color: var(--opt-focus-bd); box-shadow: var(--opt-focus-ring); }
+.key-wrap:focus-within input { background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
 /* Hover is where the eye may show a fill -- a pointer affordance, and not a
    state the rest/focus invariant covers. */
 .key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-input-bg)); border-radius: var(--opt-radius-sm); }
@@ -2103,6 +2091,15 @@ html[data-theme="modern-card"] {
   --opt-chip-bg: #e6effe;
   --opt-chip-fg: #175ec0;
   --opt-on-accent: #ffffff;
+  --opt-field-bg: #e7e7e9;
+  --opt-field-border: #e7e7e9;
+  --opt-field-bg-hover: #dcdcdf;
+  --opt-field-border-hover: #dcdcdf;
+  --opt-field-bg-focus: #e7e7e9;
+  --opt-field-border-focus: #3984e8;
+  --opt-field-edge: #7d7d7d;
+  --opt-field-edge-hover: #505059;
+  --opt-field-placeholder: #585e64;
 }
 html[data-theme="nord-night"] {
   color-scheme: dark;
@@ -2137,6 +2134,15 @@ html[data-theme="nord-night"] {
   --opt-chip-bg: #4a5b6b;
   --opt-chip-fg: #c7d8ba;
   --opt-on-accent: #384762;
+  --opt-field-bg: #434c5e;
+  --opt-field-border: #4c566a;
+  --opt-field-bg-hover: #4a5364;
+  --opt-field-border-hover: #535d70;
+  --opt-field-bg-focus: #434c5e;
+  --opt-field-border-focus: #75a0b0;
+  --opt-field-edge: #99a2b6;
+  --opt-field-edge-hover: #b5bdcd;
+  --opt-field-placeholder: #c2c8d5;
 }
 html[data-theme="terminal"] {
   color-scheme: dark;
@@ -2172,6 +2178,15 @@ html[data-theme="terminal"] {
   --opt-chip-bg: #142914;
   --opt-chip-fg: #00cccc;
   --opt-on-accent: #007000;
+  --opt-field-bg: #111111;
+  --opt-field-border: #1a4d1a;
+  --opt-field-bg-hover: #111111;
+  --opt-field-border-hover: #1b551b;
+  --opt-field-bg-focus: #111111;
+  --opt-field-border-focus: #33ff33;
+  --opt-field-edge: #267326;
+  --opt-field-edge-hover: #2cb22c;
+  --opt-field-placeholder: #21b621;
 }
 html[data-theme="paper-ink"] {
   color-scheme: light;
@@ -2207,6 +2222,15 @@ html[data-theme="paper-ink"] {
   --opt-chip-bg: #cfd1d0;
   --opt-chip-fg: #8b4513;
   --opt-on-accent: #faf8f5;
+  --opt-field-bg: #e6e5e3;
+  --opt-field-border: #e6e5e3;
+  --opt-field-bg-hover: #dbdad8;
+  --opt-field-border-hover: #dbdad8;
+  --opt-field-bg-focus: #e6e5e3;
+  --opt-field-border-focus: #1a3a5c;
+  --opt-field-edge: #917749;
+  --opt-field-edge-hover: #64553c;
+  --opt-field-placeholder: #5c5c5c;
 }
 html[data-theme="dracula"] {
   color-scheme: dark;
@@ -2241,6 +2265,15 @@ html[data-theme="dracula"] {
   --opt-chip-bg: #2e3b47;
   --opt-chip-fg: #50fa7b;
   --opt-on-accent: #282a36;
+  --opt-field-bg: #44475a;
+  --opt-field-border: #6272a4;
+  --opt-field-bg-hover: #4b4e60;
+  --opt-field-border-hover: #6a79a8;
+  --opt-field-bg-focus: #44475a;
+  --opt-field-border-focus: #6ba0b4;
+  --opt-field-edge: #999db2;
+  --opt-field-edge-hover: #c4c6cf;
+  --opt-field-placeholder: #bcc3d8;
 }
 html[data-theme="flexoki-light"] {
   color-scheme: light;
@@ -2275,6 +2308,15 @@ html[data-theme="flexoki-light"] {
   --opt-chip-bg: #d7dddd;
   --opt-chip-fg: #705501;
   --opt-on-accent: #fffcf0;
+  --opt-field-bg: #dcd9d0;
+  --opt-field-border: #dcd9d0;
+  --opt-field-bg-hover: #d2cfc6;
+  --opt-field-border-hover: #d2cfc6;
+  --opt-field-bg-focus: #dcd9d0;
+  --opt-field-border-focus: #4f7db1;
+  --opt-field-edge: #7a7350;
+  --opt-field-edge-hover: #4a4633;
+  --opt-field-placeholder: #555450;
 }
 html[data-theme="flexoki-dark"] {
   color-scheme: dark;
@@ -2309,6 +2351,15 @@ html[data-theme="flexoki-dark"] {
   --opt-chip-bg: #2b3238;
   --opt-chip-fg: #d9a916;
   --opt-on-accent: #171615;
+  --opt-field-bg: #343331;
+  --opt-field-border: #343331;
+  --opt-field-bg-hover: #3b3a38;
+  --opt-field-border-hover: #3b3a38;
+  --opt-field-bg-focus: #343331;
+  --opt-field-border-focus: #4280b6;
+  --opt-field-edge: #898581;
+  --opt-field-edge-hover: #a8a59f;
+  --opt-field-placeholder: #a5a39f;
 }
 html[data-theme="solarized-light"] {
   color-scheme: light;
@@ -2343,6 +2394,15 @@ html[data-theme="solarized-light"] {
   --opt-chip-bg: #ccd4cd;
   --opt-chip-fg: #19605b;
   --opt-on-accent: #fdf6e3;
+  --opt-field-bg: #e1decf;
+  --opt-field-border: #e1decf;
+  --opt-field-bg-hover: #d6d4c7;
+  --opt-field-border-hover: #d6d4c7;
+  --opt-field-bg-focus: #e1decf;
+  --opt-field-border-focus: #4784ad;
+  --opt-field-edge: #817147;
+  --opt-field-edge-hover: #686853;
+  --opt-field-placeholder: #525d5f;
 }
 html[data-theme="solarized-dark"] {
   color-scheme: dark;
@@ -2378,6 +2438,15 @@ html[data-theme="solarized-dark"] {
   --opt-chip-bg: #0d455c;
   --opt-chip-fg: #35c9be;
   --opt-on-accent: #271d03;
+  --opt-field-bg: #163d46;
+  --opt-field-border: #163d46;
+  --opt-field-bg-hover: #1e444c;
+  --opt-field-border-hover: #1e444c;
+  --opt-field-bg-focus: #163d46;
+  --opt-field-border-focus: #268bd2;
+  --opt-field-edge: #1299b6;
+  --opt-field-edge-hover: #58a7b7;
+  --opt-field-placeholder: #9facad;
 }
 html[data-theme="catppuccin-latte"] {
   color-scheme: light;
@@ -2412,6 +2481,15 @@ html[data-theme="catppuccin-latte"] {
   --opt-chip-bg: #c7d1e5;
   --opt-chip-fg: #0f5f64;
   --opt-on-accent: #eff1f5;
+  --opt-field-bg: #dcdee5;
+  --opt-field-border: #dcdee5;
+  --opt-field-bg-hover: #d2d4dc;
+  --opt-field-border-hover: #d2d4dc;
+  --opt-field-bg-focus: #dcdee5;
+  --opt-field-border-focus: #4b7bdb;
+  --opt-field-edge: #687490;
+  --opt-field-edge-hover: #5b637e;
+  --opt-field-placeholder: #585a71;
 }
 html[data-theme="catppuccin-mocha"] {
   color-scheme: dark;
@@ -2446,6 +2524,15 @@ html[data-theme="catppuccin-mocha"] {
   --opt-chip-bg: #4f5772;
   --opt-chip-fg: #9ce4d8;
   --opt-on-accent: #1e1e2e;
+  --opt-field-bg: #262637;
+  --opt-field-border: #262637;
+  --opt-field-bg-hover: #2d2d3f;
+  --opt-field-border-hover: #2d2d3f;
+  --opt-field-bg-focus: #262637;
+  --opt-field-border-focus: #7395cf;
+  --opt-field-edge: #9597ae;
+  --opt-field-edge-hover: #aeb3ce;
+  --opt-field-placeholder: #999fb6;
 }
 html[data-theme="gruvbox-dark"] {
   color-scheme: dark;
@@ -2480,6 +2567,15 @@ html[data-theme="gruvbox-dark"] {
   --opt-chip-bg: #484b47;
   --opt-chip-fg: #dcde5e;
   --opt-on-accent: #282828;
+  --opt-field-bg: #302f2e;
+  --opt-field-border: #302f2e;
+  --opt-field-bg-hover: #373633;
+  --opt-field-border-hover: #373633;
+  --opt-field-bg-focus: #302f2e;
+  --opt-field-border-focus: #7e9e92;
+  --opt-field-edge: #9f958f;
+  --opt-field-edge-hover: #c1b59f;
+  --opt-field-placeholder: #aca093;
 }
 html[data-theme="rose-pine"] {
   color-scheme: dark;
@@ -2514,6 +2610,15 @@ html[data-theme="rose-pine"] {
   --opt-chip-bg: #3d364f;
   --opt-chip-fg: #9ccfd8;
   --opt-on-accent: #191724;
+  --opt-field-bg: #26233a;
+  --opt-field-border: #403d52;
+  --opt-field-bg-hover: #26233a;
+  --opt-field-border-hover: #474459;
+  --opt-field-bg-focus: #26233a;
+  --opt-field-border-focus: #7d6c99;
+  --opt-field-edge: #756da7;
+  --opt-field-edge-hover: #a5a0ca;
+  --opt-field-placeholder: #8e8ba3;
 }
 html[data-theme="github-light"] {
   color-scheme: light;
@@ -2548,6 +2653,15 @@ html[data-theme="github-light"] {
   --opt-chip-bg: #ddf4ff;
   --opt-chip-fg: #0550ae;
   --opt-on-accent: #ffffff;
+  --opt-field-bg: #ececed;
+  --opt-field-border: #ececed;
+  --opt-field-bg-hover: #e1e1e2;
+  --opt-field-border-hover: #e1e1e2;
+  --opt-field-bg-focus: #ececed;
+  --opt-field-border-focus: #3f88df;
+  --opt-field-edge: #6a8097;
+  --opt-field-edge-hover: #485665;
+  --opt-field-placeholder: #5a626b;
 }
 :root {
   color-scheme: light;
@@ -2568,6 +2682,15 @@ html[data-theme="github-light"] {
   --opt-input-bg: #eaeaea;
   --opt-input-border: #eaeaea;
   --opt-border: #858585;
+  --opt-field-bg: #eaeaea;
+  --opt-field-border: #eaeaea;
+  --opt-field-bg-hover: #dfdfdf;
+  --opt-field-border-hover: #dfdfdf;
+  --opt-field-bg-focus: #eaeaea;
+  --opt-field-border-focus: #5d88c2;
+  --opt-field-edge: #7b7b7b;
+  --opt-field-edge-hover: #5b5b5b;
+  --opt-field-placeholder: #616161;
 }
 .theme-preset-btn[data-theme="flexoki"] {
   --variant-swatch: #205EA6;

@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import {
   contrast,
   deltaE2000,
+  deriveFieldRoles,
+  FIELD_EDGE_HOVER_FG_MIX,
+  FIELD_ROLES,
   fgToAA,
   fgToAAMulti,
   fillDistinct,
@@ -831,6 +834,147 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   check(isCovered("opt", "bg", reasonsMissingBg) === false,
     "negative control: removing DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS.bg must make the coverage " +
     "predicate return false for opt/bg (proves the cross-check above is not vacuous)");
+}
+
+// --- B+ field family: deriveFieldRoles unit cases (spec docs/superpowers/
+// specs/2026-09-28-ui-fields-bplus-design.md §2). ---
+{
+  const throwsNaming = (fn, roles) => {
+    try { fn(); } catch (e) { return roles.every((r) => String(e?.message ?? e).includes(r)); }
+    return false;
+  };
+  check(!("field-bg" in finalizeUiControlRoles(base, palette)),
+    "finalizeUiControlRoles must not emit field-* roles unless config.fieldRoles is set (popup/library stay byte-identical)");
+  // The shared `base` fixture has no fg-hint / pf-bg: add both, so the smoke
+  // check below proves nine REAL values, not placeholders read off
+  // hexToRgb(undefined) (which silently parses as #000000).
+  const withFields = finalizeUiControlRoles({ ...base, "fg-hint": "#666666", "pf-bg": "#f9f9f6" }, palette, {}, { fieldRoles: true });
+  check(FIELD_ROLES.every((r) => /^#[0-9a-f]{6}$/.test(withFields[r] ?? "")),
+    "fieldRoles: true must emit all nine field-* roles as 6-digit hex");
+  check(throwsNaming(() => finalizeUiControlRoles(base, palette, {}, { fieldRoles: true }), ["fg-hint"]),
+    "fieldRoles: true over a map without fg-hint must throw naming the missing role, not derive the placeholder from #000000");
+
+  const light = { fg: "#333333", "fg-hint": "#666666", panel: "#ffffff", "pf-bg": "#f9f9f6", "input-bg": "#ffffff",
+    border: "#858585", "focus-bd": "#5d88c2", accent: "#4477bb" };
+  const { "fg-hint": _droppedHint, ...lightNoHint } = light;
+  check(throwsNaming(() => deriveFieldRoles(lightNoHint), ["fg-hint"]),
+    "deriveFieldRoles without fg-hint must throw and name fg-hint");
+  const REQUIRED = ["fg", "fg-hint", "panel", "input-bg", "border", "focus-bd", "accent"];
+  check(throwsNaming(() => deriveFieldRoles({}), REQUIRED),
+    "deriveFieldRoles over an empty map must throw listing every missing required input (fg, fg-hint, panel, input-bg, border, focus-bd, accent)");
+  const { "pf-bg": _droppedPf, ...lightNoPf } = light;
+  check(JSON.stringify(deriveFieldRoles(lightNoPf)) === JSON.stringify(deriveFieldRoles({ ...light, "pf-bg": light.panel })),
+    "deriveFieldRoles without pf-bg must fall back to the panel as the second host");
+
+  const f = deriveFieldRoles(light);
+  const hosts = [light.panel, light["pf-bg"]];
+  check(hosts.every((h) => ratio(f["field-bg"], h) >= FILL_SEPARATE_MIN),
+    "an unframed field fill must separate from the panel AND the provider-card pf-bg");
+  check(f["field-border"] === f["field-bg"] && f["field-border-hover"] === f["field-bg-hover"],
+    "an unframed frame collapses into its fill at rest and on hover (§9.1 law 1)");
+  check(f["field-bg-focus"] === f["field-bg"], "focus must not repaint the fill (fusedStateStable depends on it)");
+  check(ratio(f["field-bg-hover"], f["field-bg"]) >= FILL_SEPARATE_MIN, "the hover fill is one separated step deeper");
+  check([f["field-bg"], f["field-bg-hover"], ...hosts].every((h) => ratio(f["field-edge"], h) >= 3),
+    "the bottom edge clears 3:1 against the rest fill, the hover fill, the panel and pf-bg");
+  check([f["field-bg-hover"], ...hosts].every((h) => ratio(f["field-edge-hover"], h) >= 3) &&
+    ratio(f["field-edge-hover"], f["field-bg-hover"]) > ratio(f["field-edge"], f["field-bg"]),
+    "the hover edge clears 3:1 and is strictly stronger than the rest edge");
+  check(f["field-edge-hover"] === rgbToHex(mix(hexToRgb(f["field-edge"]), hexToRgb(light.fg), FIELD_EDGE_HOVER_FG_MIX)),
+    "field-edge-hover must be mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX)");
+  check([f["field-bg"], f["field-bg-hover"]].every((h) => ratio(f["field-placeholder"], h) >= 4.5),
+    "the placeholder ink clears 4.5:1 on the rest and hover fills");
+  check(ratio(f["field-border-focus"], f["field-bg"]) >= 3, "the focus border clears 3:1 on the fill");
+
+  // terminal's shape: framed, fill == panel (unseparated) -> no hover fill step.
+  const term = { ...light, fg: "#33ff33", "fg-hint": "#21b621", panel: "#111111", "pf-bg": "#111111",
+    "input-bg": "#111111", border: "#267326", "focus-bd": "#33ff33", accent: "#33ff33" };
+  const t = deriveFieldRoles(term, "#33ff3340");
+  check(t["field-bg"] === "#111111" && t["field-bg-hover"] === "#111111",
+    "an unseparated framed fill keeps its pilot value and takes no hover fill step (the frame and the edge carry hover)");
+  check(t["field-border"] === "#1a4d1a", "a translucent pilot frame is composited over the field fill (#33ff3340 on #111111)");
+  check(ratio(t["field-border-hover"], t["field-border"]) >= FILL_SEPARATE_MIN, "the frame deepens on hover when the fill does not");
+  check(t["field-edge"] === "#267326", "terminal's structural border already clears 3:1 on its own fill -- identity");
+
+  const byRef = deriveFieldRoles(light, "var(--opt-border)");
+  check(byRef["field-border"] === "#858585", "a var(--opt-<role>) frame must resolve through the map, not collapse to the fill");
+
+  const weakFocus = deriveFieldRoles({ ...light, "focus-bd": "#c8d6ea" });
+  check(weakFocus["field-border-focus"] !== "#c8d6ea" && ratio(weakFocus["field-border-focus"], weakFocus["field-bg"]) >= 3,
+    "a focus-bd under 3:1 on the field fill must be re-derived with focusBdToAA");
+}
+
+// --- B+ field family over the real composer pipeline, every options theme.
+// Category assertions (not per-theme literals): the same invariants
+// contrast-audit gates on the shipped CSS, run against composeOptionsThemeMap
+// so a deriver change is caught before sync-all writes it. ---
+{
+  let walked = 0;
+  for (const entry of POPUP_THEME_MAP) {
+    const tk = JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${entry.pilot}.tokens.json`, import.meta.url), "utf8"));
+    const { map } = composeOptionsThemeMap(tk, entry.mode, entry.useDarkMode);
+    const id = entry.id;
+    walked++;
+    check(FIELD_ROLES.every((r) => /^#[0-9a-f]{6}$/.test(map[r] ?? "")), `${id}: options map lacks a field-* role`);
+    check([map["field-bg"], map["field-bg-hover"], map.panel, map["pf-bg"]].every((h) => ratio(map["field-edge"], h) >= 3),
+      `${id}: field-edge ${map["field-edge"]} under 3:1 on a fill or host`);
+    check(ratio(map["field-edge-hover"], map["field-bg-hover"]) > ratio(map["field-edge"], map["field-bg"]) &&
+      [map.panel, map["pf-bg"]].every((h) => ratio(map["field-edge-hover"], h) > ratio(map["field-edge"], h)),
+      `${id}: the hover edge is not strictly stronger than the rest edge`);
+    check(map["field-bg-focus"] === map["field-bg"], `${id}: focus repaints the fill`);
+    check(ratio(map.fg, map["field-bg-hover"]) >= 4.5, `${id}: typed text under 4.5:1 on the hover fill`);
+  }
+  check(walked === POPUP_THEME_MAP.length && walked === 14, `field-family pipeline walk visited ${walked} themes, expected 14`);
+}
+
+// --- The default :root literals (options-chrome.mjs DEFAULT_LIGHT) are the
+// deriver's output over the folded shipped :root blocks, not hand picks. ---
+{
+  const css = readFileSync(new URL("../options.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const dict = {};
+  for (const m of css.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) {
+    for (const d of m[1].matchAll(/--opt-([a-z0-9-]+)\s*:\s*([^;]+);/g)) dict[d[1]] = d[2].trim();
+  }
+  const want = deriveFieldRoles(dict);
+  for (const role of FIELD_ROLES) {
+    check(dict[role] === want[role],
+      `default :root --opt-${role}=${dict[role]} is not deriveFieldRoles(folded :root)=${want[role]} -- DEFAULT_LIGHT drifted from its hand :root inputs (fg / fg-hint / pf-bg / focus-bd / accent)`);
+  }
+}
+
+// --- Anchors: 5 themes x 9 roles read back from the SHIPPED generated region
+// (not from the deriver), +-1 per channel -- a drift anywhere between
+// deriveFieldRoles and options.css (wiring, emit, a hand edit) fails here.
+// fill / border / edge are the research values the user approved (the B+
+// comparison page https://claude.ai/artifact/EBpjZuxTmXQLjcvzqskvsX, its
+// embedded DATA.Bp.t.<theme>); the other six are this stage's derivation
+// (plan 2026-09-28-ui-fields-bplus, Task 1 table), pinned so it cannot move
+// silently. ---
+{
+  const css = readFileSync(new URL("../options.css", import.meta.url), "utf8");
+  const region = css.slice(css.indexOf("/* @generated:ui-themes start"), css.indexOf("/* @generated:ui-themes end */"));
+  const blockOf = (selector) => {
+    const at = region.indexOf(`${selector} {`);
+    return at < 0 ? null : region.slice(at, region.indexOf("}", at));
+  };
+  const near = (a, b) => /^#[0-9a-f]{6}$/i.test(a || "") && hexToRgb(a).every((c, i) => Math.abs(c - hexToRgb(b)[i]) <= 1);
+  const ANCHORS = {
+    ":root": ["#eaeaea", "#eaeaea", "#dfdfdf", "#dfdfdf", "#eaeaea", "#5d88c2", "#7b7b7b", "#5b5b5b", "#616161"],
+    'html[data-theme="terminal"]': ["#111111", "#1a4d1a", "#111111", "#1b551b", "#111111", "#33ff33", "#267326", "#2cb22c", "#21b621"],
+    'html[data-theme="paper-ink"]': ["#e6e5e3", "#e6e5e3", "#dbdad8", "#dbdad8", "#e6e5e3", "#1a3a5c", "#917749", "#64553c", "#5c5c5c"],
+    'html[data-theme="nord-night"]': ["#434c5e", "#4c566a", "#4a5364", "#535d70", "#434c5e", "#75a0b0", "#99a2b6", "#b5bdcd", "#c2c8d5"],
+    'html[data-theme="gruvbox-dark"]': ["#302f2e", "#302f2e", "#373633", "#373633", "#302f2e", "#7e9e92", "#9f958f", "#c1b59f", "#aca093"],
+  };
+  let compared = 0;
+  for (const [selector, values] of Object.entries(ANCHORS)) {
+    const body = blockOf(selector);
+    check(!!body, `anchor block ${selector} not found in options.css @generated:ui-themes`);
+    FIELD_ROLES.forEach((role, i) => {
+      const got = (body?.match(new RegExp(`--opt-${role}:\\s*([^;]+);`)) || [])[1]?.trim();
+      compared++;
+      check(near(got, values[i]), `${selector} --opt-${role}=${got} drifted from the anchor ${values[i]} (+-1/channel)`);
+    });
+  }
+  check(compared === 45, `field anchor block made ${compared} comparisons, expected 45 (5 themes x 9 roles)`);
 }
 
 if (failures.length) {

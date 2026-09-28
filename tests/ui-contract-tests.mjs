@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
-import { parseStyleRules, parseDeclarations } from "../docs/theme-surface/tools/css-syntax.mjs";
+import { parseStyleRules, parseDeclarations, declarationValueMap } from "../docs/theme-surface/tools/css-syntax.mjs";
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -5568,6 +5568,42 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
 check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--opt-fg-hint\);[^}]*color: var\(--opt-bg\);/.test(optionsCss) &&
   !/\.pick > input:disabled ~ \.pick-mark\b/.test(optionsCss),
   "options.css: a disabled+checked .pick mark must fill with --opt-fg-hint and a --opt-bg tick (composer pickRules), not a hint tick on the accent fill");
+
+// ---- B+ field family, Task 1 (spec docs/superpowers/specs/2026-09-28-ui-
+// fields-bplus-design.md §2/§3): the generated .fg recipe paints every value
+// box from the --opt-field-* roles (composers/_ui-derive.mjs deriveFieldRoles)
+// and owns the placeholder ink; the two hand-written overrides that used to
+// repaint text fields -- stage 0's panel fill + --opt-border frame and stage
+// 3c's color-mix(border 55%, fg) hover -- stay deleted (rulings superseded).
+{
+  const genStart = optionsCss.indexOf("/* @generated:ui-components start (options) */");
+  const genEnd = optionsCss.indexOf("/* @generated:ui-components end (options) */");
+  check(genStart >= 0 && genEnd > genStart, "options.css: @generated:ui-components (options) markers not found");
+  const gen = optionsCss.slice(genStart, genEnd);
+  const base = declarationValueMap(gen, '.fg input[type="text"]');
+  const hover = declarationValueMap(gen, ".fg input:hover:not(:focus)");
+  const focus = declarationValueMap(gen, ".fg input:focus");
+  check(base.get("border") === "1px solid var(--opt-field-border)" && base.get("background-color") === "var(--opt-field-bg)" &&
+    hover.get("background-color") === "var(--opt-field-bg-hover)" && hover.get("border-color") === "var(--opt-field-border-hover)" &&
+    focus.get("background-color") === "var(--opt-field-bg-focus)" && focus.get("border-color") === "var(--opt-field-border-focus)",
+    "options.css: the generated .fg recipe no longer paints rest/hover/focus from the --opt-field-* family (composers/ui-components.mjs formRules)");
+  check(declarationValueMap(gen, ".fg input::placeholder").get("color") === "var(--opt-field-placeholder)" &&
+    declarationValueMap(gen, ".fg textarea::placeholder").get("color") === "var(--opt-field-placeholder)",
+    "options.css: the generated .fg recipe lost its placeholder rule (color: var(--opt-field-placeholder))");
+  const hand = stripGeneratedRegions(optionsCss).replace(/\/\*[\s\S]*?\*\//g, "");
+  const rowModel = declarationValueMap(hand, '.fg :is(input[type="text"], input[type="password"], input[type="number"])');
+  const textarea = declarationValueMap(hand, ".fg textarea");
+  // Existence first (P10): a renamed or split selector makes declarationValueMap
+  // return an empty Map, and the negative checks below would pass vacuously.
+  check(rowModel.size > 0,
+    "options.css: the hand-written row-model rule .fg :is(input[type=\"text\"], input[type=\"password\"], input[type=\"number\"]) was not found -- update this check's selector, do not let it pass vacuously");
+  check(textarea.size > 0,
+    "options.css: the hand-written .fg textarea rule was not found -- update this check's selector, do not let it pass vacuously");
+  check(!rowModel.has("background-color") && !rowModel.has("border-color") &&
+    !textarea.has("background-color") && !textarea.has("border-color") &&
+    !/color-mix\(in srgb, var\(--opt-border\) 55%, var\(--opt-fg\)\)/.test(hand),
+    "options.css: a hand-written row-model rule repaints text fields again (the stage-0 panel/--opt-border override or the stage-3c border-55% hover mix) -- superseded by the B+ field family");
+}
 
 if (fail.length) {
   console.error(fail.join("\n"));

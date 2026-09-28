@@ -434,6 +434,36 @@ export const COMPONENT_PAIR_SPEC = [
   // but is a non-text glyph (WCAG 1.4.11's 3:1 floor, not this 4.5:1 text
   // floor), and popup's `#submit-btn:disabled` fg-hint-on-btn-bg is the
   // documented `:disabled` contrast exemption (COMPONENTS.md §3.4 / row 9).
+
+  // B+ field family (spec docs/superpowers/specs/2026-09-28-ui-fields-bplus-
+  // design.md §4; COMPONENTS.md §6.2 / §9.1 law 9). Options only -- the nine
+  // --opt-field-* roles are deriveFieldRoles() outputs (UI_DERIVED_OUTPUT_ROLES
+  // .options), so on the default (:root) block a missing field-* role named in
+  // one of the rows below FAILs rather than SKIPs (isOutputRoleForDefault);
+  // field-border / field-border-hover are in no row, so their default-block
+  // presence is pinned by tests/theme-ui-derive-tests.mjs instead. Themed
+  // blocks FAIL on any missing role here, as for every other row. The bottom
+  // edge is the value box's WCAG 1.4.11 boundary: it has to clear 3:1 against
+  // the fill it is painted on (rest and hover) AND every surface behind the box
+  // (panel; pf-bg inside the AI provider cards). The frame (--opt-field-border)
+  // is deliberately NOT gated -- it collapses into the fill (§9.1 law 1).
+  ["field-edge", "field-bg", 3, ["opt"]],
+  ["field-edge", "field-bg-hover", 3, ["opt"]],
+  ["field-edge", "panel", 3, ["opt"]],
+  ["field-edge", "pf-bg", 3, ["opt"]],
+  ["field-edge-hover", "field-bg-hover", 3, ["opt"]],
+  ["field-edge-hover", "panel", 3, ["opt"]],
+  ["field-edge-hover", "pf-bg", 3, ["opt"]],
+  ["field-border-focus", "field-bg", 3, ["opt"]],
+  ["field-border-focus", "field-bg-focus", 3, ["opt"]],
+  // Placeholder text, the key-wrap eye and the listbox chevron all paint the
+  // field's secondary ink on the field fills.
+  ["field-placeholder", "field-bg", 4.5, ["opt"]],
+  ["field-placeholder", "field-bg-hover", 4.5, ["opt"]],
+  ["field-placeholder", "field-bg-focus", 4.5, ["opt"]],
+  // Typed text sits on the rest and the (deeper) hover fill.
+  ["fg", "field-bg", 4.5, ["opt"]],
+  ["fg", "field-bg-hover", 4.5, ["opt"]],
 ];
 
 // Generic `--name: value;` extractor over an arbitrary block body -- the
@@ -522,6 +552,7 @@ export const DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS = {
   "tag-fg": "popup-only: legacy pre-chip-migration raw palette pair (COMPONENTS.md §5.3), taken verbatim",
   "tag-bg": "popup-only: same legacy pair as tag-fg",
   "spinner-bg": "popup-only: hand-maintained UI-indicator base fill (spinner-fg IS a derived output; this is only what it's measured against)",
+  "pf-bg": "options-only hand-maintained :root literal (provider sub-panel fill); per theme a composer map value (ui.bg2 or a pilot override), never a finalizeUiControlRoles output",
 };
 
 // Runs COMPONENT_PAIR_SPEC against one already-parsed token dict (a themed
