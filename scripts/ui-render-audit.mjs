@@ -1073,15 +1073,20 @@ function evaluateCheck(check, raw, theme) {
   // devicePixelRatio 1) computes a 1px border as 0.666667px; any painted
   // border keeps at least one device pixel, an unpainted one computes 0.
   const sidePainted = (i) => sideWidths[i] > 0 && !!sideStyles[i] && !/^(?:none|hidden)$/.test(sideStyles[i]);
+  // Final review G4: on a value-box row the three frame sides must also be
+  // PAINTED -- on the framed themes (nord-night, dracula, rose-pine,
+  // terminal) they are the pilot's frame, and `border-top-width: 0` /
+  // `border-inline-style: none` kept the computed colour while erasing it.
+  const valueBoxRow = "edgeColorEqVar" in exp;
   const sideDesc = (i) => `${sideColors[i]} ${sideWidths[i]}px ${sideStyles[i]}`;
   if ("borderColorEqVar" in exp) {
     const want = parseSolidColor(raw.extraBorderColorRaw);
-    const idx = "edgeColorEqVar" in exp ? [0, 1, 3] : [0];
-    const gotRaw = idx.map((i) => sideColors[i]).join("|");
-    const ok = idx.every((i) => colorsEqual(want, parseSolidColor(sideColors[i])));
+    const idx = valueBoxRow ? [0, 1, 3] : [0];
+    const gotRaw = valueBoxRow ? idx.map(sideDesc).join("|") : sideColors[0];
+    const ok = idx.every((i) => colorsEqual(want, parseSolidColor(sideColors[i])) && (!valueBoxRow || sidePainted(i)));
     const note = !want ? `--${exp.borderColorEqVar} token unresolved (raw=${JSON.stringify(raw.extraBorderColorRaw)})` : undefined;
     out.push(verdict("borderColorEqVar", ok, gotRaw,
-      `${idx.length === 1 ? "" : "top|right|left = "}var(--...-${exp.borderColorEqVar})=${raw.extraBorderColorRaw}`, note));
+      `${valueBoxRow ? "painted top|right|left = " : ""}var(--...-${exp.borderColorEqVar})=${raw.extraBorderColorRaw}`, note));
   }
   // edgeColorEqVar (B+ field family 2026-09-28, COMPONENTS.md §9.1 law 9): the
   // value box's BOTTOM side (index 2 of raw.borderColors' top|right|bottom|

@@ -375,8 +375,10 @@
 //                      EXCEPT on a row that also sets edgeColorEqVar (a B+
 //                      value box, whose bottom side is the edge): there the
 //                      frame is every other side, and top, right AND left
-//                      (indices 0, 1, 3) must all equal the token -- a
-//                      side-only repaint cannot hide behind a correct top.
+//                      (indices 0, 1, 3) must all equal the token AND be
+//                      painted (width > 0, style not none/hidden; final
+//                      review G4) -- a side-only repaint or a side-only
+//                      unpaint cannot hide behind a correct top.
 //   edgeColorEqVar   -- role name (e.g. "field-edge"): the element's BOTTOM
 //                      border-color (index 2 of the computed top|right|bottom|
 //                      left quad) must equal (+-1/channel) the active theme's

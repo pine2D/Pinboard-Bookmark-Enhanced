@@ -1707,10 +1707,20 @@ function isNativeSelectSelector(sel) {
 }
 // §7.3's --opt-field-border-focus core belongs to value boxes and to the
 // key-wrap eye that sits on a value box's fill -- nothing else (GI-5). Every
-// selector of the rule's list must qualify.
+// selector of the rule's list must qualify. Stricter than isValueBoxCompound
+// on one point (final fix wave, T2 minor): a TYPELESS `input` subject does
+// not qualify here -- `.pick > input:focus-visible` / `.switch > input` style
+// overlays are radio/checkbox inputs whose type lives in the HTML, not the
+// selector -- so the field core needs an explicit text-like [type], an
+// options.html value-box id, .listbox-btn, a textarea or a select.
+function isTypedValueBoxCompound(compound) {
+  if (!isValueBoxCompound(compound)) return false;
+  const c = classifyCompound(compound);
+  return !(c.tag === "input" && c.type === null && !c.ids.some((id) => OPTIONS_VALUE_BOX_IDS.ids.has(id)));
+}
 function acceptsFieldFocusCore(selectorText) {
   const list = splitSelectorList(selectorText);
-  return list.length > 0 && list.every((sel) => isValueBoxSelector(sel) ||
+  return list.length > 0 && list.every((sel) => subjectAlternatives(subjectOf(sel)).some(isTypedValueBoxCompound) ||
     subjectAlternatives(subjectOf(sel)).some((compound) => { const c = classifyCompound(compound); return !c.pseudoElement && c.classes.includes("key-toggle"); }));
 }
 // Specificity [a, b, c] of one complex selector; :is()/:not()/:has() take
@@ -1752,6 +1762,9 @@ check(isValueBoxSelector('.fg input:not([type="checkbox"])') && isValueBoxSelect
   isNativeSelectSelector(".mobile-tab-picker select:hover:not(:focus)") && isNativeSelectSelector("#mobile-tab-select") && !isNativeSelectSelector(".listbox-btn") &&
   acceptsFieldFocusCore(".key-toggle:focus-visible") && !acceptsFieldFocusCore(".btn:focus-visible") &&
   !acceptsFieldFocusCore(".listbox-btn:focus-visible, .btn:focus-visible") &&
+  !acceptsFieldFocusCore(".pick > input:focus-visible") && !acceptsFieldFocusCore(".switch > input:focus-visible") &&
+  acceptsFieldFocusCore('.fg input[type="text"]:focus') && acceptsFieldFocusCore("#dict-anki-deck:focus") &&
+  acceptsFieldFocusCore(".fg textarea:focus") && isValueBoxSelector(".pick > input:focus-visible") &&
   cmpSpecificity(selectorSpecificity('html[data-theme] .theme-name-popover input[type="text"]'), [0, 3, 2]) === 0 &&
   cmpSpecificity(selectorSpecificity('.fg :is(input[type="text"], textarea):hover:not(:focus)'), [0, 4, 1]) === 0 &&
   cmpSpecificity(selectorSpecificity(".fg input:hover:not(:focus)"), [0, 3, 1]) === 0 &&
@@ -5844,9 +5857,14 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
 // options.html), so a .fg / .key-wrap / .entry-block text control, textarea
 // or select, the listbox button, the narrow-screen tab picker, the theme-name
 // popover input and an #id rule on any of them are all in. Beyond colour the
-// scan also rejects (fix round 1): a rule that unpaints the bottom edge
-// (width 0 / style none|hidden / transparent bottom colour, in any longhand
-// or shorthand spelling), a hand-written --opt-field-* custom property (a
+// scan also rejects (fix round 1): a rule that unpaints a side -- the bottom
+// edge, and (final review G4) any of the other three, which carry the pilot
+// frame on nord-night / dracula / rose-pine / terminal (width 0 / style
+// none|hidden / transparent colour, in any physical or logical, longhand or
+// shorthand spelling); a background that drops the Soft Fill (`transparent`
+// / `none`, G2); typed text in anything but --opt-field-fg on a value box
+// that is not a fill-only native select (ruling R13; the tab picker keeps
+// --opt-fg and paints no placeholder); a hand-written --opt-field-* custom property (a
 // local re-point of the family; the generated ui-themes blocks own them),
 // and a static value-box rule at or above the generated hover's (0,3,1)
 // specificity that paints fill or frame -- it would freeze the hover/focus
@@ -5882,26 +5900,22 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const ZERO_W = (t) => /^0(?:\.0*)?(?:px|em|rem|%)?$/i.test(t || "");
   const NO_STYLE = (t) => /^(?:none|hidden)$/i.test(t || "");
   const NO_COLOUR = (t) => /^transparent$/i.test(t || "");
-  const bottomOf = (ts) => (ts.length >= 3 ? ts[2] : ts[0]);  // 1-4 value box shorthands
-  const blockEndOf = (ts) => (ts.length >= 2 ? ts[1] : ts[0]); // 1-2 value logical block pairs
-  // GI-1: does this declaration leave the bottom edge unpainted?
-  const unpaintsBottom = (prop, value) => {
+  // GI-1 + G4: does this declaration leave ANY side unpainted? Every value of
+  // a 1-4 value box list / 1-2 value logical pair names some side, so any one
+  // of them failing is enough. Sides: the physical four and the logical
+  // inline/block pairs with their -start/-end.
+  const SIDE_RE = "(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?";
+  const SHORTHAND_RE = new RegExp(`^border${SIDE_RE}$`);
+  const PART_RE = new RegExp(`^border${SIDE_RE}-(width|style|color)$`);
+  const unpaintsSide = (prop, value) => {
     const ts = valueTokens(value);
     if (!ts.length) return false;
-    switch (prop) {
-      case "border": case "border-bottom": case "border-block": case "border-block-end":
-        return ts.some((t) => ZERO_W(t) || NO_STYLE(t) || NO_COLOUR(t));
-      case "border-bottom-width": case "border-block-end-width": return ZERO_W(ts[0]);
-      case "border-bottom-style": case "border-block-end-style": return NO_STYLE(ts[0]);
-      case "border-bottom-color": case "border-block-end-color": return NO_COLOUR(ts[0]);
-      case "border-width": return ZERO_W(bottomOf(ts));
-      case "border-style": return NO_STYLE(bottomOf(ts));
-      case "border-color": return NO_COLOUR(bottomOf(ts));
-      case "border-block-width": return ZERO_W(blockEndOf(ts));
-      case "border-block-style": return NO_STYLE(blockEndOf(ts));
-      case "border-block-color": return NO_COLOUR(blockEndOf(ts));
-      default: return false;
-    }
+    if (SHORTHAND_RE.test(prop)) return ts.some((t) => ZERO_W(t) || NO_STYLE(t) || NO_COLOUR(t));
+    const part = PART_RE.exec(prop)?.[1];
+    if (part === "width") return ts.some(ZERO_W);
+    if (part === "style") return ts.some(NO_STYLE);
+    if (part === "color") return ts.some(NO_COLOUR);
+    return false;
   };
   const offenders = (css) => {
     const out = [];
@@ -5914,9 +5928,18 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
       const boxes = rule.selectors.filter(isValueBoxSelector);
       if (!boxes.length) continue;
       const live = decls.filter((d) => !boxes.every((sel) => isExempt(sel, d)));
+      const typedBoxes = boxes.filter((sel) => !isNativeSelectSelector(sel));
       for (const d of live) {
-        if (unpaintsBottom(d.property, d.value)) { out.push(`${boxes.join(", ")} { ${d.property}: ${d.value} } -- unpaints the bottom edge`); continue; }
+        if (unpaintsSide(d.property, d.value)) { out.push(`${boxes.join(", ")} { ${d.property}: ${d.value} } -- unpaints a border side`); continue; }
+        if (d.property === "color") {
+          if (typedBoxes.length && d.value.trim() !== "var(--opt-field-fg)") out.push(`${typedBoxes.join(", ")} { color: ${d.value} } -- typed text must be var(--opt-field-fg)`);
+          continue;
+        }
         if (!COLOUR_PROP_RE.test(d.property)) continue;
+        if (/^background(?:-color)?$/.test(d.property) && /^(?:none|transparent)$/i.test(d.value.trim())) {
+          out.push(`${boxes.join(", ")} { ${d.property}: ${d.value} } -- drops the Soft Fill`);
+          continue;
+        }
         if (/^(?:none|transparent|inherit|currentcolor|0)$/i.test(d.value.trim())) continue;
         const refs = [...d.value.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map((m) => m[1]);
         const literal = /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|color-mix\(/i.test(d.value);
@@ -5967,6 +5990,26 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".fg option:hover { background: var(--opt-option-hover-bg); }", false],
     ['.fg input[type="text"]:hover:not(:focus) { background-color: var(--opt-field-bg-hover); }', false],
     [".fg textarea { border-width: 1px; }", false],
+    // final fix wave: G2 (fill dropped), G4 (any side unpainted), R13 (typed text)
+    ['.fg input[type="text"] { background: transparent; }', true],
+    [".listbox-btn:hover { background-color: transparent; }", true],
+    [".fg textarea { background: none; }", true],
+    ['.fg input[type="text"] { border-top-width: 0; }', true],
+    [".fg textarea { border-inline-style: none; }", true],
+    [".listbox-btn { border-left-color: transparent; }", true],
+    ['.fg input[type="password"] { border-width: 1px 0 1px 1px; }', true],
+    ['.fg input[type="text"] { border-inline-start: 0; }', true],
+    [".fg textarea { border-style: solid hidden solid solid; }", true],
+    [".listbox-btn { color: var(--opt-fg); }", true],
+    ['.fg input[type="text"] { color: var(--opt-fg-muted); }', true],
+    ["#dict-anki-deck { color: #333; }", true],
+    // must stay clean
+    [".listbox-btn { color: var(--opt-field-fg); }", false],
+    ['.fg :is(input[type="text"], textarea) { color: var(--opt-field-fg); }', false],
+    [".mobile-tab-picker select { color: var(--opt-fg); }", false],
+    [".fg input::placeholder { color: var(--opt-field-placeholder); }", false],
+    [".fg textarea { border-color: var(--opt-field-border); border-width: 1px 1px 1px 1px; }", false],
+    [".key-toggle { background: none; }", false],
   ];
   const misjudged = VALUE_BOX_CASES.filter(([css, want]) => (offenders(css).length > 0) !== want);
   check(misjudged.length === 0,
@@ -5986,8 +6029,8 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "options.css: the listbox button left the B+ value-box family (bottom edge / radius / hover edge)");
   check(declarationValueMap(hand, ".listbox-btn .btn-ic").get("color") === "var(--opt-field-placeholder)" &&
     declarationValueMap(hand, ".key-toggle").get("color") === "var(--opt-field-placeholder)" &&
-    declarationValueMap(hand, ".key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg))",
-    "options.css: the key-wrap eye / listbox chevron must paint the field's secondary ink (--opt-field-placeholder) and the eye's hover chip must mix over --opt-field-bg");
+    declarationValueMap(hand, ".key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-hover))",
+    "options.css: the key-wrap eye / listbox chevron must paint the field's secondary ink (--opt-field-placeholder) and the eye's hover chip must mix over --opt-field-bg-hover (the eye is only hovered while its field wears the hover paint -- C-1)");
   // P7: the eye's inset focus ring sits ON the field fill, so its core is the
   // field's own focus border (flexoki-light: --opt-focus-bd is 2.73:1 there).
   check(declarationValueMap(hand, ".key-toggle:focus-visible").get("outline") === "2px solid var(--opt-field-border-focus)",
@@ -5998,12 +6041,41 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // frame: strictly higher specificity, or equal and later in source.
   {
     const FW = '.fg .key-wrap:focus-within :is(input[type="text"], input[type="password"])';
-    const all = parseStyleRules(optionsCss.replace(/\/\*[\s\S]*?\*\//g, ""));
+    // Comments are blanked, not removed, so r.lineNum is the real options.css
+    // line in the failure messages below (T2 minor).
+    const all = parseStyleRules(optionsCss.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, "")));
     const fw = all.filter((r) => r.context.length === 0 && r.selectors.includes(FW));
     const fwDecls = new Map(fw.flatMap((r) => parseDeclarations(r.body).map((d) => [d.property, d.value])));
     check(fw.length === 1 && fwDecls.get("background-color") === "var(--opt-field-bg-focus)" &&
       fwDecls.get("border-color") === "var(--opt-field-border-focus)" && fwDecls.get("box-shadow") === "var(--opt-focus-ring)",
       `options.css: the key-wrap focus frame rule \`${FW}\` is missing or no longer paints bg-focus + field-border-focus (all four sides) + the ring`);
+    check(fw.length === 1 && optionsCss.split("\n")[fw[0].lineNum - 1].includes(".fg .key-wrap:focus-within"),
+      `ui-contract-tests.mjs: rule line numbers no longer point at options.css's real lines (key-wrap frame reported at line ${fw[0]?.lineNum})`);
+    // C-1 (final review): the pointer over the EYE (the input's sibling) keeps
+    // the field in its hover paint -- fill, frame and bottom edge -- via the
+    // unit's own :hover, which must out-rank the hand rest rule's edge and be
+    // mutually exclusive with the focus frame. (A render-audit row cannot pin
+    // this: its "hover" state can only hover the probed element itself.)
+    const KWH = '.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"])';
+    const kwh = all.filter((r) => r.context.length === 0 && r.selectors.includes(KWH));
+    const kwhDecls = new Map(kwh.flatMap((r) => parseDeclarations(r.body).map((d) => [d.property, d.value])));
+    const REST = '.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea)';
+    check(kwh.length === 1 && kwhDecls.get("background-color") === "var(--opt-field-bg-hover)" &&
+      kwhDecls.get("border-color") === "var(--opt-field-border-hover)" && kwhDecls.get("border-bottom-color") === "var(--opt-field-edge-hover)" &&
+      cmpSpecificity(selectorSpecificity(KWH), selectorSpecificity(REST)) > 0 &&
+      cmpSpecificity(selectorSpecificity(KWH), selectorSpecificity(".fg input:hover:not(:focus)")) > 0,
+      `options.css: the key-wrap unit hover rule \`${KWH}\` is missing, no longer restates hover fill / frame / edge-hover, or no longer out-ranks the rest edge and the generated hover`);
+    // A hover rule whose key-wrap (or an ancestor of it) carries
+    // :not(:focus-within) cannot match while the unit holds focus, so it
+    // cannot beat the frame; every other hover rule must lose to it.
+    const exclusiveOfFocusWithin = (sel) => {
+      const parts = sel.split(/\s+|\s*>\s*/).filter(Boolean);
+      const kw = parts.findIndex((p) => /\.key-wrap\b/.test(p));
+      return kw >= 0 && parts.slice(0, kw + 1).some((p) => p.includes(":not(:focus-within)"));
+    };
+    check(exclusiveOfFocusWithin(KWH) && !exclusiveOfFocusWithin('.fg .key-wrap:hover :is(input[type="text"]):not(:focus-within)') &&
+      !exclusiveOfFocusWithin(".fg input:hover:not(:focus)"),
+      "ui-contract-tests.mjs: the focus-within exclusivity predicate no longer discriminates (it must only credit :not(:focus-within) on the key-wrap or an ancestor, never on the input)");
     const PAINT_RE = /^(?:background(?:-color)?|border(?:-(?:top|right|bottom|left))?(?:-color)?)$/;
     const reachesKeyWrapInput = (sel) => /:hover/.test(sel) && subjectAlternatives(subjectOf(sel)).some((compound) => {
       const c = classifyCompound(compound);
@@ -6014,7 +6086,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     check(hovers.length >= 2,
       "ui-contract-tests.mjs: found fewer than 2 hover rules painting a key-wrap input (the generated .fg input hover + the B+ shape hover) -- the focus-within precedence check would be vacuous");
     const fwSpec = selectorSpecificity(FW);
-    const winners = fw.length !== 1 ? [] : hovers.filter((r) => r.selectors.filter(reachesKeyWrapInput).some((sel) => {
+    const winners = fw.length !== 1 ? [] : hovers.filter((r) => r.selectors.filter(reachesKeyWrapInput).filter((sel) => !exclusiveOfFocusWithin(sel)).some((sel) => {
       const c = cmpSpecificity(fwSpec, selectorSpecificity(sel));
       return c < 0 || (c === 0 && r.sourceOrder > fw[0].sourceOrder);
     }));

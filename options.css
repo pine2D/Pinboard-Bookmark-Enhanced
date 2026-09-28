@@ -2067,9 +2067,22 @@ html.motion-ready #preset-preview-section > summary::after {
    sits in a .fg and holds a text or password input (options.html + the
    export-target builder in options.js). */
 .fg .key-wrap:focus-within :is(input[type="text"], input[type="password"]) { background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
+/* The pointer over the EYE is still inside the field. The eye is the input's
+   sibling (absolutely positioned over its right end), so moving onto it drops
+   the input's own :hover and the whole B+ hover paint -- fill, frame, bottom
+   edge -- snapped back to rest while the pointer was visibly inside the box
+   (final review C-1; Chrome's cr-input keeps hover on the host). Restated on
+   the unit's :hover at (0,5,1): above the generated hover (0,3,1) and the
+   hand rest/hover edge rules; `:not(:focus-within)` makes it mutually
+   exclusive with the focus frame above, so focus still wins whichever piece
+   holds it. ui-contract pins it (a render-audit hover row can only hover the
+   probed element itself, not a sibling). */
+.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"]) { background-color: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); border-bottom-color: var(--opt-field-edge-hover); }
 /* Hover is where the eye may show a fill -- a pointer affordance, and not a
-   state the rest/focus invariant covers. */
-.key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg)); border-radius: var(--opt-radius-sm); }
+   state the rest/focus invariant covers. It mixes over the HOVER fill: the
+   eye is only ever hovered while the field under it wears its hover paint
+   (rule above). */
+.key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-hover)); border-radius: var(--opt-radius-sm); }
 /* Focus = the project's standard button ring (§7.3), pulled INSIDE the eye's
    own box with a negative offset so it never reaches the capsule edge and
    never competes with the container's own :focus-within ring.
