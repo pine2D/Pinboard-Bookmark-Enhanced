@@ -5955,7 +5955,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   };
   const bad = offenders(stripGeneratedRegions(optionsCss).replace(/\/\*[\s\S]*?\*\//g, ""));
   check(bad.length === 0,
-    "options.css: a hand-written value-box rule leaves the B+ field family (non-field colour / unpainted bottom edge / --opt-field-* re-point / state freeze): " + bad.join(" | "));
+    "options.css: a hand-written value-box rule leaves the B+ field family (non-field colour / unpainted border side / dropped fill / typed text not --opt-field-fg / --opt-field-* re-point / state freeze): " + bad.join(" | "));
   // Discrimination, one synthetic rule at a time: [css, must be caught].
   // Fix round 1 added the second group; the Task 2 scan (subject-blind
   // substring exclusion, class-shaped selectors only, colour props only)
