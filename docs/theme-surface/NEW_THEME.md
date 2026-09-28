@@ -363,10 +363,10 @@ final-fix wave:
 - **Derived component-pair colors are not `ui` inputs.** The shared
   `btn-fg`, `btn-fg-muted`, `danger-quiet-fg`, `on-danger`, `chip-bg`,
   `chip-fg` roles and popup-only `preset-fg` / `spinner-fg` / `ai-chip-fg`,
-  plus the options-only B+ field family (`field-bg`, `field-border`,
-  `field-bg-hover`, `field-border-hover`, `field-bg-focus`,
+  plus the options-only B+ field family (10 roles: `field-bg`,
+  `field-border`, `field-bg-hover`, `field-border-hover`, `field-bg-focus`,
   `field-border-focus`, `field-edge`, `field-edge-hover`,
-  `field-placeholder` — `deriveFieldRoles`, derived from `input-bg` /
+  `field-placeholder`, `field-fg` — `deriveFieldRoles`, derived from `input-bg` /
   `input-border` / `border` / `focus-bd` / `accent` / `fg` / `fg-hint` /
   `panel` / `pf-bg`; tune those inputs instead),
   are computed

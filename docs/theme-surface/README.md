@@ -277,15 +277,20 @@ clears their threshold):
 - `borderToAA(border, bgs, min = 3)` — same repeated-worst-case shape as
   `fgToAAMulti`, at the WCAG 1.4.11 non-text 3:1 floor instead of the 4.5:1
   text floor. Drives the `border` role's derivation (Task 16).
-- `fillSeparate(fill, surfaces, fg, min = 1.06)` — the Soft Fill law
-  (COMPONENTS.md §9): mixes a surface's own `fg` into a control's fill until
-  it clears a much weaker "is this fill perceivable at all against its host
-  surface" floor (1.06:1, well below the 3:1 non-text AA floor — that job
+- `fillSeparate(fill, surfaces, fg, min = FILL_SEPARATE_MIN)` — the Soft
+  Fill law (COMPONENTS.md §9): mixes a surface's own `fg` into a control's
+  fill until it clears a much weaker "is this fill perceivable at all against
+  its host surface" floor (`FILL_SEPARATE_MIN` = 1.10:1 since 2026-09-21,
+  1.06 before; well below the 3:1 non-text AA floor — that job
   still belongs to the focus ring and hover state; options value boxes are
   the exception since B+: their resting 3:1 boundary is the 1px bottom edge
   `--opt-field-edge`, COMPONENTS.md §9.1 law 9). Drives `btn-bg`,
   `btn-hover`, `input-bg` and `chip-bg` once a control's resting border
-  color collapses into its fill.
+  color collapses into its fill. The third argument is really the mix
+  target: the B+ field hover step (`deriveFieldRoles`) passes `fg` only when
+  `fg` lies away from the hosts, otherwise the matching pole (#000000 /
+  #ffffff), so a recessed well darkens on hover instead of fading into its
+  panel (COMPONENTS.md §6.2).
 - `resolveOpaqueBg(raw, fallbackBg)` / `resolveChipBg(raw, accentRgb,
   panelRgb)` — not derivations themselves, but a prerequisite every
   above lever needs: a pilot's `border` or `tag-bg` may be a non-opaque
