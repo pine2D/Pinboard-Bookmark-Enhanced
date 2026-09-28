@@ -362,7 +362,13 @@ final-fix wave:
   them vary either.
 - **Derived component-pair colors are not `ui` inputs.** The shared
   `btn-fg`, `btn-fg-muted`, `danger-quiet-fg`, `on-danger`, `chip-bg`,
-  `chip-fg` roles and popup-only `preset-fg` / `spinner-fg` / `ai-chip-fg`
+  `chip-fg` roles and popup-only `preset-fg` / `spinner-fg` / `ai-chip-fg`,
+  plus the options-only B+ field family (`field-bg`, `field-border`,
+  `field-bg-hover`, `field-border-hover`, `field-bg-focus`,
+  `field-border-focus`, `field-edge`, `field-edge-hover`,
+  `field-placeholder` — `deriveFieldRoles`, derived from `input-bg` /
+  `input-border` / `border` / `focus-bd` / `accent` / `fg` / `fg-hint` /
+  `panel` / `pf-bg`; tune those inputs instead),
   are computed
   from the FINAL,
   post-override map — as is `on-accent` on options and library (Task 4,
@@ -467,6 +473,11 @@ final-fix wave:
   to this mechanism.) Note the naming split: popup uses the `-bd` suffix
   (`btn-bd`/`input-bd`), options/library use `-border`
   (`btn-border`/`input-border`) — copy the exact key your surface expects.
+  On options, `input-border` also frames the B+ field family
+  (`deriveFieldRoles`), so its value must be a `#rgb` / `#rrggbb` /
+  `#rrggbbaa` hex or exactly `var(--opt-<role>)` naming a role the options
+  map defines; any other spelling (`rgba()`, a `var()` with a fallback, a
+  named colour) makes sync-all throw instead of shipping a guessed frame.
   **Geometry (radius, padding) is never exemptable this way** — it follows
   the surface's token ladder unconditionally for every theme, terminal
   included; only the fill-vs-frame *color* language has an opt-out.
