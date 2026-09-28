@@ -117,6 +117,20 @@ async function launch() {
       "--no-first-run", "--no-default-browser-check", "--disable-default-apps",
       "--disable-background-networking", "--disable-component-update", "--disable-sync",
       "--metrics-recording-only", "--no-pings", "--force-device-scale-factor=1",
+      // Pin analytic anti-aliasing (fields-bplus Task 3, ruling R10/R11).
+      // Measured 2026-09-28: at 4019b3a4 the default GPU raster drew 8 panels
+      // (general, ai-behavior, archive, vocab x default/terminal) through
+      // MSAA, while the same panels at the B+ HEAD are not (HEAD shots are
+      // byte-identical with and without this flag; only the 4019b3a4 shots
+      // change, by 5,765-14,768 px each). Same-version re-shoots were
+      // byte-identical and element geometry was unchanged, yet 2,554-8,120 px
+      // per panel differed OUTSIDE the changed value boxes (button corners,
+      // switch-track ends, disclosure chevrons, icon edges): a CSS change
+      // elsewhere on a layer can flip that layer's raster mode and move
+      // anti-aliasing all over it. This script feeds a change detector
+      // (scripts/panel-pixel-diff.mjs), not a fidelity check, so both sides
+      // are rasterized the same way. Keep DSF 1 and the warm-up capture too.
+      "--gpu-rasterization-msaa-sample-count=0",
       "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1",
     ],
   });
