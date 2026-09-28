@@ -485,8 +485,8 @@ function chipRules(ns) {
 // emitted here.
 //
 // Colour half of the B+ field family (spec 2026-09-28-ui-fields-bplus-design
-// §3): fill / frame / hover / focus / placeholder read the --opt-field-*
-// roles (_ui-derive.mjs deriveFieldRoles). The SHAPE half -- the >=3:1 bottom
+// §3): fill / frame / hover / focus / placeholder / typed text read the
+// --opt-field-* roles (_ui-derive.mjs deriveFieldRoles). The SHAPE half -- the >=3:1 bottom
 // edge and the md/md/sm/sm radius -- is hand-written in options.css: the
 // row-model block for text entry, the .listbox-btn rule block for the
 // listbox. It never applies to the native <select> fallback, and
@@ -506,7 +506,10 @@ function formRules(ns) {
         ["border", `1px solid var(--${ns}-field-border)`],
         ["border-radius", `var(--${ns}-radius-md)`],
         ["background-color", `var(--${ns}-field-bg)`],
-        ["color", `var(--${ns}-fg)`],
+        // Typed text: --opt-field-fg, = fg except where fg sits within
+        // FIELD_TEXT_PLACEHOLDER_MIN (1.4:1) of the placeholder ink
+        // (_ui-derive.mjs deriveFieldRoles, ruling R13).
+        ["color", `var(--${ns}-field-fg)`],
         ["-webkit-appearance", "none"],
         ["appearance", "none"],
         ["box-shadow", "none"],

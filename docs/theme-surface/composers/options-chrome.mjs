@@ -104,13 +104,14 @@ const DEFAULT_LIGHT = {
   // blocks on every run: move any of those inputs and it fails there.
   "field-bg": "#eaeaea",            // = input-bg: already 1.20:1 vs panel, 1.14:1 vs pf-bg
   "field-border": "#eaeaea",        // = field-bg (frame collapsed into the fill)
-  "field-bg-hover": "#dfdfdf",      // fillSeparate(field-bg, [field-bg], fg), 1.11:1
+  "field-bg-hover": "#dfdfdf",      // one step away from the hosts (toward fg here), 1.11:1 vs field-bg
   "field-border-hover": "#dfdfdf",  // = field-bg-hover
   "field-bg-focus": "#eaeaea",      // = field-bg (focus never repaints the fill)
   "field-border-focus": "#5d88c2",  // = focus-bd, 3.03:1 on field-bg
   "field-edge": "#7b7b7b",          // border #858585 pushed to 3:1 vs the hover fill (3.18)
   "field-edge-hover": "#5b5b5b",    // mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX)
   "field-placeholder": "#616161",   // fg-hint #666666 pushed to 4.5:1 vs the hover fill (4.65)
+  "field-fg": "#333333",            // = fg: already 2.04:1 from the placeholder (>= FIELD_TEXT_PLACEHOLDER_MIN)
 };
 
 // Map canonical UI colors (from _ui-derive) + a few options-only roles to --opt-* names.

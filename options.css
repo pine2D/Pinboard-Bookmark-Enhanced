@@ -276,16 +276,18 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
   padding: var(--opt-sp-3) var(--opt-sp-4);
   border: 1px solid var(--opt-input-border);
   border-radius: var(--opt-radius-md);
-  background: var(--opt-input-bg); color: var(--opt-fg);
+  background: var(--opt-input-bg); color: var(--opt-field-fg);
   font-size: 12px; -webkit-appearance: none; appearance: none;
 }
 .options-search input[type="search"]:focus-visible { outline: none; border-color: var(--opt-focus-bd); box-shadow: var(--opt-focus-ring); }
 /* The sidebar search box is a value box outside .fg: its fill and frame stay
    --opt-input-bg / --opt-input-border (spec 2026-09-28-ui-fields-bplus-design
    §3), but its placeholder takes the field family's secondary ink -- the UA
-   default (#757575) fell to 1.87:1 on nord-night. contrast-audit gates
-   --opt-field-placeholder against --opt-input-bg, the only fill this box
-   paints (rest, hover and focus alike). */
+   default (#757575) fell to 1.87:1 on nord-night -- and its typed text the
+   field family's --opt-field-fg (above), so the two stay >= 1.4:1 apart like
+   every other value box (ruling R13). contrast-audit gates both inks against
+   --opt-input-bg, the only fill this box paints (rest, hover and focus
+   alike); ui-contract pins both consumers. */
 .options-search input[type="search"]::placeholder { color: var(--opt-field-placeholder); }
 .options-search-results {
   position: absolute; z-index: var(--opt-z-menu); top: calc(100% + var(--opt-sp-2)); left: 0;
@@ -324,7 +326,7 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    primary-button pair), disabled = fg-hint on panel. No :has(), no inline
    styles: the flip is the data-flip attribute the script sets on open. ---- */
 .listbox { position: relative; display: inline-block; width: max-content; min-width: 240px; max-width: 100%; }
-.listbox-btn { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 0 var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-fg); background: var(--opt-field-bg); border: 1px solid var(--opt-field-border); border-bottom-color: var(--opt-field-edge); border-radius: var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm); cursor: pointer; text-align: left; }
+.listbox-btn { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 0 var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-field-fg); background: var(--opt-field-bg); border: 1px solid var(--opt-field-border); border-bottom-color: var(--opt-field-edge); border-radius: var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm); cursor: pointer; text-align: left; }
 .listbox-btn:hover { background: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); border-bottom-color: var(--opt-field-edge-hover); }
 .listbox-btn:focus-visible { outline: none; background: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
 .listbox-btn .btn-ic { flex: none; width: 16px; height: 16px; color: var(--opt-field-placeholder); }
@@ -1091,7 +1093,7 @@ input:focus-visible + .tag-gov-chip-face {
   border: 1px solid var(--opt-field-border);
   border-radius: var(--opt-radius-md);
   background-color: var(--opt-field-bg);
-  color: var(--opt-fg);
+  color: var(--opt-field-fg);
   -webkit-appearance: none;
   appearance: none;
   box-shadow: none;
@@ -2140,6 +2142,7 @@ html[data-theme="modern-card"] {
   --opt-field-edge: #7d7d7d;
   --opt-field-edge-hover: #505059;
   --opt-field-placeholder: #585e64;
+  --opt-field-fg: #1a1a2e;
 }
 html[data-theme="nord-night"] {
   color-scheme: dark;
@@ -2182,7 +2185,8 @@ html[data-theme="nord-night"] {
   --opt-field-border-focus: #75a0b0;
   --opt-field-edge: #99a2b6;
   --opt-field-edge-hover: #b5bdcd;
-  --opt-field-placeholder: #c2c8d5;
+  --opt-field-placeholder: #c0c6d2;
+  --opt-field-fg: #e5e9f0;
 }
 html[data-theme="terminal"] {
   color-scheme: dark;
@@ -2227,6 +2231,7 @@ html[data-theme="terminal"] {
   --opt-field-edge: #267326;
   --opt-field-edge-hover: #2cb22c;
   --opt-field-placeholder: #21b621;
+  --opt-field-fg: #33ff33;
 }
 html[data-theme="paper-ink"] {
   color-scheme: light;
@@ -2271,6 +2276,7 @@ html[data-theme="paper-ink"] {
   --opt-field-edge: #917749;
   --opt-field-edge-hover: #64553c;
   --opt-field-placeholder: #5c5c5c;
+  --opt-field-fg: #2c2c2c;
 }
 html[data-theme="dracula"] {
   color-scheme: dark;
@@ -2314,6 +2320,7 @@ html[data-theme="dracula"] {
   --opt-field-edge: #999db2;
   --opt-field-edge-hover: #c4c6cf;
   --opt-field-placeholder: #bcc3d8;
+  --opt-field-fg: #f8f8f2;
 }
 html[data-theme="flexoki-light"] {
   color-scheme: light;
@@ -2357,6 +2364,7 @@ html[data-theme="flexoki-light"] {
   --opt-field-edge: #7a7350;
   --opt-field-edge-hover: #4a4633;
   --opt-field-placeholder: #555450;
+  --opt-field-fg: #100f0f;
 }
 html[data-theme="flexoki-dark"] {
   color-scheme: dark;
@@ -2400,6 +2408,7 @@ html[data-theme="flexoki-dark"] {
   --opt-field-edge: #898581;
   --opt-field-edge-hover: #a8a59f;
   --opt-field-placeholder: #a5a39f;
+  --opt-field-fg: #cecdc3;
 }
 html[data-theme="solarized-light"] {
   color-scheme: light;
@@ -2442,7 +2451,8 @@ html[data-theme="solarized-light"] {
   --opt-field-border-focus: #4784ad;
   --opt-field-edge: #817147;
   --opt-field-edge-hover: #686853;
-  --opt-field-placeholder: #525d5f;
+  --opt-field-placeholder: #535d5f;
+  --opt-field-fg: #39474b;
 }
 html[data-theme="solarized-dark"] {
   color-scheme: dark;
@@ -2487,6 +2497,7 @@ html[data-theme="solarized-dark"] {
   --opt-field-edge: #1299b6;
   --opt-field-edge-hover: #58a7b7;
   --opt-field-placeholder: #9facad;
+  --opt-field-fg: #c3cbcb;
 }
 html[data-theme="catppuccin-latte"] {
   color-scheme: light;
@@ -2529,7 +2540,8 @@ html[data-theme="catppuccin-latte"] {
   --opt-field-border-focus: #4b7bdb;
   --opt-field-edge: #687490;
   --opt-field-edge-hover: #5b637e;
-  --opt-field-placeholder: #585a71;
+  --opt-field-placeholder: #595a71;
+  --opt-field-fg: #41445a;
 }
 html[data-theme="catppuccin-mocha"] {
   color-scheme: dark;
@@ -2566,13 +2578,14 @@ html[data-theme="catppuccin-mocha"] {
   --opt-on-accent: #1e1e2e;
   --opt-field-bg: #262637;
   --opt-field-border: #262637;
-  --opt-field-bg-hover: #2d2d3f;
-  --opt-field-border-hover: #2d2d3f;
+  --opt-field-bg-hover: #1e1e2c;
+  --opt-field-border-hover: #1e1e2c;
   --opt-field-bg-focus: #262637;
   --opt-field-border-focus: #7395cf;
   --opt-field-edge: #9597ae;
   --opt-field-edge-hover: #aeb3ce;
   --opt-field-placeholder: #999fb6;
+  --opt-field-fg: #cdd6f4;
 }
 html[data-theme="gruvbox-dark"] {
   color-scheme: dark;
@@ -2609,13 +2622,14 @@ html[data-theme="gruvbox-dark"] {
   --opt-on-accent: #282828;
   --opt-field-bg: #302f2e;
   --opt-field-border: #302f2e;
-  --opt-field-bg-hover: #373633;
-  --opt-field-border-hover: #373633;
+  --opt-field-bg-hover: #292828;
+  --opt-field-border-hover: #292828;
   --opt-field-bg-focus: #302f2e;
   --opt-field-border-focus: #7e9e92;
   --opt-field-edge: #9f958f;
   --opt-field-edge-hover: #c1b59f;
   --opt-field-placeholder: #aca093;
+  --opt-field-fg: #ebdbb2;
 }
 html[data-theme="rose-pine"] {
   color-scheme: dark;
@@ -2659,6 +2673,7 @@ html[data-theme="rose-pine"] {
   --opt-field-edge: #756da7;
   --opt-field-edge-hover: #a5a0ca;
   --opt-field-placeholder: #8e8ba3;
+  --opt-field-fg: #e0def4;
 }
 html[data-theme="github-light"] {
   color-scheme: light;
@@ -2702,6 +2717,7 @@ html[data-theme="github-light"] {
   --opt-field-edge: #6a8097;
   --opt-field-edge-hover: #485665;
   --opt-field-placeholder: #5a626b;
+  --opt-field-fg: #1f2328;
 }
 :root {
   color-scheme: light;
@@ -2731,6 +2747,7 @@ html[data-theme="github-light"] {
   --opt-field-edge: #7b7b7b;
   --opt-field-edge-hover: #5b5b5b;
   --opt-field-placeholder: #616161;
+  --opt-field-fg: #333333;
 }
 .theme-preset-btn[data-theme="flexoki"] {
   --variant-swatch: #205EA6;

@@ -12,7 +12,7 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, primaryHoverFill, mix, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
+import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, FIELD_TEXT_PLACEHOLDER_MIN, primaryHoverFill, mix, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
 // LIB_BATCH_BAND_MIX: library.css paints a batch-selected row's fill as an
@@ -436,7 +436,7 @@ export const COMPONENT_PAIR_SPEC = [
   // documented `:disabled` contrast exemption (COMPONENTS.md §3.4 / row 9).
 
   // B+ field family (spec docs/superpowers/specs/2026-09-28-ui-fields-bplus-
-  // design.md §4; COMPONENTS.md §6.2 / §9.1 law 9). Options only -- the nine
+  // design.md §4; COMPONENTS.md §6.2 / §9.1 law 9). Options only -- the ten
   // --opt-field-* roles are deriveFieldRoles() outputs (UI_DERIVED_OUTPUT_ROLES
   // .options), so on the default (:root) block a missing field-* role named in
   // one of the rows below FAILs rather than SKIPs (isOutputRoleForDefault);
@@ -461,7 +461,22 @@ export const COMPONENT_PAIR_SPEC = [
   ["field-placeholder", "field-bg", 4.5, ["opt"]],
   ["field-placeholder", "field-bg-hover", 4.5, ["opt"]],
   ["field-placeholder", "field-bg-focus", 4.5, ["opt"]],
-  // Typed text sits on the rest and the (deeper) hover fill.
+  // Typed text in every value box that paints --opt-field-placeholder (the
+  // generated .fg recipe, .listbox-btn, the sidebar search box) is
+  // --opt-field-fg (final fix wave, ruling R13): on the rest and the hover
+  // fill, and on the search box's own fill (input-bg, every state).
+  ["field-fg", "field-bg", 4.5, ["opt"]],
+  ["field-fg", "field-bg-hover", 4.5, ["opt"]],
+  ["field-fg", "input-bg", 4.5, ["opt"]],
+  // ...and it must be tellable apart from the placeholder: a distinction
+  // floor, not a legibility one (both inks already clear 4.5:1 on the fills),
+  // expressed like the other non-text rows here (chip-bg vs panel's
+  // FILL_SEPARATE_MIN): the same ratio, a lower min. The UA placeholder gave
+  // 1.52:1 on solarized-light; the first B+ derivation 1.03.
+  ["field-fg", "field-placeholder", FIELD_TEXT_PLACEHOLDER_MIN, ["opt"]],
+  // Plain --opt-fg on the field fills stays gated: the narrow-screen tab
+  // picker (.mobile-tab-picker select) is fill-only B+ (--opt-field-bg /
+  // -hover) but keeps --opt-fg text -- it paints no placeholder.
   ["fg", "field-bg", 4.5, ["opt"]],
   ["fg", "field-bg-hover", 4.5, ["opt"]],
   // The sidebar search box (options.css `.options-search input[type="search"]`)

@@ -5,6 +5,7 @@ import {
   deriveFieldRoles,
   FIELD_EDGE_HOVER_FG_MIX,
   FIELD_ROLES,
+  FIELD_TEXT_PLACEHOLDER_MIN,
   fgToAA,
   fgToAAMulti,
   fillDistinct,
@@ -846,11 +847,11 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   check(!("field-bg" in finalizeUiControlRoles(base, palette)),
     "finalizeUiControlRoles with the default config (fieldRoles unset) must not emit field-* roles -- the composer-level popup/library walk below checks that those surfaces really call it that way");
   // The shared `base` fixture has no fg-hint / pf-bg: add both, so the smoke
-  // check below proves nine REAL values, not placeholders read off
+  // check below proves ten REAL values, not placeholders read off
   // hexToRgb(undefined) (which silently parses as #000000).
   const withFields = finalizeUiControlRoles({ ...base, "fg-hint": "#666666", "pf-bg": "#f9f9f6" }, palette, {}, { fieldRoles: true });
   check(FIELD_ROLES.every((r) => /^#[0-9a-f]{6}$/.test(withFields[r] ?? "")),
-    "fieldRoles: true must emit all nine field-* roles as 6-digit hex");
+    "fieldRoles: true must emit all ten field-* roles as 6-digit hex");
   check(throwsNaming(() => finalizeUiControlRoles(base, palette, {}, { fieldRoles: true }), ["fg-hint"]),
     "fieldRoles: true over a map without fg-hint must throw naming the missing role, not derive the placeholder from #000000");
 
@@ -915,10 +916,87 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   // pre-empt the missing-var-target throw here.
   check(!("input-border" in light) && throwsNaming(() => deriveFieldRoles(light, "var(--opt-input-border)"), ["input-border"]),
     "a var(--opt-<role>) frame whose role is absent from the map must throw and name the role");
-  for (const bad of ["rgba(0,0,0,.5)", "var(--opt-border, #ccc)", "red"]) {
+  // "rebeccapurple", not "red": "red" is a substring of "required", so a
+  // missing-input throw would have satisfied throwsNaming vacuously.
+  for (const bad of ["rgba(0,0,0,.5)", "var(--opt-border, #ccc)", "rebeccapurple"]) {
     check(throwsNaming(() => deriveFieldRoles(light, bad), [bad]),
       `an unparseable framed value (${bad}) must throw with the value in the message, not collapse into the fill`);
   }
+
+  // Required inputs must be a hex the deriver reads correctly (final fix
+  // wave, alignment F1): hexToRgb parses any other spelling as #000000.
+  check(throwsNaming(() => deriveFieldRoles({ ...light, "input-bg": "rgb(234, 234, 234)" }), ["input-bg", "rgb(234, 234, 234)"]),
+    "a non-hex required input (input-bg: rgb()) must throw naming the role and its value, not derive the fill from #000000");
+  check(throwsNaming(() => deriveFieldRoles({ ...light, fg: "#333333cc" }), ["fg", "#333333cc"]),
+    "an 8-digit ink (fg) must throw -- hexToRgb reads an 8-digit hex's bytes wrongly; only border is composited");
+  check(!(() => { try { deriveFieldRoles({ ...light, border: "#85858580" }); return false; } catch { return true; } })(),
+    "an 8-digit border stays valid (it is composited over the fill by resolveOpaqueBg)");
+  check(JSON.stringify(deriveFieldRoles({ ...light, "input-bg": " #ffffff ", fg: " #333333 " })) === JSON.stringify(deriveFieldRoles(light)),
+    "surrounding whitespace on a required input is trimmed before parsing (hexToRgb strips '#' before trimming: ' #ffffff ' would read as #000000)");
+  // Frame value with surrounding spaces: trimmed before resolveOpaqueBg, so it
+  // resolves exactly like the unspaced value (it used to pass the frame check
+  // and come out #000000) ...
+  const spacedFrame = deriveFieldRoles(light, " #6272a4 ");
+  check(spacedFrame["field-border"] === "#6272a4" && JSON.stringify(spacedFrame) === JSON.stringify(deriveFieldRoles(light, "#6272a4")),
+    `a framed border with surrounding spaces must resolve like the unspaced value (got field-border ${spacedFrame["field-border"]})`);
+  // ... and a spaced value that is not a hex still throws, naming it.
+  check(throwsNaming(() => deriveFieldRoles(light, " rebeccapurple "), [" rebeccapurple "]),
+    "a framed border with surrounding spaces that is not a hex must throw with the value in the message");
+
+  // R12: the hover fill steps AWAY from its hosts. A recessed well (a fill
+  // DARKER than its panel on a dark theme, gruvbox-dark's shape) must darken
+  // on hover; mixing toward its light fg would walk it back into the panel.
+  const well = { fg: "#ebdbb2", "fg-hint": "#a89984", panel: "#3c3836", "pf-bg": "#3c3836", "input-bg": "#302f2e",
+    border: "#9f958f", "focus-bd": "#7e9e92", accent: "#83a598" };
+  const w = deriveFieldRoles(well);
+  const wellHosts = [well.panel, well["pf-bg"]];
+  check(ratio(w["field-bg"], well.panel) >= FILL_SEPARATE_MIN && relLum(hexToRgb(w["field-bg"])) < relLum(hexToRgb(well.panel)),
+    "recessed-well fixture precondition: the rest fill is separated and darker than its host");
+  check(relLum(hexToRgb(w["field-bg-hover"])) < relLum(hexToRgb(w["field-bg"])),
+    `a recessed well must DARKEN on hover (away from its lighter host), got ${w["field-bg"]} -> ${w["field-bg-hover"]}`);
+  check(ratio(w["field-bg-hover"], w["field-bg"]) >= FILL_SEPARATE_MIN &&
+    wellHosts.every((h) => ratio(w["field-bg-hover"], h) >= FILL_SEPARATE_MIN && ratio(w["field-bg-hover"], h) >= ratio(w["field-bg"], h)),
+    "a well's hover fill separates from the rest fill and from every host, and no less than the rest fill does");
+  check(w["field-border-hover"] === w["field-bg-hover"], "an unframed well's frame follows its hover fill");
+  // The mirror: a dark theme whose field is RAISED above its panel lightens
+  // (toward its light fg, the pre-R12 behaviour, byte-identical there).
+  const raised = { ...well, "input-bg": "#4a4644" };
+  const rz = deriveFieldRoles(raised);
+  check(relLum(hexToRgb(rz["field-bg"])) > relLum(hexToRgb(raised.panel)) &&
+    relLum(hexToRgb(rz["field-bg-hover"])) > relLum(hexToRgb(rz["field-bg"])) &&
+    rz["field-bg-hover"] === rgbToHex(fillSeparate(hexToRgb(rz["field-bg"]), [hexToRgb(rz["field-bg"])], hexToRgb(raised.fg))),
+    "a raised dark field lightens on hover, exactly as the pre-R12 toward-fg step");
+
+  // R13: typed text must be tellable apart from the placeholder.
+  // (a) fg already clears the floor -> field-fg is fg and the placeholder is
+  //     the untouched fgToAAMulti(fg-hint) result (the default :root's shape).
+  check(f["field-fg"] === "#333333" && ratio(f["field-fg"], f["field-placeholder"]) >= FIELD_TEXT_PLACEHOLDER_MIN &&
+    f["field-placeholder"] === rgbToHex(fgToAAMulti(hexToRgb(light["fg-hint"]), [hexToRgb(f["field-bg"]), hexToRgb(f["field-bg-hover"])], 4.5)),
+    "where fg already clears FIELD_TEXT_PLACEHOLDER_MIN, field-fg = fg and the placeholder is not moved");
+  // (b) a placeholder with head-room above 4.5:1 moves toward the fills far
+  //     enough on its own -- typed text keeps fg.
+  const roomy = deriveFieldRoles({ ...light, "fg-hint": "#444444" });
+  check(ratio("#333333", "#444444") < FIELD_TEXT_PLACEHOLDER_MIN && roomy["field-fg"] === "#333333" &&
+    ratio(roomy["field-fg"], roomy["field-placeholder"]) >= FIELD_TEXT_PLACEHOLDER_MIN &&
+    relLum(hexToRgb(roomy["field-placeholder"])) > relLum(hexToRgb("#444444")) &&
+    [roomy["field-bg"], roomy["field-bg-hover"]].every((h) => ratio(roomy["field-placeholder"], h) >= 4.5),
+    `a placeholder with room above 4.5:1 must lighten toward the (light) fills until typed text (fg) is >= ${FIELD_TEXT_PLACEHOLDER_MIN}:1 from it, staying >= 4.5:1 on both fills (got ${roomy["field-placeholder"]}, field-fg ${roomy["field-fg"]})`);
+  // (c) solarized-light's shape: the placeholder already sits at 4.5:1 on the
+  //     hover fill and cannot move, so typed text darkens (away from the
+  //     light fills) until it clears the floor.
+  const lowC = { fg: "#4a5c61", "fg-hint": "#5b686a", panel: "#eee8d5", "pf-bg": "#eee8d5", "input-bg": "#e1decf",
+    border: "#88774b", "focus-bd": "#4784ad", accent: "#1e6ca4" };
+  const lc = deriveFieldRoles(lowC);
+  check(ratio(lc["field-fg"], lc["field-placeholder"]) >= FIELD_TEXT_PLACEHOLDER_MIN &&
+    relLum(hexToRgb(lc["field-fg"])) < relLum(hexToRgb(lowC.fg)) &&
+    [lc["field-bg"], lc["field-bg-hover"]].every((h) => ratio(lc["field-placeholder"], h) >= 4.5 && ratio(lc["field-fg"], h) >= 4.5),
+    `low-contrast fixture: field-fg must darken away from the light fills until >= ${FIELD_TEXT_PLACEHOLDER_MIN}:1 from the placeholder (got ${lc["field-fg"]} vs ${lc["field-placeholder"]})`);
+  // (d) the dark mirror: typed text LIGHTENS away from dark fills.
+  const lowD = { fg: "#aeb9b9", "fg-hint": "#8e9e9f", panel: "#073642", "pf-bg": "#073642", "input-bg": "#163d46",
+    border: "#1191ad", "focus-bd": "#268bd2", accent: "#268bd2" };
+  const ld = deriveFieldRoles(lowD);
+  check(ratio(ld["field-fg"], ld["field-placeholder"]) >= FIELD_TEXT_PLACEHOLDER_MIN && relLum(hexToRgb(ld["field-fg"])) > relLum(hexToRgb(lowD.fg)),
+    `low-contrast dark fixture: field-fg must lighten away from the dark fills (got ${ld["field-fg"]})`);
 
   const weakFocus = deriveFieldRoles({ ...light, "focus-bd": "#c8d6ea" });
   check(weakFocus["field-border-focus"] !== "#c8d6ea" && ratio(weakFocus["field-border-focus"], weakFocus["field-bg"]) >= 3,
@@ -930,22 +1008,75 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
 // contrast-audit gates on the shipped CSS, run against composeOptionsThemeMap
 // so a deriver change is caught before sync-all writes it. ---
 {
+  const hex6 = (v) => rgbToHex(hexToRgb(String(v).trim()));
+  // Category assertions shared by the 14 themed maps and the default :root.
+  // `framed` = the pilot declares ui.options.<mode>.input-border (§9.5).
+  const fieldCategory = (id, map, framed) => {
+    check(FIELD_ROLES.every((r) => /^#[0-9a-f]{6}$/.test(map[r] ?? "")), `${id}: options map lacks a field-* role`);
+    const hosts = [map.panel, map["pf-bg"] ?? map.panel];
+    check([map["field-bg"], map["field-bg-hover"], ...hosts].every((h) => ratio(map["field-edge"], h) >= 3),
+      `${id}: field-edge ${map["field-edge"]} under 3:1 on a fill or host`);
+    check(ratio(map["field-edge-hover"], map["field-bg-hover"]) > ratio(map["field-edge"], map["field-bg"]) &&
+      hosts.every((h) => ratio(map["field-edge-hover"], h) > ratio(map["field-edge"], h)),
+      `${id}: the hover edge is not strictly stronger than the rest edge`);
+    check(map["field-bg-focus"] === map["field-bg"], `${id}: focus repaints the fill`);
+    check(ratio(map.fg, map["field-bg-hover"]) >= 4.5, `${id}: plain fg under 4.5:1 on the hover fill (the tab picker's text)`);
+    // R12: the hover fill steps AWAY from the hosts. An unseparated framed
+    // fill (the frame carries hover) keeps its fill; every other fill takes
+    // a separated step that moves no closer to any host than rest does.
+    const unseparated = hosts.some((h) => ratio(map["field-bg"], h) < FILL_SEPARATE_MIN);
+    check((framed && unseparated) === (map["field-bg-hover"] === map["field-bg"]),
+      `${id}: framed-and-unseparated (${framed && unseparated}) must hold exactly when field-bg-hover == field-bg (${map["field-bg-hover"]} vs ${map["field-bg"]})`);
+    if (!(framed && unseparated)) {
+      check(ratio(map["field-bg-hover"], map["field-bg"]) >= FILL_SEPARATE_MIN,
+        `${id}: the hover fill ${map["field-bg-hover"]} is under FILL_SEPARATE_MIN from the rest fill ${map["field-bg"]}`);
+      for (const h of hosts) {
+        check(ratio(map["field-bg-hover"], h) >= FILL_SEPARATE_MIN && ratio(map["field-bg-hover"], h) >= ratio(map["field-bg"], h),
+          `${id}: the hover fill ${map["field-bg-hover"]} steps toward host ${h} (${ratio(map["field-bg-hover"], h).toFixed(3)} vs rest ${ratio(map["field-bg"], h).toFixed(3)}; floor ${FILL_SEPARATE_MIN})`);
+      }
+    }
+    // R13: typed text vs placeholder.
+    check(ratio(map["field-fg"], map["field-placeholder"]) >= FIELD_TEXT_PLACEHOLDER_MIN,
+      `${id}: field-fg ${map["field-fg"]} is ${ratio(map["field-fg"], map["field-placeholder"]).toFixed(3)}:1 from the placeholder ${map["field-placeholder"]} (floor ${FIELD_TEXT_PLACEHOLDER_MIN})`);
+    check(ratio(hex6(map.fg), map["field-placeholder"]) < FIELD_TEXT_PLACEHOLDER_MIN || map["field-fg"] === hex6(map.fg),
+      `${id}: fg ${map.fg} already clears the floor against the placeholder, so field-fg must be fg (got ${map["field-fg"]})`);
+    // ...and the placeholder only moves when it has to: where fg already
+    // clears the floor against the plain AA placeholder, that is what ships.
+    const p0 = rgbToHex(fgToAAMulti(hexToRgb(map["fg-hint"].trim()), [hexToRgb(map["field-bg"]), hexToRgb(map["field-bg-hover"])], 4.5));
+    check(ratio(hex6(map.fg), p0) < FIELD_TEXT_PLACEHOLDER_MIN || (map["field-placeholder"] === p0 && map["field-fg"] === hex6(map.fg)),
+      `${id}: fg ${map.fg} already clears the floor against the AA placeholder ${p0}, so neither ink may move (got placeholder ${map["field-placeholder"]}, field-fg ${map["field-fg"]})`);
+    check([map["field-bg"], map["field-bg-hover"], map["input-bg"]].every((h) => ratio(map["field-fg"], h) >= 4.5),
+      `${id}: field-fg ${map["field-fg"]} under 4.5:1 on a field fill or the search box's input-bg`);
+    check([map["field-bg"], map["field-bg-hover"]].every((h) => ratio(map["field-placeholder"], h) >= 4.5),
+      `${id}: field-placeholder ${map["field-placeholder"]} under 4.5:1 on a field fill`);
+  };
   let walked = 0;
   for (const entry of POPUP_THEME_MAP) {
     const tk = JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${entry.pilot}.tokens.json`, import.meta.url), "utf8"));
     const { map } = composeOptionsThemeMap(tk, entry.mode, entry.useDarkMode);
-    const id = entry.id;
     walked++;
-    check(FIELD_ROLES.every((r) => /^#[0-9a-f]{6}$/.test(map[r] ?? "")), `${id}: options map lacks a field-* role`);
-    check([map["field-bg"], map["field-bg-hover"], map.panel, map["pf-bg"]].every((h) => ratio(map["field-edge"], h) >= 3),
-      `${id}: field-edge ${map["field-edge"]} under 3:1 on a fill or host`);
-    check(ratio(map["field-edge-hover"], map["field-bg-hover"]) > ratio(map["field-edge"], map["field-bg"]) &&
-      [map.panel, map["pf-bg"]].every((h) => ratio(map["field-edge-hover"], h) > ratio(map["field-edge"], h)),
-      `${id}: the hover edge is not strictly stronger than the rest edge`);
-    check(map["field-bg-focus"] === map["field-bg"], `${id}: focus repaints the fill`);
-    check(ratio(map.fg, map["field-bg-hover"]) >= 4.5, `${id}: typed text under 4.5:1 on the hover fill`);
+    fieldCategory(entry.id, map, tk.ui?.options?.[entry.mode]?.["input-border"] != null);
   }
   check(walked === POPUP_THEME_MAP.length && walked === 14, `field-family pipeline walk visited ${walked} themes, expected 14`);
+  // The 15th block: the default :root (never framed), folded from the shipped
+  // CSS the same way the re-derivation block below reads it.
+  const rootCss = readFileSync(new URL("../options.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const rootDict = {};
+  for (const m of rootCss.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) {
+    for (const d of m[1].matchAll(/--opt-([a-z0-9-]+)\s*:\s*([^;]+);/g)) rootDict[d[1]] = d[2].trim();
+  }
+  check(FIELD_ROLES.every((r) => r in rootDict), "field-family pipeline walk: the folded default :root lacks a field-* role");
+  fieldCategory(":root", rootDict, false);
+  // The shipped themes must actually exercise both R12 branches, or the
+  // category checks above prove nothing about the direction rule.
+  const WELLS = ["gruvbox-dark", "catppuccin-mocha"];
+  let darkened = 0;
+  for (const entry of POPUP_THEME_MAP.filter((e) => WELLS.includes(e.id))) {
+    const tk = JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${entry.pilot}.tokens.json`, import.meta.url), "utf8"));
+    const { map } = composeOptionsThemeMap(tk, entry.mode, entry.useDarkMode);
+    if (relLum(hexToRgb(map["field-bg"])) < relLum(hexToRgb(map.panel)) && relLum(hexToRgb(map["field-bg-hover"])) < relLum(hexToRgb(map["field-bg"]))) darkened++;
+  }
+  check(darkened === WELLS.length, `recessed wells (${WELLS.join(", ")}) must be darker than their panel and darken on hover -- ${darkened}/${WELLS.length}`);
 }
 
 // --- The field family is options-only: popup and library must not grow it.
@@ -987,14 +1118,18 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   }
 }
 
-// --- Anchors: 5 themes x 9 roles read back from the SHIPPED generated region
+// --- Anchors: 5 themes x 10 roles read back from the SHIPPED generated region
 // (not from the deriver), +-1 per channel -- a drift anywhere between
 // deriveFieldRoles and options.css (wiring, emit, a hand edit) fails here.
 // fill / border / edge are the research values the user approved (the B+
 // comparison page https://claude.ai/artifact/EBpjZuxTmXQLjcvzqskvsX, its
 // embedded DATA.Bp.t.<theme>); the other six are this stage's derivation
 // (plan 2026-09-28-ui-fields-bplus, Task 1 table), pinned so it cannot move
-// silently. ---
+// silently. Final fix wave: gruvbox-dark's hover fill / hover frame moved with
+// ruling R12 (#373633 -> #292828, the recessed well now darkens on hover);
+// nord-night's placeholder moved with R13 (#c2c8d5 -> #c0c6d2) and every
+// anchor gained the 10th role, field-fg (nord-night #d8dee9 -> #e5e9f0; the
+// other four = their fg). No other anchor cell changed. ---
 {
   const css = readFileSync(new URL("../options.css", import.meta.url), "utf8");
   const region = css.slice(css.indexOf("/* @generated:ui-themes start"), css.indexOf("/* @generated:ui-themes end */"));
@@ -1004,11 +1139,11 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   };
   const near = (a, b) => /^#[0-9a-f]{6}$/i.test(a || "") && hexToRgb(a).every((c, i) => Math.abs(c - hexToRgb(b)[i]) <= 1);
   const ANCHORS = {
-    ":root": ["#eaeaea", "#eaeaea", "#dfdfdf", "#dfdfdf", "#eaeaea", "#5d88c2", "#7b7b7b", "#5b5b5b", "#616161"],
-    'html[data-theme="terminal"]': ["#111111", "#1a4d1a", "#111111", "#1b551b", "#111111", "#33ff33", "#267326", "#2cb22c", "#21b621"],
-    'html[data-theme="paper-ink"]': ["#e6e5e3", "#e6e5e3", "#dbdad8", "#dbdad8", "#e6e5e3", "#1a3a5c", "#917749", "#64553c", "#5c5c5c"],
-    'html[data-theme="nord-night"]': ["#434c5e", "#4c566a", "#4a5364", "#535d70", "#434c5e", "#75a0b0", "#99a2b6", "#b5bdcd", "#c2c8d5"],
-    'html[data-theme="gruvbox-dark"]': ["#302f2e", "#302f2e", "#373633", "#373633", "#302f2e", "#7e9e92", "#9f958f", "#c1b59f", "#aca093"],
+    ":root": ["#eaeaea", "#eaeaea", "#dfdfdf", "#dfdfdf", "#eaeaea", "#5d88c2", "#7b7b7b", "#5b5b5b", "#616161", "#333333"],
+    'html[data-theme="terminal"]': ["#111111", "#1a4d1a", "#111111", "#1b551b", "#111111", "#33ff33", "#267326", "#2cb22c", "#21b621", "#33ff33"],
+    'html[data-theme="paper-ink"]': ["#e6e5e3", "#e6e5e3", "#dbdad8", "#dbdad8", "#e6e5e3", "#1a3a5c", "#917749", "#64553c", "#5c5c5c", "#2c2c2c"],
+    'html[data-theme="nord-night"]': ["#434c5e", "#4c566a", "#4a5364", "#535d70", "#434c5e", "#75a0b0", "#99a2b6", "#b5bdcd", "#c0c6d2", "#e5e9f0"],
+    'html[data-theme="gruvbox-dark"]': ["#302f2e", "#302f2e", "#292828", "#292828", "#302f2e", "#7e9e92", "#9f958f", "#c1b59f", "#aca093", "#ebdbb2"],
   };
   let compared = 0;
   for (const [selector, values] of Object.entries(ANCHORS)) {
@@ -1020,7 +1155,7 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
       check(near(got, values[i]), `${selector} --opt-${role}=${got} drifted from the anchor ${values[i]} (+-1/channel) -- a wiring/emit/hand-edit drift, or FIELD_EDGE_HOVER_FG_MIX / the deriver changed -- re-run sync-all and update DEFAULT_LIGHT and ANCHORS`);
     });
   }
-  check(compared === 45, `field anchor block made ${compared} comparisons, expected 45 (5 themes x 9 roles)`);
+  check(compared === 50, `field anchor block made ${compared} comparisons, expected 50 (5 themes x 10 roles)`);
 }
 
 if (failures.length) {

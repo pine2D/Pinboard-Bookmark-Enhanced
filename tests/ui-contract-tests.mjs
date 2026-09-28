@@ -5796,6 +5796,31 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(declarationValueMap(gen, ".fg input::placeholder").get("color") === "var(--opt-field-placeholder)" &&
     declarationValueMap(gen, ".fg textarea::placeholder").get("color") === "var(--opt-field-placeholder)",
     "options.css: the generated .fg recipe lost its placeholder rule (color: var(--opt-field-placeholder))");
+  // Typed text (final fix wave, ruling R13): every value box that paints
+  // --opt-field-placeholder paints its typed text with --opt-field-fg, so
+  // "empty" (placeholder) and "configured" (typed text) stay >= 1.4:1 apart
+  // (contrast-audit's field-fg vs field-placeholder row gates the token
+  // pair; these checks gate the consumers). The generated recipe covers
+  // .fg text / password / number / textarea / the native select fallback and,
+  // through them, the key-wrap inputs and the theme-name popover input.
+  check(base.get("color") === "var(--opt-field-fg)",
+    `options.css: the generated .fg recipe paints typed text with ${base.get("color")} instead of var(--opt-field-fg) (composers/ui-components.mjs formRules)`);
+  const handTyped = stripGeneratedRegions(optionsCss).replace(/\/\*[\s\S]*?\*\//g, "");
+  const SEARCH = '.options-search input[type="search"]';
+  check(declarationValueMap(handTyped, ".listbox-btn").get("color") === "var(--opt-field-fg)" &&
+    declarationValueMap(handTyped, SEARCH).get("color") === "var(--opt-field-fg)",
+    "options.css: .listbox-btn and the sidebar search box must paint typed text with var(--opt-field-fg) (ruling R13)");
+  // G1 (final review): the search box's placeholder consumer itself is
+  // pinned -- contrast-audit's `field-placeholder vs input-bg` row only gates
+  // the token pair, so deleting this rule used to leave every gate green
+  // while the box fell back to the UA #757575 (nord-night 1.87:1).
+  check(declarationValueMap(handTyped, `${SEARCH}::placeholder`).get("color") === "var(--opt-field-placeholder)",
+    "options.css: the sidebar search box's ::placeholder must paint var(--opt-field-placeholder) (R4; contrast-audit gates only the token pair)");
+  // The popover input must not re-declare typed text (it inherits the recipe).
+  const popoverColour = parseStyleRules(handTyped).filter((r) => r.selectors.some((sel) => /\.theme-name-popover input/.test(sel)) &&
+    parseDeclarations(r.body).some((d) => d.property === "color" && d.value.trim() !== "var(--opt-field-fg)"));
+  check(popoverColour.length === 0,
+    "options.css: a hand rule repaints the theme-name popover input's typed text with something other than --opt-field-fg: " + popoverColour.map((r) => r.selectorText).join(" | "));
   const hand = stripGeneratedRegions(optionsCss).replace(/\/\*[\s\S]*?\*\//g, "");
   const rowModel = declarationValueMap(hand, '.fg :is(input[type="text"], input[type="password"], input[type="number"])');
   const textarea = declarationValueMap(hand, ".fg textarea");

@@ -12,7 +12,7 @@ const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
 ]);
 
 // B+ field family (spec docs/superpowers/specs/2026-09-28-ui-fields-bplus-design.md
-// §2): nine options-only OUTPUT roles, derived by deriveFieldRoles() at the end
+// §2): ten options-only OUTPUT roles, derived by deriveFieldRoles() at the end
 // of finalizeUiControlRoles when the caller passes `fieldRoles: true`
 // (options-chrome.mjs only -- popup/library emit none of them). Listed in
 // UI_DERIVED_OUTPUT_ROLES.options so validate-contracts.mjs rejects a pilot
@@ -20,12 +20,14 @@ const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
 // (:root) block audit FAIL instead of SKIP when a role is missing -- but only
 // for roles that appear in one of its COMPONENT_PAIR_SPEC rows
 // (isOutputRoleForDefault is asked per pair row). field-border and
-// field-border-hover appear in none, so the default block's copy of all nine
+// field-border-hover appear in none, so the default block's copy of all ten
 // is pinned by tests/theme-ui-derive-tests.mjs instead (the folded-:root
-// re-derivation and the 5-theme anchor block).
+// re-derivation and the 5-theme anchor block). field-fg (final fix wave,
+// ruling R13) is the value box's typed-text ink -- see deriveFieldRoles.
 export const FIELD_ROLES = Object.freeze([
   "field-bg", "field-border", "field-bg-hover", "field-border-hover",
   "field-bg-focus", "field-border-focus", "field-edge", "field-edge-hover", "field-placeholder",
+  "field-fg",
 ]);
 
 // Authoring contract shared with validate-contracts.mjs. These roles are
@@ -495,6 +497,15 @@ export const primaryHoverFill = (accentRgb, fgRgb) => mix(accentRgb, fgRgb, PRIM
 // tests/theme-ui-derive-tests.mjs.
 export const FIELD_EDGE_HOVER_FG_MIX = 0.45;
 
+// Typed text vs placeholder: the least contrast between a value box's typed
+// text (field-fg) and its placeholder ink (field-placeholder) -- "empty" must
+// not read as "configured" (final fix wave, ruling R13). The UA default
+// placeholder #757575 gave 1.52:1 against solarized-light's text; the first
+// B+ derivation, which only floored the placeholder at 4.5:1 on the fills,
+// left solarized-light at 1.03, solarized-dark 1.16, catppuccin-latte 1.18
+// and nord-night 1.24. 1.4 is the floor the ruling set.
+export const FIELD_TEXT_PLACEHOLDER_MIN = 1.4;
+
 // Inputs deriveFieldRoles cannot do without. hexToRgb(undefined) does not
 // throw -- it silently parses as #000000 -- so a map missing one of these
 // would ship plausible-looking 6-digit hex derived from black. pf-bg is the
@@ -516,13 +527,27 @@ const FIELD_REQUIRED_INPUTS = Object.freeze(["fg", "fg-hint", "panel", "input-bg
 // - frame: = fill (collapsed); framed = the pilot frame composited over the
 //   fill (terminal's translucent #33ff3340 -> #1a4d1a) or resolved through a
 //   `var(--opt-<role>)` reference (NEW_THEME.md §9.5's recommended spelling).
-// - hover: the fill deepens one FILL_SEPARATE_MIN step -- but only where the
-//   resting fill is itself a perceivable plane (>= FILL_SEPARATE_MIN against
-//   every host). An unseparated framed fill (terminal 1.00, rose-pine 1.09)
-//   keeps its fill on hover and the FRAME deepens instead: "a framed control
-//   does not need its fill to carry affordance" (§9.5), applied to hover.
-//   This branch is what reproduces the research anchors (terminal edge
-//   #267326, hover edge 6.75:1).
+// - hover: the fill steps one FILL_SEPARATE_MIN step AWAY from its hosts
+//   (final fix wave, ruling R12) -- but only where the resting fill is itself
+//   a perceivable plane (>= FILL_SEPARATE_MIN against every host). A fill
+//   darker than its hosts darkens, a lighter one lightens: the step mixes
+//   toward fg where fg lies in that direction (every light theme, and every
+//   dark theme whose field is raised above its panel -- byte-identical to the
+//   pre-R12 "toward fg" rule there), otherwise toward the matching pole
+//   (#000000 / #ffffff). The recessed dark wells (gruvbox-dark #302f2e on
+//   panel #3c3836, catppuccin-mocha #262637 on #313244) used to mix toward
+//   their light fg, i.e. TOWARD the panel: hover fell to 1.04 / 1.07 against
+//   it, under FILL_SEPARATE_MIN -- the box dissolved into the card on hover.
+//   The hover fill clears FILL_SEPARATE_MIN against the rest fill AND every
+//   host, and stepping away keeps its separation from each host >= the rest
+//   fill's. (A fill lying BETWEEN two hosts' luminances steps away from the
+//   nearer one; no shipped theme has one, and the pipeline walk in
+//   tests/theme-ui-derive-tests.mjs would flag the host it drifts toward.)
+//   An unseparated framed fill (terminal 1.00, rose-pine 1.09) keeps its fill
+//   on hover and the FRAME deepens instead: "a framed control does not need
+//   its fill to carry affordance" (§9.5), applied to hover. This branch is
+//   what reproduces the research anchors (terminal edge #267326, hover edge
+//   6.75:1).
 // - focus: fill unchanged (fusedStateStable relies on it); border = focus-bd,
 //   re-derived with focusBdToAA only where it drops under 3:1 on this fill.
 // - edge: the structural border pushed to >= 3:1 against the fill, the hover
@@ -530,15 +555,29 @@ const FIELD_REQUIRED_INPUTS = Object.freeze(["fg", "fg-hint", "panel", "input-bg
 // - placeholder: the field's secondary ink (placeholder text, the key-wrap eye,
 //   the listbox chevron): fg-hint pushed to >= 4.5:1 on the rest and hover
 //   fills (the focus fill is the rest fill).
+// - fg (typed text, ruling R13): the theme fg, unless it sits within
+//   FIELD_TEXT_PLACEHOLDER_MIN of the placeholder. Then, first, the
+//   placeholder moves toward the fills (lighter on light fills, darker on
+//   dark ones: a mix toward white / black, same hue line) as far as >= 4.5:1
+//   on BOTH fills allows; if typed text still sits within the floor, field-fg
+//   is pushed away from the fills (HSL lightness, hue + saturation kept, the
+//   fgToAA technique in .005 steps) until it clears it. Body text, labels,
+//   buttons, popup and library keep --opt-fg.
 // Every value is hex-rounded before it feeds the next step, the same
 // "verify on what ships" discipline as the other derivers in this file.
 // Throws, naming every missing role, when a FIELD_REQUIRED_INPUTS entry (or
-// the role a `var(--opt-<role>)` frame points at) is absent from `map`; and
-// throws, quoting the value, when a framed border is anything but #rgb /
-// #rrggbb / #rrggbbaa or exactly `var(--<ns>-<role>)` resolving to one of
-// those -- resolveOpaqueBg reads any other spelling (rgba(), a var() with a
-// fallback, a named colour) as transparent, which would silently collapse the
-// pilot's frame into the fill.
+// the role a `var(--opt-<role>)` frame points at) is absent from `map`;
+// throws, naming the role and its value, when a required input (or a given
+// pf-bg) is not a hex this function reads correctly -- #rgb / #rrggbb, plus
+// #rrggbbaa for `border`, the one input composited through resolveOpaqueBg
+// (hexToRgb would read an 8-digit ink or surface's bytes wrongly, and parses
+// every non-hex spelling as #000000); and throws, quoting the value, when a
+// framed border is anything but #rgb / #rrggbb / #rrggbbaa or exactly
+// `var(--<ns>-<role>)` resolving to one of those -- resolveOpaqueBg reads any
+// other spelling (rgba(), a var() with a fallback, a named colour) as
+// transparent, which would silently collapse the pilot's frame into the fill.
+// Surrounding whitespace is trimmed before any of these values is parsed.
+const FIELD_HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const FIELD_FRAME_HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 export function deriveFieldRoles(map, framedBorder = null) {
   const present = (v) => typeof v === "string" && v.trim() !== "";
@@ -546,8 +585,15 @@ export function deriveFieldRoles(map, framedBorder = null) {
   if (missing.length) {
     throw new Error(`deriveFieldRoles: missing required input role(s): ${missing.join(", ")}`);
   }
-  const fg = hexToRgb(map.fg);
-  const hosts = [hexToRgb(map.panel), hexToRgb(present(map["pf-bg"]) ? map["pf-bg"] : map.panel)];
+  const hasPf = present(map["pf-bg"]);
+  const unparseable = [...FIELD_REQUIRED_INPUTS, ...(hasPf ? ["pf-bg"] : [])]
+    .filter((r) => !(r === "border" ? FIELD_FRAME_HEX_RE : FIELD_HEX_RE).test(map[r].trim()));
+  if (unparseable.length) {
+    throw new Error(`deriveFieldRoles: input role(s) not a parseable hex (#rgb / #rrggbb${unparseable.includes("border") ? "; border may be #rrggbbaa" : ""}): ${unparseable.map((r) => `${r}=${JSON.stringify(map[r])}`).join(", ")}`);
+  }
+  const rgbOf = (r) => hexToRgb(map[r].trim());
+  const fg = rgbOf("fg");
+  const hosts = [rgbOf("panel"), rgbOf(hasPf ? "pf-bg" : "panel")];
   const framed = framedBorder != null;
   const roleRef = typeof framedBorder === "string" && /^var\(--[a-z]+-([a-z0-9-]+)\)$/.exec(framedBorder.trim());
   if (roleRef && !present(map[roleRef[1]])) {
@@ -559,19 +605,53 @@ export function deriveFieldRoles(map, framedBorder = null) {
     throw new Error(`deriveFieldRoles: framed border ${JSON.stringify(framedBorder)}${resolved} is not #rgb / #rrggbb / #rrggbbaa or exactly var(--<ns>-<role>)`);
   }
 
-  const bgHex = rgbToHex(framed ? hexToRgb(map["input-bg"]) : fillSeparate(hexToRgb(map["input-bg"]), hosts, fg));
+  const round = (c) => hexToRgb(rgbToHex(c));
+  const bgHex = rgbToHex(framed ? rgbOf("input-bg") : fillSeparate(rgbOf("input-bg"), hosts, fg));
   const bg = hexToRgb(bgHex);
-  const borderHex = framed ? rgbToHex(resolveOpaqueBg(frameRaw, bg)) : bgHex;
+  const borderHex = framed ? rgbToHex(resolveOpaqueBg(frameRaw.trim(), bg)) : bgHex;
   const border = hexToRgb(borderHex);
   const separated = hosts.every((h) => contrast(bg, h) >= FILL_SEPARATE_MIN);
-  const bgHoverHex = separated ? rgbToHex(fillSeparate(bg, [bg], fg)) : bgHex;
+  let bgHoverHex = bgHex;
+  if (separated) {
+    const lum = relLum(bg);
+    const hostLums = hosts.map(relLum);
+    const nearest = hosts.reduce((a, h) => (contrast(bg, h) < contrast(bg, a) ? h : a));
+    const darken = hostLums.every((l) => lum < l) ? true
+      : hostLums.every((l) => lum > l) ? false
+        : lum < relLum(nearest);
+    const toward = (relLum(fg) < lum) === darken ? fg : darken ? [0, 0, 0] : [255, 255, 255];
+    bgHoverHex = rgbToHex(fillSeparate(bg, [bg, ...hosts], toward));
+  }
   const bgHover = hexToRgb(bgHoverHex);
   const borderHoverHex = framed ? rgbToHex(fillSeparate(border, [border], fg)) : bgHoverHex;
-  const focusBd = hexToRgb(map["focus-bd"]);
-  const borderFocusHex = rgbToHex(contrast(focusBd, bg) >= 3 ? focusBd : focusBdToAA(hexToRgb(map.accent), bg, [bg]));
-  const edgeHex = rgbToHex(fgToAAMulti(resolveOpaqueBg(map.border, bg), [bg, bgHover, ...hosts], 3));
+  const focusBd = rgbOf("focus-bd");
+  const borderFocusHex = rgbToHex(contrast(focusBd, bg) >= 3 ? focusBd : focusBdToAA(rgbOf("accent"), bg, [bg]));
+  const edgeHex = rgbToHex(fgToAAMulti(resolveOpaqueBg(map.border.trim(), bg), [bg, bgHover, ...hosts], 3));
   const edgeHoverHex = rgbToHex(mix(hexToRgb(edgeHex), fg, FIELD_EDGE_HOVER_FG_MIX));
-  const placeholderHex = rgbToHex(fgToAAMulti(hexToRgb(map["fg-hint"]), [bg, bgHover], 4.5));
+
+  // Placeholder, then typed text (R13) -- see the header comment.
+  const fills = [bg, bgHover];
+  const placeholder0 = round(fgToAAMulti(rgbOf("fg-hint"), fills, 4.5));
+  let placeholder = placeholder0;
+  let fieldFg = round(fg);
+  if (contrast(fieldFg, placeholder) < FIELD_TEXT_PLACEHOLDER_MIN) {
+    const lightFills = relLum(placeholder0) < relLum(bg); // the ink sits darker than the fills
+    const pole = lightFills ? [255, 255, 255] : [0, 0, 0];
+    for (let i = 1; i <= 1000; i++) {
+      const c = round(mix(placeholder0, pole, i / 1000));
+      if (!fills.every((f) => contrast(c, f) >= 4.5)) break;
+      placeholder = c;
+    }
+    if (contrast(fieldFg, placeholder) < FIELD_TEXT_PLACEHOLDER_MIN) {
+      const [h, s] = rgbToHsl(fg);
+      let [, , l] = rgbToHsl(fg);
+      for (let i = 0; i < 400 && contrast(fieldFg, placeholder) < FIELD_TEXT_PLACEHOLDER_MIN; i++) {
+        l = lightFills ? Math.max(0, l - 0.005) : Math.min(1, l + 0.005);
+        fieldFg = round(hslToRgb([h, s, l]));
+        if (l <= 0 || l >= 1) break;
+      }
+    }
+  }
   return {
     "field-bg": bgHex,
     "field-border": borderHex,
@@ -581,7 +661,8 @@ export function deriveFieldRoles(map, framedBorder = null) {
     "field-border-focus": borderFocusHex,
     "field-edge": edgeHex,
     "field-edge-hover": edgeHoverHex,
-    "field-placeholder": placeholderHex,
+    "field-placeholder": rgbToHex(placeholder),
+    "field-fg": rgbToHex(fieldFg),
   };
 }
 
