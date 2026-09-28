@@ -353,8 +353,9 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
 - 第一行固定为「语义锚点 + 24×24px 命中区」，13px help SVG 只移动可见墨迹，不移动 summary 的
   命中盒或焦点盒；说明正文由同一个 `<details>` 在第二行全宽展开。
 - 校准最多按「角色 × 实际文案文字系统族」声明一次；禁止 ID、文案、单项 class、主题选择器或内联 transform。
-  同一角色出现不同偏差时先修 DOM/布局异常，不新增例外；校准值必须同时落在 Windows 常用字体与
-  CI 的 DejaVu + 文泉驿正黑（`scripts/ci-fonts.conf`，必须以绝对路径传给 `FONTCONFIG_FILE`）字体栅格交集内，门禁容许至多 2 个物理像素的抗锯齿量化差异。
+  同一角色出现不同偏差时先修 DOM/布局异常，不新增例外；校准值必须同时落在 Windows 常用字体（Verdana / 微软雅黑）与
+  CI 的 Liberation Sans + 文泉驿正黑（`scripts/ci-fonts.conf` 在 Ubuntu 24.04 主机上逐字节复现 CI，必须以绝对路径传给 `FONTCONFIG_FILE`）字体栅格交集内，门禁容许至多 2 个物理像素的抗锯齿量化差异。
+  拉丁文案的墨迹中心只取「墨迹顶 → 基线」（基线由 DOM 零尺寸探针读出，下伸部不计）：整框中心会让有无下伸部的同角色标题相差最多 4 个物理像素，量到的是单词而不是图标；CJK 文案仍取整个墨迹框。
 - 两种锚定模型，按宿主有没有文字基线可借选择：**有文案的宿主**（`section` / `field` / `group` / `choice`）用
   `align-items: baseline` 把 summary 锚到文案基线，再按字号常量下移到光学中心（拉丁小写混排 ≈0.3em、
   方块字 ≈0.38em；文案字面钉 px 所以常量也是 px）——行内墨迹相对行盒的位置是字体的升降部拆分，Segoe UI 与
@@ -1531,7 +1532,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 - 提交期：`scripts/pre-commit-hook.sh` 第二触发组（四 HTML / 表面 JS / md-preview.css / 注册表 / 基线）。
 - push 期：`scripts/verify.sh` `[ui-vocabulary]`（含 `tests/ui-vocabulary-tests.mjs` CLI 契约）+ `[render-audit]` 的类扫描家族（family 4–12；`spacingScale` 对账 `tests/render-audit-spacing-baseline.json`，其余对账 `render-audit-known-failures.json`）。
 - **扫描覆盖面**（2026-09-06 起）：sweep 不只扫静态页——阅读器会种 AI 配置、两个 Send-to 目标与按 URL 哈希键的高亮记录，然后逐个打开 explain 弹层（含词典视图、显示回答态的底栏按钮）、ask 面板、搜索/快捷键/字号弹层、高亮卡、发送菜单、确认弹层；popup 会显示默认隐藏的反馈卡、批量授权、进度条、Markdown 条、离线队列；视频工作台通过 `window.pbpVideoFixture`（md-video.js `prepareVideoSession` 的 QA 夹具入口，跳过授权与抓取）离线挂载后度量。任何「交互后才出现」的新界面都要在 `READER_SURFACES` 或 popup 状态腿里登记开启方式，否则它的控件不在门内（explain 底栏 36px 按钮就是这样漏掉的）。含 `×`（U+00D7）为唯一文字的按钮按图标键度量（命中区 ≥24）。
-- **CI 字体对齐**：CI 的 Ubuntu runner 只有 DejaVu / Liberation / Noto，本机 WSL 借到 Windows 字体，`line-height: normal` 的控件两端相差约 0.7px，恰好一边在容差内一边出界。push 前用 `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf"` 跑 sweep 或相关套件即可看到 CI 看到的几何；出界的修法永远是钉 px（height / min-height / line-height），不是改数字迁就某个字体。**这条不再是人肉仪式**（K107，2026-09-15）：`ui-render-audit.mjs` / `options-help-render-audit.mjs` 在 `FONTCONFIG_FILE` 已设置时会自跑 `checkFontconfigParity()`——校验路径是绝对路径、并用 `fc-match "Microsoft YaHei"` 确认真解析到 DejaVu Sans（conf 未加载时是 msyh.ttc）；不符即 FAIL 并点名配置路径。未设置该变量（CI 的默认路径）不触发，零行为变化。
+- **CI 字体对齐**：CI 的 Ubuntu runner 只有 DejaVu / Liberation / 文泉驿正黑等 Playwright 依赖字体（拉丁正文实际落在 Liberation Sans），本机 WSL 借到 Windows 字体，`line-height: normal` 的控件两端相差约 0.7px，恰好一边在容差内一边出界。push 前用 `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf"` 跑 sweep 或相关套件即可看到 CI 看到的几何；出界的修法永远是钉 px（height / min-height / line-height），不是改数字迁就某个字体。**这条不再是人肉仪式**（K107，2026-09-15）：`ui-render-audit.mjs` / `options-help-render-audit.mjs` 在 `FONTCONFIG_FILE` 已设置时会自跑 `checkFontconfigParity()`——校验路径是绝对路径、并用 `fc-match "Microsoft YaHei"` 确认真解析到 DejaVu Sans（conf 未加载时是 msyh.ttc）；不符即 FAIL 并点名配置路径。未设置该变量（CI 的默认路径）不触发，零行为变化。
 - 新增原语的流程：注册表登记 → 本节补一行契约 → CSS 写关系规则 → 门自然放行。顺序反过来（先写 CSS 再想名字）就是本节要消灭的路径。
 
 ## 11. 密度档

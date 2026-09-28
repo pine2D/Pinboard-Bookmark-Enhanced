@@ -679,24 +679,24 @@ label.switch > .context-help > .context-help-body {
 /* Action role: the toggle rides the button-text baseline (rule above the
    choice block); the constant is baseline -> optical centre, one value per
    script, sitting at the midpoint of the two font stacks the raster audit
-   runs under (Segoe UI / Microsoft YaHei on the Windows host, DejaVu /
-   WenQuanYi Zen Hei on CI via scripts/ci-fonts.conf). Folded in stage-3c
-   Task 4 from a separate +3px row-model correction that used to live next to
-   the `.context-help-toggle .btn-ic` recipe below as its own
-   translateY(calc(...)) rule -- see the calibration record below, just above
-   the section/field/group constants below, for the fold arithmetic and
-   measured ranges shared by every constant in this block. Re-measure with
-   PBP_HELP_RASTER_RANGES=1 before
+   runs under (Verdana / Microsoft YaHei on the Windows host, Liberation Sans /
+   WenQuanYi Zen Hei on CI, reproduced locally by scripts/ci-fonts.conf).
+   Folded in stage-3c Task 4 from a separate +3px row-model correction that
+   used to live next to the `.context-help-toggle .btn-ic` recipe below as its
+   own translateY(calc(...)) rule. See the calibration record below, just
+   above the section/field/group constants, for the measured ranges of every
+   constant in this block. Re-measure with PBP_HELP_RASTER_RANGES=1 before
    touching it. */
 [data-help-script="alphabetic"][data-help-role="action"] { --context-help-optical-y: 1.5px; }
 [data-help-script="cjk"][data-help-role="action"] { --context-help-optical-y: 2px; }
 /* Text-only hosts (section / field / group) anchor the toggle to the copy's
    BASELINE instead of the row's centre. Where a line's ink sits inside its box
-   is the font's ascent/descent split -- Segoe UI and DejaVu differ by ~1 CSS
-   px there and no CSS unit exposes it, so a centre-anchored constant fitted
-   one family and missed the other (raster audit, 2026-09-06). The baseline
+   is the font's ascent/descent split -- the Windows and CI font stacks differ
+   by ~1 CSS px there and no CSS unit exposes it, so a centre-anchored constant
+   fitted one family and missed the other (raster audit, 2026-09-06). The baseline
    absorbs that split; what remains, baseline -> optical centre, is a stable
-   fraction of the em per script (Latin mixed case ~0.3em, ideographs ~0.38em),
+   fraction of the em per script (Latin ~0.37em: the centre of the ink ABOVE
+   the baseline, descenders not counted; ideographs ~0.38em),
    written in px because the copy face is pinned px -- since stage 3c every
    section/field/group host renders the row model's --opt-text-section
    (16px/600) title face or --opt-text-body (14px) label/group face, not a
@@ -718,68 +718,39 @@ label.switch > .context-help > .context-help-body {
    the row container itself stays centre-aligned. */
 .context-help-action-row[data-help-role="action"] > .save-theme-wrap,
 .context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle { align-self: baseline; }
-/* Stage-3c Task 4 calibration record (fold-by-construction). Through
-   stage 3b these constants -- the six below plus action's two constants
-   above ([data-help-role="action"]) -- carried the SURFACE-WIDE fraction
-   fitted to the smaller pre-row-model face (title 15px/600, field/group
-   copy 12px). A separate per-role
-   translateY(calc(var(--context-help-optical-y) +/- Npx)) rule next to the
-   `.context-help-toggle .btn-ic` recipe below additively corrected each
-   role for the WIDER row-model face (--opt-text-section 16px/600,
-   --opt-text-body 14px) that
-   every host on the page has used since stage 3b moved every panel onto the
-   row model and stage 3c retired the prototype marker that used to scope
-   that correction. Task 4 folds the addend into the constant
-   itself -- new value = old shared constant + the deleted rule's addend --
-   so the rendered icon position is pixel-identical by construction (verified:
-   PBP_HELP_RASTER_RANGES=1 output is byte-identical before and after the fold
-   under both font configs) and the per-role rules are gone:
-     action:  alphabetic -1.5 + 3    = 1.5  | cjk -1   + 3    = 2
-     section: alphabetic  2   - 0.5  = 1.5  | cjk  1.75 - 0.5 = 1.25
-     field:   alphabetic  2.75 - 0.75 = 2   | cjk  2.25 - 0.75 = 1.5
-     group:   alphabetic  2.5  - 0.75 = 1.75| cjk  2    - 0.75 = 1.25
-   Measured worst |delta| physical px (PBP_HELP_RASTER_RANGES=1, all four
-   DPRs, both locales; "local" = this machine's fonts, "CI" =
-   FONTCONFIG_FILE=scripts/ci-fonts.conf), DPR2 range then DPR 1/1.25/1.5
-   worst:
-     action/alphabetic:  DPR2 -0.5..-0.5 | worst 1 local, 1 CI
-     action/cjk:         DPR2  0..0      | worst 0.5 local, 0.5 CI
-     section/alphabetic: DPR2 -1.5..2    | worst 1.5 local, 2 CI (DPR2 itself hits +2 in BOTH configs -- "worst" here is DPR 1/1.25/1.5 only, see the line above)
-     section/cjk:        DPR2  0.5..1    | worst 0.5 local, 1 CI
-     field/alphabetic:   DPR2 -1.5..1.5  | worst 2 local, 1 CI
-     field/cjk:          DPR2 -1..0      | worst 1.5 local, 0.5 CI
-     group/alphabetic:   DPR2 -1.5..1    | worst 2 local, 1.5 CI
-     group/cjk:          DPR2 -0.5..-0.5 | worst 0.5 local, 0 CI
-   Three folded values sit exactly on the +-2px tolerance edge (section/
-   alphabetic in BOTH configs, at DPR2 -- see the row above; field/alphabetic
-   local; group/alphabetic local) -- each was swept +-0.125px per the design
-   doc's decision rule
-   (docs/superpowers/specs/2026-09-27-ui-system-stage3c-design.md §4.1) before
-   being kept as-is:
-     section/alphabetic: 1.375 FAILS (CI storageIntro -2.5px); 1.625 FAILS
-       (both configs, freeTierTitle/optThemeHint +2.5px) -- the same
-       quantization wall stage-3a Task 1 already found in the old additive
-       scale (that -0.6/-0.625px boundary is this fold's 1.4/1.375px), so
-       1.5px is the only viable point on the 0.125px grid.
-     field/alphabetic: both 1.875 and 2.125 raise the CI worst from 1 to 2
-       without moving the local worst off 2 -- neither direction helps.
-     group/alphabetic: 1.625 raises the CI worst from 1.5 to 2 without moving
-       local off 2; 1.875 drops local to 1.5 but raises CI to 2 -- no
-       candidate clears <=1.5 on both configs at once.
-   All eight constants therefore keep the folded value; none needed the
-   pixel-gate's `--allow "*:.context-help-toggle"` escape hatch. Choice's two
-   constants (the `[data-help-role="choice"]` pair below) are untouched --
-   their correction was never split into a separate rule, so there was
-   nothing to fold. Choice sits at the same +-2px edge too (en@2/alphabetic/
-   choice local -0.5..2, zh-CN@2/alphabetic/choice local 2, zh-CN@2/cjk/
-   choice CI 1..2) -- historical, not touched this stage; a future
-   recalibration should sweep it the same way as the six above. Re-measure with
-   `node scripts/options-help-render-audit.mjs` and
+/* Calibration record (2026-09-28). Stage-3c Task 4 folded the old per-role
+   translateY(calc(...)) addends into these constants (pixel-identical by
+   construction); the values below then moved when the raster audit changed
+   how it measures Latin copy. The old metric centred the copy's WHOLE ink
+   box, so a title with a descender ("Prompts", "Storage Management") read up
+   to 4 device px lower than one without ("AI Provider", "Theme") for the
+   same icon placement -- the entire +-2 window at DPR 2, which left no value
+   that passed both the Windows fonts and CI. The audit now centres Latin copy
+   on its ink above the DOM baseline (descender rows excluded; CJK keeps the
+   whole ink box), which collapses that spread, so the Latin constants were
+   re-centred on it. scripts/ci-fonts.conf was rebuilt at the same time: the
+   old one rendered Latin in DejaVu Sans with full hinting, but CI renders it
+   in Liberation Sans with hintslight + rgb, so "passes under ci-fonts.conf"
+   did not mean "passes on CI" (the new file reproduces the CI log
+   byte-for-byte). Swept in 1/32px steps under both configs, every probe at
+   every DPR; each changed value is the 1/8px point nearest the middle of the
+   widest run of values that keeps the largest margin in both:
+     section/alphabetic 1.5  -> 0.625 (run 0.40625..0.75)
+     field/alphabetic   2    -> 1.25  (run 0.96875..1.59375)
+     choice/alphabetic  2.375 -> 1.125 (run 0.96875..1.375; below)
+   Worst |delta| physical px after the change, local Windows fonts / CI
+   (FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf"), gate +-2:
+     section/alphabetic 1   / 0.5   field/alphabetic 0.5 / 1
+     choice/alphabetic  0.5 / 0.5   group/alphabetic 1.5 / 1   (unchanged)
+     action/alphabetic  0.5 / 1     (unchanged)
+     every cjk role     <= 1.5 in both (all four cjk constants unchanged; the
+                        metric change does not touch CJK copy)
+   Re-measure with `node scripts/options-help-render-audit.mjs` and
    `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node
    scripts/options-help-render-audit.mjs` (add PBP_HELP_RASTER_RANGES=1 for
-   the per-role range dump) before nudging any of these eight values. */
-[data-help-script="alphabetic"][data-help-role="section"] { --context-help-optical-y: 1.5px; }
-[data-help-script="alphabetic"][data-help-role="field"] { --context-help-optical-y: 2px; }
+   the per-role range dump) before nudging any of these values. */
+[data-help-script="alphabetic"][data-help-role="section"] { --context-help-optical-y: 0.625px; }
+[data-help-script="alphabetic"][data-help-role="field"] { --context-help-optical-y: 1.25px; }
 [data-help-script="alphabetic"][data-help-role="group"] { --context-help-optical-y: 1.75px; }
 [data-help-script="cjk"][data-help-role="section"] { --context-help-optical-y: 1.25px; }
 [data-help-script="cjk"][data-help-role="field"] { --context-help-optical-y: 1.5px; }
@@ -804,7 +775,7 @@ label.switch > .context-help > .context-help-body {
 .context-help-host[data-help-role="choice"] > label > span:not(.switch-track) { align-self: baseline; }
 .context-help-host[data-help-role="choice"] > .context-help > summary.context-help-toggle,
 .context-help-host[data-help-role="choice"] > label.switch > .context-help > summary.context-help-toggle { align-self: baseline; }
-[data-help-script="alphabetic"][data-help-role="choice"] { --context-help-optical-y: 2.375px; }
+[data-help-script="alphabetic"][data-help-role="choice"] { --context-help-optical-y: 1.125px; }
 [data-help-script="cjk"][data-help-role="choice"] { --context-help-optical-y: 2.125px; }
 .context-help-toggle .btn-ic {
   margin: 0;

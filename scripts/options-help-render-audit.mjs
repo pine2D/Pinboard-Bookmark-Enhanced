@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Pixel-level oracle for Settings contextual-help alignment. DOM line boxes
 // and Canvas text metrics are not accepted here: both can be correct while
-// the rasterized CJK ink is visibly above or below the Lucide glyph.
+// the rasterized CJK ink is visibly above or below the Lucide glyph. The one
+// DOM input is the alphabetic copy's baseline, and it only decides which ink
+// rows are descenders (see capturePair); every centre is still raster ink.
 
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
@@ -241,10 +243,56 @@ async function capturePair(page, item) {
     const copyNode = host?.querySelector("[data-help-audit-copy]");
     const iconNode = host?.querySelector("[data-help-audit-icon]");
     if (!host || !copyNode || !iconNode) return null;
+    // Alphabetic copy: the first line's baseline, read from layout by a
+    // zero-size inline-block (its bottom edge IS the baseline it sits on)
+    // placed with the first text run. A <span> wraps probe + text so the pair
+    // stays one inline run even when the text's parent is a flex container
+    // (the action row's <button>), where a bare probe would become a flex item
+    // of its own. The probe must not move anything: the copy, the icon and the
+    // text run are re-measured with it in place, and any shift, a missing text
+    // run or a baseline outside the copy box is a SETUP error, not a delta.
+    let baseline = null;
+    if (host.dataset.helpScript === "alphabetic") {
+      const walker = document.createTreeWalker(copyNode, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => (node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+      });
+      const text = walker.nextNode();
+      if (!text) {
+        baseline = { error: "no text run inside the copy node" };
+      } else {
+        const textRect = () => {
+          const range = document.createRange();
+          range.selectNodeContents(text);
+          return range.getBoundingClientRect();
+        };
+        const snapshot = () => [copyNode.getBoundingClientRect(), iconNode.getBoundingClientRect(), textRect()]
+          .flatMap((rect) => [rect.left, rect.top, rect.width, rect.height]);
+        const before = snapshot();
+        const wrap = document.createElement("span");
+        const probe = document.createElement("span");
+        probe.style.cssText = "display:inline-block;width:0;height:0;margin:0;padding:0;border:0;vertical-align:baseline";
+        text.before(wrap);
+        wrap.append(probe, text);
+        const probeRect = probe.getBoundingClientRect();
+        const during = snapshot();
+        wrap.before(text);
+        wrap.remove();
+        const copyBox = copyNode.getBoundingClientRect();
+        const drift = Math.max(...before.map((value, index) => Math.abs(value - during[index])));
+        if (drift > 0.01) {
+          baseline = { error: `probe moved the layout by ${drift.toFixed(3)}px` };
+        } else if (!Number.isFinite(probeRect.bottom) || probeRect.bottom <= copyBox.top || probeRect.bottom > copyBox.bottom) {
+          baseline = { error: `baseline ${probeRect.bottom} outside the copy box ${copyBox.top}..${copyBox.bottom}` };
+        } else {
+          baseline = { y: probeRect.bottom - host.getBoundingClientRect().top };
+        }
+      }
+    }
     const hostRect = host.getBoundingClientRect();
     const copyRect = copyNode.getBoundingClientRect();
     const iconRect = iconNode.getBoundingClientRect();
     return {
+      baseline,
       host: { width: hostRect.width, height: hostRect.height },
       copy: {
         left: copyRect.left - hostRect.left,
@@ -268,12 +316,28 @@ async function capturePair(page, item) {
   const copyInk = inkBounds(png, settled.copy, scaleX, scaleY);
   const iconInk = inkBounds(png, settled.icon, scaleX, scaleY);
   if (!copyInk || !iconInk) return { error: `missing raster ink copy=${!!copyInk} icon=${!!iconInk}` };
-  const copyCenter = (copyInk.minY + copyInk.maxY + 1) / 2;
+  // Alphabetic copy is centred on its ink ABOVE the baseline: ink top down to
+  // the baseline row, descender rows excluded. The full ink box made the same
+  // icon placement read up to 4 device px apart between titles with and
+  // without a descender ("Prompts" vs "Theme" at 16px/600, DPR 2 -- the whole
+  // +-2 window), so the gate was judging the words, not the icon. CJK copy
+  // has no descender band and keeps the full ink box.
+  let copyBottom = copyInk.maxY + 1;
+  let baselineRow = null;
+  if (settled.baseline) {
+    if (settled.baseline.error) return { error: `SETUP baseline probe: ${settled.baseline.error}` };
+    baselineRow = Math.round(settled.baseline.y * scaleY);
+    if (baselineRow <= copyInk.minY) {
+      return { error: `SETUP baseline probe: baseline row ${baselineRow} is not below the ink top ${copyInk.minY}` };
+    }
+    copyBottom = Math.min(copyBottom, baselineRow);
+  }
+  const copyCenter = (copyInk.minY + copyBottom) / 2;
   const iconCenter = (iconInk.minY + iconInk.maxY + 1) / 2;
   return {
     deltaPhysicalPx: iconCenter - copyCenter,
     rasterScale: Number(scaleY.toFixed(3)),
-    copyInkY: `${copyInk.minY}-${copyInk.maxY}`,
+    copyInkY: `${copyInk.minY}-${copyInk.maxY}${baselineRow === null ? "" : ` baseline=${baselineRow}`}`,
     iconInkY: `${iconInk.minY}-${iconInk.maxY}`,
   };
 }
