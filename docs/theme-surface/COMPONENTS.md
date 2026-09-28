@@ -639,7 +639,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); 
 长手属性**，让只设 `background-color` 的主题覆盖不至于抹掉箭头）与 `.fg textarea` 的等宽字体栈是页面级
 特例，**留在手写区**，不进生成区。
 
-**字段 = Soft Fill + 一条底边（B+，2026-09-28 用户裁决，spec `2026-09-28-ui-fields-bplus-design`）**。值盒子靠填充自证身份，WCAG 1.4.11 边界只由 1px 底边承担（Chrome 设置页 `cr-input`、Material Filled 的做法），其余三边塌陷进填充（§9.1 律 1）或是 pilot 框。状态正序：静息 `field-edge`，悬停时填充加深一档、底边变为 `field-edge-hover`，聚焦时四边都是 `field-border-focus` 并加光晕。
+**字段 = Soft Fill + 一条底边（B+，2026-09-28 用户裁决，spec `2026-09-28-ui-fields-bplus-design`）**。值盒子靠填充自证身份，WCAG 1.4.11 边界只由 1px 底边承担（Chrome 设置页 `cr-input`、Material Filled 的做法），其余三边塌陷进填充（§9.1 律 1）或是 pilot 框。状态正序：静息 `field-edge`，悬停时填充加深一档、底边变为 `field-edge-hover`（未与宿主分离的 framed 主题 terminal、rose-pine 除外：它们的填充不变，由框与底边承担悬停，见 §6.2），聚焦时四边都是 `field-border-focus` 并加光晕。
 聚焦的显著度来自「四边 + 光晕」，不靠单边对比度高于悬停：悬停只动一条底边，聚焦改涂整圈边并加环（开工前裁决 P14）。`field-border-focus` 只保证对填充 ≥3:1，单看一条边可能比悬停底边浅。
 - 特异性：静息 (0,2,1) 排在生成的 `border` 简写 (0,2,1) 之后，靠源序拿回底边。生成的 hover (0,3,1) 会重写四边，所以手写 hover 以 (0,4,1) 重申底边。生成的 focus 只有 (0,2,1)，且排在手写块之前，聚焦时手写静息规则会把底边抢回静息色；手写 focus 以 (0,3,1) 重申底边，它要压的是手写静息规则，不是生成的 focus。
 - 取代关系：本段取代阶段 0 的「底 `--opt-panel` + 边 `--opt-border`」手写覆盖，以及 3c 裁决 A 的 hover 边 `color-mix(input-border 55%, fg)`，及终审 B1 把混合基改为 `--opt-border`（4019b3a4）。两条手写规则在 45c0b909 删除；`.fg select` 的手写 hover 与 `--opt-select-hover-bg` 在 11dc12b6 删除。
@@ -693,18 +693,19 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
 
 ### 6.2 消费 token 对
 
-popup / library（`{ns}` = `pp` / `lib`；两者不发射 `.fg` 配方，下表是它们手写字段遵守的颜色对）：
+popup / library 不发射 `.fg` 配方，字段规则全部手写（popup.css / library.css 手写区）。下表按已发布的规则写：
 
-| 属性 | token | 派生要求 |
-|---|---|---|
-| `background-color` | `--{ns}-input-bg` | 既有 |
-| `color` | `--{ns}-fg` | 对 `input-bg` ≥4.5:1 |
-| `border-color`（hover） | `color-mix(input-border 55%, fg)` | 不开新 token；对 `input-bg` ≥3:1 |
-| `border-color`（focus） | `--{ns}-focus-bd` | 既有 |
-| `box-shadow`（focus） | `--{ns}-focus-ring` | 既有 |
-| `accent-color` | `--{ns}-accent` | 既有 |
+| 属性 | popup | library | 派生要求 |
+|---|---|---|---|
+| `background-color` | `--pp-input-bg` | `--lib-input-bg` | 既有 |
+| `color` | `--pp-fg` | `--lib-fg` | 对 `input-bg` ≥4.5:1 |
+| `border-color`（静息） | `--pp-input-bd`（popup 用 `-bd` 后缀） | `--lib-input-border` | 律 1 的塌陷载体，不承担 3:1 |
+| `border-color`（hover） | 无字段 hover 规则 | 工具条搜索框 `--lib-fg-muted`（library.css:491-492）；筛选 select 只换底 `--lib-btn-hover`、边保持 `--lib-input-border`（:1762-1765）；其余字段无 hover 规则 | — |
+| `border-color`（focus） | `--pp-focus-bd` | `--lib-focus-bd` | 既有 |
+| `box-shadow`（focus） | `--pp-focus-ring` | `--lib-focus-ring` | 既有 |
+| `accent-color` | `--pp-accent` | `--lib-accent` | 既有 |
 
-原表里「`border-color` = `--{ns}-input-border`，对 `input-bg` 与页面底 ≥3:1」一行已删：它与 §9.1 律 1 矛盾，静息边塌陷进填充，不承担 3:1。原「hover，options 行模型字段」一行由下表取代。
+原表里「`border-color` = `--{ns}-input-border`，对 `input-bg` 与页面底 ≥3:1」一行已删：它与 §9.1 律 1 矛盾，静息边塌陷进填充，不承担 3:1。原表的 hover 行 `color-mix(input-border 55%, fg)` 在 popup / library 从未有消费者，一并删去；原「hover，options 行模型字段」一行由下表取代。
 
 options（B+ 值盒子，§6.1；9 个 `--opt-field-*` 角色由 `_ui-derive.mjs` 的 `deriveFieldRoles` 派生，只对 options 发射）：
 
@@ -733,8 +734,8 @@ contrast-audit 的字段行合计：底边 4 + 悬停底边 3 + 聚焦边 2 + �
 
 | 行 | 规则 | 被谁取代 |
 |---|---|---|
-| `options.css:1187-1191` | `html[data-theme] .fg input/select/textarea { background-color; border-color; color }` | 配方基类的 `input-bg` / `input-border` / `fg` |
-| `options.css:1192-1196` | `html[data-theme] .fg input:hover:not(:focus) { border-color: var(--opt-fg-muted) }` | 配方的 hover `color-mix` |
+| `options.css:1187-1191` | `html[data-theme] .fg input/select/textarea { background-color; border-color; color }` | 配方基类（B+ 起为 `--opt-field-bg` / `--opt-field-border` / `--opt-fg`，见 §6.2） |
+| `options.css:1192-1196` | `html[data-theme] .fg input:hover:not(:focus) { border-color: var(--opt-fg-muted) }` | 配方的 hover（B+ 起为 `--opt-field-bg-hover` / `--opt-field-border-hover`，配方里已没有 hover 混色） |
 
 `html[data-theme] .fg …:focus` / `:focus-visible`（:1116 起）消费的 `--opt-focus-bd` / `--opt-focus-ring`
 与配方同源同值，属可删可留的重复；删之前逐条比对值，不确定就留着（它不会让任何新 token 变成死代码）。
@@ -992,6 +993,7 @@ accent 焦点色，等于焦点一来就抹掉危险信号——所以它们走 
   而 terminal(13.93) / paper-ink(9.63) / solarized-dark(3.30) 达标恰恰是因为 pilot 覆盖
   **绕开了**那条公式。Soft Fill（§9 律 1）把静息边框塌进填充之后（`btn-border == btn-bg`，1.00:1），
   `bordered` 落位的这圈边就是整个 `.btn` 族、全部字段、全部融合外壳**唯一**的合规载体。
+  （options 值盒子例外：B+ 起它们静息态的 1.4.11 边界由底边 `--opt-field-edge` 承担，§9.1 律 9；聚焦时仍由这圈边加环表示。）
   现在 `focusBdToAA()`（`composers/_ui-derive.mjs`）逐主题派生：起点仍是原公式（已达标的主题
   逐字节不变），不足则先沿混合比走向纯 accent（**保住主题自己的色相**），纯 accent 仍不够才动明度。
   三个 chrome composer 发射进 `@generated:ui-themes`，pilot `ui.*` 覆盖照旧胜出。
@@ -1275,6 +1277,8 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
    承载塌陷的是**每角色一个 token**：`--{ns}-btn-border` / `--{ns}-input-border`
    （popup 用自己的 `-bd` 后缀：`--pp-btn-bd` / `--pp-input-bd`）。控件规则一律引用这些，
    **不再引用 `--{ns}-border`**——后者留给真正的结构边（浮层、表格线、滚动条）。
+   options 的值盒子（`.fg` 文本/密钥/数字/textarea、`.listbox-btn`、原生 select 回退、窄屏页签选择器）
+   B+ 起改用 `--opt-field-border` 作塌陷载体（§6.2），不再直接引用 `--opt-input-border`。
 
 2. **填充必须与所在表面分离。** 去掉边框后，与宿主表面同色的填充 = 看不见的控件。
    派生函数 `fillSeparate(fill, surfaces, fg, min)`（`composers/_ui-derive.mjs`）把表面自己的
@@ -1283,7 +1287,8 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
      `--lib-bg` 的工具条上，也出现在 `--lib-panel` 的详情面板里，只对其中一层分离会把填充
      推到另一层上。所以宿主是**数组**，不是单值。
    - 1.10:1 远低于 WCAG 1.4.11 的 3:1，这是**故意的**：1.4.11 管的是「控件边界对背景」，
-     那件事仍由 focus 环与 hover 填充在做；这条门只管「静息形状还看不看得见」。
+     那件事仍由 focus 环与 hover 填充在做（options 值盒子例外：静息边界由底边承担，律 9）；
+     这条门只管「静息形状还看不看得见」。
      白底上单通道差一级约 1.005:1（完全不可见），1.10:1 是 12 级（`contrast()` 在 `#ffffff`
      表面上首次在 `#f3f3f3` 达标），是平面填充开始读作「另一层」而不是「色带」的位置。
    - **hover 必须跟着重算。** 静息填充一变深，旧的 hover 填充就贴到了新静息上
@@ -1357,7 +1362,9 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 
    **字段填充上的次级墨色**是 `--opt-field-placeholder`（B+），与 `btn-fg-muted` 同理。
 
-9. **字段边界 = 底边（B+，2026-09-28 用户裁决）。** 值盒子的 WCAG 1.4.11 边界不是整圈框，而是一条
+9. **字段边界 = 底边（B+，2026-09-28 用户裁决）。** 适用范围：options 的 `.fg` 值盒子与 `.listbox-btn`。
+   options 侧栏搜索框与 popup / library 的字段不在此列，它们没有底边（spec §3）。在适用范围内，
+   值盒子的 WCAG 1.4.11 边界不是整圈框，而是一条
    1px ≥3:1 的底边（`--opt-field-edge`）：它要对静息填充、hover 填充以及盒子背后的每一层（panel、
    pf-bg）都达到 3:1。其余三边照律 1 塌陷，或由 framed 主题的 pilot 框承担。圆角 `md md sm sm`，
    让底边读作平直的一条线。只有文本录入类控件与列表框按钮有底边；原生 select 回退与窄屏选择器只有
@@ -1451,7 +1458,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | options | `.fg.entry-block` | 录入块：`label.bl`（正文字号、`--opt-fg` 色、`margin-bottom --opt-label-gap`）+ 控件占满内容列（`max-width: none`），唯 select 例外（枚举类控件按内容定宽：`width: max-content; min-width: 240px; max-width: 100%`，阶段 2 的列表框按钮同此）+ 可选 `p.hint`；带帮助时 label 归 grid 宿主、`details:not([open]) + *` 承担 label-gap，展开态由全局 `[open] + *` 固定 8。Send-to 卡片字段（options.js `renderExportTargets`）即录入块，无 `.et-field` 修饰、无宽度分档 |
 | options | `.entry-block-sub` | 从属录入块，左缩进 sp-7，与 `.pref-row-sub` 同值 |
 | options | `.fg.edit-area` | 编辑区：`label.bl` + textarea 占满（min-height 96、13px/20px、内距 sp-4 × control-pad-x） |
-| options | 控件外观 | B+ 值盒子：底 `--opt-field-bg`，边 `--opt-field-border`（塌陷进填充；framed 主题为 pilot 框），1px 底边 `--opt-field-edge`（≥3:1，15/15），圆角 md md sm sm；hover 填充加深一档加 `--opt-field-edge-hover`；focus 四边 `--opt-field-border-focus` 加光晕；原生 select 回退与窄屏选择器只取填充（§6.1、§6.2、§9.1 律 9） |
+| options | 控件外观 | B+ 值盒子：底 `--opt-field-bg`，边 `--opt-field-border`（塌陷进填充；framed 主题为 pilot 框），1px 底边 `--opt-field-edge`（≥3:1，15/15），圆角 md md sm sm；hover 填充加深一档加 `--opt-field-edge-hover`（未与宿主分离的 framed 主题 terminal、rose-pine 填充不变，由框与底边承担，见 §6.2）；focus 四边 `--opt-field-border-focus` 加光晕；原生 select 回退与窄屏选择器只取填充（§6.1、§6.2、§9.1 律 9） |
 | popup | `.row` / `.label` / `.field` | 表单行壳（flex，padding sp-2 sp-5，gap sp-4）/ 52px 标签槽 / 控件槽（flex:1，min-width:0） |
 | popup | `.suggest-area` | chip 流容器 |
 | popup | `.divider` | 表单与快捷区之间的分隔 |
@@ -1492,7 +1499,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | `headerFace` | 同表面分区标题集（options：h2 + `.disclosure > summary`；md-preview：`.rail-label` + `.rail-sec-head`）computed 面唯一 | `[render]` family 7 |
 | `actionRowGap` | 含按钮的 flex/grid 行 column-gap **= 8px**（`--opt-sp-4` / `--pp-sp-4` / `--lib-sp-2` / `--sp-2`），四表面同一值；space-between 行、页签、融合壳、图标簇、色板/chip 行、分段条豁免 | `[render]` family 8 |
 | `clusterGap` | 图标簇（library `.lib-cluster`、popup `.header-icons`、md-preview `.xp-window-actions`）column-gap **= 4px**，四表面同值；这三处是同一形状的三个名字，门锁形状、名字留在各表面 | `[render]` family 12 |
-| `radiusScale` | 有 chrome 的盒子统一圆角 ∈ 本表面 radius token 的**实时**值（token 逐主题不同）或 pill；融合壳后代豁免 | `[render]` family 9 |
+| `radiusScale` | 有 chrome 的盒子统一圆角 ∈ 本表面 radius token 的**实时**值（token 逐主题不同）或 pill；上下成对分段（tl = tr、bl = br，如值盒子 `md md sm sm`）逐对度量，每一对都要落刻度，sweep 打印分段计数，options 计数为 0 时 SETUP ERROR；左右分段与单角切仍跳过；融合壳后代豁免 | `[render]` family 9 |
 | `textFloor` | 任何可见文字 computed font-size ≥ 11px（`sup`/`sub` 除外；阅读器正文不在 chrome 扫描内） | `[render]` family 10 |
 | `spacingScale` | 所有元素的 margin、以及**布局盒**（条/面板/弹层/行/列表）的 padding 与 gap，computed 值 ∈ 本表面 sp 刻度的**实时**值（`--opt-sp-N` / `--pp-sp-N` / `--lib-sp-N` / `--sp-N`）；`auto`/百分比/负值/≤1px hairline 不计。**控件与 chip 自身的 inset 是组件几何**（`.btn-sm` 2/8、chip padV 2、select 箭头位 26、key 字段眼睛位 32），由 controlRung / hitAreaMin / chip 律管，本律只查其 margin。页面壳（`main` / `.rail` / 空态）与派生对齐偏移（`.tab-group-label` = 页签内距 sp-5 + 2px 指示条）豁免。存量债在 `tests/render-audit-spacing-baseline.json`（只减不增：新增即 FAIL，删除放行并报 STALE；`--write-spacing-baseline` 是唯一写入口） | `[render]` family 11 |
 | `weakTextOnFill` | §9.1 律 8：任何带自身文字节点的元素、或 icon-only 按钮，computed `color` 若命中本主题**实时**的 `--{ns}-fg-hint` / `--{ns}-fg-muted` / `--{ns}-link`，则从该元素本身起沿祖先链上溯到最近一个非透明 `background-color`，该填充若命中本主题实时的 `--{ns}-btn-bg` / `--{ns}-btn-hover` / `--{ns}-input-bg` / `--{ns}-chip-bg`（library 另加两条批量选中带，值算自实时 `--lib-bg`/`--lib-accent` 与 composer 导出的 `LIB_BATCH_BAND_MIX`，不手抄 0.20/0.26）即判 FAIL。只测静息态——hover 不在门内（token 侧由 `contrast-audit` 的 `btn-fg-muted vs btn-hover` / `fg vs btn-hover` 行兜底）。**豁免清单**（T5 fix wave 起，每一类都是「触发」而非自动豁免——命中还须清同一道**实测配色比**门槛：文字 4.5:1、icon-only 3:1，用本文件自带的 `cr` 现测 colorRgb/fillRgb，不借用任何角色名义上的保证；未清门槛照样落 FAIL，附 `[was-exempt-by …]` 标注）：①`:disabled`——唯一**无条件**豁免（WCAG 1.4.3，按活的 `disabled` IDL 属性沿祖先链判定，不按选择器文本）；②identity——实测色同时命中 `fg` / `btn-fg` / `btn-fg-muted`（三表面通用）或 `--lib-row-selected-fg`（library 独有）之一，命中角色全部列出（非 first-match-wins）；③selection-marker——实测色 = `accent` 且元素带选中态标记（`aria-pressed="true"` / `aria-selected="true"` / `aria-current` / `.active` / `.selected`）；④safe-host——落点填充**逐字节相等**（无 ±3 容差）于本主题已由 `contrast-audit` 保证 `fg-hint`/`fg-muted` 达 4.5:1 的页面级宿主（`bg`、`bg2`/`panel`；options 另加 `pf-bg`/`code-bg`；popup 另加 `drop-hover`——options 从未声明 `--opt-drop-hover`，不在其安全宿主表内）；popup/options 的 `link` 排除在此豁免外（两表面均无 `link vs <host>` 行，无保证可借；library 因有 `link vs bg`/`link vs panel` 行而保留）。**覆盖面**（不再只测 CHECKS 顺手打开的状态）：options 逐一点开全部 13 个 tab 面板 + 面板内每个非帮助 `<details>` + appearance 页的预设预览/主题命名弹层/确认弹层 + Account 页连接状态折叠；popup 复用 `runSweep` 已知的 11 条隐藏态开关 + 确认弹层；library 的批量选中带开关一律 fail-closed（缺目标即 `throw SETUP`，不再静默扫错状态）。与 family 4-12 不同：颜色 token 逐主题不同，不是主题不变量，因此**不是**单趟 `--sweep` 覆盖全部主题，而是在每个 (surface, theme) 页面内、由本 family 自己的点开顺序就地扫描（`recordWeakTextHits`，见 `runSimpleTheme`/`runLibraryTheme`）。扫描元素计数逐 (surface, theme, context) 打印，用于把「0 FAIL」与「根本没扫到」分开。**范围外**（故意不建模，非疏漏）：背景图/渐变填充、`::before`/`::after` 填充、`::placeholder` 文字、alpha 合成（`parseColor` 丢弃 alpha）、`<a>`/`<summary>` 的 icon-only 与带自身标签文字的按钮内图标、library 两条批量选中带以外的任何 `color-mix()` 填充 | `[render]` family 13 |
@@ -1675,7 +1682,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | C46 | **生词列表的多选从 checkbox 改为行本体**（`library.html` 的 `#vocab-list`、`library.css` 的 `.vocab-card.selected`）——**USER RULING 2026-08-06**：「取消用 checkbox 标示单词被选中，直接用选中项的底色予以区别；注意区别鼠标点击选中（激活详情）和多项选中进行操作的状态」 | 每行一个 16px `input[type=checkbox]` 占一列；`.selected` 只换底（`color-mix(accent 10%, bg)`），`aria-current` 换底（`--lib-row-selected-bg`）+ 左侧 2px accent 条 | checkbox 删除，行左侧一列回收；手势改 Ctrl/Cmd+点击（切换）、Shift+点击（区间，与锚点动作一致因此支持区间取消）、键盘 `Ctrl+Space` / `Shift+Space`；`#vocab-list` 从 `role=list` 改 `role=grid` + `aria-multiselectable`，行 `role=row` + `aria-selected`，`.notes-card-top` 补 `role=gridcell`。视觉上 `.selected` 升为 **18%（hover 24%）填充 + 1px inset accent 环**，并新增 `.vocab-card.selected[aria-current]` (0,4,0) 显式合成两个标识物 | 选中态与「你在这一行」不再靠同一种形状的两个强度区分。**升到 18% + 环不是审美决定，是量出来的**：新增的渲染门 `bandDistinct` 在原 10% 无环方案下实测 rest↔selected 仅差 19（rose-pine）/18（solarized-dark），selected+current↔current 仅差 4（rose-pine），即「排队等批量操作」与「详情面板正在读」在多套主题下是同一个颜色。**门**：`bandDistinct`（新 `rowStates` 驱动——同一行用真实手势跑完 rest / selected / selected+current / current 四态，两两比较填充与标识物，任一对既无 ≥24 的填充差又无标识物差即 FAIL），并在同一条里连测四态下行文字对自身色带的 AA（拉高填充最容易吃掉的就是自己的标签）。**顺带修掉一个渲染 oracle 的结构性盲点**：`parseRgba` 只认 `rgb()`，而 `getComputedStyle` 把解析后的 `color-mix(in srgb, ...)` 序列化成 `color(srgb ...)`——于是 `compositeStack` 一直在**静默跳过**所有 color-mix 出来的背景层，改读它下面那层。整个 Soft Fill 行带家族的实测背景此前都是错的，是 `bandDistinct` 把两个明显不同的状态报成逐字节相同才暴露出来 | 2026-08-06 selection-rebuild |
 | C47 | **笔记页补批量选中与 sticky 批量条**（`library.html` 的 `#notes-list` / 新 `.notes-list-region` / 新 `.notes-batch-bar`，`library-notes.js`）——**USER RULING 2026-08-06**：「为笔记页面也增加类似生词页面的批量选中、batch-bar 功能」 | 笔记列表只有「打开阅读」一个动作，唯一的删除在详情面板且作用域是整页记录；`role=list` / `role=listitem`；无选中概念 | 与生词页**同一套**手势与视觉：Ctrl/Cmd+点击切换、Shift+点击区间（含区间取消）、`Ctrl+Space` / `Shift+Space` 键盘孪生；`role=grid` + `aria-multiselectable`，行 `role=row` + `aria-selected`，按钮外包一层 `role=gridcell`（**必须是真盒子而非 `display:contents`**——行按钮靠 `border-radius: inherit` 取圆角）。sticky 条**复用**既有配方族：`.vocab-batch-bar` 一系规则改为选择器并列，不复制一份。操作集裁到笔记适用：已选计数 / 全选 / 反选 / 批量删除（§4 quiet 档 + confirm-popover）/ 清除 | **批量删除的作用域是「选中的 N 条高亮」，不是整页**：按页分组重写 `items[]`，某页被删空才 `storage.local.remove` 整条记录（与阅读器 `_pbpHlSave` 同形）。确认弹层开启时快照选中集，`onConfirm` 内重新比对，不一致即中止并把 `is-error` 打在按下的那颗按钮上——后台刷新（另一个标签页在写高亮）可能在弹层挂着时挪动列表。**顺带把笔记行的 aria-current 标识物从 1px 环换成 2px 左边条**：新的 selected 态在两个视图里都用环，而笔记侧 selected 与 current 的填充实测只差 7（gruvbox-dark）/ 9（terminal），共用一种形状等于看不出区别；原注释说左缘「已经属于高亮色条」是量错了——色条在按钮 8px 内距之后起画，2px 内嵌边落在那段内距里，两者相距 6px 不相碰 | 2026-08-06 selection-rebuild |
 | C48 | **详情面板里的来源链接横向溢出**（`.notes-row-open`）——**USER REPORT 2026-08-06**：浏览器调窄时引句下的来源链接文本越过 `.vocab-detail-pane` 右缘；**2026-09-22 taste-uplift-batch3 T2 fix round 二次现身**：display:block 那版修复本身没错，但暴露了第二层根因——越界的不再是文字，是链接后面跟着的图标 | 第一版（已废弃）：`max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap` 写在一个**裸 `<a>`（display: inline）**上，CSS 2.1 下非替换行内盒上 `max-width`/`overflow`/`text-overflow` 全部不生效，只有继承来的 `white-space: nowrap` 生效，实测越出面板内容边缘 350.99px。第二版（display:block 修好链接盒后的新缺口）：`text-overflow: ellipsis` 只裁 **PAINT**，不裁 **LAYOUT**——行内追加的 `.ext-icon`（`<svg>`）仍按"整行不裁剪"时该在的位置参与布局，900px 视口、105ch 不可断行的种子标题下量出图标 `right=1355.32px` 而链接自身已正确收窄到 851.33px，相差 +503.99px，与当时 `paneFit` 的报数吻合——即便 `overflow: hidden` 让它在画面上看不见，`getBoundingClientRect` 仍报真实几何 | 在**根因**处修，不再在裸 `<a>` 上堆声明：文本单独装进新引入的 `.notes-row-open-text`（`overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%`），`.notes-row-open` 本身改 `display: inline-flex; align-items: center; gap: var(--lib-sp-1); min-width: 0; max-width: 100%`，图标 `.ext-icon` 拿 `flex: none`——三者协作后图标的布局位置永远跟着已正确收窄的文本盒走，不会再停在未裁剪整行的旧位置。`text-decoration`（hover/focus 下划线）随之从 `<a>` 移到 `.notes-row-open-text`：flex item 边界会掐断它向后代文字的传播，靠容器画不可靠。与 options.css 既有的 `.wayback-log-url`/`.wayback-log-url-text` 同一手法，不是新发明 | **门是类扫描不是选择器清单**：render oracle 的 `paneFit`——在 900/960/1024/1100/1200 五档宽度下遍历两个视图各自两个 pane 内的**全部**元素，断言没有任何元素的边缘越出 pane 内容盒、且 pane 自身不产生横向滚动（`sr-only` 显式豁免，因为它本来就停在画布外）。**刻意不断言 `scrollWidth > clientWidth`**：那是每一个正确省略号元素的常态，首轮实测它把 1 条真问题埋在 5 条误报下面。RED 实测（第一版，2026-08-06）：把 `display: block` 去掉重跑，报 `pastRightEdge +350.99px a.notes-row-open at 900px`。RED 实测（当前 a2fbe6fa 形态，本轮终审复核重新验证）：把 `.notes-row-open-text` 的 `overflow: hidden` 去掉重跑，`#vocab-detail-pane` 的 `scrollWidth` 从 347px 涨到 813px（+466px 横向溢出）；单独去掉两处 `min-width: 0`（容器与文本 span 各自那份）**未复现**同一红——flex 规范里 `overflow` 非 `visible` 的子项自动最小尺寸本就退化为 0，`.notes-row-open-text` 的 `overflow: hidden` 已经隐式满足这一点，两处 `min-width: 0` 在这个上下文下是防御性冗余（防的是未来某次重构把 overflow 改掉却忘了同步删 min-width），不是这条修复眼下唯一的生效面，写法上仍保留。**夹具同步补洞**：审计种子原本只写 term/gloss，没有 context，因此这两条断言在补种子之前是**恒真**的——`pbpVocabSaveWord` 合并的是单数 `context`，传 `contexts` 数组会被静默丢弃 | 2026-08-06 selection-rebuild；2026-09-22 taste-uplift-batch3 T2 fix round（a2fbe6f） |
-| C49 | **设置页字段家族 B+**（`.fg` 文本/密钥/数字/textarea、`.listbox-btn`、原生 select 回退、`.mobile-tab-picker select`、theme-name popover 输入框；另含侧栏搜索框占位符）——**USER RULING 2026-09-28** | 白底（`--opt-panel`）+ 四边 3:1 结构色 `--opt-border`（阶段 0 手写覆盖）；hover 边 `color-mix(border 55%, fg)`（3c 裁决 A 的 `color-mix(input-border 55%, fg)`，终审 B1 把混合基改为 `--opt-border`，4019b3a4）；列表框 hover 借用 focus-bd；占位符是 UA 默认 #757575（12/15 主题 <4.5:1） | Soft Fill 填充 + 1px ≥3:1 底边，`md md sm sm`；9 个派生角色 `--opt-field-*`；占位符、眼睛、chevron 用 `--opt-field-placeholder`；侧栏搜索框的填充与边框不变，只把占位符改涂 `--opt-field-placeholder` | 全部值盒子从「白底加深框」变为「灰阶填充加一条底边」；静息边界 3.2–5.9:1、悬停 3.8–9.3:1、聚焦 ≥3.00、占位符 ≥4.51（15/15，contrast-audit 225 行全 OK）；flexoki-light 的 provider 卡内字段填充对卡底从 1.01 提到 1.10；dracula 眼睛图标在 hover 填充上从 2.76 提到 ≥4.5；侧栏搜索框占位符从 UA 默认 #757575（nord 1.87）提到 ≥4.5 | 2026-09-28 fields-bplus |
+| C49 | **设置页字段家族 B+**（`.fg` 文本/密钥/数字/textarea、`.listbox-btn`、原生 select 回退、`.mobile-tab-picker select`、theme-name popover 输入框；另含侧栏搜索框占位符）——**USER RULING 2026-09-28** | 白底（`--opt-panel`）+ 四边 3:1 结构色 `--opt-border`（阶段 0 手写覆盖）；hover 边 `color-mix(border 55%, fg)`（3c 裁决 A 的 `color-mix(input-border 55%, fg)`，终审 B1 把混合基改为 `--opt-border`，4019b3a4）；列表框 hover 借用 focus-bd；占位符是 UA 默认 #757575（12/15 主题 <4.5:1） | Soft Fill 填充 + 1px ≥3:1 底边，`md md sm sm`；9 个派生角色 `--opt-field-*`；占位符、眼睛、chevron 用 `--opt-field-placeholder`；侧栏搜索框的填充与边框不变，只把占位符改涂 `--opt-field-placeholder` | 全部值盒子从「白底加深框」变为「灰阶填充加一条底边」；静息边界 3.2–5.9:1、悬停 3.8–9.3:1、聚焦 ≥3.00、占位符 ≥4.51（15/15，contrast-audit 225 行全 OK）；flexoki-light 的 provider 卡内字段：改动前画的是 `--opt-panel` #F2F0E5，对卡底 #E6E4D9 1.12:1 且比卡更亮，现在 #dcd9d0 对卡底 1.11:1 且比卡更暗（分离度保住、明暗翻转；field-bg 另对卡底分离，若直接取 input-bg #e8e5db 只有 1.01:1）；dracula 眼睛图标：改动前 `fg-hint` 画在 panel 上 5.32:1，现在 `--opt-field-placeholder` 静息 5.20:1、悬停 4.67:1（若沿用 fg-hint，在新的悬停填充上只有 2.76:1）；侧栏搜索框占位符从 UA 默认 #757575（nord 1.87）提到 ≥4.5 | 2026-09-28 fields-bplus |
 
 **偏离实施计划之处**（Task 9/10 以本规范为准，但需知晓）：
 

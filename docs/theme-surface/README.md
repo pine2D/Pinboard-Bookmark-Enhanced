@@ -281,7 +281,9 @@ clears their threshold):
   (COMPONENTS.md §9): mixes a surface's own `fg` into a control's fill until
   it clears a much weaker "is this fill perceivable at all against its host
   surface" floor (1.06:1, well below the 3:1 non-text AA floor — that job
-  still belongs to the focus ring and hover state). Drives `btn-bg`,
+  still belongs to the focus ring and hover state; options value boxes are
+  the exception since B+: their resting 3:1 boundary is the 1px bottom edge
+  `--opt-field-edge`, COMPONENTS.md §9.1 law 9). Drives `btn-bg`,
   `btn-hover`, `input-bg` and `chip-bg` once a control's resting border
   color collapses into its fill.
 - `resolveOpaqueBg(raw, fallbackBg)` / `resolveChipBg(raw, accentRgb,
@@ -489,7 +491,13 @@ relevant `-bd`/`-border` role(s) explicitly in your pilot's
 `ui.options.dark.btn-border`/`input-border`, `ui.library.dark.btn-border`/
 `input-border`): the composer treats "this pilot declared its own border
 role" as the opt-out signal and skips the `fillSeparate()` step for that
-role, restoring your pilot's own border color exactly as declared. Geometry
+role, restoring your pilot's own border color exactly as declared. On
+options, `input-border` also frames the B+ field family (`deriveFieldRoles`),
+so it must be a `#rgb` / `#rrggbb` / `#rrggbbaa` hex, or exactly
+`var(--<ns>-<role>)` (write `--opt-`) naming an options-map role whose value
+is itself such a hex; `rgba()`, a `var()` with a fallback, a named colour, or
+a `var()` pointing at a role holding one of those makes sync-all throw
+(NEW_THEME.md has the same rule). Geometry
 (radius, padding) is NOT exemptable this way — it follows the surface's
 token ladder unconditionally, same as every other theme. See
 `pilots/terminal.tokens.json`'s `ui.popup/options/library.dark` blocks for

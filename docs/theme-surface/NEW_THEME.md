@@ -475,9 +475,13 @@ final-fix wave:
   (`btn-border`/`input-border`) — copy the exact key your surface expects.
   On options, `input-border` also frames the B+ field family
   (`deriveFieldRoles`), so its value must be a `#rgb` / `#rrggbb` /
-  `#rrggbbaa` hex or exactly `var(--opt-<role>)` naming a role the options
-  map defines; any other spelling (`rgba()`, a `var()` with a fallback, a
-  named colour) makes sync-all throw instead of shipping a guessed frame.
+  `#rrggbbaa` hex, or exactly `var(--<ns>-<role>)` (write `--opt-`; the
+  parser accepts any lowercase prefix and looks `<role>` up in the options
+  map) naming a role the options map defines whose value is itself a
+  `#rgb` / `#rrggbb` / `#rrggbbaa` hex. Anything else (`rgba()`, a `var()`
+  with a fallback, a named colour, or a `var()` pointing at a role that
+  holds one of those) makes sync-all throw instead of shipping a guessed
+  frame.
   **Geometry (radius, padding) is never exemptable this way** — it follows
   the surface's token ladder unconditionally for every theme, terminal
   included; only the fill-vs-frame *color* language has an opt-out.
