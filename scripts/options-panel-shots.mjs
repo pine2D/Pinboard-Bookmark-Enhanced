@@ -47,8 +47,19 @@
 // from a full `--panels`-less run. Only diff a full run against another
 // full run (this is what the baseline/candidate pair always is).
 //
+// shots-meta.json (final review C-2): every run writes the settings that
+// decide HOW pixels are rasterized -- the raster-relevant Chromium flags
+// (RASTER_ARGS below, including the MSAA pin), the device scale factor, the
+// viewport/locale frame and this script's git blob sha -- into its output
+// directory. scripts/panel-pixel-diff.mjs refuses (exit 2) to compare two
+// directories whose meta differ or when either lacks it: a directory shot
+// before 07e97334 (default GPU raster, no meta) must be re-shot, never
+// diffed against one shot after it (that reproduces the 8-panel false
+// "outside" failures of fields-bplus Task 3).
+//
 // Usage:
 //   node scripts/options-panel-shots.mjs <outDir> [--rects "<sel>,<sel>"] [--panels a,b] [--themes default,terminal]
+import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -56,7 +67,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const SCRIPT = fileURLToPath(import.meta.url);
 const TIMEOUT_MS = 20_000;
+const DEVICE_SCALE_FACTOR = 1;
+const VIEWPORT = { width: 1280, height: 1000 };
+const LOCALE = "zh-CN";
 const FAKE_TOKEN = "qa:0000000000000000000000000000000000000000";
 const ALL_PANELS = ["general", "popup", "bookmarks", "quick", "ai", "ai-behavior", "reader", "vocab", "markdown", "tags", "archive", "appearance", "storage"];
 const ALL_THEMES = ["default", "terminal"];
@@ -104,37 +119,62 @@ try {
   process.exit(2);
 }
 
+// The flags that decide how a frame is rasterized -- written verbatim into
+// shots-meta.json so the pixel diff can refuse a mixed pair.
+const RASTER_ARGS = [
+  `--force-device-scale-factor=${DEVICE_SCALE_FACTOR}`,
+  // Pin analytic anti-aliasing (fields-bplus Task 3, ruling R10/R11).
+  // Measured 2026-09-28: at 4019b3a4 the default GPU raster drew 8 panels
+  // (general, ai-behavior, archive, vocab x default/terminal) through
+  // MSAA, while the same panels at the B+ HEAD are not (HEAD shots are
+  // byte-identical with and without this flag; only the 4019b3a4 shots
+  // change, by 5,765-14,768 px each). Same-version re-shoots were
+  // byte-identical and element geometry was unchanged, yet 2,554-8,120 px
+  // per panel differed OUTSIDE the changed value boxes (button corners,
+  // switch-track ends, disclosure chevrons, icon edges): a CSS change
+  // elsewhere on a layer can flip that layer's raster mode and move
+  // anti-aliasing all over it. This script feeds a change detector
+  // (scripts/panel-pixel-diff.mjs), not a fidelity check, so both sides
+  // are rasterized the same way. Keep DSF 1 and the warm-up capture too.
+  "--gpu-rasterization-msaa-sample-count=0",
+];
+
 async function launch() {
   const profile = mkdtempSync(join(tmpdir(), "pbp-stage3c-shots-"));
   const ctx = await chromium.launchPersistentContext(profile, {
     executablePath: chromium.executablePath(),
     headless: false, // MV3 extensions require headed
-    locale: "zh-CN",
-    deviceScaleFactor: 1,
-    viewport: { width: 1280, height: 1000 },
+    locale: LOCALE,
+    deviceScaleFactor: DEVICE_SCALE_FACTOR,
+    viewport: VIEWPORT,
     args: [
-      `--disable-extensions-except=${ROOT}`, `--load-extension=${ROOT}`, "--lang=zh-CN",
+      `--disable-extensions-except=${ROOT}`, `--load-extension=${ROOT}`, `--lang=${LOCALE}`,
       "--no-first-run", "--no-default-browser-check", "--disable-default-apps",
       "--disable-background-networking", "--disable-component-update", "--disable-sync",
-      "--metrics-recording-only", "--no-pings", "--force-device-scale-factor=1",
-      // Pin analytic anti-aliasing (fields-bplus Task 3, ruling R10/R11).
-      // Measured 2026-09-28: at 4019b3a4 the default GPU raster drew 8 panels
-      // (general, ai-behavior, archive, vocab x default/terminal) through
-      // MSAA, while the same panels at the B+ HEAD are not (HEAD shots are
-      // byte-identical with and without this flag; only the 4019b3a4 shots
-      // change, by 5,765-14,768 px each). Same-version re-shoots were
-      // byte-identical and element geometry was unchanged, yet 2,554-8,120 px
-      // per panel differed OUTSIDE the changed value boxes (button corners,
-      // switch-track ends, disclosure chevrons, icon edges): a CSS change
-      // elsewhere on a layer can flip that layer's raster mode and move
-      // anti-aliasing all over it. This script feeds a change detector
-      // (scripts/panel-pixel-diff.mjs), not a fidelity check, so both sides
-      // are rasterized the same way. Keep DSF 1 and the warm-up capture too.
-      "--gpu-rasterization-msaa-sample-count=0",
+      "--metrics-recording-only", "--no-pings",
+      ...RASTER_ARGS,
       "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1",
     ],
   });
   return { ctx, profile };
+}
+
+// shots-meta.json: `compare` must match between the two directories the
+// pixel diff is given; `info` is recorded for the report only (the before
+// side is shot from another commit by design).
+function writeMeta(dir, browserVersion) {
+  let scriptBlob;
+  try { scriptBlob = execFileSync("git", ["hash-object", SCRIPT], { encoding: "utf8" }).trim(); } catch (e) {
+    throw new Error(`git hash-object failed -- cannot record the script blob in shots-meta.json: ${e.message}`);
+  }
+  let head = null;
+  try { head = execFileSync("git", ["-C", ROOT, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(); } catch { head = null; }
+  const meta = {
+    schema: 1,
+    compare: { rasterArgs: RASTER_ARGS, deviceScaleFactor: DEVICE_SCALE_FACTOR, viewport: VIEWPORT, locale: LOCALE, scriptBlob },
+    info: { head, browserVersion, takenAt: new Date().toISOString() },
+  };
+  writeFileSync(join(dir, "shots-meta.json"), JSON.stringify(meta, null, 1) + "\n");
 }
 
 async function getWorker(ctx) {
@@ -307,6 +347,7 @@ async function main() {
   try {
     const worker = await getWorker(ctx);
     const extId = new URL(worker.url()).hostname;
+    writeMeta(opt.dir, ctx.browser()?.version() ?? null);
     await seed(worker);
     const page = await ctx.newPage();
     await page.goto(`chrome-extension://${extId}/options.html`, { waitUntil: "load", timeout: TIMEOUT_MS });

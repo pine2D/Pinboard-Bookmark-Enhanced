@@ -4,7 +4,16 @@
 // file, exact per-pixel (pixelmatch threshold 0, anti-aliasing counted).
 // Exit 0: every PNG pair identical outside the --allow boxes.
 // Exit 1: any differing pixel outside them, a missing/extra PNG, or a size change.
-// Exit 2: usage/tooling error (including an --allow selector the shots never recorded).
+// Exit 2: usage/tooling error (including an --allow selector the shots never
+//         recorded), or the two directories were not shot the same way:
+//         scripts/options-panel-shots.mjs writes shots-meta.json (raster flags
+//         incl. the MSAA pin, device scale factor, viewport/locale, the shot
+//         script's git blob sha) and its `compare` block must be identical on
+//         both sides. A directory without shots-meta.json was shot before
+//         the meta existed, so its raster mode is unknown (every set before
+//         07e97334 used the default GPU raster): re-shoot it, never mix it
+//         with a newer one -- a mixed pair is what produced fields-bplus
+//         Task 3's 8 panels of false "outside" pixels.
 // .styles.json differences (computed styles, rest/hover/focus probes) are
 // ADVISORY: printed, counted, never change the exit code -- the implementer
 // explains each one in the task report.
@@ -56,6 +65,30 @@ function parseArgs(argv) {
 }
 
 const { before, after, rules, diffDir } = parseArgs(process.argv.slice(2));
+
+// Same-raster guard (final review C-2): compare the two shots-meta.json
+// `compare` blocks before looking at a single pixel.
+function metaOf(dir, label) {
+  const p = join(dir, "shots-meta.json");
+  if (!existsSync(p)) {
+    console.error(`[panel-diff] ${label} directory ${dir} has no shots-meta.json -- it was shot before the raster settings were recorded, so how its pixels were rasterized is unknown (every set before 07e97334 used the default GPU raster). Re-shoot it with the current scripts/options-panel-shots.mjs; never diff it against a set that carries meta.`);
+    process.exit(2);
+  }
+  try { return JSON.parse(readFileSync(p, "utf8")); } catch (e) {
+    console.error(`[panel-diff] ${label} shots-meta.json is unreadable (${e.message}) -- re-shoot ${dir}.`);
+    process.exit(2);
+  }
+}
+{
+  const mb = metaOf(before, "before"), ma = metaOf(after, "after");
+  const keys = [...new Set([...Object.keys(mb.compare || {}), ...Object.keys(ma.compare || {})])].sort();
+  const differ = keys.filter((k) => JSON.stringify(mb.compare?.[k]) !== JSON.stringify(ma.compare?.[k]));
+  if (mb.schema !== ma.schema || !mb.compare || !ma.compare || differ.length) {
+    console.error(`[panel-diff] before and after were not shot the same way -- re-shoot both with the same scripts/options-panel-shots.mjs. Differs: ${mb.schema !== ma.schema ? "schema " : ""}${differ.map((k) => `${k} (${JSON.stringify(mb.compare?.[k])} vs ${JSON.stringify(ma.compare?.[k])})`).join("; ") || "compare block missing"}`);
+    process.exit(2);
+  }
+  console.log(`[panel-diff] shots-meta match: ${keys.map((k) => `${k}=${JSON.stringify(mb.compare[k])}`).join(" ")} (before head ${mb.info?.head?.slice(0, 8) ?? "?"}, after head ${ma.info?.head?.slice(0, 8) ?? "?"})`);
+}
 function pngsIn(dir, label) {
   let entries;
   try {
