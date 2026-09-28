@@ -1506,10 +1506,10 @@ check(/orig\.dataset\.pbTrDone = "1";[\s\S]{0,380}_pbpTrSyncToc\(st, "translated
 // static text contracts here rather than render entries whose setup would be
 // longer than the rule they guard. Every other §7.3 site is gated live in
 // tests/render-audit-checklist.mjs via `focusRecipe`.
-check(/\.theme-name-popover input\[type="text"\]:focus \{[^}]*border-color: var\(--opt-focus-bd\)/.test(optionsCss) &&
+check(/\.theme-name-popover input\[type="text"\]:focus \{[^}]*border-color: var\(--opt-field-border-focus\)/.test(optionsCss) &&
   /\.theme-name-popover input\[type="text"\]:focus-visible \{ box-shadow: var\(--opt-focus-ring\); \}/.test(optionsCss) &&
   !/theme-name-popover input\[type="text"\]:focus-visible \{ box-shadow: 0 0 0 2px/.test(optionsCss),
-  "options.css: the theme-name popover input is back on a bespoke focus ring instead of --opt-focus-bd/--opt-focus-ring (§7.3), so per-theme focus styling does not reach it");
+  "options.css: the theme-name popover input is back on a bespoke focus ring instead of --opt-field-border-focus/--opt-focus-ring (§7.3 + B+ field family)");
 // The two `borderless` sites (§7.3, 2026-08-06 unification): a 1px accent
 // core PLUS the surface's --{ns}-focus-ring glow. Both halves are asserted
 // separately, and the glow specifically has to be the TOKEN: its shape is
@@ -1608,7 +1608,9 @@ function forcedColorsBodyRanges(css) {
   }
   return ranges;
 }
-for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", optionsCss, "opt"], ["library.css", libraryCss, "lib"]]) {
+// The scan is a function (P12, B+ field family 2026-09-28) so its widening
+// below can be run against synthetic CSS, not only the shipped files.
+function focusShapeOffenders(css, ns) {
   const hand = stripGeneratedRegions(css).replace(/\/\*[\s\S]*?\*\//g, "");
   const forcedColorsRanges = forcedColorsBodyRanges(hand);
   const rules = [];
@@ -1621,6 +1623,14 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
   }
   const bySelector = new Map(rules.map(r => [r.selector, r.body]));
   const RING = `var(--${ns}-focus-ring)`, BD = `var(--${ns}-focus-bd)`, ACCENT = `var(--${ns}-accent)`;
+  // B+ field family (2026-09-28): a value box's bordered core is its own derived
+  // focus border, --opt-field-border-focus (= focus-bd wherever that clears 3:1
+  // on the field fill; re-derived where it does not -- flexoki-light). Accepted
+  // as a `bordered` core on options only. P7: the key-wrap eye draws its inset
+  // ring ON the field fill, so on options the inset core accepts it too.
+  const BORDERED_CORES = ns === "opt" ? [BD, "var(--opt-field-border-focus)"] : [BD];
+  const INSET_CORES = ns === "opt" ? [BD, "var(--opt-field-border-focus)"] : [BD];
+  const coreRe = new RegExp(`border-color:\\s*(?:${BORDERED_CORES.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`);
   const bad = [];
   for (const { selector, body, forcedColors } of rules) {
     if (!/:focus-visible/.test(selector)) continue;
@@ -1654,29 +1664,60 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
         else if (s.shadow !== RING) fail(`borderless needs the ${RING} glow, got ${s.shadow === undefined ? "no box-shadow" : s.shadow}`);
       } else {
         if (!(s.width >= 2)) fail(`inset core must be >=2px, got ${s.width}px`);
-        else if (s.color !== BD) fail(`inset core must be ${BD}, got ${s.color}`);
+        else if (!INSET_CORES.includes(s.color)) fail(`inset core must be ${INSET_CORES.join(" or ")}, got ${s.color}`);
         else if (s.shadow !== "none") fail(`inset must suppress box-shadow (the .btn family's glow leaks across a fused seam and stacks on the core), got ${s.shadow === undefined ? "no box-shadow declaration" : s.shadow}`);
       }
     } else if (suppressesOutline) {
-      if (s.borderColor === BD && s.shadow === RING) continue;             // bordered
+      if (BORDERED_CORES.includes(s.borderColor) && s.shadow === RING) continue;             // bordered
       if (!s.borderColor && s.shadow === undefined
           && FOCUS_SHAPE_EXEMPT.defer.some(re => re.test(selector))) continue; // §8 law 2 passenger
-      fail(`suppresses the outline without the bordered pair (border-color: ${BD} + box-shadow: ${RING}); got border-color=${s.borderColor} shadow=${s.shadow}`);
+      fail(`suppresses the outline without the bordered pair (border-color: ${BORDERED_CORES.join(" or ")} + box-shadow: ${RING}); got border-color=${s.borderColor} shadow=${s.shadow}`);
     } else if (s.shadow !== undefined && s.shadow !== "none") {
       // No outline of its own. Legal only as the glow half of `bordered`,
       // whose core lives on the matching :focus rule -- and only as the TOKEN,
       // never a literal (a literal here is the box-shadow spelling of a hard
       // ring, which is what defeated the previous blacklist).
       if (s.shadow !== RING) { fail(`box-shadow focus ring must be ${RING}, got ${s.shadow}`); continue; }
-      if (s.borderColor === BD) continue;                                   // themed bordered twin
+      if (BORDERED_CORES.includes(s.borderColor)) continue;                                   // themed bordered twin
       const partner = bySelector.get(selector.replaceAll(":focus-visible", ":focus"));
-      if (!partner || !new RegExp(`border-color:\\s*${BD.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(partner)) {
-        fail(`glow with no core — needs either border-color: ${BD} here, or the matching :focus rule to set it`);
+      if (!partner || !coreRe.test(partner)) {
+        fail(`glow with no core — needs either border-color: ${BORDERED_CORES.join(" or ")} here, or the matching :focus rule to set it`);
       }
     }
   }
+  return bad;
+}
+for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", optionsCss, "opt"], ["library.css", libraryCss, "lib"]]) {
+  const bad = focusShapeOffenders(css, ns);
   check(bad.length === 0,
     `${file}: hand-written focus rule(s) do not match any §7.3 placement (bordered / borderless / inset):\n    ${bad.join("\n    ")}`);
+}
+// P12 discrimination for the B+ widening, on synthetic CSS: options accepts
+// --opt-field-border-focus as a bordered core (on the rule itself or on the
+// :focus partner of a glow-only rule) and as an inset core; the popup and
+// library namespaces still reject the same spelling in their own namespace;
+// a non-focus core (--opt-border) plus the ring is still rejected.
+{
+  const accepted = (ns) => `.a:focus-visible { outline: none; border-color: var(--${ns}-field-border-focus); box-shadow: var(--${ns}-focus-ring); }
+.b:focus { outline: none; border-color: var(--${ns}-field-border-focus); }
+.b:focus-visible { box-shadow: var(--${ns}-focus-ring); }
+.c:focus-visible { outline: 2px solid var(--${ns}-field-border-focus); outline-offset: -2px; box-shadow: none; }
+`;
+  const optBad = focusShapeOffenders(accepted("opt"), "opt");
+  check(optBad.length === 0,
+    "ui-contract-tests.mjs: §7.3 no longer accepts var(--opt-field-border-focus) as the options bordered / glow-partner / inset core (B+ P7/P12): " + optBad.join(" | "));
+  for (const ns of ["pp", "lib"]) {
+    const nsBad = focusShapeOffenders(accepted(ns), ns);
+    check(nsBad.length === 3 && [".a:", ".b:", ".c:"].every((sel, i) => nsBad[i].startsWith(sel)),
+      `ui-contract-tests.mjs: the §7.3 field-border-focus widening leaked into the ${ns} namespace (expected .a/.b/.c all rejected) -- got [${nsBad.join(" | ")}]`);
+  }
+  const frameBad = focusShapeOffenders(`.d:focus-visible { outline: none; border-color: var(--opt-border); box-shadow: var(--opt-focus-ring); }
+.e:focus { outline: none; border-color: var(--opt-border); }
+.e:focus-visible { box-shadow: var(--opt-focus-ring); }
+.f:focus-visible { outline: 2px solid var(--opt-border); outline-offset: -2px; box-shadow: none; }
+`, "opt");
+  check(frameBad.length === 3 && [".d:", ".e:", ".f:"].every((sel, i) => frameBad[i].startsWith(sel)),
+    "ui-contract-tests.mjs: §7.3 accepts a non-focus core (--opt-border + ring) on options -- got [" + frameBad.join(" | ") + "]");
 }
 // The two same-specificity deletions this sweep made must stay deleted --
 // both were measured, not eyeballed (CLAUDE.md's two-way cascade rule).
@@ -5603,6 +5644,108 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     !textarea.has("background-color") && !textarea.has("border-color") &&
     !/color-mix\(in srgb, var\(--opt-border\) 55%, var\(--opt-fg\)\)/.test(hand),
     "options.css: a hand-written row-model rule repaints text fields again (the stage-0 panel/--opt-border override or the stage-3c border-55% hover mix) -- superseded by the B+ field family");
+}
+
+// ---- B+ field family, Task 2: every HAND-WRITTEN colour declaration on a
+// value box (a .fg / .key-wrap text control or select, the listbox button,
+// the narrow-screen tab picker, the theme-name popover input) reads the
+// --opt-field-* family -- the class form of "the stage-0 panel/--opt-border
+// override stays gone" (CLAUDE.md: assert the category, not the instance).
+// Exempt: forced-colors blocks (system colours by design), the ::picker(select)
+// popover and <option> rows (floating surfaces, §9.1 law 4), checkbox/radio/
+// file/search inputs (not value boxes).
+{
+  const isValueBox = (s) => {
+    if (/::picker|\boption\b|type="(?:checkbox|radio|file|search)"/.test(s)) return false;
+    return /\.(?:fg|key-wrap)\b[^,]*\b(?:input|textarea|select)\b/.test(s)
+      || /\.listbox-btn(?![\w-])(?!\s+\.)/.test(s)
+      || /\.mobile-tab-picker select\b/.test(s)
+      || /\.theme-name-popover input\b/.test(s);
+  };
+  // P11: every colour-bearing fill / border property by PATTERN (all four
+  // physical sides, the logical inline/block sides and their -start/-end,
+  // shorthand and -color longhand), not a hand-kept list a new spelling
+  // (border-left, border-inline-end-color) would walk around.
+  const COLOUR_PROP_RE = /^(?:background(?:-color)?|border(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?(?:-color)?)$/;
+  const offenders = (css) => {
+    const out = [];
+    for (const rule of parseStyleRules(css)) {
+      if (rule.context.some((c) => /forced-colors/.test(c))) continue;
+      const boxes = rule.selectors.filter(isValueBox);
+      if (!boxes.length) continue;
+      for (const d of parseDeclarations(rule.body)) {
+        if (!COLOUR_PROP_RE.test(d.property)) continue;
+        if (/^(?:none|transparent|inherit|currentcolor|0)$/i.test(d.value.trim())) continue;
+        const refs = [...d.value.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map((m) => m[1]);
+        const literal = /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|color-mix\(/i.test(d.value);
+        if (literal || !refs.length || refs.some((r) => !r.startsWith("--opt-field-"))) out.push(`${boxes.join(", ")} { ${d.property}: ${d.value} }`);
+      }
+    }
+    return out;
+  };
+  const bad = offenders(stripGeneratedRegions(optionsCss).replace(/\/\*[\s\S]*?\*\//g, ""));
+  check(bad.length === 0,
+    "options.css: a hand-written value-box rule paints with a non-field token (B+: every value box reads --opt-field-*): " + bad.join(" | "));
+  // Discrimination: the scan must catch the stage-0 frame, the old focus-bd
+  // hover and a single-side spelling of the frame (P11), and must skip the
+  // ::picker popover and a field-token edge.
+  const caught = offenders('.fg input[type="text"] { border-color: var(--opt-border); }\n'
+    + ".listbox-btn:hover { border-color: var(--opt-focus-bd); }\n"
+    + '.fg input[type="text"] { border-left: 1px solid var(--opt-border); }\n'
+    + ".fg select::picker(select) { border: 1px solid var(--opt-border); }\n"
+    + ".fg textarea { border-bottom-color: var(--opt-field-edge); }\n");
+  check(caught.length === 3 && caught[0].startsWith('.fg input[type="text"] { border-color') && caught[1].startsWith(".listbox-btn:hover")
+    && caught[2].startsWith('.fg input[type="text"] { border-left'),
+    "ui-contract-tests.mjs: the value-box colour scan no longer discriminates -- caught=[" + caught.join(" | ") + "]");
+
+  const hand = stripGeneratedRegions(optionsCss);
+  const S = '.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea)';
+  const SPLIT = "var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm)";
+  const rest = declarationValueMap(hand, S);
+  check(rest.get("border-bottom-color") === "var(--opt-field-edge)" && rest.get("border-radius") === SPLIT &&
+    declarationValueMap(hand, `${S}:hover:not(:focus)`).get("border-bottom-color") === "var(--opt-field-edge-hover)" &&
+    declarationValueMap(hand, `${S}:focus`).get("border-bottom-color") === "var(--opt-field-border-focus)",
+    "options.css: the B+ shape half lost a state (rest edge + md/md/sm/sm radius, hover edge-hover at (0,4,1), focus edge = focus border at (0,3,1))");
+  const lb = declarationValueMap(hand, ".listbox-btn");
+  check(lb.get("border-bottom-color") === "var(--opt-field-edge)" && lb.get("border-radius") === SPLIT &&
+    declarationValueMap(hand, ".listbox-btn:hover").get("border-bottom-color") === "var(--opt-field-edge-hover)",
+    "options.css: the listbox button left the B+ value-box family (bottom edge / radius / hover edge)");
+  check(declarationValueMap(hand, ".listbox-btn .btn-ic").get("color") === "var(--opt-field-placeholder)" &&
+    declarationValueMap(hand, ".key-toggle").get("color") === "var(--opt-field-placeholder)" &&
+    declarationValueMap(hand, ".key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg))",
+    "options.css: the key-wrap eye / listbox chevron must paint the field's secondary ink (--opt-field-placeholder) and the eye's hover chip must mix over --opt-field-bg");
+  // P7: the eye's inset focus ring sits ON the field fill, so its core is the
+  // field's own focus border (flexoki-light: --opt-focus-bd is 2.73:1 there).
+  check(declarationValueMap(hand, ".key-toggle:focus-visible").get("outline") === "2px solid var(--opt-field-border-focus)",
+    "options.css: .key-toggle:focus-visible must draw its inset ring in --opt-field-border-focus (it sits on the field fill; B+ P7)");
+  // Fill-only (spec §3): no hand rule gives the native <select> fallback or
+  // the mobile tab picker a bottom edge -- neither by a bottom-side property
+  // (physical or logical, shorthand or -color) nor by an all-sides frame in
+  // an --opt-field-edge* token (P11). Selector test accepts `select` as a
+  // type selector anywhere after .fg / .mobile-tab-picker (also inside :is()).
+  const selectEdges = (css) => {
+    const out = [];
+    for (const r of parseStyleRules(css)) {
+      const sels = r.selectors.filter((s) => /(?:\.fg|\.mobile-tab-picker)\b[^{]*?(?:^|[\s(,>+~])select\b/.test(s) && !/::picker|\boption\b/.test(s));
+      if (!sels.length) continue;
+      for (const d of parseDeclarations(r.body)) {
+        if (/^border-(?:bottom|block-end)(?:-color)?$/.test(d.property) ||
+          ((d.property === "border-color" || d.property === "border") && /--opt-field-edge/.test(d.value))) out.push(`${sels.join(", ")} { ${d.property}: ${d.value} }`);
+      }
+    }
+    return out;
+  };
+  const selEdge = selectEdges(hand);
+  check(selEdge.length === 0,
+    "options.css: the native <select> fallback / mobile tab picker must stay fill-only (no bottom edge, spec §3): " + selEdge.join(" | "));
+  const edgeCaught = selectEdges(".fg select { border-bottom: 1px solid var(--opt-field-edge); }\n"
+    + ".mobile-tab-picker select:hover:not(:focus) { border-color: var(--opt-field-edge-hover); }\n"
+    + '.fg :is(input[type="text"], select) { border-block-end-color: var(--opt-field-edge); }\n'
+    + ".fg select { background-color: var(--opt-field-bg); border: 1px solid var(--opt-field-border); }\n"
+    + ".fg select::picker(select) { border-bottom: 1px solid var(--opt-border); }\n");
+  check(edgeCaught.length === 3 && edgeCaught[0].startsWith(".fg select { border-bottom:") &&
+    edgeCaught[1].startsWith(".mobile-tab-picker select:hover") && edgeCaught[2].startsWith(".fg :is("),
+    "ui-contract-tests.mjs: the select fill-only check no longer discriminates -- caught=[" + edgeCaught.join(" | ") + "]");
 }
 
 if (fail.length) {

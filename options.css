@@ -180,7 +180,6 @@
   --opt-overlimit-fg: #ff5050;
   --opt-preview-hover-bg: #f0f0f0;
   --opt-preview-content-bg: #f6f8fa;
-  --opt-select-hover-bg: #f1f5f9;
 }
 
 /* Compact density tier (stage 0, spec §2, ruling R3): terminal-flavoured
@@ -316,15 +315,19 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    higher (popover, not menu) because it can open over the sticky nav column.
    Width follows the select exception (§10.2 .fg.entry-block row): content-
    sized, 240px floor, never wider than the column; the button fills it.
+   The button is a B+ value box (spec 2026-09-28-ui-fields-bplus-design):
+   field fill, collapsed/framed sides, the >=3:1 bottom edge, md/md/sm/sm
+   radius, hover never borrows the focus colour; the chevron is the field's
+   secondary ink.
    Colours are token pairs already verified per theme: active = btn-hover +
    btn-fg (the control hover pair), selected = accent + on-accent (the
    primary-button pair), disabled = fg-hint on panel. No :has(), no inline
    styles: the flip is the data-flip attribute the script sets on open. ---- */
 .listbox { position: relative; display: inline-block; width: max-content; min-width: 240px; max-width: 100%; }
-.listbox-btn { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 0 var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-fg); background: var(--opt-panel); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-md); cursor: pointer; text-align: left; }
-.listbox-btn:hover { border-color: var(--opt-focus-bd); }
-.listbox-btn:focus-visible { outline: none; border-color: var(--opt-focus-bd); box-shadow: var(--opt-focus-ring); }
-.listbox-btn .btn-ic { flex: none; width: 16px; height: 16px; color: var(--opt-fg-muted); }
+.listbox-btn { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 0 var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-fg); background: var(--opt-field-bg); border: 1px solid var(--opt-field-border); border-bottom-color: var(--opt-field-edge); border-radius: var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm); cursor: pointer; text-align: left; }
+.listbox-btn:hover { background: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); border-bottom-color: var(--opt-field-edge-hover); }
+.listbox-btn:focus-visible { outline: none; background: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
+.listbox-btn .btn-ic { flex: none; width: 16px; height: 16px; color: var(--opt-field-placeholder); }
 .listbox-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Width stability: with only the value in the button, max-content would
    track the CURRENT value and the field would jump on every pick. The sizer
@@ -348,7 +351,7 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 /* The translate select's follow-up free-text input: the relationship rule
    `.fg > select + input` no longer matches once the listbox sits between. */
 .fg > .listbox + input { margin-top: var(--opt-sp-3); }
-@media (prefers-reduced-motion: no-preference) { .listbox-btn { transition: border-color var(--motion-state) ease, box-shadow var(--motion-state) ease; } }
+@media (prefers-reduced-motion: no-preference) { .listbox-btn { transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, box-shadow var(--motion-state) ease; } }
 @media (forced-colors: active) {
   .listbox-btn, .listbox-pop { border-color: ButtonText; }
   /* box-shadow is dropped under forced-colors (WHATWG mandates ignoring
@@ -1657,6 +1660,23 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
    stage-0 panel-fill + --opt-border frame override and the stage-3c hover mix
    that used to live here are retired (spec 2026-09-28-ui-fields-bplus-design
    §3); their rulings are superseded in the ledger. */
+/* B+ shape half (spec 2026-09-28-ui-fields-bplus-design §3; COMPONENTS.md
+   §6.1, §9.1 law 9). A text-entry value box keeps ONE >=3:1 bottom edge as its
+   "type here" indicator (Chrome settings cr-input / Material Filled) and a
+   flat bottom: md top corners, sm bottom corners. The edge follows the state:
+   field-edge -> field-edge-hover -> the focus border on all four sides.
+   Specificity is load-bearing: rest (0,2,1) sits after the generated border
+   shorthand (0,2,1) and wins on source order; the generated hover (0,3,1)
+   and focus (0,2,1, later than the generated base) rewrite every side, so the
+   hover (0,4,1) and focus (0,3,1) rules below restate the bottom side one
+   pseudo-class higher. The native <select> fallback is OUT of this list on
+   purpose: fill only, no edge (§6.4). */
+.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea) {
+  border-bottom-color: var(--opt-field-edge);
+  border-radius: var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm);
+}
+.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea):hover:not(:focus) { border-bottom-color: var(--opt-field-edge-hover); }
+.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea):focus { border-bottom-color: var(--opt-field-border-focus); }
 /* The padding shorthand above resets padding-right to --opt-control-pad-x on
    EVERY matched input, including a `.key-wrap`'s -- clobbering the 32px gap
    `.fg .key-wrap input { padding-right: 32px; }` (COMPONENTS.md §8) reserves
@@ -1989,7 +2009,8 @@ html.motion-ready #preset-preview-section > summary::after {
 }
 
 /* ---- API key toggle ---- */
-.key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: var(--opt-sp-1) var(--opt-sp-2); color: var(--opt-fg-hint); vertical-align: middle; }
+/* The eye sits ON the field fill (B+): fg-hint is only AA-derived against bg/panel and fell to 2.76:1 on dracula's hover fill -- the field's secondary ink is derived >=4.5:1 on all three field fills. */
+.key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: var(--opt-sp-1) var(--opt-sp-2); color: var(--opt-field-placeholder); vertical-align: middle; }
 .key-toggle svg { display: block; }
 /* §1.5 hit-area expansion (same technique as popup's .login-body .key-toggle,
    commit 6d65d07): the 14px eye glyph + 2px/4px padding + no border renders
@@ -2036,7 +2057,7 @@ html.motion-ready #preset-preview-section > summary::after {
 .key-wrap:focus-within input { background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
 /* Hover is where the eye may show a fill -- a pointer affordance, and not a
    state the rest/focus invariant covers. */
-.key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-input-bg)); border-radius: var(--opt-radius-sm); }
+.key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg)); border-radius: var(--opt-radius-sm); }
 /* Focus = the project's standard button ring (§7.3), pulled INSIDE the eye's
    own box with a negative offset so it never reaches the capsule edge and
    never competes with the container's own :focus-within ring.
@@ -2052,9 +2073,11 @@ html.motion-ready #preset-preview-section > summary::after {
        (rgb(25,77,25) at x=1957 on terminal, absent in the same column at
        rest) -- a sub-pixel artifact of an inset shadow on a fractionally
        positioned box. Both defects had this one declaration as their cause.
-   An outline paints no shadow geometry, so neither problem can recur. */
+   An outline paints no shadow geometry, so neither problem can recur.
+   The core is --opt-field-border-focus, not --opt-focus-bd: the ring sits on
+   the field fill (B+), where flexoki-light's focus-bd is only 2.73:1. */
 .key-toggle:focus-visible {
-  outline: 2px solid var(--opt-focus-bd);
+  outline: 2px solid var(--opt-field-border-focus);
   outline-offset: -2px;
   border-radius: var(--opt-radius-sm);
   box-shadow: none;
@@ -2789,7 +2812,9 @@ html[data-theme="rose-pine"] .mobile-tab-picker select {
    Colors ride only the 17 tokens every one of the 14 data-theme presets
    defines (+ :root literals for the no-preset light state); the no-preset
    DARK state always resolves to data-theme="flexoki-dark"
-   (options-theme-early.js:25), so there is no unthemed-dark gap. */
+   (options-theme-early.js:25), so there is no unthemed-dark gap.
+   Fill and hover fill now come from the generated field recipe
+   (--opt-field-bg / -bg-hover): fill only, no bottom edge (B+ §6.4). */
 .fg select {
   border-radius: var(--opt-radius-md);
   /* Same block padding and text inset as the generated field recipe, so a
@@ -2797,17 +2822,6 @@ html[data-theme="rose-pine"] .mobile-tab-picker select {
      sp-3 / sp-5 pair made every dropdown 29px tall and its text 4px further
      in than the input above it (2026-09-05 cross-surface probe). */
   padding: var(--opt-sp-2) 26px var(--opt-sp-2) var(--opt-sp-4);
-}
-.fg select:hover:not(:focus) {
-  background-color: var(--opt-select-hover-bg);
-  border-color: var(--opt-input-border);
-}
-html[data-theme] .fg select {
-  background-color: var(--opt-btn-bg);
-}
-html[data-theme] .fg select:hover:not(:focus) {
-  background-color: var(--opt-btn-hover);
-  border-color: var(--opt-input-border);
 }
 
 /* Customizable select (Chrome 135+): same opt-in pair + recipe as
@@ -2913,7 +2927,7 @@ html[data-theme] .key-toggle:hover { color: var(--opt-fg); }
    that used to sit here is gone with the outline itself (§8, above): the
    base rule now resolves to `outline-style: none`, so an outline-COLOUR
    override had nothing left to colour -- dead code that would have read as
-   live coverage. The themed focus treatment comes from --opt-focus-bd /
+   live coverage. The themed focus treatment comes from --opt-field-border-focus /
    --opt-focus-ring on the field, which are per-theme tokens already. */
 html[data-theme] .fg input[type="checkbox"]:focus-visible { outline-color: var(--opt-accent); }
 html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--opt-accent); }
@@ -3035,7 +3049,7 @@ html.motion-ready .theme-name-popover.is-closing {
    terminal's CRT glow, solarized's 2px ring). It escaped the rgba ratchet
    because that gate only counts background/color/border-color, not
    box-shadow. Now the same two tokens every other field uses. */
-.theme-name-popover input[type="text"]:focus { outline: none; border-color: var(--opt-focus-bd); }
+.theme-name-popover input[type="text"]:focus { outline: none; border-color: var(--opt-field-border-focus); }
 .theme-name-popover input[type="text"]:focus-visible { box-shadow: var(--opt-focus-ring); }
 /* §7.3 button recipe -- both buttons had no :focus-visible rule at all and
    fell through to the UA ring, the only two controls in this popover that
@@ -3080,7 +3094,7 @@ html[data-theme] .theme-name-popover label { color: var(--opt-fg); }
    The bespoke `:focus-visible` twin is gone with it: --opt-focus-ring is
    already per-theme, so a second hand-mixed ring here only overrode the
    themed value with a flatter one. */
-html[data-theme] .theme-name-popover input[type="text"] { background: var(--opt-input-bg); color: var(--opt-fg); }
+html[data-theme] .theme-name-popover input[type="text"] { background: var(--opt-field-bg); color: var(--opt-fg); }
 html[data-theme] .theme-name-popover .tnp-overwrite { color: var(--opt-fg); }
 html[data-theme] .theme-name-popover .tnp-save { background: var(--opt-fg); border-color: var(--opt-fg); }
 html[data-theme] .theme-name-popover .tnp-save:hover { background: var(--opt-fg); box-shadow: inset 0 0 0 1px var(--opt-panel); }
@@ -3670,16 +3684,17 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     width: 100%;
     min-height: 34px;
     padding: var(--opt-sp-3) 26px var(--opt-sp-3) var(--opt-sp-5);
-    border: 1px solid var(--opt-input-border);
+    border: 1px solid var(--opt-field-border);
     /* Dropdown-design round: joins the .fg select family (7px
-       radius, drawn chevron, btn-bg surface). It used to keep the UA arrow;
+       radius, drawn chevron, field fill (B+ value box, fill only -- no
+       bottom edge)). It used to keep the UA arrow;
        the @supports picker block above hides ::picker-icon for ALL selects,
        so without its own drawn chevron this control would lose its arrow
        entirely on Chrome 135+ (Codex review). Longhand background-*
        properties, same reason as .fg select's comment. */
     border-radius: var(--opt-radius-md);
     -webkit-appearance: none; appearance: none;
-    background-color: var(--opt-btn-bg);
+    background-color: var(--opt-field-bg);
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
     background-repeat: no-repeat;
     background-position: right 8px center;
@@ -3688,7 +3703,8 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     cursor: pointer;
   }
   .mobile-tab-picker select:hover:not(:focus) {
-    background-color: var(--opt-btn-hover);
+    background-color: var(--opt-field-bg-hover);
+    border-color: var(--opt-field-border-hover);
   }
   /* Re-assert after the appearance:none above -- this @media block sits
      LATER in the file than the global @supports opt-in, so without this the
@@ -3698,7 +3714,7 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
   }
   .mobile-tab-picker select:focus-visible {
     outline: none;
-    border-color: var(--opt-focus-bd);
+    border-color: var(--opt-field-border-focus);
     box-shadow: var(--opt-focus-ring);
   }
   .reset-tab-btn {

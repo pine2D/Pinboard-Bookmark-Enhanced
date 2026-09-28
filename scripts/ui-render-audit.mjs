@@ -252,7 +252,7 @@ function skip(check, expected, note) { return { check, status: "SKIP", actual: n
 // between the two silently made colorEqVar compare against whichever token
 // bgEqVar/textContrastMulti had already claimed (caught live: `.stag`'s
 // colorEqVar read chip-BG's value while labelled chip-fg in the verdict).
-function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVarName, extraBorderColorVarName, radiusVarName, childSelectors, focusTargetSelector }) {
+function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVarName, extraBorderColorVarName, extraEdgeColorVarName, radiusVarName, childSelectors, focusTargetSelector }) {
   const el = document.querySelector(selector);
   if (!el) return { found: false };
   const cs = getComputedStyle(el);
@@ -398,6 +398,13 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
   let extraBorderColorRaw = null;
   if (extraBorderColorVarName) {
     extraBorderColorRaw = getComputedStyle(document.documentElement).getPropertyValue(extraBorderColorVarName).trim() || null;
+  }
+  // extraEdgeColorRaw (B+ field family, 2026-09-28): edgeColorEqVar's own slot,
+  // so one row can pin bgEqVar (fill) + borderColorEqVar (top side) +
+  // edgeColorEqVar (bottom side) -- the three paints of a B+ value box at rest.
+  let extraEdgeColorRaw = null;
+  if (extraEdgeColorVarName) {
+    extraEdgeColorRaw = getComputedStyle(document.documentElement).getPropertyValue(extraEdgeColorVarName).trim() || null;
   }
   // Effective hit-area box (COMPONENTS.md §1.5's ::before hit-area expansion
   // recipe, e.g. .row-del-x / #vocab-invert-selection): getBoundingClientRect()
@@ -568,6 +575,7 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     extraBgRaw,
     extraColorRaw,
     extraBorderColorRaw,
+    extraEdgeColorRaw,
     textInset,
     containmentChildren,
     // Unconditional (cheap, selector-independent) -- colorSchemeMatchesTheme's
@@ -1048,6 +1056,26 @@ function evaluateCheck(check, raw, theme) {
     const got = parseSolidColor(gotRaw);
     const note = !want ? `--${exp.borderColorEqVar} token unresolved (raw=${JSON.stringify(raw.extraBorderColorRaw)})` : undefined;
     out.push(verdict("borderColorEqVar", colorsEqual(want, got), gotRaw, `var(--...-${exp.borderColorEqVar})=${raw.extraBorderColorRaw}`, note));
+  }
+  // edgeColorEqVar (B+ field family 2026-09-28, COMPONENTS.md §9.1 law 9): the
+  // value box's BOTTOM side (index 2 of raw.borderColors' top|right|bottom|
+  // left quad) must equal this theme's --{ns}-{role} token, +-1/channel.
+  if ("edgeColorEqVar" in exp) {
+    const want = parseSolidColor(raw.extraEdgeColorRaw);
+    const gotRaw = (raw.borderColors || "").split("|")[2];
+    const got = parseSolidColor(gotRaw);
+    const note = !want ? `--${exp.edgeColorEqVar} token unresolved (raw=${JSON.stringify(raw.extraEdgeColorRaw)})` : undefined;
+    out.push(verdict("edgeColorEqVar", colorsEqual(want, got), gotRaw, `var(--...-${exp.edgeColorEqVar})=${raw.extraEdgeColorRaw}`, note));
+  }
+  // borderSidesEqVar: ALL FOUR sides equal the token -- a focused value box
+  // paints one focus colour all the way round (spec §3: the edge follows
+  // focus). Shares borderColorEqVar's probe slot; a row may not set both.
+  if ("borderSidesEqVar" in exp) {
+    const want = parseSolidColor(raw.extraBorderColorRaw);
+    const sides = (raw.borderColors || "").split("|");
+    const ok = !!want && sides.length === 4 && sides.every((s) => colorsEqual(want, parseSolidColor(s)));
+    const note = !want ? `--${exp.borderSidesEqVar} token unresolved (raw=${JSON.stringify(raw.extraBorderColorRaw)})` : undefined;
+    out.push(verdict("borderSidesEqVar", ok, raw.borderColors, `4 x var(--...-${exp.borderSidesEqVar})=${raw.extraBorderColorRaw}`, note));
   }
   if ("hitAreaMin" in exp) {
     if (hostZero) out.push(verdict("hitAreaMin", false, null, exp.hitAreaMin, zeroNote));
@@ -2158,7 +2186,12 @@ async function runOneCheck(page, theme, check, results, extBase) {
   const extraBgSelectorVar = check.expect.textContrastMulti?.extraBgSelectorVar
     || check.expect.bgEqVar;
   const extraColorSelectorVar = check.expect.colorEqVar;
-  const extraBorderColorSelectorVar = check.expect.borderColorEqVar;
+  if (check.expect.borderColorEqVar && check.expect.borderSidesEqVar) {
+    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
+      "check declares BOTH borderColorEqVar and borderSidesEqVar -- they share the extraBorderColorVarName probe slot; split into two checklist entries instead.");
+  }
+  const extraBorderColorSelectorVar = check.expect.borderColorEqVar || check.expect.borderSidesEqVar;
+  const extraEdgeColorSelectorVar = check.expect.edgeColorEqVar;
   const radiusVar = check.expect.insetBand?.radiusVar || check.expect.borderRadiusPx?.radiusVar;
   const raw = await page.evaluate(probeSelector, {
     selector: check.selector,
@@ -2166,6 +2199,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     extraBgVarName: extraBgSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBgSelectorVar}` : null,
     extraColorVarName: extraColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraColorSelectorVar}` : null,
     extraBorderColorVarName: extraBorderColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBorderColorSelectorVar}` : null,
+    extraEdgeColorVarName: extraEdgeColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraEdgeColorSelectorVar}` : null,
     radiusVarName: radiusVar ? `--${NS_BY_SURFACE[check.surface]}-${radiusVar}` : null,
     childSelectors: check.expect.fusedChildrenFlat?.children || check.expect.fusedStateStableChildren || check.expect.edgeClickable?.children || null,
     focusTargetSelector: check.state === "focusWithin" ? check.focusTarget : null,
@@ -2752,35 +2786,26 @@ async function recordWeakTextHits(page, surface, theme, results, context) {
   }
 }
 
-// ---- fieldHoverContrast (family 14, stage 3c final review B1). COMPONENTS.md
-// §6.1/§6.2: an options field rests on --opt-border and its hover border is
-// "slightly darker" -- it mixes the SAME base 55% toward --opt-fg. B1 was the
-// class of defect where the hover step mixed a DIFFERENT base than the rest
-// state painted (the generated recipe's --opt-input-border vs the row model's
-// --opt-border): on 12/15 themes hover got lighter and on 8 it fell under 3:1.
-// No other gate saw it: the pixel gate is rest-state only, contrast-audit
-// pairs the generated hover with input-border/input-bg (not what the row
-// model paints), and no CHECKS row hovers a field. So this is a CLASS sweep,
-// not per-theme checklist rows: on every theme, every panel, every visible
-// enabled text-entry control inside the active panel (any text-entry input
-// type or textarea -- a population wider than the CSS rule's own :is() list
-// on purpose, so a field that escapes the row model's rest/hover pair is
-// caught instead of silently not measured), measured twice with the real
-// pointer: parked (rest) and hovered. Each read finishes the element's own
-// running transitions first (border-color transitions for --motion-state;
-// an unfinished one reads back as an interpolated oklab() frame, i.e. the
-// rest paint). Pass = the painted hover border clears 3:1 (WCAG 1.4.11)
-// against BOTH sides of the border -- the field's own fill (inner) and the
-// backdrop behind the field (outer) -- AND is strictly higher contrast than
-// the rest border on both sides (hover never lighter, never a no-op:
-// ruling A's "slightly darker"). One OK/FAIL row per (theme, field).
+// ---- fieldHoverContrast (family 14; stage 3c final review B1, rebuilt for
+// the B+ field family 2026-09-28). COMPONENTS.md §6.1/§6.2/§9.1 law 9: a value
+// box's WCAG 1.4.11 boundary is its 1px BOTTOM EDGE (--opt-field-edge); the
+// other three sides collapse into the fill (Soft Fill law 1) or carry a pilot
+// frame, so the sweep reads border-bottom-color. Population: every visible
+// enabled text-entry control in the active panel (wider than the CSS :is()
+// list on purpose, so a field that escapes the family is caught) plus the
+// drawn listbox button, the one non-text value box carrying the edge. Each is
+// measured with the real pointer, parked (rest) and hovered, after finishing
+// its own transitions. Pass = the edge clears 3:1 against the control's own
+// fill (inner) AND the backdrop behind it (outer) at rest AND on hover, and
+// hover is strictly higher contrast than rest on both sides (never lighter,
+// never a no-op). One OK/FAIL row per (theme, control).
 const FIELD_HOVER_SEL = [
   "input:not([type])", 'input[type="text"]', 'input[type="password"]', 'input[type="number"]',
-  'input[type="search"]', 'input[type="url"]', 'input[type="email"]', 'input[type="tel"]', "textarea",
+  'input[type="search"]', 'input[type="url"]', 'input[type="email"]', 'input[type="tel"]', "textarea", "button.listbox-btn",
 ].map((s) => `.panel.active ${s}`).join(", ");
-// The four kinds the row model actually ships; every theme must reach at
-// least one of each or the sweep is vacuous for that kind (SETUP ERROR).
-const FIELD_HOVER_REQUIRED_KINDS = ['input[type="text"]', 'input[type="password"]', 'input[type="number"]', "textarea"];
+// The kinds the family actually ships; every theme must reach at least one
+// of each or the sweep is vacuous for that kind (SETUP ERROR).
+const FIELD_HOVER_REQUIRED_KINDS = ['input[type="text"]', 'input[type="password"]', 'input[type="number"]', "textarea", "button.listbox-btn"];
 const fieldHoverScanLog = [];
 
 // Runs INSIDE the page (element handle evaluate) -- self-contained.
@@ -2792,7 +2817,9 @@ async function readFieldPaint(el) {
   const chain = [];
   for (let n = el.parentElement; n; n = n.parentElement) chain.push(getComputedStyle(n).backgroundColor);
   const tag = el.tagName.toLowerCase();
-  const kind = tag === "textarea" ? "textarea" : (el.hasAttribute("type") ? `input[type="${el.getAttribute("type")}"]` : "input:not([type])");
+  const kind = tag === "textarea" ? "textarea"
+    : tag === "button" ? "button.listbox-btn"
+    : (el.hasAttribute("type") ? `input[type="${el.getAttribute("type")}"]` : "input:not([type])");
   let path = el.id ? `#${el.id}` : null;
   if (!path) {
     const parts = [];
@@ -2803,7 +2830,7 @@ async function readFieldPaint(el) {
     path, kind,
     visible: r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none",
     disabled: !!el.disabled,
-    border: cs.borderTopColor, own: cs.backgroundColor, chain,
+    edge: cs.borderBottomColor, own: cs.backgroundColor, chain,
   };
 }
 
@@ -2829,7 +2856,7 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
   const ratios = (paint) => {
     const inner = stackOf([paint.own, ...paint.chain], paint.path);
     const outer = stackOf(paint.chain, paint.path);
-    const b = parse(paint.border, "border-top-color", paint.path);
+    const b = parse(paint.edge, "border-bottom-color", paint.path);
     const painted = composite(b.slice(0, 3), b[3], inner);
     return { inner: cr(painted, inner), outer: cr(painted, outer) };
   };
@@ -2842,14 +2869,14 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
     const hover = await h.evaluate(readFieldPaint);
     await page.mouse.move(0, 0);
     const r = ratios(rest), v = ratios(hover);
-    const ok = v.inner >= 3 && v.outer >= 3 && v.inner > r.inner && v.outer > r.outer;
+    const ok = r.inner >= 3 && r.outer >= 3 && v.inner >= 3 && v.outer >= 3 && v.inner > r.inner && v.outer > r.outer;
     scanned++;
     kindsSeen[rest.kind] = (kindsSeen[rest.kind] || 0) + 1;
     results.push({
       surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
       status: ok ? "OK" : "FAIL",
-      actual: `inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.border} -> hover ${hover.border})`,
-      expected: "hover border >=3:1 against the field fill and its backdrop, and higher contrast than rest on both (COMPONENTS.md §6.1/§6.2: hover mixes the rest base 55% toward fg)",
+      actual: `edge inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.edge} -> hover ${hover.edge})`,
+      expected: "bottom edge >=3:1 against the control's fill and its backdrop at rest and on hover, hover strictly higher on both (COMPONENTS.md §6.1/§9.1 law 9: edge -> edge-hover = mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX))",
       note: null,
     });
   }
@@ -3706,8 +3733,8 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     }
     // Non-vacuity (family 14): a population selector that stops matching, a
     // panel that never opens or a fixture that hides every field would
-    // otherwise pass as "0 FAIL". Every kind the row model ships must have
-    // been hovered at least once on THIS theme.
+    // otherwise pass as "0 FAIL". Every kind the value-box family ships must
+    // have been hovered at least once on THIS theme.
     const missingKinds = FIELD_HOVER_REQUIRED_KINDS.filter((k) => !fieldHoverKinds[k]);
     if (missingKinds.length) {
       throw new Error(`SETUP: fieldHoverContrast reached no visible enabled ${missingKinds.join(" / ")} on any options panel (theme=${JSON.stringify(theme)}; kinds seen ${JSON.stringify(fieldHoverKinds)}) -- the sweep would be vacuous for that kind`);
@@ -4069,7 +4096,9 @@ const SWEEP_CFG = {
   //    theme-variant: 15 presets restyle --opt-radius-md, so the probe reads
   //    the live values; `tokens` below is only the fallback when none resolve)
   //    or a pill; fused-shell descendants carry concentric (token - border)
-  //    radii and are exempt.
+  //    radii and are exempt. A top/bottom split (top pair equal, bottom pair
+  //    equal: the B+ value box's md md sm sm, 2026-09-28) is measured pair by
+  //    pair; left/right splits and single-corner cuts are still skipped.
   // 10. textFloor -- no visible text under 11px on any surface (popup and
   //     options carried 10px and 9px captions; 11px is every surface's hint size).
   textFloor: { min: 11, exempt: "sup, sub" },
@@ -4524,12 +4553,28 @@ function sweepProbe(cfg) {
       const chromed = (cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== "transparent") || parseFloat(cs.borderTopWidth) > 0 || cs.outlineStyle !== "none";
       if (!chromed) continue;
       const corners = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius];
-      if (corners.some((c) => c !== corners[0]) || corners[0] === "0px") continue;
-      const r = corners[0];
-      if (/%$/.test(r)) continue;                       // 50% dots
-      const px = parseFloat(r);
-      if (px >= 999 || radiusTokens.some((t) => Math.abs(px - t) < 0.5)) continue;
-      hits.push({ kind: "radiusScale", path: pathOf(el), radius: r, tokens: radiusTokens, detail: r });
+      const onScale = (r) => /%$/.test(r) || parseFloat(r) === 0 || parseFloat(r) >= 999 || radiusTokens.some((t) => Math.abs(parseFloat(r) - t) < 0.5);
+      if (corners.every((c) => c === corners[0])) {
+        if (onScale(corners[0])) continue;
+        hits.push({ kind: "radiusScale", path: pathOf(el), radius: corners[0], tokens: radiusTokens, detail: corners[0] });
+        continue;
+      }
+      // Split shape (B+ field family 2026-09-28): top pair equal, bottom pair
+      // equal -- the flat-bottomed value box (md md sm sm), a sheet (lg lg 0 0),
+      // a tab (0 0 md md). Until now every non-uniform box was skipped
+      // outright, so the field shape would have "passed" unmeasured. Each pair
+      // must sit on the scale (0 allowed). Left/right splits and single-corner
+      // cuts stay skipped: fused-segment geometry (exemptWithin above) and
+      // concentric calc(token - 1px) values the scale cannot express.
+      const [tl, tr, br, bl] = corners;
+      if (tl !== tr || bl !== br) continue;
+      // Liveness marker, not a hit: runSweep's add() diverts it into the
+      // per-surface "[radiusScale] split top/bottom pairs measured" count, so
+      // a run can prove this branch measured something (a vacuous branch and
+      // a clean one would otherwise both read as 0 radiusScale FAIL).
+      hits.push({ kind: "radiusSplitMeasured", path: pathOf(el), detail: corners.join(" ") });
+      if (onScale(tl) && onScale(bl)) continue;
+      hits.push({ kind: "radiusScale", path: pathOf(el), radius: corners.join(" "), tokens: radiusTokens, detail: corners.join(" ") });
     }
     // ---- 11. spacingScale. Typed OM (computedStyleMap) gives the COMPUTED
     // value, which still distinguishes `auto` / `normal` keywords and
@@ -4736,7 +4781,21 @@ async function runFamilySweep(page) {
 
 async function runSweep(page, sw, extBase) {
   const hits = [];
-  const add = (found, surface, context) => { for (const h of found) hits.push({ surface, context, ...h }); };
+  // family 9 liveness (P6a): sweepProbe reports every top/bottom split-radius
+  // box it measured as a `radiusSplitMeasured` marker; those are counted per
+  // surface here and never reach the hit list (they are not failures).
+  const splitPairs = {};
+  const add = (found, surface, context) => {
+    for (const h of found) {
+      if (h.kind === "radiusSplitMeasured") {
+        const s = (splitPairs[surface] ||= { measured: 0, paths: new Set() });
+        s.measured++;
+        s.paths.add(h.path);
+        continue;
+      }
+      hits.push({ surface, context, ...h });
+    }
+  };
 
   // Deterministic baseline for the options/library legs below (no per-theme
   // loop there, unlike popup's explicit light/dark setTheme calls further
@@ -4961,6 +5020,8 @@ async function runSweep(page, sw, extBase) {
   add(await runFamilySweep(page), "popup", "login");
   await sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF);
 
+  console.log("[radiusScale] split top/bottom pairs measured: " + ["options", "library", "md-preview", "popup"]
+    .map((s) => `${s}=${splitPairs[s]?.measured || 0} (${splitPairs[s]?.paths.size || 0} unique)`).join(" "));
   return hits;
 }
 

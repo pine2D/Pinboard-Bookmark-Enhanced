@@ -372,6 +372,18 @@
 //                      border-color quad (added stage-3b Task 1, `.pick-mark`
 //                      -- its border is uniform on every side, so one side
 //                      stands in for all four rather than a second raw shape).
+//   edgeColorEqVar   -- role name (e.g. "field-edge"): the element's BOTTOM
+//                      border-color (index 2 of the computed top|right|bottom|
+//                      left quad) must equal (+-1/channel) the active theme's
+//                      `--{ns}-{role}`. Own probe slot (extraEdgeColorVarName),
+//                      so one row can pin bgEqVar + borderColorEqVar (top) +
+//                      edgeColorEqVar (bottom) -- a B+ value box's three rest
+//                      paints (spec 2026-09-28-ui-fields-bplus-design §3).
+//   borderSidesEqVar -- role name: ALL FOUR computed border sides equal the
+//                      token (a focused value box paints one focus colour all
+//                      round; the edge must follow focus). Shares
+//                      borderColorEqVar's probe slot -- a row may not set both
+//                      (SETUP ERROR).
 //
 // weakTextOnFill (family 13, weak-text-on-fill batch T5, COMPONENTS.md
 // §9.1 law 8): no CHECKS entries carry this key -- like hitAreaMin (family
@@ -1663,6 +1675,37 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: "#translate-target-lang-btn", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { min: 240 },
       widthLteWith: { selector: ".fg:has(#translate-target-lang-btn)" }, hitRectMin: { height: 24 } } },
+  // ---- B+ field family (spec 2026-09-28-ui-fields-bplus-design §3, COMPONENTS.md
+  // §6.1/§6.2/§9.1 law 9): token IDENTITY of a value box's paints -- rest fill /
+  // collapsed-or-framed sides / bottom edge, hover fill / sides / edge, and the
+  // one-colour focus frame -- on a plain entry-block text field, a key-wrap
+  // secret, the textarea and the drawn listbox. Contrast is contrast-audit's
+  // field-* rows and family 14; these rows catch a hand-written rule
+  // repainting a value box with a non-field token (the stage-0 shape). ----
+  { surface: "options", page: "options.html", selector: "#dict-anki-deck", tab: "vocab", state: "default",
+    expect: { bgEqVar: "field-bg", borderColorEqVar: "field-border", edgeColorEqVar: "field-edge" } },
+  { surface: "options", page: "options.html", selector: "#dict-anki-deck", tab: "vocab", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderColorEqVar: "field-border-hover", edgeColorEqVar: "field-edge-hover" } },
+  { surface: "options", page: "options.html", selector: "#dict-anki-deck", tab: "vocab", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "options", page: "options.html", selector: "#dict-anki-key", tab: "vocab", state: "default",
+    expect: { bgEqVar: "field-bg", borderColorEqVar: "field-border", edgeColorEqVar: "field-edge" } },
+  { surface: "options", page: "options.html", selector: "#dict-anki-key", tab: "vocab", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderColorEqVar: "field-border-hover", edgeColorEqVar: "field-edge-hover" } },
+  { surface: "options", page: "options.html", selector: "#dict-anki-key", tab: "vocab", state: "focusWithin", focusTarget: ":scope",
+    expect: { borderSidesEqVar: "field-border-focus" } },
+  { surface: "options", page: "options.html", selector: "#opt-custom-css", tab: "appearance", state: "default",
+    expect: { bgEqVar: "field-bg", borderColorEqVar: "field-border", edgeColorEqVar: "field-edge" } },
+  { surface: "options", page: "options.html", selector: "#opt-custom-css", tab: "appearance", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderColorEqVar: "field-border-hover", edgeColorEqVar: "field-edge-hover" } },
+  { surface: "options", page: "options.html", selector: "#opt-custom-css", tab: "appearance", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "default",
+    expect: { bgEqVar: "field-bg", borderColorEqVar: "field-border", edgeColorEqVar: "field-edge" } },
+  { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderColorEqVar: "field-border-hover", edgeColorEqVar: "field-edge-hover" } },
+  { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   // #test-gemini (Task 4): the FIRST `.btn.btn-sm` action inside #panel-ai,
   // reachable without switching the provider away from its gemini default --
   // scripts/ui-render-audit.mjs routes this row through the switchChecks
