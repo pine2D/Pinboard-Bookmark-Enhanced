@@ -2056,13 +2056,17 @@ html.motion-ready #preset-preview-section > summary::after {
    over the unit hover). Mixing over the hover fill in both states nearly
    erased the chip in the recessed wells, whose hover fill is darker than
    rest: 1.113:1 on gruvbox-dark and 1.094:1 on catppuccin-mocha against the
-   focus fill it actually sat on (B+ re-review M1). 12% is the smallest whole
-   percent that keeps the chip >= 1.15:1 from the fill beneath it in both
-   states on all 15 blocks (8% bottomed out at 1.106 on solarized-light's
-   focus fill; ui-contract computes it per block). (0,4,0) beats the plain
-   hover chip's (0,2,0). */
-.key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 12%, var(--opt-field-bg-hover)); border-radius: var(--opt-radius-sm); }
-.key-wrap:focus-within .key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 12%, var(--opt-field-bg-focus)); }
+   focus fill it actually sat on (B+ re-review M1); over the right base the
+   same 8% gives them ~1.2:1. The mix stays 8%, deliberately faint: the
+   one heavier eye fill ever shipped, the 10% ghost FILL of round 5 (on
+   focus; recorded below), was rejected on sight for reading as a chip
+   sitting on the field. ui-contract computes the chip against the fill
+   beneath it on all 15 blocks in both states and holds it to
+   FILL_SEPARATE_MIN (1.10:1), the project's floor for "a fill reads as its
+   own plane" (COMPONENTS.md §9 law 2) -- lowest 1.106:1, solarized-light's
+   focus fill. (0,4,0) beats the plain hover chip's (0,2,0). */
+.key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-hover)); border-radius: var(--opt-radius-sm); }
+.key-wrap:focus-within .key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-focus)); }
 /* Focus = the project's standard button ring (§7.3), pulled INSIDE the eye's
    own box with a negative offset so it never reaches the capsule edge and
    never competes with the container's own :focus-within ring.

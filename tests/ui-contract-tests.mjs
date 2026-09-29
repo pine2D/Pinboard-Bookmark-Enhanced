@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import { parseStyleRules, parseDeclarations, declarationValueMap, splitSelectorList } from "../docs/theme-surface/tools/css-syntax.mjs";
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
-import { contrast, hexToRgb } from "../docs/theme-surface/composers/_ui-derive.mjs";
+import { contrast, hexToRgb, FILL_SEPARATE_MIN } from "../docs/theme-surface/composers/_ui-derive.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
@@ -6061,9 +6061,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "options.css: the listbox button left the B+ value-box family (bottom edge / radius / hover edge)");
   check(declarationValueMap(hand, ".listbox-btn .btn-ic").get("color") === "var(--opt-field-placeholder)" &&
     declarationValueMap(hand, ".key-toggle").get("color") === "var(--opt-field-placeholder)" &&
-    declarationValueMap(hand, ".key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 12%, var(--opt-field-bg-hover))" &&
-    declarationValueMap(hand, ".key-wrap:focus-within .key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 12%, var(--opt-field-bg-focus))",
-    "options.css: the key-wrap eye / listbox chevron must paint the field's secondary ink (--opt-field-placeholder), and the eye's hover chip must mix over the fill its field paints in each state -- --opt-field-bg-hover while the unit is only hovered (C-1), --opt-field-bg-focus while it holds focus (B+ re-review M1) -- at 12% (the chip-contrast block below derives why)");
+    declarationValueMap(hand, ".key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-hover))" &&
+    declarationValueMap(hand, ".key-wrap:focus-within .key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-focus))",
+    "options.css: the key-wrap eye / listbox chevron must paint the field's secondary ink (--opt-field-placeholder), and the eye's hover chip must mix over the fill its field paints in each state -- --opt-field-bg-hover while the unit is only hovered (C-1), --opt-field-bg-focus while it holds focus (B+ re-review M1) -- at 8% (a heavier eye fill was rejected on sight; the chip-contrast block below holds it to FILL_SEPARATE_MIN)");
   // P7: the eye's inset focus ring sits ON the field fill, so its core is the
   // field's own focus border (flexoki-light: --opt-focus-bd is 2.73:1 there).
   check(declarationValueMap(hand, ".key-toggle:focus-visible").get("outline") === "2px solid var(--opt-field-border-focus)",
@@ -6179,16 +6179,22 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
 // field wears the focus fill). Mixing over the hover fill in both states left
 // the chip at 1.113:1 (gruvbox-dark) / 1.094:1 (catppuccin-mocha) against the
 // focus fill in the recessed wells, whose hover fill is darker than rest.
+// The floor is FILL_SEPARATE_MIN (1.10), the project's "is this fill a plane
+// of its own at all" separation floor (COMPONENTS.md §9 law 2), imported from
+// the deriver rather than restated: the chip IS a fill on a fill. It is not a
+// stricter number because the chip is deliberately faint -- a heavier eye
+// fill was rejected on sight (options.css, the 10% ghost FILL of round 5) and
+// 8% over the correct per-state base already clears 1.10 on all 15 blocks.
 // Lives here, not in theme-ui-derive-tests.mjs: the gate is about what the
 // HAND-WRITTEN rules do with the generated values (which rule paints the chip
 // in which state, which fill the input paints then, the mix percentage), so it
-// reads the chip rules, the two key-wrap input rules and all 15 generated
-// options blocks from the shipped CSS; the deriver never sees the chip.
+// reads the chip rules, the key-wrap input rules and all 15 generated options
+// blocks from the shipped CSS; the deriver never sees the chip.
 // color-mix(in srgb, A p%, B) is a per-channel linear mix in sRGB space; the
 // browser keeps it as float colour(srgb ...) and quantises to 8 bits at paint,
 // so each channel is Math.round(A*p + B*(1-p)) on the 0-255 scale.
 {
-  const KEY_CHIP_MIN = 1.15;
+  const KEY_CHIP_MIN = FILL_SEPARATE_MIN;
   const cssNoComments = optionsCss.replace(/\/\*[\s\S]*?\*\//g, "");
   const hand = stripGeneratedRegions(cssNoComments);
   const handRules = parseStyleRules(hand).filter((r) => !r.context.some((c) => /forced-colors/.test(c)));
@@ -6197,25 +6203,110 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     return !c.pseudoElement && c.classes.includes("key-toggle");
   });
   const BG_RE = /^background(?:-color)?$/;
-  // Category first: every hand rule that paints a background on a hovered eye
-  // is one of the two modelled below -- a third one would repaint the chip in
-  // a state this block does not compute.
+  // Chip side, as a category: every hand rule that paints a background on a
+  // hovered eye is one of the two modelled below -- a third one would repaint
+  // the chip in a state this block does not compute.
   const chipPainters = handRules.filter((r) => r.selectors.some(isChipSelector) && parseDeclarations(r.body).some((d) => BG_RE.test(d.property)));
   const CHIP_HOVER = ".key-toggle:hover";
   const CHIP_FOCUS = ".key-wrap:focus-within .key-toggle:hover";
   const painterSelectors = chipPainters.flatMap((r) => r.selectors.filter(isChipSelector));
   check(painterSelectors.length === 2 && painterSelectors.includes(CHIP_HOVER) && painterSelectors.includes(CHIP_FOCUS),
     `options.css: the eye's hover chip is painted by exactly \`${CHIP_HOVER}\` (unit hovered, not focused) and \`${CHIP_FOCUS}\` (unit focused) -- found ${JSON.stringify(painterSelectors)}`);
-  check(cmpSpecificity(selectorSpecificity(CHIP_FOCUS), selectorSpecificity(CHIP_HOVER)) > 0,
-    `options.css: \`${CHIP_FOCUS}\` must out-rank \`${CHIP_HOVER}\` or the focused unit keeps the hover-fill chip`);
+  // Specificity of the painters actually FOUND (not of the two constants
+  // above, which could never disagree with themselves): every focus-within
+  // painter must out-rank every other one, or the focused unit keeps the
+  // hover-fill chip whatever the source order.
+  const focusPainters = painterSelectors.filter((s) => /:focus-within/.test(s));
+  const plainPainters = painterSelectors.filter((s) => !/:focus-within/.test(s));
+  const underRanked = focusPainters.flatMap((f) => plainPainters
+    .filter((h) => cmpSpecificity(selectorSpecificity(f), selectorSpecificity(h)) <= 0)
+    .map((h) => `${f} (${selectorSpecificity(f).join(",")}) vs ${h} (${selectorSpecificity(h).join(",")})`));
+  check(focusPainters.length > 0 && plainPainters.length > 0 && underRanked.length === 0,
+    `options.css: the focused-unit eye chip must out-rank the plain hover chip -- ${focusPainters.length && plainPainters.length ? "not out-ranked: " + underRanked.join(" | ") : `found focus-within painters ${JSON.stringify(focusPainters)}, plain ${JSON.stringify(plainPainters)}`}`);
   const bgOf = (selector) => {
     const m = declarationValueMap(hand, selector);
     return (m.get("background") ?? m.get("background-color") ?? "").trim();
   };
   const KWH = '.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"])';
   const FW = '.fg .key-wrap:focus-within :is(input[type="text"], input[type="password"])';
-  // A missing focus rule falls back (cascade) to the plain hover chip -- the
-  // exact M1 shape, so the numbers below catch its removal too.
+  // Fill side, as a category too (round-2 gates/F1): the chip is only
+  // computed against the fill the gate READS, so every rule that could paint
+  // the key-wrap's text/password input must either BE one of the two read
+  // below, or provably lose to them. Reaches that input = a subject compound
+  // (after :is() expansion, no pseudo-element) that is an <input> typed
+  // text/password or untyped, an options.html key-wrap input id, or a
+  // tagless, class-less compound under a .key-wrap ancestor. Then:
+  //   - one that names .key-wrap or a key-wrap id must be KWH or FW itself
+  //     (a third, e.g. a later password-only override at the same (0,4,1),
+  //     would silently repaint what the chip sits on);
+  //   - a generic input rule must be strictly out-ranked by FW (0,4,1), the
+  //     lower of the two, and not !important -- then it can never win while
+  //     the unit is hovered or focused, whatever its source order.
+  // Runs over the whole file (generated fills included), so a composer that
+  // starts emitting a stronger input fill is caught the same way.
+  const KEY_WRAP_INPUT_IDS = new Set([...optionsHtml.matchAll(/<span class="key-wrap">\s*<input\b([^>]*)>/g)]
+    .map((m) => (/\bid="([^"]+)"/.exec(m[1]) || [])[1]).filter(Boolean));
+  check(KEY_WRAP_INPUT_IDS.size >= 19 && KEY_WRAP_INPUT_IDS.has("opt-pinboard-token") && KEY_WRAP_INPUT_IDS.has("dict-anki-key"),
+    `ui-contract-tests.mjs: the options.html key-wrap input harvest drifted -- got ${KEY_WRAP_INPUT_IDS.size} ids`);
+  const reachesKeyWrapInput = (sel) => {
+    const subject = subjectOf(sel);
+    const underKeyWrap = /\.key-wrap(?![\w-])/.test(sel.slice(0, sel.length - subject.length));
+    return subjectAlternatives(subject).some((compound) => {
+      const c = classifyCompound(compound);
+      if (c.pseudoElement) return false;
+      if (c.ids.length) return c.ids.some((id) => KEY_WRAP_INPUT_IDS.has(id));
+      if (c.tag === "input") return c.type === null || c.type === "text" || c.type === "password";
+      return c.tag === null && c.classes.length === 0 && underKeyWrap;
+    });
+  };
+  const FW_SPEC = selectorSpecificity(FW);
+  const keyWrapFillOffenders = (css) => {
+    const out = [];
+    const modelled = new Set();
+    for (const rule of parseStyleRules(css)) {
+      if (rule.context.some((c) => /forced-colors/.test(c))) continue;
+      const paints = parseDeclarations(rule.body).filter((d) => BG_RE.test(d.property));
+      if (!paints.length) continue;
+      for (const sel of rule.selectors.filter(reachesKeyWrapInput)) {
+        if (sel === KWH || sel === FW) { modelled.add(sel); continue; }
+        const named = /\.key-wrap(?![\w-])/.test(sel) || subjectAlternatives(subjectOf(sel)).some((c) => classifyCompound(c).ids.some((id) => KEY_WRAP_INPUT_IDS.has(id)));
+        const decl = paints.map((d) => `${d.property}: ${d.value}${d.important ? " !important" : ""}`).join("; ");
+        if (named) out.push(`${sel} { ${decl} } -- paints the key-wrap input's fill outside the two rules the eye-chip gate reads`);
+        else if (paints.some((d) => d.important) || cmpSpecificity(selectorSpecificity(sel), FW_SPEC) >= 0) {
+          out.push(`${sel} (${selectorSpecificity(sel).join(",")}) { ${decl} } -- can out-rank the key-wrap fill rules (${FW_SPEC.join(",")}), so the chip may sit on a fill the gate never reads`);
+        }
+      }
+    }
+    for (const sel of [KWH, FW]) if (!modelled.has(sel)) out.push(`${sel} -- missing: the eye-chip gate reads the field fill from it`);
+    return out;
+  };
+  const shippedFill = keyWrapFillOffenders(cssNoComments);
+  check(shippedFill.length === 0, "options.css: the key-wrap input's hover/focus fill is painted by a rule the eye-chip gate does not read: " + shippedFill.join(" | "));
+  // Discrimination: [rule appended to the shipped CSS, must be caught].
+  const FILL_CASES = [
+    // round-2 gates/F1's counterexample: same (0,4,1) as FW, later in source.
+    ['.fg .key-wrap:focus-within input[type="password"] { background-color: var(--opt-field-bg-hover); }', true],
+    ["#opt-pinboard-token:focus { background-color: var(--opt-field-bg); }", true],
+    [".key-wrap:hover input { background: var(--opt-field-bg); }", true],
+    [".key-wrap:focus-within :not(.key-toggle) { background: var(--opt-field-bg); }", true],
+    ['html[data-theme] .fg input[type="password"]:focus { background-color: var(--opt-field-bg); }', true],
+    ['.fg input[type="password"]:focus { background-color: var(--opt-field-bg) !important; }', true],
+    // must stay clean
+    ['.fg input[type="text"]:focus { background-color: var(--opt-field-bg-focus); }', false],
+    [".key-wrap:focus-within .key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-focus)); }", false],
+    [".fg .key-wrap input { padding-right: 32px; }", false],
+    ['.options-search input[type="search"]:hover { background: var(--opt-input-bg); }', false],
+    ['.fg input[type="checkbox"]:focus { background: var(--opt-accent); }', false],
+    ["@media (forced-colors: active) { .fg .key-wrap:focus-within input { background: Canvas; } }", false],
+  ];
+  // Judged by what the synthetic rule ADDS, so a shipped offender reported
+  // above does not also turn every clean case into a false hit.
+  const fillMisjudged = FILL_CASES.filter(([css, want]) =>
+    keyWrapFillOffenders(`${cssNoComments}\n${css}`).some((o) => !shippedFill.includes(o)) !== want);
+  check(fillMisjudged.length === 0,
+    "ui-contract-tests.mjs: the eye-chip fill category no longer discriminates -- misjudged: " + fillMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
+  // A missing focus chip falls back (cascade) to the plain hover chip -- the
+  // exact M1 shape; the base check below catches its removal.
   const STATES = [
     { name: "unit hovered", chip: bgOf(CHIP_HOVER), fill: bgOf(KWH) },
     { name: "unit focused", chip: bgOf(CHIP_FOCUS) || bgOf(CHIP_HOVER), fill: bgOf(FW) },
@@ -6247,6 +6338,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(blocks.length === 15, `ui-contract-tests.mjs: the eye chip gate found ${blocks.length} options theme blocks, expected 15 (14 themes + :root)`);
   const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
   let measured = 0;
+  const lowest = { r: Infinity, where: "" };
   for (const [id, vars] of blocks) {
     for (const s of STATES) {
       if (s.skip) continue;
@@ -6261,11 +6353,13 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
       const chip = a.map((c, i) => Math.round(c * s.pct + b[i] * (1 - s.pct)));
       const r = contrast(chip, under);
       measured++;
+      if (r < lowest.r) Object.assign(lowest, { r, where: `${id} ${s.name}` });
       check(r >= KEY_CHIP_MIN,
-        `options.css ${id}: ${s.name}: the eye's hover chip is ${r.toFixed(3)}:1 against the fill beneath it (${s.fillVar} ${fill}; chip = ${Math.round(s.pct * 100)}% ${s.ink} over ${s.base}) -- floor ${KEY_CHIP_MIN}`);
+        `options.css ${id}: ${s.name}: the eye's hover chip is ${r.toFixed(3)}:1 against the fill beneath it (${s.fillVar} ${fill}; chip = ${Math.round(s.pct * 100)}% ${s.ink} over ${s.base}) -- floor FILL_SEPARATE_MIN ${KEY_CHIP_MIN}`);
     }
   }
   check(measured === 30, `ui-contract-tests.mjs: the eye chip gate measured ${measured} (block, state) pairs, expected 30`);
+  if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] eye chip: lowest ${lowest.r.toFixed(3)}:1 (${lowest.where}) over ${measured} (block, state) pairs; floor ${KEY_CHIP_MIN}`);
 }
 
 if (fail.length) {
