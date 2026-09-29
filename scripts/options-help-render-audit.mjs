@@ -28,6 +28,12 @@ const DPR_VALUES = Object.freeze([1, 1.25, 1.5, 2]);
 // paths within 1 CSS px at DPR 2 while still rejecting the visible 3px drift
 // this oracle was introduced to catch.
 const MAX_CENTER_DELTA_PHYSICAL_PX = 2;
+// How far the DOM baseline row may sit below the copy's ink bottom (the row
+// after its last ink row) before the probe is treated as broken
+// (capturePair). Measured 2026-09-29 over all 102 Latin probes, local fonts
+// and ci-fonts.conf alike: never below it (baseline - ink bottom = -7..0);
+// the rounding of baseline x DPR is the only reason for any slack.
+const BASELINE_BELOW_INK_SLACK_PHYSICAL_PX = 2;
 // PBP_HELP_RASTER_RANGES=1 prints the per-(locale, DPR, script, role) delta ranges on
 // a passing run too -- the calibration view, across all four DPRs (the plain gate
 // above already covers all four; this just also prints them): run it under the local
@@ -364,6 +370,15 @@ async function capturePair(page, item) {
     baselineRow = Math.round(settled.baseline.y * scaleY);
     if (baselineRow <= copyInk.minY) {
       return { error: `SETUP baseline probe: baseline row ${baselineRow} is not below the ink top ${copyInk.minY}` };
+    }
+    // The other side of the cross-check: a baseline row BELOW the ink bottom
+    // would make the min() below pick the ink bottom, i.e. silently fall back
+    // to the old whole-ink-box centre this metric replaced. On every real
+    // Latin string the baseline row equals the ink bottom (flat letters) or
+    // sits above it (descenders, round letters' one faint overshoot row), so
+    // anything past the slack means the probe measured the wrong line.
+    if (baselineRow > copyBottom + BASELINE_BELOW_INK_SLACK_PHYSICAL_PX) {
+      return { error: `SETUP baseline probe: baseline row ${baselineRow} is below the copy's ink bottom ${copyBottom} (+${BASELINE_BELOW_INK_SLACK_PHYSICAL_PX} device px slack) -- the Latin metric would silently fall back to the whole ink box` };
     }
     copyBottom = Math.min(copyBottom, baselineRow);
   }
