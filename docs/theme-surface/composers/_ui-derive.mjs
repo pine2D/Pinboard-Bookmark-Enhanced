@@ -399,12 +399,19 @@ export function focusBdToAA(accent, seedBg, hosts, min = 3) {
 //
 // The third argument is the mix TARGET, not necessarily fg: the function
 // mixes `fill` toward whatever colour it is handed, in .005 steps, until
-// every surface clears `min`. Every resting-fill caller (btn-bg, input-bg,
-// btn-hover, the chip, the B+ field fill) passes the surface fg. Since the
-// final fix wave (ruling R12) deriveFieldRoles' hover step passes fg only
-// where fg lies on the side away from the field's hosts, and otherwise the
-// pole on that side (#000000 / #ffffff) -- that is how a recessed well
-// darkens on hover instead of walking back into its panel.
+// every surface clears `min`. Every caller but one passes the surface fg:
+// the resting fills (btn-bg, input-bg, the chip, the B+ field fill), the
+// btn-hover step (surfaces [btn-bg]) and deriveFieldRoles' framed
+// border-hover step (surfaces [border]). The one exception, since the final
+// fix wave (ruling R12), is deriveFieldRoles' FILL hover step. It first picks
+// a side: darker when the rest fill is darker than both hosts, lighter when
+// it is lighter than both, and for a fill that sits BETWEEN its two hosts,
+// away from the nearer one (the host it contrasts least with). It then
+// targets fg when fg lies on that side of the fill, otherwise that side's
+// pole (#000000 / #ffffff) -- that is how a recessed well darkens on hover
+// instead of walking back into its panel. That step runs only when the rest
+// fill already clears the floor from both hosts, and it must clear it from
+// the rest fill and both hosts.
 export const FILL_SEPARATE_MIN = 1.10;
 
 export function fillSeparate(fill, surfaces, target, min = FILL_SEPARATE_MIN) {
