@@ -55,9 +55,17 @@
 //   cd .qa-scan && npm install && npx playwright install chromium
 //
 // EXIT
-//   0 → pass (all failures already in known-failures, or --update-known-failures ran)
-//   1 → at least one NEW violation not covered by known-failures
-//   2 → tooling/env error (no playwright, no display, seed failed, bad JSON, etc.)
+//   0 → pass (all failures already in known-failures and no SETUP row), or
+//       --update-known-failures rewrote the ledger
+//   1 → at least one NEW violation not covered by known-failures (wins over 2
+//       when a run has both)
+//   2 → tooling/env error (no playwright, no display, seed failed, bad JSON,
+//       etc.), OR at least one per-row harness precondition failed: a SETUP
+//       row (the real pointer's :hover never reached the element or was
+//       still on it at rest, or focus held the element through a blur and
+//       retry during a hover read), listed under "=== SETUP" -- that row was
+//       not measured, so it is neither a pass nor a product verdict. With any
+//       SETUP row, --update-known-failures refuses to write and exits 2.
 
 import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
@@ -1907,13 +1915,27 @@ async function runOneCheck(page, theme, check, results, extBase) {
   if (check.state !== "hover") {
     await page.mouse.move(0, 0);
   }
-  let hoverAttempts = 0; // set by the "hover" state below (follow-up 6)
+  // Per-run hover diagnostics for this row (follow-up 6; round 2 moved them
+  // out of `actual` into their own field so a ledger rewrite never churns on
+  // an attempt count), set by the "hover" state below.
+  let hoverHarness = null;
   // seedChecked (taste-uplift batch4 T1, render-audit-checklist.mjs header):
   // pin a checkbox-driven state by writing the input's `.checked` property
   // (no change event, so options.js's autosave never fires), settle past the
   // track's --motion-state transition, and restore the original value once
   // this check has read what it needs (see the restore after the probe).
   let seedRestore = null;
+  // Every exit after the seed must run this, including the hover state's
+  // early SETUP return (round 2, correctness/F3): a seeded `.checked` left in
+  // the DOM would be read by every later row on this page.
+  const restoreSeed = async () => {
+    if (!seedRestore) return;
+    await page.evaluate(({ input, checked }) => {
+      const el = document.querySelector(input);
+      if (el) el.checked = checked;
+    }, seedRestore);
+    await settleAnimations(page);
+  };
   if (check.state === "checked" && check.seedChecked?.checked !== true) {
     throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: state "checked" requires seedChecked: { input, checked: true }`);
   }
@@ -2165,25 +2187,39 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // must have reached the element, or every hover assertion below would be
     // judging the REST paint. One retry (re-scroll, pointer away, settle,
     // back); a hover that still does not apply is a SETUP row, not a verdict.
+    // Focus is part of the precondition too (round 2, gates/F5): hover rules
+    // are commonly `:hover:not(:focus)`, so focus left on the element (or
+    // inside it) reads exactly like a hover that never took. The retry blurs
+    // it first; focus that survives the blur is its own SETUP row.
     let hv = await hoverOnce();
-    hoverAttempts = 1;
-    if (!hv.hovered) {
+    let attempts = 1;
+    if (!hv.hovered || hv.focused) {
+      if (hv.focused) await page.evaluate(() => document.activeElement?.blur());
       await page.locator(check.selector).first().scrollIntoViewIfNeeded({ timeout: TIMEOUT_MS });
       await page.mouse.move(0, 0);
       await settleAnimations(page);
       hv = await hoverOnce();
-      hoverAttempts = 2;
+      attempts = 2;
     }
-    if (!hv.hovered) {
+    if (!hv.hovered || hv.focused) {
       await page.mouse.move(0, 0);
+      await restoreSeed();
+      const focusHeld = hv.focused;
       results.push({
-        surface: check.surface, theme, selector: check.selector, state: check.state, check: "hoverApplied", status: "SETUP",
-        actual: `:hover never applied after ${hoverAttempts} hover attempt(s) (re-scrolled, pointer away and back) -- elementFromPoint at the hover point: ${hv.hit}${hv.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}`,
-        expected: "the real pointer's :hover reaches the probed element (harness precondition for this row's hover assertions)",
-        note: "harness, not a product FAIL",
+        surface: check.surface, theme, selector: check.selector, state: check.state,
+        check: focusHeld ? "hoverUnfocused" : "hoverApplied", status: "SETUP",
+        setup: focusHeld ? "focusDuringHover" : "hoverNotApplied",
+        actual: focusHeld
+          ? `the element (or something inside it) still held focus on hover after a blur and ${attempts} hover attempt(s) -- document.activeElement: ${hv.active}; :hover=${hv.hovered}`
+          : `:hover never applied after ${attempts} hover attempt(s) (re-scrolled, pointer away and back) -- elementFromPoint at the hover point: ${hv.hit}${hv.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}; document.activeElement: ${hv.active}`,
+        expected: "the real pointer's :hover reaches the probed element with focus elsewhere (harness precondition for this row's hover assertions)",
+        note: focusHeld
+          ? "unmeasured: focus survived a blur, so a :hover:not(:focus) paint cannot be read -- a harness focus leak, or page script re-focusing the element (see activeElement)"
+          : "unmeasured: :hover never reached the element -- a harness pointer miss, or an overlay a user would hit too (see elementFromPoint)",
       });
       return;
     }
+    hoverHarness = `:hover=true, focus=false (activeElement ${hv.active}), attempt ${attempts}`;
   } else if (check.state === "open") {
     // "open" (Task 4, ui-system-stage2, Controller ruling C): a reusable
     // click-then-measure state for anything that stays hidden/zero-size
@@ -2267,13 +2303,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
   if (focusBaseline) raw.focusBaseline = focusBaseline;
   if (stabilityBaseline) raw.stabilityBaseline = stabilityBaseline;
   if (restBgStack) raw.restBgStack = restBgStack;
-  if (seedRestore) {
-    await page.evaluate(({ input, checked }) => {
-      const el = document.querySelector(input);
-      if (el) el.checked = checked;
-    }, seedRestore);
-    await settleAnimations(page);
-  }
+  await restoreSeed();
   if (check.state === "classState") {
     // Same discipline as the hover-pointer reset below: leaving the class on
     // would leak into the next check that reads this same element in its
@@ -2324,10 +2354,12 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // surface|theme|selector|state|check -- without this they would all
     // collapse onto one known-failures key and shadow each other.
     const state = check.state === "focusWithin" ? `focusWithin[${check.focusTarget}]` : check.state;
-    // A hover-state FAIL says the pointer state did apply (a harness miss is
-    // a SETUP row above, never a FAIL), so a flake can be told apart.
-    const hoverFlag = check.state === "hover" && r.status === "FAIL" ? { actual: `${r.actual} [:hover=true, attempt ${hoverAttempts}]` } : {};
-    results.push({ surface: check.surface, theme, selector: check.selector, state, ...r, ...hoverFlag });
+    // A hover-state row carries what the pointer/focus state was when it was
+    // read (a harness miss is a SETUP row above, never a FAIL), so a flake
+    // can be told apart -- in `harness`, not `actual`: the ledger writer
+    // copies actual/expected/note verbatim, and an attempt count there would
+    // churn every rewrite (round 2, correctness/F6).
+    results.push({ surface: check.surface, theme, selector: check.selector, state, ...r, ...(hoverHarness ? { harness: hoverHarness } : {}) });
   }
 }
 
@@ -2905,42 +2937,61 @@ async function readFieldPaint(el) {
     // hover read without :hover measures the REST paint, and "hover edge ==
     // rest edge" then reads as a product FAIL. `hit` is what sits at the
     // element's centre -- where Playwright's hover aims -- clamped into the
-    // viewport.
+    // viewport; `parkedHit` is what sits under the PARKED pointer at (0,0),
+    // the only useful witness when :hover is still on the element at rest.
+    // `focused` (round 2, gates/F5): the family's hover rule is
+    // `:hover:not(:focus)`, so focus left on the element (or inside it)
+    // gives the same "hover edge == rest edge" signature with :hover=true;
+    // `active` names whatever holds focus.
     hovered: el.matches(":hover"),
+    focused: el.matches(":focus-within"),
     ...(() => {
+      const name = (n) => (n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null");
       const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
       const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
       const n = document.elementFromPoint(x, y);
-      const name = n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...n.classList].map((c) => `.${c}`).join("")}` : "null";
-      return { hit: `${name} @(${Math.round(x)},${Math.round(y)})`, hitInside: !!n && (n === el || el.contains(n)) };
+      return {
+        hit: `${name(n)} @(${Math.round(x)},${Math.round(y)})`, hitInside: !!n && (n === el || el.contains(n)),
+        parkedHit: `${name(document.elementFromPoint(0, 0))} @(0,0)`,
+        active: name(document.activeElement),
+      };
     })(),
   };
 }
 
 // Runs INSIDE the page (page.evaluate(fn, selector)) -- self-contained. The
-// checklist runner's twin of readFieldPaint's hovered / hit fields.
+// checklist runner's twin of readFieldPaint's hovered / focused / hit /
+// active fields.
 function probeHoverApplied(selector) {
+  const name = (n) => (n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null");
   const el = document.querySelector(selector);
-  if (!el) return { hovered: false, hit: `no element matches ${selector}`, hitInside: false };
+  if (!el) return { hovered: false, focused: false, hit: `no element matches ${selector}`, hitInside: false, active: name(document.activeElement) };
   const r = el.getBoundingClientRect();
   const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
   const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
   const n = document.elementFromPoint(x, y);
-  const name = n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...n.classList].map((c) => `.${c}`).join("")}` : "null";
-  return { hovered: el.matches(":hover"), hit: `${name} @(${Math.round(x)},${Math.round(y)})`, hitInside: !!n && (n === el || el.contains(n)) };
+  return {
+    hovered: el.matches(":hover"), focused: el.matches(":focus-within"),
+    hit: `${name(n)} @(${Math.round(x)},${Math.round(y)})`, hitInside: !!n && (n === el || el.contains(n)),
+    active: name(document.activeElement),
+  };
 }
 
 // Real-pointer hover with a check that it took (follow-up 6; render-audit
 // family 14 saw 4 one-off FAILs on modern-card tag inputs whose hover edge
 // equalled the rest edge -- 39/39 reproductions were OK, i.e. a pointer /
-// hover timing flake). One retry, the way a person would: scroll the element
-// into view again, move the pointer away, let the same settle run, come back.
-// Returns the last read plus the attempt count; the caller decides what a
-// hover that never applied means. `read` must settle and report `hovered`.
+// hover timing flake). One retry, the way a person would: blur whatever holds
+// focus in the element (round 2, gates/F5 -- focus reproduces the same
+// signature through `:hover:not(:focus)`), scroll the element into view
+// again, move the pointer away, let the same settle run, come back. Returns
+// the last read plus the attempt count; the caller decides what a hover that
+// never applied (or focus that survived the blur) means. `read` must settle
+// and report `hovered` / `focused`.
 async function hoverVerified(page, handle, read) {
   await handle.hover({ timeout: TIMEOUT_MS });
   let got = await handle.evaluate(read);
-  if (got.hovered) return { got, attempts: 1 };
+  if (got.hovered && !got.focused) return { got, attempts: 1 };
+  if (got.focused) await handle.evaluate(() => document.activeElement?.blur());
   await handle.scrollIntoViewIfNeeded({ timeout: TIMEOUT_MS });
   await page.mouse.move(0, 0);
   await handle.evaluate(read); // the same settle the first read ran
@@ -2949,7 +3000,7 @@ async function hoverVerified(page, handle, read) {
   return { got, attempts: 2 };
 }
 
-async function recordFieldHoverContrast(page, theme, results, context, kindsSeen) {
+async function recordFieldHoverContrast(page, theme, results, context, kindsSeen, kindsUnmeasured) {
   const liveTheme = await page.evaluate(() => document.documentElement.dataset.theme || null);
   const expected = expectedDatasetTheme(theme);
   if (liveTheme !== expected) {
@@ -2975,36 +3026,54 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
     const painted = composite(b.slice(0, 3), b[3], inner);
     return { inner: cr(painted, inner), outer: cr(painted, outer) };
   };
-  let scanned = 0;
+  // Only MEASURED rows (OK / FAIL) count as scanned and as a kind seen: a
+  // SETUP row was reached but never measured, so counting it would let the
+  // non-vacuity guard and the coverage line report a measurement that did
+  // not happen (round 2, gates/F2). SETUP rows are tallied apart.
+  let scanned = 0, unmeasured = 0;
   for (const h of await page.$$(FIELD_HOVER_SEL)) {
     await page.mouse.move(0, 0);
     let rest = await h.evaluate(readFieldPaint);
     if (!rest.visible || rest.disabled) continue; // inert/hidden: no pointer state to test (WCAG 1.4.11 exempts inactive components)
     if (rest.hovered) { await page.mouse.move(0, 0); rest = await h.evaluate(readFieldPaint); } // parked pointer still on it: park again once
+    if (rest.focused) { await h.evaluate(() => document.activeElement?.blur()); rest = await h.evaluate(readFieldPaint); } // focus left on it by an earlier step: blur once
     const { got: hover, attempts } = await hoverVerified(page, h, readFieldPaint);
     await page.mouse.move(0, 0);
-    // A pointer state that never applied is a HARNESS condition, not a
-    // product verdict: a SETUP row (report() fails the run with exit 2 and
-    // lists it apart from product FAILs) naming the element and what sat
-    // under the pointer. Not a WARN: a WARN would pass the run with this
-    // control's hover paint never measured -- the one outcome R16's
-    // fail-safe reasoning ("a missed hover only ever produces a false FAIL,
-    // never a false OK") rules out. After a fresh scroll + pointer-away-and-
-    // back retry it is no longer a timing flake either: either something
-    // covers the field (elementFromPoint names it -- a real overlay a user
-    // would hit too, or a panel/popover an earlier step left open) or the
-    // harness lost its page.
-    if (rest.hovered || !hover.hovered) {
-      scanned++;
-      kindsSeen[rest.kind] = (kindsSeen[rest.kind] || 0) + 1;
+    // A precondition that never held is a HARNESS condition, not a product
+    // verdict: a SETUP row (report() fails the run with exit 2 and lists it
+    // apart from product FAILs) naming the element and the witness for its
+    // case. Not a WARN: a WARN would pass the run with this control's hover
+    // paint never measured -- the one outcome R16's fail-safe reasoning ("a
+    // missed hover only ever produces a false FAIL, never a false OK") rules
+    // out. After a blur + fresh scroll + pointer-away-and-back retry it is no
+    // longer a timing flake either: something covers the field
+    // (elementFromPoint names it -- a real overlay a user would hit too, or a
+    // panel/popover an earlier step left open), something keeps focus on it
+    // (activeElement), or the harness lost its page. Focus is checked first:
+    // with focus held the `:hover:not(:focus)` paint cannot be read at all,
+    // whatever :hover did.
+    const setup = rest.focused || hover.focused ? {
+      kind: "focusDuringHover",
+      actual: `the element (or something inside it) held focus ${rest.focused ? "at REST" : "on hover"} after a blur${rest.focused ? "" : ` and ${attempts} hover attempt(s)`} -- document.activeElement: ${rest.focused ? rest.active : hover.active}; :hover rest=${rest.hovered} hover=${hover.hovered}`,
+      note: "unmeasured: focus survived a blur, so the :hover:not(:focus) paint cannot be read -- a harness focus leak, or page script re-focusing the field (see activeElement)",
+    } : rest.hovered ? {
+      kind: "hoverAtRest",
+      actual: `:hover still applied at REST after re-parking the pointer -- elementFromPoint at the parked pointer: ${rest.parkedHit}`,
+      note: "unmeasured: :hover stuck on the element with the pointer parked at (0,0) -- the element (or an ancestor) sits under the parked pointer, or the page kept a stale hover chain (see elementFromPoint at (0,0))",
+    } : !hover.hovered ? {
+      kind: "hoverNotApplied",
+      actual: `:hover never applied after ${attempts} hover attempt(s) (re-scrolled, pointer away and back) -- elementFromPoint at the hover point: ${hover.hit}${hover.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}`,
+      note: "unmeasured: :hover never reached the element -- a harness pointer miss, or an overlay a user would hit too (see elementFromPoint)",
+    } : null;
+    if (setup) {
+      unmeasured++;
+      kindsUnmeasured[rest.kind] = kindsUnmeasured[rest.kind] || [];
+      kindsUnmeasured[rest.kind].push(`${rest.path} [${setup.kind}] ${setup.actual}`);
       results.push({
         surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
-        status: "SETUP",
-        actual: rest.hovered
-          ? `:hover still applied at REST after re-parking the pointer at (0,0) -- elementFromPoint at the element centre: ${rest.hit}`
-          : `:hover never applied after ${attempts} hover attempt(s) (re-scrolled, pointer away and back) -- elementFromPoint at the hover point: ${hover.hit}${hover.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}`,
-        expected: "the real pointer's :hover reaches the probed element (harness precondition for the fieldHoverContrast verdict)",
-        note: "harness, not a product FAIL",
+        status: "SETUP", setup: setup.kind, actual: setup.actual,
+        expected: "the real pointer's :hover reaches the probed element with focus elsewhere, and leaves it at rest (harness precondition for the fieldHoverContrast verdict)",
+        note: setup.note,
       });
       continue;
     }
@@ -3017,12 +3086,15 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
     results.push({
       surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
       status: ok ? "OK" : "FAIL",
-      actual: `edge inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.edge} ${rest.edgeW}px ${rest.edgeStyle} -> hover ${hover.edge} ${hover.edgeW}px ${hover.edgeStyle}; :hover rest=${rest.hovered} hover=${hover.hovered}, attempt ${attempts})`,
+      actual: `edge inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.edge} ${rest.edgeW}px ${rest.edgeStyle} -> hover ${hover.edge} ${hover.edgeW}px ${hover.edgeStyle})`,
       expected: "a painted bottom edge (width > 0, style not none/hidden) >=3:1 against the control's fill and its backdrop at rest and on hover, hover strictly higher on both (COMPONENTS.md §6.1/§9.1 law 9: edge -> edge-hover = mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX))",
       note: null,
+      // Per-run pointer/focus diagnostics, kept out of `actual` so a ledger
+      // rewrite never churns on them (round 2, correctness/F6).
+      harness: `:hover rest=${rest.hovered} hover=${hover.hovered}, focus rest=${rest.focused} hover=${hover.focused} (activeElement ${hover.active}), attempt ${attempts}`,
     });
   }
-  fieldHoverScanLog.push({ theme, context, scanned });
+  fieldHoverScanLog.push({ theme, context, scanned, unmeasured });
 }
 
 async function runLibraryTheme(page, extBase, theme, checks, results) {
@@ -3786,7 +3858,8 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     if (!panelIds.length) {
       throw new Error(`SETUP: no ".tab-btn" elements on options.html (theme=${theme}) -- weakTextOnFill cannot reach any panel`);
     }
-    const fieldHoverKinds = {};
+    const fieldHoverKinds = {}; // measured (OK/FAIL) rows per kind
+    const fieldHoverUnmeasured = {}; // SETUP rows per kind (reached, never measured)
     for (const tabId of panelIds) {
       await page.click(`#${tabId}`);
       await page.waitForTimeout(150);
@@ -3801,7 +3874,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // fieldHoverContrast (family 14) rides the same clean navigation and
       // the same opened panel, BEFORE this tab's own legs below (the
       // appearance leg's preset click repaints dataset.theme).
-      await recordFieldHoverContrast(page, theme, results, `panel:${tabId}`, fieldHoverKinds);
+      await recordFieldHoverContrast(page, theme, results, `panel:${tabId}`, fieldHoverKinds, fieldHoverUnmeasured);
 
       if (tabId === "tab-appearance") {
         // #preset-preview-section (F1's drift trigger, see above) + the
@@ -3876,10 +3949,14 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // Non-vacuity (family 14): a population selector that stops matching, a
     // panel that never opens or a fixture that hides every field would
     // otherwise pass as "0 FAIL". Every kind the value-box family ships must
-    // have been hovered at least once on THIS theme.
+    // have been MEASURED at least once on THIS theme -- a kind reached only
+    // as SETUP rows counts as missing (round 2, gates/F2), and the error
+    // quotes those rows so the cause is not lost with the run.
     const missingKinds = FIELD_HOVER_REQUIRED_KINDS.filter((k) => !fieldHoverKinds[k]);
     if (missingKinds.length) {
-      throw new Error(`SETUP: fieldHoverContrast reached no visible enabled ${missingKinds.join(" / ")} on any options panel (theme=${JSON.stringify(theme)}; kinds seen ${JSON.stringify(fieldHoverKinds)}) -- the sweep would be vacuous for that kind`);
+      const unmeasuredNote = missingKinds.filter((k) => fieldHoverUnmeasured[k]?.length)
+        .map((k) => `${k}: ${fieldHoverUnmeasured[k].length} reached but unmeasured, e.g. ${fieldHoverUnmeasured[k][0]}`).join("; ");
+      throw new Error(`SETUP: fieldHoverContrast measured no visible enabled ${missingKinds.join(" / ")} on any options panel (theme=${JSON.stringify(theme)}; measured kinds ${JSON.stringify(fieldHoverKinds)}${unmeasuredNote ? `; ${unmeasuredNote}` : ""}) -- the sweep would be vacuous for that kind`);
     }
     return;
   }
@@ -5209,17 +5286,21 @@ function report(results) {
   const okCount = results.filter((r) => r.status === "OK").length;
   const skipCount = results.filter((r) => r.status === "SKIP").length;
   // SETUP = a harness precondition that did not hold for one row (follow-up
-  // 6: the real pointer's :hover never reached the element), so that row was
-  // not measured. Listed apart from product FAILs, never written to or
-  // matched against the known-failures ledger, and the run exits 2 -- the
-  // same code as every other SETUP ERROR -- because an unmeasured row must
-  // not pass silently.
+  // 6 / round 2: the real pointer's :hover never reached the element, was
+  // still on it at rest, or focus held it through a blur during the hover
+  // read), so that row was not measured. Listed apart from product FAILs,
+  // never written to or matched against the known-failures ledger, and the
+  // run exits 2 -- the same code as every other SETUP ERROR -- because an
+  // unmeasured row must not pass silently.
   const setupRows = results.filter((r) => r.status === "SETUP");
   const printSetup = () => {
     if (!setupRows.length) return;
     console.log(`[render-audit] === SETUP -- ${setupRows.length} row(s) not measured (harness precondition failed; not a product verdict) ===`);
-    for (const r of setupRows) console.log(`  SETUP  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}`);
+    for (const r of setupRows) console.log(`  SETUP [${r.setup || "?"}]  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}${r.note ? "  (" + r.note + ")" : ""}`);
   };
+  // `harness` = per-run pointer/focus diagnostics of a measured hover row;
+  // printed on FAIL/WARN lines and kept in --json, never in the ledger.
+  const harnessOf = (r) => (r.harness ? `  [${r.harness}]` : "");
 
   if (UPDATE && setupRows.length) {
     printSetup();
@@ -5229,6 +5310,9 @@ function report(results) {
   if (UPDATE) {
     const knownFailures = {};
     for (const r of fails) {
+      // An explicit field list: `harness` (attempt counts, focus flags) is
+      // per-run noise and stays out, so rewriting the same failures twice
+      // gives the same file.
       knownFailures[keyOf(r)] = {
         surface: r.surface, theme: r.theme, selector: r.selector, state: r.state, check: r.check,
         actual: r.actual, expected: r.expected, note: r.note,
@@ -5238,7 +5322,7 @@ function report(results) {
     console.log(`[render-audit] ${okCount} OK, ${skipCount} SKIP, ${fails.length} FAIL`);
     if (skipCount) console.log(`[render-audit] SKIP = disabled controls exempted from contrast checks (WCAG 1.4.3), not a failure`);
     console.log(`[render-audit] wrote ${fails.length} known-failure(s) to ${KNOWN_FAILURES_PATH}`);
-    for (const r of fails) console.log(`  FAIL  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}${r.note ? "  (" + r.note + ")" : ""}`);
+    for (const r of fails) console.log(`  FAIL  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}${r.note ? "  (" + r.note + ")" : ""}${harnessOf(r)}`);
     process.exit(0);
   }
 
@@ -5264,7 +5348,16 @@ function report(results) {
   // than the whole gate growing a cross-process seenKeys merge protocol; a
   // full run (no --shard: verify.sh's single-shard path and every manual
   // invocation) still does it exactly as before.
-  const stale = SHARD ? [] : Object.keys(known).filter((k) => !seenKeys.has(k));
+  //
+  // A key whose row came back SETUP this run was never measured, so its
+  // absence from seenKeys says nothing (round 2, gates/F3): every known key
+  // under a SETUP row's surface|theme|selector|state| prefix is held out of
+  // STALE -- a checklist SETUP row renames its check (hoverApplied /
+  // hoverUnfocused), so the prefix, not the full key, is what matches the
+  // ledger's bgEqVar / edgeColorEqVar / ... entries for that row.
+  const setupPrefixes = [...new Set(setupRows.map((r) => `${r.surface}|${r.theme}|${r.selector}|${r.state}|`))];
+  const unmeasuredKnown = Object.keys(known).filter((k) => !seenKeys.has(k) && setupPrefixes.some((p) => k.startsWith(p)));
+  const stale = SHARD ? [] : Object.keys(known).filter((k) => !seenKeys.has(k) && !unmeasuredKnown.includes(k));
 
   console.log(`[render-audit] ${okCount} OK, ${skipCount} SKIP, ${warnings.length} WARN (known), ${violations.length} FAIL (new), ${setupRows.length} SETUP (harness)${SHARD_TAG}`);
   if (skipCount) console.log(`[render-audit] SKIP = disabled controls exempted from contrast checks (WCAG 1.4.3), not a failure`);
@@ -5273,7 +5366,11 @@ function report(results) {
   }
   if (warnings.length) {
     console.log(`[render-audit] known failures still outstanding (see ${KNOWN_FAILURES_PATH}):`);
-    for (const r of warnings) console.log(`  WARN  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}`);
+    for (const r of warnings) console.log(`  WARN  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}${harnessOf(r)}`);
+  }
+  if (!SHARD && unmeasuredKnown.length) {
+    console.log(`[render-audit] ${unmeasuredKnown.length} known-failure key(s) not reconciled -- their rows came back SETUP (unmeasured), see === SETUP:`);
+    for (const k of unmeasuredKnown) console.log(`  UNMEASURED  ${k}`);
   }
   if (stale.length) {
     console.log(`[render-audit] ${stale.length} known-failure key(s) no longer reproduce -- consider deleting from ${KNOWN_FAILURES_PATH}:`);
@@ -5282,7 +5379,7 @@ function report(results) {
   printSetup();
   if (violations.length) {
     console.log(`[render-audit] === FAIL -- ${violations.length} new violation(s) not covered by known-failures ===`);
-    for (const r of violations) console.log(`  FAIL  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}${r.note ? "  (" + r.note + ")" : ""}`);
+    for (const r of violations) console.log(`  FAIL  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}${r.note ? "  (" + r.note + ")" : ""}${harnessOf(r)}`);
     process.exit(1);
   }
   if (setupRows.length) process.exit(2);
@@ -5641,8 +5738,9 @@ async function main() {
   // fieldHoverContrast (family 14): same "scanned nothing vs 0 FAIL" line.
   {
     const total = fieldHoverScanLog.reduce((sum, entry) => sum + entry.scanned, 0);
-    const themes = new Set(fieldHoverScanLog.map((entry) => entry.theme)).size;
-    console.log(`[render-audit] fieldHoverContrast: ${total} field hover probe(s) across ${themes} options theme(s) this run${SHARD_TAG}`);
+    const unmeasured = fieldHoverScanLog.reduce((sum, entry) => sum + entry.unmeasured, 0);
+    const themes = new Set(fieldHoverScanLog.filter((entry) => entry.scanned > 0).map((entry) => entry.theme)).size;
+    console.log(`[render-audit] fieldHoverContrast: ${total} field hover probe(s) measured across ${themes} options theme(s) this run, ${unmeasured} unmeasured (SETUP)${SHARD_TAG}`);
   }
   if (JSON_OUT) {
     writeFileSync(JSON_OUT, JSON.stringify(results, null, 2) + "\n");
