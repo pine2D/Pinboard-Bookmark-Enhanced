@@ -357,9 +357,9 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
   CI 的 Liberation Sans + 文泉驿正黑（`scripts/ci-fonts.conf` 在 Ubuntu 24.04 主机上逐字节复现 CI，必须以绝对路径传给 `FONTCONFIG_FILE`）字体栅格交集内，门禁容许至多 2 个物理像素的抗锯齿量化差异。
   拉丁文案的墨迹中心只取「墨迹顶 → 基线」（基线由 DOM 零尺寸探针读出，下伸部不计）：整框中心会让有无下伸部的同角色标题相差最多 4 个物理像素，量到的是单词而不是图标；CJK 文案仍取整个墨迹框。
 - 两种锚定模型，按宿主有没有文字基线可借选择：**有文案的宿主**（`section` / `field` / `group` / `choice`）用
-  `align-items: baseline` 把 summary 锚到文案基线，再按字号常量下移到光学中心（拉丁小写混排 ≈0.3em、
-  方块字 ≈0.38em；文案字面钉 px 所以常量也是 px）——行内墨迹相对行盒的位置是字体的升降部拆分，Segoe UI 与
-  DejaVu 差约 1 CSS px 且没有 CSS 单位能表达它，中心锚定的常量只能拟合其中一家（2026-09-06 栅格门实测）。
+  `align-items: baseline` 把 summary 锚到文案基线，再按字号常量下移到光学中心（拉丁 ≈0.37em，取基线以上墨迹的
+  中心、下伸部不计；方块字 ≈0.38em；文案字面钉 px 所以常量也是 px）——行内墨迹相对行盒的位置是字体的升降部拆分，
+  Windows 与 CI 两套字体（Verdana / Liberation Sans）差约 1 CSS px 且没有 CSS 单位能表达它，中心锚定的常量只能拟合其中一家（2026-09-06 栅格门实测）。
   `choice` 的 label 是 flex 行且首项是 checkbox，flex 容器的基线默认取首项（checkbox 没有文字基线，按底边合成、
   不随字体动），所以由文案 span 单独 `align-self: baseline` 参与基线对齐，label 的基线即成为文字基线；所有 choice 文案 span 的
   `line-height` 取 pref-row 行的 `--opt-lh-body`，文字与 checkbox 均不动。
