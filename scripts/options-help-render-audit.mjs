@@ -6,8 +6,9 @@
 // rows are descenders (see capturePair); every centre is still raster ink.
 
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
-import { resolve, dirname, isAbsolute } from "node:path";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { resolve, dirname, isAbsolute, join } from "node:path";
+import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
@@ -45,6 +46,40 @@ const HELP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" strok
 // check, now the script's job instead of a human's. Only runs when a
 // developer has opted in by setting FONTCONFIG_FILE; CI never sets it, so
 // this is a no-op there.
+// The CI emulation must not depend on the developer's OWN fontconfig.
+// scripts/ci-fonts.conf includes the host's /etc/fonts/conf.d, and that
+// directory's 50-user.conf pulls in $XDG_CONFIG_HOME/fontconfig/{conf.d,
+// fonts.conf} (default ~/.config/fontconfig) -- a personal hintstyle,
+// subpixel order or family preference there would silently change what the
+// "CI" run rasterises (a global `<match target="font">` assign even
+// overrides conf.d's per-font rules that CI keeps, e.g. 25-wqy-zenhei.conf's
+// hintnone + rgba none for WenQuanYi). So, with FONTCONFIG_FILE set, the
+// browser (and the fc-match parity probe) get XDG_CONFIG_HOME pointed at an
+// empty temp dir. The two legacy per-user files 50-user.conf also reads,
+// ~/.fonts.conf and ~/.fonts.conf.d, hang off $HOME and cannot be redirected
+// that way, so their presence stops the run instead of being half-honoured.
+// A pin of hintstyle/rgba after the include was rejected for the same
+// per-font reason: it would clobber the WenQuanYi rule CI has. What is left
+// host-dependent is the host conf.d itself and 51-local.conf's
+// /etc/fonts/local.conf (the ci-fonts.conf header says so).
+function isolatedFontconfigEnv() {
+  if (!process.env.FONTCONFIG_FILE) return null;
+  const legacy = [join(homedir(), ".fonts.conf"), join(homedir(), ".fonts.conf.d")].filter((p) => existsSync(p));
+  if (legacy.length) {
+    console.error(
+      `[options-help-render-audit] FONTCONFIG_FILE is set but legacy per-user fontconfig exists (${legacy.join(", ")}). ` +
+      `/etc/fonts/conf.d/50-user.conf reads it through $HOME, which this script cannot isolate the way it isolates ` +
+      `$XDG_CONFIG_HOME/fontconfig, so the CI emulation would silently include your personal settings. ` +
+      `Move it under ~/.config/fontconfig (isolated automatically) or out of the way, then rerun.`
+    );
+    process.exit(2);
+  }
+  const dir = mkdtempSync(join(tmpdir(), "pbp-ci-fonts-xdg-"));
+  process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
+  return { dir, env: { ...process.env, XDG_CONFIG_HOME: dir } };
+}
+const FONTCONFIG_ISOLATION = isolatedFontconfigEnv();
+
 function checkFontconfigParity() {
   const confPath = process.env.FONTCONFIG_FILE;
   if (!confPath) return;
@@ -59,7 +94,7 @@ function checkFontconfigParity() {
   }
   let resolved;
   try {
-    resolved = execFileSync("fc-match", ["Microsoft YaHei"], { encoding: "utf8" }).trim();
+    resolved = execFileSync("fc-match", ["Microsoft YaHei"], { encoding: "utf8", env: FONTCONFIG_ISOLATION?.env ?? process.env }).trim();
   } catch (e) {
     console.warn(`[options-help-render-audit] fc-match unavailable (${e.code || e.message}) -- skipping the FONTCONFIG_FILE=${confPath} parity check (fontconfig is Linux-only).`);
     return;
@@ -345,7 +380,7 @@ async function capturePair(page, item) {
 const failures = [];
 const samples = new Map();
 let probes = 0;
-const browser = await chromium.launch();
+const browser = await chromium.launch(FONTCONFIG_ISOLATION ? { env: FONTCONFIG_ISOLATION.env } : {});
 try {
   for (const dpr of DPR_VALUES) {
     for (const locale of LOCALES) {
