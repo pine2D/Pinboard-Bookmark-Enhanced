@@ -394,19 +394,28 @@ export function focusBdToAA(accent, seedBg, hosts, min = 3) {
 // resting fill reads as its own plane on light surfaces, while 1.15 starts to
 // read as an old-style grey button AND pushes five "recessed well" input fields
 // (darker than their hosts) far enough toward fg that they cross the hosts'
-// luminance and come out as raised pills -- this function only ever mixes
-// toward fg, so a well can only be separated further by flipping it.
+// luminance and come out as raised pills -- the RESTING-fill callers all pass
+// fg as the mix target, so a well can only be separated further by flipping it.
+//
+// The third argument is the mix TARGET, not necessarily fg: the function
+// mixes `fill` toward whatever colour it is handed, in .005 steps, until
+// every surface clears `min`. Every resting-fill caller (btn-bg, input-bg,
+// btn-hover, the chip, the B+ field fill) passes the surface fg. Since the
+// final fix wave (ruling R12) deriveFieldRoles' hover step passes fg only
+// where fg lies on the side away from the field's hosts, and otherwise the
+// pole on that side (#000000 / #ffffff) -- that is how a recessed well
+// darkens on hover instead of walking back into its panel.
 export const FILL_SEPARATE_MIN = 1.10;
 
-export function fillSeparate(fill, surfaces, fg, min = FILL_SEPARATE_MIN) {
+export function fillSeparate(fill, surfaces, target, min = FILL_SEPARATE_MIN) {
   const round = c => hexToRgb(rgbToHex(c));
   const clears = c => surfaces.every(s => contrast(round(c), round(s)) >= min);
   if (clears(fill)) return fill;
   for (let i = 1; i <= 100; i++) {
-    const out = mix(fill, fg, i * 0.005);
+    const out = mix(fill, target, i * 0.005);
     if (clears(out)) return out;
   }
-  return mix(fill, fg, 0.5);
+  return mix(fill, target, 0.5);
 }
 
 // Two control TIERS that sit side by side (a tonal button next to a plain one, a

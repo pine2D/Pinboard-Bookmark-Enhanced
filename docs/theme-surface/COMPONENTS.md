@@ -1293,8 +1293,8 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
    B+ 起改用 `--opt-field-border` 作塌陷载体（§6.2），不再直接引用 `--opt-input-border`。
 
 2. **填充必须与所在表面分离。** 去掉边框后，与宿主表面同色的填充 = 看不见的控件。
-   派生函数 `fillSeparate(fill, surfaces, fg, min)`（`composers/_ui-derive.mjs`）把表面自己的
-   `fg` 混进填充，直到对**每一个**宿主表面都达到 1.10:1。
+   派生函数 `fillSeparate(fill, surfaces, target, min)`（`composers/_ui-derive.mjs`）把混色目标
+   `target` 混进填充，直到对**每一个**宿主表面都达到 1.10:1；静息填充传入的 `target` 一律是表面自己的 `fg`。
    - **分离的基准是控件真正坐着的那层**，而且往往不止一层：library 的 `.btn` 既出现在
      `--lib-bg` 的工具条上，也出现在 `--lib-panel` 的详情面板里，只对其中一层分离会把填充
      推到另一层上。所以宿主是**数组**，不是单值。
