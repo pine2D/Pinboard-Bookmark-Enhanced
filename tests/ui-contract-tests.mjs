@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import { parseStyleRules, parseDeclarations, declarationValueMap, splitSelectorList } from "../docs/theme-surface/tools/css-syntax.mjs";
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
+import { contrast, hexToRgb } from "../docs/theme-surface/composers/_ui-derive.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
@@ -6029,8 +6030,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "options.css: the listbox button left the B+ value-box family (bottom edge / radius / hover edge)");
   check(declarationValueMap(hand, ".listbox-btn .btn-ic").get("color") === "var(--opt-field-placeholder)" &&
     declarationValueMap(hand, ".key-toggle").get("color") === "var(--opt-field-placeholder)" &&
-    declarationValueMap(hand, ".key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-hover))",
-    "options.css: the key-wrap eye / listbox chevron must paint the field's secondary ink (--opt-field-placeholder) and the eye's hover chip must mix over --opt-field-bg-hover (the eye is only hovered while its field wears the hover paint -- C-1)");
+    declarationValueMap(hand, ".key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 12%, var(--opt-field-bg-hover))" &&
+    declarationValueMap(hand, ".key-wrap:focus-within .key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 12%, var(--opt-field-bg-focus))",
+    "options.css: the key-wrap eye / listbox chevron must paint the field's secondary ink (--opt-field-placeholder), and the eye's hover chip must mix over the fill its field paints in each state -- --opt-field-bg-hover while the unit is only hovered (C-1), --opt-field-bg-focus while it holds focus (B+ re-review M1) -- at 12% (the chip-contrast block below derives why)");
   // P7: the eye's inset focus ring sits ON the field fill, so its core is the
   // field's own focus border (flexoki-light: --opt-focus-bd is 2.73:1 there).
   check(declarationValueMap(hand, ".key-toggle:focus-visible").get("outline") === "2px solid var(--opt-field-border-focus)",
@@ -6137,6 +6139,102 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const selMisjudged = SELECT_CASES.filter(([css, want]) => (selectEdges(css).length > 0) !== want);
   check(selMisjudged.length === 0,
     "ui-contract-tests.mjs: the select fill-only check no longer discriminates -- misjudged: " + selMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
+}
+
+// ---- B+ follow-up (re-review M1): the key-wrap eye's hover chip must stay
+// visible against the fill its field ACTUALLY paints under it, in both states
+// the eye can be hovered in -- the unit hovered but unfocused (the field wears
+// the unit-hover fill) and the unit holding focus (the focus frame wins, the
+// field wears the focus fill). Mixing over the hover fill in both states left
+// the chip at 1.113:1 (gruvbox-dark) / 1.094:1 (catppuccin-mocha) against the
+// focus fill in the recessed wells, whose hover fill is darker than rest.
+// Lives here, not in theme-ui-derive-tests.mjs: the gate is about what the
+// HAND-WRITTEN rules do with the generated values (which rule paints the chip
+// in which state, which fill the input paints then, the mix percentage), so it
+// reads the chip rules, the two key-wrap input rules and all 15 generated
+// options blocks from the shipped CSS; the deriver never sees the chip.
+// color-mix(in srgb, A p%, B) is a per-channel linear mix in sRGB space; the
+// browser keeps it as float colour(srgb ...) and quantises to 8 bits at paint,
+// so each channel is Math.round(A*p + B*(1-p)) on the 0-255 scale.
+{
+  const KEY_CHIP_MIN = 1.15;
+  const cssNoComments = optionsCss.replace(/\/\*[\s\S]*?\*\//g, "");
+  const hand = stripGeneratedRegions(cssNoComments);
+  const handRules = parseStyleRules(hand).filter((r) => !r.context.some((c) => /forced-colors/.test(c)));
+  const isChipSelector = (sel) => /:hover/.test(sel) && subjectAlternatives(subjectOf(sel)).some((compound) => {
+    const c = classifyCompound(compound);
+    return !c.pseudoElement && c.classes.includes("key-toggle");
+  });
+  const BG_RE = /^background(?:-color)?$/;
+  // Category first: every hand rule that paints a background on a hovered eye
+  // is one of the two modelled below -- a third one would repaint the chip in
+  // a state this block does not compute.
+  const chipPainters = handRules.filter((r) => r.selectors.some(isChipSelector) && parseDeclarations(r.body).some((d) => BG_RE.test(d.property)));
+  const CHIP_HOVER = ".key-toggle:hover";
+  const CHIP_FOCUS = ".key-wrap:focus-within .key-toggle:hover";
+  const painterSelectors = chipPainters.flatMap((r) => r.selectors.filter(isChipSelector));
+  check(painterSelectors.length === 2 && painterSelectors.includes(CHIP_HOVER) && painterSelectors.includes(CHIP_FOCUS),
+    `options.css: the eye's hover chip is painted by exactly \`${CHIP_HOVER}\` (unit hovered, not focused) and \`${CHIP_FOCUS}\` (unit focused) -- found ${JSON.stringify(painterSelectors)}`);
+  check(cmpSpecificity(selectorSpecificity(CHIP_FOCUS), selectorSpecificity(CHIP_HOVER)) > 0,
+    `options.css: \`${CHIP_FOCUS}\` must out-rank \`${CHIP_HOVER}\` or the focused unit keeps the hover-fill chip`);
+  const bgOf = (selector) => {
+    const m = declarationValueMap(hand, selector);
+    return (m.get("background") ?? m.get("background-color") ?? "").trim();
+  };
+  const KWH = '.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"])';
+  const FW = '.fg .key-wrap:focus-within :is(input[type="text"], input[type="password"])';
+  // A missing focus rule falls back (cascade) to the plain hover chip -- the
+  // exact M1 shape, so the numbers below catch its removal too.
+  const STATES = [
+    { name: "unit hovered", chip: bgOf(CHIP_HOVER), fill: bgOf(KWH) },
+    { name: "unit focused", chip: bgOf(CHIP_FOCUS) || bgOf(CHIP_HOVER), fill: bgOf(FW) },
+  ];
+  const MIX_RE = /^color-mix\(\s*in srgb\s*,\s*var\((--opt-[a-z0-9-]+)\)\s+(\d+(?:\.\d+)?)%\s*,\s*var\((--opt-[a-z0-9-]+)\)\s*\)$/;
+  const VAR_RE = /^var\((--opt-[a-z0-9-]+)\)$/;
+  for (const s of STATES) {
+    const m = MIX_RE.exec(s.chip), f = VAR_RE.exec(s.fill);
+    check(!!m && !!f, `options.css: ${s.name}: the chip (${JSON.stringify(s.chip)}) must be color-mix(in srgb, var(--opt-*) N%, var(--opt-*)) and the field fill (${JSON.stringify(s.fill)}) a single var(--opt-*) -- anything else and this gate cannot compute it`);
+    Object.assign(s, m && f ? { ink: m[1], pct: Number(m[2]) / 100, base: m[3], fillVar: f[1] } : { skip: true });
+    if (!s.skip) {
+      check(s.base === s.fillVar,
+        `options.css: ${s.name}: the chip mixes over ${s.base} but the field under the eye paints ${s.fillVar} in that state`);
+    }
+  }
+  // All 15 generated options blocks: 14 html[data-theme] + the default :root,
+  // which inherits every role it does not re-declare from the hand :root.
+  const region = optionsCss.slice(optionsCss.indexOf("/* @generated:ui-themes start"), optionsCss.indexOf("/* @generated:ui-themes end */")).replace(/\/\*[\s\S]*?\*\//g, "");
+  const rootVars = {};
+  for (const m of cssNoComments.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) {
+    for (const d of m[1].matchAll(/(--opt-[a-z0-9-]+)\s*:\s*([^;]+);/g)) rootVars[d[1]] = d[2].trim();
+  }
+  const blocks = [[":root", rootVars]];
+  for (const m of region.matchAll(/html\[data-theme="([a-z0-9-]+)"\]\s*\{([^}]*)\}/g)) {
+    const vars = { ...rootVars };
+    for (const d of m[2].matchAll(/(--opt-[a-z0-9-]+)\s*:\s*([^;]+);/g)) vars[d[1]] = d[2].trim();
+    blocks.push([m[1], vars]);
+  }
+  check(blocks.length === 15, `ui-contract-tests.mjs: the eye chip gate found ${blocks.length} options theme blocks, expected 15 (14 themes + :root)`);
+  const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+  let measured = 0;
+  for (const [id, vars] of blocks) {
+    for (const s of STATES) {
+      if (s.skip) continue;
+      const ink = vars[s.ink], base = vars[s.base], fill = vars[s.fillVar];
+      if (![ink, base, fill].every((v) => HEX.test(v ?? ""))) {
+        check(false, `options.css ${id}: ${s.ink}=${ink} / ${s.base}=${base} / ${s.fillVar}=${fill} is not a #rgb / #rrggbb hex -- the eye chip gate cannot compute it`);
+        continue;
+      }
+      // The chip as painted (its own mix base), against the fill the field
+      // really paints beneath it in this state.
+      const a = hexToRgb(ink), b = hexToRgb(base), under = hexToRgb(fill);
+      const chip = a.map((c, i) => Math.round(c * s.pct + b[i] * (1 - s.pct)));
+      const r = contrast(chip, under);
+      measured++;
+      check(r >= KEY_CHIP_MIN,
+        `options.css ${id}: ${s.name}: the eye's hover chip is ${r.toFixed(3)}:1 against the fill beneath it (${s.fillVar} ${fill}; chip = ${Math.round(s.pct * 100)}% ${s.ink} over ${s.base}) -- floor ${KEY_CHIP_MIN}`);
+    }
+  }
+  check(measured === 30, `ui-contract-tests.mjs: the eye chip gate measured ${measured} (block, state) pairs, expected 30`);
 }
 
 if (fail.length) {

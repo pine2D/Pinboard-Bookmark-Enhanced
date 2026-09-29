@@ -2050,10 +2050,19 @@ html.motion-ready #preset-preview-section > summary::after {
    probed element itself, not a sibling). */
 .fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"]) { background-color: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); border-bottom-color: var(--opt-field-edge-hover); }
 /* Hover is where the eye may show a fill -- a pointer affordance, and not a
-   state the rest/focus invariant covers. It mixes over the HOVER fill: the
-   eye is only ever hovered while the field under it wears its hover paint
-   (rule above). */
-.key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-hover)); border-radius: var(--opt-radius-sm); }
+   state the rest/focus invariant covers. The chip mixes over the fill the
+   input actually paints under it: the HOVER fill while the unit is not
+   focused (rule above), the FOCUS fill while it is (the focus frame wins
+   over the unit hover). Mixing over the hover fill in both states nearly
+   erased the chip in the recessed wells, whose hover fill is darker than
+   rest: 1.113:1 on gruvbox-dark and 1.094:1 on catppuccin-mocha against the
+   focus fill it actually sat on (B+ re-review M1). 12% is the smallest whole
+   percent that keeps the chip >= 1.15:1 from the fill beneath it in both
+   states on all 15 blocks (8% bottomed out at 1.106 on solarized-light's
+   focus fill; ui-contract computes it per block). (0,4,0) beats the plain
+   hover chip's (0,2,0). */
+.key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 12%, var(--opt-field-bg-hover)); border-radius: var(--opt-radius-sm); }
+.key-wrap:focus-within .key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 12%, var(--opt-field-bg-focus)); }
 /* Focus = the project's standard button ring (§7.3), pulled INSIDE the eye's
    own box with a negative offset so it never reaches the capsule edge and
    never competes with the container's own :focus-within ring.
