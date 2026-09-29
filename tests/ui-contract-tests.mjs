@@ -6324,8 +6324,17 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     walk(host);
     return ids;
   })();
-  check(RUNTIME_KEY_WRAP_IDS.size >= 1 && RUNTIME_KEY_WRAP_IDS.has("notion-token"),
-    `ui-contract-tests.mjs: the runtime (renderExportTargets) key-wrap input harvest drifted -- got ${JSON.stringify([...RUNTIME_KEY_WRAP_IDS])}`);
+  // Drift pin: the harvest must return exactly the key-wraps the builder
+  // makes today, one per secret setting in the registry (Notion and GitHub
+  // tokens, the webhook's capability URL and token). A harvest that shrinks
+  // -- a stub gap that loses a card, a builder change that stops wrapping a
+  // secret -- would otherwise leave that field's id-only fill rules unchecked.
+  const EXPECTED_RUNTIME_KEY_WRAP_IDS = ["github-token", "notion-token", "webhook-token", "webhook-url"];
+  const runtimeKeyWrapIds = [...RUNTIME_KEY_WRAP_IDS].sort();
+  check(JSON.stringify(runtimeKeyWrapIds) === JSON.stringify(EXPECTED_RUNTIME_KEY_WRAP_IDS),
+    `ui-contract-tests.mjs: the runtime (renderExportTargets) key-wrap input harvest drifted -- got ${JSON.stringify(runtimeKeyWrapIds)}, expected ${JSON.stringify(EXPECTED_RUNTIME_KEY_WRAP_IDS)}. ` +
+    "If export-targets.js's registry (or renderExportTargets() in options.js) legitimately changed which settings get a key-wrap, " +
+    "set EXPECTED_RUNTIME_KEY_WRAP_IDS to the ids listed under `got`; otherwise fix the harvest's DOM stub so it reaches every card again.");
   const KEY_WRAP_INPUT_IDS = new Set([...STATIC_KEY_WRAP_IDS, ...RUNTIME_KEY_WRAP_IDS]);
   const reachesKeyWrapInput = (sel) => {
     const subject = subjectOf(sel);

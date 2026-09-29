@@ -62,10 +62,11 @@
 //   2 → tooling/env error (no playwright, no display, seed failed, bad JSON,
 //       etc.), OR at least one per-row harness precondition failed: a SETUP
 //       row (the real pointer's hover or rest state did not hold through the
-//       read in holdPointerState's bounded attempts: :hover never reached
-//       the element or never left it, pointer events the harness did not
-//       dispatch displaced it every time, or focus held the element through
-//       every blur), listed under "=== SETUP" -- that row was not measured,
+//       read in any of holdPointerState's bounded attempts, each spoiled by
+//       one of: :hover never reaching the element or never leaving it, a
+//       pointer event the harness did not dispatch, or focus surviving the
+//       blur; the row's kind and note say which, over all attempts), listed
+//       under "=== SETUP" -- that row was not measured,
 //       so it is neither a pass nor a product verdict. With any SETUP row,
 //       --update-known-failures refuses to write and exits 2.
 
@@ -2276,7 +2277,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
         check: hold.kind === "focusDuringHover" ? "hoverUnfocused" : "hoverApplied", status: "SETUP", setup: hold.kind,
         actual: `:hover with focus elsewhere did not hold through the read in ${hold.attempts} attempt(s) -- ${describeHoldTries(hold.tries, "hover")}`,
         expected: "the real pointer's :hover reaches the probed element with focus elsewhere, undisturbed through the read (harness precondition for this row's hover assertions)",
-        note: HOLD_SETUP_NOTES[hold.kind],
+        note: holdSetupNote(hold),
       });
       return;
     }
@@ -3009,12 +3010,15 @@ async function readFieldPaint(el) {
 //     read other than at the point it moved to (the witness log);
 //   - up to HOLD_ATTEMPTS attempts (one once HOLD_FAIL_STREAK holds of that
 //     mode in a row have failed). A state that never holds stays a SETUP row (the
-//     caller's), never a WARN and never a verdict: kind
-//     focusDuringHover (focus survived every blur), pointerDisplaced (a
-//     pointer event the harness did not dispatch disturbed every attempt --
-//     the witness lists them), hoverNotApplied / hoverAtRest (no such event,
-//     yet :hover never came / never left -- elementFromPoint names what is
-//     under the point).
+//     caller's), never a WARN and never a verdict. Each failed attempt gets a
+//     cause (holdAttemptCause): focusDuringHover (focus survived the blur),
+//     pointerDisplaced (a pointer event the harness did not dispatch arrived
+//     in the read window -- the witness lists them), hoverNotApplied /
+//     hoverAtRest (no such event, yet :hover never came / never left --
+//     elementFromPoint names what is under the point). The row's kind is
+//     taken from ALL attempts, not the last one, by HOLD_KIND_PRECEDENCE, and
+//     its note says on how many of the attempts that cause was seen
+//     (holdSetupNote).
 const HOLD_ATTEMPTS = 4;
 const HOVER_APPLY_MS = 500;
 const POINTER_QUIET_MS = 300;
@@ -3137,6 +3141,7 @@ async function holdPointerState(page, handle, read, mode, skip = null) {
     const t = { attempt, hovered: !!got.hovered, focused: !!got.focused, active: got.active || "?", hit: prep.hit, hitInside: prep.hitInside, parkHit: prep.parkHit, blurred: prep.blurred, foreign, applyMs, outside: prep.outside };
     tries.push(t);
     const held = (mode === "hover" ? t.hovered : !t.hovered) && !t.focused && !foreign.length && (mode === "hover" || !!prep.outside);
+    t.cause = held ? null : holdAttemptCause(t, mode);
     if (held) {
       holdFailStreak[mode] = 0;
       pointerHoldLog.holds++;
@@ -3146,31 +3151,59 @@ async function holdPointerState(page, handle, read, mode, skip = null) {
   }
   holdFailStreak[mode]++;
   pointerHoldLog.holds++; pointerHoldLog.failed++;
-  const last = tries[tries.length - 1];
-  const kind = last.focused ? "focusDuringHover"
-    : last.foreign.length ? "pointerDisplaced"
-    : mode === "hover" ? "hoverNotApplied" : "hoverAtRest";
+  const kind = HOLD_KIND_PRECEDENCE.find((k) => tries.some((t) => t.cause === k));
   return { got, ok: false, attempts: tries.length, tries, kind };
 }
+
+// Why one attempt did not hold, checked in this order: focus that survived
+// the blur voids a :hover:not(:focus) read wherever the pointer was; then a
+// pointer event the harness did not dispatch in the read window; otherwise
+// the wanted state itself never came (hover) or never left (rest -- or there
+// was no viewport corner outside the element to park at).
+function holdAttemptCause(t, mode) {
+  return t.focused ? "focusDuringHover" : t.foreign.length ? "pointerDisplaced" : mode === "hover" ? "hoverNotApplied" : "hoverAtRest";
+}
+// A failed hold's kind, from all of its attempts: the first cause in this
+// list that any attempt had. pointerDisplaced comes last because a displaced
+// attempt's read says nothing about the element (the retries exist to
+// outlast exactly that), so it names the row only when it spoiled every
+// attempt; a quiet attempt whose state still did not hold, or focus that
+// survived the harness's own blur, is evidence about the page and names the
+// row even if other attempts were displaced. The note says how many attempts
+// had the named cause and what the others had (holdSetupNote), and the
+// actual text tags every attempt with its own cause.
+const HOLD_KIND_PRECEDENCE = ["focusDuringHover", "hoverNotApplied", "hoverAtRest", "pointerDisplaced"];
 
 // One clause per attempt, for SETUP rows and the `harness` field. `mode`
 // picks the elementFromPoint witness that matters: the hover point, or the
 // park point a rest read left the pointer at.
 function describeHoldTries(tries, mode) {
-  return tries.map((t) => `attempt ${t.attempt}: :hover=${t.hovered} focus=${t.focused} (activeElement ${t.active})` +
+  return tries.map((t) => `attempt ${t.attempt}${t.cause ? ` [${t.cause}]` : ""}: :hover=${t.hovered} focus=${t.focused} (activeElement ${t.active})` +
     `${t.blurred ? `, blurred ${t.blurred} first` : ""}` +
     `${t.foreign.length ? `, pointer events the harness did not dispatch: ${t.foreign.slice(0, 4).join(" ")}` : ""}` +
     (mode === "rest"
       ? (t.parkHit ? `, elementFromPoint at the park point ${t.parkHit}` : ", no viewport corner outside the element to park at")
       : `, elementFromPoint at the hover point ${t.hit}${t.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}${t.applyMs != null ? `, :hover wait ${t.applyMs}ms` : ""}`)).join("; ");
 }
-// The SETUP note per kind: what each case can mean, and which witness says so.
+// The SETUP note per kind: what each case can mean, and which witness says
+// so. `on` is holdSetupNote's count phrase ("on all 4 attempts", "on 1 of 4
+// attempts (the others: 3 pointerDisplaced)"), so the note never claims more
+// attempts than the row's per-attempt causes show.
 const HOLD_SETUP_NOTES = {
-  focusDuringHover: "unmeasured: focus survived a blur on every attempt, so a :hover:not(:focus) paint cannot be read -- a harness focus leak, or page script re-focusing the element (see activeElement)",
-  pointerDisplaced: "unmeasured: on every attempt a trusted pointer event the harness did not dispatch moved the pointer before the read finished -- the host's OS pointer inside the headed window (see the listed events; round-3 root cause at holdPointerState)",
-  hoverNotApplied: "unmeasured: :hover never reached the element and no foreign pointer event explains it -- an overlay a user would hit too, or pointer-events on the element (see elementFromPoint)",
-  hoverAtRest: "unmeasured: :hover stayed on the element with the pointer parked outside it and no foreign pointer event -- the element (or an ancestor) sits under the park point, or the page kept a stale hover chain (see elementFromPoint)",
+  focusDuringHover: (on) => `unmeasured: ${on}, focus survived the harness's blur, so a :hover:not(:focus) paint cannot be read -- a harness focus leak, or page script re-focusing the element (see activeElement)`,
+  pointerDisplaced: (on) => `unmeasured: ${on}, a trusted pointer event the harness did not dispatch moved the pointer before the read finished -- the host's OS pointer inside the headed window (see the listed events; round-3 root cause at holdPointerState)`,
+  hoverNotApplied: (on) => `unmeasured: ${on}, :hover never reached the element with no foreign pointer event in the read window to explain it -- an overlay a user would hit too, or pointer-events on the element (see elementFromPoint)`,
+  hoverAtRest: (on) => `unmeasured: ${on}, :hover stayed on the element with the pointer parked outside it (or there was no viewport corner outside it to park at) with no foreign pointer event in the read window to explain it -- the element (or an ancestor) sits under the park point, or the page kept a stale hover chain (see elementFromPoint)`,
 };
+function holdSetupNote(hold) {
+  const n = hold.tries.length;
+  const counts = new Map();
+  for (const t of hold.tries) counts.set(t.cause, (counts.get(t.cause) || 0) + 1);
+  const k = counts.get(hold.kind) || 0;
+  const others = [...counts].filter(([cause]) => cause !== hold.kind).map(([cause, m]) => `${m} ${cause}`).join(", ");
+  const on = k === n ? (n === 1 ? "on its only attempt" : n === 2 ? "on both attempts" : `on all ${n} attempts`) : `on ${k} of ${n} attempts (the others: ${others})`;
+  return HOLD_SETUP_NOTES[hold.kind](on);
+}
 
 async function recordFieldHoverContrast(page, theme, results, context, kindsSeen, kindsUnmeasured) {
   const liveTheme = await page.evaluate(() => document.documentElement.dataset.theme || null);
@@ -3227,7 +3260,7 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
       const setup = {
         kind: failed.hold.kind,
         actual: `${failed.phase === "REST" ? "the rest state (pointer parked outside, focus elsewhere)" : ":hover with focus elsewhere"} did not hold through the read in ${failed.hold.attempts} attempt(s) -- ${describeHoldTries(failed.hold.tries, failed.phase === "REST" ? "rest" : "hover")}`,
-        note: HOLD_SETUP_NOTES[failed.hold.kind],
+        note: holdSetupNote(failed.hold),
       };
       unmeasured++;
       kindsUnmeasured[rest.kind] = kindsUnmeasured[rest.kind] || [];
