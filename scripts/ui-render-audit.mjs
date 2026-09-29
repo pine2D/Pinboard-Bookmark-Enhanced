@@ -1907,6 +1907,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
   if (check.state !== "hover") {
     await page.mouse.move(0, 0);
   }
+  let hoverAttempts = 0; // set by the "hover" state below (follow-up 6)
   // seedChecked (taste-uplift batch4 T1, render-audit-checklist.mjs header):
   // pin a checkbox-driven state by writing the input's `.checked` property
   // (no change event, so options.js's autosave never fires), settle past the
@@ -2151,12 +2152,38 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // pointer events, so the live cascade's own `:hover` pseudo-class match
     // drives getComputedStyle exactly the way a real user's cursor would --
     // no need to fake it by toggling a class the CSS never checks for.
-    await page.hover(check.selector);
-    // Read the settled state, not the first interpolation frame. Buttons
-    // transition background/color for --*-motion-state; an immediate read
-    // can serialize the 0% frame as transparent oklab(), making a hover
-    // assertion accidentally inspect the resting paint.
-    await settleAnimations(page);
+    const hoverOnce = async () => {
+      await page.hover(check.selector);
+      // Read the settled state, not the first interpolation frame. Buttons
+      // transition background/color for --*-motion-state; an immediate read
+      // can serialize the 0% frame as transparent oklab(), making a hover
+      // assertion accidentally inspect the resting paint.
+      await settleAnimations(page);
+      return page.evaluate(probeHoverApplied, check.selector);
+    };
+    // Same :hover verification as family 14 (follow-up 6): the pointer state
+    // must have reached the element, or every hover assertion below would be
+    // judging the REST paint. One retry (re-scroll, pointer away, settle,
+    // back); a hover that still does not apply is a SETUP row, not a verdict.
+    let hv = await hoverOnce();
+    hoverAttempts = 1;
+    if (!hv.hovered) {
+      await page.locator(check.selector).first().scrollIntoViewIfNeeded({ timeout: TIMEOUT_MS });
+      await page.mouse.move(0, 0);
+      await settleAnimations(page);
+      hv = await hoverOnce();
+      hoverAttempts = 2;
+    }
+    if (!hv.hovered) {
+      await page.mouse.move(0, 0);
+      results.push({
+        surface: check.surface, theme, selector: check.selector, state: check.state, check: "hoverApplied", status: "SETUP",
+        actual: `:hover never applied after ${hoverAttempts} hover attempt(s) (re-scrolled, pointer away and back) -- elementFromPoint at the hover point: ${hv.hit}${hv.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}`,
+        expected: "the real pointer's :hover reaches the probed element (harness precondition for this row's hover assertions)",
+        note: "harness, not a product FAIL",
+      });
+      return;
+    }
   } else if (check.state === "open") {
     // "open" (Task 4, ui-system-stage2, Controller ruling C): a reusable
     // click-then-measure state for anything that stays hidden/zero-size
@@ -2297,7 +2324,10 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // surface|theme|selector|state|check -- without this they would all
     // collapse onto one known-failures key and shadow each other.
     const state = check.state === "focusWithin" ? `focusWithin[${check.focusTarget}]` : check.state;
-    results.push({ surface: check.surface, theme, selector: check.selector, state, ...r });
+    // A hover-state FAIL says the pointer state did apply (a harness miss is
+    // a SETUP row above, never a FAIL), so a flake can be told apart.
+    const hoverFlag = check.state === "hover" && r.status === "FAIL" ? { actual: `${r.actual} [:hover=true, attempt ${hoverAttempts}]` } : {};
+    results.push({ surface: check.surface, theme, selector: check.selector, state, ...r, ...hoverFlag });
   }
 }
 
@@ -2871,7 +2901,52 @@ async function readFieldPaint(el) {
     // a box with no boundary at all. Painted = width > 0 (Chromium snaps a
     // 1px border to whole device pixels: 0.666667px on this headed host).
     edgeW: parseFloat(cs.borderBottomWidth) || 0, edgeStyle: cs.borderBottomStyle,
+    // Did the pointer state actually reach the element (follow-up 6)? A
+    // hover read without :hover measures the REST paint, and "hover edge ==
+    // rest edge" then reads as a product FAIL. `hit` is what sits at the
+    // element's centre -- where Playwright's hover aims -- clamped into the
+    // viewport.
+    hovered: el.matches(":hover"),
+    ...(() => {
+      const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
+      const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
+      const n = document.elementFromPoint(x, y);
+      const name = n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...n.classList].map((c) => `.${c}`).join("")}` : "null";
+      return { hit: `${name} @(${Math.round(x)},${Math.round(y)})`, hitInside: !!n && (n === el || el.contains(n)) };
+    })(),
   };
+}
+
+// Runs INSIDE the page (page.evaluate(fn, selector)) -- self-contained. The
+// checklist runner's twin of readFieldPaint's hovered / hit fields.
+function probeHoverApplied(selector) {
+  const el = document.querySelector(selector);
+  if (!el) return { hovered: false, hit: `no element matches ${selector}`, hitInside: false };
+  const r = el.getBoundingClientRect();
+  const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
+  const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
+  const n = document.elementFromPoint(x, y);
+  const name = n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...n.classList].map((c) => `.${c}`).join("")}` : "null";
+  return { hovered: el.matches(":hover"), hit: `${name} @(${Math.round(x)},${Math.round(y)})`, hitInside: !!n && (n === el || el.contains(n)) };
+}
+
+// Real-pointer hover with a check that it took (follow-up 6; render-audit
+// family 14 saw 4 one-off FAILs on modern-card tag inputs whose hover edge
+// equalled the rest edge -- 39/39 reproductions were OK, i.e. a pointer /
+// hover timing flake). One retry, the way a person would: scroll the element
+// into view again, move the pointer away, let the same settle run, come back.
+// Returns the last read plus the attempt count; the caller decides what a
+// hover that never applied means. `read` must settle and report `hovered`.
+async function hoverVerified(page, handle, read) {
+  await handle.hover({ timeout: TIMEOUT_MS });
+  let got = await handle.evaluate(read);
+  if (got.hovered) return { got, attempts: 1 };
+  await handle.scrollIntoViewIfNeeded({ timeout: TIMEOUT_MS });
+  await page.mouse.move(0, 0);
+  await handle.evaluate(read); // the same settle the first read ran
+  await handle.hover({ timeout: TIMEOUT_MS });
+  got = await handle.evaluate(read);
+  return { got, attempts: 2 };
 }
 
 async function recordFieldHoverContrast(page, theme, results, context, kindsSeen) {
@@ -2903,11 +2978,36 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
   let scanned = 0;
   for (const h of await page.$$(FIELD_HOVER_SEL)) {
     await page.mouse.move(0, 0);
-    const rest = await h.evaluate(readFieldPaint);
+    let rest = await h.evaluate(readFieldPaint);
     if (!rest.visible || rest.disabled) continue; // inert/hidden: no pointer state to test (WCAG 1.4.11 exempts inactive components)
-    await h.hover({ timeout: TIMEOUT_MS });
-    const hover = await h.evaluate(readFieldPaint);
+    if (rest.hovered) { await page.mouse.move(0, 0); rest = await h.evaluate(readFieldPaint); } // parked pointer still on it: park again once
+    const { got: hover, attempts } = await hoverVerified(page, h, readFieldPaint);
     await page.mouse.move(0, 0);
+    // A pointer state that never applied is a HARNESS condition, not a
+    // product verdict: a SETUP row (report() fails the run with exit 2 and
+    // lists it apart from product FAILs) naming the element and what sat
+    // under the pointer. Not a WARN: a WARN would pass the run with this
+    // control's hover paint never measured -- the one outcome R16's
+    // fail-safe reasoning ("a missed hover only ever produces a false FAIL,
+    // never a false OK") rules out. After a fresh scroll + pointer-away-and-
+    // back retry it is no longer a timing flake either: either something
+    // covers the field (elementFromPoint names it -- a real overlay a user
+    // would hit too, or a panel/popover an earlier step left open) or the
+    // harness lost its page.
+    if (rest.hovered || !hover.hovered) {
+      scanned++;
+      kindsSeen[rest.kind] = (kindsSeen[rest.kind] || 0) + 1;
+      results.push({
+        surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
+        status: "SETUP",
+        actual: rest.hovered
+          ? `:hover still applied at REST after re-parking the pointer at (0,0) -- elementFromPoint at the element centre: ${rest.hit}`
+          : `:hover never applied after ${attempts} hover attempt(s) (re-scrolled, pointer away and back) -- elementFromPoint at the hover point: ${hover.hit}${hover.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}`,
+        expected: "the real pointer's :hover reaches the probed element (harness precondition for the fieldHoverContrast verdict)",
+        note: "harness, not a product FAIL",
+      });
+      continue;
+    }
     const r = ratios(rest), v = ratios(hover);
     const painted = (p) => p.edgeW > 0 && !/^(?:none|hidden)$/.test(p.edgeStyle || "none");
     const ok = painted(rest) && painted(hover) &&
@@ -2917,7 +3017,7 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
     results.push({
       surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
       status: ok ? "OK" : "FAIL",
-      actual: `edge inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.edge} ${rest.edgeW}px ${rest.edgeStyle} -> hover ${hover.edge} ${hover.edgeW}px ${hover.edgeStyle})`,
+      actual: `edge inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.edge} ${rest.edgeW}px ${rest.edgeStyle} -> hover ${hover.edge} ${hover.edgeW}px ${hover.edgeStyle}; :hover rest=${rest.hovered} hover=${hover.hovered}, attempt ${attempts})`,
       expected: "a painted bottom edge (width > 0, style not none/hidden) >=3:1 against the control's fill and its backdrop at rest and on hover, hover strictly higher on both (COMPONENTS.md §6.1/§9.1 law 9: edge -> edge-hover = mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX))",
       note: null,
     });
@@ -5108,7 +5208,24 @@ function report(results) {
   const fails = results.filter((r) => r.status === "FAIL");
   const okCount = results.filter((r) => r.status === "OK").length;
   const skipCount = results.filter((r) => r.status === "SKIP").length;
+  // SETUP = a harness precondition that did not hold for one row (follow-up
+  // 6: the real pointer's :hover never reached the element), so that row was
+  // not measured. Listed apart from product FAILs, never written to or
+  // matched against the known-failures ledger, and the run exits 2 -- the
+  // same code as every other SETUP ERROR -- because an unmeasured row must
+  // not pass silently.
+  const setupRows = results.filter((r) => r.status === "SETUP");
+  const printSetup = () => {
+    if (!setupRows.length) return;
+    console.log(`[render-audit] === SETUP -- ${setupRows.length} row(s) not measured (harness precondition failed; not a product verdict) ===`);
+    for (const r of setupRows) console.log(`  SETUP  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}`);
+  };
 
+  if (UPDATE && setupRows.length) {
+    printSetup();
+    console.log("[render-audit] refusing to rewrite the known-failures ledger from a run with unmeasured rows");
+    process.exit(2);
+  }
   if (UPDATE) {
     const knownFailures = {};
     for (const r of fails) {
@@ -5149,7 +5266,7 @@ function report(results) {
   // invocation) still does it exactly as before.
   const stale = SHARD ? [] : Object.keys(known).filter((k) => !seenKeys.has(k));
 
-  console.log(`[render-audit] ${okCount} OK, ${skipCount} SKIP, ${warnings.length} WARN (known), ${violations.length} FAIL (new)${SHARD_TAG}`);
+  console.log(`[render-audit] ${okCount} OK, ${skipCount} SKIP, ${warnings.length} WARN (known), ${violations.length} FAIL (new), ${setupRows.length} SETUP (harness)${SHARD_TAG}`);
   if (skipCount) console.log(`[render-audit] SKIP = disabled controls exempted from contrast checks (WCAG 1.4.3), not a failure`);
   if (SHARD && Object.keys(known).length) {
     console.log(`[render-audit] stale known-failure reconciliation skipped${SHARD_TAG} -- rerun without --shard to find ledger entries that no longer reproduce`);
@@ -5162,11 +5279,13 @@ function report(results) {
     console.log(`[render-audit] ${stale.length} known-failure key(s) no longer reproduce -- consider deleting from ${KNOWN_FAILURES_PATH}:`);
     for (const k of stale) console.log(`  STALE  ${k}`);
   }
+  printSetup();
   if (violations.length) {
     console.log(`[render-audit] === FAIL -- ${violations.length} new violation(s) not covered by known-failures ===`);
     for (const r of violations) console.log(`  FAIL  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}${r.note ? "  (" + r.note + ")" : ""}`);
     process.exit(1);
   }
+  if (setupRows.length) process.exit(2);
   console.log("[render-audit] === PASS ===");
   process.exit(0);
 }
