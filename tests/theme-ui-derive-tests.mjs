@@ -13,6 +13,7 @@ import {
   FILL_SEPARATE_MIN,
   finalizeUiControlRoles,
   hexToRgb,
+  hslToRgb,
   mix,
   primaryHoverFill,
   PRIMARY_HOVER_FG_MIX,
@@ -20,6 +21,7 @@ import {
   resolveChipBg,
   resolveOpaqueBg,
   rgbToHex,
+  rgbToHsl,
   TIER_DISTINCT_MIN_DE,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
@@ -837,6 +839,57 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     "predicate return false for opt/bg (proves the cross-check above is not vacuous)");
 }
 
+// R13 minimality (follow-up 7c), shared by the unit fixtures and the
+// pipeline walk. deriveFieldRoles' documented order is: (1) move the
+// placeholder toward the fills "as far as >= 4.5:1 on BOTH fills allows",
+// then (2) only if typed text is still within FIELD_TEXT_PLACEHOLDER_MIN,
+// push field-fg away from the fills along HSL lightness (hue + saturation
+// kept) in .005 steps "until it clears it". The category checks elsewhere
+// only prove the END state (>= 1.4, >= 4.5); these prove neither step
+// overshoots or stops short: (1) the shipped placeholder is on the mix path
+// from the plain AA placeholder toward the fills' pole and the NEXT distinct
+// point on that path fails 4.5:1 on a fill; (2) the shipped field-fg is on the
+// fg lightness path and the point one step closer to fg is still under the
+// floor. Returns what it proved, so callers can assert coverage.
+// `inputs` = the map deriveFieldRoles read (fg, fg-hint); `out` = its roles.
+function r13MinimalityFailures(id, inputs, out) {
+  const bad = [];
+  const fgRgb = hexToRgb(String(inputs.fg).trim());
+  const fgHex = rgbToHex(fgRgb);
+  const fills = [hexToRgb(out["field-bg"]), hexToRgb(out["field-bg-hover"])];
+  const clears45 = (hex) => fills.every((f) => contrast(hexToRgb(hex), f) >= 4.5);
+  const p0 = rgbToHex(fgToAAMulti(hexToRgb(String(inputs["fg-hint"]).trim()), fills, 4.5));
+  if (contrast(fgRgb, hexToRgb(p0)) >= FIELD_TEXT_PLACEHOLDER_MIN) {
+    return { bad, placeholderMoved: false, pushed: false }; // R13 branch not taken; the category checks pin "no move"
+  }
+  // (1) placeholder: on the path, and maximal.
+  const pole = relLum(hexToRgb(p0)) < relLum(fills[0]) ? [255, 255, 255] : [0, 0, 0];
+  const path = [p0];
+  for (let i = 1; i <= 1000; i++) path.push(rgbToHex(mix(hexToRgb(p0), pole, i / 1000)));
+  const at = path.lastIndexOf(out["field-placeholder"]);
+  if (at < 0) bad.push(`${id}: field-placeholder ${out["field-placeholder"]} is not on the documented path from ${p0} toward ${rgbToHex(pole)}`);
+  else {
+    const next = path.slice(at + 1).find((c) => c !== out["field-placeholder"]);
+    if (next && clears45(next)) bad.push(`${id}: the placeholder stopped early at ${out["field-placeholder"]} -- the next point ${next} still clears 4.5:1 on both fills, so field-fg is pushed further than the rule needs`);
+  }
+  // (2) field-fg: on the HSL lightness path from fg, and minimal.
+  if (out["field-fg"] === fgHex) return { bad, placeholderMoved: out["field-placeholder"] !== p0, pushed: false };
+  const [h, sat, l0] = rgbToHsl(fgRgb);
+  const darker = relLum(hexToRgb(out["field-fg"])) < relLum(fgRgb);
+  const steps = [fgHex];
+  for (let l = l0, i = 0; i < 400; i++) {
+    l = darker ? Math.max(0, l - 0.005) : Math.min(1, l + 0.005);
+    steps.push(rgbToHex(hslToRgb([h, sat, l])));
+    if (l <= 0 || l >= 1) break;
+  }
+  const k = steps.indexOf(out["field-fg"]);
+  if (k < 1) bad.push(`${id}: field-fg ${out["field-fg"]} is not on fg ${fgHex}'s HSL lightness path (hue/saturation kept, .005 steps)`);
+  else if (ratio(steps[k - 1], out["field-placeholder"]) >= FIELD_TEXT_PLACEHOLDER_MIN) {
+    bad.push(`${id}: field-fg over-pushed to ${out["field-fg"]} -- one step less (${steps[k - 1]}) is already ${ratio(steps[k - 1], out["field-placeholder"]).toFixed(3)}:1 from the placeholder ${out["field-placeholder"]} (floor ${FIELD_TEXT_PLACEHOLDER_MIN})`);
+  }
+  return { bad, placeholderMoved: true, pushed: true };
+}
+
 // --- B+ field family: deriveFieldRoles unit cases (spec docs/superpowers/
 // specs/2026-09-28-ui-fields-bplus-design.md §2). ---
 {
@@ -998,6 +1051,54 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   check(ratio(ld["field-fg"], ld["field-placeholder"]) >= FIELD_TEXT_PLACEHOLDER_MIN && relLum(hexToRgb(ld["field-fg"])) > relLum(hexToRgb(lowD.fg)),
     `low-contrast dark fixture: field-fg must lighten away from the dark fills (got ${ld["field-fg"]})`);
 
+  // R13 minimality on the unit fixtures (follow-up 7c): the light and dark
+  // push cases really push, the roomy one only moves the placeholder.
+  {
+    const lcMin = r13MinimalityFailures("lowC", lowC, lc);
+    const ldMin = r13MinimalityFailures("lowD", lowD, ld);
+    const roomyMin = r13MinimalityFailures("roomy", { ...light, "fg-hint": "#444444" }, roomy);
+    [lcMin, ldMin, roomyMin].forEach((m) => m.bad.forEach((b) => check(false, b)));
+    check(lcMin.pushed && ldMin.pushed && !roomyMin.pushed && roomyMin.placeholderMoved,
+      `R13 minimality fixtures no longer exercise both steps (lowC pushed=${lcMin.pushed}, lowD pushed=${ldMin.pushed}, roomy pushed=${roomyMin.pushed} / placeholder moved=${roomyMin.placeholderMoved})`);
+  }
+
+  // A fill lying BETWEEN its two hosts' luminances (follow-up 7b). Stepping
+  // away from BOTH is impossible there -- WCAG contrast is monotone in
+  // luminance, so any step raises the separation from one host and lowers it
+  // from the other. The documented rule (deriveFieldRoles' header): step away
+  // from the NEARER host (lower contrast), toward fg when fg lies on that
+  // side, else toward that side's pole; the step still clears
+  // FILL_SEPARATE_MIN against the rest fill and against BOTH hosts. All four
+  // shapes: dark/light theme x nearer host lighter/darker, which covers both
+  // targets in both directions. `target` is the hand-labelled expectation;
+  // the fgs are tinted so a fg target and a pole target land on different
+  // bytes (with a grey fg both reach the same hex and the check is blind).
+  {
+    const bx = { "fg-hint": "#9a9a9a", border: "#8a8a8a", "focus-bd": "#7aa2f7", accent: "#7aa2f7" };
+    const BETWEEN = [
+      { id: "dark, nearer host darker", fx: { ...bx, fg: "#a0c0e0", panel: "#4a4a4a", "pf-bg": "#1a1a1a", "input-bg": "#333333" }, target: "fg" },
+      { id: "dark, nearer host lighter", fx: { ...bx, fg: "#a0c0e0", panel: "#505050", "pf-bg": "#1a1a1a", "input-bg": "#3d3d3d" }, target: "#000000" },
+      { id: "light, nearer host darker", fx: { ...bx, fg: "#204060", "fg-hint": "#666666", panel: "#ffffff", "pf-bg": "#c8c8c8", "input-bg": "#dadada" }, target: "#ffffff" },
+      { id: "light, nearer host lighter", fx: { ...bx, fg: "#204060", "fg-hint": "#666666", panel: "#f8f8f8", "pf-bg": "#b0b0b0", "input-bg": "#d4d4d4" }, target: "fg" },
+    ];
+    for (const { id, fx, target } of BETWEEN) {
+      const out = deriveFieldRoles(fx);
+      const rest = out["field-bg"], hover = out["field-bg-hover"];
+      const lum = (x) => relLum(hexToRgb(x));
+      const [near, far] = [fx.panel, fx["pf-bg"]].sort((a, b) => ratio(rest, a) - ratio(rest, b));
+      check((lum(rest) - lum(fx.panel)) * (lum(rest) - lum(fx["pf-bg"])) < 0 &&
+        [fx.panel, fx["pf-bg"]].every((hh) => ratio(rest, hh) >= FILL_SEPARATE_MIN) && ratio(rest, near) < ratio(rest, far),
+        `between-hosts fixture (${id}) precondition: the rest fill ${rest} must sit strictly between its hosts, separated from both, with one strictly nearer`);
+      check(ratio(hover, near) > ratio(rest, near) && ratio(hover, far) < ratio(rest, far),
+        `between-hosts (${id}): the hover step must move AWAY from the nearer host ${near} (and so, unavoidably, toward ${far}) -- rest ${rest} -> hover ${hover}: near ${ratio(rest, near).toFixed(3)} -> ${ratio(hover, near).toFixed(3)}, far ${ratio(rest, far).toFixed(3)} -> ${ratio(hover, far).toFixed(3)}`);
+      check(ratio(hover, rest) >= FILL_SEPARATE_MIN && [near, far].every((hh) => ratio(hover, hh) >= FILL_SEPARATE_MIN),
+        `between-hosts (${id}): the hover fill ${hover} must clear FILL_SEPARATE_MIN against the rest fill and against BOTH hosts`);
+      const t = target === "fg" ? hexToRgb(fx.fg) : hexToRgb(target);
+      check(hover === rgbToHex(fillSeparate(hexToRgb(rest), [hexToRgb(rest), hexToRgb(fx.panel), hexToRgb(fx["pf-bg"])], t)),
+        `between-hosts (${id}): the hover step must mix toward ${target === "fg" ? `fg ${fx.fg}` : target} (fg when it lies on the side away from the nearer host, else that side's pole) -- got ${hover}`);
+    }
+  }
+
   const weakFocus = deriveFieldRoles({ ...light, "focus-bd": "#c8d6ea" });
   check(weakFocus["field-border-focus"] !== "#c8d6ea" && ratio(weakFocus["field-border-focus"], weakFocus["field-bg"]) >= 3,
     "a focus-bd under 3:1 on the field fill must be re-derived with focusBdToAA");
@@ -1049,7 +1150,12 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
       `${id}: field-fg ${map["field-fg"]} under 4.5:1 on a field fill or the search box's input-bg`);
     check([map["field-bg"], map["field-bg-hover"]].every((h) => ratio(map["field-placeholder"], h) >= 4.5),
       `${id}: field-placeholder ${map["field-placeholder"]} under 4.5:1 on a field fill`);
+    // R13 minimality (follow-up 7c): neither step of the R13 move overshoots.
+    const min = r13MinimalityFailures(id, map, map);
+    min.bad.forEach((b) => check(false, b));
+    if (min.pushed) r13Pushed.push(id);
   };
+  const r13Pushed = [];
   let walked = 0;
   for (const entry of POPUP_THEME_MAP) {
     const tk = JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${entry.pilot}.tokens.json`, import.meta.url), "utf8"));
@@ -1067,6 +1173,9 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
   }
   check(FIELD_ROLES.every((r) => r in rootDict), "field-family pipeline walk: the folded default :root lacks a field-* role");
   fieldCategory(":root", rootDict, false);
+  // The shipped themes must exercise the field-fg push, or the minimality
+  // check above ran on nothing but the unit fixtures.
+  check(r13Pushed.length >= 1, `R13 minimality: no shipped options theme pushes field-fg away from fg (pushed: ${JSON.stringify(r13Pushed)}) -- the pipeline half of the check is vacuous`);
   // The shipped themes must actually exercise both R12 branches, or the
   // category checks above prove nothing about the direction rule.
   const WELLS = ["gruvbox-dark", "catppuccin-mocha"];

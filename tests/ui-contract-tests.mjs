@@ -1700,6 +1700,15 @@ function isValueBoxCompound(compound) {
   return c.tag === "input" && (c.type === null || TEXT_ENTRY_TYPES.has(c.type));
 }
 function isValueBoxSelector(sel) { return subjectAlternatives(subjectOf(sel)).some(isValueBoxCompound); }
+// The placeholder pseudo-element OF a value box (follow-up 7a): the subject
+// compound minus its ::placeholder (or the legacy ::-webkit-input-placeholder)
+// must itself be a value box. The search box stays out, as above -- its
+// placeholder consumer is pinned by name in the Task 1 block (G1).
+const PLACEHOLDER_PSEUDO_RE = /::(?:-webkit-input-)?placeholder\b/;
+function isValueBoxPlaceholderSelector(sel) {
+  return subjectAlternatives(subjectOf(sel)).some((compound) =>
+    PLACEHOLDER_PSEUDO_RE.test(compound) && isValueBoxCompound(compound.replace(PLACEHOLDER_PSEUDO_RE, "")));
+}
 function isNativeSelectSelector(sel) {
   return subjectAlternatives(subjectOf(sel)).some((compound) => {
     const c = classifyCompound(compound);
@@ -5926,6 +5935,16 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
         if (d.property.startsWith("--opt-field-")) out.push(`${rule.selectorText} { ${d.property}: ${d.value} } -- re-points the field family`);
       }
       if (rule.context.some((c) => /forced-colors/.test(c))) continue;
+      // Follow-up 7a: a value box's placeholder ink is the field family's
+      // secondary ink too. isValueBoxSelector drops pseudo-element subjects,
+      // so a hand `::placeholder` repaint (fg-hint, a literal) walked around
+      // every check above and re-opened the "empty reads as configured" gap.
+      const placeholders = rule.selectors.filter(isValueBoxPlaceholderSelector);
+      for (const d of decls) {
+        if (placeholders.length && /^(?:color|-webkit-text-fill-color)$/.test(d.property) && d.value.trim() !== "var(--opt-field-placeholder)") {
+          out.push(`${placeholders.join(", ")} { ${d.property}: ${d.value} } -- a value box's placeholder must paint var(--opt-field-placeholder)`);
+        }
+      }
       const boxes = rule.selectors.filter(isValueBoxSelector);
       if (!boxes.length) continue;
       const live = decls.filter((d) => !boxes.every((sel) => isExempt(sel, d)));
@@ -5956,7 +5975,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   };
   const bad = offenders(stripGeneratedRegions(optionsCss).replace(/\/\*[\s\S]*?\*\//g, ""));
   check(bad.length === 0,
-    "options.css: a hand-written value-box rule leaves the B+ field family (non-field colour / unpainted border side / dropped fill / typed text not --opt-field-fg / --opt-field-* re-point / state freeze): " + bad.join(" | "));
+    "options.css: a hand-written value-box rule leaves the B+ field family (non-field colour / unpainted border side / dropped fill / typed text not --opt-field-fg / placeholder not --opt-field-placeholder / --opt-field-* re-point / state freeze): " + bad.join(" | "));
   // Discrimination, one synthetic rule at a time: [css, must be caught].
   // Fix round 1 added the second group; the Task 2 scan (subject-blind
   // substring exclusion, class-shaped selectors only, colour props only)
@@ -6011,6 +6030,18 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".fg input::placeholder { color: var(--opt-field-placeholder); }", false],
     [".fg textarea { border-color: var(--opt-field-border); border-width: 1px 1px 1px 1px; }", false],
     [".key-toggle { background: none; }", false],
+    // follow-up 7a: hand ::placeholder repaints on a value box
+    ['.fg input[type="text"]::placeholder { color: var(--opt-fg-hint); }', true],
+    [".fg textarea::placeholder { color: #999; }", true],
+    ["#dict-anki-deck::placeholder { color: var(--opt-fg-muted); }", true],
+    ['.fg :is(input[type="password"], textarea)::placeholder { color: var(--opt-fg-hint); }', true],
+    ['.fg input[type="text"]::-webkit-input-placeholder { color: var(--opt-fg-hint); }', true],
+    ['.fg input[type="text"]::placeholder { -webkit-text-fill-color: var(--opt-fg-hint); }', true],
+    // must stay clean
+    ['.fg input[type="text"]::placeholder { color: var(--opt-field-placeholder); }', false],
+    [".fg textarea::placeholder { font-style: italic; }", false],
+    ['.options-search input[type="search"]::placeholder { color: var(--opt-fg-hint); }', false],
+    ['.fg input[type="checkbox"]::placeholder { color: var(--opt-fg-hint); }', false],
   ];
   const misjudged = VALUE_BOX_CASES.filter(([css, want]) => (offenders(css).length > 0) !== want);
   check(misjudged.length === 0,
