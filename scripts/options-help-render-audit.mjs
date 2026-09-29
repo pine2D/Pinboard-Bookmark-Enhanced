@@ -6,11 +6,11 @@
 // rows are descenders (see capturePair); every centre is still raster ink.
 
 import { createRequire } from "node:module";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { resolve, dirname, isAbsolute, join } from "node:path";
-import { homedir, tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
+import { resolve, dirname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { isolatedFontconfigEnv, parityProbeEnv, parityReproduceCommand } from "./ci-fonts-env.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const requireFromQa = createRequire(resolve(ROOT, ".qa-scan", "package.json"));
@@ -42,58 +42,13 @@ const BASELINE_BELOW_INK_SLACK_PHYSICAL_PX = 2;
 const PRINT_RANGES = process.env.PBP_HELP_RASTER_RANGES === "1";
 const HELP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>';
 
-// The CI emulation must not depend on the developer's OWN fontconfig.
-// scripts/ci-fonts.conf includes the host's /etc/fonts/conf.d, and that
-// directory's 50-user.conf pulls in $XDG_CONFIG_HOME/fontconfig/{conf.d,
-// fonts.conf} (default ~/.config/fontconfig) -- a personal hintstyle,
-// subpixel order or family preference there would silently change what the
-// "CI" run rasterises (a global `<match target="font">` assign even
-// overrides conf.d's per-font rules that CI keeps, e.g. 25-wqy-zenhei.conf's
-// hintnone + rgba none for WenQuanYi). So, with FONTCONFIG_FILE set, the
-// browser (and the fc-match parity probe) get XDG_CONFIG_HOME pointed at an
-// empty temp dir. scripts/ui-render-audit.mjs carries the same helper (the
-// two scripts are separate processes; a shared module for ~20 lines was not
-// worth it). The two legacy per-user files 50-user.conf also reads,
-// ~/.fonts.conf and ~/.fonts.conf.d, hang off $HOME and cannot be redirected
-// that way, so their presence stops the run instead of being half-honoured.
-// A pin of hintstyle/rgba after the include was rejected for the same
-// per-font reason: it would clobber the WenQuanYi rule CI has. What is left
-// host-dependent is the host conf.d itself and 51-local.conf's
-// /etc/fonts/local.conf (the ci-fonts.conf header says so).
-function isolatedFontconfigEnv() {
-  if (!process.env.FONTCONFIG_FILE) return null;
-  const legacy = [join(homedir(), ".fonts.conf"), join(homedir(), ".fonts.conf.d")].filter((p) => existsSync(p));
-  if (legacy.length) {
-    console.error(
-      `[options-help-render-audit] FONTCONFIG_FILE is set but legacy per-user fontconfig exists (${legacy.join(", ")}). ` +
-      `/etc/fonts/conf.d/50-user.conf reads it through $HOME, which this script cannot isolate the way it isolates ` +
-      `$XDG_CONFIG_HOME/fontconfig, so the CI emulation would silently include your personal settings. ` +
-      `Move it under ~/.config/fontconfig (isolated automatically) or out of the way, then rerun.`
-    );
-    process.exit(2);
-  }
-  const dir = mkdtempSync(join(tmpdir(), "pbp-ci-fonts-xdg-"));
-  process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
-  return { dir, env: { ...process.env, XDG_CONFIG_HOME: dir } };
-}
-const FONTCONFIG_ISOLATION = isolatedFontconfigEnv();
-
-// The parity probe's own environment: the isolated one, minus the locale.
-// fontconfig takes its default language from FC_LANG, else the LC_CTYPE
-// locale (LC_ALL > LC_CTYPE > LANG), and "Microsoft YaHei" is a family the
-// conf does not have, so fc-match falls back to the best font for THAT
-// language: under zh_CN.UTF-8 (or FC_LANG=ja) a correctly loaded conf
-// answers WenQuanYi Zen Hei, not DejaVu Sans, and the check below blamed an
-// XML comment for it. Pinned to C.UTF-8 with every LC_* / LANGUAGE /
-// FC_LANG dropped (measured: DejaVu Sans under the conf, msyh.ttc without
-// it, whatever the parent locale). Only the probe: the browser keeps the
-// inherited locale, and a zh_CN run rasterised the same 184 probes pixel
-// for pixel (round-2 review).
-function parityProbeEnv(env) {
-  const out = Object.fromEntries(Object.entries(env).filter(([k]) => !/^(?:LC_\w+|LANGUAGE|FC_LANG)$/.test(k)));
-  out.LANG = "C.UTF-8";
-  return out;
-}
+// The CI emulation must not depend on the developer's OWN fontconfig: with
+// FONTCONFIG_FILE set, the browser and the fc-match parity probe run with
+// XDG_CONFIG_HOME on an empty temp dir, removed on exit and on
+// SIGINT/SIGTERM/SIGHUP, and the probe with its locale pinned.
+// scripts/ci-fonts-env.mjs has the whole story; scripts/ui-render-audit.mjs
+// uses the same module.
+const FONTCONFIG_ISOLATION = isolatedFontconfigEnv("options-help-render-audit");
 
 // K107: scripts/ci-fonts.conf exists so a developer can make their machine's
 // font resolution match CI's, but nothing ever asserted the file actually
@@ -130,7 +85,7 @@ function checkFontconfigParity() {
       `resolved to "${resolved}", expected a DejaVu Sans match. This is one of the two silent failure ` +
       `modes ${confPath} documents (relative path already ruled out above; check the file for an ` +
       `XML comment containing "--", which fontconfig fails to parse and drops silently). ` +
-      `Reproduce: env -u LC_ALL -u LC_CTYPE -u FC_LANG LANG=C.UTF-8 XDG_CONFIG_HOME="$(mktemp -d)" FONTCONFIG_FILE="${confPath}" fc-match "Microsoft YaHei"`
+      `Reproduce: ${parityReproduceCommand(confPath)}`
     );
     process.exit(2);
   }

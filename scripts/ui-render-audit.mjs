@@ -71,8 +71,9 @@ import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { resolve, dirname, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { isolatedFontconfigEnv, parityProbeEnv, parityReproduceCommand } from "./ci-fonts-env.mjs";
 
 import {
   CHECKS,
@@ -5387,50 +5388,15 @@ function report(results) {
   process.exit(0);
 }
 
-// The CI emulation must not depend on the developer's OWN fontconfig (same
-// helper as scripts/options-help-render-audit.mjs, whose comment has the
-// long form; round 2 ported it here so the geometry gate and the sweep --
-// the run .claude/rules/ui-primitives.md asks for before a push -- are
-// isolated too). ci-fonts.conf includes the host's /etc/fonts/conf.d, whose
-// 50-user.conf pulls in $XDG_CONFIG_HOME/fontconfig (default
-// ~/.config/fontconfig): a personal hintstyle, subpixel order or family
-// preference there would silently change what the "CI" run renders, and a
-// global `<match target="font">` assign even overrides the per-font conf.d
-// rules CI keeps. So, with FONTCONFIG_FILE set, Chromium (and the fc-match
-// parity probe) get XDG_CONFIG_HOME pointed at an empty temp dir; the two
-// legacy files 50-user.conf also reads through $HOME (~/.fonts.conf,
-// ~/.fonts.conf.d) cannot be redirected that way, so their presence stops
-// the run instead of being half-honoured.
-function isolatedFontconfigEnv() {
-  if (!process.env.FONTCONFIG_FILE) return null;
-  const legacy = [join(homedir(), ".fonts.conf"), join(homedir(), ".fonts.conf.d")].filter((p) => existsSync(p));
-  if (legacy.length) {
-    console.error(
-      `[render-audit] FONTCONFIG_FILE is set but legacy per-user fontconfig exists (${legacy.join(", ")}). ` +
-      `/etc/fonts/conf.d/50-user.conf reads it through $HOME, which this script cannot isolate the way it isolates ` +
-      `$XDG_CONFIG_HOME/fontconfig, so the CI emulation would silently include your personal settings. ` +
-      `Move it under ~/.config/fontconfig (isolated automatically) or out of the way, then rerun.`
-    );
-    process.exit(2);
-  }
-  const dir = mkdtempSync(join(tmpdir(), "pbp-ci-fonts-xdg-"));
-  process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
-  return { dir, env: { ...process.env, XDG_CONFIG_HOME: dir } };
-}
-const FONTCONFIG_ISOLATION = isolatedFontconfigEnv();
-
-// The parity probe's own environment: the isolated one with the locale
-// pinned (round 2, item4/R4-2). "Microsoft YaHei" is a family ci-fonts.conf
-// does not have, so fc-match answers with the best font for the default
-// LANGUAGE -- FC_LANG, else LC_ALL > LC_CTYPE > LANG -- and under a zh_CN or
-// ja locale a correctly loaded conf answers WenQuanYi Zen Hei, which the
-// check below used to blame on an XML comment. Only the probe: Chromium
-// keeps the inherited locale.
-function parityProbeEnv(env) {
-  const out = Object.fromEntries(Object.entries(env).filter(([k]) => !/^(?:LC_\w+|LANGUAGE|FC_LANG)$/.test(k)));
-  out.LANG = "C.UTF-8";
-  return out;
-}
+// The CI emulation must not depend on the developer's OWN fontconfig (round
+// 2 extended this from the help audit to the geometry gate and the sweep --
+// the run .claude/rules/ui-primitives.md asks for before a push): with
+// FONTCONFIG_FILE set, Chromium and the fc-match parity probe run with
+// XDG_CONFIG_HOME on an empty temp dir, removed on exit and on
+// SIGINT/SIGTERM/SIGHUP, and the probe with its locale pinned.
+// scripts/ci-fonts-env.mjs has the whole story; the help audit uses the same
+// module.
+const FONTCONFIG_ISOLATION = isolatedFontconfigEnv("render-audit");
 
 // K107: scripts/ci-fonts.conf exists so a developer can make their machine's
 // font resolution match CI's (CJK on WenQuanYi, no Windows/macOS fonts), but
@@ -5469,7 +5435,7 @@ function checkFontconfigParity() {
       `resolved to "${resolved}", expected a DejaVu Sans match. This is one of the two silent failure ` +
       `modes ${confPath} documents (relative path already ruled out above; check the file for an ` +
       `XML comment containing "--", which fontconfig fails to parse and drops silently). ` +
-      `Reproduce: env -u LC_ALL -u LC_CTYPE -u FC_LANG LANG=C.UTF-8 XDG_CONFIG_HOME="$(mktemp -d)" FONTCONFIG_FILE="${confPath}" fc-match "Microsoft YaHei"`
+      `Reproduce: ${parityReproduceCommand(confPath)}`
     );
     process.exit(2);
   }
