@@ -61,11 +61,13 @@
 //       when a run has both)
 //   2 → tooling/env error (no playwright, no display, seed failed, bad JSON,
 //       etc.), OR at least one per-row harness precondition failed: a SETUP
-//       row (the real pointer's :hover never reached the element or was
-//       still on it at rest, or focus held the element through a blur and
-//       retry during a hover read), listed under "=== SETUP" -- that row was
-//       not measured, so it is neither a pass nor a product verdict. With any
-//       SETUP row, --update-known-failures refuses to write and exits 2.
+//       row (the real pointer's hover or rest state did not hold through the
+//       read in holdPointerState's bounded attempts: :hover never reached
+//       the element or never left it, pointer events the harness did not
+//       dispatch displaced it every time, or focus held the element through
+//       every blur), listed under "=== SETUP" -- that row was not measured,
+//       so it is neither a pass nor a product verdict. With any SETUP row,
+//       --update-known-failures refuses to write and exits 2.
 
 import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
@@ -644,6 +646,18 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     // for every check to read.
     fontSize: parseFloat(cs.fontSize) || 0,
     fontVariantNumeric: cs.fontVariantNumeric,
+    // The pointer / focus state this probe ran under, from this same task
+    // (round 3, H): the checklist's `hover` state judges it inside
+    // holdPointerState, so a pointer displaced between a separate check and
+    // this read can no longer hand the assertions a rest paint.
+    pointer: {
+      hovered: el.matches(":hover"), focused: el.matches(":focus-within"),
+      active: (() => {
+        const n = document.activeElement;
+        return n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null";
+      })(),
+      at: performance.now(),
+    },
   };
 }
 
@@ -1892,6 +1906,67 @@ async function settleAnimations(page) {
   await page.waitForTimeout(50);
 }
 
+// The probeSelector arguments for one checklist row, with the guards that
+// refuse a row declaring two expect keys that share one probe slot. Built
+// at the probe itself, and inside the hover hold (round 3, H), whose read IS
+// the probe so the pointer state and the paint come from one page task.
+function probeArgsFor(check, theme) {
+  // bgEqVar (D6/D7, Task 5): reuses the SAME extraBgVarName slot
+  // textContrastMulti already has -- both read a BACKGROUND-role token, and
+  // no check sets both at once. colorEqVar gets its OWN extraColorVarName
+  // slot (see probeSelector's header comment) -- a check (popup's `.stag`)
+  // legitimately sets bgEqVar AND colorEqVar together, two DIFFERENT tokens.
+  // T5 fix round F5: the "no check sets both at once" invariant above was
+  // prose-only -- a check declaring BOTH textContrastMulti.extraBgSelectorVar
+  // and bgEqVar would have the `||` below silently pick one and starve the
+  // other of its own probe value. Enforced here instead of just documented.
+  if (check.expect.textContrastMulti?.extraBgSelectorVar && check.expect.bgEqVar) {
+    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
+      `check declares BOTH textContrastMulti.extraBgSelectorVar (${check.expect.textContrastMulti.extraBgSelectorVar}) ` +
+      `and bgEqVar (${check.expect.bgEqVar}) -- they share the same extraBgVarName probe slot ` +
+      `and only one would ever be read; split into two checklist entries instead.`);
+  }
+  // widthLteWith (F2, final fix wave, Ruling 29) shares heightEqWith's
+  // compareSelector probe slot the same way bgEqVar shares textContrastMulti's
+  // above -- guarded the same way, for the same reason: a check declaring
+  // both would silently starve one of a comparison rect it asked for.
+  if (check.expect.heightEqWith?.selector && check.expect.widthLteWith?.selector) {
+    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
+      `check declares BOTH heightEqWith.selector (${check.expect.heightEqWith.selector}) ` +
+      `and widthLteWith.selector (${check.expect.widthLteWith.selector}) -- they share the same ` +
+      `compareSelector probe slot and only one would ever be read; split into two checklist entries instead.`);
+  }
+  // borderRadiusPx shares insetBand.radiusVar's radiusVarName/radiusVarPx
+  // probe slot (added fixwave stage2) -- same guard shape as the two above.
+  if (check.expect.insetBand?.radiusVar && check.expect.borderRadiusPx?.radiusVar) {
+    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
+      `check declares BOTH insetBand.radiusVar (${check.expect.insetBand.radiusVar}) ` +
+      `and borderRadiusPx.radiusVar (${check.expect.borderRadiusPx.radiusVar}) -- they share the same ` +
+      `radiusVarName probe slot and only one would ever be read; split into two checklist entries instead.`);
+  }
+  const extraBgSelectorVar = check.expect.textContrastMulti?.extraBgSelectorVar
+    || check.expect.bgEqVar;
+  const extraColorSelectorVar = check.expect.colorEqVar;
+  if (check.expect.borderColorEqVar && check.expect.borderSidesEqVar) {
+    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
+      "check declares BOTH borderColorEqVar and borderSidesEqVar -- they share the extraBorderColorVarName probe slot; split into two checklist entries instead.");
+  }
+  const extraBorderColorSelectorVar = check.expect.borderColorEqVar || check.expect.borderSidesEqVar;
+  const extraEdgeColorSelectorVar = check.expect.edgeColorEqVar;
+  const radiusVar = check.expect.insetBand?.radiusVar || check.expect.borderRadiusPx?.radiusVar;
+  return {
+    selector: check.selector,
+    compareSelector: check.expect.heightEqWith?.selector || check.expect.widthLteWith?.selector || null,
+    extraBgVarName: extraBgSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBgSelectorVar}` : null,
+    extraColorVarName: extraColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraColorSelectorVar}` : null,
+    extraBorderColorVarName: extraBorderColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBorderColorSelectorVar}` : null,
+    extraEdgeColorVarName: extraEdgeColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraEdgeColorSelectorVar}` : null,
+    radiusVarName: radiusVar ? `--${NS_BY_SURFACE[check.surface]}-${radiusVar}` : null,
+    childSelectors: check.expect.fusedChildrenFlat?.children || check.expect.fusedStateStableChildren || check.expect.edgeClickable?.children || null,
+    focusTargetSelector: check.state === "focusWithin" ? check.focusTarget : null,
+  };
+}
+
 async function runOneCheck(page, theme, check, results, extBase) {
   // F1 (final fix wave, Ruling 29, batch-end review F1): this audit runs
   // HEADED (MV3 extensions require it -- the comment on the launch call
@@ -1920,6 +1995,9 @@ async function runOneCheck(page, theme, check, results, extBase) {
   // out of `actual` into their own field so a ledger rewrite never churns on
   // an attempt count), set by the "hover" state below.
   let hoverHarness = null;
+  // The hover state's probe result: read inside the pointer hold, reused by
+  // the shared evaluation below instead of a second probe.
+  let hoverRaw = null;
   // seedChecked (taste-uplift batch4 T1, render-audit-checklist.mjs header):
   // pin a checkbox-driven state by writing the input's `.checked` property
   // (no change event, so options.js's autosave never fires), settle past the
@@ -2171,56 +2249,40 @@ async function runOneCheck(page, theme, check, results, extBase) {
     if (!focused) throw new Error(`SETUP: could not focus "${check.focusTarget}" inside ${check.selector} (theme=${theme})`);
     await settleAnimations(page);
   } else if (check.state === "hover") {
-    // Real mouse hover (not a class hack): Playwright dispatches actual
-    // pointer events, so the live cascade's own `:hover` pseudo-class match
-    // drives getComputedStyle exactly the way a real user's cursor would --
-    // no need to fake it by toggling a class the CSS never checks for.
-    const hoverOnce = async () => {
-      await page.hover(check.selector);
-      // Read the settled state, not the first interpolation frame. Buttons
-      // transition background/color for --*-motion-state; an immediate read
-      // can serialize the 0% frame as transparent oklab(), making a hover
-      // assertion accidentally inspect the resting paint.
+    // Real mouse hover (not a class hack): real pointer events, so the live
+    // cascade's own `:hover` match drives getComputedStyle exactly the way a
+    // real user's cursor would -- no need to fake it by toggling a class the
+    // CSS never checks for. Through the same pointer hold as family 14
+    // (round 3, H -- holdPointerState has the root cause): the hold's read IS
+    // this row's probe, after the settle (buttons transition background /
+    // color over --*-motion-state; an unsettled read can serialize the 0%
+    // frame as transparent oklab()), so the pointer and focus state are
+    // judged in the same page task as the paint the assertions below read.
+    // A state that never holds is a SETUP row, not a verdict, and its
+    // assertions are skipped.
+    const handle = await page.$(check.selector);
+    if (!handle) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: hover target not found`);
+    const hold = await holdPointerState(page, handle, async () => {
       await settleAnimations(page);
-      return page.evaluate(probeHoverApplied, check.selector);
-    };
-    // Same :hover verification as family 14 (follow-up 6): the pointer state
-    // must have reached the element, or every hover assertion below would be
-    // judging the REST paint. One retry (re-scroll, pointer away, settle,
-    // back); a hover that still does not apply is a SETUP row, not a verdict.
-    // Focus is part of the precondition too (round 2, gates/F5): hover rules
-    // are commonly `:hover:not(:focus)`, so focus left on the element (or
-    // inside it) reads exactly like a hover that never took. The retry blurs
-    // it first; focus that survives the blur is its own SETUP row.
-    let hv = await hoverOnce();
-    let attempts = 1;
-    if (!hv.hovered || hv.focused) {
-      if (hv.focused) await page.evaluate(() => document.activeElement?.blur());
-      await page.locator(check.selector).first().scrollIntoViewIfNeeded({ timeout: TIMEOUT_MS });
-      await page.mouse.move(0, 0);
-      await settleAnimations(page);
-      hv = await hoverOnce();
-      attempts = 2;
-    }
-    if (!hv.hovered || hv.focused) {
+      const probed = await page.evaluate(probeSelector, probeArgsFor(check, theme));
+      return { ...(probed.pointer || {}), probed };
+    }, "hover");
+    await handle.dispose();
+    if (!hold.ok) {
       await page.mouse.move(0, 0);
       await restoreSeed();
-      const focusHeld = hv.focused;
       results.push({
         surface: check.surface, theme, selector: check.selector, state: check.state,
-        check: focusHeld ? "hoverUnfocused" : "hoverApplied", status: "SETUP",
-        setup: focusHeld ? "focusDuringHover" : "hoverNotApplied",
-        actual: focusHeld
-          ? `the element (or something inside it) still held focus on hover after a blur and ${attempts} hover attempt(s) -- document.activeElement: ${hv.active}; :hover=${hv.hovered}`
-          : `:hover never applied after ${attempts} hover attempt(s) (re-scrolled, pointer away and back) -- elementFromPoint at the hover point: ${hv.hit}${hv.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}; document.activeElement: ${hv.active}`,
-        expected: "the real pointer's :hover reaches the probed element with focus elsewhere (harness precondition for this row's hover assertions)",
-        note: focusHeld
-          ? "unmeasured: focus survived a blur, so a :hover:not(:focus) paint cannot be read -- a harness focus leak, or page script re-focusing the element (see activeElement)"
-          : "unmeasured: :hover never reached the element -- a harness pointer miss, or an overlay a user would hit too (see elementFromPoint)",
+        check: hold.kind === "focusDuringHover" ? "hoverUnfocused" : "hoverApplied", status: "SETUP", setup: hold.kind,
+        actual: `:hover with focus elsewhere did not hold through the read in ${hold.attempts} attempt(s) -- ${describeHoldTries(hold.tries, "hover")}`,
+        expected: "the real pointer's :hover reaches the probed element with focus elsewhere, undisturbed through the read (harness precondition for this row's hover assertions)",
+        note: HOLD_SETUP_NOTES[hold.kind],
       });
       return;
     }
-    hoverHarness = `:hover=true, focus=false (activeElement ${hv.active}), attempt ${attempts}`;
+    hoverRaw = hold.got.probed;
+    const lastTry = hold.tries[hold.tries.length - 1];
+    hoverHarness = `:hover=true, focus=false (activeElement ${lastTry.active}), attempt ${hold.attempts}${hold.attempts > 1 ? ` (${describeHoldTries(hold.tries.slice(0, -1), "hover")})` : ""}`;
   } else if (check.state === "open") {
     // "open" (Task 4, ui-system-stage2, Controller ruling C): a reusable
     // click-then-measure state for anything that stays hidden/zero-size
@@ -2247,60 +2309,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
   } else if (check.state !== "default" && check.state !== "classState" && check.state !== "checked") {
     throw new Error(`unsupported state "${check.state}" on ${check.selector} -- extend runOneCheck() before adding non-default states to the checklist`);
   }
-  // bgEqVar (D6/D7, Task 5): reuses the SAME extraBgVarName slot
-  // textContrastMulti already has -- both read a BACKGROUND-role token, and
-  // no check sets both at once. colorEqVar gets its OWN extraColorVarName
-  // slot (see probeSelector's header comment) -- a check (popup's `.stag`)
-  // legitimately sets bgEqVar AND colorEqVar together, two DIFFERENT tokens.
-  // T5 fix round F5: the "no check sets both at once" invariant above was
-  // prose-only -- a check declaring BOTH textContrastMulti.extraBgSelectorVar
-  // and bgEqVar would have the `||` below silently pick one and starve the
-  // other of its own probe value. Enforced here instead of just documented.
-  if (check.expect.textContrastMulti?.extraBgSelectorVar && check.expect.bgEqVar) {
-    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
-      `check declares BOTH textContrastMulti.extraBgSelectorVar (${check.expect.textContrastMulti.extraBgSelectorVar}) ` +
-      `and bgEqVar (${check.expect.bgEqVar}) -- they share the same extraBgVarName probe slot ` +
-      `and only one would ever be read; split into two checklist entries instead.`);
-  }
-  // widthLteWith (F2, final fix wave, Ruling 29) shares heightEqWith's
-  // compareSelector probe slot the same way bgEqVar shares textContrastMulti's
-  // above -- guarded the same way, for the same reason: a check declaring
-  // both would silently starve one of a comparison rect it asked for.
-  if (check.expect.heightEqWith?.selector && check.expect.widthLteWith?.selector) {
-    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
-      `check declares BOTH heightEqWith.selector (${check.expect.heightEqWith.selector}) ` +
-      `and widthLteWith.selector (${check.expect.widthLteWith.selector}) -- they share the same ` +
-      `compareSelector probe slot and only one would ever be read; split into two checklist entries instead.`);
-  }
-  // borderRadiusPx shares insetBand.radiusVar's radiusVarName/radiusVarPx
-  // probe slot (added fixwave stage2) -- same guard shape as the two above.
-  if (check.expect.insetBand?.radiusVar && check.expect.borderRadiusPx?.radiusVar) {
-    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
-      `check declares BOTH insetBand.radiusVar (${check.expect.insetBand.radiusVar}) ` +
-      `and borderRadiusPx.radiusVar (${check.expect.borderRadiusPx.radiusVar}) -- they share the same ` +
-      `radiusVarName probe slot and only one would ever be read; split into two checklist entries instead.`);
-  }
-  const extraBgSelectorVar = check.expect.textContrastMulti?.extraBgSelectorVar
-    || check.expect.bgEqVar;
-  const extraColorSelectorVar = check.expect.colorEqVar;
-  if (check.expect.borderColorEqVar && check.expect.borderSidesEqVar) {
-    throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ` +
-      "check declares BOTH borderColorEqVar and borderSidesEqVar -- they share the extraBorderColorVarName probe slot; split into two checklist entries instead.");
-  }
-  const extraBorderColorSelectorVar = check.expect.borderColorEqVar || check.expect.borderSidesEqVar;
-  const extraEdgeColorSelectorVar = check.expect.edgeColorEqVar;
-  const radiusVar = check.expect.insetBand?.radiusVar || check.expect.borderRadiusPx?.radiusVar;
-  const raw = await page.evaluate(probeSelector, {
-    selector: check.selector,
-    compareSelector: check.expect.heightEqWith?.selector || check.expect.widthLteWith?.selector || null,
-    extraBgVarName: extraBgSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBgSelectorVar}` : null,
-    extraColorVarName: extraColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraColorSelectorVar}` : null,
-    extraBorderColorVarName: extraBorderColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBorderColorSelectorVar}` : null,
-    extraEdgeColorVarName: extraEdgeColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraEdgeColorSelectorVar}` : null,
-    radiusVarName: radiusVar ? `--${NS_BY_SURFACE[check.surface]}-${radiusVar}` : null,
-    childSelectors: check.expect.fusedChildrenFlat?.children || check.expect.fusedStateStableChildren || check.expect.edgeClickable?.children || null,
-    focusTargetSelector: check.state === "focusWithin" ? check.focusTarget : null,
-  });
+  const raw = hoverRaw ?? await page.evaluate(probeSelector, probeArgsFor(check, theme));
   if (focusBaseline) raw.focusBaseline = focusBaseline;
   if (stabilityBaseline) raw.stabilityBaseline = stabilityBaseline;
   if (restBgStack) raw.restBgStack = restBgStack;
@@ -2934,72 +2943,234 @@ async function readFieldPaint(el) {
     // a box with no boundary at all. Painted = width > 0 (Chromium snaps a
     // 1px border to whole device pixels: 0.666667px on this headed host).
     edgeW: parseFloat(cs.borderBottomWidth) || 0, edgeStyle: cs.borderBottomStyle,
-    // Did the pointer state actually reach the element (follow-up 6)? A
-    // hover read without :hover measures the REST paint, and "hover edge ==
-    // rest edge" then reads as a product FAIL. `hit` is what sits at the
-    // element's centre -- where Playwright's hover aims -- clamped into the
-    // viewport; `parkedHit` is what sits under the PARKED pointer at (0,0),
-    // the only useful witness when :hover is still on the element at rest.
-    // `focused` (round 2, gates/F5): the family's hover rule is
-    // `:hover:not(:focus)`, so focus left on the element (or inside it)
-    // gives the same "hover edge == rest edge" signature with :hover=true;
+    // The pointer state this paint was read under, from the SAME task as
+    // the paint (follow-up 6; round 3 holdPointerState judges it): a hover
+    // read without :hover measures the REST paint, and "hover edge == rest
+    // edge" then reads as a product FAIL. `focused` (round 2, gates/F5): the
+    // family's hover rule is `:hover:not(:focus)`, so focus left on the
+    // element (or inside it) gives the same signature with :hover=true;
     // `active` names whatever holds focus.
     hovered: el.matches(":hover"),
     focused: el.matches(":focus-within"),
-    ...(() => {
-      const name = (n) => (n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null");
-      const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
-      const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
-      const n = document.elementFromPoint(x, y);
-      return {
-        hit: `${name(n)} @(${Math.round(x)},${Math.round(y)})`, hitInside: !!n && (n === el || el.contains(n)),
-        parkedHit: `${name(document.elementFromPoint(0, 0))} @(0,0)`,
-        active: name(document.activeElement),
-      };
+    active: (() => {
+      const n = document.activeElement;
+      return n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null";
     })(),
+    // When this task ran: a pointer event after it cannot have changed it.
+    at: performance.now(),
   };
 }
 
-// Runs INSIDE the page (page.evaluate(fn, selector)) -- self-contained. The
-// checklist runner's twin of readFieldPaint's hovered / focused / hit /
-// active fields.
-function probeHoverApplied(selector) {
+// ---- Pointer holds (round 3, H): the one real-pointer helper family 14 and
+// the checklist's `hover` state share.
+//
+// ROOT CAUSE of the intermittent hover SETUP rows (verify run 1 of round 2:
+// library|github-light|.notes-detail-delete|hover; most likely also the
+// one-off "hover edge == rest edge" family-14 FAILs of follow-up 6, same
+// signature, not re-traced): this audit is HEADED,
+// and the host's pointer sits inside the Chromium windows. Not a person
+// moving the mouse -- the pointer is stationary: on WSLg it is XWayland's
+// last-known cursor position (measured with XQueryPointer: root (1218,969),
+// inside all four shard windows, which WSLg stacks at the same spot; CSS
+// (798,531) in each). CI runs headed under xvfb-run, whose pointer can sit
+// inside the windows the same way (not measured there). Chromium's browser
+// side dispatches TRUSTED mouse events at that OS position whenever it
+// re-evaluates what is under the OS cursor -- reproduced in isolation on a
+// scratch page (an emulated-viewport resize whose edge crosses the pointer,
+// 1280 -> 700 -> 1280, then a CDP hover: mouseout/mouseover at (798,531)
+// arrived +198..+634 ms later and took :hover off the hovered button; with
+// 900 -> 1280 nothing came) -- and in the four-window verify run at further
+// moments too. Those events move the renderer's hover chain to the OS
+// pointer, undoing Playwright's CDP hover. Instrumented runs of
+// the old harness (round 3: 6 x 4 parallel shards, 4606 hover reads) found
+// :hover gone at 17 reads, every one with a trusted event at (798,531)
+// between the hover and the read and no other cause; one row lost both of
+// its attempts -- a SETUP row with the verify failure's exact signature
+// (library|flexoki-dark|.vocab-detail-delete). The same event landing in the
+// gap between the old separate :hover check and the probe read would have
+// measured the REST paint with the hover "verified" (seen once: the check
+// said true, the next read false).
+//
+// No harness setting keeps these events out (Input.setIgnoreInputEvents
+// drops CDP input too; --window-position off-screen is moved back on-screen
+// by the WSLg window manager), so the hold makes a read TRUSTWORTHY instead:
+//   - every attempt blurs focus held inside the element (focus left by an
+//     earlier row, or page script), and a retry first waits for the trusted
+//     pointer log to go quiet (POINTER_QUIET_MS) so a burst can finish;
+//   - hover: leave to a viewport corner outside the element when it already
+//     reads :hover (a real crossing, never a no-op move onto itself), then
+//     move to the element's centre at integer coordinates and poll :hover
+//     frame by frame up to HOVER_APPLY_MS (normally 20-45 ms) -- a late
+//     hover is waited for, not judged; rest: park at that outside corner;
+//   - the caller's `read` measures and reports hovered / focused from the
+//     SAME page task as the measurement, and the attempt counts only if the
+//     wanted pointer state held there, focus was elsewhere, and the page saw
+//     no trusted pointer event between the attempt's final move and that
+//     read other than at the point it moved to (the witness log);
+//   - up to HOLD_ATTEMPTS attempts (one once HOLD_FAIL_STREAK holds of that
+//     mode in a row have failed). A state that never holds stays a SETUP row (the
+//     caller's), never a WARN and never a verdict: kind
+//     focusDuringHover (focus survived every blur), pointerDisplaced (a
+//     pointer event the harness did not dispatch disturbed every attempt --
+//     the witness lists them), hoverNotApplied / hoverAtRest (no such event,
+//     yet :hover never came / never left -- elementFromPoint names what is
+//     under the point).
+const HOLD_ATTEMPTS = 4;
+const HOVER_APPLY_MS = 500;
+const POINTER_QUIET_MS = 300;
+// Fail fast once holds keep failing (a display that disturbs every hover, the
+// all-miss control): after HOLD_FAIL_STREAK holds of one mode in a row never
+// held, the next ones of that mode get a single attempt and no quiet wait
+// until one holds again (per mode: family 14's rest holds keep succeeding
+// between its failing hover holds and must not reset the hover streak).
+// Their rows are SETUP rows all the same -- the run fails either way; this
+// only keeps a broken environment from stretching a failing run by up to
+// ~7 s per control (one full hold's bound: four attempts, three of them
+// after a quiet wait of up to 4 x POINTER_QUIET_MS).
+const HOLD_FAIL_STREAK = 3;
+const holdFailStreak = { hover: 0, rest: 0 };
+// Per-run tally for the coverage line: how many holds needed more than one
+// attempt, and how many of those were a displaced pointer.
+const pointerHoldLog = { holds: 0, retried: 0, displaced: 0, failed: 0 };
+
+// Runs INSIDE the page (handle.evaluate(fn, quietMs)) -- self-contained.
+// Installs the trusted-pointer witness once per document, blurs focus held
+// inside the element, optionally waits for the pointer log to go quiet, and
+// returns the attempt's mark, the points the node side moves to, and the
+// hit / focus witnesses the SETUP text reports.
+async function preparePointerAttempt(el, quietMs) {
   const name = (n) => (n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null");
-  const el = document.querySelector(selector);
-  if (!el) return { hovered: false, focused: false, hit: `no element matches ${selector}`, hitInside: false, active: name(document.activeElement) };
+  if (!window.__pbpPointerLog) {
+    const log = [];
+    for (const type of ["mousemove", "mouseover", "mouseout"]) {
+      addEventListener(type, (e) => {
+        if (!e.isTrusted) return;
+        log.push([performance.now(), type, e.clientX, e.clientY]);
+        if (log.length > 400) log.splice(0, 200);
+      }, { capture: true, passive: true });
+    }
+    window.__pbpPointerLog = log;
+  }
+  let blurred = null;
+  if (el.matches(":focus-within")) { blurred = name(document.activeElement); document.activeElement.blur(); }
+  if (quietMs > 0) {
+    const start = performance.now();
+    for (;;) {
+      const last = window.__pbpPointerLog.length ? window.__pbpPointerLog[window.__pbpPointerLog.length - 1][0] : 0;
+      if (performance.now() - last >= quietMs || performance.now() - start >= 4 * quietMs) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+  }
   const r = el.getBoundingClientRect();
-  const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
-  const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
-  const n = document.elementFromPoint(x, y);
+  const cx = Math.round(Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1));
+  const cy = Math.round(Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1));
+  const within = (n) => !!n && (n === el || el.contains(n));
+  const outside = [[0, 0], [innerWidth - 1, 0], [0, innerHeight - 1], [innerWidth - 1, innerHeight - 1]]
+    .find(([x, y]) => !(x >= r.left && x < r.right && y >= r.top && y < r.bottom) && !within(document.elementFromPoint(x, y))) || null;
+  const hitNode = document.elementFromPoint(cx, cy);
   return {
-    hovered: el.matches(":hover"), focused: el.matches(":focus-within"),
-    hit: `${name(n)} @(${Math.round(x)},${Math.round(y)})`, hitInside: !!n && (n === el || el.contains(n)),
-    active: name(document.activeElement),
+    mark: performance.now(), center: [cx, cy], outside, hovered: el.matches(":hover"),
+    hit: `${name(hitNode)} @(${cx},${cy})`, hitInside: within(hitNode), blurred,
+    parkHit: outside ? `${name(document.elementFromPoint(outside[0], outside[1]))} @(${outside[0]},${outside[1]})` : null,
   };
 }
 
-// Real-pointer hover with a check that it took (follow-up 6; render-audit
-// family 14 saw 4 one-off FAILs on modern-card tag inputs whose hover edge
-// equalled the rest edge -- 39/39 reproductions were OK, i.e. a pointer /
-// hover timing flake). One retry, the way a person would: blur whatever holds
-// focus in the element (round 2, gates/F5 -- focus reproduces the same
-// signature through `:hover:not(:focus)`), scroll the element into view
-// again, move the pointer away, let the same settle run, come back. Returns
-// the last read plus the attempt count; the caller decides what a hover that
-// never applied (or focus that survived the blur) means. `read` must settle
-// and report `hovered` / `focused`.
-async function hoverVerified(page, handle, read) {
-  await handle.hover({ timeout: TIMEOUT_MS });
-  let got = await handle.evaluate(read);
-  if (got.hovered && !got.focused) return { got, attempts: 1 };
-  if (got.focused) await handle.evaluate(() => document.activeElement?.blur());
-  await handle.scrollIntoViewIfNeeded({ timeout: TIMEOUT_MS });
-  await page.mouse.move(0, 0);
-  await handle.evaluate(read); // the same settle the first read ran
-  await handle.hover({ timeout: TIMEOUT_MS });
-  got = await handle.evaluate(read);
-  return { got, attempts: 2 };
+// Runs INSIDE the page (handle.evaluate(fn, { want, ms })) -- self-contained.
+// Two frames, then one check per frame (with a timer fallback so a page that
+// is not producing frames cannot hang it) until el.matches(":hover") === want
+// or `ms` ran out.
+async function awaitHoverState(el, { want, ms }) {
+  const frame = () => new Promise((r) => { const t = setTimeout(r, 50); requestAnimationFrame(() => { clearTimeout(t); r(); }); });
+  const start = performance.now();
+  await frame();
+  for (;;) {
+    await frame();
+    if (el.matches(":hover") === want) return { ok: true, ms: Math.round(performance.now() - start) };
+    if (performance.now() - start >= ms) return { ok: false, ms: Math.round(performance.now() - start) };
+  }
 }
+
+// Runs INSIDE the page -- self-contained. The trusted pointer events that
+// arrived after the harness's final move of this attempt (to `target`, the
+// hover point or the park point) and before the read's own task (`until`),
+// and are NOT at that point (+-1 CSS px: the renderer floors MouseEvent
+// coordinates after its DIP conversion). Anything before that move -- the
+// leave move, a post-scroll hover update at the old pointer position -- is
+// overridden by it, and anything after the read cannot have changed it. The
+// move shows up in the log as its first event at `target` after `since`;
+// Chromium dispatches a mousemove for every CDP move, even onto one point.
+function foreignPointerEvents({ since, target, until }) {
+  const log = (window.__pbpPointerLog || []).filter(([t]) => t > since && (until == null || t <= until));
+  const at = ([, , x, y]) => Math.abs(target[0] - x) <= 1 && Math.abs(target[1] - y) <= 1;
+  const moved = log.findIndex(at);
+  return log.slice(moved + 1).filter((e) => !at(e))
+    .map(([t, type, x, y]) => `${type}@(${x},${y})+${Math.round(t - since)}ms`);
+}
+
+// mode "hover": the element must read :hover; "rest": it must not. `read()`
+// is node-side and must return { hovered, focused, active, at, ... } measured
+// in the same page task as whatever the caller will judge (`at` =
+// performance.now() in that task). `skip(got)` (rest
+// only) ends the hold early for a read the caller will not judge at all
+// (hidden / disabled controls). Returns { got, ok, attempts, tries, kind }.
+async function holdPointerState(page, handle, read, mode, skip = null) {
+  const tries = [];
+  let got = null;
+  const maxAttempts = holdFailStreak[mode] >= HOLD_FAIL_STREAK ? 1 : HOLD_ATTEMPTS;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (mode === "hover") await handle.scrollIntoViewIfNeeded({ timeout: TIMEOUT_MS });
+    const prep = await handle.evaluate(preparePointerAttempt, attempt > 1 ? POINTER_QUIET_MS : 0);
+    let applyMs = null;
+    if (mode === "rest") {
+      if (prep.outside) await page.mouse.move(prep.outside[0], prep.outside[1]);
+    } else {
+      if (prep.hovered && prep.outside) {
+        await page.mouse.move(prep.outside[0], prep.outside[1]);
+        await handle.evaluate(awaitHoverState, { want: false, ms: HOVER_APPLY_MS });
+      }
+      await page.mouse.move(prep.center[0], prep.center[1]);
+      applyMs = (await handle.evaluate(awaitHoverState, { want: true, ms: HOVER_APPLY_MS })).ms;
+    }
+    got = await read();
+    if (skip && skip(got)) return { got, ok: true, attempts: attempt, tries, kind: null };
+    const foreign = await page.evaluate(foreignPointerEvents, { since: prep.mark, target: mode === "hover" ? prep.center : (prep.outside || prep.center), until: typeof got.at === "number" ? got.at : null });
+    const t = { attempt, hovered: !!got.hovered, focused: !!got.focused, active: got.active || "?", hit: prep.hit, hitInside: prep.hitInside, parkHit: prep.parkHit, blurred: prep.blurred, foreign, applyMs, outside: prep.outside };
+    tries.push(t);
+    const held = (mode === "hover" ? t.hovered : !t.hovered) && !t.focused && !foreign.length && (mode === "hover" || !!prep.outside);
+    if (held) {
+      holdFailStreak[mode] = 0;
+      pointerHoldLog.holds++;
+      if (attempt > 1) { pointerHoldLog.retried++; if (tries.some((x) => x.foreign.length)) pointerHoldLog.displaced++; }
+      return { got, ok: true, attempts: attempt, tries, kind: null };
+    }
+  }
+  holdFailStreak[mode]++;
+  pointerHoldLog.holds++; pointerHoldLog.failed++;
+  const last = tries[tries.length - 1];
+  const kind = last.focused ? "focusDuringHover"
+    : last.foreign.length ? "pointerDisplaced"
+    : mode === "hover" ? "hoverNotApplied" : "hoverAtRest";
+  return { got, ok: false, attempts: tries.length, tries, kind };
+}
+
+// One clause per attempt, for SETUP rows and the `harness` field. `mode`
+// picks the elementFromPoint witness that matters: the hover point, or the
+// park point a rest read left the pointer at.
+function describeHoldTries(tries, mode) {
+  return tries.map((t) => `attempt ${t.attempt}: :hover=${t.hovered} focus=${t.focused} (activeElement ${t.active})` +
+    `${t.blurred ? `, blurred ${t.blurred} first` : ""}` +
+    `${t.foreign.length ? `, pointer events the harness did not dispatch: ${t.foreign.slice(0, 4).join(" ")}` : ""}` +
+    (mode === "rest"
+      ? (t.parkHit ? `, elementFromPoint at the park point ${t.parkHit}` : ", no viewport corner outside the element to park at")
+      : `, elementFromPoint at the hover point ${t.hit}${t.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}${t.applyMs != null ? `, :hover wait ${t.applyMs}ms` : ""}`)).join("; ");
+}
+// The SETUP note per kind: what each case can mean, and which witness says so.
+const HOLD_SETUP_NOTES = {
+  focusDuringHover: "unmeasured: focus survived a blur on every attempt, so a :hover:not(:focus) paint cannot be read -- a harness focus leak, or page script re-focusing the element (see activeElement)",
+  pointerDisplaced: "unmeasured: on every attempt a trusted pointer event the harness did not dispatch moved the pointer before the read finished -- the host's OS pointer inside the headed window (see the listed events; round-3 root cause at holdPointerState)",
+  hoverNotApplied: "unmeasured: :hover never reached the element and no foreign pointer event explains it -- an overlay a user would hit too, or pointer-events on the element (see elementFromPoint)",
+  hoverAtRest: "unmeasured: :hover stayed on the element with the pointer parked outside it and no foreign pointer event -- the element (or an ancestor) sits under the park point, or the page kept a stale hover chain (see elementFromPoint)",
+};
 
 async function recordFieldHoverContrast(page, theme, results, context, kindsSeen, kindsUnmeasured) {
   const liveTheme = await page.evaluate(() => document.documentElement.dataset.theme || null);
@@ -3033,47 +3204,38 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
   // not happen (round 2, gates/F2). SETUP rows are tallied apart.
   let scanned = 0, unmeasured = 0;
   for (const h of await page.$$(FIELD_HOVER_SEL)) {
+    // Rest, then hover, each through the shared pointer hold (round 3, H --
+    // see holdPointerState for the root cause it answers). The rest hold
+    // skips hidden / disabled controls outright: inert, no pointer state to
+    // test (WCAG 1.4.11 exempts inactive components).
+    const restHold = await holdPointerState(page, h, () => h.evaluate(readFieldPaint), "rest", (p) => !p.visible || p.disabled);
+    const rest = restHold.got;
+    if (!rest.visible || rest.disabled) continue;
+    const hoverHold = restHold.ok ? await holdPointerState(page, h, () => h.evaluate(readFieldPaint), "hover") : null;
     await page.mouse.move(0, 0);
-    let rest = await h.evaluate(readFieldPaint);
-    if (!rest.visible || rest.disabled) continue; // inert/hidden: no pointer state to test (WCAG 1.4.11 exempts inactive components)
-    if (rest.hovered) { await page.mouse.move(0, 0); rest = await h.evaluate(readFieldPaint); } // parked pointer still on it: park again once
-    if (rest.focused) { await h.evaluate(() => document.activeElement?.blur()); rest = await h.evaluate(readFieldPaint); } // focus left on it by an earlier step: blur once
-    const { got: hover, attempts } = await hoverVerified(page, h, readFieldPaint);
-    await page.mouse.move(0, 0);
+    const hover = hoverHold?.got ?? null;
     // A precondition that never held is a HARNESS condition, not a product
     // verdict: a SETUP row (report() fails the run with exit 2 and lists it
-    // apart from product FAILs) naming the element and the witness for its
-    // case. Not a WARN: a WARN would pass the run with this control's hover
-    // paint never measured -- the one outcome R16's fail-safe reasoning ("a
-    // missed hover only ever produces a false FAIL, never a false OK") rules
-    // out. After a blur + fresh scroll + pointer-away-and-back retry it is no
-    // longer a timing flake either: something covers the field
-    // (elementFromPoint names it -- a real overlay a user would hit too, or a
-    // panel/popover an earlier step left open), something keeps focus on it
-    // (activeElement), or the harness lost its page. Focus is checked first:
-    // with focus held the `:hover:not(:focus)` paint cannot be read at all,
-    // whatever :hover did.
-    const setup = rest.focused || hover.focused ? {
-      kind: "focusDuringHover",
-      actual: `the element (or something inside it) held focus ${rest.focused ? "at REST" : "on hover"} after a blur${rest.focused ? "" : ` and ${attempts} hover attempt(s)`} -- document.activeElement: ${rest.focused ? rest.active : hover.active}; :hover rest=${rest.hovered} hover=${hover.hovered}`,
-      note: "unmeasured: focus survived a blur, so the :hover:not(:focus) paint cannot be read -- a harness focus leak, or page script re-focusing the field (see activeElement)",
-    } : rest.hovered ? {
-      kind: "hoverAtRest",
-      actual: `:hover still applied at REST after re-parking the pointer -- elementFromPoint at the parked pointer: ${rest.parkedHit}`,
-      note: "unmeasured: :hover stuck on the element with the pointer parked at (0,0) -- the element (or an ancestor) sits under the parked pointer, or the page kept a stale hover chain (see elementFromPoint at (0,0))",
-    } : !hover.hovered ? {
-      kind: "hoverNotApplied",
-      actual: `:hover never applied after ${attempts} hover attempt(s) (re-scrolled, pointer away and back) -- elementFromPoint at the hover point: ${hover.hit}${hover.hitInside ? " (inside the element)" : " (NOT the element or inside it)"}`,
-      note: "unmeasured: :hover never reached the element -- a harness pointer miss, or an overlay a user would hit too (see elementFromPoint)",
-    } : null;
-    if (setup) {
+    // apart from product FAILs) naming the element and each attempt's
+    // witnesses. Not a WARN: a WARN would pass the run with this control's
+    // hover paint never measured -- the one outcome R16's fail-safe
+    // reasoning ("a missed hover only ever produces a false FAIL, never a
+    // false OK") rules out. After HOLD_ATTEMPTS bounded attempts it is not a
+    // late hover any more: the kind (holdPointerState) says what held it off.
+    const failed = !restHold.ok ? { hold: restHold, phase: "REST" } : !hoverHold.ok ? { hold: hoverHold, phase: "hover" } : null;
+    if (failed) {
+      const setup = {
+        kind: failed.hold.kind,
+        actual: `${failed.phase === "REST" ? "the rest state (pointer parked outside, focus elsewhere)" : ":hover with focus elsewhere"} did not hold through the read in ${failed.hold.attempts} attempt(s) -- ${describeHoldTries(failed.hold.tries, failed.phase === "REST" ? "rest" : "hover")}`,
+        note: HOLD_SETUP_NOTES[failed.hold.kind],
+      };
       unmeasured++;
       kindsUnmeasured[rest.kind] = kindsUnmeasured[rest.kind] || [];
       kindsUnmeasured[rest.kind].push(`${rest.path} [${setup.kind}] ${setup.actual}`);
       results.push({
         surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
         status: "SETUP", setup: setup.kind, actual: setup.actual,
-        expected: "the real pointer's :hover reaches the probed element with focus elsewhere, and leaves it at rest (harness precondition for the fieldHoverContrast verdict)",
+        expected: "the real pointer's :hover reaches the probed element with focus elsewhere, and leaves it at rest, undisturbed through each read (harness precondition for the fieldHoverContrast verdict)",
         note: setup.note,
       });
       continue;
@@ -3092,7 +3254,7 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
       note: null,
       // Per-run pointer/focus diagnostics, kept out of `actual` so a ledger
       // rewrite never churns on them (round 2, correctness/F6).
-      harness: `:hover rest=${rest.hovered} hover=${hover.hovered}, focus rest=${rest.focused} hover=${hover.focused} (activeElement ${hover.active}), attempt ${attempts}`,
+      harness: `:hover rest=${rest.hovered} hover=${hover.hovered}, focus rest=${rest.focused} hover=${hover.focused} (activeElement ${hover.active}), rest attempt ${restHold.attempts}, hover attempt ${hoverHold.attempts}${hoverHold.attempts > 1 ? ` (${describeHoldTries(hoverHold.tries.slice(0, -1), "hover")})` : ""}`,
     });
   }
   fieldHoverScanLog.push({ theme, context, scanned, unmeasured });
@@ -5287,9 +5449,9 @@ function report(results) {
   const okCount = results.filter((r) => r.status === "OK").length;
   const skipCount = results.filter((r) => r.status === "SKIP").length;
   // SETUP = a harness precondition that did not hold for one row (follow-up
-  // 6 / round 2: the real pointer's :hover never reached the element, was
-  // still on it at rest, or focus held it through a blur during the hover
-  // read), so that row was not measured. Listed apart from product FAILs,
+  // 6 / rounds 2-3: holdPointerState could not make the pointer's hover or
+  // rest state, with focus elsewhere, hold through the read), so that row
+  // was not measured. Listed apart from product FAILs,
   // never written to or matched against the known-failures ledger, and the
   // run exits 2 -- the same code as every other SETUP ERROR -- because an
   // unmeasured row must not pass silently.
@@ -5755,6 +5917,11 @@ async function main() {
     const themes = new Set(fieldHoverScanLog.filter((entry) => entry.scanned > 0).map((entry) => entry.theme)).size;
     console.log(`[render-audit] fieldHoverContrast: ${total} field hover probe(s) measured across ${themes} options theme(s) this run, ${unmeasured} unmeasured (SETUP)${SHARD_TAG}`);
   }
+  // Pointer holds (round 3, H): how often a rest / hover read needed more
+  // than one attempt, and why -- the recoveries the old single retry could
+  // lose, so a desktop (or CI display) that starts disturbing the headed
+  // window more shows up here before it turns into SETUP rows.
+  console.log(`[render-audit] pointer holds: ${pointerHoldLog.holds} rest/hover read(s), ${pointerHoldLog.retried} held after a retry (${pointerHoldLog.displaced} of them after a pointer event the harness did not dispatch), ${pointerHoldLog.failed} never held (SETUP)${SHARD_TAG}`);
   if (JSON_OUT) {
     writeFileSync(JSON_OUT, JSON.stringify(results, null, 2) + "\n");
     console.log(`[render-audit] wrote ${results.length} result row(s) to ${JSON_OUT}`);
