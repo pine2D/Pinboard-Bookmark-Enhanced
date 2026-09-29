@@ -5939,10 +5939,26 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
       // secondary ink too. isValueBoxSelector drops pseudo-element subjects,
       // so a hand `::placeholder` repaint (fg-hint, a literal) walked around
       // every check above and re-opened the "empty reads as configured" gap.
+      // The category is "anything that changes the placeholder's RENDERED
+      // contrast", not only its colour (round 2, gates/F7): --opt-field-
+      // placeholder is derived for >= 4.5:1 on both fills, and an opacity
+      // below 1, a filter or a blend mode fades or shifts that ink after the
+      // derivation (`opacity: .45` passed the colour-only scan). Identity
+      // values (opacity 1 / 100%, filter none, mix-blend-mode normal) are
+      // fine -- Firefox ships a UA placeholder opacity of .54, and resetting
+      // it to 1 is the one opacity rule a stylesheet may want here.
       const placeholders = rule.selectors.filter(isValueBoxPlaceholderSelector);
+      const PLACEHOLDER_INK_IDENTITY = {
+        opacity: /^(?:1(?:\.0*)?|100(?:\.0*)?%)$/,
+        filter: /^none$/i,
+        "mix-blend-mode": /^normal$/i,
+      };
       for (const d of decls) {
-        if (placeholders.length && /^(?:color|-webkit-text-fill-color)$/.test(d.property) && d.value.trim() !== "var(--opt-field-placeholder)") {
+        if (!placeholders.length) continue;
+        if (/^(?:color|-webkit-text-fill-color)$/.test(d.property) && d.value.trim() !== "var(--opt-field-placeholder)") {
           out.push(`${placeholders.join(", ")} { ${d.property}: ${d.value} } -- a value box's placeholder must paint var(--opt-field-placeholder)`);
+        } else if (Object.hasOwn(PLACEHOLDER_INK_IDENTITY, d.property) && !PLACEHOLDER_INK_IDENTITY[d.property].test(d.value.trim())) {
+          out.push(`${placeholders.join(", ")} { ${d.property}: ${d.value} } -- changes the placeholder's rendered contrast after --opt-field-placeholder was derived for it`);
         }
       }
       const boxes = rule.selectors.filter(isValueBoxSelector);
@@ -6037,8 +6053,16 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     ['.fg :is(input[type="password"], textarea)::placeholder { color: var(--opt-fg-hint); }', true],
     ['.fg input[type="text"]::-webkit-input-placeholder { color: var(--opt-fg-hint); }', true],
     ['.fg input[type="text"]::placeholder { -webkit-text-fill-color: var(--opt-fg-hint); }', true],
+    // round 2 (gates/F7): the rendered contrast, not only the colour
+    ['.fg input[type="text"]::placeholder { opacity: .45; }', true],
+    [".fg textarea::placeholder { opacity: 50%; }", true],
+    ['.fg input[type="password"]::placeholder { filter: opacity(.6); }', true],
+    ["#dict-anki-deck::placeholder { mix-blend-mode: multiply; }", true],
     // must stay clean
     ['.fg input[type="text"]::placeholder { color: var(--opt-field-placeholder); }', false],
+    ['.fg input[type="text"]::placeholder { opacity: 1; }', false],
+    [".fg textarea::placeholder { opacity: 100%; filter: none; mix-blend-mode: normal; }", false],
+    ['.options-search input[type="search"]::placeholder { opacity: .5; }', false],
     [".fg textarea::placeholder { font-style: italic; }", false],
     ['.options-search input[type="search"]::placeholder { color: var(--opt-fg-hint); }', false],
     ['.fg input[type="checkbox"]::placeholder { color: var(--opt-fg-hint); }', false],
