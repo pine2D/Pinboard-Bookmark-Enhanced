@@ -6258,8 +6258,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // the key-wrap's text/password input must either BE one of the two read
   // below, or provably lose to them. Reaches that input = a subject compound
   // (after :is() expansion, no pseudo-element) that is an <input> typed
-  // text/password or untyped, an options.html key-wrap input id, or a
-  // tagless, class-less compound under a .key-wrap ancestor. Then:
+  // text/password or untyped, a key-wrap input id (options.html's, or one
+  // options.js builds at run time -- see below), or a tagless, class-less
+  // compound under a .key-wrap ancestor. Then:
   //   - one that names .key-wrap or a key-wrap id must be KWH or FW itself
   //     (a third, e.g. a later password-only override at the same (0,4,1),
   //     would silently repaint what the chip sits on);
@@ -6268,10 +6269,64 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   //     the unit is hovered or focused, whatever its source order.
   // Runs over the whole file (generated fills included), so a composer that
   // starts emitting a stronger input fill is caught the same way.
-  const KEY_WRAP_INPUT_IDS = new Set([...optionsHtml.matchAll(/<span class="key-wrap">\s*<input\b([^>]*)>/g)]
+  const STATIC_KEY_WRAP_IDS = new Set([...optionsHtml.matchAll(/<span class="key-wrap">\s*<input\b([^>]*)>/g)]
     .map((m) => (/\bid="([^"]+)"/.exec(m[1]) || [])[1]).filter(Boolean));
-  check(KEY_WRAP_INPUT_IDS.size >= 19 && KEY_WRAP_INPUT_IDS.has("opt-pinboard-token") && KEY_WRAP_INPUT_IDS.has("dict-anki-key"),
-    `ui-contract-tests.mjs: the options.html key-wrap input harvest drifted -- got ${KEY_WRAP_INPUT_IDS.size} ids`);
+  check(STATIC_KEY_WRAP_IDS.size >= 19 && STATIC_KEY_WRAP_IDS.has("opt-pinboard-token") && STATIC_KEY_WRAP_IDS.has("dict-anki-key"),
+    `ui-contract-tests.mjs: the options.html key-wrap input harvest drifted -- got ${STATIC_KEY_WRAP_IDS.size} ids`);
+  // The key-wraps options.js builds at run time (round 3, K): the Send-to
+  // cards' secret fields (notion-token, github-token, webhook-url,
+  // webhook-token today) are not in options.html, so an id-only fill rule on
+  // one of them used to pass. Harvested by RUNNING the builder,
+  // renderExportTargets(), over the export-targets.js registry on a minimal
+  // DOM stub and reading the ids of the inputs it put inside a .key-wrap: the
+  // builder decides which settings get a key-wrap and how their ids are
+  // formed, so neither is restated here. Fail-closed: a builder this stub can
+  // no longer run (renamed, moved, a new DOM call) stops the test instead of
+  // silently harvesting nothing.
+  const RUNTIME_KEY_WRAP_IDS = (() => {
+    const head = "  function renderExportTargets(exportTargets) {";
+    const start = optionsJs.indexOf(head);
+    const end = start < 0 ? -1 : optionsJs.indexOf("\n  }\n", start);
+    if (start < 0 || end < 0 || optionsJs.indexOf(head, start + 1) >= 0) {
+      check(false, "ui-contract-tests.mjs: cannot find exactly one `function renderExportTargets(exportTargets)` in options.js to harvest the runtime key-wrap ids from");
+      return new Set();
+    }
+    class StubEl {
+      constructor(tag) { this.tagName = String(tag).toUpperCase(); this.children = []; this.dataset = {}; this.className = ""; this.id = ""; this.attrs = {}; }
+      get classList() { return { add: (...c) => { this.className = [this.className, ...c].join(" ").trim(); } }; }
+      appendChild(c) { this.children.push(c); return c; }
+      setAttribute(k, v) { this.attrs[k] = String(v); }
+      removeAttribute(k) { delete this.attrs[k]; }
+      addEventListener() {}
+      querySelector() { return null; }
+      querySelectorAll() { return []; }
+      set innerHTML(_) { this.children = []; }
+    }
+    const host = new StubEl("div");
+    try {
+      runInNewContext(`${read("export-targets.js")}\n${optionsJs.slice(start, end + 4)}\nrenderExportTargets({});`, {
+        document: { createElement: (tag) => new StubEl(tag) }, window: {},
+        $id: (id) => (id === "export-targets" ? host : null), t: (key) => key, deobfuscateKey: (v) => v,
+        pbpAccRestore() {}, setupSecretToggles() {}, bindAutoSave() {},
+      });
+    } catch (e) {
+      check(false, `ui-contract-tests.mjs: running options.js renderExportTargets() on the DOM stub failed (${e.message}) -- extend the stub rather than dropping the runtime key-wrap harvest`);
+      return new Set();
+    }
+    const ids = new Set();
+    const walk = (node) => {
+      const isWrap = node.className.split(/\s+/).includes("key-wrap");
+      for (const child of node.children) {
+        if (isWrap && child.tagName === "INPUT" && child.id) ids.add(child.id);
+        walk(child);
+      }
+    };
+    walk(host);
+    return ids;
+  })();
+  check(RUNTIME_KEY_WRAP_IDS.size >= 1 && RUNTIME_KEY_WRAP_IDS.has("notion-token"),
+    `ui-contract-tests.mjs: the runtime (renderExportTargets) key-wrap input harvest drifted -- got ${JSON.stringify([...RUNTIME_KEY_WRAP_IDS])}`);
+  const KEY_WRAP_INPUT_IDS = new Set([...STATIC_KEY_WRAP_IDS, ...RUNTIME_KEY_WRAP_IDS]);
   const reachesKeyWrapInput = (sel) => {
     const subject = subjectOf(sel);
     const underKeyWrap = /\.key-wrap(?![\w-])/.test(sel.slice(0, sel.length - subject.length));
@@ -6315,10 +6370,17 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".key-wrap:focus-within :not(.key-toggle) { background: var(--opt-field-bg); }", true],
     ['html[data-theme] .fg input[type="password"]:focus { background-color: var(--opt-field-bg); }', true],
     ['.fg input[type="password"]:focus { background-color: var(--opt-field-bg) !important; }', true],
+    // round-3 K: id-only rules on key-wraps options.js builds at run time
+    // (Send-to secrets), which the options.html harvest alone never saw.
+    ["#notion-token:focus { background-color: var(--opt-field-bg-hover); }", true],
+    ["#webhook-url:hover { background: var(--opt-field-bg); }", true],
     // must stay clean
     ['.fg input[type="text"]:focus { background-color: var(--opt-field-bg-focus); }', false],
     [".key-wrap:focus-within .key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-focus)); }", false],
     [".fg .key-wrap input { padding-right: 32px; }", false],
+    // a builder-made Send-to field OUTSIDE a key-wrap: the runtime harvest
+    // reads the key-wrap, not every input the builder makes
+    ["#notion-parent:focus { background-color: var(--opt-field-bg-hover); }", false],
     ['.options-search input[type="search"]:hover { background: var(--opt-input-bg); }', false],
     ['.fg input[type="checkbox"]:focus { background: var(--opt-accent); }', false],
     ["@media (forced-colors: active) { .fg .key-wrap:focus-within input { background: Canvas; } }", false],
