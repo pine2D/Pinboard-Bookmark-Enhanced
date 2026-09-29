@@ -42,16 +42,6 @@ const BASELINE_BELOW_INK_SLACK_PHYSICAL_PX = 2;
 const PRINT_RANGES = process.env.PBP_HELP_RASTER_RANGES === "1";
 const HELP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>';
 
-// K107: scripts/ci-fonts.conf exists so a developer can make their machine's
-// font resolution match CI's, but nothing ever asserted the file actually
-// loaded -- and its own header names two silent failure modes: a relative
-// FONTCONFIG_FILE is looked up under /etc/fonts and silently falls back to
-// the default config, and an XML comment containing "--" fails to parse and
-// is dropped just as quietly. Both leave fc-match resolving "Microsoft YaHei"
-// to msyh.ttc instead of DejaVu Sans -- the conf's own prescribed sanity
-// check, now the script's job instead of a human's. Only runs when a
-// developer has opted in by setting FONTCONFIG_FILE; CI never sets it, so
-// this is a no-op there.
 // The CI emulation must not depend on the developer's OWN fontconfig.
 // scripts/ci-fonts.conf includes the host's /etc/fonts/conf.d, and that
 // directory's 50-user.conf pulls in $XDG_CONFIG_HOME/fontconfig/{conf.d,
@@ -61,7 +51,9 @@ const HELP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" strok
 // overrides conf.d's per-font rules that CI keeps, e.g. 25-wqy-zenhei.conf's
 // hintnone + rgba none for WenQuanYi). So, with FONTCONFIG_FILE set, the
 // browser (and the fc-match parity probe) get XDG_CONFIG_HOME pointed at an
-// empty temp dir. The two legacy per-user files 50-user.conf also reads,
+// empty temp dir. scripts/ui-render-audit.mjs carries the same helper (the
+// two scripts are separate processes; a shared module for ~20 lines was not
+// worth it). The two legacy per-user files 50-user.conf also reads,
 // ~/.fonts.conf and ~/.fonts.conf.d, hang off $HOME and cannot be redirected
 // that way, so their presence stops the run instead of being half-honoured.
 // A pin of hintstyle/rgba after the include was rejected for the same
@@ -86,6 +78,33 @@ function isolatedFontconfigEnv() {
 }
 const FONTCONFIG_ISOLATION = isolatedFontconfigEnv();
 
+// The parity probe's own environment: the isolated one, minus the locale.
+// fontconfig takes its default language from FC_LANG, else the LC_CTYPE
+// locale (LC_ALL > LC_CTYPE > LANG), and "Microsoft YaHei" is a family the
+// conf does not have, so fc-match falls back to the best font for THAT
+// language: under zh_CN.UTF-8 (or FC_LANG=ja) a correctly loaded conf
+// answers WenQuanYi Zen Hei, not DejaVu Sans, and the check below blamed an
+// XML comment for it. Pinned to C.UTF-8 with every LC_* / LANGUAGE /
+// FC_LANG dropped (measured: DejaVu Sans under the conf, msyh.ttc without
+// it, whatever the parent locale). Only the probe: the browser keeps the
+// inherited locale, and a zh_CN run rasterised the same 184 probes pixel
+// for pixel (round-2 review).
+function parityProbeEnv(env) {
+  const out = Object.fromEntries(Object.entries(env).filter(([k]) => !/^(?:LC_\w+|LANGUAGE|FC_LANG)$/.test(k)));
+  out.LANG = "C.UTF-8";
+  return out;
+}
+
+// K107: scripts/ci-fonts.conf exists so a developer can make their machine's
+// font resolution match CI's, but nothing ever asserted the file actually
+// loaded -- and its own header names two silent failure modes: a relative
+// FONTCONFIG_FILE is looked up under /etc/fonts and silently falls back to
+// the default config, and an XML comment containing "--" fails to parse and
+// is dropped just as quietly. Both leave fc-match resolving "Microsoft YaHei"
+// to msyh.ttc instead of DejaVu Sans -- the conf's own prescribed sanity
+// check, now the script's job instead of a human's. Only runs when a
+// developer has opted in by setting FONTCONFIG_FILE; CI never sets it, so
+// this is a no-op there.
 function checkFontconfigParity() {
   const confPath = process.env.FONTCONFIG_FILE;
   if (!confPath) return;
@@ -100,7 +119,7 @@ function checkFontconfigParity() {
   }
   let resolved;
   try {
-    resolved = execFileSync("fc-match", ["Microsoft YaHei"], { encoding: "utf8", env: FONTCONFIG_ISOLATION?.env ?? process.env }).trim();
+    resolved = execFileSync("fc-match", ["Microsoft YaHei"], { encoding: "utf8", env: parityProbeEnv(FONTCONFIG_ISOLATION?.env ?? process.env) }).trim();
   } catch (e) {
     console.warn(`[options-help-render-audit] fc-match unavailable (${e.code || e.message}) -- skipping the FONTCONFIG_FILE=${confPath} parity check (fontconfig is Linux-only).`);
     return;
@@ -111,7 +130,7 @@ function checkFontconfigParity() {
       `resolved to "${resolved}", expected a DejaVu Sans match. This is one of the two silent failure ` +
       `modes ${confPath} documents (relative path already ruled out above; check the file for an ` +
       `XML comment containing "--", which fontconfig fails to parse and drops silently). ` +
-      `Reproduce: FONTCONFIG_FILE="${confPath}" fc-match "Microsoft YaHei"`
+      `Reproduce: env -u LC_ALL -u LC_CTYPE -u FC_LANG LANG=C.UTF-8 XDG_CONFIG_HOME="$(mktemp -d)" FONTCONFIG_FILE="${confPath}" fc-match "Microsoft YaHei"`
     );
     process.exit(2);
   }
