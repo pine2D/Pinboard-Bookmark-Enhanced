@@ -502,13 +502,14 @@ relevant `-bd`/`-border` role(s) explicitly in your pilot's
 `ui.options.dark.btn-border`/`input-border`, `ui.library.dark.btn-border`/
 `input-border`): the composer treats "this pilot declared its own border
 role" as the opt-out signal and skips the `fillSeparate()` step for that
-role, restoring your pilot's own border color exactly as declared. On
-options, `input-border` also frames the B+ field family (`deriveFieldRoles`),
-so it must be a `#rgb` / `#rrggbb` / `#rrggbbaa` hex, or exactly
-`var(--<ns>-<role>)` (write `--opt-`) naming an options-map role whose value
-is itself such a hex; `rgba()`, a `var()` with a fallback, a named colour, or
-a `var()` pointing at a role holding one of those makes sync-all throw
-(NEW_THEME.md has the same rule). Geometry
+role, restoring your pilot's own border color exactly as declared.
+The value-box frame key (popup `input-bd`, options/library `input-border`)
+also frames the field family (`deriveFieldRoles`) on every surface, so it
+must be a `#rgb` / `#rrggbb` / `#rrggbbaa` hex, or exactly
+`var(--<ns>-<role>)` (your surface's prefix) naming a role of that surface's
+map whose value is itself such a hex; `rgba()`, a `var()` with a fallback, a
+named colour, or a `var()` pointing at a role holding one of those makes
+sync-all throw (NEW_THEME.md has the same rule). Geometry
 (radius, padding) is NOT exemptable this way — it follows the surface's
 token ladder unconditionally, same as every other theme. See
 `pilots/terminal.tokens.json`'s `ui.popup/options/library.dark` blocks for

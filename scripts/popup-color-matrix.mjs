@@ -55,6 +55,8 @@ const PROBES = [
   [".del-btn", false],
   [".del-btn", true],
   [".batch-progress-text", false],
+  [".batch-progress", false],
+  [".batch-cancel-btn .btn-ic", false],
   [".regen-link.loading", false],
   [".regen-link + .regen-link", false],
   [".ql-sep", false],
@@ -131,7 +133,7 @@ const PROBES = [
   ['.field > input[type="text"]', true],
 ];
 
-const PROPS = ["color", "background-color", "border-top-color", "border-bottom-color", "border-left-color"];
+const PROPS = ["color", "background-color", "border-top-color", "border-bottom-color", "border-left-color", "text-shadow"];
 const WIDTH_PROPS = ["border-top-width", "border-bottom-width", "border-left-width"];
 
 function serveRoot() {

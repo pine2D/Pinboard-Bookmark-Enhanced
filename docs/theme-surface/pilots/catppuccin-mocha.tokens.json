@@ -94,7 +94,6 @@
     "popup": {
       "dark": {
         "fg-hint": "#999fb6",
-        "input-bg": "#11111b",
         "input-focus-bg": "#181825",
         "tag-hover": "#585b70",
         "ok-bg": "#2f4a46",

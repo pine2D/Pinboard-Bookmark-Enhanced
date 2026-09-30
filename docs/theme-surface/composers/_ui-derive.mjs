@@ -11,24 +11,15 @@ const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
   "chip-fg",
 ]);
 
-// Soft Fill field family (stage 4 spec docs/superpowers/specs/2026-09-30-ui-
-// fields-stage4-design.md §2; COMPONENTS.md §6.2 / §9.1 law 9): eight OUTPUT
-// roles, derived by deriveFieldRoles() at the end of finalizeUiControlRoles
-// when the caller passes `fieldRoles: true`. A value box is fill-only: rest
-// field-bg with four field-border sides, hover field-bg-hover /
-// field-border-hover, focus field-bg-focus with four field-border-focus
-// sides. There is no bottom edge any more -- the B+ roles field-edge /
-// field-edge-hover retired on 2026-09-30, and tests/ui-contract-tests.mjs
-// keeps them out of every composer map, pilot and surface CSS. Listed in
-// UI_DERIVED_OUTPUT_ROLES for each surface that derives them, so
-// validate-contracts.mjs rejects a pilot writing any of them, and
-// contrast-audit.mjs's default (:root) block FAILs instead of SKIPs when a
-// role named in one of its COMPONENT_PAIR_SPEC rows is missing.
-// field-border / field-border-hover are in no pair row: contrast-audit's
-// host-separation section and tests/theme-ui-derive-tests.mjs pin them.
-// field-chevron (fieldChevronUri below) is NOT in this list -- it is a url(),
-// not a colour -- and is emitted only where the caller also passes
-// `fieldChevron: true`.
+// Value-box field family (stage-4 spec docs/superpowers/specs/2026-09-30-ui-
+// fields-stage4-design.md §2.2): eight OUTPUT roles derived by
+// deriveFieldRoles() at the end of finalizeUiControlRoles when a composer
+// passes `fieldRoles: true`. Since stage 4 Task 5 all three composers do,
+// each with its own hosts (FIELD_HOST_ROLES: options [panel, pf-bg], popup
+// [bg], library [panel, bg]). options and library also pass
+// `fieldChevron: true` for the non-colour field-chevron (a url(), so not in
+// this list); popup adds tag-chip-fg / tag-chip-icon in popup-chrome.mjs.
+// Every one of them is in UI_DERIVED_OUTPUT_ROLES below.
 export const FIELD_ROLES = Object.freeze([
   "field-bg", "field-border", "field-bg-hover", "field-border-hover",
   "field-bg-focus", "field-border-focus", "field-placeholder", "field-fg",
@@ -54,10 +45,20 @@ export const FIELD_ROLES = Object.freeze([
 // tag-fg -- see popup-chrome.mjs's derivation, run right after chip-bg's own
 // tinted finalization below. Popup-only: options/library have no AI-purple
 // accent2 role or chip consumer for it.
+//
+// Stage 4 Task 5 (spec docs/superpowers/specs/2026-09-30-ui-fields-stage4-
+// design.md §2.2): popup and library carry the value-box field family too
+// (FIELD_ROLES, plus library's non-colour field-chevron), and popup adds
+// tag-chip-fg / tag-chip-icon -- the chip text and remove-x ink derived in
+// popup-chrome.mjs against the three backdrops a chip is painted on inside
+// the tags shell. Listing them here is what makes validate-contracts.mjs
+// reject a pilot writing ui.popup/library.<mode>.<role> for any of them, and
+// what makes contrast-audit.mjs's default (:root) block FAIL, not SKIP, when
+// a DEFAULT_LIGHT literal goes missing.
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
-  popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg"]),
+  popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg", ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"]),
   options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
-  library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent"]),
+  library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
 });
 
 export function hexToRgb(h) {
@@ -558,7 +559,14 @@ export const FIELD_HOST_ROLES = Object.freeze({
 // bottom edge. Its resting boundary is the fill-vs-host step
 // (FILL_SEPARATE_MIN), not WCAG 1.4.11's 3:1 -- a deviation the user
 // accepted (spec §1.3). Placeholder (4.5), typed text (4.5) and the focus
-// border (3) keep their floors.
+// border (3) keep their floors. Rest paints field-bg with four field-border
+// sides, hover field-bg-hover / field-border-hover, focus field-bg-focus
+// with four field-border-focus sides. The B+ bottom-edge roles field-edge /
+// field-edge-hover retired on 2026-09-30, and tests/ui-contract-tests.mjs
+// keeps them out of every composer map, pilot and surface CSS.
+// field-border / field-border-hover are in no contrast-audit pair row: its
+// host-separation section (auditFieldSeparation) and
+// tests/theme-ui-derive-tests.mjs pin them.
 //
 // - hosts: `hostRoles` names the surfaces the box sits on (FIELD_HOST_ROLES:
 //   opt [panel, pf-bg], pp [bg], lib [panel, bg]). Each is a required input.
@@ -742,8 +750,9 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
     // true so its own pre-set/overridden value is left untouched, mirroring
     // the on-danger-style `== null` gap-fill instead of an overwrite.
     onAccentIsInput = false,
-    // Soft Fill field family (deriveFieldRoles above). Only a surface that
-    // passes true emits it (options); the others stay byte-identical.
+    // Field family (deriveFieldRoles above): every surface's composer passes
+    // true since stage 4 Task 5. false (the default) keeps the unit fixtures,
+    // and any caller without value boxes, free of field-* roles.
     fieldRoles = false,
     // The roles that surface's value boxes sit on (FIELD_HOST_ROLES, keyed by
     // CSS prefix). options' pair is the default.

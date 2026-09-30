@@ -31,6 +31,7 @@ import {
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
 import { composeLibraryThemeMap, LIB_BATCH_BAND_MIX } from "../docs/theme-surface/composers/library-chrome.mjs";
+import { parseDeclarations, parseStyleRules } from "../docs/theme-surface/tools/css-syntax.mjs";
 // COMPONENT_PAIR_SPEC / DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS /
 // isOutputRoleForDefault (final fix wave, Ruling 29 F3): safe to import for
 // these -- contrast-audit.mjs's whole static-CSS audit lives inside main(),
@@ -44,6 +45,8 @@ import {
   isOutputRoleForDefault,
   OPT_BG_VALUE_BOXES,
   SIDEBAR_SEARCH_HOST,
+  TAG_CHIP_INK_SPEC,
+  tagChipInkRows,
 } from "../docs/theme-surface/tools/contrast-audit.mjs";
 
 const failures = [];
@@ -948,7 +951,7 @@ function f8Failures(id, out, hosts) {
     return false;
   };
   check(!Object.keys(finalizeUiControlRoles(base, palette)).some((k) => k.startsWith("field-")),
-    "finalizeUiControlRoles with the default config (fieldRoles unset) must not emit any field-* role, field-chevron included -- the composer-level popup/library walk below checks that those surfaces really call it that way");
+    "finalizeUiControlRoles with the default config (fieldRoles unset) must not emit any field-* role, field-chevron included -- all three composers opt in explicitly; the stage-4 walk below re-derives each surface's field roles from its composed map");
   check(FIELD_ROLES.length === 8 && !FIELD_ROLES.some((r) => /^field-(edge|chevron)/.test(r)),
     `FIELD_ROLES must be the eight colour roles of the fill-only value box -- no retired field-edge role, and not the field-chevron url() (got ${JSON.stringify(FIELD_ROLES)})`);
   // The shared `base` fixture has no fg-hint / pf-bg: add both, so the smoke
@@ -1381,6 +1384,41 @@ function f8Failures(id, out, hosts) {
         `${ns}: contrast-audit's FIELD_SEPARATION_HOSTS ${JSON.stringify(FIELD_SEPARATION_HOSTS[ns])} differs from _ui-derive.mjs's FIELD_HOST_ROLES ${JSON.stringify(FIELD_HOST_ROLES[ns])}`);
     }
   }
+  // The loop above is keyed on the REGISTRY: a composer that starts emitting
+  // field roles while UI_DERIVED_OUTPUT_ROLES does not list them reads as
+  // "derives nothing, audits nothing" there and stays green -- so would
+  // validate-contracts (it would let a pilot override the role) and
+  // contrast-audit's default block (it would SKIP a missing role). This half
+  // is keyed on what each surface ACTUALLY ships: every theme map its
+  // composer returns, and the shipped generated region (which also carries
+  // the hand-carried DEFAULT_LIGHT :root). Any field-* role found there must
+  // be registered, and the prefix must have a FIELD_SEPARATION_HOSTS entry
+  // (stage 4 Task 3 review handoff to Task 5).
+  const COMPOSE = {
+    pp: (tk, e) => composePopupThemeMap(tk, e.mode, e.useDarkMode),
+    opt: (tk, e) => composeOptionsThemeMap(tk, e.mode, e.useDarkMode).map,
+    lib: (tk, e) => composeLibraryThemeMap(tk, e.mode, e.useDarkMode).map,
+  };
+  const CSS_OF = { pp: "../popup.css", opt: "../options.css", lib: "../library.css" };
+  for (const [ns, surface] of Object.entries(SURFACE_OF)) {
+    const emitted = new Set();
+    for (const entry of POPUP_THEME_MAP) {
+      const tk = JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${entry.pilot}.tokens.json`, import.meta.url), "utf8"));
+      for (const k of Object.keys(COMPOSE[ns](tk, entry))) if (k.startsWith("field-")) emitted.add(k);
+    }
+    const css = readFileSync(new URL(CSS_OF[ns], import.meta.url), "utf8");
+    const start = css.indexOf("@generated:ui-themes start");
+    const region = css.slice(css.indexOf("*/", start) + 2, css.indexOf("/* @generated:ui-themes end */"));
+    for (const rule of parseStyleRules(region)) {
+      for (const d of parseDeclarations(rule.body)) if (d.property.startsWith(`--${ns}-field-`)) emitted.add(d.property.slice(ns.length + 3));
+    }
+    if (!emitted.size) continue;
+    const unregistered = [...emitted].filter((r) => !UI_DERIVED_OUTPUT_ROLES[surface].includes(r)).sort();
+    check(!unregistered.length,
+      `${ns}: the ${surface} composer / generated region ships ${unregistered.join(", ")} but UI_DERIVED_OUTPUT_ROLES.${surface} does not list it -- validate-contracts would accept a pilot override and contrast-audit's default block would SKIP it`);
+    check(Object.prototype.hasOwnProperty.call(FIELD_SEPARATION_HOSTS, ns),
+      `${ns}: the ${surface} composer / generated region ships field-* roles but contrast-audit's FIELD_SEPARATION_HOSTS has no "${ns}" entry -- its fill-vs-host floors (F1-F3 / F8b) go unaudited`);
+  }
   // The orphan guard's coverage set is keyed by surface: a pp-only row covers
   // pp:<role> and nothing on the other two surfaces.
   check(COMPONENT_PAIR_ROLES.has("pp:ai-chip-fg") && !COMPONENT_PAIR_ROLES.has("opt:ai-chip-fg") &&
@@ -1388,28 +1426,289 @@ function f8Failures(id, out, hosts) {
     "contrast-audit's COMPONENT_PAIR_ROLES must be keyed `${ns}:${role}` over each row's onlyNs (a popup-only row must not cover options/library)");
 }
 
-// --- The field family is options-only: popup and library must not grow it.
-// Checked at the composer level (the maps each surface actually emits, for
-// every theme) and in the shipped CSS, so turning fieldRoles on in
-// popup-chrome.mjs / library-chrome.mjs fails here even while every other
-// gate stays green. ---
+// --- Stage 4 field family, all three surfaces, over the real composer
+// pipeline (spec docs/superpowers/specs/2026-09-30-ui-fields-stage4-design.md
+// §2.2-§2.4). Category assertions per block, then equality guards on the
+// class memberships the relaxations hang on (§2.4): a theme drifting into a
+// different class must fail here, not quietly switch which checks it gets.
+// Hosts come from FIELD_HOST_ROLES (what finalizeUiControlRoles hands
+// deriveFieldRoles), never from contrast-audit's ROLE_ALIAS (pp panel = bg2
+// is not the popup value boxes' host). ---
 {
-  let walked = 0;
-  for (const entry of POPUP_THEME_MAP) {
-    const tk = JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${entry.pilot}.tokens.json`, import.meta.url), "utf8"));
-    const popupMap = composePopupThemeMap(tk, entry.mode, entry.useDarkMode);
-    const libraryMap = composeLibraryThemeMap(tk, entry.mode, entry.useDarkMode).map;
-    walked++;
-    check(Object.keys(popupMap).length > 0 && !Object.keys(popupMap).some((k) => k.startsWith("field-")),
-      `${entry.id}: the popup map carries field-* roles (the B+ field family is options-only)`);
-    check(Object.keys(libraryMap).length > 0 && !Object.keys(libraryMap).some((k) => k.startsWith("field-")),
-      `${entry.id}: the library map carries field-* roles (the B+ field family is options-only)`);
+  const hex6 = (v) => rgbToHex(hexToRgb(String(v).trim()));
+  const pilotOf = (entry) => JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${entry.pilot}.tokens.json`, import.meta.url), "utf8"));
+  // New roles each surface must carry after stage 4 (hand-listed, not read
+  // back from UI_DERIVED_OUTPUT_ROLES: the test states the contract, the
+  // registry is checked against it below).
+  const NEW_ROLES = {
+    opt: [...FIELD_ROLES, "field-chevron"],
+    pp: [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"],
+    lib: [...FIELD_ROLES, "field-chevron"],
+  };
+  const FIELD_SURFACES = [
+    { ns: "opt", surface: "options", frameKey: "input-border", compose: (tk, e) => composeOptionsThemeMap(tk, e.mode, e.useDarkMode).map },
+    { ns: "pp", surface: "popup", frameKey: "input-bd", compose: (tk, e) => composePopupThemeMap(tk, e.mode, e.useDarkMode) },
+    { ns: "lib", surface: "library", frameKey: "input-border", compose: (tk, e) => composeLibraryThemeMap(tk, e.mode, e.useDarkMode).map },
+  ];
+  for (const { ns, surface } of FIELD_SURFACES) {
+    const outputs = new Set(UI_DERIVED_OUTPUT_ROLES[surface]);
+    check(NEW_ROLES[ns].every((r) => outputs.has(r)),
+      `UI_DERIVED_OUTPUT_ROLES.${surface} lacks a stage-4 role (${NEW_ROLES[ns].filter((r) => !outputs.has(r)).join(", ")}) -- validate-contracts would let a pilot override it and contrast-audit's default block would SKIP it`);
   }
-  check(walked === 14, `options-only field-family walk visited ${walked} themes, expected 14`);
-  const popupCss = readFileSync(new URL("../popup.css", import.meta.url), "utf8");
-  const libraryCss = readFileSync(new URL("../library.css", import.meta.url), "utf8");
-  check(popupCss.includes("--pp-") && !popupCss.includes("--pp-field-"), "popup.css declares or consumes --pp-field-* (the B+ field family is options-only)");
-  check(libraryCss.includes("--lib-") && !libraryCss.includes("--lib-field-"), "library.css declares or consumes --lib-field-* (the B+ field family is options-only)");
+  check(!UI_DERIVED_OUTPUT_ROLES.popup.includes("field-chevron"),
+    "UI_DERIVED_OUTPUT_ROLES.popup lists field-chevron -- popup has no <select> (spec §2.2)");
+  const sets = { unseparatedFramed: [], sandwich: [], well: [], r13Pushed: [] };
+  let walked = 0;
+  for (const S of FIELD_SURFACES) {
+    for (const entry of POPUP_THEME_MAP) {
+      const tk = pilotOf(entry);
+      const map = S.compose(tk, entry);
+      const id = `${S.ns}:${entry.id}`;
+      walked++;
+      const missing = NEW_ROLES[S.ns].filter((r) => typeof map[r] !== "string" || map[r] === "");
+      check(!missing.length, `${id}: composed map lacks ${missing.join(", ")}`);
+      const stray = Object.keys(map).filter((k) => /^field-edge/.test(k) || (S.ns === "pp" && k === "field-chevron"));
+      check(!stray.length, `${id}: composed map carries retired or foreign role(s) ${stray.join(", ")}`);
+      if (missing.length) continue;
+      const hosts = FIELD_HOST_ROLES[S.ns].map((r) => map[r]);
+      const frame = tk.ui?.[S.surface]?.[entry.mode]?.[S.frameKey] ?? null;
+      const framed = frame != null;
+      if (S.ns !== "opt") {
+        // The composer really hands the deriver this surface's hosts and the
+        // pilot frame: re-deriving from the final map must reproduce every
+        // field role (nothing the deriver reads changes after finalization).
+        const again = deriveFieldRoles(map, frame, FIELD_HOST_ROLES[S.ns]);
+        check(FIELD_ROLES.every((r) => again[r] === map[r]),
+          `${id}: the composed field roles are not deriveFieldRoles(final map, pilot frame, FIELD_HOST_ROLES.${S.ns}) -- the composer passes other hosts or another frame`);
+      }
+      const bg = map["field-bg"], hover = map["field-bg-hover"], border = map["field-border"], borderHover = map["field-border-hover"];
+      const unseparated = hosts.some((h) => ratio(bg, h) < FILL_SEPARATE_MIN);
+      const lum = (x) => relLum(hexToRgb(x));
+      const between = hosts.length === 2 && (lum(bg) - lum(hosts[0])) * (lum(bg) - lum(hosts[1])) < 0;
+      if (framed && unseparated) sets.unseparatedFramed.push(id);
+      if (between) sets.sandwich.push(id);
+      if (entry.mode === "dark" && hosts.every((h) => lum(bg) < lum(h)) && lum(hover) < lum(bg)) sets.well.push(id);
+      // Every block: focus keeps the fill; F4-F7.
+      check(map["field-bg-focus"] === bg, `${id}: focus repaints the fill`);
+      check([bg, hover].every((f) => ratio(map["field-placeholder"], f) >= 4.5), `${id}: F4 field-placeholder under 4.5:1 on a field fill`);
+      check([bg, hover].every((f) => ratio(map["field-fg"], f) >= 4.5), `${id}: F5 field-fg under 4.5:1 on a field fill`);
+      check(ratio(map["field-fg"], map["field-placeholder"]) >= FIELD_TEXT_PLACEHOLDER_MIN, `${id}: F6 field-fg within ${FIELD_TEXT_PLACEHOLDER_MIN}:1 of the placeholder`);
+      check(ratio(map["field-border-focus"], bg) >= 3, `${id}: F7 field-border-focus under 3:1 on the fill`);
+      if (!framed) {
+        check(border === bg && borderHover === hover, `${id}: an unframed frame must collapse into its fill at rest and on hover`);
+      }
+      if (framed && unseparated) {
+        // The frame carries hover (F8), the fill does not move.
+        check(hover === bg, `${id}: an unseparated framed fill must keep its fill on hover (${bg} -> ${hover})`);
+        check(borderHover === rgbToHex(mix(hexToRgb(border), hexToRgb(hex6(map.fg)), FRAMED_HOVER_FG_MIX)),
+          `${id}: field-border-hover ${borderHover} is not mix(field-border, fg, FRAMED_HOVER_FG_MIX)`);
+        check(ratio(borderHover, border) >= 1.30 && deltaE2000(hexToRgb(borderHover), hexToRgb(border)) >= 6 &&
+          ratio(borderHover, hover) > ratio(border, bg),
+          `${id}: F8 hover frame ${borderHover} vs rest frame ${border}: ${ratio(borderHover, border).toFixed(3)}:1 (min 1.30), ΔE ${deltaE2000(hexToRgb(borderHover), hexToRgb(border)).toFixed(2)} (min 6), on-fill ${ratio(borderHover, hover).toFixed(3)} vs ${ratio(border, bg).toFixed(3)} (must be stronger)`);
+        check(hosts.every((h) => ratio(border, h) >= 1.5), `${id}: F8b the rest frame ${border} is under 1.5:1 against a host`);
+      } else {
+        // F1-F3: the fill itself is the boundary and the hover signal.
+        check(hosts.every((h) => ratio(bg, h) >= FILL_SEPARATE_MIN), `${id}: F1 field-bg ${bg} under ${FILL_SEPARATE_MIN}:1 against a host`);
+        check(ratio(hover, bg) >= FILL_SEPARATE_MIN, `${id}: F2 field-bg-hover ${hover} under ${FILL_SEPARATE_MIN}:1 from the rest fill`);
+        check(hosts.every((h) => ratio(hover, h) >= FILL_SEPARATE_MIN), `${id}: F3 field-bg-hover ${hover} under ${FILL_SEPARATE_MIN}:1 against a host`);
+        // R12 direction, except for a fill sandwiched between two hosts
+        // (D2): there any step nears one host, so only the floor applies.
+        if (!between) {
+          check(hosts.every((h) => ratio(hover, h) >= ratio(bg, h)), `${id}: the hover fill ${hover} steps toward a host`);
+        }
+      }
+      // R13 minimality on the shipped maps of every surface (the helper above).
+      const r13 = r13MinimalityFailures(id, map, map);
+      r13.bad.forEach((m) => check(false, m));
+      if (r13.pushed) sets.r13Pushed.push(id);
+      if (NEW_ROLES[S.ns].includes("field-chevron")) {
+        const uri = map["field-chevron"];
+        check(uri === fieldChevronUri(map["field-placeholder"]) && uri.includes(`%23${map["field-placeholder"].slice(1)}`) && !uri.includes(";"),
+          `${id}: field-chevron is not fieldChevronUri(field-placeholder ${map["field-placeholder"]}) (stroke must be the placeholder ink, no ";" in the value)`);
+      }
+      if (S.ns === "pp") {
+        // F9: chip ink on every backdrop a chip is painted on -- the shell at
+        // rest, the shell hovered, and the chip's own hover fill over the
+        // hovered shell. A transparent chip shows the shell through.
+        const shellRest = hexToRgb(bg), shellHover = hexToRgb(hover);
+        const backdrops = [resolveOpaqueBg(map["tag-bg"], shellRest), resolveOpaqueBg(map["tag-bg"], shellHover), resolveOpaqueBg(map["tag-hover"], shellHover)];
+        const worst = (ink) => Math.min(...backdrops.map((b) => contrast(hexToRgb(ink), b)));
+        check(worst(map["tag-chip-fg"]) >= 4.5, `${id}: F9 tag-chip-fg ${map["tag-chip-fg"]} is ${worst(map["tag-chip-fg"]).toFixed(3)}:1 on its worst backdrop (min 4.5)`);
+        check(worst(map["tag-chip-icon"]) >= 3, `${id}: F9 tag-chip-icon ${map["tag-chip-icon"]} is ${worst(map["tag-chip-icon"]).toFixed(3)}:1 on its worst backdrop (min 3)`);
+        // Identity where the seed already clears: no gratuitous recolour.
+        check(worst(hex6(map["tag-fg"])) < 4.5 || map["tag-chip-fg"] === hex6(map["tag-fg"]), `${id}: tag-fg already clears 4.5:1 on every backdrop, so tag-chip-fg must equal it (got ${map["tag-chip-fg"]})`);
+        check(worst(hex6(map["fg-muted"])) < 3 || map["tag-chip-icon"] === hex6(map["fg-muted"]), `${id}: fg-muted already clears 3:1 on every backdrop, so tag-chip-icon must equal it (got ${map["tag-chip-icon"]})`);
+      }
+    }
+  }
+  check(walked === 42, `stage-4 field walk visited ${walked} blocks, expected 42 (3 surfaces x 14 themes)`);
+  check(sets.r13Pushed.some((id) => id.startsWith("pp:")) && sets.r13Pushed.some((id) => id.startsWith("lib:")),
+    `R13 minimality: no shipped popup or library block pushes field-fg (pushed: ${JSON.stringify(sets.r13Pushed)}) -- the pipeline half is vacuous there`);
+  const eq = (got, want) => JSON.stringify([...got].sort()) === JSON.stringify([...want].sort());
+  check(eq(sets.unseparatedFramed, ["opt:terminal", "opt:rose-pine", "pp:terminal", "lib:terminal"]),
+    `unseparated framed blocks changed: ${JSON.stringify(sets.unseparatedFramed)} (spec §2.4: opt terminal, opt rose-pine, pp terminal, lib terminal)`);
+  check(eq(sets.sandwich, ["lib:catppuccin-mocha", "lib:gruvbox-dark"]),
+    `sandwiched fills changed: ${JSON.stringify(sets.sandwich)} (spec §2.4: lib catppuccin-mocha, lib gruvbox-dark)`);
+  check(eq(sets.well, ["opt:gruvbox-dark", "opt:catppuccin-mocha", "pp:gruvbox-dark"]),
+    `dark recessed wells (fill darker than every host, darkening on hover) changed: ${JSON.stringify(sets.well)} -- after D1a popup mocha is raised, not a well`);
+
+  // D1a (spec §2.2): popup catppuccin-mocha no longer overrides input-bg;
+  // the other four popup input-bg overrides are deliberate and stay.
+  const inputBgOverrides = [];
+  for (const entry of POPUP_THEME_MAP) {
+    const v = pilotOf(entry).ui?.popup?.[entry.mode]?.["input-bg"];
+    if (v != null) inputBgOverrides.push(`${entry.pilot}:${entry.mode}`);
+  }
+  check(eq(new Set(inputBgOverrides), ["catppuccin-latte:light", "flexoki:light", "gruvbox-dark:dark", "solarized-light:light"]),
+    `ui.popup.<mode>.input-bg overrides changed: ${JSON.stringify([...new Set(inputBgOverrides)])} -- D1a removes only catppuccin-mocha's`);
+  {
+    const entry = POPUP_THEME_MAP.find((e) => e.id === "catppuccin-mocha");
+    const tk = pilotOf(entry);
+    const now = composePopupThemeMap(tk, entry.mode, entry.useDarkMode);
+    check(now["input-bg"] === "#262637" && now["input-bd"] === "#262637" && now["field-bg"] === "#262637" && now["field-bg-hover"] === "#2d2d3f",
+      `D1a: popup mocha input-bg/input-bd/field-bg/field-bg-hover = ${now["input-bg"]}/${now["input-bd"]}/${now["field-bg"]}/${now["field-bg-hover"]}, expected #262637/#262637/#262637/#2d2d3f`);
+    const restored = structuredClone(tk);
+    restored.ui.popup.dark["input-bg"] = "#11111b";
+    const before = composePopupThemeMap(restored, entry.mode, entry.useDarkMode);
+    const skip = new Set(NEW_ROLES.pp);
+    const moved = Object.keys(now).filter((k) => !skip.has(k) && now[k] !== before[k]).sort();
+    check(eq(moved, ["input-bd", "input-bg"]),
+      `D1a blast radius: removing the override must move only input-bg and input-bd outside the stage-4 roles, moved ${JSON.stringify(moved)}`);
+  }
+}
+
+// --- Shipped CSS: every generated block of popup.css / library.css declares
+// every stage-4 role (spec §2.2). Replaces the stage-3 "options-only" guard,
+// which asserted the opposite. Per block and per role: ui-token-coverage
+// only reports tokens that are CONSUMED and undefined, and the new roles have
+// no consumer until the popup/library consumer tasks, so an emitPp whitelist
+// that dropped one role would otherwise ship green. ---
+{
+  const REQUIRED = {
+    pp: [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"],
+    lib: [...FIELD_ROLES, "field-chevron"],
+  };
+  for (const [ns, file] of [["pp", "../popup.css"], ["lib", "../library.css"]]) {
+    const css = readFileSync(new URL(file, import.meta.url), "utf8");
+    const start = css.indexOf("@generated:ui-themes start");
+    const region = css.slice(css.indexOf("*/", start) + 2, css.indexOf("/* @generated:ui-themes end */"));
+    const blocks = parseStyleRules(region).filter((r) => r.context.length === 0 &&
+      r.selectors.length === 1 && /^(?:html\[data-theme="[a-z-]+"\]|:root)$/.test(r.selectors[0]));
+    check(blocks.length === 15, `${file}: expected 15 generated theme blocks (14 presets + :root), found ${blocks.length}`);
+    for (const block of blocks) {
+      const declared = new Set(parseDeclarations(block.body).map((d) => d.property));
+      const absent = REQUIRED[ns].filter((r) => !declared.has(`--${ns}-${r}`));
+      check(!absent.length, `${file} ${block.selectors[0]}: missing ${absent.map((r) => `--${ns}-${r}`).join(", ")}`);
+      const stray = [...declared].filter((p) => p.startsWith(`--${ns}-field-edge`) || p === "--pp-field-chevron");
+      check(!stray.length, `${file} ${block.selectors[0]}: declares retired or foreign role(s) ${stray.join(", ")}`);
+    }
+  }
+}
+
+// --- The default :root literals (popup-chrome.mjs / library-chrome.mjs
+// DEFAULT_LIGHT) are the deriver's output over the folded shipped :root, not
+// hand picks -- same contract as the options :root block below. ---
+{
+  const fold = (file, ns) => {
+    const css = readFileSync(new URL(file, import.meta.url), "utf8");
+    const dict = {};
+    for (const rule of parseStyleRules(css)) {
+      if (rule.context.length !== 0 || !rule.selectors.includes(":root")) continue;
+      for (const d of parseDeclarations(rule.body)) if (d.property.startsWith(`--${ns}-`)) dict[d.property.slice(ns.length + 3)] = d.value;
+    }
+    return dict;
+  };
+  const pp = fold("../popup.css", "pp");
+  const lib = fold("../library.css", "lib");
+  const absent = (dict, roles) => roles.filter((r) => typeof dict[r] !== "string");
+  const ppAbsent = absent(pp, [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"]);
+  const libAbsent = absent(lib, [...FIELD_ROLES, "field-chevron"]);
+  check(!ppAbsent.length, `popup.css default :root (folded) lacks ${ppAbsent.map((r) => `--pp-${r}`).join(", ")} -- popup-chrome.mjs DEFAULT_LIGHT`);
+  check(!libAbsent.length, `library.css default :root (folded) lacks ${libAbsent.map((r) => `--lib-${r}`).join(", ")} -- library-chrome.mjs DEFAULT_LIGHT`);
+  if (!ppAbsent.length) {
+    const want = deriveFieldRoles(pp, null, FIELD_HOST_ROLES.pp);
+    for (const role of FIELD_ROLES) {
+      check(pp[role] === want[role], `default :root --pp-${role}=${pp[role]} is not deriveFieldRoles(folded :root, hosts [bg])=${want[role]} -- update popup-chrome.mjs DEFAULT_LIGHT`);
+    }
+    const backdrops = [resolveOpaqueBg(pp["tag-bg"], hexToRgb(pp["field-bg"])), resolveOpaqueBg(pp["tag-bg"], hexToRgb(pp["field-bg-hover"])), resolveOpaqueBg(pp["tag-hover"], hexToRgb(pp["field-bg-hover"]))];
+    check(pp["tag-chip-fg"] === rgbToHex(fgToAAMulti(hexToRgb(pp["tag-fg"]), backdrops, 4.5)) &&
+      pp["tag-chip-icon"] === rgbToHex(fgToAAMulti(hexToRgb(pp["fg-muted"]), backdrops, 3)),
+      `default :root --pp-tag-chip-fg/--pp-tag-chip-icon (${pp["tag-chip-fg"]}/${pp["tag-chip-icon"]}) are not the chip derivation over the folded :root -- update popup-chrome.mjs DEFAULT_LIGHT`);
+  }
+  if (!libAbsent.length) {
+    const want = deriveFieldRoles(lib, null, FIELD_HOST_ROLES.lib);
+    for (const role of FIELD_ROLES) {
+      check(lib[role] === want[role], `default :root --lib-${role}=${lib[role]} is not deriveFieldRoles(folded :root, hosts [panel, bg])=${want[role]} -- update library-chrome.mjs DEFAULT_LIGHT`);
+    }
+    check(lib["field-chevron"] === fieldChevronUri(lib["field-placeholder"]), "default :root --lib-field-chevron is not fieldChevronUri(--lib-field-placeholder)");
+  }
+}
+
+// --- Anchors (popup + library): read back from the SHIPPED generated
+// region, exact. popup terminal's frame follows --pp-border (pilot
+// `input-bd: var(--pp-border)`), so a border re-derivation moves it and
+// must land here visibly; popup mocha pins D1a; library mocha / gruvbox-dark
+// pin the two sandwiched fills. Order: FIELD_ROLES. ---
+{
+  const ANCHORS = {
+    pp: {
+      ":root": ["#e9ecf0", "#e9ecf0", "#dee1e6", "#dee1e6", "#e9ecf0", "#5686de", "#5c6167", "#2a2d33"],
+      'html[data-theme="terminal"]': ["#111111", "#267326", "#111111", "#2a9d2a", "#111111", "#33ff33", "#21b621", "#33ff33"],
+      'html[data-theme="catppuccin-mocha"]': ["#262637", "#262637", "#2d2d3f", "#2d2d3f", "#262637", "#6684b8", "#999fb6", "#cdd6f4"],
+    },
+    lib: {
+      ":root": ["#ececed", "#ececed", "#e0e0e2", "#e0e0e2", "#ececed", "#3e88e9", "#5c636a", "#1a1a2e"],
+      'html[data-theme="terminal"]': ["#111111", "#1a4d1a", "#111111", "#228222", "#111111", "#33ff33", "#5bae5b", "#33ff33"],
+      'html[data-theme="catppuccin-mocha"]': ["#262637", "#262637", "#38394c", "#38394c", "#262637", "#6784b8", "#a2a4b5", "#cdd6f4"],
+      'html[data-theme="gruvbox-dark"]': ["#302f2e", "#302f2e", "#423f3b", "#423f3b", "#302f2e", "#749085", "#b6ada7", "#ebdbb2"],
+    },
+  };
+  let compared = 0;
+  for (const [ns, file] of [["pp", "../popup.css"], ["lib", "../library.css"]]) {
+    const css = readFileSync(new URL(file, import.meta.url), "utf8");
+    const start = css.indexOf("@generated:ui-themes start");
+    const region = css.slice(css.indexOf("*/", start) + 2, css.indexOf("/* @generated:ui-themes end */"));
+    const rules = parseStyleRules(region).filter((r) => r.context.length === 0);
+    for (const [selector, values] of Object.entries(ANCHORS[ns])) {
+      const rule = rules.find((r) => r.selectors.length === 1 && r.selectors[0] === selector);
+      check(!!rule, `anchor block ${selector} not found in ${file} @generated:ui-themes`);
+      const decls = new Map(rule ? parseDeclarations(rule.body).map((d) => [d.property, d.value]) : []);
+      FIELD_ROLES.forEach((role, i) => {
+        compared++;
+        check(decls.get(`--${ns}-${role}`) === values[i], `${file} ${selector} --${ns}-${role}=${decls.get(`--${ns}-${role}`)} drifted from the anchor ${values[i]} -- a deriver, emit or pilot change; re-derive deliberately and update ANCHORS`);
+      });
+    }
+  }
+  check(compared === 56, `stage-4 anchor block made ${compared} comparisons, expected 56 (7 blocks x 8 roles)`);
+}
+
+// --- contrast-audit's popup chip-ink check (F9, spec §2.3) as a pure
+// function: negative controls, so a check that drops a backdrop or measures
+// the wrong fill fails here and not only on a future theme. (The F1-F3 / F8b
+// half is contrast-audit's auditFieldSeparation; its hosts are
+// FIELD_SEPARATION_HOSTS, pinned to FIELD_HOST_ROLES -- pp [bg], never
+// ROLE_ALIAS's bg2 -- by the host-table block above.) ---
+{
+  // F9: a transparent chip shows the shell through, so its ink is measured on
+  // the shell's rest and hover fills and on tag-hover over the hovered shell.
+  const chip = { "pp-field-bg": "#e2decd", "pp-field-bg-hover": "#d6d4c5", "pp-tag-bg": "transparent", "pp-tag-hover": "#eee8d5",
+    "pp-tag-chip-fg": "#1e746d", "pp-tag-chip-icon": "#54696f" };
+  const rows = tagChipInkRows(chip);
+  check(rows.length === TAG_CHIP_INK_SPEC.length * 3 && TAG_CHIP_INK_SPEC.every(([role]) => rows.filter((r) => r.label.startsWith(`${role} vs `)).length === 3),
+    `tagChipInkRows must measure every TAG_CHIP_INK_SPEC role on three backdrops (got ${JSON.stringify(rows.map((r) => r.label))})`);
+  check(JSON.stringify(TAG_CHIP_INK_SPEC) === JSON.stringify([["tag-chip-fg", 4.5], ["tag-chip-icon", 3]]),
+    `TAG_CHIP_INK_SPEC changed: ${JSON.stringify(TAG_CHIP_INK_SPEC)} (chip text 4.5:1, remove-x icon 3:1)`);
+  const hov = rows.find((r) => r.label === "tag-chip-fg vs tag-bg/field-bg-hover (F9)");
+  check(!!hov && hov.ratio < 4.5 && Math.abs(hov.ratio - contrast(hexToRgb("#1e746d"), hexToRgb("#d6d4c5"))) < 1e-9,
+    `a transparent chip's text must be measured on the hovered shell fill (solarized-light's pre-stage-4 #1e746d is 3.73:1 there) -- got ${JSON.stringify(hov)}`);
+  const onTagHover = rows.find((r) => r.label === "tag-chip-icon vs tag-hover/field-bg-hover (F9)");
+  check(!!onTagHover && Math.abs(onTagHover.ratio - contrast(hexToRgb("#54696f"), hexToRgb("#eee8d5"))) < 1e-9 && onTagHover.min === 3,
+    `the remove-x icon must be measured on tag-hover over the hovered shell at 3:1 -- got ${JSON.stringify(onTagHover)}`);
+  const opaque = tagChipInkRows({ ...chip, "pp-tag-bg": "#dce0e8", "pp-tag-chip-fg": "#116e73" });
+  check(opaque.find((r) => r.label === "tag-chip-fg vs tag-bg/field-bg (F9)")?.ratio === contrast(hexToRgb("#116e73"), hexToRgb("#dce0e8")),
+    "an opaque chip's text must be measured on its own tag-bg, not on the shell");
+  check(tagChipInkRows({ ...chip, "pp-tag-chip-icon": undefined })[0]?.missing?.includes("tag-chip-icon"), "a missing chip ink role must come back as a missing row");
+  check(tagChipInkRows({ ...chip, "pp-field-bg-hover": "transparent" })[0]?.missing?.includes("field-bg-hover"), "a non-hex shell fill must come back as a missing row, not be measured as black");
 }
 
 // --- The default :root literals (options-chrome.mjs DEFAULT_LIGHT) are the

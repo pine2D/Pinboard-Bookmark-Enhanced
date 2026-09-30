@@ -363,13 +363,15 @@ final-fix wave:
 - **Derived component-pair colors are not `ui` inputs.** The shared
   `btn-fg`, `btn-fg-muted`, `danger-quiet-fg`, `on-danger`, `chip-bg`,
   `chip-fg` roles and popup-only `preset-fg` / `spinner-fg` / `ai-chip-fg`,
-  plus the options-only Soft Fill field family (8 roles: `field-bg`,
-  `field-border`, `field-bg-hover`, `field-border-hover`, `field-bg-focus`,
-  `field-border-focus`, `field-placeholder`, `field-fg` — `deriveFieldRoles`,
-  derived from `input-bg` / `input-border` / `focus-bd` / `accent` / `fg` /
-  `fg-hint` and the surface's host roles, `FIELD_HOST_ROLES.opt` =
-  `panel` / `pf-bg`; plus `field-chevron`, the select arrow `fieldChevronUri`
-  strokes with `field-placeholder`; tune those inputs instead),
+  plus the value-box field family on all three surfaces (8 roles:
+  `field-bg`, `field-border`, `field-bg-hover`, `field-border-hover`,
+  `field-bg-focus`, `field-border-focus`, `field-placeholder`, `field-fg`,
+  plus `field-chevron` on options and library and the popup chip inks
+  `tag-chip-fg` / `tag-chip-icon` — `deriveFieldRoles` and popup-chrome.mjs,
+  derived from `input-bg` / the surface's frame key / `focus-bd` / `accent` /
+  `fg` / `fg-hint` / `fg-muted` / `tag-fg` / `tag-bg` / `tag-hover` and the
+  surface's hosts (options `panel` + `pf-bg`, popup `bg`, library `panel` +
+  `bg`); tune those inputs instead),
   are computed
   from the FINAL,
   post-override map — as is `on-accent` on options and library (Task 4,
@@ -474,15 +476,19 @@ final-fix wave:
   to this mechanism.) Note the naming split: popup uses the `-bd` suffix
   (`btn-bd`/`input-bd`), options/library use `-border`
   (`btn-border`/`input-border`) — copy the exact key your surface expects.
-  On options, `input-border` also frames the B+ field family
-  (`deriveFieldRoles`), so its value must be a `#rgb` / `#rrggbb` /
-  `#rrggbbaa` hex, or exactly `var(--<ns>-<role>)` (write `--opt-`; the
-  parser accepts any lowercase prefix and looks `<role>` up in the options
-  map) naming a role the options map defines whose value is itself a
+  The value-box frame key (popup `input-bd`, options/library
+  `input-border`) also frames the field family (`deriveFieldRoles`), so its
+  value must be a `#rgb` / `#rrggbb` / `#rrggbbaa` hex, or exactly
+  `var(--<ns>-<role>)` (write your surface's prefix, `--pp-` / `--opt-` /
+  `--lib-`; the parser accepts any lowercase prefix and looks `<role>` up in
+  that surface's map) naming a role the map defines whose value is itself a
   `#rgb` / `#rrggbb` / `#rrggbbaa` hex. Anything else (`rgba()`, a `var()`
-  with a fallback, a named colour, or a `var()` pointing at a role that
-  holds one of those) makes sync-all throw instead of shipping a guessed
-  frame.
+  with a fallback, a named colour, or a `var()` pointing at a role that holds
+  one of those) makes sync-all throw instead of shipping a guessed frame. A
+  frame on a theme whose field fill does not separate from its hosts
+  (terminal on all three surfaces, rose-pine on options) carries the hover
+  state by itself: the fill stays put and the frame mixes
+  `FRAMED_HOVER_FG_MIX` (.30) of `fg` in.
   **Geometry (radius, padding) is never exemptable this way** — it follows
   the surface's token ladder unconditionally for every theme, terminal
   included; only the fill-vs-frame *color* language has an opt-out.

@@ -1,6 +1,6 @@
 import { expandPalette } from "./_util.mjs";
 import { mergeTokens } from "./compose-theme.mjs";
-import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, resolveOpaqueBg } from "./_ui-derive.mjs";
+import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, resolveOpaqueBg, FIELD_HOST_ROLES, FIELD_ROLES } from "./_ui-derive.mjs";
 
 // popup theme id -> { pilot, mode, useDarkMode? }
 // 12 themes map 1:1; the flexoki pilot yields BOTH flexoki-light and flexoki-dark.
@@ -97,6 +97,21 @@ const DEFAULT_LIGHT = {
                                  // 1.10-separated btn-bg above) for FILL_SEPARATE_MIN 1.06 -> 1.10;
                                  // before that, re-derived 2026-08-05 (was #848fa4 against a btn-bg
                                  // that was still bg2).
+  // Field family (stage 4 Task 5). NOT hand-picked: deriveFieldRoles(folded
+  // :root, null, FIELD_HOST_ROLES.pp) over popup.css's hand :root -- bg
+  // #ffffff, input-bg #e9ecf0, fg #2a2d33, fg-hint #666b72, focus-bd #5686de,
+  // accent #3b72d9. tests/theme-ui-derive-tests.mjs re-derives all eight, and
+  // the two chip inks, from the shipped :root on every run.
+  "field-bg": "#e9ecf0",            // = input-bg: already 1.19:1 vs bg
+  "field-border": "#e9ecf0",        // = field-bg (frame collapsed into the fill)
+  "field-bg-hover": "#dee1e6",      // one step away from bg (toward fg), 1.11:1 vs field-bg
+  "field-border-hover": "#dee1e6",  // = field-bg-hover
+  "field-bg-focus": "#e9ecf0",      // = field-bg (focus never repaints the fill)
+  "field-border-focus": "#5686de",  // = focus-bd, 3.02:1 on field-bg
+  "field-placeholder": "#5c6167",   // fg-hint #666b72 (4.10:1 on the hover fill) pushed to 4.77:1
+  "field-fg": "#2a2d33",            // = fg: already 2.21:1 from the placeholder
+  "tag-chip-fg": "#33589f",         // = tag-fg: 5.72:1 on tag-bg #e2eafa, 5.19:1 on tag-hover #d3e0f7
+  "tag-chip-icon": "#62676e",       // = fg-muted: 4.72:1 / 4.28:1 on the same two chip fills (min 3)
 };
 // DEFAULT_DARK (the popup's `html.dark` component-layer tokens) is gone:
 // since the theme model of 2026-08-25 (batch 2 D6) the popup's no-preset
@@ -120,7 +135,13 @@ function emitPp(ui, mode) {
     "banner-bg", "banner-bd", "banner-fg", "warn-bg", "warn-bd", "warn-fg",
     "ok-bg", "ok-bd", "ok-fg", "offline-bg", "offline-bd", "offline-fg",
     "danger", "danger-quiet-fg", "on-danger", "spinner-bg", "spinner-fg", "preset-bg", "preset-fg",
-    "radius-sm", "radius-md", "radius-lg", "radius-tag", "focus-bd", "focus-ring", "on-accent"]) {
+    "radius-sm", "radius-md", "radius-lg", "radius-tag", "focus-bd", "focus-ring", "on-accent",
+    // Stage 4 Task 5: the field family and the chip inks. This list is a
+    // whitelist -- a role the finalizer computes but this list omits is
+    // silently not emitted, and ui-token-coverage cannot see that (it only
+    // reports tokens that are consumed and undefined).
+    // tests/theme-ui-derive-tests.mjs checks every block for every role.
+    ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"]) {
     if (ui[k] != null) set(k, ui[k]);
   }
   // info-* are aliases of banner-* (no separate derivation)
@@ -128,6 +149,20 @@ function emitPp(ui, mode) {
   set("info-bd", "var(--pp-banner-bd)");
   set("info-fg", "var(--pp-banner-fg)");
   return lines.join("\n");
+}
+
+// The three fills a popup tag chip is painted on (see tag-chip-fg below):
+// tag-bg over the resting tags shell, tag-bg over the hovered shell, and
+// tag-hover over the hovered shell. resolveOpaqueBg: a `transparent` tag-bg
+// (8/14 blocks) IS the shell, an opaque one ignores it.
+function tagChipBackdrops(map) {
+  const shellRest = hexToRgb(map["field-bg"]);
+  const shellHover = hexToRgb(map["field-bg-hover"]);
+  return [
+    resolveOpaqueBg(map["tag-bg"], shellRest),
+    resolveOpaqueBg(map["tag-bg"], shellHover),
+    resolveOpaqueBg(map["tag-hover"], shellHover),
+  ];
 }
 
 // Compute ONE theme's real, final --pp-* color map (post-derivation,
@@ -180,6 +215,13 @@ export function composePopupThemeMap(tk, mode, useDarkMode = false) {
     // ppO) -- this only says "don't clobber it", never "always derive"
     // (Task 4, taste-uplift-batch2).
     onAccentIsInput: true,
+    // Field family (stage 4 Task 5): every popup value box sits on --pp-bg
+    // (popup.css: `body` and `html[data-theme]` both paint `background:
+    // var(--pp-bg)`), never on bg2 -- the panelRole above names the strip
+    // the buttons sit on, not the fields' host. The framed signal is the pilot's own ui.popup.<mode>.input-bd
+    // (terminal only, `var(--pp-border)`).
+    fieldRoles: true,
+    fieldHostRoles: FIELD_HOST_ROLES.pp,
   });
   // ai-chip-fg (Task 4, taste-uplift-batch3, D8): popup-only OUTPUT role
   // (UI_DERIVED_OUTPUT_ROLES.popup, _ui-derive.mjs) for AI-suggested text
@@ -199,6 +241,18 @@ export function composePopupThemeMap(tk, mode, useDarkMode = false) {
     hexToRgb(ui["accent2"]),
     [hexToRgb(ui["chip-bg"]), hexToRgb(ui["btn-hover"])],
   ));
+  // tag-chip-fg / tag-chip-icon (stage 4 Task 5, spec §2.2 / F9): the text
+  // and the remove-x ink of a .tag-item inside the tags shell, measured on
+  // all three backdrops tagChipBackdrops() lists. Seeds stay tag-fg /
+  // fg-muted (TEXT inputs, taken verbatim) and move only where they miss
+  // 4.5:1 / 3:1 on one of those backdrops: 6/14 themes move the text
+  // (nord-night, solarized x2 on the shell; flexoki-dark, catppuccin x2 on
+  // their own tag-hover), only catppuccin-mocha moves the icon (2.999 on
+  // tag-hover). MUST run after finalizeUiControlRoles: the backdrops read
+  // the final field-bg / field-bg-hover.
+  const tagChipBases = tagChipBackdrops(ui);
+  ui["tag-chip-fg"] = rgbToHex(fgToAAMulti(hexToRgb(ui["tag-fg"]), tagChipBases, 4.5));
+  ui["tag-chip-icon"] = rgbToHex(fgToAAMulti(hexToRgb(ui["fg-muted"]), tagChipBases, 3));
   // preset-bd RETIRED (design-uplift, preset-row Variant A, 2026-08-04):
   // `.preset-btn` is borderless now (COMPONENTS.md Appendix C30), so no
   // rule anywhere reads --pp-preset-bd -- removed from emitPp's key list

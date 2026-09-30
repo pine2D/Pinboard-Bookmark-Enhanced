@@ -1,6 +1,6 @@
 import { expandPalette } from "./_util.mjs";
 import { mergeTokens } from "./compose-theme.mjs";
-import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, mix, hexToRgb, rgbToHex } from "./_ui-derive.mjs";
+import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, mix, hexToRgb, rgbToHex, FIELD_HOST_ROLES, fieldChevronUri } from "./_ui-derive.mjs";
 import { POPUP_THEME_MAP } from "./popup-chrome.mjs";
 
 // Accent-over-bg mixes library.css paints behind a row that is SELECTED for a
@@ -75,6 +75,20 @@ const DEFAULT_LIGHT = {
                                  // btn-bg above; #858596 still clears, unchanged). Re-derived 2026-08-05
                                  // (was #90909f) because Soft Fill darkened btn-bg out from under it —
                                  // contrast-audit's `border vs btn-bg` row caught the stale value at 2.76:1.
+  // Field family (stage 4 Task 5). NOT hand-picked: deriveFieldRoles(folded
+  // :root, null, FIELD_HOST_ROLES.lib) over library.css's hand :root -- panel
+  // #ffffff, bg #f7f7f8, fg #1a1a2e, fg-hint #61686f, focus-bd #3e88e9, accent
+  // #1a73e8 -- and input-bg above. tests/theme-ui-derive-tests.mjs re-derives
+  // them from the shipped :root on every run.
+  "field-bg": "#ececed",            // = input-bg: already 1.18:1 vs panel, 1.10:1 vs bg
+  "field-border": "#ececed",        // = field-bg (frame collapsed into the fill)
+  "field-bg-hover": "#e0e0e2",      // one step away from both hosts (toward fg), 1.12:1 vs field-bg
+  "field-border-hover": "#e0e0e2",  // = field-bg-hover
+  "field-bg-focus": "#ececed",      // = field-bg (focus never repaints the fill)
+  "field-border-focus": "#3e88e9",  // = focus-bd, 3.01:1 on field-bg
+  "field-placeholder": "#5c636a",   // fg-hint #61686f (4.29:1 on the hover fill) pushed to 4.62:1
+  "field-fg": "#1a1a2e",            // = fg: already 2.80:1 from the placeholder
+  "field-chevron": fieldChevronUri("#5c636a"), // the native <select> chevron, stroked in field-placeholder
 };
 
 // Map canonical UI colors to --lib-* names for the standalone library page
@@ -88,9 +102,11 @@ const DEFAULT_LIGHT = {
 // spread: deriveUiColors never computes focus-bd/focus-ring itself, so an
 // unconditional `ui["focus-bd"]` here would literally emit
 // `--lib-focus-bd: undefined;` for every one of the other 11 themes. Themes
-// without an override fall through the cascade to library.css's :root
-// computed default (same color-mix(--lib-accent) formula), which is the ONLY
-// thing that makes --lib-focus-ring resolve for those themes at all.
+// without an override get --lib-focus-bd from finalizeUiControlRoles
+// (focusBdToAA) -- which deriveFieldRoles then reads for field-border-focus --
+// while --lib-focus-ring still falls through the cascade to library.css's
+// :root computed default (same color-mix(--lib-accent) formula), the ONLY
+// thing that makes it resolve for those themes at all.
 // `mode` drives the native-control scheme (scrollbar, number spinner, etc.)
 // for this theme's own block -- Task 6, library's FIRST color-scheme
 // declaration (popup/options already had a hand-written one; library never
@@ -155,7 +171,17 @@ function emitLib(ui, palette, overrides, radius, focus = {}, mode) {
 
   // The shared post-override pass keeps library's two-host soft-fill and
   // contrast contract aligned with options without duplicating its algorithm.
-  map = finalizeUiControlRoles(map, palette, overrides);
+  map = finalizeUiControlRoles(map, palette, overrides, {
+    // Field family (stage 4 Task 5): library value boxes sit on the panel
+    // surfaces and on the page bg, so both are hosts. With [panel] alone the
+    // two themes whose fill lies between them (catppuccin-mocha,
+    // gruvbox-dark) would step their hover toward the page bg until it
+    // dissolves there (1.002 / 1.003). library emits every map key, so no
+    // whitelist to extend; field-chevron is the native <select> arrow.
+    fieldRoles: true,
+    fieldHostRoles: FIELD_HOST_ROLES.lib,
+    fieldChevron: true,
+  });
 
   // Returns the computed map alongside the rendered text (not just text) --
   // same shape as options-chrome.mjs's emitOpt, for the same reason: a

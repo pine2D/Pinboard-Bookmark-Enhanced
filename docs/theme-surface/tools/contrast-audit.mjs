@@ -12,7 +12,7 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, FIELD_TEXT_PLACEHOLDER_MIN, primaryHoverFill, mix, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
+import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, FIELD_TEXT_PLACEHOLDER_MIN, FIELD_HOST_ROLES, primaryHoverFill, mix, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
 // LIB_BATCH_BAND_MIX: library.css paints a batch-selected row's fill as an
@@ -22,6 +22,7 @@ import { compose } from "../composers/classic-list-v2.mjs";
 // SAME exported constant library-chrome.mjs's own derivation uses, so the
 // two can never drift apart (see that file's comment on the constant).
 import { LIB_BATCH_BAND_MIX } from "../composers/library-chrome.mjs";
+import { POPUP_THEME_MAP } from "../composers/popup-chrome.mjs";
 import { parseDeclarations, parseStyleRules } from "./css-syntax.mjs";
 
 // deltaE2000 moved to _ui-derive.mjs (Task 2, taste-uplift-batch2) so
@@ -218,6 +219,12 @@ const ROLE_ALIAS = {
   opt: {},
   lib: {},
 };
+
+// The namespaces whose composers emit the value-box field family (stage 4
+// Task 5: all three). Read from FIELD_HOST_ROLES -- the registry
+// finalizeUiControlRoles actually hands deriveFieldRoles -- so a surface that
+// gains or loses the family moves its F4-F7 rows with it.
+const FIELD_FAMILY_NS = Object.freeze(Object.keys(FIELD_HOST_ROLES));
 
 // [fgRole, bgRole, minRatio, onlyNs?, themedOnly?] -- role names, not literal
 // --{ns}-* strings; ROLE_ALIAS resolves the per-surface literal name at lookup
@@ -437,38 +444,44 @@ export const COMPONENT_PAIR_SPEC = [
 
   // Soft Fill field family (stage 4 spec docs/superpowers/specs/2026-09-30-
   // ui-fields-stage4-design.md §2.3; COMPONENTS.md §6.2 / §9.1 law 9).
-  // Options only for now -- the --opt-field-* roles are deriveFieldRoles()
-  // outputs (UI_DERIVED_OUTPUT_ROLES.options), so on the default (:root)
-  // block a missing field-* role named in one of the rows below FAILs rather
-  // than SKIPs (isOutputRoleForDefault). Themed blocks FAIL on any missing
+  // F4-F7 (stage-4 spec §2.3): one row set for every surface in
+  // FIELD_FAMILY_NS -- the focus edge on the fill, the placeholder on all
+  // three fill states, typed text on rest + hover, and typed text vs
+  // placeholder (a distinction floor, not a legibility one). The
+  // --{ns}-field-* roles are deriveFieldRoles() outputs on every surface
+  // (UI_DERIVED_OUTPUT_ROLES), so on the default (:root) block a missing
+  // field-* role named in one of the rows below FAILs rather than SKIPs
+  // (isOutputRoleForDefault). Themed blocks FAIL on any missing
   // role here, as for every other row. There is no bottom edge any more: the
   // box's resting boundary is its fill's separation from the surfaces it sits
   // on, which depends on whether the block is framed -- not a fixed role
   // pair, so auditFieldSeparation (below COMPONENT_PAIR_SPEC) owns F1-F3 and
   // F8b, and field-border / field-border-hover appear in no row here.
   // F7: the focus border on the fill (rest = focus fill).
-  ["field-border-focus", "field-bg", 3, ["opt"]],
-  ["field-border-focus", "field-bg-focus", 3, ["opt"]],
+  ["field-border-focus", "field-bg", 3, FIELD_FAMILY_NS],
+  ["field-border-focus", "field-bg-focus", 3, FIELD_FAMILY_NS],
   // F4: placeholder text, the key-wrap eye and the listbox / native-select
   // chevrons all paint the field's secondary ink on the field fills.
-  ["field-placeholder", "field-bg", 4.5, ["opt"]],
-  ["field-placeholder", "field-bg-hover", 4.5, ["opt"]],
-  ["field-placeholder", "field-bg-focus", 4.5, ["opt"]],
-  // F5: text painted on a field fill is --opt-field-fg (ruling R13; spec §2.2
-  // D6 -- the generated .fg recipe incl. the native select, .listbox-btn, the
-  // narrow-screen tab picker and the sidebar search box), on the rest and the
-  // hover fill. The two plain `fg vs field-bg(-hover)` rows that stood here
-  // are gone with D6 (these two are what they became), and so is `field-fg
-  // vs input-bg`: stage 4 Task 4 moved the sidebar search box onto the field
-  // fill, so no value box paints on input-bg any more.
-  ["field-fg", "field-bg", 4.5, ["opt"]],
-  ["field-fg", "field-bg-hover", 4.5, ["opt"]],
+  ["field-placeholder", "field-bg", 4.5, FIELD_FAMILY_NS],
+  ["field-placeholder", "field-bg-hover", 4.5, FIELD_FAMILY_NS],
+  ["field-placeholder", "field-bg-focus", 4.5, FIELD_FAMILY_NS],
+  // F5: text painted on a field fill is --{ns}-field-fg (ruling R13; spec
+  // §2.2 D6 -- on options the generated .fg recipe incl. the native select,
+  // .listbox-btn, the narrow-screen tab picker and the sidebar search box;
+  // popup / library value boxes from their stage-4 consumer tasks on), on the
+  // rest and the hover fill. The two plain `fg vs field-bg(-hover)` rows that
+  // stood here are gone with D6 (these two are what they became), and so is
+  // `field-fg vs input-bg`: stage 4 Task 4 moved the options sidebar search
+  // box onto the field fill, so no options value box paints on input-bg any
+  // more.
+  ["field-fg", "field-bg", 4.5, FIELD_FAMILY_NS],
+  ["field-fg", "field-bg-hover", 4.5, FIELD_FAMILY_NS],
   // F6: ...and it must be tellable apart from the placeholder: a distinction
   // floor, not a legibility one (both inks already clear 4.5:1 on the fills),
   // expressed like the other non-text rows here (chip-bg vs panel's
   // FILL_SEPARATE_MIN): the same ratio, a lower min. The UA placeholder gave
   // 1.52:1 on solarized-light; the first B+ derivation 1.03.
-  ["field-fg", "field-placeholder", FIELD_TEXT_PLACEHOLDER_MIN, ["opt"]],
+  ["field-fg", "field-placeholder", FIELD_TEXT_PLACEHOLDER_MIN, FIELD_FAMILY_NS],
 ];
 
 // Host separation of the Soft Fill value box (stage 4 spec 2026-09-30 §2.3
@@ -481,8 +494,11 @@ export const COMPONENT_PAIR_SPEC = [
 //   separated = field-bg clears FILL_SEPARATE_MIN against every host.
 // Unframed, and framed-but-separated (options nord-night, dracula): F1 fill vs
 // every host, F2 hover fill vs rest fill, F3 hover fill vs every host, each
-// >= FILL_SEPARATE_MIN; an unframed box's frame must also equal its fill on
-// hover. Framed and NOT separated (terminal, options rose-pine): the fill
+// >= FILL_SEPARATE_MIN (floors only: library's two sandwiched fills,
+// catppuccin-mocha and gruvbox-dark, step toward one host on hover by
+// construction, so direction is the derivation tests' business); an
+// unframed box's frame must also equal its fill on hover. Framed and NOT
+// separated (terminal on all three surfaces, options rose-pine): the fill
 // keeps its pilot value on hover (field-bg-hover == field-bg) and the rest
 // frame has to announce the box, F8b >= FIELD_FRAME_HOST_MIN against every
 // host. F8 (hover frame vs rest frame) needs ΔE2000 and an on-the-fill
@@ -492,21 +508,48 @@ export const COMPONENT_PAIR_SPEC = [
 // pins the class membership (spec §2.4) so that cannot happen silently.
 //
 // Hosts are listed per CSS prefix HERE -- not resolved through ROLE_ALIAS,
-// whose pp.panel is bg2, a surface no popup value box sits on. A prefix
-// missing from this table is not audited; tests/theme-ui-derive-tests.mjs
-// fails when a surface that derives field roles (UI_DERIVED_OUTPUT_ROLES)
-// has no entry, or when an entry differs from _ui-derive.mjs's
+// whose pp.panel is bg2, a surface no popup value box sits on. Since stage 4
+// Task 5 all three prefixes have an entry (popup [bg], library [panel, bg]).
+// A block that declares any --<ns>-field-* role while its prefix has no
+// entry FAILs here instead of going unaudited, and
+// tests/theme-ui-derive-tests.mjs fails when a surface whose registry
+// (UI_DERIVED_OUTPUT_ROLES), composed maps or generated region carry field
+// roles has no entry, or when an entry differs from _ui-derive.mjs's
 // FIELD_HOST_ROLES.
 export const FIELD_SEPARATION_HOSTS = Object.freeze({
   opt: Object.freeze(["panel", "pf-bg"]),
+  pp: Object.freeze(["bg"]),
+  lib: Object.freeze(["panel", "bg"]),
 });
 // F8b: an unseparated framed box's rest frame vs every host. Lowest shipped
-// value 1.576 (options rose-pine vs panel).
+// value 1.576 (options rose-pine vs panel); popup terminal 3.36 (vs bg),
+// library terminal 1.91 / 2.00 (vs panel / bg).
 export const FIELD_FRAME_HOST_MIN = 1.5;
+// Which blocks the stage-4 field sections really measured, per prefix
+// (auditFieldFamilyCoverage below reads it). A section whose call site is
+// dropped, or whose prefix silently stops matching, prints nothing at all --
+// indistinguishable from a pass -- so main() FAILs unless every prefix in
+// FIELD_SEPARATION_HOSTS, and popup's chip inks, were measured on all 14
+// themed blocks plus the default one.
+const fieldFamilyCoverage = { separation: new Map(), chipInk: new Map(), chipInkRoles: new Set() };
+const noteCovered = (map, ns, blockLabel) => {
+  if (!map.has(ns)) map.set(ns, new Set());
+  map.get(ns).add(blockLabel);
+};
 function auditFieldSeparation(scope, ns, blockLabel, dict) {
   const hosts = FIELD_SEPARATION_HOSTS[ns];
-  if (!hosts) return;
   const line = (label, verdict) => "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + label.padEnd(28) + " " + verdict;
+  if (!hosts) {
+    // A surface without a hosts entry is only fine while it ships no field
+    // family at all; a block that does is a registry gap, not "N/A".
+    const declared = Object.keys(dict).filter((k) => k.startsWith(`${ns}-field-`));
+    if (declared.length) {
+      const l = line("field separation", `FAIL (declares ${declared.map((k) => `--${k}`).join(", ")} but FIELD_SEPARATION_HOSTS has no "${ns}" entry)`);
+      console.log(l);
+      violations.push(l);
+    }
+    return;
+  }
   const roles = ["field-bg", "field-bg-hover", "field-border", "field-border-hover", ...hosts];
   const raw = Object.fromEntries(roles.map((r) => [r, dict[`${ns}-${r}`]]));
   const unusable = roles.filter((r) => !isHex(raw[r]));
@@ -519,6 +562,7 @@ function auditFieldSeparation(scope, ns, blockLabel, dict) {
     violations.push(l);
     return;
   }
+  noteCovered(fieldFamilyCoverage.separation, ns, blockLabel);
   const rgb = Object.fromEntries(roles.map((r) => [r, hexRgb(normHex(raw[r].trim()))]));
   const same = (a, b) => normHex(raw[a].trim()) === normHex(raw[b].trim());
   const assertSame = (a, b) => {
@@ -587,6 +631,44 @@ function auditSidebarSearchSeparation(scope, ns, blockLabel, dict) {
   } else {
     console.log(check(scope, blockLabel, `${OPT_BG_VALUE_BOXES.join(" + ")}: field-bg vs ${SIDEBAR_SEARCH_HOST}`, fillVsHost, FILL_SEPARATE_MIN));
   }
+}
+
+// ============================================================
+// tagChipInkRows -- F9, popup only (stage 4 spec docs/superpowers/specs/
+// 2026-09-30-ui-fields-stage4-design.md §2.3): a check COMPONENT_PAIR_SPEC's
+// static pair rows cannot express. A .tag-item chip inside the tags shell is
+// painted on three backdrops: tag-bg over the resting shell (field-bg),
+// tag-bg over the hovered shell (field-bg-hover), and tag-hover over the
+// hovered shell. A `transparent` tag-bg (8/14 blocks) shows the shell
+// through -- exactly what COMPONENT_PAIR_SPEC's `tag-fg vs tag-bg` row
+// cannot see, because its resolveRole() composites tag-bg over ROLE_ALIAS's
+// panel (bg2). Chip text (tag-chip-fg) needs 4.5:1 on all three, the
+// remove-x ink (tag-chip-icon) 3:1. A pure function over one block's token
+// dict (keys "pp-<role>", tokenDict()'s shape), exported so
+// tests/theme-ui-derive-tests.mjs can hand it negative controls; a missing
+// or non-hex input comes back as one { label, missing } row, never a skip.
+// TAG_CHIP_INK_SPEC is also what auditOrphanTokens reads, so a chip ink role
+// counts as covered only while a row here really measures it.
+export const TAG_CHIP_INK_SPEC = Object.freeze([
+  Object.freeze(["tag-chip-fg", 4.5]),
+  Object.freeze(["tag-chip-icon", 3]),
+]);
+export function tagChipInkRows(dict) {
+  const hexRoles = ["field-bg", "field-bg-hover", ...TAG_CHIP_INK_SPEC.map(([role]) => role)];
+  const missing = [
+    ...hexRoles.filter((role) => !isHex(dict[`pp-${role}`] ?? "")),
+    ...["tag-bg", "tag-hover"].filter((role) => !dict[`pp-${role}`]),
+  ];
+  if (missing.length) return [{ label: "tag chip ink (F9)", missing }];
+  const shellRest = hexRgb(dict["pp-field-bg"].trim()), shellHover = hexRgb(dict["pp-field-bg-hover"].trim());
+  const backdrops = [
+    ["tag-bg/field-bg", resolveOpaqueBg(dict["pp-tag-bg"], shellRest)],
+    ["tag-bg/field-bg-hover", resolveOpaqueBg(dict["pp-tag-bg"], shellHover)],
+    ["tag-hover/field-bg-hover", resolveOpaqueBg(dict["pp-tag-hover"], shellHover)],
+  ];
+  return TAG_CHIP_INK_SPEC.flatMap(([role, min]) => backdrops.map(([name, rgb]) => ({
+    label: `${role} vs ${name} (F9)`, ratio: cr(hexRgb(dict[`pp-${role}`].trim()), rgb), min,
+  })));
 }
 
 // Generic `--name: value;` extractor over an arbitrary block body -- the
@@ -869,6 +951,25 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
   // Task 4) -- see auditSidebarSearchSeparation. Not part of the per-host
   // section above.
   auditSidebarSearchSeparation(scope, ns, blockLabel, dict);
+
+  // Popup tag chip inks on the tags shell (F9, stage 4 Task 5) -- see
+  // tagChipInkRows. Always strict, on the default (:root) block too: both
+  // inks are UI_DERIVED_OUTPUT_ROLES.popup members and every popup block
+  // declares the shell fills and tag-bg / tag-hover, so a missing one is a
+  // regression, never a legitimate gap.
+  if (ns === "pp") {
+    for (const row of tagChipInkRows(dict)) {
+      if (row.missing) {
+        const l = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + row.label.padEnd(28) + " FAIL (not declared or not hex: " + row.missing.map((r) => `--${ns}-${r}`).join(", ") + ")";
+        console.log(l);
+        violations.push(l);
+        continue;
+      }
+      noteCovered(fieldFamilyCoverage.chipInk, ns, blockLabel);
+      fieldFamilyCoverage.chipInkRoles.add(row.label.split(" vs ")[0]);
+      console.log(check(scope, blockLabel, row.label, row.ratio, row.min));
+    }
+  }
 }
 
 // Orphan guard: every *-fg / on-* shaped custom property this surface's
@@ -895,8 +996,12 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
 // "credit for the ad-hoc checks automatically" convenience in exchange for
 // an allowlist that can never be fooled by a comment.
 // Keyed `${ns}:${role}` (stage 4 spec §5.1): a row covers a role only on the
-// surfaces it runs on (its onlyNs, or all three), so e.g. a popup
-// --pp-field-fg cannot pass as covered by an options-only field-fg row.
+// surfaces it runs on (its onlyNs, or all three), so e.g. an options or
+// library --*-ai-chip-fg could not pass as covered by the popup-only
+// ai-chip-fg rows. (--pp-field-fg / --lib-field-fg are covered because the
+// F4-F7 rows run on FIELD_FAMILY_NS, all three surfaces since stage 4 Task
+// 5; --pp-tag-chip-fg is covered by tagChipInkRows' TAG_CHIP_INK_SPEC, the
+// one non-pair-row exception auditOrphanTokens reads.)
 // Exported for tests/theme-ui-derive-tests.mjs's check of that keying.
 export const COMPONENT_PAIR_ROLES = new Set(COMPONENT_PAIR_SPEC.flatMap(([fg, bg, , onlyNs]) =>
   (onlyNs || ["pp", "opt", "lib"]).flatMap((ns) => [`${ns}:${fg}`, `${ns}:${bg}`])));
@@ -941,6 +1046,29 @@ const ORPHAN_ALLOWLIST = new Set([
   // COMPONENT_PAIR_SPEC role.
   "lib:row-selected-fg",
 ]);
+// Stage-4 field sections must have measured every block (see
+// fieldFamilyCoverage): 14 themed blocks (POPUP_THEME_MAP) + the default one,
+// per prefix in FIELD_SEPARATION_HOSTS, and the same for popup's chip inks.
+function auditFieldFamilyCoverage() {
+  const want = POPUP_THEME_MAP.length + 1;
+  const rows = [
+    ...Object.keys(FIELD_SEPARATION_HOSTS).map((ns) => [`field separation ${ns}`, fieldFamilyCoverage.separation.get(ns)]),
+    ["tag chip ink pp", fieldFamilyCoverage.chipInk.get("pp")],
+  ];
+  for (const [label, seen] of rows) {
+    const got = seen?.size ?? 0;
+    const l = "  " + "coverage".padEnd(10) + " " + label.padEnd(20) + " " + `${got}/${want} blocks measured`.padEnd(28) + " " + (got === want ? "OK" : "FAIL");
+    console.log(l);
+    if (got !== want) violations.push(l);
+  }
+  const unmeasured = TAG_CHIP_INK_SPEC.map(([role]) => role).filter((role) => !fieldFamilyCoverage.chipInkRoles.has(role));
+  if (unmeasured.length) {
+    const l = "  " + "coverage".padEnd(10) + " " + "tag chip ink pp".padEnd(20) + " FAIL (never measured: " + unmeasured.join(", ") + ")";
+    console.log(l);
+    violations.push(l);
+  }
+}
+
 function generatedRegion(text) {
   const start = text.indexOf("@generated:ui-themes start");
   const end = text.indexOf("@generated:ui-themes end");
@@ -954,6 +1082,10 @@ function auditOrphanTokens(scope, ns, cssText) {
   while ((m = re.exec(region)) !== null) names.add(m[1]);
   for (const name of names) {
     if (COMPONENT_PAIR_ROLES.has(`${ns}:${name}`)) continue;
+    // A chip ink is covered by tagChipInkRows, not by a pair row -- but only
+    // once a row there really measured it this run, not merely because
+    // TAG_CHIP_INK_SPEC names it.
+    if (ns === "pp" && TAG_CHIP_INK_SPEC.some(([role]) => role === name) && fieldFamilyCoverage.chipInkRoles.has(name)) continue;
     if (ORPHAN_ALLOWLIST.has(`${ns}:${name}`)) continue;
     const line = "  " + scope.padEnd(10) + " " + "orphan".padEnd(20) + " " + (`--${ns}-${name}`).padEnd(28) + " FAIL (not a COMPONENT_PAIR_SPEC role, not in ORPHAN_ALLOWLIST)";
     console.log(line);
@@ -1979,6 +2111,9 @@ auditComponentPairsDefault("popup", "pp", resolve(ROOT, "popup.css"), ":root", "
     console.log(check("popup", "default-light", "preset-fg vs preset-btn-hover-bg", cr(fg, hexRgb(hoverS)), 4.5));
   }
 }
+
+console.log("\n=== field-family coverage: blocks the stage-4 field sections measured ===");
+auditFieldFamilyCoverage();
 
 console.log("\n=== orphan check: *-fg / on-* tokens with zero coverage in this file ===");
 auditOrphanTokens("popup", "pp", readFileSync(resolve(ROOT, "popup.css"), "utf8"));

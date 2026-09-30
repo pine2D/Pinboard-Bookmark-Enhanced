@@ -17,7 +17,7 @@ paths:
 
 ## 两个生成区
 
-- `@generated:ui-themes` — 逐主题颜色/状态角色，`popup-chrome.mjs` / `options-chrome.mjs` / `library-chrome.mjs` 经 `_ui-derive.mjs` 派生；pilot 可用 `ui.popup/options/library.light/dark` 调整受支持的输入角色。公共 finalizer 会在覆盖之后统一推导 `btn-fg` / `danger-quiet-fg` / `on-danger` / `chip-bg` / `chip-fg`；popup 另行推导 `preset-fg` / `spinner-fg`；传 `fieldRoles: true` 的表面（现为 options）另得 8 个 `field-*` 值盒子角色，宿主取 `FIELD_HOST_ROLES[<前缀>]`，框与填充不分离的 framed 块悬停框 = `mix(frame, fg, FRAMED_HOVER_FG_MIX)`；再传 `fieldChevron: true` 另得 `field-chevron`，即按主题生成的箭头 data URI，值里不许有 `;`。这些是**输出角色，不是覆盖输入**，`validate-contracts.mjs` 会按 JSON pointer 硬阻断，禁止再出现“写了但被静默吃掉”。`on-accent` 是合法 popup 输入并逐主题显式发射，勿依赖 var() fallback——自定义属性继承使 fallback 成死代码。
+- `@generated:ui-themes` — 逐主题颜色/状态角色，`popup-chrome.mjs` / `options-chrome.mjs` / `library-chrome.mjs` 经 `_ui-derive.mjs` 派生；pilot 可用 `ui.popup/options/library.light/dark` 调整受支持的输入角色。公共 finalizer 会在覆盖之后统一推导 `btn-fg` / `btn-fg-muted` / `danger-quiet-fg` / `on-danger` / `chip-bg` / `chip-fg`，并在末尾由 `deriveFieldRoles` 为三个表面推导 8 个 `field-*` 值盒子角色（宿主取 `FIELD_HOST_ROLES`：opt `[panel, pf-bg]`、pp `[bg]`、lib `[panel, bg]`；框与填充不分离的 framed 块悬停框 = `mix(frame, fg, FRAMED_HOVER_FG_MIX)`；options / library 另有 `field-chevron`，即按主题生成的箭头 data URI，值里不许有 `;`）；popup 另行推导 `preset-fg` / `spinner-fg` / `ai-chip-fg` / `tag-chip-fg` / `tag-chip-icon`。这些是**输出角色，不是覆盖输入**，`validate-contracts.mjs` 会按 JSON pointer 硬阻断，禁止再出现“写了但被静默吃掉”。`on-accent` 是合法 popup 输入并逐主题显式发射，勿依赖 var() fallback——自定义属性继承使 fallback 成死代码。
 - `@generated:ui-components` — 组件**结构**配方（按钮/chip/危险分级/表单几何 + 状态反馈，不分主题、三表面各一份），单源 `composers/ui-components.mjs`，独立哨兵（`start (popup|options|library)` / `end (...)`），**绝不**与 ui-themes 共用 `@generated:ui-themes end` 标记（这是 css-region-audit 解析区块的锚点）。
 
 ## 唯一编辑顺序
