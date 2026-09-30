@@ -743,7 +743,7 @@ options（值盒子，§6.1；8 个 `--opt-field-*` 颜色角色由 `_ui-derive.
 
 options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2、次级墨色 3、键入文字 3〔对两态填充 ≥4.5、对占位符 ≥1.4〕）；宿主分离段（`auditFieldSeparation`，宿主按前缀显式列在 `FIELD_SEPARATION_HOSTS`，不经 `ROLE_ALIAS`）按块的类别给 6 / 5 / 3 行——无框块是「悬停框 == 悬停填充」1 + F1 2 + F2 1 + F3 2，已分离的 framed 块是 F1–F3 共 5 行，未分离的 framed 块是「悬停填充 == 静息填充」1 + F8b 2；侧栏搜索段（`auditSidebarSearchSeparation`，宿主 `--opt-bg`，覆盖侧栏搜索框与窄屏页签选择器）每块 1 行。15 块共 217 行（11 × 15 + 2 × 14 + 2 × 12）。
 
-**popup / library 的字段派生角色（阶段 4 Task 5 起）**。两个表面也由 `deriveFieldRoles` 派生同一组 8 个 `--{ns}-field-*` 角色。它们只在生成区定义：14 个主题块加默认 `:root`，默认块的字面量写在各自 composer 的 `DEFAULT_LIGHT` 里，由 `tests/theme-ui-derive-tests.mjs` 按折叠后的 `:root` 复算钉住。Task 6（popup）/ Task 7（library）之前它们还没有消费者，上面 popup / library 表里的消费规则仍是已发布的样子。
+**popup / library 的字段派生角色（阶段 4 Task 5 起）**。两个表面也由 `deriveFieldRoles` 派生同一组 8 个 `--{ns}-field-*` 角色。它们只在生成区定义：14 个主题块加默认 `:root`，默认块的字面量写在各自 composer 的 `DEFAULT_LIGHT` 里，由 `tests/theme-ui-derive-tests.mjs` 按折叠后的 `:root` 复算钉住。popup 的角色自阶段 4 Task 6 起由 `FIELD_TARGETS.pp` 的生成规则消费（六个值盒子，上面 popup 列即现状）；library 的角色在 Task 7 之前还没有消费者，上面 library 列仍是已发布的手写规则。
 
 | 项 | popup（`--pp-*`） | library（`--lib-*`） |
 |---|---|---|
@@ -755,7 +755,7 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
 | 另加角色 | `tag-chip-fg` = `fgToAAMulti(tag-fg, 底色, 4.5)`，`tag-chip-icon` = `fgToAAMulti(fg-muted, 底色, 3)`。底色有三种：tag-bg 合成在 field-bg 上、tag-bg 合成在 field-bg-hover 上、tag-hover 合成在 field-bg-hover 上（透明 chip 露出壳的填充）。文字变值的有 6 个主题：nord-night、solarized-light / -dark 是透明 chip 在壳的填充上不达标；flexoki-dark、catppuccin-latte / -mocha 是不透明 chip 在自身悬停底上不达标的既有问题。图标只有 catppuccin-mocha 变值（2.999 → 3.20） | `field-chevron` = `fieldChevronUri(field-placeholder)`：原生下拉箭头的 data URI，描边取占位符色，值里没有 `;` |
 | 门 | contrast-audit：F4–F7 配对行 8 行 × 15 块；宿主分离段 `auditFieldSeparation`（宿主 `FIELD_SEPARATION_HOSTS.pp = [bg]`）无框块 4 行（悬停框 == 悬停填充、F1、F2、F3），terminal 2 行（悬停填充 == 静息填充、F8b）；F9（`tagChipInkRows`）6 行 × 15 块。共 268 行（120 + 58 + 90），见 §9.4 | contrast-audit：F4–F7 配对行 8 行 × 15 块；宿主分离段（`FIELD_SEPARATION_HOSTS.lib = [panel, bg]`）无框块 6 行（悬停框 == 悬停填充、F1 ×2、F2、F3 ×2），terminal 3 行（悬停填充 == 静息填充、F8b ×2）。共 207 行（120 + 87），见 §9.4 |
 
-`--pp-input-bd` 仍在 `emitPp` 白名单里，Task 6 删掉它最后的 CSS 消费者时一并移除。带框信号读的是 pilot 覆盖 `ui.popup.<mode>.input-bd`，不读这个 token。
+`--pp-input-bd` 自阶段 4 Task 6 起不再发射：`emitPp` 白名单与 `DEFAULT_LIGHT` 都已去掉它，popup.css 里也没有消费者（ui-contract 钉住不许回流）。带框信号读的是 pilot 覆盖 `ui.popup.<mode>.input-bd`，从来不读这个 token。
 
 **字段与按钮同病**：`options.css:207` 与 `library.css:136` 的字段基类都声明了 `background-color` 却
 **没有 `color`**——options 靠 `html[data-theme] .fg input…`（:1187-1191）补；library 当时的 `.fg` 是死代码所以

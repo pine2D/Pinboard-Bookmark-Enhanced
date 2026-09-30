@@ -2244,12 +2244,15 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
 // gone: the base rules moved into the generated region and the twins were
 // deleted in the same commit).
 //
-// popup.html as a tree: tag, attributes, class list, parent. popup.html has
-// no inline <script> / <style> body (CSP), so a tag scan is exact here. The
-// root carries `classes`: every class the static markup names anywhere,
-// which structuralReach below uses to tell a runtime state class (.ac-open,
-// toggled by popup-tags.js, never in the markup) from a static one the node
-// simply lacks.
+// popup.html as a tree: tag, content attributes (exactly as written -- no
+// defaults: an <input> without `type` has no type attribute, and
+// `[type="text"]` does not match it, just as in the browser), class list,
+// parent. popup.html has no inline <script> / <style> body (CSP), so a tag
+// scan is exact here. The synthetic root (every top-level node's `parent`)
+// carries `staticClasses`: every class the static markup names anywhere,
+// which callers pass to selectorReaches so nodeMatchesCompound can tell a
+// runtime state class (.ac-open, toggled by popup-tags.js, never in the
+// markup) from a static one the node simply lacks.
 function htmlNodes(html) {
   const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
   const root = { tag: "#root", attrs: {}, classes: [], parent: null, staticClasses: new Set() };
@@ -2270,15 +2273,52 @@ function htmlNodes(html) {
   }
   return nodes;
 }
-// One compound's structural conditions (tag, #id, .class, [attr], [attr=v]);
-// pseudo-classes and their arguments (:hover, :where(), :not(), ...) are
-// dropped -- the question is which ELEMENT a rule can reach, not in which
-// state. A pseudo-element is reported so callers can tell a ::placeholder
-// rule from a rule on the box itself.
+// One attribute selector's text between the brackets -> { name, op, value,
+// flag }. Selectors Level 4 attribute matching in full: presence, `=`, `~=`,
+// `|=`, `^=`, `$=`, `*=`, and the ` i` / ` s` case flags. Anything else (a
+// namespace prefix, an unknown operator) THROWS: a matcher that silently
+// dropped a condition it could not read would widen the selector and call
+// covered what the browser does not paint.
+function parseAttributeSelector(inner) {
+  const m = /^\s*([A-Za-z_][\w-]*)\s*(?:([~|^$*]?=)\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\s"'\]]+))\s*(?:([iIsS])\s*)?)?$/.exec(inner);
+  if (!m) throw new TypeError(`ui-contract-tests.mjs: unsupported attribute selector [${inner}] (the structural matcher refuses to drop a condition it cannot read)`);
+  const raw = m[3] ?? m[4] ?? m[5];
+  return {
+    name: m[1].toLowerCase(),
+    op: m[2] ?? null,
+    value: raw === undefined ? null : raw.replace(/\\(.)/g, "$1"),
+    flag: m[6] ? m[6].toLowerCase() : null,
+  };
+}
+// HTML attributes whose VALUES match ASCII case-insensitively under a plain
+// attribute selector in an HTML document (HTML Living Standard, "case-
+// sensitivity of selectors"); an explicit ` s` / ` i` flag overrides.
+const HTML_CASE_INSENSITIVE_ATTRS = new Set(["accept", "accept-charset", "align", "alink", "axis", "bgcolor", "charset", "checked", "clear", "codetype", "color", "compact", "declare", "defer", "dir", "direction", "disabled", "enctype", "face", "frame", "hreflang", "http-equiv", "lang", "language", "link", "media", "method", "multiple", "nohref", "noresize", "noshade", "nowrap", "readonly", "rel", "rev", "rules", "scope", "scrolling", "selected", "shape", "target", "text", "type", "valign", "valuetype", "vlink"]);
+function attributeMatches(have, a) {
+  if (have === undefined) return false;
+  if (a.op === null) return true;
+  const ci = a.flag ? a.flag === "i" : HTML_CASE_INSENSITIVE_ATTRS.has(a.name);
+  const h = ci ? have.toLowerCase() : have, v = ci ? a.value.toLowerCase() : a.value;
+  switch (a.op) {
+    case "=": return h === v;
+    case "~=": return v !== "" && !/\s/.test(v) && h.split(/\s+/).includes(v);
+    case "|=": return h === v || h.startsWith(`${v}-`);
+    case "^=": return v !== "" && h.startsWith(v);
+    case "$=": return v !== "" && h.endsWith(v);
+    case "*=": return v !== "" && h.includes(v);
+    default: throw new TypeError(`ui-contract-tests.mjs: unsupported attribute operator ${a.op}`);
+  }
+}
+// One compound's structural conditions (tag, #id, .class, attribute
+// selectors); pseudo-classes and their arguments (:hover, :where(), :not(),
+// ...) are dropped -- the question is which ELEMENT a rule can reach, not in
+// which state. A pseudo-element is reported so callers can tell a
+// ::placeholder rule from a rule on the box itself.
 function structuralCompound(text) {
   let own = "", pseudoElement = null;
+  const attrs = [];
   for (let i = 0; i < text.length; i += 1) {
-    if (text[i] === "[") { const j = closeOfBracket(text, i); own += text.slice(i, j + 1); i = j; continue; }
+    if (text[i] === "[") { const j = closeOfBracket(text, i); attrs.push(parseAttributeSelector(text.slice(i + 1, j))); i = j; continue; }
     if (text[i] === ":") {
       let j = i + 1;
       const element = text[j] === ":";
@@ -2292,12 +2332,11 @@ function structuralCompound(text) {
     }
     own += text[i];
   }
-  const bare = own.replace(/\[[^\]]*\]/g, "");
   return {
     tag: ((/^([a-zA-Z][\w-]*)/.exec(own) || [])[1] || "").toLowerCase() || null,
-    ids: [...bare.matchAll(/#([\w-]+)/g)].map((m) => m[1]),
-    classes: [...bare.matchAll(/\.([\w-]+)/g)].map((m) => m[1]),
-    attrs: [...own.matchAll(/\[\s*([\w-]+)\s*(?:=\s*["']?([^"'\]]*)["']?)?\s*\]/g)].map((m) => [m[1].toLowerCase(), m[2]]),
+    ids: [...own.matchAll(/#([\w-]+)/g)].map((m) => m[1]),
+    classes: [...own.matchAll(/\.([\w-]+)/g)].map((m) => m[1]),
+    attrs,
     pseudoElement,
   };
 }
@@ -2318,12 +2357,14 @@ function structuralParts(sel) {
     buf += ch;
   }
   flush();
-  const themed = parts.length > 0 && parts[0].c.tag === "html" && parts[0].c.attrs.some(([name]) => name === "data-theme");
+  const themed = parts.length > 0 && parts[0].c.tag === "html" && parts[0].c.attrs.some((a) => a.name === "data-theme");
   const rest = themed ? parts.slice(1) : parts;
   if (rest.length) rest[0] = { ...rest[0], comb: null };
   return { parts: rest, themed };
 }
-// Tag, ids and attributes are exact. A class the node lacks fails the match
+// Tag and ids are exact, attribute selectors follow Selectors 4 against the
+// node's CONTENT attributes only (attributeMatches; no implied defaults, so
+// `input[type="text"]` never reaches an untyped <input>). A class the node lacks fails the match
 // when the static markup names it somewhere (`staticClasses`); one it never
 // names is a RUNTIME state class (.ac-open, .dragging) that script may put on
 // this very node, so it is allowed -- except on the SUBJECT, which must still
@@ -2339,10 +2380,7 @@ function nodeMatchesCompound(node, c, staticClasses = null, subject = false) {
     else if (!staticClasses || staticClasses.has(cls)) return false;
   }
   if (subject && staticClasses && c.classes.length && !anchored) return false;
-  return c.attrs.every(([name, value]) => {
-    const have = name === "type" && node.tag === "input" && node.attrs.type === undefined ? "text" : node.attrs[name];
-    return value === undefined ? have !== undefined : have !== undefined && have.toLowerCase() === value.toLowerCase();
-  });
+  return c.attrs.every((a) => attributeMatches(node.attrs[a.name], a));
 }
 function selectorReaches(sel, node, staticClasses = null) {
   const { parts } = structuralParts(sel);
@@ -2375,6 +2413,125 @@ function structuralText(sel) {
   return out.replace(/\s*>\s*/g, " > ").replace(/\s+/g, " ").trim();
 }
 const selectorListOf = (text) => (text ? splitSelectorList(text) : []);
+// Coverage of an html tree by one surface's FIELD_TARGETS entries: every
+// text-entry control (a textarea, or an <input> whose type -- absent means
+// text -- is a text-entry type) must be reached by exactly one entry, either
+// as that entry's box (rest) or as the passenger of a shell some ancestor of
+// it is the box of. Matching is strict (selectorReaches without runtime
+// classes): the registry's own selectors name static structure. Library
+// (Task 7) runs the same function over library.html.
+function valueBoxCoverage(nodes, targets) {
+  const entries = nodes.filter((n) => n.tag === "textarea" || (n.tag === "input" && TEXT_ENTRY_TYPES.has((n.attrs.type || "text").toLowerCase())));
+  const restHits = (node) => targets.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, node)));
+  const passengerHits = (node) => targets.filter((t) => selectorListOf(t.passenger).some((sel) => selectorReaches(sel, node)));
+  const boxes = new Set(), passengers = new Set(), uncovered = [];
+  for (const node of entries) {
+    const asBox = restHits(node), asPassenger = passengerHits(node);
+    const label = `#${node.attrs.id || "?"}`;
+    if (asBox.length === 1 && asPassenger.length === 0) boxes.add(node);
+    else if (asBox.length === 0 && asPassenger.length === 1) {
+      let host = null;
+      for (let p = node.parent; p?.parent && !host; p = p.parent) if (restHits(p).includes(asPassenger[0])) host = p;
+      if (host) { passengers.add(node); boxes.add(host); }
+      else uncovered.push(`${label}: passenger of ${asPassenger[0].id}, but no ancestor is that entry's box`);
+    } else uncovered.push(`${label}: rest of [${asBox.map((t) => t.id).join(", ")}], passenger of [${asPassenger.map((t) => t.id).join(", ")}]`);
+  }
+  const dead = targets.filter((t) => !nodes.some((n) => restHits(n).includes(t)));
+  return { entries: entries.length, boxes, passengers, uncovered, dead };
+}
+// The state grammar of one FIELD_TARGETS box (R1 / T6-g, every surface): the
+// focus selector carries exactly ONE focus trigger -- `:focus`,
+// `:focus-visible`, `:focus-within` or a `:has(...)` whose argument holds
+// one of those (library's group unit: `:has(> input[type="text"]:focus)`) --
+// on some compound (the box itself, or the shell that carries the box's
+// state: popup's .secret-field); the hover selector carries `:hover` on
+// that same compound and a `:not(...)` whose argument list contains that
+// exact trigger (text-equal after whitespace normalisation -- `:focus` does
+// not excuse `:focus-visible`), and excludes the disabled state with
+// `:disabled` in a `:not(...)` on that compound or on the subject, or with
+// `:has(... :disabled)` there (the group unit's `:has(> input:disabled)`).
+// `:not()` / `:hover` count at the compound's top level or inside a
+// `:where()` / `:is()` of it (the exclusions live in :where() by R1).
+// Bracket-aware throughout (closeOfBracket); no text `includes`.
+function compoundTexts(sel) {
+  const out = [];
+  let cur = "";
+  for (let i = 0; i < sel.length; i += 1) {
+    const ch = sel[i];
+    if (ch === "(" || ch === "[") { const j = closeOfBracket(sel, i); cur += sel.slice(i, j + 1); i = j; continue; }
+    if (ch === " " || ch === ">" || ch === "+" || ch === "~") { if (cur) out.push(cur); cur = ""; continue; }
+    cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+// Pseudo-class tokens of one compound: [{ name, arg (text inside the
+// parentheses, or null), text }], top level only.
+function pseudoClassTokens(compound) {
+  const out = [];
+  for (let i = 0; i < compound.length; i += 1) {
+    if (compound[i] === "[") { i = closeOfBracket(compound, i); continue; }
+    if (compound[i] !== ":") continue;
+    if (compound[i + 1] === ":") { i += 1; continue; } // pseudo-element: not a state
+    let j = i + 1;
+    while (j < compound.length && /[\w-]/.test(compound[j])) j += 1;
+    const name = compound.slice(i + 1, j).toLowerCase();
+    let arg = null;
+    if (compound[j] === "(") { const close = closeOfBracket(compound, j); arg = compound.slice(j + 1, close); j = close + 1; }
+    out.push({ name, arg, text: compound.slice(i, j) });
+    i = j - 1;
+  }
+  return out;
+}
+// The compound's state tokens with :where() / :is() arguments flattened in
+// (each argument read as a compound of its own).
+function stateTokens(compound) {
+  return pseudoClassTokens(compound).flatMap((t) => ((t.name === "where" || t.name === "is") && t.arg !== null
+    ? splitSelectorList(t.arg).flatMap((a) => (compoundTexts(a).length === 1 ? stateTokens(a) : []))
+    : [t]));
+}
+const normSel = (text) => text.replace(/\s*([>+~])\s*/g, " $1 ").replace(/\s+/g, " ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")").trim();
+const FOCUS_TRIGGER_RE = /:focus(?:-visible|-within)?(?![\w-])/;
+function focusTriggerOf(focusSel) {
+  const found = [];
+  compoundTexts(focusSel).forEach((compound, index) => {
+    for (const t of stateTokens(compound)) {
+      if (["focus", "focus-visible", "focus-within"].includes(t.name) && t.arg === null) found.push({ index, text: t.text });
+      else if (t.name === "has" && t.arg !== null && FOCUS_TRIGGER_RE.test(t.arg)) found.push({ index, text: normSel(t.text) });
+    }
+  });
+  return found.length === 1 ? found[0] : { index: -1, text: null, found: found.map((f) => f.text) };
+}
+// Problems with one (rest, hover, focus) box, [] when it is sound.
+function fieldLadderProblems(rest, hover, focus) {
+  const problems = [];
+  if (!rest || !hover || !focus) return ["rest / hover / focus are not parallel"];
+  const [sr, sh, sf] = [rest, hover, focus].map(selectorSpecificity);
+  if (!(cmpSpecificity(sr, sh) < 0 && cmpSpecificity(sh, sf) < 0)) problems.push(`specificity must climb rest < hover < focus -- got ${sr.join(",")} / ${sh.join(",")} / ${sf.join(",")}`);
+  if (!(structuralText(hover) === structuralText(rest) && structuralText(focus) === structuralText(rest))) {
+    problems.push(`hover / focus must name the same box as rest (\`${structuralText(hover)}\` / \`${structuralText(focus)}\` vs \`${structuralText(rest)}\`)`);
+    return problems;
+  }
+  const trigger = focusTriggerOf(focus);
+  if (trigger.index < 0) {
+    problems.push(`the focus selector must carry exactly one focus trigger (:focus / :focus-visible / :focus-within / :has(...:focus...)) -- found ${JSON.stringify(trigger.found)}`);
+    return problems;
+  }
+  const H = compoundTexts(hover);
+  const on = stateTokens(H[trigger.index] ?? "");
+  const subject = stateTokens(H[H.length - 1] ?? "");
+  const notArgs = (tokens) => tokens.filter((t) => t.name === "not" && t.arg !== null).flatMap((t) => splitSelectorList(t.arg).map(normSel));
+  if (!on.some((t) => t.name === "hover" && t.arg === null)) problems.push(`the hover selector must carry :hover on the compound that holds the focus trigger (\`${H[trigger.index] ?? ""}\`)`);
+  if (!notArgs(on).includes(trigger.text)) problems.push(`the hover selector must exclude the exact focus trigger \`${trigger.text}\` with :not(...) on that compound -- got :not() arguments ${JSON.stringify(notArgs(on))}`);
+  const disabledArg = (a) => a === ":disabled" || (() => {
+    const [t] = pseudoClassTokens(a);
+    if (!t || t.name !== "has" || t.arg === null || t.text !== a) return false;
+    const inner = compoundTexts(t.arg);
+    return stateTokens(inner[inner.length - 1] ?? "").some((x) => x.name === "disabled" && x.arg === null);
+  })();
+  if (![...notArgs(on), ...notArgs(subject)].some(disabledArg)) problems.push("the hover selector must exclude the disabled state (:not(:disabled), or :not(:has(> input:disabled)) on a shell) on that compound or the subject");
+  return problems;
+}
 // The hand ring of a registry entry (rule 4 below) and its forced-colours
 // outline (rule 10) sit on the entry's own focus selectors: :focus becomes
 // :focus-visible for the :focus-triggered boxes (a text field matches both on
@@ -2399,16 +2556,9 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
       `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id}: rest / hover / focus must be parallel non-empty lists (got ${R.length} / ${H.length} / ${F.length})`);
     R.forEach((rest, i) => {
       const hover = H[i] ?? "", focus = F[i] ?? "";
-      const [sr, sh, sf] = [rest, hover, focus].map((sel) => (sel ? selectorSpecificity(sel) : [0, 0, 0]));
-      check(cmpSpecificity(sr, sh) < 0 && cmpSpecificity(sh, sf) < 0,
-        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} box ${i}: specificity must climb rest < hover < focus -- got ${sr.join(",")} / ${sh.join(",")} / ${sf.join(",")} for \`${rest}\` / \`${hover}\` / \`${focus}\``);
-      check(structuralText(hover) === structuralText(rest) && structuralText(focus) === structuralText(rest),
-        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} box ${i}: hover / focus must name the same box as rest (\`${structuralText(hover)}\` / \`${structuralText(focus)}\` vs \`${structuralText(rest)}\`)`);
-      const trigger = /:focus-within\b/.test(focus) ? ":focus-within" : ":focus";
-      check(/:hover\b/.test(hover) && hover.includes(`:not(${trigger}`) && /:not\([^()]*:disabled/.test(hover),
-        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} box ${i}: the hover selector must exclude the focus trigger (${trigger}) and :disabled (spec §2.1) -- \`${hover}\``);
-      check(focus.includes(trigger) && !/:focus-visible\b/.test(focus),
-        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} box ${i}: the focus selector must fire on ${trigger} (spec §2.1 keeps each control's trigger), not :focus-visible -- \`${focus}\``);
+      const problems = fieldLadderProblems(rest, hover, focus);
+      check(problems.length === 0,
+        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} box ${i} (\`${rest}\` / \`${hover}\` / \`${focus}\`): ${problems.join("; ")} (spec §2.1, ruling R1)`);
     });
     for (const sel of selectorListOf(t.placeholder)) {
       check(structuralCompound(subjectOf(sel)).pseudoElement === "placeholder",
@@ -2416,15 +2566,37 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     }
   }
 }
-// The ladder check must discriminate (a rule-of-thumb equal-specificity
-// hover -- `rest:where(:hover)` -- or a focus that only ties hover would
-// slip through a `<=`).
+// The ladder grammar must discriminate -- on popup's shapes AND on the two
+// library shapes Task 7 will register (spec §2.1: .xp-dict-lang keeps
+// :focus-visible; the group unit's trigger is `:has(> input[type="text"]
+// :focus)` and a disabled input takes no hover), so Task 7 adds entries
+// without touching this gate. [rest, hover, focus, must pass]
 {
-  const climbs = (rest, hover, focus) => { const [a, b, c] = [rest, hover, focus].map(selectorSpecificity); return cmpSpecificity(a, b) < 0 && cmpSpecificity(b, c) < 0; };
-  check(climbs(".tags-input-wrap", ".tags-input-wrap:hover:where(:not(:focus-within, :disabled))", ".tags-input-wrap:focus-within:not(:disabled)") &&
-    !climbs(".x", ".x:where(:hover:not(:focus))", ".x:focus") && !climbs(".x", ".x:hover:not(:focus)", ".x:focus") &&
-    !climbs('.field > input[type="text"]', '.field > input[type="text"]:hover:where(:not(:focus, :disabled))', '.field > input[type="text"]:focus'),
-    "ui-contract-tests.mjs: the FIELD_TARGETS specificity-ladder predicate no longer discriminates");
+  const LADDER_CASES = [
+    // popup shapes
+    [".tags-input-wrap", ".tags-input-wrap:hover:where(:not(:focus-within, :disabled))", ".tags-input-wrap:focus-within:not(:disabled)", true],
+    ['.login-body .secret-field > input[type="password"]', '.login-body .secret-field:hover:where(:not(:focus-within)) > input[type="password"]:where(:not(:disabled))', '.login-body .secret-field:focus-within > input[type="password"]:not(:disabled)', true],
+    // an .xp-dict-lang-like entry
+    [".xp-dict-lang", ".xp-dict-lang:hover:where(:not(:focus-visible, :disabled))", ".xp-dict-lang:focus-visible:not(:disabled)", true],
+    [".xp-dict-lang", ".xp-dict-lang:hover:where(:not(:focus, :disabled))", ".xp-dict-lang:focus-visible:not(:disabled)", false],
+    [".xp-dict-lang", ".xp-dict-lang:hover:where(:not(:focus-visible))", ".xp-dict-lang:focus-visible:not(:disabled)", false],
+    [".xp-dict-lang", ".xp-dict-lang:where(:hover:not(:focus-visible):not(:disabled))", ".xp-dict-lang:focus-visible", false],
+    // the old `includes` prefix trap: :focus-visible does not excuse :focus
+    ['.field > input[type="text"]', '.field > input[type="text"]:hover:where(:not(:focus-visible, :disabled))', '.field > input[type="text"]:focus:not(:disabled)', false],
+    // a group-unit-like entry
+    [".vocab-group-unit", '.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus), :has(> input:disabled)))', '.vocab-group-unit:has(> input[type="text"]:focus):not(:disabled)', true],
+    [".vocab-group-unit", '.vocab-group-unit:hover:where(:not(:has(> input:focus), :has(> input:disabled)))', '.vocab-group-unit:has(> input[type="text"]:focus):not(:disabled)', false],
+    [".vocab-group-unit", '.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus)))', '.vocab-group-unit:has(> input[type="text"]:focus):not(:disabled)', false],
+    [".vocab-group-unit", '.vocab-group-unit:where(:hover:not(:has(> input[type="text"]:focus)):not(:has(> input:disabled)))', '.vocab-group-unit:has(> input[type="text"]:focus)', false],
+    [".vocab-group-unit", '.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus), :has(> input:disabled)))', ".vocab-group-unit:not(:disabled):not(.x)", false],
+    // generic: equal specificity, a tie at focus, :hover on the wrong compound
+    [".x", ".x:where(:hover:not(:focus, :disabled))", ".x:focus", false],
+    [".x", ".x:hover:not(:focus, :disabled)", ".x:focus", false],
+    [".s > input", ".s:where(:not(:focus-within)) > input:hover:where(:not(:disabled))", ".s:focus-within > input:not(:disabled)", false],
+  ];
+  const misjudged = LADDER_CASES.filter(([rest, hover, focus, want]) => (fieldLadderProblems(rest, hover, focus).length === 0) !== want);
+  check(misjudged.length === 0,
+    "ui-contract-tests.mjs: the FIELD_TARGETS ladder grammar (fieldLadderProblems) no longer discriminates -- misjudged: " + misjudged.map(([rest, hover, focus, want]) => `${want ? "false fail" : "missed"}: ${rest} / ${hover} / ${focus} -> ${JSON.stringify(fieldLadderProblems(rest, hover, focus))}`).join(" | "));
 }
 {
   const POPUP_NODES = htmlNodes(popupHtml);
@@ -2448,6 +2620,23 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     reaches(".tags-input-wrap.ac-open", shell) && !selectorReaches(".tags-input-wrap.ac-open", shell) &&
     !reaches(".tag-item", shell) && !reaches(".tags-input-wrap.hidden", shell) &&
     reaches('.is-busy .field > input[type="text"]', byId("title-input")) &&
+    // content attributes only: an untyped <input> is NOT [type="text"]
+    (() => {
+      const [field, untyped] = htmlNodes('<div class="field"><input id="u" data-x="a b-c" lang="en-US" data-k="A" href="https://ex.com/a.png" hidden></div>');
+      const r = (sel) => selectorReaches(sel, untyped);
+      const throwsOn = (sel) => { try { r(sel); return false; } catch { return true; } };
+      return !!field && !r('.field > input[type="text"]') && r(".field > input") && r("input[hidden]") && !r("input[type]") &&
+        r('[data-x~="a"]') && r('[data-x~="b-c"]') && !r('[data-x~="b"]') && !r('[data-x~=""]') &&
+        r('[lang|="en"]') && !r('[lang|="e"]') && r('[href^="https"]') && !r('[href^=""]') && r('[href$=".png"]') && !r('[href$=".jpg"]') &&
+        r('[href*="ex.com"]') && !r('[href*="xyz"]') && r("[data-k=A]") && !r('[data-k="a"]') && r('[data-k="a" i]') &&
+        r('[id="U" i]') && !r('[id="U"]') &&
+        throwsOn("[ns|data-x]") && throwsOn('[data-x!="a"]') && throwsOn("[*|data-x]") && throwsOn('[data-x="a" q]');
+    })() &&
+    // an HTML case-insensitive attribute (type) matches either case unless `s` says otherwise
+    (() => {
+      const [inp] = htmlNodes('<input type="TEXT" id="t">');
+      return selectorReaches('input[type="text"]', inp) && !selectorReaches('input[type="text" s]', inp);
+    })() &&
     structuralText('.login-body .secret-field:hover:where(:not(:focus-within)) > input[type="text"]:where(:not(:disabled))') === '.login-body .secret-field > input[type="text"]',
     "ui-contract-tests.mjs: the popup.html tree / structural selector matcher no longer discriminates (the popup value-box model below would be blind)");
 
@@ -2455,29 +2644,23 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     check(t.chevron === null, `ui-components.mjs: FIELD_TARGETS.pp ${t.id} has a chevron -- popup has no select, and pp emits no --pp-field-chevron (spec §2.2)`);
   }
 
-  // 2. Coverage against popup.html: every text-entry control is painted by
-  //    exactly ONE registry entry -- as the box itself, or as the passenger of
-  //    a shell that is -- and every entry reaches something.
-  const entries = POPUP_NODES.filter((n) => n.tag === "textarea" || (n.tag === "input" && TEXT_ENTRY_TYPES.has((n.attrs.type || "text").toLowerCase())));
-  const restHits = (node) => PP.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, node)));
-  const passengerHits = (node) => PP.filter((t) => selectorListOf(t.passenger).some((sel) => selectorReaches(sel, node)));
-  const PP_BOX_NODES = new Set(), PP_PASSENGER_NODES = new Set();
-  const uncovered = [];
-  for (const node of entries) {
-    const boxes = restHits(node), passengers = passengerHits(node);
-    const label = `#${node.attrs.id || "?"}`;
-    if (boxes.length === 1 && passengers.length === 0) PP_BOX_NODES.add(node);
-    else if (boxes.length === 0 && passengers.length === 1) {
-      let host = null;
-      for (let p = node.parent; p?.parent && !host; p = p.parent) if (restHits(p).includes(passengers[0])) host = p;
-      if (host) { PP_PASSENGER_NODES.add(node); PP_BOX_NODES.add(host); }
-      else uncovered.push(`${label}: passenger of ${passengers[0].id}, but no ancestor is that entry's box`);
-    } else uncovered.push(`${label}: rest of [${boxes.map((t) => t.id).join(", ")}], passenger of [${passengers.map((t) => t.id).join(", ")}]`);
+  // 2. Coverage against popup.html (valueBoxCoverage above): every
+  //    text-entry control is painted by exactly ONE registry entry -- as the
+  //    box itself, or as the passenger of a shell that is -- and every entry
+  //    reaches something.
+  const cov = valueBoxCoverage(POPUP_NODES, PP);
+  const { boxes: PP_BOX_NODES, passengers: PP_PASSENGER_NODES } = cov;
+  check(cov.entries >= 6 && PP_BOX_NODES.size >= 6 && cov.uncovered.length === 0,
+    `popup.html / FIELD_TARGETS.pp: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${cov.entries} controls, ${PP_BOX_NODES.size} boxes; ${cov.uncovered.join(" | ") || "none uncovered"}`);
+  check(cov.dead.length === 0, `ui-components.mjs: FIELD_TARGETS.pp entries whose rest selector reaches nothing in popup.html: ${cov.dead.map((t) => t.id).join(", ")}`);
+  // The coverage model must discriminate: an untyped <input> in .field is a
+  // text-entry control the typed `.field > input[type="text"]` does NOT
+  // paint (it would render as a UA box), so it must come out uncovered.
+  {
+    const probe = valueBoxCoverage(htmlNodes('<div class="field"><input id="untyped"></div><div class="field"><input type="text" id="typed"></div><div class="tags-input-wrap"><input type="text" id="core"></div>'), PP);
+    check(probe.entries === 3 && probe.uncovered.length === 1 && probe.uncovered[0].startsWith("#untyped:") && probe.passengers.size === 1,
+      "ui-contract-tests.mjs: the popup coverage model no longer discriminates (an untyped <input> inside .field must be uncovered; a typed one and a shell passenger covered) -- got " + JSON.stringify(probe.uncovered));
   }
-  check(entries.length >= 6 && PP_BOX_NODES.size >= 6 && uncovered.length === 0,
-    `popup.html / FIELD_TARGETS.pp: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${entries.length} controls, ${PP_BOX_NODES.size} boxes; ${uncovered.join(" | ") || "none uncovered"}`);
-  const deadTargets = PP.filter((t) => !POPUP_NODES.some((n) => restHits(n).includes(t)));
-  check(deadTargets.length === 0, `ui-components.mjs: FIELD_TARGETS.pp entries whose rest selector reaches nothing in popup.html: ${deadTargets.map((t) => t.id).join(", ")}`);
   // The two predicates every scan below uses: a rule on a box / a passenger
   // (pseudo-element subjects excluded -- ::placeholder has its own branch).
   const onNodes = (sel, nodes) => !structuralCompound(subjectOf(sel)).pseudoElement && [...nodes].some((n) => reaches(sel, n));

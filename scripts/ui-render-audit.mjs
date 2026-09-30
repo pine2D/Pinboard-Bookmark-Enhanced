@@ -6348,12 +6348,29 @@ async function main() {
     console.log(`[render-audit] fieldHoverContrast: ${total} field hover probe(s) measured across ${themes} options theme(s) this run, ${unmeasured} unmeasured (SETUP)${SHARD_TAG}`);
   }
   // fieldHoverContrast (family 14), the popup / library value-box legs:
-  // "measured nothing" vs "0 FAIL", per surface.
+  // "measured nothing" vs "0 FAIL", per surface -- and a HARD check (spec
+  // 2026-09-30-ui-fields-stage4-design §5.2: a leg that measures zero boxes
+  // is a SETUP ERROR, never a pass): when a surface's checks ran this
+  // process, every theme it ran must have measured every box its
+  // VALUE_BOX_LEGS entry names. Anything short -- the per-theme call removed
+  // or bypassed, a leg that returned early, boxes left unmeasured -- becomes
+  // a SETUP row, so report() exits 2.
   for (const surface of Object.keys(VALUE_BOX_LEGS)) {
     const logs = valueBoxHoverLog.filter((entry) => entry.surface === surface);
     const measured = logs.reduce((sum, entry) => sum + entry.measured.length, 0);
     const unmeasured = logs.reduce((sum, entry) => sum + entry.unmeasured.length, 0);
     console.log(`[render-audit] fieldHoverContrast ${surface}: ${measured} value box(es) measured across ${logs.length} theme(s) this run, ${unmeasured} unmeasured (SETUP)${SHARD_TAG}`);
+    if (!CHECKS.some((c) => c.surface === surface)) continue;
+    const required = SHARD_THEMES.length * VALUE_BOX_LEGS[surface].boxes.length;
+    if (measured < required) {
+      results.push({
+        surface, theme: "", selector: "(run)", state: "fieldHoverContrast", check: "valueBoxLegCoverage",
+        status: "SETUP", setup: "legVacuous",
+        actual: `${measured} value box(es) measured across ${logs.length} theme(s) (${unmeasured} reached but unmeasured)`,
+        expected: `${required} = ${SHARD_THEMES.length} theme(s) run x ${VALUE_BOX_LEGS[surface].boxes.length} VALUE_BOX_LEGS.${surface} boxes (spec 2026-09-30-ui-fields-stage4-design §5.2)`,
+        note: `the family-14 ${surface} value-box leg measured fewer boxes than the run requires -- recordValueBoxHover was not called for every theme, or boxes were left unmeasured (see their own SETUP rows)`,
+      });
+    }
   }
   // Pointer holds (round 3, H): how often a rest / hover read needed more
   // than one attempt, and why -- the recoveries the old single retry could
