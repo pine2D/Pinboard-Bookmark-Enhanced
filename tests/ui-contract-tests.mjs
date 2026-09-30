@@ -359,6 +359,34 @@ function nonExemptSelectors(rule) {
 // -hover / -focus (render family 13's options fill set gained the same three).
 const OPT_CONTROL_FILL_RE = /--opt-(?:btn-bg|btn-hover|input-bg|chip-bg|field-bg(?:-hover|-focus)?)\b/;
 
+// A colour literal inside a url() of a value box's own rule (stage 4 spec
+// 2026-09-30 §2.2 / §5.1): `%23<hex>` / `#<hex>` / rgb() / hsl() in a data URI
+// paints the same colour on every theme and sails past countBareHex (it looks
+// for a bare "#"). Module-level so each surface's block can run it with its
+// own value-box predicate (options's Stage 4 Task 4 block; popup / library
+// follow). Keep both ABOVE their first caller: URL_COLOUR_RE is a const, and
+// calling the function before this line has run throws a TDZ ReferenceError.
+const URL_COLOUR_RE = /%23[0-9a-f]{3,8}(?![0-9a-z])|#[0-9a-f]{3,8}(?![0-9a-z])|\b(?:rgba?|hsla?)\(/i;
+function valueBoxUrlColourOffenders(css, isBox) {
+  return parseStyleRules(css).flatMap((r) => {
+    const boxes = r.selectors.filter(isBox);
+    if (!boxes.length) return [];
+    return parseDeclarations(r.body).filter((d) => /url\(/i.test(d.value) && URL_COLOUR_RE.test(d.value))
+      .map((d) => `${boxes.join(", ")} { ${d.property}: ${d.value.slice(0, 72)}... }`);
+  });
+}
+
+// Windows High Contrast contexts (stage 4 Task 4 fix round 1). A rule inside
+// `@media (forced-colors: active)` paints system colours by design, so the
+// value-box scans exempt it and the forced-colours focus gate counts its
+// outline as coverage. `@media (forced-colors: none)` is the OPPOSITE --
+// ordinary rendering (options.css has one such block) -- so a bare
+// /forced-colors/ test, which matched both, exempted normal-mode rules and
+// credited normal-mode outlines as High Contrast coverage.
+const FORCED_ACTIVE_RE = /forced-colors\s*:\s*active/;
+const FORCED_NONE_RE = /forced-colors\s*:\s*none/;
+const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(c));
+
 // ---- Ruling 16 (T3 review) + F7 (T5 fix wave): three adversarial selector
 // shapes, reproduced as scratch CSS (not the real popup/options/library
 // source), pairing a weak-text colour with a control fill on the SAME rule,
@@ -5843,18 +5871,44 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     searchFocus.get("outline") === "none" && searchFocus.get("background-color") === "var(--opt-field-bg-focus)" &&
     searchFocus.get("border-color") === "var(--opt-field-border-focus)" && searchFocus.get("box-shadow") === "var(--opt-focus-ring)",
     "options.css: the sidebar search box must paint the field family at rest (background var(--opt-field-bg), border 1px solid var(--opt-field-border)) and on :focus-visible (outline none, --opt-field-bg-focus, --opt-field-border-focus, the ring) -- spec 2026-09-30 §3.1");
+  // Fix round 1 (review finding 3, controller ruling): the narrow-screen tab
+  // picker sits in .options-nav on the same --opt-bg and gets the same rule
+  // -- rest and focus only, no hover (its field-bg-hover step fell to
+  // ~1.002 / 1.003 against --opt-bg on catppuccin-mocha / gruvbox-dark,
+  // spec F3). Its rest and focus consumers are pinned like the search box's.
+  const PICKER = ".mobile-tab-picker select";
+  const mergedDecls = (css, selector) => new Map(parseStyleRules(css).filter((r) => !inForcedColors(r) && r.selectors.includes(selector))
+    .flatMap((r) => parseDeclarations(r.body).map((d) => [d.property, d.value])));
+  const pickerRest = mergedDecls(handTyped, PICKER);
+  const pickerFocus = mergedDecls(handTyped, `${PICKER}:focus-visible`);
+  check(pickerRest.get("background-color") === "var(--opt-field-bg)" && pickerRest.get("border") === "1px solid var(--opt-field-border)" &&
+    pickerRest.get("color") === "var(--opt-field-fg)" && pickerRest.get("background-image") === "var(--opt-field-chevron)" &&
+    pickerFocus.get("outline") === "none" && pickerFocus.get("border-color") === "var(--opt-field-border-focus)" && pickerFocus.get("box-shadow") === "var(--opt-focus-ring)",
+    "options.css: the narrow-screen tab picker must paint the field family at rest (background-color var(--opt-field-bg), border 1px solid var(--opt-field-border), color var(--opt-field-fg), the --opt-field-chevron) and on :focus-visible (outline none, --opt-field-border-focus, the ring) -- found rest " +
+    JSON.stringify([...pickerRest]) + " focus " + JSON.stringify([...pickerFocus]));
   const SEARCH_PAINT_RE = /^(?:background(?:-color)?|border(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?(?:-color)?)$/;
-  const reachesSearchOnHover = (sel) => /:hover\b/.test(sel) && subjectAlternatives(subjectOf(sel)).some((compound) => {
-    const c = classifyCompound(compound);
-    return !c.pseudoElement && (c.ids.includes("options-search-input") || (c.tag === "input" && c.type === "search"));
-  });
+  // The two value boxes on --opt-bg: the search box (by id, by type, or an
+  // untyped input under .options-search) and the picker (by id, or a select
+  // under .mobile-tab-picker).
+  const reachesSearchOnHover = (sel) => {
+    if (!/:hover\b/.test(sel)) return false;
+    const subject = subjectOf(sel);
+    const prefix = sel.slice(0, sel.length - subject.length);
+    return subjectAlternatives(subject).some((compound) => {
+      const c = classifyCompound(compound);
+      if (c.pseudoElement) return false;
+      if (c.ids.includes("options-search-input") || c.ids.includes("mobile-tab-select")) return true;
+      if (c.tag === "input" && (c.type === "search" || (c.type === null && /\.options-search(?![\w-])/.test(prefix)))) return true;
+      return c.tag === "select" && /\.mobile-tab-picker(?![\w-])/.test(prefix);
+    });
+  };
   const searchHoverPainters = (css) => parseStyleRules(css)
-    .filter((r) => !r.context.some((c) => /forced-colors/.test(c)) && r.selectors.some(reachesSearchOnHover) &&
+    .filter((r) => !inForcedColors(r) && r.selectors.some(reachesSearchOnHover) &&
       parseDeclarations(r.body).some((d) => SEARCH_PAINT_RE.test(d.property)))
     .map((r) => r.selectorText);
   const searchHovers = searchHoverPainters(optionsCss.replace(/\/\*[\s\S]*?\*\//g, ""));
   check(searchHovers.length === 0,
-    "options.css: a hover rule paints the sidebar search box's fill or frame (it has no hover state by design, spec 2026-09-30 §6 item 3): " + searchHovers.join(" | "));
+    "options.css: a hover rule paints the fill or frame of a value box on --opt-bg -- the sidebar search box or the narrow-screen tab picker; neither has a hover state (spec 2026-09-30 §6 item 3; Task 4 fix round 1 for the picker): " + searchHovers.join(" | "));
   const SEARCH_HOVER_CASES = [
     ['.options-search input[type="search"]:hover { background: var(--opt-field-bg-hover); }', true],
     ["#options-search-input:hover:not(:focus-visible) { border-color: var(--opt-field-border-hover); }", true],
@@ -5862,10 +5916,20 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     ['.options-search input[type="search"]:hover { color: var(--opt-field-fg); }', false],
     [".options-search-result:hover { background: var(--opt-btn-hover); }", false],
     ['@media (forced-colors: active) { .options-search input[type="search"]:hover { border-color: Highlight; } }', false],
+    // fix round 1 (review findings 1 / 3): the narrow-screen tab picker sits
+    // on --opt-bg too and has no hover either; an untyped input under
+    // .options-search is the search box; `forced-colors: none` is normal mode
+    [".mobile-tab-picker select:hover:not(:focus-visible, :disabled) { background-color: var(--opt-field-bg-hover); }", true],
+    ["#mobile-tab-select:hover { border-color: var(--opt-field-border-hover); }", true],
+    [".options-search input:hover { background: var(--opt-field-bg-hover); }", true],
+    ['@media (forced-colors: none) { .options-search input[type="search"]:hover { background: var(--opt-field-bg-hover); } }', true],
+    [".mobile-tab-picker select:hover { color: var(--opt-field-fg); }", false],
+    [".mobile-tab-picker label:hover { background: var(--opt-btn-hover); }", false],
+    [".fg select:hover:not(:focus, :disabled) { background-color: var(--opt-field-bg-hover); }", false],
   ];
   const searchMisjudged = SEARCH_HOVER_CASES.filter(([css, want]) => (searchHoverPainters(css).length > 0) !== want);
   check(searchMisjudged.length === 0,
-    "ui-contract-tests.mjs: the sidebar-search no-hover scan no longer discriminates -- misjudged: " + searchMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
+    "ui-contract-tests.mjs: the --opt-bg value boxes' no-hover scan (sidebar search, tab picker) no longer discriminates -- misjudged: " + searchMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
   // The popover input must not re-declare typed text (it inherits the recipe).
   const popoverColour = parseStyleRules(handTyped).filter((r) => r.selectors.some((sel) => /\.theme-name-popover input/.test(sel)) &&
     parseDeclarations(r.body).some((d) => d.property === "color" && d.value.trim() !== "var(--opt-field-fg)"));
@@ -5961,7 +6025,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
       for (const d of decls) {
         if (d.property.startsWith("--opt-field-")) out.push(`${rule.selectorText} { ${d.property}: ${d.value} } -- re-points the field family`);
       }
-      if (rule.context.some((c) => /forced-colors/.test(c))) continue;
+      if (inForcedColors(rule)) continue;
       // Follow-up 7a: a value box's placeholder ink is the field family's
       // secondary ink too. isValueBoxSelector drops pseudo-element subjects,
       // so a hand `::placeholder` repaint (fg-hint, a literal) walked around
@@ -6191,7 +6255,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
       const c = classifyCompound(compound);
       return !c.pseudoElement && c.tag === "input" && (c.type === null || c.type === "text" || c.type === "password");
     });
-    const hovers = all.filter((r) => !r.context.some((c) => /forced-colors/.test(c)) && r.selectors.some(reachesKeyWrapInput) &&
+    const hovers = all.filter((r) => !inForcedColors(r) && r.selectors.some(reachesKeyWrapInput) &&
       parseDeclarations(r.body).some((d) => PAINT_RE.test(d.property)));
     check(hovers.length >= 2,
       "ui-contract-tests.mjs: found fewer than 2 hover rules painting a key-wrap input (the generated .fg input hover + the key-wrap unit hover) -- the focus-within precedence check would be vacuous");
@@ -6299,7 +6363,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const KEY_CHIP_MIN = FILL_SEPARATE_MIN;
   const cssNoComments = optionsCss.replace(/\/\*[\s\S]*?\*\//g, "");
   const hand = stripGeneratedRegions(cssNoComments);
-  const handRules = parseStyleRules(hand).filter((r) => !r.context.some((c) => /forced-colors/.test(c)));
+  const handRules = parseStyleRules(hand).filter((r) => !inForcedColors(r));
   const isChipSelector = (sel) => /:hover/.test(sel) && subjectAlternatives(subjectOf(sel)).some((compound) => {
     const c = classifyCompound(compound);
     return !c.pseudoElement && c.classes.includes("key-toggle");
@@ -6431,7 +6495,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     const out = [];
     const modelled = new Set();
     for (const rule of parseStyleRules(css)) {
-      if (rule.context.some((c) => /forced-colors/.test(c))) continue;
+      if (inForcedColors(rule)) continue;
       const paints = parseDeclarations(rule.body).filter((d) => BG_RE.test(d.property));
       if (!paints.length) continue;
       for (const sel of rule.selectors.filter(reachesKeyWrapInput)) {
@@ -6612,21 +6676,6 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
 }
 
-// A colour literal inside a url() of a value box's own rule (stage 4 spec
-// 2026-09-30 §2.2 / §5.1): `%23<hex>` / `#<hex>` / rgb() / hsl() in a data URI
-// paints the same colour on every theme and sails past countBareHex (it looks
-// for a bare "#"). Module-level so each surface's block can run it with its
-// own value-box predicate (options below; popup / library follow).
-const URL_COLOUR_RE = /%23[0-9a-f]{3,8}(?![0-9a-z])|#[0-9a-f]{3,8}(?![0-9a-z])|\b(?:rgba?|hsla?)\(/i;
-function valueBoxUrlColourOffenders(css, isBox) {
-  return parseStyleRules(css).flatMap((r) => {
-    const boxes = r.selectors.filter(isBox);
-    if (!boxes.length) return [];
-    return parseDeclarations(r.body).filter((d) => /url\(/i.test(d.value) && URL_COLOUR_RE.test(d.value))
-      .map((d) => `${boxes.join(", ")} { ${d.property}: ${d.value.slice(0, 72)}... }`);
-  });
-}
-
 // ---- Stage 4 Task 4 (spec docs/superpowers/specs/2026-09-30-ui-fields-
 // stage4-design.md §2.1 / §2.2 / §6 item 10), options scope: the value boxes'
 // state exclusions, their chevron and their forced-colours focus. Read through
@@ -6634,7 +6683,7 @@ function valueBoxUrlColourOffenders(css, isBox) {
 // kept), so a comment is not a hit and a generated rule counts like a hand one.
 {
   const css = optionsCss.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""));
-  const forced = (r) => r.context.some((c) => /forced-colors/.test(c));
+  const forced = inForcedColors;
   // The top-level :not(...) arguments of one compound, e.g.
   // `input[type="text"]:hover:not(:focus, :disabled)` -> [":focus", ":disabled"].
   const notArgs = (compound) => {
@@ -6715,6 +6764,10 @@ function valueBoxUrlColourOffenders(css, isBox) {
     ['.fg .key-wrap:hover:not(:focus-within) :is(input[type="password"]) { border-color: var(--opt-field-border-hover); }', true],
     ["#dict-anki-deck:hover { background-color: var(--opt-field-bg-hover); }", true],
     ["#opt-lang-btn:hover:not(:focus, :disabled) { background: var(--opt-field-bg-hover); }", true],
+    // fix round 1: `forced-colors: none` is the NORMAL rendering, not a
+    // system-colour exemption; an untyped input is a value box too
+    ["@media (forced-colors: none) { .listbox-btn:hover { background: var(--opt-field-bg-hover); } }", true],
+    [".fg input:hover:not(:disabled) { background-color: var(--opt-field-bg-hover); }", true],
     // must stay clean
     [".fg textarea:hover:not(:focus):not(:disabled) { background-color: var(--opt-field-bg-hover); }", false],
     [".listbox-btn:hover:not(:focus-visible, :disabled) { background: var(--opt-field-bg-hover); }", false],
@@ -6757,45 +6810,97 @@ function valueBoxUrlColourOffenders(css, isBox) {
   // (3) Forced colours (spec §6 item 10): every value-box kind gets a
   // 1px solid Highlight outline on :focus-visible inside
   // @media (forced-colors: active) -- §7.3's scan above holds its shape --
-  // and no outline-suppressing focus rule on the same kind out-ranks it
-  // (strictly higher specificity, or equal and later in the file).
+  // and no outline-suppressing focus rule that applies under forced colours
+  // out-ranks it for the same kind. Fix round 1 (review finding 1) widened
+  // both halves to the value-box model used everywhere else in this file:
+  //   - a subject is mapped to kinds the way isValueBoxCompound sees it: an
+  //     options.html value-box id through its element / type (a `-btn` id is
+  //     the listbox button), an untyped `input` to every input kind it can
+  //     match there (the search box under .options-search, else the .fg
+  //     text / password / number), a tag-, class- and id-less compound
+  //     (`.fg :focus`) to every kind under its prefix;
+  //   - coverage counts only `forced-colors: active` contexts, never
+  //     `forced-colors: none`;
+  //   - a suppressor is any :focus / :focus-visible rule that applies with
+  //     forced colours on -- outside every forced-colors context OR inside
+  //     `forced-colors: active` itself -- but not inside `forced-colors:
+  //     none`;
+  //   - "out-ranks" follows the cascade: an !important suppressor beats a
+  //     normal outline outright; otherwise (both or neither important)
+  //     strictly higher specificity, or equal and later in the file.
+  const VALUE_BOX_ID_KINDS = (() => {
+    const kinds = new Map();
+    for (const m of optionsHtml.matchAll(/<(input|textarea|select)\b([^>]*)>/gi)) {
+      const tag = m[1].toLowerCase(), attrs = m[2];
+      const id = (/\bid="([^"]+)"/.exec(attrs) || [])[1];
+      if (!id || !OPTIONS_VALUE_BOX_IDS.ids.has(id)) continue;
+      if (tag === "textarea") kinds.set(id, "fg textarea");
+      else if (tag === "select") {
+        kinds.set(id, id === "mobile-tab-select" ? "picker select" : "fg select");
+        if (OPTIONS_VALUE_BOX_IDS.ids.has(`${id}-btn`)) kinds.set(`${id}-btn`, "listbox-btn");
+      } else {
+        const type = ((/\btype="([^"]+)"/.exec(attrs) || [])[1] || "text").toLowerCase();
+        kinds.set(id, type === "search" ? "search" : `fg ${type}`);
+      }
+    }
+    return kinds;
+  })();
+  check(VALUE_BOX_ID_KINDS.get("opt-pinboard-token") === "fg password" && VALUE_BOX_ID_KINDS.get("options-search-input") === "search" &&
+    VALUE_BOX_ID_KINDS.get("mobile-tab-select") === "picker select" && VALUE_BOX_ID_KINDS.get("opt-custom-css") === "fg textarea" &&
+    VALUE_BOX_ID_KINDS.get("opt-lang-btn") === "listbox-btn" && VALUE_BOX_ID_KINDS.size === OPTIONS_VALUE_BOX_IDS.ids.size,
+    `ui-contract-tests.mjs: the options.html value-box id -> kind map drifted (${VALUE_BOX_ID_KINDS.size} kinds for ${OPTIONS_VALUE_BOX_IDS.ids.size} ids)`);
+  const FORCED_KINDS = ["fg text", "fg password", "fg number", "fg select", "fg textarea", "picker select", "search", "listbox-btn"];
   const kindsOf = (sel) => {
     const subject = subjectOf(sel);
     const prefix = sel.slice(0, sel.length - subject.length);
-    return subjectAlternatives(subject).flatMap((compound) => {
+    const underPicker = /\.mobile-tab-picker(?![\w-])/.test(prefix), underSearch = /\.options-search(?![\w-])/.test(prefix);
+    return [...new Set(subjectAlternatives(subject).flatMap((compound) => {
       const c = classifyCompound(compound);
       if (c.pseudoElement) return [];
+      const byId = c.ids.map((id) => VALUE_BOX_ID_KINDS.get(id)).filter(Boolean);
+      if (byId.length) return byId;
+      if (c.ids.length) return [];
       if (c.classes.includes("listbox-btn")) return ["listbox-btn"];
-      if (c.tag === "select") return [/\.mobile-tab-picker(?![\w-])/.test(prefix) ? "picker select" : "fg select"];
+      if (c.tag === "select") return [underPicker ? "picker select" : "fg select"];
       if (c.tag === "textarea") return ["fg textarea"];
       if (c.tag === "input" && c.type === "search") return ["search"];
       if (c.tag === "input" && ["text", "password", "number"].includes(c.type)) return [`fg ${c.type}`];
+      if (c.tag === "input" && c.type === null) return underSearch ? ["search"] : ["fg text", "fg password", "fg number"];
+      if ((c.tag === null || c.tag === "*") && !c.classes.length && c.type === null) {
+        return underPicker ? ["picker select"] : underSearch ? ["search"] : FORCED_KINDS;
+      }
       return [];
-    });
+    }))];
   };
-  const FORCED_KINDS = ["fg text", "fg password", "fg number", "fg select", "fg textarea", "picker select", "search", "listbox-btn"];
+  check(["#opt-pinboard-token:focus", "html[data-theme] .fg input:focus", ".options-search input:focus-visible", ".fg :focus", ".pick > input[type=\"radio\"]:focus"]
+    .map((sel) => kindsOf(sel).join("+")).join(" | ") === "fg password | fg text+fg password+fg number | search | " + FORCED_KINDS.join("+") + " | ",
+    "ui-contract-tests.mjs: kindsOf no longer maps ids / untyped inputs / wildcard subjects onto the value-box kinds they can match");
+  const SUPPRESSOR_RE = { outline: /^(?:none|0(?:px)?)$/i, "outline-style": /^none$/i, "outline-width": /^0(?:px)?$/ };
   const forcedFocusReport = (text) => {
     const rules = parseStyleRules(text);
     const outlines = new Map();
-    for (const r of rules.filter((x) => forced(x) && parseDeclarations(x.body).some((d) => d.property === "outline" && /^1px solid Highlight$/i.test(d.value)))) {
+    for (const r of rules.filter((x) => forced(x))) {
+      const outline = parseDeclarations(r.body).find((d) => d.property === "outline" && /^1px solid Highlight$/i.test(d.value));
+      if (!outline) continue;
       for (const sel of r.selectors.filter((x) => /:focus-visible\b/.test(x))) {
         for (const k of kindsOf(sel)) {
           if (!outlines.has(k)) outlines.set(k, []);
-          outlines.get(k).push({ sel, spec: selectorSpecificity(sel), order: r.sourceOrder });
+          outlines.get(k).push({ sel, spec: selectorSpecificity(sel), order: r.sourceOrder, important: outline.important });
         }
       }
     }
     const missing = FORCED_KINDS.filter((k) => !outlines.has(k));
     const outranked = [];
-    for (const r of rules.filter((x) => !forced(x))) {
-      const suppresses = parseDeclarations(r.body).some((d) => (d.property === "outline" && /^(?:none|0(?:px)?)$/i.test(d.value)) ||
-        (d.property === "outline-style" && /^none$/i.test(d.value)) || (d.property === "outline-width" && /^0(?:px)?$/.test(d.value)));
-      if (!suppresses) continue;
+    for (const r of rules.filter((x) => !x.context.some((c) => FORCED_NONE_RE.test(c)))) {
+      const sup = parseDeclarations(r.body).filter((d) => Object.hasOwn(SUPPRESSOR_RE, d.property) && SUPPRESSOR_RE[d.property].test(d.value.trim()));
+      if (!sup.length) continue;
+      const important = sup.some((d) => d.important);
       for (const sel of r.selectors.filter((x) => /:focus(?:-visible)?\b/.test(x))) {
         for (const k of kindsOf(sel)) {
           for (const f of outlines.get(k) || []) {
+            if (f.important && !important) continue;
             const c = cmpSpecificity(selectorSpecificity(sel), f.spec);
-            if (c > 0 || (c === 0 && r.sourceOrder > f.order)) outranked.push(`${sel} (line ${r.lineNum}) over ${f.sel}`);
+            if ((important && !f.important) || c > 0 || (c === 0 && r.sourceOrder > f.order)) outranked.push(`${sel} (line ${r.lineNum}) over ${f.sel}`);
           }
         }
       }
@@ -6812,13 +6917,38 @@ function valueBoxUrlColourOffenders(css, isBox) {
     ['html[data-theme] .fg input[type="text"]:focus { outline: none; }', true],
     [".mobile-tab-picker select:focus-visible { outline: none; }", true],
     ['.options-search input[type="search"]:focus-visible { outline-style: none; }', true],
+    // fix round 1 (review finding 1): an id-addressed value box (options.html
+    // names #opt-pinboard-token a password input); an untyped input, in .fg
+    // and under .options-search; an !important suppressor below the
+    // Highlight rule's specificity; a later suppressor INSIDE forced-colors
+    // active (it applies exactly when the outline should)
+    ["#opt-pinboard-token:focus { outline: none; }", true],
+    ["#mobile-tab-select:focus-visible { outline-width: 0; }", true],
+    ["html[data-theme] .fg input:focus { outline: none; }", true],
+    ["html[data-theme] .options-search input:focus-visible { outline: none; }", true],
+    [".fg textarea:focus { outline: none !important; }", true],
+    ["@media (forced-colors: active) { .mobile-tab-picker select:focus-visible { outline: none; } }", true],
     [".fg textarea:focus { outline: 0; }", false],
     [".listbox-btn:hover { outline: none; }", false],
+    // must stay clean: `forced-colors: none` never applies with forced colours on
+    ['@media (forced-colors: none) { html[data-theme] .fg input[type="text"]:focus { outline: none !important; } }', false],
+    ["#opt-pinboard-token:hover { outline: none; }", false],
+    [".fg :focus { outline: none !important; }", true],
   ];
   const forcedMisjudged = FORCED_CASES.filter(([rule, want]) => (forcedFocusReport(`${css}\n${rule}`).outranked.length > shipped.outranked.length) !== want);
   const onlyText = forcedFocusReport('@media (forced-colors: active) { .fg input[type="text"]:focus-visible { outline: 1px solid Highlight; outline-offset: 2px; } }');
-  check(forcedMisjudged.length === 0 && onlyText.missing.length === FORCED_KINDS.length - 1 && !onlyText.missing.includes("fg text"),
-    "ui-contract-tests.mjs: the forced-colors value-box focus scan no longer discriminates -- misjudged: " + forcedMisjudged.map(([rule, want]) => `${want ? "missed" : "false hit"}: ${rule}`).join(" | ") + ` (coverage probe missing=${JSON.stringify(onlyText.missing)})`);
+  // A Highlight outline inside `forced-colors: none` covers nothing (fix round 1).
+  const onlyNone = forcedFocusReport('@media (forced-colors: none) { .fg input[type="text"]:focus-visible { outline: 1px solid Highlight; outline-offset: 2px; } }');
+  // !important on both sides falls back to specificity; only an important
+  // suppressor over a normal outline wins regardless (fix round 1).
+  // The outline rule (0,2,2) out-specifies the suppressor (0,2,1) here.
+  const FORCED_IMPORTANT = "@media (forced-colors: active) { html .fg textarea:focus-visible { outline: 1px solid Highlight IMP; outline-offset: 2px; } }\n.fg textarea:focus { outline: none !important; }";
+  const impBoth = forcedFocusReport(FORCED_IMPORTANT.replace(" IMP", " !important"));
+  const impSupOnly = forcedFocusReport(FORCED_IMPORTANT.replace(" IMP", ""));
+  check(forcedMisjudged.length === 0 && onlyText.missing.length === FORCED_KINDS.length - 1 && !onlyText.missing.includes("fg text") &&
+    onlyNone.missing.length === FORCED_KINDS.length && impBoth.outranked.length === 0 && impSupOnly.outranked.length === 1,
+    "ui-contract-tests.mjs: the forced-colors value-box focus scan no longer discriminates -- misjudged: " + forcedMisjudged.map(([rule, want]) => `${want ? "missed" : "false hit"}: ${rule}`).join(" | ") +
+    ` (coverage probe missing=${JSON.stringify(onlyText.missing)}; forced-colors:none probe missing ${onlyNone.missing.length}/${FORCED_KINDS.length}; !important probes both=${impBoth.outranked.length} (want 0) suppressor-only=${impSupOnly.outranked.length} (want 1))`);
 }
 
 if (fail.length) {

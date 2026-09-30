@@ -42,6 +42,8 @@ import {
   FIELD_FRAME_HOST_MIN,
   FIELD_SEPARATION_HOSTS,
   isOutputRoleForDefault,
+  OPT_BG_VALUE_BOXES,
+  SIDEBAR_SEARCH_HOST,
 } from "../docs/theme-surface/tools/contrast-audit.mjs";
 
 const failures = [];
@@ -1241,18 +1243,21 @@ function f8Failures(id, out, hosts) {
       `${id}: field-chevron is not fieldChevronUri(field-placeholder ${map["field-placeholder"]}) -- got ${map["field-chevron"]}`);
     const hosts = FIELD_HOST_ROLES.opt.map((r) => map[r]);
     check(map["field-bg-focus"] === map["field-bg"], `${id}: focus repaints the fill`);
-    // The sidebar search box (stage 4 Task 4; contrast-audit's
-    // auditSidebarSearchSeparation gates the shipped CSS the same way) sits
-    // on --opt-bg, not on a field host. Its class is read against that one
-    // host: framed with the fill under FILL_SEPARATE_MIN from bg -> the rest
-    // frame carries the boundary (F8b); otherwise the fill does (F1).
-    if (framed && ratio(map["field-bg"], map.bg) < FILL_SEPARATE_MIN) {
+    // The value boxes on --opt-bg -- the sidebar search box and the narrow-
+    // screen tab picker (stage 4 Task 4 + fix round 1; contrast-audit's
+    // auditSidebarSearchSeparation gates the shipped CSS the same way, host
+    // SIDEBAR_SEARCH_HOST) -- sit on the page, not on a field host, and paint
+    // the same field-bg / field-border at rest. Their class is read against
+    // that one host: framed with the fill under FILL_SEPARATE_MIN from it ->
+    // the rest frame carries the boundary (F8b); otherwise the fill does (F1).
+    const onBg = map[SIDEBAR_SEARCH_HOST], boxes = OPT_BG_VALUE_BOXES.join(" + ");
+    if (framed && ratio(map["field-bg"], onBg) < FILL_SEPARATE_MIN) {
       classes.searchFramedUnseparated.push(`opt:${id}`);
-      check(ratio(map["field-border"], map.bg) >= FIELD_FRAME_HOST_MIN,
-        `${id}: the sidebar search box's frame ${map["field-border"]} is ${ratio(map["field-border"], map.bg).toFixed(3)}:1 from --opt-bg ${map.bg} (F8b floor ${FIELD_FRAME_HOST_MIN})`);
+      check(ratio(map["field-border"], onBg) >= FIELD_FRAME_HOST_MIN,
+        `${id}: the ${boxes} frame ${map["field-border"]} is ${ratio(map["field-border"], onBg).toFixed(3)}:1 from --opt-${SIDEBAR_SEARCH_HOST} ${onBg} (F8b floor ${FIELD_FRAME_HOST_MIN})`);
     } else {
-      check(ratio(map["field-bg"], map.bg) >= FILL_SEPARATE_MIN,
-        `${id}: the sidebar search box's fill ${map["field-bg"]} is ${ratio(map["field-bg"], map.bg).toFixed(3)}:1 from --opt-bg ${map.bg} (F1 floor FILL_SEPARATE_MIN ${FILL_SEPARATE_MIN})`);
+      check(ratio(map["field-bg"], onBg) >= FILL_SEPARATE_MIN,
+        `${id}: the ${boxes} fill ${map["field-bg"]} is ${ratio(map["field-bg"], onBg).toFixed(3)}:1 from --opt-${SIDEBAR_SEARCH_HOST} ${onBg} (F1 floor FILL_SEPARATE_MIN ${FILL_SEPARATE_MIN})`);
     }
     // contrast-audit classifies a block as framed by field-border != field-bg;
     // that has to agree with the pilot actually declaring a frame.
@@ -1344,7 +1349,9 @@ function f8Failures(id, out, hosts) {
   check(members(classes.between) === "",
     `no options block may have a fill between its two hosts (floors-only branch), got {${members(classes.between)}}`);
   check(members(classes.searchFramedUnseparated) === "opt:terminal",
-    `sidebar search boxes whose frame carries the boundary on --opt-bg (framed, fill under FILL_SEPARATE_MIN from bg) must be exactly {opt:terminal}, got {${members(classes.searchFramedUnseparated)}}`);
+    `--opt-${SIDEBAR_SEARCH_HOST} value boxes (${OPT_BG_VALUE_BOXES.join(", ")}) whose frame carries the boundary (framed, fill under FILL_SEPARATE_MIN from the page) must be exactly {opt:terminal}, got {${members(classes.searchFramedUnseparated)}}`);
+  check(SIDEBAR_SEARCH_HOST === "bg" && OPT_BG_VALUE_BOXES.join() === "sidebar search,tab picker",
+    `contrast-audit's --opt-bg value-box host / list drifted (${SIDEBAR_SEARCH_HOST} / ${OPT_BG_VALUE_BOXES.join(", ")}) -- options.css puts the sidebar search box and the narrow-screen tab picker on the body's --opt-bg`);
   // The shipped themes must actually exercise both R12 branches, or the
   // category checks above prove nothing about the direction rule.
   const WELLS = ["gruvbox-dark", "catppuccin-mocha"];

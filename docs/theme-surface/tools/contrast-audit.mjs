@@ -540,25 +540,31 @@ function auditFieldSeparation(scope, ns, blockLabel, dict) {
   for (const h of hosts) console.log(check(scope, blockLabel, `field-bg-hover vs ${h}`, cr(rgb["field-bg-hover"], rgb[h]), FILL_SEPARATE_MIN));
 }
 
-// The options sidebar search box (options.css `.options-search
-// input[type="search"]`; stage 4 spec 2026-09-30 §2.3 F1 / §3.1 / §6 item 3)
-// is the one value box that sits on neither field host: it rests on the page
-// itself (--opt-bg, the body), outside every panel. It paints field-bg /
-// field-border at rest and the focus pair on focus, and has NO hover state
-// (a field-bg-hover step, derived against panel / pf-bg, sinks into --opt-bg
-// on catppuccin-mocha / gruvbox-dark: 1.002 / 1.003). Its resting boundary
-// on that page is gated here, by the box's class read against --opt-bg:
+// The options value boxes that sit on neither field host: both live in
+// .options-nav on the page itself (--opt-bg, the body), outside every panel --
+// the sidebar search box (options.css `.options-search input[type="search"]`)
+// and, on narrow screens (<=720px), the tab picker (`.mobile-tab-picker
+// select`). Both paint field-bg / field-border at rest and the focus pair on
+// focus, and neither has a hover state: a field-bg-hover step, derived
+// against panel / pf-bg, sinks into --opt-bg on catppuccin-mocha /
+// gruvbox-dark (1.002 / 1.003) -- stage 4 spec 2026-09-30 §2.3 F1 / §3.1 /
+// §6 item 3 for the search box, Task 4 fix round 1 (controller ruling, spec
+// F3) for the picker. Their shared resting boundary on that page is gated
+// here, by the block's class read against --opt-bg:
 //   framed (field-border != field-bg) with the fill under FILL_SEPARATE_MIN
 //   from --opt-bg (terminal, 1.048): the rest frame announces the box, >=
 //   FIELD_FRAME_HOST_MIN against --opt-bg (F8b; terminal 2.00);
 //   every other block: the fill >= FILL_SEPARATE_MIN against --opt-bg (F1;
 //   lowest shipped 1.1000, the default :root).
-// The class is re-read per block; tests/theme-ui-derive-tests.mjs pins its
-// membership ({opt:terminal}), so a drifting palette cannot swap floors
-// silently. Separate from the per-host F1-F3 / F8b section on purpose: that
-// one reads the field hosts (panel / pf-bg), and this box's one host is not
-// among them. One row per options block.
+// One row per options block covers both boxes: they paint the same two
+// roles, which ui-contract pins on each box's rest rule (and pins that no
+// hover rule paints either). The class is re-read per block;
+// tests/theme-ui-derive-tests.mjs pins its membership ({opt:terminal}), so a
+// drifting palette cannot swap floors silently. Separate from the per-host
+// F1-F3 / F8b section on purpose: that one reads the field hosts (panel /
+// pf-bg), and these boxes' one host is not among them.
 export const SIDEBAR_SEARCH_HOST = "bg";
+export const OPT_BG_VALUE_BOXES = Object.freeze(["sidebar search", "tab picker"]);
 function auditSidebarSearchSeparation(scope, ns, blockLabel, dict) {
   if (ns !== "opt") return;
   const roles = ["field-bg", "field-border", SIDEBAR_SEARCH_HOST];
@@ -567,7 +573,7 @@ function auditSidebarSearchSeparation(scope, ns, blockLabel, dict) {
   if (unusable.length) {
     // Two derivation outputs and the page bg every options block declares:
     // missing or non-hex is a regression on the default block too -- FAIL.
-    const l = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + "sidebar search".padEnd(28) + " FAIL (" +
+    const l = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + OPT_BG_VALUE_BOXES.join(" + ").padEnd(28) + " FAIL (" +
       unusable.map((r) => `--${ns}-${r}: ${raw[r] ?? "not declared"}`).join(", ") + ")";
     console.log(l);
     violations.push(l);
@@ -577,9 +583,9 @@ function auditSidebarSearchSeparation(scope, ns, blockLabel, dict) {
   const framed = normHex(raw["field-border"].trim()) !== normHex(raw["field-bg"].trim());
   const fillVsHost = cr(rgb["field-bg"], rgb[SIDEBAR_SEARCH_HOST]);
   if (framed && fillVsHost < FILL_SEPARATE_MIN) {
-    console.log(check(scope, blockLabel, `sidebar search: field-border vs ${SIDEBAR_SEARCH_HOST}`, cr(rgb["field-border"], rgb[SIDEBAR_SEARCH_HOST]), FIELD_FRAME_HOST_MIN));
+    console.log(check(scope, blockLabel, `${OPT_BG_VALUE_BOXES.join(" + ")}: field-border vs ${SIDEBAR_SEARCH_HOST}`, cr(rgb["field-border"], rgb[SIDEBAR_SEARCH_HOST]), FIELD_FRAME_HOST_MIN));
   } else {
-    console.log(check(scope, blockLabel, `sidebar search: field-bg vs ${SIDEBAR_SEARCH_HOST}`, fillVsHost, FILL_SEPARATE_MIN));
+    console.log(check(scope, blockLabel, `${OPT_BG_VALUE_BOXES.join(" + ")}: field-bg vs ${SIDEBAR_SEARCH_HOST}`, fillVsHost, FILL_SEPARATE_MIN));
   }
 }
 
@@ -859,8 +865,9 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
   // (F8b) -- see auditFieldSeparation above.
   auditFieldSeparation(scope, ns, blockLabel, dict);
 
-  // The options sidebar search box on --opt-bg (stage 4 Task 4) -- see
-  // auditSidebarSearchSeparation. Not part of the per-host section above.
+  // The options value boxes on --opt-bg (sidebar search, tab picker; stage 4
+  // Task 4) -- see auditSidebarSearchSeparation. Not part of the per-host
+  // section above.
   auditSidebarSearchSeparation(scope, ns, blockLabel, dict);
 }
 

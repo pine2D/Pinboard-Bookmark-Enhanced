@@ -3681,8 +3681,14 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
        box, no bottom edge). Stage 4 (spec 2026-09-30 §2.2 D6 / §3.1): its
        text is --opt-field-fg like every value box's, its chevron the
        per-theme --opt-field-chevron (the dark-preset chevron twin list is
-       gone), and its hover excludes its focus trigger, :focus-visible, and
-       :disabled. It used to keep the UA arrow;
+       gone), and it has NO hover state: like the sidebar search box it
+       sits in .options-nav on the page's --opt-bg, not on the panel /
+       pf-bg hosts the field roles are derived against, and a
+       field-bg-hover step there dissolved into the page (catppuccin-mocha
+       / gruvbox-dark ~1.002 / 1.003; Task 4 fix round 1, controller
+       ruling). Rest and focus only; contrast-audit gates its rest fill
+       (framed and unseparated: its frame) against --opt-bg, and ui-contract
+       pins that no hover rule paints it. It used to keep the UA arrow;
        the @supports picker block above hides ::picker-icon for ALL selects,
        so without its own drawn chevron this control would lose its arrow
        entirely on Chrome 135+ (Codex review). Longhand background-*
@@ -3696,10 +3702,6 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     color: var(--opt-field-fg);
     font-size: 13px;
     cursor: pointer;
-  }
-  .mobile-tab-picker select:hover:not(:focus-visible, :disabled) {
-    background-color: var(--opt-field-bg-hover);
-    border-color: var(--opt-field-border-hover);
   }
   /* Re-assert after the appearance:none above -- this @media block sits
      LATER in the file than the global @supports opt-in, so without this the
