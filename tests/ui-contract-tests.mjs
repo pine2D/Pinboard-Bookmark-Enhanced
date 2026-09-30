@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
-import { parseStyleRules, parseDeclarations, declarationValueMap, splitSelectorList } from "../docs/theme-surface/tools/css-syntax.mjs";
+import { parseStyleRules, parseDeclarations, declarationValueMap, splitSelectorList, closeOfBracket, cmpSpecificity, selectorSpecificity } from "../docs/theme-surface/tools/css-syntax.mjs";
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 import { contrast, hexToRgb, FILL_SEPARATE_MIN } from "../docs/theme-surface/composers/_ui-derive.mjs";
 
@@ -1623,18 +1623,9 @@ function forcedColorsBodyRanges(css) {
 // box, but it stays on --opt-input-bg / --opt-input-border by design (spec
 // 2026-09-28-ui-fields-bplus-design §3), so these field-family scans skip it.
 const TEXT_ENTRY_TYPES = new Set(["text", "password", "number", "url", "email", "tel"]);
-function closeOfBracket(sel, i) {
-  const open = sel[i], close = open === "(" ? ")" : "]";
-  let depth = 0, quote = null;
-  for (let j = i; j < sel.length; j += 1) {
-    const ch = sel[j];
-    if (quote) { if (ch === "\\") j += 1; else if (ch === quote) quote = null; continue; }
-    if (ch === '"' || ch === "'") quote = ch;
-    else if (ch === open) depth += 1;
-    else if (ch === close && --depth === 0) return j;
-  }
-  return sel.length - 1;
-}
+// closeOfBracket / cmpSpecificity / selectorSpecificity are imported from
+// css-syntax.mjs, the one Selectors-4 engine shared with cascade-lint (stage 4
+// T0); only the subject model below is local to this file.
 function subjectOf(sel) {
   let start = 0;
   for (let i = 0; i < sel.length; i += 1) {
@@ -1732,36 +1723,6 @@ function acceptsFieldFocusCore(selectorText) {
   const list = splitSelectorList(selectorText);
   return list.length > 0 && list.every((sel) => subjectAlternatives(subjectOf(sel)).some(isTypedValueBoxCompound) ||
     subjectAlternatives(subjectOf(sel)).some((compound) => { const c = classifyCompound(compound); return !c.pseudoElement && c.classes.includes("key-toggle"); }));
-}
-// Specificity [a, b, c] of one complex selector; :is()/:not()/:has() take
-// their most specific argument, :where() adds nothing.
-function cmpSpecificity(x, y) { return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; }
-function selectorSpecificity(sel) {
-  let a = 0, b = 0, c = 0;
-  const identEnd = (i) => { while (i < sel.length && /[\w-]/.test(sel[i])) i += 1; return i; };
-  for (let i = 0; i < sel.length;) {
-    const ch = sel[i];
-    if (ch === "#") { a += 1; i = identEnd(i + 1); }
-    else if (ch === ".") { b += 1; i = identEnd(i + 1); }
-    else if (ch === "[") { b += 1; i = closeOfBracket(sel, i) + 1; }
-    else if (ch === ":" && sel[i + 1] === ":") { c += 1; i = identEnd(i + 2); if (sel[i] === "(") i = closeOfBracket(sel, i) + 1; }
-    else if (ch === ":") {
-      const end = identEnd(i + 1), name = sel.slice(i + 1, end).toLowerCase();
-      i = end;
-      if (sel[i] === "(") {
-        const close = closeOfBracket(sel, i), arg = sel.slice(i + 1, close);
-        i = close + 1;
-        if (name === "where") continue;
-        if (["is", "not", "has", "matches"].includes(name)) {
-          const best = splitSelectorList(arg).map(selectorSpecificity).reduce((m, x) => (cmpSpecificity(x, m) > 0 ? x : m), [0, 0, 0]);
-          a += best[0]; b += best[1]; c += best[2];
-        } else b += 1;
-      } else if (["before", "after", "first-line", "first-letter"].includes(name)) c += 1;
-      else b += 1;
-    } else if (/[a-zA-Z]/.test(ch)) { c += 1; i = identEnd(i); }
-    else i += 1;
-  }
-  return [a, b, c];
 }
 // The model itself must discriminate, or every scan built on it is blind.
 check(isValueBoxSelector('.fg input:not([type="checkbox"])') && isValueBoxSelector('.fg :is(input[type="checkbox"], textarea)') &&

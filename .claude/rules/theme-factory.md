@@ -22,7 +22,7 @@ paths:
 
 ## 唯一编辑顺序
 
-改 `composers/*.mjs` 或 `pilots/*.tokens.json` → `node docs/theme-surface/tools/sync-all.mjs`（写入并执行 13 道门，末道 `node --check pinboard-themes.js`——overrides.css 原样拼进模板字面量，一个反引号能让前 12 道 CSS 解析门全绿而产物是坏 JS）→ `node docs/theme-surface/tools/sync-all.mjs --check`（同一管线、严格只读、生成物逐字节一致）→ commit。**禁止手工编辑 `pinboard-themes.js` 与六个 `@generated:*` 区。** CSS 规则、声明和选择器列表统一经 `tools/css-syntax.mjs` 扫描；它保留字符串/注释/嵌套 component value 边界，并把 `@media`/`@supports` 等分组 at-rule 上下文纳入规则身份，工具内禁止再写正则或裸逗号/分号切分器。
+改 `composers/*.mjs` 或 `pilots/*.tokens.json` → `node docs/theme-surface/tools/sync-all.mjs`（写入并执行 13 道门，末道 `node --check pinboard-themes.js`——overrides.css 原样拼进模板字面量，一个反引号能让前 12 道 CSS 解析门全绿而产物是坏 JS）→ `node docs/theme-surface/tools/sync-all.mjs --check`（同一管线、严格只读、生成物逐字节一致）→ commit。**禁止手工编辑 `pinboard-themes.js` 与六个 `@generated:*` 区。** CSS 规则、声明和选择器列表统一经 `tools/css-syntax.mjs` 扫描；它保留字符串/注释/嵌套 component value 边界，并把 `@media`/`@supports` 等分组 at-rule 上下文纳入规则身份，工具内禁止再写正则或裸逗号/分号切分器。选择器特异性同样只用它导出的 `selectorSpecificity` / `cmpSpecificity`（Selectors 4：`:is()` / `:not()` / `:has()` 取参数最大值，`:where()` 记 0，`:nth-child(… of S)` 计入 S；传入选择器列表或空串抛 `TypeError`，先用 `splitSelectorList` 拆开），工具与测试禁止再写私有引擎——cascade-lint 的旧引擎曾把 `:has(#id)` 记成一个伪类、把 `:not(a, b)` 的参数相加（阶段 4 T0 并入）。
 
 ## 间距边界（design-uplift 修订）
 
@@ -32,7 +32,7 @@ paths:
 
 Pre-commit 有两组触发。主题组使用**同一组触发条件**（theme-surface 源、pinboard-themes.js 或三份 CSS 任一改动）：先跑复杂 CSS 语法回归，再跑完整 `sync-all --check` 只读管线，随后补跑 source/cascade/hand-edit/UI contract 门；任一红即 block，禁止 `--no-verify`。`scripts/setup-hooks.sh` 安装的是委托器而非脚本快照，受版本控制的 hook 脚本更新后无需重装；`sh scripts/setup-hooks.sh --check`（verify.sh 的 `[hooks]` 段）检测本机是否残留旧版脚本快照。
 
-`sync-all --check` 覆盖：`validate-contracts`、`render-all --check`、UI 六个生成区逐字节检查、13 个站点主题逐字节检查、`diff-all --strict --check`、`contrast-audit`、`css-region-audit`、`ui-token-coverage`、`layout-lint`、`url-lint`、`recipe-lint`、`override-debt`。其中 `override-debt` 从 CSS 解析器真实消费的 `(at-rule 上下文, selector, property, !important, theme)` 身份做 ratchet：删债直接通过，新增结构债必须阻断；禁止只看总数。补充门为 `token-coverage`、`cascade-lint`、`override-drift`、`handedit-audit` 与 `tests/ui-contract-tests.mjs`；CSS 解析器自身由 `tests/theme-css-syntax-tests.mjs` 固定复杂语法边界。
+`sync-all --check` 覆盖：`validate-contracts`、`render-all --check`、UI 六个生成区逐字节检查、13 个站点主题逐字节检查、`diff-all --strict --check`、`contrast-audit`、`css-region-audit`、`ui-token-coverage`、`layout-lint`、`url-lint`、`recipe-lint`、`override-debt`。其中 `override-debt` 从 CSS 解析器真实消费的 `(at-rule 上下文, selector, property, !important, theme)` 身份做 ratchet：删债直接通过，新增结构债必须阻断；禁止只看总数。补充门为 `token-coverage`、`cascade-lint`、`override-drift`、`handedit-audit` 与 `tests/ui-contract-tests.mjs`；CSS 解析器自身由 `tests/theme-css-syntax-tests.mjs` 固定复杂语法边界与特异性计分，同一文件拦截私有特异性引擎回流。
 
 **verify.sh [theme] 段**还执行 `tests/theme-contract-tests.mjs`、`tests/theme-tooling-tests.mjs`、`tests/theme-css-syntax-tests.mjs`、`tests/theme-ui-derive-tests.mjs`、`tests/theme-override-debt-tests.mjs` 与 `tests/theme-sync-check-tests.mjs`；最后一项同时快照内容与 mtime，证明 `--check` 全程零写入。
 

@@ -18,7 +18,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { parseDeclarations, parseStyleRules, splitSelectorList } from "./css-syntax.mjs";
+import { cmpSpecificity, parseDeclarations, parseStyleRules, selectorSpecificity, splitSelectorList } from "./css-syntax.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..", "..", "..");
@@ -351,31 +351,13 @@ function parseCompound(text) {
 }
 
 // ----------------------------------------------------------------------------
-// Specificity (a, b, c) per CSS spec: a = ids, b = classes/attrs/pseudo-classes,
-// c = element/pseudo-element. :not(X) contributes X's specificity but the :not
-// itself adds 0.
+// Specificity comes from css-syntax.mjs's selectorSpecificity -- the shared
+// Selectors-4 engine (stage 4 T0) -- scored on the selector text itself. The
+// compound model above is for MATCHING only: it keeps :is()/:where()/:has()
+// as plain states and reads > + ~ as descendant combinators, so it must not
+// rank anything (it used to score :has(#id) as one pseudo-class and SUM the
+// arguments of :not(a, b)).
 // ----------------------------------------------------------------------------
-function specificityOf(compounds) {
-  let a = 0, b = 0, c = 0;
-  for (const cp of compounds) {
-    if (cp.id) a += 1;
-    b += cp.classes.length;
-    for (const _s of cp.states) b += 1;
-    if (cp.tag) c += 1;
-    if (cp.pseudo) c += 1;
-    for (const neg of cp.negations) {
-      const [na, nb, nc] = specificityOf([neg]);
-      a += na; b += nb; c += nc;
-    }
-  }
-  return [a, b, c];
-}
-
-function cmpSpec(x, y) {
-  if (x[0] !== y[0]) return x[0] - y[0];
-  if (x[1] !== y[1]) return x[1] - y[1];
-  return x[2] - y[2];
-}
 
 // ----------------------------------------------------------------------------
 // Match a parsed selector against a probe element.
@@ -486,14 +468,14 @@ function resolveCascade(rules, probeElem, prop) {
     try { compounds = parseSelector(r.selectorText); }
     catch { continue; }
     if (!selectorMatches(compounds, probeElem)) continue;
-    const spec = specificityOf(compounds);
+    const spec = selectorSpecificity(r.selectorText);
     const decl = r.decls.get(prop);
     candidates.push({ rule: r, spec, important: decl.important, value: decl.value });
   }
   if (candidates.length === 0) return { winner: null, candidates };
   candidates.sort((a, b) => {
     if (a.important !== b.important) return a.important ? -1 : 1;
-    const c = cmpSpec(b.spec, a.spec);
+    const c = cmpSpecificity(b.spec, a.spec);
     if (c !== 0) return c;
     return b.rule.sourceOrder - a.rule.sourceOrder;
   });
@@ -581,7 +563,7 @@ function explainReason(winner, candidates, wanted) {
   const expected = candidates.find(c => c.rule.selectorText.includes(wanted));
   if (!expected) return "expected rule absent from CSS";
   const ws = winner.spec, es = expected.spec;
-  if (cmpSpec(ws, es) > 0) return `winning selector has higher specificity (${ws.join(",")}) than expected (${es.join(",")})`;
+  if (cmpSpecificity(ws, es) > 0) return `winning selector has higher specificity (${ws.join(",")}) than expected (${es.join(",")})`;
   if (winner.important && !expected.important) return "winner uses !important; expected rule does not";
   return "winner appears later in source order";
 }

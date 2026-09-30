@@ -337,3 +337,108 @@ export function prefixSelectorList(selectorText, trigger) {
     return `${leading}${trigger} ${selector}${trailing}`;
   }).join(",");
 }
+
+// ---- Selector specificity (CSS Selectors Level 4 §17) ----------------------
+// The one specificity engine for every factory tool and UI test that ranks
+// selectors (cascade-lint's probe resolver, ui-contract's winner scans).
+// Stage 4 T0 (2026-09-30) folded the two private copies into this module;
+// cascade-lint's copy scored :is()/:where()/:has() as a plain pseudo-class
+// and SUMMED :not(a, b). Do not grow a third one -- import from here.
+//
+//   #id -> a;  .class, [attr], :pseudo-class -> b;  type, ::pseudo-element -> c
+//   * and combinators add nothing; comments are dropped before scoring
+//   :is() / :not() / :has() (and legacy :matches()) add their MOST specific
+//     argument; :where() adds nothing
+//   :nth-child() / :nth-last-child() add one pseudo-class plus the most
+//     specific selector of an "of S" clause
+//   :before / :after / :first-line / :first-letter with ONE colon are still
+//     pseudo-elements (c)
+// Not modelled -- none of the scanned sheets use them: the nesting selector &
+// (it needs the parent rule) and the arguments of :host(X) / :host-context(X)
+// / ::slotted(X) (Shadow DOM, CSS Scoping).
+
+// Index of the bracket that closes the "(" or "[" at sel[i]; quoted strings
+// and backslash escapes never close it early. Unclosed -> sel.length - 1.
+export function closeOfBracket(sel, i) {
+  const open = sel[i], close = open === "(" ? ")" : "]";
+  let depth = 0, quote = null;
+  for (let j = i; j < sel.length; j += 1) {
+    const ch = sel[j];
+    if (ch === "\\") { j += 1; continue; }
+    if (quote) { if (ch === quote) quote = null; continue; }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === open) depth += 1;
+    else if (ch === close && --depth === 0) return j;
+  }
+  return sel.length - 1;
+}
+
+// Negative / zero / positive like a sort comparator: x vs y.
+export function cmpSpecificity(x, y) {
+  return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+}
+
+// End of the identifier starting at sel[i]: name code points, non-ASCII and
+// CSS escapes (a backslash plus 1-6 hex digits and one optional whitespace,
+// or a backslash plus any one character).
+function identEnd(sel, i) {
+  while (i < sel.length) {
+    const ch = sel[i];
+    if (ch === "\\") {
+      const hex = /^[0-9a-fA-F]{1,6}\s?/.exec(sel.slice(i + 1, i + 8));
+      i += 1 + (hex ? hex[0].length : 1);
+    } else if (/[\w-]/.test(ch) || ch.charCodeAt(0) >= 0x80) i += 1;
+    else break;
+  }
+  return i;
+}
+
+function maxSpecificity(listText) {
+  return splitSelectorList(listText).map(complexSpecificity)
+    .reduce((best, x) => (cmpSpecificity(x, best) > 0 ? x : best), [0, 0, 0]);
+}
+
+function complexSpecificity(sel) {
+  let a = 0, b = 0, c = 0;
+  for (let i = 0; i < sel.length;) {
+    const ch = sel[i];
+    if (ch === "#") { a += 1; i = identEnd(sel, i + 1); }
+    else if (ch === ".") { b += 1; i = identEnd(sel, i + 1); }
+    else if (ch === "[") { b += 1; i = closeOfBracket(sel, i) + 1; }
+    else if (ch === ":" && sel[i + 1] === ":") {
+      c += 1; i = identEnd(sel, i + 2);
+      if (sel[i] === "(") i = closeOfBracket(sel, i) + 1;
+    } else if (ch === ":") {
+      const end = identEnd(sel, i + 1), name = sel.slice(i + 1, end).toLowerCase();
+      i = end;
+      if (sel[i] === "(") {
+        const close = closeOfBracket(sel, i), arg = sel.slice(i + 1, close);
+        i = close + 1;
+        if (name === "where") continue;
+        if (name === "is" || name === "not" || name === "has" || name === "matches") {
+          const [x, y, z] = maxSpecificity(arg);
+          a += x; b += y; c += z;
+        } else if (name === "nth-child" || name === "nth-last-child") {
+          b += 1;
+          const of = /\bof\b([\s\S]*)$/i.exec(arg);
+          if (of) { const [x, y, z] = maxSpecificity(of[1]); a += x; b += y; c += z; }
+        } else b += 1;
+      } else if (name === "before" || name === "after" || name === "first-line" || name === "first-letter") c += 1;
+      else b += 1;
+    } else if (/[a-zA-Z]/.test(ch)) { c += 1; i = identEnd(sel, i); }
+    else i += 1;
+  }
+  return [a, b, c];
+}
+
+// Specificity [a, b, c] of ONE complex selector. A selector list has no
+// single specificity (each item ranks on its own), so a top-level comma --
+// or an empty / non-string input -- throws instead of silently summing:
+// split with splitSelectorList() first.
+export function selectorSpecificity(selectorText) {
+  const list = typeof selectorText === "string" ? splitSelectorList(selectorText) : [];
+  if (list.length !== 1) {
+    throw new TypeError(`selectorSpecificity() takes exactly one complex selector (split lists with splitSelectorList first), got ${JSON.stringify(selectorText)}`);
+  }
+  return complexSpecificity(list[0]);
+}
