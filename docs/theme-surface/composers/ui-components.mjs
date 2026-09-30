@@ -494,7 +494,20 @@ function chipRules(ns) {
 // sm sm corners) is retired; the .listbox-btn, a <button> outside FIELD_SEL,
 // states the same md radius in its own hand-written rule.
 function formRules(ns) {
-  const FIELD_SEL = `.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea`;
+  // The five value-box kinds this recipe paints, named one by one in every
+  // rule -- base AND state (stage 4, spec 2026-09-30-ui-fields-stage4-design
+  // §2.1; factory-assessment §5.3). A bare `.fg input:hover` / `:focus` also
+  // reached the radio / checkbox overlays inside .fg (.pick, .switch): they
+  // took the field fill, the field focus frame and `outline: none`.
+  // Hover excludes the box's focus trigger and :disabled in ONE :not() list,
+  // so a typed input hover is (0,4,1) and a select / textarea hover (0,3,1):
+  // the hand-written key-wrap focus frame (options.css, (0,5,1)) stays
+  // strictly above every hover that can paint a key-wrap input, and the
+  // static-freeze scan in tests/ui-contract-tests.mjs keeps its (0,3,1)
+  // threshold. Focus keeps today's :focus trigger (spec §2.1 table).
+  const FIELD_KINDS = ['input[type="text"]', 'input[type="password"]', 'input[type="number"]', "select", "textarea"];
+  const fieldList = (state = "") => FIELD_KINDS.map((kind) => `.fg ${kind}${state}`).join(", ");
+  const FIELD_SEL = fieldList();
   const out = [];
   if (ns === "opt") {
     out.push(
@@ -548,16 +561,16 @@ function formRules(ns) {
       //                        capping their width would just wrap more.
       rule(`.fg select`, [["width", "max-content"], ["min-width", "240px"], ["max-width", "100%"]]),
       rule(`.fg input[type="number"]`, [["max-width", "96px"]]),
-      rule(`.fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus)`, [
+      rule(fieldList(":hover:not(:focus, :disabled)"), [
         ["background-color", `var(--${ns}-field-bg-hover)`],
         ["border-color", `var(--${ns}-field-border-hover)`],
       ], { pairColorWith: FIELD_SEL }),
-      rule(`.fg input:focus, .fg select:focus, .fg textarea:focus`, [
+      rule(fieldList(":focus"), [
         ["outline", "none"],
         ["background-color", `var(--${ns}-field-bg-focus)`],
         ["border-color", `var(--${ns}-field-border-focus)`],
       ], { pairColorWith: FIELD_SEL }),
-      rule(`.fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible`, [
+      rule(fieldList(":focus-visible"), [
         ["box-shadow", `var(--${ns}-focus-ring)`],
       ]),
       // Placeholder ink (spec §3): the UA default (#757575) never followed the

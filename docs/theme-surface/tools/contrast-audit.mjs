@@ -455,27 +455,20 @@ export const COMPONENT_PAIR_SPEC = [
   ["field-placeholder", "field-bg-hover", 4.5, ["opt"]],
   ["field-placeholder", "field-bg-focus", 4.5, ["opt"]],
   // F5: text painted on a field fill is --opt-field-fg (ruling R13; spec §2.2
-  // D6 -- the generated .fg recipe, .listbox-btn, the sidebar search box), on
-  // the rest and the hover fill, and on the search box's own fill (input-bg,
-  // every state). The two plain `fg vs field-bg(-hover)` rows that stood here
-  // are gone with D6: text on a field fill reads field-fg, and these two rows
-  // are exactly the ones they would have become.
+  // D6 -- the generated .fg recipe incl. the native select, .listbox-btn, the
+  // narrow-screen tab picker and the sidebar search box), on the rest and the
+  // hover fill. The two plain `fg vs field-bg(-hover)` rows that stood here
+  // are gone with D6 (these two are what they became), and so is `field-fg
+  // vs input-bg`: stage 4 Task 4 moved the sidebar search box onto the field
+  // fill, so no value box paints on input-bg any more.
   ["field-fg", "field-bg", 4.5, ["opt"]],
   ["field-fg", "field-bg-hover", 4.5, ["opt"]],
-  ["field-fg", "input-bg", 4.5, ["opt"]],
   // F6: ...and it must be tellable apart from the placeholder: a distinction
   // floor, not a legibility one (both inks already clear 4.5:1 on the fills),
   // expressed like the other non-text rows here (chip-bg vs panel's
   // FILL_SEPARATE_MIN): the same ratio, a lower min. The UA placeholder gave
   // 1.52:1 on solarized-light; the first B+ derivation 1.03.
   ["field-fg", "field-placeholder", FIELD_TEXT_PLACEHOLDER_MIN, ["opt"]],
-  // The sidebar search box (options.css `.options-search input[type="search"]`)
-  // is a value box outside .fg: it keeps --opt-input-bg as its fill at rest,
-  // on hover and on focus (only its border changes on focus), but paints its
-  // placeholder with --opt-field-placeholder. That ink is derived against the
-  // field fills, not input-bg -- the two differ on flexoki-light -- so gate the
-  // pair the search box actually renders.
-  ["field-placeholder", "input-bg", 4.5, ["opt"]],
 ];
 
 // Host separation of the Soft Fill value box (stage 4 spec 2026-09-30 §2.3
@@ -545,6 +538,49 @@ function auditFieldSeparation(scope, ns, blockLabel, dict) {
   for (const h of hosts) console.log(check(scope, blockLabel, `field-bg vs ${h}`, cr(rgb["field-bg"], rgb[h]), FILL_SEPARATE_MIN));
   console.log(check(scope, blockLabel, "field-bg-hover vs field-bg", cr(rgb["field-bg-hover"], rgb["field-bg"]), FILL_SEPARATE_MIN));
   for (const h of hosts) console.log(check(scope, blockLabel, `field-bg-hover vs ${h}`, cr(rgb["field-bg-hover"], rgb[h]), FILL_SEPARATE_MIN));
+}
+
+// The options sidebar search box (options.css `.options-search
+// input[type="search"]`; stage 4 spec 2026-09-30 §2.3 F1 / §3.1 / §6 item 3)
+// is the one value box that sits on neither field host: it rests on the page
+// itself (--opt-bg, the body), outside every panel. It paints field-bg /
+// field-border at rest and the focus pair on focus, and has NO hover state
+// (a field-bg-hover step, derived against panel / pf-bg, sinks into --opt-bg
+// on catppuccin-mocha / gruvbox-dark: 1.002 / 1.003). Its resting boundary
+// on that page is gated here, by the box's class read against --opt-bg:
+//   framed (field-border != field-bg) with the fill under FILL_SEPARATE_MIN
+//   from --opt-bg (terminal, 1.048): the rest frame announces the box, >=
+//   FIELD_FRAME_HOST_MIN against --opt-bg (F8b; terminal 2.00);
+//   every other block: the fill >= FILL_SEPARATE_MIN against --opt-bg (F1;
+//   lowest shipped 1.1000, the default :root).
+// The class is re-read per block; tests/theme-ui-derive-tests.mjs pins its
+// membership ({opt:terminal}), so a drifting palette cannot swap floors
+// silently. Separate from the per-host F1-F3 / F8b section on purpose: that
+// one reads the field hosts (panel / pf-bg), and this box's one host is not
+// among them. One row per options block.
+export const SIDEBAR_SEARCH_HOST = "bg";
+function auditSidebarSearchSeparation(scope, ns, blockLabel, dict) {
+  if (ns !== "opt") return;
+  const roles = ["field-bg", "field-border", SIDEBAR_SEARCH_HOST];
+  const raw = Object.fromEntries(roles.map((r) => [r, dict[`${ns}-${r}`]]));
+  const unusable = roles.filter((r) => !isHex(raw[r]));
+  if (unusable.length) {
+    // Two derivation outputs and the page bg every options block declares:
+    // missing or non-hex is a regression on the default block too -- FAIL.
+    const l = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + "sidebar search".padEnd(28) + " FAIL (" +
+      unusable.map((r) => `--${ns}-${r}: ${raw[r] ?? "not declared"}`).join(", ") + ")";
+    console.log(l);
+    violations.push(l);
+    return;
+  }
+  const rgb = Object.fromEntries(roles.map((r) => [r, hexRgb(normHex(raw[r].trim()))]));
+  const framed = normHex(raw["field-border"].trim()) !== normHex(raw["field-bg"].trim());
+  const fillVsHost = cr(rgb["field-bg"], rgb[SIDEBAR_SEARCH_HOST]);
+  if (framed && fillVsHost < FILL_SEPARATE_MIN) {
+    console.log(check(scope, blockLabel, `sidebar search: field-border vs ${SIDEBAR_SEARCH_HOST}`, cr(rgb["field-border"], rgb[SIDEBAR_SEARCH_HOST]), FIELD_FRAME_HOST_MIN));
+  } else {
+    console.log(check(scope, blockLabel, `sidebar search: field-bg vs ${SIDEBAR_SEARCH_HOST}`, fillVsHost, FILL_SEPARATE_MIN));
+  }
 }
 
 // Generic `--name: value;` extractor over an arbitrary block body -- the
@@ -822,6 +858,10 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
   // Soft Fill value boxes: fill vs host (F1-F3) or framed rest frame vs host
   // (F8b) -- see auditFieldSeparation above.
   auditFieldSeparation(scope, ns, blockLabel, dict);
+
+  // The options sidebar search box on --opt-bg (stage 4 Task 4) -- see
+  // auditSidebarSearchSeparation. Not part of the per-host section above.
+  auditSidebarSearchSeparation(scope, ns, blockLabel, dict);
 }
 
 // Orphan guard: every *-fg / on-* shaped custom property this surface's

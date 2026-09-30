@@ -271,23 +271,26 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 }
 .mobile-tab-picker { display: none; }
 .options-search { position: relative; margin-bottom: var(--opt-sp-5); }
+/* The sidebar search box is a value box outside .fg (spec 2026-09-30-ui-
+   fields-stage4-design §3.1): it paints the field family at rest (field-bg
+   fill, field-border on all four sides, typed text field-fg, placeholder
+   field-placeholder) and on focus (field-bg-focus, field-border-focus on all
+   four sides + the ring), and deliberately has NO hover rule (spec §6 item
+   3). It sits on --opt-bg, not on the panel / pf-bg hosts the field roles
+   are derived against: a field-bg-hover step there would sink into the page
+   on catppuccin-mocha / gruvbox-dark (1.002 / 1.003). contrast-audit's
+   sidebar-search section gates its fill (or, framed and unseparated, its
+   frame) against --opt-bg; ui-contract pins every consumer below and that
+   no hover rule paints it. */
 .options-search input[type="search"] {
   width: 100%; min-height: 32px; /* the sidebar column's one rung: the tab buttons below are 32px (was 34, two px off both that and the control rungs) */
   padding: var(--opt-sp-3) var(--opt-sp-4);
-  border: 1px solid var(--opt-input-border);
+  border: 1px solid var(--opt-field-border);
   border-radius: var(--opt-radius-md);
-  background: var(--opt-input-bg); color: var(--opt-field-fg);
+  background: var(--opt-field-bg); color: var(--opt-field-fg);
   font-size: 12px; -webkit-appearance: none; appearance: none;
 }
-.options-search input[type="search"]:focus-visible { outline: none; border-color: var(--opt-focus-bd); box-shadow: var(--opt-focus-ring); }
-/* The sidebar search box is a value box outside .fg: its fill and frame stay
-   --opt-input-bg / --opt-input-border (spec 2026-09-28-ui-fields-bplus-design
-   §3), but its placeholder takes the field family's secondary ink -- the UA
-   default (#757575) fell to 1.87:1 on nord-night -- and its typed text the
-   field family's --opt-field-fg (above), so the two stay >= 1.4:1 apart like
-   every other value box (ruling R13). contrast-audit gates both inks against
-   --opt-input-bg, the only fill this box paints (rest, hover and focus
-   alike); ui-contract pins both consumers. */
+.options-search input[type="search"]:focus-visible { outline: none; background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
 .options-search input[type="search"]::placeholder { color: var(--opt-field-placeholder); }
 .options-search-results {
   position: absolute; z-index: var(--opt-z-menu); top: calc(100% + var(--opt-sp-2)); left: 0;
@@ -320,15 +323,16 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    The button is a value box (spec 2026-09-30-ui-fields-stage4-design
    §2.1): field fill, all four sides one colour (collapsed into the fill,
    or the pilot frame), one md radius on all four corners -- no bottom
-   edge -- and hover never borrows the focus colour; the chevron is the
-   field's secondary ink.
+   edge -- and hover never borrows the focus colour and excludes the
+   button's focus trigger and :disabled (`:hover:not(:focus-visible,
+   :disabled)`, spec §2.1); the chevron is the field's secondary ink.
    Colours are token pairs already verified per theme: active = btn-hover +
    btn-fg (the control hover pair), selected = accent + on-accent (the
    primary-button pair), disabled = fg-hint on panel. No :has(), no inline
    styles: the flip is the data-flip attribute the script sets on open. ---- */
 .listbox { position: relative; display: inline-block; width: max-content; min-width: 240px; max-width: 100%; }
 .listbox-btn { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 0 var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-field-fg); background: var(--opt-field-bg); border: 1px solid var(--opt-field-border); border-radius: var(--opt-radius-md); cursor: pointer; text-align: left; }
-.listbox-btn:hover { background: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); }
+.listbox-btn:hover:not(:focus-visible, :disabled) { background: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); }
 .listbox-btn:focus-visible { outline: none; background: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
 .listbox-btn .btn-ic { flex: none; width: 16px; height: 16px; color: var(--opt-field-placeholder); }
 .listbox-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1079,16 +1083,16 @@ input:focus-visible + .tag-gov-chip-face {
 .fg input[type="number"] {
   max-width: 96px;
 }
-.fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus) {
+.fg input[type="text"]:hover:not(:focus, :disabled), .fg input[type="password"]:hover:not(:focus, :disabled), .fg input[type="number"]:hover:not(:focus, :disabled), .fg select:hover:not(:focus, :disabled), .fg textarea:hover:not(:focus, :disabled) {
   background-color: var(--opt-field-bg-hover);
   border-color: var(--opt-field-border-hover);
 }
-.fg input:focus, .fg select:focus, .fg textarea:focus {
+.fg input[type="text"]:focus, .fg input[type="password"]:focus, .fg input[type="number"]:focus, .fg select:focus, .fg textarea:focus {
   outline: none;
   background-color: var(--opt-field-bg-focus);
   border-color: var(--opt-field-border-focus);
 }
-.fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible {
+.fg input[type="text"]:focus-visible, .fg input[type="password"]:focus-visible, .fg input[type="number"]:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible {
   box-shadow: var(--opt-focus-ring);
 }
 .fg input::placeholder, .fg textarea::placeholder {
@@ -1280,9 +1284,13 @@ input[type="checkbox"], input[type="radio"] {
 /* @generated:ui-components end (options) */
 /* Custom chevron for <select> — native arrow removed by appearance:none. Use
    background-image / background-repeat / background-position as LONGHANDS so themed
-   overrides that only set background-color preserve the chevron. */
+   overrides that only set background-color preserve the chevron. The image is the
+   per-theme --opt-field-chevron (stage 4, spec 2026-09-30-ui-fields-stage4-design
+   §2.2): composers/_ui-derive.mjs fieldChevronUri() strokes today's chevron in the
+   block's own --opt-field-placeholder, so no hand rule carries a colour literal
+   inside a data URI (ui-contract rejects %23<hex> in a value box's url()). */
 .fg select {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-image: var(--opt-field-chevron);
   background-repeat: no-repeat;
   background-position: right 8px center;
   padding-right: 26px;
@@ -2016,24 +2024,30 @@ html.motion-ready #preset-preview-section > summary::after {
    2px width + 1px offset = 3px into a 2px gutter). An inner ring cutting
    across the container's chrome is the same defect shape the group row was
    rejected for, one order of magnitude smaller. */
-/* (0,4,1): with the EYE focused and the pointer over the input, the unit's
-   focus frame must beat the generated hover (0,3,1) on fill and all four
-   sides -- at the old (0,2,1) the hover repainted the frame while the ring
-   stayed. Every .key-wrap
+/* (0,5,1): with the EYE focused and the pointer over the input, the unit's
+   focus frame must beat the typed generated hover (0,4,1) on fill and all
+   four sides by specificity alone (stage 4, spec 2026-09-30-ui-fields-
+   stage4-design §2.1: focus never wins on source order) -- at the old
+   (0,2,1) the hover repainted the frame while the ring stayed.
+   `:not(:disabled)` is the one pseudo-class that lifts it there: like every
+   value-box hover (spec §2.1), both unit rules paint only an enabled input.
+   Every .key-wrap
    sits in a .fg and holds a text or password input (options.html + the
    export-target builder in options.js). */
-.fg .key-wrap:focus-within :is(input[type="text"], input[type="password"]) { background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
+.fg .key-wrap:focus-within :is(input[type="text"], input[type="password"]):not(:disabled) { background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
 /* The pointer over the EYE is still inside the field. The eye is the input's
    sibling (absolutely positioned over its right end), so moving onto it drops
    the input's own :hover and the whole hover paint -- fill and all four
    sides -- snapped back to rest while the pointer was visibly inside the box
    (final review C-1; Chrome's cr-input keeps hover on the host). Restated on
-   the unit's :hover at (0,5,1), above the generated hover (0,3,1);
+   the unit's :hover at (0,6,1), above the typed generated hover (0,4,1),
+   and -- like every value-box hover (spec 2026-09-30 §2.1) -- only on an
+   enabled input;
    `:not(:focus-within)` makes it mutually exclusive with the focus frame
    above, so focus still wins whichever piece holds it. ui-contract pins it
    (a render-audit hover row can only hover the probed element itself, not a
    sibling). */
-.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"]) { background-color: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); }
+.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"]):not(:disabled) { background-color: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); }
 /* Hover is where the eye may show a fill -- a pointer affordance, and not a
    state the rest/focus invariant covers. The chip mixes over the fill the
    input actually paints under it: the HOVER fill while the unit is not
@@ -2042,16 +2056,20 @@ html.motion-ready #preset-preview-section > summary::after {
    erased the chip in the recessed wells, whose hover fill is darker than
    rest: 1.113:1 on gruvbox-dark and 1.094:1 on catppuccin-mocha against the
    focus fill it actually sat on (B+ re-review M1); over the right base the
-   same 8% gives them ~1.2:1. The mix stays 8%, deliberately faint: the
-   one heavier eye fill ever shipped, the 10% ghost FILL of round 5 (on
-   focus; recorded below), was rejected on sight for reading as a chip
+   same 8% gives them ~1.2:1. The ink is the field's own text colour,
+   --opt-field-fg (stage 4, spec 2026-09-30-ui-fields-stage4-design §2.2: a
+   small button's hover fill inside a value box is field-fg 8% over the
+   shell's fill; it was --opt-fg, which differs only on nord-night,
+   solarized-light/-dark and catppuccin-latte). The mix stays 8%, deliberately
+   faint: the one heavier eye fill ever shipped, the 10% ghost FILL of round 5
+   (on focus; recorded below), was rejected on sight for reading as a chip
    sitting on the field. ui-contract computes the chip against the fill
    beneath it on all 15 blocks in both states and holds it to
    FILL_SEPARATE_MIN (1.10:1), the project's floor for "a fill reads as its
-   own plane" (COMPONENTS.md §9 law 2) -- lowest 1.106:1, solarized-light's
-   focus fill. (0,4,0) beats the plain hover chip's (0,2,0). */
-.key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-hover)); border-radius: var(--opt-radius-sm); }
-.key-wrap:focus-within .key-toggle:hover { background: color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-focus)); }
+   own plane" (COMPONENTS.md §9 law 2) -- lowest 1.122:1, solarized-light's
+   hover fill. (0,4,0) beats the plain hover chip's (0,2,0). */
+.key-toggle:hover { background: color-mix(in srgb, var(--opt-field-fg) 8%, var(--opt-field-bg-hover)); border-radius: var(--opt-radius-sm); }
+.key-wrap:focus-within .key-toggle:hover { background: color-mix(in srgb, var(--opt-field-fg) 8%, var(--opt-field-bg-focus)); }
 /* Focus = the project's standard button ring (§7.3), pulled INSIDE the eye's
    own box with a negative offset so it never reaches the capsule edge and
    never competes with the container's own :focus-within ring.
@@ -2766,28 +2784,6 @@ html[data-theme] .tab-btn.active { border-left-color: var(--opt-accent, var(--op
    #e0e0e0 hairline. Zero effect on desktop (border-left-width is 0 there). */
 html[data-theme] .reset-tab-btn { border-left-color: var(--opt-border-section, var(--opt-border)); }
 html[data-theme] .fg label { color: var(--opt-fg); }
-/* Dark-bg themes: lighter chevron stroke so the arrow reads against dark input
-   fill. Covers all 8 color-scheme:dark presets (gruvbox-dark / rose-pine were
-   missing from this list -- pre-existing gap, closed in the dropdown-design
-   round) and the mobile tab picker (which gains the same drawn chevron below). */
-html[data-theme="nord-night"] .fg select,
-html[data-theme="terminal"] .fg select,
-html[data-theme="dracula"] .fg select,
-html[data-theme="flexoki-dark"] .fg select,
-html[data-theme="solarized-dark"] .fg select,
-html[data-theme="catppuccin-mocha"] .fg select,
-html[data-theme="gruvbox-dark"] .fg select,
-html[data-theme="rose-pine"] .fg select,
-html[data-theme="nord-night"] .mobile-tab-picker select,
-html[data-theme="terminal"] .mobile-tab-picker select,
-html[data-theme="dracula"] .mobile-tab-picker select,
-html[data-theme="flexoki-dark"] .mobile-tab-picker select,
-html[data-theme="solarized-dark"] .mobile-tab-picker select,
-html[data-theme="catppuccin-mocha"] .mobile-tab-picker select,
-html[data-theme="gruvbox-dark"] .mobile-tab-picker select,
-html[data-theme="rose-pine"] .mobile-tab-picker select {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-}
 
 /* ---- Select controls adopt the md-preview dropdown design (dropdown-design
    round, user request). Two layers, matching md-preview.css .exp-img-row
@@ -3682,7 +3678,11 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     border: 1px solid var(--opt-field-border);
     /* Dropdown-design round: joins the .fg select family (md
        radius on all four corners, drawn chevron, field fill -- a value
-       box, no bottom edge). It used to keep the UA arrow;
+       box, no bottom edge). Stage 4 (spec 2026-09-30 §2.2 D6 / §3.1): its
+       text is --opt-field-fg like every value box's, its chevron the
+       per-theme --opt-field-chevron (the dark-preset chevron twin list is
+       gone), and its hover excludes its focus trigger, :focus-visible, and
+       :disabled. It used to keep the UA arrow;
        the @supports picker block above hides ::picker-icon for ALL selects,
        so without its own drawn chevron this control would lose its arrow
        entirely on Chrome 135+ (Codex review). Longhand background-*
@@ -3690,14 +3690,14 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     border-radius: var(--opt-radius-md);
     -webkit-appearance: none; appearance: none;
     background-color: var(--opt-field-bg);
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-image: var(--opt-field-chevron);
     background-repeat: no-repeat;
     background-position: right 8px center;
-    color: var(--opt-fg);
+    color: var(--opt-field-fg);
     font-size: 13px;
     cursor: pointer;
   }
-  .mobile-tab-picker select:hover:not(:focus) {
+  .mobile-tab-picker select:hover:not(:focus-visible, :disabled) {
     background-color: var(--opt-field-bg-hover);
     border-color: var(--opt-field-border-hover);
   }
@@ -3719,5 +3719,23 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     border-top: 0;
     border-left: 1px solid var(--opt-border-section);
     white-space: nowrap;
+  }
+}
+/* Forced colours (Windows High Contrast), stage 4 spec §6 item 10: the UA
+   drops author box-shadow and remaps border colours to system colours, so a
+   focused value box -- whose focus is "field-border-focus on four sides + the
+   ring" everywhere else, with outline: none -- showed no focus at all. Restore
+   one system-colour edge, the .listbox-btn precedent's sanctioned shape (1px
+   solid Highlight, a non-negative offset, no shadow; ui-contract's §7.3 scan).
+   Last in the file on purpose: the generated .fg focus rule and the narrow-
+   screen picker's focus-visible rule above both set outline: none at equal or
+   lower specificity; ui-contract checks every value box kind is listed here
+   and that no outline-suppressing rule out-ranks this one. */
+@media (forced-colors: active) {
+  .fg :is(input[type="text"], input[type="password"], input[type="number"], select, textarea):focus-visible,
+  .mobile-tab-picker select:focus-visible,
+  .options-search input[type="search"]:focus-visible {
+    outline: 1px solid Highlight;
+    outline-offset: 2px;
   }
 }

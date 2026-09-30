@@ -1709,6 +1709,15 @@ export const CHECKS = [
     expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
   { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "focusWithin", focusTarget: ":scope",
     expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  // The sidebar search box (stage 4, spec 2026-09-30-ui-fields-stage4-design
+  // §3.1 / §5.2): a value box outside .fg that joined the family at rest and
+  // on focus -- and has no hover row, because it has no hover state (spec §6
+  // item 3; ui-contract pins that no hover rule paints it). It sits outside
+  // every .panel, so the row names a tab only to have one active.
+  { surface: "options", page: "options.html", selector: "#options-search-input", tab: "general", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "options", page: "options.html", selector: "#options-search-input", tab: "general", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   // #test-gemini (Task 4): the FIRST `.btn.btn-sm` action inside #panel-ai,
   // reachable without switching the provider away from its gemini default --
   // scripts/ui-render-audit.mjs routes this row through the switchChecks

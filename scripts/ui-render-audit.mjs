@@ -2462,8 +2462,11 @@ const WEAK_TEXT_CFG = {
   // live `--opt-fg-dim:` definition is 0). COMPONENTS.md §9.1 law 8 itself
   // only names fg-hint/fg-muted/link, so this family checks exactly those
   // three on options too -- not a narrowing, the role doesn't exist to check.
+  // Stage 4 (spec 2026-09-30-ui-fields-stage4-design §3.1): the options value
+  // boxes' own fills join the scan -- field-bg / -hover / -focus are control
+  // fills like input-bg, and COMPONENTS.md §9.1 law 8 keeps weak inks off them.
   options: {
-    prefix: "opt", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg"],
+    prefix: "opt", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg", "field-bg", "field-bg-hover", "field-bg-focus"],
     safeHostRoles: ["bg", "panel", "pf-bg", "code-bg"],
     safeHostExcludeTextRoles: ["link"],
   },
@@ -2899,7 +2902,10 @@ const FIELD_HOVER_SEL = [
 // of each or the sweep is vacuous for that kind (SETUP ERROR). Family 9's
 // value-box radius law requires the same kinds on options.
 const FIELD_HOVER_REQUIRED_KINDS = ['input[type="text"]', 'input[type="password"]', 'input[type="number"]', "textarea", "button.listbox-btn"];
-const RADIUS_VALUE_BOX_REQUIRED = Object.freeze({ options: FIELD_HOVER_REQUIRED_KINDS });
+// Family 9 also requires the sidebar search box on options (stage 4 Task 4:
+// it joined the value boxes at rest and on focus; it has no hover, so it is
+// not one of family 14's kinds).
+const RADIUS_VALUE_BOX_REQUIRED = Object.freeze({ options: Object.freeze([...FIELD_HOVER_REQUIRED_KINDS, 'input[type="search"]']) });
 // Themes whose value boxes are framed and NOT separated from their hosts, per
 // surface (spec 2026-09-30-ui-fields-stage4-design §2.2 / §2.4): the fill
 // holds on hover and the frame carries it.

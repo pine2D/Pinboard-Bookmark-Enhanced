@@ -978,6 +978,14 @@ function f8Failures(id, out, hosts) {
     chev.includes("stroke-linecap='round'") && chev.includes("stroke-linejoin='round'") &&
     chev.includes("stroke='%23aabbcc'") && !chev.includes(";") && !chev.includes("#"),
     `fieldChevronUri must keep the chevron geometry, stroke %23rrggbb and contain no ";" or "#" (got ${chev})`);
+  // The two attributes that make the URI PAINT as a stroked chevron (stage 4
+  // Task 4, from the Task 3 review): an image-context SVG without the SVG
+  // namespace renders nothing at all, and the open path without fill='none'
+  // fills as a solid black wedge. Pinned on the literal output -- the
+  // shipped-block checks below compare the generator with itself and cannot
+  // see a format regression. (Task 4's chevron probe showed the pixels.)
+  check(chev.includes("%3Csvg xmlns='http://www.w3.org/2000/svg' ") && chev.includes(" fill='none' "),
+    `fieldChevronUri must declare xmlns='http://www.w3.org/2000/svg' on the <svg> and fill='none' on the path (got ${chev})`);
   for (const bad of [undefined, "transparent", "#33ff3340", "var(--opt-fg)"]) {
     check(throwsNaming(() => fieldChevronUri(bad), ["fieldChevronUri"]), `fieldChevronUri(${JSON.stringify(bad)}) must throw`);
   }
@@ -1223,7 +1231,7 @@ function f8Failures(id, out, hosts) {
   // direction). Each class is decided by measured ratios, so one drifting
   // theme could change class silently -- the equality guards after the walk
   // pin every member.
-  const classes = { unseparatedFramed: [], separatedFramed: [], between: [] };
+  const classes = { unseparatedFramed: [], separatedFramed: [], between: [], searchFramedUnseparated: [] };
   // Category assertions shared by the 14 themed maps and the default :root.
   // `framed` = the pilot declares ui.options.<mode>.input-border (§9.5).
   const fieldCategory = (id, map, framed) => {
@@ -1233,12 +1241,19 @@ function f8Failures(id, out, hosts) {
       `${id}: field-chevron is not fieldChevronUri(field-placeholder ${map["field-placeholder"]}) -- got ${map["field-chevron"]}`);
     const hosts = FIELD_HOST_ROLES.opt.map((r) => map[r]);
     check(map["field-bg-focus"] === map["field-bg"], `${id}: focus repaints the fill`);
-    // The narrow-screen tab picker still paints plain --opt-fg on the field
-    // fills; contrast-audit dropped its two plain-fg rows with D6 (spec
-    // §2.2), so this keeps that ink gated until the picker paints
-    // --opt-field-fg.
-    check([map["field-bg"], map["field-bg-hover"]].every((h) => ratio(map.fg, h) >= 4.5),
-      `${id}: plain fg under 4.5:1 on a field fill (the tab picker's text)`);
+    // The sidebar search box (stage 4 Task 4; contrast-audit's
+    // auditSidebarSearchSeparation gates the shipped CSS the same way) sits
+    // on --opt-bg, not on a field host. Its class is read against that one
+    // host: framed with the fill under FILL_SEPARATE_MIN from bg -> the rest
+    // frame carries the boundary (F8b); otherwise the fill does (F1).
+    if (framed && ratio(map["field-bg"], map.bg) < FILL_SEPARATE_MIN) {
+      classes.searchFramedUnseparated.push(`opt:${id}`);
+      check(ratio(map["field-border"], map.bg) >= FIELD_FRAME_HOST_MIN,
+        `${id}: the sidebar search box's frame ${map["field-border"]} is ${ratio(map["field-border"], map.bg).toFixed(3)}:1 from --opt-bg ${map.bg} (F8b floor ${FIELD_FRAME_HOST_MIN})`);
+    } else {
+      check(ratio(map["field-bg"], map.bg) >= FILL_SEPARATE_MIN,
+        `${id}: the sidebar search box's fill ${map["field-bg"]} is ${ratio(map["field-bg"], map.bg).toFixed(3)}:1 from --opt-bg ${map.bg} (F1 floor FILL_SEPARATE_MIN ${FILL_SEPARATE_MIN})`);
+    }
     // contrast-audit classifies a block as framed by field-border != field-bg;
     // that has to agree with the pilot actually declaring a frame.
     check(framed === (map["field-border"] !== map["field-bg"]),
@@ -1288,8 +1303,8 @@ function f8Failures(id, out, hosts) {
     const p0 = rgbToHex(fgToAAMulti(hexToRgb(map["fg-hint"].trim()), [hexToRgb(map["field-bg"]), hexToRgb(map["field-bg-hover"])], 4.5));
     check(ratio(hex6(map.fg), p0) < FIELD_TEXT_PLACEHOLDER_MIN || (map["field-placeholder"] === p0 && map["field-fg"] === hex6(map.fg)),
       `${id}: fg ${map.fg} already clears the floor against the AA placeholder ${p0}, so neither ink may move (got placeholder ${map["field-placeholder"]}, field-fg ${map["field-fg"]})`);
-    check([map["field-bg"], map["field-bg-hover"], map["input-bg"]].every((h) => ratio(map["field-fg"], h) >= 4.5),
-      `${id}: field-fg ${map["field-fg"]} under 4.5:1 on a field fill or the search box's input-bg`);
+    check([map["field-bg"], map["field-bg-hover"]].every((h) => ratio(map["field-fg"], h) >= 4.5),
+      `${id}: field-fg ${map["field-fg"]} under 4.5:1 on a field fill`);
     check([map["field-bg"], map["field-bg-hover"]].every((h) => ratio(map["field-placeholder"], h) >= 4.5),
       `${id}: field-placeholder ${map["field-placeholder"]} under 4.5:1 on a field fill`);
     // R13 minimality (follow-up 7c): neither step of the R13 move overshoots.
@@ -1328,6 +1343,8 @@ function f8Failures(id, out, hosts) {
     `framed-but-separated blocks must be exactly {opt:dracula, opt:nord-night}, got {${members(classes.separatedFramed)}}`);
   check(members(classes.between) === "",
     `no options block may have a fill between its two hosts (floors-only branch), got {${members(classes.between)}}`);
+  check(members(classes.searchFramedUnseparated) === "opt:terminal",
+    `sidebar search boxes whose frame carries the boundary on --opt-bg (framed, fill under FILL_SEPARATE_MIN from bg) must be exactly {opt:terminal}, got {${members(classes.searchFramedUnseparated)}}`);
   // The shipped themes must actually exercise both R12 branches, or the
   // category checks above prove nothing about the direction rule.
   const WELLS = ["gruvbox-dark", "catppuccin-mocha"];
