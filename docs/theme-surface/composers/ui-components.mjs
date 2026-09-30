@@ -484,14 +484,15 @@ function chipRules(ns) {
 // stack are explicitly page-level hand-maintained exceptions (§6.1), never
 // emitted here.
 //
-// Colour half of the B+ field family (spec 2026-09-28-ui-fields-bplus-design
-// §3): fill / frame / hover / focus / placeholder / typed text read the
-// --opt-field-* roles (_ui-derive.mjs deriveFieldRoles). The SHAPE half -- the >=3:1 bottom
-// edge and the md/md/sm/sm radius -- is hand-written in options.css: the
-// row-model block for text entry, the .listbox-btn rule block for the
-// listbox. It never applies to the native <select> fallback, and
-// recipe-lint's radiusToken law (one token per border-radius) is right to
-// keep a four-value radius out of this recipe.
+// The field family (spec 2026-09-28-ui-fields-bplus-design §3, reshaped by
+// spec 2026-09-30-ui-fields-stage4-design §2.1): fill / frame / hover / focus
+// / placeholder / typed text read the --opt-field-* roles (_ui-derive.mjs
+// deriveFieldRoles), and this recipe's single `border-radius:
+// var(--opt-radius-md)` is the whole shape -- one radius on all four
+// corners, one frame colour on all four sides, no bottom edge. The B+ shape
+// half that options.css used to re-split it with (a >=3:1 bottom edge, md md
+// sm sm corners) is retired; the .listbox-btn, a <button> outside FIELD_SEL,
+// states the same md radius in its own hand-written rule.
 function formRules(ns) {
   const FIELD_SEL = `.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea`;
   const out = [];

@@ -100,6 +100,11 @@ import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs"
 import { LIB_BATCH_BAND_MIX } from "../docs/theme-surface/composers/library-chrome.mjs";
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
+// Family 14's fill-separation floor (spec 2026-09-30-ui-fields-stage4-design
+// §2.3 F1-F3) is the derivation's own constant, imported, never a hand-typed
+// 1.10; its frame step measures perceptual distance with the same CIEDE2000
+// the derivation uses.
+import { FILL_SEPARATE_MIN, deltaE2000 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -264,7 +269,7 @@ function skip(check, expected, note) { return { check, status: "SKIP", actual: n
 // between the two silently made colorEqVar compare against whichever token
 // bgEqVar/textContrastMulti had already claimed (caught live: `.stag`'s
 // colorEqVar read chip-BG's value while labelled chip-fg in the verdict).
-function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVarName, extraBorderColorVarName, extraEdgeColorVarName, radiusVarName, childSelectors, focusTargetSelector }) {
+function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVarName, extraBorderColorVarName, radiusVarName, childSelectors, focusTargetSelector }) {
   const el = document.querySelector(selector);
   if (!el) return { found: false };
   const cs = getComputedStyle(el);
@@ -410,13 +415,6 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
   let extraBorderColorRaw = null;
   if (extraBorderColorVarName) {
     extraBorderColorRaw = getComputedStyle(document.documentElement).getPropertyValue(extraBorderColorVarName).trim() || null;
-  }
-  // extraEdgeColorRaw (B+ field family, 2026-09-28): edgeColorEqVar's own slot,
-  // so one row can pin bgEqVar (fill) + borderColorEqVar (top side) +
-  // edgeColorEqVar (bottom side) -- the three paints of a B+ value box at rest.
-  let extraEdgeColorRaw = null;
-  if (extraEdgeColorVarName) {
-    extraEdgeColorRaw = getComputedStyle(document.documentElement).getPropertyValue(extraEdgeColorVarName).trim() || null;
   }
   // Effective hit-area box (COMPONENTS.md §1.5's ::before hit-area expansion
   // recipe, e.g. .row-del-x / #vocab-invert-selection): getBoundingClientRect()
@@ -593,7 +591,6 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     extraBgRaw,
     extraColorRaw,
     extraBorderColorRaw,
-    extraEdgeColorRaw,
     textInset,
     containmentChildren,
     // Unconditional (cheap, selector-independent) -- colorSchemeMatchesTheme's
@@ -1079,14 +1076,9 @@ function evaluateCheck(check, raw, theme) {
   // `border: 1px solid var(--{ns}-border)`, one declaration, no per-side
   // override anywhere in the recipe or in options.css), so the first side
   // stands in for all four rather than adding a second raw shape just for
-  // this one check.
-  //
-  // B+ field family (2026-09-28): on a row that ALSO pins edgeColorEqVar (a
-  // value box, whose bottom side is the edge), the frame is every OTHER side
-  // -- top, right AND left (indices 0, 1, 3) must all equal the token, so a
-  // side-only repaint (the stage-0 frame back as border-left/right-color)
-  // cannot hide behind a correct top side. Without edgeColorEqVar the old
-  // first-side reading stands (uniform rings such as .pick-mark).
+  // this one check. A value box's frame is pinned on all four sides by
+  // borderSidesEqVar below (stage 4: the B+ bottom edge, and the
+  // edgeColorEqVar that read it, are retired).
   const sideColors = (raw.borderColors || "").split("|");
   const sideWidths = (raw.borderSideWidths || "").split("|").map((w) => parseFloat(w));
   const sideStyles = (raw.borderSideStyles || "").split("|");
@@ -1097,37 +1089,19 @@ function evaluateCheck(check, raw, theme) {
   // devicePixelRatio 1) computes a 1px border as 0.666667px; any painted
   // border keeps at least one device pixel, an unpainted one computes 0.
   const sidePainted = (i) => sideWidths[i] > 0 && !!sideStyles[i] && !/^(?:none|hidden)$/.test(sideStyles[i]);
-  // Final review G4: on a value-box row the three frame sides must also be
-  // PAINTED -- on the framed themes (nord-night, dracula, rose-pine,
-  // terminal) they are the pilot's frame, and `border-top-width: 0` /
-  // `border-inline-style: none` kept the computed colour while erasing it.
-  const valueBoxRow = "edgeColorEqVar" in exp;
   const sideDesc = (i) => `${sideColors[i]} ${sideWidths[i]}px ${sideStyles[i]}`;
   if ("borderColorEqVar" in exp) {
     const want = parseSolidColor(raw.extraBorderColorRaw);
-    const idx = valueBoxRow ? [0, 1, 3] : [0];
-    const gotRaw = valueBoxRow ? idx.map(sideDesc).join("|") : sideColors[0];
-    const ok = idx.every((i) => colorsEqual(want, parseSolidColor(sideColors[i])) && (!valueBoxRow || sidePainted(i)));
     const note = !want ? `--${exp.borderColorEqVar} token unresolved (raw=${JSON.stringify(raw.extraBorderColorRaw)})` : undefined;
-    out.push(verdict("borderColorEqVar", ok, gotRaw,
-      `${valueBoxRow ? "painted top|right|left = " : ""}var(--...-${exp.borderColorEqVar})=${raw.extraBorderColorRaw}`, note));
-  }
-  // edgeColorEqVar (B+ field family 2026-09-28, COMPONENTS.md §9.1 law 9): the
-  // value box's BOTTOM side (index 2 of raw.borderColors' top|right|bottom|
-  // left quad) must equal this theme's --{ns}-{role} token, +-1/channel, AND
-  // be painted (width > 0, style not none/hidden) -- an unpainted bottom
-  // keeps its computed colour, so colour alone would pass a missing edge.
-  if ("edgeColorEqVar" in exp) {
-    const want = parseSolidColor(raw.extraEdgeColorRaw);
-    const got = parseSolidColor(sideColors[2]);
-    const note = !want ? `--${exp.edgeColorEqVar} token unresolved (raw=${JSON.stringify(raw.extraEdgeColorRaw)})` : undefined;
-    out.push(verdict("edgeColorEqVar", colorsEqual(want, got) && sidePainted(2), sideDesc(2),
-      `painted (width > 0, not none/hidden) var(--...-${exp.edgeColorEqVar})=${raw.extraEdgeColorRaw}`, note));
+    out.push(verdict("borderColorEqVar", colorsEqual(want, parseSolidColor(sideColors[0])), sideColors[0],
+      `var(--...-${exp.borderColorEqVar})=${raw.extraBorderColorRaw}`, note));
   }
   // borderSidesEqVar: ALL FOUR sides equal the token and are painted -- a
-  // focused value box paints one focus colour all the way round (spec §3: the
-  // edge follows focus). Shares borderColorEqVar's probe slot; a row may not
-  // set both.
+  // value box paints one frame colour all the way round in every state (stage
+  // 4, spec 2026-09-30-ui-fields-stage4-design §2.1: no bottom edge; final
+  // review G4: `border-top-width: 0` / `border-inline-style: none` keep the
+  // computed colour while erasing the side, hence "painted"). Shares
+  // borderColorEqVar's probe slot; a row may not set both.
   if ("borderSidesEqVar" in exp) {
     const want = parseSolidColor(raw.extraBorderColorRaw);
     const ok = !!want && sideColors.length === 4 && [0, 1, 2, 3].every((i) => colorsEqual(want, parseSolidColor(sideColors[i])) && sidePainted(i));
@@ -1953,7 +1927,6 @@ function probeArgsFor(check, theme) {
       "check declares BOTH borderColorEqVar and borderSidesEqVar -- they share the extraBorderColorVarName probe slot; split into two checklist entries instead.");
   }
   const extraBorderColorSelectorVar = check.expect.borderColorEqVar || check.expect.borderSidesEqVar;
-  const extraEdgeColorSelectorVar = check.expect.edgeColorEqVar;
   const radiusVar = check.expect.insetBand?.radiusVar || check.expect.borderRadiusPx?.radiusVar;
   return {
     selector: check.selector,
@@ -1961,7 +1934,6 @@ function probeArgsFor(check, theme) {
     extraBgVarName: extraBgSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBgSelectorVar}` : null,
     extraColorVarName: extraColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraColorSelectorVar}` : null,
     extraBorderColorVarName: extraBorderColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraBorderColorSelectorVar}` : null,
-    extraEdgeColorVarName: extraEdgeColorSelectorVar ? `--${NS_BY_SURFACE[check.surface]}-${extraEdgeColorSelectorVar}` : null,
     radiusVarName: radiusVar ? `--${NS_BY_SURFACE[check.surface]}-${radiusVar}` : null,
     childSelectors: check.expect.fusedChildrenFlat?.children || check.expect.fusedStateStableChildren || check.expect.edgeClickable?.children || null,
     focusTargetSelector: check.state === "focusWithin" ? check.focusTarget : null,
@@ -2893,26 +2865,53 @@ async function recordWeakTextHits(page, surface, theme, results, context) {
 }
 
 // ---- fieldHoverContrast (family 14; stage 3c final review B1, rebuilt for
-// the B+ field family 2026-09-28). COMPONENTS.md §6.1/§6.2/§9.1 law 9: a value
-// box's WCAG 1.4.11 boundary is its 1px BOTTOM EDGE (--opt-field-edge); the
-// other three sides collapse into the fill (Soft Fill law 1) or carry a pilot
-// frame, so the sweep reads border-bottom-color. Population: every visible
-// enabled text-entry control in the active panel (wider than the CSS :is()
-// list on purpose, so a field that escapes the family is caught) plus the
-// drawn listbox button, the one non-text value box carrying the edge. Each is
-// measured with the real pointer, parked (rest) and hovered, after finishing
-// its own transitions. Pass = the edge is painted (width > 0, style not
-// none/hidden) and clears 3:1 against the control's own
-// fill (inner) AND the backdrop behind it (outer) at rest AND on hover, and
-// hover is strictly higher contrast than rest on both sides (never lighter,
-// never a no-op). One OK/FAIL row per (theme, control).
+// the B+ field family 2026-09-28 and again for stage 4 2026-09-30). spec
+// docs/superpowers/specs/2026-09-30-ui-fields-stage4-design.md §2 / §5.1,
+// COMPONENTS.md §6.1 / §9.1 law 9: a value box is announced by its FILL --
+// there is no bottom edge -- so the sweep reads, with the real pointer
+// parked (rest) and on the box (hover), after its own transitions finish:
+// the box's composited fill, the backdrop behind it, and all four border
+// sides. Verdicts, one OK/FAIL row per (theme, control):
+//   every box   -- at rest and on hover all four sides are painted (width >
+//                  0, style not none/hidden) and identical (colour, width,
+//                  style): the render proof that no side is drawn apart;
+//   fill step   -- every theme outside FIELD_UNSEPARATED_FRAMED: F1 rest
+//                  fill vs backdrop, F2 hover fill vs rest fill, F3 hover
+//                  fill vs backdrop, each >= FILL_SEPARATE_MIN (spec §2.3);
+//   frame step  -- a FIELD_UNSEPARATED_FRAMED theme (a pilot frame whose
+//                  fill does not separate from its hosts; deriveFieldRoles
+//                  keeps that fill on hover): the box paints a frame
+//                  distinct from its fill, the fill holds on hover, and the
+//                  hover frame steps >= FIELD_FRAME_HOVER_MIN (contrast) and
+//                  >= FIELD_FRAME_HOVER_MIN_DE (CIEDE2000) against the rest
+//                  frame and reads stronger on the fill than the rest frame.
+// The class is pinned by name, not re-derived from the measured ratios (spec
+// §2.4): a palette that drifts across FILL_SEPARATE_MIN then FAILs one rule
+// or the other instead of silently swapping which rule judges it.
+// Population: every visible enabled text-entry control in the active panel
+// (wider than the CSS :is() list on purpose, so a field that escapes the
+// family is caught) plus the drawn listbox button.
 const FIELD_HOVER_SEL = [
   "input:not([type])", 'input[type="text"]', 'input[type="password"]', 'input[type="number"]',
   'input[type="search"]', 'input[type="url"]', 'input[type="email"]', 'input[type="tel"]', "textarea", "button.listbox-btn",
 ].map((s) => `.panel.active ${s}`).join(", ");
 // The kinds the family actually ships; every theme must reach at least one
-// of each or the sweep is vacuous for that kind (SETUP ERROR).
+// of each or the sweep is vacuous for that kind (SETUP ERROR). Family 9's
+// value-box radius law requires the same kinds on options.
 const FIELD_HOVER_REQUIRED_KINDS = ['input[type="text"]', 'input[type="password"]', 'input[type="number"]', "textarea", "button.listbox-btn"];
+const RADIUS_VALUE_BOX_REQUIRED = Object.freeze({ options: FIELD_HOVER_REQUIRED_KINDS });
+// Themes whose value boxes are framed and NOT separated from their hosts, per
+// surface (spec 2026-09-30-ui-fields-stage4-design §2.2 / §2.4): the fill
+// holds on hover and the frame carries it.
+const FIELD_UNSEPARATED_FRAMED = Object.freeze({ options: Object.freeze(["terminal", "rose-pine"]) });
+// The frame-step floors for those themes (contrast ratio and CIEDE2000 of
+// the hover frame against the rest frame, both composited over the fill):
+// what deriveFieldRoles guarantees today (field-border-hover =
+// fillSeparate(frame, [frame], fg), >= FILL_SEPARATE_MIN; lowest 1.114 on
+// terminal, 1.115 on rose-pine; no perceptual floor). spec §2.3 F8 raises
+// both (1.30 and 6) together with the derivation's frame-to-fg mix.
+const FIELD_FRAME_HOVER_MIN = FILL_SEPARATE_MIN;
+const FIELD_FRAME_HOVER_MIN_DE = 0;
 const fieldHoverScanLog = [];
 
 // Runs INSIDE the page (element handle evaluate) -- self-contained.
@@ -2937,17 +2936,20 @@ async function readFieldPaint(el) {
     path, kind,
     visible: r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none",
     disabled: !!el.disabled,
-    edge: cs.borderBottomColor, own: cs.backgroundColor, chain,
-    // The edge must be PAINTED, not only coloured (fix round 1): with
-    // border-bottom-width 0 or style none/hidden Chromium still reports the
-    // token as border-bottom-color, and the contrast math below would pass
-    // a box with no boundary at all. Painted = width > 0 (Chromium snaps a
-    // 1px border to whole device pixels: 0.666667px on this headed host).
-    edgeW: parseFloat(cs.borderBottomWidth) || 0, edgeStyle: cs.borderBottomStyle,
+    own: cs.backgroundColor, chain,
+    // All four sides (stage 4): colour, computed width and style, so the
+    // verdict can prove every side is PAINTED and none is drawn apart. With
+    // width 0 or style none/hidden Chromium still reports a side's colour
+    // (fix round 1), so colour alone would pass a missing side. Painted =
+    // width > 0: Chromium snaps a 1px border to whole device pixels
+    // (0.666667px on a 1.5-scaled headed host).
+    sides: ["Top", "Right", "Bottom", "Left"].map((side) => ({
+      color: cs[`border${side}Color`], width: parseFloat(cs[`border${side}Width`]) || 0, style: cs[`border${side}Style`],
+    })),
     // The pointer state this paint was read under, from the SAME task as
     // the paint (follow-up 6; round 3 holdPointerState judges it): a hover
-    // read without :hover measures the REST paint, and "hover edge == rest
-    // edge" then reads as a product FAIL. `focused` (round 2, gates/F5): the
+    // read without :hover measures the REST paint, and "hover fill == rest
+    // fill" then reads as a product FAIL. `focused` (round 2, gates/F5): the
     // family's hover rule is `:hover:not(:focus)`, so focus left on the
     // element (or inside it) gives the same signature with :hover=true;
     // `active` names whatever holds focus.
@@ -3206,6 +3208,7 @@ function holdSetupNote(hold) {
 }
 
 async function recordFieldHoverContrast(page, theme, results, context, kindsSeen, kindsUnmeasured) {
+  const surface = "options";
   const liveTheme = await page.evaluate(() => document.documentElement.dataset.theme || null);
   const expected = expectedDatasetTheme(theme);
   if (liveTheme !== expected) {
@@ -3224,13 +3227,21 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
     }
     return base;
   };
-  const ratios = (paint) => {
-    const inner = stackOf([paint.own, ...paint.chain], paint.path);
-    const outer = stackOf(paint.chain, paint.path);
-    const b = parse(paint.edge, "border-bottom-color", paint.path);
-    const painted = composite(b.slice(0, 3), b[3], inner);
-    return { inner: cr(painted, inner), outer: cr(painted, outer) };
+  // What the box paints: its composited fill, the backdrop behind it, and
+  // its frame (the top side -- oneFrame below proves the other three match)
+  // composited over that fill.
+  const paints = (paint) => {
+    const fill = stackOf([paint.own, ...paint.chain], paint.path);
+    const backdrop = stackOf(paint.chain, paint.path);
+    const b = parse(paint.sides[0].color, "border-top-color", paint.path);
+    return { fill, backdrop, frame: composite(b.slice(0, 3), b[3], fill) };
   };
+  const sidePainted = (side) => side.width > 0 && !/^(?:none|hidden)$/.test(side.style || "none");
+  const oneFrame = (paint) => paint.sides.every((side) => sidePainted(side) &&
+    side.color === paint.sides[0].color && side.width === paint.sides[0].width && side.style === paint.sides[0].style);
+  const sameRgb = (a, b) => a.every((c, i) => Math.abs(c - b[i]) <= 1);
+  const sidesText = (paint) => paint.sides.map((side) => `${side.color} ${side.width}px ${side.style}`).join("|");
+  const frameStepTheme = (FIELD_UNSEPARATED_FRAMED[surface] || []).includes(theme);
   // Only MEASURED rows (OK / FAIL) count as scanned and as a kind seen: a
   // SETUP row was reached but never measured, so counting it would let the
   // non-vacuity guard and the coverage line report a measurement that did
@@ -3266,24 +3277,35 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
       kindsUnmeasured[rest.kind] = kindsUnmeasured[rest.kind] || [];
       kindsUnmeasured[rest.kind].push(`${rest.path} [${setup.kind}] ${setup.actual}`);
       results.push({
-        surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
+        surface, theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
         status: "SETUP", setup: setup.kind, actual: setup.actual,
         expected: "the real pointer's :hover reaches the probed element with focus elsewhere, and leaves it at rest, undisturbed through each read (harness precondition for the fieldHoverContrast verdict)",
         note: setup.note,
       });
       continue;
     }
-    const r = ratios(rest), v = ratios(hover);
-    const painted = (p) => p.edgeW > 0 && !/^(?:none|hidden)$/.test(p.edgeStyle || "none");
-    const ok = painted(rest) && painted(hover) &&
-      r.inner >= 3 && r.outer >= 3 && v.inner >= 3 && v.outer >= 3 && v.inner > r.inner && v.outer > r.outer;
+    const r = paints(rest), v = paints(hover);
+    const sidesOk = oneFrame(rest) && oneFrame(hover);
+    const framed = !sameRgb(r.frame, r.fill);
+    let ok, actual, expected;
+    if (frameStepTheme) {
+      const step = cr(v.frame, r.frame), stepDE = deltaE2000(v.frame, r.frame), onFillRest = cr(r.frame, r.fill), onFillHover = cr(v.frame, v.fill);
+      ok = sidesOk && framed && sameRgb(v.fill, r.fill) && step >= FIELD_FRAME_HOVER_MIN && stepDE >= FIELD_FRAME_HOVER_MIN_DE && onFillHover > onFillRest;
+      actual = `frame step ${round2(step)} / ΔE2000 ${round2(stepDE)} (hover frame vs rest frame), frame on fill ${round2(onFillRest)}->${round2(onFillHover)}, fill rgb(${r.fill})->rgb(${v.fill}); sides rest ${sidesText(rest)} -> hover ${sidesText(hover)}`;
+      expected = `framed-unseparated class (FIELD_UNSEPARATED_FRAMED.${surface}): all four sides painted and one colour at rest and on hover, a frame distinct from the fill, the fill held on hover, the frame stepping >= ${FIELD_FRAME_HOVER_MIN} and ΔE2000 >= ${FIELD_FRAME_HOVER_MIN_DE} against the rest frame and reading stronger on the fill (spec 2026-09-30-ui-fields-stage4-design §2.2 / §2.3)`;
+    } else {
+      const f1 = cr(r.fill, r.backdrop), f2 = cr(v.fill, r.fill), f3 = cr(v.fill, v.backdrop);
+      ok = sidesOk && f1 >= FILL_SEPARATE_MIN && f2 >= FILL_SEPARATE_MIN && f3 >= FILL_SEPARATE_MIN;
+      actual = `F1 rest fill vs backdrop ${round2(f1)}, F2 hover vs rest fill ${round2(f2)}, F3 hover fill vs backdrop ${round2(f3)} (${framed ? "framed" : "unframed"}; fill rgb(${r.fill})->rgb(${v.fill}) on rgb(${r.backdrop})); sides rest ${sidesText(rest)} -> hover ${sidesText(hover)}`;
+      expected = `fill-step class: all four sides painted and one colour at rest and on hover (no bottom edge), rest fill vs backdrop, hover fill vs rest fill and hover fill vs backdrop each >= ${FILL_SEPARATE_MIN} (FILL_SEPARATE_MIN; spec 2026-09-30-ui-fields-stage4-design §2.3 F1-F3)`;
+    }
     scanned++;
     kindsSeen[rest.kind] = (kindsSeen[rest.kind] || 0) + 1;
     results.push({
-      surface: "options", theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
+      surface, theme, selector: rest.path, state: `hover|${context}`, check: "fieldHoverContrast",
       status: ok ? "OK" : "FAIL",
-      actual: `edge inner ${round2(r.inner)}->${round2(v.inner)}, outer ${round2(r.outer)}->${round2(v.outer)} (rest ${rest.edge} ${rest.edgeW}px ${rest.edgeStyle} -> hover ${hover.edge} ${hover.edgeW}px ${hover.edgeStyle})`,
-      expected: "a painted bottom edge (width > 0, style not none/hidden) >=3:1 against the control's fill and its backdrop at rest and on hover, hover strictly higher on both (COMPONENTS.md §6.1/§9.1 law 9: edge -> edge-hover = mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX))",
+      actual,
+      expected,
       note: null,
       // Per-run pointer/focus diagnostics, kept out of `actual` so a ledger
       // rewrite never churns on them (round 2, correctness/F6).
@@ -4510,10 +4532,18 @@ const SWEEP_CFG = {
   //    the surface's radius TOKENS as currently resolved on <html> (they are
   //    theme-variant: 15 presets restyle --opt-radius-md, so the probe reads
   //    the live values; `tokens` below is only the fallback when none resolve)
-  //    or a pill; fused-shell descendants carry concentric (token - border)
-  //    radii and are exempt. A top/bottom split (top pair equal, bottom pair
-  //    equal: the B+ value box's md md sm sm, 2026-09-28) is measured pair by
-  //    pair; left/right splits and single-corner cuts are still skipped.
+  //    or a pill. A fused shell's DESCENDANTS carry concentric (token -
+  //    border) radii and are exempt; the shell itself is measured like any
+  //    other box (stage 4, spec 2026-09-30-ui-fields-stage4-design §5.1).
+  //    Non-uniform corners are skipped by this walk (left/right splits and
+  //    single-corner cuts are fused-segment geometry). VALUE BOXES carry a
+  //    positive law instead (spec §2.1): all four corners == the surface's
+  //    md, by name (`valueBoxes`), with two named exceptions
+  //    (`valueBoxExempt`): the theme-name popover input (sm on all four, a
+  //    popover's compact field) and the popup tag shell while its suggestion
+  //    list is open (.ac-open squares its two bottom corners to seat the
+  //    list). runSweep fails SETUP when a surface in
+  //    RADIUS_VALUE_BOX_REQUIRED misses a required kind.
   // 10. textFloor -- no visible text under 11px on any surface (popup and
   //     options carried 10px and 9px captions; 11px is every surface's hint size).
   textFloor: { min: 11, exempt: "sup, sub" },
@@ -4522,6 +4552,12 @@ const SWEEP_CFG = {
     names: ["sm", "md", "lg", "full", "tag"],
     tokens: { options: [3, 8, 10], popup: [3, 8, 10], library: [4, 8, 12], "md-preview": [4, 8, 12] },
     exemptWithin: ".vocab-sort-seg, .source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split",
+    valueBoxes: {
+      options: '.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg textarea, .fg select, .listbox-btn, .mobile-tab-picker select, .options-search input[type="search"]',
+      popup: "#url-input, #title-input, #description-input, .tags-input-wrap, #token-input, #search-input",
+      library: "#vocab-search, #notes-filter, #vocab-lookup-input, #vocab-group-filter, #vocab-lookup-lang, .xp-dict-lang, .vocab-group-unit, .vocab-note-input",
+    },
+    valueBoxExempt: '.theme-name-popover input[type="text"], .tags-input-wrap.ac-open',
   },
   // 11. spacingScale -- every computed margin / padding / gap on a chromed
   //     surface is a value of that surface's spacing scale, read live from
@@ -4961,35 +4997,37 @@ function sweepProbe(cfg) {
       if (fs < cfg.textFloor.min - 0.01) hits.push({ kind: "textFloor", path: pathOf(el), fontSize: Math.round(fs * 100) / 100, detail: `${fs}px` });
     }
     const radiusTokens = liveTokens.length ? liveTokens : (cfg.radiusScale.tokens[surface] || []);
+    const mdRadius = parseFloat(rootCs.getPropertyValue(`${cfg.radiusScale.prefix[surface] || "--radius-"}md`));
+    const valueBoxSel = cfg.radiusScale.valueBoxes[surface] || null;
     for (const el of document.querySelectorAll("*")) {
-      if (!visible(el) || excluded(el) || el.closest(cfg.radiusScale.exemptWithin)) continue;
+      // Descendants only (`parentElement`): the fused shell itself is measured.
+      if (!visible(el) || excluded(el) || el.parentElement?.closest(cfg.radiusScale.exemptWithin)) continue;
       if (el.closest("svg")) continue;
       const cs = getComputedStyle(el);
-      const chromed = (cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== "transparent") || parseFloat(cs.borderTopWidth) > 0 || cs.outlineStyle !== "none";
-      if (!chromed) continue;
       const corners = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius];
-      const onScale = (r) => /%$/.test(r) || parseFloat(r) === 0 || parseFloat(r) >= 999 || radiusTokens.some((t) => Math.abs(parseFloat(r) - t) < 0.5);
-      if (corners.every((c) => c === corners[0])) {
-        if (onScale(corners[0])) continue;
-        hits.push({ kind: "radiusScale", path: pathOf(el), radius: corners[0], tokens: radiusTokens, detail: corners[0] });
+      if (valueBoxSel && el.matches(valueBoxSel) && !el.matches(cfg.radiusScale.valueBoxExempt)) {
+        // Liveness marker, not a hit: runSweep's add() counts it per surface
+        // and kind, so a run proves the value-box law measured something (a
+        // vacuous walk and a clean one would both read as 0 FAIL).
+        const tag = el.tagName.toLowerCase();
+        const kind = tag === "input" ? `input[type="${el.type}"]` : tag === "button" ? "button.listbox-btn"
+          : tag === "textarea" || tag === "select" ? tag : `.${el.classList[0]}`;
+        hits.push({ kind: "radiusValueBoxMeasured", path: pathOf(el), detail: kind });
+        if (!corners.every((c) => !/%$/.test(c) && Math.abs(parseFloat(c) - mdRadius) < 0.5)) {
+          hits.push({ kind: "radiusValueBox", path: pathOf(el), radius: corners.join(" "), md: mdRadius, detail: corners.join(" ") });
+        }
         continue;
       }
-      // Split shape (B+ field family 2026-09-28): top pair equal, bottom pair
-      // equal -- the flat-bottomed value box (md md sm sm), a sheet (lg lg 0 0),
-      // a tab (0 0 md md). Until now every non-uniform box was skipped
-      // outright, so the field shape would have "passed" unmeasured. Each pair
-      // must sit on the scale (0 allowed). Left/right splits and single-corner
-      // cuts stay skipped: fused-segment geometry (exemptWithin above) and
-      // concentric calc(token - 1px) values the scale cannot express.
-      const [tl, tr, br, bl] = corners;
-      if (tl !== tr || bl !== br) continue;
-      // Liveness marker, not a hit: runSweep's add() diverts it into the
-      // per-surface "[radiusScale] split top/bottom pairs measured" count, so
-      // a run can prove this branch measured something (a vacuous branch and
-      // a clean one would otherwise both read as 0 radiusScale FAIL).
-      hits.push({ kind: "radiusSplitMeasured", path: pathOf(el), detail: corners.join(" ") });
-      if (onScale(tl) && onScale(bl)) continue;
-      hits.push({ kind: "radiusScale", path: pathOf(el), radius: corners.join(" "), tokens: radiusTokens, detail: corners.join(" ") });
+      const chromed = (cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== "transparent") || parseFloat(cs.borderTopWidth) > 0 || cs.outlineStyle !== "none";
+      if (!chromed) continue;
+      // Non-uniform corners: left/right or top/bottom splits and single-corner
+      // cuts are fused-segment geometry and concentric calc(token - 1px)
+      // values the scale cannot express -- skipped (the value boxes above are
+      // the one shape held to four equal corners).
+      if (!corners.every((c) => c === corners[0])) continue;
+      const onScale = (r) => /%$/.test(r) || parseFloat(r) === 0 || parseFloat(r) >= 999 || radiusTokens.some((t) => Math.abs(parseFloat(r) - t) < 0.5);
+      if (onScale(corners[0])) continue;
+      hits.push({ kind: "radiusScale", path: pathOf(el), radius: corners[0], tokens: radiusTokens, detail: corners[0] });
     }
     // ---- 11. spacingScale. Typed OM (computedStyleMap) gives the COMPUTED
     // value, which still distinguishes `auto` / `normal` keywords and
@@ -5196,16 +5234,18 @@ async function runFamilySweep(page) {
 
 async function runSweep(page, sw, extBase) {
   const hits = [];
-  // family 9 liveness (P6a): sweepProbe reports every top/bottom split-radius
-  // box it measured as a `radiusSplitMeasured` marker; those are counted per
-  // surface here and never reach the hit list (they are not failures).
-  const splitPairs = {};
+  // family 9 liveness (stage 4): sweepProbe reports every value box whose
+  // four corners it measured as a `radiusValueBoxMeasured` marker; those are
+  // counted per surface and kind here and never reach the hit list (they
+  // are not failures).
+  const valueBoxRadii = {};
   const add = (found, surface, context) => {
     for (const h of found) {
-      if (h.kind === "radiusSplitMeasured") {
-        const s = (splitPairs[surface] ||= { measured: 0, paths: new Set() });
+      if (h.kind === "radiusValueBoxMeasured") {
+        const s = (valueBoxRadii[surface] ||= { measured: 0, paths: new Set(), kinds: {} });
         s.measured++;
         s.paths.add(h.path);
+        s.kinds[h.detail] = (s.kinds[h.detail] || 0) + 1;
         continue;
       }
       hits.push({ surface, context, ...h });
@@ -5435,15 +5475,18 @@ async function runSweep(page, sw, extBase) {
   add(await runFamilySweep(page), "popup", "login");
   await sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF);
 
-  console.log("[radiusScale] split top/bottom pairs measured: " + ["options", "library", "md-preview", "popup"]
-    .map((s) => `${s}=${splitPairs[s]?.measured || 0} (${splitPairs[s]?.paths.size || 0} unique)`).join(" "));
-  // Non-vacuity (family 9, fix round 1), in the style of family 14's
-  // missingKinds guard: every options value box is md md sm sm, so a sweep
-  // that measured no split pair on options means the branch went vacuous
-  // (a broken pair guard, exemptWithin or visibility swallowing .fg fields).
-  if (!(splitPairs.options?.measured > 0)) {
-    throw new Error("SETUP ERROR: radiusScale (family 9) measured 0 top/bottom split-radius boxes on options -- the split branch is vacuous. " +
-      "Options value boxes are md md sm sm (spec 2026-09-28-ui-fields-bplus-design §3); if the design changes to uniform corners, update this guard.");
+  console.log("[radiusScale] value boxes measured (four corners == md): " + ["options", "library", "md-preview", "popup"]
+    .map((s) => `${s}=${valueBoxRadii[s]?.measured || 0} (${valueBoxRadii[s]?.paths.size || 0} unique; ${JSON.stringify(valueBoxRadii[s]?.kinds || {})})`).join(" "));
+  // Non-vacuity (family 9, stage 4), in the style of family 14's missingKinds
+  // guard: every kind RADIUS_VALUE_BOX_REQUIRED lists for a surface must have
+  // been measured at least once, or the value-box law went vacuous there (a
+  // stale `valueBoxes` selector, a visibility change, a fixture that stopped
+  // rendering the box).
+  for (const [surface, kinds] of Object.entries(RADIUS_VALUE_BOX_REQUIRED)) {
+    const missing = kinds.filter((k) => !valueBoxRadii[surface]?.kinds[k]);
+    if (missing.length) {
+      throw new Error(`SETUP ERROR: radiusScale (family 9) measured no visible ${missing.join(" / ")} value box on ${surface} (measured kinds ${JSON.stringify(valueBoxRadii[surface]?.kinds || {})}) -- the four-corners-equal-md law is vacuous there`);
+    }
   }
   return hits;
 }
@@ -5467,6 +5510,7 @@ function reportSweep(hits) {
     else if (h.kind === "headerFace") console.log(`  headerFace         [${h.surface}/${h.context}]  ${h.path}  face=${h.face}  majority=${h.majority}`);
     else if (h.kind === "actionRowGap") console.log(`  actionRowGap       [${h.surface}/${h.context}]  ${h.path}  gap=${h.gap}px  allowed=${h.allowed.join("|")}`);
     else if (h.kind === "radiusScale") console.log(`  radiusScale        [${h.surface}/${h.context}]  ${h.path}  radius=${h.radius}  tokens=${h.tokens.join("|")}`);
+    else if (h.kind === "radiusValueBox") console.log(`  radiusValueBox     [${h.surface}/${h.context}]  ${h.path}  radius=${h.radius}  md=${h.md}px`);
     else if (h.kind === "textFloor") console.log(`  textFloor          [${h.surface}/${h.context}]  ${h.path}  font-size=${h.fontSize}px`);
     else if (h.kind === "spacingScale") console.log(`  spacingScale       [${h.surface}/${h.context}]  ${h.path}  ${h.prop}=${h.value}px  scale=${h.scale.join("|")}`);
     else if (h.kind === "clusterGap") console.log(`  clusterGap         [${h.surface}/${h.context}]  ${h.path}  gap=${h.gap}px  expected=${h.expected}px`);
@@ -5550,7 +5594,7 @@ function report(results) {
   // under a SETUP row's surface|theme|selector|state| prefix is held out of
   // STALE -- a checklist SETUP row renames its check (hoverApplied /
   // hoverUnfocused), so the prefix, not the full key, is what matches the
-  // ledger's bgEqVar / edgeColorEqVar / ... entries for that row.
+  // ledger's bgEqVar / borderSidesEqVar / ... entries for that row.
   const setupPrefixes = [...new Set(setupRows.map((r) => `${r.surface}|${r.theme}|${r.selector}|${r.state}|`))];
   const unmeasuredKnown = Object.keys(known).filter((k) => !seenKeys.has(k) && setupPrefixes.some((p) => k.startsWith(p)));
   const stale = SHARD ? [] : Object.keys(known).filter((k) => !seenKeys.has(k) && !unmeasuredKnown.includes(k));
@@ -5879,6 +5923,7 @@ async function main() {
       headerFace: (h) => ({ actual: h.face, expected: h.majority, note: "section heading face differs from the surface majority" }),
       actionRowGap: (h) => ({ actual: h.gap, expected: h.allowed.join("|"), note: "column-gap of a button row (px)" }),
       radiusScale: (h) => ({ actual: h.radius, expected: h.tokens.map((t) => t + "px").join("|"), note: "border-radius off the surface's token scale" }),
+      radiusValueBox: (h) => ({ actual: h.radius, expected: `${h.md}px on all four corners`, note: "a value box's four corners must all equal the surface's --*-radius-md (spec 2026-09-30-ui-fields-stage4-design §2.1; named exceptions: the theme-name popover input, .tags-input-wrap.ac-open)" }),
       textFloor: (h) => ({ actual: h.fontSize, expected: ">=11", note: "visible text below the 11px floor" }),
       clusterGap: (h) => ({ actual: h.gap, expected: String(h.expected), note: "column-gap of an icon-button cluster (px): one rung on every surface" }),
     };

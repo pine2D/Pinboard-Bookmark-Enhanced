@@ -317,17 +317,18 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    higher (popover, not menu) because it can open over the sticky nav column.
    Width follows the select exception (§10.2 .fg.entry-block row): content-
    sized, 240px floor, never wider than the column; the button fills it.
-   The button is a B+ value box (spec 2026-09-28-ui-fields-bplus-design):
-   field fill, collapsed/framed sides, the >=3:1 bottom edge, md/md/sm/sm
-   radius, hover never borrows the focus colour; the chevron is the field's
-   secondary ink.
+   The button is a value box (spec 2026-09-30-ui-fields-stage4-design
+   §2.1): field fill, all four sides one colour (collapsed into the fill,
+   or the pilot frame), one md radius on all four corners -- no bottom
+   edge -- and hover never borrows the focus colour; the chevron is the
+   field's secondary ink.
    Colours are token pairs already verified per theme: active = btn-hover +
    btn-fg (the control hover pair), selected = accent + on-accent (the
    primary-button pair), disabled = fg-hint on panel. No :has(), no inline
    styles: the flip is the data-flip attribute the script sets on open. ---- */
 .listbox { position: relative; display: inline-block; width: max-content; min-width: 240px; max-width: 100%; }
-.listbox-btn { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 0 var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-field-fg); background: var(--opt-field-bg); border: 1px solid var(--opt-field-border); border-bottom-color: var(--opt-field-edge); border-radius: var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm); cursor: pointer; text-align: left; }
-.listbox-btn:hover { background: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); border-bottom-color: var(--opt-field-edge-hover); }
+.listbox-btn { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 0 var(--opt-sp-4); width: 100%; height: var(--opt-control-h); padding: 0 var(--opt-sp-4) 0 var(--opt-control-pad-x); font: inherit; font-size: var(--opt-text-body); color: var(--opt-field-fg); background: var(--opt-field-bg); border: 1px solid var(--opt-field-border); border-radius: var(--opt-radius-md); cursor: pointer; text-align: left; }
+.listbox-btn:hover { background: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); }
 .listbox-btn:focus-visible { outline: none; background: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
 .listbox-btn .btn-ic { flex: none; width: 16px; height: 16px; color: var(--opt-field-placeholder); }
 .listbox-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1632,27 +1633,12 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
    above; roles derived by composers/_ui-derive.mjs deriveFieldRoles). The
    stage-0 panel-fill + --opt-border frame override and the stage-3c hover mix
    that used to live here are retired (spec 2026-09-28-ui-fields-bplus-design
-   §3); their rulings are superseded in the ledger. */
-/* B+ shape half (spec 2026-09-28-ui-fields-bplus-design §3; COMPONENTS.md
-   §6.1, §9.1 law 9). A text-entry value box keeps ONE >=3:1 bottom edge as its
-   "type here" indicator (Chrome settings cr-input / Material Filled) and a
-   flat bottom: md top corners, sm bottom corners. The edge follows the state:
-   field-edge -> field-edge-hover -> the focus border on all four sides.
-   Specificity is load-bearing. Rest (0,2,1) sits after the generated border
-   shorthand (0,2,1) and wins the bottom side on source order. The generated
-   hover (0,3,1) rewrites every side, so the hover rule below restates the
-   bottom side at (0,4,1). The generated focus is only (0,2,1) and sits BEFORE
-   this block, so on focus the rest rule here wins the bottom side back (the
-   rest edge would sit under a focus frame); the focus rule below restates it
-   at (0,3,1) to beat this rest rule, not the generated focus. The native
-   <select> fallback is OUT of this list on purpose: fill only, no edge
-   (§6.4). */
-.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea) {
-  border-bottom-color: var(--opt-field-edge);
-  border-radius: var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm);
-}
-.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea):hover:not(:focus) { border-bottom-color: var(--opt-field-edge-hover); }
-.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea):focus { border-bottom-color: var(--opt-field-border-focus); }
+   §3); their rulings are superseded in the ledger. So is the B+ shape half
+   that followed this comment -- a >=3:1 bottom edge and md/md/sm/sm corners
+   (spec 2026-09-30-ui-fields-stage4-design §2.1, COMPONENTS.md appendix
+   C50): a value box is its fill alone, all four sides one colour and the
+   generated recipe's md radius on all four corners, so no hand rule here
+   restates a side or a corner. */
 /* The padding shorthand above resets padding-right to --opt-control-pad-x on
    EVERY matched input, including a `.key-wrap`'s -- clobbering the 32px gap
    `.fg .key-wrap input { padding-right: 32px; }` (COMPONENTS.md §8) reserves
@@ -2030,25 +2016,24 @@ html.motion-ready #preset-preview-section > summary::after {
    2px width + 1px offset = 3px into a 2px gutter). An inner ring cutting
    across the container's chrome is the same defect shape the group row was
    rejected for, one order of magnitude smaller. */
-/* (0,4,1), and after the B+ shape block's hover rule (also (0,4,1)) in source
-   order: with the EYE focused and the pointer over the input, the unit's
-   focus frame must beat the generated hover (0,3,1) and the hand hover
-   (0,4,1) on fill, all four sides and the bottom edge -- at the old (0,2,1)
-   both hovers repainted the frame while the ring stayed. Every .key-wrap
+/* (0,4,1): with the EYE focused and the pointer over the input, the unit's
+   focus frame must beat the generated hover (0,3,1) on fill and all four
+   sides -- at the old (0,2,1) the hover repainted the frame while the ring
+   stayed. Every .key-wrap
    sits in a .fg and holds a text or password input (options.html + the
    export-target builder in options.js). */
 .fg .key-wrap:focus-within :is(input[type="text"], input[type="password"]) { background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
 /* The pointer over the EYE is still inside the field. The eye is the input's
    sibling (absolutely positioned over its right end), so moving onto it drops
-   the input's own :hover and the whole B+ hover paint -- fill, frame, bottom
-   edge -- snapped back to rest while the pointer was visibly inside the box
+   the input's own :hover and the whole hover paint -- fill and all four
+   sides -- snapped back to rest while the pointer was visibly inside the box
    (final review C-1; Chrome's cr-input keeps hover on the host). Restated on
-   the unit's :hover at (0,5,1): above the generated hover (0,3,1) and the
-   hand rest/hover edge rules; `:not(:focus-within)` makes it mutually
-   exclusive with the focus frame above, so focus still wins whichever piece
-   holds it. ui-contract pins it (a render-audit hover row can only hover the
-   probed element itself, not a sibling). */
-.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"]) { background-color: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); border-bottom-color: var(--opt-field-edge-hover); }
+   the unit's :hover at (0,5,1), above the generated hover (0,3,1);
+   `:not(:focus-within)` makes it mutually exclusive with the focus frame
+   above, so focus still wins whichever piece holds it. ui-contract pins it
+   (a render-audit hover row can only hover the probed element itself, not a
+   sibling). */
+.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"]) { background-color: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover); }
 /* Hover is where the eye may show a fill -- a pointer affordance, and not a
    state the rest/focus invariant covers. The chip mixes over the fill the
    input actually paints under it: the HOVER fill while the unit is not
@@ -2822,14 +2807,13 @@ html[data-theme="rose-pine"] .mobile-tab-picker select {
 /* ---- Select controls adopt the md-preview dropdown design (dropdown-design
    round, user request). Two layers, matching md-preview.css .exp-img-row
    select + its ::picker block (shipped bbd8eb1):
-   1. CLOSED control: the same field fill as the text inputs -- a B+ value
+   1. CLOSED control: the same field fill as the text inputs -- a value
       box painted by the generated field recipe (--opt-field-bg, hover
-      --opt-field-bg-hover, focus frame --opt-field-border-focus). It differs
-      from a text input by carrying NO bottom edge (a pick-one control, not a
-      type-here field; spec 2026-09-28-ui-fields-bplus-design §3 / §6.4),
-      uniform md corners and a drawn chevron. Width is content-sized (the
-      generated .fg select rule: max-content, 240px floor, never past the
-      column).
+      --opt-field-bg-hover, focus frame --opt-field-border-focus), the same
+      shape as a text input (no value box carries a bottom edge; md on all
+      four corners -- spec 2026-09-30-ui-fields-stage4-design §2.1) plus a
+      drawn chevron. Width is content-sized (the generated .fg select rule:
+      max-content, 240px floor, never past the column).
    2. OPEN list (@supports block below): Chrome 135+ customizable select
       renders the option popup in-page so it can carry the same surface /
       border / radius / shadow / row-hover recipe as md-preview's .send-menu,
@@ -3063,6 +3047,10 @@ html.motion-ready .theme-name-popover.is-closing {
   transition-duration: var(--motion-pop-out);
 }
 .theme-name-popover label { font-size: 12px; color: var(--opt-fg-soft); margin: 0; }
+/* The one named radius exception among value boxes (spec 2026-09-30-ui-
+   fields-stage4-design §2.1): sm on all four corners, a popover's compact
+   field. It still takes the whole .fg recipe (it sits in .fg.edit-area);
+   render family 9 exempts it by name from the "four corners == md" law. */
 .theme-name-popover input[type="text"] {
   border-radius: var(--opt-radius-sm); width: 100%; box-sizing: border-box;
 }
@@ -3707,9 +3695,9 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     min-height: 34px;
     padding: var(--opt-sp-3) 26px var(--opt-sp-3) var(--opt-sp-5);
     border: 1px solid var(--opt-field-border);
-    /* Dropdown-design round: joins the .fg select family (7px
-       radius, drawn chevron, field fill (B+ value box, fill only -- no
-       bottom edge)). It used to keep the UA arrow;
+    /* Dropdown-design round: joins the .fg select family (md
+       radius on all four corners, drawn chevron, field fill -- a value
+       box, no bottom edge). It used to keep the UA arrow;
        the @supports picker block above hides ::picker-icon for ALL selects,
        so without its own drawn chevron this control would lose its arrow
        entirely on Chrome 135+ (Codex review). Longhand background-*

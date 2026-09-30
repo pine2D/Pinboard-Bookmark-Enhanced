@@ -372,28 +372,15 @@
 //                      border-color quad (added stage-3b Task 1, `.pick-mark`
 //                      -- its border is uniform on every side, so one side
 //                      stands in for all four rather than a second raw shape).
-//                      EXCEPT on a row that also sets edgeColorEqVar (a B+
-//                      value box, whose bottom side is the edge): there the
-//                      frame is every other side, and top, right AND left
-//                      (indices 0, 1, 3) must all equal the token AND be
-//                      painted (width > 0, style not none/hidden; final
-//                      review G4) -- a side-only repaint or a side-only
-//                      unpaint cannot hide behind a correct top.
-//   edgeColorEqVar   -- role name (e.g. "field-edge"): the element's BOTTOM
-//                      border-color (index 2 of the computed top|right|bottom|
-//                      left quad) must equal (+-1/channel) the active theme's
-//                      `--{ns}-{role}`, AND the bottom side must be painted
-//                      (computed width > 0 -- Chromium snaps a 1px border to
-//                      whole device pixels, 0.666667px on a 1.5-scaled host --
-//                      and style not none/hidden; Chromium keeps the colour
-//                      of an unpainted side). Own probe slot
-//                      (extraEdgeColorVarName), so one row can pin bgEqVar +
-//                      borderColorEqVar (top/right/left) + edgeColorEqVar
-//                      (bottom) -- a B+ value box's three rest paints (spec
-//                      2026-09-28-ui-fields-bplus-design §3).
 //   borderSidesEqVar -- role name: ALL FOUR computed border sides equal the
-//                      token and are painted (a focused value box paints one
-//                      focus colour all round; the edge must follow focus).
+//                      token and are painted (computed width > 0 -- Chromium
+//                      snaps a 1px border to whole device pixels, 0.666667px
+//                      on a 1.5-scaled host -- and style not none/hidden;
+//                      Chromium keeps the colour of an unpainted side). A
+//                      value box paints one frame colour all round in every
+//                      state (stage 4, spec 2026-09-30-ui-fields-stage4-
+//                      design §2.1: no bottom edge), so a side-only repaint
+//                      or unpaint cannot hide behind a correct top side.
 //                      Shares borderColorEqVar's probe slot -- a row may not
 //                      set both (SETUP ERROR).
 //
@@ -1687,35 +1674,39 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: "#translate-target-lang-btn", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 }, widthPx: { min: 240 },
       widthLteWith: { selector: ".fg:has(#translate-target-lang-btn)" }, hitRectMin: { height: 24 } } },
-  // ---- B+ field family (spec 2026-09-28-ui-fields-bplus-design §3, COMPONENTS.md
-  // §6.1/§6.2/§9.1 law 9): token IDENTITY of a value box's paints -- rest fill /
-  // collapsed-or-framed sides / bottom edge, hover fill / sides / edge, and the
-  // one-colour focus frame -- on a plain entry-block text field, a key-wrap
-  // secret, the textarea and the drawn listbox. Contrast is contrast-audit's
-  // field-* rows and family 14; these rows catch a hand-written rule
-  // repainting a value box with a non-field token (the stage-0 shape). ----
+  // ---- Value boxes (B+ field family 2026-09-28; stage 4, spec 2026-09-30-
+  // ui-fields-stage4-design §2.1; COMPONENTS.md §6.1/§6.2/§9.1 law 9): token
+  // IDENTITY of a value box's paints -- rest fill + one frame colour on all
+  // four sides (collapsed into the fill, or the pilot frame), the same on
+  // hover, and the one-colour focus frame -- on a plain entry-block text
+  // field, a key-wrap secret, the textarea and the drawn listbox. Four sides,
+  // not three plus a bottom edge: stage 4 retired the edge, and
+  // borderSidesEqVar holds every side painted and equal. Contrast is
+  // contrast-audit's field-* rows and family 14; these rows catch a
+  // hand-written rule repainting a value box with a non-field token (the
+  // stage-0 shape) or drawing one side apart (the B+ edge). ----
   { surface: "options", page: "options.html", selector: "#dict-anki-deck", tab: "vocab", state: "default",
-    expect: { bgEqVar: "field-bg", borderColorEqVar: "field-border", edgeColorEqVar: "field-edge" } },
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
   { surface: "options", page: "options.html", selector: "#dict-anki-deck", tab: "vocab", state: "hover",
-    expect: { bgEqVar: "field-bg-hover", borderColorEqVar: "field-border-hover", edgeColorEqVar: "field-edge-hover" } },
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
   { surface: "options", page: "options.html", selector: "#dict-anki-deck", tab: "vocab", state: "focusWithin", focusTarget: ":scope",
     expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   { surface: "options", page: "options.html", selector: "#dict-anki-key", tab: "vocab", state: "default",
-    expect: { bgEqVar: "field-bg", borderColorEqVar: "field-border", edgeColorEqVar: "field-edge" } },
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
   { surface: "options", page: "options.html", selector: "#dict-anki-key", tab: "vocab", state: "hover",
-    expect: { bgEqVar: "field-bg-hover", borderColorEqVar: "field-border-hover", edgeColorEqVar: "field-edge-hover" } },
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
   { surface: "options", page: "options.html", selector: "#dict-anki-key", tab: "vocab", state: "focusWithin", focusTarget: ":scope",
     expect: { borderSidesEqVar: "field-border-focus" } },
   { surface: "options", page: "options.html", selector: "#opt-custom-css", tab: "appearance", state: "default",
-    expect: { bgEqVar: "field-bg", borderColorEqVar: "field-border", edgeColorEqVar: "field-edge" } },
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
   { surface: "options", page: "options.html", selector: "#opt-custom-css", tab: "appearance", state: "hover",
-    expect: { bgEqVar: "field-bg-hover", borderColorEqVar: "field-border-hover", edgeColorEqVar: "field-edge-hover" } },
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
   { surface: "options", page: "options.html", selector: "#opt-custom-css", tab: "appearance", state: "focusWithin", focusTarget: ":scope",
     expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "default",
-    expect: { bgEqVar: "field-bg", borderColorEqVar: "field-border", edgeColorEqVar: "field-edge" } },
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
   { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "hover",
-    expect: { bgEqVar: "field-bg-hover", borderColorEqVar: "field-border-hover", edgeColorEqVar: "field-edge-hover" } },
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
   { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "focusWithin", focusTarget: ":scope",
     expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   // #test-gemini (Task 4): the FIRST `.btn.btn-sm` action inside #panel-ai,

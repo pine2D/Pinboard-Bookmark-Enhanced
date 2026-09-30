@@ -5828,11 +5828,11 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
 // options.html), so a .fg / .key-wrap / .entry-block text control, textarea
 // or select, the listbox button, the narrow-screen tab picker, the theme-name
 // popover input and an #id rule on any of them are all in. Beyond colour the
-// scan also rejects (fix round 1): a rule that unpaints a side -- the bottom
-// edge, and (final review G4) any of the other three, which carry the pilot
-// frame on nord-night / dracula / rose-pine / terminal (width 0 / style
-// none|hidden / transparent colour, in any physical or logical, longhand or
-// shorthand spelling); a background that drops the Soft Fill (`transparent`
+// scan also rejects (fix round 1, final review G4): a rule that unpaints any
+// side -- all four carry the box's one frame colour, collapsed into the fill
+// or the pilot frame on nord-night / dracula / rose-pine / terminal (width 0
+// / style none|hidden / transparent colour, in any physical or logical,
+// longhand or shorthand spelling); a background that drops the Soft Fill (`transparent`
 // / `none`, G2); typed text in anything but --opt-field-fg on a value box
 // that is not a fill-only native select (ruling R13; the tab picker keeps
 // --opt-fg and paints no placeholder); a hand-written --opt-field-* custom property (a
@@ -5846,8 +5846,8 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
 {
   const VALUE_BOX_EXEMPT = [
     // The byte-over-limit ERROR state of the custom-CSS box repaints its whole
-    // frame, bottom edge included, in --opt-danger on purpose (options.js
-    // toggles .over-limit); an error state outranks the field family.
+    // frame in --opt-danger on purpose (options.js toggles .over-limit); an
+    // error state outranks the field family.
     { selector: "#opt-custom-css.over-limit", property: "border-color", value: "var(--opt-danger)" },
   ];
   const isExempt = (sel, d) => VALUE_BOX_EXEMPT.some((e) => e.selector === sel && e.property === d.property && e.value === d.value.trim());
@@ -6033,17 +6033,29 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "ui-contract-tests.mjs: the value-box scan no longer discriminates -- misjudged: " + misjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
 
   const hand = stripGeneratedRegions(optionsCss);
-  const S = '.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea)';
-  const SPLIT = "var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm)";
-  const rest = declarationValueMap(hand, S);
-  check(rest.get("border-bottom-color") === "var(--opt-field-edge)" && rest.get("border-radius") === SPLIT &&
-    declarationValueMap(hand, `${S}:hover:not(:focus)`).get("border-bottom-color") === "var(--opt-field-edge-hover)" &&
-    declarationValueMap(hand, `${S}:focus`).get("border-bottom-color") === "var(--opt-field-border-focus)",
-    "options.css: the B+ shape half lost a state (rest edge + md/md/sm/sm radius, hover edge-hover at (0,4,1), focus edge = focus border at (0,3,1))");
+  // Stage 4 (spec 2026-09-30-ui-fields-stage4-design §2.1): a value box has
+  // ONE radius on all four corners -- the surface's md -- and no bottom edge.
+  // The generated base owns that radius for .fg text / password / number /
+  // select / textarea (the hand-written B+ shape half that re-split it is
+  // gone); the listbox button, a <button> outside the recipe's FIELD_SEL,
+  // declares the same md itself. The class form -- no hand rule may split a
+  // value box's radius or give it a bottom side -- is the shape scan below.
+  {
+    const genStart = optionsCss.indexOf("/* @generated:ui-components start (options) */");
+    const genEnd = optionsCss.indexOf("/* @generated:ui-components end (options) */");
+    const gen = genStart >= 0 && genEnd > genStart ? optionsCss.slice(genStart, genEnd) : "";
+    check(declarationValueMap(gen, '.fg input[type="text"]').get("border-radius") === "var(--opt-radius-md)",
+      "options.css: the generated .fg recipe no longer gives value boxes var(--opt-radius-md) on all four corners (composers/ui-components.mjs formRules)");
+  }
   const lb = declarationValueMap(hand, ".listbox-btn");
-  check(lb.get("border-bottom-color") === "var(--opt-field-edge)" && lb.get("border-radius") === SPLIT &&
-    declarationValueMap(hand, ".listbox-btn:hover").get("border-bottom-color") === "var(--opt-field-edge-hover)",
-    "options.css: the listbox button left the B+ value-box family (bottom edge / radius / hover edge)");
+  // Every top-level hover rule on the button itself, however its state
+  // exclusions are spelled (`.listbox-btn:hover`, `...:hover:not(...)`).
+  const lbHovers = parseStyleRules(hand.replace(/\/\*[\s\S]*?\*\//g, ""))
+    .filter((r) => r.context.length === 0 && r.selectors.some((sel) => /^\.listbox-btn(?![\w-])[^\s>+~]*:hover/.test(sel)))
+    .map((r) => new Map(parseDeclarations(r.body).map((d) => [d.property, d.value])));
+  check(lb.get("border-radius") === "var(--opt-radius-md)" && lb.get("border") === "1px solid var(--opt-field-border)" && !lb.has("border-bottom-color") &&
+    lbHovers.length > 0 && lbHovers.every((m) => m.get("border-color") === "var(--opt-field-border-hover)" && !m.has("border-bottom-color")),
+    "options.css: the listbox button must be a stage-4 value box -- var(--opt-radius-md) on all four corners, one --opt-field-border frame, hover --opt-field-border-hover on all four sides, no bottom edge in either state");
   check(declarationValueMap(hand, ".listbox-btn .btn-ic").get("color") === "var(--opt-field-placeholder)" &&
     declarationValueMap(hand, ".key-toggle").get("color") === "var(--opt-field-placeholder)" &&
     declarationValueMap(hand, ".key-toggle:hover").get("background") === "color-mix(in srgb, var(--opt-fg) 8%, var(--opt-field-bg-hover))" &&
@@ -6070,19 +6082,19 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     check(fw.length === 1 && optionsCss.split("\n")[fw[0].lineNum - 1].includes(".fg .key-wrap:focus-within"),
       `ui-contract-tests.mjs: rule line numbers no longer point at options.css's real lines (key-wrap frame reported at line ${fw[0]?.lineNum})`);
     // C-1 (final review): the pointer over the EYE (the input's sibling) keeps
-    // the field in its hover paint -- fill, frame and bottom edge -- via the
-    // unit's own :hover, which must out-rank the hand rest rule's edge and be
+    // the field in its hover paint -- fill and all four sides -- via the
+    // unit's own :hover, which must out-rank the generated hover and be
     // mutually exclusive with the focus frame. (A render-audit row cannot pin
     // this: its "hover" state can only hover the probed element itself.)
+    // Stage 4: no hand rest / hover edge rule is left for it to out-rank,
+    // and it restates no bottom side of its own.
     const KWH = '.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"])';
     const kwh = all.filter((r) => r.context.length === 0 && r.selectors.includes(KWH));
     const kwhDecls = new Map(kwh.flatMap((r) => parseDeclarations(r.body).map((d) => [d.property, d.value])));
-    const REST = '.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea)';
     check(kwh.length === 1 && kwhDecls.get("background-color") === "var(--opt-field-bg-hover)" &&
-      kwhDecls.get("border-color") === "var(--opt-field-border-hover)" && kwhDecls.get("border-bottom-color") === "var(--opt-field-edge-hover)" &&
-      cmpSpecificity(selectorSpecificity(KWH), selectorSpecificity(REST)) > 0 &&
+      kwhDecls.get("border-color") === "var(--opt-field-border-hover)" && !kwhDecls.has("border-bottom-color") &&
       cmpSpecificity(selectorSpecificity(KWH), selectorSpecificity(".fg input:hover:not(:focus)")) > 0,
-      `options.css: the key-wrap unit hover rule \`${KWH}\` is missing, no longer restates hover fill / frame / edge-hover, or no longer out-ranks the rest edge and the generated hover`);
+      `options.css: the key-wrap unit hover rule \`${KWH}\` is missing, no longer restates the hover fill and all four sides (--opt-field-border-hover, no separate bottom side), or no longer out-ranks the generated hover`);
     // A hover rule whose key-wrap (or an ancestor of it) carries
     // :not(:focus-within) cannot match while the unit holds focus, so it
     // cannot beat the frame; every other hover rule must lose to it.
@@ -6102,7 +6114,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     const hovers = all.filter((r) => !r.context.some((c) => /forced-colors/.test(c)) && r.selectors.some(reachesKeyWrapInput) &&
       parseDeclarations(r.body).some((d) => PAINT_RE.test(d.property)));
     check(hovers.length >= 2,
-      "ui-contract-tests.mjs: found fewer than 2 hover rules painting a key-wrap input (the generated .fg input hover + the B+ shape hover) -- the focus-within precedence check would be vacuous");
+      "ui-contract-tests.mjs: found fewer than 2 hover rules painting a key-wrap input (the generated .fg input hover + the key-wrap unit hover) -- the focus-within precedence check would be vacuous");
     const fwSpec = selectorSpecificity(FW);
     const winners = fw.length !== 1 ? [] : hovers.filter((r) => r.selectors.filter(reachesKeyWrapInput).filter((sel) => !exclusiveOfFocusWithin(sel)).some((sel) => {
       const c = cmpSpecificity(fwSpec, selectorSpecificity(sel));
@@ -6111,33 +6123,54 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     check(winners.length === 0,
       "options.css: a hover rule out-ranks the key-wrap focus frame (eye focused + pointer over the input shows hover paint): " + winners.map((r) => `${r.selectorText} (line ${r.lineNum})`).join(" | "));
   }
-  // Fill-only (spec §3): no hand rule gives the native <select> fallback or
-  // the mobile tab picker (any native select, by type or by options.html id)
-  // a bottom edge -- not by a bottom-side property (physical or logical;
-  // colour, width or style), not by ANY value that references an
-  // --opt-field-edge* token (border, border-block, border-color lists...),
-  // and not by a multi-value border-color / border-block-color whose bottom
-  // differs from its top (GI-4).
-  const selectEdges = (css) => {
+  // Stage 4 shape scan (spec 2026-09-30-ui-fields-stage4-design §2.1 / §5.1;
+  // COMPONENTS.md §6.1): no hand rule draws a value box apart from its one
+  // frame colour and one radius. Every value box by the selector model above
+  // (.fg text / password / number / textarea / select, the listbox button,
+  // the tab picker, the key-wrap inputs, the theme-name popover input, their
+  // options.html ids): no bottom-side border property (physical or logical;
+  // shorthand, colour, width or style), no value that names an
+  // --opt-field-edge* token (border, border-block, border-color lists,
+  // box-shadow...), no multi-value border-color / border-block-color whose
+  // bottom differs from its top, no multi-value border-radius and no
+  // per-corner radius longhand (physical or logical). This is the class form
+  // of the deleted B+ shape half (and of its predecessor, the native-select
+  // fill-only check, which only covered selects).
+  const RADIUS_CORNER_RE = /^border-(?:(?:top|bottom)-(?:left|right)|(?:start|end)-(?:start|end))-radius$/;
+  const valueBoxShapeOffenders = (css) => {
     const out = [];
     for (const r of parseStyleRules(css)) {
-      const sels = r.selectors.filter(isNativeSelectSelector);
+      const sels = r.selectors.filter(isValueBoxSelector);
       if (!sels.length) continue;
       for (const d of parseDeclarations(r.body)) {
         const ts = valueTokens(d.value);
         const splitBottom = (d.property === "border-color" && ts.length >= 3 && ts[2] !== ts[0]) ||
           (d.property === "border-block-color" && ts.length >= 2 && ts[1] !== ts[0]);
-        if (/^border-(?:bottom|block-end)(?:-(?:color|width|style))?$/.test(d.property) || /--opt-field-edge/.test(d.value) || splitBottom) {
+        const splitRadius = (d.property === "border-radius" && ts.length > 1) || RADIUS_CORNER_RE.test(d.property);
+        if (/^border-(?:bottom|block-end)(?:-(?:color|width|style))?$/.test(d.property) || /--opt-field-edge/.test(d.value) || splitBottom || splitRadius) {
           out.push(`${sels.join(", ")} { ${d.property}: ${d.value} }`);
         }
       }
     }
     return out;
   };
-  const selEdge = selectEdges(hand);
-  check(selEdge.length === 0,
-    "options.css: the native <select> fallback / mobile tab picker must stay fill-only (no bottom edge, spec §3): " + selEdge.join(" | "));
-  const SELECT_CASES = [
+  const shapeBad = valueBoxShapeOffenders(hand);
+  check(shapeBad.length === 0,
+    "options.css: a hand-written value-box rule draws a bottom edge or splits the radius (stage 4: one frame colour on all four sides, one md radius on all four corners): " + shapeBad.join(" | "));
+  const SHAPE_CASES = [
+    // the retired B+ shape half, each piece on its own
+    ['.fg :is(input[type="text"], input[type="password"], input[type="number"], textarea) { border-bottom-color: var(--opt-field-edge); }', true],
+    ['.fg :is(input[type="text"], textarea):hover:not(:focus) { border-bottom-color: var(--opt-field-edge-hover); }', true],
+    ['.fg :is(input[type="text"], textarea):focus { border-bottom-color: var(--opt-field-border-focus); }', true],
+    ['.fg :is(input[type="text"], textarea) { border-radius: var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm); }', true],
+    [".listbox-btn { border-bottom-color: var(--opt-field-edge); }", true],
+    [".listbox-btn { border-radius: var(--opt-radius-md) var(--opt-radius-md) var(--opt-radius-sm) var(--opt-radius-sm); }", true],
+    ['.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"]) { border-bottom-color: var(--opt-field-edge-hover); }', true],
+    ['.fg input[type="text"] { border-bottom-left-radius: 0; }', true],
+    [".fg textarea { border-end-end-radius: var(--opt-radius-sm); }", true],
+    ["#dict-anki-deck { border-block-end-color: var(--opt-field-border-focus); }", true],
+    ['.fg input[type="number"] { border-radius: var(--opt-radius-md) / var(--opt-radius-sm); }', true],
+    // the former native-select fill-only cases, now over every value box
     [".fg select { border-bottom: 1px solid var(--opt-field-edge); }", true],
     [".mobile-tab-picker select:hover:not(:focus) { border-color: var(--opt-field-edge-hover); }", true],
     ['.fg :is(input[type="text"], select) { border-block-end-color: var(--opt-field-edge); }', true],
@@ -6147,14 +6180,20 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".fg select { border-block-color: var(--opt-field-border) var(--opt-field-border-focus); }", true],
     ["#mobile-tab-select { box-shadow: inset 0 -1px 0 var(--opt-field-edge); }", true],
     [".fg select { border-bottom-width: 2px; }", true],
+    // must stay clean
     [".fg select { background-color: var(--opt-field-bg); border: 1px solid var(--opt-field-border); }", false],
     [".fg select { border-color: var(--opt-field-border-hover); }", false],
     [".fg select::picker(select) { border-bottom: 1px solid var(--opt-border); }", false],
-    [".listbox-btn { border-bottom-color: var(--opt-field-edge); }", false],
+    [".listbox-btn { border-radius: var(--opt-radius-md); }", false],
+    ['.theme-name-popover input[type="text"] { border-radius: var(--opt-radius-sm); }', false],
+    [".listbox-pop { border-radius: var(--opt-radius-lg) var(--opt-radius-lg) 0 0; }", false],
+    ['.fg input[type="checkbox"] { border-bottom-color: var(--opt-accent); }', false],
+    [".key-toggle:hover { border-radius: var(--opt-radius-sm); }", false],
+    [".fg textarea { border-color: var(--opt-field-border); border-width: 1px 1px 1px 1px; }", false],
   ];
-  const selMisjudged = SELECT_CASES.filter(([css, want]) => (selectEdges(css).length > 0) !== want);
-  check(selMisjudged.length === 0,
-    "ui-contract-tests.mjs: the select fill-only check no longer discriminates -- misjudged: " + selMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
+  const shapeMisjudged = SHAPE_CASES.filter(([css, want]) => (valueBoxShapeOffenders(css).length > 0) !== want);
+  check(shapeMisjudged.length === 0,
+    "ui-contract-tests.mjs: the value-box shape scan no longer discriminates -- misjudged: " + shapeMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
 }
 
 // ---- B+ follow-up (re-review M1): the key-wrap eye's hover chip must stay

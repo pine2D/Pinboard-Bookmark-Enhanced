@@ -283,9 +283,10 @@ clears their threshold):
   fill until it clears a much weaker "is this fill perceivable at all against
   its host surface" floor (`FILL_SEPARATE_MIN` = 1.10:1 since 2026-09-21,
   1.06 before; well below the 3:1 non-text AA floor — that job
-  still belongs to the focus ring and hover state; options value boxes are
-  the exception since B+: their resting 3:1 boundary is the 1px bottom edge
-  `--opt-field-edge`, COMPONENTS.md §9.1 law 9). Drives `btn-bg`,
+  still belongs to the focus ring and hover state; value boxes carry no 3:1
+  resting boundary at all -- their fill's step off every host is the
+  boundary, a WCAG 1.4.11 deviation the user accepted, COMPONENTS.md §9.1
+  law 9). Drives `btn-bg`,
   `btn-hover`, `input-bg` and `chip-bg` once a control's resting border
   color collapses into its fill. `target` is the mix target, not
   necessarily `fg`. Every caller passes `fg` except the B+ field FILL hover
