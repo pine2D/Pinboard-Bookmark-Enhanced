@@ -198,6 +198,20 @@ export function resolveOpaqueBg(raw, fallbackBg) {
   return mix(fallbackBg, rgb, alpha);
 }
 
+// The spellings resolveOpaqueBg reads FAITHFULLY: #rgb / #rrggbb (opaque),
+// #rrggbbaa (alpha over the fallback) and, only where the caller allows it,
+// the keyword `transparent` (the fallback itself). Every other CSS colour --
+// rgba(), var(), color-mix(), a named colour, garbage -- also comes back as
+// the fallback, silently, i.e. measured as if it were transparent. A caller
+// whose backdrop has to be exact (popup's tag chip fills, stage 4 Task 5 F9:
+// popup-chrome.mjs tagChipBackdrops and contrast-audit.mjs tagChipInkRows)
+// checks this first and refuses anything else.
+export function isCompositableBg(raw, { allowTransparent = false } = {}) {
+  if (typeof raw !== "string") return false;
+  const v = raw.trim();
+  return isHex(v) || HEX8_RE.test(v) || (allowTransparent && /^transparent$/i.test(v));
+}
+
 // chip-bg's palette source (`tag-bg`) is the literal "transparent" for 9 of
 // 13 pilots. resolveOpaqueBg's own fallback for that shape is `fallbackBg`
 // verbatim (mixing in 0% of a fully-transparent color) -- correct for its

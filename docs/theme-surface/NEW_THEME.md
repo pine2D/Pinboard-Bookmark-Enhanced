@@ -371,7 +371,10 @@ final-fix wave:
   derived from `input-bg` / the surface's frame key / `focus-bd` / `accent` /
   `fg` / `fg-hint` / `fg-muted` / `tag-fg` / `tag-bg` / `tag-hover` and the
   surface's hosts (options `panel` + `pf-bg`, popup `bg`, library `panel` +
-  `bg`); tune those inputs instead),
+  `bg`); tune those inputs instead; a popup `tag-bg` override must be
+  `#rgb` / `#rrggbb` / `#rrggbbaa` or `transparent`, and `tag-hover`
+  `#rgb` / `#rrggbb` / `#rrggbbaa`; any other spelling makes sync-all
+  throw, because the chip inks would be derived against a guessed backdrop),
   are computed
   from the FINAL,
   post-override map — as is `on-accent` on options and library (Task 4,

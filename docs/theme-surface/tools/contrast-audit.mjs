@@ -12,7 +12,7 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, FIELD_TEXT_PLACEHOLDER_MIN, FIELD_HOST_ROLES, primaryHoverFill, mix, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
+import { isHex, isCompositableBg, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, FIELD_TEXT_PLACEHOLDER_MIN, FIELD_HOST_ROLES, primaryHoverFill, mix, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
 // LIB_BATCH_BAND_MIX: library.css paints a batch-selected row's fill as an
@@ -536,19 +536,25 @@ const noteCovered = (map, ns, blockLabel) => {
   if (!map.has(ns)) map.set(ns, new Set());
   map.get(ns).add(blockLabel);
 };
-function auditFieldSeparation(scope, ns, blockLabel, dict) {
+// fieldSeparationRows -- the whole verdict of one block as data; the printer
+// auditFieldSeparation below only prints and records what this returns, so
+// tests/theme-ui-derive-tests.mjs's counter-examples run the audit's own code
+// path (exported for exactly that). Row shapes:
+//   { label, ratio, min }   a floor, printed through check();
+//   { label, equal, detail } an identity the block's class requires;
+//   { label, fail }          the block cannot be audited: a missing or
+//                            non-hex role, or field roles declared under a
+//                            prefix with no FIELD_SEPARATION_HOSTS entry.
+// [] means not applicable: no hosts entry and no field role declared.
+export function fieldSeparationRows(ns, dict) {
   const hosts = FIELD_SEPARATION_HOSTS[ns];
-  const line = (label, verdict) => "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + label.padEnd(28) + " " + verdict;
   if (!hosts) {
     // A surface without a hosts entry is only fine while it ships no field
     // family at all; a block that does is a registry gap, not "N/A".
     const declared = Object.keys(dict).filter((k) => k.startsWith(`${ns}-field-`));
-    if (declared.length) {
-      const l = line("field separation", `FAIL (declares ${declared.map((k) => `--${k}`).join(", ")} but FIELD_SEPARATION_HOSTS has no "${ns}" entry)`);
-      console.log(l);
-      violations.push(l);
-    }
-    return;
+    return declared.length
+      ? [{ label: "field separation", fail: `declares ${declared.map((k) => `--${k}`).join(", ")} but FIELD_SEPARATION_HOSTS has no "${ns}" entry` }]
+      : [];
   }
   const roles = ["field-bg", "field-bg-hover", "field-border", "field-border-hover", ...hosts];
   const raw = Object.fromEntries(roles.map((r) => [r, dict[`${ns}-${r}`]]));
@@ -557,31 +563,44 @@ function auditFieldSeparation(scope, ns, blockLabel, dict) {
     // Every role here is a derivation output or a host the derivation itself
     // requires, so a missing or non-hex one is a regression on the default
     // block too -- FAIL, never SKIP.
-    const l = line("field separation", "FAIL (" + unusable.map((r) => `--${ns}-${r}: ${raw[r] ?? "not declared"}`).join(", ") + ")");
-    console.log(l);
-    violations.push(l);
-    return;
+    return [{ label: "field separation", fail: unusable.map((r) => `--${ns}-${r}: ${raw[r] ?? "not declared"}`).join(", ") }];
   }
-  noteCovered(fieldFamilyCoverage.separation, ns, blockLabel);
   const rgb = Object.fromEntries(roles.map((r) => [r, hexRgb(normHex(raw[r].trim()))]));
   const same = (a, b) => normHex(raw[a].trim()) === normHex(raw[b].trim());
-  const assertSame = (a, b) => {
-    const ok = same(a, b);
-    const l = line(`${a} == ${b}`, ok ? "OK" : `FAIL (${raw[a]} vs ${raw[b]})`);
-    console.log(l);
-    if (!ok) violations.push(l);
-  };
+  const identity = (a, b) => ({ label: `${a} == ${b}`, equal: same(a, b), detail: `${raw[a]} vs ${raw[b]}` });
+  const floor = (label, a, b, min) => ({ label, ratio: cr(a, b), min });
   const framed = !same("field-border", "field-bg");
   const separated = hosts.every((h) => cr(rgb["field-bg"], rgb[h]) >= FILL_SEPARATE_MIN);
   if (framed && !separated) {
-    assertSame("field-bg-hover", "field-bg");
-    for (const h of hosts) console.log(check(scope, blockLabel, `field-border vs ${h}`, cr(rgb["field-border"], rgb[h]), FIELD_FRAME_HOST_MIN));
-    return;
+    return [
+      identity("field-bg-hover", "field-bg"),
+      ...hosts.map((h) => floor(`field-border vs ${h}`, rgb["field-border"], rgb[h], FIELD_FRAME_HOST_MIN)),
+    ];
   }
-  if (!framed) assertSame("field-border-hover", "field-bg-hover");
-  for (const h of hosts) console.log(check(scope, blockLabel, `field-bg vs ${h}`, cr(rgb["field-bg"], rgb[h]), FILL_SEPARATE_MIN));
-  console.log(check(scope, blockLabel, "field-bg-hover vs field-bg", cr(rgb["field-bg-hover"], rgb["field-bg"]), FILL_SEPARATE_MIN));
-  for (const h of hosts) console.log(check(scope, blockLabel, `field-bg-hover vs ${h}`, cr(rgb["field-bg-hover"], rgb[h]), FILL_SEPARATE_MIN));
+  return [
+    ...(framed ? [] : [identity("field-border-hover", "field-bg-hover")]),
+    ...hosts.map((h) => floor(`field-bg vs ${h}`, rgb["field-bg"], rgb[h], FILL_SEPARATE_MIN)),
+    floor("field-bg-hover vs field-bg", rgb["field-bg-hover"], rgb["field-bg"], FILL_SEPARATE_MIN),
+    ...hosts.map((h) => floor(`field-bg-hover vs ${h}`, rgb["field-bg-hover"], rgb[h], FILL_SEPARATE_MIN)),
+  ];
+}
+function auditFieldSeparation(scope, ns, blockLabel, dict) {
+  const rows = fieldSeparationRows(ns, dict);
+  const line = (label, verdict) => "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + label.padEnd(28) + " " + verdict;
+  if (rows.length && rows.every((r) => !r.fail)) noteCovered(fieldFamilyCoverage.separation, ns, blockLabel);
+  for (const row of rows) {
+    if (row.fail) {
+      const l = line(row.label, `FAIL (${row.fail})`);
+      console.log(l);
+      violations.push(l);
+    } else if ("equal" in row) {
+      const l = line(row.label, row.equal ? "OK" : `FAIL (${row.detail})`);
+      console.log(l);
+      if (!row.equal) violations.push(l);
+    } else {
+      console.log(check(scope, blockLabel, row.label, row.ratio, row.min));
+    }
+  }
 }
 
 // The options value boxes that sit on neither field host: both live in
@@ -645,8 +664,14 @@ function auditSidebarSearchSeparation(scope, ns, blockLabel, dict) {
 // panel (bg2). Chip text (tag-chip-fg) needs 4.5:1 on all three, the
 // remove-x ink (tag-chip-icon) 3:1. A pure function over one block's token
 // dict (keys "pp-<role>", tokenDict()'s shape), exported so
-// tests/theme-ui-derive-tests.mjs can hand it negative controls; a missing
-// or non-hex input comes back as one { label, missing } row, never a skip.
+// tests/theme-ui-derive-tests.mjs can hand it negative controls. A missing or
+// unusable input comes back as one { label, missing } row, never a skip:
+// field-bg / field-bg-hover / both inks must be #rgb / #rrggbb; tag-bg must be
+// #rgb / #rrggbb / #rrggbbaa or `transparent`, and tag-hover #rgb / #rrggbb /
+// #rrggbbaa (isCompositableBg) -- resolveOpaqueBg would read any other
+// spelling (rgba(), var(), color-mix(), a named colour) as the shell itself,
+// so F9 would measure the wrong backdrop and pass. popup-chrome.mjs's
+// tagChipBackdrops throws on the same set.
 // TAG_CHIP_INK_SPEC is also what auditOrphanTokens reads, so a chip ink role
 // counts as covered only while a row here really measures it.
 export const TAG_CHIP_INK_SPEC = Object.freeze([
@@ -657,7 +682,7 @@ export function tagChipInkRows(dict) {
   const hexRoles = ["field-bg", "field-bg-hover", ...TAG_CHIP_INK_SPEC.map(([role]) => role)];
   const missing = [
     ...hexRoles.filter((role) => !isHex(dict[`pp-${role}`] ?? "")),
-    ...["tag-bg", "tag-hover"].filter((role) => !dict[`pp-${role}`]),
+    ...[["tag-bg", true], ["tag-hover", false]].filter(([role, allowTransparent]) => !isCompositableBg(dict[`pp-${role}`], { allowTransparent })).map(([role]) => role),
   ];
   if (missing.length) return [{ label: "tag chip ink (F9)", missing }];
   const shellRest = hexRgb(dict["pp-field-bg"].trim()), shellHover = hexRgb(dict["pp-field-bg-hover"].trim());
@@ -960,7 +985,7 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
   if (ns === "pp") {
     for (const row of tagChipInkRows(dict)) {
       if (row.missing) {
-        const l = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + row.label.padEnd(28) + " FAIL (not declared or not hex: " + row.missing.map((r) => `--${ns}-${r}`).join(", ") + ")";
+        const l = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + row.label.padEnd(28) + " FAIL (not declared or not a usable colour: " + row.missing.map((r) => `--${ns}-${r}: ${dict[`${ns}-${r}`] ?? "not declared"}`).join(", ") + ")";
         console.log(l);
         violations.push(l);
         continue;

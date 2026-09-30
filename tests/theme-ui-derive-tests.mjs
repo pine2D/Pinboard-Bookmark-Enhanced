@@ -42,6 +42,7 @@ import {
   DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS,
   FIELD_FRAME_HOST_MIN,
   FIELD_SEPARATION_HOSTS,
+  fieldSeparationRows,
   isOutputRoleForDefault,
   OPT_BG_VALUE_BOXES,
   SIDEBAR_SEARCH_HOST,
@@ -1685,9 +1686,7 @@ function f8Failures(id, out, hosts) {
 // --- contrast-audit's popup chip-ink check (F9, spec §2.3) as a pure
 // function: negative controls, so a check that drops a backdrop or measures
 // the wrong fill fails here and not only on a future theme. (The F1-F3 / F8b
-// half is contrast-audit's auditFieldSeparation; its hosts are
-// FIELD_SEPARATION_HOSTS, pinned to FIELD_HOST_ROLES -- pp [bg], never
-// ROLE_ALIAS's bg2 -- by the host-table block above.) ---
+// half, fieldSeparationRows, has its own block below.) ---
 {
   // F9: a transparent chip shows the shell through, so its ink is measured on
   // the shell's rest and hover fills and on tag-hover over the hovered shell.
@@ -1709,6 +1708,87 @@ function f8Failures(id, out, hosts) {
     "an opaque chip's text must be measured on its own tag-bg, not on the shell");
   check(tagChipInkRows({ ...chip, "pp-tag-chip-icon": undefined })[0]?.missing?.includes("tag-chip-icon"), "a missing chip ink role must come back as a missing row");
   check(tagChipInkRows({ ...chip, "pp-field-bg-hover": "transparent" })[0]?.missing?.includes("field-bg-hover"), "a non-hex shell fill must come back as a missing row, not be measured as black");
+  // The two chip fills: resolveOpaqueBg reads every spelling other than
+  // #rgb / #rrggbb / #rrggbbaa as transparent, i.e. as the shell itself, so
+  // an rgba(), a var(), a named colour or garbage would be measured on the
+  // wrong backdrop and F9 would go green on it. tag-bg may also be the
+  // literal `transparent` (8/14 blocks); tag-hover is always a real fill.
+  // The audit must report such a value as missing, and the composer (the
+  // derivation reads the same backdrops) must throw, naming the role and the
+  // value, so sync-all aborts instead of shipping a guessed ink.
+  const BAD_BACKDROPS = [["tag-hover", "rgba(205,214,244,0.9)"], ["tag-hover", "var(--pp-bg2)"], ["tag-bg", "not-a-colour"],
+    ["tag-hover", "transparent"], ["tag-bg", "color-mix(in srgb, #ffffff 50%, #000000)"], ["tag-bg", "white"]];
+  const probeEntry = POPUP_THEME_MAP.find((e) => e.id === "modern-card");
+  const probePilot = JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${probeEntry.pilot}.tokens.json`, import.meta.url), "utf8"));
+  for (const [role, bad] of BAD_BACKDROPS) {
+    const got = tagChipInkRows({ ...chip, [`pp-${role}`]: bad });
+    check(got.length === 1 && got[0].missing?.includes(role),
+      `tagChipInkRows must report --pp-${role}: ${bad} as missing, not measure it as the shell showing through (got ${JSON.stringify(got)})`);
+    const tk = structuredClone(probePilot);
+    tk.ui ??= {};
+    tk.ui.popup ??= {};
+    tk.ui.popup[probeEntry.mode] = { ...(tk.ui.popup[probeEntry.mode] ?? {}), [role]: bad };
+    let thrown = null;
+    try { composePopupThemeMap(tk, probeEntry.mode, probeEntry.useDarkMode); } catch (e) { thrown = String(e?.message ?? e); }
+    check(thrown !== null && thrown.includes(role) && thrown.includes(bad),
+      `composePopupThemeMap must throw naming ${role} and ${JSON.stringify(bad)} (tagChipBackdrops), got ${thrown === null ? "no throw" : JSON.stringify(thrown)}`);
+  }
+  // Controls: the shapes that ARE read faithfully stay measured.
+  check(tagChipInkRows({ ...chip, "pp-tag-bg": "TRANSPARENT" }).every((r) => !r.missing),
+    "the keyword transparent (any case) is a valid tag-bg: the shell shows through");
+  const alphaHover = tagChipInkRows({ ...chip, "pp-tag-hover": "#eee8d580" });
+  const alphaRow = alphaHover.find((r) => r.label === "tag-chip-fg vs tag-hover/field-bg-hover (F9)");
+  check(!!alphaRow && Math.abs(alphaRow.ratio - contrast(hexToRgb("#1e746d"), resolveOpaqueBg("#eee8d580", hexToRgb("#d6d4c5")))) < 1e-9,
+    `an #rrggbbaa tag-hover must be composited over the hovered shell, not refused (got ${JSON.stringify(alphaRow)})`);
+}
+
+// --- contrast-audit's field host-separation section (F1-F3 / F8b, spec
+// §2.3 / §2.4) as the pure function its printer runs (fieldSeparationRows;
+// auditFieldSeparation only prints and records these rows). Persistent
+// counter-examples for the per-prefix behaviour: which hosts are read, one
+// row per host, which class gets which rows, and the unregistered prefix. ---
+{
+  const labels = (rows) => rows.map((r) => r.label);
+  const failing = (r) => !!r.fail || r.equal === false || (typeof r.ratio === "number" && r.ratio < r.min);
+  // (a) popup's host is bg, never ROLE_ALIAS's bg2: a fill that equals bg
+  // must fail F1 even though it is far from bg2, and bg2 is never read.
+  const ppA = { "pp-field-bg": "#ffffff", "pp-field-border": "#ffffff", "pp-field-bg-hover": "#e8e8e8", "pp-field-border-hover": "#e8e8e8", "pp-bg": "#ffffff", "pp-bg2": "#000000" };
+  const a = fieldSeparationRows("pp", ppA);
+  const aF1 = a.find((r) => r.label === "field-bg vs bg");
+  check(!!aF1 && aF1.ratio < aF1.min && aF1.min === FILL_SEPARATE_MIN,
+    `(a) fieldSeparationRows("pp") must measure F1 against --pp-bg and fail a fill equal to it (got ${JSON.stringify(a)})`);
+  check(!a.some((r) => /\bbg2\b/.test(r.label)), `(a) fieldSeparationRows("pp") must not read --pp-bg2 as a field host (got ${JSON.stringify(labels(a))})`);
+  // (b) library has two hosts: one F1 and one F3 row per host, in
+  // FIELD_SEPARATION_HOSTS order, after the unframed identity row.
+  const libB = { "lib-field-bg": "#ececed", "lib-field-border": "#ececed", "lib-field-bg-hover": "#e0e0e2", "lib-field-border-hover": "#e0e0e2", "lib-panel": "#ffffff", "lib-bg": "#f7f7f8" };
+  const b = fieldSeparationRows("lib", libB);
+  check(JSON.stringify(labels(b)) === JSON.stringify(["field-border-hover == field-bg-hover", "field-bg vs panel", "field-bg vs bg", "field-bg-hover vs field-bg", "field-bg-hover vs panel", "field-bg-hover vs bg"]) && !b.some(failing),
+    `(b) fieldSeparationRows("lib") must give the identity row, F1 and F3 once per host (panel, bg) and F2, all passing here (got ${JSON.stringify(b)})`);
+  const libMissing = fieldSeparationRows("lib", { ...libB, "lib-bg": undefined });
+  check(libMissing.length === 1 && libMissing[0].fail?.includes("--lib-bg"), `(b) a missing library host must come back as one failing row naming it (got ${JSON.stringify(libMissing)})`);
+  // (c) framed and unseparated (terminal's shape): only the "fill keeps
+  // still" identity and F8b per host -- no F1-F3.
+  const term = { "pp-field-bg": "#111111", "pp-field-border": "#267326", "pp-field-bg-hover": "#111111", "pp-field-border-hover": "#2a9d2a", "pp-bg": "#0a0a0a" };
+  const c = fieldSeparationRows("pp", term);
+  check(JSON.stringify(labels(c)) === JSON.stringify(["field-bg-hover == field-bg", "field-border vs bg"]) && c[0].equal === true &&
+    c[1].min === FIELD_FRAME_HOST_MIN && c[1].ratio >= FIELD_FRAME_HOST_MIN,
+    `(c) an unseparated framed block must get exactly the identity row and F8b (got ${JSON.stringify(c)})`);
+  const cMoved = fieldSeparationRows("pp", { ...term, "pp-field-bg-hover": "#1c1c1c" });
+  check(cMoved[0]?.label === "field-bg-hover == field-bg" && cMoved[0].equal === false, `(c) an unseparated framed fill that moves on hover must fail the identity row (got ${JSON.stringify(cMoved)})`);
+  // (d) unframed and unseparated is a real failure, not the framed
+  // exemption: F1 runs and fails, and neither the exemption's identity row
+  // nor F8b appears.
+  const d = fieldSeparationRows("pp", { ...term, "pp-field-border": "#111111", "pp-field-bg-hover": "#1c1c1c", "pp-field-border-hover": "#1c1c1c" });
+  const dF1 = d.find((r) => r.label === "field-bg vs bg");
+  check(!!dF1 && dF1.ratio < dF1.min && !d.some((r) => r.label === "field-bg-hover == field-bg" || /^field-border vs /.test(r.label)),
+    `(d) an unframed fill that does not separate from its host must fail F1 and not fall into the framed exemption (got ${JSON.stringify(d)})`);
+  // (e) a prefix that declares the field family but has no
+  // FIELD_SEPARATION_HOSTS entry fails; one that declares none is N/A.
+  check(!Object.prototype.hasOwnProperty.call(FIELD_SEPARATION_HOSTS, "zz"), "the (e) fixture prefix zz must stay unregistered");
+  const e = fieldSeparationRows("zz", { "zz-field-bg": "#ffffff", "zz-bg": "#ffffff" });
+  check(e.length === 1 && failing(e[0]) && /FIELD_SEPARATION_HOSTS/.test(e[0].fail ?? "") && e[0].fail.includes("--zz-field-bg"),
+    `(e) a prefix that declares field roles without a FIELD_SEPARATION_HOSTS entry must fail, naming the roles (got ${JSON.stringify(e)})`);
+  check(fieldSeparationRows("zz", { "zz-bg": "#ffffff" }).length === 0, "(e) a prefix with no hosts entry and no field role is not applicable (no rows)");
 }
 
 // --- The default :root literals (options-chrome.mjs DEFAULT_LIGHT) are the

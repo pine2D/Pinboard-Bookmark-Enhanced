@@ -1,6 +1,6 @@
 import { expandPalette } from "./_util.mjs";
 import { mergeTokens } from "./compose-theme.mjs";
-import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, resolveOpaqueBg, FIELD_HOST_ROLES, FIELD_ROLES } from "./_ui-derive.mjs";
+import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, resolveOpaqueBg, isCompositableBg, FIELD_HOST_ROLES, FIELD_ROLES } from "./_ui-derive.mjs";
 
 // popup theme id -> { pilot, mode, useDarkMode? }
 // 12 themes map 1:1; the flexoki pilot yields BOTH flexoki-light and flexoki-dark.
@@ -154,8 +154,17 @@ function emitPp(ui, mode) {
 // The three fills a popup tag chip is painted on (see tag-chip-fg below):
 // tag-bg over the resting tags shell, tag-bg over the hovered shell, and
 // tag-hover over the hovered shell. resolveOpaqueBg: a `transparent` tag-bg
-// (8/14 blocks) IS the shell, an opaque one ignores it.
+// (8/14 blocks) IS the shell, an opaque one ignores it, an #rrggbbaa one is
+// composited over it. Any other spelling (rgba(), var(), a named colour...)
+// would ALSO read as the shell -- a guessed backdrop the chip inks would then
+// be derived against -- so it throws, naming the role and the value, and
+// sync-all aborts (contrast-audit's tagChipInkRows refuses the same set).
 function tagChipBackdrops(map) {
+  for (const [role, allowTransparent] of [["tag-bg", true], ["tag-hover", false]]) {
+    if (!isCompositableBg(map[role], { allowTransparent })) {
+      throw new Error(`popup-chrome: tag chip backdrop ${role}=${JSON.stringify(map[role])} is not #rgb / #rrggbb / #rrggbbaa${allowTransparent ? " or transparent" : ""} -- resolveOpaqueBg would read it as the tags shell`);
+    }
+  }
   const shellRest = hexToRgb(map["field-bg"]);
   const shellHover = hexToRgb(map["field-bg-hover"]);
   return [
