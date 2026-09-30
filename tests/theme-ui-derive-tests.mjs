@@ -3,8 +3,10 @@ import {
   contrast,
   deltaE2000,
   deriveFieldRoles,
-  FIELD_EDGE_HOVER_FG_MIX,
+  FIELD_HOST_ROLES,
   FIELD_ROLES,
+  fieldChevronUri,
+  FRAMED_HOVER_FG_MIX,
   FIELD_TEXT_PLACEHOLDER_MIN,
   fgToAA,
   fgToAAMulti,
@@ -12,8 +14,9 @@ import {
   fillSeparate,
   FILL_SEPARATE_MIN,
   finalizeUiControlRoles,
-  hexToRgb,
+  hexToRgb as hexToRgbLoose,
   hslToRgb,
+  isHex,
   mix,
   primaryHoverFill,
   PRIMARY_HOVER_FG_MIX,
@@ -23,6 +26,7 @@ import {
   rgbToHex,
   rgbToHsl,
   TIER_DISTINCT_MIN_DE,
+  UI_DERIVED_OUTPUT_ROLES,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
@@ -32,14 +36,33 @@ import { composeLibraryThemeMap, LIB_BATCH_BAND_MIX } from "../docs/theme-surfac
 // these -- contrast-audit.mjs's whole static-CSS audit lives inside main(),
 // guarded by isDirectRun(), so pulling these three in does not also run it.
 import {
+  COMPONENT_PAIR_ROLES,
   COMPONENT_PAIR_SPEC,
   DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS,
+  FIELD_FRAME_HOST_MIN,
+  FIELD_SEPARATION_HOSTS,
   isOutputRoleForDefault,
 } from "../docs/theme-surface/tools/contrast-audit.mjs";
 
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); };
+// hexToRgb() and ratio() refuse anything but #rgb / #rrggbb (stage 4 spec
+// 2026-09-30 §2.4). The composer's own hexToRgb reads undefined,
+// "transparent" or an 8-digit hex as some other colour without complaint,
+// and a check against black passes on every light theme -- that is how the
+// retired field-edge assertions would have kept passing on light themes
+// with the role already gone. Every measurement in this file goes through
+// these two, so a missing or misspelled role throws instead of measuring
+// #000000.
+const hexToRgb = (v) => {
+  if (!isHex(v)) throw new Error(`theme-ui-derive-tests: not a #rgb / #rrggbb hex: ${JSON.stringify(v)}`);
+  return hexToRgbLoose(v.trim());
+};
 const ratio = (fg, bg) => contrast(hexToRgb(fg), hexToRgb(bg));
+for (const bad of [undefined, "", "transparent", "#33ff3340", "rgb(0, 0, 0)"]) {
+  check((() => { try { ratio(bad, "#ffffff"); return false; } catch { return true; } })(),
+    `ratio(${JSON.stringify(bad)}, "#ffffff") must throw, not measure it as #000000`);
+}
 
 const palette = {
   "btn-fg": "#ffffff",
@@ -890,32 +913,101 @@ function r13MinimalityFailures(id, inputs, out) {
   return { bad, placeholderMoved: true, pushed: true };
 }
 
-// --- B+ field family: deriveFieldRoles unit cases (spec docs/superpowers/
-// specs/2026-09-28-ui-fields-bplus-design.md §2). ---
+// F8 / F8b (stage 4 spec 2026-09-30 §2.3): a framed value box whose fill is
+// not separated from its hosts announces hover with its frame alone, so the
+// hover frame has to be >= F8_MIN_RATIO and >= F8_MIN_DE from the rest frame
+// and stronger on the fill it is painted on than the rest frame is on its
+// own (both fills are the same pilot fill here); and the rest frame has to
+// stand off every host by >= FIELD_FRAME_HOST_MIN (contrast-audit gates the
+// same floor on the shipped CSS). Not a contrast-audit pair row: an unframed
+// frame IS the fill, whose hover step is only 1.10 by design.
+const F8_MIN_RATIO = 1.30;
+const F8_MIN_DE = 6;
+function f8Failures(id, out, hosts) {
+  const bad = [];
+  const rest = out["field-border"], hover = out["field-border-hover"];
+  const r = ratio(hover, rest), de = deltaE2000(hexToRgb(hover), hexToRgb(rest));
+  if (r < F8_MIN_RATIO) bad.push(`${id}: hover frame ${hover} is ${r.toFixed(3)}:1 from the rest frame ${rest} (F8 floor ${F8_MIN_RATIO})`);
+  if (de < F8_MIN_DE) bad.push(`${id}: hover frame ${hover} is ΔE2000 ${de.toFixed(2)} from the rest frame ${rest} (F8 floor ${F8_MIN_DE})`);
+  if (!(ratio(hover, out["field-bg-hover"]) > ratio(rest, out["field-bg"]))) {
+    bad.push(`${id}: hover frame on the hover fill (${ratio(hover, out["field-bg-hover"]).toFixed(3)}) is not stronger than the rest frame on the rest fill (${ratio(rest, out["field-bg"]).toFixed(3)})`);
+  }
+  for (const h of hosts) {
+    if (ratio(rest, h) < FIELD_FRAME_HOST_MIN) bad.push(`${id}: rest frame ${rest} is ${ratio(rest, h).toFixed(3)}:1 from host ${h} (F8b floor ${FIELD_FRAME_HOST_MIN})`);
+  }
+  return bad;
+}
+
+// --- Soft Fill field family: deriveFieldRoles unit cases (stage 4 spec
+// docs/superpowers/specs/2026-09-30-ui-fields-stage4-design.md §2). ---
 {
   const throwsNaming = (fn, roles) => {
     try { fn(); } catch (e) { return roles.every((r) => String(e?.message ?? e).includes(r)); }
     return false;
   };
-  check(!("field-bg" in finalizeUiControlRoles(base, palette)),
-    "finalizeUiControlRoles with the default config (fieldRoles unset) must not emit field-* roles -- the composer-level popup/library walk below checks that those surfaces really call it that way");
+  check(!Object.keys(finalizeUiControlRoles(base, palette)).some((k) => k.startsWith("field-")),
+    "finalizeUiControlRoles with the default config (fieldRoles unset) must not emit any field-* role, field-chevron included -- the composer-level popup/library walk below checks that those surfaces really call it that way");
+  check(FIELD_ROLES.length === 8 && !FIELD_ROLES.some((r) => /^field-(edge|chevron)/.test(r)),
+    `FIELD_ROLES must be the eight colour roles of the fill-only value box -- no retired field-edge role, and not the field-chevron url() (got ${JSON.stringify(FIELD_ROLES)})`);
   // The shared `base` fixture has no fg-hint / pf-bg: add both, so the smoke
-  // check below proves ten REAL values, not placeholders read off
+  // check below proves eight REAL values, not placeholders read off
   // hexToRgb(undefined) (which silently parses as #000000).
-  const withFields = finalizeUiControlRoles({ ...base, "fg-hint": "#666666", "pf-bg": "#f9f9f6" }, palette, {}, { fieldRoles: true });
-  check(FIELD_ROLES.every((r) => /^#[0-9a-f]{6}$/.test(withFields[r] ?? "")),
-    "fieldRoles: true must emit all ten field-* roles as 6-digit hex");
+  const fieldBase = { ...base, "fg-hint": "#666666", "pf-bg": "#f9f9f6" };
+  const withFields = finalizeUiControlRoles(fieldBase, palette, {}, { fieldRoles: true });
+  check(FIELD_ROLES.every((r) => /^#[0-9a-f]{6}$/.test(withFields[r] ?? "")) && !("field-chevron" in withFields),
+    "fieldRoles: true must emit all eight field-* roles as 6-digit hex, and no field-chevron unless fieldChevron is also set");
   check(throwsNaming(() => finalizeUiControlRoles(base, palette, {}, { fieldRoles: true }), ["fg-hint"]),
     "fieldRoles: true over a map without fg-hint must throw naming the missing role, not derive the placeholder from #000000");
+  const withChevron = finalizeUiControlRoles(fieldBase, palette, {}, { fieldRoles: true, fieldChevron: true });
+  check(withChevron["field-chevron"] === fieldChevronUri(withChevron["field-placeholder"]),
+    "fieldChevron: true must emit field-chevron = fieldChevronUri(field-placeholder)");
+  check(throwsNaming(() => finalizeUiControlRoles(fieldBase, palette, {}, { fieldChevron: true }), ["fieldChevron", "fieldRoles"]),
+    "fieldChevron without fieldRoles must throw (the chevron strokes field-placeholder)");
+  // fieldHostRoles reaches the deriver: fieldBase's pf-bg (#f9f9f6) sits
+  // close enough to the fill to steer the default [panel, pf-bg] output, and
+  // a [panel]-only host list ignores pf-bg whatever its value.
+  const pick = (o) => JSON.stringify(FIELD_ROLES.map((r) => o[r]));
+  const onPanel = finalizeUiControlRoles(fieldBase, palette, {}, { fieldRoles: true, fieldHostRoles: ["panel"] });
+  const onPanelBlackPf = finalizeUiControlRoles({ ...fieldBase, "pf-bg": "#000000" }, palette, {}, { fieldRoles: true, fieldHostRoles: ["panel"] });
+  check(pick(withFields) !== pick(onPanel) && pick(onPanel) === pick(onPanelBlackPf),
+    "finalizeUiControlRoles must hand fieldHostRoles to deriveFieldRoles (pf-bg steers the default hosts and is ignored by [panel])");
+  // fieldChevronUri: today's chevron geometry, a %23 stroke, never a ";" or a bare "#".
+  const chev = fieldChevronUri("#abc");
+  check(/^url\("data:image\/svg\+xml,%3Csvg /.test(chev) && chev.endsWith('%3C/svg%3E")') &&
+    chev.includes("viewBox='0 0 12 12'") && chev.includes("d='M3 4.5 6 7.5 9 4.5'") && chev.includes("stroke-width='1.5'") &&
+    chev.includes("stroke-linecap='round'") && chev.includes("stroke-linejoin='round'") &&
+    chev.includes("stroke='%23aabbcc'") && !chev.includes(";") && !chev.includes("#"),
+    `fieldChevronUri must keep the chevron geometry, stroke %23rrggbb and contain no ";" or "#" (got ${chev})`);
+  for (const bad of [undefined, "transparent", "#33ff3340", "var(--opt-fg)"]) {
+    check(throwsNaming(() => fieldChevronUri(bad), ["fieldChevronUri"]), `fieldChevronUri(${JSON.stringify(bad)}) must throw`);
+  }
 
   const light = { fg: "#333333", "fg-hint": "#666666", panel: "#ffffff", "pf-bg": "#f9f9f6", "input-bg": "#ffffff",
     border: "#858585", "focus-bd": "#5d88c2", accent: "#4477bb" };
   const { "fg-hint": _droppedHint, ...lightNoHint } = light;
   check(throwsNaming(() => deriveFieldRoles(lightNoHint), ["fg-hint"]),
     "deriveFieldRoles without fg-hint must throw and name fg-hint");
-  const REQUIRED = ["fg", "fg-hint", "panel", "input-bg", "border", "focus-bd", "accent"];
+  const REQUIRED = ["fg", "fg-hint", "input-bg", "focus-bd", "accent", ...FIELD_HOST_ROLES.opt];
   check(throwsNaming(() => deriveFieldRoles({}), REQUIRED),
-    "deriveFieldRoles over an empty map must throw listing every missing required input (fg, fg-hint, panel, input-bg, border, focus-bd, accent)");
+    `deriveFieldRoles over an empty map must throw listing every missing required input, the default hosts included (${REQUIRED.join(", ")})`);
+  // hostRoles [bg] (popup's hosts): the missing-role list after the colon,
+  // read as whole role names -- a substring test for "bg" would pass on
+  // "input-bg" alone, which is always in the list.
+  const ppMissing = (() => { try { deriveFieldRoles({}, null, FIELD_HOST_ROLES.pp); return ""; } catch (e) { return String(e?.message ?? e); } })();
+  const ppRoles = ppMissing.includes(": ") ? ppMissing.slice(ppMissing.lastIndexOf(": ") + 2).split(", ") : [];
+  check(JSON.stringify(ppRoles) === JSON.stringify(["fg", "fg-hint", "input-bg", "focus-bd", "accent", "bg"]) &&
+    ppRoles.includes("bg") && !ppRoles.includes("panel") && !ppRoles.includes("pf-bg"),
+    `deriveFieldRoles with hostRoles [bg] must require exactly fg, fg-hint, input-bg, focus-bd, accent, bg -- bg as a role of its own, neither panel nor pf-bg (got: ${ppMissing})`);
+  for (const bad of [[], "panel", [""], null]) {
+    check(throwsNaming(() => deriveFieldRoles(light, null, bad), ["hostRoles"]),
+      `deriveFieldRoles must reject hostRoles ${JSON.stringify(bad)} by name`);
+  }
+  // `border` is not an input any more: it only fed the retired bottom edge.
+  const { border: _droppedBorder, ...lightNoBorder } = light;
+  check(JSON.stringify(deriveFieldRoles(lightNoBorder)) === JSON.stringify(deriveFieldRoles(light)),
+    "deriveFieldRoles must not read border any more (dropping it must change nothing)");
+  check(throwsNaming(() => deriveFieldRoles(lightNoBorder, "var(--opt-border)"), ["border"]),
+    "a var(--opt-border) frame still needs border in the map, and must throw naming it");
   // pf-bg fallback. The fixture has to be one where the host actually steers
   // an output, or the check is vacuous: on a light fixture a #000000 host
   // (what hexToRgb(undefined) silently yields once the fallback is gone)
@@ -926,11 +1018,17 @@ function r13MinimalityFailures(id, inputs, out) {
   const pfFx = { fg: "#e0e0e0", "fg-hint": "#a0a0a0", panel: "#262626", "input-bg": "#0d0d0d", border: "#5a5a5a",
     "focus-bd": "#7aa2f7", accent: "#7aa2f7" };
   const pfFrame = "#444444";
+  // Hosts are explicit (FIELD_HOST_ROLES): pf-bg has no silent fallback any
+  // more, and a missing host throws like any other required input.
   const pfAsPanel = JSON.stringify(deriveFieldRoles({ ...pfFx, "pf-bg": pfFx.panel }, pfFrame));
   check(JSON.stringify(deriveFieldRoles({ ...pfFx, "pf-bg": "#000000" }, pfFrame)) !== pfAsPanel,
-    "pf-bg fallback precondition: a #000000 pf-bg host must change this fixture's output, or the fallback check below proves nothing");
-  check(JSON.stringify(deriveFieldRoles(pfFx, pfFrame)) === pfAsPanel,
-    "deriveFieldRoles without pf-bg must fall back to the panel as the second host (not to hexToRgb(undefined) = #000000)");
+    "host precondition: a #000000 pf-bg host must change this fixture's output, or the checks below prove nothing");
+  check(throwsNaming(() => deriveFieldRoles(pfFx, pfFrame), ["pf-bg"]),
+    "deriveFieldRoles with the default options hosts and no pf-bg must throw naming pf-bg (not fall back, not read hexToRgb(undefined) = #000000)");
+  check(JSON.stringify(deriveFieldRoles(pfFx, pfFrame, ["panel"])) === pfAsPanel,
+    "one host must derive exactly what that host listed twice derives -- hostRoles alone decides the hosts");
+  check(throwsNaming(() => deriveFieldRoles({ ...pfFx, "pf-bg": "transparent" }, pfFrame), ["pf-bg", "transparent"]),
+    "a non-hex host must throw naming the role and its value");
 
   const f = deriveFieldRoles(light);
   const hosts = [light.panel, light["pf-bg"]];
@@ -940,13 +1038,8 @@ function r13MinimalityFailures(id, inputs, out) {
     "an unframed frame collapses into its fill at rest and on hover (§9.1 law 1)");
   check(f["field-bg-focus"] === f["field-bg"], "focus must not repaint the fill (fusedStateStable depends on it)");
   check(ratio(f["field-bg-hover"], f["field-bg"]) >= FILL_SEPARATE_MIN, "the hover fill is one separated step deeper");
-  check([f["field-bg"], f["field-bg-hover"], ...hosts].every((h) => ratio(f["field-edge"], h) >= 3),
-    "the bottom edge clears 3:1 against the rest fill, the hover fill, the panel and pf-bg");
-  check([f["field-bg-hover"], ...hosts].every((h) => ratio(f["field-edge-hover"], h) >= 3) &&
-    ratio(f["field-edge-hover"], f["field-bg-hover"]) > ratio(f["field-edge"], f["field-bg"]),
-    "the hover edge clears 3:1 and is strictly stronger than the rest edge");
-  check(f["field-edge-hover"] === rgbToHex(mix(hexToRgb(f["field-edge"]), hexToRgb(light.fg), FIELD_EDGE_HOVER_FG_MIX)),
-    "field-edge-hover must be mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX)");
+  check(Object.keys(f).sort().join() === [...FIELD_ROLES].sort().join(),
+    `deriveFieldRoles must return exactly FIELD_ROLES -- no retired field-edge role (got ${Object.keys(f).join(", ")})`);
   check([f["field-bg"], f["field-bg-hover"]].every((h) => ratio(f["field-placeholder"], h) >= 4.5),
     "the placeholder ink clears 4.5:1 on the rest and hover fills");
   check(ratio(f["field-border-focus"], f["field-bg"]) >= 3, "the focus border clears 3:1 on the fill");
@@ -956,10 +1049,23 @@ function r13MinimalityFailures(id, inputs, out) {
     "input-bg": "#111111", border: "#267326", "focus-bd": "#33ff33", accent: "#33ff33" };
   const t = deriveFieldRoles(term, "#33ff3340");
   check(t["field-bg"] === "#111111" && t["field-bg-hover"] === "#111111",
-    "an unseparated framed fill keeps its pilot value and takes no hover fill step (the frame and the edge carry hover)");
+    "an unseparated framed fill keeps its pilot value and takes no hover fill step (the frame carries hover)");
   check(t["field-border"] === "#1a4d1a", "a translucent pilot frame is composited over the field fill (#33ff3340 on #111111)");
-  check(ratio(t["field-border-hover"], t["field-border"]) >= FILL_SEPARATE_MIN, "the frame deepens on hover when the fill does not");
-  check(t["field-edge"] === "#267326", "terminal's structural border already clears 3:1 on its own fill -- identity");
+  check(t["field-border-hover"] === rgbToHex(mix(hexToRgb(t["field-border"]), hexToRgb(term.fg), FRAMED_HOVER_FG_MIX)) &&
+    t["field-border-hover"] === "#228222",
+    `an unseparated framed box's hover frame must be mix(frame, fg, FRAMED_HOVER_FG_MIX) = #228222 (got ${t["field-border-hover"]})`);
+  f8Failures("terminal fixture", t, [term.panel, term["pf-bg"]]).forEach((b) => check(false, b));
+  // dracula's shape: framed, but the fill already clears FILL_SEPARATE_MIN
+  // from both hosts -> the fill steps on hover, and the frame keeps its one
+  // fillSeparate step (FRAMED_HOVER_FG_MIX does not apply).
+  const sepFramed = { fg: "#f8f8f2", "fg-hint": "#8995ba", panel: "#21222c", "pf-bg": "#21222c", "input-bg": "#44475a",
+    "focus-bd": "#6ba0b4", accent: "#8be9fd" };
+  const sf = deriveFieldRoles(sepFramed, "#6272a4");
+  check(sf["field-bg"] === "#44475a" && sf["field-bg-hover"] !== sf["field-bg"] && ratio(sf["field-bg-hover"], sf["field-bg"]) >= FILL_SEPARATE_MIN,
+    `a separated framed fill keeps its pilot value at rest and steps on hover (got ${sf["field-bg"]} -> ${sf["field-bg-hover"]})`);
+  check(sf["field-border-hover"] === rgbToHex(fillSeparate(hexToRgb("#6272a4"), [hexToRgb("#6272a4")], hexToRgb(sepFramed.fg))) &&
+    sf["field-border-hover"] === "#6a79a8",
+    `a separated framed box's hover frame keeps the one fillSeparate step (#6a79a8), not the FRAMED_HOVER_FG_MIX mix (got ${sf["field-border-hover"]})`);
 
   const byRef = deriveFieldRoles(light, "var(--opt-border)");
   check(byRef["field-border"] === "#858585", "a var(--opt-<role>) frame must resolve through the map, not collapse to the fill");
@@ -981,9 +1087,9 @@ function r13MinimalityFailures(id, inputs, out) {
   check(throwsNaming(() => deriveFieldRoles({ ...light, "input-bg": "rgb(234, 234, 234)" }), ["input-bg", "rgb(234, 234, 234)"]),
     "a non-hex required input (input-bg: rgb()) must throw naming the role and its value, not derive the fill from #000000");
   check(throwsNaming(() => deriveFieldRoles({ ...light, fg: "#333333cc" }), ["fg", "#333333cc"]),
-    "an 8-digit ink (fg) must throw -- hexToRgb reads an 8-digit hex's bytes wrongly; only border is composited");
-  check(!(() => { try { deriveFieldRoles({ ...light, border: "#85858580" }); return false; } catch { return true; } })(),
-    "an 8-digit border stays valid (it is composited over the fill by resolveOpaqueBg)");
+    "an 8-digit ink (fg) must throw -- hexToRgb reads an 8-digit hex's bytes wrongly; only a framed border is composited");
+  check(!(() => { try { deriveFieldRoles(light, "#85858580"); return false; } catch { return true; } })(),
+    "an 8-digit framed border stays valid (it is composited over the fill by resolveOpaqueBg)");
   check(JSON.stringify(deriveFieldRoles({ ...light, "input-bg": " #ffffff ", fg: " #333333 " })) === JSON.stringify(deriveFieldRoles(light)),
     "surrounding whitespace on a required input is trimmed before parsing (hexToRgb strips '#' before trimming: ' #ffffff ' would read as #000000)");
   // Frame value with surrounding spaces: trimmed before resolveOpaqueBg, so it
@@ -1104,35 +1210,71 @@ function r13MinimalityFailures(id, inputs, out) {
     "a focus-bd under 3:1 on the field fill must be re-derived with focusBdToAA");
 }
 
-// --- B+ field family over the real composer pipeline, every options theme.
-// Category assertions (not per-theme literals): the same invariants
+// --- Soft Fill field family over the real composer pipeline, every options
+// theme. Category assertions (not per-theme literals): the same invariants
 // contrast-audit gates on the shipped CSS, run against composeOptionsThemeMap
 // so a deriver change is caught before sync-all writes it. ---
 {
   const hex6 = (v) => rgbToHex(hexToRgb(String(v).trim()));
+  const lum = (v) => relLum(hexToRgb(v));
+  // Class membership (stage 4 spec §2.4): which blocks take the framed-
+  // unseparated branch (fill frozen, frame carries hover), the framed-but-
+  // separated branch, and the between-two-hosts branch (floors only, no
+  // direction). Each class is decided by measured ratios, so one drifting
+  // theme could change class silently -- the equality guards after the walk
+  // pin every member.
+  const classes = { unseparatedFramed: [], separatedFramed: [], between: [] };
   // Category assertions shared by the 14 themed maps and the default :root.
   // `framed` = the pilot declares ui.options.<mode>.input-border (§9.5).
   const fieldCategory = (id, map, framed) => {
     check(FIELD_ROLES.every((r) => /^#[0-9a-f]{6}$/.test(map[r] ?? "")), `${id}: options map lacks a field-* role`);
-    const hosts = [map.panel, map["pf-bg"] ?? map.panel];
-    check([map["field-bg"], map["field-bg-hover"], ...hosts].every((h) => ratio(map["field-edge"], h) >= 3),
-      `${id}: field-edge ${map["field-edge"]} under 3:1 on a fill or host`);
-    check(ratio(map["field-edge-hover"], map["field-bg-hover"]) > ratio(map["field-edge"], map["field-bg"]) &&
-      hosts.every((h) => ratio(map["field-edge-hover"], h) > ratio(map["field-edge"], h)),
-      `${id}: the hover edge is not strictly stronger than the rest edge`);
+    check(!Object.keys(map).some((k) => /^field-edge/.test(k)), `${id}: options map still carries a retired field-edge role`);
+    check(isHex(map["field-placeholder"]) && map["field-chevron"] === fieldChevronUri(map["field-placeholder"]),
+      `${id}: field-chevron is not fieldChevronUri(field-placeholder ${map["field-placeholder"]}) -- got ${map["field-chevron"]}`);
+    const hosts = FIELD_HOST_ROLES.opt.map((r) => map[r]);
     check(map["field-bg-focus"] === map["field-bg"], `${id}: focus repaints the fill`);
-    check(ratio(map.fg, map["field-bg-hover"]) >= 4.5, `${id}: plain fg under 4.5:1 on the hover fill (the tab picker's text)`);
-    // R12: the hover fill steps AWAY from the hosts. An unseparated framed
-    // fill (the frame carries hover) keeps its fill; every other fill takes
-    // a separated step that moves no closer to any host than rest does.
+    // The narrow-screen tab picker still paints plain --opt-fg on the field
+    // fills; contrast-audit dropped its two plain-fg rows with D6 (spec
+    // §2.2), so this keeps that ink gated until the picker paints
+    // --opt-field-fg.
+    check([map["field-bg"], map["field-bg-hover"]].every((h) => ratio(map.fg, h) >= 4.5),
+      `${id}: plain fg under 4.5:1 on a field fill (the tab picker's text)`);
+    // contrast-audit classifies a block as framed by field-border != field-bg;
+    // that has to agree with the pilot actually declaring a frame.
+    check(framed === (map["field-border"] !== map["field-bg"]),
+      `${id}: the pilot ${framed ? "declares" : "declares no"} input-border, but field-border ${map["field-border"]} ${framed ? "equals" : "differs from"} field-bg ${map["field-bg"]}`);
     const unseparated = hosts.some((h) => ratio(map["field-bg"], h) < FILL_SEPARATE_MIN);
+    // F1: an unframed fill always separates from every host.
+    check(framed || !unseparated,
+      `${id}: unframed fill ${map["field-bg"]} is under FILL_SEPARATE_MIN from a host (${hosts.map((h) => ratio(map["field-bg"], h).toFixed(3)).join(" / ")})`);
+    if (!framed) {
+      check(map["field-border"] === map["field-bg"] && map["field-border-hover"] === map["field-bg-hover"],
+        `${id}: an unframed frame must collapse into its fill at rest and on hover (§9.1 law 1)`);
+    }
     check((framed && unseparated) === (map["field-bg-hover"] === map["field-bg"]),
       `${id}: framed-and-unseparated (${framed && unseparated}) must hold exactly when field-bg-hover == field-bg (${map["field-bg-hover"]} vs ${map["field-bg"]})`);
-    if (!(framed && unseparated)) {
+    if (framed && unseparated) {
+      classes.unseparatedFramed.push(`opt:${id}`);
+      // F8 / F8b: the frame alone carries hover.
+      check(map["field-border-hover"] === rgbToHex(mix(hexToRgb(map["field-border"]), hexToRgb(hex6(map.fg)), FRAMED_HOVER_FG_MIX)),
+        `${id}: an unseparated framed box's hover frame ${map["field-border-hover"]} is not mix(frame ${map["field-border"]}, fg ${map.fg}, FRAMED_HOVER_FG_MIX)`);
+      f8Failures(id, map, hosts).forEach((b) => check(false, b));
+    } else {
+      if (framed) {
+        classes.separatedFramed.push(`opt:${id}`);
+        const frame = hexToRgb(map["field-border"]);
+        check(map["field-border-hover"] === rgbToHex(fillSeparate(frame, [frame], hexToRgb(hex6(map.fg)))),
+          `${id}: a separated framed box's hover frame ${map["field-border-hover"]} is not the one fillSeparate step from ${map["field-border"]}`);
+      }
+      // F2 / F3, and R12's direction: the hover fill steps away from every
+      // host -- except for a fill lying between two hosts, which can only
+      // move away from the nearer one (floors only there).
+      const between = hosts.some((h) => lum(h) > lum(map["field-bg"])) && hosts.some((h) => lum(h) < lum(map["field-bg"]));
+      if (between) classes.between.push(`opt:${id}`);
       check(ratio(map["field-bg-hover"], map["field-bg"]) >= FILL_SEPARATE_MIN,
         `${id}: the hover fill ${map["field-bg-hover"]} is under FILL_SEPARATE_MIN from the rest fill ${map["field-bg"]}`);
       for (const h of hosts) {
-        check(ratio(map["field-bg-hover"], h) >= FILL_SEPARATE_MIN && ratio(map["field-bg-hover"], h) >= ratio(map["field-bg"], h),
+        check(ratio(map["field-bg-hover"], h) >= FILL_SEPARATE_MIN && (between || ratio(map["field-bg-hover"], h) >= ratio(map["field-bg"], h)),
           `${id}: the hover fill ${map["field-bg-hover"]} steps toward host ${h} (${ratio(map["field-bg-hover"], h).toFixed(3)} vs rest ${ratio(map["field-bg"], h).toFixed(3)}; floor ${FILL_SEPARATE_MIN})`);
       }
     }
@@ -1171,11 +1313,21 @@ function r13MinimalityFailures(id, inputs, out) {
   for (const m of rootCss.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) {
     for (const d of m[1].matchAll(/--opt-([a-z0-9-]+)\s*:\s*([^;]+);/g)) rootDict[d[1]] = d[2].trim();
   }
-  check(FIELD_ROLES.every((r) => r in rootDict), "field-family pipeline walk: the folded default :root lacks a field-* role");
+  check(FIELD_ROLES.every((r) => r in rootDict) && "field-chevron" in rootDict,
+    "field-family pipeline walk: the folded default :root lacks a field-* role or field-chevron");
   fieldCategory(":root", rootDict, false);
   // The shipped themes must exercise the field-fg push, or the minimality
   // check above ran on nothing but the unit fixtures.
   check(r13Pushed.length >= 1, `R13 minimality: no shipped options theme pushes field-fg away from fg (pushed: ${JSON.stringify(r13Pushed)}) -- the pipeline half of the check is vacuous`);
+  // §2.4 class guards: equality, not "at least", so a theme cannot drift into
+  // or out of a floor-exempt branch without this failing.
+  const members = (a) => [...a].sort().join(", ");
+  check(members(classes.unseparatedFramed) === "opt:rose-pine, opt:terminal",
+    `framed-and-unseparated blocks (fill frozen on hover, frame carries it) must be exactly {opt:rose-pine, opt:terminal}, got {${members(classes.unseparatedFramed)}}`);
+  check(members(classes.separatedFramed) === "opt:dracula, opt:nord-night",
+    `framed-but-separated blocks must be exactly {opt:dracula, opt:nord-night}, got {${members(classes.separatedFramed)}}`);
+  check(members(classes.between) === "",
+    `no options block may have a fill between its two hosts (floors-only branch), got {${members(classes.between)}}`);
   // The shipped themes must actually exercise both R12 branches, or the
   // category checks above prove nothing about the direction rule.
   const WELLS = ["gruvbox-dark", "catppuccin-mocha"];
@@ -1186,6 +1338,30 @@ function r13MinimalityFailures(id, inputs, out) {
     if (relLum(hexToRgb(map["field-bg"])) < relLum(hexToRgb(map.panel)) && relLum(hexToRgb(map["field-bg-hover"])) < relLum(hexToRgb(map["field-bg"]))) darkened++;
   }
   check(darkened === WELLS.length, `recessed wells (${WELLS.join(", ")}) must be darker than their panel and darken on hover -- ${darkened}/${WELLS.length}`);
+}
+
+// --- Host tables and orphan keying (stage 4 spec §2.4 / §5.1).
+// contrast-audit lists the field hosts per CSS prefix itself (never through
+// ROLE_ALIAS); every surface that derives field roles must have an entry,
+// and it must be the deriver's own FIELD_HOST_ROLES -- otherwise the
+// fill-vs-host floors are audited against the wrong surface, or not at all. ---
+{
+  const SURFACE_OF = { pp: "popup", opt: "options", lib: "library" };
+  for (const [ns, surface] of Object.entries(SURFACE_OF)) {
+    const derives = UI_DERIVED_OUTPUT_ROLES[surface].includes("field-bg");
+    const audited = Object.prototype.hasOwnProperty.call(FIELD_SEPARATION_HOSTS, ns);
+    check(derives === audited,
+      `${ns}: ${derives ? "derives field roles but contrast-audit's FIELD_SEPARATION_HOSTS has no entry, so its fill-vs-host floors go unaudited" : "has a FIELD_SEPARATION_HOSTS entry but derives no field roles"}`);
+    if (audited) {
+      check(JSON.stringify(FIELD_SEPARATION_HOSTS[ns]) === JSON.stringify(FIELD_HOST_ROLES[ns]),
+        `${ns}: contrast-audit's FIELD_SEPARATION_HOSTS ${JSON.stringify(FIELD_SEPARATION_HOSTS[ns])} differs from _ui-derive.mjs's FIELD_HOST_ROLES ${JSON.stringify(FIELD_HOST_ROLES[ns])}`);
+    }
+  }
+  // The orphan guard's coverage set is keyed by surface: a pp-only row covers
+  // pp:<role> and nothing on the other two surfaces.
+  check(COMPONENT_PAIR_ROLES.has("pp:ai-chip-fg") && !COMPONENT_PAIR_ROLES.has("opt:ai-chip-fg") &&
+    !COMPONENT_PAIR_ROLES.has("lib:ai-chip-fg") && !COMPONENT_PAIR_ROLES.has("ai-chip-fg"),
+    "contrast-audit's COMPONENT_PAIR_ROLES must be keyed `${ns}:${role}` over each row's onlyNs (a popup-only row must not cover options/library)");
 }
 
 // --- The field family is options-only: popup and library must not grow it.
@@ -1223,22 +1399,24 @@ function r13MinimalityFailures(id, inputs, out) {
   const want = deriveFieldRoles(dict);
   for (const role of FIELD_ROLES) {
     check(dict[role] === want[role],
-      `default :root --opt-${role}=${dict[role]} is not deriveFieldRoles(folded :root)=${want[role]} -- DEFAULT_LIGHT drifted from its hand :root inputs (fg / fg-hint / pf-bg / focus-bd / accent), or FIELD_EDGE_HOVER_FG_MIX / the deriver changed -- re-run sync-all and update DEFAULT_LIGHT and ANCHORS`);
+      `default :root --opt-${role}=${dict[role]} is not deriveFieldRoles(folded :root)=${want[role]} -- DEFAULT_LIGHT drifted from its hand :root inputs (fg / fg-hint / pf-bg / focus-bd / accent), or FRAMED_HOVER_FG_MIX / the deriver changed -- re-run sync-all and update DEFAULT_LIGHT and ANCHORS`);
   }
+  check(dict["field-chevron"] === fieldChevronUri(want["field-placeholder"]),
+    `default :root --opt-field-chevron is not fieldChevronUri(${want["field-placeholder"]}) -- DEFAULT_LIGHT's field-chevron drifted from its field-placeholder`);
 }
 
-// --- Anchors: 5 themes x 10 roles read back from the SHIPPED generated region
+// --- Anchors: 6 blocks x 8 roles read back from the SHIPPED generated region
 // (not from the deriver), +-1 per channel -- a drift anywhere between
 // deriveFieldRoles and options.css (wiring, emit, a hand edit) fails here.
-// fill / border / edge are the research values the user approved (the B+
-// comparison page https://claude.ai/artifact/EBpjZuxTmXQLjcvzqskvsX, its
-// embedded DATA.Bp.t.<theme>); the other six are this stage's derivation
-// (plan 2026-09-28-ui-fields-bplus, Task 1 table), pinned so it cannot move
-// silently. Final fix wave: gruvbox-dark's hover fill / hover frame moved with
-// ruling R12 (#373633 -> #292828, the recessed well now darkens on hover);
-// nord-night's placeholder moved with R13 (#c2c8d5 -> #c0c6d2) and every
-// anchor gained the 10th role, field-fg (nord-night #d8dee9 -> #e5e9f0; the
-// other four = their fg). No other anchor cell changed. ---
+// The fill / border columns are the research values the user approved (the
+// B+ comparison page https://claude.ai/artifact/EBpjZuxTmXQLjcvzqskvsX); the
+// others are the derivation, pinned so it cannot move silently. Stage 4
+// (spec 2026-09-30 §2.2): the two field-edge columns are gone with the
+// roles; terminal's and rose-pine's hover frames are mix(frame, fg,
+// FRAMED_HOVER_FG_MIX) (#1b551b -> #228222, #474459 -> #706d83; rose-pine
+// joins the table to pin it); nord-night, a framed but separated block,
+// keeps its fillSeparate hover frame #535d70. Every block's field-chevron is
+// checked below against its own field-placeholder. ---
 {
   const css = readFileSync(new URL("../options.css", import.meta.url), "utf8");
   const region = css.slice(css.indexOf("/* @generated:ui-themes start"), css.indexOf("/* @generated:ui-themes end */"));
@@ -1246,13 +1424,14 @@ function r13MinimalityFailures(id, inputs, out) {
     const at = region.indexOf(`${selector} {`);
     return at < 0 ? null : region.slice(at, region.indexOf("}", at));
   };
-  const near = (a, b) => /^#[0-9a-f]{6}$/i.test(a || "") && hexToRgb(a).every((c, i) => Math.abs(c - hexToRgb(b)[i]) <= 1);
+  const near = (a, b) => isHex(a) && hexToRgb(a).every((c, i) => Math.abs(c - hexToRgb(b)[i]) <= 1);
   const ANCHORS = {
-    ":root": ["#eaeaea", "#eaeaea", "#dfdfdf", "#dfdfdf", "#eaeaea", "#5d88c2", "#7b7b7b", "#5b5b5b", "#616161", "#333333"],
-    'html[data-theme="terminal"]': ["#111111", "#1a4d1a", "#111111", "#1b551b", "#111111", "#33ff33", "#267326", "#2cb22c", "#21b621", "#33ff33"],
-    'html[data-theme="paper-ink"]': ["#e6e5e3", "#e6e5e3", "#dbdad8", "#dbdad8", "#e6e5e3", "#1a3a5c", "#917749", "#64553c", "#5c5c5c", "#2c2c2c"],
-    'html[data-theme="nord-night"]': ["#434c5e", "#4c566a", "#4a5364", "#535d70", "#434c5e", "#75a0b0", "#99a2b6", "#b5bdcd", "#c0c6d2", "#e5e9f0"],
-    'html[data-theme="gruvbox-dark"]': ["#302f2e", "#302f2e", "#292828", "#292828", "#302f2e", "#7e9e92", "#9f958f", "#c1b59f", "#aca093", "#ebdbb2"],
+    ":root": ["#eaeaea", "#eaeaea", "#dfdfdf", "#dfdfdf", "#eaeaea", "#5d88c2", "#616161", "#333333"],
+    'html[data-theme="terminal"]': ["#111111", "#1a4d1a", "#111111", "#228222", "#111111", "#33ff33", "#21b621", "#33ff33"],
+    'html[data-theme="paper-ink"]': ["#e6e5e3", "#e6e5e3", "#dbdad8", "#dbdad8", "#e6e5e3", "#1a3a5c", "#5c5c5c", "#2c2c2c"],
+    'html[data-theme="nord-night"]': ["#434c5e", "#4c566a", "#4a5364", "#535d70", "#434c5e", "#75a0b0", "#c0c6d2", "#e5e9f0"],
+    'html[data-theme="gruvbox-dark"]': ["#302f2e", "#302f2e", "#292828", "#292828", "#302f2e", "#7e9e92", "#aca093", "#ebdbb2"],
+    'html[data-theme="rose-pine"]': ["#26233a", "#403d52", "#26233a", "#706d83", "#26233a", "#7d6c99", "#8e8ba3", "#e0def4"],
   };
   let compared = 0;
   for (const [selector, values] of Object.entries(ANCHORS)) {
@@ -1261,10 +1440,21 @@ function r13MinimalityFailures(id, inputs, out) {
     FIELD_ROLES.forEach((role, i) => {
       const got = (body?.match(new RegExp(`--opt-${role}:\\s*([^;]+);`)) || [])[1]?.trim();
       compared++;
-      check(near(got, values[i]), `${selector} --opt-${role}=${got} drifted from the anchor ${values[i]} (+-1/channel) -- a wiring/emit/hand-edit drift, or FIELD_EDGE_HOVER_FG_MIX / the deriver changed -- re-run sync-all and update DEFAULT_LIGHT and ANCHORS`);
+      check(near(got, values[i]), `${selector} --opt-${role}=${got} drifted from the anchor ${values[i]} (+-1/channel) -- a wiring/emit/hand-edit drift, or FRAMED_HOVER_FG_MIX / the deriver changed -- re-run sync-all and update DEFAULT_LIGHT and ANCHORS`);
     });
   }
-  check(compared === 50, `field anchor block made ${compared} comparisons, expected 50 (5 themes x 10 roles)`);
+  check(compared === 48, `field anchor block made ${compared} comparisons, expected 48 (6 blocks x 8 roles)`);
+  // field-chevron, every shipped block: its stroke is that block's own
+  // field-placeholder (spec §2.2), in the ";"-free data-URI form.
+  let chevrons = 0;
+  for (const m of region.matchAll(/(?:^|\n)(html\[data-theme="[^"]+"\]|:root) \{([^}]*)\}/g)) {
+    const decl = (role) => (m[2].match(new RegExp(`--opt-${role}:\\s*([^;]+);`)) || [])[1]?.trim();
+    const placeholder = decl("field-placeholder");
+    chevrons++;
+    check(isHex(placeholder) && decl("field-chevron") === fieldChevronUri(placeholder),
+      `${m[1]} --opt-field-chevron ${decl("field-chevron")} is not fieldChevronUri(its --opt-field-placeholder ${placeholder})`);
+  }
+  check(chevrons === 15, `field-chevron check visited ${chevrons} options blocks, expected 15 (14 themes + :root)`);
 }
 
 if (failures.length) {

@@ -4,7 +4,11 @@ import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import { parseStyleRules, parseDeclarations, declarationValueMap, splitSelectorList, closeOfBracket, cmpSpecificity, selectorSpecificity } from "../docs/theme-surface/tools/css-syntax.mjs";
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
-import { contrast, hexToRgb, FILL_SEPARATE_MIN } from "../docs/theme-surface/composers/_ui-derive.mjs";
+import { contrast, hexToRgb, FILL_SEPARATE_MIN, FIELD_ROLES, UI_DERIVED_OUTPUT_ROLES } from "../docs/theme-surface/composers/_ui-derive.mjs";
+import * as uiDerive from "../docs/theme-surface/composers/_ui-derive.mjs";
+import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
+import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
+import { composeLibraryThemeMap } from "../docs/theme-surface/composers/library-chrome.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
@@ -6455,6 +6459,73 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
   check(measured === 30, `ui-contract-tests.mjs: the eye chip gate measured ${measured} (block, state) pairs, expected 30`);
   if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] eye chip: lowest ${lowest.r.toFixed(3)}:1 (${lowest.where}) over ${measured} (block, state) pairs; floor ${KEY_CHIP_MIN}`);
+}
+
+// ---- Retired field roles (stage 4 spec docs/superpowers/specs/2026-09-30-
+// ui-fields-stage4-design.md §1.4 item 2, §2.4): the B+ bottom edge is gone.
+// field-edge / field-edge-hover must not come back through any door -- the
+// deriver's role registries, a composer map on any surface, a pilot's ui.*
+// block (validate-contracts stopped blocking the two names the moment they
+// left UI_DERIVED_OUTPUT_ROLES, so a pilot writing one would ship an orphan
+// custom property), or any declaration in the three surface stylesheets --
+// and FIELD_EDGE_HOVER_FG_MIX must not be re-exported. Declarations are read
+// through the CSS parser, so a comment that mentions the old names (or a
+// history note) is not a hit, and a consumer anywhere -- generated region,
+// hand-written region, @media / @supports -- is.
+{
+  const RETIRED_FIELD_ROLES = ["field-edge", "field-edge-hover"];
+  const RETIRED_TOKEN_RE = /--[a-z]+-field-edge/;
+  const retiredDecls = (css) => parseStyleRules(css).flatMap((rule) =>
+    parseDeclarations(rule.body)
+      .filter((d) => RETIRED_TOKEN_RE.test(d.property) || RETIRED_TOKEN_RE.test(d.value))
+      .map((d) => `${rule.selectorText} { ${d.property}: ${d.value} }`));
+  // The scan must be able to fail (negative controls): a consumer, a
+  // definition and an @media-nested use are all caught; a comment is not.
+  check(retiredDecls(".fg textarea { border-bottom-color: var(--opt-field-edge); }").length === 1 &&
+    retiredDecls(':root { --lib-field-edge-hover: #000000; }').length === 1 &&
+    retiredDecls("@media (min-width: 1px) { .listbox-btn:hover { border-bottom-color: var(--pp-field-edge-hover); } }").length === 1 &&
+    retiredDecls("/* --opt-field-edge retired */ .x { color: var(--opt-field-fg); }").length === 0,
+    "ui-contract-tests.mjs: the retired field-edge scan no longer tells a consumer / definition from a comment");
+  for (const [file, css] of [["popup.css", popupCss], ["options.css", optionsCss], ["library.css", libraryCss]]) {
+    const hits = retiredDecls(css);
+    check(hits.length === 0, `${file}: declares or consumes a retired field-edge token (the B+ bottom edge is gone, spec 2026-09-30 §2.2): ${hits.join(" | ")}`);
+  }
+  for (const r of RETIRED_FIELD_ROLES) {
+    check(!FIELD_ROLES.includes(r), `_ui-derive.mjs FIELD_ROLES lists the retired role ${r}`);
+    for (const [surface, roles] of Object.entries(UI_DERIVED_OUTPUT_ROLES)) {
+      check(!roles.includes(r), `_ui-derive.mjs UI_DERIVED_OUTPUT_ROLES.${surface} lists the retired role ${r}`);
+    }
+  }
+  check(!("FIELD_EDGE_HOVER_FG_MIX" in uiDerive), "_ui-derive.mjs exports FIELD_EDGE_HOVER_FG_MIX again (retired with the bottom edge)");
+  let composed = 0;
+  for (const entry of POPUP_THEME_MAP) {
+    const tk = JSON.parse(read(`docs/theme-surface/pilots/${entry.pilot}.tokens.json`));
+    const maps = {
+      options: composeOptionsThemeMap(tk, entry.mode, entry.useDarkMode).map,
+      popup: composePopupThemeMap(tk, entry.mode, entry.useDarkMode),
+      library: composeLibraryThemeMap(tk, entry.mode, entry.useDarkMode).map,
+    };
+    for (const [surface, map] of Object.entries(maps)) {
+      composed++;
+      const stale = Object.keys(map).filter((k) => RETIRED_FIELD_ROLES.includes(k));
+      check(stale.length === 0, `${surface} composer map for ${entry.id} carries retired role(s) ${stale.join(", ")}`);
+    }
+  }
+  check(composed === 42, `ui-contract-tests.mjs: the retired-role composer walk visited ${composed} (surface, theme) maps, expected 42 (3 x 14)`);
+  const pilotDir = resolve(root, "docs/theme-surface/pilots");
+  const pilotFiles = readdirSync(pilotDir).filter((f) => f.endsWith(".tokens.json"));
+  check(pilotFiles.length >= 13, `ui-contract-tests.mjs: found only ${pilotFiles.length} pilot files under docs/theme-surface/pilots`);
+  for (const file of pilotFiles) {
+    const pilot = JSON.parse(readFileSync(resolve(pilotDir, file), "utf8"));
+    for (const [surface, modes] of Object.entries(pilot.ui ?? {})) {
+      for (const [mode, roles] of Object.entries(modes ?? {})) {
+        if (!roles || typeof roles !== "object") continue;
+        for (const role of Object.keys(roles)) {
+          check(!RETIRED_FIELD_ROLES.includes(role), `${file}: ui.${surface}.${mode}.${role} sets a retired field role (it would ship as an orphan custom property)`);
+        }
+      }
+    }
+  }
 }
 
 if (fail.length) {

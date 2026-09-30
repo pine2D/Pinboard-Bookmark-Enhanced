@@ -11,23 +11,27 @@ const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
   "chip-fg",
 ]);
 
-// B+ field family (spec docs/superpowers/specs/2026-09-28-ui-fields-bplus-design.md
-// §2): ten options-only OUTPUT roles, derived by deriveFieldRoles() at the end
-// of finalizeUiControlRoles when the caller passes `fieldRoles: true`
-// (options-chrome.mjs only -- popup/library emit none of them). Listed in
-// UI_DERIVED_OUTPUT_ROLES.options so validate-contracts.mjs rejects a pilot
-// writing any of them. The same membership makes contrast-audit.mjs's default
-// (:root) block audit FAIL instead of SKIP when a role is missing -- but only
-// for roles that appear in one of its COMPONENT_PAIR_SPEC rows
-// (isOutputRoleForDefault is asked per pair row). field-border and
-// field-border-hover appear in none, so the default block's copy of all ten
-// is pinned by tests/theme-ui-derive-tests.mjs instead (the folded-:root
-// re-derivation and the 5-theme anchor block). field-fg (final fix wave,
-// ruling R13) is the value box's typed-text ink -- see deriveFieldRoles.
+// Soft Fill field family (stage 4 spec docs/superpowers/specs/2026-09-30-ui-
+// fields-stage4-design.md §2; COMPONENTS.md §6.2 / §9.1 law 9): eight OUTPUT
+// roles, derived by deriveFieldRoles() at the end of finalizeUiControlRoles
+// when the caller passes `fieldRoles: true`. A value box is fill-only: rest
+// field-bg with four field-border sides, hover field-bg-hover /
+// field-border-hover, focus field-bg-focus with four field-border-focus
+// sides. There is no bottom edge any more -- the B+ roles field-edge /
+// field-edge-hover retired on 2026-09-30, and tests/ui-contract-tests.mjs
+// keeps them out of every composer map, pilot and surface CSS. Listed in
+// UI_DERIVED_OUTPUT_ROLES for each surface that derives them, so
+// validate-contracts.mjs rejects a pilot writing any of them, and
+// contrast-audit.mjs's default (:root) block FAILs instead of SKIPs when a
+// role named in one of its COMPONENT_PAIR_SPEC rows is missing.
+// field-border / field-border-hover are in no pair row: contrast-audit's
+// host-separation section and tests/theme-ui-derive-tests.mjs pin them.
+// field-chevron (fieldChevronUri below) is NOT in this list -- it is a url(),
+// not a colour -- and is emitted only where the caller also passes
+// `fieldChevron: true`.
 export const FIELD_ROLES = Object.freeze([
   "field-bg", "field-border", "field-bg-hover", "field-border-hover",
-  "field-bg-focus", "field-border-focus", "field-edge", "field-edge-hover", "field-placeholder",
-  "field-fg",
+  "field-bg-focus", "field-border-focus", "field-placeholder", "field-fg",
 ]);
 
 // Authoring contract shared with validate-contracts.mjs. These roles are
@@ -52,7 +56,7 @@ export const FIELD_ROLES = Object.freeze([
 // accent2 role or chip consumer for it.
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
   popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg"]),
-  options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES]),
+  options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
   library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent"]),
 });
 
@@ -498,20 +502,21 @@ export function fillDistinct(fill, others, toward, hosts = [], minDE = TIER_DIST
 export const PRIMARY_HOVER_FG_MIX = 0.12;
 export const primaryHoverFill = (accentRgb, fgRgb) => mix(accentRgb, fgRgb, PRIMARY_HOVER_FG_MIX);
 
-// Hover step of the field's bottom edge: mix(edge, fg, this). Spec §2 names it
-// a tunable constant. The constraint it must meet is not just "move toward
-// fg": the hover edge has to read strictly stronger than the rest edge ON THE
-// FILL EACH IS PAINTED ON -- ratio(edge-hover, field-bg-hover) > ratio(edge,
-// field-bg) -- and the hover fill is itself one step deeper than the rest
-// fill, which eats into the edge's contrast. A small mix loses that race.
-// Measured over the 15 shipped blocks (14 themes + default :root), the lowest
-// value that holds everywhere is ~.27 (every .01 step from .27 to 1 passes);
-// .25 fails solarized-light (3.5395 < 3.5452). The user's real-device
-// fallback, if .45 reads too heavy, is therefore .30 (controller ruling R2).
-// Changing it moves every field-edge-hover: re-run sync-all and update the
-// DEFAULT_LIGHT literal (options-chrome.mjs) and the anchor table in
-// tests/theme-ui-derive-tests.mjs.
-export const FIELD_EDGE_HOVER_FG_MIX = 0.45;
+// Hover frame of a FRAMED value box whose fill is NOT separated from its
+// hosts (terminal; rose-pine on options): the fill keeps its pilot value on
+// hover (§9.5: a framed control does not need its fill to carry affordance),
+// so the frame is the only hover signal:
+//   field-border-hover = mix(frame, fg, FRAMED_HOVER_FG_MIX).
+// Stage 4 spec §2.3 F8 is the floor it has to clear: >= 1.30:1 and ΔE2000
+// >= 6 from the rest frame, and stronger on the fill than the rest frame.
+// Scanning t in .01 steps, those floors alone need .11-.15 on the four
+// shipped unseparated framed blocks (spec-facts-values.md §4.2); .30 keeps
+// about twice that margin, and every larger step moves the hover frame
+// closer to the focus border (at .45 rose-pine's hover frame out-contrasts
+// its focus border on the fill, 4.25 vs 3.24). A framed box whose fill IS
+// separated (options nord-night, dracula) steps its fill like an unframed
+// box, and its frame keeps the one FILL_SEPARATE_MIN step it always took.
+export const FRAMED_HOVER_FG_MIX = 0.30;
 
 // Typed text vs placeholder: the least contrast between a value box's typed
 // text (field-fg) and its placeholder ink (field-placeholder) -- "empty" must
@@ -524,92 +529,109 @@ export const FIELD_TEXT_PLACEHOLDER_MIN = 1.4;
 
 // Inputs deriveFieldRoles cannot do without. hexToRgb(undefined) does not
 // throw -- it silently parses as #000000 -- so a map missing one of these
-// would ship plausible-looking 6-digit hex derived from black. pf-bg is the
-// one optional host: absent, the provider sub-panel is the panel itself.
-const FIELD_REQUIRED_INPUTS = Object.freeze(["fg", "fg-hint", "panel", "input-bg", "border", "focus-bd", "accent"]);
+// would ship plausible-looking 6-digit hex derived from black. The host
+// roles (FIELD_HOST_ROLES below, or the caller's hostRoles) are required on
+// top of these; `border` is not an input any more (it only fed the retired
+// bottom edge).
+const FIELD_REQUIRED_INPUTS = Object.freeze(["fg", "fg-hint", "input-bg", "focus-bd", "accent"]);
 
-// B+ field family (spec 2026-09-28-ui-fields-bplus-design §2; COMPONENTS.md
-// §6.2 / §9.1 law 9). A value box is announced by its Soft Fill; its WCAG
-// 1.4.11 boundary is ONE 1px bottom edge (Chrome settings cr-input, Material
-// Filled) -- the other three sides collapse into the fill (§9.1 law 1) or
-// carry the pilot's frame.
+// The surfaces a value box sits on, per CSS prefix: the hosts its fill must
+// separate from (FILL_SEPARATE_MIN) and its hover step moves away from.
+//   opt: the settings panel and the AI provider sub-panel (.pf, --opt-pf-bg);
+//   pp:  the popup page (--pp-bg) -- every popup value box sits on it, bg2
+//        never hosts one (so contrast-audit's ROLE_ALIAS.pp.panel = bg2 is
+//        not a field host);
+//   lib: the list pane (--lib-panel) and the page (--lib-bg).
+// Keyed by prefix because every reader works per prefix: finalizeUiControlRoles'
+// fieldHostRoles default, contrast-audit's FIELD_SEPARATION_HOSTS (pinned
+// equal to this table by tests/theme-ui-derive-tests.mjs), and the
+// derivation tests' host lists.
+export const FIELD_HOST_ROLES = Object.freeze({
+  opt: Object.freeze(["panel", "pf-bg"]),
+  pp: Object.freeze(["bg"]),
+  lib: Object.freeze(["panel", "bg"]),
+});
+
+// Soft Fill field family (stage 4 spec 2026-09-30-ui-fields-stage4-design §2;
+// COMPONENTS.md §6.2 / §9.1 law 9). A value box is announced by its fill
+// alone: all four sides share one colour and one radius, and nothing draws a
+// bottom edge. Its resting boundary is the fill-vs-host step
+// (FILL_SEPARATE_MIN), not WCAG 1.4.11's 3:1 -- a deviation the user
+// accepted (spec §1.3). Placeholder (4.5), typed text (4.5) and the focus
+// border (3) keep their floors.
 //
-// - fill: the post-finalize input-bg, re-separated against EVERY surface a
-//   field sits on -- the panel AND the provider sub-panel (.pf, --opt-pf-bg).
+// - hosts: `hostRoles` names the surfaces the box sits on (FIELD_HOST_ROLES:
+//   opt [panel, pf-bg], pp [bg], lib [panel, bg]). Each is a required input.
+// - fill: the post-finalize input-bg, re-separated against EVERY host.
 //   input-bg itself was only separated against [panel, bg]; flexoki-light's
-//   pf-bg override (#E6E4D9) left it at 1.01:1 inside the AI provider cards.
-//   Identity everywhere else. A framed theme (pilot `input-border` declared,
-//   §9.5) keeps its pilot fill verbatim, same exemption the finalizer applies.
+//   pf-bg override (#E6E4D9) left it at 1.01:1 inside the options AI provider
+//   cards. Identity everywhere else. A framed theme (the pilot declares its
+//   input border role, §9.5) keeps its pilot fill verbatim, the same
+//   exemption the finalizer applies.
 // - frame: = fill (collapsed); framed = the pilot frame composited over the
 //   fill (terminal's translucent #33ff3340 -> #1a4d1a) or resolved through a
-//   `var(--opt-<role>)` reference (NEW_THEME.md §9.5's recommended spelling).
-// - hover: the fill steps one FILL_SEPARATE_MIN step AWAY from its hosts
-//   (final fix wave, ruling R12) -- but only where the resting fill is itself
-//   a perceivable plane (>= FILL_SEPARATE_MIN against every host). A fill
-//   darker than its hosts darkens, a lighter one lightens: the step mixes
-//   toward fg where fg lies in that direction (every light theme, and every
-//   dark theme whose field is raised above its panel -- byte-identical to the
-//   pre-R12 "toward fg" rule there), otherwise toward the matching pole
-//   (#000000 / #ffffff). The recessed dark wells (gruvbox-dark #302f2e on
-//   panel #3c3836, catppuccin-mocha #262637 on #313244) used to mix toward
-//   their light fg, i.e. TOWARD the panel: hover fell to 1.04 / 1.07 against
-//   it, under FILL_SEPARATE_MIN -- the box dissolved into the card on hover.
-//   The hover fill clears FILL_SEPARATE_MIN against the rest fill AND every
-//   host, and stepping away keeps its separation from each host >= the rest
-//   fill's. (A fill lying BETWEEN two hosts' luminances steps away from the
-//   nearer one; no shipped theme has one, and the pipeline walk in
-//   tests/theme-ui-derive-tests.mjs would flag the host it drifts toward.)
-//   An unseparated framed fill (terminal 1.00, rose-pine 1.09) keeps its fill
-//   on hover and the FRAME deepens instead: "a framed control does not need
-//   its fill to carry affordance" (§9.5), applied to hover. This branch is
-//   what reproduces the research anchors (terminal edge #267326, hover edge
-//   6.75:1).
+//   `var(--<ns>-<role>)` reference (NEW_THEME.md §9.5's recommended spelling).
+// - hover (ruling R12): where the rest fill is itself a perceivable plane
+//   (>= FILL_SEPARATE_MIN against every host) the fill steps one
+//   FILL_SEPARATE_MIN step AWAY from its hosts. A fill darker than every
+//   host darkens, a lighter one lightens: the step mixes toward fg where fg
+//   lies in that direction, otherwise toward that side's pole
+//   (#000000 / #ffffff) -- that is how a recessed well (options gruvbox-dark
+//   #302f2e on panel #3c3836) darkens instead of walking back into its
+//   panel. A fill lying BETWEEN two hosts' luminances steps away from the
+//   nearer one; tests/theme-ui-derive-tests.mjs pins which shipped blocks
+//   take that branch. The hover fill clears FILL_SEPARATE_MIN against the
+//   rest fill and every host. An unframed frame follows its fill; a framed
+//   box whose fill is separated (options nord-night, dracula) also steps its
+//   frame once, fillSeparate(frame, [frame], fg). A framed fill that is NOT
+//   separated (terminal 1.00, options rose-pine 1.09) keeps its fill on
+//   hover, and the frame carries the hover: mix(frame, fg,
+//   FRAMED_HOVER_FG_MIX).
 // - focus: fill unchanged (fusedStateStable relies on it); border = focus-bd,
 //   re-derived with focusBdToAA only where it drops under 3:1 on this fill.
-// - edge: the structural border pushed to >= 3:1 against the fill, the hover
-//   fill, the panel and pf-bg; edge-hover = mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX).
-// - placeholder: the field's secondary ink (placeholder text, the key-wrap eye,
-//   the listbox chevron): fg-hint pushed to >= 4.5:1 on the rest and hover
-//   fills (the focus fill is the rest fill).
+// - placeholder: the field's secondary ink (placeholder text, the key-wrap
+//   eye, the listbox and native-select chevrons): fg-hint pushed to >= 4.5:1
+//   on the rest and hover fills (the focus fill is the rest fill).
 // - fg (typed text, ruling R13): the theme fg, unless it sits within
 //   FIELD_TEXT_PLACEHOLDER_MIN of the placeholder. Then, first, the
 //   placeholder moves toward the fills (lighter on light fills, darker on
 //   dark ones: a mix toward white / black, same hue line) as far as >= 4.5:1
 //   on BOTH fills allows; if typed text still sits within the floor, field-fg
 //   is pushed away from the fills (HSL lightness, hue + saturation kept, the
-//   fgToAA technique in .005 steps) until it clears it. Body text, labels,
-//   buttons, popup and library keep --opt-fg.
+//   fgToAA technique in .005 steps) until it clears it. Body text, labels and
+//   buttons keep the surface's plain fg.
 // Every value is hex-rounded before it feeds the next step, the same
 // "verify on what ships" discipline as the other derivers in this file.
-// Throws, naming every missing role, when a FIELD_REQUIRED_INPUTS entry (or
-// the role a `var(--opt-<role>)` frame points at) is absent from `map`;
-// throws, naming the role and its value, when a required input (or a given
-// pf-bg) is not a hex this function reads correctly -- #rgb / #rrggbb, plus
-// #rrggbbaa for `border`, the one input composited through resolveOpaqueBg
-// (hexToRgb would read an 8-digit ink or surface's bytes wrongly, and parses
-// every non-hex spelling as #000000); and throws, quoting the value, when a
-// framed border is anything but #rgb / #rrggbb / #rrggbbaa or exactly
+// Throws when `hostRoles` is not a non-empty array of role names; throws,
+// naming every missing role, when a FIELD_REQUIRED_INPUTS entry, a host role
+// or the role a `var(--<ns>-<role>)` frame points at is absent from `map`;
+// throws, naming the role and its value, when a required input or host is
+// not #rgb / #rrggbb (hexToRgb reads an 8-digit hex's bytes wrongly and
+// parses every non-hex spelling as #000000); and throws, quoting the value,
+// when a framed border is anything but #rgb / #rrggbb / #rrggbbaa or exactly
 // `var(--<ns>-<role>)` resolving to one of those -- resolveOpaqueBg reads any
 // other spelling (rgba(), a var() with a fallback, a named colour) as
 // transparent, which would silently collapse the pilot's frame into the fill.
 // Surrounding whitespace is trimmed before any of these values is parsed.
 const FIELD_HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const FIELD_FRAME_HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-export function deriveFieldRoles(map, framedBorder = null) {
+export function deriveFieldRoles(map, framedBorder = null, hostRoles = FIELD_HOST_ROLES.opt) {
+  if (!Array.isArray(hostRoles) || hostRoles.length === 0 || !hostRoles.every((r) => typeof r === "string" && r !== "")) {
+    throw new Error(`deriveFieldRoles: hostRoles must be a non-empty array of role names, got ${JSON.stringify(hostRoles)}`);
+  }
   const present = (v) => typeof v === "string" && v.trim() !== "";
-  const missing = FIELD_REQUIRED_INPUTS.filter((r) => !present(map[r]));
+  const required = [...new Set([...FIELD_REQUIRED_INPUTS, ...hostRoles])];
+  const missing = required.filter((r) => !present(map[r]));
   if (missing.length) {
     throw new Error(`deriveFieldRoles: missing required input role(s): ${missing.join(", ")}`);
   }
-  const hasPf = present(map["pf-bg"]);
-  const unparseable = [...FIELD_REQUIRED_INPUTS, ...(hasPf ? ["pf-bg"] : [])]
-    .filter((r) => !(r === "border" ? FIELD_FRAME_HEX_RE : FIELD_HEX_RE).test(map[r].trim()));
+  const unparseable = required.filter((r) => !FIELD_HEX_RE.test(map[r].trim()));
   if (unparseable.length) {
-    throw new Error(`deriveFieldRoles: input role(s) not a parseable hex (#rgb / #rrggbb${unparseable.includes("border") ? "; border may be #rrggbbaa" : ""}): ${unparseable.map((r) => `${r}=${JSON.stringify(map[r])}`).join(", ")}`);
+    throw new Error(`deriveFieldRoles: input role(s) not a parseable hex (#rgb / #rrggbb): ${unparseable.map((r) => `${r}=${JSON.stringify(map[r])}`).join(", ")}`);
   }
   const rgbOf = (r) => hexToRgb(map[r].trim());
   const fg = rgbOf("fg");
-  const hosts = [rgbOf("panel"), rgbOf(hasPf ? "pf-bg" : "panel")];
+  const hosts = hostRoles.map(rgbOf);
   const framed = framedBorder != null;
   const roleRef = typeof framedBorder === "string" && /^var\(--[a-z]+-([a-z0-9-]+)\)$/.exec(framedBorder.trim());
   if (roleRef && !present(map[roleRef[1]])) {
@@ -639,11 +661,11 @@ export function deriveFieldRoles(map, framedBorder = null) {
     bgHoverHex = rgbToHex(fillSeparate(bg, [bg, ...hosts], toward));
   }
   const bgHover = hexToRgb(bgHoverHex);
-  const borderHoverHex = framed ? rgbToHex(fillSeparate(border, [border], fg)) : bgHoverHex;
+  const borderHoverHex = !framed ? bgHoverHex
+    : separated ? rgbToHex(fillSeparate(border, [border], fg))
+      : rgbToHex(mix(border, fg, FRAMED_HOVER_FG_MIX));
   const focusBd = rgbOf("focus-bd");
   const borderFocusHex = rgbToHex(contrast(focusBd, bg) >= 3 ? focusBd : focusBdToAA(rgbOf("accent"), bg, [bg]));
-  const edgeHex = rgbToHex(fgToAAMulti(resolveOpaqueBg(map.border.trim(), bg), [bg, bgHover, ...hosts], 3));
-  const edgeHoverHex = rgbToHex(mix(hexToRgb(edgeHex), fg, FIELD_EDGE_HOVER_FG_MIX));
 
   // Placeholder, then typed text (R13) -- see the header comment.
   const fills = [bg, bgHover];
@@ -675,11 +697,29 @@ export function deriveFieldRoles(map, framedBorder = null) {
     "field-border-hover": borderHoverHex,
     "field-bg-focus": bgHex,
     "field-border-focus": borderFocusHex,
-    "field-edge": edgeHex,
-    "field-edge-hover": edgeHoverHex,
     "field-placeholder": rgbToHex(placeholder),
     "field-fg": rgbToHex(fieldFg),
   };
+}
+
+// The native-select chevron of a value box, as a CSS <image> value (stage 4
+// spec §0 item 2 / §2.2): a per-theme data URI the composer generates, whose
+// stroke is the box's secondary ink (field-placeholder, >= 4.5:1 on both
+// fills). A select cannot host a masked ::after, so the colour cannot come
+// from currentColor; generating it keeps the ink a derived role instead of a
+// hand-typed literal. Geometry is the hand-written chevron's, unchanged: a
+// 12x12 viewBox, one polyline M3 4.5 6 7.5 9 4.5, stroke-width 1.5, round
+// caps and joins. The value never contains ";" (no `;utf8` / `;base64`
+// media-type parameter; "<" / ">" escaped as %3C / %3E), so every
+// `--x: <value>;` reader that stops at the first ";" -- contrast-audit's
+// grab(), the derivation tests' :root fold -- reads it whole; the stroke is
+// written %23rrggbb because a bare "#" would start the URL's fragment.
+export function fieldChevronUri(hex) {
+  if (!FIELD_HEX_RE.test(typeof hex === "string" ? hex.trim() : "")) {
+    throw new Error(`fieldChevronUri: stroke must be #rgb / #rrggbb, got ${JSON.stringify(hex)}`);
+  }
+  const stroke = rgbToHex(hexToRgb(hex.trim())).replace("#", "%23");
+  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='${stroke}' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`;
 }
 
 // Final post-override pass shared by popup/options/library. It owns only the
@@ -702,10 +742,19 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
     // true so its own pre-set/overridden value is left untouched, mirroring
     // the on-danger-style `== null` gap-fill instead of an overwrite.
     onAccentIsInput = false,
-    // B+ field family (deriveFieldRoles above): options only. popup/library
-    // leave it false so their generated regions stay byte-identical.
+    // Soft Fill field family (deriveFieldRoles above). Only a surface that
+    // passes true emits it (options); the others stay byte-identical.
     fieldRoles = false,
+    // The roles that surface's value boxes sit on (FIELD_HOST_ROLES, keyed by
+    // CSS prefix). options' pair is the default.
+    fieldHostRoles = FIELD_HOST_ROLES.opt,
+    // Also emit field-chevron = fieldChevronUri(field-placeholder), for a
+    // surface with native <select> value boxes. Needs fieldRoles.
+    fieldChevron = false,
   } = config;
+  if (fieldChevron && !fieldRoles) {
+    throw new Error("finalizeUiControlRoles: fieldChevron needs fieldRoles (the chevron strokes field-placeholder)");
+  }
 
   const map = { ...inputMap };
   const ovr = overrides ?? {};
@@ -848,7 +897,8 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
     const onAccentHoverRgb = primaryHoverFill(accentRgb, fgRgb);
     map["on-accent"] = rgbToHex(fgToAAMulti(hexToRgb(palette["btn-fg"]), [accentRgb, onAccentHoverRgb]));
   }
-  if (fieldRoles) Object.assign(map, deriveFieldRoles(map, ovr[inputBorderRole] ?? null));
+  if (fieldRoles) Object.assign(map, deriveFieldRoles(map, ovr[inputBorderRole] ?? null, fieldHostRoles));
+  if (fieldChevron) map["field-chevron"] = fieldChevronUri(map["field-placeholder"]);
   return map;
 }
 

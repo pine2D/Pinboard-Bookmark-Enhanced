@@ -2906,12 +2906,17 @@ const RADIUS_VALUE_BOX_REQUIRED = Object.freeze({ options: FIELD_HOVER_REQUIRED_
 const FIELD_UNSEPARATED_FRAMED = Object.freeze({ options: Object.freeze(["terminal", "rose-pine"]) });
 // The frame-step floors for those themes (contrast ratio and CIEDE2000 of
 // the hover frame against the rest frame, both composited over the fill):
-// what deriveFieldRoles guarantees today (field-border-hover =
-// fillSeparate(frame, [frame], fg), >= FILL_SEPARATE_MIN; lowest 1.114 on
-// terminal, 1.115 on rose-pine; no perceptual floor). spec §2.3 F8 raises
-// both (1.30 and 6) together with the derivation's frame-to-fg mix.
-const FIELD_FRAME_HOVER_MIN = FILL_SEPARATE_MIN;
-const FIELD_FRAME_HOVER_MIN_DE = 0;
+// spec 2026-09-30-ui-fields-stage4-design §2.3 F8, the same floors
+// tests/theme-ui-derive-tests.mjs holds the derivation to (F8_MIN_RATIO /
+// F8_MIN_DE). deriveFieldRoles paints that hover frame as mix(frame, fg,
+// FRAMED_HOVER_FG_MIX = .30): options terminal #1a4d1a -> #228222 (about
+// 2.02:1, ΔE2000 18.0), rose-pine #403d52 -> #706d83 (about 2.09:1, ΔE2000
+// 17.0). The B+ one-step fillSeparate frame (1.114 / 1.115, ΔE2000 2.74 /
+// 2.33) fails both floors: a frame that alone announces hover has to be
+// seen to move. Module-level so the popup / library value-box legs read the
+// same two floors.
+const FIELD_FRAME_HOVER_MIN = 1.30;
+const FIELD_FRAME_HOVER_MIN_DE = 6;
 const fieldHoverScanLog = [];
 
 // Runs INSIDE the page (element handle evaluate) -- self-contained.

@@ -289,12 +289,14 @@ clears their threshold):
   law 9). Drives `btn-bg`,
   `btn-hover`, `input-bg` and `chip-bg` once a control's resting border
   color collapses into its fill. `target` is the mix target, not
-  necessarily `fg`. Every caller passes `fg` except the B+ field FILL hover
+  necessarily `fg`. Every caller passes `fg` except the field FILL hover
   step (`deriveFieldRoles`): it steps away from both hosts (for a fill that
   sits between them, away from the nearer one) and targets `fg` when `fg`
   lies on that side, otherwise that side's pole (#000000 / #ffffff), so a
   recessed well darkens on hover instead of fading into its panel
-  (COMPONENTS.md §6.2).
+  (COMPONENTS.md §6.2). A framed box whose fill is not separated from its
+  hosts keeps that fill on hover; its frame steps instead,
+  `mix(frame, fg, FRAMED_HOVER_FG_MIX)` (F8, COMPONENTS.md §9.1 law 9).
 - `resolveOpaqueBg(raw, fallbackBg)` / `resolveChipBg(raw, accentRgb,
   panelRgb)` — not derivations themselves, but a prerequisite every
   above lever needs: a pilot's `border` or `tag-bg` may be a non-opaque

@@ -1,6 +1,6 @@
 import { expandPalette } from "./_util.mjs";
 import { mergeTokens } from "./compose-theme.mjs";
-import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, finalizeUiControlRoles, hexToRgb, rgbToHex } from "./_ui-derive.mjs";
+import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, finalizeUiControlRoles, fieldChevronUri, hexToRgb, rgbToHex } from "./_ui-derive.mjs";
 import { POPUP_THEME_MAP } from "./popup-chrome.mjs";
 
 // Default-surface (no preset selected) component-layer baseline — Task 5,
@@ -96,10 +96,11 @@ const DEFAULT_LIGHT = {
                                   // 2026-08-05 (was #8a8a8a) because Soft Fill darkened btn-bg out from under it:
                                   // contrast-audit's `border vs btn-bg` row caught the stale value at
                                   // 2.97:1 -- this pair is gated by derivation, never by allowlist.
-  // B+ field family (spec 2026-09-28-ui-fields-bplus-design §2). NOT hand-
-  // picked: deriveFieldRoles() (_ui-derive.mjs) over the folded default :root
-  // -- panel / input-bg / border above plus options.css's hand :root (fg #333,
-  // fg-hint #666666, pf-bg #f9f9f6, focus-bd #5d88c2, accent #4477bb).
+  // Soft Fill field family (stage 4 spec 2026-09-30-ui-fields-stage4-design
+  // §2.2). NOT hand-picked: deriveFieldRoles() (_ui-derive.mjs) over the
+  // folded default :root -- panel / input-bg above plus options.css's hand
+  // :root (fg #333, fg-hint #666666, pf-bg #f9f9f6, focus-bd #5d88c2, accent
+  // #4477bb), hosts FIELD_HOST_ROLES.opt = [panel, pf-bg].
   // tests/theme-ui-derive-tests.mjs re-derives them from the shipped :root
   // blocks on every run: move any of those inputs and it fails there.
   "field-bg": "#eaeaea",            // = input-bg: already 1.20:1 vs panel, 1.14:1 vs pf-bg
@@ -108,10 +109,9 @@ const DEFAULT_LIGHT = {
   "field-border-hover": "#dfdfdf",  // = field-bg-hover
   "field-bg-focus": "#eaeaea",      // = field-bg (focus never repaints the fill)
   "field-border-focus": "#5d88c2",  // = focus-bd, 3.03:1 on field-bg
-  "field-edge": "#7b7b7b",          // border #858585 pushed to 3:1 vs the hover fill (3.18)
-  "field-edge-hover": "#5b5b5b",    // mix(edge, fg, FIELD_EDGE_HOVER_FG_MIX)
   "field-placeholder": "#616161",   // fg-hint #666666 pushed to 4.5:1 vs the hover fill (4.65)
   "field-fg": "#333333",            // = fg: already 2.04:1 from the placeholder (>= FIELD_TEXT_PLACEHOLDER_MIN)
+  "field-chevron": fieldChevronUri("#616161"), // = fieldChevronUri(field-placeholder above)
 };
 
 // Map canonical UI colors (from _ui-derive) + a few options-only roles to --opt-* names.
@@ -145,7 +145,7 @@ function emitOpt(ui, palette, overrides, radius, mode) {
   // Shared final pass operates on the post-override map. It preserves framed
   // controls, separates frameless fills from both hosts, and recomputes the
   // five paired output roles against the values that will actually ship.
-  map = finalizeUiControlRoles(map, palette, overrides, { fieldRoles: true });
+  map = finalizeUiControlRoles(map, palette, overrides, { fieldRoles: true, fieldChevron: true });
 
   // Returns the computed map alongside the rendered text (not just text):
   // composeOptionsThemes needs map.accent AFTER pilot overrides are applied

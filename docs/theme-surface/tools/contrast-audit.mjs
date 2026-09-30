@@ -435,50 +435,40 @@ export const COMPONENT_PAIR_SPEC = [
   // floor), and popup's `#submit-btn:disabled` fg-hint-on-btn-bg is the
   // documented `:disabled` contrast exemption (COMPONENTS.md §3.4 / row 9).
 
-  // B+ field family (spec docs/superpowers/specs/2026-09-28-ui-fields-bplus-
-  // design.md §4; COMPONENTS.md §6.2 / §9.1 law 9). Options only -- the ten
-  // --opt-field-* roles are deriveFieldRoles() outputs (UI_DERIVED_OUTPUT_ROLES
-  // .options), so on the default (:root) block a missing field-* role named in
-  // one of the rows below FAILs rather than SKIPs (isOutputRoleForDefault);
-  // field-border / field-border-hover are in no row, so their default-block
-  // presence is pinned by tests/theme-ui-derive-tests.mjs instead. Themed
-  // blocks FAIL on any missing role here, as for every other row. The bottom
-  // edge is the value box's WCAG 1.4.11 boundary: it has to clear 3:1 against
-  // the fill it is painted on (rest and hover) AND every surface behind the box
-  // (panel; pf-bg inside the AI provider cards). The frame (--opt-field-border)
-  // is deliberately NOT gated -- it collapses into the fill (§9.1 law 1).
-  ["field-edge", "field-bg", 3, ["opt"]],
-  ["field-edge", "field-bg-hover", 3, ["opt"]],
-  ["field-edge", "panel", 3, ["opt"]],
-  ["field-edge", "pf-bg", 3, ["opt"]],
-  ["field-edge-hover", "field-bg-hover", 3, ["opt"]],
-  ["field-edge-hover", "panel", 3, ["opt"]],
-  ["field-edge-hover", "pf-bg", 3, ["opt"]],
+  // Soft Fill field family (stage 4 spec docs/superpowers/specs/2026-09-30-
+  // ui-fields-stage4-design.md §2.3; COMPONENTS.md §6.2 / §9.1 law 9).
+  // Options only for now -- the --opt-field-* roles are deriveFieldRoles()
+  // outputs (UI_DERIVED_OUTPUT_ROLES.options), so on the default (:root)
+  // block a missing field-* role named in one of the rows below FAILs rather
+  // than SKIPs (isOutputRoleForDefault). Themed blocks FAIL on any missing
+  // role here, as for every other row. There is no bottom edge any more: the
+  // box's resting boundary is its fill's separation from the surfaces it sits
+  // on, which depends on whether the block is framed -- not a fixed role
+  // pair, so auditFieldSeparation (below COMPONENT_PAIR_SPEC) owns F1-F3 and
+  // F8b, and field-border / field-border-hover appear in no row here.
+  // F7: the focus border on the fill (rest = focus fill).
   ["field-border-focus", "field-bg", 3, ["opt"]],
   ["field-border-focus", "field-bg-focus", 3, ["opt"]],
-  // Placeholder text, the key-wrap eye and the listbox chevron all paint the
-  // field's secondary ink on the field fills.
+  // F4: placeholder text, the key-wrap eye and the listbox / native-select
+  // chevrons all paint the field's secondary ink on the field fills.
   ["field-placeholder", "field-bg", 4.5, ["opt"]],
   ["field-placeholder", "field-bg-hover", 4.5, ["opt"]],
   ["field-placeholder", "field-bg-focus", 4.5, ["opt"]],
-  // Typed text in every value box that paints --opt-field-placeholder (the
-  // generated .fg recipe, .listbox-btn, the sidebar search box) is
-  // --opt-field-fg (final fix wave, ruling R13): on the rest and the hover
-  // fill, and on the search box's own fill (input-bg, every state).
+  // F5: text painted on a field fill is --opt-field-fg (ruling R13; spec §2.2
+  // D6 -- the generated .fg recipe, .listbox-btn, the sidebar search box), on
+  // the rest and the hover fill, and on the search box's own fill (input-bg,
+  // every state). The two plain `fg vs field-bg(-hover)` rows that stood here
+  // are gone with D6: text on a field fill reads field-fg, and these two rows
+  // are exactly the ones they would have become.
   ["field-fg", "field-bg", 4.5, ["opt"]],
   ["field-fg", "field-bg-hover", 4.5, ["opt"]],
   ["field-fg", "input-bg", 4.5, ["opt"]],
-  // ...and it must be tellable apart from the placeholder: a distinction
+  // F6: ...and it must be tellable apart from the placeholder: a distinction
   // floor, not a legibility one (both inks already clear 4.5:1 on the fills),
   // expressed like the other non-text rows here (chip-bg vs panel's
   // FILL_SEPARATE_MIN): the same ratio, a lower min. The UA placeholder gave
   // 1.52:1 on solarized-light; the first B+ derivation 1.03.
   ["field-fg", "field-placeholder", FIELD_TEXT_PLACEHOLDER_MIN, ["opt"]],
-  // Plain --opt-fg on the field fills stays gated: the narrow-screen tab
-  // picker (.mobile-tab-picker select) is fill-only B+ (--opt-field-bg /
-  // -hover) but keeps --opt-fg text -- it paints no placeholder.
-  ["fg", "field-bg", 4.5, ["opt"]],
-  ["fg", "field-bg-hover", 4.5, ["opt"]],
   // The sidebar search box (options.css `.options-search input[type="search"]`)
   // is a value box outside .fg: it keeps --opt-input-bg as its fill at rest,
   // on hover and on focus (only its border changes on focus), but paints its
@@ -487,6 +477,75 @@ export const COMPONENT_PAIR_SPEC = [
   // pair the search box actually renders.
   ["field-placeholder", "input-bg", 4.5, ["opt"]],
 ];
+
+// Host separation of the Soft Fill value box (stage 4 spec 2026-09-30 §2.3
+// F1-F3 and F8b, §2.4; COMPONENTS.md §9.1 law 9) -- the box's resting
+// boundary now that no bottom edge draws it. Not COMPONENT_PAIR_SPEC rows:
+// which floor applies depends on the block's class, read from the shipped
+// tokens themselves --
+//   framed    = field-border differs from field-bg (an unframed frame
+//               collapses into its fill byte for byte, deriveFieldRoles);
+//   separated = field-bg clears FILL_SEPARATE_MIN against every host.
+// Unframed, and framed-but-separated (options nord-night, dracula): F1 fill vs
+// every host, F2 hover fill vs rest fill, F3 hover fill vs every host, each
+// >= FILL_SEPARATE_MIN; an unframed box's frame must also equal its fill on
+// hover. Framed and NOT separated (terminal, options rose-pine): the fill
+// keeps its pilot value on hover (field-bg-hover == field-bg) and the rest
+// frame has to announce the box, F8b >= FIELD_FRAME_HOST_MIN against every
+// host. F8 (hover frame vs rest frame) needs ΔE2000 and an on-the-fill
+// comparison: tests/theme-ui-derive-tests.mjs and render family 14 own it.
+// The class is re-read per block, so a block that drifts from one class to
+// the other changes which rows it gets; tests/theme-ui-derive-tests.mjs
+// pins the class membership (spec §2.4) so that cannot happen silently.
+//
+// Hosts are listed per CSS prefix HERE -- not resolved through ROLE_ALIAS,
+// whose pp.panel is bg2, a surface no popup value box sits on. A prefix
+// missing from this table is not audited; tests/theme-ui-derive-tests.mjs
+// fails when a surface that derives field roles (UI_DERIVED_OUTPUT_ROLES)
+// has no entry, or when an entry differs from _ui-derive.mjs's
+// FIELD_HOST_ROLES.
+export const FIELD_SEPARATION_HOSTS = Object.freeze({
+  opt: Object.freeze(["panel", "pf-bg"]),
+});
+// F8b: an unseparated framed box's rest frame vs every host. Lowest shipped
+// value 1.576 (options rose-pine vs panel).
+export const FIELD_FRAME_HOST_MIN = 1.5;
+function auditFieldSeparation(scope, ns, blockLabel, dict) {
+  const hosts = FIELD_SEPARATION_HOSTS[ns];
+  if (!hosts) return;
+  const line = (label, verdict) => "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + label.padEnd(28) + " " + verdict;
+  const roles = ["field-bg", "field-bg-hover", "field-border", "field-border-hover", ...hosts];
+  const raw = Object.fromEntries(roles.map((r) => [r, dict[`${ns}-${r}`]]));
+  const unusable = roles.filter((r) => !isHex(raw[r]));
+  if (unusable.length) {
+    // Every role here is a derivation output or a host the derivation itself
+    // requires, so a missing or non-hex one is a regression on the default
+    // block too -- FAIL, never SKIP.
+    const l = line("field separation", "FAIL (" + unusable.map((r) => `--${ns}-${r}: ${raw[r] ?? "not declared"}`).join(", ") + ")");
+    console.log(l);
+    violations.push(l);
+    return;
+  }
+  const rgb = Object.fromEntries(roles.map((r) => [r, hexRgb(normHex(raw[r].trim()))]));
+  const same = (a, b) => normHex(raw[a].trim()) === normHex(raw[b].trim());
+  const assertSame = (a, b) => {
+    const ok = same(a, b);
+    const l = line(`${a} == ${b}`, ok ? "OK" : `FAIL (${raw[a]} vs ${raw[b]})`);
+    console.log(l);
+    if (!ok) violations.push(l);
+  };
+  const framed = !same("field-border", "field-bg");
+  const separated = hosts.every((h) => cr(rgb["field-bg"], rgb[h]) >= FILL_SEPARATE_MIN);
+  if (framed && !separated) {
+    assertSame("field-bg-hover", "field-bg");
+    for (const h of hosts) console.log(check(scope, blockLabel, `field-border vs ${h}`, cr(rgb["field-border"], rgb[h]), FIELD_FRAME_HOST_MIN));
+    return;
+  }
+  if (!framed) assertSame("field-border-hover", "field-bg-hover");
+  for (const h of hosts) console.log(check(scope, blockLabel, `field-bg vs ${h}`, cr(rgb["field-bg"], rgb[h]), FILL_SEPARATE_MIN));
+  console.log(check(scope, blockLabel, "field-bg-hover vs field-bg", cr(rgb["field-bg-hover"], rgb["field-bg"]), FILL_SEPARATE_MIN));
+  for (const h of hosts) console.log(check(scope, blockLabel, `field-bg-hover vs ${h}`, cr(rgb["field-bg-hover"], rgb[h]), FILL_SEPARATE_MIN));
+}
 
 // Generic `--name: value;` extractor over an arbitrary block body -- the
 // "programmatic" half of the enumeration: whatever the composer actually
@@ -759,6 +818,10 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
       console.log(check(scope, blockLabel, hoverLabel, cr(onAccent.rgb, hoverFill), 4.5));
     }
   }
+
+  // Soft Fill value boxes: fill vs host (F1-F3) or framed rest frame vs host
+  // (F8b) -- see auditFieldSeparation above.
+  auditFieldSeparation(scope, ns, blockLabel, dict);
 }
 
 // Orphan guard: every *-fg / on-* shaped custom property this surface's
@@ -784,7 +847,12 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
 // too, same as a true gap; that's a deliberate loss of the old proxy's
 // "credit for the ad-hoc checks automatically" convenience in exchange for
 // an allowlist that can never be fooled by a comment.
-const COMPONENT_PAIR_ROLES = new Set(COMPONENT_PAIR_SPEC.flatMap(([fg, bg]) => [fg, bg]));
+// Keyed `${ns}:${role}` (stage 4 spec §5.1): a row covers a role only on the
+// surfaces it runs on (its onlyNs, or all three), so e.g. a popup
+// --pp-field-fg cannot pass as covered by an options-only field-fg row.
+// Exported for tests/theme-ui-derive-tests.mjs's check of that keying.
+export const COMPONENT_PAIR_ROLES = new Set(COMPONENT_PAIR_SPEC.flatMap(([fg, bg, , onlyNs]) =>
+  (onlyNs || ["pp", "opt", "lib"]).flatMap((ns) => [`${ns}:${fg}`, `${ns}:${bg}`])));
 const ORPHAN_ALLOWLIST = new Set([
   // --pp-preset-fg / --pp-tag-fg / --pp-spinner-fg: formerly parked here as
   // real-but-unaudited gaps (Task 7's orphan guard surfaced all three).
@@ -838,7 +906,7 @@ function auditOrphanTokens(scope, ns, cssText) {
   let m;
   while ((m = re.exec(region)) !== null) names.add(m[1]);
   for (const name of names) {
-    if (COMPONENT_PAIR_ROLES.has(name)) continue;
+    if (COMPONENT_PAIR_ROLES.has(`${ns}:${name}`)) continue;
     if (ORPHAN_ALLOWLIST.has(`${ns}:${name}`)) continue;
     const line = "  " + scope.padEnd(10) + " " + "orphan".padEnd(20) + " " + (`--${ns}-${name}`).padEnd(28) + " FAIL (not a COMPONENT_PAIR_SPEC role, not in ORPHAN_ALLOWLIST)";
     console.log(line);

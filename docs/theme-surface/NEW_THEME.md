@@ -363,12 +363,13 @@ final-fix wave:
 - **Derived component-pair colors are not `ui` inputs.** The shared
   `btn-fg`, `btn-fg-muted`, `danger-quiet-fg`, `on-danger`, `chip-bg`,
   `chip-fg` roles and popup-only `preset-fg` / `spinner-fg` / `ai-chip-fg`,
-  plus the options-only B+ field family (10 roles: `field-bg`,
+  plus the options-only Soft Fill field family (8 roles: `field-bg`,
   `field-border`, `field-bg-hover`, `field-border-hover`, `field-bg-focus`,
-  `field-border-focus`, `field-edge`, `field-edge-hover`,
-  `field-placeholder`, `field-fg` — `deriveFieldRoles`, derived from `input-bg` /
-  `input-border` / `border` / `focus-bd` / `accent` / `fg` / `fg-hint` /
-  `panel` / `pf-bg`; tune those inputs instead),
+  `field-border-focus`, `field-placeholder`, `field-fg` — `deriveFieldRoles`,
+  derived from `input-bg` / `input-border` / `focus-bd` / `accent` / `fg` /
+  `fg-hint` and the surface's host roles, `FIELD_HOST_ROLES.opt` =
+  `panel` / `pf-bg`; plus `field-chevron`, the select arrow `fieldChevronUri`
+  strokes with `field-placeholder`; tune those inputs instead),
   are computed
   from the FINAL,
   post-override map — as is `on-accent` on options and library (Task 4,
