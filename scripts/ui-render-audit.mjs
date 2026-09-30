@@ -3475,8 +3475,11 @@ const VALUE_BOX_LEGS = Object.freeze({
   // search fields, the three native selects, the two .vocab-group-unit
   // shells (the shell carries the look; its text input is a transparent
   // passenger) and the note editor. Named rather than class-scanned, like
-  // popup's. Both legs navigate fresh instead of inheriting whatever the
-  // CHECKS loop left open (a typed note, an open tab).
+  // popup's. The vocab leg navigates fresh instead of inheriting whatever the
+  // CHECKS loop left open (a typed note, an open tab); the notes leg then
+  // reuses that fresh page and only switches it to the notes tab. The vocab
+  // leg also reads .xp-dict-lang FOCUSED (`focus`): the relookup fixture it
+  // builds is the only way to reach that select, so no checklist row can.
   library: Object.freeze({
     ns: "lib",
     radiusVar: "--lib-radius-md",
@@ -3503,6 +3506,7 @@ const VALUE_BOX_LEGS = Object.freeze({
         boxes: ["#vocab-search", "#vocab-group-filter", "#vocab-lookup-input", "#vocab-lookup-lang",
           "#vocab-detail .xp-dict-lang", "#vocab-detail .vocab-note-input",
           "#vocab-batch-toolbar .vocab-group-unit", "#vocab-detail .vocab-group-unit"],
+        focus: ["#vocab-detail .xp-dict-lang"],
         async open(page, url, theme) {
           await page.goto(`${url}?_ra=${encodeURIComponent(`fieldhover-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
@@ -3530,6 +3534,8 @@ const VALUE_BOX_LEGS = Object.freeze({
         },
       },
       {
+        // Reuses the vocab leg's page (no navigation): switches it to the
+        // notes tab.
         context: "notes",
         boxes: ["#notes-filter"],
         async open(page, url, theme) {
@@ -3548,6 +3554,13 @@ const VALUE_BOX_LEGS = Object.freeze({
   }),
 });
 const valueBoxHoverLog = [];
+// One colour parser for every read of this leg (Task 7 fix round 1): a hex
+// token or a computed rgb()/rgba()/color(srgb ...) value -> [r, g, b] or
+// [r, g, b, a]; null when it does not parse.
+const readCssColour = (value) => {
+  const s = String(value || "").trim();
+  return s.startsWith("#") ? hexRgb(s) : parseRgba(s);
+};
 
 // Runs INSIDE the page (handle.evaluate(fn, carrierSel)) -- self-contained.
 async function readValueBoxPaint(el, carrierSel) {
@@ -3591,8 +3604,7 @@ async function recordValueBoxes(page, surface, theme, results, context, boxes, l
     };
   }, { ns, names: ["field-bg", "field-border", "field-bg-hover", "field-border-hover", ...hosts], radiusVar: cfg.radiusVar });
   const solid = (value, what, where) => {
-    const s = String(value || "").trim();
-    const p = s.startsWith("#") ? hexRgb(s) : parseRgba(s);
+    const p = readCssColour(value);
     if (!p || (p.length === 4 && p[3] !== 1)) {
       throw new Error(`SETUP: fieldHoverContrast ${surface} ${where} (theme=${theme}) ${what} ${JSON.stringify(value)} is not an opaque parseable colour -- the step math would silently skip it`);
     }
@@ -3641,14 +3653,16 @@ async function recordValueBoxes(page, surface, theme, results, context, boxes, l
     const hover = hoverHold.got;
     const bad = [];
     const painted = (p, i) => p.widths[i] > 0 && !/^(?:none|hidden)$/.test(p.styles[i] || "none");
-    // A BOX paint that is not an opaque colour (a transparent note editor, a
-    // translucent frame) is a product FAIL -- it is not the field token --
-    // unlike a token that does not parse (solid() above: the math has
-    // nothing to stand on, SETUP). null here, and every use below FAILs it.
+    // A BOX paint the harness cannot parse is a SETUP (it cannot read what
+    // the page painted -- a colour format this leg does not know), exactly
+    // like a token that does not parse (solid() above). A parsed paint that
+    // is not opaque (a transparent note editor, a translucent frame) is the
+    // product's FAIL -- it is not the field token: null here, and every use
+    // below FAILs it.
     const opaque = (value) => {
-      const s = String(value || "").trim();
-      const p = s.startsWith("#") ? hexRgb(s) : parseRgba(s);
-      return !p || (p.length === 4 && p[3] !== 1) ? null : p.slice(0, 3);
+      const p = readCssColour(value);
+      if (!p) throw new Error(`SETUP: fieldHoverContrast ${surface}/${context} ${box} (theme=${theme}) painted ${JSON.stringify(value)}, which the harness cannot parse -- not a product verdict; teach readCssColour the format`);
+      return p.length === 4 && p[3] !== 1 ? null : p.slice(0, 3);
     };
     const eqTok = (value, role) => { const c = opaque(value); return !!c && same(c, tok[role]); };
     for (const [p, fillRole, sideRole, name] of [[rest, "field-bg", "field-border", "rest"], [hover, "field-bg-hover", "field-border-hover", "hover"]]) {
@@ -3689,10 +3703,91 @@ async function recordValueBoxes(page, surface, theme, results, context, boxes, l
   }
 }
 
+// Runs INSIDE the page (handle.evaluate) -- self-contained. A focused box's
+// paint and the focus state it was read under.
+async function readValueBoxFocusPaint(el) {
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  el.getAnimations().forEach((a) => { try { a.finish(); } catch { /* idle */ } });
+  const cs = getComputedStyle(el);
+  const n = document.activeElement;
+  return {
+    own: cs.backgroundColor,
+    sides: [cs.borderTopColor, cs.borderRightColor, cs.borderBottomColor, cs.borderLeftColor],
+    widths: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth].map((w) => parseFloat(w) || 0),
+    styles: [cs.borderTopStyle, cs.borderRightStyle, cs.borderBottomStyle, cs.borderLeftStyle],
+    boxShadow: cs.boxShadow,
+    focusVisible: el.matches(":focus-visible"),
+    hovered: el.matches(":hover"),
+    active: n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null",
+  };
+}
+
+// The FOCUS state of the boxes a leg names in `focus` (Task 7 fix round 1):
+// keyboard-modality focus (a Shift press, then element.focus(), so
+// :focus-visible matches as it does for a Tab), read with the pointer parked
+// at the viewport corner. Verdict: fill = --<ns>-field-bg-focus, all four
+// sides painted and = --<ns>-field-border-focus, the focus ring drawn
+// (box-shadow not none). A focus that never becomes :focus-visible is a
+// SETUP row, never a pass.
+async function recordValueBoxFocus(page, surface, theme, results, context, boxes, log) {
+  const { ns } = VALUE_BOX_LEGS[surface];
+  const raw = await page.evaluate(({ ns }) => {
+    const cs = getComputedStyle(document.documentElement);
+    return { "field-bg-focus": cs.getPropertyValue(`--${ns}-field-bg-focus`).trim(), "field-border-focus": cs.getPropertyValue(`--${ns}-field-border-focus`).trim() };
+  }, { ns });
+  const tok = {};
+  for (const [name, value] of Object.entries(raw)) {
+    const p = readCssColour(value);
+    if (!p || (p.length === 4 && p[3] !== 1)) throw new Error(`SETUP: fieldFocusPaint ${surface} :root (theme=${theme}) --${ns}-${name} ${JSON.stringify(value)} is not an opaque parseable colour`);
+    tok[name] = p.slice(0, 3);
+  }
+  const same = (a, b) => a.every((c, i) => Math.abs(c - b[i]) <= 1);
+  for (const box of boxes) {
+    const h = await page.$(box);
+    if (!h) throw new Error(`SETUP: fieldFocusPaint ${surface}/${context} found no ${box} (theme=${theme}) -- the fixture did not render it`);
+    await page.mouse.move(0, 0);
+    await page.keyboard.press("Shift");
+    await h.focus();
+    const p = await h.evaluate(readValueBoxFocusPaint);
+    await h.evaluate((el) => el.blur());
+    await h.dispose();
+    if (!p.focusVisible) {
+      log.focusUnmeasured.push(box);
+      results.push({
+        surface, theme, selector: box, state: `focus|${context}`, check: "fieldFocusPaint", status: "SETUP", setup: "focusNotVisible",
+        actual: `keyboard-modality focus did not match :focus-visible (activeElement ${p.active})`,
+        expected: "the box focused with :focus-visible (harness precondition for the fieldFocusPaint verdict)",
+        note: null,
+      });
+      continue;
+    }
+    const colour = (value) => {
+      const c = readCssColour(value);
+      if (!c) throw new Error(`SETUP: fieldFocusPaint ${surface}/${context} ${box} (theme=${theme}) painted ${JSON.stringify(value)}, which the harness cannot parse`);
+      return c.length === 4 && c[3] !== 1 ? null : c.slice(0, 3);
+    };
+    const bad = [];
+    const fill = colour(p.own);
+    if (!fill || !same(fill, tok["field-bg-focus"])) bad.push(`focus fill ${p.own} != --${ns}-field-bg-focus ${raw["field-bg-focus"]}`);
+    const off = [0, 1, 2, 3].filter((i) => !(p.widths[i] > 0 && !/^(?:none|hidden)$/.test(p.styles[i] || "none")) || !colour(p.sides[i]) || !same(colour(p.sides[i]), tok["field-border-focus"]));
+    if (off.length) bad.push(`focus side(s) ${off.join(",")} not a painted --${ns}-field-border-focus ${raw["field-border-focus"]} (${p.sides.join(" | ")}; widths ${p.widths.join("/")}; styles ${p.styles.join("/")})`);
+    if (!p.boxShadow || p.boxShadow === "none") bad.push("no focus ring (box-shadow none)");
+    log.focusMeasured.push(box);
+    results.push({
+      surface, theme, selector: box, state: `focus|${context}`, check: "fieldFocusPaint",
+      status: bad.length ? "FAIL" : "OK",
+      actual: bad.length ? bad.join("; ") : `fill and four painted sides on the focus tokens, ring ${p.boxShadow.slice(0, 48)}`,
+      expected: `focused value box (spec §2.1): fill --${ns}-field-bg-focus, four painted --${ns}-field-border-focus sides, the --${ns}-focus-ring glow`,
+      note: null,
+      harness: `:focus-visible=${p.focusVisible} :hover=${p.hovered} (activeElement ${p.active})`,
+    });
+  }
+}
+
 async function recordValueBoxHover(page, surface, url, theme, results, sw) {
   const cfg = VALUE_BOX_LEGS[surface];
   if (!cfg) throw new Error(`SETUP: fieldHoverContrast has no VALUE_BOX_LEGS entry for ${surface}`);
-  const log = { surface, theme, measured: [], unmeasured: [] };
+  const log = { surface, theme, measured: [], unmeasured: [], focusMeasured: [], focusUnmeasured: [] };
   for (const leg of cfg.legs) {
     const boxes = leg.boxes.map((sel) => {
       const entry = cfg.boxes.find(([box]) => box === sel);
@@ -3702,6 +3797,11 @@ async function recordValueBoxHover(page, surface, url, theme, results, sw) {
     const close = await leg.open(page, url, theme, sw);
     try {
       await recordValueBoxes(page, surface, theme, results, leg.context, boxes, log);
+      if (leg.focus) {
+        const stray = leg.focus.filter((sel) => !leg.boxes.includes(sel));
+        if (stray.length) throw new Error(`SETUP: VALUE_BOX_LEGS.${surface} leg ${leg.context} reads focus on ${stray.join(" / ")}, which it does not measure`);
+        await recordValueBoxFocus(page, surface, theme, results, leg.context, leg.focus, log);
+      }
     } finally {
       if (close) await close();
     }
@@ -3847,10 +3947,12 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
   await recordWeakTextHits(page, "library", theme, results, "notes-batch");
 
   // ---- fieldHoverContrast (family 14), the library value-box leg (stage 4
-  // Task 7, spec §5.2; R7: the same two functions as popup's leg). Last on
-  // purpose: its legs reload the page and open the relookup fixture, which
-  // must not widen family 13's vocab / notes scans above; the run-level
-  // valueBoxLegCoverage check holds every theme to all nine boxes measured.
+  // Task 7, spec §5.2; R7: the same functions as popup's leg). Last on
+  // purpose: its vocab leg reloads the page and opens the relookup fixture
+  // (the notes leg then reuses that page), which must not widen family 13's
+  // vocab / notes scans above; the run-level valueBoxLegCoverage /
+  // valueBoxFocusCoverage checks hold every theme to all nine boxes measured
+  // and .xp-dict-lang read focused.
   await recordValueBoxHover(page, "library", `${extBase}library.html`, theme, results, null);
 }
 
@@ -6470,6 +6572,18 @@ async function main() {
     const unmeasured = logs.reduce((sum, entry) => sum + entry.unmeasured.length, 0);
     console.log(`[render-audit] fieldHoverContrast ${surface}: ${measured} value box(es) measured across ${logs.length} theme(s) this run, ${unmeasured} unmeasured (SETUP)${SHARD_TAG}`);
     if (!CHECKS.some((c) => c.surface === surface)) continue;
+    const focusBoxes = VALUE_BOX_LEGS[surface].legs.reduce((sum, leg) => sum + (leg.focus?.length || 0), 0);
+    const focusMeasured = logs.reduce((sum, entry) => sum + entry.focusMeasured.length, 0);
+    if (focusBoxes) console.log(`[render-audit] fieldFocusPaint ${surface}: ${focusMeasured} focused value box(es) measured across ${logs.length} theme(s) this run${SHARD_TAG}`);
+    if (focusMeasured < SHARD_THEMES.length * focusBoxes) {
+      results.push({
+        surface, theme: "", selector: "(run)", state: "fieldFocusPaint", check: "valueBoxFocusCoverage",
+        status: "SETUP", setup: "legVacuous",
+        actual: `${focusMeasured} focused value box(es) measured across ${logs.length} theme(s)`,
+        expected: `${SHARD_THEMES.length * focusBoxes} = ${SHARD_THEMES.length} theme(s) run x ${focusBoxes} VALUE_BOX_LEGS.${surface} focus box(es)`,
+        note: `the family-14 ${surface} leg read fewer focused boxes than the run requires (see their own SETUP rows)`,
+      });
+    }
     const required = SHARD_THEMES.length * VALUE_BOX_LEGS[surface].boxes.length;
     if (measured < required) {
       results.push({

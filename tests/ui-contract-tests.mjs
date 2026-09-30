@@ -2582,6 +2582,19 @@ function focusTriggerOf(focusSel) {
   });
   return found.length === 1 ? found[0] : { index: -1, text: null, found: found.map((f) => f.text) };
 }
+// A `:has(... :disabled)` :not() argument (normalised text): the busy-state
+// exclusion of a SHELL, whose own :disabled never matches (a <span> or <div>
+// is not a form control) -- the disabled one is the control inside it.
+function hasDisabledArgument(a) {
+  const [t] = pseudoClassTokens(a);
+  if (!t || t.name !== "has" || t.arg === null || t.text !== a) return false;
+  const inner = compoundTexts(t.arg);
+  return stateTokens(inner[inner.length - 1] ?? "").some((x) => x.name === "disabled" && x.arg === null);
+}
+// Every :not() argument of a selector, on any compound (top level or inside
+// :where() / :is()), whitespace-normalised.
+const notArgumentsOf = (sel) => compoundTexts(sel).flatMap((c) => stateTokens(c))
+  .filter((t) => t.name === "not" && t.arg !== null).flatMap((t) => splitSelectorList(t.arg).map(normSel));
 // Problems with one (rest, hover, focus) box, [] when it is sound.
 function fieldLadderProblems(rest, hover, focus) {
   const problems = [];
@@ -2603,12 +2616,7 @@ function fieldLadderProblems(rest, hover, focus) {
   const notArgs = (tokens) => tokens.filter((t) => t.name === "not" && t.arg !== null).flatMap((t) => splitSelectorList(t.arg).map(normSel));
   if (!on.some((t) => t.name === "hover" && t.arg === null)) problems.push(`the hover selector must carry :hover on the compound that holds the focus trigger (\`${H[trigger.index] ?? ""}\`)`);
   if (!notArgs(on).includes(trigger.text)) problems.push(`the hover selector must exclude the exact focus trigger \`${trigger.text}\` with :not(...) on that compound -- got :not() arguments ${JSON.stringify(notArgs(on))}`);
-  const disabledArg = (a) => a === ":disabled" || (() => {
-    const [t] = pseudoClassTokens(a);
-    if (!t || t.name !== "has" || t.arg === null || t.text !== a) return false;
-    const inner = compoundTexts(t.arg);
-    return stateTokens(inner[inner.length - 1] ?? "").some((x) => x.name === "disabled" && x.arg === null);
-  })();
+  const disabledArg = (a) => a === ":disabled" || hasDisabledArgument(a);
   if (![...notArgs(on), ...notArgs(subject)].some(disabledArg)) problems.push("the hover selector must exclude the disabled state (:not(:disabled), or :not(:has(> input:disabled)) on a shell) on that compound or the subject");
   return problems;
 }
@@ -2617,6 +2625,191 @@ function fieldLadderProblems(rest, hover, focus) {
 // :focus-visible for the :focus-triggered boxes (a text field matches both on
 // any focus), the :focus-within shells keep theirs.
 const fieldRingSelectors = (t) => selectorListOf(t.focus).map((sel) => sel.replace(/:focus(?=:not\(:disabled\))/g, ":focus-visible"));
+
+// ---- Stage 4 shared value-box gates (Task 7 fix round 1). Each gate below
+// used to be written out once per surface; one implementation now, called
+// from the options / popup / library blocks with that surface's own
+// registry, box model and discriminating cases (the precedent is
+// valueBoxShapeOffenders / valueBoxUrlColourOffenders and the ladder gate).
+//
+// (a) The generated half of FIELD_TARGETS[ns]: every role of every entry
+//     emitted with exactly the declarations the binding contract names
+//     (spec §4). Returns one message per wrong selector; `checked` counts the
+//     selectors read.
+const FIELD_TARGET_EMITS = Object.freeze({
+  rest: [["background-color", "field-bg"], ["border-color", "field-border"], ["color", "field-fg"]],
+  hover: [["background-color", "field-bg-hover"], ["border-color", "field-border-hover"]],
+  focus: [["background-color", "field-bg-focus"], ["border-color", "field-border-focus"]],
+  placeholder: [["color", "field-placeholder"]],
+  passenger: [["color", "field-fg"]],
+  chevron: [["background-image", "field-chevron"]],
+});
+function fieldTargetEmissionProblems(ns, targets, genCss, file) {
+  const problems = [];
+  let checked = 0;
+  for (const t of targets) {
+    for (const [key, want] of Object.entries(FIELD_TARGET_EMITS)) {
+      for (const sel of selectorListOf(t[key])) {
+        checked += 1;
+        const got = declarationValueMap(genCss, sel);
+        const wrong = want.filter(([prop, role]) => got.get(prop) !== `var(--${ns}-${role})`);
+        if (wrong.length) {
+          problems.push(`${file}: the generated FIELD_TARGETS.${ns} ${t.id}.${key} rule for \`${sel}\` does not paint ${wrong.map(([pr, r]) => `${pr}: var(--${ns}-${r})`).join(", ")} (got ${JSON.stringify(Object.fromEntries(got))}) -- run node docs/theme-surface/tools/sync-all.mjs`);
+        }
+      }
+    }
+  }
+  return { problems, checked };
+}
+// (b) The hand half keeps each box's ring (§7.3 `bordered`: the core is the
+//     generated focus border, the glow is hand-written) on the entry's own
+//     ring selectors (fieldRingSelectors), so ring and frame cannot fire in
+//     different states. Returns { missing: [{ id, sels }], checked }.
+function fieldRingMissing(ns, targets, handCss) {
+  const missing = [];
+  let checked = 0;
+  for (const t of targets) {
+    const sels = fieldRingSelectors(t);
+    checked += sels.length;
+    const off = sels.filter((sel) => declarationValueMap(handCss, sel).get("box-shadow") !== `var(--${ns}-focus-ring)`);
+    if (off.length) missing.push({ id: t.id, sels: off });
+  }
+  return { missing, checked };
+}
+// (c) Forced colours (spec §6 item 10, ruling R5): the outlines that restore
+//     a value box's focus edge under @media (forced-colors: active), and the
+//     outline suppressors that out-rank one of them on the same box.
+//     `targetsOf(sel)` maps a selector to what it reaches -- tree nodes on
+//     popup / library, value-box kinds on options -- and two selectors meet
+//     when they share a target. `outlineSelector` narrows which selectors of
+//     an outline rule count (options: :focus-visible only); `requireOffset`
+//     demands a declared non-negative outline-offset (popup / library).
+//     A suppressor is any outline-removing rule outside `forced-colors: none`
+//     that can apply WHILE its element holds focus (canCoMatchFocus): a :focus
+//     rule, and also a :hover rule (the pointer can rest on a box the keyboard
+//     focuses -- spec §2.1, plan review focus 2) or a stateless one. It
+//     out-ranks an outline the way the cascade does: !important over a
+//     normal declaration outright; otherwise (both or neither important)
+//     strictly higher specificity, or equal and later in the file.
+//     `required` = [{ label, sel } | { label, target }]: an outline must exist
+//     on that exact selector / reach that target. Returns { outlines,
+//     missing, outranked }.
+const OUTLINE_OFF = Object.freeze({ outline: /^(?:none|0(?:px)?)$/i, "outline-style": /^none$/i, "outline-width": /^0(?:px)?$/ });
+// Can a rule on this selector apply while its element (or the shell carrying
+// its state) holds focus? Not when the selector excludes focus somewhere --
+// a :not() whose argument holds a focus trigger, on any compound -- or when
+// its subject is disabled (a disabled control cannot take focus). Everything
+// else can: focus rules, hover rules, stateless rules.
+function canCoMatchFocus(sel) {
+  if (notArgumentsOf(sel).some((a) => FOCUS_TRIGGER_RE.test(a))) return false;
+  const parts = compoundTexts(sel);
+  const subject = parts[parts.length - 1] ?? "";
+  if (stateTokens(subject).some((t) => t.name === "disabled" && t.arg === null)) return false;
+  return !structuralCompound(subject).attrs.some((a) => a.name === "disabled");
+}
+function forcedOutlineReport(text, { targetsOf, required, outlineSelector = () => true, requireOffset = true }) {
+  const rules = parseStyleRules(text);
+  const outlines = [];
+  for (const r of rules.filter(inForcedColors)) {
+    const decls = parseDeclarations(r.body);
+    const outline = decls.find((d) => d.property === "outline" && /^1px solid Highlight$/i.test(d.value.trim()));
+    if (!outline) continue;
+    if (requireOffset) {
+      const offset = decls.find((d) => d.property === "outline-offset");
+      if (!offset || !(parseFloat(offset.value) >= 0)) continue;
+    }
+    for (const sel of r.selectors.filter(outlineSelector)) {
+      outlines.push({ sel, targets: new Set(targetsOf(sel)), spec: selectorSpecificity(sel), order: r.sourceOrder, important: outline.important });
+    }
+  }
+  const missing = required.filter((q) => !outlines.some((o) => ("sel" in q ? o.sel === q.sel : o.targets.has(q.target)))).map((q) => q.label);
+  const outranked = [];
+  for (const r of rules.filter((x) => !x.context.some((c) => FORCED_NONE_RE.test(c)))) {
+    const off = parseDeclarations(r.body).filter((d) => Object.hasOwn(OUTLINE_OFF, d.property) && OUTLINE_OFF[d.property].test(d.value.trim()));
+    if (!off.length) continue;
+    const important = off.some((d) => d.important);
+    for (const sel of r.selectors.filter(canCoMatchFocus)) {
+      const targets = targetsOf(sel);
+      if (!targets.length) continue;
+      for (const f of outlines) {
+        if (!targets.some((t) => f.targets.has(t))) continue;
+        if (f.important && !important) continue;
+        const c = cmpSpecificity(selectorSpecificity(sel), f.spec);
+        if ((important && !f.important) || c > 0 || (c === 0 && r.sourceOrder > f.order)) outranked.push(`${sel} (line ${r.lineNum}) over ${f.sel}`);
+      }
+    }
+  }
+  return { outlines, missing, outranked };
+}
+// (d) F10 (spec §2.2 / §2.3): a small button's ghost chip inside a value box
+//     must stay a visible plane (>= FILL_SEPARATE_MIN, imported from the
+//     deriver) against the fill the box ACTUALLY paints beneath it, on every
+//     block -- the 14 generated html[data-theme] blocks over the default
+//     (the column-0 :root blocks, hand then generated, in file order).
+//     `states` = [{ name, chip, fill, pct }]: the chip's `background` value
+//     (must be color-mix(in srgb, var(--<ns>-field-fg) <pct>, var(--<ns>-*)))
+//     and the box's fill value in that state (a single var(--<ns>-*)); the
+//     chip must mix over exactly that fill. color-mix(in srgb, A p%, B) is a
+//     per-channel linear sRGB mix quantised to 8 bits at paint, so each
+//     channel is Math.round(A*p + B*(1-p)). Returns { failures, measured,
+//     lowest, ratios, blocks }; the caller pins the expected measured count.
+function fieldThemeBlocks(css, ns) {
+  const noComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const region = css.slice(css.indexOf("/* @generated:ui-themes start"), css.indexOf("/* @generated:ui-themes end */")).replace(/\/\*[\s\S]*?\*\//g, "");
+  const varRe = new RegExp(`(--${ns}-[a-z0-9-]+)\\s*:\\s*([^;]+);`, "g");
+  const readVars = (body, into) => { for (const d of body.matchAll(varRe)) into[d[1]] = d[2].trim(); return into; };
+  const rootVars = {};
+  for (const m of noComments.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) readVars(m[1], rootVars);
+  const blocks = [[":root", rootVars]];
+  for (const m of region.matchAll(/html\[data-theme="([a-z0-9-]+)"\]\s*\{([^}]*)\}/g)) blocks.push([m[1], readVars(m[2], { ...rootVars })]);
+  return blocks;
+}
+function chipOverFillAcrossBlocks(css, ns, states, { file, what }) {
+  const failures = [];
+  const MIX_RE = new RegExp(`^color-mix\\(\\s*in srgb\\s*,\\s*var\\((--${ns}-[a-z0-9-]+)\\)\\s+(\\d+(?:\\.\\d+)?)%\\s*,\\s*var\\((--${ns}-[a-z0-9-]+)\\)\\s*\\)$`);
+  const VAR_RE = new RegExp(`^var\\((--${ns}-[a-z0-9-]+)\\)$`);
+  const parsed = [];
+  for (const s of states) {
+    const m = MIX_RE.exec((s.chip ?? "").trim()), f = VAR_RE.exec((s.fill ?? "").trim());
+    if (!m || !f) {
+      failures.push(`${file}: ${s.name}: ${what} (${JSON.stringify(s.chip)}) must be color-mix(in srgb, var(--${ns}-*) N%, var(--${ns}-*)) and the fill beneath it (${JSON.stringify(s.fill)}) a single var(--${ns}-*) -- anything else and this gate cannot compute it`);
+      continue;
+    }
+    const st = { name: s.name, ink: m[1], pct: Number(m[2]) / 100, base: m[3], fillVar: f[1] };
+    if (st.base !== st.fillVar) failures.push(`${file}: ${s.name}: ${what} mixes over ${st.base} but the box paints ${st.fillVar} in that state`);
+    if (st.ink !== `--${ns}-field-fg` || st.pct !== s.pct) failures.push(`${file}: ${s.name}: ${what} must mix --${ns}-field-fg at ${Math.round(s.pct * 100)}% (spec 2026-09-30 §2.2) -- got ${st.ink} at ${Math.round(st.pct * 100)}%`);
+    parsed.push(st);
+  }
+  const blocks = fieldThemeBlocks(css, ns);
+  if (blocks.length !== 15) failures.push(`${file}: the ${what} gate found ${blocks.length} theme blocks, expected 15 (14 themes + :root)`);
+  const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+  let measured = 0;
+  const lowest = { r: Infinity, where: "" };
+  const ratios = [];
+  for (const [id, vars] of blocks) {
+    for (const s of parsed) {
+      const ink = vars[s.ink], base = vars[s.base], fill = vars[s.fillVar];
+      if (![ink, base, fill].every((v) => HEX.test(v ?? ""))) {
+        failures.push(`${file} ${id}: ${s.ink}=${ink} / ${s.base}=${base} / ${s.fillVar}=${fill} is not a #rgb / #rrggbb hex -- the ${what} gate cannot compute it`);
+        continue;
+      }
+      const a = hexToRgb(ink), b = hexToRgb(base), under = hexToRgb(fill);
+      const chip = a.map((c, i) => Math.round(c * s.pct + b[i] * (1 - s.pct)));
+      const r = contrast(chip, under);
+      measured += 1;
+      ratios.push(`${id}|${s.name}|${r.toFixed(6)}`);
+      if (r < lowest.r) Object.assign(lowest, { r, where: `${id} ${s.name}` });
+      if (!(r >= FILL_SEPARATE_MIN)) {
+        failures.push(`${file} ${id}: ${s.name}: ${what} is ${r.toFixed(3)}:1 against the fill beneath it (${s.fillVar} ${fill}; chip = ${Math.round(s.pct * 100)}% ${s.ink} over ${s.base}) -- floor FILL_SEPARATE_MIN ${FILL_SEPARATE_MIN}`);
+      }
+    }
+  }
+  return { failures, measured, lowest, ratios, blocks: blocks.length };
+}
+// PBP_GATE_DUMP=1: one summary line per shared gate and surface, so a change
+// to a helper can be diffed before / after (Task 7 fix round 1 evidence).
+const gateDump = (line) => { if (process.env.PBP_GATE_DUMP === "1") console.log(line); };
+const ratioHash = (xs) => createHash("sha256").update(xs.join("\n")).digest("hex").slice(0, 16);
 
 // 1. The registry itself, EVERY surface's entries (stage 4 R1 / T6-g; Task 7
 //    filled FIELD_TARGETS.lib and this loop covers it unchanged):
@@ -2753,23 +2946,9 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
   const genEnd = popupCss.indexOf("/* @generated:ui-components end (popup) */");
   check(genStart >= 0 && genEnd > genStart, "popup.css: @generated:ui-components (popup) markers not found");
   const ppGen = popupCss.slice(genStart, genEnd);
-  const EMITS = {
-    rest: [["background-color", "field-bg"], ["border-color", "field-border"], ["color", "field-fg"]],
-    hover: [["background-color", "field-bg-hover"], ["border-color", "field-border-hover"]],
-    focus: [["background-color", "field-bg-focus"], ["border-color", "field-border-focus"]],
-    placeholder: [["color", "field-placeholder"]],
-    passenger: [["color", "field-fg"]],
-  };
-  for (const t of PP) {
-    for (const [key, want] of Object.entries(EMITS)) {
-      for (const sel of selectorListOf(t[key])) {
-        const got = declarationValueMap(ppGen, sel);
-        const wrong = want.filter(([prop, role]) => got.get(prop) !== `var(--pp-${role})`);
-        check(wrong.length === 0,
-          `popup.css: the generated FIELD_TARGETS.pp ${t.id}.${key} rule for \`${sel}\` does not paint ${wrong.map(([p, r]) => `${p}: var(--pp-${r})`).join(", ")} (got ${JSON.stringify(Object.fromEntries(got))}) -- run node docs/theme-surface/tools/sync-all.mjs`);
-      }
-    }
-  }
+  const ppEmission = fieldTargetEmissionProblems("pp", PP, ppGen, "popup.css");
+  for (const problem of ppEmission.problems) check(false, problem);
+  gateDump(`[gate] emission popup selectors=${ppEmission.checked} problems=${JSON.stringify(ppEmission.problems.map((m) => /`([^`]+)`/.exec(m)?.[1]))}`);
 
   // 4. The hand half keeps each box's ring (§7.3 `bordered`: the core is the
   //    generated focus border, the glow is here) on the entry's own focus
@@ -2777,11 +2956,11 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
   //    different states.
   const ppNoComments = popupCss.replace(/\/\*[\s\S]*?\*\//g, "");
   const ppHand = stripGeneratedRegions(popupCss).replace(/\/\*[\s\S]*?\*\//g, "");
-  for (const t of PP) {
-    const missing = fieldRingSelectors(t).filter((sel) => declarationValueMap(ppHand, sel).get("box-shadow") !== "var(--pp-focus-ring)");
-    check(missing.length === 0,
-      `popup.css: FIELD_TARGETS.pp ${t.id} has no hand-written ring (box-shadow: var(--pp-focus-ring)) on ${missing.map((s) => `\`${s}\``).join(", ")}`);
+  const ppRing = fieldRingMissing("pp", PP, ppHand);
+  for (const { id, sels } of ppRing.missing) {
+    check(false, `popup.css: FIELD_TARGETS.pp ${id} has no hand-written ring (box-shadow: var(--pp-focus-ring)) on ${sels.map((sel) => `\`${sel}\``).join(", ")}`);
   }
+  gateDump(`[gate] ring popup selectors=${ppRing.checked} missing=${JSON.stringify(ppRing.missing.flatMap((m) => m.sels))}`);
 
   // 5. The hand-written region paints no colour on a value box, a shell or
   //    a passenger (the generated region sits BEFORE it, so any such
@@ -2950,62 +3129,46 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
   //     draws `outline: 1px solid Highlight` (a non-negative offset) inside
   //     @media (forced-colors: active) on each of its entry's ring selectors
   //     (fieldRingSelectors -- the shells keep :focus-within), and no
-  //     outline-suppressing focus rule that applies with forced colours on
-  //     out-ranks it on the same popup.html box (an !important suppressor
-  //     beats a normal outline; otherwise specificity, then source order).
+  //     outline-suppressing rule that can apply while the box holds focus --
+  //     a focus, hover or stateless rule (canCoMatchFocus) -- out-ranks it on
+  //     the same popup.html box (the shared forcedOutlineReport).
   //     §7.3's forced-colors branch above holds the outline's own shape.
-  const OUTLINE_OFF = { outline: /^(?:none|0(?:px)?)$/i, "outline-style": /^none$/i, "outline-width": /^0(?:px)?$/ };
-  const ppForcedReport = (text) => {
-    const rules = parseStyleRules(text);
-    const outlines = [];
-    for (const r of rules.filter(inForcedColors)) {
-      const decls = parseDeclarations(r.body);
-      const outline = decls.find((d) => d.property === "outline" && /^1px solid Highlight$/i.test(d.value));
-      const offset = decls.find((d) => d.property === "outline-offset");
-      if (!outline || !offset || !(parseFloat(offset.value) >= 0)) continue;
-      for (const sel of r.selectors) outlines.push({ sel, spec: selectorSpecificity(sel), order: r.sourceOrder, important: outline.important });
-    }
-    const missing = PP.flatMap((t) => fieldRingSelectors(t).filter((sel) => !outlines.some((o) => o.sel === sel)).map((sel) => `${t.id}: ${sel}`));
-    const outranked = [];
-    for (const r of rules.filter((x) => !x.context.some((c) => FORCED_NONE_RE.test(c)))) {
-      const off = parseDeclarations(r.body).filter((d) => Object.hasOwn(OUTLINE_OFF, d.property) && OUTLINE_OFF[d.property].test(d.value));
-      if (!off.length) continue;
-      const important = off.some((d) => d.important);
-      for (const sel of r.selectors.filter((x) => /:focus(?:-visible|-within)?\b/.test(x))) {
-        for (const node of PP_BOX_NODES) {
-          if (!reaches(sel, node)) continue;
-          for (const f of outlines.filter((o) => reaches(o.sel, node))) {
-            if (f.important && !important) continue;
-            const c = cmpSpecificity(selectorSpecificity(sel), f.spec);
-            if ((important && !f.important) || c > 0 || (c === 0 && r.sourceOrder > f.order)) outranked.push(`${sel} (line ${r.lineNum}) over ${f.sel}`);
-          }
-        }
-      }
-    }
-    return { missing, outranked };
-  };
+  const ppForcedReport = (text) => forcedOutlineReport(text, {
+    targetsOf: (sel) => [...PP_BOX_NODES].filter((n) => reaches(sel, n)),
+    required: PP.flatMap((t) => fieldRingSelectors(t).map((sel) => ({ label: `${t.id}: ${sel}`, sel }))),
+  });
   const ppForced = ppForcedReport(ppNoComments);
   check(ppForced.missing.length === 0,
     "popup.css: a popup value box has no forced-colors focus outline (1px solid Highlight, non-negative offset, on its registry entry's ring selector) -- spec 2026-09-30 §6 item 10 / R5: " + ppForced.missing.join(" | "));
   check(ppForced.outranked.length === 0,
-    "popup.css: an outline-suppressing focus rule out-ranks the forced-colors value-box outline, so High Contrast shows no focus: " + ppForced.outranked.join(" | "));
+    "popup.css: an outline-suppressing rule that can apply while the box holds focus out-ranks the forced-colors value-box outline, so High Contrast shows no focus: " + ppForced.outranked.join(" | "));
   const PP_FORCED_CASES = [
     // appended to the shipped file: [rule, must be caught]
     ['html[data-theme] .field > input[type="text"]:focus { outline: none !important; }', true],
     [".tags-input-wrap:focus-within:not(:disabled):not(.x) { outline: none; }", true],
     ["#token-input:focus-visible:not(:disabled):not(.a):not(.b):not(.c) { outline-style: none; }", true],
     ["@media (forced-colors: active) { #search-input:focus { outline: 0; } }", true],
+    // Task 7 fix round 1: a hover rule applies while the pointer rests on a
+    // keyboard-focused box, a stateless one always -- both can erase the
+    // only Highlight edge
+    [".field > textarea:hover { outline: none !important; }", true],
+    [".field > textarea { outline: none !important; }", true],
+    ["#search-input { outline-style: none; }", true],
     // must stay clean
     ["@media (forced-colors: none) { .search-field:focus { outline: none !important; } }", false],
     [".tags-input-wrap input:focus { outline: none !important; }", false],
-    [".field > textarea:hover { outline: none !important; }", false],
     [".search-field:focus { outline: none; }", false],
+    [".search-field { outline: none; }", false],
+    [".field > textarea:not(:focus) { outline: none !important; }", false],
+    [".field > textarea:disabled { outline: none !important; }", false],
   ];
   const ppForcedMisjudged = PP_FORCED_CASES.filter(([rule, want]) => (ppForcedReport(`${ppNoComments}\n${rule}`).outranked.length > ppForced.outranked.length) !== want);
   const ppForcedNone = ppForcedReport(ppNoComments.replace(/forced-colors\s*:\s*active/g, "forced-colors: none"));
   check(ppForcedMisjudged.length === 0 && ppForcedNone.missing.length === PP.flatMap(fieldRingSelectors).length,
     "ui-contract-tests.mjs: the popup forced-colors value-box focus scan no longer discriminates -- misjudged: " + ppForcedMisjudged.map(([rule, want]) => `${want ? "missed" : "false hit"}: ${rule}`).join(" | ") +
     ` (with every forced-colors block flipped to none, ${ppForcedNone.missing.length}/${PP.flatMap(fieldRingSelectors).length} ring selectors reported missing)`);
+  gateDump(`[gate] forced popup missing=${JSON.stringify(ppForced.missing)} outranked=${JSON.stringify(ppForced.outranked)} none-missing=${ppForcedNone.missing.length}`);
+  for (const [rule] of PP_FORCED_CASES) gateDump(`[gate] forced popup case ${ppForcedReport(`${ppNoComments}\n${rule}`).outranked.length > ppForced.outranked.length ? "CAUGHT" : "clean "} ${rule}`);
 }
 
 check(/\.wayback-log-row:focus-within\s+\.wayback-perm-tip/.test(optionsCss) &&
@@ -7332,65 +7495,22 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(fillMisjudged.length === 0,
     "ui-contract-tests.mjs: the eye-chip fill category no longer discriminates -- misjudged: " + fillMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
   // A missing focus chip falls back (cascade) to the plain hover chip -- the
-  // exact M1 shape; the base check below catches its removal.
-  const STATES = [
-    { name: "unit hovered", chip: bgOf(CHIP_HOVER), fill: bgOf(KWH) },
-    { name: "unit focused", chip: bgOf(CHIP_FOCUS) || bgOf(CHIP_HOVER), fill: bgOf(FW) },
-  ];
-  const MIX_RE = /^color-mix\(\s*in srgb\s*,\s*var\((--opt-[a-z0-9-]+)\)\s+(\d+(?:\.\d+)?)%\s*,\s*var\((--opt-[a-z0-9-]+)\)\s*\)$/;
-  const VAR_RE = /^var\((--opt-[a-z0-9-]+)\)$/;
-  for (const s of STATES) {
-    const m = MIX_RE.exec(s.chip), f = VAR_RE.exec(s.fill);
-    check(!!m && !!f, `options.css: ${s.name}: the chip (${JSON.stringify(s.chip)}) must be color-mix(in srgb, var(--opt-*) N%, var(--opt-*)) and the field fill (${JSON.stringify(s.fill)}) a single var(--opt-*) -- anything else and this gate cannot compute it`);
-    Object.assign(s, m && f ? { ink: m[1], pct: Number(m[2]) / 100, base: m[3], fillVar: f[1] } : { skip: true });
-    if (!s.skip) {
-      check(s.base === s.fillVar,
-        `options.css: ${s.name}: the chip mixes over ${s.base} but the field under the eye paints ${s.fillVar} in that state`);
-      // Stage 4 (spec 2026-09-30 §2.2, F10): a small button's hover fill
-      // inside a value box is the field's own text ink, --opt-field-fg, at 8%
-      // over the fill it sits on (popup's eye and library's steppers follow).
-      check(s.ink === "--opt-field-fg" && s.pct === 0.08,
-        `options.css: ${s.name}: the eye's hover chip must mix --opt-field-fg at 8% (spec 2026-09-30 §2.2) -- got ${s.ink} at ${Math.round(s.pct * 100)}%`);
-    }
-  }
-  // All 15 generated options blocks: 14 html[data-theme] + the default :root,
-  // which inherits every role it does not re-declare from the hand :root.
-  const region = optionsCss.slice(optionsCss.indexOf("/* @generated:ui-themes start"), optionsCss.indexOf("/* @generated:ui-themes end */")).replace(/\/\*[\s\S]*?\*\//g, "");
-  const rootVars = {};
-  for (const m of cssNoComments.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) {
-    for (const d of m[1].matchAll(/(--opt-[a-z0-9-]+)\s*:\s*([^;]+);/g)) rootVars[d[1]] = d[2].trim();
-  }
-  const blocks = [[":root", rootVars]];
-  for (const m of region.matchAll(/html\[data-theme="([a-z0-9-]+)"\]\s*\{([^}]*)\}/g)) {
-    const vars = { ...rootVars };
-    for (const d of m[2].matchAll(/(--opt-[a-z0-9-]+)\s*:\s*([^;]+);/g)) vars[d[1]] = d[2].trim();
-    blocks.push([m[1], vars]);
-  }
-  check(blocks.length === 15, `ui-contract-tests.mjs: the eye chip gate found ${blocks.length} options theme blocks, expected 15 (14 themes + :root)`);
-  const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-  let measured = 0;
-  const lowest = { r: Infinity, where: "" };
-  for (const [id, vars] of blocks) {
-    for (const s of STATES) {
-      if (s.skip) continue;
-      const ink = vars[s.ink], base = vars[s.base], fill = vars[s.fillVar];
-      if (![ink, base, fill].every((v) => HEX.test(v ?? ""))) {
-        check(false, `options.css ${id}: ${s.ink}=${ink} / ${s.base}=${base} / ${s.fillVar}=${fill} is not a #rgb / #rrggbb hex -- the eye chip gate cannot compute it`);
-        continue;
-      }
-      // The chip as painted (its own mix base), against the fill the field
-      // really paints beneath it in this state.
-      const a = hexToRgb(ink), b = hexToRgb(base), under = hexToRgb(fill);
-      const chip = a.map((c, i) => Math.round(c * s.pct + b[i] * (1 - s.pct)));
-      const r = contrast(chip, under);
-      measured++;
-      if (r < lowest.r) Object.assign(lowest, { r, where: `${id} ${s.name}` });
-      check(r >= KEY_CHIP_MIN,
-        `options.css ${id}: ${s.name}: the eye's hover chip is ${r.toFixed(3)}:1 against the fill beneath it (${s.fillVar} ${fill}; chip = ${Math.round(s.pct * 100)}% ${s.ink} over ${s.base}) -- floor FILL_SEPARATE_MIN ${KEY_CHIP_MIN}`);
-    }
-  }
-  check(measured === 30, `ui-contract-tests.mjs: the eye chip gate measured ${measured} (block, state) pairs, expected 30`);
-  if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] eye chip: lowest ${lowest.r.toFixed(3)}:1 (${lowest.where}) over ${measured} (block, state) pairs; floor ${KEY_CHIP_MIN}`);
+  // exact M1 shape; the base check below catches its removal. The chip as
+  // painted (its own mix base), against the fill the field really paints
+  // beneath it in this state, on all 15 generated options blocks (14
+  // html[data-theme] + the default :root, which inherits every role it does
+  // not re-declare from the hand :root) -- the shared chipOverFillAcrossBlocks.
+  // Stage 4 (spec 2026-09-30 §2.2, F10): a small button's hover fill inside a
+  // value box is the field's own text ink, --opt-field-fg, at 8% over the fill
+  // it sits on (popup's eye and library's steppers follow).
+  const eyeChip = chipOverFillAcrossBlocks(optionsCss, "opt", [
+    { name: "unit hovered", chip: bgOf(CHIP_HOVER), fill: bgOf(KWH), pct: 0.08 },
+    { name: "unit focused", chip: bgOf(CHIP_FOCUS) || bgOf(CHIP_HOVER), fill: bgOf(FW), pct: 0.08 },
+  ], { file: "options.css", what: "the eye's hover chip" });
+  for (const failure of eyeChip.failures) check(false, failure);
+  check(eyeChip.measured === 30, `ui-contract-tests.mjs: the eye chip gate measured ${eyeChip.measured} (block, state) pairs, expected 30`);
+  if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] eye chip: lowest ${eyeChip.lowest.r.toFixed(3)}:1 (${eyeChip.lowest.where}) over ${eyeChip.measured} (block, state) pairs; floor ${KEY_CHIP_MIN}`);
+  gateDump(`[gate] chip options measured=${eyeChip.measured} lowest=${eyeChip.lowest.r.toFixed(3)} (${eyeChip.lowest.where}) ratios=${ratioHash(eyeChip.ratios)}`);
 }
 
 // ---- Retired field roles (stage 4 spec docs/superpowers/specs/2026-09-30-
@@ -7605,10 +7725,11 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   //     (`.fg :focus`) to every kind under its prefix;
   //   - coverage counts only `forced-colors: active` contexts, never
   //     `forced-colors: none`;
-  //   - a suppressor is any :focus / :focus-visible rule that applies with
-  //     forced colours on -- outside every forced-colors context OR inside
-  //     `forced-colors: active` itself -- but not inside `forced-colors:
-  //     none`;
+  //   - a suppressor is any rule that applies with forced colours on --
+  //     outside every forced-colors context OR inside `forced-colors:
+  //     active` itself, but not inside `forced-colors: none` -- and can apply
+  //     while the box holds focus: a focus rule, and since Task 7 fix round 1
+  //     also a hover or stateless one (canCoMatchFocus);
   //   - "out-ranks" follows the cascade: an !important suppressor beats a
   //     normal outline outright; otherwise (both or neither important)
   //     strictly higher specificity, or equal and later in the file.
@@ -7659,43 +7780,21 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(["#opt-pinboard-token:focus", "html[data-theme] .fg input:focus", ".options-search input:focus-visible", ".fg :focus", ".pick > input[type=\"radio\"]:focus"]
     .map((sel) => kindsOf(sel).join("+")).join(" | ") === "fg password | fg text+fg password+fg number | search | " + FORCED_KINDS.join("+") + " | ",
     "ui-contract-tests.mjs: kindsOf no longer maps ids / untyped inputs / wildcard subjects onto the value-box kinds they can match");
-  const SUPPRESSOR_RE = { outline: /^(?:none|0(?:px)?)$/i, "outline-style": /^none$/i, "outline-width": /^0(?:px)?$/ };
-  const forcedFocusReport = (text) => {
-    const rules = parseStyleRules(text);
-    const outlines = new Map();
-    for (const r of rules.filter((x) => forced(x))) {
-      const outline = parseDeclarations(r.body).find((d) => d.property === "outline" && /^1px solid Highlight$/i.test(d.value));
-      if (!outline) continue;
-      for (const sel of r.selectors.filter((x) => /:focus-visible\b/.test(x))) {
-        for (const k of kindsOf(sel)) {
-          if (!outlines.has(k)) outlines.set(k, []);
-          outlines.get(k).push({ sel, spec: selectorSpecificity(sel), order: r.sourceOrder, important: outline.important });
-        }
-      }
-    }
-    const missing = FORCED_KINDS.filter((k) => !outlines.has(k));
-    const outranked = [];
-    for (const r of rules.filter((x) => !x.context.some((c) => FORCED_NONE_RE.test(c)))) {
-      const sup = parseDeclarations(r.body).filter((d) => Object.hasOwn(SUPPRESSOR_RE, d.property) && SUPPRESSOR_RE[d.property].test(d.value.trim()));
-      if (!sup.length) continue;
-      const important = sup.some((d) => d.important);
-      for (const sel of r.selectors.filter((x) => /:focus(?:-visible)?\b/.test(x))) {
-        for (const k of kindsOf(sel)) {
-          for (const f of outlines.get(k) || []) {
-            if (f.important && !important) continue;
-            const c = cmpSpecificity(selectorSpecificity(sel), f.spec);
-            if ((important && !f.important) || c > 0 || (c === 0 && r.sourceOrder > f.order)) outranked.push(`${sel} (line ${r.lineNum}) over ${f.sel}`);
-          }
-        }
-      }
-    }
-    return { missing, outranked };
-  };
+  // The shared forcedOutlineReport over value-box KINDS (kindsOf): an outline
+  // counts on its :focus-visible selectors, and every kind must be reached by
+  // one. Suppressors: see the helper (Task 7 fix round 1 widened them from
+  // focus rules to every rule that can apply while the box holds focus).
+  const forcedFocusReport = (text) => forcedOutlineReport(text, {
+    targetsOf: kindsOf,
+    outlineSelector: (sel) => /:focus-visible\b/.test(sel),
+    requireOffset: false,
+    required: FORCED_KINDS.map((k) => ({ label: k, target: k })),
+  });
   const shipped = forcedFocusReport(css);
   check(shipped.missing.length === 0,
     `options.css: no forced-colors :focus-visible outline (1px solid Highlight) covers the value box kind(s) ${shipped.missing.join(", ")} -- spec 2026-09-30 §6 item 10`);
   check(shipped.outranked.length === 0,
-    "options.css: an outline-suppressing focus rule out-ranks the forced-colors value-box outline, so High Contrast shows no focus: " + shipped.outranked.join(" | "));
+    "options.css: an outline-suppressing rule that can apply while the box holds focus out-ranks the forced-colors value-box outline, so High Contrast shows no focus: " + shipped.outranked.join(" | "));
   const FORCED_CASES = [
     // appended to the shipped file: [rule, must be caught]
     ['html[data-theme] .fg input[type="text"]:focus { outline: none; }', true],
@@ -7712,12 +7811,19 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     ["html[data-theme] .options-search input:focus-visible { outline: none; }", true],
     [".fg textarea:focus { outline: none !important; }", true],
     ["@media (forced-colors: active) { .mobile-tab-picker select:focus-visible { outline: none; } }", true],
-    [".fg textarea:focus { outline: 0; }", false],
-    [".listbox-btn:hover { outline: none; }", false],
+    [".fg :focus { outline: none !important; }", true],
+    // Task 7 fix round 1: a hover rule applies while the pointer rests on a
+    // keyboard-focused box, a stateless one always; at equal specificity and
+    // later in the file, or with an id, either erases the Highlight edge
+    [".listbox-btn:hover { outline: none; }", true],
+    ["#opt-pinboard-token:hover { outline: none; }", true],
+    [".fg textarea { outline: none !important; }", true],
     // must stay clean: `forced-colors: none` never applies with forced colours on
     ['@media (forced-colors: none) { html[data-theme] .fg input[type="text"]:focus { outline: none !important; } }', false],
-    ["#opt-pinboard-token:hover { outline: none; }", false],
-    [".fg :focus { outline: none !important; }", true],
+    [".fg textarea:focus { outline: 0; }", false],
+    [".fg textarea { outline: none; }", false],
+    [".listbox-btn:not(:focus-visible) { outline: none !important; }", false],
+    [".fg input[type=\"text\"]:disabled { outline: none !important; }", false],
   ];
   const forcedMisjudged = FORCED_CASES.filter(([rule, want]) => (forcedFocusReport(`${css}\n${rule}`).outranked.length > shipped.outranked.length) !== want);
   const onlyText = forcedFocusReport('@media (forced-colors: active) { .fg input[type="text"]:focus-visible { outline: 1px solid Highlight; outline-offset: 2px; } }');
@@ -7733,6 +7839,8 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     onlyNone.missing.length === FORCED_KINDS.length && impBoth.outranked.length === 0 && impSupOnly.outranked.length === 1,
     "ui-contract-tests.mjs: the forced-colors value-box focus scan no longer discriminates -- misjudged: " + forcedMisjudged.map(([rule, want]) => `${want ? "missed" : "false hit"}: ${rule}`).join(" | ") +
     ` (coverage probe missing=${JSON.stringify(onlyText.missing)}; forced-colors:none probe missing ${onlyNone.missing.length}/${FORCED_KINDS.length}; !important probes both=${impBoth.outranked.length} (want 0) suppressor-only=${impSupOnly.outranked.length} (want 1))`);
+  gateDump(`[gate] forced options missing=${JSON.stringify(shipped.missing)} outranked=${JSON.stringify(shipped.outranked)} none-missing=${onlyNone.missing.length} text-only-missing=${onlyText.missing.length} imp-both=${impBoth.outranked.length} imp-sup=${impSupOnly.outranked.length}`);
+  for (const [rule] of FORCED_CASES) gateDump(`[gate] forced options case ${forcedFocusReport(`${css}\n${rule}`).outranked.length > shipped.outranked.length ? "CAUGHT" : "clean "} ${rule}`);
 }
 
 // ---- Stage 4 Task 6 (spec §2.2 / §2.3 F10): popup's eye hover chip, the
@@ -7748,7 +7856,6 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
 // fg 8% over the hover fill would be 1.098:1 on solarized-light, which is
 // why the ink is --pp-field-fg (lowest 1.119:1, spec §2.2).
 {
-  const cssNoComments = popupCss.replace(/\/\*[\s\S]*?\*\//g, "");
   const hand = stripGeneratedRegions(popupCss).replace(/\/\*[\s\S]*?\*\//g, "");
   const gen = popupCss.slice(popupCss.indexOf("/* @generated:ui-components start (popup) */"), popupCss.indexOf("/* @generated:ui-components end (popup) */"));
   const secret = FIELD_TARGETS.pp.filter((t) => selectorListOf(t.rest).some((sel) => /\.secret-field\b/.test(sel)));
@@ -7765,55 +7872,16 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(cmpSpecificity(selectorSpecificity(CHIP_FOCUS), selectorSpecificity(CHIP_HOVER)) > 0,
     `popup.css: the focused-shell eye chip (${selectorSpecificity(CHIP_FOCUS).join(",")}) must out-rank the plain hover chip (${selectorSpecificity(CHIP_HOVER).join(",")})`);
   const bgOf = (sel) => { const m = declarationValueMap(hand, sel); return (m.get("background") ?? m.get("background-color") ?? "").trim(); };
-  const STATES = secret.length !== 1 ? [] : [
-    { name: "shell hovered", chip: bgOf(CHIP_HOVER), fill: fillVarOf(secret[0].hover) },
-    { name: "shell focused", chip: bgOf(CHIP_FOCUS), fill: fillVarOf(secret[0].focus) },
-  ];
-  const MIX_RE = /^color-mix\(\s*in srgb\s*,\s*var\((--pp-[a-z0-9-]+)\)\s+(\d+(?:\.\d+)?)%\s*,\s*var\((--pp-[a-z0-9-]+)\)\s*\)$/;
-  const VAR_RE = /^var\((--pp-[a-z0-9-]+)\)$/;
-  for (const s of STATES) {
-    const m = MIX_RE.exec(s.chip), f = VAR_RE.exec(s.fill);
-    check(!!m && !!f, `popup.css: ${s.name}: the chip (${JSON.stringify(s.chip)}) must be color-mix(in srgb, var(--pp-*) N%, var(--pp-*)) and the generated field fill (${JSON.stringify(s.fill)}) a single var(--pp-*)`);
-    Object.assign(s, m && f ? { ink: m[1], pct: Number(m[2]) / 100, base: m[3], fillVar: f[1] } : { skip: true });
-    if (!s.skip) {
-      check(s.base === s.fillVar, `popup.css: ${s.name}: the chip mixes over ${s.base} but the token field paints ${s.fillVar} in that state`);
-      check(s.ink === "--pp-field-fg" && s.pct === 0.08, `popup.css: ${s.name}: the chip must be --pp-field-fg at 8% (spec §2.2), got ${s.ink} at ${Math.round(s.pct * 100)}%`);
-    }
-  }
-  const region = popupCss.slice(popupCss.indexOf("/* @generated:ui-themes start"), popupCss.indexOf("/* @generated:ui-themes end */")).replace(/\/\*[\s\S]*?\*\//g, "");
-  const rootVars = {};
-  for (const m of cssNoComments.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) {
-    for (const d of m[1].matchAll(/(--pp-[a-z0-9-]+)\s*:\s*([^;]+);/g)) rootVars[d[1]] = d[2].trim();
-  }
-  const blocks = [[":root", rootVars]];
-  for (const m of region.matchAll(/html\[data-theme="([a-z0-9-]+)"\]\s*\{([^}]*)\}/g)) {
-    const vars = { ...rootVars };
-    for (const d of m[2].matchAll(/(--pp-[a-z0-9-]+)\s*:\s*([^;]+);/g)) vars[d[1]] = d[2].trim();
-    blocks.push([m[1], vars]);
-  }
-  check(blocks.length === 15, `ui-contract-tests.mjs: the popup eye chip gate found ${blocks.length} popup theme blocks, expected 15 (14 themes + :root)`);
-  const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-  let measured = 0;
-  const lowest = { r: Infinity, where: "" };
-  for (const [id, vars] of blocks) {
-    for (const s of STATES) {
-      if (s.skip) continue;
-      const ink = vars[s.ink], base = vars[s.base], fill = vars[s.fillVar];
-      if (![ink, base, fill].every((v) => HEX.test(v ?? ""))) {
-        check(false, `popup.css ${id}: ${s.ink}=${ink} / ${s.base}=${base} / ${s.fillVar}=${fill} is not a #rgb / #rrggbb hex -- the popup eye chip gate cannot compute it`);
-        continue;
-      }
-      const a = hexToRgb(ink), b = hexToRgb(base), under = hexToRgb(fill);
-      const chip = a.map((c, i) => Math.round(c * s.pct + b[i] * (1 - s.pct)));
-      const r = contrast(chip, under);
-      measured++;
-      if (r < lowest.r) Object.assign(lowest, { r, where: `${id} ${s.name}` });
-      check(r >= FILL_SEPARATE_MIN,
-        `popup.css ${id}: ${s.name}: the eye's hover chip is ${r.toFixed(3)}:1 against the fill beneath it (${s.fillVar} ${fill}; chip = ${Math.round(s.pct * 100)}% ${s.ink} over ${s.base}) -- floor FILL_SEPARATE_MIN ${FILL_SEPARATE_MIN}`);
-    }
-  }
-  check(measured === 30, `ui-contract-tests.mjs: the popup eye chip gate measured ${measured} (block, state) pairs, expected 30`);
-  if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] popup eye chip: lowest ${lowest.r.toFixed(3)}:1 (${lowest.where}) over ${measured} (block, state) pairs; floor ${FILL_SEPARATE_MIN}`);
+  // The chip against the fill the token field paints in each state, on all
+  // 15 popup blocks (the shared chipOverFillAcrossBlocks).
+  const ppChip = chipOverFillAcrossBlocks(popupCss, "pp", secret.length !== 1 ? [] : [
+    { name: "shell hovered", chip: bgOf(CHIP_HOVER), fill: fillVarOf(secret[0].hover), pct: 0.08 },
+    { name: "shell focused", chip: bgOf(CHIP_FOCUS), fill: fillVarOf(secret[0].focus), pct: 0.08 },
+  ], { file: "popup.css", what: "the eye's hover chip" });
+  for (const failure of ppChip.failures) check(false, failure);
+  check(ppChip.measured === 30, `ui-contract-tests.mjs: the popup eye chip gate measured ${ppChip.measured} (block, state) pairs, expected 30`);
+  if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] popup eye chip: lowest ${ppChip.lowest.r.toFixed(3)}:1 (${ppChip.lowest.where}) over ${ppChip.measured} (block, state) pairs; floor ${FILL_SEPARATE_MIN}`);
+  gateDump(`[gate] chip popup measured=${ppChip.measured} lowest=${ppChip.lowest.r.toFixed(3)} (${ppChip.lowest.where}) ratios=${ratioHash(ppChip.ratios)}`);
 }
 
 // ---- Stage 4 Task 7: library's value boxes speak the field language through
@@ -7897,36 +7965,49 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const LIB_BOX_NODES = new Set([...libCov.boxes, ...libSelects]);
   const libReaches = (sel, node) => selectorReaches(sel, node, LIB_STATIC);
 
-  // (b) Emission: formRules("lib") shipped every role of every entry into the
-  // generated region with exactly the field tokens the binding contract names.
-  const EMITS = {
-    rest: [["background-color", "field-bg"], ["border-color", "field-border"], ["color", "field-fg"]],
-    hover: [["background-color", "field-bg-hover"], ["border-color", "field-border-hover"]],
-    focus: [["background-color", "field-bg-focus"], ["border-color", "field-border-focus"]],
-    placeholder: [["color", "field-placeholder"]],
-    passenger: [["color", "field-fg"]],
-    chevron: [["background-image", "field-chevron"]],
-  };
-  for (const t of LIB) {
-    for (const [key, want] of Object.entries(EMITS)) {
-      for (const sel of selectorListOf(t[key])) {
-        const got = declarationValueMap(libGen, sel);
-        const wrong = want.filter(([prop, role]) => got.get(prop) !== `var(--lib-${role})`);
-        check(wrong.length === 0,
-          `library.css: the generated FIELD_TARGETS.lib ${t.id}.${key} rule for \`${sel}\` does not paint ${wrong.map(([p, r]) => `${p}: var(--lib-${r})`).join(", ")} (got ${JSON.stringify(Object.fromEntries(got))}) -- run node docs/theme-surface/tools/sync-all.mjs`);
-      }
-    }
+  // (a3) A shell's busy state (plan review focus 4; Task 7 fix round 1): an
+  // entry whose rest box is not a form control -- the .vocab-group-unit
+  // <span> -- can never itself match :disabled, so the ladder gate's bare
+  // `:disabled` exclusion is meaningless on it. Its hover must exclude the
+  // disabled control INSIDE it, with a `:has(... :disabled)` :not() argument
+  // (hasDisabledArgument): #vocab-group-input is disabled while a batch
+  // mutation runs, and the shell must not answer the pointer then. Shells are
+  // found on the tree (what each rest selector reaches), not by name.
+  const FORM_CONTROL_TAGS = new Set(["input", "select", "textarea", "button"]);
+  const shellEntries = LIB.filter((t) => {
+    const reached = LIB_NODES.filter((n) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n)));
+    return reached.length > 0 && reached.every((n) => !FORM_CONTROL_TAGS.has(n.tag));
+  });
+  const shellBusyMisses = (hover) => selectorListOf(hover).filter((sel) => !notArgumentsOf(sel).some(hasDisabledArgument));
+  const shellBusyBad = shellEntries.flatMap((t) => shellBusyMisses(t.hover).map((sel) => `${t.id}: ${sel}`));
+  check(shellEntries.map((t) => t.id).join(",") === "lib-group-unit" && shellBusyBad.length === 0,
+    `ui-components.mjs FIELD_TARGETS.lib: a shell entry's hover must exclude its disabled control with :not(:has(> input:disabled)) -- a bare :disabled never matches a <span> -- shells ${JSON.stringify(shellEntries.map((t) => t.id))}; missing on ${JSON.stringify(shellBusyBad)}`);
+  {
+    // The bare-:disabled shell hover passes the ladder gate (which accepts
+    // either form on any compound) and must fail here.
+    const focusSel = '.vocab-group-unit:has(> input[type="text"]:focus):not(:disabled)';
+    const bare = '.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus), :disabled))';
+    const shipped = '.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus), :has(> input:disabled)))';
+    check(fieldLadderProblems(".vocab-group-unit", bare, focusSel).length === 0 && shellBusyMisses(bare).length === 1 &&
+      shellBusyMisses(shipped).length === 0 && shellBusyMisses('.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus))):not(:has(> input:disabled))').length === 0 &&
+      shellBusyMisses('.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus), :has(> input:focus)))').length === 1,
+      "ui-contract-tests.mjs: the shell busy-state check no longer discriminates (a bare :disabled on the shell hover must fail it while the ladder gate still passes; :not(:has(> input:disabled)) anywhere on the selector must pass)");
   }
 
-  // (b2) The hand half keeps each box's ring (§7.3 `bordered`: the core is
-  // the generated focus border, the glow is here) on the entry's own focus
-  // selector (fieldRingSelectors), so ring and frame cannot fire in
-  // different states.
-  for (const t of LIB) {
-    const missing = fieldRingSelectors(t).filter((sel) => declarationValueMap(libHand, sel).get("box-shadow") !== "var(--lib-focus-ring)");
-    check(missing.length === 0,
-      `library.css: FIELD_TARGETS.lib ${t.id} has no hand-written ring (box-shadow: var(--lib-focus-ring)) on ${missing.map((s) => `\`${s}\``).join(", ")}`);
+  // (b) Emission: formRules("lib") shipped every role of every entry into the
+  // generated region with exactly the field tokens the binding contract names
+  // (the shared fieldTargetEmissionProblems).
+  const libEmission = fieldTargetEmissionProblems("lib", LIB, libGen, "library.css");
+  for (const problem of libEmission.problems) check(false, problem);
+  gateDump(`[gate] emission library selectors=${libEmission.checked} problems=${JSON.stringify(libEmission.problems.map((m) => /`([^`]+)`/.exec(m)?.[1]))}`);
+
+  // (b2) The hand half keeps each box's ring on the entry's own ring
+  // selectors (the shared fieldRingMissing).
+  const libRing = fieldRingMissing("lib", LIB, libHand);
+  for (const { id, sels } of libRing.missing) {
+    check(false, `library.css: FIELD_TARGETS.lib ${id} has no hand-written ring (box-shadow: var(--lib-focus-ring)) on ${sels.map((sel) => `\`${sel}\``).join(", ")}`);
   }
+  gateDump(`[gate] ring library selectors=${libRing.checked} missing=${JSON.stringify(libRing.missing.flatMap((m) => m.sels))}`);
 
   // (c) The hand-written region paints no value-box colour (§4 / 3c lesson):
   // it sits after the generated one, so a same-specificity hand colour wins,
@@ -8081,47 +8162,21 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   //     box draws `outline: 1px solid Highlight` (a non-negative offset)
   //     inside @media (forced-colors: active) on each of its entry's ring
   //     selectors (fieldRingSelectors -- the group-unit shell keeps its :has()
-  //     trigger), and no outline-suppressing focus rule that applies with
-  //     forced colours on out-ranks it on the same box (the tree above:
-  //     library.html plus the grafted runtime boxes; an !important suppressor
-  //     beats a normal outline; otherwise specificity, then source order).
-  //     §7.3's forced-colors branch holds the outline's own shape where the
-  //     selector names :focus-visible.
-  const OUTLINE_OFF = { outline: /^(?:none|0(?:px)?)$/i, "outline-style": /^none$/i, "outline-width": /^0(?:px)?$/ };
-  const libForcedReport = (text) => {
-    const rules = parseStyleRules(text);
-    const outlines = [];
-    for (const r of rules.filter(inForcedColors)) {
-      const decls = parseDeclarations(r.body);
-      const outline = decls.find((d) => d.property === "outline" && /^1px solid Highlight$/i.test(d.value));
-      const offset = decls.find((d) => d.property === "outline-offset");
-      if (!outline || !offset || !(parseFloat(offset.value) >= 0)) continue;
-      for (const sel of r.selectors) outlines.push({ sel, spec: selectorSpecificity(sel), order: r.sourceOrder, important: outline.important });
-    }
-    const missing = LIB.flatMap((t) => fieldRingSelectors(t).filter((sel) => !outlines.some((o) => o.sel === sel)).map((sel) => `${t.id}: ${sel}`));
-    const outranked = [];
-    for (const r of rules.filter((x) => !x.context.some((c) => FORCED_NONE_RE.test(c)))) {
-      const off = parseDeclarations(r.body).filter((d) => Object.hasOwn(OUTLINE_OFF, d.property) && OUTLINE_OFF[d.property].test(d.value));
-      if (!off.length) continue;
-      const important = off.some((d) => d.important);
-      for (const sel of r.selectors.filter((x) => /:focus(?:-visible|-within)?\b/.test(x))) {
-        for (const node of LIB_BOX_NODES) {
-          if (!libReaches(sel, node)) continue;
-          for (const f of outlines.filter((o) => libReaches(o.sel, node))) {
-            if (f.important && !important) continue;
-            const c = cmpSpecificity(selectorSpecificity(sel), f.spec);
-            if ((important && !f.important) || c > 0 || (c === 0 && r.sourceOrder > f.order)) outranked.push(`${sel} (line ${r.lineNum}) over ${f.sel}`);
-          }
-        }
-      }
-    }
-    return { missing, outranked };
-  };
+  //     trigger), and no outline-suppressing rule that can apply while the
+  //     box holds focus -- a focus, hover or stateless rule (canCoMatchFocus)
+  //     -- out-ranks it on the same box (the tree above: library.html plus the
+  //     grafted runtime boxes; the shared forcedOutlineReport). §7.3's
+  //     forced-colors branch holds the outline's own shape where the selector
+  //     names :focus-visible.
+  const libForcedReport = (text) => forcedOutlineReport(text, {
+    targetsOf: (sel) => [...LIB_BOX_NODES].filter((n) => libReaches(sel, n)),
+    required: LIB.flatMap((t) => fieldRingSelectors(t).map((sel) => ({ label: `${t.id}: ${sel}`, sel }))),
+  });
   const libForced = libForcedReport(libNoComments);
   check(libForced.missing.length === 0,
     "library.css: a library value box has no forced-colors focus outline (1px solid Highlight, non-negative offset, on its registry entry's ring selector) -- spec 2026-09-30 §6 item 10 / R5: " + libForced.missing.join(" | "));
   check(libForced.outranked.length === 0,
-    "library.css: an outline-suppressing focus rule out-ranks the forced-colors value-box outline, so High Contrast shows no focus: " + [...new Set(libForced.outranked)].join(" | "));
+    "library.css: an outline-suppressing rule that can apply while the box holds focus out-ranks the forced-colors value-box outline, so High Contrast shows no focus: " + [...new Set(libForced.outranked)].join(" | "));
   const LIB_FORCED_CASES = [
     // appended to the shipped file: [rule, must be caught]
     ["#vocab-search:focus { outline: none !important; }", true],
@@ -8129,17 +8184,26 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".vocab-note-input:focus:not(:disabled):not(.a):not(.b) { outline-style: none; }", true],
     ["@media (forced-colors: active) { .vocab-group-unit:has(> input[type=\"text\"]:focus):not(:disabled):not(.x) { outline: 0; } }", true],
     ["html[data-theme] .vocab-filter-row select:focus-visible:not(:disabled) { outline: none; }", true],
+    // Task 7 fix round 1: a hover rule applies while the pointer rests on a
+    // keyboard-focused box, a stateless one always
+    [".vocab-note-input:hover { outline: none !important; }", true],
+    [".vocab-note-input { outline: none !important; }", true],
+    ["#vocab-detail .vocab-group-unit:hover { outline-width: 0; }", true],
     // must stay clean
     ["@media (forced-colors: none) { .xp-dict-lang:focus-visible { outline: none !important; } }", false],
     [".vocab-group-unit > input[type=\"text\"]:focus { outline: none !important; }", false],
-    [".vocab-note-input:hover { outline: none !important; }", false],
     [".notes-toolbar input[type=\"search\"]:focus { outline: none; }", false],
+    [".vocab-note-input { outline: none; }", false],
+    [".vocab-note-input:not(:focus) { outline: none !important; }", false],
+    [".vocab-group-unit:not(:focus-within) { outline: none !important; }", false],
   ];
   const libForcedMisjudged = LIB_FORCED_CASES.filter(([rule, want]) => (libForcedReport(`${libNoComments}\n${rule}`).outranked.length > libForced.outranked.length) !== want);
   const libForcedNone = libForcedReport(libNoComments.replace(/forced-colors\s*:\s*active/g, "forced-colors: none"));
   check(libForcedMisjudged.length === 0 && libForcedNone.missing.length === LIB.flatMap(fieldRingSelectors).length && LIB.flatMap(fieldRingSelectors).length > 0,
     "ui-contract-tests.mjs: the library forced-colors value-box focus scan no longer discriminates -- misjudged: " + libForcedMisjudged.map(([rule, want]) => `${want ? "missed" : "false hit"}: ${rule}`).join(" | ") +
     ` (with every forced-colors block flipped to none, ${libForcedNone.missing.length}/${LIB.flatMap(fieldRingSelectors).length} ring selectors reported missing)`);
+  gateDump(`[gate] forced library missing=${JSON.stringify(libForced.missing)} outranked=${JSON.stringify(libForced.outranked)} none-missing=${libForcedNone.missing.length}`);
+  for (const [rule] of LIB_FORCED_CASES) gateDump(`[gate] forced library case ${libForcedReport(`${libNoComments}\n${rule}`).outranked.length > libForced.outranked.length ? "CAUGHT" : "clean "} ${rule}`);
 }
 
 // ---- Stage 4 F10 (spec §2.2 / §2.3), library leg: the .vocab-group-unit
@@ -8187,53 +8251,17 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const at = (sel) => handRules.findIndex((r) => r.selectors.includes(sel));
   check(at(CHIPS[1].sel) > at(CHIPS[0].sel) && at(CHIPS[3].sel) > at(CHIPS[2].sel),
     "library.css: each stepper press chip rule must come after its hover chip rule (equal specificity: source order decides)");
-  const MIX_RE = /^color-mix\(\s*in srgb\s*,\s*var\((--lib-[a-z0-9-]+)\)\s+(\d+(?:\.\d+)?)%\s*,\s*var\((--lib-[a-z0-9-]+)\)\s*\)$/;
-  const VAR_RE = /^var\((--lib-[a-z0-9-]+)\)$/;
-  for (const s of CHIPS) {
-    const chipMap = declarationValueMap(hand, s.sel);
-    const chip = (chipMap.get("background") ?? chipMap.get("background-color") ?? "").trim();
-    const fillMap = s.fillRule ? declarationValueMap(all, s.fillRule) : new Map();
-    const fill = (fillMap.get("background-color") ?? "").trim();
-    const m = MIX_RE.exec(chip), f = VAR_RE.exec(fill);
-    check(!!m && !!f, `library.css: ${s.name}: the chip (${JSON.stringify(chip)}) must be color-mix(in srgb, var(--lib-*) N%, var(--lib-*)) and the shell fill (${JSON.stringify(fill)} on ${JSON.stringify(s.fillRule)}) a single var(--lib-*)`);
-    Object.assign(s, m && f ? { ink: m[1], mix: Number(m[2]) / 100, base: m[3], fillVar: f[1] } : { skip: true });
-    if (!s.skip) {
-      check(s.ink === "--lib-field-fg" && s.mix === s.pct, `library.css: ${s.name}: the chip must be ${Math.round(s.pct * 100)}% --lib-field-fg (D6), got ${Math.round(s.mix * 100)}% ${s.ink}`);
-      check(s.base === s.fillVar, `library.css: ${s.name}: the chip mixes over ${s.base} but the shell paints ${s.fillVar} in that state`);
-    }
-  }
-  // All 15 library blocks: 14 generated html[data-theme] blocks over the
-  // default, which is the hand :root overlaid by the generated :root.
-  const themes = libraryCss.slice(libraryCss.indexOf("/* @generated:ui-themes start"), libraryCss.indexOf("/* @generated:ui-themes end */")).replace(/\/\*[\s\S]*?\*\//g, "");
-  const rootVars = {};
-  const readVars = (body, into) => { for (const d of body.matchAll(/(--lib-[a-z0-9-]+)\s*:\s*([^;]+);/g)) into[d[1]] = d[2].trim(); return into; };
-  for (const m of hand.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) readVars(m[1], rootVars);
-  for (const m of themes.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) readVars(m[1], rootVars);
-  const blocks = [[":root", rootVars]];
-  for (const m of themes.matchAll(/html\[data-theme="([a-z0-9-]+)"\]\s*\{([^}]*)\}/g)) blocks.push([m[1], readVars(m[2], { ...rootVars })]);
-  check(blocks.length === 15, `ui-contract-tests.mjs: the stepper chip gate found ${blocks.length} library theme blocks, expected 15 (14 themes + :root)`);
-  const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-  let measured = 0;
-  const lowest = { r: Infinity, where: "" };
-  for (const [id, vars] of blocks) {
-    for (const s of CHIPS) {
-      if (s.skip) continue;
-      const ink = vars[s.ink], base = vars[s.base], fill = vars[s.fillVar];
-      if (![ink, base, fill].every((v) => HEX.test(v ?? ""))) {
-        check(false, `library.css ${id}: ${s.ink}=${ink} / ${s.base}=${base} / ${s.fillVar}=${fill} is not a #rgb / #rrggbb hex -- the stepper chip gate cannot compute it`);
-        continue;
-      }
-      const a = hexToRgb(ink), b = hexToRgb(base), under = hexToRgb(fill);
-      const chip = a.map((c, i) => Math.round(c * s.mix + b[i] * (1 - s.mix)));
-      const r = contrast(chip, under);
-      measured++;
-      if (r < lowest.r) Object.assign(lowest, { r, where: `${id} ${s.name}` });
-      check(r >= STEP_CHIP_MIN,
-        `library.css ${id}: ${s.name}: the stepper chip is ${r.toFixed(3)}:1 against the shell fill beneath it (${s.fillVar} ${fill}; chip = ${Math.round(s.mix * 100)}% ${s.ink} over ${s.base}) -- floor FILL_SEPARATE_MIN ${STEP_CHIP_MIN}`);
-    }
-  }
-  check(measured === 60, `ui-contract-tests.mjs: the stepper chip gate measured ${measured} (block, state) pairs, expected 60`);
-  if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] stepper chip: lowest ${lowest.r.toFixed(3)}:1 (${lowest.where}) over ${measured} (block, state) pairs; floor ${STEP_CHIP_MIN}`);
+  // The chip against the fill the shell paints in each state, on all 15
+  // library blocks (the shared chipOverFillAcrossBlocks); the shell fills are
+  // read from the generated rules of the shell entry.
+  const fillOf = (sel) => (sel ? (declarationValueMap(all, sel).get("background-color") ?? "").trim() : "");
+  const chipOf = (sel) => { const m = declarationValueMap(hand, sel); return (m.get("background") ?? m.get("background-color") ?? "").trim(); };
+  const stepChip = chipOverFillAcrossBlocks(libraryCss, "lib", CHIPS.map((c) => ({ name: c.name, chip: chipOf(c.sel), fill: fillOf(c.fillRule), pct: c.pct })),
+    { file: "library.css", what: "the stepper chip" });
+  for (const failure of stepChip.failures) check(false, failure);
+  check(stepChip.measured === 60, `ui-contract-tests.mjs: the stepper chip gate measured ${stepChip.measured} (block, state) pairs, expected 60`);
+  if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] stepper chip: lowest ${stepChip.lowest.r.toFixed(3)}:1 (${stepChip.lowest.where}) over ${stepChip.measured} (block, state) pairs; floor ${STEP_CHIP_MIN}`);
+  gateDump(`[gate] chip library measured=${stepChip.measured} lowest=${stepChip.lowest.r.toFixed(3)} (${stepChip.lowest.where}) ratios=${ratioHash(stepChip.ratios)}`);
 }
 
 if (fail.length) {
