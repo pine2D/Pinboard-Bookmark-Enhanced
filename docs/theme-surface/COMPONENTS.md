@@ -594,8 +594,12 @@ library 都没有一个 `class="fg"`（`ui-vocabulary.json` 也只在 options �
 （阶段 4 起）从 `FIELD_TARGETS.pp`（`composers/ui-components.mjs`，同一个 `formRules`）拿到同一套字段
 语言的**颜色半边**：静息 / 悬停 / 聚焦三态、占位符与乘客文字，选择器一律带类型，三态特异性逐盒严格递增
 （§6.2 popup 列）；形状半边（宽、内距、圆角、`border-width` / `border-style`）与光晕留在 popup.css
-手写区，手写区在值盒子上不写任何颜色。library 在阶段 4 Task 7 之前仍只吃颜色对与 `accent-color`。library 的字段按工具条逐条手写在 library.css 手写区——那是 §6.4 记录的用户裁决（工具条留
-在 sm 20px 阶），不是欠账；手写规则还带着 forced-colors 焦点兜底与焦点环 z-index 抬升，共享配方表达不了。
+手写区，手写区在值盒子上不写任何颜色。library 的值盒子（工具条三个搜索框、`#vocab-group-filter` /
+`#vocab-lookup-lang` / `.xp-dict-lang` 三个原生 select、两处 `.vocab-group-unit` 壳与乘客、笔记框）自阶段 4 起由
+`FIELD_TARGETS.lib` 生成颜色半边（填充、四边、键入文字、占位符、悬停、聚焦边、`--lib-field-chevron`），三态同样逐盒
+严格递增；形状半边（高度、内距、圆角、宽度、边框宽度与样式）、§6.4 记录的 sm 20px 阶、焦点环 `box-shadow` 与
+z-index 抬升、forced-colors 兜底仍手写在 library.css。手写区不得再给值盒子写颜色、`border` 简写或 chevron
+（ui-contract 钉住）。
 **代价**：`.fg` 是 options 独占词汇，别的表面加 `class="fg"` 会静默失效——要用就先改 composer 守卫。
 
 ### 6.1 结构配方
@@ -712,16 +716,17 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
 
 ### 6.2 消费 token 对
 
-popup / library 不发射 `.fg` 配方。popup 的颜色半边由 `FIELD_TARGETS.pp` 生成（阶段 4，见 §6 适用），library 的字段规则仍手写在 library.css 手写区。下表按已发布的规则写：
+popup / library 不发射 `.fg` 配方。两个表面的颜色半边分别由 `FIELD_TARGETS.pp` / `FIELD_TARGETS.lib` 生成（阶段 4 Task 6 / Task 7，见 §6 适用）。下表按已发布的规则写：
 
 | 属性 | popup | library | 派生要求 |
 |---|---|---|---|
-| `background-color` | 静息 `--pp-field-bg`、悬停 `--pp-field-bg-hover`、聚焦 `--pp-field-bg-focus`（生成） | 文本框 `--lib-input-bg`；筛选 select 与 `.xp-dict-lang` 静息为 `--lib-btn-bg`（library.css:1748 / :1393） | 既有 |
-| `color` | `--pp-field-fg`（盒子与标签芯乘客，生成）；占位符 `--pp-field-placeholder` | `--lib-fg` | popup：`field-fg` 对两态填充 ≥4.5、对占位符 ≥1.4，占位符对三态填充 ≥4.5（contrast-audit 的 pp 字段行）；library：对 `input-bg` ≥4.5:1 |
-| `border-color`（静息） | `--pp-field-border`（= 填充；terminal 为 pilot `input-bd` 声明的框。`--pp-input-bd` 变量阶段 4 退役） | `--lib-input-border`；`.xp-dict-lang` 为 `--lib-btn-border`（:1391） | 律 1 的塌陷载体，不承担 3:1 |
-| `border-color`（hover） | `--pp-field-border-hover`（无框块 = 悬停填充；terminal 的框向文字色混 30%）。六个值盒子都有悬停，标签壳与密钥框的悬停挂在壳上 | 工具条搜索框 `--lib-fg-muted`（library.css:491-492）；筛选 select 只换底 `--lib-btn-hover`、边保持 `--lib-input-border`（:1762-1765）；`.xp-dict-lang:hover` 换底 `--lib-btn-hover`、边改为 `--lib-input-border`（:1412）；其余字段无 hover 规则 | — |
-| `border-color`（focus） | `--pp-field-border-focus`（四边；填充 `--pp-field-bg-focus` = 静息填充） | `--lib-focus-bd` | popup：对填充 ≥3:1（contrast-audit）；library：既有 |
-| `box-shadow`（focus） | `--pp-focus-ring` | `--lib-focus-ring` | 既有 |
+| `background-color` | 静息 `--pp-field-bg`、悬停 `--pp-field-bg-hover`、聚焦 `--pp-field-bg-focus`（生成） | 静息 `--lib-field-bg`、悬停 `--lib-field-bg-hover`、聚焦 `--lib-field-bg-focus`（生成，`FIELD_TARGETS.lib`；三个 select 与 `.xp-dict-lang` 不再用 `--lib-btn-bg`，笔记框不再透明） | 既有 |
+| `color` | `--pp-field-fg`（盒子与标签芯乘客，生成）；占位符 `--pp-field-placeholder` | `--lib-field-fg`（值盒子、壳内乘客输入、步进格图标，生成）；占位符 `--lib-field-placeholder` | `field-fg` 对两态填充 ≥4.5、对占位符 ≥1.4，占位符对三态填充 ≥4.5（contrast-audit 的 pp / lib 字段行） |
+| `border-color`（静息） | `--pp-field-border`（= 填充；terminal 为 pilot `input-bd` 声明的框。`--pp-input-bd` 变量阶段 4 退役） | `--lib-field-border`（无框主题等于填充；terminal 为 pilot `input-border` 框）。`--lib-input-border` 只剩两个批量条外框在用 | 律 1 的塌陷载体，不承担 3:1 |
+| `border-color`（hover） | `--pp-field-border-hover`（无框块 = 悬停填充；terminal 的框向文字色混 30%）。六个值盒子都有悬停，标签壳与密钥框的悬停挂在壳上 | `--lib-field-border-hover`（原搜索框 `--lib-fg-muted` 整圈悬停已删；terminal = `mix(frame, fg, .30)`）。九个值盒子都有悬停，分组单元的悬停挂在壳上并排除文本录入聚焦与禁用，分隔线随壳换色 | — |
+| `border-color`（focus） | `--pp-field-border-focus`（四边；填充 `--pp-field-bg-focus` = 静息填充） | `--lib-field-border-focus`（四边；填充 `--lib-field-bg-focus` = 静息填充） | 对填充 ≥3:1（contrast-audit） |
+| select 箭头 | —（popup 没有 select） | `--lib-field-chevron`（按主题生成，描边色 = `field-placeholder`；原 `%23888` / 暗色孪生 `%23aaa` 已删） | `tests/theme-ui-derive-tests.mjs` 逐块断言描边 |
+| `box-shadow`（focus） | `--pp-focus-ring` | `--lib-focus-ring`（手写） | 既有 |
 | `accent-color` | `--pp-accent` | `--lib-accent` | 既有 |
 
 原表里「`border-color` = `--{ns}-input-border`，对 `input-bg` 与页面底 ≥3:1」一行已删：它与 §9.1 律 1 矛盾，静息边塌陷进填充，不承担 3:1。原表的 hover 行 `color-mix(input-border 55%, fg)` 在 popup / library 从未有消费者，一并删去；原「hover，options 行模型字段」一行由下表取代。
@@ -743,7 +748,7 @@ options（值盒子，§6.1；8 个 `--opt-field-*` 颜色角色由 `_ui-derive.
 
 options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2、次级墨色 3、键入文字 3〔对两态填充 ≥4.5、对占位符 ≥1.4〕）；宿主分离段（`auditFieldSeparation`，宿主按前缀显式列在 `FIELD_SEPARATION_HOSTS`，不经 `ROLE_ALIAS`）按块的类别给 6 / 5 / 3 行——无框块是「悬停框 == 悬停填充」1 + F1 2 + F2 1 + F3 2，已分离的 framed 块是 F1–F3 共 5 行，未分离的 framed 块是「悬停填充 == 静息填充」1 + F8b 2；侧栏搜索段（`auditSidebarSearchSeparation`，宿主 `--opt-bg`，覆盖侧栏搜索框与窄屏页签选择器）每块 1 行。15 块共 217 行（11 × 15 + 2 × 14 + 2 × 12）。
 
-**popup / library 的字段派生角色（阶段 4 Task 5 起）**。两个表面也由 `deriveFieldRoles` 派生同一组 8 个 `--{ns}-field-*` 角色。它们只在生成区定义：14 个主题块加默认 `:root`，默认块的字面量写在各自 composer 的 `DEFAULT_LIGHT` 里，由 `tests/theme-ui-derive-tests.mjs` 按折叠后的 `:root` 复算钉住。popup 的角色自阶段 4 Task 6 起由 `FIELD_TARGETS.pp` 的生成规则消费（六个值盒子，上面 popup 列即现状）；library 的角色在 Task 7 之前还没有消费者，上面 library 列仍是已发布的手写规则。
+**popup / library 的字段派生角色（阶段 4 Task 5 起）**。两个表面也由 `deriveFieldRoles` 派生同一组 8 个 `--{ns}-field-*` 角色。它们只在生成区定义：14 个主题块加默认 `:root`，默认块的字面量写在各自 composer 的 `DEFAULT_LIGHT` 里，由 `tests/theme-ui-derive-tests.mjs` 按折叠后的 `:root` 复算钉住。popup 的角色自阶段 4 Task 6 起由 `FIELD_TARGETS.pp` 的生成规则消费（六个值盒子），library 的角色自 Task 7 起由 `FIELD_TARGETS.lib` 消费（九个值盒子）；上表两列都是现状。
 
 | 项 | popup（`--pp-*`） | library（`--lib-*`） |
 |---|---|---|
@@ -759,8 +764,8 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
 
 **字段与按钮同病**：`options.css:207` 与 `library.css:136` 的字段基类都声明了 `background-color` 却
 **没有 `color`**——options 靠 `html[data-theme] .fg input…`（:1187-1191）补；library 当时的 `.fg` 是死代码所以
-还没爆，2026-09-15 起 composer 干脆不对 lib 发射这一族（见 §6 适用），library 的字段一律由手写规则自带
-`color`。成对消费律（§7）对字段和按钮一视同仁。
+还没爆，2026-09-15 起 composer 干脆不对 lib 发射 `.fg` 族（见 §6 适用）；阶段 4 起 library 的值盒子由
+`FIELD_TARGETS.lib` 成对给出填充与 `--lib-field-fg`。成对消费律（§7）对字段和按钮一视同仁。
 
 **同一 commit 删除的 `html[data-theme]` 字段覆盖**（同 §1.3 的理由与时机）：
 
@@ -982,13 +987,14 @@ html[data-theme="<dark preset>"] { color-scheme: dark; }
 密钥眼睛 `.key-toggle` 的 `inset` 芯同样用它，因为这圈环画在字段填充上（flexoki-light 的 `focus-bd` 对字段
 填充只有 2.73:1，`--opt-field-border-focus` 在该主题重推为 `#4f7db1`）。它仍是 `focus-bd` 的派生（对字段填充
 已达 3:1 时逐字节等于 `focus-bd`），不是第二套焦点语言。ui-contract 只在 `opt` 命名空间、且规则的每个选择器
-都是值盒子或 `.key-toggle` 时接受这个芯。popup 自阶段 4 起同样接受**自己命名空间**的
-`--pp-field-border-focus`（值盒子的 `bordered` 芯与眼睛钮的 `inset` 芯），借用 options 字面量的写法仍然拒绝；
-library（阶段 4 Task 7 之前）与三个表面的非值盒子控件（`.btn` 等）仍只接受 `--{ns}-focus-bd`。popup 值盒子的
-芯写在生成区（`FIELD_TARGETS.pp` 的聚焦规则），手写区的光晕规则用同一条选择器（`:focus` 换成
-`:focus-visible`，`:focus-within` 的壳原样），§7.3 扫描在整个文件（含生成区）里找这条伙伴规则。
+都是值盒子或 `.key-toggle` 时接受这个芯。阶段 4 起三个表面同理：popup、library 的值盒子各用本命名空间的
+`--pp-field-border-focus` / `--lib-field-border-focus` 作芯（值盒子的 `bordered` 芯与眼睛钮的 `inset` 芯），颜色由
+生成配方给出，手写的焦点规则只剩光晕与 `outline: none`；手写区的光晕规则用注册表聚焦选择器的同一条（`:focus`
+换成 `:focus-visible`，`:focus-visible` 与 `:focus-within` / `:has()` 的壳原样）。§7.3 扫描把同一选择器的生成声明
+并进来判定（library 的 `.xp-dict-lang` 就在自己的聚焦选择器上压掉 outline），:focus 搭档也在整个文件（含生成区）
+里找。外命名空间的芯与非值盒子控件（`.btn` 等）仍只接受 `--{ns}-focus-bd`。
 
-**强制色模式下的值盒子聚焦（阶段 4）**：`bordered` 落位靠改涂边框加光晕，强制色下这两样都失效（光晕被丢弃，边色被压成系统色）。所以 options 的每种值盒子另有一条 `@media (forced-colors: active)` 下的 `:focus-visible { outline: 1px solid Highlight; outline-offset: 2px }`，形状与 `.listbox-btn` 的先例相同，放在 options.css 文件末尾，保证不被写了 `outline: none` 的聚焦规则反超（ui-contract 钉住覆盖面与这条次序）。popup 自阶段 4 Task 6 起同样有一段（popup.css 文件末尾）：六个值盒子各用自己注册表条目的光晕选择器画这圈轮廓，壳（标签壳、密钥框）按壳的 `:focus-within`；ui-contract 从 `FIELD_TARGETS.pp` 推出应有的选择器逐条核对，并确认没有 `outline: none` 的聚焦规则在同一个盒子上反超它。§7.3 扫描的强制色分支也审 `:focus-within` 写法的这类规则。
+**强制色模式下的值盒子聚焦（阶段 4）**：`bordered` 落位靠改涂边框加光晕，强制色下这两样都失效（光晕被丢弃，边色被压成系统色）。所以 options 的每种值盒子另有一条 `@media (forced-colors: active)` 下的 `:focus-visible { outline: 1px solid Highlight; outline-offset: 2px }`，形状与 `.listbox-btn` 的先例相同，放在 options.css 文件末尾，保证不被写了 `outline: none` 的聚焦规则反超（ui-contract 钉住覆盖面与这条次序）。popup 自阶段 4 Task 6 起同样有一段（popup.css 文件末尾）：六个值盒子各用自己注册表条目的光晕选择器画这圈轮廓，壳（标签壳、密钥框）按壳的 `:focus-within`；ui-contract 从 `FIELD_TARGETS.pp` 推出应有的选择器逐条核对，并确认没有 `outline: none` 的聚焦规则在同一个盒子上反超它。library 自阶段 4 Task 7 起同理：两个工具条搜索框的那段留在原处（搜索框规则之后），其余七个盒子（两个工具条 select、`.xp-dict-lang`、笔记框、两处分组单元壳按壳的 `:has(> input[type="text"]:focus)`）的一段放在手写区末尾，ui-contract 从 `FIELD_TARGETS.lib` 推出选择器逐条核对，反超检查在 library.html 加上运行时盒子（笔记框、`.xp-dict-lang`、详情窗格的分组单元）的结构树上做。§7.3 扫描的强制色分支也审 `:focus-within` 写法的这类规则。
 
 **落位判定只问两件事**，按顺序：
 
@@ -1144,10 +1150,16 @@ chevron 探出边框——根因是同一处：一条 id 选择器规则把水�
    格子的 `inset` 环见 §7.3，**必须带 `box-shadow: none`**：格子多半是 `.btn`，而生成区的
    `.btn:focus-visible` 现在带辉光，不压掉就会从焊缝溢到邻格上。
 3. **内部分隔线单一颜色单一粗细**（1px，与容器边框同色或降饱和一档），贯穿高度一致。分隔线的颜色
-   **不得随任何状态变化**——选中态改分隔线颜色是这条律最容易踩的坑（`.vocab-sort-seg` 的原实现）。
+   **只跟随容器边框**，不得随格子自身的任何状态变化——选中态改分隔线颜色是这条律最容易踩的坑
+   （`.vocab-sort-seg` 的原实现）。字段型单元（`.vocab-group-unit`，阶段 4）的分隔线取 `--{ns}-field-border`，
+   容器悬停时与容器边框一起换成 `--{ns}-field-border-hover`（同一谓词：文本录入未聚焦、未禁用），否则静息色
+   的细线会浮在悬停填充上；容器聚焦时分隔线不变。
 4. **hover / press 反馈按 §3 既有语言**，但内部件用 ghost 底色变化，**`transform` 显式取消**：
    `scale(0.97)` 作用在焊死的分段上会在接缝处撕开一条缝。按压瞬时（`transition-duration: 0s`），
    与 §3.2 的行按压语言同源。
+   字段型单元的 ghost 底 = `--{ns}-field-fg` 8%（悬停）/ 10%（按下）叠在容器**当时**的填充上——容器悬停时
+   是 `field-bg-hover`，文本录入持焦点时是 `field-bg-focus`；对该填充 ≥ `FILL_SEPARATE_MIN`（spec §2.3 F10，
+   ui-contract 逐块实算，library 最低 1.119）。
 5. **内部件与容器边缘的内距上 spacing 阶**；原生附属物（`<input list>` 的 datalist ▼ 之类平台不可
    抑制的）保证在 padding 内不撞分隔线。
 6. **rest ↔ focus 状态稳定律**（2026-08-05 第五轮加入）。聚焦只许改**边框颜色**并**加一圈环**
@@ -1183,34 +1195,39 @@ chevron 探出边框——根因是同一处：一条 id 选择器规则把水�
 （§7.3 的 button 环 + 负 offset），不是发明新的：自造视觉词汇的两次尝试都被用户否掉（律 6）。
 
 ```css
-/* 容器（字段型：有文本录入。按钮组型见下方差异说明） */
+/* 容器（字段型：有文本录入。按钮组型见下方差异说明）。阶段 4 起字段型单元的颜色半边——填充、四边、
+   悬停、聚焦边、乘客文字——由生成的字段配方给出（composers/ui-components.mjs FIELD_TARGETS，壳即值盒子）；
+   手写区只留下面的形状声明，不写颜色，也不写 `border` 简写（无色简写会把边色重置为 currentColor）。 */
 .<unit> {
   display: inline-flex;
   align-items: stretch;                 /* 分隔线才能贯穿全高 */
-  border: 1px solid var(--{ns}-input-border);
+  border-width: 1px;
+  border-style: solid;
   border-radius: var(--{ns}-radius-md);
-  background: var(--{ns}-input-bg);
-  color: var(--{ns}-fg);
   overflow: hidden;                     /* 裁角：内部件因此不需要任何 radius */
-  transition: border-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
+  transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
 }
-/* 律 2：容器环只为文本录入那条路径。`:focus-within` 会连步进钮一起吃进来，
-   于是格子的 inset 环和容器环同时出现（真机打回的「两层框」）。 */
-.<unit>:has(> input[type="text"]:focus) { border-color: var(--{ns}-focus-bd); box-shadow: var(--{ns}-focus-ring); }
+/* 律 2：容器环只为文本录入那条路径（聚焦边由生成配方给出，这里只加光晕，选择器与生成的聚焦规则同一条）。
+   `:focus-within` 会连步进钮一起吃进来，于是格子的 inset 环和容器环同时出现（真机打回的「两层框」）。 */
+.<unit>:has(> input[type="text"]:focus):not(:disabled) { box-shadow: var(--{ns}-focus-ring); }
 
-/* 内部件。`> ` 让每条覆盖靠特异性 (0,2,0)+ 赢过生成区的 .btn (0,1,0)，不靠源序 */
-.<unit> > input[type="text"] { border: 0; border-radius: 0; background: transparent; color: var(--{ns}-fg); }
+/* 内部件。`> ` 让每条覆盖靠特异性 (0,2,0)+ 赢过生成区的 .btn (0,1,0)，不靠源序；文字色来自生成的乘客规则 */
+.<unit> > input[type="text"] { border: 0; border-radius: 0; background: transparent; }
 .<unit> > input[type="text"]:focus,
 .<unit> > input[type="text"]:focus-visible { outline: none; }
 .<unit> > .<seg> {
   border: 0;
-  border-left: 1px solid var(--{ns}-input-border);   /* 唯一分隔线 */
+  border-left: 1px solid var(--{ns}-field-border);   /* 唯一分隔线，与容器边框同源 */
   border-radius: 0;
   background: transparent;
-  color: var(--{ns}-fg);
 }
-.<unit> > .<seg>:hover:not(:disabled)  { background: color-mix(in srgb, var(--{ns}-fg) 6%, var(--{ns}-input-bg)); }
-.<unit> > .<seg>:active:not(:disabled) { transform: none; background: color-mix(in srgb, var(--{ns}-fg) 10%, var(--{ns}-input-bg)); transition-duration: 0s; }
+/* 律 3：分隔线随容器悬停（与生成的容器悬停同一条选择器，特异性高于上面的静息分隔线） */
+.<unit>:hover:where(:not(:has(> input[type="text"]:focus), :has(> input:disabled))) > .<seg> { border-left-color: var(--{ns}-field-border-hover); }
+/* 律 4：ghost 底叠在容器当时的填充上；聚焦那对靠特异性胜出，按下排在悬停之后 */
+.<unit> > .<seg>:hover:not(:disabled)  { background: color-mix(in srgb, var(--{ns}-field-fg) 8%, var(--{ns}-field-bg-hover)); }
+.<unit> > .<seg>:active:not(:disabled) { transform: none; background: color-mix(in srgb, var(--{ns}-field-fg) 10%, var(--{ns}-field-bg-hover)); transition-duration: 0s; }
+.<unit>:has(> input[type="text"]:focus):not(:disabled) > .<seg>:hover:not(:disabled)  { background: color-mix(in srgb, var(--{ns}-field-fg) 8%, var(--{ns}-field-bg-focus)); }
+.<unit>:has(> input[type="text"]:focus):not(:disabled) > .<seg>:active:not(:disabled) { background: color-mix(in srgb, var(--{ns}-field-fg) 10%, var(--{ns}-field-bg-focus)); }
 /* 律 6 + §7.3 `inset`：聚焦不碰填充；环收进盒内说明「焦点在这一段」。
    box-shadow: none 是必需的——格子是 .btn，生成区的 .btn:focus-visible 带辉光。 */
 .<unit> > .<seg>:focus-visible         { outline: 2px solid var(--{ns}-focus-bd); outline-offset: -2px; box-shadow: none; }
@@ -1229,11 +1246,10 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 聚焦格子的 inset 环即全部指示）；分隔线只画在**有左邻居**的那一格（`.<seg> + .<seg>`），
 因为容器的第一格左侧就是容器边框本身。
 
-**内部件的前景取 `--{ns}-fg` 而不是 `--{ns}-btn-fg`**：`btn-fg` 是对 `btn-bg`/`btn-hover` 派生的，
-而融合进字段型容器之后图标实际压在 `--{ns}-input-bg` 上。`--{ns}-fg` 才是对这个底派生过的那个
-（§6.2）。这条在 `contrast-audit.mjs` 的 `COMPONENT_PAIR_SPEC` 里**没有**对应行（`fg × input-bg`
-从未登记），目前唯一看管它的是下面的 `iconContrast` 渲染断言——16 套主题逐个实测，比一条 token 对
-更强，但要知道静态侧是空的。
+**内部件的前景取 `--{ns}-field-fg` 而不是 `--{ns}-btn-fg`**（阶段 4，D6）：`btn-fg` 是对 `btn-bg`/`btn-hover`
+派生的，而融合进字段型容器之后图标与键入文字实际压在容器的字段填充上。`--{ns}-field-fg` 由生成的乘客规则给出，
+contrast-audit 的字段行（`field-fg` 对 `field-bg` / `field-bg-hover` ≥4.5）管住 token 对，下面的 `iconContrast`
+渲染断言仍逐主题实测合成后的图标。
 
 **`.key-wrap` 变体（容器无 chrome，输入框即视觉框）**：options 的 19 个密钥字段与 popup 的
 `.secret-field` 是同一形状——`<span>` 只是定位壳，眼睛钮 `position: absolute` 浮在输入框上。这时
@@ -1280,7 +1296,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 
 | 控件 | 表面 | 判定 | 备注 |
 |---|---|---|---|
-| `.vocab-group-unit`（批量条 + 详情面板两处） | library | **本次重建** | 输入 + 双步进钮；用户四轮打回的主案 |
+| `.vocab-group-unit`（批量条 + 详情面板两处） | library | **本次重建** | 输入 + 双步进钮；用户四轮打回的主案。阶段 4：壳入字段语言（生成颜色半边，悬停换填充、排除聚焦与禁用，分隔线随壳） |
 | `.vocab-sort-seg` | library | **本次重建** | 分段按钮对；分隔线原本随 `aria-pressed` 变色 |
 | `.key-wrap`（19 个密钥字段） | options | **本次修律 2** | 容器无 chrome 变体 |
 | `.secret-field` | popup | **本次修律 2；阶段 4 入字段族** | 同上，跨表面同形。输入框承担外观（`FIELD_TARGETS.pp` 的 `pp-secret`），悬停 / 聚焦挂在壳上（`:hover:where(:not(:focus-within))` / `:focus-within`），指针移到眼睛上字段仍是悬停态；眼睛悬停底 = `field-fg` 8% 叠在当时的字段填充上 |
@@ -1322,6 +1338,8 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
    **不再引用 `--{ns}-border`**——后者留给真正的结构边（浮层、表格线、滚动条）。
    options 的值盒子（`.fg` 文本/密钥/数字/textarea、`.listbox-btn`、原生 select 回退、窄屏页签选择器）
    B+ 起改用 `--opt-field-border` 作塌陷载体（§6.2），不再直接引用 `--opt-input-border`。
+   library 的值盒子（三个搜索框、三个原生 select、`.vocab-group-unit` 壳、笔记框）阶段 4 起同样以
+   `--lib-field-border` 作塌陷载体；`--lib-input-border` 只剩两个批量条外框这一处消费者，保留。
 
 2. **填充必须与所在表面分离。** 去掉边框后，与宿主表面同色的填充 = 看不见的控件。
    派生函数 `fillSeparate(fill, surfaces, target, min)`（`composers/_ui-derive.mjs`）把混色目标
@@ -1462,14 +1480,16 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | `contrast-audit` 的 popup / library 字段行（阶段 4 Task 5） | F4–F7：`field-border-focus` 对 `field-bg` / `field-bg-focus` ≥3，`field-placeholder` 对三态填充 ≥4.5，`field-fg` 对两态填充 ≥4.5、对占位符 ≥1.4。三表面共用同一组行（`FIELD_FAMILY_NS` = `Object.keys(FIELD_HOST_ROLES)`），pp / lib 各 8 行 × 15 块。F1–F3 / F8b 由同一个宿主分离段给出：纯函数 `fieldSeparationRows(ns, dict)` 算出整块的行（导出供派生测试喂反例），`auditFieldSeparation` 只负责打印与记账；宿主取 `FIELD_SEPARATION_HOSTS`（pp `[bg]`、lib `[panel, bg]`，与 `FIELD_HOST_ROLES` 逐前缀相等），不经 `ROLE_ALIAS`；类别与相等式行同 options（无框块「悬停框 == 悬停填充」+ F1–F3，不分离的带框块即三个表面的 terminal「悬停填充 == 静息填充」+ 框对每个宿主 ≥1.5）。某前缀没有宿主条目、块里却声明了 `--{ns}-field-*` 时该块 FAIL，不再静默跳过。F9 由 `tagChipInkRows(dict)` 给出：popup chip 文字 ≥4.5、移除图标 ≥3，三种底色各一行。两种 chip 底色的写法受限（`isCompositableBg`）：tag-bg 只能是 #rgb / #rrggbb / #rrggbbaa 或 `transparent`，tag-hover 只能是 #rgb / #rrggbb / #rrggbbaa；其他写法（rgba()、var()、color-mix()、具名色）`resolveOpaqueBg` 会当成透明、量到壳上，所以 audit 回报 missing 行 FAIL，composer 的 `tagChipBackdrops` 直接抛错、sync-all 中止。缺角色一律 FAIL，默认块也不例外。`tag-chip-*` 的孤儿判定读 `TAG_CHIP_INK_SPEC`，且只在本次运行真的量过该墨色时放行。覆盖计数 `auditFieldFamilyCoverage`：每个前缀的宿主分离段、popup 的 chip 墨色段都必须量到 15 块（14 主题 + default），少一块即 FAIL，调用点被删或前缀不再匹配都不会静默变绿。合计 popup 268 行（配对 120 + 宿主分离 58 + F9 90）、library 207 行（配对 120 + 宿主分离 87）；options 仍是上一行的 217 行 |
 | `tests/theme-ui-derive-tests.mjs` 的三表面字段 walk（阶段 4 Task 5） | 42 块（3 表面 × 14 主题）的类别断言：F1–F8b、F9、R13 最小性；pp / lib 从最终 map 复算字段角色，证明 composer 传的是本表面的宿主与 pilot 框。相等式守卫：不分离带框集合 = {opt terminal, opt rose-pine, pp terminal, lib terminal}；夹层集合 = {lib catppuccin-mocha, lib gruvbox-dark}；暗色凹井集合 = {opt gruvbox-dark, opt catppuccin-mocha, pp gruvbox-dark}。另有 D1a 与 popup `input-bg` 覆盖名单；popup.css / library.css 生成区 15 块逐块逐角色存在（并且没有 `field-edge*`，popup 没有 `field-chevron`）；默认 `:root` 复算；7 块 × 8 角色锚点。宿主表守卫两半：按注册表（`UI_DERIVED_OUTPUT_ROLES` 含 `field-bg` ⇔ 有 `FIELD_SEPARATION_HOSTS` 条目，且条目等于 `FIELD_HOST_ROLES`），按实际输出（composer map 或生成区里出现的任何 `field-*` 角色必须登记在注册表，该前缀必须有宿主条目）。`tagChipInkRows` 带反例：透明 chip 量在悬停后的壳上，不透明 chip 量在自身底上，缺角色或非 hex 壳填充回报 missing；rgba() / var() / color-mix() / 具名色 / 垃圾值 / 透明的 tag-hover 都回报 missing，且 composer 对同样的输入抛错（修复轮 1）。`fieldSeparationRows` 带五组反例（修复轮 1），各自对一个分支的变异体变红：popup 宿主是 bg 不是 bg2；library 每个宿主各一条 F1 / F3；不分离的带框块只有相等式行与 F8b；无框且不分离的块 F1 失败、不落进带框豁免；声明了字段族却没有宿主条目的前缀 FAIL |
 | render oracle family 14 `fieldHoverContrast`（阶段 4） | 值盒子静息与悬停时四边都已绘制（计算宽度 >0 且线型不为 none/hidden）且同色同宽同线型；`FIELD_UNSEPARATED_FRAMED` 以外的主题读填充步：静息填充对背后底色、悬停填充对静息填充、悬停填充对背后底色都 ≥ `FILL_SEPARATE_MIN`（spec F1–F3）；名单内的主题（options 的 terminal、rose-pine）读框步：框不同于填充、悬停时填充不动、悬停框对静息框 ≥ `FIELD_FRAME_HOVER_MIN`（1.30）且 ΔE2000 ≥ `FIELD_FRAME_HOVER_MIN_DE`（6）、画在填充上比静息框更强；类别按名单钉住，不按实测比值重分；群体含 `button.listbox-btn`，每主题每种控件至少实测到一个，否则 SETUP ERROR。读数前提是真指针的 `:hover` 落到元素上（静息读数则不在元素上）、焦点不在元素内（悬停规则排除聚焦触发，阶段 4 起写成 `:hover:not(:focus, :disabled)` / `:hover:not(:focus-visible, :disabled)`），并且读数期间指针没被挪走：有头 Chromium 会在宿主静止的系统指针处派发可信鼠标事件（WSLg 下是 XWayland 记住的光标位置，落在四个分片窗口里），把 CDP 悬停挪走——这是 round 2 verify 偶发 SETUP 的根因。前提由 `holdPointerState` 保证，family 14 与清单的 `hover` 态共用：每次尝试先失焦、必要时先移出元素再移入，移入后逐帧等 `:hover` 最多 500 ms（`HOVER_APPLY_MS`，先移出时等 `:hover` 离开也以此为限），读数与指针/焦点状态出自同一页面任务，且最后一次移动到读数之间不得有脚本没派发的可信指针事件；最多 4 次（同一模式已连续 3 个读数不成立时只试 1 次），仍不成立记为 SETUP 行（`focusDuringHover` / `pointerDisplaced` / `hoverNotApplied` / `hoverAtRest`，逐次标出原因并列出见证；行的种类按全部尝试取，焦点 > 未生效或静息仍悬停 > 指针被挪，`pointerDisplaced` 只在每次都被挪时出现，备注写明该原因占几次尝试），不算产品 FAIL、不计入实测数与覆盖行、不进 known-failures 账本，整次运行以 2 退出，此时 `--update-known-failures` 拒绝写账本；覆盖行另打印 `pointer holds` 计数（重试成功几次、其中几次因外来指针事件） |
-| render oracle family 9 `radiusScale` 的值盒子律（阶段 4） | 值盒子四角都等于本表面的 `--*-radius-md`（按名字列出；具名例外：主题名弹层输入框、`.tags-input-wrap.ac-open`）；sweep 打印逐表面、逐种类的实测计数（`[radiusScale] value boxes measured (four corners == md): …`），`RADIUS_VALUE_BOX_REQUIRED` 列出的种类（options：文本 / 密码 / 数字 / textarea / 列表框按钮 / 侧栏搜索框〔阶段 4 Task 4〕）缺一个即 SETUP ERROR；融合壳只豁免后代，壳本身参与度量 |
+| render oracle family 9 `radiusScale` 的值盒子律（阶段 4） | 值盒子四角都等于本表面的 `--*-radius-md`（按名字列出；具名例外：主题名弹层输入框、`.tags-input-wrap.ac-open`）；sweep 打印逐表面、逐种类的实测计数（`[radiusScale] value boxes measured (four corners == md): …`），`RADIUS_VALUE_BOX_REQUIRED` 列出的种类（options：文本 / 密码 / 数字 / textarea / 列表框按钮 / 侧栏搜索框〔阶段 4 Task 4〕；popup：六个盒子〔Task 6〕；library：搜索框 / select / textarea / `.vocab-group-unit` 壳〔Task 7〕）缺一个即 SETUP ERROR；融合壳只豁免后代，壳本身参与度量 |
 | checklist `borderSidesEqVar` + ui-contract 值盒子扫描 | 值盒子静息、悬停、聚焦三态的四边分别等于 `--opt-field-border` / `-hover` / `-focus` 且都已绘制（4 个盒子 × 3 态 × 15 主题 = 180 行）。ui-contract 形状扫描：值盒子手写规则不许有底边属性、上下不同的多值边色、多值圆角或逐角圆角长手属性，也不许引用 `--opt-field-edge*`；列表框按钮与生成配方的圆角钉为 `var(--opt-radius-md)`。ui-contract 静态扫描手写区的值盒子颜色：只许 `--opt-field-*`，值盒子里的文字只许 `--opt-field-fg`（阶段 4 起原生 select 也不例外），抓「让任何一边不画」的写法、`transparent` / `none` 的背景与手写的 `--opt-field-*` 重定义，原生 select 只许填充；另钉住侧栏搜索框的两条消费规则与 `.key-wrap` 的悬停规则 |
 | `tests/theme-ui-derive-tests.mjs` 的字段 pipeline walk（阶段 4） | 15 块的类别断言：pilot 声明框 ⇔ 框 ≠ 填充；无框块填充对宿主 ≥1.10 且框塌陷；framed 且静息未分离 ⇔ 悬停填充 = 静息填充，这类块悬停框 = `mix(frame, fg, .30)` 且过 F8（对静息框 ≥1.30、ΔE2000 ≥6、在填充上更强）与 F8b；已分离 framed 块悬停框 = `fillSeparate(frame, [frame], fg)`；其余块悬停填充对静息填充与每个宿主 ≥1.10 且对宿主不低于静息；箭头描边 = 该块占位符；`field-fg` 对占位符 ≥1.4、对两态填充 ≥4.5；fg 本已达标的块 `field-fg = fg` 且占位符不动；两个凹井主题必须走到「加深」分支；三类成员集合用相等式钉住；`FIELD_SEPARATION_HOSTS` 与 `FIELD_HOST_ROLES` 逐前缀相等；侧栏搜索框与窄屏页签选择器按 `--opt-bg`（`SIDEBAR_SEARCH_HOST`）读类别（F1 / F8b），「框承担」成员钉为 {terminal}（阶段 4 Task 4 + 修复轮 1） |
 | ui-contract 退役名单（阶段 4） | `field-edge` / `field-edge-hover` 不在派生注册表、composer map（3 表面 × 14 主题）、pilot `ui.*`、三份表面 CSS 的任何声明里；`FIELD_EDGE_HOVER_FG_MIX` 不再导出。带正反例自检，注释不算命中 |
 | ui-contract options 值盒子消费方（阶段 4 Task 4 + 修复轮 1） | 生成的 `.fg` 状态规则逐个点名五种值盒子，没有裸 `input` 的状态规则；值盒子悬停排除自己的聚焦触发与 `:disabled`（融合单元排除壳的 `:focus-within` 与输入框的 `:disabled`）；`.key-wrap` 聚焦框 (0,5,1) 严格高于任何能涂密钥输入框的悬停（不靠源序）；值盒子规则的 `url()` 里没有颜色字面量，原生 select 的箭头只能是 `var(--opt-field-chevron)`；强制色下八种值盒子都有 `forced-colors: active` 语境里的 `1px solid Highlight` 聚焦轮廓（`forced-colors: none` 不算），且在强制色下生效的压 outline 聚焦规则（含强制色语境内的，按 `!important` → 特异性 → 源序）都不反超它；主体按值盒子模型映射（带类型选择器、options.html 值盒子 id、无 `[type]` 的 input、无标签无类无 id 的主体）；侧栏搜索框与窄屏页签选择器静息 / 聚焦入族、没有悬停规则；眼睛悬停底 = `--opt-field-fg` 8%，15 块两态 ≥ `FILL_SEPARATE_MIN`（F10，最低 1.122）；弱墨色静态门的填充集合含 `field-bg(-hover|-focus)`；跳过强制色的扫描只认 `forced-colors: active`。每项都带正反例自检 |
 | checklist 侧栏搜索框 + render family 13 / 9（阶段 4 Task 4） | `#options-search-input` 静息 `bgEqVar field-bg` + `borderSidesEqVar field-border`，聚焦 `bordered` + `field-bg-focus` + `field-border-focus`（2 行 × 15 主题）；family 13 的 options 填充集合加入 `field-bg` / `-hover` / `-focus`；family 9 的 options 必需种类加入 `input[type="search"]` |
-| render oracle family 14 `fieldHoverContrast` 的 popup 腿 + checklist popup 行（阶段 4 Task 6） | popup 六个值盒子（手写名单 `VALUE_BOX_LEGS.popup`：url / title / description / tags 壳 / search / token，token 走登出腿）逐个用真指针读静息与悬停：两态填充与四边都等于各自的 `--pp-field-*` 且四边都已绘制，四角等于 `--pp-radius-md`；类别按 `FIELD_UNSEPARATED_FRAMED.popup`（`["terminal"]`）点名判：名单外的块悬停填充对静息 ≥ `FILL_SEPARATE_MIN`，名单内的块填充不动、改看框：≥ `FIELD_FRAME_HOVER_MIN`、ΔE2000 ≥ `FIELD_FRAME_HOVER_MIN_DE`、画在填充上更强（F8）；另有一行 `fieldHoverClass` 按页面 token 与 `FIELD_HOST_ROLES.pp` 实测类别，与名单不等即 FAIL。缺盒子、不可见或禁用都是 SETUP ERROR，覆盖行打印 `fieldHoverContrast popup: N value box(es)`。函数按表面参数化（`readValueBoxPaint` / `recordValueBoxes` / `recordValueBoxHover`），Task 7 给 `VALUE_BOX_LEGS` 加 `library`。checklist 另有 5 盒 × 3 态 15 行钉 token 身份（聚焦行加 `focusRecipe: "bordered"`）；所有 `focusWithin` 行的未聚焦基线改经 `holdPointerState` 的 rest 读数（壳有了悬停填充以后，宿主指针停在壳上会读到悬停态），不成立记 `focusBaselineRest` SETUP 行。family 9 的值盒子律在 popup 按 `valueBoxes` 条目认种类，`RADIUS_VALUE_BOX_REQUIRED.popup` 要求六个盒子都量到，sweep 为此新增 popup `form` 腿（去掉 `.unsupported-url`、显示搜索行） |
+| render oracle family 14 `fieldHoverContrast` 的 popup 腿 + checklist popup 行（阶段 4 Task 6） | popup 六个值盒子（手写名单 `VALUE_BOX_LEGS.popup`：url / title / description / tags 壳 / search / token，token 走登出腿）逐个用真指针读静息与悬停：两态填充与四边都等于各自的 `--pp-field-*` 且四边都已绘制，四角等于 `--pp-radius-md`；类别按 `FIELD_UNSEPARATED_FRAMED.popup`（`["terminal"]`）点名判：名单外的块悬停填充对静息 ≥ `FILL_SEPARATE_MIN`，名单内的块填充不动、改看框：≥ `FIELD_FRAME_HOVER_MIN`、ΔE2000 ≥ `FIELD_FRAME_HOVER_MIN_DE`、画在填充上更强（F8）；另有一行 `fieldHoverClass` 按页面 token 与 `FIELD_HOST_ROLES.pp` 实测类别，与名单不等即 FAIL。缺盒子、不可见或禁用都是 SETUP ERROR，覆盖行打印 `fieldHoverContrast popup: N value box(es)`。函数按表面参数化（`readValueBoxPaint` / `recordValueBoxes` / `recordValueBoxHover`），library 腿复用同一套函数（下下行）。checklist 另有 5 盒 × 3 态 15 行钉 token 身份（聚焦行加 `focusRecipe: "bordered"`）；所有 `focusWithin` 行的未聚焦基线改经 `holdPointerState` 的 rest 读数（壳有了悬停填充以后，宿主指针停在壳上会读到悬停态），不成立记 `focusBaselineRest` SETUP 行。family 9 的值盒子律在 popup 按 `valueBoxes` 条目认种类，`RADIUS_VALUE_BOX_REQUIRED.popup` 要求六个盒子都量到，sweep 为此新增 popup `form` 腿（去掉 `.unsupported-url`、显示搜索行） |
 | ui-contract 的 popup 值盒子模型（阶段 4 Task 6） | 遍历导入的 `FIELD_TARGETS`（pp 与 lib 全部条目）：三态选择器平行、带类型、特异性逐盒严格递增（静息 < 悬停 < 聚焦）、悬停排除聚焦触发与 `:disabled`；popup.html 的每个文本录入控件恰被一个条目覆盖（盒子本身或壳的乘客），每个条目都命中元素；生成区逐条声明正确；手写区在值盒子 / 壳 / 乘客上不写任何颜色（乘客只许透明、无框、`field-fg`；运行期状态类如 `.ac-open` 也算命中），不许 `html[data-theme]` 颜色孪生、手写占位符；url() 里的颜色字面量走模块级 `valueBoxUrlColourOffenders`；形状走模块级 `valueBoxShapeOffenders`（仅豁免 `.tags-input-wrap.ac-open` 的两个下角归零）；光晕规则与生成的聚焦规则同选择器；强制色下六个盒子各有 1px Highlight 轮廓且不被 `outline: none` 反超；眼睛墨色静息 `field-placeholder`、悬停 `field-fg`，眼睛悬停底 15 块 × 2 态 ≥ `FILL_SEPARATE_MIN`（F10，最低 1.119）；`--pp-input-bd`、`--pp-fg-soft` 与 `:has()` 不得回流。§7.3 扫描的伙伴规则在整个文件里找 |
+| render oracle family 14 的 library 腿 + checklist library 行（阶段 4 Task 7） | library 九个值盒子（`VALUE_BOX_LEGS.library`：三个搜索框、`#vocab-group-filter` / `#vocab-lookup-lang` / `.xp-dict-lang`、两处 `.vocab-group-unit` 壳、笔记框）走 popup 腿同一套函数，判定相同，类别名单 `FIELD_UNSEPARATED_FRAMED.library = ["terminal"]`。两条腿各自重新导航：vocab 腿单击行头打开详情、Ctrl+单击打开批量条、点「再次查询」生成 `.xp-dict-lang`（本 profile 未授权词典 origin，只渲染连接态，不发请求），并断言 `#vocab-group-input` 未禁用；notes 腿切到笔记页签量 `#notes-filter`。盒子涂的颜色不是不透明色（透明笔记框、半透明框）记产品 FAIL，只有 token 解析不了才是 SETUP。运行级 `valueBoxLegCoverage` 同样覆盖 library（每主题 9 个）。checklist 另有 8 盒的静息 / 悬停 / 聚焦 token 身份行（22 行新增、2 行补断言）（`.xp-dict-lang` 只在 family 14 里量，聚焦规则由 ui-contract 静态钉住）；family 13 的 library 填充集合加入 `field-bg` / `-hover` / `-focus` |
+| ui-contract 的 library 值盒子模型（阶段 4 Task 7） | 收割 library.html 的值盒子 id（跳过 `hidden` 状态载体）与 library 脚本里 `createElement` 造的运行时盒子，两份名单都钉住；值盒子模型认得这些 id、类与 `.vocab-group-unit` 壳。注册表：选择器都落到值盒子、带类型、只有 select 族带 `--lib-field-chevron`；结构覆盖用 library.html 加嫁接在 `#vocab-detail` 下的运行时盒子建树：六个文本录入控件恰被一个条目覆盖（盒子或壳的乘客），三个渲染出来的 select 恰是一个条目的静息盒子，每个条目都命中元素；生成区逐条声明正确；光晕挂在注册表聚焦选择器上；手写区在值盒子上不写颜色、`border` 简写或 chevron，也不重定义 `--lib-field-*`，步进格不重述墨色；形状走 `valueBoxShapeOffenders`（仅豁免壳内输入框左侧同心圆角）；url() 颜色字面量走 `valueBoxUrlColourOffenders`；分隔线静息 `field-border`、随壳悬停换 `field-border-hover`（壳悬停同一选择器，特异性更高）；强制色下 7 条光晕选择器都有 1px Highlight 轮廓且不被 `outline: none` 反超；步进格 F10：悬停 8% / 按下 10% `field-fg` 叠在壳当时的填充上，15 块 × 4 态 ≥ `FILL_SEPARATE_MIN`（最低 1.119）。§7.3 扫描把同一选择器的生成声明并进来判定，三个命名空间都接受本命名空间的 `field-border-focus` 芯。每项带正反例自检 |
 
 `fillSeparate` 本身**没有独立的门**：它的正确性由 `contrast-audit` 从下游反向约束
 （填充错了，btn-fg / border / danger-quiet-fg 的配对必然红），加上恒等性质
@@ -1753,6 +1773,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | C51 | **options framed 值盒子的悬停框**（terminal、rose-pine：填充与宿主不分离的两块）——阶段 4 spec §2.2 / §6 第 1 条 | 悬停框 = `fillSeparate(frame, [frame], fg)` 一步：terminal `#1a4d1a → #1b551b`（1.114，ΔE 2.74）、rose-pine `#403d52 → #474459`（1.115，ΔE 2.33），B+ 时代靠底边补足悬停信号 | 悬停框 = `mix(frame, fg, FRAMED_HOVER_FG_MIX = .30)`：`#228222`（2.02，ΔE 18.0）、`#706d83`（2.09，ΔE 17.0）；nord-night、dracula 填充已分离，悬停照常换填充，框步不变 | 两个主题悬停时四边框明显变亮；rose-pine 的悬停框与聚焦边亮度接近（1.06 倍，ΔE 8.6），靠光环与色相区分，列入真机过眼 | 阶段 4 Task 3 |
 | C52 | **options 值盒子的消费方（阶段 4 Task 4）**（生成的 `.fg` 状态规则、`.listbox-btn`、`.key-wrap`、侧栏搜索框、窄屏页签选择器、原生 select 箭头、密钥眼睛悬停底、强制色聚焦）——阶段 4 spec §2.1 / §2.2 / §3.1 / §6 第 2、3、5、7、10 条 | 生成的 hover / focus 用裸 `.fg input`，连 `.pick` / `.switch` 的 radio / checkbox 叠层一起涂；悬停不排除 `:disabled`；`.key-wrap` 聚焦框与带类型悬停同级时靠源序；侧栏搜索框填充 `input-bg`、框 `input-border`、聚焦边 `focus-bd`；窄屏选择器文字 `--opt-fg`、悬停填充 `field-bg-hover`（对页面底 `--opt-bg` 在 catppuccin-mocha / gruvbox-dark 上约 1.002 / 1.003）；原生 select 箭头是 `%23888` 与 8 个深色预设 `%23aaa` 的字面量；眼睛悬停底 `--opt-fg` 8%；强制色下值盒子聚焦不可见 | 状态规则逐个点名五种值盒子，悬停 `:not(<聚焦触发>, :disabled)`；`.key-wrap` 两条单元规则加 `:not(:disabled)`，聚焦框 (0,5,1) 严格高于带类型悬停 (0,4,1)；侧栏搜索框静息 / 聚焦入 `field-*`，不加悬停，contrast-audit 另按 `--opt-bg` 查它；窄屏选择器文字 `--opt-field-fg`、去掉悬停（与侧栏搜索框同规则，修复轮 1），contrast-audit 侧栏搜索段一行覆盖二者；两处原生 select 箭头改为 `var(--opt-field-chevron)`，孪生规则删除；眼睛悬停底 `--opt-field-fg` 8%；文件末尾补强制色 `1px solid Highlight` 聚焦轮廓 | 侧栏搜索框只有 flexoki-light 变（填充 `#e8e5db → #dcd9d0`，聚焦边 `#5a85b5 → #4f7db1`）；窄屏选择器文字与眼睛悬停底在 nord-night、solarized ×2、catppuccin-latte 四块变；窄屏选择器悬停不再换填充或框（15 块）；原生 select 箭头由固定灰改为该主题的占位符色；强制色下值盒子聚焦出现系统色轮廓，`.fg` 里的 radio 恢复 UA 焦点环。options 面板像素门 26/26 零差异 | 2026-09-30 ui-fields-stage4 |
 | C53 | **popup catppuccin-mocha 值盒子填充（D1a，阶段 4 Task 5）** | pilot 覆盖 `ui.popup.dark.input-bg: #11111b`：比 `--pp-bg` #1e1e2e 更深的凹井；按纯填充规则派生，悬停对静息只有 1.059（F2 不过） | 删除该覆盖，`input-bg` / `field-bg` 回到派生值 #262637（抬起），`field-bg-hover` #2d2d3f，对静息 1.102 | popup mocha 的四类值盒子从 #11111b 变为 #262637。连带 4 处读 `--pp-input-bg` 的非值盒子：批量进度轨道、取消按钮圆盘、进度文字描边、密钥眼睛悬停混色基底。其余 13 个主题与默认面字节不变 | 2026-09-30 stage 4 |
+| C54 | **library 值盒子入字段语言（阶段 4 Task 7）**（`.notes-toolbar` / `.vocab-lookup-bar input[type="search"]`、`.vocab-filter-toolbar` / `.vocab-filter-row select`、`.xp-dict-lang`、`.vocab-group-unit` ×2、`.vocab-note-input`） | 按工具条逐条手写：搜索框悬停整圈 `--lib-fg-muted`；select 与 `.xp-dict-lang` 填充 `--lib-btn-bg`、幽灵边、字面量箭头（`%23888` / 暗色孪生 `%23aaa`）；壳悬停不变；步进格 ghost 为 6% `fg` 混在 `--lib-input-bg` 上（solarized-light 1.074 / latte 1.083 / solarized-dark 1.095，低于 1.10）；笔记框透明 | 颜色半边由 `FIELD_TARGETS.lib` 生成（阶梯写法，静息 < 悬停 < 聚焦逐盒严格递增）：静息 `field-bg` + 四边 `field-border`，悬停 `field-bg-hover` / `field-border-hover`（排除聚焦与禁用），聚焦 `field-bg-focus` + `field-border-focus`，文字 `field-fg`，占位符 `field-placeholder`，select 箭头 `--lib-field-chevron`；分隔线随壳悬停；步进格 ghost = `field-fg` 8% / 10% 叠在壳当时的填充上（最低 1.119）；形状、sm 阶、焦点环（改挂在注册表聚焦选择器上）、forced-colors 仍手写，七个盒子补 Highlight 轮廓 | 16 套主题下 9 个值盒子：搜索框悬停由整圈深框改为填充步进；select 在 dracula / mocha / gruvbox 暗色上换填充（ΔE 8.6 / 6.1 / 5.8），幽灵边消失，箭头改为本主题占位符色；壳悬停整体换填充；笔记框获得填充；占位符由 UA `#757575` 改为派生色；nord-night / solarized ×2 / latte 键入文字随 R13 微调；terminal 悬停只加亮框（`#228222`） | 阶段 4 Task 7 |
 
 **偏离实施计划之处**（Task 9/10 以本规范为准，但需知晓）：
 

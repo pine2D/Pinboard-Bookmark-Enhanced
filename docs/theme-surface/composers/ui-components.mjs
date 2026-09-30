@@ -468,13 +468,14 @@ function chipRules(ns) {
 // match anything (library.css carried five such rules from 2026-08-05 until
 // this guard landed).
 //
-// library's fields are hand-written per toolbar instead, and that is
-// deliberate, not debt: §6.4 records the user decision that the toolbar rows
-// stay on the sm 20px rung, because lifting them to this recipe's md 26px
-// rung grows the sticky batch bar by 7px. Those hand-written rules also carry
-// a forced-colors focus fallback and a focus-ring z-index lift that this
-// recipe has no way to express (library.css, `.notes-toolbar
-// input[type="search"]` and the `.vocab-group-unit` fused shell).
+// library's value boxes (stage 4, spec 2026-09-30 §3.3) take the COLOUR half
+// from FIELD_TARGETS.lib like popup's: the toolbar search fields, the native
+// selects and .xp-dict-lang (plus the per-theme chevron), the
+// .vocab-group-unit shell and its passengers, and the note editor. Their
+// SHAPE half stays hand-written in library.css -- including the sm 20px
+// toolbar rung §6.4 records as a user decision (the .fg recipe's md 26px would
+// grow the sticky batch bar by 7px), the focus-ring glow with its z-index
+// lift and the forced-colors outline, none of which this recipe expresses.
 //
 // COST OF THE ASYMMETRY -- keep this note: `.fg` is now an options-only
 // vocabulary word. If library.html or popup.html ever grows a `class="fg"`
@@ -675,7 +676,9 @@ function formRules(ns) {
 // within), so the eye or a tag chip holding focus keeps the unit out of its
 // hover paint, and the pointer over the eye keeps the token field in it.
 // No :has() on popup (the tags list toggles `.ac-open` by class for the same
-// reason, popup-tags.js).
+// reason, popup-tags.js). Library keeps its shipped triggers: .xp-dict-lang
+// :focus-visible, and the group unit's `:has(> input[type="text"]:focus)`
+// (its one :has() precedent), whose hover also excludes a disabled input.
 export const FIELD_TARGETS = Object.freeze({
   pp: Object.freeze([
     // #url-input, #title-input, #description-input. The child combinator is
@@ -724,8 +727,75 @@ export const FIELD_TARGETS = Object.freeze({
       chevron: null,
     }),
   ]),
-  // Filled by stage 4 Task 7 (library.css).
-  lib: Object.freeze([]),
+  // library (stage 4 Task 7, spec §3.3), on the same ladder as pp. Colour
+  // half only: every entry's shape (height, padding, radius, the sm toolbar
+  // rung, the focus glow and its z-index lift, the forced-colors outline)
+  // stays hand-written in library.css, keyed on fieldRingSelectors (the
+  // entry's focus selector, :focus -> :focus-visible).
+  lib: Object.freeze([
+    // #vocab-search, #vocab-lookup-input, #notes-filter. Focus on :focus.
+    Object.freeze({
+      id: "lib-toolbar-search",
+      rest: '.notes-toolbar input[type="search"], .vocab-lookup-bar input[type="search"]',
+      hover: '.notes-toolbar input[type="search"]:hover:where(:not(:focus, :disabled)), .vocab-lookup-bar input[type="search"]:hover:where(:not(:focus, :disabled))',
+      focus: '.notes-toolbar input[type="search"]:focus:not(:disabled), .vocab-lookup-bar input[type="search"]:focus:not(:disabled)',
+      placeholder: '.notes-toolbar input[type="search"]::placeholder, .vocab-lookup-bar input[type="search"]::placeholder',
+      passenger: null,
+      chevron: null,
+    }),
+    // #vocab-group-filter, #vocab-lookup-lang (and the two `hidden` state
+    // carriers, which never render). The fill moves off --lib-btn-bg
+    // (spec §6 item 8); focus on :focus.
+    Object.freeze({
+      id: "lib-toolbar-select",
+      rest: ".vocab-filter-toolbar select, .vocab-filter-row select",
+      hover: ".vocab-filter-toolbar select:hover:where(:not(:focus, :disabled)), .vocab-filter-row select:hover:where(:not(:focus, :disabled))",
+      focus: ".vocab-filter-toolbar select:focus:not(:disabled), .vocab-filter-row select:focus:not(:disabled)",
+      placeholder: null,
+      passenger: null,
+      chevron: ".vocab-filter-toolbar select, .vocab-filter-row select",
+    }),
+    // The word relookup's language select (library-vocab.js). Focus stays on
+    // :focus-visible (spec §2.1). md-preview's own .xp-dict-lang lives in
+    // md-preview.css and is untouched.
+    Object.freeze({
+      id: "lib-dict-lang",
+      rest: ".xp-dict-lang",
+      hover: ".xp-dict-lang:hover:where(:not(:focus-visible, :disabled))",
+      focus: ".xp-dict-lang:focus-visible:not(:disabled)",
+      placeholder: null,
+      passenger: null,
+      chevron: ".xp-dict-lang",
+    }),
+    // The detail pane's note editor (library-vocab.js); it used to inherit
+    // the pane's paint (transparent).
+    Object.freeze({
+      id: "lib-note",
+      rest: ".vocab-note-input",
+      hover: ".vocab-note-input:hover:where(:not(:focus, :disabled))",
+      focus: ".vocab-note-input:focus:not(:disabled)",
+      placeholder: ".vocab-note-input::placeholder",
+      passenger: null,
+      chevron: null,
+    }),
+    // The fused group unit, batch bar + detail pane (COMPONENTS.md §8): the
+    // shell is the value box; the text input and the two stepper cells are
+    // passengers (transparent, borderless, --lib-field-fg ink). The trigger
+    // is the shipped :has() precedent -- the unit's TEXT ENTRY holding focus,
+    // not :focus-within, which a stepper cell would also fire -- and a
+    // disabled input (a batch mutation running) takes no hover either. A
+    // <span> is never :disabled, so the focus rule's :not(:disabled) is pure
+    // specificity ballast (see the ladder note above).
+    Object.freeze({
+      id: "lib-group-unit",
+      rest: ".vocab-group-unit",
+      hover: '.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus), :has(> input:disabled)))',
+      focus: '.vocab-group-unit:has(> input[type="text"]:focus):not(:disabled)',
+      placeholder: '.vocab-group-unit > input[type="text"]::placeholder',
+      passenger: '.vocab-group-unit > input[type="text"], .vocab-group-unit > .vocab-group-step',
+      chevron: null,
+    }),
+  ]),
 });
 
 function fieldTargetRules(ns) {

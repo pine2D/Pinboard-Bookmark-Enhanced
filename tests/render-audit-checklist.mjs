@@ -1308,7 +1308,7 @@ export const CHECKS = [
   // button-style outline on top of the field recipe's focus border, putting
   // two focus languages side by side in one toolbar row.
   { surface: "library", page: "library.html", selector: "#vocab-group-filter", state: "focusWithin",
-    focusTarget: ":scope", expect: { focusRecipe: "bordered" } },
+    focusTarget: ":scope", expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   // The lookup field, added 2026-08-07 by independent review F1. When the row
   // moved into the detail pane it dropped the `notes-toolbar` class, and with
   // it the ENTIRE field recipe -- border, fill, radius, appearance:none AND
@@ -1325,7 +1325,68 @@ export const CHECKS = [
   // every member of the row was wrong together -- "漏判的最简单反例" for a
   // pure-geometry gate, and the reason this row needed a materials gate too.
   { surface: "library", page: "library.html", selector: "#vocab-lookup-input", state: "focusWithin",
-    focusTarget: ":scope", expect: { focusRecipe: "bordered" } },
+    focusTarget: ":scope", expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  // ---- Stage 4 (spec 2026-09-30-ui-fields-stage4-design §5.1, checklist row;
+  // COMPONENTS.md §6.2): token IDENTITY of library's value-box paints in each
+  // state -- rest fill + all four sides (field-border: collapsed into the fill,
+  // or terminal's pilot frame), hover fill + sides, focus fill + sides.
+  // borderSidesEqVar asserts all four sides painted and equal (there is no
+  // edge any more). Contrast is contrast-audit's lib field rows and family
+  // 14's library leg; these rows catch a hand-written rule (or a themed twin)
+  // repainting a box with a non-field token -- the pre-stage-4 shapes: search
+  // fields hovered to --lib-fg-muted, selects filled with --lib-btn-bg, the
+  // note editor transparent. The two focusRecipe rows just above carry the
+  // focus assertions for #vocab-group-filter / #vocab-lookup-input. Detail-pane
+  // selectors contain "-detail-" (needsDetailOpen); the batch-bar shell is in
+  // BATCH_BAR_SELECTORS (needsBatchBarOpen); `.notes-toolbar #notes-filter`
+  // starts with ".notes-" so the runner opens the notes view for it. The
+  // relookup .xp-dict-lang has no row: it exists only behind the relookup
+  // click, which family 14's library leg makes (rest / hover tokens and four
+  // corners there; its focus rule is pinned statically in ui-contract). ----
+  { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "library", page: "library.html", selector: "#vocab-search", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "library", page: "library.html", selector: "#vocab-search", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "library", page: "library.html", selector: "#vocab-group-filter", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "library", page: "library.html", selector: "#vocab-group-filter", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-input", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-input", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "library", page: "library.html", selector: ".notes-toolbar #notes-filter", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "library", page: "library.html", selector: ".notes-toolbar #notes-filter", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "library", page: "library.html", selector: ".notes-toolbar #notes-filter", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "library", page: "library.html", selector: ".vocab-detail-pane .vocab-note-input", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "library", page: "library.html", selector: ".vocab-detail-pane .vocab-note-input", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "library", page: "library.html", selector: ".vocab-detail-pane .vocab-note-input", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "library", page: "library.html", selector: ".vocab-detail-pane .vocab-group-unit", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "library", page: "library.html", selector: ".vocab-detail-pane .vocab-group-unit", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "library", page: "library.html", selector: ".vocab-detail-pane .vocab-group-unit", state: "focusWithin", focusTarget: 'input[type="text"]',
+    expect: { bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "library", page: "library.html", selector: "#vocab-batch-toolbar .vocab-group-unit", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "library", page: "library.html", selector: "#vocab-batch-toolbar .vocab-group-unit", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "library", page: "library.html", selector: "#vocab-batch-toolbar .vocab-group-unit", state: "focusWithin", focusTarget: 'input[type="text"]',
+    expect: { bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   // `borderless` (1px accent core + --{ns}-focus-ring glow) on the two
   // full-width row families. Nothing here asserts a shadow LITERAL: the glow
   // is per-theme identity (terminal blur / paper-ink flat 1px / solarized
@@ -1395,11 +1456,11 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: ".saved-theme-btn", state: "focusWithin",
     focusTarget: ":scope", expect: { focusRecipe: "borderless" } },
 
-  // The two steppers now paint --lib-fg on --lib-input-bg instead of
-  // --lib-btn-fg on --lib-btn-bg. fg-vs-input-bg is a COMPONENTS.md §6.2
-  // derivation requirement but is NOT in contrast-audit's
-  // COMPONENT_PAIR_SPEC, so this render entry is the only gate on it -- and
-  // it covers all 15 theme states rather than one token pair.
+  // The two steppers paint --lib-field-fg (the generated passenger rule,
+  // stage 4 D6) on the shell's --lib-field-bg. contrast-audit's lib field rows
+  // (field-fg vs field-bg / field-bg-hover, stage 4 Task 5) cover the token
+  // pair; this render entry still measures the composed icon on all 15 theme
+  // states.
   // (Deliberately the detail-pane pair, not #vocab-add-group/#vocab-remove-
   // group: the batch bar's two steppers render :disabled on an untouched
   // page, and the runner correctly SKIPs contrast on disabled controls --

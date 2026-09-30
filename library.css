@@ -343,6 +343,89 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
   box-shadow: var(--lib-focus-ring);
 }
 
+.notes-toolbar input[type="search"], .vocab-lookup-bar input[type="search"] {
+  background-color: var(--lib-field-bg);
+  border-color: var(--lib-field-border);
+  color: var(--lib-field-fg);
+}
+.notes-toolbar input[type="search"]:hover:where(:not(:focus, :disabled)), .vocab-lookup-bar input[type="search"]:hover:where(:not(:focus, :disabled)) {
+  background-color: var(--lib-field-bg-hover);
+  border-color: var(--lib-field-border-hover);
+}
+.notes-toolbar input[type="search"]:focus:not(:disabled), .vocab-lookup-bar input[type="search"]:focus:not(:disabled) {
+  background-color: var(--lib-field-bg-focus);
+  border-color: var(--lib-field-border-focus);
+}
+.notes-toolbar input[type="search"]::placeholder, .vocab-lookup-bar input[type="search"]::placeholder {
+  color: var(--lib-field-placeholder);
+}
+.vocab-filter-toolbar select, .vocab-filter-row select {
+  background-color: var(--lib-field-bg);
+  border-color: var(--lib-field-border);
+  color: var(--lib-field-fg);
+}
+.vocab-filter-toolbar select:hover:where(:not(:focus, :disabled)), .vocab-filter-row select:hover:where(:not(:focus, :disabled)) {
+  background-color: var(--lib-field-bg-hover);
+  border-color: var(--lib-field-border-hover);
+}
+.vocab-filter-toolbar select:focus:not(:disabled), .vocab-filter-row select:focus:not(:disabled) {
+  background-color: var(--lib-field-bg-focus);
+  border-color: var(--lib-field-border-focus);
+}
+.vocab-filter-toolbar select, .vocab-filter-row select {
+  background-image: var(--lib-field-chevron);
+}
+.xp-dict-lang {
+  background-color: var(--lib-field-bg);
+  border-color: var(--lib-field-border);
+  color: var(--lib-field-fg);
+}
+.xp-dict-lang:hover:where(:not(:focus-visible, :disabled)) {
+  background-color: var(--lib-field-bg-hover);
+  border-color: var(--lib-field-border-hover);
+}
+.xp-dict-lang:focus-visible:not(:disabled) {
+  background-color: var(--lib-field-bg-focus);
+  border-color: var(--lib-field-border-focus);
+}
+.xp-dict-lang {
+  background-image: var(--lib-field-chevron);
+}
+.vocab-note-input {
+  background-color: var(--lib-field-bg);
+  border-color: var(--lib-field-border);
+  color: var(--lib-field-fg);
+}
+.vocab-note-input:hover:where(:not(:focus, :disabled)) {
+  background-color: var(--lib-field-bg-hover);
+  border-color: var(--lib-field-border-hover);
+}
+.vocab-note-input:focus:not(:disabled) {
+  background-color: var(--lib-field-bg-focus);
+  border-color: var(--lib-field-border-focus);
+}
+.vocab-note-input::placeholder {
+  color: var(--lib-field-placeholder);
+}
+.vocab-group-unit {
+  background-color: var(--lib-field-bg);
+  border-color: var(--lib-field-border);
+  color: var(--lib-field-fg);
+}
+.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus), :has(> input:disabled))) {
+  background-color: var(--lib-field-bg-hover);
+  border-color: var(--lib-field-border-hover);
+}
+.vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) {
+  background-color: var(--lib-field-bg-focus);
+  border-color: var(--lib-field-border-focus);
+}
+.vocab-group-unit > input[type="text"]::placeholder {
+  color: var(--lib-field-placeholder);
+}
+.vocab-group-unit > input[type="text"], .vocab-group-unit > .vocab-group-step {
+  color: var(--lib-field-fg);
+}
 input[type="checkbox"], input[type="radio"] {
   accent-color: var(--lib-accent);
 }
@@ -353,30 +436,29 @@ input[type="checkbox"], input[type="radio"] {
 }
 /* @generated:ui-components end (library) */
 
-/* NO `.fg` ON THIS SURFACE -- the gap is closed at the source now. `.fg` has
-   ZERO consumers here: `grep -c 'class="fg' library.html` is 0, no library JS
-   ever adds the token, and docs/theme-surface/ui-vocabulary.json registers
-   `fg` under the options surface alone. From 2026-08-05 (vocab-group-inspect-
-   report.md Finding 9) until this commit the composer nevertheless emitted the
-   five `.fg …` field rules here, plus a `.fg select` chevron sitting in this
-   hand-written region -- ~1.5KB that could never match anything. The composer
-   (composers/ui-components.mjs, formRules) now guards the whole family with
-   `ns === "opt"`, so nothing to delete by hand remains and nothing regrows on
-   the next sync-all.
-   What library uses instead: a per-toolbar field recipe written by hand below
-   (.notes-toolbar / .vocab-lookup-bar input[type="search"], .vocab-filter-
-   toolbar + .vocab-filter-row select, .vocab-group-unit, .vocab-note-input,
-   .xp-dict-lang). That is deliberate, not debt -- COMPONENTS.md §6.4 records
-   the user decision that these toolbar rows stay on the sm 20px rung (the
-   `.fg` recipe is md 26px and would grow the sticky batch bar by 7px), and
-   those rules also carry a forced-colors focus fallback and a focus-ring
-   z-index lift that the shared recipe cannot express.
-   COST: `.fg` is now options-only. A `class="fg"` added to library.html would
-   silently get nothing -- widen the composer guard (after settling the rung
-   question), never hand-copy the recipe back into this region. The chevron
-   longhands §6.1 keeps hand-maintained already live on this surface's two
-   <select> families of their own: `.vocab-filter-toolbar select,
-   .vocab-filter-row select` and `.xp-dict-lang`. */
+/* NO `.fg` ON THIS SURFACE, and none needed. `.fg` stays an options-only
+   vocabulary word (docs/theme-surface/ui-vocabulary.json registers it under
+   options alone; `grep -c 'class="fg' library.html` is 0) -- a `class="fg"`
+   added to library.html would silently get nothing.
+   Library's value boxes take the COLOUR half of the shared field language
+   from @generated:ui-components above instead: composers/ui-components.mjs
+   FIELD_TARGETS.lib (stage 4, spec 2026-09-30-ui-fields-stage4-design §3.3)
+   paints fill, frame, typed text, placeholder, hover and focus from the
+   --lib-field-* roles on the toolbar search fields (.notes-toolbar /
+   .vocab-lookup-bar input[type="search"]), the native selects
+   (.vocab-filter-toolbar + .vocab-filter-row select, .xp-dict-lang, which also
+   take --lib-field-chevron), the .vocab-group-unit shell and its passengers,
+   and the note editor (.vocab-note-input).
+   What stays hand-written below is the SHAPE half only: height, padding,
+   radius, width, border width/style, the sm-rung toolbar geometry
+   COMPONENTS.md §6.4 records as a user decision, the focus-ring box-shadow
+   with its z-index lift (keyed on the registry's focus selector, :focus ->
+   :focus-visible), and the forced-colors fallback. Never put a background,
+   border colour, `border` shorthand, `color` or chevron image back on one of
+   those rules: this region comes AFTER the generated one, so a
+   same-specificity hand colour silently beats the recipe, and a colourless
+   `border: 1px solid` resets border-color to currentColor
+   (tests/ui-contract-tests.mjs pins both). */
 
 /* §7.3 `borderless` placement (full-width sidebar tabs, accordion and
    disclosure headers): 1px accent core + the --lib-focus-ring glow. The core
@@ -477,10 +559,9 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
   width: 100%;
   padding: var(--lib-sp-1) var(--lib-sp-2);
   line-height: 16px; /* md rung in px: 4+16+4+2 = 26 under any font -- a CJK placeholder on a fallback font gave 24.67 with `normal`; .vocab-lookup-bar re-pins 14px for its sm rung below */
-  border: 1px solid var(--lib-input-border);
+  border-width: 1px;
+  border-style: solid;
   border-radius: var(--lib-radius-md);
-  background-color: var(--lib-input-bg, #fff);
-  color: var(--lib-fg);
   font-size: 13px;
   box-sizing: border-box;
   -webkit-appearance: none;
@@ -488,12 +569,14 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
   box-shadow: none;
   transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
 }
-.notes-toolbar input[type="search"]:hover:not(:focus),
-.vocab-lookup-bar input[type="search"]:hover:not(:focus) { border-color: var(--lib-fg-muted); }
+/* Hover and the focus border/fill come from the generated field recipe
+   (FIELD_TARGETS.lib): the fill steps, the old --lib-fg-muted ring is gone
+   (stage 4 §3.3). Only the outline suppression and the glow stay here, the
+   glow on the registry's focus selector (:focus -> :focus-visible). */
 .notes-toolbar input[type="search"]:focus,
-.vocab-lookup-bar input[type="search"]:focus { outline: none; border-color: var(--lib-focus-bd); }
-.notes-toolbar input[type="search"]:focus-visible,
-.vocab-lookup-bar input[type="search"]:focus-visible {
+.vocab-lookup-bar input[type="search"]:focus { outline: none; }
+.notes-toolbar input[type="search"]:focus-visible:not(:disabled),
+.vocab-lookup-bar input[type="search"]:focus-visible:not(:disabled) {
   box-shadow: var(--lib-focus-ring);
   /* The ring is a 6px halo drawn outside the box; a later sibling with an
      opaque fill would otherwise paint over its trailing edge. Lift the
@@ -505,8 +588,8 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
   /* Forced colours suppress the token shadow, while the field recipe's
      outline:none leaves border colour as the only focus delta. Restore a
      system-colour edge without opting out of the user's palette. */
-  .notes-toolbar input[type="search"]:focus-visible,
-  .vocab-lookup-bar input[type="search"]:focus-visible {
+  .notes-toolbar input[type="search"]:focus-visible:not(:disabled),
+  .vocab-lookup-bar input[type="search"]:focus-visible:not(:disabled) {
     outline: 1px solid Highlight;
     outline-offset: 2px;
   }
@@ -1376,25 +1459,23 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
    border/divider -> --lib-border, link/emphasis -> --lib-accent, block
    background -> --lib-code-bg (retry/connect buttons) or --lib-btn-bg
    (the select, see below). .xp-dict-lang and .xp-dict-connect/.xp-retry are
-   NOT .btn-classed by md-dict.js, so they need their own paint here;
-   .xp-dict-lang mirrors the closed-select recipe already established by
-   .vocab-filter-toolbar select above -- same chevron markup, same
-   --lib-btn-bg/--lib-input-border/--lib-btn-hover tokens, not md-preview's
-   literal chevron color -- so it reads as the same control family on this
-   page. */
+   NOT .btn-classed by md-dict.js, so they need their own paint here.
+   .xp-dict-lang is a value box: its colours (field fill, frame, typed text,
+   hover, focus border and the per-theme --lib-field-chevron) come from the
+   generated field recipe, the same FIELD_TARGETS.lib family as the toolbar
+   selects below, so it reads as the same control on this page; only its
+   shape stays here. Its focus stays on :focus-visible (stage 4 §2.1). */
 .xp-dict-head { display: flex; align-items: center; gap: var(--lib-sp-2); margin-bottom: var(--lib-sp-2); }
 .xp-dict-lang {
   flex: 0 1 auto;
   -webkit-appearance: none;
   appearance: none;
   padding: 3px 22px 3px var(--lib-sp-2);
-  border: 1px solid var(--lib-btn-border);
+  border-width: 1px;
+  border-style: solid;
   border-radius: var(--lib-radius-md);
-  background-color: var(--lib-btn-bg);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
   background-repeat: no-repeat;
   background-position: right 6px center;
-  color: var(--lib-fg);
   font: inherit;
   font-size: 0.8em;
   /* `font: inherit` above also sets line-height: inherit, pulling in the
@@ -1409,18 +1490,7 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
   box-shadow: none;
   transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease;
 }
-.xp-dict-lang:hover { background-color: var(--lib-btn-hover, var(--lib-btn-bg)); border-color: var(--lib-input-border, var(--lib-border)); }
-.xp-dict-lang:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
-html[data-theme="nord-night"] .xp-dict-lang,
-html[data-theme="terminal"] .xp-dict-lang,
-html[data-theme="dracula"] .xp-dict-lang,
-html[data-theme="flexoki-dark"] .xp-dict-lang,
-html[data-theme="solarized-dark"] .xp-dict-lang,
-html[data-theme="catppuccin-mocha"] .xp-dict-lang,
-html[data-theme="gruvbox-dark"] .xp-dict-lang,
-html[data-theme="rose-pine"] .xp-dict-lang {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-}
+.xp-dict-lang:focus-visible:not(:disabled) { outline: none; box-shadow: var(--lib-focus-ring); }
 .xp-dict-slot { min-height: 20px; }
 .xp-dict-match { color: var(--lib-fg-muted); font-size: 0.8em; margin: 0 0 var(--lib-sp-2); }
 .xp-dict-entry { margin: 0 0 var(--lib-sp-2); }
@@ -1521,12 +1591,16 @@ html[data-theme="rose-pine"] .xp-dict-lang {
   min-height: 2lh;
   max-height: min(40vh, 20lh);
   padding: 4px var(--lib-sp-2);
-  border: 1px solid var(--lib-input-border, #cdd1d6);
+  border-width: 1px;
+  border-style: solid;
   border-radius: var(--lib-radius-md);
-  background: inherit; color: inherit;
+  /* Fill, frame, typed text, placeholder, hover and focus colours come from
+     the generated field recipe (FIELD_TARGETS.lib, stage 4 §3.3): the editor
+     used to inherit the pane's paint and read as a hole in it. */
+  transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
 }
-.vocab-note-input:focus { outline: none; border-color: var(--lib-focus-bd); }
-.vocab-note-input:focus-visible { box-shadow: var(--lib-focus-ring); }
+.vocab-note-input:focus { outline: none; }
+.vocab-note-input:focus-visible:not(:disabled) { box-shadow: var(--lib-focus-ring); }
 /* Zero-shift reveal. The button used to be `display: none` while hidden, so
    the first keystroke inserted a whole button into the flex row and the
    textarea jumped narrower under the cursor. Now the box is ALWAYS in
@@ -1700,7 +1774,7 @@ html.motion-ready .vocab-note-save {
      against this field's right edge. */
   border-radius: calc(var(--lib-radius-md) - 1px) 0 0 calc(var(--lib-radius-md) - 1px);
   background: transparent;
-  color: var(--lib-fg);
+  /* Typed text: --lib-field-fg from the generated passenger rule (stage 4 D6). */
   box-sizing: border-box;
 }
 /* §8 law 2: the ring belongs to the shell -- specifically to
@@ -1720,8 +1794,10 @@ html.motion-ready .vocab-note-save {
 /* A toolbar select is still a select: the same closed-control recipe that
    COMPONENTS.md §6.1 spells `.fg select` on the options surface (this surface
    has no `.fg` at all -- see the note just below the @generated:ui-components
-   end marker), written token-first so it needs no themed twin. Only the
-   chevron, being a data URI, needs the dark variant below.
+   end marker). Colours -- field fill, frame, typed text, hover, focus border
+   and the per-theme --lib-field-chevron -- come from the generated field
+   recipe (FIELD_TARGETS.lib, stage 4 §3.3), so there is no themed twin and no
+   literal chevron any more; only the shape and the chevron's position stay.
    .vocab-filter-row joins the selector list rather than getting a copy: when
    the header rebuild moved the group select out of the toolbar wrapper it
    silently lost this whole recipe -- measured 20.5px tall with a native
@@ -1743,13 +1819,11 @@ html.motion-ready .vocab-note-save {
      along for free too -- .vocab-filter-row's align-items: stretch matches
      it to whichever sibling there is tallest. */
   padding: var(--lib-sp-1) 26px var(--lib-sp-1) var(--lib-sp-3); line-height: 16px; /* md rung in px (see the search field above) */
-  border: 1px solid var(--lib-input-border, #cdd1d6);
+  border-width: 1px;
+  border-style: solid;
   border-radius: var(--lib-radius-md);
-  background-color: var(--lib-btn-bg, #fff);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
   background-repeat: no-repeat;
   background-position: right 8px center;
-  color: var(--lib-fg);
   font: inherit;
   font-size: 13px;
   cursor: pointer;
@@ -1758,11 +1832,6 @@ html.motion-ready .vocab-note-save {
   appearance: none;
   box-shadow: none;
   transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
-}
-.vocab-filter-toolbar select:hover:not(:focus),
-.vocab-filter-row select:hover:not(:focus) {
-  background-color: var(--lib-btn-hover);
-  border-color: var(--lib-input-border, #cdd1d6);
 }
 /* §7.3: a <select> is an input-class field, so it takes the FIELD recipe --
    `outline: none` + focus border + the focus-ring shadow -- not the button
@@ -1775,10 +1844,9 @@ html.motion-ready .vocab-note-save {
 .vocab-filter-toolbar select:focus,
 .vocab-filter-row select:focus {
   outline: none;
-  border-color: var(--lib-focus-bd);
 }
-.vocab-filter-toolbar select:focus-visible,
-.vocab-filter-row select:focus-visible {
+.vocab-filter-toolbar select:focus-visible:not(:disabled),
+.vocab-filter-row select:focus-visible:not(:disabled) {
   box-shadow: var(--lib-focus-ring);
 }
 /* #vocab-lookup-go is a bare icon .btn-sm (COMPONENTS.md §1.5's "dense
@@ -1809,9 +1877,9 @@ html.motion-ready .vocab-note-save {
    on its left (#vocab-lookup-bar's gap, 2026-08-25) is untouched. */
 #vocab-lookup-go { position: relative; }
 #vocab-lookup-go::before { content: ""; position: absolute; inset: -3px 0; }
-/* Same eight-dark-theme group as the chevron override below: 20% of a dark
-   theme's foreground on its near-black panel reads as a lit bar rather than
-   a seam (measured on terminal, whose fg is a saturated #33ff33). */
+/* The eight dark themes: 20% of a dark theme's foreground on its near-black
+   panel reads as a lit bar rather than a seam (measured on terminal, whose fg
+   is a saturated #33ff33). */
 html[data-theme="nord-night"],
 html[data-theme="terminal"],
 html[data-theme="dracula"],
@@ -1820,26 +1888,6 @@ html[data-theme="solarized-dark"],
 html[data-theme="catppuccin-mocha"],
 html[data-theme="gruvbox-dark"],
 html[data-theme="rose-pine"] { --lib-seam-mix: 24%; }
-/* The dark themes need their own chevron: it is a data URI, so the stroke
-   colour cannot come from a token. */
-html[data-theme="nord-night"] .vocab-filter-toolbar select,
-html[data-theme="terminal"] .vocab-filter-toolbar select,
-html[data-theme="dracula"] .vocab-filter-toolbar select,
-html[data-theme="flexoki-dark"] .vocab-filter-toolbar select,
-html[data-theme="solarized-dark"] .vocab-filter-toolbar select,
-html[data-theme="catppuccin-mocha"] .vocab-filter-toolbar select,
-html[data-theme="gruvbox-dark"] .vocab-filter-toolbar select,
-html[data-theme="rose-pine"] .vocab-filter-toolbar select,
-html[data-theme="nord-night"] .vocab-filter-row select,
-html[data-theme="terminal"] .vocab-filter-row select,
-html[data-theme="dracula"] .vocab-filter-row select,
-html[data-theme="flexoki-dark"] .vocab-filter-row select,
-html[data-theme="solarized-dark"] .vocab-filter-row select,
-html[data-theme="catppuccin-mocha"] .vocab-filter-row select,
-html[data-theme="gruvbox-dark"] .vocab-filter-row select,
-html[data-theme="rose-pine"] .vocab-filter-row select {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-}
 /* Sort segment: two fused direction-toggle cells replacing the widest select
    (#vocab-sort stays as the hidden state carrier). The pressed cell wears the
    accent; icons show the CURRENT direction, titles the sort a click applies. */
@@ -2235,13 +2283,16 @@ html.motion-ready .notes-batch-bar.selecting {
 .vocab-group-unit {
   display: inline-flex;
   align-items: stretch;
+  /* Fill, frame and hover/focus colours: the generated field recipe
+     (FIELD_TARGETS.lib) -- the shell IS the value box (§8 law 1), so it takes
+     the field fill and steps it on hover like any other field (stage 4 §3.3).
+     Only the border's width and style are declared here. */
+  border-width: 1px;
+  border-style: solid;
   flex: 1 1 200px;
   min-width: 150px;
   max-width: 320px;
-  border: 1px solid var(--lib-input-border);
   border-radius: var(--lib-radius-md);
-  background: var(--lib-input-bg);
-  color: var(--lib-fg);
   /* `clip` + a margin, not bare `hidden` (COMPONENTS.md §1.5/§8, same
      reasoning as .vocab-sort-seg above): the two 28x18 stepper cells are
      `align-items: stretch`-ed to fill this shell's content box exactly
@@ -2262,7 +2313,7 @@ html.motion-ready .notes-batch-bar.selecting {
      each stepper's ::before needs. */
   overflow: clip;
   overflow-clip-margin: 4px;
-  transition: border-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
+  transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
 }
 /* §8 law 2 + §7.3's `bordered` placement, scoped to the unit's TEXT ENTRY.
    It used to be a bare `:focus-within`, which also fired for the two stepper
@@ -2270,8 +2321,10 @@ html.motion-ready .notes-batch-bar.selecting {
    rings at once (the same defect .vocab-sort-seg was reported for). A text
    field's focus belongs on the frame that contains it; a button cell's
    belongs inside the cell. */
-.vocab-group-unit:has(> input[type="text"]:focus) {
-  border-color: var(--lib-focus-bd);
+/* The focus border and fill come from the generated recipe, on this same
+   selector (FIELD_TARGETS.lib's focus; a <span> is never :disabled, the
+   :not() is its specificity ballast). Only the glow is here. */
+.vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) {
   box-shadow: var(--lib-focus-ring);
 }
 /* Passengers. `> ` keeps every override at (0,2,0)+ so it out-ranks the
@@ -2309,14 +2362,22 @@ html.motion-ready .notes-batch-bar.selecting {
   /* §8 law 3: ONE divider colour, one width, full height (align-items:
      stretch). Both cells have a left neighbour -- the input, then "+" -- so
      both draw the same 1px line and the unit reads as evenly segmented. */
-  border-left: 1px solid var(--lib-input-border);
+  border-left: 1px solid var(--lib-field-border);
   border-radius: 0;
   background: transparent;
-  /* Not --lib-btn-fg: that token is AA-derived against btn-bg/btn-hover, and
-     inside this shell the icons sit on --lib-input-bg. --lib-fg is the token
-     derived for exactly this background (§6.2), which is also what the
-     input's own text uses one pixel to the left. */
-  color: var(--lib-fg);
+  /* Icon ink: --lib-field-fg from the generated passenger rule (stage 4 D6),
+     not --lib-btn-fg -- that token is AA-derived against btn-bg/btn-hover,
+     while these icons sit on the shell's field fill, the same ink the input's
+     own text uses one pixel to the left. */
+}
+/* §8 law 3, stage 4: the dividers are the SHELL's frame colour, so they follow
+   the shell into its hover state -- a rest-coloured line on the hover fill
+   would surface as a hairline. The generated shell hover's own selector
+   (FIELD_TARGETS.lib): not while the text entry holds focus, not while it is
+   disabled; (0,3,0), so it out-ranks the rest divider above by specificity.
+   Never driven by a cell's own state. */
+.vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus), :has(> input:disabled))) > .vocab-group-step {
+  border-left-color: var(--lib-field-border-hover);
 }
 /* Concentric RIGHT outer corners (COMPONENTS.md §9.2 law 2; independent
    review F1, hit-area-debt) -- only the LAST step (remove-group) touches
@@ -2339,13 +2400,26 @@ html.motion-ready .notes-batch-bar.selecting {
    background step with no transition (§3.2's row-press language) and the
    .btn family's transform is explicitly cancelled rather than left to a
    specificity race. */
+/* Stage 4 §2.2 (ruling R6): the ghost chip is --lib-field-fg over the fill
+   the shell paints AT THAT MOMENT -- the hover fill while the unit is only
+   hovered, the focus fill while its text entry holds focus (the pointer can
+   rest on a cell then). 8% hover / 10% press, each >= FILL_SEPARATE_MIN
+   (1.10) against that fill on all 15 blocks (tests/ui-contract-tests.mjs
+   computes it). The focused pair out-ranks the plain pair by specificity
+   ((0,7,1) vs (0,4,0)), and each press rule sits after its hover rule. */
 .vocab-group-unit > .vocab-group-step:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--lib-fg) 6%, var(--lib-input-bg));
+  background: color-mix(in srgb, var(--lib-field-fg) 8%, var(--lib-field-bg-hover));
 }
 .vocab-group-unit > .vocab-group-step:active:not(:disabled) {
   transform: none;
-  background: color-mix(in srgb, var(--lib-fg) 10%, var(--lib-input-bg));
+  background: color-mix(in srgb, var(--lib-field-fg) 10%, var(--lib-field-bg-hover));
   transition-duration: 0s;
+}
+.vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) > .vocab-group-step:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--lib-field-fg) 8%, var(--lib-field-bg-focus));
+}
+.vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) > .vocab-group-step:active:not(:disabled) {
+  background: color-mix(in srgb, var(--lib-field-fg) 10%, var(--lib-field-bg-focus));
 }
 /* When a STEPPER holds focus the shell stays inert (its ring is scoped to
    the text input, see that rule above) and this inset core is the whole
@@ -2592,6 +2666,27 @@ html[data-options-ready] .lib-header, html[data-options-ready] .lib-main { visib
      change, and it is the only signal that a lookup is in flight. Mirrors popup.css's
      .tag-skel carve-out. Duration mirrors the base rule. */
   .xp-skel { animation-duration: 1.2s !important; animation-iteration-count: infinite !important; }
+}
+
+/* ---- Forced colours: the value boxes' focus edge (stage 4 §6 item 10,
+   ruling R5). Forced colours drop the --lib-focus-ring glow and remap the
+   generated focus border, so each value box draws a system-colour outline
+   on its FIELD_TARGETS.lib entry's ring selector (the toolbar search fields
+   carry theirs beside their own rules above). Kept at the end of the hand
+   region on purpose: `.xp-dict-lang:focus-visible:not(:disabled)` suppresses
+   its outline at this same specificity, so source order is what lets this
+   win (tests/ui-contract-tests.mjs checks every ring selector is covered and
+   that no outline-suppressing focus rule out-ranks it). The group-unit shell
+   keeps its :has() trigger; its text passenger draws nothing (§8 law 2). */
+@media (forced-colors: active) {
+  .vocab-filter-toolbar select:focus-visible:not(:disabled),
+  .vocab-filter-row select:focus-visible:not(:disabled),
+  .xp-dict-lang:focus-visible:not(:disabled),
+  .vocab-note-input:focus-visible:not(:disabled),
+  .vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) {
+    outline: 1px solid Highlight;
+    outline-offset: 2px;
+  }
 }
 
 /* @generated:ui-themes start — do not edit; produced by composers/library-chrome.mjs */

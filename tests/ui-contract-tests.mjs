@@ -385,9 +385,10 @@ function valueBoxUrlColourOffenders(css, isBox) {
 // whose bottom differs from its top, no multi-value border-radius and no
 // per-corner radius longhand. Module level since Task 6 so each surface's
 // block runs it with its own value-box predicate (`isBox`, per selector):
-// options since Task 2, popup since Task 6, library in Task 7. `exempt(sels,
-// decl)` lets a surface name its one sanctioned exception (popup: the open
-// tags shell's two square bottom corners). Keep the const ABOVE its first
+// options since Task 2, popup since Task 6, library since Task 7. `exempt(
+// sels, decl)` lets a surface name its one sanctioned exception (popup: the
+// open tags shell's two square bottom corners; library: the group unit's text
+// passenger's concentric left corners). Keep the const ABOVE its first
 // caller (TDZ; the popup block runs long before the options one).
 function valueTokens(value) {
   const out = [];
@@ -699,13 +700,15 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
     const bgDecl = decls.find((d) => d.property === "background" || d.property === "background-color");
     if (!colorDecl || !bgDecl) continue;
     // Q3 (T5 fix wave): widened to law 8's full four-fill set (input-bg,
-    // chip-bg added) -- see the options check above for the rationale.
-    if (/--lib-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--lib-(btn-bg|btn-hover|input-bg|chip-bg)\b/.test(bgDecl.value)) {
+    // chip-bg added) -- see the options check above for the rationale. Stage 4
+    // (Task 7, T7-f): the value boxes' own fills (field-bg / -hover / -focus)
+    // joined it, as on options and popup.
+    if (/--lib-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--lib-(btn-bg|btn-hover|input-bg|chip-bg|field-bg(?:-hover|-focus)?)\b/.test(bgDecl.value)) {
       offendersLib.push(...liveSelectors);
     }
   }
   check(offendersLib.length === 0,
-    "library.css: a hand-written rule pairs --lib-fg-hint/--lib-fg-muted/--lib-link directly with --lib-btn-bg/--lib-btn-hover on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offendersLib.join(", "));
+    "library.css: a hand-written rule pairs --lib-fg-hint/--lib-fg-muted/--lib-link directly with a control fill (--lib-btn-bg/-hover, --lib-input-bg, --lib-chip-bg, --lib-field-bg/-hover/-focus) on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offendersLib.join(", "));
 }
 
 // ---- weak-text-on-fill (D6 follow-up / Ruling 17): the batch-selected
@@ -1771,10 +1774,59 @@ const OPTIONS_VALUE_BOX_IDS = (() => {
 check(OPTIONS_VALUE_BOX_IDS.ids.has("dict-anki-deck") && OPTIONS_VALUE_BOX_IDS.ids.has("opt-custom-css") && OPTIONS_VALUE_BOX_IDS.ids.has("opt-lang-btn") &&
   OPTIONS_VALUE_BOX_IDS.selectIds.has("mobile-tab-select") && OPTIONS_VALUE_BOX_IDS.ids.has("options-search-input") && OPTIONS_VALUE_BOX_IDS.ids.size > 60,
   "ui-contract-tests.mjs: the options.html value-box id harvest drifted (expected text/password/number/search inputs, textareas, selects and their -btn listbox buttons) -- got " + OPTIONS_VALUE_BOX_IDS.ids.size + " ids");
+// ---- Stage 4 Task 7: library's value boxes (spec 2026-09-30-ui-fields-stage4-
+// design §1.2 / §3.3). Static ones are harvested from library.html: every
+// text-entry input (TEXT_ENTRY_TYPES, search included), textarea and select
+// that carries an id and is not one of the `hidden` state carriers
+// (#vocab-status-filter / #vocab-sort are driven by chip / segment proxies and
+// never render). Runtime ones are the elements library-vocab.js builds -- the
+// note editor (.vocab-note-input), the relookup language select
+// (.xp-dict-lang) and the detail pane's group-unit text input -- harvested
+// from every createElement("input" | "select" | "textarea") site of the
+// library scripts and pinned below, so a new runtime value box fails here
+// instead of silently escaping the class-level scans. The fused shell
+// .vocab-group-unit is its unit's value box (COMPONENTS.md §8 law 1); its
+// children are passengers.
+const LIBRARY_VALUE_BOX = (() => {
+  const ids = new Set();
+  for (const m of libraryHtml.matchAll(/<(input|textarea|select)\b([^>]*)>/gi)) {
+    const tag = m[1].toLowerCase(), attrs = m[2];
+    const id = (/\bid="([^"]+)"/.exec(attrs) || [])[1];
+    if (!id || /\shidden(?=[\s/]|$)/.test(attrs)) continue;
+    if (tag === "input" && !TEXT_ENTRY_TYPES.has(((/\btype="([^"]+)"/.exec(attrs) || [])[1] || "text").toLowerCase())) continue;
+    ids.add(id);
+  }
+  const built = [];
+  for (const file of ["library-vocab.js", "library-notes.js", "library.js"]) {
+    for (const m of read(file).matchAll(/const (\w+) = document\.createElement\("(input|select|textarea)"\);([\s\S]{0,400})/g)) {
+      const [, v, tag, after] = m;
+      const cls = (new RegExp(`\\b${v}\\.className = "([^"]+)"`).exec(after) || [])[1];
+      const type = (new RegExp(`\\b${v}\\.type = "([^"]+)"`).exec(after) || [])[1];
+      built.push(`${file}:${tag}${type ? `[type="${type}"]` : ""}${cls ? `.${cls}` : ""}`);
+    }
+  }
+  // The fused shell is named by class: it is a <span>, invisible to a tag harvest.
+  const shells = new Set(["vocab-group-unit"]);
+  const classOf = (b) => (/\.([\w-]+)$/.exec(b) || [])[1];
+  return {
+    ids, built: built.sort(), shells,
+    classes: new Set([...shells, ...built.map(classOf).filter(Boolean)]),
+    selectClasses: new Set(built.filter((b) => /:select\./.test(b)).map(classOf)),
+  };
+})();
+check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["notes-filter", "vocab-group-filter", "vocab-group-input", "vocab-lookup-input", "vocab-lookup-lang", "vocab-search"]),
+  `ui-contract-tests.mjs: the library.html value-box id harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort())}. ` +
+  "A new value box must join composers/ui-components.mjs FIELD_TARGETS.lib and scripts/ui-render-audit.mjs's VALUE_BOX_LEGS.library in the same commit; then update this list.");
+check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-vocab.js:input[type="text"]', "library-vocab.js:select.xp-dict-lang", "library-vocab.js:textarea.vocab-note-input"]) &&
+  /groupUnit\.className = "vocab-group-unit";[\s\S]{0,400}groupUnit\.appendChild\(groupInput\);/.test(libraryVocabJs),
+  `ui-contract-tests.mjs: the runtime library value-box harvest drifted -- got ${JSON.stringify(LIBRARY_VALUE_BOX.built)} ` +
+  "(expected the note editor textarea, the relookup language select and the detail pane's group-unit text input). " +
+  "A new runtime value box must join FIELD_TARGETS.lib and VALUE_BOX_LEGS.library; then update this list.");
 function isValueBoxCompound(compound) {
   const c = classifyCompound(compound);
   if (c.pseudoElement || c.tag === "option") return false;
   if (c.ids.some((id) => OPTIONS_VALUE_BOX_IDS.ids.has(id)) || c.classes.includes("listbox-btn")) return true;
+  if (c.ids.some((id) => LIBRARY_VALUE_BOX.ids.has(id)) || c.classes.some((cl) => LIBRARY_VALUE_BOX.classes.has(cl))) return true;
   if (c.tag === "textarea" || c.tag === "select") return true;
   return c.tag === "input" && (c.type === null || TEXT_ENTRY_TYPES.has(c.type));
 }
@@ -1857,19 +1909,30 @@ function focusShapeOffenders(css, ns) {
     const sel = m[1].trim().replace(/\s+/g, " ");
     bySelector.set(sel, `${bySelector.get(sel) ?? ""};${m[2]}`);
   }
+  // Stage 4 (spec §5.1, Task 7 T7-d): a value box's focus border now lives in
+  // @generated:ui-components (composers/ui-components.mjs FIELD_TARGETS) and
+  // the hand rule keeps only the glow / outline suppression. So a hand rule is
+  // judged on the generated declarations of the SAME selector text merged
+  // under its own (hand wins, as in the cascade: it comes later) -- library's
+  // .xp-dict-lang suppresses its outline on the very selector whose generated
+  // rule paints the core -- and a glow-only rule's :focus partner is looked up
+  // in both regions (bySelector above already reads the whole file).
+  const generatedBySelector = new Map();
+  for (const region of css.matchAll(/\/\*\s*@generated:([\w-]+) start[\s\S]*?\*\/([\s\S]*?)\/\*\s*@generated:\1 end[\s\S]*?\*\//g)) {
+    for (const m of region[2].replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const sel = m[1].trim().replace(/\s+/g, " ");
+      generatedBySelector.set(sel, `${generatedBySelector.get(sel) ?? ""};${m[2]}`);
+    }
+  }
   const RING = `var(--${ns}-focus-ring)`, BD = `var(--${ns}-focus-bd)`, ACCENT = `var(--${ns}-accent)`;
-  // B+ field family (2026-09-28): a value box's bordered core is its own derived
-  // focus border, --opt-field-border-focus (= focus-bd wherever that clears 3:1
-  // on the field fill; re-derived where it does not -- flexoki-light). Accepted
-  // as a `bordered` core on options only, and only on a VALUE-BOX selector
-  // (fix round 1, GI-5: flexoki-light's value is derived against the field
-  // fill, not a button's). P7: the key-wrap eye draws its inset ring ON the
-  // field fill, so on options its inset core accepts it too.
-  // The value box's own derived focus border: options since B+, popup since
-  // stage 4 Task 6 (FIELD_TARGETS.pp). Library joins in Task 7.
-  const FIELD_CORE_NS = new Set(["opt", "pp"]);
+  // Stage 4 end state (Tasks 6/7): every surface's value boxes carry their own
+  // derived focus border, var(--<ns>-field-border-focus) (= focus-bd wherever
+  // that clears 3:1 on the field fill; re-derived where it does not -- options
+  // flexoki-light). Accepted as a `bordered` / glow-partner core, and as the
+  // eye's `inset` core, only on VALUE-BOX selectors (fix round 1, GI-5) and
+  // only in its OWN namespace: another namespace's literal is still a leak.
   const FIELD_CORE = `var(--${ns}-field-border-focus)`;
-  const coresFor = (selector) => (FIELD_CORE_NS.has(ns) && acceptsFieldFocusCore(selector) ? [BD, FIELD_CORE] : [BD]);
+  const coresFor = (selector) => (acceptsFieldFocusCore(selector) ? [BD, FIELD_CORE] : [BD]);
   const coreReFor = (cores) => new RegExp(`border-color:\\s*(?:${cores.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`);
   const bad = [];
   for (const { selector, body, forcedColors } of rules) {
@@ -1879,7 +1942,7 @@ function focusShapeOffenders(css, ns) {
     if (!/:focus-visible/.test(selector) && !(forcedColors && /:focus-within\b/.test(selector))) continue;
     if (FOCUS_SHAPE_EXEMPT.ring.some(re => re.test(selector))) continue;
     const BORDERED_CORES = coresFor(selector), INSET_CORES = BORDERED_CORES, coreRe = coreReFor(BORDERED_CORES);
-    const s = parseFocusShape(body);
+    const s = parseFocusShape(`${generatedBySelector.get(selector) ?? ""};${body}`);
     const drawsOutline = s.style && s.style !== "none" && s.width > 0;
     const suppressesOutline = s.outlineTouched && (s.style === "none" || s.width === 0);
     const fail = (why) => bad.push(`${selector} — ${why}`);
@@ -1923,7 +1986,8 @@ function focusShapeOffenders(css, ns) {
       // ring, which is what defeated the previous blacklist).
       if (s.shadow !== RING) { fail(`box-shadow focus ring must be ${RING}, got ${s.shadow}`); continue; }
       if (BORDERED_CORES.includes(s.borderColor)) continue;                                   // themed bordered twin
-      const partner = bySelector.get(selector.replaceAll(":focus-visible", ":focus"));
+      const partnerSel = selector.replaceAll(":focus-visible", ":focus");
+      const partner = [generatedBySelector.get(partnerSel), bySelector.get(partnerSel)].filter(Boolean).join(";") || undefined;
       if (!partner || !coreRe.test(partner)) {
         fail(`glow with no core — needs either border-color: ${BORDERED_CORES.join(" or ")} here, or the matching :focus rule to set it`);
       }
@@ -1936,17 +2000,18 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
   check(bad.length === 0,
     `${file}: hand-written focus rule(s) do not match any §7.3 placement (bordered / borderless / inset):\n    ${bad.join("\n    ")}`);
 }
-// P12 discrimination for the B+ widening, on synthetic CSS (value-box
+// P12 discrimination for the field-core widening, on synthetic CSS (value-box
 // selectors throughout, so a rejection below is about the CORE, not the
-// selector): options accepts --opt-field-border-focus as a bordered core (on
-// the rule itself or on the :focus partner of a glow-only rule) and as an
-// inset core (the key-wrap eye). Popup accepts its OWN spelling since stage 4
-// Task 6 (FIELD_TARGETS.pp); the options LITERAL var(--opt-field-border-focus)
-// stays rejected there (the real leak shape: a popup/library rule borrowing
-// the options token, fix round 1 T2-Q1), and library rejects both until
-// stage 4 Task 7. A non-focus core (--opt-border) plus the
-// ring is still rejected, and so is the field core on a non-value-box
-// selector (fix round 1 GI-5: .btn).
+// selector). Stage 4 end state: every surface accepts ITS OWN derived focus
+// border, var(--<ns>-field-border-focus), as a bordered core (on the rule
+// itself or on the :focus partner of a glow-only rule) and as an inset core
+// (the eye). A foreign namespace's literal is still a leak (fix round 1
+// T2-Q1: a popup/library rule borrowing the options token, and the reverse),
+// a non-focus core (--opt-border) plus the ring is still rejected, and so is
+// the field core on a non-value-box selector (fix round 1 GI-5: .btn).
+// Stage 4 Task 7 (T7-d): the same-selector merge -- a hand rule that only
+// suppresses the outline and adds the glow passes on the core its OWN
+// selector's generated rule paints, and fails once that generated rule is gone.
 {
   const focusCss = (ns, core) => `.fg input[type="text"]:focus-visible { outline: none; border-color: ${core}; box-shadow: var(--${ns}-focus-ring); }
 .theme-name-popover input[type="text"]:focus { outline: none; border-color: ${core}; }
@@ -1955,17 +2020,29 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
 `;
   const WANT = ['.fg input[type="text"]:focus-visible', '.theme-name-popover input[type="text"]:focus-visible', ".key-toggle:focus-visible"];
   const allRejected = (bad) => bad.length === 3 && WANT.every((sel, i) => bad[i].startsWith(sel + " "));
-  const optBad = focusShapeOffenders(focusCss("opt", "var(--opt-field-border-focus)"), "opt");
-  check(optBad.length === 0,
-    "ui-contract-tests.mjs: §7.3 no longer accepts var(--opt-field-border-focus) as the options bordered / glow-partner / inset core on value boxes (B+ P7/P12): " + optBad.join(" | "));
-  const ppOwn = focusShapeOffenders(focusCss("pp", "var(--pp-field-border-focus)"), "pp");
-  check(ppOwn.length === 0,
-    "ui-contract-tests.mjs: §7.3 no longer accepts var(--pp-field-border-focus) as the popup bordered / glow-partner / inset core on value boxes (stage 4 Task 6): " + ppOwn.join(" | "));
-  for (const [ns, core] of [["pp", "var(--opt-field-border-focus)"], ["lib", "var(--opt-field-border-focus)"], ["lib", "var(--lib-field-border-focus)"]]) {
-    const nsBad = focusShapeOffenders(focusCss(ns, core), ns);
-    check(allRejected(nsBad),
-      `ui-contract-tests.mjs: the §7.3 field-border-focus widening leaked into the ${ns} namespace with core ${core} (expected all three value-box rules rejected) -- got [${nsBad.join(" | ")}]`);
+  for (const ns of ["opt", "pp", "lib"]) {
+    const ownBad = focusShapeOffenders(focusCss(ns, `var(--${ns}-field-border-focus)`), ns);
+    check(ownBad.length === 0,
+      `ui-contract-tests.mjs: §7.3 no longer accepts var(--${ns}-field-border-focus) as the ${ns} bordered / glow-partner / inset core on value boxes: ` + ownBad.join(" | "));
+    for (const foreign of ["opt", "pp", "lib"].filter((other) => other !== ns)) {
+      const leakBad = focusShapeOffenders(focusCss(ns, `var(--${foreign}-field-border-focus)`), ns);
+      check(allRejected(leakBad),
+        `ui-contract-tests.mjs: §7.3 accepts the ${foreign} field core var(--${foreign}-field-border-focus) in the ${ns} namespace (expected all three value-box rules rejected) -- got [${leakBad.join(" | ")}]`);
+    }
   }
+  const generatedCore = (core) => `/* @generated:ui-components start (library) */
+.xp-dict-lang:focus-visible:not(:disabled) { background-color: var(--lib-field-bg-focus); border-color: ${core}; }
+.vocab-note-input:focus:not(:disabled) { background-color: var(--lib-field-bg-focus); border-color: ${core}; }
+/* @generated:ui-components end (library) */
+.xp-dict-lang:focus-visible:not(:disabled) { outline: none; box-shadow: var(--lib-focus-ring); }
+.vocab-note-input:focus-visible:not(:disabled) { box-shadow: var(--lib-focus-ring); }
+`;
+  const mergedOwn = focusShapeOffenders(generatedCore("var(--lib-field-border-focus)"), "lib");
+  const mergedForeign = focusShapeOffenders(generatedCore("var(--opt-field-border-focus)"), "lib");
+  const mergedNone = focusShapeOffenders(generatedCore("var(--lib-field-border)").replace(/border-color: var\(--lib-field-border\); /g, ""), "lib");
+  check(mergedOwn.length === 0 && mergedForeign.length === 2 && mergedNone.length === 2,
+    "ui-contract-tests.mjs: §7.3's same-selector generated merge no longer discriminates (a hand outline-suppressor / glow must pass on its own or its :focus partner's GENERATED lib field core, and fail on a foreign or missing one) -- got " +
+    JSON.stringify({ own: mergedOwn, foreign: mergedForeign, none: mergedNone }));
   const frameBad = focusShapeOffenders(focusCss("opt", "var(--opt-border)"), "opt");
   check(allRejected(frameBad),
     "ui-contract-tests.mjs: §7.3 accepts a non-focus core (--opt-border + ring) on options value boxes -- got [" + frameBad.join(" | ") + "]");
@@ -2191,9 +2268,11 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
   // visible rather than merely un-animated.
   check(!/html\.motion-ready\s+\.vocab-note-save\[hidden\]/.test(libraryCss),
     "library.css: the .vocab-note-save[hidden] rule is gated on html.motion-ready — the button renders fully visible until that class is added");
-  const input = /\.vocab-note-input\s*\{([^}]*)\}/.exec(libraryCss);
-  check(!!input && /field-sizing:\s*content/.test(input[1])
-    && /min-height:/.test(input[1]) && /max-height:/.test(input[1]) && /resize:\s*vertical/.test(input[1]),
+  // The HAND-WRITTEN rule, by exact selector: since stage 4 the generated
+  // field recipe also emits a `.vocab-note-input {` rule (colours only), and a
+  // first-match regex over the whole file would read that one instead.
+  const input = declarationValueMap(stripGeneratedRegions(libraryCss), ".vocab-note-input");
+  check(input.get("field-sizing") === "content" && input.has("min-height") && input.has("max-height") && input.get("resize") === "vertical",
     "library.css: .vocab-note-input lost auto-grow (field-sizing: content) or one of its bounds — without the max-height a 500-char note pushes the rest of the detail pane off-screen");
   // v2b (USER RULING 2026-08-06): Save is a commit control, so it lives with
   // the other commit controls at the right end of the pane's closing row --
@@ -2419,7 +2498,8 @@ const selectorListOf = (text) => (text ? splitSelectorList(text) : []);
 // as that entry's box (rest) or as the passenger of a shell some ancestor of
 // it is the box of. Matching is strict (selectorReaches without runtime
 // classes): the registry's own selectors name static structure. Library
-// (Task 7) runs the same function over library.html.
+// (Task 7) runs the same function over library.html plus its grafted
+// runtime boxes.
 function valueBoxCoverage(nodes, targets) {
   const entries = nodes.filter((n) => n.tag === "textarea" || (n.tag === "input" && TEXT_ENTRY_TYPES.has((n.attrs.type || "text").toLowerCase())));
   const restHits = (node) => targets.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, node)));
@@ -2538,8 +2618,8 @@ function fieldLadderProblems(rest, hover, focus) {
 // any focus), the :focus-within shells keep theirs.
 const fieldRingSelectors = (t) => selectorListOf(t.focus).map((sel) => sel.replace(/:focus(?=:not\(:disabled\))/g, ":focus-visible"));
 
-// 1. The registry itself, EVERY surface's entries (stage 4 R1 / T6-g: Task 7
-//    fills FIELD_TARGETS.lib and this loop covers it without a change):
+// 1. The registry itself, EVERY surface's entries (stage 4 R1 / T6-g; Task 7
+//    filled FIELD_TARGETS.lib and this loop covers it unchanged):
 //    well-formed, parallel, and a strict specificity ladder rest < hover <
 //    focus for EVERY box (spec §2.1: focus must win over hover by
 //    specificity, never by source order -- the pointer can sit on a box the
@@ -2567,10 +2647,10 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
   }
 }
 // The ladder grammar must discriminate -- on popup's shapes AND on the two
-// library shapes Task 7 will register (spec §2.1: .xp-dict-lang keeps
+// library shapes Task 7 registered (spec §2.1: .xp-dict-lang keeps
 // :focus-visible; the group unit's trigger is `:has(> input[type="text"]
-// :focus)` and a disabled input takes no hover), so Task 7 adds entries
-// without touching this gate. [rest, hover, focus, must pass]
+// :focus)` and a disabled input takes no hover) -- FIELD_TARGETS.lib uses
+// exactly the two passing shapes below. [rest, hover, focus, must pass]
 {
   const LADDER_CASES = [
     // popup shapes
@@ -7734,6 +7814,426 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
   check(measured === 30, `ui-contract-tests.mjs: the popup eye chip gate measured ${measured} (block, state) pairs, expected 30`);
   if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] popup eye chip: lowest ${lowest.r.toFixed(3)}:1 (${lowest.where}) over ${measured} (block, state) pairs; floor ${FILL_SEPARATE_MIN}`);
+}
+
+// ---- Stage 4 Task 7: library's value boxes speak the field language through
+// the generated recipe (spec 2026-09-30-ui-fields-stage4-design §3.3 / §4 /
+// §5.1). Every answer comes from what the program consumes: FIELD_TARGETS.lib
+// (the registry formRules("lib") emits from), the shipped library.css, and
+// library.html plus the runtime boxes the LIBRARY_VALUE_BOX harvest pins --
+// never from prose or comments. The rest < hover < focus ladder of every lib
+// entry is the registry gate above (it walks every surface's entries).
+{
+  const LIB = FIELD_TARGETS.lib || [];
+  const noComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const libNoComments = noComments(libraryCss);
+  // The region markers ARE comments: cut the generated regions first.
+  const libHand = noComments(stripGeneratedRegions(libraryCss));
+  const genStart = libraryCss.indexOf("/* @generated:ui-components start (library) */");
+  const genEnd = libraryCss.indexOf("/* @generated:ui-components end (library) */");
+  check(genStart >= 0 && genEnd > genStart, "library.css: cannot find the @generated:ui-components (library) region");
+  const libGen = noComments(libraryCss.slice(genStart, genEnd));
+  const subjects = (sel) => subjectAlternatives(subjectOf(sel)).map(classifyCompound);
+
+  // (a) Registry: every entry names rest / hover / focus, every selector it
+  // carries reaches a library value box (or, for placeholder / passenger, the
+  // text part of one), no subject is an untyped <input> (§4: typed from day
+  // one), and only the <select> families carry the per-theme chevron.
+  check(LIB.length > 0, `ui-components.mjs: FIELD_TARGETS.lib is empty -- library's value boxes take their colours from it (stage 4 Task 7)`);
+  for (const t of LIB) {
+    for (const key of ["rest", "hover", "focus"]) {
+      check(selectorListOf(t[key]).length > 0 && selectorListOf(t[key]).every(isValueBoxSelector),
+        `ui-components.mjs FIELD_TARGETS.lib ${t.id}.${key}: every selector must reach a library value box -- got ${JSON.stringify(t[key])}`);
+    }
+    check(t.placeholder === null || (selectorListOf(t.placeholder).length > 0 && selectorListOf(t.placeholder).every(isValueBoxPlaceholderSelector)),
+      `ui-components.mjs FIELD_TARGETS.lib ${t.id}.placeholder must be null or ::placeholder of a value box -- got ${JSON.stringify(t.placeholder)}`);
+    check(t.passenger === null || (selectorListOf(t.passenger).length > 0 && selectorListOf(t.passenger).every((p) => selectorListOf(t.rest).some((r) => p.startsWith(`${r} > `)))),
+      `ui-components.mjs FIELD_TARGETS.lib ${t.id}.passenger must be null or direct children (\`<rest> > ...\`) of the entry's shell -- got ${JSON.stringify(t.passenger)}`);
+    const untyped = ["rest", "hover", "focus", "placeholder", "passenger", "chevron"].flatMap((k) => selectorListOf(t[k]))
+      .filter((sel) => subjects(sel).some((c) => c.tag === "input" && c.type === null));
+    check(untyped.length === 0, `ui-components.mjs FIELD_TARGETS.lib ${t.id}: untyped input subject(s) ${JSON.stringify(untyped)} -- type-restrict them (a checkbox must never take the field fill)`);
+    // A <select> family (a select tag, or a class the harvest saw on a runtime
+    // select) takes the per-theme chevron on exactly its rest selectors;
+    // nothing else does.
+    const isSelect = selectorListOf(t.rest).every((sel) => subjects(sel).some((c) => c.tag === "select" || c.classes.some((cl) => LIBRARY_VALUE_BOX.selectClasses.has(cl))));
+    check(isSelect ? t.chevron === t.rest : t.chevron === null,
+      `ui-components.mjs FIELD_TARGETS.lib ${t.id}: chevron must be ${isSelect ? "the rest selector list (a select family)" : "null (not a select)"} -- got ${JSON.stringify(t.chevron)}`);
+  }
+  const coveredClasses = new Set(LIB.flatMap((t) => selectorListOf(t.rest).flatMap((sel) => subjects(sel).flatMap((c) => c.classes))));
+  const uncoveredClasses = [...LIBRARY_VALUE_BOX.classes].filter((cl) => !coveredClasses.has(cl));
+  check(uncoveredClasses.length === 0, `ui-components.mjs FIELD_TARGETS.lib covers no rest selector for the library value box class(es) ${JSON.stringify(uncoveredClasses)}`);
+
+  // (a2) Coverage, structurally (valueBoxCoverage, the popup model): library
+  // .html as a tree plus the runtime boxes, grafted under #vocab-detail from
+  // the pinned harvest -- the classed ones as themselves, the unclassed text
+  // input inside its .vocab-group-unit shell (the groupUnit build the drift
+  // check above pins). Every text-entry control is painted by exactly one
+  // entry (as its box or as a shell's passenger), every rendered <select>
+  // (the `hidden` state carriers never render) by exactly one entry's rest,
+  // and every entry reaches something.
+  const LIB_TREE = htmlNodes(libraryHtml);
+  const LIB_STATIC = LIB_TREE[0]?.parent?.staticClasses ?? new Set();
+  const detailNode = LIB_TREE.find((n) => n.attrs.id === "vocab-detail");
+  const runtimeHtml = LIBRARY_VALUE_BOX.built.map((b) => {
+    const m = /^[^:]+:(\w+)(?:\[type="([^"]+)"\])?(?:\.([\w-]+))?$/.exec(b);
+    if (!m) return "";
+    const [, tag, type, cls] = m;
+    const el = `<${tag}${type ? ` type="${type}"` : ""}${cls ? ` class="${cls}"` : ""}>${tag === "input" ? "" : `</${tag}>`}`;
+    return cls ? el : `<span class="${[...LIBRARY_VALUE_BOX.shells][0]}">${el}</span>`;
+  }).join("");
+  const runtimeNodes = htmlNodes(runtimeHtml);
+  for (const n of runtimeNodes) if (n.parent?.tag === "#root") n.parent = detailNode;
+  const LIB_NODES = [...LIB_TREE, ...runtimeNodes];
+  check(!!detailNode && runtimeNodes.length === 4,
+    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes under #vocab-detail (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 4)`);
+  const libCov = valueBoxCoverage(LIB_NODES, LIB);
+  check(libCov.entries === 6 && libCov.uncovered.length === 0,
+    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 6); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
+  check(libCov.dead.length === 0, `ui-components.mjs: FIELD_TARGETS.lib entries whose rest selector reaches nothing in library.html + the runtime boxes: ${libCov.dead.map((t) => t.id).join(", ")}`);
+  const libSelects = LIB_NODES.filter((n) => n.tag === "select" && !Object.hasOwn(n.attrs, "hidden"));
+  const selectMiss = libSelects.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
+  check(libSelects.length === 3 && selectMiss.length === 0,
+    `library.html + runtime boxes / FIELD_TARGETS.lib: every rendered <select> must be the rest box of exactly one entry -- ${libSelects.length} select(s) (expected 3), unpainted or doubly painted: ${selectMiss.map((n) => n.attrs.id ? `#${n.attrs.id}` : `select.${n.classes.join(".")}`).join(", ") || "none"}`);
+  const LIB_BOX_NODES = new Set([...libCov.boxes, ...libSelects]);
+  const libReaches = (sel, node) => selectorReaches(sel, node, LIB_STATIC);
+
+  // (b) Emission: formRules("lib") shipped every role of every entry into the
+  // generated region with exactly the field tokens the binding contract names.
+  const EMITS = {
+    rest: [["background-color", "field-bg"], ["border-color", "field-border"], ["color", "field-fg"]],
+    hover: [["background-color", "field-bg-hover"], ["border-color", "field-border-hover"]],
+    focus: [["background-color", "field-bg-focus"], ["border-color", "field-border-focus"]],
+    placeholder: [["color", "field-placeholder"]],
+    passenger: [["color", "field-fg"]],
+    chevron: [["background-image", "field-chevron"]],
+  };
+  for (const t of LIB) {
+    for (const [key, want] of Object.entries(EMITS)) {
+      for (const sel of selectorListOf(t[key])) {
+        const got = declarationValueMap(libGen, sel);
+        const wrong = want.filter(([prop, role]) => got.get(prop) !== `var(--lib-${role})`);
+        check(wrong.length === 0,
+          `library.css: the generated FIELD_TARGETS.lib ${t.id}.${key} rule for \`${sel}\` does not paint ${wrong.map(([p, r]) => `${p}: var(--lib-${r})`).join(", ")} (got ${JSON.stringify(Object.fromEntries(got))}) -- run node docs/theme-surface/tools/sync-all.mjs`);
+      }
+    }
+  }
+
+  // (b2) The hand half keeps each box's ring (§7.3 `bordered`: the core is
+  // the generated focus border, the glow is here) on the entry's own focus
+  // selector (fieldRingSelectors), so ring and frame cannot fire in
+  // different states.
+  for (const t of LIB) {
+    const missing = fieldRingSelectors(t).filter((sel) => declarationValueMap(libHand, sel).get("box-shadow") !== "var(--lib-focus-ring)");
+    check(missing.length === 0,
+      `library.css: FIELD_TARGETS.lib ${t.id} has no hand-written ring (box-shadow: var(--lib-focus-ring)) on ${missing.map((s) => `\`${s}\``).join(", ")}`);
+  }
+
+  // (c) The hand-written region paints no value-box colour (§4 / 3c lesson):
+  // it sits after the generated one, so a same-specificity hand colour wins,
+  // and a colourless `border: 1px solid` resets border-color to currentColor.
+  // A passenger (a direct child of a shell) may only declare the transparent /
+  // borderless half of §8 law 1; its text colour is generated too. No hand
+  // rule re-points a --lib-field-* role (the generated ui-themes blocks own
+  // them). Forced-colors (active) blocks are exempt: system colours by design.
+  const SHELLS = [...LIBRARY_VALUE_BOX.shells].map((cl) => `.${cl}`);
+  const COLOUR_PROPS = /^(?:color|-webkit-text-fill-color|background|background-color|background-image|border-(?:top-|right-|bottom-|left-|block-|inline-|block-start-|block-end-|inline-start-|inline-end-)?color)$/;
+  const BORDER_SHORTHAND = /^border(?:-(?:top|right|bottom|left|block|inline|block-start|block-end|inline-start|inline-end))?$/;
+  const libHandColourOffenders = (hand) => {
+    const out = [];
+    for (const rule of parseStyleRules(hand)) {
+      for (const d of parseDeclarations(rule.body)) {
+        if (d.property.startsWith("--lib-field-")) out.push(`${rule.selectorText} { ${d.property}: ${d.value} } (re-points a --lib-field-* role)`);
+      }
+      if (inForcedColors(rule)) continue;
+      for (const sel of rule.selectors) {
+        if (!isValueBoxSelector(sel) && !isValueBoxPlaceholderSelector(sel)) continue;
+        const subject = subjectOf(sel);
+        const prefix = sel.slice(0, sel.length - subject.length).trim();
+        const passenger = SHELLS.some((s) => prefix === `${s} >`);
+        for (const d of parseDeclarations(rule.body)) {
+          const v = d.value.trim();
+          const allowed = passenger && ((/^background(?:-color)?$/.test(d.property) && v === "transparent") || (BORDER_SHORTHAND.test(d.property) && /^(?:0|none)$/.test(v)));
+          if (allowed) continue;
+          if (COLOUR_PROPS.test(d.property) || (BORDER_SHORTHAND.test(d.property) && !/^(?:0|none)$/.test(v))) out.push(`${sel} { ${d.property}: ${v} }`);
+        }
+      }
+    }
+    return out;
+  };
+  const shippedColour = libHandColourOffenders(libHand);
+  check(shippedColour.length === 0,
+    "library.css: a hand-written rule paints a value box's colour (the generated FIELD_TARGETS.lib recipe owns fill / frame / text / placeholder / chevron; write border-width + border-style, never a `border` shorthand) -- " + shippedColour.join(" | "));
+  // The stepper cells are passengers too (FIELD_TARGETS.lib's passenger list
+  // paints their icon ink --lib-field-fg): no hand rule restates a cell's
+  // `color` -- the base cell rule used to (--lib-fg), at the generated
+  // passenger rule's own (0,2,0) and later in source, so it won.
+  const stepInkOffenders = (hand) => parseStyleRules(hand).filter((r) => !inForcedColors(r)).flatMap((r) => r.selectors
+    .filter((sel) => { const s = structuralCompound(subjectOf(sel)); return !s.pseudoElement && s.classes.includes("vocab-group-step"); })
+    .flatMap((sel) => parseDeclarations(r.body).filter((d) => d.property === "color" || d.property === "-webkit-text-fill-color").map((d) => `${sel} { ${d.property}: ${d.value} }`)));
+  check(stepInkOffenders(libHand).length === 0,
+    "library.css: a hand-written rule restates a .vocab-group-step cell's ink (the generated FIELD_TARGETS.lib passenger rule paints it --lib-field-fg, stage 4 D6) -- " + stepInkOffenders(libHand).join(" | "));
+  // Discrimination: [hand rule appended, caught by the colour scan].
+  const CHEVRON = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><path stroke='%23888'/></svg>")`;
+  const LIB_CASES = [
+    [`.xp-dict-lang { background-image: ${CHEVRON}; }`, true],
+    [`html[data-theme="dracula"] .vocab-filter-row select { background-image: ${CHEVRON}; }`, true],
+    [".vocab-note-input { background: inherit; }", true],
+    [".notes-toolbar input[type=\"search\"] { border: 1px solid; }", true],
+    [".vocab-group-unit { border: 1px solid var(--lib-input-border); }", true],
+    [".vocab-group-unit:hover { background-color: var(--lib-btn-hover); }", true],
+    ["#vocab-lookup-lang:focus { border-color: var(--lib-focus-bd); }", true],
+    [".vocab-group-unit > input[type=\"text\"] { color: var(--lib-fg); }", true],
+    [".vocab-note-input::placeholder { color: var(--lib-fg-hint); }", true],
+    ["#vocab-search { --lib-field-bg: #fff; }", true],
+    ["@media (forced-colors: none) { .xp-dict-lang { background-color: var(--lib-btn-bg); } }", true],
+    // must stay clean
+    [".vocab-group-unit > input[type=\"text\"] { background: transparent; border: 0; }", false],
+    [".vocab-group-unit > .vocab-group-step { border-left: 1px solid var(--lib-field-border); }", false],
+    [".xp-dict-lang { border-width: 1px; border-style: solid; background-position: right 6px center; }", false],
+    [".vocab-note-input:focus-visible:not(:disabled) { box-shadow: var(--lib-focus-ring); }", false],
+    ["@media (forced-colors: active) { .notes-toolbar input[type=\"search\"]:focus-visible { outline: 1px solid Highlight; outline-offset: 2px; } }", false],
+    [`.vocab-sort-seg { background-image: ${CHEVRON}; }`, false],
+  ];
+  const libMisjudged = LIB_CASES.filter(([css, want]) => (libHandColourOffenders(`${libHand}\n${css}`).length > shippedColour.length) !== want);
+  check(libMisjudged.length === 0,
+    "ui-contract-tests.mjs: the library value-box colour scan no longer discriminates -- misjudged: " + libMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
+  check(stepInkOffenders(".vocab-group-unit > .vocab-group-step { color: var(--lib-fg); }").length === 1 &&
+    stepInkOffenders(".vocab-group-unit:has(> input[type=\"text\"]:focus) > .vocab-group-step:hover:not(:disabled) { color: var(--lib-fg-muted); }").length === 1 &&
+    stepInkOffenders(".vocab-group-unit > .vocab-group-step { border-left: 1px solid var(--lib-field-border); background: transparent; }").length === 0 &&
+    stepInkOffenders("@media (forced-colors: active) { .vocab-group-unit > .vocab-group-step:focus-visible { color: Highlight; } }").length === 0,
+    "ui-contract-tests.mjs: the stepper-ink scan no longer discriminates");
+
+  // (c2) Shape (stage 4 T7-b; the module-level valueBoxShapeOffenders the
+  //      options and popup blocks run too): no hand rule draws a library value
+  //      box apart from its one frame colour and one radius. The one named
+  //      exception is geometry, not a split box: the group unit's text
+  //      passenger nests its two LEFT corners concentrically inside the shell
+  //      (COMPONENTS.md §9.2 law 2), by selector, property and value. The
+  //      stepper cells' concentric corners never reach this scan -- a
+  //      .vocab-group-step is a button passenger, not a value box (the model
+  //      check below pins that).
+  const LIB_SHAPE_EXEMPT = [{ selector: '.vocab-group-unit > input[type="text"]', property: "border-radius", value: "calc(var(--lib-radius-md) - 1px) 0 0 calc(var(--lib-radius-md) - 1px)" }];
+  const libShapeExempt = (sels, d) => LIB_SHAPE_EXEMPT.some((e) => sels.every((sel) => sel === e.selector) && d.property === e.property && d.value.trim() === e.value);
+  const libShapeOffenders = (css) => valueBoxShapeOffenders(css, isValueBoxSelector, { ns: "lib", exempt: libShapeExempt });
+  const libShapeBad = libShapeOffenders(libHand);
+  check(libShapeBad.length === 0,
+    "library.css: a hand-written value-box rule draws a bottom edge or splits the radius (stage 4: one frame colour on all four sides, one md radius on all four corners; only the group-unit text passenger's concentric left corners are exempt): " + libShapeBad.join(" | "));
+  const LIB_SHAPE_CASES = [
+    [".xp-dict-lang { border-radius: var(--lib-radius-md) var(--lib-radius-md) 0 0; }", true],
+    [".vocab-note-input { border-bottom: 1px solid var(--lib-field-border-focus); }", true],
+    [".vocab-group-unit { border-top-left-radius: 0; }", true],
+    ["#vocab-search { border-bottom-color: var(--lib-accent); }", true],
+    [".vocab-group-unit > input[type=\"text\"] { border-radius: calc(var(--lib-radius-md) - 1px) 0 0 0; }", true],
+    [".vocab-filter-row select { border-color: var(--lib-field-border) var(--lib-field-border) var(--lib-accent); }", true],
+    // must stay clean
+    [".vocab-group-unit > input[type=\"text\"] { border-radius: calc(var(--lib-radius-md) - 1px) 0 0 calc(var(--lib-radius-md) - 1px); }", false],
+    [".vocab-group-unit > .vocab-group-step:last-child { border-radius: 0 calc(var(--lib-radius-md) - 1px) calc(var(--lib-radius-md) - 1px) 0; }", false],
+    [".vocab-note-input { border-radius: var(--lib-radius-md); }", false],
+    [".vocab-sort-seg > .vocab-sort-btn:first-child { border-radius: 3px 0 0 3px; }", false],
+  ];
+  const libShapeMisjudged = LIB_SHAPE_CASES.filter(([css, want]) => (libShapeOffenders(css).length > 0) !== want);
+  check(libShapeMisjudged.length === 0,
+    "ui-contract-tests.mjs: the library value-box shape scan no longer discriminates -- misjudged: " + libShapeMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
+
+  // (d) A colour literal inside a url() of a value-box rule (%23<hex>, #<hex>,
+  //     rgb(), hsl() -- stage 4 T7-e, Task 4's module-level
+  //     valueBoxUrlColourOffenders): the bare hex ratchet cannot see it, and
+  //     library's chevrons are the per-theme --lib-field-chevron role now
+  //     (§2.2). Whole file, generated regions included.
+  const libUrlOffenders = (css) => valueBoxUrlColourOffenders(css, isValueBoxSelector);
+  check(libUrlOffenders(libNoComments).length === 0,
+    "library.css: a value-box rule carries a colour literal inside url() -- the chevron is var(--lib-field-chevron): " + libUrlOffenders(libNoComments).join(" | "));
+  check(libUrlOffenders(`.xp-dict-lang { background-image: ${CHEVRON}; }`).length === 1 &&
+    libUrlOffenders(`html[data-theme="dracula"] .vocab-filter-row select { background-image: ${CHEVRON}; }`).length === 1 &&
+    libUrlOffenders(`.vocab-sort-seg { background-image: ${CHEVRON}; }`).length === 0 &&
+    libUrlOffenders(".xp-dict-lang { background-image: var(--lib-field-chevron); }").length === 0,
+    "ui-contract-tests.mjs: the library url() colour scan no longer discriminates");
+
+  // The value-box model itself must tell library's boxes from their neighbours.
+  check(isValueBoxSelector(".vocab-note-input:focus") && isValueBoxSelector(".xp-dict-lang") && isValueBoxSelector("#vocab-group-filter") &&
+    isValueBoxSelector('.notes-toolbar input[type="search"]') && isValueBoxSelector('.vocab-group-unit:has(> input[type="text"]:focus)') &&
+    !isValueBoxSelector(".vocab-group-unit > .vocab-group-step") && !isValueBoxSelector("#vocab-status-filter") &&
+    !isValueBoxSelector(".xp-dict-lang option:checked") && !isValueBoxSelector(".vocab-sort-seg") &&
+    acceptsFieldFocusCore(".vocab-note-input:focus:not(:disabled)") && acceptsFieldFocusCore(".xp-dict-lang:focus-visible:not(:disabled)") &&
+    acceptsFieldFocusCore('.notes-toolbar input[type="search"]:focus-visible:not(:disabled), .vocab-lookup-bar input[type="search"]:focus-visible:not(:disabled)') &&
+    !acceptsFieldFocusCore(".vocab-group-unit > .vocab-group-step:focus-visible"),
+    "ui-contract-tests.mjs: the value-box model no longer tells library's value boxes (toolbar search, selects, .xp-dict-lang, note editor, group-unit shell) from their neighbours");
+
+  // (e) §8 law 3 under stage 4: the stepper dividers are the shell's frame
+  // colour at rest and follow the shell into its hover state under exactly
+  // the shell hover's own selector (read from the registry), so a
+  // rest-coloured hairline never shows on the hover fill -- and they win over
+  // the rest divider by specificity, not by source order.
+  const groupShell = LIB.find((t) => t.passenger !== null && selectorListOf(t.rest).includes(".vocab-group-unit"));
+  check(!!groupShell && selectorListOf(groupShell.hover).length === 1,
+    `ui-components.mjs FIELD_TARGETS.lib: no single-selector .vocab-group-unit shell entry with passengers -- got ${JSON.stringify(groupShell?.hover)}`);
+  if (groupShell) {
+    const DIVIDER = ".vocab-group-unit > .vocab-group-step";
+    const dividerHover = `${selectorListOf(groupShell.hover)[0]} > .vocab-group-step`;
+    check(declarationValueMap(libHand, DIVIDER).get("border-left") === "1px solid var(--lib-field-border)" &&
+      declarationValueMap(libHand, dividerHover).get("border-left-color") === "var(--lib-field-border-hover)" &&
+      cmpSpecificity(selectorSpecificity(dividerHover), selectorSpecificity(DIVIDER)) > 0,
+      `library.css: the group-unit dividers must be \`${DIVIDER} { border-left: 1px solid var(--lib-field-border) }\` at rest and \`${dividerHover} { border-left-color: var(--lib-field-border-hover) }\` on hover (the shell hover's own selector, out-ranking the rest divider)`);
+  }
+
+  // (f) Forced colours (spec §6 item 10, ruling R5 / T7-g): the UA drops the
+  //     box-shadow ring and remaps the focus frame, so every library value
+  //     box draws `outline: 1px solid Highlight` (a non-negative offset)
+  //     inside @media (forced-colors: active) on each of its entry's ring
+  //     selectors (fieldRingSelectors -- the group-unit shell keeps its :has()
+  //     trigger), and no outline-suppressing focus rule that applies with
+  //     forced colours on out-ranks it on the same box (the tree above:
+  //     library.html plus the grafted runtime boxes; an !important suppressor
+  //     beats a normal outline; otherwise specificity, then source order).
+  //     §7.3's forced-colors branch holds the outline's own shape where the
+  //     selector names :focus-visible.
+  const OUTLINE_OFF = { outline: /^(?:none|0(?:px)?)$/i, "outline-style": /^none$/i, "outline-width": /^0(?:px)?$/ };
+  const libForcedReport = (text) => {
+    const rules = parseStyleRules(text);
+    const outlines = [];
+    for (const r of rules.filter(inForcedColors)) {
+      const decls = parseDeclarations(r.body);
+      const outline = decls.find((d) => d.property === "outline" && /^1px solid Highlight$/i.test(d.value));
+      const offset = decls.find((d) => d.property === "outline-offset");
+      if (!outline || !offset || !(parseFloat(offset.value) >= 0)) continue;
+      for (const sel of r.selectors) outlines.push({ sel, spec: selectorSpecificity(sel), order: r.sourceOrder, important: outline.important });
+    }
+    const missing = LIB.flatMap((t) => fieldRingSelectors(t).filter((sel) => !outlines.some((o) => o.sel === sel)).map((sel) => `${t.id}: ${sel}`));
+    const outranked = [];
+    for (const r of rules.filter((x) => !x.context.some((c) => FORCED_NONE_RE.test(c)))) {
+      const off = parseDeclarations(r.body).filter((d) => Object.hasOwn(OUTLINE_OFF, d.property) && OUTLINE_OFF[d.property].test(d.value));
+      if (!off.length) continue;
+      const important = off.some((d) => d.important);
+      for (const sel of r.selectors.filter((x) => /:focus(?:-visible|-within)?\b/.test(x))) {
+        for (const node of LIB_BOX_NODES) {
+          if (!libReaches(sel, node)) continue;
+          for (const f of outlines.filter((o) => libReaches(o.sel, node))) {
+            if (f.important && !important) continue;
+            const c = cmpSpecificity(selectorSpecificity(sel), f.spec);
+            if ((important && !f.important) || c > 0 || (c === 0 && r.sourceOrder > f.order)) outranked.push(`${sel} (line ${r.lineNum}) over ${f.sel}`);
+          }
+        }
+      }
+    }
+    return { missing, outranked };
+  };
+  const libForced = libForcedReport(libNoComments);
+  check(libForced.missing.length === 0,
+    "library.css: a library value box has no forced-colors focus outline (1px solid Highlight, non-negative offset, on its registry entry's ring selector) -- spec 2026-09-30 §6 item 10 / R5: " + libForced.missing.join(" | "));
+  check(libForced.outranked.length === 0,
+    "library.css: an outline-suppressing focus rule out-ranks the forced-colors value-box outline, so High Contrast shows no focus: " + [...new Set(libForced.outranked)].join(" | "));
+  const LIB_FORCED_CASES = [
+    // appended to the shipped file: [rule, must be caught]
+    ["#vocab-search:focus { outline: none !important; }", true],
+    [".xp-dict-lang:focus-visible:not(:disabled) { outline: none; }", true],
+    [".vocab-note-input:focus:not(:disabled):not(.a):not(.b) { outline-style: none; }", true],
+    ["@media (forced-colors: active) { .vocab-group-unit:has(> input[type=\"text\"]:focus):not(:disabled):not(.x) { outline: 0; } }", true],
+    ["html[data-theme] .vocab-filter-row select:focus-visible:not(:disabled) { outline: none; }", true],
+    // must stay clean
+    ["@media (forced-colors: none) { .xp-dict-lang:focus-visible { outline: none !important; } }", false],
+    [".vocab-group-unit > input[type=\"text\"]:focus { outline: none !important; }", false],
+    [".vocab-note-input:hover { outline: none !important; }", false],
+    [".notes-toolbar input[type=\"search\"]:focus { outline: none; }", false],
+  ];
+  const libForcedMisjudged = LIB_FORCED_CASES.filter(([rule, want]) => (libForcedReport(`${libNoComments}\n${rule}`).outranked.length > libForced.outranked.length) !== want);
+  const libForcedNone = libForcedReport(libNoComments.replace(/forced-colors\s*:\s*active/g, "forced-colors: none"));
+  check(libForcedMisjudged.length === 0 && libForcedNone.missing.length === LIB.flatMap(fieldRingSelectors).length && LIB.flatMap(fieldRingSelectors).length > 0,
+    "ui-contract-tests.mjs: the library forced-colors value-box focus scan no longer discriminates -- misjudged: " + libForcedMisjudged.map(([rule, want]) => `${want ? "missed" : "false hit"}: ${rule}`).join(" | ") +
+    ` (with every forced-colors block flipped to none, ${libForcedNone.missing.length}/${LIB.flatMap(fieldRingSelectors).length} ring selectors reported missing)`);
+}
+
+// ---- Stage 4 F10 (spec §2.2 / §2.3), library leg: the .vocab-group-unit
+// stepper cells' ghost chip must stay visible against the fill the SHELL
+// actually paints beneath it, in every state a cell can be hovered or pressed
+// in -- the unit hovered (shell on its hover fill) and the unit's text entry
+// focused (shell on its focus fill; the pointer can rest on a cell then, and a
+// press keeps it there where buttons do not take focus). Ink is
+// --lib-field-fg (D6: ink drawn on a field fill), 8% for hover and 10% for
+// press (ruling R6 / T7-h), over that same fill. Floor FILL_SEPARATE_MIN
+// (1.10), imported from the deriver, the same floor the options / popup eye
+// chips are held to. The shell fill per state is read from the generated
+// rules of FIELD_TARGETS.lib's shell entry (the registry formRules consumes),
+// the chips from the hand rules, the values from all 15 library blocks.
+{
+  const STEP_CHIP_MIN = FILL_SEPARATE_MIN;
+  const noComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const hand = noComments(stripGeneratedRegions(libraryCss));
+  const all = noComments(libraryCss);
+  const handRules = parseStyleRules(hand).filter((r) => !inForcedColors(r));
+  const BG_RE = /^background(?:-color)?$/;
+  const isStepChipSelector = (sel) => /:(?:hover|active)/.test(sel) && subjectAlternatives(subjectOf(sel)).some((compound) => {
+    const c = classifyCompound(compound);
+    return !c.pseudoElement && c.classes.includes("vocab-group-step");
+  });
+  const painterSelectors = handRules.filter((r) => r.selectors.some(isStepChipSelector) && parseDeclarations(r.body).some((d) => BG_RE.test(d.property)))
+    .flatMap((r) => r.selectors.filter(isStepChipSelector));
+  const shell = (FIELD_TARGETS.lib || []).find((t) => t.passenger !== null && splitSelectorList(t.rest).includes(".vocab-group-unit"));
+  const FOCUSED = shell ? `${shell.focus} > ` : "\u0000";
+  const CHIPS = [
+    { name: "unit hovered, cell hovered", sel: ".vocab-group-unit > .vocab-group-step:hover:not(:disabled)", fillRule: shell?.hover, pct: 0.08 },
+    { name: "unit hovered, cell pressed", sel: ".vocab-group-unit > .vocab-group-step:active:not(:disabled)", fillRule: shell?.hover, pct: 0.10 },
+    { name: "unit focused, cell hovered", sel: `${FOCUSED}.vocab-group-step:hover:not(:disabled)`, fillRule: shell?.focus, pct: 0.08 },
+    { name: "unit focused, cell pressed", sel: `${FOCUSED}.vocab-group-step:active:not(:disabled)`, fillRule: shell?.focus, pct: 0.10 },
+  ];
+  check(!!shell && JSON.stringify([...painterSelectors].sort()) === JSON.stringify(CHIPS.map((c) => c.sel).sort()),
+    `library.css: the stepper ghost chip is painted by exactly ${JSON.stringify(CHIPS.map((c) => c.sel))} -- found ${JSON.stringify(painterSelectors)}`);
+  // Specificity of what was FOUND: every focused-unit painter out-ranks every
+  // plain one, and each press rule comes after its equal-specificity hover rule.
+  const focusPainters = painterSelectors.filter((s) => s.startsWith(FOCUSED));
+  const plainPainters = painterSelectors.filter((s) => !s.startsWith(FOCUSED));
+  const underRanked = focusPainters.flatMap((f) => plainPainters.filter((p) => cmpSpecificity(selectorSpecificity(f), selectorSpecificity(p)) <= 0).map((p) => `${f} vs ${p}`));
+  check(focusPainters.length === 2 && plainPainters.length === 2 && underRanked.length === 0,
+    `library.css: the focused-unit stepper chips must out-rank the plain ones -- ${underRanked.join(" | ") || JSON.stringify({ focusPainters, plainPainters })}`);
+  const at = (sel) => handRules.findIndex((r) => r.selectors.includes(sel));
+  check(at(CHIPS[1].sel) > at(CHIPS[0].sel) && at(CHIPS[3].sel) > at(CHIPS[2].sel),
+    "library.css: each stepper press chip rule must come after its hover chip rule (equal specificity: source order decides)");
+  const MIX_RE = /^color-mix\(\s*in srgb\s*,\s*var\((--lib-[a-z0-9-]+)\)\s+(\d+(?:\.\d+)?)%\s*,\s*var\((--lib-[a-z0-9-]+)\)\s*\)$/;
+  const VAR_RE = /^var\((--lib-[a-z0-9-]+)\)$/;
+  for (const s of CHIPS) {
+    const chipMap = declarationValueMap(hand, s.sel);
+    const chip = (chipMap.get("background") ?? chipMap.get("background-color") ?? "").trim();
+    const fillMap = s.fillRule ? declarationValueMap(all, s.fillRule) : new Map();
+    const fill = (fillMap.get("background-color") ?? "").trim();
+    const m = MIX_RE.exec(chip), f = VAR_RE.exec(fill);
+    check(!!m && !!f, `library.css: ${s.name}: the chip (${JSON.stringify(chip)}) must be color-mix(in srgb, var(--lib-*) N%, var(--lib-*)) and the shell fill (${JSON.stringify(fill)} on ${JSON.stringify(s.fillRule)}) a single var(--lib-*)`);
+    Object.assign(s, m && f ? { ink: m[1], mix: Number(m[2]) / 100, base: m[3], fillVar: f[1] } : { skip: true });
+    if (!s.skip) {
+      check(s.ink === "--lib-field-fg" && s.mix === s.pct, `library.css: ${s.name}: the chip must be ${Math.round(s.pct * 100)}% --lib-field-fg (D6), got ${Math.round(s.mix * 100)}% ${s.ink}`);
+      check(s.base === s.fillVar, `library.css: ${s.name}: the chip mixes over ${s.base} but the shell paints ${s.fillVar} in that state`);
+    }
+  }
+  // All 15 library blocks: 14 generated html[data-theme] blocks over the
+  // default, which is the hand :root overlaid by the generated :root.
+  const themes = libraryCss.slice(libraryCss.indexOf("/* @generated:ui-themes start"), libraryCss.indexOf("/* @generated:ui-themes end */")).replace(/\/\*[\s\S]*?\*\//g, "");
+  const rootVars = {};
+  const readVars = (body, into) => { for (const d of body.matchAll(/(--lib-[a-z0-9-]+)\s*:\s*([^;]+);/g)) into[d[1]] = d[2].trim(); return into; };
+  for (const m of hand.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) readVars(m[1], rootVars);
+  for (const m of themes.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) readVars(m[1], rootVars);
+  const blocks = [[":root", rootVars]];
+  for (const m of themes.matchAll(/html\[data-theme="([a-z0-9-]+)"\]\s*\{([^}]*)\}/g)) blocks.push([m[1], readVars(m[2], { ...rootVars })]);
+  check(blocks.length === 15, `ui-contract-tests.mjs: the stepper chip gate found ${blocks.length} library theme blocks, expected 15 (14 themes + :root)`);
+  const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+  let measured = 0;
+  const lowest = { r: Infinity, where: "" };
+  for (const [id, vars] of blocks) {
+    for (const s of CHIPS) {
+      if (s.skip) continue;
+      const ink = vars[s.ink], base = vars[s.base], fill = vars[s.fillVar];
+      if (![ink, base, fill].every((v) => HEX.test(v ?? ""))) {
+        check(false, `library.css ${id}: ${s.ink}=${ink} / ${s.base}=${base} / ${s.fillVar}=${fill} is not a #rgb / #rrggbb hex -- the stepper chip gate cannot compute it`);
+        continue;
+      }
+      const a = hexToRgb(ink), b = hexToRgb(base), under = hexToRgb(fill);
+      const chip = a.map((c, i) => Math.round(c * s.mix + b[i] * (1 - s.mix)));
+      const r = contrast(chip, under);
+      measured++;
+      if (r < lowest.r) Object.assign(lowest, { r, where: `${id} ${s.name}` });
+      check(r >= STEP_CHIP_MIN,
+        `library.css ${id}: ${s.name}: the stepper chip is ${r.toFixed(3)}:1 against the shell fill beneath it (${s.fillVar} ${fill}; chip = ${Math.round(s.mix * 100)}% ${s.ink} over ${s.base}) -- floor FILL_SEPARATE_MIN ${STEP_CHIP_MIN}`);
+    }
+  }
+  check(measured === 60, `ui-contract-tests.mjs: the stepper chip gate measured ${measured} (block, state) pairs, expected 60`);
+  if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] stepper chip: lowest ${lowest.r.toFixed(3)}:1 (${lowest.where}) over ${measured} (block, state) pairs; floor ${STEP_CHIP_MIN}`);
 }
 
 if (fail.length) {

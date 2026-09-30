@@ -2517,8 +2517,9 @@ const WEAK_TEXT_CFG = {
   // roles, only for row-selected-fg, a role outside this family's text set.
   // link IS gated vs bg/panel here (auditLibraryThemes :1427-1434), so it
   // stays eligible for the safe-host exemption -- no exclusion list.
+  // Stage 4 Task 7 (T7-f): library's value boxes paint the field fills now.
   library: {
-    prefix: "lib", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg"],
+    prefix: "lib", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg", "field-bg", "field-bg-hover", "field-bg-focus"],
     batchBandMix: LIB_BATCH_BAND_MIX, bgRole: "bg", accentRole: "accent",
     safeHostRoles: ["bg", "panel"],
     // --lib-row-selected-fg is DERIVED specifically to clear both batch bands
@@ -2948,9 +2949,15 @@ const FIELD_HOVER_REQUIRED_KINDS = ['input[type="text"]', 'input[type="password"
 // keys popup's value-box kinds by the SWEEP_CFG valueBoxes entry a box
 // matches (radiusScale.valueBoxKindByEntry), since three of them are plain
 // text inputs a tag/type kind could not tell apart.
+// Library (stage 4 Task 7, T7-b): the kinds its sweep legs render -- the
+// three search fields, the two toolbar selects, the note editor and the
+// .vocab-group-unit shells (keyed by tag/type, or by class for the <span>
+// shell). The relookup .xp-dict-lang (a select) only exists behind a click
+// the sweep does not make; family 14's library leg holds its four corners.
 const RADIUS_VALUE_BOX_REQUIRED = Object.freeze({
   options: Object.freeze([...FIELD_HOVER_REQUIRED_KINDS, 'input[type="search"]']),
   popup: Object.freeze(["#url-input", "#title-input", "#description-input", ".tags-input-wrap", "#token-input", "#search-input"]),
+  library: Object.freeze(['input[type="search"]', "select", "textarea", ".vocab-group-unit"]),
 });
 // Themes whose value boxes are framed and NOT separated from their hosts, per
 // surface (spec 2026-09-30-ui-fields-stage4-design §2.2 / §2.4): the fill
@@ -2961,6 +2968,10 @@ const FIELD_UNSEPARATED_FRAMED = Object.freeze({
   // from --pp-bg. The popup leg re-measures the class from the tokens and
   // FAILs a theme whose measured class differs from this list.
   popup: Object.freeze(["terminal"]),
+  // library (stage 4 Task 7): terminal's pilot frame on a fill that does not
+  // separate from --lib-panel / --lib-bg; the hover frame is
+  // mix(frame, fg, .30) = #228222.
+  library: Object.freeze(["terminal"]),
 });
 // The frame-step floors for those themes (contrast ratio and CIEDE2000 of
 // the hover frame against the rest frame, both composited over the fill):
@@ -3380,7 +3391,7 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
 
 // ---- fieldHoverContrast (family 14), the popup / library value-box legs
 // (stage 4 Task 6, spec 2026-09-30-ui-fields-stage4-design §2.1 / §2.3 /
-// §5.2; ruling R7: ONE surface-parameterised leg, Task 7 adds `library` to
+// §5.2; ruling R7: ONE surface-parameterised leg; Task 7 added `library` to
 // VALUE_BOX_LEGS and calls the same two functions). Each surface's value
 // boxes -- a HAND-WRITTEN list, the render oracle never derives its
 // population from the recipe it checks (tests/render-audit-checklist.mjs
@@ -3456,6 +3467,81 @@ const VALUE_BOX_LEGS = Object.freeze({
             throw e;
           }
           return restore;
+        },
+      },
+    ]),
+  }),
+  // library (stage 4 Task 7, spec §5.2): the nine value boxes -- the three
+  // search fields, the three native selects, the two .vocab-group-unit
+  // shells (the shell carries the look; its text input is a transparent
+  // passenger) and the note editor. Named rather than class-scanned, like
+  // popup's. Both legs navigate fresh instead of inheriting whatever the
+  // CHECKS loop left open (a typed note, an open tab).
+  library: Object.freeze({
+    ns: "lib",
+    radiusVar: "--lib-radius-md",
+    boxes: Object.freeze([
+      ["#vocab-search", null], ["#vocab-group-filter", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang", null],
+      ["#vocab-detail .xp-dict-lang", null], ["#vocab-detail .vocab-note-input", null],
+      ["#vocab-batch-toolbar .vocab-group-unit", null], ["#vocab-detail .vocab-group-unit", null],
+      ["#notes-filter", null],
+    ]),
+    legs: Object.freeze([
+      {
+        // Established here and fail-closed: the detail pane showing the
+        // seeded word (a plain click activates the row), the batch bar open
+        // (Control+click adds the row to the selection; library-vocab.js
+        // keeps the two verbs apart) and NOT busy (#vocab-group-input is
+        // disabled while a batch mutation runs -- an inactive control, whose
+        // shell the hover recipe excludes, so it could never be measured),
+        // and the word's dictionary relookup, whose run builds the only
+        // .xp-dict-lang (library-vocab.js _pbpVocabRelookup). The relookup
+        // makes no request: the dictionary origin is an optional host
+        // permission this profile never grants, so md-dict renders its
+        // connect state under the select.
+        context: "vocab",
+        boxes: ["#vocab-search", "#vocab-group-filter", "#vocab-lookup-input", "#vocab-lookup-lang",
+          "#vocab-detail .xp-dict-lang", "#vocab-detail .vocab-note-input",
+          "#vocab-batch-toolbar .vocab-group-unit", "#vocab-detail .vocab-group-unit"],
+        async open(page, url, theme) {
+          await page.goto(`${url}?_ra=${encodeURIComponent(`fieldhover-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
+          await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
+          const head = page.locator("#vocab-list .vocab-card .notes-card-head").first();
+          if (!(await head.count())) {
+            throw new Error(`SETUP: fieldHoverContrast library: no "#vocab-list .vocab-card .notes-card-head" (theme=${theme}) -- seed fixture broken or markup renamed`);
+          }
+          await head.click();
+          await page.waitForSelector("#vocab-detail:not([hidden]) .vocab-group-unit", { timeout: TIMEOUT_MS });
+          await head.click({ modifiers: ["Control"] });
+          await page.waitForSelector("#vocab-batch-toolbar.selecting", { timeout: TIMEOUT_MS });
+          const relookup = page.locator("#vocab-detail .vocab-detail-relookup:not([hidden])");
+          if (!(await relookup.count())) {
+            throw new Error(`SETUP: fieldHoverContrast library: no visible "#vocab-detail .vocab-detail-relookup" to build .xp-dict-lang (theme=${theme})`);
+          }
+          await relookup.click();
+          await page.waitForSelector("#vocab-detail .xp-dict-lang", { timeout: TIMEOUT_MS });
+          if (await page.$eval("#vocab-group-input", (el) => el.disabled)) {
+            throw new Error(`SETUP: fieldHoverContrast library: #vocab-group-input is disabled (a batch mutation is running) -- the leg must measure the batch-bar group unit enabled (theme=${theme})`);
+          }
+          await page.evaluate(() => document.activeElement?.blur?.());
+          await page.mouse.move(0, 0);
+          await settleAnimations(page);
+          return null;
+        },
+      },
+      {
+        context: "notes",
+        boxes: ["#notes-filter"],
+        async open(page, url, theme) {
+          await page.click("#lib-tab-notes");
+          await page.waitForSelector("#notes-filter", { state: "visible", timeout: TIMEOUT_MS });
+          await page.evaluate(() => document.activeElement?.blur?.());
+          await page.mouse.move(0, 0);
+          await settleAnimations(page);
+          if (!(await page.$("#view-notes:not([hidden])"))) {
+            throw new Error(`SETUP: fieldHoverContrast library: the notes view did not open (theme=${theme})`);
+          }
+          return null;
         },
       },
     ]),
@@ -3555,16 +3641,32 @@ async function recordValueBoxes(page, surface, theme, results, context, boxes, l
     const hover = hoverHold.got;
     const bad = [];
     const painted = (p, i) => p.widths[i] > 0 && !/^(?:none|hidden)$/.test(p.styles[i] || "none");
+    // A BOX paint that is not an opaque colour (a transparent note editor, a
+    // translucent frame) is a product FAIL -- it is not the field token --
+    // unlike a token that does not parse (solid() above: the math has
+    // nothing to stand on, SETUP). null here, and every use below FAILs it.
+    const opaque = (value) => {
+      const s = String(value || "").trim();
+      const p = s.startsWith("#") ? hexRgb(s) : parseRgba(s);
+      return !p || (p.length === 4 && p[3] !== 1) ? null : p.slice(0, 3);
+    };
+    const eqTok = (value, role) => { const c = opaque(value); return !!c && same(c, tok[role]); };
     for (const [p, fillRole, sideRole, name] of [[rest, "field-bg", "field-border", "rest"], [hover, "field-bg-hover", "field-border-hover", "hover"]]) {
-      if (!same(solid(p.own, "background-color", box), tok[fillRole])) bad.push(`${name} fill ${p.own} != --${ns}-${fillRole} ${raw[fillRole]}`);
-      const off = [0, 1, 2, 3].filter((i) => !painted(p, i) || !same(solid(p.sides[i], "border colour", box), tok[sideRole]));
+      if (!eqTok(p.own, fillRole)) bad.push(`${name} fill ${p.own} != --${ns}-${fillRole} ${raw[fillRole]}`);
+      const off = [0, 1, 2, 3].filter((i) => !painted(p, i) || !eqTok(p.sides[i], sideRole));
       if (off.length) bad.push(`${name} side(s) ${off.join(",")} not a painted --${ns}-${sideRole} ${raw[sideRole]} (${p.sides.join(" | ")}; widths ${p.widths.join("/")}; styles ${p.styles.join("/")})`);
     }
     if (!rest.radii.every((v) => Math.abs(v - radiusMd) <= 0.5)) bad.push(`corners ${rest.radii.join("/")}px, want four x ${cfg.radiusVar} ${radiusMd}px`);
-    const fill0 = solid(rest.own, "background-color", box), fill1 = solid(hover.own, "background-color", box);
+    const fill0 = opaque(rest.own), fill1 = opaque(hover.own);
     let step;
-    if (frameCarriesHover) {
-      const b0 = solid(rest.sides[0], "border colour", box), b1 = solid(hover.sides[0], "border colour", box);
+    if (!fill0 || !fill1) {
+      step = "fill not opaque";
+      bad.push(`the ${!fill0 ? "rest" : "hover"} fill ${!fill0 ? rest.own : hover.own} is not an opaque colour -- no step to measure (a value box paints its field fill)`);
+    } else if (frameCarriesHover && !(opaque(rest.sides[0]) && opaque(hover.sides[0]))) {
+      step = "frame not opaque";
+      bad.push(`the ${!opaque(rest.sides[0]) ? "rest" : "hover"} frame ${!opaque(rest.sides[0]) ? rest.sides[0] : hover.sides[0]} is not an opaque colour -- no frame step to measure`);
+    } else if (frameCarriesHover) {
+      const b0 = opaque(rest.sides[0]), b1 = opaque(hover.sides[0]);
       const r = cr(b0, b1), de = deltaE2000(b0, b1);
       step = `frame ${round2(r)}:1 dE2000 ${round2(de)} (framed, fill not separated)`;
       if (!(r >= FIELD_FRAME_HOVER_MIN && de >= FIELD_FRAME_HOVER_MIN_DE && same(fill0, fill1) && cr(b1, fill1) > cr(b0, fill0))) {
@@ -3743,6 +3845,13 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
     await hit.click({ modifiers: ["Control"] }); await page.waitForTimeout(300);
   }
   await recordWeakTextHits(page, "library", theme, results, "notes-batch");
+
+  // ---- fieldHoverContrast (family 14), the library value-box leg (stage 4
+  // Task 7, spec §5.2; R7: the same two functions as popup's leg). Last on
+  // purpose: its legs reload the page and open the relookup fixture, which
+  // must not widen family 13's vocab / notes scans above; the run-level
+  // valueBoxLegCoverage check holds every theme to all nine boxes measured.
+  await recordValueBoxHover(page, "library", `${extBase}library.html`, theme, results, null);
 }
 
 // The provider <select> is a listbox-enhanced value carrier (hidden;
