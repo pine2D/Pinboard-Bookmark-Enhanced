@@ -27,6 +27,14 @@ paths:
 
 只有在三问都答"不能复用"时才新造：在 `ui-vocabulary.json` 对应表面的 `primitives` 登记（一个名字 = 一份几何契约），在 COMPONENTS.md §10 补一行契约，然后才写 CSS。`ui-vocabulary-lint` 会拦下任何名字像结构包装（`-row/-actions/-bar/-toolbar/-card/-section/...`，完整正则见注册表）却未登记、也不在遗留基线里的类；基线只能减不能增，`--write-baseline` 只在有意接受遗留时手动跑。
 
+## 值盒子（阶段 4 起）
+
+popup / library 的值盒子（文本、搜索、密钥输入框，textarea，原生 select，以及 `.tags-input-wrap`、`.vocab-group-unit` 这类融合壳）只有一种字段语言：只有填充，四边同一框色，**不画底边**，四角同一个 `--*-radius-md`；聚焦 = 四边 `field-border-focus` + 手写光晕，另在 `@media (forced-colors: active)` 里补 `outline: 1px solid Highlight`（非负 offset）。
+
+- **颜色只来自生成的注册表**：`docs/theme-surface/composers/ui-components.mjs` 的 `FIELD_TARGETS.pp` / `FIELD_TARGETS.lib`（options 是 `.fg` 配方）。手写区只写几何（高度、内距、宽度、`border-width` + `border-style`、圆角、光晕、`outline: none`），不写任何颜色，也不写 `border` 简写（它把框色重置成 currentColor）。
+- **新增值盒子要在同一提交里登记进 `FIELD_TARGETS`** 并跑 `sync-all`。library 在运行时创建的盒子，必须写成 `tests/ui-contract-tests.mjs` 收割得到的形式：在被收割的脚本（`library-vocab.js` / `library-notes.js` / `library.js`）里写 `const X = document.createElement("input" | "select" | "textarea")`；换写法或换文件就先扩展收割，否则这个盒子不在门内。
+- ui-contract 的覆盖、颜色、形状、`url()` 与强制色扫描会拦下漏登记、手写颜色、底边与分段圆角。
+
 ## 门在哪里响
 
 - 编辑期：`.claude/settings.json` 的 PostToolUse 钩子对 Edit/Write 命中表面文件时跑 `scripts/ui-consumer-lint.mjs`（layout-lint + ui-vocabulary，<1s），红了直接把结论回喂。

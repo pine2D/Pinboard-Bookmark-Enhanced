@@ -2326,15 +2326,18 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
 // popup.html as a tree: tag, content attributes (exactly as written -- no
 // defaults: an <input> without `type` has no type attribute, and
 // `[type="text"]` does not match it, just as in the browser), class list,
-// parent. popup.html has no inline <script> / <style> body (CSP), so a tag
-// scan is exact here. The synthetic root (every top-level node's `parent`)
-// carries `staticClasses`: every class the static markup names anywhere,
-// which callers pass to selectorReaches so nodeMatchesCompound can tell a
-// runtime state class (.ac-open, toggled by popup-tags.js, never in the
-// markup) from a static one the node simply lacks.
+// parent, and its element children in document order (`children`, which the
+// sibling combinators read). popup.html has no inline <script> / <style> body
+// (CSP), so a tag scan is exact here. The synthetic root (every top-level
+// node's `parent`) carries what the static markup names anywhere -- every
+// class (`staticClasses`), attribute name (`staticAttrs`) and id
+// (`staticIds`) -- which scanScopeOf hands to selectorReaches so
+// nodeMatchesCompound can tell a runtime state (.ac-open, toggled by
+// popup-tags.js; html[data-section], set by popup-theme-early.js; neither in
+// the markup) from a static one the node simply lacks.
 function htmlNodes(html) {
   const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
-  const root = { tag: "#root", attrs: {}, classes: [], parent: null, staticClasses: new Set() };
+  const root = { tag: "#root", attrs: {}, classes: [], parent: null, children: [], staticClasses: new Set(), staticAttrs: new Set(), staticIds: new Set() };
   const nodes = [];
   let cur = root;
   for (const m of html.replace(/<!--[\s\S]*?-->/g, "").matchAll(/<(\/?)([a-zA-Z][\w-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {
@@ -2345,12 +2348,22 @@ function htmlNodes(html) {
     }
     const attrs = {};
     for (const a of m[3].matchAll(/([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) attrs[a[1].toLowerCase()] = a[2] ?? a[3] ?? a[4] ?? "";
-    const node = { tag, attrs, classes: (attrs.class || "").split(/\s+/).filter(Boolean), parent: cur };
+    const node = { tag, attrs, classes: (attrs.class || "").split(/\s+/).filter(Boolean), parent: cur, children: [] };
     for (const cls of node.classes) root.staticClasses.add(cls);
+    for (const name of Object.keys(attrs)) root.staticAttrs.add(name);
+    if (attrs.id) root.staticIds.add(attrs.id);
+    cur.children.push(node);
     nodes.push(node);
     if (!VOID.has(tag) && !/\/\s*$/.test(m[3])) cur = node;
   }
   return nodes;
+}
+// The scan-mode scope of a tree (what its static markup names), for
+// selectorReaches' third argument; without one, matching is strict.
+function scanScopeOf(nodes) {
+  let root = nodes[0];
+  while (root?.parent) root = root.parent;
+  return root?.staticClasses ? { classes: root.staticClasses, attrs: root.staticAttrs, ids: root.staticIds } : null;
 }
 // One attribute selector's text between the brackets -> { name, op, value,
 // flag }. Selectors Level 4 attribute matching in full: presence, `=`, `~=`,
@@ -2419,11 +2432,10 @@ function structuralCompound(text) {
     pseudoElement,
   };
 }
-// Complex selector -> compounds, each with the combinator BEFORE it. A
-// leading html[data-theme...] compound is the preset layer's prefix: the
-// attribute is set at run time, never in popup.html, so it is dropped and
-// reported as `themed`. `+` / `~` are not modelled (no field rule uses them)
-// and make the selector match nothing.
+// Complex selector -> compounds, each with the combinator BEFORE it (null on
+// the first). `themed` reports a leading html[data-theme...] compound (the
+// preset layer's prefix) for messages only: it is matched like any other
+// compound -- a runtime attribute in scan mode, unmatched in strict mode.
 function structuralParts(sel) {
   const parts = [];
   let buf = "", pending = null;
@@ -2436,40 +2448,87 @@ function structuralParts(sel) {
     buf += ch;
   }
   flush();
+  if (parts.length) parts[0] = { ...parts[0], comb: null };
   const themed = parts.length > 0 && parts[0].c.tag === "html" && parts[0].c.attrs.some((a) => a.name === "data-theme");
-  const rest = themed ? parts.slice(1) : parts;
-  if (rest.length) rest[0] = { ...rest[0], comb: null };
-  return { parts: rest, themed };
+  return { parts, themed };
 }
+// Attributes a script sets by design: ARIA states and properties, data-*
+// and the HTML boolean states. Their VALUE in the static markup says nothing
+// about the value at run time (popup.html ships aria-busy="true" on the
+// suggestion area and popup-tags.js flips it; library.html ships
+// #vocab-detail hidden).
+const RUNTIME_STATE_ATTR = /^(?:aria-[\w-]+|data-[\w-]+|hidden|disabled|open|inert|checked|selected|readonly)$/;
 // Tag and ids are exact, attribute selectors follow Selectors 4 against the
 // node's CONTENT attributes only (attributeMatches; no implied defaults, so
-// `input[type="text"]` never reaches an untyped <input>). A class the node lacks fails the match
-// when the static markup names it somewhere (`staticClasses`); one it never
-// names is a RUNTIME state class (.ac-open, .dragging) that script may put on
-// this very node, so it is allowed -- except on the SUBJECT, which must still
-// be anchored by something the node really carries (a `.tag-item` rule, a
-// runtime-only class, would otherwise reach every box). Without the set
-// (null) every class is exact.
-function nodeMatchesCompound(node, c, staticClasses = null, subject = false) {
+// `input[type="text"]` never reaches an untyped <input>). Without a scope
+// (null) that is all: strict mode, the one the coverage count runs on --
+// only what the static markup proves.
+// Scan mode (a scanScopeOf scope; every hand-rule scan) asks what the
+// BROWSER can reach, so runtime state counts:
+//   - a class the node lacks fails the match when the static markup names it
+//     somewhere; one it never names is a RUNTIME state class (.ac-open,
+//     .dragging) that script may put on this very node, so it is allowed --
+//     except on the SUBJECT, which must still be anchored by something the
+//     node really carries (a `.tag-item` rule, a runtime-only class, would
+//     otherwise reach every box);
+//   - an attribute condition on a compound OTHER than the subject is
+//     satisfiable when the static markup never carries that attribute name
+//     (html[data-section] / :root[data-theme], set by popup-theme-early.js)
+//     or when it is a RUNTIME_STATE_ATTR (whatever value the markup ships).
+//     The subject's own attributes stay exact ([type="text"] must still tell
+//     a text box from a checkbox).
+function nodeMatchesCompound(node, c, scope = null, subject = false) {
   if (c.tag && node.tag !== c.tag) return false;
   if (c.ids.some((id) => node.attrs.id !== id)) return false;
   let anchored = !!c.tag || c.ids.length > 0 || c.attrs.length > 0;
   for (const cls of c.classes) {
     if (node.classes.includes(cls)) anchored = true;
-    else if (!staticClasses || staticClasses.has(cls)) return false;
+    else if (!scope || scope.classes.has(cls)) return false;
   }
-  if (subject && staticClasses && c.classes.length && !anchored) return false;
-  return c.attrs.every((a) => attributeMatches(node.attrs[a.name], a));
+  if (subject && scope && c.classes.length && !anchored) return false;
+  return c.attrs.every((a) => attributeMatches(node.attrs[a.name], a) ||
+    (!!scope && !subject && (!scope.attrs.has(a.name) || RUNTIME_STATE_ATTR.test(a.name))));
 }
-function selectorReaches(sel, node, staticClasses = null) {
+// Could a compound in a sibling position be an element a script inserts
+// (popup-tags.js puts the .tag-item chips into .tags-input-wrap)? Yes unless
+// it names something only the static markup has: an id the markup carries,
+// a class the markup names, an attribute name the markup carries that is not
+// a runtime state. A bare tag, a runtime class or attribute proves nothing.
+function mayBeInserted(c, scope) {
+  return !c.ids.some((id) => scope.ids.has(id)) && !c.classes.some((cls) => scope.classes.has(cls)) &&
+    c.attrs.every((a) => !scope.attrs.has(a.name) || RUNTIME_STATE_ATTR.test(a.name));
+}
+// Does `sel` reach `node`? Strict mode (no scope) keeps the pre-final-wave
+// answer for the sibling combinators: `+` / `~` reach nothing -- a coverage
+// claim through a sibling the static markup may not keep proves nothing.
+// Scan mode models them in document order (node.parent.children): `+` the
+// immediately preceding element sibling, `~` any preceding one -- and, fail-
+// closed, also a sibling a script may insert (mayBeInserted), or ANY sibling
+// when the node itself is a runtime box whose place is unknown (`unplaced`,
+// library's grafted boxes). Such a virtual sibling shares the node's parent,
+// so the compounds left of it still resolve against the real tree.
+function selectorReaches(sel, node, scope = null) {
   const { parts } = structuralParts(sel);
-  if (!parts.length || parts.some((p) => p.comb === "+" || p.comb === "~")) return false;
-  const from = (n, i) => {
-    if (!nodeMatchesCompound(n, parts[i].c, staticClasses, i === parts.length - 1)) return false;
+  if (!parts.length) return false;
+  if (!scope && parts.some((p) => p.comb === "+" || p.comb === "~")) return false;
+  const inTree = (n) => !!n?.parent; // the synthetic root is no element
+  const from = (n, i) => nodeMatchesCompound(n, parts[i].c, scope, i === parts.length - 1) && leftOf(n, i);
+  // Compound i is matched by n (a virtual sibling: { parent, virtual: true });
+  // do the compounds before it resolve?
+  const leftOf = (n, i) => {
     if (i === 0) return true;
-    if (parts[i].comb === ">") return !!n.parent?.parent && from(n.parent, i - 1);
-    for (let p = n.parent; p?.parent; p = p.parent) if (from(p, i - 1)) return true;
-    return false;
+    const comb = parts[i].comb;
+    if (comb === ">") return inTree(n.parent) && from(n.parent, i - 1);
+    if (comb === " ") {
+      for (let p = n.parent; inTree(p); p = p.parent) if (from(p, i - 1)) return true;
+      return false;
+    }
+    if (!n.virtual && !n.unplaced && n.parent?.children) {
+      const siblings = n.parent.children, at = siblings.indexOf(n);
+      const before = comb === "+" ? siblings.slice(Math.max(0, at - 1), Math.max(0, at)) : siblings.slice(0, Math.max(0, at));
+      if (before.some((p) => from(p, i - 1))) return true;
+    }
+    return !!n.parent && (n.virtual || n.unplaced || mayBeInserted(parts[i - 1].c, scope)) && leftOf({ parent: n.parent, virtual: true }, i - 1);
   };
   return from(node, parts.length - 1);
 }
@@ -2719,8 +2778,17 @@ function compoundStates(sel) {
 }
 // Does the suppressor selector `supSel` provably NOT apply while the outline
 // `outlineSel` does? Both reach the same box (the caller pairs them on a
-// shared target), so their SUBJECT compounds name the same element, and every
-// ancestor compound of the suppressor names an ancestor of it. Task 7 fix
+// shared target), so their SUBJECT compounds name the same element. A
+// compound left of the subject names an ANCESTOR of the box exactly when the
+// combinator right after it is a descendant or child one (final fix wave).
+// Read right to left, every element the selector names is the box, an
+// ancestor of it, or a preceding sibling of one of those: a ` ` / `>` step
+// goes up to an ancestor of the element on its right, and an ancestor of any
+// of those contains the box; a `+` / `~` step goes to a preceding sibling,
+// which contains nothing of the element beside it. So
+// `.row:not(:focus-within) > .label + .field > textarea` names the .row that
+// holds the field, while `.fg label:not(:focus-within) ~ textarea` names a
+// label beside the textarea, which never contains its focus. Task 7 fix
 // round 2: an exclusion only counts for the state the outline actually
 // depends on, on the element that holds it -- read from the outline's own
 // focus trigger (focusTriggerOf):
@@ -2736,10 +2804,10 @@ function compoundStates(sel) {
 //   - a trigger on an ANCESTOR of the outline's subject (popup's
 //     .secret-field:focus-within > input): the box may not hold focus at all
 //     (the eye can), so nothing on the subject excludes it;
-//   - on any ancestor compound of the suppressor only :not(:focus-within)
+//   - on an ancestor compound of the suppressor only :not(:focus-within)
 //     excludes (every ancestor of the box contains the focused element; none
 //     of them is focused itself, so :not(:focus) / :not(:focus-visible) there
-//     exclude nothing);
+//     exclude nothing); on a sibling compound nothing does;
 //   - a subject that is :disabled / [disabled] never co-applies (a disabled
 //     control cannot take focus; a shell never matches :disabled at all).
 // Anything else can apply while the outline does: focus rules, hover rules
@@ -2749,7 +2817,9 @@ function suppressorExcludedBy(supSel, outlineSel) {
   const subject = sup[sup.length - 1];
   if (!subject) return false;
   if (subject.states.includes("disabled") || subject.attrs.some((a) => a.name === "disabled")) return true;
-  if (sup.slice(0, -1).some((c) => c.nots.includes(":focus-within"))) return true;
+  const combs = structuralParts(supSel).parts.map((p) => p.comb);
+  if (combs.length !== sup.length) throw new TypeError(`ui-contract-tests.mjs: suppressorExcludedBy could not align the compounds of \`${supSel}\` with their combinators`);
+  if (sup.slice(0, -1).some((c, k) => (combs[k + 1] === " " || combs[k + 1] === ">") && c.nots.includes(":focus-within"))) return true;
   const trigger = focusTriggerOf(outlineSel);
   if (trigger.index < 0 || trigger.index !== compoundTexts(outlineSel).length - 1) return false;
   const excluding = new Set([":focus-within"]);
@@ -2925,13 +2995,13 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
 }
 {
   const POPUP_NODES = htmlNodes(popupHtml);
-  const PP_STATIC = POPUP_NODES[0]?.parent?.staticClasses ?? new Set();
-  const reaches = (sel, node) => selectorReaches(sel, node, PP_STATIC);
+  const PP_SCOPE = scanScopeOf(POPUP_NODES);
+  const reaches = (sel, node) => selectorReaches(sel, node, PP_SCOPE);
   const PP = FIELD_TARGETS.pp;
   // The tree and the matcher must discriminate, or everything below is blind.
   const byId = (id) => POPUP_NODES.find((n) => n.attrs.id === id);
   const shell = POPUP_NODES.find((n) => n.classes.includes("tags-input-wrap"));
-  check(!!byId("token-input") && !!byId("tags-input") && !!byId("description-input") && !!shell && PP_STATIC.has("secret-field") && !PP_STATIC.has("ac-open") &&
+  check(!!byId("token-input") && !!byId("tags-input") && !!byId("description-input") && !!shell && !!PP_SCOPE && PP_SCOPE.classes.has("secret-field") && !PP_SCOPE.classes.has("ac-open") &&
     reaches('.login-body .secret-field > input[type="password"]', byId("token-input")) &&
     !reaches('.login-body .secret-field > input[type="text"]', byId("token-input")) &&
     reaches('.field > input[type="text"]', byId("title-input")) &&
@@ -2964,6 +3034,41 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     })() &&
     structuralText('.login-body .secret-field:hover:where(:not(:focus-within)) > input[type="text"]:where(:not(:disabled))') === '.login-body .secret-field > input[type="text"]',
     "ui-contract-tests.mjs: the popup.html tree / structural selector matcher no longer discriminates (the popup value-box model below would be blind)");
+  // Scan mode vs strict mode (stage 4 final fix wave): a hand rule reaches a
+  // box when the BROWSER can apply it -- runtime attributes on a compound
+  // other than the subject (html[data-section] from popup-theme-early.js,
+  // :root[data-theme], an aria-* / data-* state) and the sibling combinators
+  // `+` / `~` (document order, plus elements a script inserts) included --
+  // while strict mode, which the coverage count runs on, still reaches only
+  // what the static markup proves. [selector, node id, scan reaches, strict reaches]
+  const PP_SCAN_CASES = [
+    ['html[data-section="login"] .secret-field > input[type="password"]', "token-input", true, false],
+    ["html[data-theme] .field > textarea", "description-input", true, false],
+    [':root[data-theme="nord-night"] .field > textarea', "description-input", true, false],
+    // aria-busy IS in popup.html (#pinboard-suggest-tags), but it is a state
+    // scripts toggle: satisfiable on any ancestor
+    ['[aria-busy="true"] .field > textarea', "description-input", true, false],
+    ['.row > .label + .field > input[type="text"]', "title-input", true, false],
+    [".label ~ .field > textarea", "description-input", true, false],
+    ['#tags-display + input[type="text"]', "tags-input", true, false],
+    // a runtime-inserted sibling (popup-tags.js adds the chips)
+    ['.tag-item ~ input[type="text"]', "tags-input", true, false],
+    ['span + input[type="text"]', "tags-input", true, false],
+    // must NOT reach: a structural attribute the markup carries stays exact,
+    // the subject's attributes stay exact, and a static sibling the markup
+    // proves absent stays absent
+    ['[role="combobox"] .field > textarea', "description-input", false, false],
+    [".field > textarea[data-never]", "description-input", false, false],
+    [".field + .field > textarea", "description-input", false, false],
+    ["#url-input ~ textarea", "description-input", false, false],
+    ['.label + .field > input[type="text"]', "tags-input", false, false],
+    ['#tags-autocomplete + input[type="text"]', "tags-input", false, false],
+    ['html[data-section="login"] .secret-field > input[type="text"]', "token-input", false, false],
+  ];
+  const ppScanMisjudged = PP_SCAN_CASES.filter(([sel, id, scan, strict]) => reaches(sel, byId(id)) !== scan || selectorReaches(sel, byId(id)) !== strict);
+  check(ppScanMisjudged.length === 0,
+    "ui-contract-tests.mjs: the popup scan-mode matcher (runtime attributes off the subject, sibling combinators) or its strict coverage mode no longer discriminates -- misjudged: " +
+    ppScanMisjudged.map(([sel, id, scan, strict]) => `${sel} on #${id}: scan ${reaches(sel, byId(id))} (want ${scan}), strict ${selectorReaches(sel, byId(id))} (want ${strict})`).join(" | "));
 
   for (const t of PP) {
     check(t.chevron === null, `ui-components.mjs: FIELD_TARGETS.pp ${t.id} has a chevron -- popup has no select, and pp emits no --pp-field-chevron (spec §2.2)`);
@@ -2985,7 +3090,22 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     const probe = valueBoxCoverage(htmlNodes('<div class="field"><input id="untyped"></div><div class="field"><input type="text" id="typed"></div><div class="tags-input-wrap"><input type="text" id="core"></div>'), PP);
     check(probe.entries === 3 && probe.uncovered.length === 1 && probe.uncovered[0].startsWith("#untyped:") && probe.passengers.size === 1,
       "ui-contract-tests.mjs: the popup coverage model no longer discriminates (an untyped <input> inside .field must be uncovered; a typed one and a shell passenger covered) -- got " + JSON.stringify(probe.uncovered));
+    // The coverage count stays strict (final fix wave): an entry that reaches
+    // a box only through a runtime attribute or a sibling combinator -- both
+    // of which the scans below DO follow -- proves nothing about what the
+    // shipped registry paints, so it covers nothing and reads as dead, and the
+    // shipped registry's count is the one pinned in the gate dump.
+    const scanOnly = [
+      { id: "probe-runtime-attr", rest: 'html[data-section="main"] .field > textarea', passenger: null },
+      { id: "probe-sibling", rest: '.row > .label + .field > input[type="text"]', passenger: null },
+      { id: "probe-state-attr", rest: '[aria-busy="true"] .login-body .secret-field > input[type="password"]', passenger: null },
+    ];
+    const strictProbe = valueBoxCoverage(POPUP_NODES, scanOnly);
+    check(strictProbe.boxes.size === 0 && strictProbe.dead.length === scanOnly.length &&
+      scanOnly.every((t) => POPUP_NODES.some((n) => reaches(t.rest, n))),
+      `ui-contract-tests.mjs: the popup coverage count must stay strict -- entries reaching a box only through a runtime attribute or a sibling combinator (which scan mode follows) must cover nothing; got ${strictProbe.boxes.size} box(es), dead ${JSON.stringify(strictProbe.dead.map((t) => t.id))}`);
   }
+  gateDump(`[gate] coverage popup entries=${cov.entries} boxes=${PP_BOX_NODES.size} passengers=${PP_PASSENGER_NODES.size} uncovered=${cov.uncovered.length} dead=${cov.dead.length}`);
   // The two predicates every scan below uses: a rule on a box / a passenger
   // (pseudo-element subjects excluded -- ::placeholder has its own branch).
   const onNodes = (sel, nodes) => !structuralCompound(subjectOf(sel)).pseudoElement && [...nodes].some((n) => reaches(sel, n));
@@ -3087,7 +3207,15 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     [".tags-input-wrap.ac-open { border-color: var(--pp-focus-bd); }", true],
     ["@media (forced-colors: none) { .search-field { background: var(--pp-bg); } }", true],
     [".tags-input-wrap input { border: 1px solid var(--pp-border); }", true],
+    // final fix wave: a sibling combinator and a runtime attribute off the
+    // subject both reach a box in the browser (scan mode follows them)
+    ['.row > .label + .field > input[type="text"] { background-color: var(--pp-bg2); }', true],
+    ['html[data-section="main"] .field > textarea { background-color: var(--pp-bg2); border-bottom-color: red; }', true],
+    [':root[data-theme="nord-night"] .search-field { color: var(--pp-fg); }', true],
+    ['[aria-busy="true"] .login-body .secret-field > input[type="password"] { background: var(--pp-bg); }', true],
+    ['.tag-item ~ input[type="text"] { color: var(--pp-fg); }', true],
     // must stay clean
+    [".field + .field > textarea { background-color: var(--pp-bg2); }", false],
     [".tags-input-wrap input { border: none !important; outline: none; background: transparent; }", false],
     [".search-field { width: 100%; border-width: 1px; border-style: solid; border-radius: var(--pp-radius-md); }", false],
     [".tags-input-wrap:focus-within:not(:disabled) { box-shadow: var(--pp-focus-ring); }", false],
@@ -3123,7 +3251,12 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     [".field > textarea { border-bottom: 1px solid var(--pp-field-border); }", true],
     ["#token-input { border-top-left-radius: 0; }", true],
     ['.field > input[type="text"] { border-color: var(--pp-field-border) var(--pp-field-border) var(--pp-field-border-focus); }', true],
+    // final fix wave: a runtime attribute off the subject, a sibling combinator
+    ['html[data-section="main"] .field > textarea { background-color: var(--pp-bg2); border-bottom-color: red; }', true],
+    ['.row > .label + .field > input[type="text"] { border-bottom-color: red; }', true],
+    ['html[data-section="login"] .secret-field > input[type="password"] { border-top-left-radius: 0; }', true],
     // must stay clean
+    [".field + .field > textarea { border-bottom-color: red; }", false],
     [".tags-input-wrap.ac-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }", false],
     [".search-field { border-radius: var(--pp-radius-md); }", false],
     [".tags-input-wrap input { border: none !important; border-radius: 0 var(--pp-radius-sm) 0 0; }", false],
@@ -3143,6 +3276,9 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
   check(ppUrlOffenders(ppNoComments).length === 0, "popup.css: a value-box rule carries a colour literal inside url() -- " + ppUrlOffenders(ppNoComments).join(" | "));
   check(ppUrlOffenders('.search-field { background-image: url("data:image/svg+xml,%3Csvg stroke=%22%23888%22/%3E"); }').length === 1 &&
     ppUrlOffenders(".tags-input-wrap > input[type=\"text\"] { background: url(\"data:image/svg+xml,%3Csvg stroke='#888'%3E%3C/svg%3E\") no-repeat; }").length === 1 &&
+    // final fix wave: a runtime attribute off the subject, a sibling combinator
+    ppUrlOffenders('html[data-section="main"] .field > textarea { background-image: url("data:image/svg+xml,%3Csvg stroke=%22%23888%22/%3E"); }').length === 1 &&
+    ppUrlOffenders('.row > .label + .field > input[type="text"] { background-image: url("data:image/svg+xml,%3Csvg stroke=%22%23888%22/%3E"); }').length === 1 &&
     ppUrlOffenders('.stag { background-image: url("data:image/svg+xml,%3Csvg stroke=%22%23888%22/%3E"); }').length === 0 &&
     ppUrlOffenders(".search-field { background-image: var(--pp-field-bg); }").length === 0,
     "ui-contract-tests.mjs: the popup url() colour scan no longer discriminates");
@@ -3216,7 +3352,20 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     // can hold focus while the input shows the outline, so :not(:focus) on
     // the input excludes nothing either
     ['.login-body .secret-field > input[type="password"]:not(:focus) { outline: none !important; }', true],
+    // final fix wave: a sibling combinator and a runtime attribute off the
+    // subject reach the box in the browser; a :not(:focus-within) on a
+    // SIBLING compound (the label beside the field) excludes nothing -- only
+    // an ancestor of the box contains its focus
+    ['.row > .label + .field > input[type="text"] { outline: none !important; }', true],
+    ['html[data-section="login"] .secret-field > input[type="password"] { outline: none !important; }', true],
+    [':root[data-theme] .tags-input-wrap:focus-within { outline: none !important; }', true],
+    ['.row > .label:not(:focus-within) + .field > textarea:focus { outline: none !important; }', true],
+    ['.label:not(:focus-within) ~ .field > input[type="text"]:focus { outline: none !important; }', true],
     // must stay clean
+    // an ancestor linked to the rest by a sibling step further down is still
+    // an ancestor (.row contains the .label AND the .field beside it)
+    [".row:not(:focus-within) > .label + .field > textarea:focus { outline: none !important; }", false],
+    [".field + .field > textarea:focus { outline: none !important; }", false],
     ["@media (forced-colors: none) { .search-field:focus { outline: none !important; } }", false],
     [".tags-input-wrap input:focus { outline: none !important; }", false],
     [".search-field:focus { outline: none; }", false],
@@ -7886,6 +8035,12 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     // Task 7 fix round 2: :not(<trigger>) on an ancestor excludes nothing
     [".fg:not(:focus) textarea:focus { outline: none !important; }", true],
     [".fg:not(:focus-visible) .key-wrap input:focus { outline: none !important; }", true],
+    // final fix wave: a :not(:focus-within) on a SIBLING compound (the label
+    // beside the textarea) excludes nothing -- only an ancestor contains focus
+    [".fg label:not(:focus-within) ~ textarea:focus { outline: none !important; }", true],
+    [".fg > label:not(:focus-within) + textarea:focus { outline: none !important; }", true],
+    // must stay clean: an ancestor stays an ancestor whatever sits below it
+    [".fg:not(:focus-within) label ~ textarea:focus { outline: none !important; }", false],
     // must stay clean: `forced-colors: none` never applies with forced colours on
     ['@media (forced-colors: none) { html[data-theme] .fg input[type="text"]:focus { outline: none !important; } }', false],
     [".fg textarea:focus { outline: 0; }", false],
@@ -8008,7 +8163,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // (the `hidden` state carriers never render) by exactly one entry's rest,
   // and every entry reaches something.
   const LIB_TREE = htmlNodes(libraryHtml);
-  const LIB_STATIC = LIB_TREE[0]?.parent?.staticClasses ?? new Set();
+  const LIB_SCOPE = scanScopeOf(LIB_TREE);
   const detailNode = LIB_TREE.find((n) => n.attrs.id === "vocab-detail");
   const runtimeHtml = LIBRARY_VALUE_BOX.built.map((b) => {
     const m = /^[^:]+:(\w+)(?:\[type="([^"]+)"\])?(?:\.([\w-]+))?$/.exec(b);
@@ -8018,7 +8173,13 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     return cls ? el : `<span class="${[...LIBRARY_VALUE_BOX.shells][0]}">${el}</span>`;
   }).join("");
   const runtimeNodes = htmlNodes(runtimeHtml);
-  for (const n of runtimeNodes) if (n.parent?.tag === "#root") n.parent = detailNode;
+  // Grafted boxes sit somewhere under #vocab-detail next to other runtime
+  // elements: their place among siblings is unknown (`unplaced`, which scan
+  // mode's sibling combinators read fail-closed; strict mode never follows one).
+  for (const n of runtimeNodes) {
+    if (n.parent?.tag === "#root") n.parent = detailNode;
+    n.unplaced = true;
+  }
   const LIB_NODES = [...LIB_TREE, ...runtimeNodes];
   check(!!detailNode && runtimeNodes.length === 4,
     `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes under #vocab-detail (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 4)`);
@@ -8031,7 +8192,31 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(libSelects.length === 3 && selectMiss.length === 0,
     `library.html + runtime boxes / FIELD_TARGETS.lib: every rendered <select> must be the rest box of exactly one entry -- ${libSelects.length} select(s) (expected 3), unpainted or doubly painted: ${selectMiss.map((n) => n.attrs.id ? `#${n.attrs.id}` : `select.${n.classes.join(".")}`).join(", ") || "none"}`);
   const LIB_BOX_NODES = new Set([...libCov.boxes, ...libSelects]);
-  const libReaches = (sel, node) => selectorReaches(sel, node, LIB_STATIC);
+  const libReaches = (sel, node) => selectorReaches(sel, node, LIB_SCOPE);
+  // Scan mode vs strict mode on library (final fix wave; the popup block
+  // above holds the model's full case list): [selector, node, scan, strict].
+  {
+    const libNode = (key) => LIB_NODES.find((n) => (key.startsWith("#") ? n.attrs.id === key.slice(1) : n.classes.includes(key.slice(1))));
+    const LIB_SCAN_CASES = [
+      ["#vocab-lookup-input + select", "#vocab-lookup-lang", true, false],
+      ["#vocab-lookup-input ~ select", "#vocab-lookup-lang", true, false],
+      // a runtime box's siblings are unknown (library-vocab.js builds them):
+      // scan mode lets any sibling compound precede it
+      ["#vocab-lookup-input + select", ".xp-dict-lang", true, false],
+      ['html[data-theme="dracula"] .vocab-filter-row select', "#vocab-group-filter", true, false],
+      ["#vocab-detail[aria-busy] .vocab-note-input", ".vocab-note-input", true, false],
+      ['[role="search"] select', "#vocab-lookup-lang", true, true],
+      // must NOT reach
+      ["#vocab-search + select", "#vocab-group-filter", false, false],
+      ['[role="grid"] select', "#vocab-lookup-lang", false, false],
+      ["#vocab-lookup-lang + input", "#vocab-lookup-input", false, false],
+    ];
+    const libScanMisjudged = LIB_SCAN_CASES.filter(([sel, key, scan, strict]) => !libNode(key) || libReaches(sel, libNode(key)) !== scan || selectorReaches(sel, libNode(key)) !== strict);
+    check(libScanMisjudged.length === 0,
+      "ui-contract-tests.mjs: the library scan-mode matcher (runtime attributes off the subject, sibling combinators) or its strict coverage mode no longer discriminates -- misjudged: " +
+      libScanMisjudged.map(([sel, key, scan, strict]) => `${sel} on ${key}: ${libNode(key) ? `scan ${libReaches(sel, libNode(key))} (want ${scan}), strict ${selectorReaches(sel, libNode(key))} (want ${strict})` : "node not found"}`).join(" | "));
+  }
+  gateDump(`[gate] coverage library entries=${libCov.entries} boxes=${libCov.boxes.size} passengers=${libCov.passengers.size} selects=${libSelects.length} uncovered=${libCov.uncovered.length} dead=${libCov.dead.length}`);
 
   // (a3) A shell's busy state (plan review focus 4; Task 7 fix round 1): an
   // entry whose rest box is not a form control -- the .vocab-group-unit
@@ -8135,6 +8320,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".vocab-note-input::placeholder { color: var(--lib-fg-hint); }", true],
     ["#vocab-search { --lib-field-bg: #fff; }", true],
     ["@media (forced-colors: none) { .xp-dict-lang { background-color: var(--lib-btn-bg); } }", true],
+    // final fix wave: a sibling combinator and a runtime attribute off the subject
+    ["#vocab-lookup-input + select { background-color: var(--lib-bg2); }", true],
+    [':root[data-theme] .vocab-lookup-bar input[type="search"] { color: var(--lib-fg); }', true],
     // must stay clean
     [".vocab-group-unit > input[type=\"text\"] { background: transparent; border: 0; }", false],
     [".vocab-group-unit > .vocab-group-step { border-left: 1px solid var(--lib-field-border); }", false],
@@ -8174,6 +8362,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     ["#vocab-search { border-bottom-color: var(--lib-accent); }", true],
     [".vocab-group-unit > input[type=\"text\"] { border-radius: calc(var(--lib-radius-md) - 1px) 0 0 0; }", true],
     [".vocab-filter-row select { border-color: var(--lib-field-border) var(--lib-field-border) var(--lib-accent); }", true],
+    // final fix wave: a sibling combinator and a runtime attribute off the subject
+    ["#vocab-lookup-input + select { border-bottom-color: red; }", true],
+    ['html[data-section="main"] .vocab-note-input { border-bottom: 1px solid red; }', true],
     // must stay clean
     [".vocab-group-unit > input[type=\"text\"] { border-radius: calc(var(--lib-radius-md) - 1px) 0 0 calc(var(--lib-radius-md) - 1px); }", false],
     [".vocab-group-unit > .vocab-group-step:last-child { border-radius: 0 calc(var(--lib-radius-md) - 1px) calc(var(--lib-radius-md) - 1px) 0; }", false],
@@ -8262,7 +8453,16 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".vocab-group-unit:not(:focus-visible) { outline: none !important; }", true],
     [".vocab-group-unit:not(:focus) { outline: none !important; }", true],
     ["#vocab-detail:not(:focus) .vocab-note-input:focus { outline: none !important; }", true],
+    // final fix wave: a sibling combinator and a runtime attribute off the
+    // subject reach the box in the browser; a :not(:focus-within) on a
+    // SIBLING compound excludes nothing
+    ["#vocab-lookup-input + select { outline: none !important; }", true],
+    [":root[data-theme] .vocab-note-input { outline: none !important; }", true],
+    ['#vocab-detail[aria-busy="true"] .vocab-group-unit { outline: none !important; }', true],
+    [".vocab-lookup-bar > #vocab-lookup-input:not(:focus-within) + select:focus { outline: none !important; }", true],
     // must stay clean
+    [".vocab-lookup-bar:not(:focus-within) > #vocab-lookup-input + select:focus { outline: none !important; }", false],
+    ["#vocab-lookup-lang + input[type=\"search\"] { outline: none !important; }", false],
     ["@media (forced-colors: none) { .xp-dict-lang:focus-visible { outline: none !important; } }", false],
     [".vocab-group-unit > input[type=\"text\"]:focus { outline: none !important; }", false],
     [".notes-toolbar input[type=\"search\"]:focus { outline: none; }", false],
