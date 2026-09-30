@@ -432,10 +432,17 @@ function complexSpecificity(sel) {
 }
 
 // Specificity [a, b, c] of ONE complex selector. A selector list has no
-// single specificity (each item ranks on its own), so a top-level comma --
-// or an empty / non-string input -- throws instead of silently summing:
-// split with splitSelectorList() first.
+// single specificity (each item ranks on its own), so ANY top-level comma --
+// including a degenerate one, like a trailing "a," or a leading ", a" or a
+// doubled "a,,b" -- or an empty / non-string input -- throws instead of
+// silently summing or silently dropping list-ness. The comma check runs on
+// splitTopLevel() BEFORE splitSelectorList()'s .filter(Boolean) collapses a
+// degenerate comma's empty parts back down to a single item; split with
+// splitSelectorList() first.
 export function selectorSpecificity(selectorText) {
+  if (typeof selectorText === "string" && splitTopLevel(selectorText, ",").length > 1) {
+    throw new TypeError(`selectorSpecificity() takes exactly one complex selector (split lists with splitSelectorList first), got ${JSON.stringify(selectorText)}`);
+  }
   const list = typeof selectorText === "string" ? splitSelectorList(selectorText) : [];
   if (list.length !== 1) {
     throw new TypeError(`selectorSpecificity() takes exactly one complex selector (split lists with splitSelectorList first), got ${JSON.stringify(selectorText)}`);

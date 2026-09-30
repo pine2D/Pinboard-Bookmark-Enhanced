@@ -136,17 +136,18 @@ if (syntax) {
       ["li:nth-child(2n+1 of .a, #b)", [1, 1, 1], ":nth-child(... of S) adds one pseudo-class plus the max of S"],
       ["li:nth-child(odd)", [0, 1, 1], ":nth-child() without of S is one pseudo-class"],
       [".a\\:hover", [0, 1, 0], "an escaped colon stays inside the class name"],
-      ["#\\31 23 .b", [1, 1, 0], "a hex escape swallows one trailing space"],
-      ["A:IS(.x)", [0, 1, 1], "pseudo-class names are case-insensitive"],
+      ["#\\31 a .b", [1, 1, 0], "a hex escape swallows one trailing space (without the swallow, the literal \"a\" that follows would score as a type selector too)"],
+      ["A:IS(#x)", [1, 0, 1], "pseudo-class names are case-insensitive (case-sensitive, :IS(#x) falls to the flat-pseudo-class branch and never scores the #x argument)"],
+      [".日a", [0, 1, 0], "non-ASCII code points are identifier characters, not a break inside a compound"],
       ["#opt-custom-css.over-limit", [1, 1, 0], "id plus class"],
     ];
     for (const [selector, expected, why] of SPECIFICITY_CASES) {
       equal(syntax.selectorSpecificity(selector), expected, `selectorSpecificity(${JSON.stringify(selector)}): ${why}`);
     }
-    for (const bad of [".a, .b", "", "  ", undefined]) {
+    for (const bad of [".a, .b", ".a,", ", .a", ".a,,", "", "  ", undefined]) {
       let threw = false;
       try { syntax.selectorSpecificity(bad); } catch (error) { threw = error instanceof TypeError; }
-      check(threw, `selectorSpecificity(${JSON.stringify(bad)}) must throw a TypeError: a selector list, an empty or a non-string input has no single specificity`);
+      check(threw, `selectorSpecificity(${JSON.stringify(bad)}) must throw a TypeError: a selector list (even a degenerate one with a trailing, leading or doubled comma), an empty or a non-string input has no single specificity`);
     }
     check(syntax.cmpSpecificity([1, 0, 0], [0, 99, 99]) > 0 && syntax.cmpSpecificity([0, 1, 0], [0, 0, 99]) > 0 &&
       syntax.cmpSpecificity([0, 2, 1], [0, 2, 1]) === 0 && syntax.cmpSpecificity([0, 2, 0], [0, 2, 1]) < 0,
@@ -154,6 +155,9 @@ if (syntax) {
     const bracketed = ':is(.a, [x=")"]) .b';
     equal(syntax.closeOfBracket(bracketed, 3), bracketed.indexOf(") .b"),
       "closeOfBracket skips quoted brackets and returns the index of the matching close");
+    const escapedClose = ':is(a\\)) .b';
+    equal(syntax.closeOfBracket(escapedClose, 3), escapedClose.indexOf(") .b"),
+      "closeOfBracket does not let a backslash-escaped close paren end the group early, outside quotes");
   }
 }
 
