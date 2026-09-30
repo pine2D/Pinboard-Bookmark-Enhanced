@@ -3553,6 +3553,14 @@ const VALUE_BOX_LEGS = Object.freeze({
     ]),
   }),
 });
+// The focused reads each surface's legs MUST make (Task 7 fix round 2), held
+// apart from the legs' own `focus` keys so that deleting a key cannot remove
+// both the measurement and its coverage check: the run-level check below
+// requires every entry here to be named by some leg's `focus` and measured on
+// every theme it ran.
+const VALUE_BOX_FOCUS_REQUIRED = Object.freeze({
+  library: Object.freeze(["#vocab-detail .xp-dict-lang"]),
+});
 const valueBoxHoverLog = [];
 // One colour parser for every read of this leg (Task 7 fix round 1): a hex
 // token or a computed rgb()/rgba()/color(srgb ...) value -> [r, g, b] or
@@ -6572,7 +6580,19 @@ async function main() {
     const unmeasured = logs.reduce((sum, entry) => sum + entry.unmeasured.length, 0);
     console.log(`[render-audit] fieldHoverContrast ${surface}: ${measured} value box(es) measured across ${logs.length} theme(s) this run, ${unmeasured} unmeasured (SETUP)${SHARD_TAG}`);
     if (!CHECKS.some((c) => c.surface === surface)) continue;
-    const focusBoxes = VALUE_BOX_LEGS[surface].legs.reduce((sum, leg) => sum + (leg.focus?.length || 0), 0);
+    const focusRequired = VALUE_BOX_FOCUS_REQUIRED[surface] || [];
+    const focusDeclared = new Set(VALUE_BOX_LEGS[surface].legs.flatMap((leg) => leg.focus || []));
+    const focusUnpinned = focusRequired.filter((sel) => !focusDeclared.has(sel));
+    if (focusUnpinned.length) {
+      results.push({
+        surface, theme: "", selector: "(run)", state: "fieldFocusPaint", check: "valueBoxFocusPin",
+        status: "SETUP", setup: "legVacuous",
+        actual: `no VALUE_BOX_LEGS.${surface} leg names ${focusUnpinned.join(" / ")} in its \`focus\` list`,
+        expected: `every VALUE_BOX_FOCUS_REQUIRED.${surface} box read focused by a leg`,
+        note: "the focused read was removed from the leg -- restore its `focus` key (the relookup .xp-dict-lang is reachable only through that leg's fixture)",
+      });
+    }
+    const focusBoxes = new Set([...focusRequired, ...focusDeclared]).size;
     const focusMeasured = logs.reduce((sum, entry) => sum + entry.focusMeasured.length, 0);
     if (focusBoxes) console.log(`[render-audit] fieldFocusPaint ${surface}: ${focusMeasured} focused value box(es) measured across ${logs.length} theme(s) this run${SHARD_TAG}`);
     if (focusMeasured < SHARD_THEMES.length * focusBoxes) {
@@ -6580,7 +6600,7 @@ async function main() {
         surface, theme: "", selector: "(run)", state: "fieldFocusPaint", check: "valueBoxFocusCoverage",
         status: "SETUP", setup: "legVacuous",
         actual: `${focusMeasured} focused value box(es) measured across ${logs.length} theme(s)`,
-        expected: `${SHARD_THEMES.length * focusBoxes} = ${SHARD_THEMES.length} theme(s) run x ${focusBoxes} VALUE_BOX_LEGS.${surface} focus box(es)`,
+        expected: `${SHARD_THEMES.length * focusBoxes} = ${SHARD_THEMES.length} theme(s) run x ${focusBoxes} focus box(es) (VALUE_BOX_FOCUS_REQUIRED.${surface} + the legs' \`focus\` keys)`,
         note: `the family-14 ${surface} leg read fewer focused boxes than the run requires (see their own SETUP rows)`,
       });
     }

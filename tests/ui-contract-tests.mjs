@@ -2685,27 +2685,79 @@ function fieldRingMissing(ns, targets, handCss) {
 //     an outline rule count (options: :focus-visible only); `requireOffset`
 //     demands a declared non-negative outline-offset (popup / library).
 //     A suppressor is any outline-removing rule outside `forced-colors: none`
-//     that can apply WHILE its element holds focus (canCoMatchFocus): a :focus
-//     rule, and also a :hover rule (the pointer can rest on a box the keyboard
-//     focuses -- spec §2.1, plan review focus 2) or a stateless one. It
-//     out-ranks an outline the way the cascade does: !important over a
-//     normal declaration outright; otherwise (both or neither important)
-//     strictly higher specificity, or equal and later in the file.
+//     that can apply WHILE the outline does (suppressorExcludedBy decides,
+//     per outline): a :focus rule, and also a :hover rule (the pointer can
+//     rest on a box the keyboard focuses -- spec §2.1, plan review focus 2)
+//     or a stateless one. It out-ranks an outline the way the cascade does:
+//     !important over a normal declaration outright; otherwise (both or
+//     neither important) strictly higher specificity, or equal and later in
+//     the file.
 //     `required` = [{ label, sel } | { label, target }]: an outline must exist
 //     on that exact selector / reach that target. Returns { outlines,
 //     missing, outranked }.
 const OUTLINE_OFF = Object.freeze({ outline: /^(?:none|0(?:px)?)$/i, "outline-style": /^none$/i, "outline-width": /^0(?:px)?$/ });
-// Can a rule on this selector apply while its element (or the shell carrying
-// its state) holds focus? Not when the selector excludes focus somewhere --
-// a :not() whose argument holds a focus trigger, on any compound -- or when
-// its subject is disabled (a disabled control cannot take focus). Everything
-// else can: focus rules, hover rules, stateless rules.
-function canCoMatchFocus(sel) {
-  if (notArgumentsOf(sel).some((a) => FOCUS_TRIGGER_RE.test(a))) return false;
-  const parts = compoundTexts(sel);
-  const subject = parts[parts.length - 1] ?? "";
-  if (stateTokens(subject).some((t) => t.name === "disabled" && t.arg === null)) return false;
-  return !structuralCompound(subject).attrs.some((a) => a.name === "disabled");
+// Per compound (subject last): the :not() arguments written on it and its
+// positive state pseudo-classes, read at its top level and inside a
+// SINGLE-argument :where() / :is() only -- a multi-argument one is an OR, so
+// no exclusion is credited from it (the ladder gate's stateTokens flattens
+// both; this reader must not).
+function compoundStates(sel) {
+  return compoundTexts(sel).map((compound) => {
+    const nots = [], states = [];
+    const walk = (c) => {
+      for (const t of pseudoClassTokens(c)) {
+        if (t.name === "not" && t.arg !== null) nots.push(...splitSelectorList(t.arg).map(normSel));
+        else if ((t.name === "where" || t.name === "is") && t.arg !== null) {
+          const args = splitSelectorList(t.arg);
+          if (args.length === 1 && compoundTexts(args[0]).length === 1) walk(args[0]);
+        } else if (t.arg === null) states.push(t.name);
+      }
+    };
+    walk(compound);
+    return { nots, states, attrs: structuralCompound(compound).attrs };
+  });
+}
+// Does the suppressor selector `supSel` provably NOT apply while the outline
+// `outlineSel` does? Both reach the same box (the caller pairs them on a
+// shared target), so their SUBJECT compounds name the same element, and every
+// ancestor compound of the suppressor names an ancestor of it. Task 7 fix
+// round 2: an exclusion only counts for the state the outline actually
+// depends on, on the element that holds it -- read from the outline's own
+// focus trigger (focusTriggerOf):
+//   - trigger :focus / :focus-visible on the outline's subject: the box
+//     itself holds focus, so on the suppressor's subject :not(:focus),
+//     :not(:focus-within) and (for a :focus-visible trigger)
+//     :not(:focus-visible) exclude it;
+//   - trigger :focus-within / :has(...) on the outline's subject (a shell --
+//     .tags-input-wrap, .vocab-group-unit -- that never takes focus itself):
+//     only :not(:focus-within) or the very same :not(:has(...)) on the
+//     subject excludes it; :not(:focus) / :not(:focus-visible) there exclude
+//     nothing;
+//   - a trigger on an ANCESTOR of the outline's subject (popup's
+//     .secret-field:focus-within > input): the box may not hold focus at all
+//     (the eye can), so nothing on the subject excludes it;
+//   - on any ancestor compound of the suppressor only :not(:focus-within)
+//     excludes (every ancestor of the box contains the focused element; none
+//     of them is focused itself, so :not(:focus) / :not(:focus-visible) there
+//     exclude nothing);
+//   - a subject that is :disabled / [disabled] never co-applies (a disabled
+//     control cannot take focus; a shell never matches :disabled at all).
+// Anything else can apply while the outline does: focus rules, hover rules
+// (the pointer can rest on a keyboard-focused box), stateless rules.
+function suppressorExcludedBy(supSel, outlineSel) {
+  const sup = compoundStates(supSel);
+  const subject = sup[sup.length - 1];
+  if (!subject) return false;
+  if (subject.states.includes("disabled") || subject.attrs.some((a) => a.name === "disabled")) return true;
+  if (sup.slice(0, -1).some((c) => c.nots.includes(":focus-within"))) return true;
+  const trigger = focusTriggerOf(outlineSel);
+  if (trigger.index < 0 || trigger.index !== compoundTexts(outlineSel).length - 1) return false;
+  const excluding = new Set([":focus-within"]);
+  if (trigger.text === ":focus" || trigger.text === ":focus-visible") {
+    excluding.add(":focus");
+    if (trigger.text === ":focus-visible") excluding.add(":focus-visible");
+  } else if (trigger.text.startsWith(":has(")) excluding.add(trigger.text);
+  return subject.nots.some((a) => excluding.has(a));
 }
 function forcedOutlineReport(text, { targetsOf, required, outlineSelector = () => true, requireOffset = true }) {
   const rules = parseStyleRules(text);
@@ -2728,11 +2780,11 @@ function forcedOutlineReport(text, { targetsOf, required, outlineSelector = () =
     const off = parseDeclarations(r.body).filter((d) => Object.hasOwn(OUTLINE_OFF, d.property) && OUTLINE_OFF[d.property].test(d.value.trim()));
     if (!off.length) continue;
     const important = off.some((d) => d.important);
-    for (const sel of r.selectors.filter(canCoMatchFocus)) {
+    for (const sel of r.selectors) {
       const targets = targetsOf(sel);
       if (!targets.length) continue;
       for (const f of outlines) {
-        if (!targets.some((t) => f.targets.has(t))) continue;
+        if (!targets.some((t) => f.targets.has(t)) || suppressorExcludedBy(sel, f.sel)) continue;
         if (f.important && !important) continue;
         const c = cmpSpecificity(selectorSpecificity(sel), f.spec);
         if ((important && !f.important) || c > 0 || (c === 0 && r.sourceOrder > f.order)) outranked.push(`${sel} (line ${r.lineNum}) over ${f.sel}`);
@@ -3130,7 +3182,7 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
   //     @media (forced-colors: active) on each of its entry's ring selectors
   //     (fieldRingSelectors -- the shells keep :focus-within), and no
   //     outline-suppressing rule that can apply while the box holds focus --
-  //     a focus, hover or stateless rule (canCoMatchFocus) -- out-ranks it on
+  //     a focus, hover or stateless rule (suppressorExcludedBy) -- out-ranks it on
   //     the same popup.html box (the shared forcedOutlineReport).
   //     §7.3's forced-colors branch above holds the outline's own shape.
   const ppForcedReport = (text) => forcedOutlineReport(text, {
@@ -3154,6 +3206,16 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     [".field > textarea:hover { outline: none !important; }", true],
     [".field > textarea { outline: none !important; }", true],
     ["#search-input { outline-style: none; }", true],
+    // Task 7 fix round 2: a :not(<trigger>) excludes nothing on a shell (it
+    // never takes focus itself) or on an ancestor (it contains the focused
+    // box, it is not focused)
+    [".tags-input-wrap:not(:focus-visible) { outline: none !important; }", true],
+    [".tags-input-wrap:not(:focus) { outline: none !important; }", true],
+    [".field:not(:focus) > textarea:focus { outline: none !important; }", true],
+    // the token field's outline hangs on the SHELL's :focus-within: the eye
+    // can hold focus while the input shows the outline, so :not(:focus) on
+    // the input excludes nothing either
+    ['.login-body .secret-field > input[type="password"]:not(:focus) { outline: none !important; }', true],
     // must stay clean
     ["@media (forced-colors: none) { .search-field:focus { outline: none !important; } }", false],
     [".tags-input-wrap input:focus { outline: none !important; }", false],
@@ -3161,6 +3223,9 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     [".search-field { outline: none; }", false],
     [".field > textarea:not(:focus) { outline: none !important; }", false],
     [".field > textarea:disabled { outline: none !important; }", false],
+    [".field:not(:focus-within) > textarea { outline: none !important; }", false],
+    [".tags-input-wrap:not(:focus-within) { outline: none !important; }", false],
+    ['.login-body .secret-field:not(:focus-within) > input[type="password"] { outline: none !important; }', false],
   ];
   const ppForcedMisjudged = PP_FORCED_CASES.filter(([rule, want]) => (ppForcedReport(`${ppNoComments}\n${rule}`).outranked.length > ppForced.outranked.length) !== want);
   const ppForcedNone = ppForcedReport(ppNoComments.replace(/forced-colors\s*:\s*active/g, "forced-colors: none"));
@@ -7729,7 +7794,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   //     outside every forced-colors context OR inside `forced-colors:
   //     active` itself, but not inside `forced-colors: none` -- and can apply
   //     while the box holds focus: a focus rule, and since Task 7 fix round 1
-  //     also a hover or stateless one (canCoMatchFocus);
+  //     also a hover or stateless one (suppressorExcludedBy);
   //   - "out-ranks" follows the cascade: an !important suppressor beats a
   //     normal outline outright; otherwise (both or neither important)
   //     strictly higher specificity, or equal and later in the file.
@@ -7818,6 +7883,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".listbox-btn:hover { outline: none; }", true],
     ["#opt-pinboard-token:hover { outline: none; }", true],
     [".fg textarea { outline: none !important; }", true],
+    // Task 7 fix round 2: :not(<trigger>) on an ancestor excludes nothing
+    [".fg:not(:focus) textarea:focus { outline: none !important; }", true],
+    [".fg:not(:focus-visible) .key-wrap input:focus { outline: none !important; }", true],
     // must stay clean: `forced-colors: none` never applies with forced colours on
     ['@media (forced-colors: none) { html[data-theme] .fg input[type="text"]:focus { outline: none !important; } }', false],
     [".fg textarea:focus { outline: 0; }", false],
@@ -8163,7 +8231,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   //     inside @media (forced-colors: active) on each of its entry's ring
   //     selectors (fieldRingSelectors -- the group-unit shell keeps its :has()
   //     trigger), and no outline-suppressing rule that can apply while the
-  //     box holds focus -- a focus, hover or stateless rule (canCoMatchFocus)
+  //     box holds focus -- a focus, hover or stateless rule (suppressorExcludedBy)
   //     -- out-ranks it on the same box (the tree above: library.html plus the
   //     grafted runtime boxes; the shared forcedOutlineReport). §7.3's
   //     forced-colors branch holds the outline's own shape where the selector
@@ -8189,6 +8257,11 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".vocab-note-input:hover { outline: none !important; }", true],
     [".vocab-note-input { outline: none !important; }", true],
     ["#vocab-detail .vocab-group-unit:hover { outline-width: 0; }", true],
+    // Task 7 fix round 2: :not(<trigger>) excludes nothing on a shell or an
+    // ancestor
+    [".vocab-group-unit:not(:focus-visible) { outline: none !important; }", true],
+    [".vocab-group-unit:not(:focus) { outline: none !important; }", true],
+    ["#vocab-detail:not(:focus) .vocab-note-input:focus { outline: none !important; }", true],
     // must stay clean
     ["@media (forced-colors: none) { .xp-dict-lang:focus-visible { outline: none !important; } }", false],
     [".vocab-group-unit > input[type=\"text\"]:focus { outline: none !important; }", false],
@@ -8196,6 +8269,10 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".vocab-note-input { outline: none; }", false],
     [".vocab-note-input:not(:focus) { outline: none !important; }", false],
     [".vocab-group-unit:not(:focus-within) { outline: none !important; }", false],
+    ['.vocab-group-unit:not(:has(> input[type="text"]:focus)) { outline: none !important; }', false],
+    ["#vocab-detail:not(:focus-within) .xp-dict-lang { outline: none !important; }", false],
+    // a multi-argument :where() is an OR: no exclusion is credited from it
+    [".vocab-note-input:where(:not(:focus), .never) { outline: none !important; }", true],
   ];
   const libForcedMisjudged = LIB_FORCED_CASES.filter(([rule, want]) => (libForcedReport(`${libNoComments}\n${rule}`).outranked.length > libForced.outranked.length) !== want);
   const libForcedNone = libForcedReport(libNoComments.replace(/forced-colors\s*:\s*active/g, "forced-colors: none"));

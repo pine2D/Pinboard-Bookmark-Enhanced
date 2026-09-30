@@ -1341,8 +1341,9 @@ export const CHECKS = [
   // BATCH_BAR_SELECTORS (needsBatchBarOpen); `.notes-toolbar #notes-filter`
   // starts with ".notes-" so the runner opens the notes view for it. The
   // relookup .xp-dict-lang has no row: it exists only behind the relookup
-  // click, which family 14's library leg makes (rest / hover tokens and four
-  // corners there; its focus rule is pinned statically in ui-contract). ----
+  // click, which family 14's library leg makes: rest / hover tokens, four
+  // corners, and a keyboard-focused read (focus fill, four focus sides, the
+  // ring) on every theme, held by VALUE_BOX_FOCUS_REQUIRED.library. ----
   { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
     expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
   { surface: "library", page: "library.html", selector: "#vocab-search", state: "hover",
