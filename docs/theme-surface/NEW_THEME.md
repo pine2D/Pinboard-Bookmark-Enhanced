@@ -479,6 +479,9 @@ final-fix wave:
   to this mechanism.) Note the naming split: popup uses the `-bd` suffix
   (`btn-bd`/`input-bd`), options/library use `-border`
   (`btn-border`/`input-border`) — copy the exact key your surface expects.
+  Popup's `input-bd` is an input only: since stage 4 the popup value boxes
+  paint `--pp-field-border` (derived by `deriveFieldRoles`), and no
+  `--pp-input-bd` custom property is emitted any more.
   The value-box frame key (popup `input-bd`, options/library
   `input-border`) also frames the field family (`deriveFieldRoles`), so its
   value must be a `#rgb` / `#rrggbb` / `#rrggbbaa` hex, or exactly

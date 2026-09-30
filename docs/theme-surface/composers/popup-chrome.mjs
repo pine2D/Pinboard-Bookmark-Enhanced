@@ -82,12 +82,9 @@ const DEFAULT_LIGHT = {
                                  // stopped reading as a change at all. fillSeparate(drop-hover, [btn-bg],
                                  // fg) -- 1.10:1 vs rest, still the same accent-tinted family. (re-derived
                                  // 2026-09-21 alongside btn-bg; was #dee5f2).
-  "input-bd": "#e9ecf0",        // = --pp-input-bg (itself nudged to #e9ecf0 in :root by the same
-                                 // fillSeparate([bg, bg2]) pass, re-derived 2026-09-21 for the 1.10 floor;
-                                 // was #edf0f4) -- the field's resting frame collapses into its own fill,
-                                 // same rule as btn-bd. Replaces the hand-written `--pp-input-bd:
-                                 // transparent`, which only ever held on the default surface: every
-                                 // preset re-armed a full --pp-border frame further down.
+  // input-bd: no longer emitted (stage 4 Task 6). popup's value boxes paint
+  // --pp-field-border from FIELD_TARGETS.pp; the pilot key ui.popup.<mode>
+  // ["input-bd"] stays the finalizer's framed-field signal (inputBorderRole).
   "border": "#78859c",          // NOT a literal copy: the hand-written :root's old #e8eaee was only
                                  // 1.12:1 against --pp-bg2 (design-uplift Task 16, USER RULING --
                                  // border reads visibly heavier now, the intended effect). Derived the
@@ -130,7 +127,7 @@ function emitPp(ui, mode) {
   const lines = [`  color-scheme: ${mode};`];
   const set = (k, val) => lines.push(`  --pp-${k}: ${val};`);
   for (const k of ["bg", "bg2", "fg", "fg-muted", "fg-hint", "link", "accent", "accent2",
-    "border", "divider", "input-bg", "input-bd", "input-focus-bg", "tag-bg", "tag-fg", "tag-hover", "drop-hover",
+    "border", "divider", "input-bg", "input-focus-bg", "tag-bg", "tag-fg", "tag-hover", "drop-hover",
     "chip-bg", "chip-fg", "ai-chip-fg", "btn-bg", "btn-bd", "btn-hover", "btn-fg", "btn-fg-muted",
     "banner-bg", "banner-bd", "banner-fg", "warn-bg", "warn-bd", "warn-fg",
     "ok-bg", "ok-bd", "ok-fg", "offline-bg", "offline-bd", "offline-fg",

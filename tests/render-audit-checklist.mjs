@@ -1254,14 +1254,47 @@ export const CHECKS = [
     focusTarget: "input",
     expect: { fusedStateStable: true, fusedStateStableChildren: ["input", ".key-toggle"] } },
 
-  // NOTE: popup's plain inputs (#title-input, #search-input) are gated
-  // statically in tests/ui-contract-tests.mjs, not here. They live in
-  // #main-section, which popup.js only un-hides after resolving the active
-  // tab's bookmark state -- something this fixture (a normal page, no
-  // meaningful active tab) cannot produce, so a render entry here fails at
-  // setup rather than measuring anything. Same reason .secret-field and
-  // .tags-input-wrap are static-gated; the four surfaces that CAN render
-  // their fused controls are all gated live above.
+  // ---- Stage 4 (spec 2026-09-30-ui-fields-stage4-design §2.1 / §5.1):
+  // popup's value boxes, token IDENTITY per state -- rest fill + four painted
+  // --pp-field-border sides, hover fill + four --pp-field-border-hover sides,
+  // focus fill + four --pp-field-border-focus sides and the bordered ring.
+  // The runner reaches all of them now (it did not when this spot said
+  // "static-gated only"): #main-section is unhidden by the fixture that the
+  // focusWithin rows already trigger, and runSimpleTheme unhides .search-row
+  // and #login-section for #search-input / #token-input. The tags field is
+  // measured on its SHELL (it carries the look; #tags-input is a transparent
+  // passenger), focused through the passenger. The step sizes are family
+  // 14's popup leg; the token pairs are contrast-audit's pp field rows. ----
+  { surface: "popup", page: "popup.html", selector: "#title-input", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "popup", page: "popup.html", selector: "#title-input", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "popup", page: "popup.html", selector: "#title-input", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "popup", page: "popup.html", selector: "#description-input", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "popup", page: "popup.html", selector: "#description-input", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "popup", page: "popup.html", selector: "#description-input", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "popup", page: "popup.html", selector: ".tags-input-wrap", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "popup", page: "popup.html", selector: ".tags-input-wrap", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "popup", page: "popup.html", selector: ".tags-input-wrap", state: "focusWithin", focusTarget: 'input[type="text"]',
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "popup", page: "popup.html", selector: "#search-input", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "popup", page: "popup.html", selector: "#search-input", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "popup", page: "popup.html", selector: "#search-input", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
+  { surface: "popup", page: "popup.html", selector: "#token-input", state: "default",
+    expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
+  { surface: "popup", page: "popup.html", selector: "#token-input", state: "hover",
+    expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
+  { surface: "popup", page: "popup.html", selector: "#token-input", state: "focusWithin", focusTarget: ":scope",
+    expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
 
   // ---- COMPONENTS.md §7.3: focus-ring recipe conformance (2026-08-05
   // sweep). One entry per converged site. The two sites that need heavy

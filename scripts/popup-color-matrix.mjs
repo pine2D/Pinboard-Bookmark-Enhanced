@@ -131,6 +131,19 @@ const PROBES = [
   [".add-all-link", true],
   ['.field > input[type="text"]', false],
   ['.field > input[type="text"]', true],
+  // Stage 4 Task 6 (spec §3.2 / §5.1 evidence): the rest of the popup
+  // value-box family and what rides on it -- the textarea, the tags shell's
+  // hover, the chips, the eye's hover, the suggestion list's frame. The
+  // three non-value-box --pp-input-bg consumers, which must NOT move, reuse
+  // Task 5's probes above (.batch-progress, .batch-cancel-btn .btn-ic, and
+  // .batch-progress-text through the text-shadow property).
+  ['.field > textarea', false],
+  ['.field > textarea', true],
+  [".tags-input-wrap", true],
+  [".tag-item", false],
+  [".tag-item", true],
+  [".login-body .key-toggle", true],
+  [".autocomplete-dropdown", false],
 ];
 
 const PROPS = ["color", "background-color", "border-top-color", "border-bottom-color", "border-left-color", "text-shadow"];
@@ -153,7 +166,11 @@ function serveRoot() {
 async function dump() {
   const { server, port } = await serveRoot();
   const browser = await chromium.launch();
-  const page = await browser.newPage();
+  // Tall enough that the login section, the whole form and the quick-actions
+  // strip all sit inside the viewport once both sections are unhidden below
+  // (stage 4 Task 6): a :hover probe on an element below the fold never
+  // lands, and the probe would read its REST paint as "hover".
+  const page = await browser.newPage({ viewport: { width: 1280, height: 2400 } });
   // popup.css's own @media (prefers-reduced-motion: reduce) block sets
   // transition-duration: 0.01ms !important globally -- without this a
   // getComputedStyle() read right after a theme switch or hover() can land
@@ -270,6 +287,14 @@ async function dump() {
 
     // #desc-char-count.over-limit -- state class on the real static node.
     document.getElementById("desc-char-count")?.classList.add("over-limit");
+
+    // Both sections ship `.hidden` (popup.js never runs here), and
+    // popup-theme-early.js tags <html data-section="login"> on an empty
+    // localStorage, which display:none's the whole quick-actions strip. A
+    // display:none element cannot be hovered: without this every ":hover"
+    // probe on a value box read its REST paint (stage 4 Task 6).
+    for (const id of ["main-section", "login-section"]) document.getElementById(id)?.classList.remove("hidden");
+    delete document.documentElement.dataset.section;
   });
 
   const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -314,6 +339,13 @@ async function dump() {
       }
     }
   }
+  // Evidence metadata (stage 4 spec §5.1): what the dump was rendered at.
+  // --diff skips "__"-prefixed keys and prints both.
+  out.__meta = {
+    ...(await page.evaluate(() => ({ devicePixelRatio: window.devicePixelRatio, bodyZoom: getComputedStyle(document.body).zoom }))),
+    fontconfig: process.env.FONTCONFIG_FILE || null,
+    chromium: browser.version(),
+  };
   await browser.close();
   server.close();
   if (missing.size) {
@@ -337,7 +369,9 @@ async function main() {
     let changes = 0;
     const uncovered = new Set();
     const asymmetric = [];
+    console.log(`before: ${JSON.stringify(before.__meta ?? null)}\nafter:  ${JSON.stringify(after.__meta ?? null)}\n`);
     for (const theme of Object.keys(after)) {
+      if (theme.startsWith("__")) continue;
       const b = before[theme] || {};
       const a = after[theme];
       for (const label of Object.keys(a)) {

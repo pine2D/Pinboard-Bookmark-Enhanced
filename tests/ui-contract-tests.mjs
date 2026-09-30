@@ -5,6 +5,7 @@ import { runInNewContext } from "node:vm";
 import { parseStyleRules, parseDeclarations, declarationValueMap, splitSelectorList, closeOfBracket, cmpSpecificity, selectorSpecificity } from "../docs/theme-surface/tools/css-syntax.mjs";
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 import { contrast, hexToRgb, FILL_SEPARATE_MIN, FIELD_ROLES, UI_DERIVED_OUTPUT_ROLES } from "../docs/theme-surface/composers/_ui-derive.mjs";
+import { FIELD_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
 import * as uiDerive from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
@@ -376,6 +377,50 @@ function valueBoxUrlColourOffenders(css, isBox) {
   });
 }
 
+// The stage 4 value-box SHAPE scan (spec 2026-09-30-ui-fields-stage4-design
+// §2.1 / §5.1; COMPONENTS.md §6.1): no hand rule draws a value box apart from
+// its one frame colour and one radius -- no bottom-side border property
+// (physical or logical; shorthand, colour, width or style), no value naming a
+// --<ns>-field-edge* token, no multi-value border-color / border-block-color
+// whose bottom differs from its top, no multi-value border-radius and no
+// per-corner radius longhand. Module level since Task 6 so each surface's
+// block runs it with its own value-box predicate (`isBox`, per selector):
+// options since Task 2, popup since Task 6, library in Task 7. `exempt(sels,
+// decl)` lets a surface name its one sanctioned exception (popup: the open
+// tags shell's two square bottom corners). Keep the const ABOVE its first
+// caller (TDZ; the popup block runs long before the options one).
+function valueTokens(value) {
+  const out = [];
+  let cur = "", depth = 0;
+  for (const ch of value.replace(/!important\s*$/i, "").trim()) {
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    if (/\s/.test(ch) && depth === 0) { if (cur) out.push(cur); cur = ""; } else cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+const RADIUS_CORNER_RE = /^border-(?:(?:top|bottom)-(?:left|right)|(?:start|end)-(?:start|end))-radius$/;
+function valueBoxShapeOffenders(css, isBox, { ns = "opt", exempt = null } = {}) {
+  const edgeRe = new RegExp(`--${ns}-field-edge`);
+  const out = [];
+  for (const r of parseStyleRules(css)) {
+    const sels = r.selectors.filter(isBox);
+    if (!sels.length) continue;
+    for (const d of parseDeclarations(r.body)) {
+      if (exempt && exempt(sels, d)) continue;
+      const ts = valueTokens(d.value);
+      const splitBottom = (d.property === "border-color" && ts.length >= 3 && ts[2] !== ts[0]) ||
+        (d.property === "border-block-color" && ts.length >= 2 && ts[1] !== ts[0]);
+      const splitRadius = (d.property === "border-radius" && ts.length > 1) || RADIUS_CORNER_RE.test(d.property);
+      if (/^border-(?:bottom|block-end)(?:-(?:color|width|style))?$/.test(d.property) || edgeRe.test(d.value) || splitBottom || splitRadius) {
+        out.push(`${sels.join(", ")} { ${d.property}: ${d.value} }`);
+      }
+    }
+  }
+  return out;
+}
+
 // Windows High Contrast contexts (stage 4 Task 4 fix round 1). A rule inside
 // `@media (forced-colors: active)` paints system colours by design, so the
 // value-box scans exempt it and the forced-colours focus gate counts its
@@ -580,12 +625,14 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
     if (!colorDecl || !bgDecl) continue;
     // Q3 (T5 fix wave): widened to law 8's full four-fill set (input-bg,
     // chip-bg added) -- see the options check above for the rationale.
-    if (/--pp-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--pp-(btn-bg|btn-hover|input-bg|chip-bg)\b/.test(bgDecl.value)) {
+    // Stage 4 Task 6: the field fills joined law 8's set -- popup's value
+    // boxes paint --pp-field-bg(-hover|-focus) now, not --pp-input-bg.
+    if (/--pp-(fg-hint|fg-muted|link)\b/.test(colorDecl.value) && /--pp-(btn-bg|btn-hover|input-bg|chip-bg|field-bg(?:-hover|-focus)?)\b/.test(bgDecl.value)) {
       offendersPp.push(...liveSelectors);
     }
   }
   check(offendersPp.length === 0,
-    "popup.css: a hand-written rule pairs --pp-fg-hint/--pp-fg-muted/--pp-link directly with --pp-btn-bg/--pp-btn-hover on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offendersPp.join(", "));
+    "popup.css: a hand-written rule pairs --pp-fg-hint/--pp-fg-muted/--pp-link directly with a control fill (--pp-btn-bg/-hover, --pp-input-bg, --pp-chip-bg, --pp-field-bg/-hover/-focus) on the SAME selector -- weak text on a control fill (COMPONENTS.md §9.1 law 8); offenders: " + offendersPp.join(", "));
 }
 
 // ---- weak-text-on-fill (T4, COMPONENTS.md §9.1 law 8, D6): --lib-fg-hint /
@@ -1799,7 +1846,17 @@ function focusShapeOffenders(css, ns) {
       forcedColors: forcedColorsRanges.some(([start, end]) => m.index >= start && m.index < end),
     });
   }
-  const bySelector = new Map(rules.map(r => [r.selector, r.body]));
+  // Partners -- the `:focus` rule that carries a glow-only rule's core --
+  // are looked up in the WHOLE file, generated regions included (stage 4
+  // Task 6, spec §5.1): popup's value-box cores live in FIELD_TARGETS.pp's
+  // generated focus rules, and a partner map that could not see them would
+  // reject every popup glow. Only hand rules are CHECKED; bodies of equal
+  // selector lists merge.
+  const bySelector = new Map();
+  for (const m of css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const sel = m[1].trim().replace(/\s+/g, " ");
+    bySelector.set(sel, `${bySelector.get(sel) ?? ""};${m[2]}`);
+  }
   const RING = `var(--${ns}-focus-ring)`, BD = `var(--${ns}-focus-bd)`, ACCENT = `var(--${ns}-accent)`;
   // B+ field family (2026-09-28): a value box's bordered core is its own derived
   // focus border, --opt-field-border-focus (= focus-bd wherever that clears 3:1
@@ -1808,12 +1865,18 @@ function focusShapeOffenders(css, ns) {
   // (fix round 1, GI-5: flexoki-light's value is derived against the field
   // fill, not a button's). P7: the key-wrap eye draws its inset ring ON the
   // field fill, so on options its inset core accepts it too.
-  const FIELD_CORE = "var(--opt-field-border-focus)";
-  const coresFor = (selector) => (ns === "opt" && acceptsFieldFocusCore(selector) ? [BD, FIELD_CORE] : [BD]);
+  // The value box's own derived focus border: options since B+, popup since
+  // stage 4 Task 6 (FIELD_TARGETS.pp). Library joins in Task 7.
+  const FIELD_CORE_NS = new Set(["opt", "pp"]);
+  const FIELD_CORE = `var(--${ns}-field-border-focus)`;
+  const coresFor = (selector) => (FIELD_CORE_NS.has(ns) && acceptsFieldFocusCore(selector) ? [BD, FIELD_CORE] : [BD]);
   const coreReFor = (cores) => new RegExp(`border-color:\\s*(?:${cores.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`);
   const bad = [];
   for (const { selector, body, forcedColors } of rules) {
-    if (!/:focus-visible/.test(selector)) continue;
+    // A forced-colours focus adaptation keyed on a fused shell's
+    // :focus-within (popup's tags shell / token field, stage 4 R5) is judged
+    // by the forced-colours branch below like a :focus-visible one.
+    if (!/:focus-visible/.test(selector) && !(forcedColors && /:focus-within\b/.test(selector))) continue;
     if (FOCUS_SHAPE_EXEMPT.ring.some(re => re.test(selector))) continue;
     const BORDERED_CORES = coresFor(selector), INSET_CORES = BORDERED_CORES, coreRe = coreReFor(BORDERED_CORES);
     const s = parseFocusShape(body);
@@ -1877,10 +1940,11 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
 // selectors throughout, so a rejection below is about the CORE, not the
 // selector): options accepts --opt-field-border-focus as a bordered core (on
 // the rule itself or on the :focus partner of a glow-only rule) and as an
-// inset core (the key-wrap eye). The popup and library namespaces reject it
-// -- both the options LITERAL var(--opt-field-border-focus) (the real leak
-// shape: a popup/library rule borrowing the options token, fix round 1 T2-Q1)
-// and their own namespaced spelling. A non-focus core (--opt-border) plus the
+// inset core (the key-wrap eye). Popup accepts its OWN spelling since stage 4
+// Task 6 (FIELD_TARGETS.pp); the options LITERAL var(--opt-field-border-focus)
+// stays rejected there (the real leak shape: a popup/library rule borrowing
+// the options token, fix round 1 T2-Q1), and library rejects both until
+// stage 4 Task 7. A non-focus core (--opt-border) plus the
 // ring is still rejected, and so is the field core on a non-value-box
 // selector (fix round 1 GI-5: .btn).
 {
@@ -1894,12 +1958,13 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
   const optBad = focusShapeOffenders(focusCss("opt", "var(--opt-field-border-focus)"), "opt");
   check(optBad.length === 0,
     "ui-contract-tests.mjs: §7.3 no longer accepts var(--opt-field-border-focus) as the options bordered / glow-partner / inset core on value boxes (B+ P7/P12): " + optBad.join(" | "));
-  for (const ns of ["pp", "lib"]) {
-    for (const core of ["var(--opt-field-border-focus)", `var(--${ns}-field-border-focus)`]) {
-      const nsBad = focusShapeOffenders(focusCss(ns, core), ns);
-      check(allRejected(nsBad),
-        `ui-contract-tests.mjs: the §7.3 field-border-focus widening leaked into the ${ns} namespace with core ${core} (expected all three value-box rules rejected) -- got [${nsBad.join(" | ")}]`);
-    }
+  const ppOwn = focusShapeOffenders(focusCss("pp", "var(--pp-field-border-focus)"), "pp");
+  check(ppOwn.length === 0,
+    "ui-contract-tests.mjs: §7.3 no longer accepts var(--pp-field-border-focus) as the popup bordered / glow-partner / inset core on value boxes (stage 4 Task 6): " + ppOwn.join(" | "));
+  for (const [ns, core] of [["pp", "var(--opt-field-border-focus)"], ["lib", "var(--opt-field-border-focus)"], ["lib", "var(--lib-field-border-focus)"]]) {
+    const nsBad = focusShapeOffenders(focusCss(ns, core), ns);
+    check(allRejected(nsBad),
+      `ui-contract-tests.mjs: the §7.3 field-border-focus widening leaked into the ${ns} namespace with core ${core} (expected all three value-box rules rejected) -- got [${nsBad.join(" | ")}]`);
   }
   const frameBad = focusShapeOffenders(focusCss("opt", "var(--opt-border)"), "opt");
   check(allRejected(frameBad),
@@ -2168,35 +2233,516 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
   check(!/\.vocab-sort-seg:focus-within/.test(libRules),
     "library.css: the .vocab-sort-seg shell focus ring is back — it lights on plain mouse-down and double-rings on Tab (the cell's own inset ring is the indicator)");
 }
-// COMPONENTS.md §7.3 / §8 law 6, for every popup control the render oracle
-// cannot reach. The library/options ones are gated live; popup's fixture is
-// seeded logged-in, so #login-section (and with it .secret-field) has a zero
-// rect, while .tags-input-wrap / #title-input / #search-input all live in
-// #main-section, which popup.js only un-hides once it has resolved the active
-// tab's bookmark state -- something a plain fixture page cannot produce. A
-// render entry for any of them fails at setup instead of measuring anything.
+// ---- Stage 4 Task 6 (spec 2026-09-30-ui-fields-stage4-design §2.1 / §3.2 /
+// §5.1): popup's value boxes are one fill-only field family. Colour comes
+// ONLY from the FIELD_TARGETS.pp registry (composers/ui-components.mjs ->
+// @generated:ui-components); the hand-written region keeps geometry, the
+// focus ring and `outline: none`. Everything below reads the registry the
+// composer actually consumes and popup.html's real DOM -- no hand list of
+// selectors or ids (CLAUDE.md, 测试与夹具). This replaces the regex pins that
+// used to name each popup focus rule and its html[data-theme] twin (both
+// gone: the base rules moved into the generated region and the twins were
+// deleted in the same commit).
 //
-// The rule under test: focus may change border-colour and add a ring, and may
-// NOT repaint a fill. --pp-input-focus-bg remains a live token (it derives
-// --pp-focus-bd and still backs two button:hover rules), so the assertion is
-// specifically that these focus rules no longer consume it. Themed twins are
-// listed alongside their base rule because each one out-ranks it
-// (html[data-theme] adds an attribute + a type), so a fill left in a themed
-// rule would keep 13 presets lightening on focus after the default surface
-// stopped.
-for (const [rule, what] of [
-  [/\.login-body input:focus \{[^}]*\}/, ".secret-field's input"],
-  [/\.login-body \.secret-field:focus-within input \{[^}]*\}/, ".secret-field's :focus-within"],
-  [/(?<!\] )\.tags-input-wrap:focus-within \{[^}]*\}/, ".tags-input-wrap"],
-  [/html\[data-theme\] \.tags-input-wrap:focus-within \{[^}]*\}/, ".tags-input-wrap (themed)"],
-  [/(?<!\] )\.field > input\[type="text"\]:focus, \.field > textarea:focus \{[^}]*\}/, ".field inputs/textarea"],
-  [/html\[data-theme\] \.field > input\[type="text"\]:focus, html\[data-theme\] \.field > textarea:focus \{[^}]*\}/, ".field inputs/textarea (themed)"],
-  [/(?<!\] )\.search-field:focus \{[^}]*\}/, ".search-field"],
-  [/html\[data-theme\] \.search-field:focus \{[^}]*\}/, ".search-field (themed)"],
-]) {
-  const m = rule.exec(popupCss);
-  check(m && !/background/.test(m[0]),
-    `popup.css: ${what} repaints its background on focus (§7.3 -- focus may change border-colour and add a ring, nothing else)`);
+// popup.html as a tree: tag, attributes, class list, parent. popup.html has
+// no inline <script> / <style> body (CSP), so a tag scan is exact here. The
+// root carries `classes`: every class the static markup names anywhere,
+// which structuralReach below uses to tell a runtime state class (.ac-open,
+// toggled by popup-tags.js, never in the markup) from a static one the node
+// simply lacks.
+function htmlNodes(html) {
+  const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+  const root = { tag: "#root", attrs: {}, classes: [], parent: null, staticClasses: new Set() };
+  const nodes = [];
+  let cur = root;
+  for (const m of html.replace(/<!--[\s\S]*?-->/g, "").matchAll(/<(\/?)([a-zA-Z][\w-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {
+    const tag = m[2].toLowerCase();
+    if (m[1]) {
+      for (let n = cur; n !== root; n = n.parent) if (n.tag === tag) { cur = n.parent; break; }
+      continue;
+    }
+    const attrs = {};
+    for (const a of m[3].matchAll(/([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) attrs[a[1].toLowerCase()] = a[2] ?? a[3] ?? a[4] ?? "";
+    const node = { tag, attrs, classes: (attrs.class || "").split(/\s+/).filter(Boolean), parent: cur };
+    for (const cls of node.classes) root.staticClasses.add(cls);
+    nodes.push(node);
+    if (!VOID.has(tag) && !/\/\s*$/.test(m[3])) cur = node;
+  }
+  return nodes;
+}
+// One compound's structural conditions (tag, #id, .class, [attr], [attr=v]);
+// pseudo-classes and their arguments (:hover, :where(), :not(), ...) are
+// dropped -- the question is which ELEMENT a rule can reach, not in which
+// state. A pseudo-element is reported so callers can tell a ::placeholder
+// rule from a rule on the box itself.
+function structuralCompound(text) {
+  let own = "", pseudoElement = null;
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === "[") { const j = closeOfBracket(text, i); own += text.slice(i, j + 1); i = j; continue; }
+    if (text[i] === ":") {
+      let j = i + 1;
+      const element = text[j] === ":";
+      if (element) j += 1;
+      const start = j;
+      while (j < text.length && /[\w-]/.test(text[j])) j += 1;
+      if (element) pseudoElement = text.slice(start, j).toLowerCase();
+      if (text[j] === "(") j = closeOfBracket(text, j) + 1;
+      i = j - 1;
+      continue;
+    }
+    own += text[i];
+  }
+  const bare = own.replace(/\[[^\]]*\]/g, "");
+  return {
+    tag: ((/^([a-zA-Z][\w-]*)/.exec(own) || [])[1] || "").toLowerCase() || null,
+    ids: [...bare.matchAll(/#([\w-]+)/g)].map((m) => m[1]),
+    classes: [...bare.matchAll(/\.([\w-]+)/g)].map((m) => m[1]),
+    attrs: [...own.matchAll(/\[\s*([\w-]+)\s*(?:=\s*["']?([^"'\]]*)["']?)?\s*\]/g)].map((m) => [m[1].toLowerCase(), m[2]]),
+    pseudoElement,
+  };
+}
+// Complex selector -> compounds, each with the combinator BEFORE it. A
+// leading html[data-theme...] compound is the preset layer's prefix: the
+// attribute is set at run time, never in popup.html, so it is dropped and
+// reported as `themed`. `+` / `~` are not modelled (no field rule uses them)
+// and make the selector match nothing.
+function structuralParts(sel) {
+  const parts = [];
+  let buf = "", pending = null;
+  const flush = () => { if (buf) { parts.push({ c: structuralCompound(buf), comb: pending }); buf = ""; } };
+  for (let i = 0; i < sel.length; i += 1) {
+    const ch = sel[i];
+    if (ch === "(" || ch === "[") { const j = closeOfBracket(sel, i); buf += sel.slice(i, j + 1); i = j; continue; }
+    if (ch === " ") { if (buf) { flush(); pending = " "; } continue; }
+    if (ch === ">" || ch === "+" || ch === "~") { flush(); pending = ch; continue; }
+    buf += ch;
+  }
+  flush();
+  const themed = parts.length > 0 && parts[0].c.tag === "html" && parts[0].c.attrs.some(([name]) => name === "data-theme");
+  const rest = themed ? parts.slice(1) : parts;
+  if (rest.length) rest[0] = { ...rest[0], comb: null };
+  return { parts: rest, themed };
+}
+// Tag, ids and attributes are exact. A class the node lacks fails the match
+// when the static markup names it somewhere (`staticClasses`); one it never
+// names is a RUNTIME state class (.ac-open, .dragging) that script may put on
+// this very node, so it is allowed -- except on the SUBJECT, which must still
+// be anchored by something the node really carries (a `.tag-item` rule, a
+// runtime-only class, would otherwise reach every box). Without the set
+// (null) every class is exact.
+function nodeMatchesCompound(node, c, staticClasses = null, subject = false) {
+  if (c.tag && node.tag !== c.tag) return false;
+  if (c.ids.some((id) => node.attrs.id !== id)) return false;
+  let anchored = !!c.tag || c.ids.length > 0 || c.attrs.length > 0;
+  for (const cls of c.classes) {
+    if (node.classes.includes(cls)) anchored = true;
+    else if (!staticClasses || staticClasses.has(cls)) return false;
+  }
+  if (subject && staticClasses && c.classes.length && !anchored) return false;
+  return c.attrs.every(([name, value]) => {
+    const have = name === "type" && node.tag === "input" && node.attrs.type === undefined ? "text" : node.attrs[name];
+    return value === undefined ? have !== undefined : have !== undefined && have.toLowerCase() === value.toLowerCase();
+  });
+}
+function selectorReaches(sel, node, staticClasses = null) {
+  const { parts } = structuralParts(sel);
+  if (!parts.length || parts.some((p) => p.comb === "+" || p.comb === "~")) return false;
+  const from = (n, i) => {
+    if (!nodeMatchesCompound(n, parts[i].c, staticClasses, i === parts.length - 1)) return false;
+    if (i === 0) return true;
+    if (parts[i].comb === ">") return !!n.parent?.parent && from(n.parent, i - 1);
+    for (let p = n.parent; p?.parent; p = p.parent) if (from(p, i - 1)) return true;
+    return false;
+  };
+  return from(node, parts.length - 1);
+}
+// A selector with every pseudo-class removed, whitespace normalized: the
+// structural "which box" part the same-box check compares across states.
+function structuralText(sel) {
+  let out = "";
+  for (let i = 0; i < sel.length; i += 1) {
+    if (sel[i] === "[") { const j = closeOfBracket(sel, i); out += sel.slice(i, j + 1); i = j; continue; }
+    if (sel[i] === ":") {
+      let j = i + 1;
+      if (sel[j] === ":") j += 1;
+      while (j < sel.length && /[\w-]/.test(sel[j])) j += 1;
+      if (sel[j] === "(") j = closeOfBracket(sel, j) + 1;
+      i = j - 1;
+      continue;
+    }
+    out += sel[i];
+  }
+  return out.replace(/\s*>\s*/g, " > ").replace(/\s+/g, " ").trim();
+}
+const selectorListOf = (text) => (text ? splitSelectorList(text) : []);
+// The hand ring of a registry entry (rule 4 below) and its forced-colours
+// outline (rule 10) sit on the entry's own focus selectors: :focus becomes
+// :focus-visible for the :focus-triggered boxes (a text field matches both on
+// any focus), the :focus-within shells keep theirs.
+const fieldRingSelectors = (t) => selectorListOf(t.focus).map((sel) => sel.replace(/:focus(?=:not\(:disabled\))/g, ":focus-visible"));
+
+// 1. The registry itself, EVERY surface's entries (stage 4 R1 / T6-g: Task 7
+//    fills FIELD_TARGETS.lib and this loop covers it without a change):
+//    well-formed, parallel, and a strict specificity ladder rest < hover <
+//    focus for EVERY box (spec §2.1: focus must win over hover by
+//    specificity, never by source order -- the pointer can sit on a box the
+//    keyboard focuses).
+check(Object.keys(FIELD_TARGETS).sort().join(",") === "lib,pp" && Object.values(FIELD_TARGETS).every(Array.isArray),
+  `ui-components.mjs: FIELD_TARGETS must be { pp: [...], lib: [...] } (options keeps its .fg recipe) -- got ${JSON.stringify(Object.keys(FIELD_TARGETS))}`);
+for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
+  check(new Set(targets.map((t) => t.id)).size === targets.length, `ui-components.mjs: FIELD_TARGETS.${ns} has duplicate ids`);
+  for (const t of targets) {
+    check(Object.keys(t).sort().join(",") === "chevron,focus,hover,id,passenger,placeholder,rest",
+      `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} must carry exactly { id, rest, hover, focus, placeholder, passenger, chevron }`);
+    const R = selectorListOf(t.rest), H = selectorListOf(t.hover), F = selectorListOf(t.focus);
+    check(R.length > 0 && R.length === H.length && H.length === F.length,
+      `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id}: rest / hover / focus must be parallel non-empty lists (got ${R.length} / ${H.length} / ${F.length})`);
+    R.forEach((rest, i) => {
+      const hover = H[i] ?? "", focus = F[i] ?? "";
+      const [sr, sh, sf] = [rest, hover, focus].map((sel) => (sel ? selectorSpecificity(sel) : [0, 0, 0]));
+      check(cmpSpecificity(sr, sh) < 0 && cmpSpecificity(sh, sf) < 0,
+        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} box ${i}: specificity must climb rest < hover < focus -- got ${sr.join(",")} / ${sh.join(",")} / ${sf.join(",")} for \`${rest}\` / \`${hover}\` / \`${focus}\``);
+      check(structuralText(hover) === structuralText(rest) && structuralText(focus) === structuralText(rest),
+        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} box ${i}: hover / focus must name the same box as rest (\`${structuralText(hover)}\` / \`${structuralText(focus)}\` vs \`${structuralText(rest)}\`)`);
+      const trigger = /:focus-within\b/.test(focus) ? ":focus-within" : ":focus";
+      check(/:hover\b/.test(hover) && hover.includes(`:not(${trigger}`) && /:not\([^()]*:disabled/.test(hover),
+        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} box ${i}: the hover selector must exclude the focus trigger (${trigger}) and :disabled (spec §2.1) -- \`${hover}\``);
+      check(focus.includes(trigger) && !/:focus-visible\b/.test(focus),
+        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} box ${i}: the focus selector must fire on ${trigger} (spec §2.1 keeps each control's trigger), not :focus-visible -- \`${focus}\``);
+    });
+    for (const sel of selectorListOf(t.placeholder)) {
+      check(structuralCompound(subjectOf(sel)).pseudoElement === "placeholder",
+        `ui-components.mjs: FIELD_TARGETS.${ns} ${t.id} placeholder selector \`${sel}\` does not end in ::placeholder`);
+    }
+  }
+}
+// The ladder check must discriminate (a rule-of-thumb equal-specificity
+// hover -- `rest:where(:hover)` -- or a focus that only ties hover would
+// slip through a `<=`).
+{
+  const climbs = (rest, hover, focus) => { const [a, b, c] = [rest, hover, focus].map(selectorSpecificity); return cmpSpecificity(a, b) < 0 && cmpSpecificity(b, c) < 0; };
+  check(climbs(".tags-input-wrap", ".tags-input-wrap:hover:where(:not(:focus-within, :disabled))", ".tags-input-wrap:focus-within:not(:disabled)") &&
+    !climbs(".x", ".x:where(:hover:not(:focus))", ".x:focus") && !climbs(".x", ".x:hover:not(:focus)", ".x:focus") &&
+    !climbs('.field > input[type="text"]', '.field > input[type="text"]:hover:where(:not(:focus, :disabled))', '.field > input[type="text"]:focus'),
+    "ui-contract-tests.mjs: the FIELD_TARGETS specificity-ladder predicate no longer discriminates");
+}
+{
+  const POPUP_NODES = htmlNodes(popupHtml);
+  const PP_STATIC = POPUP_NODES[0]?.parent?.staticClasses ?? new Set();
+  const reaches = (sel, node) => selectorReaches(sel, node, PP_STATIC);
+  const PP = FIELD_TARGETS.pp;
+  // The tree and the matcher must discriminate, or everything below is blind.
+  const byId = (id) => POPUP_NODES.find((n) => n.attrs.id === id);
+  const shell = POPUP_NODES.find((n) => n.classes.includes("tags-input-wrap"));
+  check(!!byId("token-input") && !!byId("tags-input") && !!byId("description-input") && !!shell && PP_STATIC.has("secret-field") && !PP_STATIC.has("ac-open") &&
+    reaches('.login-body .secret-field > input[type="password"]', byId("token-input")) &&
+    !reaches('.login-body .secret-field > input[type="text"]', byId("token-input")) &&
+    reaches('.field > input[type="text"]', byId("title-input")) &&
+    !reaches('.field > input[type="text"]', byId("tags-input")) &&
+    reaches(".tags-input-wrap input", byId("tags-input")) &&
+    reaches('html[data-theme] .field > textarea', byId("description-input")) &&
+    structuralParts('html[data-theme="terminal"] .field > textarea').themed &&
+    !reaches(".field + .field > textarea", byId("description-input")) &&
+    // runtime state classes: allowed next to a real anchor, never alone on
+    // the subject; a static class the node lacks still fails
+    reaches(".tags-input-wrap.ac-open", shell) && !selectorReaches(".tags-input-wrap.ac-open", shell) &&
+    !reaches(".tag-item", shell) && !reaches(".tags-input-wrap.hidden", shell) &&
+    reaches('.is-busy .field > input[type="text"]', byId("title-input")) &&
+    structuralText('.login-body .secret-field:hover:where(:not(:focus-within)) > input[type="text"]:where(:not(:disabled))') === '.login-body .secret-field > input[type="text"]',
+    "ui-contract-tests.mjs: the popup.html tree / structural selector matcher no longer discriminates (the popup value-box model below would be blind)");
+
+  for (const t of PP) {
+    check(t.chevron === null, `ui-components.mjs: FIELD_TARGETS.pp ${t.id} has a chevron -- popup has no select, and pp emits no --pp-field-chevron (spec §2.2)`);
+  }
+
+  // 2. Coverage against popup.html: every text-entry control is painted by
+  //    exactly ONE registry entry -- as the box itself, or as the passenger of
+  //    a shell that is -- and every entry reaches something.
+  const entries = POPUP_NODES.filter((n) => n.tag === "textarea" || (n.tag === "input" && TEXT_ENTRY_TYPES.has((n.attrs.type || "text").toLowerCase())));
+  const restHits = (node) => PP.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, node)));
+  const passengerHits = (node) => PP.filter((t) => selectorListOf(t.passenger).some((sel) => selectorReaches(sel, node)));
+  const PP_BOX_NODES = new Set(), PP_PASSENGER_NODES = new Set();
+  const uncovered = [];
+  for (const node of entries) {
+    const boxes = restHits(node), passengers = passengerHits(node);
+    const label = `#${node.attrs.id || "?"}`;
+    if (boxes.length === 1 && passengers.length === 0) PP_BOX_NODES.add(node);
+    else if (boxes.length === 0 && passengers.length === 1) {
+      let host = null;
+      for (let p = node.parent; p?.parent && !host; p = p.parent) if (restHits(p).includes(passengers[0])) host = p;
+      if (host) { PP_PASSENGER_NODES.add(node); PP_BOX_NODES.add(host); }
+      else uncovered.push(`${label}: passenger of ${passengers[0].id}, but no ancestor is that entry's box`);
+    } else uncovered.push(`${label}: rest of [${boxes.map((t) => t.id).join(", ")}], passenger of [${passengers.map((t) => t.id).join(", ")}]`);
+  }
+  check(entries.length >= 6 && PP_BOX_NODES.size >= 6 && uncovered.length === 0,
+    `popup.html / FIELD_TARGETS.pp: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${entries.length} controls, ${PP_BOX_NODES.size} boxes; ${uncovered.join(" | ") || "none uncovered"}`);
+  const deadTargets = PP.filter((t) => !POPUP_NODES.some((n) => restHits(n).includes(t)));
+  check(deadTargets.length === 0, `ui-components.mjs: FIELD_TARGETS.pp entries whose rest selector reaches nothing in popup.html: ${deadTargets.map((t) => t.id).join(", ")}`);
+  // The two predicates every scan below uses: a rule on a box / a passenger
+  // (pseudo-element subjects excluded -- ::placeholder has its own branch).
+  const onNodes = (sel, nodes) => !structuralCompound(subjectOf(sel)).pseudoElement && [...nodes].some((n) => reaches(sel, n));
+  const isPpBoxSelector = (sel) => onNodes(sel, PP_BOX_NODES);
+  const isPpBoxOrPassengerSelector = (sel) => [...PP_BOX_NODES, ...PP_PASSENGER_NODES].some((n) => reaches(sel, n));
+
+  // 3. The generated half: sync-all wrote every registry field with exactly
+  //    the declarations the binding contract names (spec §4).
+  const genStart = popupCss.indexOf("/* @generated:ui-components start (popup) */");
+  const genEnd = popupCss.indexOf("/* @generated:ui-components end (popup) */");
+  check(genStart >= 0 && genEnd > genStart, "popup.css: @generated:ui-components (popup) markers not found");
+  const ppGen = popupCss.slice(genStart, genEnd);
+  const EMITS = {
+    rest: [["background-color", "field-bg"], ["border-color", "field-border"], ["color", "field-fg"]],
+    hover: [["background-color", "field-bg-hover"], ["border-color", "field-border-hover"]],
+    focus: [["background-color", "field-bg-focus"], ["border-color", "field-border-focus"]],
+    placeholder: [["color", "field-placeholder"]],
+    passenger: [["color", "field-fg"]],
+  };
+  for (const t of PP) {
+    for (const [key, want] of Object.entries(EMITS)) {
+      for (const sel of selectorListOf(t[key])) {
+        const got = declarationValueMap(ppGen, sel);
+        const wrong = want.filter(([prop, role]) => got.get(prop) !== `var(--pp-${role})`);
+        check(wrong.length === 0,
+          `popup.css: the generated FIELD_TARGETS.pp ${t.id}.${key} rule for \`${sel}\` does not paint ${wrong.map(([p, r]) => `${p}: var(--pp-${r})`).join(", ")} (got ${JSON.stringify(Object.fromEntries(got))}) -- run node docs/theme-surface/tools/sync-all.mjs`);
+      }
+    }
+  }
+
+  // 4. The hand half keeps each box's ring (§7.3 `bordered`: the core is the
+  //    generated focus border, the glow is here) on the entry's own focus
+  //    selector (fieldRingSelectors), so ring and frame cannot fire in
+  //    different states.
+  const ppNoComments = popupCss.replace(/\/\*[\s\S]*?\*\//g, "");
+  const ppHand = stripGeneratedRegions(popupCss).replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const t of PP) {
+    const missing = fieldRingSelectors(t).filter((sel) => declarationValueMap(ppHand, sel).get("box-shadow") !== "var(--pp-focus-ring)");
+    check(missing.length === 0,
+      `popup.css: FIELD_TARGETS.pp ${t.id} has no hand-written ring (box-shadow: var(--pp-focus-ring)) on ${missing.map((s) => `\`${s}\``).join(", ")}`);
+  }
+
+  // 5. The hand-written region paints no colour on a value box, a shell or
+  //    a passenger (the generated region sits BEFORE it, so any such
+  //    declaration would win a specificity tie by source order -- or out-rank
+  //    it outright, as the ten html[data-theme] twins did). A passenger may be
+  //    transparent and frameless and paint typed text var(--pp-field-fg); a
+  //    placeholder is the registry's alone; no rule may unpaint a box side
+  //    (border-width 0 / border-style none|hidden) or re-point a --pp-field-*
+  //    role. Forced-colors (active) blocks are exempt: system colours by
+  //    design; `forced-colors: none` is ordinary rendering and is scanned.
+  const COLOUR_PROP = /^(?:color|-webkit-text-fill-color|background(?:-color)?|border(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?(?:-color)?)$/;
+  const WIDTH_OR_STYLE = /^border(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?-(width|style)$/;
+  const popupValueBoxOffenders = (css) => {
+    const out = [];
+    for (const rule of parseStyleRules(css)) {
+      for (const d of parseDeclarations(rule.body)) {
+        if (d.property.startsWith("--pp-field-")) out.push(`${rule.selectorText} { ${d.property}: ${d.value} } -- re-points a --pp-field-* role (the generated ui-themes blocks own them)`);
+      }
+      if (inForcedColors(rule)) continue;
+      const decls = parseDeclarations(rule.body);
+      for (const sel of rule.selectors) {
+        const subject = structuralCompound(subjectOf(sel));
+        if (subject.pseudoElement && subject.pseudoElement !== "placeholder") continue;
+        const onBox = [...PP_BOX_NODES].some((n) => reaches(sel, n));
+        const onPassenger = [...PP_PASSENGER_NODES].some((n) => reaches(sel, n));
+        if (!onBox && !onPassenger) continue;
+        const { themed } = structuralParts(sel);
+        for (const d of decls) {
+          const v = d.value.trim();
+          if (subject.pseudoElement === "placeholder") {
+            out.push(`${sel} { ${d.property}: ${v} } -- a hand rule restyles a value box's placeholder (FIELD_TARGETS.pp owns it)`);
+            continue;
+          }
+          if (onPassenger && !onBox) {
+            if (/^background(?:-color)?$/.test(d.property) && /^transparent$/i.test(v)) continue;
+            if (d.property === "border" && /^(?:none|0)$/i.test(v)) continue;
+            if (d.property === "color" && v === "var(--pp-field-fg)") continue;
+            if (COLOUR_PROP.test(d.property)) out.push(`${sel} { ${d.property}: ${v} } -- a passenger may only be transparent and frameless, with typed text var(--pp-field-fg)`);
+            continue;
+          }
+          if (COLOUR_PROP.test(d.property)) {
+            out.push(`${sel} { ${d.property}: ${v} } -- ${themed ? "an html[data-theme] twin paints" : "a hand-written rule paints"} a popup value box (every colour is FIELD_TARGETS.pp's)`);
+            continue;
+          }
+          const part = WIDTH_OR_STYLE.exec(d.property)?.[1];
+          const tokens = v.split(/\s+/);
+          if ((part === "width" && tokens.some((x) => /^0(?:\.0*)?(?:px|em|rem|%)?$/i.test(x))) || (part === "style" && tokens.some((x) => /^(?:none|hidden)$/i.test(x)))) {
+            out.push(`${sel} { ${d.property}: ${v} } -- unpaints a side of a popup value box (Soft Fill keeps all four, spec §2.1)`);
+          }
+        }
+      }
+    }
+    return out;
+  };
+  const ppBad = popupValueBoxOffenders(ppHand);
+  check(ppBad.length === 0, "popup.css: the hand-written region paints a popup value box / shell / passenger (spec §3.2 -- colour comes only from FIELD_TARGETS.pp): " + ppBad.join(" | "));
+  const PP_BOX_CASES = [
+    ['.field > input[type="text"], .field > textarea { background: var(--pp-input-bg); color: var(--pp-fg); }', true],
+    ["html[data-theme] .search-field { color: var(--pp-fg); }", true],
+    ['html[data-theme] .field > input[type="text"]:focus { border-color: var(--pp-focus-bd); }', true],
+    [".tags-input-wrap { border: 1px solid var(--pp-input-bd); }", true],
+    ["#token-input:focus { border-color: var(--pp-focus-bd); }", true],
+    [".login-body input { border-width: 1px 1px 0; }", true],
+    [".search-field { border-style: solid hidden solid solid; }", true],
+    [".tags-input-wrap input { color: var(--pp-fg); }", true],
+    ["#tags-input { background: var(--pp-bg); }", true],
+    [".search-field::placeholder { color: var(--pp-fg-hint); }", true],
+    ['.field > input[type="text"]::placeholder { opacity: .5; }', true],
+    ["#title-input { --pp-field-bg: #fff; }", true],
+    // a runtime state class on a real box, and `forced-colors: none` (the
+    // ordinary rendering, not a High Contrast exemption)
+    [".tags-input-wrap.ac-open { border-color: var(--pp-focus-bd); }", true],
+    ["@media (forced-colors: none) { .search-field { background: var(--pp-bg); } }", true],
+    [".tags-input-wrap input { border: 1px solid var(--pp-border); }", true],
+    // must stay clean
+    [".tags-input-wrap input { border: none !important; outline: none; background: transparent; }", false],
+    [".search-field { width: 100%; border-width: 1px; border-style: solid; border-radius: var(--pp-radius-md); }", false],
+    [".tags-input-wrap:focus-within:not(:disabled) { box-shadow: var(--pp-focus-ring); }", false],
+    [".tags-input-wrap.ac-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }", false],
+    ['html[data-theme="terminal"] .field > textarea { font-family: monospace; }', false],
+    [".tag-item { background: var(--pp-tag-bg); color: var(--pp-tag-chip-fg); }", false],
+    [".login-body .key-toggle { background: none; border: 0; color: var(--pp-field-placeholder); }", false],
+    ["@media (forced-colors: active) { .search-field:focus-visible { outline: 1px solid Highlight; border-color: Highlight; } }", false],
+    [".ac-item { color: var(--pp-fg); }", false],
+  ];
+  const ppMisjudged = PP_BOX_CASES.filter(([css, want]) => (popupValueBoxOffenders(css).length > 0) !== want);
+  check(ppMisjudged.length === 0,
+    "ui-contract-tests.mjs: the popup value-box scan no longer discriminates -- misjudged: " + ppMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
+
+  // 5b. Shape (stage 4 T6-b; the module-level valueBoxShapeOffenders options
+  //     runs too): no hand rule draws a popup value box apart from its one
+  //     frame colour and one radius -- no bottom-side border property, no
+  //     split border-color, no multi-value border-radius or per-corner radius
+  //     longhand. The one named exception (spec §2.1): the tags shell squares
+  //     its two bottom corners to 0 while its suggestion list is open
+  //     (.tags-input-wrap.ac-open), by selector, property and value.
+  const PP_SHAPE_EXEMPT = [{ selector: ".tags-input-wrap.ac-open", properties: ["border-bottom-left-radius", "border-bottom-right-radius"], value: "0" }];
+  const ppShapeExempt = (sels, d) => PP_SHAPE_EXEMPT.some((e) => sels.every((sel) => sel === e.selector) && e.properties.includes(d.property) && d.value.trim() === e.value);
+  const ppShapeOffenders = (css) => valueBoxShapeOffenders(css, isPpBoxSelector, { ns: "pp", exempt: ppShapeExempt });
+  const ppShapeBad = ppShapeOffenders(ppHand);
+  check(ppShapeBad.length === 0,
+    "popup.css: a hand-written value-box rule draws a bottom edge or splits the radius (stage 4: one frame colour on all four sides, one md radius on all four corners; only .tags-input-wrap.ac-open's two bottom corners are exempt): " + ppShapeBad.join(" | "));
+  const PP_SHAPE_CASES = [
+    [".tags-input-wrap.ac-open { border-bottom-left-radius: 4px; }", true],
+    [".tags-input-wrap.ac-open { border-bottom-color: var(--pp-field-border-focus); }", true],
+    [".tags-input-wrap { border-bottom-left-radius: 0; }", true],
+    [".search-field { border-radius: var(--pp-radius-md) var(--pp-radius-md) 0 0; }", true],
+    [".field > textarea { border-bottom: 1px solid var(--pp-field-border); }", true],
+    ["#token-input { border-top-left-radius: 0; }", true],
+    ['.field > input[type="text"] { border-color: var(--pp-field-border) var(--pp-field-border) var(--pp-field-border-focus); }', true],
+    // must stay clean
+    [".tags-input-wrap.ac-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }", false],
+    [".search-field { border-radius: var(--pp-radius-md); }", false],
+    [".tags-input-wrap input { border: none !important; border-radius: 0 var(--pp-radius-sm) 0 0; }", false],
+    [".tag-item { border-radius: var(--pp-radius-tag) var(--pp-radius-tag) 0 0; }", false],
+    [".autocomplete-dropdown { border-radius: 0 0 var(--pp-radius-md) var(--pp-radius-md); border-top: 0; }", false],
+  ];
+  const ppShapeMisjudged = PP_SHAPE_CASES.filter(([css, want]) => (ppShapeOffenders(css).length > 0) !== want);
+  check(ppShapeMisjudged.length === 0,
+    "ui-contract-tests.mjs: the popup value-box shape scan no longer discriminates -- misjudged: " + ppShapeMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
+
+  // 6. A colour literal inside a url() of a value-box / shell / passenger rule
+  //    (%23<hex>, #<hex>, rgb(), hsl() -- stage 4 T6-d, Task 4's module-level
+  //    valueBoxUrlColourOffenders): the bare hex scan cannot see it (spec
+  //    §5.1), and popup has no chevron to excuse one. Whole file, generated
+  //    regions included; pseudo-elements count (anything drawn on the box).
+  const ppUrlOffenders = (css) => valueBoxUrlColourOffenders(css, isPpBoxOrPassengerSelector);
+  check(ppUrlOffenders(ppNoComments).length === 0, "popup.css: a value-box rule carries a colour literal inside url() -- " + ppUrlOffenders(ppNoComments).join(" | "));
+  check(ppUrlOffenders('.search-field { background-image: url("data:image/svg+xml,%3Csvg stroke=%22%23888%22/%3E"); }').length === 1 &&
+    ppUrlOffenders(".tags-input-wrap > input[type=\"text\"] { background: url(\"data:image/svg+xml,%3Csvg stroke='#888'%3E%3C/svg%3E\") no-repeat; }").length === 1 &&
+    ppUrlOffenders('.stag { background-image: url("data:image/svg+xml,%3Csvg stroke=%22%23888%22/%3E"); }').length === 0 &&
+    ppUrlOffenders(".search-field { background-image: var(--pp-field-bg); }").length === 0,
+    "ui-contract-tests.mjs: the popup url() colour scan no longer discriminates");
+
+  // 7. The eye paints the field's secondary ink at rest and its typed-text
+  //    ink on hover, and its inset ring's core is the field's own focus
+  //    border (spec §6 item 6; options' P7) -- on every surface, no twin.
+  const eyeInk = parseStyleRules(ppHand).filter((r) => !inForcedColors(r) &&
+    r.selectors.some((sel) => { const s = structuralCompound(subjectOf(sel)); return !s.pseudoElement && s.classes.includes("key-toggle"); }))
+    .flatMap((r) => parseDeclarations(r.body).filter((d) => d.property === "color").map((d) => ({ r, d })));
+  const eyeWrong = eyeInk.filter(({ r, d }) => {
+    const hover = r.selectors.every((sel) => /:hover\b/.test(subjectOf(sel)));
+    return /^html\[data-theme/.test(r.selectorText) || d.value.trim() !== (hover ? "var(--pp-field-fg)" : "var(--pp-field-placeholder)");
+  });
+  check(eyeInk.length >= 2 && eyeWrong.length === 0,
+    "popup.css: the eye's ink must be var(--pp-field-placeholder) at rest and var(--pp-field-fg) on hover, with no html[data-theme] twin -- " + (eyeWrong.map(({ r, d }) => `${r.selectorText} { color: ${d.value} }`).join(" | ") || `found ${eyeInk.length} eye colour rule(s)`));
+  check(declarationValueMap(ppHand, ".login-body .secret-field .key-toggle:focus-visible").get("outline") === "2px solid var(--pp-field-border-focus)",
+    "popup.css: the eye's inset focus ring must use --pp-field-border-focus (it sits on the field fill; options' P7)");
+
+  // 8. Chips and the suggestion list (spec §2.2 / §3.2).
+  check(declarationValueMap(ppHand, ".tag-item").get("color") === "var(--pp-tag-chip-fg)" &&
+    declarationValueMap(ppHand, ".tag-remove").get("color") === "var(--pp-tag-chip-icon)",
+    "popup.css: .tag-item text must be var(--pp-tag-chip-fg) and .tag-remove's resting ink var(--pp-tag-chip-icon) (derived against the shell's rest / hover fills and --pp-tag-hover)");
+  check(declarationValueMap(ppHand, ".autocomplete-dropdown").get("border") === "1px solid var(--pp-field-border-focus)",
+    "popup.css: the autocomplete list's frame must be var(--pp-field-border-focus) -- the same token the focused tags shell paints");
+
+  // 9. Retired on popup: the input-bd custom property (no consumer since
+  //    stage 4; the pilot key stays the composer's framed-field signal), the
+  //    fg-soft literal the eye used to read, and any :has() (spec §2.1).
+  check(!/--pp-input-bd\b/.test(ppNoComments), "popup.css: --pp-input-bd is back -- the value boxes paint --pp-field-border (popup-chrome.mjs no longer emits the role)");
+  check(!/--pp-fg-soft\b/.test(ppNoComments), "popup.css: --pp-fg-soft is back -- the eye's ink is --pp-field-placeholder");
+  check(!/:has\(/.test(ppNoComments), "popup.css: a :has() selector -- popup adds none (spec §2.1; the tags list toggles .ac-open by class to keep :has() off the keystroke path)");
+
+  // 10. Forced colours (spec §6 item 10, ruling R5): the UA drops the
+  //     box-shadow ring and remaps the focus frame, so every popup value box
+  //     draws `outline: 1px solid Highlight` (a non-negative offset) inside
+  //     @media (forced-colors: active) on each of its entry's ring selectors
+  //     (fieldRingSelectors -- the shells keep :focus-within), and no
+  //     outline-suppressing focus rule that applies with forced colours on
+  //     out-ranks it on the same popup.html box (an !important suppressor
+  //     beats a normal outline; otherwise specificity, then source order).
+  //     §7.3's forced-colors branch above holds the outline's own shape.
+  const OUTLINE_OFF = { outline: /^(?:none|0(?:px)?)$/i, "outline-style": /^none$/i, "outline-width": /^0(?:px)?$/ };
+  const ppForcedReport = (text) => {
+    const rules = parseStyleRules(text);
+    const outlines = [];
+    for (const r of rules.filter(inForcedColors)) {
+      const decls = parseDeclarations(r.body);
+      const outline = decls.find((d) => d.property === "outline" && /^1px solid Highlight$/i.test(d.value));
+      const offset = decls.find((d) => d.property === "outline-offset");
+      if (!outline || !offset || !(parseFloat(offset.value) >= 0)) continue;
+      for (const sel of r.selectors) outlines.push({ sel, spec: selectorSpecificity(sel), order: r.sourceOrder, important: outline.important });
+    }
+    const missing = PP.flatMap((t) => fieldRingSelectors(t).filter((sel) => !outlines.some((o) => o.sel === sel)).map((sel) => `${t.id}: ${sel}`));
+    const outranked = [];
+    for (const r of rules.filter((x) => !x.context.some((c) => FORCED_NONE_RE.test(c)))) {
+      const off = parseDeclarations(r.body).filter((d) => Object.hasOwn(OUTLINE_OFF, d.property) && OUTLINE_OFF[d.property].test(d.value));
+      if (!off.length) continue;
+      const important = off.some((d) => d.important);
+      for (const sel of r.selectors.filter((x) => /:focus(?:-visible|-within)?\b/.test(x))) {
+        for (const node of PP_BOX_NODES) {
+          if (!reaches(sel, node)) continue;
+          for (const f of outlines.filter((o) => reaches(o.sel, node))) {
+            if (f.important && !important) continue;
+            const c = cmpSpecificity(selectorSpecificity(sel), f.spec);
+            if ((important && !f.important) || c > 0 || (c === 0 && r.sourceOrder > f.order)) outranked.push(`${sel} (line ${r.lineNum}) over ${f.sel}`);
+          }
+        }
+      }
+    }
+    return { missing, outranked };
+  };
+  const ppForced = ppForcedReport(ppNoComments);
+  check(ppForced.missing.length === 0,
+    "popup.css: a popup value box has no forced-colors focus outline (1px solid Highlight, non-negative offset, on its registry entry's ring selector) -- spec 2026-09-30 §6 item 10 / R5: " + ppForced.missing.join(" | "));
+  check(ppForced.outranked.length === 0,
+    "popup.css: an outline-suppressing focus rule out-ranks the forced-colors value-box outline, so High Contrast shows no focus: " + ppForced.outranked.join(" | "));
+  const PP_FORCED_CASES = [
+    // appended to the shipped file: [rule, must be caught]
+    ['html[data-theme] .field > input[type="text"]:focus { outline: none !important; }', true],
+    [".tags-input-wrap:focus-within:not(:disabled):not(.x) { outline: none; }", true],
+    ["#token-input:focus-visible:not(:disabled):not(.a):not(.b):not(.c) { outline-style: none; }", true],
+    ["@media (forced-colors: active) { #search-input:focus { outline: 0; } }", true],
+    // must stay clean
+    ["@media (forced-colors: none) { .search-field:focus { outline: none !important; } }", false],
+    [".tags-input-wrap input:focus { outline: none !important; }", false],
+    [".field > textarea:hover { outline: none !important; }", false],
+    [".search-field:focus { outline: none; }", false],
+  ];
+  const ppForcedMisjudged = PP_FORCED_CASES.filter(([rule, want]) => (ppForcedReport(`${ppNoComments}\n${rule}`).outranked.length > ppForced.outranked.length) !== want);
+  const ppForcedNone = ppForcedReport(ppNoComments.replace(/forced-colors\s*:\s*active/g, "forced-colors: none"));
+  check(ppForcedMisjudged.length === 0 && ppForcedNone.missing.length === PP.flatMap(fieldRingSelectors).length,
+    "ui-contract-tests.mjs: the popup forced-colors value-box focus scan no longer discriminates -- misjudged: " + ppForcedMisjudged.map(([rule, want]) => `${want ? "missed" : "false hit"}: ${rule}`).join(" | ") +
+    ` (with every forced-colors block flipped to none, ${ppForcedNone.missing.length}/${PP.flatMap(fieldRingSelectors).length} ring selectors reported missing)`);
 }
 
 check(/\.wayback-log-row:focus-within\s+\.wayback-perm-tip/.test(optionsCss) &&
@@ -5987,17 +6533,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // (border-left, border-inline-end-color) would walk around.
   const COLOUR_PROP_RE = /^(?:background(?:-color)?|border(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?(?:-color)?)$/;
   const STATE_RE = /:(?:hover|focus|focus-visible|focus-within|active|disabled|checked|invalid|user-invalid|placeholder-shown|autofill)\b/;
-  const valueTokens = (value) => {
-    const out = [];
-    let cur = "", depth = 0;
-    for (const ch of value.replace(/!important\s*$/i, "").trim()) {
-      if (ch === "(") depth += 1;
-      else if (ch === ")") depth -= 1;
-      if (/\s/.test(ch) && depth === 0) { if (cur) out.push(cur); cur = ""; } else cur += ch;
-    }
-    if (cur) out.push(cur);
-    return out;
-  };
+  // valueTokens: module level (lifted with valueBoxShapeOffenders, Task 6).
   const ZERO_W = (t) => /^0(?:\.0*)?(?:px|em|rem|%)?$/i.test(t || "");
   const NO_STYLE = (t) => /^(?:none|hidden)$/i.test(t || "");
   const NO_COLOUR = (t) => /^transparent$/i.test(t || "");
@@ -6278,25 +6814,10 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // per-corner radius longhand (physical or logical). This is the class form
   // of the deleted B+ shape half (and of its predecessor, the native-select
   // fill-only check, which only covered selects).
-  const RADIUS_CORNER_RE = /^border-(?:(?:top|bottom)-(?:left|right)|(?:start|end)-(?:start|end))-radius$/;
-  const valueBoxShapeOffenders = (css) => {
-    const out = [];
-    for (const r of parseStyleRules(css)) {
-      const sels = r.selectors.filter(isValueBoxSelector);
-      if (!sels.length) continue;
-      for (const d of parseDeclarations(r.body)) {
-        const ts = valueTokens(d.value);
-        const splitBottom = (d.property === "border-color" && ts.length >= 3 && ts[2] !== ts[0]) ||
-          (d.property === "border-block-color" && ts.length >= 2 && ts[1] !== ts[0]);
-        const splitRadius = (d.property === "border-radius" && ts.length > 1) || RADIUS_CORNER_RE.test(d.property);
-        if (/^border-(?:bottom|block-end)(?:-(?:color|width|style))?$/.test(d.property) || /--opt-field-edge/.test(d.value) || splitBottom || splitRadius) {
-          out.push(`${sels.join(", ")} { ${d.property}: ${d.value} }`);
-        }
-      }
-    }
-    return out;
-  };
-  const shapeBad = valueBoxShapeOffenders(hand);
+  // valueBoxShapeOffenders is module level since stage 4 Task 6 (popup runs
+  // it with its own predicate); options passes the B+ selector model.
+  const optShapeOffenders = (css) => valueBoxShapeOffenders(css, isValueBoxSelector);
+  const shapeBad = optShapeOffenders(hand);
   check(shapeBad.length === 0,
     "options.css: a hand-written value-box rule draws a bottom edge or splits the radius (stage 4: one frame colour on all four sides, one md radius on all four corners): " + shapeBad.join(" | "));
   const SHAPE_CASES = [
@@ -6333,7 +6854,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".key-toggle:hover { border-radius: var(--opt-radius-sm); }", false],
     [".fg textarea { border-color: var(--opt-field-border); border-width: 1px 1px 1px 1px; }", false],
   ];
-  const shapeMisjudged = SHAPE_CASES.filter(([css, want]) => (valueBoxShapeOffenders(css).length > 0) !== want);
+  const shapeMisjudged = SHAPE_CASES.filter(([css, want]) => (optShapeOffenders(css).length > 0) !== want);
   check(shapeMisjudged.length === 0,
     "ui-contract-tests.mjs: the value-box shape scan no longer discriminates -- misjudged: " + shapeMisjudged.map(([css, want]) => `${want ? "missed" : "false hit"}: ${css}`).join(" | "));
 }
@@ -6949,6 +7470,87 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     onlyNone.missing.length === FORCED_KINDS.length && impBoth.outranked.length === 0 && impSupOnly.outranked.length === 1,
     "ui-contract-tests.mjs: the forced-colors value-box focus scan no longer discriminates -- misjudged: " + forcedMisjudged.map(([rule, want]) => `${want ? "missed" : "false hit"}: ${rule}`).join(" | ") +
     ` (coverage probe missing=${JSON.stringify(onlyText.missing)}; forced-colors:none probe missing ${onlyNone.missing.length}/${FORCED_KINDS.length}; !important probes both=${impBoth.outranked.length} (want 0) suppressor-only=${impSupOnly.outranked.length} (want 1))`);
+}
+
+// ---- Stage 4 Task 6 (spec §2.2 / §2.3 F10): popup's eye hover chip, the
+// same gate as options' key-wrap eye above. The chip must stay a visible
+// plane (>= FILL_SEPARATE_MIN, imported from the deriver) against the fill
+// the token field ACTUALLY paints beneath it in each state the eye can be
+// hovered in: the shell hovered but not focused (the field wears
+// FIELD_TARGETS.pp pp-secret's hover fill) and the shell holding focus (its
+// focus fill). Both fills are read from the GENERATED rules of that registry
+// entry, and the hand-region value-box scan above guarantees no hand rule
+// repaints the field, so the fill read here is the fill that ships. Before
+// stage 4 the chip mixed fg 8% over --pp-input-bg in both states;
+// fg 8% over the hover fill would be 1.098:1 on solarized-light, which is
+// why the ink is --pp-field-fg (lowest 1.119:1, spec §2.2).
+{
+  const cssNoComments = popupCss.replace(/\/\*[\s\S]*?\*\//g, "");
+  const hand = stripGeneratedRegions(popupCss).replace(/\/\*[\s\S]*?\*\//g, "");
+  const gen = popupCss.slice(popupCss.indexOf("/* @generated:ui-components start (popup) */"), popupCss.indexOf("/* @generated:ui-components end (popup) */"));
+  const secret = FIELD_TARGETS.pp.filter((t) => selectorListOf(t.rest).some((sel) => /\.secret-field\b/.test(sel)));
+  check(secret.length === 1, `ui-components.mjs: expected exactly one FIELD_TARGETS.pp entry painting the .secret-field input, found ${secret.length}`);
+  const fillVarOf = (list) => (declarationValueMap(gen, selectorListOf(list)[0] ?? "").get("background-color") ?? "").trim();
+  const isChip = (sel) => /:hover\b/.test(sel) && (() => { const s = structuralCompound(subjectOf(sel)); return !s.pseudoElement && s.classes.includes("key-toggle"); })();
+  const painters = parseStyleRules(hand)
+    .filter((r) => !inForcedColors(r) && parseDeclarations(r.body).some((d) => /^background(?:-color)?$/.test(d.property)))
+    .flatMap((r) => r.selectors.filter(isChip));
+  const CHIP_HOVER = ".login-body .secret-field .key-toggle:hover";
+  const CHIP_FOCUS = ".login-body .secret-field:focus-within .key-toggle:hover";
+  check(painters.length === 2 && painters.includes(CHIP_HOVER) && painters.includes(CHIP_FOCUS),
+    `popup.css: the eye's hover chip is painted by exactly \`${CHIP_HOVER}\` (shell hovered) and \`${CHIP_FOCUS}\` (shell focused) -- found ${JSON.stringify(painters)}`);
+  check(cmpSpecificity(selectorSpecificity(CHIP_FOCUS), selectorSpecificity(CHIP_HOVER)) > 0,
+    `popup.css: the focused-shell eye chip (${selectorSpecificity(CHIP_FOCUS).join(",")}) must out-rank the plain hover chip (${selectorSpecificity(CHIP_HOVER).join(",")})`);
+  const bgOf = (sel) => { const m = declarationValueMap(hand, sel); return (m.get("background") ?? m.get("background-color") ?? "").trim(); };
+  const STATES = secret.length !== 1 ? [] : [
+    { name: "shell hovered", chip: bgOf(CHIP_HOVER), fill: fillVarOf(secret[0].hover) },
+    { name: "shell focused", chip: bgOf(CHIP_FOCUS), fill: fillVarOf(secret[0].focus) },
+  ];
+  const MIX_RE = /^color-mix\(\s*in srgb\s*,\s*var\((--pp-[a-z0-9-]+)\)\s+(\d+(?:\.\d+)?)%\s*,\s*var\((--pp-[a-z0-9-]+)\)\s*\)$/;
+  const VAR_RE = /^var\((--pp-[a-z0-9-]+)\)$/;
+  for (const s of STATES) {
+    const m = MIX_RE.exec(s.chip), f = VAR_RE.exec(s.fill);
+    check(!!m && !!f, `popup.css: ${s.name}: the chip (${JSON.stringify(s.chip)}) must be color-mix(in srgb, var(--pp-*) N%, var(--pp-*)) and the generated field fill (${JSON.stringify(s.fill)}) a single var(--pp-*)`);
+    Object.assign(s, m && f ? { ink: m[1], pct: Number(m[2]) / 100, base: m[3], fillVar: f[1] } : { skip: true });
+    if (!s.skip) {
+      check(s.base === s.fillVar, `popup.css: ${s.name}: the chip mixes over ${s.base} but the token field paints ${s.fillVar} in that state`);
+      check(s.ink === "--pp-field-fg" && s.pct === 0.08, `popup.css: ${s.name}: the chip must be --pp-field-fg at 8% (spec §2.2), got ${s.ink} at ${Math.round(s.pct * 100)}%`);
+    }
+  }
+  const region = popupCss.slice(popupCss.indexOf("/* @generated:ui-themes start"), popupCss.indexOf("/* @generated:ui-themes end */")).replace(/\/\*[\s\S]*?\*\//g, "");
+  const rootVars = {};
+  for (const m of cssNoComments.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) {
+    for (const d of m[1].matchAll(/(--pp-[a-z0-9-]+)\s*:\s*([^;]+);/g)) rootVars[d[1]] = d[2].trim();
+  }
+  const blocks = [[":root", rootVars]];
+  for (const m of region.matchAll(/html\[data-theme="([a-z0-9-]+)"\]\s*\{([^}]*)\}/g)) {
+    const vars = { ...rootVars };
+    for (const d of m[2].matchAll(/(--pp-[a-z0-9-]+)\s*:\s*([^;]+);/g)) vars[d[1]] = d[2].trim();
+    blocks.push([m[1], vars]);
+  }
+  check(blocks.length === 15, `ui-contract-tests.mjs: the popup eye chip gate found ${blocks.length} popup theme blocks, expected 15 (14 themes + :root)`);
+  const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+  let measured = 0;
+  const lowest = { r: Infinity, where: "" };
+  for (const [id, vars] of blocks) {
+    for (const s of STATES) {
+      if (s.skip) continue;
+      const ink = vars[s.ink], base = vars[s.base], fill = vars[s.fillVar];
+      if (![ink, base, fill].every((v) => HEX.test(v ?? ""))) {
+        check(false, `popup.css ${id}: ${s.ink}=${ink} / ${s.base}=${base} / ${s.fillVar}=${fill} is not a #rgb / #rrggbb hex -- the popup eye chip gate cannot compute it`);
+        continue;
+      }
+      const a = hexToRgb(ink), b = hexToRgb(base), under = hexToRgb(fill);
+      const chip = a.map((c, i) => Math.round(c * s.pct + b[i] * (1 - s.pct)));
+      const r = contrast(chip, under);
+      measured++;
+      if (r < lowest.r) Object.assign(lowest, { r, where: `${id} ${s.name}` });
+      check(r >= FILL_SEPARATE_MIN,
+        `popup.css ${id}: ${s.name}: the eye's hover chip is ${r.toFixed(3)}:1 against the fill beneath it (${s.fillVar} ${fill}; chip = ${Math.round(s.pct * 100)}% ${s.ink} over ${s.base}) -- floor FILL_SEPARATE_MIN ${FILL_SEPARATE_MIN}`);
+    }
+  }
+  check(measured === 30, `ui-contract-tests.mjs: the popup eye chip gate measured ${measured} (block, state) pairs, expected 30`);
+  if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] popup eye chip: lowest ${lowest.r.toFixed(3)}:1 (${lowest.where}) over ${measured} (block, state) pairs; floor ${FILL_SEPARATE_MIN}`);
 }
 
 if (fail.length) {

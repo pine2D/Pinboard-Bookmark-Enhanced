@@ -49,7 +49,7 @@
 
 - 原文写的是「popup **没有 `.btn` 族**」——那是**代码现状**，不是设计立场。现在
   `@generated:ui-components` 区对 `pp` 发射与另外两个表面同源的 `.btn` / `.btn-sm` / `.ghost` /
-  `.danger` 全族配方，token 名差异（popup 用 `--pp-btn-bd` / `--pp-input-bd`）由
+  `.danger` 全族配方，token 名差异（popup 用 `--pp-btn-bd`）由
   `ui-components.mjs` 的 `TOKEN_ALIAS` 解决。**剩下的是消费侧**：给某颗按钮加 `class="btn"` 是一次
   有布局后果的迁移，因此逐颗做。已迁：`#submit-btn`（`.btn`）、`.del-btn`（`.btn danger`）。
   未迁、仍走手写配方的四套是**登记在案的变体**，不是漏做——逐条见下表（controller 裁决
@@ -590,8 +590,11 @@ popup 现有的 `--pp-tag-bg` / `--pp-tag-fg` 是同一角色的旧名。Task 5 
 ## 6. 表单控件（input / select / textarea / checkbox / radio）
 
 **适用**：`.fg` 字段配方**只发射 options**（composer `formRules(ns)` 的 `ns === "opt"` 守卫）；popup 与
-library 都没有一个 `class="fg"`（`ui-vocabulary.json` 也只在 options 名下登记 `fg`），两者只吃颜色对与
-`accent-color`。library 的字段按工具条逐条手写在 library.css 手写区——那是 §6.4 记录的用户裁决（工具条留
+library 都没有一个 `class="fg"`（`ui-vocabulary.json` 也只在 options 名下登记 `fg`）。popup 的值盒子
+（阶段 4 起）从 `FIELD_TARGETS.pp`（`composers/ui-components.mjs`，同一个 `formRules`）拿到同一套字段
+语言的**颜色半边**：静息 / 悬停 / 聚焦三态、占位符与乘客文字，选择器一律带类型，三态特异性逐盒严格递增
+（§6.2 popup 列）；形状半边（宽、内距、圆角、`border-width` / `border-style`）与光晕留在 popup.css
+手写区，手写区在值盒子上不写任何颜色。library 在阶段 4 Task 7 之前仍只吃颜色对与 `accent-color`。library 的字段按工具条逐条手写在 library.css 手写区——那是 §6.4 记录的用户裁决（工具条留
 在 sm 20px 阶），不是欠账；手写规则还带着 forced-colors 焦点兜底与焦点环 z-index 抬升，共享配方表达不了。
 **代价**：`.fg` 是 options 独占词汇，别的表面加 `class="fg"` 会静默失效——要用就先改 composer 守卫。
 
@@ -709,15 +712,15 @@ on 滑块 → `on-accent vs accent ≥ 4.5`（最低 modern-card 4.51）。
 
 ### 6.2 消费 token 对
 
-popup / library 不发射 `.fg` 配方，字段规则全部手写（popup.css / library.css 手写区）。下表按已发布的规则写：
+popup / library 不发射 `.fg` 配方。popup 的颜色半边由 `FIELD_TARGETS.pp` 生成（阶段 4，见 §6 适用），library 的字段规则仍手写在 library.css 手写区。下表按已发布的规则写：
 
 | 属性 | popup | library | 派生要求 |
 |---|---|---|---|
-| `background-color` | `--pp-input-bg` | 文本框 `--lib-input-bg`；筛选 select 与 `.xp-dict-lang` 静息为 `--lib-btn-bg`（library.css:1748 / :1393） | 既有 |
-| `color` | `--pp-fg` | `--lib-fg` | 对 `input-bg` ≥4.5:1 |
-| `border-color`（静息） | `--pp-input-bd`（popup 用 `-bd` 后缀） | `--lib-input-border`；`.xp-dict-lang` 为 `--lib-btn-border`（:1391） | 律 1 的塌陷载体，不承担 3:1 |
-| `border-color`（hover） | 无字段 hover 规则 | 工具条搜索框 `--lib-fg-muted`（library.css:491-492）；筛选 select 只换底 `--lib-btn-hover`、边保持 `--lib-input-border`（:1762-1765）；`.xp-dict-lang:hover` 换底 `--lib-btn-hover`、边改为 `--lib-input-border`（:1412）；其余字段无 hover 规则 | — |
-| `border-color`（focus） | `--pp-focus-bd` | `--lib-focus-bd` | 既有 |
+| `background-color` | 静息 `--pp-field-bg`、悬停 `--pp-field-bg-hover`、聚焦 `--pp-field-bg-focus`（生成） | 文本框 `--lib-input-bg`；筛选 select 与 `.xp-dict-lang` 静息为 `--lib-btn-bg`（library.css:1748 / :1393） | 既有 |
+| `color` | `--pp-field-fg`（盒子与标签芯乘客，生成）；占位符 `--pp-field-placeholder` | `--lib-fg` | popup：`field-fg` 对两态填充 ≥4.5、对占位符 ≥1.4，占位符对三态填充 ≥4.5（contrast-audit 的 pp 字段行）；library：对 `input-bg` ≥4.5:1 |
+| `border-color`（静息） | `--pp-field-border`（= 填充；terminal 为 pilot `input-bd` 声明的框。`--pp-input-bd` 变量阶段 4 退役） | `--lib-input-border`；`.xp-dict-lang` 为 `--lib-btn-border`（:1391） | 律 1 的塌陷载体，不承担 3:1 |
+| `border-color`（hover） | `--pp-field-border-hover`（无框块 = 悬停填充；terminal 的框向文字色混 30%）。六个值盒子都有悬停，标签壳与密钥框的悬停挂在壳上 | 工具条搜索框 `--lib-fg-muted`（library.css:491-492）；筛选 select 只换底 `--lib-btn-hover`、边保持 `--lib-input-border`（:1762-1765）；`.xp-dict-lang:hover` 换底 `--lib-btn-hover`、边改为 `--lib-input-border`（:1412）；其余字段无 hover 规则 | — |
+| `border-color`（focus） | `--pp-field-border-focus`（四边；填充 `--pp-field-bg-focus` = 静息填充） | `--lib-focus-bd` | popup：对填充 ≥3:1（contrast-audit）；library：既有 |
 | `box-shadow`（focus） | `--pp-focus-ring` | `--lib-focus-ring` | 既有 |
 | `accent-color` | `--pp-accent` | `--lib-accent` | 既有 |
 
@@ -979,10 +982,13 @@ html[data-theme="<dark preset>"] { color-scheme: dark; }
 密钥眼睛 `.key-toggle` 的 `inset` 芯同样用它，因为这圈环画在字段填充上（flexoki-light 的 `focus-bd` 对字段
 填充只有 2.73:1，`--opt-field-border-focus` 在该主题重推为 `#4f7db1`）。它仍是 `focus-bd` 的派生（对字段填充
 已达 3:1 时逐字节等于 `focus-bd`），不是第二套焦点语言。ui-contract 只在 `opt` 命名空间、且规则的每个选择器
-都是值盒子或 `.key-toggle` 时接受这个芯；popup / library 与 options 的非值盒子控件（`.btn` 等）仍只接受
-`--{ns}-focus-bd`。
+都是值盒子或 `.key-toggle` 时接受这个芯。popup 自阶段 4 起同样接受**自己命名空间**的
+`--pp-field-border-focus`（值盒子的 `bordered` 芯与眼睛钮的 `inset` 芯），借用 options 字面量的写法仍然拒绝；
+library（阶段 4 Task 7 之前）与三个表面的非值盒子控件（`.btn` 等）仍只接受 `--{ns}-focus-bd`。popup 值盒子的
+芯写在生成区（`FIELD_TARGETS.pp` 的聚焦规则），手写区的光晕规则用同一条选择器（`:focus` 换成
+`:focus-visible`，`:focus-within` 的壳原样），§7.3 扫描在整个文件（含生成区）里找这条伙伴规则。
 
-**强制色模式下的值盒子聚焦（阶段 4）**：`bordered` 落位靠改涂边框加光晕，强制色下这两样都失效（光晕被丢弃，边色被压成系统色）。所以 options 的每种值盒子另有一条 `@media (forced-colors: active)` 下的 `:focus-visible { outline: 1px solid Highlight; outline-offset: 2px }`，形状与 `.listbox-btn` 的先例相同，放在 options.css 文件末尾，保证不被写了 `outline: none` 的聚焦规则反超（ui-contract 钉住覆盖面与这条次序）。
+**强制色模式下的值盒子聚焦（阶段 4）**：`bordered` 落位靠改涂边框加光晕，强制色下这两样都失效（光晕被丢弃，边色被压成系统色）。所以 options 的每种值盒子另有一条 `@media (forced-colors: active)` 下的 `:focus-visible { outline: 1px solid Highlight; outline-offset: 2px }`，形状与 `.listbox-btn` 的先例相同，放在 options.css 文件末尾，保证不被写了 `outline: none` 的聚焦规则反超（ui-contract 钉住覆盖面与这条次序）。popup 自阶段 4 Task 6 起同样有一段（popup.css 文件末尾）：六个值盒子各用自己注册表条目的光晕选择器画这圈轮廓，壳（标签壳、密钥框）按壳的 `:focus-within`；ui-contract 从 `FIELD_TARGETS.pp` 推出应有的选择器逐条核对，并确认没有 `outline: none` 的聚焦规则在同一个盒子上反超它。§7.3 扫描的强制色分支也审 `:focus-within` 写法的这类规则。
 
 **落位判定只问两件事**，按顺序：
 
@@ -1237,13 +1243,15 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 /* options：(0,5,1)——眼睛持焦点、指针停在输入框上时，聚焦的填充 / 四边 / 光晕
    靠严格更高的特异性压过带类型的生成 hover (0,4,1)，不靠源序（§6.1，阶段 4）。 */
 .fg .key-wrap:focus-within :is(input[type="text"], input[type="password"]):not(:disabled) { background-color: var(--opt-field-bg-focus); border-color: var(--opt-field-border-focus); box-shadow: var(--opt-focus-ring); }
-/* popup：同一形状，换类名。 */
-.login-body .secret-field:focus-within input { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
+/* popup：同一形状，换类名。阶段 4 起填充与四边来自生成区 FIELD_TARGETS.pp（pp-secret 的聚焦规则，
+   (0,5,1)，严格高于它的悬停规则 (0,4,1)），手写区只补光晕，选择器与生成的聚焦规则逐字相同。 */
+.login-body .secret-field:focus-within > input[type="password"]:not(:disabled),
+.login-body .secret-field:focus-within > input[type="text"]:not(:disabled) { box-shadow: var(--pp-focus-ring); }
 /* 眼睛钮走 §7.3 `inset`。这里曾经写过 ghost 填充和内嵌下划线两版，都被用户当场否掉
    （律 6 记了原委）；下面两行才是 shipped 的形状。options 的芯是 --opt-field-border-focus
-   （环画在 B+ 字段填充上，§7.3「options 值盒子的芯」），popup 仍是 --pp-focus-bd。 */
+   （环画在 B+ 字段填充上，§7.3「options 值盒子的芯」），popup 阶段 4 起同样用自己的 --pp-field-border-focus。 */
 .key-toggle:focus-visible { outline: 2px solid var(--opt-field-border-focus); outline-offset: -2px; box-shadow: none; border-radius: var(--opt-radius-sm); }
-.login-body .secret-field .key-toggle:focus-visible { outline: 2px solid var(--pp-focus-bd); outline-offset: -2px; box-shadow: none; border-radius: var(--pp-radius-sm); }
+.login-body .secret-field .key-toggle:focus-visible { outline: 2px solid var(--pp-field-border-focus); outline-offset: -2px; box-shadow: none; border-radius: var(--pp-radius-sm); }
 ```
 
 `.key-wrap` 保留 `:focus-within`（不是 `:has(> input:focus)`）：它的输入框**就是**视觉框，
@@ -1275,8 +1283,8 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | `.vocab-group-unit`（批量条 + 详情面板两处） | library | **本次重建** | 输入 + 双步进钮；用户四轮打回的主案 |
 | `.vocab-sort-seg` | library | **本次重建** | 分段按钮对；分隔线原本随 `aria-pressed` 变色 |
 | `.key-wrap`（19 个密钥字段） | options | **本次修律 2** | 容器无 chrome 变体 |
-| `.secret-field` | popup | **本次修律 2** | 同上，跨表面同形 |
-| `.tags-input-wrap` | popup | **已合规（参考实现）** | 本律的现成样板：容器持 chrome、input `border: none`、`:focus-within` 环 |
+| `.secret-field` | popup | **本次修律 2；阶段 4 入字段族** | 同上，跨表面同形。输入框承担外观（`FIELD_TARGETS.pp` 的 `pp-secret`），悬停 / 聚焦挂在壳上（`:hover:where(:not(:focus-within))` / `:focus-within`），指针移到眼睛上字段仍是悬停态；眼睛悬停底 = `field-fg` 8% 叠在当时的字段填充上 |
+| `.tags-input-wrap` | popup | **阶段 4 入字段族** | 壳持外观（`FIELD_TARGETS.pp` 的 `pp-tags`：三态填充与四边），芯 `#tags-input` 是透明、无框的乘客，文字 `field-fg`；壳的 `:focus-within` 光晕与移除钮自身的环在移除钮聚焦时叠成双环，是既有问题，另行立项（spec §1.2） |
 | `.progress-bar` / `.batch-progress` | options / popup | **已合规** | 非交互，律 2/4 不适用；`overflow: hidden` 裁角的现成先例 |
 | chip + 单个 `×` 钮（`.vocab-group-chip.removable`、`.tag-item`） | library / popup | **不适用** | 只有一个交互件（药丸本身不可聚焦），不满足"两个及以上" |
 | `.saved-theme-wrap` | options | **不适用** | 删除钮是浮在药丸外的角标，不共享边 |
@@ -1309,7 +1317,8 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 1. **rest 去线框。** 静息态控件靠**填充**自证身份，`border-color` 塌陷到自己的填充色。
    `border-width` 保留 1px——**零布局位移**是这条律的硬约束，`border: none` 不算合规实现。
    承载塌陷的是**每角色一个 token**：`--{ns}-btn-border` / `--{ns}-input-border`
-   （popup 用自己的 `-bd` 后缀：`--pp-btn-bd` / `--pp-input-bd`）。控件规则一律引用这些，
+   （popup 用自己的 `-bd` 后缀：`--pp-btn-bd`；它的 `input-bd` 自阶段 4 起只是 pilot 输入——terminal 的框信号——
+   不再发射 CSS 变量，popup 值盒子的塌陷载体是 `--pp-field-border`，§6.2）。控件规则一律引用这些，
    **不再引用 `--{ns}-border`**——后者留给真正的结构边（浮层、表格线、滚动条）。
    options 的值盒子（`.fg` 文本/密钥/数字/textarea、`.listbox-btn`、原生 select 回退、窄屏页签选择器）
    B+ 起改用 `--opt-field-border` 作塌陷载体（§6.2），不再直接引用 `--opt-input-border`。
@@ -1459,6 +1468,8 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 | ui-contract 退役名单（阶段 4） | `field-edge` / `field-edge-hover` 不在派生注册表、composer map（3 表面 × 14 主题）、pilot `ui.*`、三份表面 CSS 的任何声明里；`FIELD_EDGE_HOVER_FG_MIX` 不再导出。带正反例自检，注释不算命中 |
 | ui-contract options 值盒子消费方（阶段 4 Task 4 + 修复轮 1） | 生成的 `.fg` 状态规则逐个点名五种值盒子，没有裸 `input` 的状态规则；值盒子悬停排除自己的聚焦触发与 `:disabled`（融合单元排除壳的 `:focus-within` 与输入框的 `:disabled`）；`.key-wrap` 聚焦框 (0,5,1) 严格高于任何能涂密钥输入框的悬停（不靠源序）；值盒子规则的 `url()` 里没有颜色字面量，原生 select 的箭头只能是 `var(--opt-field-chevron)`；强制色下八种值盒子都有 `forced-colors: active` 语境里的 `1px solid Highlight` 聚焦轮廓（`forced-colors: none` 不算），且在强制色下生效的压 outline 聚焦规则（含强制色语境内的，按 `!important` → 特异性 → 源序）都不反超它；主体按值盒子模型映射（带类型选择器、options.html 值盒子 id、无 `[type]` 的 input、无标签无类无 id 的主体）；侧栏搜索框与窄屏页签选择器静息 / 聚焦入族、没有悬停规则；眼睛悬停底 = `--opt-field-fg` 8%，15 块两态 ≥ `FILL_SEPARATE_MIN`（F10，最低 1.122）；弱墨色静态门的填充集合含 `field-bg(-hover|-focus)`；跳过强制色的扫描只认 `forced-colors: active`。每项都带正反例自检 |
 | checklist 侧栏搜索框 + render family 13 / 9（阶段 4 Task 4） | `#options-search-input` 静息 `bgEqVar field-bg` + `borderSidesEqVar field-border`，聚焦 `bordered` + `field-bg-focus` + `field-border-focus`（2 行 × 15 主题）；family 13 的 options 填充集合加入 `field-bg` / `-hover` / `-focus`；family 9 的 options 必需种类加入 `input[type="search"]` |
+| render oracle family 14 `fieldHoverContrast` 的 popup 腿 + checklist popup 行（阶段 4 Task 6） | popup 六个值盒子（手写名单 `VALUE_BOX_LEGS.popup`：url / title / description / tags 壳 / search / token，token 走登出腿）逐个用真指针读静息与悬停：两态填充与四边都等于各自的 `--pp-field-*` 且四边都已绘制，四角等于 `--pp-radius-md`；类别按 `FIELD_UNSEPARATED_FRAMED.popup`（`["terminal"]`）点名判：名单外的块悬停填充对静息 ≥ `FILL_SEPARATE_MIN`，名单内的块填充不动、改看框：≥ `FIELD_FRAME_HOVER_MIN`、ΔE2000 ≥ `FIELD_FRAME_HOVER_MIN_DE`、画在填充上更强（F8）；另有一行 `fieldHoverClass` 按页面 token 与 `FIELD_HOST_ROLES.pp` 实测类别，与名单不等即 FAIL。缺盒子、不可见或禁用都是 SETUP ERROR，覆盖行打印 `fieldHoverContrast popup: N value box(es)`。函数按表面参数化（`readValueBoxPaint` / `recordValueBoxes` / `recordValueBoxHover`），Task 7 给 `VALUE_BOX_LEGS` 加 `library`。checklist 另有 5 盒 × 3 态 15 行钉 token 身份（聚焦行加 `focusRecipe: "bordered"`）；所有 `focusWithin` 行的未聚焦基线改经 `holdPointerState` 的 rest 读数（壳有了悬停填充以后，宿主指针停在壳上会读到悬停态），不成立记 `focusBaselineRest` SETUP 行。family 9 的值盒子律在 popup 按 `valueBoxes` 条目认种类，`RADIUS_VALUE_BOX_REQUIRED.popup` 要求六个盒子都量到，sweep 为此新增 popup `form` 腿（去掉 `.unsupported-url`、显示搜索行） |
+| ui-contract 的 popup 值盒子模型（阶段 4 Task 6） | 遍历导入的 `FIELD_TARGETS`（pp 与 lib 全部条目）：三态选择器平行、带类型、特异性逐盒严格递增（静息 < 悬停 < 聚焦）、悬停排除聚焦触发与 `:disabled`；popup.html 的每个文本录入控件恰被一个条目覆盖（盒子本身或壳的乘客），每个条目都命中元素；生成区逐条声明正确；手写区在值盒子 / 壳 / 乘客上不写任何颜色（乘客只许透明、无框、`field-fg`；运行期状态类如 `.ac-open` 也算命中），不许 `html[data-theme]` 颜色孪生、手写占位符；url() 里的颜色字面量走模块级 `valueBoxUrlColourOffenders`；形状走模块级 `valueBoxShapeOffenders`（仅豁免 `.tags-input-wrap.ac-open` 的两个下角归零）；光晕规则与生成的聚焦规则同选择器；强制色下六个盒子各有 1px Highlight 轮廓且不被 `outline: none` 反超；眼睛墨色静息 `field-placeholder`、悬停 `field-fg`，眼睛悬停底 15 块 × 2 态 ≥ `FILL_SEPARATE_MIN`（F10，最低 1.119）；`--pp-input-bd`、`--pp-fg-soft` 与 `:has()` 不得回流。§7.3 扫描的伙伴规则在整个文件里找 |
 
 `fillSeparate` 本身**没有独立的门**：它的正确性由 `contrast-audit` 从下游反向约束
 （填充错了，btn-fg / border / danger-quiet-fg 的配对必然红），加上恒等性质

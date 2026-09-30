@@ -47,14 +47,14 @@
      block at the end of @generated:ui-themes below; a hand-written
      duplicate here would just be dead weight. */
   --pp-divider: #eef0f3;
-  /* Nudged from #eef1f5 by the Soft Fill separation pass (design-uplift
-     2026-08-05): the search field sits on the --pp-bg2 strip, and #eef1f5 was
-     only 1.05:1 against it -- under the 1.06:1 floor fillSeparate() enforced
-     at the time, so the default surface would have been the one place the
-     invariant did not hold. Re-derived 2026-09-21 for FILL_SEPARATE_MIN's
-     1.06 -> 1.10 raise (was #edf0f4, only 1.07:1 against --pp-bg2 under the
-     new floor) -- kept in sync by hand with popup-chrome.mjs's DEFAULT_LIGHT
-     `input-bd`, which mirrors this same value. */
+  /* The input-bg ROLE's default: the seed deriveFieldRoles (_ui-derive.mjs)
+     turns into --pp-field-bg, and the fill of the three non-value-box
+     consumers that still read it (the batch progress track, the cancel
+     disc, the progress-text outline). The value boxes themselves paint the
+     --pp-field-* roles from @generated:ui-components (FIELD_TARGETS.pp,
+     stage 4). History: nudged from #eef1f5 by the Soft Fill separation pass
+     (design-uplift 2026-08-05), re-derived 2026-09-21 for FILL_SEPARATE_MIN's
+     1.06 -> 1.10 raise (was #edf0f4). */
   --pp-input-bg: #e9ecf0;
   /* No consumer since 2026-09-18: §8 law 6 took the fill change out of every
      focus rule, and the last reader was `html[data-theme] .login-body
@@ -63,12 +63,11 @@
      default surface would otherwise be the one surface missing the role.
      If something needs it again, check §8 law 6 first. */
   --pp-input-focus-bg: #ffffff;
-  /* --pp-input-bd (resting field border) is emitted by the composer now
-     (Soft Fill, design-uplift 2026-08-05): it equals --pp-input-bg on every
-     surface except terminal, which restores its green frame through its own
-     pilot ui.popup override. The hand-written `transparent` here only ever
-     held on the default surface -- every preset re-armed a full --pp-border
-     frame further down this file. */
+  /* No resting field-border token here: the value boxes paint
+     --pp-field-border (= the fill, except terminal's pilot frame, which
+     ui.popup.dark["input-bd"] still declares as the composer's framed-field
+     signal) from @generated:ui-components. The old input-bd custom property
+     lost its last consumer in stage 4 and is no longer emitted. */
   /* Focus treatment — one soft recipe shared by all 14 surfaces: the border
      tints toward the accent instead of snapping to it at full strength, and
      the halo is a blurred glow emanating FROM the border (no hard-edged ring:
@@ -178,7 +177,6 @@
      a second default nobody would have found when the first one moved. Dark values come from the preset blocks in the
      generated region: the popup's no-preset dark is the flexoki-dark preset
      (theme model 2026-08-25), so there is no separate html.dark layer. */
-  --pp-fg-soft: #666;
   --pp-preset-btn-bg: #eef2ff;
   --pp-preset-btn-hover-bg: #d5e0ff;
   --pp-disabled-fg: #aaa;
@@ -369,6 +367,73 @@ a:hover { text-decoration: underline; }
   color: var(--pp-chip-fg);
 }
 
+.field > input[type="text"], .field > textarea {
+  background-color: var(--pp-field-bg);
+  border-color: var(--pp-field-border);
+  color: var(--pp-field-fg);
+}
+.field > input[type="text"]:hover:where(:not(:focus, :disabled)), .field > textarea:hover:where(:not(:focus, :disabled)) {
+  background-color: var(--pp-field-bg-hover);
+  border-color: var(--pp-field-border-hover);
+}
+.field > input[type="text"]:focus:not(:disabled), .field > textarea:focus:not(:disabled) {
+  background-color: var(--pp-field-bg-focus);
+  border-color: var(--pp-field-border-focus);
+}
+.field > input[type="text"]::placeholder, .field > textarea::placeholder {
+  color: var(--pp-field-placeholder);
+}
+input[type="text"].search-field {
+  background-color: var(--pp-field-bg);
+  border-color: var(--pp-field-border);
+  color: var(--pp-field-fg);
+}
+input[type="text"].search-field:hover:where(:not(:focus, :disabled)) {
+  background-color: var(--pp-field-bg-hover);
+  border-color: var(--pp-field-border-hover);
+}
+input[type="text"].search-field:focus:not(:disabled) {
+  background-color: var(--pp-field-bg-focus);
+  border-color: var(--pp-field-border-focus);
+}
+input[type="text"].search-field::placeholder {
+  color: var(--pp-field-placeholder);
+}
+.login-body .secret-field > input[type="password"], .login-body .secret-field > input[type="text"] {
+  background-color: var(--pp-field-bg);
+  border-color: var(--pp-field-border);
+  color: var(--pp-field-fg);
+}
+.login-body .secret-field:hover:where(:not(:focus-within)) > input[type="password"]:where(:not(:disabled)), .login-body .secret-field:hover:where(:not(:focus-within)) > input[type="text"]:where(:not(:disabled)) {
+  background-color: var(--pp-field-bg-hover);
+  border-color: var(--pp-field-border-hover);
+}
+.login-body .secret-field:focus-within > input[type="password"]:not(:disabled), .login-body .secret-field:focus-within > input[type="text"]:not(:disabled) {
+  background-color: var(--pp-field-bg-focus);
+  border-color: var(--pp-field-border-focus);
+}
+.login-body .secret-field > input[type="password"]::placeholder, .login-body .secret-field > input[type="text"]::placeholder {
+  color: var(--pp-field-placeholder);
+}
+.tags-input-wrap {
+  background-color: var(--pp-field-bg);
+  border-color: var(--pp-field-border);
+  color: var(--pp-field-fg);
+}
+.tags-input-wrap:hover:where(:not(:focus-within, :disabled)) {
+  background-color: var(--pp-field-bg-hover);
+  border-color: var(--pp-field-border-hover);
+}
+.tags-input-wrap:focus-within:not(:disabled) {
+  background-color: var(--pp-field-bg-focus);
+  border-color: var(--pp-field-border-focus);
+}
+.tags-input-wrap > input[type="text"]::placeholder {
+  color: var(--pp-field-placeholder);
+}
+.tags-input-wrap > input[type="text"] {
+  color: var(--pp-field-fg);
+}
 input[type="checkbox"], input[type="radio"] {
   accent-color: var(--pp-accent);
 }
@@ -417,9 +482,9 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .login-body { padding: var(--pp-sp-6) var(--pp-sp-5); }
 .login-body p { margin-bottom: var(--pp-sp-4); font-size: 12px; color: var(--pp-fg); }
 .login-body input {
-  width: 100%; padding: var(--pp-sp-2) var(--pp-sp-3); border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md); font-size: 12px;
+  width: 100%; padding: var(--pp-sp-2) var(--pp-sp-3); border-width: 1px; border-style: solid; border-radius: var(--pp-radius-md); font-size: 12px;
   line-height: 16px; /* md rung (26px) like every other field; `normal` measured 23.33px (controlRung scan) */
-  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; margin-bottom: var(--pp-sp-3); background: var(--pp-input-bg); color: var(--pp-fg);
+  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; margin-bottom: var(--pp-sp-3);
   transition: border-color var(--pp-motion-state), background var(--pp-motion-state), box-shadow var(--pp-motion-state);
 }
 /* No `background: var(--pp-input-focus-bg)` here any more (§8 law 6, user
@@ -430,9 +495,11 @@ html[data-section="login"] .quick-actions { display: none !important; }
    border-colour and adds a ring; nothing else. Both ported references agree
    -- neither Primer's .input-group nor Pico's [role=group] alters a fill on
    focus. The only <input> in .login-body is #token-input, so this rule is
-   exactly the .secret-field fused control. */
-.login-body input:focus { outline: none; border-color: var(--pp-focus-bd); }
-.login-body input:focus-visible { box-shadow: var(--pp-focus-ring); }
+   exactly the .secret-field fused control. Stage 4: the focus frame colour
+   is FIELD_TARGETS.pp `pp-secret` (@generated:ui-components) and the ring
+   is the fused rule below, which fires on the shell's :focus-within -- the
+   old input-only :focus-visible glow restated it and is gone. */
+.login-body input:focus { outline: none; }
 .login-body .secret-field { position: relative; }
 .login-body .secret-field input { padding-right: 30px; }
 .login-body .key-toggle {
@@ -443,7 +510,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
      the eye a pixel for a number no user can see (see the note below on why
      this button's box is not allowed to move). */
   position: absolute; right: 3px; top: var(--pp-sp-1);
-  padding: var(--pp-sp-2); border: 0; background: none; color: var(--pp-fg-soft);
+  padding: var(--pp-sp-2); border: 0; background: none; color: var(--pp-field-placeholder);
 }
 .login-body .key-toggle svg { display: block; }
 /* Out-of-flow hit pad (COMPONENTS.md §1.5, same technique as .tag-remove):
@@ -462,21 +529,29 @@ html[data-section="login"] .quick-actions { display: none !important; }
    byte-for-byte comparable in behaviour. Previously the eye inherited
    `.login-body button:focus-visible`'s 2px ring at offset 2px (popup.css
    just above), measured 1px outside the field's right border and 2px above
-   its top edge -- an inner ring straying across the container's chrome. */
-.login-body .secret-field:focus-within input {
-  border-color: var(--pp-focus-bd);
+   its top edge -- an inner ring straying across the container's chrome.
+   Stage 4: fill and frame are FIELD_TARGETS.pp `pp-secret`
+   (@generated:ui-components); this rule adds only the ring, on that entry's
+   own focus selector list, so the two halves cannot drift apart. */
+.login-body .secret-field:focus-within > input[type="password"]:not(:disabled),
+.login-body .secret-field:focus-within > input[type="text"]:not(:disabled) {
   box-shadow: var(--pp-focus-ring);
 }
 /* Hover is where the eye may show a fill -- it is a pointer affordance, and
-   the rest/focus invariant does not cover it.
-   `.secret-field` is specificity ballast, not scoping -- the same trick the
-   :focus-visible rule below documents, and for the same reason: the themed
-   `html[data-theme] .login-body .key-toggle` rule is (0,3,1), so the (0,3,0)
-   form this rule used to have was outranked by the RESTING themed rule on all
-   13 presets and the fill never appeared there (measured transparent ->
-   transparent on dracula / modern-card / solarized-light, 2026-09-18 audit
-   M3). (0,4,0) wins on every surface with one rule. */
-.login-body .secret-field .key-toggle:hover { background: color-mix(in srgb, var(--pp-fg) 8%, var(--pp-input-bg)); border-radius: var(--pp-radius-sm); }
+   the rest/focus invariant does not cover it. The chip is --pp-field-fg at 8%
+   over the fill the field ACTUALLY paints under the eye (spec §2.2, the same
+   pair as options' .key-toggle:hover): the pointer on the eye hovers the
+   .secret-field shell, so the input wears --pp-field-bg-hover; while the
+   shell holds focus the focus paint wins and the input wears
+   --pp-field-bg-focus, so the second rule re-mixes over that at (0,5,0).
+   field-fg, not fg: fg at 8% over the hover fill is 1.098:1 on
+   solarized-light, under FILL_SEPARATE_MIN (ui-contract's popup eye-chip
+   gate recomputes all 15 blocks). The ink steps up to --pp-field-fg on
+   hover on every surface; the preset-only `html[data-theme]` hover-ink twin
+   is gone. `.secret-field` is specificity ballast, not scoping (2026-09-18
+   audit M3). */
+.login-body .secret-field .key-toggle:hover { background: color-mix(in srgb, var(--pp-field-fg) 8%, var(--pp-field-bg-hover)); color: var(--pp-field-fg); border-radius: var(--pp-radius-sm); }
+.login-body .secret-field:focus-within .key-toggle:hover { background: color-mix(in srgb, var(--pp-field-fg) 8%, var(--pp-field-bg-focus)); }
 /* `.secret-field` is the same specificity ballast as the :hover rule above
    (see that comment). Focus = the standard button ring (§7.3) pulled inside the eye's own box.
    See options.css's .key-toggle:focus-visible for the two rejected
@@ -484,7 +559,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
    measurement showing that the underline's inset shadow was also what
    painted the faint vertical hairline at the button's right edge. */
 .login-body .secret-field .key-toggle:focus-visible {
-  outline: 2px solid var(--pp-focus-bd);
+  outline: 2px solid var(--pp-field-border-focus);
   outline-offset: -2px;
   border-radius: var(--pp-radius-sm);
   box-shadow: none;
@@ -721,24 +796,28 @@ html[data-section="login"] .quick-actions { display: none !important; }
    .quick-row (space-between) and .submit-bar (an inset bar) are other shapes. */
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pp-sp-4); }
 .field > input[type="text"], .field > textarea {
-  width: 100%; padding: var(--pp-sp-2) var(--pp-sp-3); border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md);
+  width: 100%; padding: var(--pp-sp-2) var(--pp-sp-3); border-width: 1px; border-style: solid; border-radius: var(--pp-radius-md);
   /* line-height pinned (COMPONENTS.md §1.1 / §6.3): 4+16+4+2 = the 26px md rung
      the Save/Delete buttons and every other surface's fields sit on. With
      `normal` the URL/Title fields measured 24px and drifted with the fallback
      font. */
   line-height: 16px;
-  font-size: 12px; font-family: inherit; background: var(--pp-input-bg); color: var(--pp-fg);
+  font-size: 12px; font-family: inherit;
   transition: border-color var(--pp-motion-state), background var(--pp-motion-state), box-shadow var(--pp-motion-state);
 }
 /* No fill change on focus (§7.3 / §8 law 6). These two are PLAIN inputs, not
    fused controls, so round 5 left them alone and the surface ended up with
    two focus languages -- the group row and the token field held still while
    the title/URL/notes fields still lightened. Same rule everywhere now:
-   focus changes border-colour and adds a ring, nothing else. */
+   focus changes border-colour and adds a ring, nothing else. Stage 4: the
+   colours are FIELD_TARGETS.pp `pp-text` (@generated:ui-components); the
+   ring rule below is that entry's focus list with :focus -> :focus-visible
+   (a text field matches both on any focus), so ui-contract's §7.3 scan finds
+   its bordered core in the generated rule. */
 .field > input[type="text"]:focus, .field > textarea:focus {
-  outline: none; border-color: var(--pp-focus-bd);
+  outline: none;
 }
-.field > input[type="text"]:focus-visible, .field > textarea:focus-visible {
+.field > input[type="text"]:focus-visible:not(:disabled), .field > textarea:focus-visible:not(:disabled) {
   box-shadow: var(--pp-focus-ring);
 }
 /* No height transition: autoResizeTextarea (popup.js) writes style.height inside
@@ -813,20 +892,24 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 
 .tags-input-wrap {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--pp-sp-2);
-  border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md); padding: var(--pp-sp-1) var(--pp-sp-2); min-height: 24px;
-  cursor: text; background: var(--pp-input-bg);
+  border-width: 1px; border-style: solid; border-radius: var(--pp-radius-md); padding: var(--pp-sp-1) var(--pp-sp-2); min-height: 24px;
+  cursor: text;
   transition: border-color var(--pp-motion-state), background var(--pp-motion-state), box-shadow var(--pp-motion-state);
 }
 /* No fill change on focus (§8 law 6): .tags-input-wrap is a fused control
    too, so the invariant that got the group row and the eye button fixed
    applies to the reference implementation as well -- otherwise the oracle's
-   own model citizen would be the next thing to fail it. */
-.tags-input-wrap:focus-within { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
-/* Fused with the suggestion list while it is open: one box, one bottom edge. */
+   own model citizen would be the next thing to fail it. Stage 4: fill,
+   frame and hover are FIELD_TARGETS.pp `pp-tags`; the ring stays here on
+   that entry's own focus selector. */
+.tags-input-wrap:focus-within:not(:disabled) { box-shadow: var(--pp-focus-ring); }
+/* Fused with the suggestion list while it is open: one box. The two bottom
+   corners square off to meet the list (spec §2.1's one named exception to
+   four equal corners on a value box). */
 .tags-input-wrap.ac-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .tags-display { display: contents; }
 .tag-item {
-  display: inline-flex; align-items: center; background: var(--pp-tag-bg); color: var(--pp-tag-fg);
+  display: inline-flex; align-items: center; background: var(--pp-tag-bg); color: var(--pp-tag-chip-fg);
   padding: 1px var(--pp-sp-4); border-radius: var(--pp-radius-tag); font-size: 11px; gap: var(--pp-sp-1);
   line-height: 18px; white-space: nowrap;
   /* No `transform` in the transition list: no rule and no JS ever sets a
@@ -837,12 +920,12 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tag-remove {
   display: inline-flex; align-items: center; justify-content: center;
   border: 0; background: none; padding: 0; cursor: pointer;
-  /* --pp-fg-muted, not a literal: --pp-tag-remove-fg (#888) was the only
-     .tag-remove colour on all 15 surfaces and had no themed twin, so it fell
-     to 2.57-2.93:1 against --pp-tag-bg on default / catppuccin-latte /
-     catppuccin-mocha (floor 3:1 for an icon control). The muted role is
-     AA-derived against each theme's own surface. */
-  color: var(--pp-fg-muted); line-height: 1; transition: color var(--pp-motion-state);
+  /* --pp-tag-chip-icon (stage 4, popup-chrome.mjs): fg-muted re-derived to
+     >=3:1 against every fill the remove icon rests on -- the shell's rest and hover
+     fills and the chip's own --pp-tag-hover (catppuccin-mocha's raw fg-muted
+     was 2.999:1 there). Before that it was fg-muted, which replaced a #888
+     literal that fell to 2.57-2.93:1 on --pp-tag-bg. */
+  color: var(--pp-tag-chip-icon); line-height: 1; transition: color var(--pp-motion-state);
   position: relative;
 }
 /* Out-of-flow hit pad: 10px glyph -> ~24px target without touching the chip's
@@ -887,7 +970,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
      fused shell is 2+4+20 = 26px whether it holds chips or only the caret; it
      used to be 24px empty and 26px with chips. */
   line-height: 20px;
-  font-size: 12px; flex: 1; min-width: 80px; background: transparent; font-family: inherit; color: var(--pp-fg);
+  font-size: 12px; flex: 1; min-width: 80px; background: transparent; font-family: inherit;
 }
 
 /* The seam with .tags-input-wrap (2026-09-18 audit S10, user ruling): the two
@@ -911,7 +994,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    to substitute the shallower --pp-shadow-md on the 13 presets, i.e. exactly
    the value the deeper one was written to replace (audit S14). */
 .autocomplete-dropdown {
-  background: var(--pp-bg); border: 1px solid var(--pp-focus-bd); border-top: 0;
+  background: var(--pp-bg); border: 1px solid var(--pp-field-border-focus); border-top: 0;
   border-radius: 0 0 var(--pp-radius-md) var(--pp-radius-md);
   max-height: 150px; z-index: var(--pp-z-autocomplete);
   box-shadow: var(--pp-shadow-lg);
@@ -1130,19 +1213,20 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
 .search-row { padding: 0 var(--pp-sp-4) var(--pp-sp-4); }
 .search-field {
   width: 100%; padding: var(--pp-sp-2) var(--pp-sp-4);
-  border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md);
+  border-width: 1px; border-style: solid; border-radius: var(--pp-radius-md);
   /* line-height pinned, same reason as .field > input[type="text"]: with
      `normal` this field measured 23px on every theme -- off both control rungs
      (26 / 20) and drifting with the fallback font, the CI-vs-local shape
      rules/ui-primitives.md warns about. 4 + 16 + 4 + 2 = the 26px md rung. */
   line-height: 16px;
   font-size: 11px; font-family: inherit;
-  background: var(--pp-input-bg); color: var(--pp-fg);
   transition: border-color var(--pp-motion-state), background var(--pp-motion-state), box-shadow var(--pp-motion-state);
 }
-/* Same as .field > input above: border-colour + ring only, no fill. */
-.search-field:focus { outline: none; border-color: var(--pp-focus-bd); }
-.search-field:focus-visible { box-shadow: var(--pp-focus-ring); }
+/* Same as .field > input above: colours from FIELD_TARGETS.pp `pp-search`,
+   outline and ring here (the ring on that entry's focus selector with
+   :focus -> :focus-visible). */
+.search-field:focus { outline: none; }
+input[type="text"].search-field:focus-visible:not(:disabled) { box-shadow: var(--pp-focus-ring); }
 
 /* Quick Actions Bar -- the tools column below the form: search, site links,
  * the three quick buttons, then the dynamic blocks (batch permission, md
@@ -1817,7 +1901,6 @@ html[data-theme="modern-card"] {
   --pp-border: #828282;
   --pp-divider: #e8e8e8;
   --pp-input-bg: #e7e7e9;
-  --pp-input-bd: #e7e7e9;
   --pp-input-focus-bg: #f0f2f5;
   --pp-tag-bg: #e8f0fe;
   --pp-tag-fg: #1967d2;
@@ -1882,7 +1965,6 @@ html[data-theme="nord-night"] {
   --pp-border: #8d98ad;
   --pp-divider: #434c5e;
   --pp-input-bg: #434c5e;
-  --pp-input-bd: #434c5e;
   --pp-input-focus-bg: #4c566a;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #aec89a;
@@ -1948,7 +2030,6 @@ html[data-theme="terminal"] {
   --pp-border: #267326;
   --pp-divider: #33ff3325;
   --pp-input-bg: #111111;
-  --pp-input-bd: var(--pp-border);
   --pp-input-focus-bg: #0d1a0d;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #00cccc;
@@ -2015,7 +2096,6 @@ html[data-theme="paper-ink"] {
   --pp-border: #987d4c;
   --pp-divider: #e8dfd0;
   --pp-input-bg: #e6e5e3;
-  --pp-input-bd: #e6e5e3;
   --pp-input-focus-bg: #faf8f5;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #8b4513;
@@ -2082,7 +2162,6 @@ html[data-theme="dracula"] {
   --pp-border: #767b98;
   --pp-divider: #44475a;
   --pp-input-bg: #44475a;
-  --pp-input-bd: #44475a;
   --pp-input-focus-bg: #51556b;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #50fa7b;
@@ -2148,7 +2227,6 @@ html[data-theme="flexoki-light"] {
   --pp-border: #867f58;
   --pp-divider: #E6E4D9;
   --pp-input-bg: #e7e5da;
-  --pp-input-bd: #e7e5da;
   --pp-input-focus-bg: #FFFCF0;
   --pp-tag-bg: #FAEEC6;
   --pp-tag-fg: #664D01;
@@ -2214,7 +2292,6 @@ html[data-theme="flexoki-dark"] {
   --pp-border: #7a7672;
   --pp-divider: #343331;
   --pp-input-bg: #2f2e2d;
-  --pp-input-bd: #2f2e2d;
   --pp-input-focus-bg: #343331;
   --pp-tag-bg: #3A2D04;
   --pp-tag-fg: #D0A215;
@@ -2280,7 +2357,6 @@ html[data-theme="solarized-light"] {
   --pp-border: #88774b;
   --pp-divider: #d6cdb5;
   --pp-input-bg: #e2decd;
-  --pp-input-bd: #e2decd;
   --pp-input-focus-bg: #fdf6e3;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #1e746d;
@@ -2346,7 +2422,6 @@ html[data-theme="solarized-dark"] {
   --pp-border: #1191ad;
   --pp-divider: #094b5a;
   --pp-input-bg: #103d48;
-  --pp-input-bd: #103d48;
   --pp-input-focus-bg: #073642;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #4aada3;
@@ -2413,7 +2488,6 @@ html[data-theme="catppuccin-latte"] {
   --pp-border: #737e9a;
   --pp-divider: #bcc0cc;
   --pp-input-bg: #dbdee6;
-  --pp-input-bd: #dbdee6;
   --pp-input-focus-bg: #eff1f5;
   --pp-tag-bg: #dce0e8;
   --pp-tag-fg: #116e73;
@@ -2478,7 +2552,6 @@ html[data-theme="catppuccin-mocha"] {
   --pp-border: #8386a0;
   --pp-divider: #45475a;
   --pp-input-bg: #262637;
-  --pp-input-bd: #262637;
   --pp-input-focus-bg: #181825;
   --pp-tag-bg: #45475a;
   --pp-tag-fg: #94e2d5;
@@ -2543,7 +2616,6 @@ html[data-theme="gruvbox-dark"] {
   --pp-border: #958b84;
   --pp-divider: #504945;
   --pp-input-bg: #1d2021;
-  --pp-input-bd: #1d2021;
   --pp-input-focus-bg: #32302f;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #b8bb26;
@@ -2609,7 +2681,6 @@ html[data-theme="rose-pine"] {
   --pp-border: #736ca0;
   --pp-divider: #393552;
   --pp-input-bg: #27243b;
-  --pp-input-bd: #27243b;
   --pp-input-focus-bg: #403d52;
   --pp-tag-bg: transparent;
   --pp-tag-fg: #9ccfd8;
@@ -2674,7 +2745,6 @@ html[data-theme="github-light"] {
   --pp-border: #768a9f;
   --pp-divider: #d0d7de;
   --pp-input-bg: #ececed;
-  --pp-input-bd: #ececed;
   --pp-input-focus-bg: #f6f8fa;
   --pp-tag-bg: #ddf4ff;
   --pp-tag-fg: #0550ae;
@@ -2740,7 +2810,6 @@ html[data-theme="github-light"] {
   --pp-btn-bg: #ebecee;
   --pp-btn-bd: #ebecee;
   --pp-btn-hover: #dbe2ef;
-  --pp-input-bd: #e9ecf0;
   --pp-border: #78859c;
   --pp-field-bg: #e9ecf0;
   --pp-field-border: #e9ecf0;
@@ -2834,8 +2903,6 @@ html[data-theme] { background: var(--pp-bg); }
    has a width (the override set all four). Checked both directions: no
    .header-bar compound rule was losing to it, and no surviving
    html[data-theme] prefix rule matches the element. */
-html[data-theme] .login-body input { background: var(--pp-input-bg); color: var(--pp-fg); }
-html[data-theme] .login-body input:focus { border-color: var(--pp-focus-bd); }
 /* The two `html[data-theme] .login-body button` rules that used to sit here
    are gone (2026-09-18 audit M2 + N13). #login-btn carries class="btn", so its
    whole chrome belongs to the generated .btn recipe, and both rules were
@@ -2848,24 +2915,20 @@ html[data-theme] .login-body input:focus { border-color: var(--pp-focus-bd); }
    solarized-light / catppuccin-latte / github-light, and two steps the wrong
    way on dracula). .btn:hover:not(:disabled) is (0,3,0) and out-ranks what is
    left, so the login button now hovers on --pp-btn-hover everywhere.
-   The `background: transparent` below is what is left of that story: it used
-   to be load-bearing against the deleted resting rule (deleting it during the
-   §8 pass painted an opaque box behind the eye on all 13 presets). It is kept
-   as the explicit statement that this button has no fill at rest -- the row
-   below no longer cancels the hover fill the base rule gives it. */
-html[data-theme] .login-body .key-toggle { background: transparent; border: 0; color: var(--pp-fg-hint); }
-html[data-theme] .login-body .key-toggle:hover { color: var(--pp-fg); }
-html[data-theme] .field > input[type="text"], html[data-theme] .field > textarea {
-  background: var(--pp-input-bg); color: var(--pp-fg);
-}
-/* Themed twin of the base rule above -- (0,4,2) beats its (0,3,1), so the
-   fill had to come out here too or the 13 presets would have kept lightening
-   on focus while the default surface stopped. */
-html[data-theme] .field > input[type="text"]:focus, html[data-theme] .field > textarea:focus {
-  border-color: var(--pp-focus-bd);
-}
-html[data-theme] .tags-input-wrap { background: var(--pp-input-bg); }
-html[data-theme] .tags-input-wrap:focus-within { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
+   Stage 4 (Task 6) then deleted the popup value boxes' themed twins that
+   stood here and further down: .login-body input (+ :focus), .login-body
+   .key-toggle (+ :hover), .field > input/textarea (+ :focus),
+   .tags-input-wrap (+ :focus-within) and .search-field (+ :focus). Every
+   colour on a value box now comes from FIELD_TARGETS.pp
+   (@generated:ui-components); a twin at (0,3,2) / (0,4,2) out-ranked it and
+   froze the typed text, the focus frame and the eye ink on the 13 presets.
+   Checked both directions: none of the ten was a compound rule's ballast (no
+   surviving html[data-theme] rule names these elements), and the eye's
+   `background: transparent` had nothing left to cancel -- the base
+   .login-body .key-toggle already says `background: none; border: 0`, and
+   the resting button rule it fought is the one deleted 2026-09-18 above.
+   ui-contract's popup value-box scan rejects any html[data-theme] colour
+   rule on a value box, shell or passenger. */
 html[data-theme] .ac-item { color: var(--pp-fg); }
 /* html[data-theme] .stag.ai deleted (D6/D7, Task 5): it duplicated the base
    .stag.ai rule's value verbatim (--pp-accent2) at higher specificity
@@ -2924,8 +2987,6 @@ html[data-theme] .preset-btn:hover { background: var(--pp-drop-hover); }
    cannot simply read --pp-preset-bg instead: that token is emitted per theme
    only, the default surface has none. */
 html[data-theme] .preset-btn.used { color: var(--pp-fg-hint); background: var(--pp-bg2); }
-html[data-theme] .search-field { background: var(--pp-input-bg); color: var(--pp-fg); }
-html[data-theme] .search-field:focus { border-color: var(--pp-focus-bd); }
 html[data-theme] #tags-copy-all:hover { color: var(--pp-accent); }
 html[data-theme] .last-used-hint:hover { color: var(--pp-accent); }
 html[data-theme] .edit-cancel { background: color-mix(in srgb, var(--pp-fg) 10%, transparent); color: var(--pp-fg); }
@@ -3171,4 +3232,29 @@ html[data-theme] .md-strip-btn:focus-visible { border-color: var(--pp-focus-bd);
     animation-iteration-count: infinite !important;
   }
   .auto-close-bar { animation-duration: 1.8s !important; }
+}
+
+/* Forced colours (Windows High Contrast), stage 4 spec §6 item 10 / ruling
+   R5: the UA drops author box-shadow and remaps border colours to system
+   colours, so a focused value box -- whose focus is "--pp-field-border-focus
+   on four sides + the ring" everywhere else, with outline: none -- showed no
+   focus at all. Restore one system-colour edge, the options precedent's
+   sanctioned shape (1px solid Highlight, a non-negative offset, no shadow;
+   ui-contract's §7.3 scan). Each box on its FIELD_TARGETS.pp entry's own ring
+   selector: :focus-visible for the plain boxes, the shell's :focus-within
+   for the two fused units (the tags shell carries its look; the token field
+   is focused through its .secret-field shell). Last in the file on purpose:
+   the hand `outline: none` focus rules above sit at lower or equal
+   specificity; ui-contract checks every box is listed here and that no
+   outline-suppressing rule out-ranks this one. */
+@media (forced-colors: active) {
+  .field > input[type="text"]:focus-visible:not(:disabled),
+  .field > textarea:focus-visible:not(:disabled),
+  input[type="text"].search-field:focus-visible:not(:disabled),
+  .login-body .secret-field:focus-within > input[type="password"]:not(:disabled),
+  .login-body .secret-field:focus-within > input[type="text"]:not(:disabled),
+  .tags-input-wrap:focus-within:not(:disabled) {
+    outline: 1px solid Highlight;
+    outline-offset: 2px;
+  }
 }

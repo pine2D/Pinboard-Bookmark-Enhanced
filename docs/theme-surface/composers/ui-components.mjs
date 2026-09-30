@@ -56,7 +56,9 @@ export const SPACING = {
 export const sp = (ns, px) => SPACING[ns][px] ?? `${px}px`;
 
 // Per-surface token NAME differences for the same role. popup spells the two
-// control-frame roles with a `-bd` suffix (--pp-btn-bd / --pp-input-bd) --
+// control-frame roles with a `-bd` suffix (--pp-btn-bd; the input-bd twin is
+// no longer a CSS variable since stage 4 -- popup's value boxes read
+// --pp-field-border through FIELD_TARGETS) --
 // COMPONENTS.md §9.1 law 1 states this explicitly ("popup 用自己的 -bd 后缀"),
 // and those are the names popup-chrome.mjs emits per theme. A recipe that
 // spelled `--pp-btn-border` would reference a token no theme defines: not a
@@ -64,7 +66,7 @@ export const sp = (ns, px) => SPACING[ns][px] ?? `${px}px`;
 // outcome -- still, the recipe has to ask for the name that exists. Roles with
 // no entry here fall through unchanged.
 const TOKEN_ALIAS = {
-  pp: { "btn-border": "btn-bd", "input-border": "input-bd" },
+  pp: { "btn-border": "btn-bd" },
   opt: {},
   lib: {},
 };
@@ -458,8 +460,8 @@ function chipRules(ns) {
 
 // -----------------------------------------------------------------------
 // §6: form controls. The `.fg` field recipe ships to OPTIONS ONLY. Two of the
-// three surfaces have no `class="fg"` anywhere: popup never had one (§6:
-// "popup 只吃颜色对与 accent-color"), and library turned out not to have one
+// three surfaces have no `class="fg"` anywhere: popup never had one, and
+// library turned out not to have one
 // either -- `grep -c 'class="fg' library.html` is 0, no library JS ever adds
 // the token, and ui-vocabulary.json registers `fg` under the options surface
 // alone. Emitting the family for either of them ships CSS that can never
@@ -493,6 +495,11 @@ function chipRules(ns) {
 // half that options.css used to re-split it with (a >=3:1 bottom edge, md md
 // sm sm corners) is retired; the .listbox-btn, a <button> outside FIELD_SEL,
 // states the same md radius in its own hand-written rule.
+//
+// popup (stage 4 Task 6) and library (Task 7) take the COLOUR half of the
+// same field language from FIELD_TARGETS (defined after this function, next
+// to fieldTargetRules): per-surface typed selectors, no `class="fg"`, the
+// shape half hand-written in their own CSS.
 function formRules(ns) {
   // The five value-box kinds this recipe paints, named one by one in every
   // rule -- base AND state (stage 4, spec 2026-09-30-ui-fields-stage4-design
@@ -582,6 +589,7 @@ function formRules(ns) {
       ]),
     );
   }
+  if (ns !== "opt") out.push(...fieldTargetRules(ns));
   // Unscoped and therefore emitted on ALL THREE surfaces -- it is the whole
   // of popup's §6 share, and library's checkboxes consume it too. It must
   // stay outside the `.fg` guard above.
@@ -620,6 +628,125 @@ function formRules(ns) {
       ["font-size", "12px"],
       ["line-height", "14px"],
     ]));
+  }
+  return out;
+}
+
+// -----------------------------------------------------------------------
+// Stage 4 (spec 2026-09-30-ui-fields-stage4-design §2.1 / §4): the COLOUR half
+// of popup's and library's value boxes. One registry per surface, the same
+// shape as CHIP_TARGETS; formRules(ns) emits one rule per non-null field for
+// "pp" / "lib" (options keeps its own `.fg` recipe above). The SHAPE half --
+// height, padding, radius, width, border-width / border-style -- stays
+// hand-written in popup.css / library.css, and a hand rule on one of these
+// boxes may not declare any colour (tests/ui-contract-tests.mjs): the
+// generated region sits BEFORE the hand-written one, so a same-specificity
+// hand colour would win by source order (the stage-3c lesson).
+//
+// Entry: { id, rest, hover, focus, placeholder, passenger, chevron }, each a
+// selector-list string or null. rest / hover / focus are PARALLEL lists --
+// item i of each names the same box -- and every selector is typed (an
+// input's [type], a textarea, or a shell class), so a checkbox or radio can
+// never pick up a field fill (the options `.fg input:hover` debt, 5.3).
+//   rest        -> background-color field-bg, border-color field-border,
+//                  color field-fg
+//   hover       -> background-color field-bg-hover, border-color field-border-hover
+//   focus       -> background-color field-bg-focus, border-color field-border-focus
+//   placeholder -> color field-placeholder
+//   passenger   -> color field-fg (the transparent, frameless core of a
+//                  fused shell; its own border/background stay hand-written)
+//   chevron     -> background-image field-chevron (library selects, Task 7)
+//
+// The state ladder (ruling R1; binds pp AND lib): every entry climbs
+// rest < hover < focus by SPECIFICITY alone, box by box (spec §2.1: focus
+// strictly above hover for the same box, never by source order -- the
+// pointer can rest on a box the keyboard focuses). hover = rest + :hover,
+// its exclusions (the focus trigger, :disabled) wrapped in :where() so they
+// add nothing; focus = rest + its trigger + a counted :not(:disabled). A
+// disabled control cannot take focus, and a shell <div> is never :disabled,
+// so that guard never changes what matches -- it is specificity ballast (the
+// same device as `.secret-field` on popup's eye rules). ui-contract checks
+// rest < hover < focus pairwise over EVERY entry of this registry, pp and
+// lib alike. (options' .fg recipe keeps its own mutually exclusive form --
+// hover excludes the focus trigger, COMPONENTS.md §6.1.)
+//
+// Triggers (spec §2.1 table): the plain boxes use :focus / :not(:focus);
+// the two popup fused units use the SHELL's :focus-within / :not(:focus-
+// within), so the eye or a tag chip holding focus keeps the unit out of its
+// hover paint, and the pointer over the eye keeps the token field in it.
+// No :has() on popup (the tags list toggles `.ac-open` by class for the same
+// reason, popup-tags.js).
+export const FIELD_TARGETS = Object.freeze({
+  pp: Object.freeze([
+    // #url-input, #title-input, #description-input. The child combinator is
+    // load-bearing: `.field > input` must not reach #tags-input, which sits
+    // inside .tags-input-wrap (a passenger of pp-tags below).
+    Object.freeze({
+      id: "pp-text",
+      rest: '.field > input[type="text"], .field > textarea',
+      hover: '.field > input[type="text"]:hover:where(:not(:focus, :disabled)), .field > textarea:hover:where(:not(:focus, :disabled))',
+      focus: '.field > input[type="text"]:focus:not(:disabled), .field > textarea:focus:not(:disabled)',
+      placeholder: '.field > input[type="text"]::placeholder, .field > textarea::placeholder',
+      passenger: null,
+      chevron: null,
+    }),
+    // #search-input (11px, the quick-actions strip; spec §3.2).
+    Object.freeze({
+      id: "pp-search",
+      rest: 'input[type="text"].search-field',
+      hover: 'input[type="text"].search-field:hover:where(:not(:focus, :disabled))',
+      focus: 'input[type="text"].search-field:focus:not(:disabled)',
+      placeholder: 'input[type="text"].search-field::placeholder',
+      passenger: null,
+      chevron: null,
+    }),
+    // #token-input: the input carries the look and the eye sits inside it,
+    // so the state lives on the .secret-field shell (options' .key-wrap
+    // shape). Both types: the eye flips password <-> text (shared.js).
+    Object.freeze({
+      id: "pp-secret",
+      rest: '.login-body .secret-field > input[type="password"], .login-body .secret-field > input[type="text"]',
+      hover: '.login-body .secret-field:hover:where(:not(:focus-within)) > input[type="password"]:where(:not(:disabled)), .login-body .secret-field:hover:where(:not(:focus-within)) > input[type="text"]:where(:not(:disabled))',
+      focus: '.login-body .secret-field:focus-within > input[type="password"]:not(:disabled), .login-body .secret-field:focus-within > input[type="text"]:not(:disabled)',
+      placeholder: '.login-body .secret-field > input[type="password"]::placeholder, .login-body .secret-field > input[type="text"]::placeholder',
+      passenger: null,
+      chevron: null,
+    }),
+    // .tags-input-wrap: the shell carries the look (COMPONENTS.md §8), the
+    // #tags-input core is a transparent, frameless passenger.
+    Object.freeze({
+      id: "pp-tags",
+      rest: ".tags-input-wrap",
+      hover: ".tags-input-wrap:hover:where(:not(:focus-within, :disabled))",
+      focus: ".tags-input-wrap:focus-within:not(:disabled)",
+      placeholder: '.tags-input-wrap > input[type="text"]::placeholder',
+      passenger: '.tags-input-wrap > input[type="text"]',
+      chevron: null,
+    }),
+  ]),
+  // Filled by stage 4 Task 7 (library.css).
+  lib: Object.freeze([]),
+});
+
+function fieldTargetRules(ns) {
+  const out = [];
+  for (const t of FIELD_TARGETS[ns] ?? []) {
+    out.push(rule(t.rest, [
+      ["background-color", `var(--${ns}-field-bg)`],
+      ["border-color", `var(--${ns}-field-border)`],
+      ["color", `var(--${ns}-field-fg)`],
+    ]));
+    out.push(rule(t.hover, [
+      ["background-color", `var(--${ns}-field-bg-hover)`],
+      ["border-color", `var(--${ns}-field-border-hover)`],
+    ], { pairColorWith: t.rest }));
+    out.push(rule(t.focus, [
+      ["background-color", `var(--${ns}-field-bg-focus)`],
+      ["border-color", `var(--${ns}-field-border-focus)`],
+    ], { pairColorWith: t.rest }));
+    if (t.placeholder) out.push(rule(t.placeholder, [["color", `var(--${ns}-field-placeholder)`]]));
+    if (t.passenger) out.push(rule(t.passenger, [["color", `var(--${ns}-field-fg)`]]));
+    if (t.chevron) out.push(rule(t.chevron, [["background-image", `var(--${ns}-field-chevron)`]]));
   }
   return out;
 }

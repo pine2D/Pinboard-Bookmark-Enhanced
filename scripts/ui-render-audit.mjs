@@ -103,8 +103,9 @@ import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.
 // Family 14's fill-separation floor (spec 2026-09-30-ui-fields-stage4-design
 // §2.3 F1-F3) is the derivation's own constant, imported, never a hand-typed
 // 1.10; its frame step measures perceptual distance with the same CIEDE2000
-// the derivation uses.
-import { FILL_SEPARATE_MIN, deltaE2000 } from "../docs/theme-surface/composers/_ui-derive.mjs";
+// the derivation uses. The popup / library value-box legs (stage 4 Task 6)
+// read each surface's field hosts from the deriver too, never retyped here.
+import { FILL_SEPARATE_MIN, deltaE2000, FIELD_HOST_ROLES } from "../docs/theme-surface/composers/_ui-derive.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -2185,28 +2186,65 @@ async function runOneCheck(page, theme, check, results, extBase) {
   }
   if (check.state === "focusWithin") {
     if (!check.focusTarget) throw new Error(`focusWithin check on ${check.selector} has no focusTarget`);
-    focusBaseline = await page.evaluate(({ selector }) => {
-      const el = document.querySelector(selector);
-      if (!el) return null;
-      const cs = getComputedStyle(el);
-      return {
-        borderColors: [cs.borderTopColor, cs.borderRightColor, cs.borderBottomColor, cs.borderLeftColor].join("|"),
-        boxShadow: cs.boxShadow,
-        outlineStyle: cs.outlineStyle,
-      };
-    }, { selector: check.selector });
-    // The REST pass for fusedStateStable. Taken through the same probe the
-    // focused pass uses, so the two snapshots are structurally identical and
-    // a diff can only mean the CSS changed something -- not that two
-    // different measurement paths disagree.
-    if (check.expect.fusedStateStable === true) {
+    // The unfocused baseline (focusRecipe's "did the focus rule fire",
+    // fusedStateStable's REST pass) is read through the same rest pointer
+    // hold family 14 uses (stage 4 Task 6, spec §5.1), on every surface: the
+    // fused shells popup and library ship now carry a HOVER fill and frame,
+    // and a baseline read while the host's OS pointer happens to sit on the
+    // shell (the WSLg trusted-event mechanism at holdPointerState) would
+    // record the hover paint -- which focus then excludes, so the diff reads
+    // as a product FAIL. The hold parks the pointer outside the element,
+    // blurs focus inside it, and only accepts a read the pointer did not
+    // disturb; one that never holds is a `focusBaselineRest` SETUP row.
+    // The REST pass for fusedStateStable is taken through the same probe
+    // the focused pass uses, so the two snapshots are structurally identical
+    // and a diff can only mean the CSS changed something.
+    const baseHandle = await page.$(check.selector);
+    if (!baseHandle) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: focusWithin target not found`);
+    const baseHold = await holdPointerState(page, baseHandle, async () => {
+      const base = await page.evaluate(({ selector }) => {
+        const el = document.querySelector(selector);
+        const cs = getComputedStyle(el);
+        const n = document.activeElement;
+        return {
+          borderColors: [cs.borderTopColor, cs.borderRightColor, cs.borderBottomColor, cs.borderLeftColor].join("|"),
+          boxShadow: cs.boxShadow,
+          outlineStyle: cs.outlineStyle,
+          hovered: el.matches(":hover"),
+          focused: el.matches(":focus-within"),
+          active: n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null",
+          at: performance.now(),
+        };
+      }, { selector: check.selector });
+      if (check.expect.fusedStateStable !== true) return base;
       const rest = await page.evaluate(probeSelector, {
         selector: check.selector, compareSelector: null, extraBgVarName: null, extraColorVarName: null, radiusVarName: null,
         childSelectors: check.expect.fusedStateStableChildren || null,
         focusTargetSelector: null,
       });
-      stabilityBaseline = rest.stability || null;
+      // Judged on BOTH reads: the pointer must be off the element in each,
+      // and the foreign-event window runs up to the later one.
+      return {
+        ...base, stability: rest.stability || null,
+        hovered: base.hovered || !!rest.pointer?.hovered,
+        focused: base.focused || !!rest.pointer?.focused,
+        at: rest.pointer?.at ?? base.at,
+      };
+    }, "rest");
+    await baseHandle.dispose();
+    if (!baseHold.ok) {
+      await restoreSeed();
+      results.push({
+        surface: check.surface, theme, selector: check.selector, state: check.state,
+        check: "focusBaselineRest", status: "SETUP", setup: baseHold.kind,
+        actual: `the rest state (pointer parked outside, focus elsewhere) did not hold through the unfocused baseline read in ${baseHold.attempts} attempt(s) -- ${describeHoldTries(baseHold.tries, "rest")}`,
+        expected: "the unfocused baseline of a focusWithin row is read with the real pointer parked outside the element and focus elsewhere, undisturbed (harness precondition for focusRecipe / fusedFocusRing / fusedStateStable)",
+        note: holdSetupNote(baseHold),
+      });
+      return;
     }
+    focusBaseline = { borderColors: baseHold.got.borderColors, boxShadow: baseHold.got.boxShadow, outlineStyle: baseHold.got.outlineStyle };
+    stabilityBaseline = baseHold.got.stability ?? null;
     await page.keyboard.press("Shift");
     const focused = await page.evaluate(({ selector, target }) => {
       const el = document.querySelector(selector);
@@ -2451,7 +2489,8 @@ const POPUP_HIDDEN_LEG_IDS = ["existing-banner", "url-warning", "url-clean-hint"
 // eligible since ITS bg/panel rows genuinely cover it.
 const WEAK_TEXT_CFG = {
   popup: {
-    prefix: "pp", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg"],
+    // Stage 4 Task 6: popup's value boxes paint the field fills now.
+    prefix: "pp", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg", "field-bg", "field-bg-hover", "field-bg-focus"],
     safeHostRoles: ["bg", "bg2", "drop-hover"],
     safeHostExcludeTextRoles: ["link"],
   },
@@ -2905,11 +2944,24 @@ const FIELD_HOVER_REQUIRED_KINDS = ['input[type="text"]', 'input[type="password"
 // Family 9 also requires the sidebar search box on options (stage 4 Task 4:
 // it joined the value boxes at rest and on focus; it has no hover, so it is
 // not one of family 14's kinds).
-const RADIUS_VALUE_BOX_REQUIRED = Object.freeze({ options: Object.freeze([...FIELD_HOVER_REQUIRED_KINDS, 'input[type="search"]']) });
+// Popup (stage 4 Task 6, T6-b): its six value boxes by name -- the sweep
+// keys popup's value-box kinds by the SWEEP_CFG valueBoxes entry a box
+// matches (radiusScale.valueBoxKindByEntry), since three of them are plain
+// text inputs a tag/type kind could not tell apart.
+const RADIUS_VALUE_BOX_REQUIRED = Object.freeze({
+  options: Object.freeze([...FIELD_HOVER_REQUIRED_KINDS, 'input[type="search"]']),
+  popup: Object.freeze(["#url-input", "#title-input", "#description-input", ".tags-input-wrap", "#token-input", "#search-input"]),
+});
 // Themes whose value boxes are framed and NOT separated from their hosts, per
 // surface (spec 2026-09-30-ui-fields-stage4-design §2.2 / §2.4): the fill
 // holds on hover and the frame carries it.
-const FIELD_UNSEPARATED_FRAMED = Object.freeze({ options: Object.freeze(["terminal", "rose-pine"]) });
+const FIELD_UNSEPARATED_FRAMED = Object.freeze({
+  options: Object.freeze(["terminal", "rose-pine"]),
+  // popup (stage 4 Task 6): terminal's pilot frame on a fill that sits 1.05:1
+  // from --pp-bg. The popup leg re-measures the class from the tokens and
+  // FAILs a theme whose measured class differs from this list.
+  popup: Object.freeze(["terminal"]),
+});
 // The frame-step floors for those themes (contrast ratio and CIEDE2000 of
 // the hover frame against the rest frame, both composited over the fill):
 // spec 2026-09-30-ui-fields-stage4-design §2.3 F8, the same floors
@@ -3326,6 +3378,238 @@ async function recordFieldHoverContrast(page, theme, results, context, kindsSeen
   fieldHoverScanLog.push({ theme, context, scanned, unmeasured });
 }
 
+// ---- fieldHoverContrast (family 14), the popup / library value-box legs
+// (stage 4 Task 6, spec 2026-09-30-ui-fields-stage4-design §2.1 / §2.3 /
+// §5.2; ruling R7: ONE surface-parameterised leg, Task 7 adds `library` to
+// VALUE_BOX_LEGS and calls the same two functions). Each surface's value
+// boxes -- a HAND-WRITTEN list, the render oracle never derives its
+// population from the recipe it checks (tests/render-audit-checklist.mjs
+// header) -- are read with the real pointer parked and hovered
+// (holdPointerState). Per (theme, box):
+//   - token identity: rest fill / all four sides = --<ns>-field-bg /
+//     --<ns>-field-border, hover = --<ns>-field-bg-hover /
+//     --<ns>-field-border-hover, every side painted (width > 0, style not
+//     none/hidden) -- no bottom edge, no unpainted side;
+//   - four equal corners = the surface's radiusVar (spec §1.4 item 3; the
+//     one popup exception, .tags-input-wrap.ac-open, is never opened here);
+//   - the hover step, by the class FIELD_UNSEPARATED_FRAMED[surface] pins by
+//     name (spec §2.4, same discipline as the options leg): a box outside it
+//     steps its FILL >= FILL_SEPARATE_MIN (F2); a framed box whose fill is
+//     not separated from its hosts keeps its fill and steps its FRAME -- F8:
+//     >= FIELD_FRAME_HOVER_MIN:1 and dE2000 >= FIELD_FRAME_HOVER_MIN_DE
+//     against the rest frame, and stronger on the fill than the rest frame.
+//   - the class itself (`fieldHoverClass`, one row per theme and fixture):
+//     framed / separated are re-measured from the page's own tokens (hosts =
+//     the deriver's FIELD_HOST_ROLES[ns]) and must EQUAL the pinned name
+//     list, so a palette drifting across FILL_SEPARATE_MIN fails loudly
+//     instead of silently swapping which rule judges it (or leaving the F8
+//     branch with nothing to judge).
+// A box that is missing, hidden or disabled is a SETUP ERROR, never a pass;
+// a pointer state that never holds is a SETUP row.
+const VALUE_BOX_LEGS = Object.freeze({
+  popup: Object.freeze({
+    ns: "pp",
+    radiusVar: "--pp-radius-md",
+    // [box, carrier]: `carrier` names the ancestor whose state drives the box
+    // (the token field's .secret-field shell), so focus held there is seen.
+    boxes: Object.freeze([
+      ["#url-input", null], ["#title-input", null], ["#description-input", null],
+      [".tags-input-wrap", null], ["#search-input", null], ["#token-input", ".secret-field"],
+    ]),
+    // Fixtures (spec §5.2): the main form needs #main-section without
+    // .unsupported-url (popup.js sets it: the fixture's own tab is a
+    // chrome-extension:// page) and .search-row unhidden (popup.js hides it
+    // unless optShowSearch); the token field needs the logged-out page (the
+    // seed is logged in), restored whatever happens.
+    legs: Object.freeze([
+      {
+        context: "main",
+        boxes: ["#url-input", "#title-input", "#description-input", ".tags-input-wrap", "#search-input"],
+        async open(page, url, theme) {
+          await page.goto(`${url}?_ra=fieldhover`, { waitUntil: "load", timeout: TIMEOUT_MS });
+          await page.waitForTimeout(500);
+          const shown = await page.evaluate(() => {
+            const main = document.getElementById("main-section");
+            const search = document.querySelector(".search-row");
+            main?.classList.remove("hidden", "unsupported-url");
+            search?.classList.remove("hidden");
+            document.activeElement?.blur?.();
+            return !!main && !!search;
+          });
+          if (!shown) throw new Error(`SETUP: fieldHoverContrast popup: popup.html is missing #main-section / .search-row (theme=${theme})`);
+          await page.waitForTimeout(120);
+          return null;
+        },
+      },
+      {
+        context: "login",
+        boxes: ["#token-input"],
+        async open(page, url, theme, sw) {
+          await sw.evaluate(() => chrome.storage.local.set({ pinboardToken: "" }));
+          const restore = () => sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF);
+          try {
+            await page.goto(`${url}?_ra=fieldlogin`, { waitUntil: "load", timeout: TIMEOUT_MS });
+            await page.waitForSelector("#login-section:not(.hidden)", { timeout: TIMEOUT_MS });
+            await page.waitForTimeout(300);
+          } catch (e) {
+            await restore();
+            throw e;
+          }
+          return restore;
+        },
+      },
+    ]),
+  }),
+});
+const valueBoxHoverLog = [];
+
+// Runs INSIDE the page (handle.evaluate(fn, carrierSel)) -- self-contained.
+async function readValueBoxPaint(el, carrierSel) {
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  el.getAnimations().forEach((a) => { try { a.finish(); } catch { /* idle */ } });
+  const carrier = (carrierSel && el.closest(carrierSel)) || el;
+  const r = el.getBoundingClientRect();
+  const cs = getComputedStyle(el);
+  const n = document.activeElement;
+  return {
+    visible: r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none",
+    disabled: !!el.disabled,
+    own: cs.backgroundColor,
+    sides: [cs.borderTopColor, cs.borderRightColor, cs.borderBottomColor, cs.borderLeftColor],
+    widths: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth].map((w) => parseFloat(w) || 0),
+    styles: [cs.borderTopStyle, cs.borderRightStyle, cs.borderBottomStyle, cs.borderLeftStyle],
+    radii: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].map((v) => parseFloat(v) || 0),
+    hovered: el.matches(":hover"),
+    focused: carrier.matches(":focus-within"),
+    active: n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null",
+    at: performance.now(),
+  };
+}
+
+async function recordValueBoxes(page, surface, theme, results, context, boxes, log) {
+  const cfg = VALUE_BOX_LEGS[surface];
+  if (!cfg) throw new Error(`SETUP: fieldHoverContrast has no VALUE_BOX_LEGS entry for ${surface}`);
+  const { ns } = cfg;
+  const expected = expectedDatasetTheme(theme);
+  const liveTheme = await page.evaluate(() => document.documentElement.dataset.theme || null);
+  if (liveTheme !== expected) {
+    throw new Error(`SETUP: fieldHoverContrast ${surface}/${context} expected documentElement.dataset.theme=${JSON.stringify(expected)} (theme=${JSON.stringify(theme)}) but found ${JSON.stringify(liveTheme)} -- theme drifted before the family-14 ${surface} leg`);
+  }
+  const hosts = FIELD_HOST_ROLES[ns];
+  if (!Array.isArray(hosts) || !hosts.length) throw new Error(`SETUP: fieldHoverContrast ${surface}: FIELD_HOST_ROLES.${ns} is missing`);
+  const raw = await page.evaluate(({ ns, names, radiusVar }) => {
+    const cs = getComputedStyle(document.documentElement);
+    return {
+      ...Object.fromEntries(names.map((name) => [name, cs.getPropertyValue(`--${ns}-${name}`).trim()])),
+      radius: cs.getPropertyValue(radiusVar).trim(),
+    };
+  }, { ns, names: ["field-bg", "field-border", "field-bg-hover", "field-border-hover", ...hosts], radiusVar: cfg.radiusVar });
+  const solid = (value, what, where) => {
+    const s = String(value || "").trim();
+    const p = s.startsWith("#") ? hexRgb(s) : parseRgba(s);
+    if (!p || (p.length === 4 && p[3] !== 1)) {
+      throw new Error(`SETUP: fieldHoverContrast ${surface} ${where} (theme=${theme}) ${what} ${JSON.stringify(value)} is not an opaque parseable colour -- the step math would silently skip it`);
+    }
+    return p.slice(0, 3);
+  };
+  const tok = Object.fromEntries(Object.entries(raw).filter(([name]) => name !== "radius").map(([name, value]) => [name, solid(value, `--${ns}-${name}`, ":root")]));
+  const radiusMd = parseFloat(raw.radius);
+  if (!Number.isFinite(radiusMd)) throw new Error(`SETUP: fieldHoverContrast ${surface} (theme=${theme}) ${cfg.radiusVar} ${JSON.stringify(raw.radius)} is not a length`);
+  const same = (a, b) => a.every((c, i) => Math.abs(c - b[i]) <= 1);
+  // The class, measured from the tokens and pinned by name (see header).
+  const framed = !same(tok["field-border"], tok["field-bg"]);
+  const separated = hosts.every((host) => cr(tok["field-bg"], tok[host]) >= FILL_SEPARATE_MIN);
+  const measuredFrameClass = framed && !separated;
+  const frameCarriesHover = (FIELD_UNSEPARATED_FRAMED[surface] || []).includes(theme);
+  results.push({
+    surface, theme, selector: ":root", state: `hover|${context}`, check: "fieldHoverClass",
+    status: measuredFrameClass === frameCarriesHover ? "OK" : "FAIL",
+    actual: `${framed ? "framed" : "unframed"} (--${ns}-field-border ${raw["field-border"]} vs --${ns}-field-bg ${raw["field-bg"]}), fill ${separated ? "separated" : "NOT separated"} from ${hosts.map((host) => `--${ns}-${host} ${raw[host]} (${round2(cr(tok["field-bg"], tok[host]))}:1)`).join(", ")} -> ${measuredFrameClass ? "frame-step" : "fill-step"} class; FIELD_UNSEPARATED_FRAMED.${surface} ${frameCarriesHover ? "lists" : "does not list"} ${JSON.stringify(theme)}`,
+    expected: `the class measured from the theme's tokens (framed and not separated >= FILL_SEPARATE_MIN ${FILL_SEPARATE_MIN} from FIELD_HOST_ROLES.${ns}) equals FIELD_UNSEPARATED_FRAMED.${surface} (spec 2026-09-30-ui-fields-stage4-design §2.4)`,
+    note: null,
+  });
+  for (const [box, carrier] of boxes) {
+    const h = await page.$(box);
+    if (!h) throw new Error(`SETUP: fieldHoverContrast ${surface}/${context} found no ${box} (theme=${theme}) -- the fixture did not render it`);
+    const read = () => h.evaluate(readValueBoxPaint, carrier);
+    const restHold = await holdPointerState(page, h, read, "rest");
+    const rest = restHold.got;
+    if (!rest.visible || rest.disabled) {
+      throw new Error(`SETUP: fieldHoverContrast ${surface}/${context} ${box} is ${rest.visible ? "disabled" : "not visible"} (theme=${theme}) -- the ${surface} leg must measure every value box`);
+    }
+    const hoverHold = restHold.ok ? await holdPointerState(page, h, read, "hover") : null;
+    await page.mouse.move(0, 0);
+    await h.dispose();
+    const failed = !restHold.ok ? { hold: restHold, phase: "REST" } : !hoverHold.ok ? { hold: hoverHold, phase: "hover" } : null;
+    if (failed) {
+      log.unmeasured.push(box);
+      results.push({
+        surface, theme, selector: box, state: `hover|${context}`, check: "fieldHoverContrast",
+        status: "SETUP", setup: failed.hold.kind,
+        actual: `${failed.phase === "REST" ? "the rest state (pointer parked outside, focus elsewhere)" : ":hover with focus elsewhere"} did not hold through the read in ${failed.hold.attempts} attempt(s) -- ${describeHoldTries(failed.hold.tries, failed.phase === "REST" ? "rest" : "hover")}`,
+        expected: "the real pointer's :hover reaches the probed box with focus elsewhere, and leaves it at rest, undisturbed through each read (harness precondition for the fieldHoverContrast verdict)",
+        note: holdSetupNote(failed.hold),
+      });
+      continue;
+    }
+    const hover = hoverHold.got;
+    const bad = [];
+    const painted = (p, i) => p.widths[i] > 0 && !/^(?:none|hidden)$/.test(p.styles[i] || "none");
+    for (const [p, fillRole, sideRole, name] of [[rest, "field-bg", "field-border", "rest"], [hover, "field-bg-hover", "field-border-hover", "hover"]]) {
+      if (!same(solid(p.own, "background-color", box), tok[fillRole])) bad.push(`${name} fill ${p.own} != --${ns}-${fillRole} ${raw[fillRole]}`);
+      const off = [0, 1, 2, 3].filter((i) => !painted(p, i) || !same(solid(p.sides[i], "border colour", box), tok[sideRole]));
+      if (off.length) bad.push(`${name} side(s) ${off.join(",")} not a painted --${ns}-${sideRole} ${raw[sideRole]} (${p.sides.join(" | ")}; widths ${p.widths.join("/")}; styles ${p.styles.join("/")})`);
+    }
+    if (!rest.radii.every((v) => Math.abs(v - radiusMd) <= 0.5)) bad.push(`corners ${rest.radii.join("/")}px, want four x ${cfg.radiusVar} ${radiusMd}px`);
+    const fill0 = solid(rest.own, "background-color", box), fill1 = solid(hover.own, "background-color", box);
+    let step;
+    if (frameCarriesHover) {
+      const b0 = solid(rest.sides[0], "border colour", box), b1 = solid(hover.sides[0], "border colour", box);
+      const r = cr(b0, b1), de = deltaE2000(b0, b1);
+      step = `frame ${round2(r)}:1 dE2000 ${round2(de)} (framed, fill not separated)`;
+      if (!(r >= FIELD_FRAME_HOVER_MIN && de >= FIELD_FRAME_HOVER_MIN_DE && same(fill0, fill1) && cr(b1, fill1) > cr(b0, fill0))) {
+        bad.push(`frame step ${round2(r)}:1 / dE2000 ${round2(de)} / fill ${same(fill0, fill1) ? "held" : `moved rgb(${fill0})->rgb(${fill1})`} / on-fill ${round2(cr(b0, fill0))} -> ${round2(cr(b1, fill1))} -- F8 needs >= ${FIELD_FRAME_HOVER_MIN}:1, dE2000 >= ${FIELD_FRAME_HOVER_MIN_DE}, the fill held and a stronger frame on the fill`);
+      }
+    } else {
+      const r = cr(fill0, fill1);
+      step = `fill ${round2(r)}:1`;
+      if (!(r >= FILL_SEPARATE_MIN)) bad.push(`fill step ${round2(r)}:1 < FILL_SEPARATE_MIN ${FILL_SEPARATE_MIN} (F2)`);
+    }
+    log.measured.push(box);
+    results.push({
+      surface, theme, selector: box, state: `hover|${context}`, check: "fieldHoverContrast",
+      status: bad.length ? "FAIL" : "OK",
+      actual: bad.length ? bad.join("; ") : `${step}; four painted sides and four ${radiusMd}px corners, rest and hover on their tokens`,
+      expected: `fill-only value box (spec §2.1): rest / hover paint --${ns}-field-bg(-hover) with four painted --${ns}-field-border(-hover) sides and four ${cfg.radiusVar} corners; hover steps the fill >= FILL_SEPARATE_MIN, or -- FIELD_UNSEPARATED_FRAMED.${surface} -- holds the fill and steps the frame (F8: >= ${FIELD_FRAME_HOVER_MIN}:1, dE2000 >= ${FIELD_FRAME_HOVER_MIN_DE}, stronger on the fill)`,
+      note: null,
+      harness: `:hover rest=${rest.hovered} hover=${hover.hovered}, focus rest=${rest.focused} hover=${hover.focused} (activeElement ${hover.active}), rest attempt ${restHold.attempts}, hover attempt ${hoverHold.attempts}`,
+    });
+  }
+}
+
+async function recordValueBoxHover(page, surface, url, theme, results, sw) {
+  const cfg = VALUE_BOX_LEGS[surface];
+  if (!cfg) throw new Error(`SETUP: fieldHoverContrast has no VALUE_BOX_LEGS entry for ${surface}`);
+  const log = { surface, theme, measured: [], unmeasured: [] };
+  for (const leg of cfg.legs) {
+    const boxes = leg.boxes.map((sel) => {
+      const entry = cfg.boxes.find(([box]) => box === sel);
+      if (!entry) throw new Error(`SETUP: VALUE_BOX_LEGS.${surface} leg ${leg.context} names ${sel}, which is not in its boxes list`);
+      return entry;
+    });
+    const close = await leg.open(page, url, theme, sw);
+    try {
+      await recordValueBoxes(page, surface, theme, results, leg.context, boxes, log);
+    } finally {
+      if (close) await close();
+    }
+  }
+  valueBoxHoverLog.push(log);
+  const reached = new Set([...log.measured, ...log.unmeasured]);
+  const missing = cfg.boxes.map(([box]) => box).filter((box) => !reached.has(box));
+  if (missing.length) throw new Error(`SETUP: fieldHoverContrast ${surface} reached no ${missing.join(" / ")} (theme=${JSON.stringify(theme)}) -- the ${surface} leg would be vacuous for that box`);
+}
+
 async function runLibraryTheme(page, extBase, theme, checks, results) {
   if (checks.some((c) => c.tab)) throw new Error("SETUP ERROR [library]: checklist `tab:` is options-only");
   // Explicit #vocab hash (not bare navigation): _pbpLibInitialView() prefers
@@ -3571,6 +3855,22 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       return !!main && !!strip && !!del && !!submit;
     });
     if (!shown) throw new Error(`SETUP: popup.html is missing #main-section / #md-actions-strip / #delete-btn / #submit-btn (theme=${theme})`);
+    await page.waitForTimeout(120);
+  }
+  // Stage 4 Task 6 (spec §5.2): popup's value-box rows. #search-input sits in
+  // .search-row, which popup.js hides unless optShowSearch; #token-input in
+  // #login-section, which the logged-in seed keeps hidden. Same fixture
+  // class as the #main-section unhide above: no rule under test reads either
+  // `.hidden`, they only need a box to measure and to focus.
+  if (surface === "popup" && checks.some((c) => c.selector === "#search-input" || c.selector === "#token-input")) {
+    const legs = await page.evaluate(() => {
+      const search = document.querySelector(".search-row");
+      const login = document.getElementById("login-section");
+      search?.classList.remove("hidden");
+      login?.classList.remove("hidden");
+      return !!search && !!login;
+    });
+    if (!legs) throw new Error(`SETUP: popup.html is missing .search-row / #login-section (theme=${theme})`);
     await page.waitForTimeout(120);
   }
   // popup's suggest/AI tag chips (D6/D7, Task 5, taste-uplift batch3).
@@ -4254,6 +4554,9 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   if (confirmChecks.length) {
     for (const check of confirmChecks) await runOneCheck(page, theme, check, results);
   }
+  // fieldHoverContrast (family 14), popup leg: its own fresh navigations
+  // (the confirm popover above is left open on this page).
+  await recordValueBoxHover(page, "popup", url, theme, results, sw);
 }
 
 // Runs inside the page. It reports used values and structural state only;
@@ -4569,6 +4872,12 @@ const SWEEP_CFG = {
       library: "#vocab-search, #notes-filter, #vocab-lookup-input, #vocab-group-filter, #vocab-lookup-lang, .xp-dict-lang, .vocab-group-unit, .vocab-note-input",
     },
     valueBoxExempt: '.theme-name-popover input[type="text"], .tags-input-wrap.ac-open',
+    // Surfaces whose value-box KIND is the valueBoxes entry a box matches
+    // (stage 4 Task 6): popup's url / title / search are all plain text
+    // inputs, so a tag/type kind could not hold RADIUS_VALUE_BOX_REQUIRED
+    // .popup's six boxes apart. The entries carry no top-level comma of their
+    // own, so a plain split is exact here.
+    valueBoxKindByEntry: { popup: true },
   },
   // 11. spacingScale -- every computed margin / padding / gap on a chromed
   //     surface is a value of that surface's spacing scale, read live from
@@ -5021,8 +5330,10 @@ function sweepProbe(cfg) {
         // and kind, so a run proves the value-box law measured something (a
         // vacuous walk and a clean one would both read as 0 FAIL).
         const tag = el.tagName.toLowerCase();
-        const kind = tag === "input" ? `input[type="${el.type}"]` : tag === "button" ? "button.listbox-btn"
-          : tag === "textarea" || tag === "select" ? tag : `.${el.classList[0]}`;
+        const kind = cfg.radiusScale.valueBoxKindByEntry?.[surface]
+          ? valueBoxSel.split(",").map((entry) => entry.trim()).find((entry) => el.matches(entry))
+          : tag === "input" ? `input[type="${el.type}"]` : tag === "button" ? "button.listbox-btn"
+            : tag === "textarea" || tag === "select" ? tag : `.${el.classList[0]}`;
         hits.push({ kind: "radiusValueBoxMeasured", path: pathOf(el), detail: kind });
         if (!corners.every((c) => !/%$/.test(c) && Math.abs(parseFloat(c) - mdRadius) < 0.5)) {
           hits.push({ kind: "radiusValueBox", path: pathOf(el), radius: corners.join(" "), md: mdRadius, detail: corners.join(" ") });
@@ -5461,6 +5772,36 @@ async function runSweep(page, sw, extBase) {
   }
   await page.waitForTimeout(150);
   add(await runFamilySweep(page), "popup", "states");
+
+  // ---- popup, the bookmark FORM (stage 4 Task 6, T6-b). Every leg above
+  // opens popup.html as its own chrome-extension:// tab, which popup.js
+  // correctly treats as unsaveable: #main-section gets `.unsupported-url`,
+  // whose CSS display:none's every form row, and .search-row stays hidden
+  // unless optShowSearch. So until this leg the sweep had measured exactly
+  // one popup value box (the logged-out token field) and the four-corner law
+  // was vacuous for the other five. Same fixture class as the checklist's
+  // "shown" block (runSimpleTheme): the rules under test never read either
+  // class, the boxes only need a box to measure. RADIUS_VALUE_BOX_REQUIRED
+  // .popup makes a leg that stops rendering one a SETUP ERROR.
+  // Scoped to family 9's value-box law (the two radiusValueBox kinds): the
+  // form had never been swept by ANY family, and the first full sweep of it
+  // (stage 4 Task 6) surfaced two pre-existing spacingScale hits -- the
+  // label-column indent `padding-left: 72px` on .form-body > .bottom-bar and
+  // .submit-bar, off the --pp-sp-N scale -- that are geometry outside this
+  // leg's purpose (geometry is frozen in stage 4, and neither ledger takes
+  // new entries). Widening this leg to every family is a separate decision.
+  await page.goto(`${extBase}popup.html?_ra=sweepform`, { waitUntil: "load", timeout: TIMEOUT_MS });
+  await page.waitForTimeout(500);
+  const formShown = await page.evaluate(() => {
+    const main = document.getElementById("main-section");
+    const search = document.querySelector(".search-row");
+    main?.classList.remove("hidden", "unsupported-url");
+    search?.classList.remove("hidden");
+    return !!main && !!search;
+  });
+  if (!formShown) throw new Error("SETUP ERROR: popup form sweep leg: popup.html is missing #main-section / .search-row");
+  await page.waitForTimeout(150);
+  add((await runFamilySweep(page)).filter((h) => h.kind === "radiusValueBoxMeasured" || h.kind === "radiusValueBox"), "popup", "form");
 
   await setTheme(sw, "", "dark");
   await page.goto(`${extBase}popup.html?_ra=sweepdark`, { waitUntil: "load", timeout: TIMEOUT_MS });
@@ -6005,6 +6346,14 @@ async function main() {
     const unmeasured = fieldHoverScanLog.reduce((sum, entry) => sum + entry.unmeasured, 0);
     const themes = new Set(fieldHoverScanLog.filter((entry) => entry.scanned > 0).map((entry) => entry.theme)).size;
     console.log(`[render-audit] fieldHoverContrast: ${total} field hover probe(s) measured across ${themes} options theme(s) this run, ${unmeasured} unmeasured (SETUP)${SHARD_TAG}`);
+  }
+  // fieldHoverContrast (family 14), the popup / library value-box legs:
+  // "measured nothing" vs "0 FAIL", per surface.
+  for (const surface of Object.keys(VALUE_BOX_LEGS)) {
+    const logs = valueBoxHoverLog.filter((entry) => entry.surface === surface);
+    const measured = logs.reduce((sum, entry) => sum + entry.measured.length, 0);
+    const unmeasured = logs.reduce((sum, entry) => sum + entry.unmeasured.length, 0);
+    console.log(`[render-audit] fieldHoverContrast ${surface}: ${measured} value box(es) measured across ${logs.length} theme(s) this run, ${unmeasured} unmeasured (SETUP)${SHARD_TAG}`);
   }
   // Pointer holds (round 3, H): how often a rest / hover read needed more
   // than one attempt, and why -- the recoveries the old single retry could
