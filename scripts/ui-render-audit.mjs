@@ -5122,7 +5122,9 @@ const SWEEP_CFG = {
   //     layout dimensions (rail width, content column, scrollbar gutter math).
   //     `derivedOffsets`: leading-column alignment (reader note = dot 8 + gap
   //     6 + inset 4; reader section count = 24px button + gap; options sidebar
-  //     group label = tab inset sp-5 + the tab's 2px indicator border) --
+  //     group label = tab inset sp-5 + the tab's 2px indicator border; popup
+  //     form footer = .row inset sp-5 + label column 52 + gap sp-4 = 72px,
+  //     --pp-label-indent) --
   //     computed from a sibling's width, so never a scale value by
   //     construction. `hairline`: 1px is border compensation.
   spacingScale: {
@@ -5144,7 +5146,7 @@ const SWEEP_CFG = {
       ".token-badge", ".bookmark-badge", ".kbd-help-chip", ".hl-item-lang", ".ask-chip", // reader chips/badges (md-preview is not composed)
     ].join(", "),
     shells: ["html", "body", "main", ".rail", ".empty-state", ".preview-loading"],
-    derivedOffsets: [".hl-item-note", "#hl-rail-section .rail-sec-count", ".tab-group-label"],
+    derivedOffsets: [".hl-item-note", "#hl-rail-section .rail-sec-count", ".tab-group-label", ".form-body > .bottom-bar", ".form-body > .submit-bar", ".form-body > .status-msg"],
   },
 };
 
@@ -6002,13 +6004,11 @@ async function runSweep(page, sw, extBase) {
   // "shown" block (runSimpleTheme): the rules under test never read either
   // class, the boxes only need a box to measure. RADIUS_VALUE_BOX_REQUIRED
   // .popup makes a leg that stops rendering one a SETUP ERROR.
-  // Scoped to family 9's value-box law (the two radiusValueBox kinds): the
-  // form had never been swept by ANY family, and the first full sweep of it
-  // (stage 4 Task 6) surfaced two pre-existing spacingScale hits -- the
-  // label-column indent `padding-left: 72px` on .form-body > .bottom-bar and
-  // .submit-bar, off the --pp-sp-N scale -- that are geometry outside this
-  // leg's purpose (geometry is frozen in stage 4, and neither ledger takes
-  // new entries). Widening this leg to every family is a separate decision.
+  // Every family runs here. Stage 4 first scoped it to family 9's value-box
+  // law because the first full sweep surfaced the label-column indent
+  // (padding-left 72px on .bottom-bar / .submit-bar); that is now the derived
+  // --pp-label-indent token and a spacingScale derivedOffset, and a full
+  // sweep of the form reports nothing else (2026-10-02).
   await page.goto(`${extBase}popup.html?_ra=sweepform`, { waitUntil: "load", timeout: TIMEOUT_MS });
   await page.waitForTimeout(500);
   const formShown = await page.evaluate(() => {
@@ -6020,7 +6020,7 @@ async function runSweep(page, sw, extBase) {
   });
   if (!formShown) throw new Error("SETUP ERROR: popup form sweep leg: popup.html is missing #main-section / .search-row");
   await page.waitForTimeout(150);
-  add((await runFamilySweep(page)).filter((h) => h.kind === "radiusValueBoxMeasured" || h.kind === "radiusValueBox"), "popup", "form");
+  add(await runFamilySweep(page), "popup", "form");
 
   await setTheme(sw, "", "dark");
   await page.goto(`${extBase}popup.html?_ra=sweepdark`, { waitUntil: "load", timeout: TIMEOUT_MS });

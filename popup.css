@@ -8,8 +8,7 @@
   /* Spacing scale — 2026-07 density tokenization (Claude Design round 1).
      Theme-invariant, hand-maintained (NOT composer-emitted). Literal 0 and
      1px hairlines stay unscaled. Structural offsets are exempt and stay
-     literal at their sites: 72px status-msg field indent, 30px secret-field
-     eye reserve. */
+     literal at their sites: 30px secret-field eye reserve. */
   --pp-sp-1: 2px;  /* hairline: chip-internal gaps, micro nudges */
   --pp-sp-2: 4px;  /* tight: chip-flow gap, label-control gaps, button v-inset */
   --pp-sp-3: 6px;  /* snug inset: input/list-item insets */
@@ -17,6 +16,13 @@
   --pp-sp-5: 12px; /* block: field-group gaps, surface insets */
   --pp-sp-6: 16px; /* section: block separation, panel insets */
   --pp-sp-7: 24px; /* page: page-level whitespace */
+  /* Form label column. --pp-label-indent is DERIVED, never a scale value:
+     the .row inset (sp-5) + the .label width + the .row gap (sp-4) = 72px,
+     the x where every .field starts. .bottom-bar / .submit-bar / .status-msg
+     start their content there; ui-render-audit's spacingScale lists them as
+     derivedOffsets. */
+  --pp-label-w: 52px;
+  --pp-label-indent: calc(var(--pp-sp-5) + var(--pp-label-w) + var(--pp-sp-4));
 
   /* Surfaces — 2026-07 "Soft Fill" palette (Claude Design pilot, AA-verified).
      Status *-bd tokens alias their bg: soft-fill surfaces are borderless by
@@ -783,7 +789,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 #main-section.unsupported-url .form-body > *:not(#url-warning):not(#status-msg):not(.feedback-card) { display: none; }
 .row { display: flex; padding: var(--pp-sp-2) var(--pp-sp-5); gap: var(--pp-sp-4); }
 .label {
-  width: 52px; flex-shrink: 0; text-align: right;
+  width: var(--pp-label-w); flex-shrink: 0; text-align: right;
   font-weight: 400; font-size: 11px; color: var(--pp-fg-muted); padding-top: var(--pp-sp-2); line-height: 1.5;
 }
 .label.top { align-self: flex-start; } /* padding-top is .label's own; this rule only pins the alignment */
@@ -1139,10 +1145,10 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    outrun 480px in pl/ru ("Alt+P/R/A przełącza..."); wrapping keeps every
    control reachable instead of clipping. row-gap inherits the existing
    --pp-sp-6 (already on-scale), so this introduces no new spacing value. */
-.bottom-bar { padding: var(--pp-sp-3) var(--pp-sp-5) var(--pp-sp-2) 72px; display: flex; flex-wrap: wrap; gap: var(--pp-sp-6); font-size: 12px; }
+.bottom-bar { padding: var(--pp-sp-3) var(--pp-sp-5) var(--pp-sp-2) var(--pp-label-indent); display: flex; flex-wrap: wrap; gap: var(--pp-sp-6); font-size: 12px; }
 .bottom-bar label { display: inline-flex; align-items: center; gap: var(--pp-sp-2); cursor: pointer; }
 .bottom-bar input[type="checkbox"]:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
-.submit-bar { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-4) 72px; display: flex; gap: var(--pp-sp-4); } /* button-row gap: sp-4 on every surface (actionRowGap); sp-4 below = the same 8px the quick-actions divider keeps to its first block */
+.submit-bar { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-4) var(--pp-label-indent); display: flex; gap: var(--pp-sp-4); } /* button-row gap: sp-4 on every surface (actionRowGap); sp-4 below = the same 8px the quick-actions divider keeps to its first block */
 /* Both buttons in this bar carry class="btn" now, so their chrome (padding,
    border, fill, radius, transition, hover, press, focus, disabled) comes
    from @generated:ui-components. The .submit-bar button base rule that used
@@ -1155,7 +1161,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   background: var(--pp-accent); color: var(--pp-on-accent); border-color: var(--pp-accent); font-weight: 600;
   /* Content-adaptive width (2a canvas feedback: the 200px-basis button read as
      visually intrusive). white-space pins two-glyph CJK labels ("保存") on one
-     line. Left edge keeps the 72px field-alignment indent. */
+     line. Left edge keeps the --pp-label-indent field alignment. */
   flex: 0 0 auto; white-space: nowrap; padding: var(--pp-sp-2) var(--pp-sp-7);
 }
 #submit-btn:hover { background: color-mix(in srgb, var(--pp-accent) 92%, #000); }
@@ -1204,7 +1210,7 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
    exit animation, its own three theme layers, and four of this file's
    !important declarations, one of which COMPONENTS.md Appendix A listed as
    a reason the button family could not be unified at all. */
-.status-msg { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-2) 72px; font-size: 11px; }
+.status-msg { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-2) var(--pp-label-indent); font-size: 11px; }
 .status-msg.success { color: var(--pp-ok-fg); }
 .status-msg.error { color: var(--pp-danger); }
 .wayback-indicator { font-size: 11px; /* px, not 0.9em: appended to #status-msg (11px), i.e. 9.9px rendered -- under the textFloor */ opacity: 0.85; }
