@@ -119,7 +119,7 @@ popup / options / library 三个扩展表面是短命单次渲染、无暖 shape
 
 ## 设计精修工作流
 
-- 项目级设计技能位于 `.agents/skills/`（按现有约定不入 Git、不进入扩展 ZIP）：[make-interfaces-feel-better](https://github.com/jakubkrehel/make-interfaces-feel-better/tree/35545ea1512ad59fa463e6b1f95ca9c052981fe6) 与 [Impeccable](https://github.com/pbakaus/impeccable/tree/9d715cc4f5564a990ca8345abfdd5df6dc9b41c8)。前者安装源为 `skills/make-interfaces-feel-better`，后者为 `.agents/skills/impeccable`；新 checkout 需单独安装。
+- 设计技能 [make-interfaces-feel-better](https://github.com/jakubkrehel/make-interfaces-feel-better) 与 [Impeccable](https://github.com/pbakaus/impeccable) 自 2026-10-02 起为用户级安装（`~/.agents/skills`，Claude Code 与 Codex 共用，由本机更新脚本跟随上游维护），不再随项目安装或锁定版本。
 - 采用 Impeccable 的 Operate 模式审视 popup/options/library，Read 模式审视阅读器；先检查实际界面的任务路径、层级和边界状态，再按 polish 工作流修正，最后用 make-interfaces-feel-better 检查排版、状态、图标、动效与性能。已有主题与 `COMPONENTS.md` 是设计依据。
 - 优先复用 `scripts/qa-drive.mjs` 的隔离夹具和截图，对涉及的窄窗口、长文案、九种语言及明暗主题做真实渲染检查；改完执行对应编辑期 lint、主题工厂只读检查与渲染门。检测器结果须结合截图判断，不因通用建议改动已裁决的设计。
 - 本项目的快 CJK 字体栈、Lucide stroke 2、控件阶梯、主题 token 与冷启动要求优先于技能的通用字体、40/44px 命中区、按压缩放或装饰动效建议。高频操作保留即时反馈；不引入运行时依赖、远程字体或首屏入场动画。
