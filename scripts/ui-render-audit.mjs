@@ -6022,6 +6022,51 @@ async function runSweep(page, sw, extBase) {
   await page.waitForTimeout(150);
   add(await runFamilySweep(page), "popup", "form");
 
+  // ---- popup, hi-DPI width cap (2026-10-02). Chrome caps an action popup at
+  // 800px; popup.css zooms the body at >=144dpi / >=192dpi, so the width the
+  // popup asks for is setting x zoom. Over the cap the window is clamped and
+  // its auto-size reserves a 10px horizontal-scrollbar strip under the
+  // quick-actions (user report, 720px x 1.12 = 806px). Every other leg runs
+  // at dpr=1, where neither zoom tier fires, so this was ungated. Measured,
+  // not computed from the CSS: the widest setting the popup accepts (read
+  // from popup-theme-early.js's clamp), rendered at each tier's dpr, must
+  // come out <= 800px; a tier that does not zoom is a SETUP ERROR (the
+  // emulation did not reach the media query and the check would be vacuous).
+  {
+    const earlySrc = readFileSync(resolve(ROOT, "popup-theme-early.js"), "utf8");
+    const maxes = [...earlySrc.matchAll(/Math\.min\((\d+),/g)].map((m) => Number(m[1]));
+    if (!maxes.length || new Set(maxes).size !== 1) throw new Error(`SETUP ERROR: popup hi-DPI cap: cannot read one popup width ceiling from popup-theme-early.js (found ${JSON.stringify(maxes)})`);
+    const widest = maxes[0];
+    const prior = await sw.evaluate(() => chrome.storage.local.get({ popupWidth: 550 }));
+    await sw.evaluate((w) => chrome.storage.local.set({ popupWidth: w }), widest);
+    // Its own page, closed afterwards: a device-metrics override cleared on
+    // the shared page leaked dpr 1.5 into every later popup leg (the zoom
+    // tier then fired there and controlRung measured 26 x 1.12 = 29.11px).
+    const dpiPage = await page.context().newPage();
+    const dpiSession = await page.context().newCDPSession(dpiPage);
+    try {
+      for (const dpr of [1.5, 2]) {
+        await dpiSession.send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, deviceScaleFactor: dpr, mobile: false });
+        await dpiPage.goto(`${extBase}popup.html?_ra=sweepdpi${dpr}`, { waitUntil: "load", timeout: TIMEOUT_MS });
+        await dpiPage.waitForTimeout(400);
+        const m = await dpiPage.evaluate(() => ({
+          dpr: window.devicePixelRatio,
+          zoom: Number(getComputedStyle(document.body).zoom),
+          setting: document.documentElement.style.getPropertyValue("--pp-popup-width"),
+          width: document.body.getBoundingClientRect().width,
+        }));
+        if (!(m.zoom > 1)) throw new Error(`SETUP ERROR: popup hi-DPI cap: no zoom tier fired at dpr ${dpr} (measured ${JSON.stringify(m)}) -- the cap check would be vacuous`);
+        if (m.setting !== `${widest}px`) throw new Error(`SETUP ERROR: popup hi-DPI cap: --pp-popup-width is ${m.setting}, expected the ${widest}px ceiling`);
+        if (m.width > 800) hits.push({ surface: "popup", context: `dpr${dpr}`, kind: "popupWidthCap", path: "body", width: Math.round(m.width * 100) / 100, zoom: m.zoom, setting: widest });
+      }
+      console.log(`[render-audit] popup hi-DPI cap: ${widest}px measured at dpr 1.5 and 2 (zoomed body <= 800px)`);
+    } finally {
+      await dpiSession.detach().catch(() => {});
+      await dpiPage.close().catch(() => {});
+      await sw.evaluate((w) => chrome.storage.local.set({ popupWidth: w }), prior.popupWidth);
+    }
+  }
+
   await setTheme(sw, "", "dark");
   await page.goto(`${extBase}popup.html?_ra=sweepdark`, { waitUntil: "load", timeout: TIMEOUT_MS });
   await page.waitForTimeout(500);
@@ -6084,6 +6129,7 @@ function reportSweep(hits) {
     else if (h.kind === "radiusValueBox") console.log(`  radiusValueBox     [${h.surface}/${h.context}]  ${h.path}  radius=${h.radius}  md=${h.md}px`);
     else if (h.kind === "textFloor") console.log(`  textFloor          [${h.surface}/${h.context}]  ${h.path}  font-size=${h.fontSize}px`);
     else if (h.kind === "spacingScale") console.log(`  spacingScale       [${h.surface}/${h.context}]  ${h.path}  ${h.prop}=${h.value}px  scale=${h.scale.join("|")}`);
+    else if (h.kind === "popupWidthCap") console.log(`  popupWidthCap      [${h.surface}/${h.context}]  body  width=${h.width}px  zoom=${h.zoom}  setting=${h.setting}px`);
     else if (h.kind === "clusterGap") console.log(`  clusterGap         [${h.surface}/${h.context}]  ${h.path}  gap=${h.gap}px  expected=${h.expected}px`);
   }
   console.log(unique.length ? "[render-audit --sweep] === hits found -- fix, then lock in as CHECKS entries ===" : "[render-audit --sweep] === clean ===");
@@ -6497,6 +6543,7 @@ async function main() {
       radiusValueBox: (h) => ({ actual: h.radius, expected: `${h.md}px on all four corners`, note: "a value box's four corners must all equal the surface's --*-radius-md (spec 2026-09-30-ui-fields-stage4-design §2.1; named exceptions: the theme-name popover input, .tags-input-wrap.ac-open)" }),
       textFloor: (h) => ({ actual: h.fontSize, expected: ">=11", note: "visible text below the 11px floor" }),
       clusterGap: (h) => ({ actual: h.gap, expected: String(h.expected), note: "column-gap of an icon-button cluster (px): one rung on every surface" }),
+      popupWidthCap: (h) => ({ actual: h.width, expected: "<=800", note: `zoomed popup body (setting ${h.setting}px x zoom ${h.zoom}) over Chrome's 800px popup cap: the clamped window reserves a 10px scrollbar strip` }),
     };
     for (const h of sweepHits) {
       const f = FAMILY[h.kind];
