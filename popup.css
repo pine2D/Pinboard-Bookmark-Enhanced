@@ -225,11 +225,19 @@
 }
 
 body {
-  width: var(--pp-popup-width); max-width: 100%;
-  /* At widths >=715px with page zoom above 1, Chrome can clamp the popup at
-     its 800 DIP ceiling, leaving a fractional CSS viewport whose rounded
-     scrollWidth exceeds clientWidth by one pixel. The body already shrinks
-     via max-width:100%, so there is no real horizontal content to scroll. */
+  /* Chrome caps an action popup at 800px wide. The hi-DPI tiers below zoom
+     the body, so the width the popup asks for is setting x zoom: 720px at
+     1.12 is 806px. Over the cap the window is clamped AND its auto-size
+     reserves a horizontal scrollbar's height (10px) that overflow-x:hidden
+     never paints -- an empty strip under the quick-actions (user report
+     2026-10-02, innerHeight 545 vs clientHeight 535). So the body never asks
+     for more than 799px after zoom (1px under the cap for rounding).
+     --pp-body-zoom is set next to each zoom tier; unset it is 1. */
+  width: min(var(--pp-popup-width), calc(799px / var(--pp-body-zoom, 1))); max-width: 100%;
+  /* Belt and braces for a browser page zoom on top (which CSS cannot see):
+     a fractional CSS viewport whose rounded scrollWidth exceeds clientWidth
+     by one pixel. The body already shrinks via max-width:100%, so there is
+     no real horizontal content to scroll. */
   overflow-x: hidden;
   /* CJK fonts named before `sans-serif` so Chinese/Japanese text uses a fast system font
      (YaHei/PingFang) instead of falling through to the profile's Standard font, which may be
@@ -3205,8 +3213,8 @@ html[data-theme] .md-strip-btn:focus-visible { border-color: var(--pp-focus-bd);
    desync") -- popup keeps it, a separate real-machine-verified call.
    render-audit runs at dpr=1, so neither tier is gated; to measure hi-DPI
    hairlines, use options-help-render-audit.mjs's DPR harness shape. */
-@media (min-resolution: 144dpi) { body { zoom: 1.12; } }
-@media (min-resolution: 192dpi) { body { zoom: 1.22; } }
+@media (min-resolution: 144dpi) { body { zoom: 1.12; --pp-body-zoom: 1.12; } }
+@media (min-resolution: 192dpi) { body { zoom: 1.22; --pp-body-zoom: 1.22; } }
 
 /* The @media (hover: hover) and (pointer: fine) block that used to sit here
    is gone with its only tenant: popup no longer has ANY hover that changes
