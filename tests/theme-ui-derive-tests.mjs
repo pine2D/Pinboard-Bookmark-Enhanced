@@ -1443,7 +1443,7 @@ function f8Failures(id, out, hosts) {
   // registry is checked against it below).
   const NEW_ROLES = {
     opt: [...FIELD_ROLES, "field-chevron"],
-    pp: [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"],
+    pp: [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"],
     lib: [...FIELD_ROLES, "field-chevron"],
   };
   const FIELD_SURFACES = [
@@ -1536,9 +1536,11 @@ function f8Failures(id, out, hosts) {
         const worst = (ink) => Math.min(...backdrops.map((b) => contrast(hexToRgb(ink), b)));
         check(worst(map["tag-chip-fg"]) >= 4.5, `${id}: F9 tag-chip-fg ${map["tag-chip-fg"]} is ${worst(map["tag-chip-fg"]).toFixed(3)}:1 on its worst backdrop (min 4.5)`);
         check(worst(map["tag-chip-icon"]) >= 3, `${id}: F9 tag-chip-icon ${map["tag-chip-icon"]} is ${worst(map["tag-chip-icon"]).toFixed(3)}:1 on its worst backdrop (min 3)`);
+        check(worst(map["tag-chip-icon-hover"]) >= 3, `${id}: F9 tag-chip-icon-hover ${map["tag-chip-icon-hover"]} is ${worst(map["tag-chip-icon-hover"]).toFixed(3)}:1 on its worst backdrop (min 3)`);
         // Identity where the seed already clears: no gratuitous recolour.
         check(worst(hex6(map["tag-fg"])) < 4.5 || map["tag-chip-fg"] === hex6(map["tag-fg"]), `${id}: tag-fg already clears 4.5:1 on every backdrop, so tag-chip-fg must equal it (got ${map["tag-chip-fg"]})`);
         check(worst(hex6(map["fg-muted"])) < 3 || map["tag-chip-icon"] === hex6(map["fg-muted"]), `${id}: fg-muted already clears 3:1 on every backdrop, so tag-chip-icon must equal it (got ${map["tag-chip-icon"]})`);
+        check(worst(hex6(map["danger"])) < 3 || map["tag-chip-icon-hover"] === hex6(map["danger"]), `${id}: danger already clears 3:1 on every backdrop, so tag-chip-icon-hover must equal it (got ${map["tag-chip-icon-hover"]})`);
       }
     }
   }
@@ -1586,7 +1588,7 @@ function f8Failures(id, out, hosts) {
 // that dropped one role would otherwise ship green. ---
 {
   const REQUIRED = {
-    pp: [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"],
+    pp: [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"],
     lib: [...FIELD_ROLES, "field-chevron"],
   };
   for (const [ns, file] of [["pp", "../popup.css"], ["lib", "../library.css"]]) {
@@ -1622,7 +1624,7 @@ function f8Failures(id, out, hosts) {
   const pp = fold("../popup.css", "pp");
   const lib = fold("../library.css", "lib");
   const absent = (dict, roles) => roles.filter((r) => typeof dict[r] !== "string");
-  const ppAbsent = absent(pp, [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"]);
+  const ppAbsent = absent(pp, [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"]);
   const libAbsent = absent(lib, [...FIELD_ROLES, "field-chevron"]);
   check(!ppAbsent.length, `popup.css default :root (folded) lacks ${ppAbsent.map((r) => `--pp-${r}`).join(", ")} -- popup-chrome.mjs DEFAULT_LIGHT`);
   check(!libAbsent.length, `library.css default :root (folded) lacks ${libAbsent.map((r) => `--lib-${r}`).join(", ")} -- library-chrome.mjs DEFAULT_LIGHT`);
@@ -1633,7 +1635,8 @@ function f8Failures(id, out, hosts) {
     }
     const backdrops = [resolveOpaqueBg(pp["tag-bg"], hexToRgb(pp["field-bg"])), resolveOpaqueBg(pp["tag-bg"], hexToRgb(pp["field-bg-hover"])), resolveOpaqueBg(pp["tag-hover"], hexToRgb(pp["field-bg-hover"]))];
     check(pp["tag-chip-fg"] === rgbToHex(fgToAAMulti(hexToRgb(pp["tag-fg"]), backdrops, 4.5)) &&
-      pp["tag-chip-icon"] === rgbToHex(fgToAAMulti(hexToRgb(pp["fg-muted"]), backdrops, 3)),
+      pp["tag-chip-icon"] === rgbToHex(fgToAAMulti(hexToRgb(pp["fg-muted"]), backdrops, 3)) &&
+      pp["tag-chip-icon-hover"] === rgbToHex(fgToAAMulti(hexToRgb(pp["danger"]), backdrops, 3)),
       `default :root --pp-tag-chip-fg/--pp-tag-chip-icon (${pp["tag-chip-fg"]}/${pp["tag-chip-icon"]}) are not the chip derivation over the folded :root -- update popup-chrome.mjs DEFAULT_LIGHT`);
   }
   if (!libAbsent.length) {
@@ -1691,12 +1694,12 @@ function f8Failures(id, out, hosts) {
   // F9: a transparent chip shows the shell through, so its ink is measured on
   // the shell's rest and hover fills and on tag-hover over the hovered shell.
   const chip = { "pp-field-bg": "#e2decd", "pp-field-bg-hover": "#d6d4c5", "pp-tag-bg": "transparent", "pp-tag-hover": "#eee8d5",
-    "pp-tag-chip-fg": "#1e746d", "pp-tag-chip-icon": "#54696f" };
+    "pp-tag-chip-fg": "#1e746d", "pp-tag-chip-icon": "#54696f", "pp-tag-chip-icon-hover": "#dc322f" };
   const rows = tagChipInkRows(chip);
   check(rows.length === TAG_CHIP_INK_SPEC.length * 3 && TAG_CHIP_INK_SPEC.every(([role]) => rows.filter((r) => r.label.startsWith(`${role} vs `)).length === 3),
     `tagChipInkRows must measure every TAG_CHIP_INK_SPEC role on three backdrops (got ${JSON.stringify(rows.map((r) => r.label))})`);
-  check(JSON.stringify(TAG_CHIP_INK_SPEC) === JSON.stringify([["tag-chip-fg", 4.5], ["tag-chip-icon", 3]]),
-    `TAG_CHIP_INK_SPEC changed: ${JSON.stringify(TAG_CHIP_INK_SPEC)} (chip text 4.5:1, remove-x icon 3:1)`);
+  check(JSON.stringify(TAG_CHIP_INK_SPEC) === JSON.stringify([["tag-chip-fg", 4.5], ["tag-chip-icon", 3], ["tag-chip-icon-hover", 3]]),
+    `TAG_CHIP_INK_SPEC changed: ${JSON.stringify(TAG_CHIP_INK_SPEC)} (chip text 4.5:1, remove-x icon 3:1 at rest and on hover)`);
   const hov = rows.find((r) => r.label === "tag-chip-fg vs tag-bg/field-bg-hover (F9)");
   check(!!hov && hov.ratio < 4.5 && Math.abs(hov.ratio - contrast(hexToRgb("#1e746d"), hexToRgb("#d6d4c5"))) < 1e-9,
     `a transparent chip's text must be measured on the hovered shell fill (solarized-light's pre-stage-4 #1e746d is 3.73:1 there) -- got ${JSON.stringify(hov)}`);

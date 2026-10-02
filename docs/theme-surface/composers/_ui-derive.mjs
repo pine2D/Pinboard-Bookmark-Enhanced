@@ -49,14 +49,15 @@ export const FIELD_ROLES = Object.freeze([
 // Stage 4 Task 5 (spec docs/superpowers/specs/2026-09-30-ui-fields-stage4-
 // design.md §2.2): popup and library carry the value-box field family too
 // (FIELD_ROLES, plus library's non-colour field-chevron), and popup adds
-// tag-chip-fg / tag-chip-icon -- the chip text and remove-x ink derived in
+// tag-chip-fg / tag-chip-icon / tag-chip-icon-hover -- the chip text and the
+// remove-x's resting and hover inks derived in
 // popup-chrome.mjs against the three backdrops a chip is painted on inside
 // the tags shell. Listing them here is what makes validate-contracts.mjs
 // reject a pilot writing ui.popup/library.<mode>.<role> for any of them, and
 // what makes contrast-audit.mjs's default (:root) block FAIL, not SKIP, when
 // a DEFAULT_LIGHT literal goes missing.
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
-  popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg", ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"]),
+  popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg", ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"]),
   options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
   library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
 });

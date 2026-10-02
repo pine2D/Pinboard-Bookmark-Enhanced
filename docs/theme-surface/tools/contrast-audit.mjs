@@ -662,7 +662,7 @@ function auditSidebarSearchSeparation(scope, ns, blockLabel, dict) {
 // through -- exactly what COMPONENT_PAIR_SPEC's `tag-fg vs tag-bg` row
 // cannot see, because its resolveRole() composites tag-bg over ROLE_ALIAS's
 // panel (bg2). Chip text (tag-chip-fg) needs 4.5:1 on all three, the
-// remove-x ink (tag-chip-icon) 3:1. A pure function over one block's token
+// remove-x ink at rest and on hover (tag-chip-icon / tag-chip-icon-hover) 3:1. A pure function over one block's token
 // dict (keys "pp-<role>", tokenDict()'s shape), exported so
 // tests/theme-ui-derive-tests.mjs can hand it negative controls. A missing or
 // unusable input comes back as one { label, missing } row, never a skip:
@@ -677,6 +677,7 @@ function auditSidebarSearchSeparation(scope, ns, blockLabel, dict) {
 export const TAG_CHIP_INK_SPEC = Object.freeze([
   Object.freeze(["tag-chip-fg", 4.5]),
   Object.freeze(["tag-chip-icon", 3]),
+  Object.freeze(["tag-chip-icon-hover", 3]),
 ]);
 export function tagChipInkRows(dict) {
   const hexRoles = ["field-bg", "field-bg-hover", ...TAG_CHIP_INK_SPEC.map(([role]) => role)];

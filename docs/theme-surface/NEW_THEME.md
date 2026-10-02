@@ -367,9 +367,9 @@ final-fix wave:
   `field-bg`, `field-border`, `field-bg-hover`, `field-border-hover`,
   `field-bg-focus`, `field-border-focus`, `field-placeholder`, `field-fg`,
   plus `field-chevron` on options and library and the popup chip inks
-  `tag-chip-fg` / `tag-chip-icon` — `deriveFieldRoles` and popup-chrome.mjs,
-  derived from `input-bg` / the surface's frame key / `focus-bd` / `accent` /
-  `fg` / `fg-hint` / `fg-muted` / `tag-fg` / `tag-bg` / `tag-hover` and the
+  `tag-chip-fg` / `tag-chip-icon` / `tag-chip-icon-hover` — `deriveFieldRoles`
+  and popup-chrome.mjs, derived from `input-bg` / the surface's frame key /
+  `focus-bd` / `accent` / `fg` / `fg-hint` / `fg-muted` / `danger` / `tag-fg` / `tag-bg` / `tag-hover` and the
   surface's hosts (options `panel` + `pf-bg`, popup `bg`, library `panel` +
   `bg`); tune those inputs instead; a popup `tag-bg` override must be
   `#rgb` / `#rrggbb` / `#rrggbbaa` or `transparent`, and `tag-hover`

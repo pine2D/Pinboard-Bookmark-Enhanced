@@ -109,6 +109,7 @@ const DEFAULT_LIGHT = {
   "field-fg": "#2a2d33",            // = fg: already 2.21:1 from the placeholder
   "tag-chip-fg": "#33589f",         // = tag-fg: 5.72:1 on tag-bg #e2eafa, 5.19:1 on tag-hover #d3e0f7
   "tag-chip-icon": "#62676e",       // = fg-muted: 4.72:1 / 4.28:1 on the same two chip fills (min 3)
+  "tag-chip-icon-hover": "#c24343", // = danger: the remove-x hover ink, >=3:1 on the same chip backdrops
 };
 // DEFAULT_DARK (the popup's `html.dark` component-layer tokens) is gone:
 // since the theme model of 2026-08-25 (batch 2 D6) the popup's no-preset
@@ -138,7 +139,7 @@ function emitPp(ui, mode) {
     // silently not emitted, and ui-token-coverage cannot see that (it only
     // reports tokens that are consumed and undefined).
     // tests/theme-ui-derive-tests.mjs checks every block for every role.
-    ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon"]) {
+    ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"]) {
     if (ui[k] != null) set(k, ui[k]);
   }
   // info-* are aliases of banner-* (no separate derivation)
@@ -259,6 +260,12 @@ export function composePopupThemeMap(tk, mode, useDarkMode = false) {
   const tagChipBases = tagChipBackdrops(ui);
   ui["tag-chip-fg"] = rgbToHex(fgToAAMulti(hexToRgb(ui["tag-fg"]), tagChipBases, 4.5));
   ui["tag-chip-icon"] = rgbToHex(fgToAAMulti(hexToRgb(ui["fg-muted"]), tagChipBases, 3));
+  // tag-chip-icon-hover (2026-10-02): the remove-x turns danger on hover,
+  // and raw danger fell under 3:1 on a hovered chip (dracula 2.91,
+  // flexoki-dark 2.41, catppuccin-mocha 2.88 -- stage-4 spec §1.2's parked
+  // item). Same seed-then-move rule as the resting ink: danger verbatim
+  // wherever it already clears 3:1 on all three backdrops.
+  ui["tag-chip-icon-hover"] = rgbToHex(fgToAAMulti(hexToRgb(ui["danger"]), tagChipBases, 3));
   // preset-bd RETIRED (design-uplift, preset-row Variant A, 2026-08-04):
   // `.preset-btn` is borderless now (COMPONENTS.md Appendix C30), so no
   // rule anywhere reads --pp-preset-bd -- removed from emitPp's key list

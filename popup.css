@@ -947,7 +947,9 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    handler); the drag handle sits on the chip's far side. */
 .tag-remove::before { content: ""; position: absolute; inset: -7px; }
 .tag-remove svg { width: 10px; height: 10px; }
-.tag-remove:hover { color: var(--pp-danger); }
+/* --pp-tag-chip-icon-hover: danger, moved only where it misses 3:1 on a
+   chip backdrop (dracula / flexoki-dark / catppuccin-mocha, 2026-10-02). */
+.tag-remove:hover { color: var(--pp-tag-chip-icon-hover); }
 .tag-remove:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 .tag-item:hover { background: var(--pp-tag-hover); }
 .tag-item[draggable] { cursor: grab; }
@@ -1962,6 +1964,7 @@ html[data-theme="modern-card"] {
   --pp-field-fg: #1a1a2e;
   --pp-tag-chip-fg: #1967d2;
   --pp-tag-chip-icon: #5f6368;
+  --pp-tag-chip-icon-hover: #d93025;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2027,6 +2030,7 @@ html[data-theme="nord-night"] {
   --pp-field-fg: #e5e9f0;
   --pp-tag-chip-fg: #b9cfa7;
   --pp-tag-chip-icon: #9db7d1;
+  --pp-tag-chip-icon-hover: #d39198;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2093,6 +2097,7 @@ html[data-theme="terminal"] {
   --pp-field-fg: #33ff33;
   --pp-tag-chip-fg: #00cccc;
   --pp-tag-chip-icon: #24b324;
+  --pp-tag-chip-icon-hover: #ff3333;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2159,6 +2164,7 @@ html[data-theme="paper-ink"] {
   --pp-field-fg: #2c2c2c;
   --pp-tag-chip-fg: #8b4513;
   --pp-tag-chip-icon: #6b4c3b;
+  --pp-tag-chip-icon-hover: #c0392b;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2224,6 +2230,7 @@ html[data-theme="dracula"] {
   --pp-field-fg: #f8f8f2;
   --pp-tag-chip-fg: #50fa7b;
   --pp-tag-chip-icon: #bd93f9;
+  --pp-tag-chip-icon-hover: #ff7474;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2289,6 +2296,7 @@ html[data-theme="flexoki-light"] {
   --pp-field-fg: #100f0f;
   --pp-tag-chip-fg: #664d01;
   --pp-tag-chip-icon: #6a6964;
+  --pp-tag-chip-icon-hover: #af3029;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2354,6 +2362,7 @@ html[data-theme="flexoki-dark"] {
   --pp-field-fg: #cecdc3;
   --pp-tag-chip-fg: #d9a916;
   --pp-tag-chip-icon: #9f9d96;
+  --pp-tag-chip-icon-hover: #d96c62;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2419,6 +2428,7 @@ html[data-theme="solarized-light"] {
   --pp-field-fg: #3a484c;
   --pp-tag-chip-fg: #1a645e;
   --pp-tag-chip-icon: #54696f;
+  --pp-tag-chip-icon-hover: #dc322f;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2485,6 +2495,7 @@ html[data-theme="solarized-dark"] {
   --pp-field-fg: #c2cbcb;
   --pp-tag-chip-fg: #5cb9b0;
   --pp-tag-chip-icon: #8e9e9f;
+  --pp-tag-chip-icon-hover: #e98077;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2549,6 +2560,7 @@ html[data-theme="catppuccin-latte"] {
   --pp-field-fg: #41445a;
   --pp-tag-chip-fg: #0e5d61;
   --pp-tag-chip-icon: #5c5f77;
+  --pp-tag-chip-icon-hover: #d20f39;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2613,6 +2625,7 @@ html[data-theme="catppuccin-mocha"] {
   --pp-field-fg: #cdd6f4;
   --pp-tag-chip-fg: #9ce4d8;
   --pp-tag-chip-icon: #acb3cc;
+  --pp-tag-chip-icon-hover: #f494af;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2678,6 +2691,7 @@ html[data-theme="gruvbox-dark"] {
   --pp-field-fg: #ebdbb2;
   --pp-tag-chip-fg: #b8bb26;
   --pp-tag-chip-icon: #b0a390;
+  --pp-tag-chip-icon-hover: #fc6a52;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2742,6 +2756,7 @@ html[data-theme="rose-pine"] {
   --pp-field-fg: #e0def4;
   --pp-tag-chip-fg: #9ccfd8;
   --pp-tag-chip-icon: #908caa;
+  --pp-tag-chip-icon-hover: #eb6f92;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2806,6 +2821,7 @@ html[data-theme="github-light"] {
   --pp-field-fg: #1f2328;
   --pp-tag-chip-fg: #0550ae;
   --pp-tag-chip-icon: #656d76;
+  --pp-tag-chip-icon-hover: #cf222e;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2835,6 +2851,7 @@ html[data-theme="github-light"] {
   --pp-field-fg: #2a2d33;
   --pp-tag-chip-fg: #33589f;
   --pp-tag-chip-icon: #62676e;
+  --pp-tag-chip-icon-hover: #c24343;
 }
 /* @generated:ui-themes end */
 

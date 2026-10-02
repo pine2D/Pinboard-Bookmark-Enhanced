@@ -3302,6 +3302,18 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
   check(declarationValueMap(ppHand, ".tag-item").get("color") === "var(--pp-tag-chip-fg)" &&
     declarationValueMap(ppHand, ".tag-remove").get("color") === "var(--pp-tag-chip-icon)",
     "popup.css: .tag-item text must be var(--pp-tag-chip-fg) and .tag-remove's resting ink var(--pp-tag-chip-icon) (derived against the shell's rest / hover fills and --pp-tag-hover)");
+  // The hover ink is derived too (2026-10-02): raw --pp-danger fell under 3:1
+  // on a hovered chip in dracula / flexoki-dark / catppuccin-mocha. Every
+  // hand-written rule that colours .tag-remove on hover must use the derived
+  // role, so a themed override cannot quietly put danger back.
+  {
+    const hoverInks = parseStyleRules(ppHand)
+      .filter((r) => r.selectors.some((sel) => /\.tag-remove:hover\b/.test(sel)))
+      .map((r) => [r.selectorText, parseDeclarations(r.body).find((d) => d.property === "color")?.value])
+      .filter(([, v]) => v !== undefined);
+    check(hoverInks.length >= 1 && hoverInks.every(([, v]) => v === "var(--pp-tag-chip-icon-hover)"),
+      `popup.css: .tag-remove:hover must be coloured var(--pp-tag-chip-icon-hover) (>=3:1 on every chip backdrop), got ${JSON.stringify(hoverInks)}`);
+  }
   check(declarationValueMap(ppHand, ".autocomplete-dropdown").get("border") === "1px solid var(--pp-field-border-focus)",
     "popup.css: the autocomplete list's frame must be var(--pp-field-border-focus) -- the same token the focused tags shell paints");
 
