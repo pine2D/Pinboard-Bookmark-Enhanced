@@ -191,6 +191,37 @@ const SEED_TOKEN_RAW = `${SEED_TOKEN_ACCOUNT}:audit0000000000000000000000000000`
 const SEED_TOKEN_OBF = "obf:" + Buffer.from(SEED_TOKEN_RAW, "utf8").toString("base64");
 const SEED_OWNER = "acct_" + encodeURIComponent(SEED_TOKEN_ACCOUNT);
 
+// ---- Library redesign fixture (spec 2026-10-03 §9.2, plan T2). The gates the
+// redesign adds (G1-G7) need a library that looks like a real one: a list long
+// enough to scroll, words with and without groups, CJK heads, a word with two
+// contexts and a note, one page with several highlights and one with exactly
+// one. renderAuditFixture / pbp_hl_render-audit-fixture stay the NEWEST word
+// and highlight (seeded last / stamped latest), so every pre-existing entry
+// that reads the first row of a list still reads the same element.
+const LIB_SEED = Object.freeze({
+  richTerm: "constraint",            // two contexts + a note, language "en", ipa "/kənˈstreɪnt/"
+  cjkTerms: ["曖昧", "呼吸"],          // language "ja" / "zh"
+  latinTerm: "constraint",           // G4 Latin head
+  wordCount: 30,                     // >= 30 saved words, >= 10 without any group
+  multiUrl: "https://example.com/reading/attention",   // >= 3 highlights, one carries a note
+  multiTitle: "Attention is a scarce resource",
+  soloUrl: "https://example.com/quiet-ui",             // exactly 1 highlight
+  cjkTitle: "安静的界面",                               // soloUrl's page title (CJK G4 case)
+});
+// 27 plain Latin words; with richTerm and the two CJK terms that is
+// LIB_SEED.wordCount. The first 17 join "Reading" (so a one-group filter still
+// leaves a list that scrolls at 700px), the last 10 join no group.
+const LIB_SEED_FILLER_TERMS = Object.freeze([
+  "ambient", "brevity", "cadence", "candor", "clarity", "coherent", "diligent", "elision", "ephemeral",
+  "fidelity", "friction", "gradient", "heuristic", "inertia", "lucid", "margin", "nuance",
+  "opaque", "parsimony", "quiescent", "rhetoric", "salient", "tacit", "tenuous", "unwieldy", "verbose", "whimsy",
+]);
+// One-highlight filler pages. With the fixture, multiUrl's four and soloUrl's
+// one this makes 14 highlights: enough for the notes list region to scroll at
+// a 900px window, which G1 and G6 need to be able to tell "the page did not
+// scroll" from "there was nothing to scroll".
+const LIB_SEED_NOTE_FILLER_PAGES = 8;
+
 // ---- Theme storage mapping. Hand-copied from shared.js's ADAPTIVE_THEME_MAP
 // (verified at authoring time, not imported: shared.js is a plain script,
 // not an ES module, and this keeps the mapping legible next to the THEMES
@@ -6356,6 +6387,54 @@ async function main() {
   // (CLAUDE.md: "vocab-store.js 是 pbp-vocab 的唯一写入口"). ----
   await sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF);
 
+  // Library redesign fixture (plan T2), written BEFORE renderAuditFixture so
+  // the fixture word stays the newest row of the latest-first list. Same
+  // single writer as the fixture below: vocab-store.js's own public functions
+  // inside the SW. pbpVocabSetNote is the store's note entrance --
+  // pbpVocabSaveWord has no note field.
+  const libSeedError = await sw.evaluate(async ({ owner, seed, fillers }) => {
+    const save = async (w) => {
+      const row = await pbpVocabSaveWord(owner, w);
+      if (!row || !row.id) throw new Error(`pbpVocabSaveWord returned no id for ${w.term}`);
+      return row;
+    };
+    try {
+      const rich = await save({
+        term: seed.richTerm, language: "en", ipa: "/kənˈstreɪnt/",
+        gloss: "A limitation or restriction; something that limits what can be done.",
+        context: { quote: "Every layout starts from a constraint, not from a blank page.", articleTitle: seed.multiTitle, articleUrl: seed.multiUrl },
+      });
+      // pbpVocabSaveWord merges ONE context per call: the second call adds the second.
+      await save({
+        term: seed.richTerm, language: "en",
+        context: { quote: "The constraint is the medium: a page only has so much attention to spend.", articleTitle: seed.cjkTitle, articleUrl: seed.soloUrl },
+      });
+      if (!(await pbpVocabSetNote(rich.id, owner, "Not the same as restraint: a constraint is imposed, restraint is chosen."))) {
+        throw new Error(`pbpVocabSetNote failed for ${seed.richTerm}`);
+      }
+      const ja = await save({
+        term: seed.cjkTerms[0], language: "ja", gloss: "ambiguous; vague",
+        context: { quote: "曖昧な言い方は、読み手の注意を奪う。", articleTitle: seed.cjkTitle, articleUrl: seed.soloUrl },
+      });
+      await save({ term: seed.cjkTerms[1], language: "zh", gloss: "to breathe; breathing room" });
+      const fill = [];
+      for (const term of fillers) fill.push((await save({ term, language: "en", gloss: `Seeded filler definition for ${term}.` })).id);
+      if (!(await pbpVocabBatchAddGroup([rich.id, ja.id, ...fill.slice(0, 17)], owner, "Reading"))) throw new Error("grouping Reading failed");
+      if (!(await pbpVocabBatchAddGroup([rich.id, ...fill.slice(0, 5)], owner, "Review"))) throw new Error("grouping Review failed");
+      // A strictly later clock for the fixture write that follows.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return "";
+    } catch (error) {
+      return error && error.message ? error.message : String(error);
+    }
+  }, { owner: SEED_OWNER, seed: LIB_SEED, fillers: LIB_SEED_FILLER_TERMS });
+  if (libSeedError) {
+    console.error(`[render-audit] library seed failed: ${libSeedError}`);
+    await ctx.close().catch(() => {});
+    rmSync(userDataDir, { recursive: true, force: true });
+    process.exit(2);
+  }
+
   const seeded = await sw.evaluate(async (owner) => {
     const w = await pbpVocabSaveWord(owner, {
       term: "renderAuditFixture",
@@ -6409,19 +6488,97 @@ async function main() {
   // SETUP, 2026-09-06). The READER looks a record up by pbpAiHash(url), a key
   // only the page can compute, so the sweep's reader leg seeds a second
   // record under that computed key before it opens the highlight section.
-  await sw.evaluate(() => chrome.storage.local.set({
-    "pbp_hl_render-audit-fixture": {
-      url: "https://example.com/render-audit-fixture",
-      title: "Render Audit Fixture Page",
-      items: [{
-        id: "h1",
-        ts: Date.now(),
-        quote: "This is the highlighted passage used by the render audit fixture.",
-        note: "A short fixture note for the render audit.",
-        color: 1,
-      }],
-    },
-  }));
+  await sw.evaluate(({ seed, fillerPages }) => {
+    const now = Date.now();
+    const minute = 60000;
+    const records = {
+      "pbp_hl_render-audit-fixture": {
+        url: "https://example.com/render-audit-fixture",
+        title: "Render Audit Fixture Page",
+        items: [{
+          id: "h1",
+          ts: now,
+          quote: "This is the highlighted passage used by the render audit fixture.",
+          note: "A short fixture note for the render audit.",
+          color: 1,
+        }],
+      },
+      // Library redesign (plan T2): one page with several highlights (one
+      // with a note), one page with exactly one under a CJK title, and
+      // one-highlight filler pages. Every stamp is older than the fixture's,
+      // so the fixture stays the first row of the latest-first notes list.
+      "pbp_hl_render-audit-multi": {
+        url: seed.multiUrl,
+        title: seed.multiTitle,
+        items: [
+          { id: "m1", ts: now - 40 * minute, quote: "Attention is the one resource every element on the page competes for.", note: "", color: 1 },
+          { id: "m2", ts: now - 35 * minute, quote: "A border costs the reader a glance whether or not it carries meaning.", note: "The real price of a decorative frame.", color: 2 },
+          { id: "m3", ts: now - 30 * minute, quote: "Quiet is not the absence of design; it is design that stopped asking for attention.", note: "", color: 3 },
+          { id: "m4", ts: now - 25 * minute, quote: "The best index is the one you stop noticing while you read.", note: "", color: 5 },
+        ],
+      },
+      "pbp_hl_render-audit-solo": {
+        url: seed.soloUrl,
+        title: seed.cjkTitle,
+        items: [{ id: "s1", ts: now - 20 * minute, quote: "安静的界面不靠色块分区，靠留白、字号和对齐。", note: "", color: 4 }],
+      },
+    };
+    for (let i = 1; i <= fillerPages; i++) {
+      records[`pbp_hl_render-audit-filler-${i}`] = {
+        url: `https://example.com/reading/filler-${i}`,
+        title: `Reading list entry ${i}`,
+        items: [{ id: `f${i}`, ts: now - (60 + i * 10) * minute, quote: `Filler highlight ${i}, seeded so the notes list is long enough to scroll.`, note: "", color: ((i - 1) % 5) + 1 }],
+      };
+    }
+    return chrome.storage.local.set(records);
+  }, { seed: LIB_SEED, fillerPages: LIB_SEED_NOTE_FILLER_PAGES });
+
+  // Seed shape (plan T2). The library gates read these facts, and every
+  // pre-existing entry reads the FIRST row of a list, so the fixture word and
+  // the fixture highlight must stay the newest. Asserted on the stored data,
+  // from the SW, before any page opens -- a broken seed is exit 2, never a
+  // row of PASSes against the wrong element.
+  const seedShape = await sw.evaluate(async ({ owner, seed }) => {
+    const rows = await pbpVocabAll(owner);
+    const fixture = rows.find((r) => r.term === "renderAuditFixture");
+    const others = rows.filter((r) => r !== fixture);
+    const rich = rows.find((r) => r.term === seed.richTerm);
+    const store = await chrome.storage.local.get(null);
+    const pages = Object.entries(store).filter(([key, rec]) => key.startsWith("pbp_hl_") && rec && Array.isArray(rec.items));
+    const items = pages.flatMap(([, rec]) => rec.items);
+    const hlFixture = store["pbp_hl_render-audit-fixture"];
+    const newest = hlFixture && hlFixture.items[0];
+    const multi = (pages.find(([, rec]) => rec.url === seed.multiUrl) || [])[1];
+    const solo = (pages.find(([, rec]) => rec.url === seed.soloUrl) || [])[1];
+    return {
+      words: rows.length,
+      ungrouped: rows.filter((r) => !pbpVocabGroups(r).length).length,
+      fixtureWordNewest: !!fixture && others.every((r) => (Number(r.updatedAt) || 0) < (Number(fixture.updatedAt) || 0)),
+      richShape: !!rich && rich.language === "en" && !!rich.ipa && rich.contexts.length === 2 && !!String(rich.note || "").trim(),
+      cjkTerms: seed.cjkTerms.every((term) => rows.some((r) => r.term === term)),
+      highlights: items.length,
+      fixtureHighlightNewest: !!newest && items.every((it) => it === newest || it.ts < newest.ts),
+      multiShape: !!multi && multi.items.length >= 3 && multi.items.some((it) => String(it.note || "").trim()),
+      soloShape: !!solo && solo.items.length === 1 && solo.title === seed.cjkTitle,
+    };
+  }, { owner: SEED_OWNER, seed: LIB_SEED });
+  const seedProblems = [
+    seedShape.words === LIB_SEED.wordCount + 1 ? null : `words ${seedShape.words} (want ${LIB_SEED.wordCount + 1})`,
+    seedShape.ungrouped >= 10 ? null : `ungrouped words ${seedShape.ungrouped} (want >= 10)`,
+    seedShape.fixtureWordNewest ? null : "renderAuditFixture is not the newest word",
+    seedShape.richShape ? null : `${LIB_SEED.richTerm} lacks two contexts / a note / an ipa`,
+    seedShape.cjkTerms ? null : `missing a CJK term (${LIB_SEED.cjkTerms.join(", ")})`,
+    seedShape.highlights >= 14 ? null : `highlights ${seedShape.highlights} (want >= 14)`,
+    seedShape.fixtureHighlightNewest ? null : "the fixture highlight is not the newest",
+    seedShape.multiShape ? null : `${LIB_SEED.multiUrl} lacks >= 3 highlights with one note`,
+    seedShape.soloShape ? null : `${LIB_SEED.soloUrl} is not exactly one highlight titled ${LIB_SEED.cjkTitle}`,
+  ].filter(Boolean);
+  if (seedProblems.length) {
+    console.error(`[render-audit] library seed shape wrong: ${seedProblems.join("; ")}`);
+    await ctx.close().catch(() => {});
+    rmSync(userDataDir, { recursive: true, force: true });
+    process.exit(2);
+  }
 
   // One offline-queue record so popup's #offline-queue-bar (and its
   // #offline-queue-clear icon-only button) has something to render --
