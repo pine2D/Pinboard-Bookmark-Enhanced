@@ -231,7 +231,6 @@
       "primitives": [
         "lib-block",
         "lib-cluster",
-        "lib-quote",
         "lib-section",
         "notes-batch-bar",
         "notes-empty",

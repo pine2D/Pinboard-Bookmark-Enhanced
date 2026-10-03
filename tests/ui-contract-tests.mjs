@@ -1133,7 +1133,7 @@ check(vocabStore.includes("function _pbpVocabLocalMutation") && vocabStore.inclu
 // selector list rather than a second copy -- the contract asserts BOTH names
 // reach it, and that both regions exist as sticky containing blocks.
 check(libraryCss.includes(".vocab-filter-toolbar") &&
-  /\.vocab-list-region,\s*\n\.notes-list-region \{ position: relative; \}/.test(libraryCss) &&
+  /\.vocab-list-region,\s*\n\.notes-list-region \{[^}]*\bposition: relative;/.test(libraryCss) &&
   /\.vocab-batch-bar,\s*\n\.notes-batch-bar\s*\{[\s\S]{0,500}position:\s*sticky[\s\S]{0,500}z-index:\s*var\(--lib-z-sticky\)/.test(libraryCss) &&
   libraryCss.includes(".vocab-card .notes-card-top"),
   "library.css: the sticky batch bar contract is missing, or the notes bar stopped sharing the vocabulary bar's recipe");
@@ -2174,96 +2174,84 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
 // while the earlier kept supplying `box-shadow`, shipping a hard rectangle
 // with a glow behind it. .vocab-sort-seg's shell ring fired on mouse-down
 // (`:focus-within` has no keyboard gate) and stacked outside the cell ring.
-// Fixed-width canvas (2026-08-06). Three pieces, each one load-bearing on
-// its own, so each gets its own assertion rather than one "layout looks
-// right" catch-all.
+// Flat window-filling page (library redesign spec 2026-10-03 §2.3-§2.4; the
+// 2026-08-06 fixed 1164px canvas is overturned, §0.2): one index column and
+// one detail column on the page itself, two scroll containers per tab and
+// nothing else that scrolls. What the source can show is pinned here, one
+// assertion per load-bearing piece; the render oracle's noPageScroll / libAxis
+// states measure the composed result.
 {
-  // The gutter MUST be `max(sp-5, ...)`: a bare calc() goes negative below
-  // the cap and would clamp to 0, deleting the page's normal side padding on
-  // every ordinary laptop width.
-  const gutter = /padding-inline:\s*max\(var\(--lib-sp-5\),\s*calc\(\(100% - var\(--lib-canvas-max\)\) \/ 2\)\)/g;
-  check((libraryCss.match(gutter) || []).length === 2,
-    "library.css: .lib-header and .lib-main no longer share the same max()-guarded canvas gutter — the header's title/tabs will drift out of alignment with the workbench, or narrow screens will lose their side padding");
-  // Variant C (USER RULING 2026-08-06): the reading pane hugs its content and
-  // surplus width becomes margin outside its border. fit-content(), not a
-  // flexible track -- `1fr` absorbs every spare pixel, which is the growth
-  // this ruling exists to stop. The list column's 340px floor stays.
-  const benchCols = /grid-template-columns:\s*minmax\(340px,\s*(\d+)px\)\s*fit-content\((\d+)px\)/g;
-  const bench = [...libraryCss.matchAll(benchCols)];
-  // The centring must be counted INSIDE the two workbench blocks. A bare
-  // file-wide count was fed by the detail panes' own two `justify-content:
-  // center` declarations, so deleting both workbench centrings left the
-  // check green (independent review, measured).
-  const benchCentred = (libraryCss.match(/\.(?:vocab|notes)-workbench \{[^}]*\}/g) || [])
-    .filter((block) => /justify-content:\s*center;/.test(block)).length;
-  check(bench.length === 2 && benchCentred === 2,
-    "library.css: a workbench lost the variant-C column pair (minmax(340px, Npx) fit-content(Npx)) or its own justify-content: center — a flexible reading column grows back to whatever the window is, and an uncentred grid sits hard left in its canvas");
-  // THE anti-double-centring invariant, and the reason this is arithmetic
-  // rather than a literal: --lib-canvas-max must equal the workbench's own
-  // natural width. If it is larger, the grid sits inside a wider canvas and
-  // gets centred twice (a centred box inside a centred box) -- exactly the
-  // shape the detail-pane proposal rejected. Any of the three numbers can
-  // move; they just have to keep agreeing.
-  const canvas = /--lib-canvas-max:\s*(\d+)px/.exec(libraryCss);
-  const gap = /--lib-sp-5:\s*(\d+)px/.exec(libraryCss);
-  const want = bench.length ? Number(bench[0][1]) + Number(gap && gap[1]) + Number(bench[0][2]) : null;
-  check(!!canvas && !!gap && Number(canvas[1]) === want,
-    `library.css: --lib-canvas-max (${canvas && canvas[1]}) is not the workbench's own width (${bench.length ? bench[0][1] : "?"} + ${gap && gap[1]} gap + ${bench.length ? bench[0][2] : "?"} = ${want}) — the grid is centred inside a canvas that is centred inside the page`);
-  // The reading measure belongs to the pane, not to each child: a child that
-  // forgets its own cap is invisible until someone reads a wide screen.
-  check((libraryCss.match(/grid-template-columns:\s*minmax\(0,\s*66ch\)/g) || []).length === 2,
-    "library.css: a detail pane lost its centred 66ch content column");
+  const hand = stripGeneratedRegions(libraryCss);
+  const live = hand.replace(/\/\*[\s\S]*?\*\//g, "");
+  const decl = (selector) => declarationValueMap(hand, selector);
+  check(!/--lib-canvas-max|--lib-header-h/.test(live),
+    "library.css: --lib-canvas-max / --lib-header-h are back — the page fills the window (there is no canvas to centre in) and nothing is offset by a measured header height any more (it had drifted 1.7px from the real header)");
+  const header = decl(".lib-header");
+  check(header.get("flex") === "none" && header.get("padding") === "var(--lib-sp-4) var(--lib-page-pad) var(--lib-sp-5)" &&
+    !header.has("position") && !header.has("background") && !header.has("border-bottom"),
+    `library.css: .lib-header must be a flat flex: none row padded var(--lib-sp-4) var(--lib-page-pad) var(--lib-sp-5) — no sticky, no fill, no rule; got ${JSON.stringify(Object.fromEntries(header))}`);
+  const html = decl("html"), body = decl("body");
+  check(html.get("height") === "100%" && body.get("height") === "100%" && body.get("display") === "flex" && body.get("flex-direction") === "column",
+    "library.css: the body flex chain is gone (html, body { height: 100% } + body { display: flex; flex-direction: column }) — without a definite height the two scroll containers grow with their content and the page scrolls instead");
+  for (const sel of [".lib-main", ".lib-view"]) {
+    const m = decl(sel);
+    check(m.get("flex") === "1 1 auto" && m.get("min-height") === "0" && m.get("display") === "flex" && m.get("flex-direction") === "column",
+      `library.css: ${sel} must hand the window height down (flex: 1 1 auto; min-height: 0; a column flex box)`);
+  }
+  check(decl(".lib-view[hidden]").get("display") === "none",
+    "library.css: .lib-view[hidden] lost display: none — .lib-view's own display: flex outranks the UA [hidden] rule and both tabs render at once");
+  for (const bench of [".vocab-workbench", ".notes-workbench"]) {
+    const m = decl(bench);
+    check(m.get("grid-template-columns") === "var(--lib-index-w) minmax(0, 1fr)" && m.get("column-gap") === "var(--lib-gap)" &&
+      m.get("padding-inline-start") === "var(--lib-page-pad)" && m.get("min-height") === "0" && !m.has("align-items") && !m.has("justify-content"),
+      `library.css: ${bench} lost the index + detail grid (var(--lib-index-w) minmax(0, 1fr), column-gap var(--lib-gap), start gutter var(--lib-page-pad), stretched and never centred) — got ${JSON.stringify(Object.fromEntries(m))}`);
+  }
+  for (const region of [".vocab-list-region", ".notes-list-region"]) {
+    const m = decl(region);
+    check(m.get("overflow-y") === "auto" && m.get("scrollbar-gutter") === "stable" && m.get("min-height") === "0" &&
+      /var\(--lib-sb-w, /.test(m.get("margin-inline") || ""),
+      `library.css: ${region} must be the list's own scroll container (overflow-y auto, scrollbar-gutter stable, min-height 0) and bleed into the gap by the measured scrollbar (--lib-sb-w)`);
+  }
+  for (const pane of [".vocab-detail-pane", ".notes-detail-pane"]) {
+    const m = decl(pane);
+    const drawn = ["background", "border", "border-radius", "box-shadow", "max-height", "top", "position", "justify-content"].filter((p) => m.has(p));
+    check(m.get("overflow-y") === "auto" && m.get("container-type") === "inline-size" && m.get("container-name") === "lib-detail" && drawn.length === 0,
+      `library.css: ${pane} must be its own scroll container and the lib-detail size container — never sticky, centred or a drawn panel; stray: ${drawn.join(", ") || "none"}`);
+  }
+  check(![...decl(".lib-section").keys()].some((p) => p.startsWith("border")),
+    "library.css: .lib-section draws a rule again — sections on the flat page are divided by space and type, never by a line (user ruling 2026-10-03)");
+  // The reading measure belongs to the detail column, not to each child: a
+  // child that carries its own cap re-creates the left-hugging prose the pane
+  // column replaced.
   const paneChildCaps = (libraryCss.match(/\.(notes-detail-quote|notes-detail-note|vocab-detail-gloss|vocab-detail-context|vocab-note-edit)\b[^{}]*\{[^}]*max-width:\s*6[68]ch/g) || []);
   check(paneChildCaps.length === 0,
-    `library.css: per-child reading-measure caps are back inside the detail panes — the pane's own column already caps and CENTRES them, and a child cap only re-creates the left-hugging prose it replaced: ${paneChildCaps.join(" | ")}`);
-  // Prose that keeps its own newlines (`white-space: pre-wrap`) sits inside a
-  // `minmax(0, 66ch)` column that shrinks rather than widens, so an unbreakable
-  // run — a data URI, a hash, a long identifier lifted out of a code block —
-  // paints straight through the pane's border unless the rule also names a
-  // break policy. Asked as a CATEGORY ("every pre-wrap/pre-line rule in the
-  // hand layer"), not as the selectors that carry it today: the simplest
-  // counter-example is a fifth quote/gloss block added later with pre-wrap and
-  // no overflow-wrap, which a named list would never see.
-  const libHand = stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, "");
-  const unbrokenProse = [...libHand.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    `library.css: per-child reading-measure caps are back inside the detail panes — the detail column already sets the measure: ${paneChildCaps.join(" | ")}`);
+  // Prose that keeps its own newlines (`white-space: pre-wrap`) sits in a
+  // detail column that shrinks rather than widens, so an unbreakable run — a
+  // data URI, a hash, a long identifier lifted out of a code block — paints
+  // straight past the pane unless the rule also names a break policy. Asked as
+  // a CATEGORY ("every pre-wrap/pre-line rule in the hand layer"), not as the
+  // selectors that carry it today.
+  const unbrokenProse = [...live.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, , body]) => /white-space:\s*pre-(wrap|line)/.test(body) && !/overflow-wrap:\s*anywhere/.test(body))
     .map(([, sel]) => sel.trim().split("\n").pop().trim());
   check(unbrokenProse.length === 0,
-    `library.css: a pre-wrap prose rule declares no break policy — inside the detail panes' 66ch column an unbreakable run overflows the pane instead of wrapping: ${unbrokenProse.join(" | ")}`);
-  // Both panes are sticky inside a grid row as tall as the LIST column, so an
-  // uncapped pane taller than the viewport keeps its top edge pinned while
-  // everything past the fold stays unreachable until the whole list has been
-  // scrolled through (the relookup result lands there, i.e. on the main path).
-  // The cap has to be a border-box cap — both panes carry 16px block padding
-  // and a 1px border, which content-box would add on top of it.
-  const paneRules = [...libraryCss.matchAll(/\.(notes|vocab)-detail-pane \{([^}]*)\}/g)];
-  const stickyPanes = paneRules.filter(([, , body]) => /position:\s*sticky/.test(body));
-  const uncappedPanes = stickyPanes
-    .filter(([, , body]) => !(/box-sizing:\s*border-box/.test(body) && /max-height:\s*calc\(100vh[^;]*\)/.test(body) && /overflow-y:\s*auto/.test(body)))
-    .map(([, name]) => `.${name}-detail-pane`);
-  check(stickyPanes.length === 2 && uncappedPanes.length === 0,
-    `library.css: a sticky detail pane has no border-box height cap (${stickyPanes.length} sticky panes seen; uncapped: ${uncappedPanes.join(", ") || "none"}) — pinned, its lower half is unreachable until the list column has been scrolled to its end`);
-  const releasedPanes = (libraryCss.match(/\.(?:notes|vocab)-detail-pane \{ position: static; max-height: none; overflow: visible; \}/g) || []);
-  check(releasedPanes.length === 2,
-    "library.css: a detail pane keeps its sticky height cap in the <=860px single-pane layout — there the pane IS the page, so the cap only nests a second scroller inside the page's own");
+    `library.css: a pre-wrap prose rule declares no break policy — inside the detail column an unbreakable run overflows the pane instead of wrapping: ${unbrokenProse.join(" | ")}`);
   // The five colour-filter dots are real <button>s (library-notes.js), the one
   // interactive family on this page that used to fall through to the UA focus
-  // ring. The ring must also be legible in the OFF state — the state a keyboard
-  // user is most likely to be switching back on — and `outline` paints at its
-  // own element's opacity, so the "filtered out" dimming belongs on the swatch
-  // inside the button, never on the button itself.
-  // Existence only: the §7.3 placement gate above already polices the SHAPE of
-  // every hand-written :focus-visible rule on this surface, and duplicating its
-  // recipe here would just be a second place to update.
+  // ring. The ring must also be legible in the OFF state, and `outline` paints
+  // at its own element's opacity, so the "filtered out" dimming belongs on the
+  // swatch inside the button, never on the button itself. (T4 replaces these
+  // dots with .lib-toggle and rewrites both checks.)
   check(/\.notes-filter-dot:focus-visible \{/.test(libraryCss),
     "library.css: .notes-filter-dot has no :focus-visible rule — the colour dots fall back to the UA default ring while every neighbouring family declares a themed one");
   check(!/\.notes-filter-dot\[aria-pressed="false"\]\s*\{[^}]*opacity/.test(libraryCss) &&
     /\.notes-filter-dot\[aria-pressed="false"\] \.note-dot \{[^}]*opacity/.test(libraryCss),
     "library.css: the colour dot's off-state opacity is back on the BUTTON — a focus ring paints at its own element's opacity (border and box-shadow alike), so it would render at a third strength on exactly the dots a keyboard user is about to re-enable");
-  // Both panes end the same way: one rule-topped row, destructive action
-  // pushed to its right end. Two panes, one closing gesture.
-  check(/^\.lib-section \{[^}]*border-top:/m.test(libraryCss) &&
-    /\.vocab-detail-footer > \.vocab-detail-delete,\s*\n\.notes-detail-footer > \.notes-detail-delete \{ margin-left: auto; \}/.test(libraryCss) &&
+  // Both panes end the same way: one closing row, destructive action pushed
+  // to its right end. (The footers' class names move off .lib-section in T7 /
+  // T8, which rewrite the two className halves of this check.)
+  check(/\.vocab-detail-footer > \.vocab-detail-delete,\s*\n\.notes-detail-footer > \.notes-detail-delete \{ margin-left: auto; \}/.test(libraryCss) &&
     /footer\.className = "lib-section vocab-detail-footer"/.test(libraryVocabJs) &&
     /footer\.className = "lib-section notes-detail-footer"/.test(read("library-notes.js")),
     "library.css/library-{vocab,notes}.js: the detail panes' shared closing action row is gone or asymmetric");
@@ -2396,22 +2384,6 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
   check(/footer\.appendChild\(noteEditor\.save\)/.test(libraryVocabJs) &&
     /\.vocab-detail-footer > \.vocab-note-save \{/.test(libraryCss),
     "library-vocab.js/library.css: the note Save button left the detail pane's closing row");
-  // The seam. It must NOT be a border token: --lib-{border,border-section,
-  // pane-divider} are the 3:1 structural edges, and a full-weight rule
-  // between two buttons frames one of them instead of dividing them — which
-  // is the form the user rejected. It is the panel's own fill nudged toward
-  // the foreground, so it re-derives per theme and can never out-weigh a
-  // real border. Both halves are pinned: the recipe, and the fact that the
-  // dark themes carry their OWN strength (equal mixes are not equally
-  // legible on a near-white and a near-black panel).
-  const seam = /\.vocab-detail-footer > \.vocab-note-save::before \{([^}]*)\}/.exec(libraryCss);
-  check(!!seam && /background:\s*color-mix\(in srgb, var\(--lib-fg\) var\(--lib-seam-mix\), var\(--lib-panel\)\)/.test(seam[1])
-    && !/var\(--lib-(border|border-section|pane-divider)\)/.test(seam[1])
-    && /width:\s*1px/.test(seam[1]) && /height:\s*\d+px/.test(seam[1]),
-    "library.css: the save-button seam is gone, or went back to a structural border token (a 3:1 edge between two buttons reads as a frame around one of them, which is the form that was rejected)");
-  const seamDark = /html\[data-theme="rose-pine"\] \{ --lib-seam-mix: \d+%; \}/.test(libraryCss);
-  check(/--lib-seam-mix:\s*\d+%/.test(libraryCss) && seamDark,
-    "library.css: --lib-seam-mix lost its default or its dark-theme group — one mix percentage cannot be equally legible on a near-white and a near-black panel");
 }
 // Comments stripped first, same as the class-level gate above: BOTH of these
 // name a selector that the surrounding prose also has every reason to
@@ -6056,30 +6028,6 @@ for (const [file, css] of [["popup.css", popupCss], ["options.css", optionsCss],
   }
   check(offenders.length === 0,
     `${file}: hand-written rule(s) can paint the confirm popover's confirm button -- the solid-danger tier belongs to the @generated:ui-components recipe (COMPONENTS.md §4.2); an element-selector or themed override outranks it silently. Offenders: ${offenders.join(" | ")}`);
-}
-
-// --lib-panel / --lib-pane-bg default-state hand-consistency (debt-sweep
-// 2026-08-07, design-uplift final-review minor). Per theme (the generated
-// `html[data-theme="X"]` blocks) the two are structurally guaranteed equal --
-// library-chrome.mjs's map derives both from the SAME expression, `ui.bg2` --
-// but the "no preset selected" default fallback at the top of library.css has
-// no generated counterpart (unlike --lib-border, which moved into the
-// composer's DEFAULT_LIGHT block because it needed AA-derivation math the
-// composer alone can do; panel/pane-bg are a flat literal copy with no math
-// to derive, so composer migration would just be the same hand-typed literal
-// wearing a JS file instead of a CSS one). Two independent hand literals for
-// one concept is exactly the shape that drifts silently, so this pins them
-// equal without requiring a composer round-trip.
-{
-  const hand = stripGeneratedRegions(libraryCss);
-  const rootBlock = /:root\s*\{([^{}]*)\}/.exec(hand)?.[1] || "";
-  const panel = /--lib-panel\s*:\s*([^;]+);/.exec(rootBlock)?.[1]?.trim();
-  const paneBg = /--lib-pane-bg\s*:\s*([^;]+);/.exec(rootBlock)?.[1]?.trim();
-  check(!!panel && !!paneBg, `library.css: could not find both --lib-panel and --lib-pane-bg in the hand-written :root block (found panel=${panel}, pane-bg=${paneBg})`);
-  if (panel && paneBg) {
-    check(panel === paneBg,
-      `library.css: hand-written :root default has --lib-panel (${panel}) != --lib-pane-bg (${paneBg}) -- these two are the same role (COMPONENTS.md's ghost-resting composite relies on them matching) and are kept equal by hand in this one fallback block; every generated per-theme block derives both from the same source and can't drift`);
-  }
 }
 
 // A1/A2 table-scroll CSS contract (final-review fix batch, 2026-08-20): pin

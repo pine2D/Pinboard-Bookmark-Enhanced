@@ -664,7 +664,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   for (const c of (Array.isArray(w.contexts) ? w.contexts : [])) {
     if (!c) continue;
     const item = document.createElement("div");
-    item.className = "lib-block lib-quote vocab-detail-context";
+    item.className = "lib-block vocab-detail-context";
     const quote = document.createElement("blockquote");
     quote.className = "notes-item-quote";
     _pbpVocabHighlightTerm(quote, c.quote || "", w.term);

@@ -217,10 +217,12 @@ const LIB_SEED_FILLER_TERMS = Object.freeze([
   "opaque", "parsimony", "quiescent", "rhetoric", "salient", "tacit", "tenuous", "unwieldy", "verbose", "whimsy",
 ]);
 // One-highlight filler pages. With the fixture, multiUrl's four and soloUrl's
-// one this makes 14 highlights: enough for the notes list region to scroll at
-// a 900px window, which G1 and G6 need to be able to tell "the page did not
-// scroll" from "there was nothing to scroll".
-const LIB_SEED_NOTE_FILLER_PAGES = 8;
+// one this makes 22 highlights: enough for the notes list region to scroll at
+// a 900px window in BOTH density tiers, which G1 and G6 need to be able to
+// tell "the page did not scroll" from "there was nothing to scroll". (8 pages,
+// 14 highlights, scrolled in the comfortable tier only: terminal's compact
+// rows left the 2560x900 list region at 764/764, measured by G1, plan T3a.)
+const LIB_SEED_NOTE_FILLER_PAGES = 16;
 
 // ---- Theme storage mapping. Hand-copied from shared.js's ADAPTIVE_THEME_MAP
 // (verified at authoring time, not imported: shared.js is a plain script,
@@ -1648,7 +1650,7 @@ async function driveRowStates(page, extBase, theme, selector, textSelector) {
 // correct state of every ellipsised single-line element, and reporting it
 // buries the real finding under false positives (measured: 5 of them on the
 // first run of this sweep, against 1 real).
-const PANE_FIT_SCAN = ({ panes, tolerance }) => {
+const PANE_FIT_SCAN = ({ panes, tolerance, bleed = [] }) => {
   const hits = [];
   const nameOf = (el) => {
     const cls = (el.className && typeof el.className === "string")
@@ -1660,12 +1662,30 @@ const PANE_FIT_SCAN = ({ panes, tolerance }) => {
     if (!pane) { hits.push({ pane: paneSel, el: paneSel, kind: "paneMissing", over: 0 }); continue; }
     const pr = pane.getBoundingClientRect();
     const pcs = getComputedStyle(pane);
-    const right = pr.right - (parseFloat(pcs.paddingRight) || 0) - (parseFloat(pcs.borderRightWidth) || 0);
-    const left = pr.left + (parseFloat(pcs.paddingLeft) || 0) + (parseFloat(pcs.borderLeftWidth) || 0);
-    if (pane.scrollWidth > pane.clientWidth + tolerance) {
+    const paneRight = pr.right - (parseFloat(pcs.paddingRight) || 0) - (parseFloat(pcs.borderRightWidth) || 0);
+    const paneLeft = pr.left + (parseFloat(pcs.paddingLeft) || 0) + (parseFloat(pcs.borderLeftWidth) || 0);
+    // A list region bleeds past its pane by design (library redesign §2.4:
+    // 4px at the start so row fills meet the search box, scrollbar gutter +
+    // 4px into the gap at the end). Its own box is exempt and its overhang is
+    // allowed in the pane's scrollWidth; everything INSIDE it is still checked,
+    // against the region's own content box (the rows fill the region, so the
+    // pane's edges would flag every row by the designed 4px).
+    const bleeders = bleed.flatMap((sel) => [...pane.querySelectorAll(sel)]);
+    const allowance = bleeders.reduce((max, el) => Math.max(max, Math.ceil(el.getBoundingClientRect().right - pr.right)), 0);
+    if (pane.scrollWidth > pane.clientWidth + tolerance + allowance) {
       hits.push({ pane: paneSel, el: paneSel, kind: "paneScroll", over: +(pane.scrollWidth - pane.clientWidth).toFixed(2) });
     }
+    const contentEdges = (box) => {
+      const r = box.getBoundingClientRect();
+      const cs = getComputedStyle(box);
+      const l = r.left + box.clientLeft + (parseFloat(cs.paddingLeft) || 0);
+      return { left: l, right: r.left + box.clientLeft + box.clientWidth - (parseFloat(cs.paddingRight) || 0) };
+    };
+    const bleedEdges = new Map(bleeders.map((b) => [b, contentEdges(b)]));
     for (const el of pane.querySelectorAll("*")) {
+      if (bleeders.includes(el)) continue;
+      const host = bleeders.find((b) => b.contains(el));
+      const { left, right } = host ? bleedEdges.get(host) : { left: paneLeft, right: paneRight };
       const cs = getComputedStyle(el);
       if (cs.display === "none" || cs.visibility === "hidden" || cs.position === "fixed") continue;
       if (el.closest("[hidden]")) continue;
@@ -1681,7 +1701,7 @@ const PANE_FIT_SCAN = ({ panes, tolerance }) => {
 };
 
 async function drivePaneFit(page, check) {
-  const { widths, panes, tolerancePx = 1, resetNarrowDetail = false } = check.expect.paneFit;
+  const { widths, panes, tolerancePx = 1, resetNarrowDetail = false, bleed = [] } = check.expect.paneFit;
   const restore = page.viewportSize();
   const found = [];
   try {
@@ -1701,7 +1721,7 @@ async function drivePaneFit(page, check) {
     for (const width of widths) {
       await page.setViewportSize({ width, height: restore ? restore.height : 900 });
       await page.waitForTimeout(250);
-      for (const hit of await page.evaluate(PANE_FIT_SCAN, { panes, tolerance: tolerancePx })) {
+      for (const hit of await page.evaluate(PANE_FIT_SCAN, { panes, tolerance: tolerancePx, bleed })) {
         found.push({ ...hit, width });
       }
     }
@@ -1712,6 +1732,111 @@ async function drivePaneFit(page, check) {
   return found;
 }
 
+
+// ---- Library layout states (library redesign 2026-10-03, plan T3) ---------
+// Each runs in a FRESH page of the same context (same extension origin, same
+// theme already written to storage) so its viewport, hash and scroll churn
+// never leak into the shared page every other library check reads, and
+// closes it again before returning.
+async function openLibraryView(p, extBase, theme, view, tag) {
+  await p.goto(`${extBase}library.html?_ra=${encodeURIComponent(`${tag}-${theme}`)}#${view}`, { waitUntil: "load", timeout: TIMEOUT_MS });
+  const rowSel = view === "notes" ? "#notes-list .notes-hit-btn" : "#vocab-list .vocab-card .notes-card-head";
+  await p.waitForSelector(rowSel, { timeout: TIMEOUT_MS }).catch(() => {});
+  await p.waitForTimeout(300);
+  if (!(await p.locator(rowSel).count())) {
+    throw new Error(`SETUP: no "${rowSel}" in a fresh ${view} page (theme=${theme}) -- seed fixture broken or markup renamed`);
+  }
+  return rowSel;
+}
+
+// ---- state: "noPageScroll" (spec §9.2 G1) ----------------------------------
+// Runs INSIDE the page. `overflowing` counts visible scroll containers whose
+// content really is taller than they are: without one, "the page did not
+// scroll" cannot be told from "there was nothing to scroll".
+const NO_PAGE_SCROLL_SCAN = ({ tolerance }) => {
+  const out = [];
+  const doc = document.scrollingElement || document.documentElement;
+  if (doc.scrollHeight > innerHeight + tolerance) out.push(`page scrollHeight ${doc.scrollHeight} > innerHeight ${innerHeight}`);
+  if (doc.scrollWidth > innerWidth + tolerance) out.push(`page scrollWidth ${doc.scrollWidth} > innerWidth ${innerWidth}`);
+  let overflowing = 0;
+  const dims = [];
+  for (const sel of [".vocab-list-region", "#vocab-detail-pane", ".notes-list-region", "#notes-detail-pane"]) {
+    const el = document.querySelector(sel);
+    if (!el || !el.getClientRects().length) continue; // other tab, or the hidden half of the narrow view
+    dims.push(`${sel} ${el.scrollHeight}/${el.clientHeight}`);
+    if (el.scrollWidth > el.clientWidth + tolerance) out.push(`${sel} scrollWidth ${el.scrollWidth} > clientWidth ${el.clientWidth}`);
+    if (el.scrollHeight > el.clientHeight + tolerance) overflowing++;
+  }
+  return { out, overflowing, dims };
+};
+
+async function driveNoPageScroll(page, check, extBase, theme) {
+  const { widths, height = 900, tolerancePx = 1 } = check.expect.noPageScroll;
+  const hits = [];
+  const p = await page.context().newPage();
+  try {
+    for (const view of ["vocab", "notes"]) {
+      for (const detailOpen of [false, true]) {
+        await p.setViewportSize({ width: Math.max(...widths), height });
+        const rowSel = await openLibraryView(p, extBase, theme, view, "g1");
+        if (detailOpen) {
+          // Opened at the widest width: an ordinary two-pane click. Below 860
+          // the narrow body class is then set by hand -- the state a user gets
+          // by clicking a row at that width.
+          await p.locator(rowSel).first().click();
+          await p.waitForTimeout(250);
+          const open = await p.evaluate((v) => !document.getElementById(v === "notes" ? "notes-detail" : "vocab-detail").hidden, view);
+          if (!open) throw new Error(`SETUP: clicking the first ${view} row did not open its detail (theme=${theme})`);
+        }
+        for (const width of widths) {
+          await p.setViewportSize({ width, height });
+          await p.evaluate(({ v, on }) => {
+            document.body.classList.toggle(v === "notes" ? "lib-narrow-notes" : "lib-narrow-detail", on);
+          }, { v: view, on: detailOpen && width <= 860 });
+          await p.waitForTimeout(150);
+          const { out, overflowing, dims } = await p.evaluate(NO_PAGE_SCROLL_SCAN, { tolerance: tolerancePx });
+          const listShown = !(detailOpen && width <= 860);
+          if (listShown && !overflowing) {
+            throw new Error(`SETUP: no scroll container overflows at ${width}x${height} (${view}, detail ${detailOpen ? "open" : "closed"}, theme=${theme}; scrollHeight/clientHeight: ${dims.join(", ")}) -- the seed is too small for this probe`);
+          }
+          for (const line of out) hits.push(`${line} at ${width}x${height} (${view}, detail ${detailOpen ? "open" : "closed"})`);
+        }
+      }
+    }
+    // Narrow round trip (spec §2.6, §12 T3): list -> detail -> back keeps the
+    // list where it was. The list pane is display:none while the detail is
+    // up, and its region must come back at the same scrollTop.
+    for (const view of ["vocab", "notes"]) {
+      await p.setViewportSize({ width: 420, height });
+      await openLibraryView(p, extBase, theme, view, "g1-back");
+      const regionSel = view === "notes" ? ".notes-list-region" : ".vocab-list-region";
+      const rowSel = view === "notes" ? ".notes-hit-btn" : ".vocab-card .notes-card-head";
+      const backSel = view === "notes" ? "#notes-detail .notes-detail-back" : "#vocab-detail-back";
+      const target = await p.evaluate(({ regionSel, rowSel }) => {
+        const region = document.querySelector(regionSel);
+        region.scrollTop = 120;
+        const box = region.getBoundingClientRect();
+        const x = box.left + box.width / 2, y = box.top + box.height / 2;
+        const under = document.elementFromPoint(x, y);
+        return { top: region.scrollTop, x, y, onRow: !!(under && under.closest(rowSel)) };
+      }, { regionSel, rowSel });
+      if (target.top !== 120 || !target.onRow) {
+        throw new Error(`SETUP: the 420px ${view} list could not be scrolled to 120 with a row under its centre (scrollTop ${target.top}, row ${target.onRow}, theme=${theme})`);
+      }
+      await p.mouse.click(target.x, target.y);
+      await p.waitForTimeout(250);
+      if (!(await p.locator(backSel).isVisible())) throw new Error(`SETUP: no visible ${backSel} after opening a ${view} row at 420px (theme=${theme})`);
+      await p.click(backSel);
+      await p.waitForTimeout(250);
+      const after = await p.evaluate((sel) => document.querySelector(sel).scrollTop, regionSel);
+      if (after !== 120) hits.push(`narrow ${view}: the list region is at scrollTop ${after} after list -> detail -> back (was 120)`);
+    }
+  } finally {
+    await p.close().catch(() => {});
+    await page.bringToFront().catch(() => {});
+  }
+  return hits;
+}
 
 // ---- state: "headerRowsFlush" (list header, round 2) ---------------------
 // The header's whole point is that every row runs the full width of the list
@@ -2066,6 +2191,12 @@ async function runOneCheck(page, theme, check, results, extBase) {
       : undefined;
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("paneFit", hits.length === 0, round2(worst), 0, note) });
+    return;
+  }
+  if (check.state === "noPageScroll") {
+    const hits = await driveNoPageScroll(page, check, extBase, theme);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("noPageScroll", hits.length === 0, hits.length, 0, hits.length ? hits.slice(0, 4).join("; ") : undefined) });
     return;
   }
   if (check.state === "gapMin") {
@@ -6650,8 +6781,11 @@ async function main() {
         // 2 D6), so the "flexoki-dark" THEMES entry covers it everywhere.
         const { themePresetKey, optTheme } = themeToStorage(theme);
         await setTheme(sw, themePresetKey, optTheme);
-        if (surface === "library") await runLibraryTheme(page, extBase, theme, checks, results);
-        else await runSimpleTheme(page, `${extBase}${SURFACE_PAGES[surface]}`, theme, checks, results, surface, sw);
+        // `themes` (render-audit-checklist.mjs header) pins a layout entry to
+        // the theme states whose geometry differs; everything else runs on all.
+        const themeChecks = checks.filter((c) => !c.themes || c.themes.includes(theme));
+        if (surface === "library") await runLibraryTheme(page, extBase, theme, themeChecks, results);
+        else await runSimpleTheme(page, `${extBase}${SURFACE_PAGES[surface]}`, theme, themeChecks, results, surface, sw);
         if (MEDIA_THEME_SET.has(theme)) {
           mediaProbeCount += await runMediaPreferenceChecks(page, mediaSession, surface, theme, results);
         }

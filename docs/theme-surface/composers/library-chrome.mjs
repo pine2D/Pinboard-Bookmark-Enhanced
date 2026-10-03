@@ -55,7 +55,7 @@ const DEFAULT_LIGHT = {
                                  // (re-verified against the ΔE-pushed chip-bg above, was 14.97:1).
   // Soft Fill control fills (design-uplift 2026-08-05), moved off their
   // hand-written :root literals for the same reason options' pair was: both
-  // were #ffffff, exactly --lib-panel/--lib-pane-bg, so a frameless control
+  // were #ffffff, exactly --lib-panel (and the since-retired pane fill), so a frameless control
   // in a detail pane had nothing left to see. fillSeparate(fill, [panel,
   // bg], fg) — 1.18:1 vs panel, 1.10:1 vs --lib-bg (re-derived 2026-09-21,
   // FILL_SEPARATE_MIN 1.06 -> 1.10; was #f0f0f1 for both roles).
@@ -139,12 +139,10 @@ function emitLib(ui, palette, overrides, radius, focus = {}, mode) {
     bg: ui.bg, panel: ui.bg2,
     fg, "fg-muted": fgMuted, "fg-hint": ui["fg-hint"],
     accent: ui.accent, link, save, danger, warn,
-    border: ui.border, "border-section": ui.divider,
+    border: ui.border,
     "input-bg": ui["input-bg"], "input-border": ui.border,
     "btn-bg": ui.bg2, "btn-hover": ui["drop-hover"],
     "code-bg": ui.bg2,
-    "pane-bg": ui.bg2,
-    "pane-divider": ui.border,
     "row-selected-bg": ui["drop-hover"],
     // Not plain `fg` any more (2026-08-06 selection rebuild). --lib-row-selected-fg
     // is the label colour for BOTH row states now: "current" (--lib-row-selected-bg,

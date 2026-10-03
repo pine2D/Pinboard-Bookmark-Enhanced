@@ -706,7 +706,7 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
 
   // 2. The highlight itself, in full
   const quote = document.createElement("blockquote");
-  quote.className = "lib-quote notes-detail-quote notes-c" + _pbpNotesColorOf(hit.item);
+  quote.className = "notes-detail-quote notes-c" + _pbpNotesColorOf(hit.item);
   _pbpNotesMarkText(quote, typeof hit.item.quote === "string" ? hit.item.quote : "", q);
   frag.appendChild(quote);
 

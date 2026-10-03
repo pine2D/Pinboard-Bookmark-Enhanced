@@ -11,13 +11,10 @@
      definition it finds at each line start, so a multi-declaration line would
      hide its 2nd+ literal from that exemption and misreport as a leaked color. */
   --lib-bg: #f7f7f8;
-  /* Must equal --lib-pane-bg below (line ~59) -- kept by hand for exactly the
-     reason its neighbor --lib-border no longer is (see that comment): both
-     roles resolve to the SAME composer expression (`ui.bg2`) in every
-     generated per-theme block, but this default-state fallback predates the
-     composer and has no generated counterpart to move into. ui-contract-
-     tests.mjs pins the two equal so a future edit to one does not silently
-     drift from the other. */
+  /* Popover / list-box surface (the confirm popover now; the list boxes from
+     T6). The detail panes no longer paint it -- the page is one surface
+     (library redesign 2026-10-03 §2.1) -- so the pane-fill twin of this
+     value and its by-hand equality pin are retired. */
   --lib-panel: #ffffff;
   --lib-fg: #1a1a2e;
   --lib-fg-muted: #5f6368;
@@ -71,7 +68,6 @@
      --lib-panel (3:1, COMPONENTS.md's border-color row), emitted into the
      generated :root block at the end of @generated:ui-themes below; a
      hand-written duplicate here would just be dead weight. */
-  --lib-border-section: #e2e2e6;
   /* --lib-input-bg / --lib-input-border / --lib-btn-bg / --lib-btn-hover moved
      to the composer's DEFAULT_LIGHT block (Soft Fill, design-uplift
      2026-08-05): with the resting frame collapsed into the fill, a fill that
@@ -79,9 +75,6 @@
      were #ffffff/#eef2f9 against a #ffffff panel. Derived there by the same
      fillSeparate() the 14 themed blocks use. */
   --lib-code-bg: #f2f2f4;
-  /* Must equal --lib-panel above (line ~14) -- see that comment. */
-  --lib-pane-bg: #ffffff;
-  --lib-pane-divider: #e2e2e6;
   --lib-row-selected-bg: #eef2f9;
   --lib-row-selected-fg: #1a1a2e;
   /* Universal 5-color highlight palette (matches md-preview's .pb-hl-dot-N /
@@ -92,24 +85,6 @@
   --lib-note-c3: #60a5fa;
   --lib-note-c4: #f87171;
   --lib-note-c5: #c084fc;
-  /* Fixed-width canvas. The workbench stops widening past this and centres
-     instead; backgrounds stay full-bleed because only the INLINE PADDING of
-     .lib-header / .lib-main grows, not a wrapper's width.
-     1164px = 480 (list column cap) + 24 (--lib-sp-5 gap) + 660 (detail pane
-     cap). It is the workbench's own natural width under the 2026-08-06
-     "panel hugs its content" layout, NOT a taste number -- which is the
-     point: the canvas and the grid agree, so `justify-content: center` on
-     the workbench has nothing left to centre and the page has exactly ONE
-     centring mechanism. The predecessor value (1680) left the grid ~516px
-     narrower than the canvas it sat in, i.e. a second, nested centred box.
-     Lower it and the grid's own max width together or the double-centring
-     comes straight back. */
-  --lib-canvas-max: 1164px;
-  /* Seam strength (see .vocab-note-save::before). Equal mix percentages do
-     NOT give equal contrast on a near-white and a near-black panel, so the
-     dark themes take their own value below; both land around 1.5:1 against
-     the panel, which is the hairline register (a structural border is 3:1). */
-  --lib-seam-mix: 20%;
   /* Selected-row band mix (notes list + vocab list share this language,
      see the "TWO SIGNALS" comment near .vocab-card.selected below for how
      the render oracle's bandDistinct probe calibrated these two numbers).
@@ -167,9 +142,11 @@
   --lib-row-pad-x: var(--lib-sp-3);
   /* Stacking ladder, same semantics as options' --opt-z-*. */
   --lib-z-sticky: 5; --lib-z-menu: 10;
-  /* Measured .lib-header height (padding var(--lib-sp-3) block + its 16px line
-     content + 1px border) -- update if the header's padding or font-size changes. */
-  --lib-header-h: 55px;
+  /* Scrollbar gutter width that the list regions bleed by (spec §2.4). The
+     default is library's own ::-webkit-scrollbar width below; library.js
+     measures the real gutter at runtime and writes it inline on <html>
+     (T3c), which outranks this. */
+  --lib-sb-w: 10px;
 }
 @media (min-width: 1280px) {
   :root { --lib-page-pad: var(--lib-sp-6); }
@@ -944,27 +921,25 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
    ============================================================ */
 .notes-workbench {
   display: grid;
-  /* "The panel hugs its content" (USER RULING 2026-08-06, variant C, chosen
-     over a full-width pane -- which is permanently vetoed: the user moved
-     this page OFF full width on purpose once already).
-     fit-content(660px), not minmax(0, 1fr): a flexible track absorbs every
-     spare pixel, which is precisely what made the reading pane grow to
-     whatever the window happened to be. fit-content sizes to the content and
-     clamps at 660px, so surplus width leaves the panel alone and becomes
-     margin OUTSIDE its border -- the panel keeps one shape at 1200px and at
-     2200px. The list column goes back to a hard 480px cap for the same
-     reason (30% of a now-fixed 1164px canvas would just be 349px dressed up
-     as elasticity); its 340px floor is unchanged and still wins on narrow
-     screens.
-     justify-content: center: neither track is flexible, so below the canvas
-     cap the grid is narrower than its container and would otherwise sit
-     hard left. */
-  grid-template-columns: minmax(340px, 480px) fit-content(660px);
-  justify-content: center;
-  gap: var(--lib-sp-5);
-  align-items: start;
+  /* Index + detail on one flat page that fills the window (library redesign
+     2026-10-03 §2.3; the 2026-08-06 fixed 1164px canvas is overturned, §0.2):
+     a fixed index column L, the gap G, and a detail column that takes the
+     rest. Only the start side carries the page gutter P -- the detail pane
+     pads its own end side, so its scrollbar sits at the window edge. The one
+     row is minmax(0, 1fr): both columns get the window's height, not their
+     content's, which is what makes the list region and the detail pane scroll
+     instead of the page. Never centred, never align-items: start. */
+  grid-template-columns: var(--lib-index-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: var(--lib-gap);
+  padding-inline-start: var(--lib-page-pad);
+  flex: 1 1 auto;
+  min-height: 0;
 }
-.notes-list-pane { min-width: 0; }
+/* The index column: a header that never scrolls, then the list region, which
+   takes the rest of the height and is the only thing here that scrolls. 16
+   under it, the index's own bottom inset. */
+.notes-list-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-bottom: var(--lib-sp-4); }
 /* The toolbar now lives in a 340-480px pane instead of across the full page:
    wrap it like the vocabulary filter row rather than hold one grid line. */
 .notes-list-pane .notes-toolbar { display: flex; flex-wrap: wrap; }
@@ -1094,59 +1069,39 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 .notes-hit-note { color: var(--lib-fg-muted); }   /* upright: CJK has no true italic */
 .notes-hit-meta { display: flex; gap: var(--lib-sp-2); font-size: 11px; color: var(--lib-fg-muted); }
 
-/* Reading pane (Task 2 spec: 15px/1.65 prose, 68ch measure, controls back at
-   UI scale) -- same values as .vocab-detail-pane, see the block comment. */
+/* Reading pane (library redesign §2.3-§2.4): its own scroll container and the
+   `lib-detail` size container the T7/T8 sheets query (two longhands: the
+   ui-contract pins container-type literally). No fill, frame, radius or
+   sticky offset -- the page is one surface (§2.1). 16 of start padding with
+   an equal negative margin keeps the text axis on P + L + G while giving
+   hanging buttons, highlighter ends and focus glows room the scroller would
+   otherwise clip (§11 I11); P at the end, 96 at the bottom. Until T8's
+   .notes-sheet the content is one column that starts on that axis -- never
+   centred (§0.2). */
 .notes-detail-pane {
   min-width: 0;
-  /* Reading measure lives on the PANE as one centred column, not on each
-     child. Previously .notes-detail-quote / -note each carried their own
-     `max-width: 68ch`, so on a wide pane the prose hugged the left edge with
-     a growing empty gutter to its right, and any child that forgot the cap
-     ran the full width. One grid column caps and centres everything at once.
-     minmax(0, 66ch) so a long unbreakable token shrinks the column instead
-     of overflowing the pane's padding. 66ch, not 68: the pane's own width is
-     now derived FROM this column (see .notes-workbench's fit-content track),
-     so the measure and the panel are the same decision made once. */
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 66ch);
-  justify-content: center;
-  position: sticky; top: calc(var(--lib-header-h) + var(--lib-sp-2)); /* below the sticky .lib-header, with a visible gap */
-  /* A sticky element's pinned range is its GRID AREA -- here the row's height,
-     i.e. the taller LIST column. Uncapped, a pane longer than the viewport
-     keeps its top edge pinned while everything past the fold stays unreachable
-     until the whole list has been scrolled through. Cap it to what the sticky
-     offset actually leaves (viewport - header - the same 8px gap at the top and
-     at the bottom = --lib-sp-4) and let the pane scroll itself.
-     box-sizing: border-box so the cap counts this rule's own padding and
-     border; under the default content-box the pane would end 34px below the
-     viewport. Reset in the max-width: 860px block below, where the pane is
-     static and IS the page -- a cap there would only nest a second scroller. */
-  box-sizing: border-box;
-  max-height: calc(100vh - var(--lib-header-h) - var(--lib-sp-4));
+  grid-template-columns: minmax(0, var(--lib-main-max));
+  align-content: start;
   overflow-y: auto;
-  background: var(--lib-pane-bg);
-  border: 1px solid var(--lib-pane-divider);
-  border-radius: var(--lib-radius-lg);
-  padding: var(--lib-sp-4) var(--lib-sp-5);
+  scrollbar-gutter: stable;
+  container-type: inline-size;
+  container-name: lib-detail;
+  padding: 0 var(--lib-page-pad) var(--lib-sp-9) var(--lib-sp-4);
+  margin-inline-start: calc(-1 * var(--lib-sp-4));
   font-size: 15px;
   line-height: 1.65;
 }
 .notes-detail-empty { color: var(--lib-fg-hint); padding: var(--lib-sp-5) 0; text-align: center; }
 .notes-detail-pane .notes-meta-chip { font-size: 12px; line-height: normal; }
-/* Detail-pane primitives (COMPONENTS.md §10.2). Both panes are built from the
-   same three shapes; each used to be restated per class, with one drift
-   (.notes-detail-siblings sat at sp-5 above a pane-divider token that resolves
-   to the same colour as --lib-border-section).
-   .lib-section  a rule-topped section: one rung of air, the section divider,
-                 sp-3 under it -- the dictionary region, the sibling list and
-                 both closing rows.
-   .lib-block    a prose block in the pane's flow: sp-3 above and below.
-   .lib-quote    a quoted passage: left bar (3px, --lib-quote-bar, default
-                 --lib-border) and an sp-3 inset -- the highlight quote (bar in
-                 the highlight's colour) and the vocabulary context sentence. */
-.lib-section { margin-top: var(--lib-sp-4); padding-top: var(--lib-sp-3); border-top: 1px solid var(--lib-border-section); }
+/* Detail-pane primitives (COMPONENTS.md §10.2), two shapes:
+   .lib-section  a section of the pane's flow: one rung of air above and an
+                 sp-3 lead-in. No rule: on the flat page sections are divided
+                 by space and type, never by a line (user ruling 2026-10-03).
+   .lib-block    a prose block in the pane's flow: sp-3 above and below. */
+.lib-section { margin-top: var(--lib-sp-4); padding-top: var(--lib-sp-3); }
 .lib-block { margin: var(--lib-sp-3) 0; }
-.lib-quote { padding-left: var(--lib-sp-3); border-left: 3px solid var(--lib-quote-bar, var(--lib-border)); }
 .notes-detail-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--lib-sp-2); margin-bottom: var(--lib-sp-3); }
 /* Read as body text at rest (D4: a link-blue title over-signalled "this is
    the important thing" when its only job is attribution); underline only
@@ -1186,7 +1141,6 @@ a.notes-detail-source:focus-visible {
 }
 .notes-detail-quote {
   margin: 0;
-  --lib-quote-bar: var(--hl-color, var(--lib-note-c1)); /* .lib-quote paints its bar in the highlight's colour */
   white-space: pre-wrap;
   /* Same break policy the list side already applies to this exact quote
      (.notes-hit-text): a highlight can carry an unbreakable run -- a data
@@ -1228,17 +1182,19 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
    the media query's inline-flex can override it via cascade (same 0,1,0
    specificity, later rule wins). */
 .notes-detail-back { display: none; margin-bottom: var(--lib-sp-3); }
-/* Below the two-pane threshold the 340px minimum would push the page into
-   horizontal scroll; stack instead (and the detail pane stops being sticky,
-   since it is no longer beside anything). */
+/* Below the two-pane threshold (spec §2.6): one column, list OR detail
+   (this view's own body class), each still its own scroller -- display:none
+   and back keeps the list region's scrollTop, which is how returning to the
+   list keeps its place (render oracle: noPageScroll's narrow round trip). The
+   list pane takes the end gutter here, so the region's scrollbar bleed lands
+   inside it. */
 @media (max-width: 860px) {
-  .notes-workbench { grid-template-columns: 1fr; }
-  /* Uncapped along with it: in single-pane mode the pane IS the page, so the
-     sticky-height cap would only nest a scroller inside the page's own. */
-  .notes-detail-pane { position: static; max-height: none; overflow: visible; }
-  /* Narrow mode is list OR detail, driven by this view's own body class. */
+  .notes-workbench { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+  .notes-list-pane { margin-inline-end: var(--lib-page-pad); }
   body.lib-narrow-notes .notes-list-pane { display: none; }
   body:not(.lib-narrow-notes) .notes-detail-pane { display: none; }
+  /* Keeps a focused control clear of the back button (sm rung + 8). */
+  .notes-detail-pane { scroll-padding-top: calc(var(--lib-control-h) - 4px + var(--lib-sp-2)); }
   .notes-detail-back { display: inline-flex; }
 }
 
@@ -1269,45 +1225,37 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
 .save-status:empty { display: none; }
 .save-status.bad { color: var(--lib-danger); }
 
-/* Master (list) + detail two-pane workbench. The library page has the whole
-   window to work with, unlike options.html's single narrow panel. */
+/* Index + detail, the same grammar as .notes-workbench (see its comment). */
 .vocab-workbench {
   display: grid;
-  /* Same content-hugging pane column as .notes-workbench above; see that
-     rule's comment for why fit-content(660px) and why the grid is centred. */
-  grid-template-columns: minmax(340px, 480px) fit-content(660px);
-  justify-content: center;
-  gap: var(--lib-sp-5);
-  align-items: start;
+  grid-template-columns: var(--lib-index-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: var(--lib-gap);
+  padding-inline-start: var(--lib-page-pad);
+  flex: 1 1 auto;
+  min-height: 0;
 }
-.vocab-list-pane { min-width: 0; }
+.vocab-list-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-bottom: var(--lib-sp-4); }
 .vocab-detail-pane {
   min-width: 0;
-  /* One centred reading column; see .notes-detail-pane's comment. */
+  min-height: 0;
+  /* Same scroller / size-container / hanging-room contract as
+     .notes-detail-pane (see its comment); T7's .vocab-sheet replaces this
+     interim single column. */
   display: grid;
-  grid-template-columns: minmax(0, 66ch);
-  justify-content: center;
-  position: sticky; top: calc(var(--lib-header-h) + var(--lib-sp-2)); /* below the sticky .lib-header, with a visible gap */
-  /* Same sticky-height cap as .notes-detail-pane; see that rule's comment for
-     why the pinned range makes an uncapped pane unreachable, and why the cap
-     is reset again at <=860px. The trigger is larger on this side: a relookup
-     fills .vocab-detail-dict, which has no cap of its own. */
-  box-sizing: border-box;
-  max-height: calc(100vh - var(--lib-header-h) - var(--lib-sp-4));
+  grid-template-columns: minmax(0, var(--lib-main-max));
+  align-content: start;
   overflow-y: auto;
-  background: var(--lib-pane-bg);
-  border: 1px solid var(--lib-pane-divider);
-  border-radius: var(--lib-radius-lg);
-  padding: var(--lib-sp-4) var(--lib-sp-5);
-  /* Reading typography (Task 2): the list column is compact scan/skim scale
-     (13px/12px), the detail pane is where a definition or a context sentence
-     actually gets READ -- bump it a step above the page's 13px UI baseline
-     and open up the line-height. line-height is unitless on purpose so it
-     stays a ratio; every descendant that must stay at UI/control scale
-     (buttons, meta chips, the dictionary block below) resets its own
-     font-size AND line-height explicitly further down, since an inherited
-     unitless line-height recomputes against whatever font-size lands on
-     that element, not the 15px it was written for. */
+  scrollbar-gutter: stable;
+  container-type: inline-size;
+  container-name: lib-detail;
+  padding: 0 var(--lib-page-pad) var(--lib-sp-9) var(--lib-sp-4);
+  margin-inline-start: calc(-1 * var(--lib-sp-4));
+  /* Reading typography (Task 2): the list column is compact scan/skim scale,
+     the detail pane is where a definition or a context sentence actually gets
+     READ. line-height is unitless on purpose so it stays a ratio; every
+     descendant that must stay at UI/control scale resets its own font-size
+     AND line-height explicitly further down. */
   font-size: 15px;
   line-height: 1.65;
 }
@@ -1365,13 +1313,12 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
    load-bearing for the same reason the rule above says it is -- this and the
    media query's `inline-flex` are both (0,2,0), so the later one wins. */
 .vocab-filter-row > .vocab-lookup-narrow { display: none; }
-/* Below the two-pane threshold the 340px minimum would push the page into
-   horizontal scroll; stack instead (the detail pane also stops being sticky,
-   since it is no longer beside anything). */
+/* Below the two-pane threshold: the same single-view, two-scroller contract
+   as the notes twin above (see its comment). */
 @media (max-width: 860px) {
-  .vocab-workbench { grid-template-columns: 1fr; }
-  /* Uncapped along with it, for the reason .notes-detail-pane's twin says. */
-  .vocab-detail-pane { position: static; max-height: none; overflow: visible; }
+  .vocab-workbench { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+  .vocab-list-pane { margin-inline-end: var(--lib-page-pad); }
+  .vocab-detail-pane { scroll-padding-top: calc(var(--lib-control-h) - 4px + var(--lib-sp-2)); }
   /* Narrow mode is list OR detail, driven by a body class */
   body.lib-narrow-detail .vocab-list-pane { display: none; }
   body:not(.lib-narrow-detail) .vocab-detail-pane { display: none; }
@@ -1713,36 +1660,7 @@ html.motion-ready .vocab-note-save {
    destructive control beside it. Twice the row's own 8px gap, on top of it:
    a delete and a commit should not read as two halves of one control. */
 .vocab-detail-footer > .vocab-note-save {
-  position: relative;                 /* containing block for the seam */
   margin-left: var(--lib-sp-4);
-}
-/* The seam (user-confirmed final form). NOT a border token: --lib-border is
-   the 3:1 AA-derived STRUCTURAL edge, and a full-weight rule between two
-   buttons reads as a frame around one of them -- the rejected predecessor
-   did exactly that. COMPONENTS.md §9 law 4 already applies this to
-   .vocab-sort-seg's cell seam: a seam divides, it does not frame, so it is
-   the panel's own fill nudged toward the foreground and it re-derives per
-   theme for free.
-   Height is 60% of the sm rung's 20px box, leaving an equal 4px shoulder top
-   and bottom -- two equal shoulders read as deliberate inset, a rule that
-   reaches both edges reads as a frame. A percentage would self-derive but
-   resolves against the PADDING box, i.e. silently 54% of what the eye
-   measures, so the 12px is literal on purpose.
-   `left` is measured from the padding box and the button carries a 1px
-   border, so -13px (not -12px) is what puts equal air on both sides of the
-   line inside the 24px band.
-   `visibility` is inherited, so the [hidden] rule above carries the seam in
-   and out with the button -- a divider with nothing after it would be an
-   artefact in the rest state. */
-.vocab-detail-footer > .vocab-note-save::before {
-  content: "";
-  position: absolute;
-  left: calc((var(--lib-sp-3) + 1px) * -1);
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1px;
-  height: 12px;
-  background: color-mix(in srgb, var(--lib-fg) var(--lib-seam-mix), var(--lib-panel));
 }
 
 /* The vocab variant carries a fourth control (status filter). Flex, not a
@@ -1763,10 +1681,7 @@ html.motion-ready .vocab-note-save {
    These declarations were the mockup's number-one trap: they live on an ID
    selector, so a class-level override is silently outranked no matter how
    many classes it stacks. The fix is to delete them here, not to fight them
-   from a class -- hence this rule keeping only the seam.
-   The seam is mixed into --lib-pane-bg, not --lib-bg: this row's background
-   is the panel, and a seam is always its own surface nudged toward the
-   foreground (COMPONENTS.md §9 law 4). */
+   from a class. (Its seam went with the flat page, 2026-10-03.) */
 #vocab-lookup-bar {
   margin: 0 0 var(--lib-sp-3);
   padding-bottom: var(--lib-sp-2);
@@ -1777,7 +1692,6 @@ html.motion-ready .vocab-note-save {
      select painted over the focused input's right border + focus ring.
      sp-2 like .notes-toolbar: one button-row gap on the surface (actionRowGap). */
   gap: var(--lib-sp-2);
-  border-bottom: 1px solid color-mix(in srgb, var(--lib-fg) var(--lib-seam-mix), var(--lib-pane-bg));
 }
 .vocab-filter-toolbar input[type="search"] {
   flex: 1 1 220px;
@@ -1802,11 +1716,6 @@ html.motion-ready .vocab-note-save {
   gap: var(--lib-sp-2);
   margin-bottom: var(--lib-sp-2);
   padding-bottom: var(--lib-sp-2);
-  /* The seam. Same family and parameters as the save button's
-     (COMPONENTS.md §9 law 4: a seam divides, it does not frame), mixed into
-     the page background rather than the panel because this row sits on
-     --lib-bg. It cuts the header in two: filter this list / what this list is. */
-  border-bottom: 1px solid color-mix(in srgb, var(--lib-fg) var(--lib-seam-mix), var(--lib-bg));
 }
 .vocab-filter-row > select { flex: 1 1 auto; min-width: 0; }
 .vocab-filter-row > .vocab-stat-chip,
@@ -1940,17 +1849,6 @@ html.motion-ready .vocab-note-save {
   font-size: calc(var(--lib-text-body) - 1px);
   line-height: calc(var(--lib-control-h) - 6px);
 }
-/* The eight dark themes: 20% of a dark theme's foreground on its near-black
-   panel reads as a lit bar rather than a seam (measured on terminal, whose fg
-   is a saturated #33ff33). */
-html[data-theme="nord-night"],
-html[data-theme="terminal"],
-html[data-theme="dracula"],
-html[data-theme="flexoki-dark"],
-html[data-theme="solarized-dark"],
-html[data-theme="catppuccin-mocha"],
-html[data-theme="gruvbox-dark"],
-html[data-theme="rose-pine"] { --lib-seam-mix: 24%; }
 /* Sort segment: two fused direction-toggle cells replacing the widest select
    (#vocab-sort stays as the hidden state carrier). The pressed cell wears the
    accent; icons show the CURRENT direction, titles the sort a click applies. */
@@ -2206,10 +2104,23 @@ html[data-theme="rose-pine"] { --lib-seam-mix: 24%; }
    foreground is this context's own. */
 .lib-cluster > .btn.ghost { color: var(--lib-fg-muted); }
 .lib-cluster > .btn.ghost:hover:not(:disabled) { color: var(--lib-fg); }
-/* Sticky boundary wrapper: the bar floats only while this region is on
-   screen; past its end the bar docks and scrolls away with the list. */
+/* The list region (library redesign §2.4): the index's only scroll container,
+   under a header that never scrolls. It bleeds past its column on both sides
+   on purpose -- 4px at the start (the rows' own 4px inset band then lines up
+   with the search box) and scrollbar gutter + 4px at the end, into the gap,
+   so the row fill's right edge meets the column's right edge too. The gutter
+   is measured, not assumed: library.js writes --lib-sb-w (T3c); the fallback
+   is library's own 10px ::-webkit-scrollbar. Still the batch bar's sticky
+   boundary (it stays a direct child until T4 moves it). */
 .vocab-list-region,
-.notes-list-region { position: relative; }
+.notes-list-region {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  margin-inline: calc(-1 * var(--lib-sp-1)) calc(-1 * (var(--lib-sb-w, 10px) + var(--lib-sp-1)));
+}
 /* Batch bar: sticky DIRECT child of the region (an intermediate wrapper
    would become the containing block and cap the float range at the bar's
    own height). Dock-slot growth and bar arrival are ONE transition set --
@@ -2618,57 +2529,50 @@ html.motion-ready .notes-batch-bar.selecting {
    never reads as a blank tab. */
 .lib-header, .lib-main { visibility: hidden; }
 html[data-options-ready] .lib-header, html[data-options-ready] .lib-main { visibility: visible; }
+/* The page is the window (library redesign 2026-10-03 §2.4): html and body
+   take its height, the header keeps its own, and .lib-main / the visible
+   .lib-view hand every remaining pixel to the workbench grid. The page itself
+   never scrolls -- each tab has exactly two scroll containers, the list region
+   and the detail pane (render oracle: noPageScroll). No overflow: hidden on
+   body: a pixel too many has to show up in that gate, not be clipped. */
+html, body { height: 100%; }
+body { display: flex; flex-direction: column; }
+/* Flat header (§2.2): the title and the tabs sit on the page itself -- no
+   fill, no bottom rule, not sticky (there is nothing under it to scroll). 16
+   above, 24 below, P at both sides, 32 between the title and the tabs. */
 .lib-header {
+  flex: none;
   display: flex; flex-wrap: wrap; align-items: center;
-  gap: var(--lib-sp-1) var(--lib-sp-4);
-  padding-block: var(--lib-sp-3);
-  /* Canvas gutter, identical to .lib-main's so the header's title/tabs line
-     up with the workbench beneath. The BACKGROUND and the bottom rule still
-     run edge to edge -- only the padding grows -- so nothing about this
-     reads as a boxed-in page. Collapses back to the plain sp-5 gutter below
-     --lib-canvas-max, i.e. every viewport narrower than the cap behaves
-     exactly as before. */
-  padding-inline: max(var(--lib-sp-5), calc((100% - var(--lib-canvas-max)) / 2));
-  border-bottom: 1px solid var(--lib-border-section);
-  background: var(--lib-panel);
-  position: sticky; top: 0; z-index: 10;
+  gap: var(--lib-sp-1) var(--lib-sp-6);
+  padding: var(--lib-sp-4) var(--lib-page-pad) var(--lib-sp-5);
 }
-.lib-header h1 { font-size: 16px; margin: 0; min-width: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.lib-header h1 { font-size: 18px; line-height: 24px; font-weight: bold; margin: 0; min-width: 0; overflow-wrap: anywhere; text-wrap: balance; }
 /* Wrap the navigation as a unit instead of squeezing localized tab labels
-   into two lines inside the fixed 32px control rung. */
-.lib-tabs { display: flex; flex-wrap: wrap; gap: var(--lib-sp-1) var(--lib-sp-3); }
-/* Real tabs, not buttons wearing tab labels (USER CHECKPOINT 2026-08-05, grid
-   review: "现状是带壳按钮，不像 tab"). No shell, no fill, no radius -- a tab is
-   a label plus a selection edge. The selected edge is a 2px accent underline
-   drawn on a border that is ALWAYS 2px and merely changes colour, so
-   selecting a tab moves nothing (§9 law 1's zero-shift rule, same reason
-   every collapsed control here keeps its border-width). The underline sits
-   directly under its own label, NOT welded to .lib-header's bottom rule:
-   that rule is 12px below the tab row (the header's own block padding), and
-   reaching it would mean restructuring the header so the tab strip runs to
-   its edge -- a layout change for a decorative alignment, on a header whose
-   <h1> sibling needs that padding. Label-underline is a standard tab
-   treatment on its own (GitHub, Material both draw it this way). */
+   into two lines inside the fixed 32px tab. */
+.lib-tabs { display: flex; flex-wrap: wrap; gap: var(--lib-sp-1); }
+/* Real tabs (COMPONENTS.md §9 law 7): a label plus a selection edge, no shell.
+   32px tall at every density, 12 of inline padding so the edge spans the
+   whole tab. The edge is a 2px bottom BORDER that is always there and only
+   changes colour: the render oracle's tabChrome and forced-colours
+   selectedCue both read borders, and a box-shadow edge would be dropped by
+   forced colours and replaced by the focus glow while focused (§7.3 allows
+   one box-shadow on a focused tab: the ring). padding-top sp-0 balances it. */
 .lib-tab {
-  border: 0; border-bottom: 2px solid transparent; background: transparent;
-  color: var(--lib-fg-muted); font-size: 13px; font-family: inherit; cursor: pointer;
-  white-space: nowrap;
-  /* sp-2 block padding = the 32px tab height options' .tab-btn already has (one
-     tab family across surfaces); no inline padding so the accent underline is
-     exactly the label's width. Was 6px 2px, both off the 4-rung scale. */
-  padding: var(--lib-sp-2) 0; border-radius: 0;
-  line-height: 14px;       /* 8+14+8 + the always-2px selection edge = 32px, options' .tab-btn height exactly */
+  box-sizing: border-box;
+  display: inline-flex; align-items: center;
+  height: 32px;
+  padding: var(--lib-sp-0) var(--lib-sp-3) 0;
+  border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+  background: transparent;
+  color: var(--lib-fg-muted); font-size: 14px; line-height: 20px; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
   transition: color var(--motion-state) ease, border-bottom-color var(--motion-state) ease;
 }
 .lib-tab:hover { color: var(--lib-fg); }
-/* No font-weight change: bolding a 13px label gains ~4px of width, which
-   shoves the sibling tab sideways on every switch -- the same zero-shift rule
-   the underline itself follows. Colour + accent edge carries selection. */
-.lib-tab.active { color: var(--lib-fg); border-bottom-color: var(--lib-accent); }
-.lib-main {
-  padding-block: var(--lib-sp-4);
-  padding-inline: max(var(--lib-sp-5), calc((100% - var(--lib-canvas-max)) / 2));
-}
+/* Selected: body text, Bold, and the 2px edge in the body colour (§2.2). */
+.lib-tab.active { color: var(--lib-fg); font-weight: bold; border-bottom-color: var(--lib-fg); }
+.lib-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.lib-view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .lib-view[hidden] { display: none; }
 
 /* ---- Reduced motion ---- (`scroll-behavior` deliberately absent: the guard lives in pbpScrollIntoView, shared.js) */
@@ -2684,6 +2588,17 @@ html[data-options-ready] .lib-header, html[data-options-ready] .lib-main { visib
   .xp-skel { animation-duration: 1.2s !important; animation-iteration-count: infinite !important; }
 }
 
+/* ---- Print (library redesign §2.6): only the detail prints. Without this
+   the two scroll containers print their visible slice and nothing else. The
+   id selectors outrank the narrow-mode `body:not(.lib-narrow-*) .*-detail-pane`
+   hide, which a print page width can trigger. ---- */
+@media print {
+  html, body, .lib-main, .lib-view:not([hidden]), .vocab-workbench, .notes-workbench { height: auto; display: block; }
+  .vocab-list-region, .notes-list-region { overflow: visible; }
+  .lib-header, .vocab-list-pane, .notes-list-pane, #vocab-lookup-bar, .vocab-detail-back, .notes-detail-back,
+  #vocab-detail-pane .btn, #notes-detail-pane .btn { display: none; }
+  #vocab-detail-pane, #notes-detail-pane { display: block; overflow: visible; margin: 0; padding: 0; }
+}
 /* ---- Forced colours: the value boxes' focus edge (stage 4 §6 item 10,
    ruling R5). Forced colours drop the --lib-focus-ring glow and remap the
    generated focus border, so each value box draws a system-colour outline
@@ -2719,14 +2634,11 @@ html[data-theme="modern-card"] {
   --lib-danger: #d02e24;
   --lib-warn: #a65a00;
   --lib-border: #828282;
-  --lib-border-section: #e8e8e8;
   --lib-input-bg: #e7e7e9;
   --lib-input-border: #e7e7e9;
   --lib-btn-bg: #e7e7e9;
   --lib-btn-hover: #d5ddeb;
   --lib-code-bg: #ffffff;
-  --lib-pane-bg: #ffffff;
-  --lib-pane-divider: #e8e8e8;
   --lib-row-selected-bg: #e8f0fe;
   --lib-row-selected-fg: #1a1a2e;
   --lib-radius-sm: 4px;
@@ -2764,14 +2676,11 @@ html[data-theme="nord-night"] {
   --lib-danger: #d18d93;
   --lib-warn: #ed8100;
   --lib-border: #8d98ad;
-  --lib-border-section: #434c5e;
   --lib-input-bg: #434c5e;
   --lib-input-border: #434c5e;
   --lib-btn-bg: #424959;
   --lib-btn-hover: #3b4252;
   --lib-code-bg: #3b4252;
-  --lib-pane-bg: #3b4252;
-  --lib-pane-divider: #434c5e;
   --lib-row-selected-bg: #3b4252;
   --lib-row-selected-fg: #d8dee9;
   --lib-radius-sm: 4px;
@@ -2809,14 +2718,11 @@ html[data-theme="terminal"] {
   --lib-danger: #ff3333;
   --lib-warn: #ba6600;
   --lib-border: #267326;
-  --lib-border-section: #33ff3325;
   --lib-input-bg: #111111;
   --lib-input-border: #33ff3340;
   --lib-btn-bg: #111111;
   --lib-btn-hover: #1a3a1a;
   --lib-code-bg: #111111;
-  --lib-pane-bg: #111111;
-  --lib-pane-divider: #33ff3340;
   --lib-row-selected-bg: #1a3a1a;
   --lib-row-selected-fg: #33ff33;
   --lib-focus-bd: #33ff33;
@@ -2855,14 +2761,11 @@ html[data-theme="paper-ink"] {
   --lib-danger: #c0392b;
   --lib-warn: #a65a00;
   --lib-border: #987d4c;
-  --lib-border-section: #e8dfd0;
   --lib-input-bg: #e6e5e3;
   --lib-input-border: #e6e5e3;
   --lib-btn-bg: #eae5de;
   --lib-btn-hover: #f5f0e8;
   --lib-code-bg: #f5f0e8;
-  --lib-pane-bg: #f5f0e8;
-  --lib-pane-divider: #d4c5a9;
   --lib-row-selected-bg: #f5f0e8;
   --lib-row-selected-fg: #2c2c2c;
   --lib-focus-bd: #1a3a5c;
@@ -2901,14 +2804,11 @@ html[data-theme="dracula"] {
   --lib-danger: #ff5555;
   --lib-warn: #e37c00;
   --lib-border: #767b98;
-  --lib-border-section: #44475a;
   --lib-input-bg: #44475a;
   --lib-input-border: #44475a;
   --lib-btn-bg: #30313a;
   --lib-btn-hover: #21222c;
   --lib-code-bg: #21222c;
-  --lib-pane-bg: #21222c;
-  --lib-pane-divider: #44475a;
   --lib-row-selected-bg: #21222c;
   --lib-row-selected-fg: #f8f8f2;
   --lib-radius-sm: 2px;
@@ -2946,14 +2846,11 @@ html[data-theme="flexoki-light"] {
   --lib-danger: #af3029;
   --lib-warn: #b06000;
   --lib-border: #867f58;
-  --lib-border-section: #E6E4D9;
   --lib-input-bg: #e8e5db;
   --lib-input-border: #e8e5db;
   --lib-btn-bg: #e7e5da;
   --lib-btn-hover: #f2f0e5;
   --lib-code-bg: #F2F0E5;
-  --lib-pane-bg: #F2F0E5;
-  --lib-pane-divider: #E6E4D9;
   --lib-row-selected-bg: #F2F0E5;
   --lib-row-selected-fg: #100f0f;
   --lib-radius-sm: 3px;
@@ -2991,14 +2888,11 @@ html[data-theme="flexoki-dark"] {
   --lib-danger: #d7645a;
   --lib-warn: #cf7100;
   --lib-border: #7a7672;
-  --lib-border-section: #343331;
   --lib-input-bg: #2f2e2d;
   --lib-input-border: #2f2e2d;
   --lib-btn-bg: #2f2e2d;
   --lib-btn-hover: #363532;
   --lib-code-bg: #282726;
-  --lib-pane-bg: #282726;
-  --lib-pane-divider: #403E3C;
   --lib-row-selected-bg: #343331;
   --lib-row-selected-fg: #cecdc3;
   --lib-radius-sm: 3px;
@@ -3036,14 +2930,11 @@ html[data-theme="solarized-light"] {
   --lib-danger: #d32724;
   --lib-warn: #a65a00;
   --lib-border: #88774b;
-  --lib-border-section: #d6cdb5;
   --lib-input-bg: #e0decf;
   --lib-input-border: #e0decf;
   --lib-btn-bg: #e2decd;
   --lib-btn-hover: #eee8d5;
   --lib-code-bg: #eee8d5;
-  --lib-pane-bg: #eee8d5;
-  --lib-pane-divider: #d6cdb5;
   --lib-row-selected-bg: #eee8d5;
   --lib-row-selected-fg: #4b5e63;
   --lib-radius-sm: 2px;
@@ -3081,14 +2972,11 @@ html[data-theme="solarized-dark"] {
   --lib-danger: #e56663;
   --lib-warn: #d97600;
   --lib-border: #1191ad;
-  --lib-border-section: #094b5a;
   --lib-input-bg: #103d48;
   --lib-input-border: #103d48;
   --lib-btn-bg: #103d48;
   --lib-btn-hover: #073642;
   --lib-code-bg: #073642;
-  --lib-pane-bg: #073642;
-  --lib-pane-divider: #094b5a;
   --lib-row-selected-bg: #073642;
   --lib-row-selected-fg: #a4b1b2;
   --lib-focus-bd: #268bd2;
@@ -3127,14 +3015,11 @@ html[data-theme="catppuccin-latte"] {
   --lib-danger: #d20f39;
   --lib-warn: #a65a00;
   --lib-border: #737e9a;
-  --lib-border-section: #bcc0cc;
   --lib-input-bg: #dcdee5;
   --lib-input-border: #dcdee5;
   --lib-btn-bg: #dbdee6;
   --lib-btn-hover: #d0d4de;
   --lib-code-bg: #e6e9ef;
-  --lib-pane-bg: #e6e9ef;
-  --lib-pane-divider: #ccd0da;
   --lib-row-selected-bg: #dce0e8;
   --lib-row-selected-fg: #4c4f69;
   --lib-radius-sm: 8px;
@@ -3172,14 +3057,11 @@ html[data-theme="catppuccin-mocha"] {
   --lib-danger: #f38ba8;
   --lib-warn: #cf7100;
   --lib-border: #8386a0;
-  --lib-border-section: #45475a;
   --lib-input-bg: #262637;
   --lib-input-border: #262637;
   --lib-btn-bg: #37394b;
   --lib-btn-hover: #313244;
   --lib-code-bg: #313244;
-  --lib-pane-bg: #313244;
-  --lib-pane-divider: #45475a;
   --lib-row-selected-bg: #313244;
   --lib-row-selected-fg: #cdd6f4;
   --lib-radius-sm: 8px;
@@ -3217,14 +3099,11 @@ html[data-theme="gruvbox-dark"] {
   --lib-danger: #fb5b48;
   --lib-warn: #d97600;
   --lib-border: #958b84;
-  --lib-border-section: #504945;
   --lib-input-bg: #302f2e;
   --lib-input-border: #302f2e;
   --lib-btn-bg: #433f3b;
   --lib-btn-hover: #3c3836;
   --lib-code-bg: #3c3836;
-  --lib-pane-bg: #3c3836;
-  --lib-pane-divider: #504945;
   --lib-row-selected-bg: #3c3836;
   --lib-row-selected-fg: #ebdbb2;
   --lib-radius-sm: 2px;
@@ -3262,14 +3141,11 @@ html[data-theme="rose-pine"] {
   --lib-danger: #eb6f92;
   --lib-warn: #c46b00;
   --lib-border: #756da7;
-  --lib-border-section: #393552;
   --lib-input-bg: #27243b;
   --lib-input-border: #27243b;
   --lib-btn-bg: #272536;
   --lib-btn-hover: #2f2c43;
   --lib-code-bg: #1f1d2e;
-  --lib-pane-bg: #1f1d2e;
-  --lib-pane-divider: #26233a;
   --lib-row-selected-bg: #26233a;
   --lib-row-selected-fg: #e0def4;
   --lib-radius-sm: 4px;
@@ -3307,14 +3183,11 @@ html[data-theme="github-light"] {
   --lib-danger: #cf222e;
   --lib-warn: #a65a00;
   --lib-border: #768a9f;
-  --lib-border-section: #d0d7de;
   --lib-input-bg: #ececed;
   --lib-input-border: #ececed;
   --lib-btn-bg: #ececed;
   --lib-btn-hover: #d0e5f0;
   --lib-code-bg: #ffffff;
-  --lib-pane-bg: #ffffff;
-  --lib-pane-divider: #d0d7de;
   --lib-row-selected-bg: #ddf4ff;
   --lib-row-selected-fg: #1f2328;
   --lib-radius-sm: 3px;

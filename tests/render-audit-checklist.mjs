@@ -23,6 +23,27 @@
 // (scripts/ui-render-audit.mjs) folds theme back in:
 // "<surface>|<theme>|<selector>|<state>|<check>".
 //
+// One exception to "no theme field" (library redesign 2026-10-03, plan T3):
+// `themes: [...]` limits an entry to those THEMES values. Only for the
+// library layout states below, whose geometry a theme changes through its
+// density tier alone -- "" (default, comfortable) and "terminal" (compact)
+// cover both tiers, and 13 more passes would re-measure identical boxes.
+//
+// Library layout states (each drives its own fresh page, so the selector is
+// a label, not a query; it must not contain "-detail-"):
+//   noPageScroll      -- { widths, height, tolerancePx }: at every width x
+//                        both views x detail closed/open, the html element
+//                        fits the window and no scroll container scrolls
+//                        sideways; plus the 420px list -> detail -> back
+//                        round trip keeps the list region's scrollTop.
+//   filterScrollReset -- { inputs, viewport, probeOffset }: each named user
+//                        input puts its list region back at the top (T3c).
+//   libAxis           -- { sizes, tolerancePx, scrollbarPx }: P / L / G
+//                        geometry and the row fill against the index column,
+//                        at DPR 1 and 1.5 and after a re-measure (T3c).
+// paneFit's optional `bleed: [selector]` exempts a list region that hangs
+// out of its pane by design (its own box only, not what it contains).
+//
 // expect keys (see docs/theme-surface/COMPONENTS.md for the exact rule
 // behind each -- section references in comments below):
 //   textContrast   -- computed `color` vs the actual composited ancestor
@@ -714,10 +735,10 @@ export const CHECKS = [
       mayVanish: ["#vocab-stats"] } } },
 
   { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "paneFit",
-    expect: { paneFit: { widths: [900, 960, 1024, 1100, 1200], tolerancePx: 1,
+    expect: { paneFit: { widths: [420, 861, 1280, 1600, 2560], tolerancePx: 1, bleed: [".vocab-list-region"],
       panes: [".vocab-list-pane", "#vocab-detail-pane"] } } },
   { surface: "library", page: "library.html", selector: ".notes-list-pane", state: "paneFit",
-    expect: { paneFit: { widths: [900, 960, 1024, 1100, 1200], tolerancePx: 1,
+    expect: { paneFit: { widths: [420, 861, 1280, 1600, 2560], tolerancePx: 1, bleed: [".notes-list-region"],
       panes: [".notes-list-pane", "#notes-detail-pane"] } } },
   // Separate entry, NOT folded into the one above (debt-sweep 2026-08-07):
   // headerRowsFlush only proves "flush single line" >=860px, where the
@@ -747,8 +768,15 @@ export const CHECKS = [
   // entries apart. An identical selector here would silently collide known-
   // failures keys with the entry above.
   { surface: "library", page: "library.html", selector: ".vocab-list-pane (narrow)", state: "paneFit",
-    expect: { paneFit: { widths: [320, 360], tolerancePx: 1, resetNarrowDetail: true,
-      panes: [".vocab-list-pane"] } } },
+    expect: { paneFit: { widths: [320, 360], tolerancePx: 1, resetNarrowDetail: true, bleed: [".vocab-list-region"], panes: [".vocab-list-pane"] } } },
+  // ---- Library redesign 2026-10-03 §9.2 G1 (plan T3): the page itself never
+  // scrolls. Each tab has two scroll containers (the list region and the
+  // detail pane); at every width, in both views, with the detail closed and
+  // open, the html element fits the window and no scroll container scrolls
+  // sideways. The same state drives the narrow list -> detail -> back round
+  // trip (spec §12 T3: the list keeps its place).
+  { surface: "library", page: "library.html", selector: "html (noPageScroll)", state: "noPageScroll", themes: ["", "terminal"],
+    expect: { noPageScroll: { widths: [420, 861, 1280, 1920, 2560], height: 900, tolerancePx: 1 } } },
   // followup3's "not fused into a third cell" ruling for the narrow-screen
   // lookup door (library.css ".vocab-filter-row > .vocab-lookup-narrow")
   // never had a gate (debt-sweep 2026-08-07). 500px: comfortably inside the
