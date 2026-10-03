@@ -214,6 +214,92 @@ check(/--opt-panel-pad:\s*var\(--opt-sp-6\)/.test(optionsCss) &&
   "options.css defines --opt-panel-pad in both tiers");
 check(/(?:^|\n)\.btn:not\(\.context-help-toggle\)\s*\{[^}]*height:\s*var\(--opt-control-h\)/.test(optionsCss),
   "generated ui-components emits the options density button rung");
+// Library density tier + geometry tokens (spec 2026-10-03-library-redesign-
+// design §2.3 / §6.2, plan T1). Same two-tier shape as the options block
+// above: comfortable on the hand-written :root, compact under
+// html[data-density="compact"] (options-theme-early.js writes that attribute
+// on library.html too). Read through css-syntax's declaration maps, so a
+// comment or a same-named declaration on another selector cannot satisfy it.
+const libHandCss = stripGeneratedRegions(libraryCss);
+const libHandRoot = declarationValueMap(libHandCss, ":root");
+{
+  const libCompact = declarationValueMap(libHandCss, 'html[data-density="compact"]');
+  const LIB_DENSITY = [
+    ["--lib-control-h", "32px", "28px"],
+    ["--lib-control-pad-x", "12px", "10px"],
+    ["--lib-control-pad-x-sm", "10px", "8px"],
+    ["--lib-text-body", "14px", "13px"],
+    ["--lib-lh-body", "20px", "18px"],
+    ["--lib-text-secondary", "13px", "12px"],
+    ["--lib-lh-secondary", "18px", "16px"],
+    ["--lib-text-meta", "12px", null],
+    ["--lib-lh-meta", "16px", null],
+    ["--lib-text-row-title", "15px", "14px"],
+    ["--lib-lh-row-title", "20px", "18px"],
+    ["--lib-row-pad-y", "var(--lib-sp-2)", "var(--lib-sp-1)"],
+    ["--lib-row-pad-x", "var(--lib-sp-3)", "var(--lib-sp-2)"],
+  ];
+  for (const [name, comfortable, compact] of LIB_DENSITY) {
+    check(libHandRoot.get(name) === comfortable,
+      `library.css :root must define ${name}: ${comfortable} (comfortable tier, spec §6.2); got ${libHandRoot.get(name) ?? "nothing"}`);
+    check(compact === null ? !libCompact.has(name) : libCompact.get(name) === compact,
+      compact === null
+        ? `library.css html[data-density="compact"] must not override ${name} (one value in both tiers, spec §6.2)`
+        : `library.css html[data-density="compact"] must set ${name}: ${compact}; got ${libCompact.get(name) ?? "nothing"}`);
+  }
+
+  // Spacing scale 2..96 (ten rungs). The runner's spacingScale fallback is
+  // used only when no live --lib-sp-N resolves, so a stale fallback is
+  // invisible until the day it matters: pin it to the real :root values,
+  // and pin `names` to probe every rung :root defines.
+  const scale = [...libHandRoot]
+    .map(([property, value]) => [/^--lib-sp-(\d+)$/.exec(property), /^(\d+)px$/.exec(value)])
+    .filter(([name, px]) => name && px)
+    .map(([name, px]) => [Number(name[1]), Number(px[1])])
+    .sort((a, b) => a[0] - b[0]);
+  check(JSON.stringify(scale.map(([, px]) => px)) === JSON.stringify([2, 4, 8, 12, 16, 24, 32, 48, 64, 96]) &&
+    scale.every(([n], i) => n === i),
+  `library.css :root must define --lib-sp-0..9 = 2/4/8/12/16/24/32/48/64/96 (spec §6.2); got ${JSON.stringify(scale)}`);
+  const runnerSrc = read("scripts/ui-render-audit.mjs");
+  const spAt = runnerSrc.indexOf("  spacingScale: {");
+  const spBlock = spAt >= 0 ? runnerSrc.slice(spAt, runnerSrc.indexOf("componentInset:", spAt)) : "";
+  const namesSrc = /\n\s*names:\s*(\[[^\]]*\])/.exec(spBlock);
+  const tokensSrc = /\n\s*tokens:\s*\{[^}]*\}/.exec(spBlock);
+  const libFallbackSrc = tokensSrc && /\blibrary:\s*(\[[^\]]*\])/.exec(tokensSrc[0]);
+  const spNames = namesSrc ? JSON.parse(namesSrc[1]) : [];
+  const libFallback = libFallbackSrc ? JSON.parse(libFallbackSrc[1]) : null;
+  check(scale.length > 0 && scale.every(([n]) => spNames.includes(String(n))),
+    `scripts/ui-render-audit.mjs spacingScale.names must probe every --lib-sp-N on :root (through sp-9); got ${JSON.stringify(spNames)}`);
+  check(JSON.stringify(libFallback) === JSON.stringify(scale.map(([, px]) => px)),
+    `scripts/ui-render-audit.mjs spacingScale.tokens.library fallback must equal library.css's --lib-sp-* values; got ${JSON.stringify(libFallback)}`);
+
+  // Layout widths are theme invariants (spec §2.3 / §6.2): defined only on the
+  // hand-written :root (P and G switch by viewport through @media-scoped
+  // :root blocks), never in a generated block or on any other selector.
+  const WIDTH_TOKENS = ["--lib-hang-w", "--lib-main-max", "--lib-ref-min", "--lib-ref-max", "--lib-excerpt-max", "--lib-side-min", "--lib-side-max"];
+  const definers = (css, name) => parseStyleRules(css).filter((rule) => parseDeclarations(rule.body).some((d) => d.property === name));
+  for (const name of ["--lib-page-pad", "--lib-index-w", "--lib-gap", ...WIDTH_TOKENS]) {
+    const hand = definers(libHandCss, name);
+    const all = definers(libraryCss, name);
+    check(hand.length > 0 && hand.length === all.length && hand.every((rule) => rule.selectors.length === 1 && rule.selectors[0] === ":root"),
+      `${name} must be defined only on library.css's hand-written :root (a theme invariant, spec §6.2); found ${all.length} definition(s), ${hand.length} hand-written`);
+    if (WIDTH_TOKENS.includes(name) || name === "--lib-index-w") {
+      check(hand.length === 1 && hand[0].context.length === 0, `${name} has one value at every width: exactly one top-level :root definition`);
+    }
+  }
+  const WIDTHS = { "--lib-hang-w": "112px", "--lib-main-max": "840px", "--lib-ref-min": "360px", "--lib-ref-max": "720px",
+    "--lib-excerpt-max": "800px", "--lib-side-min": "280px", "--lib-side-max": "420px", "--lib-index-w": "clamp(360px, 20vw, 520px)" };
+  for (const [name, value] of Object.entries(WIDTHS)) {
+    check(libHandRoot.get(name) === value, `library.css :root ${name} must be ${value} (spec §2.3 / §6.2); got ${libHandRoot.get(name) ?? "nothing"}`);
+  }
+  const at1280 = declarationValueMap(libHandCss, ":root", { context: ["@media (min-width: 1280px)"] });
+  const at1920 = declarationValueMap(libHandCss, ":root", { context: ["@media (min-width: 1920px)"] });
+  check(libHandRoot.get("--lib-page-pad") === "var(--lib-sp-5)" && at1280.get("--lib-page-pad") === "var(--lib-sp-6)" &&
+    at1920.get("--lib-page-pad") === "var(--lib-sp-7)",
+  "--lib-page-pad (P) must be 24 below 1280, 32 from 1280, 48 from 1920 (spec §2.3)");
+  check(libHandRoot.get("--lib-gap") === "var(--lib-sp-7)" && !at1280.has("--lib-gap") && at1920.get("--lib-gap") === "var(--lib-sp-8)",
+    "--lib-gap (G) must be 48 below 1920 and 64 from 1920 (spec §2.3)");
+}
 {
   // Registry-driven, not enumerated: options-theme-early.js's
   // PBP_OPTIONS_DENSITY_MAP must name exactly the DATA-THEME TARGETS that

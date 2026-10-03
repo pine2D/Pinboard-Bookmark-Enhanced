@@ -5130,12 +5130,14 @@ const SWEEP_CFG = {
   spacingScale: {
     prefix: { options: "--opt-sp-", popup: "--pp-sp-", library: "--lib-sp-", "md-preview": "--sp-" },
     // sp-0 = the library/reader hairline rung (2px); "8" (Task 3, ui-system-
-    // stage0-design §2/§4) is options-only (--opt-sp-8: 32px, the stage-0
-    // section gap) -- harmless to probe on the other three surfaces since
-    // they have no --{prefix}sp-8 custom property, so the live-scale read
-    // below just comes back NaN and gets filtered out for them.
-    names: ["0", "1", "2", "3", "4", "5", "6", "7", "8"],
-    tokens: { options: [2, 4, 6, 8, 12, 16, 24, 32], popup: [2, 4, 6, 8, 12, 16, 24], library: [2, 4, 8, 12, 16, 24], "md-preview": [2, 4, 8, 12, 16, 24] },
+    // stage0-design §2/§4) is --opt-sp-8: 32px, the stage-0 section gap;
+    // library runs through "9" (sp-6..9 = 32/48/64/96, library redesign
+    // 2026-10-03 spec §6.2). Probing a name a surface does not define is
+    // harmless: the live-scale read below comes back NaN and is filtered out.
+    // tests/ui-contract-tests.mjs pins names + tokens.library to library.css's
+    // :root, so the fallback cannot drift from the live scale unnoticed.
+    names: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    tokens: { options: [2, 4, 6, 8, 12, 16, 24, 32], popup: [2, 4, 6, 8, 12, 16, 24], library: [2, 4, 8, 12, 16, 24, 32, 48, 64, 96], "md-preview": [2, 4, 8, 12, 16, 24] },
     tol: 0.5,
     hairline: 1, // <= 1px is a border/optical compensation, not a rhythm value
     margins: ["margin-top", "margin-right", "margin-bottom", "margin-left"],

@@ -35,10 +35,11 @@ const PRIMARY_HOVER_ACCENT_PCT = Math.round((1 - PRIMARY_HOVER_FG_MIX) * 100);
 // px semantics; this maps each px value to the surface token of EQUAL
 // numeric value. Never translate --sp-N *names* across surfaces — the three
 // scales don't line up rung-for-rung (popup/options are 7-step 2/4/6/8/12/
-// 16/24, library is 6-step 2/4/8/12/16/24 -- sp-0 is its hairline, added
-// 2026-09-06 when nine hand rules turned out to borrow the value). A px value
-// with no matching rung on a given surface falls back to a literal px
-// (library has no 6 rung).
+// 16/24, library is 10-step 2/4/8/12/16/24/32/48/64/96 -- sp-0 is its
+// hairline, added 2026-09-06 when nine hand rules turned out to borrow the
+// value; sp-6..9 are the layout rungs of the 2026-10-03 library redesign). A
+// px value with no matching rung on a given surface falls back to a literal
+// px (library has no 6 rung).
 export const SPACING = {
   pp: {
     2: "var(--pp-sp-1)", 4: "var(--pp-sp-2)", 6: "var(--pp-sp-3)",
@@ -50,7 +51,8 @@ export const SPACING = {
   },
   lib: {
     2: "var(--lib-sp-0)", 4: "var(--lib-sp-1)", 8: "var(--lib-sp-2)", 12: "var(--lib-sp-3)",
-    16: "var(--lib-sp-4)", 24: "var(--lib-sp-5)",
+    16: "var(--lib-sp-4)", 24: "var(--lib-sp-5)", 32: "var(--lib-sp-6)", 48: "var(--lib-sp-7)",
+    64: "var(--lib-sp-8)", 96: "var(--lib-sp-9)",
   },
 };
 export const sp = (ns, px) => SPACING[ns][px] ?? `${px}px`;

@@ -125,11 +125,77 @@
   --lib-radius-full: 9999px;
   /* Spacing tokens are a theme invariant — hand-maintained, never composed. */
   --lib-sp-0: 2px; --lib-sp-1: 4px; --lib-sp-2: 8px; --lib-sp-3: 12px; --lib-sp-4: 16px; --lib-sp-5: 24px; /* sp-0 = hairline (2026-09-06): the 2px popup/options carry as sp-1; before it nine hand rules borrowed the value as a literal. There is still no 6px rung: 6 rounds to sp-2 */
+  /* Layout rungs (library redesign 2026-10-03, spec §6.2): page padding P,
+     index/detail gap G, section and excerpt spacing, the detail pane's 96px
+     tail. Same theme-invariant rule as the six above. */
+  --lib-sp-6: 32px;
+  --lib-sp-7: 48px;
+  --lib-sp-8: 64px;
+  --lib-sp-9: 96px;
+  /* Page grid (spec §2.3): P / L / G. P and G switch by viewport in the two
+     @media :root blocks right after this rule; L is a clamp. */
+  --lib-page-pad: var(--lib-sp-5);
+  --lib-index-w: clamp(360px, 20vw, 520px);
+  --lib-gap: var(--lib-sp-7);
+  /* Detail sheet columns (spec §4.2 / §5.2): hang column, main and reference
+     column caps, excerpt cap, notes side column. */
+  --lib-hang-w: 112px;
+  --lib-main-max: 840px;
+  --lib-ref-min: 360px;
+  --lib-ref-max: 720px;
+  --lib-excerpt-max: 800px;
+  --lib-side-min: 280px;
+  --lib-side-max: 420px;
+  /* Density, comfortable tier (spec §6.2; compact overrides the subset in
+     html[data-density="compact"] below, written by options-theme-early.js
+     before this sheet loads -- same mechanism and numbers as options.css).
+     sm rung = calc(var(--lib-control-h) - 4px): 28 / 24. --lib-control-pad-x-sm
+     is the sm button's inline padding AND the optical hang of .lib-hang-start
+     / .lib-hang-end (spec §6.6). */
+  --lib-control-h: 32px;
+  --lib-control-pad-x: 12px;
+  --lib-control-pad-x-sm: 10px;
+  --lib-text-body: 14px;
+  --lib-lh-body: 20px;
+  --lib-text-secondary: 13px;
+  --lib-lh-secondary: 18px;
+  --lib-text-meta: 12px;
+  --lib-lh-meta: 16px;
+  --lib-text-row-title: 15px;
+  --lib-lh-row-title: 20px;
+  --lib-row-pad-y: var(--lib-sp-2);
+  --lib-row-pad-x: var(--lib-sp-3);
   /* Stacking ladder, same semantics as options' --opt-z-*. */
   --lib-z-sticky: 5; --lib-z-menu: 10;
   /* Measured .lib-header height (padding var(--lib-sp-3) block + its 16px line
      content + 1px border) -- update if the header's padding or font-size changes. */
   --lib-header-h: 55px;
+}
+@media (min-width: 1280px) {
+  :root { --lib-page-pad: var(--lib-sp-6); }
+}
+@media (min-width: 1920px) {
+  :root {
+    --lib-page-pad: var(--lib-sp-7);
+    --lib-gap: var(--lib-sp-8);
+  }
+}
+/* Compact density tier: terminal and gruvbox-dark (PBP_OPTIONS_DENSITY_MAP in
+   options-theme-early.js, which library.html loads before this sheet). Only
+   the UI rungs shrink; reading and display type stay the same (spec §6.1).
+   --lib-text-meta / --lib-lh-meta are one value in both tiers. */
+html[data-density="compact"] {
+  --lib-control-h: 28px;
+  --lib-control-pad-x: 10px;
+  --lib-control-pad-x-sm: 8px;
+  --lib-text-body: 13px;
+  --lib-lh-body: 18px;
+  --lib-text-secondary: 12px;
+  --lib-lh-secondary: 16px;
+  --lib-text-row-title: 14px;
+  --lib-lh-row-title: 18px;
+  --lib-row-pad-y: var(--lib-sp-1);
+  --lib-row-pad-x: var(--lib-sp-2);
 }
 
 /* ============================================================
