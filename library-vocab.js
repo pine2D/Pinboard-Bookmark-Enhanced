@@ -2149,13 +2149,17 @@ function _pbpVocabSelectAllVisible() {
   if (clear && _vocabSelected.size) { try { clear.focus({ preventScroll: true }); } catch (_) { clear.focus(); } }
 }
 const _vocabClearBtn = $id("vocab-clear-selection");
+// The batch row (with the button just pressed) hides the moment the
+// selection empties: hand focus to the count row's Select all, which comes
+// back in its place, instead of letting it fall to <body>.
+function _pbpVocabFocusCountRowSelectAll() {
+  const allBtn = $id("vocab-select-all");
+  if (allBtn) { try { allBtn.focus({ preventScroll: true }); } catch (_) { allBtn.focus(); } }
+}
 if (_vocabClearBtn) _vocabClearBtn.addEventListener("click", () => {
   _pbpVocabClearSelection();
   _pbpVocabSyncSelectionUi();
-  // The bar (with the clicked button) just hid: hand focus to the nearest
-  // persistent selection control instead of letting it fall to <body>.
-  const allBtn = $id("vocab-select-all");
-  if (allBtn) { try { allBtn.focus({ preventScroll: true }); } catch (_) { allBtn.focus(); } }
+  _pbpVocabFocusCountRowSelectAll();
 });
 const _vocabSelectAll = $id("vocab-select-all");
 if (_vocabSelectAll) _vocabSelectAll.addEventListener("click", _pbpVocabSelectAllVisible);
@@ -2166,6 +2170,8 @@ if (_vocabInvert) _vocabInvert.addEventListener("click", () => {
   _vocabSelected = pbpVocabSelectResults(_vocabSelected, _vocabViewRows, "invert");
   _vocabLastSelectedId = null;
   _pbpVocabSyncSelectionUi();
+  // Inverting "everything" empties the selection and hides this very button.
+  if (!_vocabSelected.size) _pbpVocabFocusCountRowSelectAll();
 });
 const _vocabLoadMore = $id("vocab-load-more");
 if (_vocabLoadMore) _vocabLoadMore.addEventListener("click", () => {

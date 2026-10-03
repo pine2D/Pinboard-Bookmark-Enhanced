@@ -347,6 +347,11 @@ $id("vocab-select-all").click();
 check("Select all in the count row hands focus to the batch row, not to <body>",
   document.activeElement === $id("vocab-clear-selection"),
   document.activeElement && (document.activeElement.id || document.activeElement.tagName));
+$id("vocab-invert-selection").click();
+check("inverting a full selection empties it and hands focus back to the count row's Select all, not to <body>",
+  _vocabSelected.size === 0 && getComputedStyle($id("vocab-batch-toolbar")).display === "none" &&
+  document.activeElement === $id("vocab-select-all"),
+  document.activeElement && (document.activeElement.id || document.activeElement.tagName));
 _pbpVocabClearSelection();
 _pbpVocabSyncSelectionUi();
 _vocabRows = [{ id: "row-plain", term: "plain", language: "en", status: "known", groups: ["Reading", "Close"], gloss: "g", contexts: [], updatedAt: 1 }];
@@ -386,7 +391,13 @@ check("a row keeps language and status as plain text on line one and its groups 
           if (!hit || !hit.closest(".notes-card-head")) dead.push(`${Math.round(x)},${y}:${hit ? hit.className || hit.tagName : "none"}`);
         }
       }
-      report.push({ density: density || "comfortable", pitch, pitches, dead });
+      // The delete X sits over the head's spread hit area; it must stay on top.
+      const xs = cards.map((c) => {
+        const r = c.querySelector(".row-del-x").getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return !!(hit && hit.closest(".row-del-x"));
+      });
+      report.push({ density: density || "comfortable", pitch, pitches, dead, xs });
     }
   } finally {
     delete document.documentElement.dataset.density;
@@ -395,6 +406,9 @@ check("a row keeps language and status as plain text on line one and its groups 
   check("vocabulary rows sit on a 56 / 44 pitch and the row button covers the card and the gap between rows",
     report.length === 2 && report.every((r) => r.pitches.length === sample.length - 1 && r.pitches.every((p) => p === r.pitch) && r.dead.length === 0),
     JSON.stringify(report.map((r) => ({ ...r, dead: r.dead.slice(0, 6) }))));
+  check("the row's delete X stays clickable above the row button's spread hit area",
+    report.length === 2 && report.every((r) => r.xs.length === sample.length && r.xs.every(Boolean)),
+    JSON.stringify(report.map((r) => r.xs)));
 }
 
 // Count row + status toggles (spec §3.2 / §3.5). Before the clearing check:

@@ -8778,6 +8778,14 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     /class="btn btn-sm ghost" id="vocab-batch-select-all" data-i18n="vocabSelectAll"/.test(libraryHtml) &&
     /class="btn btn-sm ghost" id="notes-batch-select-all" data-i18n="vocabSelectAll"/.test(libraryHtml),
     "library.html: the batch rows' Known / Learning text buttons (names unchanged) or their Select all are missing (spec §3.9, §11 V28)");
+  // The row head's hit area (.vocab-card .notes-card-head::before) is
+  // positioned; on touch the delete X goes back in flow and must stay
+  // positioned too, or it paints -- and hit-tests -- under that area (and its
+  // own ::before pad would resolve against the whole row).
+  const touchBlocks = [...hand.matchAll(/@media \(hover: none\) \{([\s\S]*?)\n\}/g)].map((m) => m[1]);
+  const touchX = touchBlocks.map((b) => /\.row-del-x \{([^}]*)\}/.exec(b)).find(Boolean);
+  check(!!touchX && /position:\s*relative/.test(touchX[1]) && !/position:\s*static/.test(touchX[1]),
+    "library.css: under @media (hover: none) .row-del-x must stay positioned (relative, offsets cleared), never static -- a static X sits under the row head's full-card hit area");
 }
 
 if (fail.length) {

@@ -734,9 +734,12 @@ export const CHECKS = [
   { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "headerRowsFlush",
     expect: { headerRowsFlush: { widths: [2560, 1680, 1100, 800], tolerancePx: 1, columnSel: ".vocab-list-pane",
       rows: [".vocab-filter-toolbar", ".vocab-filter-row", ".vocab-context-bar", "#vocab-batch-toolbar"],
-      // The batch row replaces the count row in place (spec §3.9): exactly
-      // one of the pair renders, and that one is measured.
-      exclusive: [[".vocab-context-bar", "#vocab-batch-toolbar"]],
+      // The batch row replaces the count row in place (spec §3.9). The pair
+      // is [rest, open]: the runner sweeps every width twice, at rest (count
+      // row must render and be flush, batch row must not render) and with a
+      // selection made through `toggle` (the other way round), so both rows
+      // are measured and neither can hide behind the other.
+      exclusive: [[".vocab-context-bar", "#vocab-batch-toolbar"]], toggle: "vocabSelection",
       mayVanish: [] } } },
 
   { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "paneFit",
@@ -904,7 +907,7 @@ export const CHECKS = [
   // gone; every remaining group chip is `.removable`, whose trailing 4px pad
   // seats the x concentric with the end cap -- so law 2 is held on the
   // leading (text) side, where the label meets the curve. ----
-  { surface: "library", page: "library.html", selector: ".vocab-detail-group-chips .vocab-group-chip", state: "default",
+  { surface: "library", page: "library.html", selector: ".vocab-detail-group-chips .vocab-group-chip.removable", state: "default",
     expect: { textContrast: 4.5, padGteRadiusH: "start", padVMin: 2 } },
   // ---- options' chip-family target (COMPONENTS.md §5.2 `selectable`). The
   // review-queue redesign (2026-09) retired .tag-gov-kind-badge -- the kind is
@@ -1154,9 +1157,10 @@ export const CHECKS = [
   // field, one sm text button, one sm icon button in the batch bar.
   { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
-  // The batch row's Select all, not the count row's: the runner opens the
-  // batch row for this whole view (Ctrl+click, needsBatchBarOpen) and the
-  // count row is `hidden` while it is up (T4d). Same .btn-sm ghost rung.
+  { surface: "library", page: "library.html", selector: "#vocab-select-all", state: "default",
+    expect: { heightPx: { comfortable: 28, compact: 24 } } },
+  // Its twin in the batch row (T4d): the runner opens the batch row for this
+  // check alone (needsBatchBarOpen), so the count-row entry above runs at rest.
   { surface: "library", page: "library.html", selector: "#vocab-batch-select-all", state: "default",
     expect: { heightPx: { comfortable: 28, compact: 24 } } },
   { surface: "library", page: "library.html", selector: "#vocab-batch-delete", state: "default",

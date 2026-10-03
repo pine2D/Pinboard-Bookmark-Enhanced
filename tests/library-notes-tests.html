@@ -564,6 +564,11 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("the batch row's Select all is disabled once every visible row is selected", $id("notes-batch-select-all").disabled === true);
   check("Select all in the count row hands focus to the batch row's Clear, not to <body>",
     document.activeElement === $id("notes-clear-selection"));
+  $id("notes-invert-selection").click();
+  check("inverting a full selection empties it and hands focus back to the count row's Select all, not to <body>",
+    _notesSelected.size === 0 && getComputedStyle($id("notes-batch-toolbar")).display === "none" &&
+    document.activeElement === $id("notes-select-all"),
+    document.activeElement && (document.activeElement.id || document.activeElement.tagName));
   $id("notes-clear-selection").click();
   check("Clear empties the selection and hides the bar",
     _notesSelected.size === 0 && !$id("notes-batch-toolbar").classList.contains("selecting") &&

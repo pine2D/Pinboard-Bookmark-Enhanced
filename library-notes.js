@@ -1379,9 +1379,8 @@ function _pbpNotesBatchDelete() {
       // A swallowed failure looks exactly like success (popover closed, rows
       // still there, no feedback). The mark still goes on the button that was
       // pressed, but it cannot be the only signal: _pbpNotesClearSelection()
-      // above just dropped `.selecting` from the batch bar, which collapses it
-      // to height 0 / visibility hidden -- that button is off the screen by
-      // the time this runs. The sentence in the list toolbar's live region is
+      // above just dropped `.selecting` from the batch row, which is then
+      // display:none -- that button is off the screen by the time this runs. The sentence in the list toolbar's live region is
       // what the user, and the screen reader, actually get.
       if (failed) {
         button.classList.add("is-error");
@@ -1491,6 +1490,9 @@ if (typeof $id === "function") {
     _notesSelected = pbpNotesSelectResults(_notesSelected, _pbpNotesVisibleHits().map((h) => h.key), "invert");
     _notesLastSelectedKey = null;
     _pbpNotesSyncSelectionUi();
+    // Inverting "everything" empties the selection and hides this very
+    // button with the batch row: same landing as Clear below.
+    if (!_notesSelected.size) _pbpNotesFocus($id("notes-select-all"));
   });
   const _notesClear = $id("notes-clear-selection");
   if (_notesClear) _notesClear.addEventListener("click", () => {

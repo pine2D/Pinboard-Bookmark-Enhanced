@@ -2071,8 +2071,8 @@ const HEADER_ROWS_SCAN = ({ rows, columnSel }) => {
   return { colW: +colW.toFixed(2), rows: out };
 };
 
-async function driveHeaderRows(page, check) {
-  const { rows, columnSel, widths, tolerancePx = 1, mayVanish = [], exclusive = [] } = check.expect.headerRowsFlush;
+async function driveHeaderRows(page, check, theme) {
+  const { rows, columnSel, widths, tolerancePx = 1, mayVanish = [], exclusive = [], toggle } = check.expect.headerRowsFlush;
   // Fail-closed (independent review F3, 2026-08-07). This used to `continue`
   // on ANY row whose computed display was none, which is a silent exemption
   // for the loudest possible defect: a header row that disappears entirely
@@ -2081,36 +2081,52 @@ async function driveHeaderRows(page, check) {
   // in the library redesign, T4b); the list stays here for rows that
   // genuinely ship hidden.
   const vanishOk = new Set(mayVanish);
-  const pairOf = new Map(exclusive.flatMap(([a, b]) => [[a, b], [b, a]]));
+  // Exclusive pairs [rest, open] (T4d review): two rows that take turns in
+  // one slot -- the count row and the batch row that replaces it. BOTH get
+  // measured: the whole width sweep runs once at rest (the first member must
+  // render, the second must not) and once with `toggle` switched on (the
+  // other way round). A hidden member is excused only in the phase where it
+  // is supposed to be hidden, so neither row can drop out of the gate by
+  // hiding behind its partner.
+  const toggles = { vocabSelection: setVocabBatchOpen };
+  if (exclusive.length && !toggles[toggle]) {
+    throw new Error(`SETUP: headerRowsFlush exclusive pairs need a known toggle (got ${JSON.stringify(toggle)})`);
+  }
+  const phases = exclusive.length ? [false, true] : [null];
   const restore = page.viewportSize();
+  const startedOpen = exclusive.length ? await page.evaluate(() => !!document.querySelector("#vocab-batch-toolbar.selecting")) : null;
   const bad = [];
   let worst = 0;
   try {
-    for (const width of widths) {
-      await page.setViewportSize({ width, height: restore ? restore.height : 900 });
-      await page.waitForTimeout(250);
-      const res = await page.evaluate(HEADER_ROWS_SCAN, { rows, columnSel });
-      if (res.error) { bad.push(`${width}px: ${res.error}`); continue; }
-      for (const row of res.rows) {
-        if (row.missing) { bad.push(`${width}px: ${row.sel} not in the DOM`); continue; }
-        if (row.hidden) {
-          const partner = pairOf.get(row.sel);
-          const partnerShown = partner && res.rows.some((r) => r.sel === partner && !r.hidden && !r.missing);
-          if (!vanishOk.has(row.sel) && !partnerShown) bad.push(`${width}px: ${row.sel} renders display:none — the whole row is gone`);
-          continue;
-        }
-        worst = Math.max(worst, Math.abs(row.widthGap), Math.abs(row.edgeGap));
-        if (Math.abs(row.widthGap) > tolerancePx) bad.push(`${width}px: ${row.sel} is ${row.widthGap}px narrower than the column`);
-        if (Math.abs(row.edgeGap) > tolerancePx) bad.push(`${width}px: ${row.sel} ends ${row.edgeGap}px short of its last control`);
+    for (const phase of phases) {
+      const tag = phase === null ? "" : phase ? " [open]" : " [rest]";
+      if (phase !== null) {
+        if (restore) await page.setViewportSize(restore);
+        await toggles[toggle](page, theme, phase);
       }
-      for (const [a, b] of exclusive) {
-        const shown = res.rows.filter((r) => (r.sel === a || r.sel === b) && !r.hidden && !r.missing).length;
-        if (shown !== 1) bad.push(`${width}px: exactly one of ${a} / ${b} must render, ${shown} do`);
+      const hiddenOk = new Set(exclusive.map(([a, b]) => (phase ? a : b)));
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: restore ? restore.height : 900 });
+        await page.waitForTimeout(250);
+        const res = await page.evaluate(HEADER_ROWS_SCAN, { rows, columnSel });
+        if (res.error) { bad.push(`${width}px${tag}: ${res.error}`); continue; }
+        for (const row of res.rows) {
+          if (row.missing) { bad.push(`${width}px${tag}: ${row.sel} not in the DOM`); continue; }
+          if (row.hidden) {
+            if (!vanishOk.has(row.sel) && !(phase !== null && hiddenOk.has(row.sel))) bad.push(`${width}px${tag}: ${row.sel} renders display:none — the whole row is gone`);
+            continue;
+          }
+          if (phase !== null && hiddenOk.has(row.sel)) bad.push(`${width}px${tag}: ${row.sel} renders although its partner holds the slot in this state`);
+          worst = Math.max(worst, Math.abs(row.widthGap), Math.abs(row.edgeGap));
+          if (Math.abs(row.widthGap) > tolerancePx) bad.push(`${width}px${tag}: ${row.sel} is ${row.widthGap}px narrower than the column`);
+          if (Math.abs(row.edgeGap) > tolerancePx) bad.push(`${width}px${tag}: ${row.sel} ends ${row.edgeGap}px short of its last control`);
+        }
       }
     }
   } finally {
     if (restore) await page.setViewportSize(restore);
     await page.waitForTimeout(250);
+    if (startedOpen !== null) await toggles[toggle](page, theme, startedOpen);
   }
   return { bad, worst: +worst.toFixed(2) };
 }
@@ -2421,7 +2437,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     await settleAnimations(page);
   }
   if (check.state === "headerRowsFlush") {
-    const { bad, worst } = await driveHeaderRows(page, check);
+    const { bad, worst } = await driveHeaderRows(page, check, theme);
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("headerRowsFlush", bad.length === 0, worst, check.expect.headerRowsFlush.tolerancePx ?? 1,
         bad.length ? bad.slice(0, 4).join("; ") : undefined) });
@@ -2836,6 +2852,33 @@ function needsBatchBarOpen(selector) { return BATCH_BAR_SELECTORS.has(selector);
 // Ctrl+clicked into the selection.
 const NOTES_BATCH_BAR_SELECTORS = new Set([".notes-batch-bar"]);
 function needsNotesBatchBarOpen(selector) { return NOTES_BATCH_BAR_SELECTORS.has(selector); }
+// Open / close the vocabulary batch row with the user's own gestures:
+// Ctrl+click a row head (the per-row checkbox went away 2026-08-06; the
+// modified click is the only way in -- it leaves the reading pane alone),
+// Clear to leave. Afterwards the pointer is parked and focus dropped, so the
+// next check starts from a neutral page either way. Throws on a missing
+// target, like every other setup opener here.
+async function setVocabBatchOpen(page, theme, open) {
+  const isOpen = () => page.evaluate(() => !!document.querySelector("#vocab-batch-toolbar.selecting"));
+  if ((await isOpen()) === open) return;
+  if (open) {
+    const head = page.locator("#vocab-list .vocab-card .notes-card-head").first();
+    if (!(await head.count())) {
+      throw new Error(`SETUP: no "#vocab-list .vocab-card .notes-card-head" to reveal .vocab-batch-bar (theme=${theme}) -- seed fixture broken or markup renamed`);
+    }
+    await head.click({ modifiers: ["Control"] });
+  } else {
+    const clear = page.locator("#vocab-clear-selection");
+    if (!(await clear.count())) {
+      throw new Error(`SETUP: no "#vocab-clear-selection" to close .vocab-batch-bar (theme=${theme}) -- markup renamed`);
+    }
+    await clear.click();
+  }
+  await page.waitForFunction((want) => !!document.querySelector("#vocab-batch-toolbar.selecting") === want, open, { timeout: TIMEOUT_MS });
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => { const a = document.activeElement; if (a && a !== document.body && typeof a.blur === "function") a.blur(); });
+  await settleAnimations(page);
+}
 // .vocab-note-save (Task 4, taste-uplift-batch2 -- COMPONENTS.md §1.2 primary
 // tier): the detail-open click above is not enough to reveal it. It starts
 // `hidden` (visibility, not display -- library.css) until the note textarea's
@@ -4337,20 +4380,15 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
       }
       await head.click(); await page.waitForTimeout(250);
     }
-    if (vocabChecks.some((c) => needsBatchBarOpen(c.selector))) {
-      // Ctrl+click the row head. The per-row checkbox was removed 2026-08-06
-      // (user ruling: the row's own fill IS the selected state), so the
-      // modified click that replaced it is the only way to open the batch
-      // bar. Same row the detail-open click above uses, exactly as the
-      // checkbox click did -- the seeded fixture has one word.
-      const head = page.locator("#vocab-list .vocab-card .notes-card-head").first();
-      if (!(await head.count())) {
-        throw new Error(`SETUP: no "#vocab-list .vocab-card .notes-card-head" to reveal .vocab-batch-bar (theme=${theme}) -- seed fixture broken or markup renamed`);
-      }
-      await head.click({ modifiers: ["Control"] });
-      await page.waitForTimeout(350);
-    }
     for (const check of vocabChecks) {
+      // The batch row, per check (T4d review): since it REPLACES the count row
+      // (that row goes `hidden` while a selection exists), opening it once for
+      // the whole view would run every other check against a header with no
+      // count row -- headerRowsFlush and #vocab-select-all would then measure
+      // nothing. So each check gets exactly the state it names: batch-row
+      // checks run selected, everything else at rest. Idempotent, and it
+      // re-asserts after driveRowStates' own reload just like needsNoteDirty.
+      await setVocabBatchOpen(page, theme, needsBatchBarOpen(check.selector));
       // .vocab-note-save cannot use the same one-shot-at-the-top pattern as
       // needsDetailOpen/needsBatchBarOpen above: `state: "rowStates"`
       // (driveRowStates) does its OWN full `page.goto()` reload partway
