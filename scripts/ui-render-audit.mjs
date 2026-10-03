@@ -799,11 +799,14 @@ function evaluateCheck(check, raw, theme) {
       out.push(verdict("bgChangedFromRest", bg.join(",") !== restBg.join(","), bg, `!= ${restBg}`));
     }
   }
-  if (exp.padGteRadiusH === true) {
+  // `true` = both inline sides; "start" = the leading side only, for a chip
+  // whose trailing end holds its own action (the removable group chip's x,
+  // concentric with the end cap). The run is LTR, so start = left.
+  if (exp.padGteRadiusH === true || exp.padGteRadiusH === "start") {
     if (hostZero) out.push(verdict("padGteRadiusH", false, null, null, zeroNote));
     else {
       const effRadius = Math.min(raw.borderRadius, raw.rect.height / 2);
-      const padH = Math.min(raw.paddingLeft, raw.paddingRight);
+      const padH = exp.padGteRadiusH === "start" ? raw.paddingLeft : Math.min(raw.paddingLeft, raw.paddingRight);
       out.push(verdict("padGteRadiusH", padH >= effRadius - 0.5, round2(padH), round2(effRadius)));
     }
   }
@@ -2069,7 +2072,7 @@ const HEADER_ROWS_SCAN = ({ rows, columnSel }) => {
 };
 
 async function driveHeaderRows(page, check) {
-  const { rows, columnSel, widths, tolerancePx = 1, mayVanish = [] } = check.expect.headerRowsFlush;
+  const { rows, columnSel, widths, tolerancePx = 1, mayVanish = [], exclusive = [] } = check.expect.headerRowsFlush;
   // Fail-closed (independent review F3, 2026-08-07). This used to `continue`
   // on ANY row whose computed display was none, which is a silent exemption
   // for the loudest possible defect: a header row that disappears entirely
@@ -2078,6 +2081,7 @@ async function driveHeaderRows(page, check) {
   // in the library redesign, T4b); the list stays here for rows that
   // genuinely ship hidden.
   const vanishOk = new Set(mayVanish);
+  const pairOf = new Map(exclusive.flatMap(([a, b]) => [[a, b], [b, a]]));
   const restore = page.viewportSize();
   const bad = [];
   let worst = 0;
@@ -2090,12 +2094,18 @@ async function driveHeaderRows(page, check) {
       for (const row of res.rows) {
         if (row.missing) { bad.push(`${width}px: ${row.sel} not in the DOM`); continue; }
         if (row.hidden) {
-          if (!vanishOk.has(row.sel)) bad.push(`${width}px: ${row.sel} renders display:none — the whole row is gone`);
+          const partner = pairOf.get(row.sel);
+          const partnerShown = partner && res.rows.some((r) => r.sel === partner && !r.hidden && !r.missing);
+          if (!vanishOk.has(row.sel) && !partnerShown) bad.push(`${width}px: ${row.sel} renders display:none — the whole row is gone`);
           continue;
         }
         worst = Math.max(worst, Math.abs(row.widthGap), Math.abs(row.edgeGap));
         if (Math.abs(row.widthGap) > tolerancePx) bad.push(`${width}px: ${row.sel} is ${row.widthGap}px narrower than the column`);
         if (Math.abs(row.edgeGap) > tolerancePx) bad.push(`${width}px: ${row.sel} ends ${row.edgeGap}px short of its last control`);
+      }
+      for (const [a, b] of exclusive) {
+        const shown = res.rows.filter((r) => (r.sel === a || r.sel === b) && !r.hidden && !r.missing).length;
+        if (shown !== 1) bad.push(`${width}px: exactly one of ${a} / ${b} must render, ${shown} do`);
       }
     }
   } finally {
@@ -2817,10 +2827,15 @@ const BATCH_BAR_SELECTORS = new Set([
   "#vocab-group-input", "#vocab-add-group", "#vocab-remove-group",
   "#vocab-invert-selection", "#vocab-mark-known", "#vocab-mark-learning",
   "#vocab-batch-delete", "#vocab-clear-selection",
+  "#vocab-batch-select-all", "#vocab-batch-toolbar",
   // §8 fused-control entries probe the shell, not the ids inside it.
   "#vocab-batch-toolbar .vocab-group-unit",
 ]);
 function needsBatchBarOpen(selector) { return BATCH_BAR_SELECTORS.has(selector); }
+// Notes twin (T4d): .notes-batch-bar is display:none until a hit is
+// Ctrl+clicked into the selection.
+const NOTES_BATCH_BAR_SELECTORS = new Set([".notes-batch-bar"]);
+function needsNotesBatchBarOpen(selector) { return NOTES_BATCH_BAR_SELECTORS.has(selector); }
 // .vocab-note-save (Task 4, taste-uplift-batch2 -- COMPONENTS.md §1.2 primary
 // tier): the detail-open click above is not enough to reveal it. It starts
 // `hidden` (visibility, not display -- library.css) until the note textarea's
@@ -4402,6 +4417,14 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
         throw new Error(`SETUP: no "#notes-list .notes-hit-btn" to open the notes detail pane (theme=${theme}) -- seed fixture broken or markup renamed`);
       }
       await hit.click(); await page.waitForTimeout(250);
+    }
+    if (notesChecks.some((c) => needsNotesBatchBarOpen(c.selector))) {
+      const hit = page.locator("#notes-list .notes-hit-btn").first();
+      if (!(await hit.count())) {
+        throw new Error(`SETUP: no "#notes-list .notes-hit-btn" to reveal .notes-batch-bar (theme=${theme}) -- seed fixture broken or markup renamed`);
+      }
+      await hit.click({ modifiers: ["Control"] });
+      await page.waitForSelector("#notes-batch-toolbar.selecting", { timeout: TIMEOUT_MS });
     }
     for (const check of notesChecks) await runOneCheck(page, theme, check, results, extBase);
   } else {

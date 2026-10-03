@@ -27,12 +27,22 @@ body.test-scroll-region .notes-list-region{max-height:60px;overflow-y:auto}
       <div class="notes-toolbar">
         <input type="search" id="notes-filter" aria-label="Filter highlights and notes" />
       </div>
-      <div id="notes-color-filters" class="notes-color-filters" role="group" aria-label="Filter highlights by color"></div>
+      <div id="notes-color-filters" class="notes-color-filters" role="group" aria-label="Filter highlights by color" hidden></div>
       <div class="lib-count-row" id="notes-context-bar">
         <span id="notes-count" class="notes-count" aria-live="polite"></span>
         <div class="lib-cluster" role="group" aria-label="Selection actions">
           <button type="button" class="btn btn-sm ghost lib-hang-end" id="notes-select-all">Select all</button>
         </div>
+      </div>
+      <div class="notes-batch-bar" id="notes-batch-toolbar" role="group" aria-label="Actions for selected highlights">
+        <span id="notes-selected-count" class="notes-count" aria-live="polite"></span>
+        <button type="button" class="btn btn-sm ghost" id="notes-batch-select-all">Select all</button>
+        <span class="lib-cluster">
+          <button type="button" class="btn btn-sm ghost" id="notes-invert-selection" aria-label="Invert selection"></button>
+          <button type="button" class="btn btn-sm danger ghost" id="notes-batch-delete" aria-label="Delete selected highlights"></button>
+          <button type="button" class="btn btn-sm ghost" id="notes-clear-selection" aria-label="Clear selection"></button>
+        </span>
+        <span class="lib-batch-status"></span>
       </div>
       <div class="notes-list-region">
         <div id="notes-list" role="grid" aria-multiselectable="true" aria-label="Saved highlights"></div>
@@ -44,12 +54,6 @@ body.test-scroll-region .notes-list-region{max-height:60px;overflow-y:auto}
           <div class="vocab-account-actions">
             <a class="btn btn-sm" id="notes-open-backup-settings" href="../options.html#general">Open backup settings</a>
           </div>
-        </div>
-        <div class="notes-batch-bar" id="notes-batch-toolbar" role="group" aria-label="Actions for selected highlights">
-          <span id="notes-selected-count" class="notes-count" aria-live="polite"></span>
-          <button type="button" class="btn btn-sm" id="notes-invert-selection" aria-label="Invert selection"></button>
-          <button type="button" class="btn btn-sm danger" id="notes-batch-delete" aria-label="Delete selected highlights"></button>
-          <button type="button" class="btn btn-sm" id="notes-clear-selection" aria-label="Clear selection"></button>
         </div>
       </div>
     </div>
@@ -140,7 +144,19 @@ const settle = async (done) => {
 const fireStorageChange = (changes, area) => { for (const fn of onChangedListeners) fn(changes, area); };
 
 (async () => {
+  // ---- colour toggles before the first count: hidden (no cold frame of six
+  // empty toggles, the vocabulary status toggles' rule), yet every colour
+  // toggle already carries its name -- an icon-only button is never nameless.
+  _pbpNotesBuildColorFilters();
+  const coldToggles = [...$id("notes-color-filters").querySelectorAll('.lib-toggle:not([data-color="all"])')];
+  check("before the first count the colour toggles are hidden yet already named",
+    $id("notes-color-filters").hidden === true && getComputedStyle($id("notes-color-filters")).display === "none" &&
+    coldToggles.length === 5 &&
+    coldToggles.every((b, i) => b.title === PBP_NOTES_COLOR_KEYS[i] && b.getAttribute("aria-label") === b.title),
+    coldToggles.map((b) => b.title + "/" + b.getAttribute("aria-label")).join(" "));
   await renderNotesPanel();
+  check("the first render with highlights shows the colour toggles",
+    $id("notes-color-filters").hidden === false && getComputedStyle($id("notes-color-filters")).display === "flex");
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   check("loading library.js into this harness never arms the page's motion gate",
     !document.documentElement.classList.contains("motion-ready"));
@@ -335,7 +351,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   toggle(3)?.click();
   check("taking out the last colour returns to All", rowKeys().split(",").length === 6 && pressed() === "all", pressed());
   for (const c of [1, 2, 3, 4, 5]) toggle(c)?.click();
-  check("pressing all five colours returns to All", pressed() === "all" && _notesActiveColors.size === 0, pressed());
+  check("pressing all five colours returns to All",
+    pressed() === "all" && _notesActiveColors.size === 0 && rowKeys().split(",").length === 6, pressed() + " | " + rowKeys());
   toggle(2)?.click();
   toggle("all")?.click();
   check("All clears a partial set", pressed() === "all" && rowKeys().split(",").length === 6, pressed());
@@ -524,6 +541,10 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     rowEl("pbp_hl_alpha#a1").getAttribute("aria-selected") === "true" &&
     $id("notes-batch-toolbar").classList.contains("selecting"));
   check("Ctrl-click leaves the reading pane where it was", _pbpNotesSelectedKey === currentBefore);
+  check("selecting hides the notes count row behind the batch row", $id("notes-context-bar").hidden === true);
+  _pbpNotesSetStatus("");
+  check("while selecting, the notes status region sits in the batch row's slot",
+    $id("notes-status")?.parentNode === $id("notes-batch-toolbar").querySelector(".lib-batch-status"));
   btnOf("pbp_hl_alpha#a3").dispatchEvent(mouse({ shiftKey: true }));
   check("Shift-click spans the interval in view order",
     _notesSelected.size === 3 && _notesSelected.has("pbp_hl_alpha#a2"));
@@ -540,6 +561,9 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("Invert flips the whole visible set", _notesSelected.size === 3 && !_notesSelected.has("pbp_hl_alpha#a1"));
   $id("notes-select-all").click();
   check("Select all takes every visible row", _notesSelected.size === rowsInOrder().length);
+  check("the batch row's Select all is disabled once every visible row is selected", $id("notes-batch-select-all").disabled === true);
+  check("Select all in the count row hands focus to the batch row's Clear, not to <body>",
+    document.activeElement === $id("notes-clear-selection"));
   $id("notes-clear-selection").click();
   check("Clear empties the selection and hides the bar",
     _notesSelected.size === 0 && !$id("notes-batch-toolbar").classList.contains("selecting") &&
@@ -706,7 +730,19 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("a highlight is open before the account switch",
     detail().hidden === false && _pbpNotesSelectedKey === "pbp_hl_beta#b1");
   _notesActiveColors = new Set([2]);
-  fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "sync");
+  // The list region goes back to the top on an account switch (spec §7.6).
+  // Counted, not just read: emptying the list would clamp scrollTop to 0 on
+  // its own, so a bare scrollTop check could not catch a missing reset.
+  document.body.classList.add("test-scroll-region");
+  const switchRegion = document.querySelector(".notes-list-region");
+  switchRegion.scrollTop = 40;
+  const switchBefore = switchRegion.scrollTop;
+  const realSwitchReset = _pbpNotesResetListScroll;
+  let switchResets = 0;
+  _pbpNotesResetListScroll = () => { switchResets++; return realSwitchReset(); };
+  try {
+    fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "sync");
+  } finally { _pbpNotesResetListScroll = realSwitchReset; }
   check("an account switch empties the reading pane at once",
     detail().hidden === true && $id("notes-detail-empty").hidden === false &&
     _pbpNotesSelectedKey === null &&
@@ -717,6 +753,10 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   await settle(() => rowKeys().includes("pbp_hl_beta#b1"));
   check("the rescan repopulates the list and leaves the reading pane closed",
     rowKeys().includes("pbp_hl_beta#b1") && detail().hidden === true, rowKeys());
+  check("an account switch puts the notes list region back at the top",
+    switchBefore === 40 && switchResets >= 1 && switchRegion.scrollTop === 0,
+    `before=${switchBefore} after=${switchRegion.scrollTop} resets=${switchResets}`);
+  document.body.classList.remove("test-scroll-region");
   check("an account switch resets the colour filter to All",
     _notesActiveColors.size === 0 &&
     $id("notes-color-filters").querySelector('.lib-toggle[data-color="all"]')?.getAttribute("aria-pressed") === "true");

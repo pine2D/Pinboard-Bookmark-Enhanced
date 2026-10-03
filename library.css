@@ -640,23 +640,24 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
 /* Keep live counts steady when filtering, selecting, or updating words. */
 .notes-count, .lib-toggle-count { font-variant-numeric: tabular-nums; }
 .vocab-list-pane.vocab-signed-out > :not(.vocab-account-empty) { display: none !important; }
-.vocab-account-empty { margin: var(--lib-sp-3); padding: var(--lib-sp-4); text-align: left; }
-.vocab-account-empty h2 { margin: 0 0 var(--lib-sp-2); color: var(--lib-fg); font-size: 15px; }
-.vocab-account-empty p { margin: 0 0 var(--lib-sp-3); line-height: 1.55; }
+/* Signed-out block and the notes storage-scope note (spec §3.11): the index
+   empty-state language -- 12px text inset (the row text's column), 8px from
+   the header, 15/20 title, 13/18 body, sm buttons, blocks 12 apart. */
+.vocab-account-empty { margin: 0; padding: var(--lib-sp-2) var(--lib-sp-3) 0; text-align: left; }
+.vocab-account-empty h2 { margin: 0 0 var(--lib-sp-3); color: var(--lib-fg); font-size: var(--lib-text-row-title); line-height: var(--lib-lh-row-title); }
+.vocab-account-empty p { margin: 0 0 var(--lib-sp-3); font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); }
 .vocab-account-actions { display: flex; align-items: center; gap: var(--lib-sp-2); flex-wrap: wrap; }
 .vocab-signed-out-lookup { display: none; }
 /* Colour toggles (spec §3.2): All + five sm .lib-toggle, 2px apart. */
 .notes-color-filters { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--lib-sp-0); min-width: 0; margin-bottom: var(--lib-sp-3); }
+/* display:flex above outranks the UA [hidden] rule. */
+.notes-color-filters[hidden] { display: none; }
 .lib-count-row > .notes-count { flex: 1 1 auto; min-width: 0; white-space: normal; }
 
 .notes-card {
-  /* Soft Fill (COMPONENTS.md §9 law 4): list rows separate by spacing and
-     fill, not by lines. The frame collapses to transparent rather than being
-     removed -- .is-error below still paints a real edge on it, and keeping
-     the 1px width means that state costs no reflow. */
-  border: 1px solid transparent;
+  /* Soft Fill (COMPONENTS.md §9 law 4): rows separate by spacing and fill,
+     never by frames; a failed action is a fill too (spec §3.10). */
   border-radius: var(--lib-radius-sm, 3px);
-  margin-bottom: var(--lib-sp-2);
   background: var(--lib-bg);
 }
 /* Deleted-card fold: library-notes.js's _pbpNotesDelete adds .card-exit only
@@ -669,10 +670,6 @@ html.motion-ready .notes-card.card-exit {
   transition: height var(--motion-collapse) var(--ease-in-out),
               margin-block var(--motion-collapse) var(--ease-in-out),
               opacity var(--motion-collapse) var(--ease-out);
-}
-.notes-card.is-error {
-  border-color: color-mix(in srgb, var(--lib-danger) 35%, var(--lib-border, #ccc));
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--lib-danger) 75%, transparent);
 }
 .notes-card-top {
   position: relative;
@@ -821,7 +818,10 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
    underneath it, and steals another 40px from an already narrow reading column
    on the single-pane layout. */
 .notes-item-quote { margin: 0; color: var(--lib-fg-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
-.notes-empty { font-size: 12px; color: var(--lib-fg-muted); padding: var(--lib-sp-3) 0; }
+.notes-empty { font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); color: var(--lib-fg-muted); padding: var(--lib-sp-2) var(--lib-sp-3) 0; }
+/* Inside a list region (which starts 4px outboard of the search box) the
+   same 12px text inset needs the rows' 4px margin first. */
+.notes-list-region > .notes-empty { margin-inline: var(--lib-sp-1); }
 
 /* Ghost X delete button (options.css's shared recipe for vocab AND notes rows;
    only the notes rows consume it here until Task 5 brings the vocab list). */
@@ -853,7 +853,11 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
   background: rgba(220, 80, 80, 0.08); /* no --lib-danger-bg token; options.css's own fallback literal */
 }
 @media (hover: none) {
-  .row-del-x { position: static; translate: none; opacity: 1; background: transparent; }
+  /* Back in flow, but still positioned (relative, offsets cleared): the
+     vocabulary row head's full-card hit area (.notes-card-head::before) is
+     positioned too, and a static X would sit under it -- and the X's own
+     ::before hit pad would resolve against the whole row. */
+  .row-del-x { position: relative; inset: auto; translate: none; opacity: 1; background: transparent; }
 }
 
 /* ============================================================
@@ -1319,10 +1323,10 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
   .vocab-filter-row > .vocab-lookup-narrow { display: inline-flex; }
   .vocab-signed-out-lookup { display: inline-flex; }
   /* The one place the nowrap law above yields (found 2026-08-07, once the
-     responsive fixture was realigned to the real markup). Four of this row's
-     five children are `flex: none` -- two count chips, the sort segment and
-     the door this very media query switches on -- so its intrinsic minimum is
-     ~413px in German. Below that the row did not just look tight, it pushed
+     responsive fixture was realigned to the real markup). Most of this row's
+     children are `flex: none` -- the filter controls (the status toggles
+     since T4b), the sort segment and the door this very media query switches
+     on -- so its intrinsic minimum was ~413px in German. Below that the row did not just look tight, it pushed
      the whole page into horizontal scroll: measured 93px of overflow at 320px
      and 53px at 360px, in every theme and most locales.
      Nowrap exists so the row can never end up narrower than the header it
@@ -2164,8 +2168,7 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
    with the search box) and scrollbar gutter + 4px at the end, into the gap,
    so the row fill's right edge meets the column's right edge too. The gutter
    is measured, not assumed: library.js writes --lib-sb-w (T3c); the fallback
-   is library's own 10px ::-webkit-scrollbar. Still the batch bar's sticky
-   boundary (it stays a direct child until T4 moves it). */
+   is library's own 10px ::-webkit-scrollbar. */
 .vocab-list-region,
 .notes-list-region {
   position: relative;
@@ -2175,75 +2178,64 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
   scrollbar-gutter: stable;
   margin-inline: calc(-1 * var(--lib-sp-1)) calc(-1 * (var(--lib-sb-w, 10px) + var(--lib-sp-1)));
 }
-/* Batch bar: sticky DIRECT child of the region (an intermediate wrapper
-   would become the containing block and cap the float range at the bar's
-   own height). Dock-slot growth and bar arrival are ONE transition set --
-   the below-sections shift only ever moves in lockstep with the bar
-   fading in, never jump-then-appear. */
+/* Batch rows (spec §3.9): while a selection exists they REPLACE the count
+   row in place (library-vocab.js / library-notes.js set the count row
+   `hidden`). Same canvas: no fill, no frame, no shadow, no float -- both are
+   canvasStructures under the flat-canvas gate. 13/18 text, 8 apart. */
 .vocab-batch-bar,
 .notes-batch-bar {
-  position: sticky;
-  bottom: 12px;
-  z-index: var(--lib-z-sticky);
+  /* flex: none -- the explicit min-height below replaces the flex item's
+     content-based minimum, so in the list pane's column (whose list region
+     takes every remaining pixel) the row would otherwise be squeezed to one
+     line and its second row painted under the list region. */
+  flex: none;
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--lib-sp-2);
-  width: fit-content;
-  max-width: 100%;
-  margin: var(--lib-sp-2) auto 0;
-  box-sizing: border-box;
-  height: 0;
-  padding: 0 var(--lib-sp-2);
-  border: 0 solid var(--lib-input-border, #cdd1d6);
-  border-radius: var(--lib-radius-lg);
-  overflow: clip;
-  background: var(--lib-panel, #fff);
-  box-shadow: 0 6px 24px color-mix(in srgb, var(--lib-fg) 18%, transparent),
-              0 2px 8px color-mix(in srgb, var(--lib-fg) 10%, transparent);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(8px);
+  min-height: calc(var(--lib-control-h) - 4px);
+  margin-bottom: var(--lib-sp-2);
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
 }
-.vocab-batch-bar.selecting,
-.notes-batch-bar.selecting {
-  height: auto;
-  padding: var(--lib-sp-2);
-  border-width: 1px;
-  opacity: 1;
-  visibility: visible;
-  transform: none;
+.vocab-batch-bar:not(.selecting),
+.notes-batch-bar:not(.selecting) { display: none; }
+/* Vocabulary: two rows at every index width (spec §3.9, §11 V8).
+   Row 1: count | Select all | (slack) | icon cluster.
+   Row 2: group unit (cols 1-3) | Known | Learning.
+   Status slot / help sentence: a full-width row 3 only while non-empty.
+   The count's track floors at 0: below ~420px of index (a single-pane
+   window narrower than Chrome lets a tab get, but the overflow sweep runs
+   320 / 360) the sentence ellipsises instead of pushing the icon cluster
+   and Learning off the page. */
+.vocab-batch-bar {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto minmax(0, 1fr) auto auto;
+  grid-template-rows: calc(var(--lib-control-h) - 4px) calc(var(--lib-control-h) - 4px);
+  gap: var(--lib-sp-2);
 }
-/* Transitions ride behind the motion-ready gate (codebase convention: no
-   load-time motion). */
-html.motion-ready .vocab-batch-bar,
-html.motion-ready .notes-batch-bar {
-  transition: height var(--motion-collapse) var(--ease-out),
-              padding var(--motion-collapse) var(--ease-out),
-              border-width var(--motion-collapse) var(--ease-out),
-              opacity var(--motion-pop-out) var(--ease-out),
-              transform var(--motion-pop-out) var(--ease-out),
-              visibility 0s var(--motion-collapse);
-}
-html.motion-ready .vocab-batch-bar.selecting,
-html.motion-ready .notes-batch-bar.selecting {
-  transition: height var(--motion-collapse) var(--ease-out),
-              padding var(--motion-collapse) var(--ease-out),
-              border-width var(--motion-collapse) var(--ease-out),
-              opacity var(--motion-pop) var(--ease-out),
-              transform var(--motion-pop) var(--ease-out),
-              visibility 0s;
-}
+#vocab-selected-count { grid-area: 1 / 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#vocab-batch-select-all { grid-area: 1 / 2; }
+.vocab-batch-bar > .lib-cluster { grid-area: 1 / 4 / 2 / 6; justify-self: end; }
+.vocab-batch-bar > .vocab-group-unit { grid-area: 2 / 1 / 3 / 4; max-width: none; }
+#vocab-mark-known { grid-area: 2 / 4; }
+#vocab-mark-learning { grid-area: 2 / 5; }
+.vocab-batch-bar > .vocab-group-help,
+.vocab-batch-bar > .lib-batch-status > .save-status { grid-column: 1 / -1; }
+/* Notes: one row -- count | Select all | (slack) | icon cluster. */
+.notes-batch-bar > .lib-cluster { margin-inline-start: auto; }
+/* The slot is only a home for the moving status node: its contents become
+   the row's own grid / flex items, and an empty status collapses away
+   (.save-status:empty). */
+.lib-batch-status { display: contents; }
+.lib-batch-status > .save-status { margin: 0; white-space: normal; font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); }
 .vocab-batch-bar .notes-count,
-.notes-batch-bar .notes-count { flex: none; font-weight: 500; color: var(--lib-fg); }
-/* Icon-only action cells (user-ratified: no labels -- width thrift + long-
-   locale safety). Names live in title/aria. Since the library density rung
-   (plan T1) the sm cell is 28 / 24 tall on its own, so the old ::before
-   hit-pads on #vocab-invert-selection, the four batch actions and the notes
-   batch bar are gone; hitAreaMin (family 4) still sweeps every icon-only
-   button. */
-.vocab-batch-bar .btn:not(.vocab-group-step),
-.notes-batch-bar .btn { padding-inline: 6px; } /* icon-only sm cell: component inset (6 + glyph + 6 + border = a square cell at the comfortable rung), not a rhythm value -- spacingScale checks a control's margins only */
+.notes-batch-bar .notes-count { flex: none; white-space: nowrap; color: var(--lib-fg); font-size: var(--lib-text-secondary); }
+.vocab-batch-bar .notes-count b,
+.notes-batch-bar .notes-count b { font-weight: bold; }
+/* Icon-only cells: 6 + glyph + 6 = a square sm cell; names in title/aria. */
+.vocab-batch-bar > .lib-cluster > .btn,
+.notes-batch-bar > .lib-cluster > .btn { padding-inline: 6px; } /* component inset, not rhythm -- spacingScale reads a control's margins only */
 .vocab-batch-bar input[type="text"] { flex: 1 1 120px; min-width: 0; }
 /* Input + stepper unit -- FUSED CONTROL (COMPONENTS.md §8). The shell owns
    the entire chrome: one border, one radius, one background, one focus ring.
@@ -2443,7 +2435,11 @@ html.motion-ready .notes-batch-bar.selecting {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.vocab-load-more { display: block; margin: var(--lib-sp-2) auto var(--lib-sp-3); }
+/* Load more (spec §3.11): ghost sm, 8 under the last row. Not .lib-hang-start:
+   the list region is a scroll container and would clip a start-side hang.
+   The row's own margin + inline padding put the label on the row-text column
+   and the button box on the row-fill edge -- the same optical result. */
+.vocab-load-more { display: block; margin: var(--lib-sp-2) 0 0 var(--lib-sp-1); padding-inline: var(--lib-row-pad-x); }
 /* Beats the component display rules above: a hidden control must stay gone. */
 #view-vocab .vocab-load-more[hidden] { display: none; }
 #view-vocab,
@@ -2461,14 +2457,8 @@ html.motion-ready .notes-batch-bar.selecting {
   gap: var(--lib-sp-1); /* the surface's own tightest rung; the old literal 6px was
     options' --opt-sp-3 borrowed across surfaces, the one 6px button-row gap the
     actionRowGap scan found on this page (2026-09-05) */
-  padding: var(--lib-sp-0) var(--lib-sp-2); /* density pass (Task 2): the hairline
-    rung, tighter than sp-1. Scoped to .vocab-card only: the shared
-    .notes-card-top base keeps sp-2 for the current Notes tab. */
+  padding: var(--lib-row-pad-y) var(--lib-row-pad-x);
 }
-/* Density pass (Task 2): the list needs >=15 rows visible at a 900px
-   viewport height; shared .notes-card's 6px margin-bottom stays as-is for
-   the Notes tab, this scoped override only tightens the vocab list. */
-.vocab-card.notes-card { margin-bottom: var(--lib-sp-1); } /* between cards: one rung above the hairline the card's own rows use */
 /* Collapsed-row rhythm (2026-08 redesign): controls anchor to the TITLE
    line instead of centering against whatever height the row happens to
    reach -- on a tall card a centered control floated mid-air. */
@@ -2487,6 +2477,17 @@ html.motion-ready .notes-batch-bar.selecting {
    eye, which is the other half of why the inset read as ~2px. */
 .vocab-card .notes-card-top { border-radius: var(--lib-radius-md); margin: var(--lib-sp-0) var(--lib-sp-1); }
 .vocab-card .notes-card-head { align-items: start; }
+/* The whole card is the row button (spec §3.6): the head's hit area spreads
+   over the row's padding and its 4px side margins, and 1px into the 2px gap
+   on each side, so no pixel between two rows is dead (the T4b geometry left
+   a 2-4px band along every card's top edge that took no click). Positioned
+   against .notes-card-top (position: relative); the delete X comes later in
+   the row and stays on top. Transparent: hit area only. */
+.vocab-card .notes-card-head::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--lib-sp-0) / -2) calc(-1 * var(--lib-sp-1));
+}
 /* The row whose word the detail pane is currently showing. Distinct from
    .selected (a batch-operation membership) -- this is "you are here".
    Drives the CHILD's --row-bg rather than painting the article: .notes-card-top
@@ -2552,23 +2553,59 @@ html.motion-ready .notes-batch-bar.selecting {
    [aria-current] rule above is not touched, its row-selected-bg fill
    already clears AA with fg-muted. */
 .vocab-card.selected .vocab-row-gloss,
-.vocab-card.selected .notes-row-meta { color: var(--lib-row-selected-fg); }
-.vocab-row-headline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--lib-sp-0) var(--lib-sp-2);
-  min-width: 0;
+.vocab-card.selected .notes-row-meta,
+.vocab-card.selected .vocab-row-groups { color: var(--lib-row-selected-fg); }
+/* A failed save / delete (spec §3.10): fill only, on the current row, above
+   every state rule here (T5 replaces these with its specificity table). */
+.vocab-card.is-error .notes-card-top,
+.vocab-card.is-error .notes-card-top:hover { --row-bg: color-mix(in srgb, var(--lib-danger) 10%, var(--lib-bg)); }
+/* Vocabulary row (spec §3.6): two fixed lines -- term 15/20 Bold + language
+   and "known" as plain 12px text on the title's baseline; gloss 13/18 left,
+   groups 12/18 right. 8 + 20 + 18 + 8 = 54 plus the 2px row gap = a 56 pitch
+   (compact 4 + 18 + 16 + 4 + 2 = 44). */
+.vocab-card .notes-card-main {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: var(--lib-lh-row-title) var(--lib-lh-secondary);
+  column-gap: var(--lib-sp-4);
+  row-gap: 0;
 }
+.vocab-row-headline {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: var(--lib-sp-2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.vocab-card .notes-row-title { font-size: var(--lib-text-row-title); line-height: var(--lib-lh-row-title); }
+.vocab-card .notes-row-meta { flex: none; flex-wrap: nowrap; gap: var(--lib-sp-2); font-size: var(--lib-text-meta); line-height: var(--lib-lh-row-title); }
 .vocab-row-gloss {
+  grid-area: 2 / 1;
   display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
   color: var(--lib-fg-muted);
 }
+/* Groups as plain text on line two's right end, never wrapping; capped at a
+   third of the index so a long group name cannot squeeze the gloss away. */
+.vocab-row-groups {
+  grid-area: 2 / 2;
+  min-width: 0;
+  max-width: calc(var(--lib-index-w) / 3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--lib-text-meta);
+  line-height: var(--lib-lh-secondary);
+  color: var(--lib-fg-muted);
+}
+.vocab-row-groups > span + span::before { content: "\00a0·\00a0"; }
 
 /* ---- Page layout ---- (body's margin/background/color live in the merged
    rule near the top of this file, next to the font-fallback-stall comment) */

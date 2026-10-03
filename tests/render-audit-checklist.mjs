@@ -62,7 +62,10 @@
 //                      target but must not expose that target as a painted
 //                      button shell in a low-emphasis state.
 //   padGteRadiusH  -- computed padding-inline (px) >= min(border-radius px,
-//                      height/2) -- pill law 2 (§5.1, §5.4 `padGteRadiusH`)
+//                      height/2) -- pill law 2 (§5.1, §5.4 `padGteRadiusH`).
+//                      `true` checks both sides; "start" checks the leading
+//                      side only, for a chip whose trailing end is its own
+//                      action button (concentric with the end cap)
 //   padVMin        -- computed padding-block (px) >= this many px --
 //                      pill law 3, applies to every chip/badge (§5.1, §5.4)
 //   heightEqWith   -- { selector, tolerancePx }: |this element's
@@ -730,9 +733,10 @@ export const CHECKS = [
   // column width cannot hide.
   { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "headerRowsFlush",
     expect: { headerRowsFlush: { widths: [2560, 1680, 1100, 800], tolerancePx: 1, columnSel: ".vocab-list-pane",
-      rows: [".vocab-filter-toolbar", ".vocab-filter-row", ".vocab-context-bar"],
-      // #vocab-stats is gone (T4b): every row must render. T4d adds the batch
-      // row as an exclusive pair with the count row.
+      rows: [".vocab-filter-toolbar", ".vocab-filter-row", ".vocab-context-bar", "#vocab-batch-toolbar"],
+      // The batch row replaces the count row in place (spec §3.9): exactly
+      // one of the pair renders, and that one is measured.
+      exclusive: [[".vocab-context-bar", "#vocab-batch-toolbar"]],
       mayVanish: [] } } },
 
   { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "paneFit",
@@ -894,9 +898,14 @@ export const CHECKS = [
     expect: { backgroundAlphaMax: 0 } },
 
   // ---- defect 3: .vocab-group-chip is `padding: 0 4px` on a `radius-full`
-  // pill -- both pill laws violated (COMPONENTS.md §5.1, §5.4). ----
-  { surface: "library", page: "library.html", selector: ".vocab-group-chip", state: "default",
-    expect: { textContrast: 4.5, padGteRadiusH: true, padVMin: 2 } },
+  // pill -- both pill laws violated (COMPONENTS.md §5.1, §5.4). (re-pointed
+  // T4d: list rows show groups as plain text now; the chip family lives on in
+  // the detail pane) The read-only list pill this row used to measure is
+  // gone; every remaining group chip is `.removable`, whose trailing 4px pad
+  // seats the x concentric with the end cap -- so law 2 is held on the
+  // leading (text) side, where the label meets the curve. ----
+  { surface: "library", page: "library.html", selector: ".vocab-detail-group-chips .vocab-group-chip", state: "default",
+    expect: { textContrast: 4.5, padGteRadiusH: "start", padVMin: 2 } },
   // ---- options' chip-family target (COMPONENTS.md §5.2 `selectable`). The
   // review-queue redesign (2026-09) retired .tag-gov-kind-badge -- the kind is
   // plain text now -- and the tags themselves became the chips. Needs the
@@ -1019,6 +1028,13 @@ export const CHECKS = [
   // stepper cells inside it can.
   { surface: "library", page: "library.html", selector: "#vocab-batch-toolbar .vocab-group-unit", state: "default",
     expect: { heightEqWith: { selector: "#vocab-invert-selection", tolerancePx: 1 } } },
+  // ---- library T4d (spec §3.9): the batch rows. Vocabulary = two rows at
+  // the sm rung + one 8px gap (64 / 56) whenever its status slot is empty;
+  // notes = one row (min-height 28 / 24).
+  { surface: "library", page: "library.html", selector: "#vocab-batch-toolbar", state: "default",
+    expect: { heightPx: { comfortable: 64, compact: 56 } } },
+  { surface: "library", page: "library.html", selector: ".notes-batch-bar", state: "default",
+    expect: { minHeightPx: { comfortable: 28, compact: 24 } } },
 
   // ---- §1.4 hitAreaMin -- design-uplift final-fix I2 migrated this from
   // two hand-enumerated entries (#vocab-invert-selection, #library-link) to
@@ -1138,7 +1154,10 @@ export const CHECKS = [
   // field, one sm text button, one sm icon button in the batch bar.
   { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
-  { surface: "library", page: "library.html", selector: "#vocab-select-all", state: "default",
+  // The batch row's Select all, not the count row's: the runner opens the
+  // batch row for this whole view (Ctrl+click, needsBatchBarOpen) and the
+  // count row is `hidden` while it is up (T4d). Same .btn-sm ghost rung.
+  { surface: "library", page: "library.html", selector: "#vocab-batch-select-all", state: "default",
     expect: { heightPx: { comfortable: 28, compact: 24 } } },
   { surface: "library", page: "library.html", selector: "#vocab-batch-delete", state: "default",
     expect: { heightPx: { comfortable: 28, compact: 24 } } },
@@ -1162,32 +1181,6 @@ export const CHECKS = [
     expect: { heightEqWith: { selector: "#vocab-lookup-go", tolerancePx: 1 } } },
   { surface: "library", page: "library.html", selector: "#vocab-lookup-lang", state: "default",
     expect: { heightEqWith: { selector: "#vocab-lookup-go", tolerancePx: 1 } } },
-
-  // ---- vocab-group-inspect-report.md 2026-08-05 Finding 8: a higher-
-  // specificity rule (.vocab-detail-head .notes-meta-chip, narrowed from
-  // .vocab-detail-pane .notes-meta-chip in this same fix) used to beat
-  // .vocab-group-chip's own line-height:14px regardless of source order
-  // whenever the group chip's selector widened enough to be caught by it --
-  // the list-row instance (.notes-row-meta, no such override anywhere near
-  // it) and the detail-pane instance would then measure different heights
-  // for what's visually "the same chip". Both instances render
-  // simultaneously in this two-pane master-detail layout for the seeded
-  // word (Render QA group), so heightEqWith can compare them directly
-  // without extra setup. Selector deliberately starts with "#vocab-list",
-  // NOT ".notes-row-meta" (the chip's real immediate wrapper, also shared
-  // by the notes view) -- libraryView()'s classifier above keys off the
-  // selector's own leading class/id to decide vocab-tab vs notes-tab, and a
-  // ".notes-"-prefixed string sends the runner to the WRONG tab even though
-  // .vocab-group-chip only ever exists in the vocab one (first version of
-  // this entry did exactly that: silent "zero-size / not found" on every
-  // theme, not a real regression -- caught before landing). Regression
-  // guard, not a currently-failing probe -- both trace to the SAME
-  // padVMin/line-height already covered by the .vocab-group-chip entry
-  // above; this entry is what would actually catch Finding 8's specific
-  // failure mode (the two instances silently drifting apart) if the
-  // narrowed selector above is ever re-widened. ----
-  { surface: "library", page: "library.html", selector: "#vocab-list .vocab-group-chip", state: "default",
-    expect: { heightEqWith: { selector: ".vocab-detail-group-chips .vocab-group-chip", tolerancePx: 1 } } },
 
   // ---- COMPONENTS.md §8: fused controls (design-uplift 2026-08-05, user
   // checkpoint round 4 -- "同类型的问题肯定不止这一处" after the group row was

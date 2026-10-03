@@ -256,8 +256,8 @@ function _pbpVocabBuildRow(w) {
   const main = document.createElement("span");
   main.className = "notes-card-main";
 
-  // Fixed two-line rhythm (2026-08 redesign): line 1 = term + chips, line 2 =
-  // the gloss clamped to ONE ellipsised line. The gloss used to live in the
+  // Fixed two-line rhythm (spec §3.6): line 1 = term + language + known as
+  // plain text, line 2 = gloss | groups. The gloss used to live in the
   // wrapping chip row, so a long AI gloss pushed the chips onto extra lines
   // and every card ended up a different height (real-device report).
   const headline = document.createElement("span");
@@ -282,12 +282,6 @@ function _pbpVocabBuildRow(w) {
     statusChip.textContent = t("vocabStatusKnown");
     meta.appendChild(statusChip);
   }
-  for (const group of pbpVocabGroups(w)) {
-    const groupChip = document.createElement("span");
-    groupChip.className = "notes-meta-chip vocab-group-chip";
-    groupChip.textContent = group;
-    meta.appendChild(groupChip);
-  }
   headline.appendChild(meta);
   main.appendChild(headline);
 
@@ -296,6 +290,19 @@ function _pbpVocabBuildRow(w) {
     glossLine.className = "vocab-row-gloss";
     glossLine.textContent = (w.gloss || "").split("\n")[0];
     main.appendChild(glossLine);
+  }
+  // Groups as plain text on line two's right end (spec §3.6); the " · "
+  // between them is CSS (.vocab-row-groups > span + span::before).
+  const groupNames = pbpVocabGroups(w);
+  if (groupNames.length) {
+    const groupsEl = document.createElement("span");
+    groupsEl.className = "vocab-row-groups";
+    for (const group of groupNames) {
+      const part = document.createElement("span");
+      part.textContent = group;
+      groupsEl.appendChild(part);
+    }
+    main.appendChild(groupsEl);
   }
 
   head.appendChild(main);
@@ -903,7 +910,7 @@ function _pbpVocabRelookup(w, host) {
 let _vocabLookupLang = "en";
 
 // One-time wiring for #vocab-lookup-bar, called once at module load from the
-// same guarded top-level section as the stats chips (bottom of this file) --
+// same guarded top-level section as the status toggles (bottom of this file) --
 // there is no per-render rebuild of this toolbar, so it only ever needs to
 // be wired once.
 function _pbpVocabWireLookupBar() {
@@ -1124,7 +1131,10 @@ function _pbpVocabStatusHost(detailReady) {
   // style read: _pbpVocabNarrowMode mirrors the 860px threshold the CSS owns.
   const listGone = _vocabStatusDetailReady && _pbpVocabNarrowMode()
     && document.body.classList.contains("lib-narrow-detail");
-  const host = (listGone && document.querySelector("#vocab-detail .vocab-detail-footer")) || bar;
+  // Tier 1 (spec §4.7): the batch row is up AND on the page -- its status slot.
+  const batch = $id("vocab-batch-toolbar");
+  const slot = !listGone && batch && batch.classList.contains("selecting") ? batch.querySelector(".lib-batch-status") : null;
+  const host = slot || (listGone && document.querySelector("#vocab-detail .vocab-detail-footer")) || bar;
   if (el.parentNode !== host) {
     // Back in the count row it sits before Select all, which hangs off the
     // row's end (spec §3.5).
@@ -1351,12 +1361,16 @@ function _pbpVocabSyncSelectionUi() {
   });
   const selectedCount = _vocabSelected.size;
   const selectedEl = $id("vocab-selected-count");
-  if (selectedEl) selectedEl.textContent = t("vocabSelectedCount", String(selectedCount));
-  // Batch bar: shown only while a selection exists; the .selecting class
-  // drives the dock-slot growth and fade as ONE transition set, so the
-  // sections below the list only ever move in lockstep with the bar.
+  if (selectedEl) pbpLibFillCount(selectedEl, pbpLibSplitCount((...a) => t("vocabSelectedCount", ...a), [String(selectedCount)]), () => "b");
+  // The batch row replaces the count row in place (spec §3.9), and the status
+  // live region follows whichever of the two is on screen (spec §4.7).
   const toolbar = $id("vocab-batch-toolbar");
   if (toolbar) toolbar.classList.toggle("selecting", selectedCount > 0);
+  const ctxBar = $id("vocab-context-bar");
+  if (ctxBar) ctxBar.hidden = selectedCount > 0;
+  _pbpVocabStatusHost();
+  const batchAll = $id("vocab-batch-select-all");
+  if (batchAll) batchAll.disabled = _vocabBatchBusy || !_vocabViewRows.length || selectedCount >= _vocabViewRows.length;
   const allBtn = $id("vocab-select-all");
   const invertBtn = $id("vocab-invert-selection");
   if (allBtn) allBtn.disabled = _vocabBatchBusy || !_vocabViewRows.length;
@@ -2059,7 +2073,7 @@ function _pbpVocabSyncFilterNarrow() {
 // applyI18n rewrites the label span from its static data-i18n key on every
 // language change; put the live reading back right after it.
 document.addEventListener("pbp:i18n-applied", _pbpVocabSyncFilterNarrow);
-// Free-lookup toolbar: one-time wiring alongside the stats chips above (see
+// Free-lookup toolbar: one-time wiring alongside the status toggles above (see
 // _pbpVocabWireLookupBar's own comment -- no per-render rebuild, so no
 // "already wired" guard is needed here either).
 _pbpVocabWireLookupBar();
@@ -2124,6 +2138,16 @@ for (const dim of PBP_VOCAB_SORT_DIMS) {
   });
 }
 _pbpVocabSyncSortSeg();
+// Select all, from either row. The count row hides the moment a selection
+// exists, taking a focused "Select all" with it -- hand focus to the batch
+// row's Clear, the control that undoes what was just done.
+function _pbpVocabSelectAllVisible() {
+  _vocabSelected = pbpVocabSelectResults(_vocabSelected, _vocabViewRows, "all");
+  _vocabLastSelectedId = null;
+  _pbpVocabSyncSelectionUi();
+  const clear = $id("vocab-clear-selection");
+  if (clear && _vocabSelected.size) { try { clear.focus({ preventScroll: true }); } catch (_) { clear.focus(); } }
+}
 const _vocabClearBtn = $id("vocab-clear-selection");
 if (_vocabClearBtn) _vocabClearBtn.addEventListener("click", () => {
   _pbpVocabClearSelection();
@@ -2134,11 +2158,9 @@ if (_vocabClearBtn) _vocabClearBtn.addEventListener("click", () => {
   if (allBtn) { try { allBtn.focus({ preventScroll: true }); } catch (_) { allBtn.focus(); } }
 });
 const _vocabSelectAll = $id("vocab-select-all");
-if (_vocabSelectAll) _vocabSelectAll.addEventListener("click", () => {
-  _vocabSelected = pbpVocabSelectResults(_vocabSelected, _vocabViewRows, "all");
-  _vocabLastSelectedId = null;
-  _pbpVocabSyncSelectionUi();
-});
+if (_vocabSelectAll) _vocabSelectAll.addEventListener("click", _pbpVocabSelectAllVisible);
+const _vocabBatchSelectAll = $id("vocab-batch-select-all");
+if (_vocabBatchSelectAll) _vocabBatchSelectAll.addEventListener("click", _pbpVocabSelectAllVisible);
 const _vocabInvert = $id("vocab-invert-selection");
 if (_vocabInvert) _vocabInvert.addEventListener("click", () => {
   _vocabSelected = pbpVocabSelectResults(_vocabSelected, _vocabViewRows, "invert");

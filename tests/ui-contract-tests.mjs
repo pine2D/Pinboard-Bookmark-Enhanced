@@ -853,12 +853,13 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
   const batchSelectedConsumers = [
     ".vocab-card.selected .vocab-row-gloss",
     ".vocab-card.selected .notes-row-meta",
+    ".vocab-card.selected .vocab-row-groups",
     ".notes-hit.selected .notes-hit-note",
     ".notes-hit.selected .notes-hit-meta",
   ];
   const missing = batchSelectedConsumers.filter((s) => !usesRowSelectedFg(s));
   check(missing.length === 0,
-    "library.css: the batch-selected (.selected) state for .vocab-row-gloss/.notes-row-meta/.notes-hit-note/.notes-hit-meta no longer reads --lib-row-selected-fg -- weak text on the batch-selection accent band (COMPONENTS.md §9.1 law 8, D6 follow-up / Ruling 17); missing: " + missing.join(", "));
+    "library.css: the batch-selected (.selected) state for .vocab-row-gloss/.notes-row-meta/.vocab-row-groups/.notes-hit-note/.notes-hit-meta no longer reads --lib-row-selected-fg -- weak text on the batch-selection accent band (COMPONENTS.md §9.1 law 8, D6 follow-up / Ruling 17); missing: " + missing.join(", "));
 }
 
 // ---- D4 (batch3 T2): the notes/vocab source links read body fg at rest,
@@ -1123,35 +1124,39 @@ check(!mdDict.includes('indexedDB.open(_PBP_VOCAB_DB_NAME'),
 check(vocabStore.includes("function _pbpVocabLocalMutation") && vocabStore.includes("tx.abort()") &&
   vocabStore.includes("tx.oncomplete") && vocabStore.includes("pbpVocabBatchAddGroup"),
   "vocab-store.js: vocabulary batch mutations are not one owner-checked atomic transaction");
-// The batch tools live in a sticky bar inside .vocab-list-region since the
-// floating-bar redesign (2026-08): the wrapper is the sticky containing
-// block, so the bar can never float over the sections below the list, and
-// the browse state reserves zero geometry above the cards. The word list
-// (and this contract) moved wholesale to the library page in Task 9 --
-// options.css/options.html no longer carry the .vocab-list-region family.
-// 2026-08-06: the notes list grew the same bar, so the recipe is a shared
-// selector list rather than a second copy -- the contract asserts BOTH names
-// reach it, and that both regions exist as sticky containing blocks.
-check(libraryCss.includes(".vocab-filter-toolbar") &&
-  /\.vocab-list-region,\s*\n\.notes-list-region \{[^}]*\bposition: relative;/.test(libraryCss) &&
-  /\.vocab-batch-bar,\s*\n\.notes-batch-bar\s*\{[\s\S]{0,500}position:\s*sticky[\s\S]{0,500}z-index:\s*var\(--lib-z-sticky\)/.test(libraryCss) &&
-  libraryCss.includes(".vocab-card .notes-card-top"),
-  "library.css: the sticky batch bar contract is missing, or the notes bar stopped sharing the vocabulary bar's recipe");
-// The batch bar must stay a DIRECT child of its region: an intermediate
-// wrapper becomes the sticky containing block and caps the float range at the
-// bar's own height. Cheap to assert, and impossible to see in a screenshot
-// until someone scrolls a long list.
-for (const [region, bar] of [["vocab-list-region", "vocab-batch-toolbar"], ["notes-list-region", "notes-batch-toolbar"]]) {
-  const start = libraryHtml.indexOf(`class="${region}"`);
-  const slice = start < 0 ? "" : libraryHtml.slice(start, libraryHtml.indexOf(`id="${bar}"`, start));
-  check(start >= 0 && (slice.match(/<div/g) || []).length === (slice.match(/<\/div>/g) || []).length + 1,
-    `library.html: #${bar} is no longer a direct child of .${region} (sticky containing block would move)`);
+// Batch rows replace the count rows in place (spec §3.9): each one is its
+// count row's NEXT element sibling in the list header -- never inside a
+// scrolling list region, never sticky. What they may paint is held by the
+// flat-canvas gate (both are canvasStructures since T4d).
+{
+  const nextSiblingIs = (html, fromId, toId) => {
+    const a = html.indexOf(`id="${fromId}"`), b = html.indexOf(`id="${toId}"`);
+    if (a < 0 || b < a) return false;
+    const re = /<(\/?)div\b[^>]*>/g;
+    re.lastIndex = a;
+    let depth = 1, m;
+    while ((m = re.exec(html)) && m.index < b) {
+      if (!m[1]) { depth++; continue; }
+      depth--;
+      if (depth === 0) return /^\s*(?:<!--[\s\S]*?-->\s*)*<div\b[^>]*$/.test(html.slice(re.lastIndex, b));
+    }
+    return false;
+  };
+  for (const [ctx, bar] of [["vocab-context-bar", "vocab-batch-toolbar"], ["notes-context-bar", "notes-batch-toolbar"]]) {
+    check(nextSiblingIs(libraryHtml, ctx, bar),
+      `library.html: #${bar} is not #${ctx}'s next sibling -- the batch row replaces the count row in place (spec §3.9)`);
+  }
+  const batchHand = stripGeneratedRegions(libraryCss);
+  check(!/\.(?:vocab|notes)-batch-bar[^{}]*\{[^}]*position:\s*sticky/.test(batchHand) &&
+    /\.vocab-batch-bar:not\(\.selecting\),\s*\n\.notes-batch-bar:not\(\.selecting\) \{ display: none; \}/.test(batchHand) &&
+    /\.vocab-batch-bar \{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*calc\(var\(--lib-control-h\) - 4px\) calc\(var\(--lib-control-h\) - 4px\)/.test(batchHand) &&
+    /\.lib-batch-status \{ display: contents; \}/.test(batchHand),
+    "library.css: the batch rows must be display:none at rest, never sticky, the vocabulary one a two-row grid at the sm rung, with a contents-only status slot (spec §3.9)");
+  check(libraryCss.includes(".vocab-card .notes-card-top") &&
+    libraryHtml.indexOf('id="vocab-list"') < libraryHtml.indexOf('id="vocab-load-more"') &&
+    libraryHtml.indexOf('id="vocab-batch-toolbar"') < libraryHtml.indexOf('class="vocab-list-region"'),
+    "library.html: Load more must follow the list inside its region, and the batch row must sit in the header above the region");
 }
-check(libraryHtml.indexOf('class="vocab-list-region"') > 0 &&
-  libraryHtml.indexOf('class="vocab-list-region"') < libraryHtml.indexOf('id="vocab-list"') &&
-  libraryHtml.indexOf('id="vocab-load-more"') < libraryHtml.indexOf('id="vocab-batch-toolbar"') &&
-  /<div class="vocab-batch-bar" id="vocab-batch-toolbar"/.test(libraryHtml),
-  "library.html: batch bar is not a sticky-region child after the load-more control");
 check(/#view-vocab\s+\.vocab-load-more\[hidden\][\s\S]{0,80}display:\s*none/.test(libraryCss),
   "library.css: vocabulary hidden controls can be redisplayed by component display rules");
 check(libraryVocabJs.includes('t("vocabLoading")') &&
@@ -2335,9 +2340,9 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
   // the chips ever mutated their own state directly instead, filtering and
   // the URL of that state would fork.
   check(/id="vocab-status-filter"[^>]*\shidden/.test(libraryHtml),
-    "library.html: #vocab-status-filter lost its `hidden` attribute — the status chips replaced it in the UI, it may not come back as a second visible control");
+    "library.html: #vocab-status-filter lost its `hidden` attribute — the status toggles replaced it in the UI, it may not come back as a second visible control");
   check(/const target = chip\.dataset\.status;\s*\n\s*filter\.value = filter\.value === target \? "" : target;\s*\n\s*filter\.dispatchEvent\(new Event\("change"\)\);/.test(libraryVocabJs),
-    "library-vocab.js: the status chips stopped writing #vocab-status-filter + dispatching change — they must drive the existing filter pipeline, not a parallel one");
+    "library-vocab.js: the status toggles stopped writing #vocab-status-filter + dispatching change — they must drive the existing filter pipeline, not a parallel one");
   const chipHand = stripGeneratedRegions(libraryCss);
   // The three status toggles are the .lib-toggle primitive (spec §3.2): no
   // frame, transparent + fg-muted at rest, btn-bg + btn-fg + Bold when pressed.
@@ -8756,6 +8761,23 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     /\.notes-hit-dot \{[^}]*width:\s*10px;[^}]*height:\s*10px;[^}]*border-radius:\s*var\(--lib-radius-full\)/.test(hand) &&
     /@media \(forced-colors: active\) \{\s*\.notes-hit-dot \{ forced-color-adjust: none; box-shadow: 0 0 0 1px CanvasText; \}/.test(hand),
     "library.css: the notes row must lead with a 10px radius-full dot that keeps its colour under forced colours (spec §3.7 / §7.3)");
+}
+
+// ---- library redesign T4d (spec §3.6 / §3.9 / §3.10): rows and batch rows. ----
+{
+  const hand = stripGeneratedRegions(libraryCss);
+  check(/\.vocab-card \.notes-card-main \{[^}]*grid-template-rows:\s*var\(--lib-lh-row-title\) var\(--lib-lh-secondary\)/.test(hand) &&
+    /\.vocab-card \.notes-card-top \{[^}]*padding:\s*var\(--lib-row-pad-y\) var\(--lib-row-pad-x\)/.test(hand) &&
+    !/\.notes-card \{[^}]*border:/.test(hand) && !/\.vocab-card\.notes-card \{[^}]*margin-bottom/.test(hand),
+    "library.css: the vocabulary row is not the two-line 8/12 grid of spec §3.6 (pitch 56 / 44), or the card frame / margin came back");
+  check(!/\.notes-card\.is-error \{[^}]*(?:border-color|box-shadow)/.test(hand) &&
+    /\.vocab-card\.is-error \.notes-card-top[^{]*\{ --row-bg: color-mix\(in srgb, var\(--lib-danger\) 10%, var\(--lib-bg\)\); \}/.test(hand),
+    "library.css: a failed save / delete marks the row by fill only (spec §3.10) -- no inset bar, no border colour");
+  check(/id="vocab-mark-known"[^>]*data-i18n="vocabStatusKnown"[^>]*data-i18n-title="vocabMarkKnown"[^>]*data-i18n-aria="vocabMarkKnown"/.test(libraryHtml) &&
+    /id="vocab-mark-learning"[^>]*data-i18n="vocabStatusLearning"[^>]*data-i18n-title="vocabMarkLearning"[^>]*data-i18n-aria="vocabMarkLearning"/.test(libraryHtml) &&
+    /class="btn btn-sm ghost" id="vocab-batch-select-all" data-i18n="vocabSelectAll"/.test(libraryHtml) &&
+    /class="btn btn-sm ghost" id="notes-batch-select-all" data-i18n="vocabSelectAll"/.test(libraryHtml),
+    "library.html: the batch rows' Known / Learning text buttons (names unchanged) or their Select all are missing (spec §3.9, §11 V28)");
 }
 
 if (fail.length) {

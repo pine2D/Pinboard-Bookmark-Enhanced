@@ -261,6 +261,7 @@
         "btn-ic",
         "btn-sm",
         "chip-remove",
+        "lib-batch-status",
         "lib-count-full",
         "lib-count-item",
         "lib-count-items",
@@ -296,6 +297,7 @@
         "vocab-load-more",
         "vocab-note-input",
         "vocab-note-save",
+        "vocab-row-groups",
         "vocab-row-headline",
         "vocab-sort-btn",
         "vocab-sort-seg",
@@ -316,7 +318,9 @@
         "vocab-detail-pane",
         "notes-detail-pane",
         "lib-section",
-        "lib-block"
+        "lib-block",
+        "vocab-batch-bar",
+        "notes-batch-bar"
       ]
     },
     "listbox": {

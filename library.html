@@ -103,11 +103,36 @@
           <button type="button" class="btn btn-sm ghost lib-hang-end" id="vocab-select-all" data-i18n="vocabSelectAll" data-i18n-title="vocabSelectHint" title="Ctrl-click a row to add it to the selection, Shift-click for a range">Select all</button>
         </div>
       </div>
+      <!-- Batch row (spec §3.9): while a selection exists it REPLACES the count
+           row right above (that row goes `hidden`); same canvas, no float, no
+           frame. Two rows at every index width: count + Select all + icon
+           cluster / group unit + Known + Learning; the status slot is a third
+           row only while it has a sentence. -->
+      <div class="vocab-batch-bar" id="vocab-batch-toolbar" role="group" data-i18n-aria="vocabBatchActions" aria-label="Actions for selected words">
+        <span id="vocab-selected-count" class="notes-count" aria-live="polite"></span>
+        <button type="button" class="btn btn-sm ghost" id="vocab-batch-select-all" data-i18n="vocabSelectAll">Select all</button>
+        <span class="lib-cluster">
+          <button type="button" class="btn btn-sm ghost" id="vocab-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
+          <button type="button" class="btn btn-sm danger ghost" id="vocab-batch-delete" data-i18n-title="vocabBatchDelete" data-i18n-aria="vocabBatchDelete" aria-label="Delete selected" title="Delete selected"><span class="btn-ic" data-ic="trash"></span></button>
+          <button type="button" class="btn btn-sm ghost vocab-clear-selection" id="vocab-clear-selection" data-i18n-title="vocabClearSelection" data-i18n-aria="vocabClearSelection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
+        </span>
+        <!-- Input + stepper unit (icon audit P0): +/- are icon-only because the
+             Group-name placeholder disambiguates them; full labels stay in
+             title/aria (remove's title is JS-owned, see _pbpVocabSyncSelectionUi). -->
+        <span class="vocab-group-unit">
+          <input type="text" id="vocab-group-input" list="vocab-group-list" placeholder="Group name" data-i18n-placeholder="vocabGroupNamePlaceholder" data-i18n-aria="vocabGroupNamePlaceholder" aria-label="Group name" autocomplete="off" />
+          <datalist id="vocab-group-list"></datalist>
+          <button type="button" class="btn btn-sm vocab-group-step" id="vocab-add-group" data-i18n-title="vocabAddToGroup" data-i18n-aria="vocabAddToGroup"><span class="btn-ic" data-ic="plus"></span></button>
+          <button type="button" class="btn btn-sm vocab-group-step" id="vocab-remove-group" data-i18n-aria="vocabRemoveFromGroup"><span class="btn-ic" data-ic="minus"></span></button>
+        </span>
+        <!-- Text buttons now (spec §3.9); the full action stays the name. -->
+        <button type="button" class="btn btn-sm" id="vocab-mark-known" data-i18n="vocabStatusKnown" data-i18n-title="vocabMarkKnown" data-i18n-aria="vocabMarkKnown" aria-label="Mark as known" title="Mark as known">Known</button>
+        <button type="button" class="btn btn-sm" id="vocab-mark-learning" data-i18n="vocabStatusLearning" data-i18n-title="vocabMarkLearning" data-i18n-aria="vocabMarkLearning" aria-label="Back to learning" title="Back to learning">Learning</button>
+        <span class="lib-batch-status"></span>
+      </div>
       <div id="vocab-empty" class="notes-empty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
       <div id="vocab-no-results" class="notes-empty" data-i18n="vocabNoResults" hidden>No words match the current filters.</div>
-      <!-- Sticky boundary: the batch bar floats ONLY within this wrapper.
-           The bar MUST stay a direct child -- any intermediate wrapper
-           becomes its containing block and kills the float range. -->
+      <!-- The list's own scroll container (spec §2.4); the header rows above it never scroll. -->
       <div class="vocab-list-region">
         <!-- role=grid, not list: rows are multi-selectable and carry
              aria-selected, which ARIA only supports on grid/listbox
@@ -115,30 +140,7 @@
              grid is the one valid shape for "rows with controls, many
              selectable at once". -->
         <div id="vocab-list" role="grid" aria-multiselectable="true" data-i18n-aria="vocabListAria" aria-label="Saved vocabulary" aria-busy="false"></div>
-        <button type="button" class="btn btn-sm vocab-load-more" id="vocab-load-more" hidden>Load more</button>
-        <div class="vocab-batch-bar" id="vocab-batch-toolbar" role="group" data-i18n-aria="vocabBatchActions" aria-label="Actions for selected words">
-          <span id="vocab-selected-count" class="notes-count" aria-live="polite"></span>
-          <!-- Icon-only bar actions (user-ratified 2026-08-02: save width, dodge
-               long-locale labels). Status pair mirrors the dict view's icons
-               (known=checkCircle / learning=rotateCcw); trash claims destroy,
-               cross stays on clear (the popup "clear all"/"clear" family). -->
-          <button type="button" class="btn btn-sm" id="vocab-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
-          <!-- Input + stepper unit (icon audit P0): +/- are icon-only because the
-               Group-name placeholder disambiguates them; full labels stay in
-               title/aria (remove's title is JS-owned, see _pbpVocabSyncSelectionUi). -->
-          <span class="vocab-group-unit">
-            <input type="text" id="vocab-group-input" list="vocab-group-list" placeholder="Group name" data-i18n-placeholder="vocabGroupNamePlaceholder" data-i18n-aria="vocabGroupNamePlaceholder" aria-label="Group name" autocomplete="off" />
-            <datalist id="vocab-group-list"></datalist>
-            <button type="button" class="btn btn-sm vocab-group-step" id="vocab-add-group" data-i18n-title="vocabAddToGroup" data-i18n-aria="vocabAddToGroup"><span class="btn-ic" data-ic="plus"></span></button>
-            <button type="button" class="btn btn-sm vocab-group-step" id="vocab-remove-group" data-i18n-aria="vocabRemoveFromGroup"><span class="btn-ic" data-ic="minus"></span></button>
-          </span>
-          <span class="lib-cluster">
-            <button type="button" class="btn btn-sm" id="vocab-mark-known" data-i18n-title="vocabMarkKnown" data-i18n-aria="vocabMarkKnown" aria-label="Mark as known" title="Mark as known"><span class="btn-ic" data-ic="checkCircle"></span></button>
-            <button type="button" class="btn btn-sm" id="vocab-mark-learning" data-i18n-title="vocabMarkLearning" data-i18n-aria="vocabMarkLearning" aria-label="Back to learning" title="Back to learning"><span class="btn-ic" data-ic="rotateCcw"></span></button>
-          </span>
-          <button type="button" class="btn btn-sm danger" id="vocab-batch-delete" data-i18n-title="vocabBatchDelete" data-i18n-aria="vocabBatchDelete" aria-label="Delete selected" title="Delete selected"><span class="btn-ic" data-ic="trash"></span></button>
-          <button type="button" class="btn btn-sm vocab-clear-selection" id="vocab-clear-selection" data-i18n-title="vocabClearSelection" data-i18n-aria="vocabClearSelection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
-        </div>
+        <button type="button" class="btn btn-sm ghost vocab-load-more" id="vocab-load-more" hidden>Load more</button>
       </div>
         </div>
         <aside class="vocab-detail-pane" id="vocab-detail-pane" aria-label="Word details" data-i18n-aria="libraryDetailTitle">
@@ -178,17 +180,27 @@
           <div class="notes-toolbar">
             <input type="search" id="notes-filter" placeholder="Filter highlights and notes" data-i18n-placeholder="notesFilterPlaceholder" data-i18n-aria="notesFilterPlaceholder" aria-label="Filter highlights and notes" />
           </div>
-          <div id="notes-color-filters" class="notes-color-filters" role="group" data-i18n-aria="hlFilterGroupAria" aria-label="Filter highlights by color"></div>
+          <!-- `hidden` until a render has counts (library-notes.js clears it), so
+               the cold page never shows six empty toggles -- same rule as the
+               vocabulary status toggles. -->
+          <div id="notes-color-filters" class="notes-color-filters" role="group" data-i18n-aria="hlFilterGroupAria" aria-label="Filter highlights by color" hidden></div>
           <div class="lib-count-row" id="notes-context-bar">
             <span id="notes-count" class="notes-count" aria-live="polite"></span>
             <div class="lib-cluster" role="group" data-i18n-aria="vocabSelectionActions" aria-label="Selection actions">
               <button type="button" class="btn btn-sm ghost lib-hang-end" id="notes-select-all" data-i18n="vocabSelectAll" data-i18n-title="vocabSelectHint" title="Ctrl-click a row to add it to the selection, Shift-click for a range">Select all</button>
             </div>
           </div>
-          <!-- Sticky boundary, identical contract to .vocab-list-region: the
-               bar floats only within this wrapper and MUST stay its direct
-               child (an intermediate wrapper becomes its containing block and
-               kills the float range). -->
+          <div class="notes-batch-bar" id="notes-batch-toolbar" role="group" data-i18n-aria="notesBatchActions" aria-label="Actions for selected highlights">
+            <span id="notes-selected-count" class="notes-count" aria-live="polite"></span>
+            <button type="button" class="btn btn-sm ghost" id="notes-batch-select-all" data-i18n="vocabSelectAll">Select all</button>
+            <span class="lib-cluster">
+              <button type="button" class="btn btn-sm ghost" id="notes-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
+              <button type="button" class="btn btn-sm danger ghost" id="notes-batch-delete" data-i18n-title="notesBatchDelete" data-i18n-aria="notesBatchDelete" aria-label="Delete selected highlights" title="Delete selected highlights"><span class="btn-ic" data-ic="trash"></span></button>
+              <button type="button" class="btn btn-sm ghost" id="notes-clear-selection" data-i18n-title="vocabClearSelection" data-i18n-aria="vocabClearSelection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
+            </span>
+            <span class="lib-batch-status"></span>
+          </div>
+          <!-- The notes list's own scroll container (spec §2.4). -->
           <div class="notes-list-region">
             <!-- role=grid + aria-multiselectable for the same reason the
                  vocabulary list carries them: rows are multi-selectable and
@@ -217,12 +229,6 @@
               <div class="vocab-account-actions">
                 <a class="btn btn-sm" id="notes-open-backup-settings" href="options.html#general" target="_blank" rel="noopener" data-i18n="libraryNotesScopeOpenBackup">Open backup settings</a>
               </div>
-            </div>
-            <div class="notes-batch-bar" id="notes-batch-toolbar" role="group" data-i18n-aria="notesBatchActions" aria-label="Actions for selected highlights">
-              <span id="notes-selected-count" class="notes-count" aria-live="polite"></span>
-              <button type="button" class="btn btn-sm" id="notes-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
-              <button type="button" class="btn btn-sm danger" id="notes-batch-delete" data-i18n-title="notesBatchDelete" data-i18n-aria="notesBatchDelete" aria-label="Delete selected highlights" title="Delete selected highlights"><span class="btn-ic" data-ic="trash"></span></button>
-              <button type="button" class="btn btn-sm" id="notes-clear-selection" data-i18n-title="vocabClearSelection" data-i18n-aria="vocabClearSelection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
             </div>
           </div>
         </div>

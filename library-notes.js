@@ -560,9 +560,18 @@ function _pbpNotesSyncSelectionUi(hits) {
   }
   const count = _notesSelected.size;
   const countEl = $id("notes-selected-count");
-  if (countEl) countEl.textContent = t("vocabSelectedCount", String(count));
+  if (countEl) pbpLibFillCount(countEl, pbpLibSplitCount((...a) => t("vocabSelectedCount", ...a), [String(count)]), () => "b");
+  // The batch row replaces the count row in place (spec §3.9); the status
+  // region follows (see _pbpNotesStatusHost).
   const bar = $id("notes-batch-toolbar");
   if (bar) bar.classList.toggle("selecting", count > 0);
+  const ctx = $id("notes-context-bar");
+  if (ctx) ctx.hidden = count > 0;
+  const status = $id("notes-status");
+  const statusHost = status ? _pbpNotesStatusHost() : null;
+  if (status && statusHost && status.parentNode !== statusHost) statusHost.appendChild(status);
+  const batchAll = $id("notes-batch-select-all");
+  if (batchAll) batchAll.disabled = _notesBatchBusy || visible.size === 0 || count >= visible.size;
   const allBtn = $id("notes-select-all");
   const invertBtn = $id("notes-invert-selection");
   const deleteBtn = $id("notes-batch-delete");
@@ -878,6 +887,12 @@ function _pbpNotesBuildColorFilters() {
     b.className = "lib-toggle sm";
     b.dataset.color = String(c);
     b.setAttribute("aria-pressed", "false");
+    // Named from birth (the colour alone); _pbpNotesSyncColorFilters adds the
+    // count. An icon-only toggle must never exist without a name, not even
+    // between this build and the first count.
+    const name = t(PBP_NOTES_COLOR_KEYS[c - 1]);
+    b.title = name;
+    b.setAttribute("aria-label", name);
     const dot = document.createElement("span");
     dot.className = "notes-hit-dot notes-c" + c;
     dot.setAttribute("aria-hidden", "true");
@@ -904,6 +919,9 @@ function _pbpNotesApplyColor(color) {
 function _pbpNotesSyncColorFilters(allHits) {
   const wrap = $id("notes-color-filters");
   if (!wrap) return;
+  // `hidden` in the markup until there are counts to show (the vocabulary
+  // status toggles' rule): no cold frame of six empty toggles.
+  wrap.hidden = !(allHits && allHits.length);
   const counts = new Map(PBP_NOTES_COLORS.map((c) => [c, 0]));
   for (const hit of allHits || []) {
     const c = _pbpNotesColorOf(hit.item);
@@ -964,7 +982,7 @@ function _pbpNotesSyncLoadMore(remaining) {
   if (!existing) {
     more.type = "button";
     more.id = "notes-load-more";
-    more.className = "btn btn-sm vocab-load-more";
+    more.className = "btn btn-sm ghost vocab-load-more";
     more.addEventListener("click", _pbpNotesLoadMore);
   }
   more.textContent = t("vocabLoadMore", String(Math.min(PBP_NOTES_RENDER_BATCH, remaining)));
@@ -1070,6 +1088,12 @@ function _pbpNotesRenderList(hits, allHits, append) {
 function _pbpNotesStatusHost() {
   const view = $id("view-notes");
   if (!view) return null;
+  // Tier 1 (spec §4.7): a selection is up and the batch row is on the page.
+  const batch = $id("notes-batch-toolbar");
+  if (batch && batch.classList.contains("selecting") && batch.offsetParent) {
+    const slot = batch.querySelector(".lib-batch-status");
+    if (slot) return slot;
+  }
   const bar = $id("notes-context-bar");
   // offsetParent is null exactly for a display:none subtree here (nothing in
   // this view is position:fixed).
@@ -1425,6 +1449,16 @@ async function renderNotesPanel() {
   _pbpNotesRender();
 }
 
+// Select all, from either row; focus goes to the batch row's Clear because
+// the count row (and its Select all) hides the moment a selection exists.
+function _pbpNotesSelectAllVisible() {
+  _notesSelected = pbpNotesSelectResults(_notesSelected, _pbpNotesVisibleHits().map((h) => h.key), "all");
+  _notesLastSelectedKey = null;
+  _pbpNotesSyncSelectionUi();
+  const clear = $id("notes-clear-selection");
+  if (clear && _notesSelected.size) _pbpNotesFocus(clear);
+}
+
 // The filter input is static markup (never recreated), so bind its listener
 // once at script-load time rather than re-binding inside renderNotesPanel on
 // every tab activation (same one-time-bind convention options.js uses for
@@ -1449,11 +1483,9 @@ if (typeof $id === "function") {
     });
   }
   const _notesSelectAll = $id("notes-select-all");
-  if (_notesSelectAll) _notesSelectAll.addEventListener("click", () => {
-    _notesSelected = pbpNotesSelectResults(_notesSelected, _pbpNotesVisibleHits().map((h) => h.key), "all");
-    _notesLastSelectedKey = null;
-    _pbpNotesSyncSelectionUi();
-  });
+  if (_notesSelectAll) _notesSelectAll.addEventListener("click", _pbpNotesSelectAllVisible);
+  const _notesBatchSelectAll = $id("notes-batch-select-all");
+  if (_notesBatchSelectAll) _notesBatchSelectAll.addEventListener("click", _pbpNotesSelectAllVisible);
   const _notesInvert = $id("notes-invert-selection");
   if (_notesInvert) _notesInvert.addEventListener("click", () => {
     _notesSelected = pbpNotesSelectResults(_notesSelected, _pbpNotesVisibleHits().map((h) => h.key), "invert");

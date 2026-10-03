@@ -74,27 +74,29 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
           <button type="button" class="btn btn-sm ghost lib-hang-end" id="vocab-select-all">Select all</button>
         </div>
       </div>
+      <div class="vocab-batch-bar" id="vocab-batch-toolbar" role="group" aria-label="Actions for selected words">
+        <span id="vocab-selected-count" class="notes-count" aria-live="polite"></span>
+        <button type="button" class="btn btn-sm ghost" id="vocab-batch-select-all">Select all</button>
+        <span class="lib-cluster">
+          <button type="button" class="btn btn-sm ghost" id="vocab-invert-selection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
+          <button type="button" class="btn btn-sm danger ghost" id="vocab-batch-delete" aria-label="Delete selected" title="Delete selected"><span class="btn-ic" data-ic="trash"></span></button>
+          <button type="button" class="btn btn-sm ghost vocab-clear-selection" id="vocab-clear-selection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
+        </span>
+        <span class="vocab-group-unit">
+          <input type="text" id="vocab-group-input" list="vocab-group-list" placeholder="Group name" aria-label="Group name" autocomplete="off" />
+          <datalist id="vocab-group-list"></datalist>
+          <button type="button" class="btn btn-sm vocab-group-step" id="vocab-add-group" aria-label="Add to group" title="Add to group"><span class="btn-ic" data-ic="plus"></span></button>
+          <button type="button" class="btn btn-sm vocab-group-step" id="vocab-remove-group" aria-label="Remove from group" title="Remove from group"><span class="btn-ic" data-ic="minus"></span></button>
+        </span>
+        <button type="button" class="btn btn-sm" id="vocab-mark-known" aria-label="Mark as known" title="Mark as known">Known</button>
+        <button type="button" class="btn btn-sm" id="vocab-mark-learning" aria-label="Back to learning" title="Back to learning">Learning</button>
+        <span class="lib-batch-status"></span>
+      </div>
       <div id="vocab-empty" class="notes-empty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
       <div id="vocab-no-results" class="notes-empty" hidden>No words match the current filters.</div>
       <div class="vocab-list-region">
         <div id="vocab-list" role="grid" aria-multiselectable="true" aria-label="Saved vocabulary" aria-busy="false"></div>
-        <button type="button" class="btn btn-sm vocab-load-more" id="vocab-load-more" hidden>Load more</button>
-        <div class="vocab-batch-bar" id="vocab-batch-toolbar" role="group" aria-label="Actions for selected words">
-          <span id="vocab-selected-count" class="notes-count" aria-live="polite"></span>
-          <button type="button" class="btn btn-sm" id="vocab-invert-selection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
-          <span class="vocab-group-unit">
-            <input type="text" id="vocab-group-input" list="vocab-group-list" placeholder="Group name" aria-label="Group name" autocomplete="off" />
-            <datalist id="vocab-group-list"></datalist>
-            <button type="button" class="btn btn-sm vocab-group-step" id="vocab-add-group" aria-label="Add to group" title="Add to group"><span class="btn-ic" data-ic="plus"></span></button>
-            <button type="button" class="btn btn-sm vocab-group-step" id="vocab-remove-group" aria-label="Remove from group" title="Remove from group"><span class="btn-ic" data-ic="minus"></span></button>
-          </span>
-          <span class="lib-cluster">
-            <button type="button" class="btn btn-sm" id="vocab-mark-known" aria-label="Mark as known" title="Mark as known"><span class="btn-ic" data-ic="checkCircle"></span></button>
-            <button type="button" class="btn btn-sm" id="vocab-mark-learning" aria-label="Back to learning" title="Back to learning"><span class="btn-ic" data-ic="rotateCcw"></span></button>
-          </span>
-          <button type="button" class="btn btn-sm danger" id="vocab-batch-delete" aria-label="Delete selected" title="Delete selected"><span class="btn-ic" data-ic="trash"></span></button>
-          <button type="button" class="btn btn-sm vocab-clear-selection" id="vocab-clear-selection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
-        </div>
+        <button type="button" class="btn btn-sm ghost vocab-load-more" id="vocab-load-more" hidden>Load more</button>
       </div>
     </div>
     <aside class="vocab-detail-pane" id="vocab-detail-pane" aria-label="Word details">
@@ -234,9 +236,8 @@ check("vocabulary loading is visible in the existing polite status region",
   getComputedStyle($id("vocab-status")).display !== "none");
 check("vocabulary loading marks the production list busy",
   $id("vocab-list").getAttribute("aria-busy") === "true");
-// The batch bar is class-driven, not hidden-attribute-driven (see
-// _pbpVocabSyncSelectionUi / library-vocab.js): it is always display:flex,
-// hidden via visibility/height/opacity through .selecting instead. The old
+// The batch row is class-driven: `.vocab-batch-bar:not(.selecting)` is
+// display:none (it no longer floats, it replaces the count row). The old
 // pre-split fixture's toolbar div carried a permanent `hidden` attribute and
 // no vocab-batch-bar class, so `.hidden` and `display === "none"` happened to
 // hold vacuously (nothing ever matched the real component's actual
@@ -244,7 +245,7 @@ check("vocabulary loading marks the production list busy",
 // checks assert the real mechanism instead.
 check("loading hides batch and load-more controls despite their production display rules",
   !$id("vocab-batch-toolbar").classList.contains("selecting") && $id("vocab-load-more").hidden &&
-  getComputedStyle($id("vocab-batch-toolbar")).visibility === "hidden" &&
+  getComputedStyle($id("vocab-batch-toolbar")).display === "none" &&
   getComputedStyle($id("vocab-load-more")).display === "none");
 
 _pbpVocabSetLoading(false);
@@ -315,6 +316,85 @@ check("exactly 100 rows fills one render batch without exposing Load more",
     pbpLibSameDay(new Date(2026, 9, 3, 0, 1).getTime(), new Date(2026, 9, 3, 23, 59).getTime()) === true &&
     pbpLibSameDay(new Date(2026, 9, 3, 23, 59).getTime(), new Date(2026, 9, 4, 0, 1).getTime()) === false,
     time);
+}
+
+// ---- Batch row replaces the count row in place (spec §3.9) + status host
+// tier 1 (spec §4.7) + Select-all focus handoff ----
+_vocabRows = sample;
+$id("vocab-search").value = "";
+_pbpVocabClearSelection();
+_pbpVocabApplyView(true);
+_vocabSelected = new Set(["a"]);
+_pbpVocabSyncSelectionUi();
+check("selecting hides the count row and shows the batch row in its place",
+  $id("vocab-context-bar").hidden === true && $id("vocab-batch-toolbar").classList.contains("selecting") &&
+  getComputedStyle($id("vocab-batch-toolbar")).display === "grid");
+check("the batch row bolds the selected count through the sentinel split",
+  $id("vocab-selected-count").textContent === "vocabSelectedCount:1" &&
+  $id("vocab-selected-count").querySelector("b")?.textContent === "1");
+check("while the batch row is up, the status live region sits in its status slot",
+  $id("vocab-status").parentNode === $id("vocab-batch-toolbar").querySelector(".lib-batch-status"));
+_vocabSelected = pbpVocabSelectResults(_vocabSelected, _vocabViewRows, "all");
+_pbpVocabSyncSelectionUi();
+check("the batch row's Select all is disabled once everything is selected", $id("vocab-batch-select-all").disabled === true);
+_pbpVocabClearSelection();
+_pbpVocabSyncSelectionUi();
+check("clearing the selection brings the count row and the status region back",
+  $id("vocab-context-bar").hidden === false && $id("vocab-status").parentNode === $id("vocab-context-bar") &&
+  getComputedStyle($id("vocab-batch-toolbar")).display === "none");
+$id("vocab-select-all").focus();
+$id("vocab-select-all").click();
+check("Select all in the count row hands focus to the batch row, not to <body>",
+  document.activeElement === $id("vocab-clear-selection"),
+  document.activeElement && (document.activeElement.id || document.activeElement.tagName));
+_pbpVocabClearSelection();
+_pbpVocabSyncSelectionUi();
+_vocabRows = [{ id: "row-plain", term: "plain", language: "en", status: "known", groups: ["Reading", "Close"], gloss: "g", contexts: [], updatedAt: 1 }];
+_pbpVocabApplyView(true);
+const plainRow = $id("vocab-list").querySelector(".vocab-card");
+check("a row keeps language and status as plain text on line one and its groups as plain text on line two",
+  !plainRow.querySelector(".vocab-group-chip") &&
+  plainRow.querySelectorAll(".vocab-row-headline .notes-row-meta > span").length === 2 &&
+  [...plainRow.querySelectorAll(".notes-card-main > .vocab-row-groups > span")].map((s) => s.textContent).join("|") === "Reading|Close",
+  plainRow.innerHTML.slice(0, 300));
+// Row pitch and hit coverage (spec §3.6): 56 comfortable / 44 compact, and the
+// row button owns every pixel of its card plus half of the 2px gap to each
+// neighbour -- a pointer anywhere between the first row's top and the last
+// row's bottom lands on SOME row's button, never on dead padding (the T4b
+// geometry had a 2-4px dead band along each card's top edge). Measured on
+// screen: elementFromPoint needs the fixture inside the viewport.
+{
+  _vocabRows = sample;
+  _pbpVocabApplyView(true);
+  const viewEl = $id("view-vocab");
+  const restoreLeft = viewEl.style.left;
+  viewEl.style.left = "0px";
+  const report = [];
+  try {
+    for (const [density, pitch] of [["", 56], ["compact", 44]]) {
+      if (density) document.documentElement.dataset.density = density;
+      else delete document.documentElement.dataset.density;
+      const cards = [...$id("vocab-list").querySelectorAll(".vocab-card")];
+      const tops = cards.map((c) => c.querySelector(".notes-card-top").getBoundingClientRect());
+      const pitches = tops.slice(1).map((r, i) => Math.round(r.top - tops[i].top));
+      const first = tops[0], last = tops[tops.length - 1];
+      const card = cards[0].getBoundingClientRect();
+      let dead = [];
+      for (let y = Math.ceil(first.top); y < Math.floor(last.bottom); y++) {
+        for (const x of [card.left + 1, card.left + card.width / 3]) {
+          const hit = document.elementFromPoint(x, y);
+          if (!hit || !hit.closest(".notes-card-head")) dead.push(`${Math.round(x)},${y}:${hit ? hit.className || hit.tagName : "none"}`);
+        }
+      }
+      report.push({ density: density || "comfortable", pitch, pitches, dead });
+    }
+  } finally {
+    delete document.documentElement.dataset.density;
+    viewEl.style.left = restoreLeft;
+  }
+  check("vocabulary rows sit on a 56 / 44 pitch and the row button covers the card and the gap between rows",
+    report.length === 2 && report.every((r) => r.pitches.length === sample.length - 1 && r.pitches.every((p) => p === r.pitch) && r.dead.length === 0),
+    JSON.stringify(report.map((r) => ({ ...r, dead: r.dead.slice(0, 6) }))));
 }
 
 // Count row + status toggles (spec §3.2 / §3.5). Before the clearing check:
@@ -542,7 +622,7 @@ _pbpVocabFlashStatus(false, "read failed");
 check("read-error state clears busy, stays visibly bad and keeps data actions hidden",
   $id("vocab-list").getAttribute("aria-busy") === "false" &&
   $id("vocab-status").classList.contains("bad") && $id("vocab-status").textContent.includes("read failed") &&
-  getComputedStyle($id("vocab-batch-toolbar")).visibility === "hidden" &&
+  getComputedStyle($id("vocab-batch-toolbar")).display === "none" &&
   getComputedStyle($id("vocab-load-more")).display === "none");
 
 let selected = pbpVocabSelectResults(new Set(), sample.slice(0,2), "all");
@@ -1722,9 +1802,9 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         <button type="button" class="btn btn-sm vocab-lookup-narrow"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
       </div>
       <div class="vocab-context-bar lib-count-row"><span class="vocab-ctx-text"><span class="notes-count"><span class="lib-count-items" aria-hidden="true"><span class="lib-count-item" data-label="ci-0"></span><span class="lib-count-item" data-label="ci-1"></span><span class="lib-count-item" data-label="ci-2"></span><span class="lib-count-item" data-label="ci-3"></span></span></span></span><span class="save-status vocab-main-status">Saved just now</span><div class="lib-cluster"><button class="btn btn-sm ghost lib-hang-end" data-label="all"></button></div></div>
+      <div class="vocab-batch-bar selecting"><span class="notes-count" id="vocab-selected-count" data-label="selected-count">5000</span><button class="btn btn-sm ghost" id="vocab-batch-select-all" data-label="batch-all"></button><span class="lib-cluster"><button class="btn btn-sm ghost" data-label="invert"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm danger ghost" data-label="batch-delete"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm ghost vocab-clear-selection"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><span class="vocab-group-unit"><input type="text"><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><button class="btn btn-sm" id="vocab-mark-known" data-label="known"></button><button class="btn btn-sm" id="vocab-mark-learning" data-label="learning"></button><span class="lib-batch-status"></span></div>
       <div class="vocab-list-region">
       <article class="notes-card vocab-card"><div class="notes-card-top"><button class="notes-card-head"><span class="notes-card-main"><span class="vocab-row-headline"><span class="notes-row-title">Wortzusammensetzung mit außergewöhnlich langem ausgewähltem Begriff</span><span class="notes-row-meta"><span class="notes-meta-chip">Außergewöhnlich lange Gruppe</span></span></span><span class="vocab-row-gloss">Außergewöhnlich lange Definition, die auf einer Zeile bleiben muss</span></span></button><button class="btn btn-sm notes-row-del" data-label="remove"></button></div></article>
-      <div class="vocab-batch-bar selecting"><span class="notes-count" data-label="selected-count">5000</span><button class="btn btn-sm" data-label="invert"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><span class="vocab-group-unit"><input type="text"><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><span class="lib-cluster"><button class="btn btn-sm" data-label="known"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm" data-label="learning"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><button class="btn btn-sm danger" data-label="batch-delete"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm vocab-clear-selection"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></div>
       </div>
     </div>
     <aside class="vocab-detail-pane">
@@ -1752,6 +1832,9 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         panel.querySelector('[data-label="invert"]').title = m.vocabInvertSelection.message;
         panel.querySelector('[data-label="known"]').title = m.vocabMarkKnown.message;
         panel.querySelector('[data-label="learning"]').title = m.vocabMarkLearning.message;
+        panel.querySelector('[data-label="batch-all"]').textContent = m.vocabSelectAll.message;
+        panel.querySelector('[data-label="known"]').textContent = m.vocabStatusKnown.message;
+        panel.querySelector('[data-label="learning"]').textContent = m.vocabStatusLearning.message;
         panel.querySelector('[data-label="selected-count"]').textContent = m.vocabSelectedCount.message.replace("$COUNT$", "5000");
         panel.querySelector('[data-label="batch-delete"]').title = m.vocabBatchDelete.message;
         panel.querySelector('[data-label="remove"]').textContent = m.delete.message;
@@ -1812,21 +1895,18 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     unreachable.length === 0, unreachable.slice(0, 8).join("; "));
   check("production CSS keeps the 320px German count row to whole items: each one fits or folds out of sight, none is cut",
     germanCountWhole, "a .lib-count-item crosses the count box's right or bottom edge");
-  // Sticky-bar geometry contract: the bar floats only within its region
-  // (a wrapper between it and the region would cap the float range at the
-  // bar's own height), and the browse state reserves ZERO geometry -- the
-  // exact regression the 2026-08 redesign exists to prevent. No motion-ready
-  // class in this harness, so the class flip lands instantly.
+  // The batch row replaces the count row in place (spec §3.9): next sibling
+  // in the list header, a two-row grid, never sticky, display:none at rest.
   const batchBar = frame.contentDocument.querySelector(".vocab-batch-bar");
-  check("batch bar is a direct child of the sticky region",
-    batchBar.parentElement.classList.contains("vocab-list-region"));
-  check("selecting batch bar is sticky with a visible face",
-    frame.contentWindow.getComputedStyle(batchBar).position === "sticky" &&
-    frame.contentWindow.getComputedStyle(batchBar).visibility === "visible");
+  check("the batch row sits in the list header right after the count row",
+    !!batchBar.previousElementSibling?.classList.contains("vocab-context-bar") && !batchBar.closest(".vocab-list-region"));
+  const batchCs = frame.contentWindow.getComputedStyle(batchBar);
+  check("the selecting batch row is a two-row grid that does not float",
+    batchCs.display === "grid" && batchCs.position !== "sticky" && batchCs.gridTemplateRows.trim().split(/\s+/).length === 2,
+    `${batchCs.display} ${batchCs.position} rows=${batchCs.gridTemplateRows}`);
   batchBar.classList.remove("selecting");
   await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
-  check("browse-state batch bar reserves zero height",
-    batchBar.getBoundingClientRect().height === 0);
+  check("the browse-state batch row is display:none", frame.contentWindow.getComputedStyle(batchBar).display === "none");
   // The detail pane's context quote is a real <blockquote> (library-vocab.js
   // builds it that way), so the UA's `margin: 1em 40px` applies unless the rule
   // resets it -- the quote then paints 40px right of the .vocab-detail-context
