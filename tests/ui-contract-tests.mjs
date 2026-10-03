@@ -8694,6 +8694,22 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   gateDump(`[gate] chip library measured=${stepChip.measured} lowest=${stepChip.lowest.r.toFixed(3)} (${stepChip.lowest.where}) ratios=${ratioHash(stepChip.ratios)}`);
 }
 
+// ---- library redesign T4a: library.js's shared render helpers and the two
+// page guards that keep them safe to load into the test harnesses. ----
+{
+  const libJs = read("library.js");
+  check(/document\.addEventListener\("DOMContentLoaded", \(\) => \{\s*\n\s*if \(!\$id\("lib-tab-vocab"\)\) return;/.test(libJs) &&
+    /if \(typeof requestAnimationFrame === "function" && document\.getElementById\("lib-tab-vocab"\)\)/.test(libJs),
+    "library.js: the DOMContentLoaded body or the motion-ready double rAF runs without the #lib-tab-vocab page guard -- the test pages that load library.js for its helpers would hydrate, route and arm motion-ready");
+  for (const sig of ["function pbpLibSplitCount(format, values)", "function pbpLibFillCount(host, parts, tagFor)",
+    "function pbpLibRenderCount(host, items, full)", "function pbpLibFormatDay(ts, now = Date.now())",
+    "function pbpLibFormatTime(ts)", "function pbpLibSameDay(a, b)"]) {
+    check(libJs.includes(sig), `library.js: shared helper missing or re-signed: ${sig}`);
+  }
+  check(!/innerHTML/.test(libJs.slice(libJs.indexOf("function pbpLibSplitCount"))),
+    "library.js: the count helpers must build text with textContent only (no innerHTML)");
+}
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);

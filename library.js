@@ -46,7 +46,11 @@ function _pbpLibInitialView() {
 // Enable decorative transitions (.confirm-popover enter/exit) only after the
 // initial paint — same double-rAF gate as options.js/popup.js/md-preview.js,
 // so this adds zero first-frame cost on the cold-start path.
-if (typeof requestAnimationFrame === "function") {
+// Only on the library page itself: tests/library-*-tests.html and
+// tests/i18n-parity-tests.html load this file for its helpers, and a
+// motion-ready <html> there would arm the 220ms card-exit hold that their
+// task-count timing does not wait for.
+if (typeof requestAnimationFrame === "function" && document.getElementById("lib-tab-vocab")) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     document.documentElement.classList.add("motion-ready");
   }));
@@ -69,6 +73,7 @@ function pbpLibMeasureScrollbar() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  if (!$id("lib-tab-vocab")) return;
   // Hydrate declarative icon slots (same contract as options.js/popup.js):
   // static PBP_ICONS constants only, never page content.
   document.querySelectorAll(".btn-ic[data-ic]").forEach(s => { s.innerHTML = PBP_ICONS[s.dataset.ic] || ""; });
@@ -118,3 +123,117 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   _pbpLibApplyView(_pbpLibInitialView(), true);
 });
+
+// ---- Shared render helpers (library redesign T4, spec §3.5 / §5.3) ----------
+// library-vocab.js and library-notes.js call these at RENDER time only: this
+// file loads after both, so a parse-time call from either would find nothing.
+
+// Numbers inside localized sentences. t() gets one private-use sentinel per
+// value (U+E000 + slot); the result is split on them and every value comes
+// back as its own part. The translator keeps the word order -- nothing is
+// concatenated, nothing goes through innerHTML -- and a locale that moves the
+// number to the front or the end still gets it bolded.
+const PBP_LIB_SENTINEL_BASE = 0xE000;
+function pbpLibSplitCount(format, values) {
+  const list = Array.isArray(values) ? values : [];
+  const marks = list.map((_, i) => String.fromCharCode(PBP_LIB_SENTINEL_BASE + i));
+  let text = "";
+  try {
+    text = String(format(...marks));
+  } catch (err) {
+    console.warn("[library] count format failed", err && err.name, err && err.message);
+  }
+  const parts = [];
+  let literal = "";
+  for (const ch of text) {
+    const slot = ch.charCodeAt(0) - PBP_LIB_SENTINEL_BASE;
+    if (ch.length === 1 && slot >= 0 && slot < list.length) {
+      if (literal) { parts.push({ text: literal, index: -1 }); literal = ""; }
+      parts.push({ text: String(list[slot]), index: slot });
+    } else {
+      literal += ch;
+    }
+  }
+  if (literal) parts.push({ text: literal, index: -1 });
+  return parts;
+}
+
+function pbpLibFillCount(host, parts, tagFor) {
+  if (!host) return;
+  const nodes = (Array.isArray(parts) ? parts : []).map((part) => {
+    const tag = part.index >= 0 && typeof tagFor === "function" ? tagFor(part.index) : null;
+    if (tag !== "b" && tag !== "span") return document.createTextNode(part.text);
+    const el = document.createElement(tag);
+    if (tag === "span") el.className = "lib-count-num";
+    el.textContent = part.text;
+    return el;
+  });
+  host.replaceChildren(...nodes);
+}
+
+// The count row's left segment (spec §3.5): compact items for the eye
+// (aria-hidden), the full sentence -- account name included -- for the screen
+// reader and the hover title. Only the FIRST item's first number is bold.
+// The sentence node is rewritten only when it changes: #vocab-count /
+// #notes-count are aria-live, and a rebuilt live region re-announces itself.
+function pbpLibRenderCount(host, items, full) {
+  if (!host) return;
+  let list = host.querySelector(":scope > .lib-count-items");
+  let sr = host.querySelector(":scope > .lib-count-full");
+  if (!list || !sr) {
+    list = document.createElement("span");
+    list.className = "lib-count-items";
+    list.setAttribute("aria-hidden", "true");
+    sr = document.createElement("span");
+    sr.className = "sr-only lib-count-full";
+    host.replaceChildren(list, sr);
+  }
+  list.replaceChildren(...(Array.isArray(items) ? items : []).map((parts, i) => {
+    const item = document.createElement("span");
+    item.className = "lib-count-item";
+    pbpLibFillCount(item, parts, (slot) => (i === 0 && slot === 0 ? "b" : null));
+    return item;
+  }));
+  const sentence = full ? String(full) : "";
+  if (sr.textContent !== sentence) sr.textContent = sentence;
+  if (sentence) host.title = sentence;
+  else host.removeAttribute("title");
+}
+
+// Dates and times (spec §5.3, §11 V7). uiLangToBCP47() can hand Intl a
+// malformed stored tag, which throws -- fall back to the browser default
+// rather than losing the date.
+function _pbpLibLocale() {
+  try { return typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined; } catch (_) { return undefined; }
+}
+function _pbpLibDateString(date, method, opts) {
+  try {
+    return date[method](_pbpLibLocale(), opts);
+  } catch (_) {
+    try {
+      return date[method](undefined, opts);
+    } catch (err) {
+      console.warn("[library] date format failed", err && err.name, err && err.message);
+      return "";
+    }
+  }
+}
+function pbpLibFormatDay(ts, now = Date.now()) {
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  const date = new Date(n);
+  const sameYear = date.getFullYear() === new Date(Number(now)).getFullYear();
+  return _pbpLibDateString(date, "toLocaleDateString",
+    sameYear ? { month: "long", day: "numeric" } : { year: "numeric", month: "long", day: "numeric" });
+}
+function pbpLibFormatTime(ts) {
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  return _pbpLibDateString(new Date(n), "toLocaleTimeString", { hour: "2-digit", minute: "2-digit" });
+}
+function pbpLibSameDay(a, b) {
+  const x = new Date(Number(a));
+  const y = new Date(Number(b));
+  if (Number.isNaN(x.getTime()) || Number.isNaN(y.getTime())) return false;
+  return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}

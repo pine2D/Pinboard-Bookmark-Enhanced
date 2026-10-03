@@ -107,6 +107,7 @@ window.chrome = {
 <script src="../shared.js"></script>
 <script src="../vocab-store.js"></script>
 <script src="../library-notes.js"></script>
+<script src="../library.js"></script>
 <script>
 const results = $id("results");
 let pass = 0, fail = 0;
@@ -138,6 +139,9 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
 
 (async () => {
   await renderNotesPanel();
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  check("loading library.js into this harness never arms the page's motion gate",
+    !document.documentElement.classList.contains("motion-ready"));
 
   // ---- scan -> one row per highlight, newest first ----
   check("every stored highlight gets its own row, newest first",

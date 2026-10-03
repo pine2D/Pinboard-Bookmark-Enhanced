@@ -4,6 +4,8 @@
 </head><body>
 <div id="results"></div>
 <script src="../i18n.js"></script>
+<script src="../shared.js"></script>
+<script src="../library.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -478,6 +480,33 @@ async function loadLocale(loc) {
     "settingsPassword was translated again");
   // libraryTitle is the page's own name, so the Chinese locales carry exactly
   // one word for the vocabulary book.
+  // T4 (library redesign §3.5): the library bolds the numbers inside its
+  // count sentences by handing t() one sentinel per value and splitting on
+  // them (pbpLibSplitCount). Every locale must give each value back exactly
+  // once, as its own part, and the parts must reassemble to what t() prints.
+  // T4b / T4c extend SPLIT_KEYS with the keys they add.
+  const SPLIT_KEYS = [
+    ["libraryStatsWords", ["16"]],
+    ["libraryStatsGroups", ["2"]],
+    ["libraryStatsLanguages", ["4"]],
+    ["libraryStatsLearning", ["13"]],
+    ["libraryStatsKnown", ["3"]],
+    ["vocabSelectedCount", ["7"]],
+  ];
+  for (const loc of LOCALES) {
+    const broken = [];
+    for (const [key, values] of SPLIT_KEYS) {
+      const entry = msgs[loc][key];
+      if (!entry) { broken.push(`${key}: missing`); continue; }
+      const parts = typeof pbpLibSplitCount === "function" ? pbpLibSplitCount((...a) => _resolveMsg(entry, a), values) : [];
+      const whole = values.every((value, i) => {
+        const slots = parts.filter((p) => p.index === i);
+        return slots.length === 1 && slots[0].text === value;
+      });
+      if (!whole || parts.map((p) => p.text).join("") !== _resolveMsg(entry, values)) broken.push(`${key}: ${JSON.stringify(parts)}`);
+    }
+    check(`T4 ${loc} count sentences give every number back as its own part`, broken.length === 0, broken.slice(0, 3).join("; "));
+  }
   check("H19 Chinese locales use libraryTitle's vocabulary name everywhere",
     ["zh_CN", "zh_TW", "zh_HK"].every((loc) => Object.values(msgs[loc])
       .every((m) => !/生词库|生詞庫/.test((m && m.message) || ""))),
@@ -529,14 +558,20 @@ async function loadLocale(loc) {
 
   // A slower refresh for the old language must not overwrite the mirror after
   // a newer refresh has already selected and loaded another locale.
+  // shared.js (loaded for library.js's $id) defines getSettingsStorage, which
+  // reads the stubbed storage itself and adds awaits ahead of the fetch this
+  // race steps through tick by tick. Hide it so the refresh takes the plain
+  // chrome.storage.local path the race was written against.
   const previousChrome = globalThis.chrome;
   const previousFetch = globalThis.fetch;
+  const previousGetSettingsStorage = globalThis.getSettingsStorage;
   const previousMessages = _i18nMessages;
   const previousLang = localStorage.getItem("pp-i18n-lang");
   const previousMirror = localStorage.getItem("pp-i18n-msgs");
   const pending = {};
   const reads = ["de", "fr"];
   try {
+    globalThis.getSettingsStorage = undefined;
     globalThis.chrome = {
       storage: { local: { get: async () => ({ optLang: reads.length ? reads.shift() : "fr" }) } },
       runtime: { getURL: (path) => path },
@@ -586,6 +621,7 @@ async function loadLocale(loc) {
   } finally {
     globalThis.chrome = previousChrome;
     globalThis.fetch = previousFetch;
+    globalThis.getSettingsStorage = previousGetSettingsStorage;
     _i18nMessages = previousMessages;
     if (previousLang === null) localStorage.removeItem("pp-i18n-lang");
     else localStorage.setItem("pp-i18n-lang", previousLang);

@@ -124,6 +124,7 @@ function t(key, ...values) { return key + (values.length ? ":" + values.join(","
      pre-split options-vocab-tests.html used. -->
 <script>pbpReadSettingsWithSecrets = async () => ({ pinboardToken: "" });</script>
 <script src="../library-vocab.js"></script>
+<script src="../library.js"></script>
 <script>
 const results = $id("results");
 let pass = 0, fail = 0;
@@ -258,6 +259,54 @@ _pbpVocabApplyView(true);
 check("exactly 100 rows fills one render batch without exposing Load more",
   $id("vocab-list").querySelectorAll(".vocab-card").length === 100 &&
   $id("vocab-load-more").hidden && getComputedStyle($id("vocab-load-more")).display === "none");
+// ---- library.js shared helpers (redesign T4a, spec §3.5 / §5.3) ----
+// typeof-guarded so a missing helper is a FAIL row, never a page error.
+{
+  const has = (name) => typeof window[name] === "function";
+  const one = has("pbpLibSplitCount") ? pbpLibSplitCount((...a) => t("libraryStatsWords", ...a), ["16"]) : null;
+  check("pbpLibSplitCount hands the value back as its own part, after the literal text",
+    JSON.stringify(one) === JSON.stringify([{ text: "libraryStatsWords:", index: -1 }, { text: "16", index: 0 }]),
+    JSON.stringify(one));
+  const moved = has("pbpLibSplitCount") ? pbpLibSplitCount((a, b) => `${b} of ${a}`, ["3", "9"]) : null;
+  const echoed = has("pbpLibSplitCount") ? pbpLibSplitCount(() => "keyEcho", ["1"]) : null;
+  check("pbpLibSplitCount follows the slot, not the position, and passes a sentinel-free string through whole",
+    JSON.stringify(moved) === JSON.stringify([{ text: "9", index: 1 }, { text: " of ", index: -1 }, { text: "3", index: 0 }]) &&
+    JSON.stringify(echoed) === JSON.stringify([{ text: "keyEcho", index: -1 }]),
+    JSON.stringify(moved) + " | " + JSON.stringify(echoed));
+  const fillHost = document.createElement("span");
+  if (has("pbpLibFillCount")) pbpLibFillCount(fillHost, [{ text: "x ", index: -1 }, { text: "<img src=x>", index: 0 }], (i) => (i === 0 ? "b" : null));
+  check("pbpLibFillCount builds <b> from textContent only",
+    fillHost.querySelector("b")?.textContent === "<img src=x>" && !fillHost.querySelector("img") &&
+    fillHost.firstChild?.nodeType === Node.TEXT_NODE,
+    fillHost.innerHTML);
+  const countHost = document.createElement("span");
+  if (has("pbpLibRenderCount")) {
+    pbpLibRenderCount(countHost, [[{ text: "16", index: 0 }, { text: " words", index: -1 }], [{ text: "2 groups", index: -1 }]], "full sentence");
+  }
+  const built = countHost.querySelector(":scope > .lib-count-items[aria-hidden='true']");
+  const fullEl = countHost.querySelector(":scope > .lib-count-full.sr-only");
+  const builtOk = !!built && built.children.length === 2 && built.querySelectorAll("b").length === 1 &&
+    built.querySelector(".lib-count-item b")?.textContent === "16" && fullEl?.textContent === "full sentence" &&
+    countHost.title === "full sentence";
+  if (has("pbpLibRenderCount")) pbpLibRenderCount(countHost, [], "");
+  check("pbpLibRenderCount writes compact items, the screen-reader sentence and the title, and clears all three",
+    builtOk && countHost.querySelector(".lib-count-items").children.length === 0 &&
+    countHost.querySelector(".lib-count-full").textContent === "" && !countHost.hasAttribute("title"),
+    countHost.outerHTML);
+  const now = new Date(2026, 9, 3, 12).getTime();
+  const sameYear = has("pbpLibFormatDay") ? pbpLibFormatDay(new Date(2026, 9, 1, 9).getTime(), now) : "";
+  const otherYear = has("pbpLibFormatDay") ? pbpLibFormatDay(new Date(2025, 9, 1, 9).getTime(), now) : "";
+  check("pbpLibFormatDay drops the year inside the current year, keeps it across years, and answers \"\" for no date",
+    !!sameYear && !sameYear.includes("2026") && otherYear.includes("2025") &&
+    pbpLibFormatDay(0) === "" && pbpLibFormatDay("x") === "",
+    JSON.stringify([sameYear, otherYear]));
+  const time = has("pbpLibFormatTime") ? pbpLibFormatTime(new Date(2026, 9, 3, 14, 5).getTime()) : "";
+  check("pbpLibFormatTime prints a two-digit minute and pbpLibSameDay compares local calendar days",
+    time.includes("05") && has("pbpLibSameDay") &&
+    pbpLibSameDay(new Date(2026, 9, 3, 0, 1).getTime(), new Date(2026, 9, 3, 23, 59).getTime()) === true &&
+    pbpLibSameDay(new Date(2026, 9, 3, 23, 59).getTime(), new Date(2026, 9, 4, 0, 1).getTime()) === false,
+    time);
+}
 
 // Stats strip: total/learning/known counts, chip status-filter linkage, and
 // hide-on-clear (Task 1: vocabulary stats strip).
@@ -675,6 +724,9 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
 
 (async () => {
   const task = () => new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  check("loading library.js into this harness never arms the page's motion gate",
+    !document.documentElement.classList.contains("motion-ready"));
 
   // renderVocabPanel's owner-read catch. Standalone: this is the only
   // consumer of the whole library-vocab.js load path in this file, no shared
