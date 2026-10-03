@@ -1232,7 +1232,14 @@ check(!read("anki-connect.js").includes("PBP_ANKI_ENDPOINT"),
   // comment to make any distance bound a tripwire for editing the comment.
   const notesRefresh = (libraryNotesJs.split("async function _pbpNotesRefreshPreservingState")[1] || "").split("\n}\n")[0];
   check(libraryNotesJs.includes("rowEl.dataset.notesKey = hit.key") &&
-    ["_pbpNotesMarkCurrentRow()", "_pbpNotesFocus(", "window.scrollTo"].every((s) => notesRefresh.includes(s)) &&
+    ["_pbpNotesMarkCurrentRow()", "_pbpNotesFocus("].every((s) => notesRefresh.includes(s)) &&
+    // The list region is the scroll container now (library redesign §2.5
+    // #2): its offset is read before the rebuild, written back after it, and
+    // the page itself is never scrolled.
+    notesRefresh.indexOf("const listScroll = region ? region.scrollTop : 0;") >= 0 &&
+    notesRefresh.indexOf("await renderNotesPanel();") > notesRefresh.indexOf("const listScroll = region ? region.scrollTop : 0;") &&
+    notesRefresh.indexOf("region.scrollTop = listScroll") > notesRefresh.indexOf("await renderNotesPanel();") &&
+    !/window\.scroll(?:To|Y)/.test(notesRefresh) &&
     /pbp-lib-view[\s\S]{0,120}_pbpNotesRefreshPreservingState\(\)/.test(libraryNotesJs) &&
     // Debounced: a single highlight drag rewrites the whole record per
     // stroke, and each refresh is a full scan plus a full rebuild.
@@ -2300,6 +2307,33 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
     `ui-contract-tests.mjs: the flat-canvas gate matched only ${subjects} hand-written skeleton selector(s) — the subject model or the registry key broke, and an empty scan passes anything`);
   check(offenders.length === 0,
     `library.css: the page skeleton paints a surface, a line or a shadow (flat canvas, user ruling 2026-10-03 — divide with type, space, column alignment, hanging labels and section heads instead): ${offenders.join(" | ")}`);
+}
+// Narrow back button (library redesign §2.6, user ruling 10-03): a ghost sm
+// button with Lucide v0.525.0 arrow-left in both views. `cross` belongs to the
+// delete / remove / close family, and "back to the list" is not a close.
+{
+  const backAt = libraryHtml.indexOf('id="vocab-detail-back"');
+  const backTag = backAt < 0 ? "" : libraryHtml.slice(libraryHtml.lastIndexOf("<button", backAt), libraryHtml.indexOf("</button>", backAt));
+  const notesSrc = read("library-notes.js");
+  check(sharedJs.includes(`arrowLeft: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>'`) &&
+    backTag.includes('class="btn btn-sm ghost vocab-detail-back"') && backTag.includes('data-ic="arrowLeft"') &&
+    notesSrc.includes('back.className = "btn btn-sm ghost notes-detail-back";') &&
+    notesSrc.includes('setBtnIcon(back, "arrowLeft", t("libraryBack"));'),
+    "shared.js/library.html/library-notes.js: the narrow back button is not a ghost Lucide arrow-left (v0.525.0, 14px) in both views");
+}
+// Scrollbar gutter (library redesign §2.4, Review Focus 1): measured into
+// --lib-sb-w at load AND again whenever it can change while the page is open
+// -- a window resize / page zoom, and the two <html> attributes another tab's
+// theme switch rewrites. Behaviour is measured by the render oracle's libAxis
+// state; this pins the wiring it depends on.
+{
+  const libraryJsSrc = read("library.js");
+  const measure = (libraryJsSrc.split("function pbpLibMeasureScrollbar() {")[1] || "").split("\n}\n")[0];
+  check(/probe\.offsetWidth - probe\.clientWidth/.test(measure) &&
+    /document\.documentElement\.style\.setProperty\("--lib-sb-w", w \+ "px"\)/.test(measure) &&
+    libraryJsSrc.includes('window.addEventListener("resize", pbpLibMeasureScrollbar);') &&
+    libraryJsSrc.includes('new MutationObserver(pbpLibMeasureScrollbar).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-density"] });'),
+    "library.js: pbpLibMeasureScrollbar is gone, does not write --lib-sb-w, or is not re-run on resize and on html[data-theme|data-density] changes");
 }
 // List header, round 2 (2026-08-07). Four bare rows that each run the full
 // width of the list column; the geometry itself is measured live by the render

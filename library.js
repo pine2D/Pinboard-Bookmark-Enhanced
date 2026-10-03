@@ -52,10 +52,29 @@ if (typeof requestAnimationFrame === "function") {
   }));
 }
 
+// Scrollbar gutter width, measured (library redesign §2.4). The list regions
+// bleed into the column gap by exactly their own scrollbar, so a row's fill
+// ends where the index column ends. library.css styles the scrollbar at 10px,
+// but a platform or zoom change can move it while the page is open, so it is
+// re-measured on resize and whenever <html> is re-themed (data-theme /
+// data-density -- another tab's theme switch rewrites both live).
+function pbpLibMeasureScrollbar() {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:absolute;top:-9999px;width:100px;height:100px;overflow:scroll;visibility:hidden";
+  document.body.appendChild(probe);
+  const w = probe.offsetWidth - probe.clientWidth;
+  probe.remove();
+  document.documentElement.style.setProperty("--lib-sb-w", w + "px");
+  return w;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // Hydrate declarative icon slots (same contract as options.js/popup.js):
   // static PBP_ICONS constants only, never page content.
   document.querySelectorAll(".btn-ic[data-ic]").forEach(s => { s.innerHTML = PBP_ICONS[s.dataset.ic] || ""; });
+  pbpLibMeasureScrollbar();
+  window.addEventListener("resize", pbpLibMeasureScrollbar);
+  new MutationObserver(pbpLibMeasureScrollbar).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-density"] });
   // Same contract as every other page (popup.js / options.js / md-preview.js):
   // i18n.js does not self-apply data-i18n attributes, so each page must call
   // both explicitly before relying on translated markup.

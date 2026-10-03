@@ -41,8 +41,11 @@
 //   libAxis           -- { sizes, tolerancePx, scrollbarPx }: P / L / G
 //                        geometry and the row fill against the index column,
 //                        at DPR 1 and 1.5 and after a re-measure (T3c).
-// paneFit's optional `bleed: [selector]` exempts a list region that hangs
-// out of its pane by design (its own box only, not what it contains).
+// paneFit's optional `bleed: [selector]` names a list region that hangs out
+// of its pane by design: its own box is exempt; what it contains is measured
+// against the region's content box. Its overhang is allowed in the pane's
+// scrollWidth only up to the region's measured scrollbar gutter + 4px (the
+// designed bleed) + tolerancePx -- a larger overhang is still a paneScroll.
 //
 // expect keys (see docs/theme-surface/COMPONENTS.md for the exact rule
 // behind each -- section references in comments below):
@@ -777,6 +780,19 @@ export const CHECKS = [
   // trip (spec §12 T3: the list keeps its place).
   { surface: "library", page: "library.html", selector: "html (noPageScroll)", state: "noPageScroll", themes: ["", "terminal"],
     expect: { noPageScroll: { widths: [420, 861, 1280, 1920, 2560], height: 900, tolerancePx: 1 } } },
+  // ---- §9.2 G6 (plan T3): a filter starts its list again from the top. T3
+  // covers the search box, the group filter and the notes filter; T4 appends
+  // "status" and "color", T6 appends "sort" (same entry, longer `inputs`).
+  { surface: "library", page: "library.html", selector: "#vocab-search (filterScrollReset)", state: "filterScrollReset", themes: ["", "terminal"],
+    expect: { filterScrollReset: { inputs: ["search", "group", "notesFilter"], viewport: [1280, 700], probeOffset: 200 } } },
+  // ---- §9.2 G5, the axis subset (plan T3, Review Focus 1): the search box
+  // at P, the detail axis at P + L + G, the row fill on the index column --
+  // at 2560x1300 and 1280x800, at DPR 1 and 1.5 with a 17px scrollbar, and
+  // after --lib-sb-w is knocked out and re-measured (re-theme / resize).
+  // T7 / T8 add the rest of G5 (head sizes, the reference column, the page
+  // side column) as their own states.
+  { surface: "library", page: "library.html", selector: "#vocab-search (libAxis)", state: "libAxis", themes: ["", "terminal"],
+    expect: { libAxis: { sizes: [[2560, 1300], [1280, 800]], tolerancePx: 1, scrollbarPx: 17 } } },
   // followup3's "not fused into a third cell" ruling for the narrow-screen
   // lookup door (library.css ".vocab-filter-row > .vocab-lookup-narrow")
   // never had a gate (debt-sweep 2026-08-07). 500px: comfortably inside the

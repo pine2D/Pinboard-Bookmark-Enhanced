@@ -618,10 +618,10 @@ function _pbpNotesFocusNarrowBack(host) {
 function _pbpNotesBuildBackBtn() {
   const back = document.createElement("button");
   back.type = "button";
-  back.className = "btn btn-sm notes-detail-back";
-  // cross, like the vocabulary pane's back control: closing the detail IS the
-  // gesture, and the icon registry has no arrowLeft.
-  setBtnIcon(back, "cross", t("libraryBack"));
+  back.className = "btn btn-sm ghost notes-detail-back";
+  // Lucide arrow-left (user ruling 10-03): going back to the list is not a
+  // close, and cross belongs to the delete / remove / close family.
+  setBtnIcon(back, "arrowLeft", t("libraryBack"));
   back.addEventListener("click", () => {
     // Read the row to return to BEFORE the pane closes: _pbpNotesRenderDetail
     // (null) drops `lib-narrow-notes`, which at <=860px takes this whole pane
@@ -779,8 +779,9 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
   // the handoff above, not before -- same ordering as the vocabulary twin.
   // Only on an actual ENTRY CHANGE, though: _pbpNotesRefreshPreservingState
   // re-renders the same key on every pbp_hl_ write an open reader makes and on
-  // every view re-entry, and it restores window.scrollY and focus right
-  // afterwards -- resetting the pane there throws away what it preserves.
+  // every view re-entry, and it restores the list region's scrollTop and
+  // focus right afterwards -- resetting the pane there throws away what it
+  // preserves.
   const pane = $id("notes-detail-pane");
   if (pane && !sameHit) pane.scrollTop = 0;
   _notesRenderedDetailKey = hit.key;
@@ -852,9 +853,18 @@ function _pbpNotesBuildColorFilters() {
       // it starts the list back at the first batch.
       _pbpNotesClearSelection();
       _pbpNotesRender(true);
+      _pbpNotesResetListScroll();
     });
     wrap.appendChild(b);
   });
+}
+
+// Filters change WHICH rows exist, so the list starts again from its first
+// row (library redesign §2.5 #1). Only the two user inputs call this; a
+// refresh keeps the user's place (_pbpNotesRefreshPreservingState).
+function _pbpNotesResetListScroll() {
+  const region = document.querySelector(".notes-list-region");
+  if (region) region.scrollTop = 0;
 }
 
 // One flatten+sort per render. _pbpNotesHits() rebuilds and re-sorts every
@@ -1366,6 +1376,7 @@ if (typeof $id === "function") {
       _pbpNotesClearSelection();
       _pbpNotesBuildColorFilters();
       _pbpNotesRender(true);
+      _pbpNotesResetListScroll();
     });
   }
   const _notesSelectAll = $id("notes-select-all");
@@ -1439,7 +1450,11 @@ if (typeof $id === "function") {
 // re-render: a refresh must never swap a narrow reader's pane.
 async function _pbpNotesRefreshPreservingState() {
   const selected = _pbpNotesSelectedKey;
-  const scroll = window.scrollY;
+  // The list region is this view's scroll container (library redesign §2.5
+  // #2); the rebuild below replaces every row, so its offset is the place to
+  // keep. The page itself never scrolls.
+  const region = document.querySelector(".notes-list-region");
+  const listScroll = region ? region.scrollTop : 0;
   // Keyboard focus lives on a row button or on a control inside the detail,
   // and the rebuild replaces both -- every delete triggers this refresh 250ms
   // later through its own storage write, so without this the focus
@@ -1474,7 +1489,7 @@ async function _pbpNotesRefreshPreservingState() {
     const same = host && !host.hidden ? host.querySelector("." + CSS.escape(detailClass)) : null;
     if (!_pbpNotesFocus(same) && host) _pbpNotesFocus(host.querySelector(".notes-detail-back"));
   }
-  if (scroll) window.scrollTo(0, scroll);
+  if (region && listScroll) region.scrollTop = listScroll;
 }
 
 // Library page mount: render on first show and on every re-show/visibility

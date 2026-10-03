@@ -13,6 +13,7 @@ body.test-narrow-back .notes-detail-back{display:inline-flex}
    without this the pane is a scroll container on paper only. Scoped to the one
    test that needs a real scrollTop, same convention as the rule above. */
 body.test-scroll-pane #notes-detail-pane{max-height:60px;overflow-y:auto}
+body.test-scroll-region .notes-list-region{max-height:60px;overflow-y:auto}
 </style></head>
 <body>
 <!-- notes-workbench two-pane skeleton, copied from library.html (minus the
@@ -235,7 +236,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   // A REFRESH render of the SAME highlight must not:
   // _pbpNotesRefreshPreservingState re-renders the selected key on every
   // pbp_hl_ write an open reader makes (250ms debounce) and on every view
-  // re-entry, and it restores window.scrollY and focus right afterwards.
+  // re-entry, and it restores the list region's scrollTop and focus right afterwards.
   scrollPane.scrollTop = 40;
   const scrolledSame = scrollPane.scrollTop;
   _pbpNotesRenderDetail(_pbpNotesFindHit("pbp_hl_alpha#a1"));
@@ -303,6 +304,31 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     !rowKeys().includes("pbp_hl_evil#e1"), rowKeys());
   dots[0].click(); // restore
 
+  // ---- list-region scroll (library redesign spec §2.5 #1 / #2) ----
+  // The list region is this view's scroll container. The two filter inputs
+  // put it back at the top; a refresh (alt-tab, a reader write in another
+  // tab) keeps the user's place.
+  document.body.classList.add("test-scroll-region");
+  const notesRegion = document.querySelector(".notes-list-region");
+  notesRegion.scrollTop = 40;
+  const filterBefore = notesRegion.scrollTop;
+  $id("notes-filter").dispatchEvent(new Event("input"));
+  check("typing in the notes filter puts the list region back at the top",
+    filterBefore > 0 && notesRegion.scrollTop === 0, `before=${filterBefore} after=${notesRegion.scrollTop}`);
+  notesRegion.scrollTop = 40;
+  const colourBefore = notesRegion.scrollTop;
+  const colourButton = $id("notes-color-filters").querySelector("button");
+  colourButton.click();
+  check("a colour filter click puts the list region back at the top",
+    colourBefore > 0 && notesRegion.scrollTop === 0, `before=${colourBefore} after=${notesRegion.scrollTop}`);
+  colourButton.click(); // restore
+  notesRegion.scrollTop = 40;
+  const refreshBefore = notesRegion.scrollTop;
+  await _pbpNotesRefreshPreservingState();
+  check("a refresh keeps the list region's scroll position",
+    refreshBefore > 0 && notesRegion.scrollTop === refreshBefore, `before=${refreshBefore} after=${notesRegion.scrollTop}`);
+  document.body.classList.remove("test-scroll-region");
+
   // ---- selection survives a refresh ----
   rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-btn").click();
   store["pbp_hl_gamma"] = { v: 1, url: "https://gamma.example/", title: "Gamma", items: [
@@ -335,6 +361,11 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       document.body.classList.contains("lib-narrow-notes") &&
       document.activeElement === detail().querySelector(".notes-detail-back"),
       document.activeElement && (document.activeElement.className || document.activeElement.tagName));
+    const backButton = detail().querySelector(".notes-detail-back");
+    check("the narrow back button is a ghost Lucide arrow-left, not the close cross",
+      !!backButton && backButton.classList.contains("ghost") &&
+      [...backButton.querySelectorAll("svg path")].map((path) => path.getAttribute("d")).join("|") === "m12 19-7-7 7-7|M19 12H5",
+      backButton && backButton.innerHTML.slice(0, 200));
     detail().querySelector(".notes-detail-back").click();
     check("the back button returns to the list and clears the selection",
       !document.body.classList.contains("lib-narrow-notes") &&

@@ -1991,16 +1991,28 @@ async function _pbpVocabApplyStatusChange(known) {
   }
 }
 
+// Filters and sort start the list again from its first row (library redesign
+// §2.5 #1): the list region is the scroll container now. Only the four user
+// inputs below call this -- never _pbpVocabApplyView itself, which the
+// reload path (_pbpVocabSoftReload, a reconcile from another tab) also calls
+// and which must keep the user's place.
+function _pbpVocabResetListScroll() {
+  const region = document.querySelector(".vocab-list-region");
+  if (region) region.scrollTop = 0;
+}
+
 const _vocabSearch = $id("vocab-search");
 if (_vocabSearch) _vocabSearch.addEventListener("input", () => {
   _pbpVocabClearSelection();
   _pbpVocabApplyView(true);
+  _pbpVocabResetListScroll();
 });
 for (const id of ["vocab-group-filter", "vocab-status-filter"]) {
   const control = $id(id);
   if (control) control.addEventListener("change", () => {
     _pbpVocabClearSelection();
     _pbpVocabApplyView(true);
+    _pbpVocabResetListScroll();
   });
 }
 // Stats-strip status chips proxy #vocab-status-filter: click sets it and
@@ -2041,6 +2053,7 @@ const _vocabSortSelect = $id("vocab-sort");
 if (_vocabSortSelect) _vocabSortSelect.addEventListener("change", () => {
   _vocabLastSelectedId = null;
   _pbpVocabApplyView(true);
+  _pbpVocabResetListScroll();
   _pbpVocabSyncSortSeg();
 });
 // Sort segment: two direction-toggle buttons proxying the hidden #vocab-sort

@@ -1669,9 +1669,15 @@ const PANE_FIT_SCAN = ({ panes, tolerance, bleed = [] }) => {
     // 4px into the gap at the end). Its own box is exempt and its overhang is
     // allowed in the pane's scrollWidth; everything INSIDE it is still checked,
     // against the region's own content box (the rows fill the region, so the
-    // pane's edges would flag every row by the designed 4px).
+    // pane's edges would flag every row by the designed 4px). The allowance
+    // is capped at what the design can produce -- the region's measured
+    // scrollbar gutter + 4px (+ tolerance) -- so a runaway negative margin is
+    // still a paneScroll rather than an overhang the gate quietly widens for.
     const bleeders = bleed.flatMap((sel) => [...pane.querySelectorAll(sel)]);
-    const allowance = bleeders.reduce((max, el) => Math.max(max, Math.ceil(el.getBoundingClientRect().right - pr.right)), 0);
+    const allowance = bleeders.reduce((max, el) => {
+      const cap = (el.offsetWidth - el.clientWidth) + 4 + tolerance;
+      return Math.max(max, Math.min(cap, Math.ceil(el.getBoundingClientRect().right - pr.right)));
+    }, 0);
     if (pane.scrollWidth > pane.clientWidth + tolerance + allowance) {
       hits.push({ pane: paneSel, el: paneSel, kind: "paneScroll", over: +(pane.scrollWidth - pane.clientWidth).toFixed(2) });
     }
@@ -1835,6 +1841,167 @@ async function driveNoPageScroll(page, check, extBase, theme) {
     await p.close().catch(() => {});
     await page.bringToFront().catch(() => {});
   }
+  return hits;
+}
+
+// ---- state: "filterScrollReset" (spec §9.2 G6) ------------------------------
+// Each user input from spec §2.5 #1 puts its list region back at the top.
+// Every input gets a freshly loaded view, the region is parked at
+// probeOffset first, and after the input the list must still be able to
+// scroll at least that far -- otherwise a filter that merely SHORTENED the
+// list would clamp scrollTop to 0 and pass for a reset. T4 drives the status
+// and colour toggles in its own state (filterScrollResetToggles); T6 turns
+// "group" into a real listbox pick and adds "sort".
+const FILTER_SCROLL_INPUTS = {
+  search: { view: "vocab", act: async (p) => { await p.fill("#vocab-search", "e"); return true; } },
+  group: {
+    view: "vocab",
+    act: (p) => p.evaluate(() => {
+      const select = document.getElementById("vocab-group-filter");
+      if (![...select.options].some((o) => o.value === "Reading")) return false;
+      select.value = "Reading";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    }),
+  },
+  // Every seeded highlight lives under example.com, and the notes filter
+  // matches page URLs too: the list stays full length.
+  notesFilter: { view: "notes", act: async (p) => { await p.fill("#notes-filter", "example"); return true; } },
+};
+
+async function driveFilterScrollReset(page, check, extBase, theme) {
+  const { inputs, viewport = [1280, 700], probeOffset = 200 } = check.expect.filterScrollReset;
+  const hits = [];
+  const p = await page.context().newPage();
+  try {
+    await p.setViewportSize({ width: viewport[0], height: viewport[1] });
+    for (const name of inputs) {
+      const input = FILTER_SCROLL_INPUTS[name];
+      if (!input) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|filterScrollReset]: unknown input "${name}"`);
+      await openLibraryView(p, extBase, theme, input.view, `g6-${name}`);
+      const regionSel = input.view === "notes" ? ".notes-list-region" : ".vocab-list-region";
+      const before = await p.evaluate(({ sel, y }) => { const r = document.querySelector(sel); r.scrollTop = y; return r.scrollTop; }, { sel: regionSel, y: probeOffset });
+      if (before !== probeOffset) throw new Error(`SETUP: ${regionSel} could not be scrolled to ${probeOffset} before "${name}" (got ${before}, theme=${theme}) -- the seeded list is too short for this probe`);
+      if (!(await input.act(p))) throw new Error(`SETUP: the "${name}" input could not be performed (theme=${theme})`);
+      await p.waitForTimeout(200);
+      const after = await p.evaluate((sel) => { const r = document.querySelector(sel); return { top: r.scrollTop, room: r.scrollHeight - r.clientHeight }; }, regionSel);
+      if (after.room < probeOffset) throw new Error(`SETUP: after "${name}" the list scrolls only ${after.room}px, under the ${probeOffset}px probe -- a clamp would pass for a reset (theme=${theme})`);
+      if (after.top !== 0) hits.push(`${name}: ${regionSel} scrollTop ${after.top} after the input (was ${before})`);
+    }
+  } finally {
+    await p.close().catch(() => {});
+    await page.bringToFront().catch(() => {});
+  }
+  return hits;
+}
+
+// ---- state: "libAxis" (spec §9.2 G5 subset; plan Review Focus 1) ----------
+// The page's three numbers, recomputed here from the spec's own table (never
+// read back from the CSS that implements them): P = 48 / 32 / 24 at >=1920 /
+// 1280-1919 / <=1279, L = clamp(360, 20vw, 520), G = 64 / 48 at >=1920 / below.
+// The search box starts at P, the detail axis sits at P + L + G, and the first
+// row's fill spans exactly the index column [P, P + L] -- which only holds if
+// --lib-sb-w equals the region's real scrollbar gutter. Runs in the page.
+const LIB_AXIS_SCAN = (view) => {
+  const px = (v) => parseFloat(v) || 0;
+  const w = innerWidth;
+  const P = w >= 1920 ? 48 : w >= 1280 ? 32 : 24;
+  const L = Math.min(520, Math.max(360, w * 0.2));
+  const G = w >= 1920 ? 64 : 48;
+  const notes = view === "notes";
+  const search = document.querySelector(notes ? "#notes-filter" : "#vocab-search");
+  const pane = document.querySelector(notes ? "#notes-detail-pane" : "#vocab-detail-pane");
+  const row = document.querySelector(notes ? "#notes-list .notes-hit-btn" : "#vocab-list .vocab-card .notes-card-top");
+  const region = document.querySelector(notes ? ".notes-list-region" : ".vocab-list-region");
+  if (!search || !pane || !row || !region) return { error: `missing ${[!search && "search", !pane && "pane", !row && "row", !region && "region"].filter(Boolean).join(", ")} in the ${view} view` };
+  const s = search.getBoundingClientRect(), r = row.getBoundingClientRect(), pr = pane.getBoundingClientRect();
+  const pcs = getComputedStyle(pane);
+  return {
+    dpr: devicePixelRatio, P, L, G,
+    searchLeft: s.left, searchRight: s.right,
+    rowLeft: r.left, rowRight: r.right,
+    axis: pr.left + px(pcs.borderLeftWidth) + px(pcs.paddingLeft),
+    gutter: region.offsetWidth - region.clientWidth,
+    sbVar: getComputedStyle(document.documentElement).getPropertyValue("--lib-sb-w").trim(),
+  };
+};
+
+async function driveLibAxis(page, check, extBase, theme) {
+  const { sizes, tolerancePx = 1, scrollbarPx = 17 } = check.expect.libAxis;
+  const hits = [];
+  const ctx = page.context();
+  const wide = sizes[sizes.length - 1];
+  // A: the shipped 10px scrollbar at DPR 1. B: the user's real window --
+  // DPR 1.5 -- with a wider scrollbar injected before load, so the FIRST
+  // measurement has to pick it up. C / D: --lib-sb-w deliberately corrupted
+  // after load, then the two re-measure triggers fired -- an <html>
+  // re-theme (MutationObserver) and a resize -- each alone must restore it.
+  const rounds = [
+    { name: "dpr1", dpr: 1, sizes },
+    { name: `dpr1.5+sb${scrollbarPx}`, dpr: 1.5, injectAtLoad: true, sizes },
+    { name: "remeasure-on-rethemed-html", dpr: 1, corruptThen: "attribute", sizes: [wide] },
+    { name: "remeasure-on-resize", dpr: 1, corruptThen: "resize", sizes: [wide] },
+  ];
+  const scrollbarCss = `::-webkit-scrollbar { width: ${scrollbarPx}px !important; }`;
+  for (const round of rounds) {
+    for (const [w, h] of round.sizes) {
+      const p = await ctx.newPage();
+      try {
+        await p.setViewportSize({ width: w, height: h });
+        if (round.dpr !== 1) {
+          const cdp = await ctx.newCDPSession(p);
+          await cdp.send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: round.dpr, mobile: false });
+        }
+        if (round.injectAtLoad) {
+          // Registered before any page script, so this DOMContentLoaded
+          // listener runs ahead of library.js's -- the stylesheet is in place
+          // when the first measurement happens.
+          await p.addInitScript((css) => {
+            document.addEventListener("DOMContentLoaded", () => {
+              const style = document.createElement("style");
+              style.textContent = css;
+              document.head.appendChild(style);
+            }, { once: true });
+          }, scrollbarCss);
+        }
+        for (const view of ["vocab", "notes"]) {
+          await openLibraryView(p, extBase, theme, view, `g5-${round.name}-${w}`);
+          if (round.corruptThen) {
+            await p.evaluate(() => document.documentElement.style.setProperty("--lib-sb-w", "0px"));
+            if (round.corruptThen === "attribute") {
+              await p.evaluate(() => {
+                const html = document.documentElement;
+                const prev = html.getAttribute("data-density");
+                html.setAttribute("data-density", prev ?? "compact");
+                if (prev === null) html.removeAttribute("data-density");
+              });
+            } else {
+              await p.setViewportSize({ width: w + 1, height: h });
+              await p.waitForTimeout(100);
+              await p.setViewportSize({ width: w, height: h });
+            }
+            await p.waitForTimeout(150);
+          }
+          const m = await p.evaluate(LIB_AXIS_SCAN, view);
+          if (m.error) throw new Error(`SETUP: libAxis ${m.error} (${round.name} ${w}x${h}, theme=${theme})`);
+          if (Math.abs(m.dpr - round.dpr) > 0.01) throw new Error(`SETUP: libAxis devicePixelRatio is ${m.dpr}, wanted ${round.dpr} (theme=${theme})`);
+          if (round.injectAtLoad && m.gutter !== scrollbarPx) throw new Error(`SETUP: the injected ${scrollbarPx}px scrollbar did not apply (region gutter ${m.gutter}px, theme=${theme})`);
+          const where = `${round.name} ${w}x${h} ${view}`;
+          const near = (a, b) => Math.abs(a - b) <= tolerancePx;
+          const indexRight = m.P + m.L;
+          if (!near(m.searchLeft, m.P)) hits.push(`${where}: search box left ${m.searchLeft.toFixed(2)} != P ${m.P}`);
+          if (view === "vocab" && !near(m.searchRight, indexRight)) hits.push(`${where}: search box right ${m.searchRight.toFixed(2)} != P + L ${indexRight.toFixed(2)}`);
+          if (!near(m.axis, indexRight + m.G)) hits.push(`${where}: detail axis ${m.axis.toFixed(2)} != P + L + G ${(indexRight + m.G).toFixed(2)}`);
+          if (!near(m.rowLeft, m.P) || !near(m.rowRight, indexRight)) {
+            hits.push(`${where}: row fill ${m.rowLeft.toFixed(2)}-${m.rowRight.toFixed(2)} != index column ${m.P}-${indexRight.toFixed(2)} (--lib-sb-w ${m.sbVar || "unset"}, gutter ${m.gutter}px)`);
+          }
+        }
+      } finally {
+        await p.close().catch(() => {});
+      }
+    }
+  }
+  await page.bringToFront().catch(() => {});
   return hits;
 }
 
@@ -2197,6 +2364,18 @@ async function runOneCheck(page, theme, check, results, extBase) {
     const hits = await driveNoPageScroll(page, check, extBase, theme);
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("noPageScroll", hits.length === 0, hits.length, 0, hits.length ? hits.slice(0, 4).join("; ") : undefined) });
+    return;
+  }
+  if (check.state === "filterScrollReset") {
+    const hits = await driveFilterScrollReset(page, check, extBase, theme);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("filterScrollReset", hits.length === 0, hits.length, 0, hits.length ? hits.slice(0, 4).join("; ") : undefined) });
+    return;
+  }
+  if (check.state === "libAxis") {
+    const hits = await driveLibAxis(page, check, extBase, theme);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("libAxis", hits.length === 0, hits.length, 0, hits.length ? hits.slice(0, 4).join("; ") : undefined) });
     return;
   }
   if (check.state === "gapMin") {

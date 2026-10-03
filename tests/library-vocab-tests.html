@@ -14,6 +14,7 @@ body.test-narrow-back .vocab-detail-back{display:inline-flex}
    that needs a real scrollTop, same convention as the rule above (and as
    library-notes-tests.html's twin). */
 body.test-scroll-pane #vocab-detail-pane{max-height:60px;overflow-y:auto}
+body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
 </style></head>
 <body>
 <!-- vocab-workbench two-pane skeleton, copied from library.html (minus
@@ -97,7 +98,7 @@ body.test-scroll-pane #vocab-detail-pane{max-height:60px;overflow-y:auto}
       </div>
     </div>
     <aside class="vocab-detail-pane" id="vocab-detail-pane" aria-label="Word details">
-      <button type="button" class="btn btn-sm vocab-detail-back" id="vocab-detail-back" aria-label="Back to list" title="Back to list"><span class="btn-ic" data-ic="cross"></span><span>Back to list</span></button>
+      <button type="button" class="btn btn-sm ghost vocab-detail-back" id="vocab-detail-back" aria-label="Back to list" title="Back to list"><span class="btn-ic" data-ic="arrowLeft"></span><span>Back to list</span></button>
       <div id="vocab-lookup-bar" class="vocab-filter-toolbar vocab-lookup-bar" role="search" aria-label="Dictionary lookup">
         <input type="search" id="vocab-lookup-input" aria-label="Look up any word" autocomplete="off" />
         <select id="vocab-lookup-lang" aria-label="Dictionary language"></select>
@@ -612,6 +613,43 @@ check("active alpha button is pressed and time is not",
   $id("vocab-sort-time").getAttribute("aria-pressed") === "false");
 $id("vocab-sort-time").click();
 check("time button re-enters latest-first", $id("vocab-sort").value === "latest");
+
+// List-region scroll reset (library redesign spec §2.5 #1): the list region
+// is the scroll container, and the four USER inputs put it back at the top --
+// never the shared _pbpVocabApplyView, which the reload path also calls with
+// resetLimit=false. Each probe re-renders the same rows, so the re-render
+// alone keeps scrollTop: without its reset call every probe below stays at 40.
+{
+  _vocabRows = sample;
+  $id("vocab-search").value = "";
+  $id("vocab-group-filter").value = "";
+  $id("vocab-status-filter").value = "";
+  _pbpVocabApplyView(true);
+  document.body.classList.add("test-scroll-region");
+  const region = document.querySelector(".vocab-list-region");
+  const scrolledThen = (act) => {
+    region.scrollTop = 40;
+    const before = region.scrollTop;
+    act();
+    return { before, after: region.scrollTop };
+  };
+  const inputs = [
+    ["typing in the search box", () => $id("vocab-search").dispatchEvent(new Event("input", { bubbles: true }))],
+    ["a group filter change", () => $id("vocab-group-filter").dispatchEvent(new Event("change"))],
+    ["a status filter change", () => $id("vocab-status-filter").dispatchEvent(new Event("change"))],
+    ["a sort change", () => { $id("vocab-sort").value = "az"; $id("vocab-sort").dispatchEvent(new Event("change")); }],
+  ];
+  for (const [name, act] of inputs) {
+    const r = scrolledThen(act);
+    check(`${name} puts the list region back at the top`, r.before > 0 && r.after === 0, `before=${r.before} after=${r.after}`);
+  }
+  const reload = scrolledThen(() => _pbpVocabApplyView(false));
+  check("a reload render (_pbpVocabApplyView) keeps the list region where it was",
+    reload.before > 0 && reload.after === reload.before, `before=${reload.before} after=${reload.after}`);
+  $id("vocab-sort").value = "latest";
+  $id("vocab-sort").dispatchEvent(new Event("change"));
+  document.body.classList.remove("test-scroll-region");
+}
 
 _vocabRows = Array.from({length:5000}, (_, i) => ({id:"id"+i,term:"word"+i,updatedAt:5000-i,groups:[],contexts:[]}));
 $id("vocab-search").value = "";
@@ -1594,7 +1632,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       </div>
     </div>
     <aside class="vocab-detail-pane">
-      <button type="button" class="btn btn-sm vocab-detail-back"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
+      <button type="button" class="btn btn-sm ghost vocab-detail-back"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
       <div class="vocab-filter-toolbar vocab-lookup-bar">
         <input type="search" data-label="lookup-input">
         <select data-label="lookup-lang"></select>
