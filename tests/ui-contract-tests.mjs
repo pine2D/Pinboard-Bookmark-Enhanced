@@ -1020,7 +1020,7 @@ check(vocabGdriveJs.includes("function pbpCreateVocabDriveSyncRunner("),
 for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-select-all",
   "vocab-invert-selection", "vocab-batch-toolbar", "vocab-group-input", "vocab-add-group",
   "vocab-batch-delete", "vocab-no-results", "vocab-load-more", "vocab-list",
-  "vocab-sort-time", "vocab-sort-alpha"]) {
+  "vocab-sort-time", "vocab-sort-alpha", "vocab-stat-all", "vocab-filter-narrow", "vocab-filter-set", "vocab-context-bar"]) {
   check(libraryHtml.includes(`id="${id}"`), `library.html: scalable vocabulary control #${id} is missing`);
 }
 // options.html no longer renders the word list (retired for the library
@@ -2349,35 +2349,23 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
     "library.html: #vocab-status-filter lost its `hidden` attribute — the status chips replaced it in the UI, it may not come back as a second visible control");
   check(/const target = chip\.dataset\.status;\s*\n\s*filter\.value = filter\.value === target \? "" : target;\s*\n\s*filter\.dispatchEvent\(new Event\("change"\)\);/.test(libraryVocabJs),
     "library-vocab.js: the status chips stopped writing #vocab-status-filter + dispatching change — they must drive the existing filter pipeline, not a parallel one");
-  // Chips are controls, so they wear the button fill; and pressed is
-  // byte-identical to the sort segment's pressed cell, which sits in the same
-  // row and means the same thing. --lib-row-selected-bg is explicitly out: it
-  // is byte-identical to --lib-panel on dracula (measured), i.e. invisible.
-  // Hand-written layer only: the generated region carries its own
-  // `.vocab-stat-chip` (the shared chip recipe), and matching that one instead
-  // would test the thing this override exists to beat.
-  // WHAT THIS PIN DOES AND DOES NOT GUARD (independent review F2, 2026-08-07):
-  // it reads CSS SOURCE, so it can only see that the declaration EXISTS --
-  // never that it WINS. Until 2026-08-07 the override was unqualified and beat
-  // the generated rule on source order alone, which this pin is structurally
-  // blind to: move the generated region below the hand-written block and every
-  // assertion here still passes while the chips render grey-on-grey. The
-  // `.vocab-filter-row > ` prefix is now required by the regexes for exactly
-  // that reason -- it is the (0,2,0)-vs-(0,1,0) qualifier that makes winning a
-  // property of the selector instead of a property of the file's layout, and
-  // requiring it here is the closest a text gate can get to "this takes
-  // effect". The render oracle's rowStates entries are what actually measure
-  // the composed result.
   const chipHand = stripGeneratedRegions(libraryCss);
-  const chipRule = /\.vocab-filter-row > \.vocab-stat-chip \{([^}]*)\}/.exec(chipHand);
-  const chipOn = /\.vocab-filter-row > \.vocab-stat-chip\[aria-pressed="true"\] \{([^}]*)\}/.exec(chipHand);
-  const segOn = /\.vocab-sort-seg > \.vocab-sort-btn\[aria-pressed="true"\] \{([^}]*)\}/.exec(chipHand);
-  const mix = (body) => (/background:\s*(color-mix\([^;]*\))/.exec(body || "") || [])[1];
-  check(!!chipRule && /background:\s*var\(--lib-btn-bg\)/.test(chipRule[1]) && /color:\s*var\(--lib-btn-fg\)/.test(chipRule[1]),
-    "library.css: the status chips fell back to the chip family's label fill, or `.vocab-filter-row > ` was dropped from the override (without it the rule ties the generated recipe and wins only on source order) — in a row of controls they are controls and take the button fill");
-  check(!!chipOn && !!segOn && mix(chipOn[1]) === mix(segOn[1]) &&
-    !/row-selected-bg/.test(chipOn[1]) && !/inset/.test(chipOn[1]),
-    "library.css: the chip's selected fill drifted from the sort segment's pressed cell (or went back to --lib-row-selected-bg / an inset ring) — two controls in one row that both mean \"this filter is on\" must not invent two looks");
+  // The three status toggles are the .lib-toggle primitive (spec §3.2): no
+  // frame, transparent + fg-muted at rest, btn-bg + btn-fg + Bold when pressed.
+  // Hand-written layer only; the chip recipe they used to borrow is gone from
+  // CHIP_TARGETS, so nothing generated competes with these rules.
+  const toggleRules = parseStyleRules(chipHand);
+  const toggleBody = (sel) => (toggleRules.find((r) => r.context.length === 0 && r.selectors.includes(sel)) || {}).body || "";
+  const toggleRest = toggleBody(".lib-toggle");
+  const togglePressed = toggleBody('.lib-toggle[aria-pressed="true"]');
+  check(/background:\s*transparent/.test(toggleRest) && /color:\s*var\(--lib-fg-muted\)/.test(toggleRest) &&
+    /border:\s*0/.test(toggleRest) && /height:\s*var\(--lib-control-h\)/.test(toggleRest) &&
+    /border-radius:\s*var\(--lib-radius-md\)/.test(toggleRest) &&
+    /background:\s*var\(--lib-btn-bg\)/.test(togglePressed) && /color:\s*var\(--lib-btn-fg\)/.test(togglePressed) &&
+    /font-weight:\s*bold/.test(togglePressed),
+    "library.css: .lib-toggle lost its spec §3.2 look -- rest is transparent + --lib-fg-muted with no frame, pressed is --lib-btn-bg + --lib-btn-fg + bold");
+  check(!/vocab-stat-chip/.test(libraryCss + libraryHtml + libraryVocabJs),
+    "library: .vocab-stat-chip came back -- the status filter is the .lib-toggle primitive now (spec §3.2)");
   // An empty status span still carried its 8px margin and stole 16px off the
   // right edge of the count row, which is the row that has to end flush.
   check(/\.save-status:empty \{ display: none; \}/.test(libraryCss),
@@ -8708,6 +8696,54 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
   check(!/innerHTML/.test(libJs.slice(libJs.indexOf("function pbpLibSplitCount"))),
     "library.js: the count helpers must build text with textContent only (no innerHTML)");
+}
+
+// ---- library redesign T4b (spec §3.1-§3.5): the vocabulary list header. ----
+{
+  const hand = stripGeneratedRegions(libraryCss);
+  const libJs = read("library.js");
+  const rules = parseStyleRules(hand);
+  const body = (sel) => (rules.find((r) => r.context.length === 0 && r.selectors.includes(sel)) || {}).body || "";
+  check(!libraryHtml.includes('id="vocab-stats"') &&
+    !/vocab-stat-(?:total|groups|languages|recent)\b/.test(libraryHtml + libraryVocabJs) && !/\.vocab-stats?\b/.test(hand),
+    "library: the retired #vocab-stats strip (or its CSS) is back -- counts live in #vocab-context-bar only (spec §3.1)");
+  check(/<div class="vocab-context-bar lib-count-row" id="vocab-context-bar">/.test(libraryHtml) &&
+    /pbpLibRenderCount\(count, items, full\)/.test(libraryVocabJs),
+    "library: #vocab-context-bar is not the .lib-count-row, or _pbpVocabRenderStats stopped rendering it through pbpLibRenderCount");
+  const items = body(".lib-count-items");
+  check(/flex-wrap:\s*wrap/.test(items) && /overflow:\s*hidden/.test(items) &&
+    /height:\s*calc\(var\(--lib-control-h\) - 4px\)/.test(items),
+    "library.css: .lib-count-items must be a fixed-height wrapping flex box that hides its second line -- an item that does not fit folds away whole instead of being cut (spec §3.5)");
+  check(/\.lib-count-item \+ \.lib-count-item::before \{ content: "\\00a0\u00b7\\00a0"; \}/.test(hand),
+    "library.css: the count-row separator must be CSS-drawn (content: \"\\00a0·\\00a0\"), never typed into a string");
+  check(/<button type="button" class="lib-toggle" id="vocab-stat-all" data-status="" aria-pressed="true" data-i18n="libraryFilterAll" hidden>/.test(libraryHtml) &&
+    /<button type="button" class="lib-toggle" id="vocab-stat-learning" data-status="new" aria-pressed="false" hidden><\/button>/.test(libraryHtml) &&
+    /<button type="button" class="lib-toggle" id="vocab-stat-known" data-status="known" aria-pressed="false" hidden><\/button>/.test(libraryHtml) &&
+    /for \(const chipId of \["vocab-stat-all", "vocab-stat-learning", "vocab-stat-known"\]\)/.test(libraryVocabJs),
+    "library: the three status toggles (All / Learning / Known) are missing, not hidden until the first count, or not all wired to the #vocab-status-filter carrier");
+  check(/\.lib-toggle\[hidden\] \{ display: none; \}/.test(hand),
+    "library.css: .lib-toggle is inline-flex, which outranks the UA [hidden] rule -- the toggles would show empty before the first count");
+  check(/<button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false">/.test(libraryHtml) &&
+    /<div class="vocab-filter-set" id="vocab-filter-set" popover="auto">/.test(libraryHtml) &&
+    (libraryHtml.match(/id="vocab-group-filter"/g) || []).length === 1,
+    "library.html: the narrow-index Filter button / popover is missing, or the group filter was copied instead of moved (one DOM for both forms, spec §3.4)");
+  const wide = /@container lib-index \(min-width: (\d+)px\) \{[\s\S]*?\.vocab-filter-set\[popover\]:not\(:popover-open\) \{([^}]*)\}/.exec(hand);
+  const threshold = wide ? Number(wide[1]) : NaN;
+  check(!!wide && threshold >= 440 && threshold <= 520 &&
+    ["display: flex", "position: static", "inset: auto", "margin: 0", "padding: 0", "border: 0", "background: none",
+      "width: auto", "height: auto", "overflow: visible", "color: inherit", "flex: 1 1 auto", "min-width: 0"].every((d) => wide[2].includes(d)),
+    `library.css: the wide-index reset of .vocab-filter-set[popover] is missing a UA override (spec §3.4 lists all of them) or its threshold ${threshold} is outside 440-520`);
+  check(/@media \(max-width: 860px\) \{\s*#vocab-filter-narrow \{ display: inline-flex; \}\s*\.vocab-filter-set\[popover\]:not\(:popover-open\) \{ display: none; \}/.test(hand),
+    "library.css: below the 860px single-pane break the vocabulary filters must always fold into the Filter popover");
+  const at = (src) => libraryHtml.indexOf(`<script defer src="${src}"></script>`);
+  check(at("shared.js") > 0 && at("shared.js") < at("listbox.js") && at("listbox.js") < at("library-notes.js"),
+    "library.html: listbox.js must load after shared.js and before library-notes.js (spec §8.1)");
+  check(/function pbpLibWireFilterPopover\(set, button, indexEl\)/.test(libJs) &&
+    /pbpLibWireFilterPopover\(\$id\("vocab-filter-set"\), \$id\("vocab-filter-narrow"\), \$id\("vocab-list-pane"\)\)/.test(libJs) &&
+    /set\.style\.removeProperty\(prop\)/.test(libJs),
+    "library.js: the Filter popover is not wired, or closing it leaves pbpListboxPlace's inline position behind (the wide form would render fixed)");
+  check(/document\.addEventListener\("pbp:i18n-applied", _pbpVocabSyncFilterNarrow\)/.test(libraryVocabJs),
+    "library-vocab.js: applyI18n rewrites the Filter button's label to the plain key on a language change; _pbpVocabSyncFilterNarrow must re-run after it");
 }
 
 if (fail.length) {

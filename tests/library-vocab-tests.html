@@ -39,14 +39,20 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
         <input type="search" id="vocab-search" aria-label="Search words, definitions, context, and groups" autocomplete="off" />
       </div>
       <div class="vocab-filter-row">
-        <select id="vocab-group-filter" aria-label="Filter by group"><option value="">All groups</option></select>
-        <select id="vocab-status-filter" aria-label="Filter by status" hidden>
-          <option value="">All statuses</option>
-          <option value="new">Learning</option>
-          <option value="known">Known</option>
-        </select>
-        <button type="button" class="vocab-stat-chip" id="vocab-stat-learning" data-status="new" aria-pressed="false"></button>
-        <button type="button" class="vocab-stat-chip" id="vocab-stat-known" data-status="known" aria-pressed="false"></button>
+        <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"><span class="btn-ic" data-ic="chevronDown"></span><span>Filter</span></button>
+        <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">
+          <select id="vocab-group-filter" aria-label="Filter by group"><option value="">All groups</option></select>
+          <select id="vocab-status-filter" aria-label="Filter by status" hidden>
+            <option value="">All statuses</option>
+            <option value="new">Learning</option>
+            <option value="known">Known</option>
+          </select>
+          <span class="vocab-status-toggles" id="vocab-status-toggles" role="group" aria-label="Filter by status">
+            <button type="button" class="lib-toggle" id="vocab-stat-all" data-status="" aria-pressed="true" hidden>All</button>
+            <button type="button" class="lib-toggle" id="vocab-stat-learning" data-status="new" aria-pressed="false" hidden></button>
+            <button type="button" class="lib-toggle" id="vocab-stat-known" data-status="known" aria-pressed="false" hidden></button>
+          </span>
+        </div>
         <select id="vocab-sort" aria-label="Sort vocabulary" hidden>
           <option value="latest">Recently updated</option>
           <option value="oldest">Least recently updated</option>
@@ -59,20 +65,14 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
         </span>
         <button type="button" class="btn btn-sm vocab-lookup-narrow" id="vocab-lookup-narrow" aria-label="Look up a word" title="Look up a word"><span class="btn-ic" data-ic="book"></span></button>
       </div>
-      <div id="vocab-stats" class="vocab-stats" hidden>
-        <span class="vocab-stat" id="vocab-stat-total"></span>
-        <span class="vocab-stat" id="vocab-stat-groups"></span>
-        <span class="vocab-stat" id="vocab-stat-languages"></span>
-        <span class="vocab-stat vocab-stat-trend" id="vocab-stat-recent"></span>
-      </div>
-      <div class="vocab-context-bar" id="vocab-context-bar">
+      <div class="vocab-context-bar lib-count-row" id="vocab-context-bar">
         <span class="vocab-ctx-text">
           <span id="vocab-count" class="notes-count" aria-live="polite"></span>
         </span>
-        <div class="lib-cluster" role="group" aria-label="Selection actions">
-          <button type="button" class="btn btn-sm ghost" id="vocab-select-all">Select all</button>
-        </div>
         <span class="save-status vocab-main-status" id="vocab-status" role="status" aria-live="polite"></span>
+        <div class="lib-cluster" role="group" aria-label="Selection actions">
+          <button type="button" class="btn btn-sm ghost lib-hang-end" id="vocab-select-all">Select all</button>
+        </div>
       </div>
       <div id="vocab-empty" class="notes-empty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
       <div id="vocab-no-results" class="notes-empty" hidden>No words match the current filters.</div>
@@ -147,11 +147,18 @@ const sample = [
 const hostileOwner = "acct_%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E";
 const hostileOwnerLabel = typeof pbpVocabOwnerLabel === "function" ? pbpVocabOwnerLabel(hostileOwner) : "";
 if (typeof _vocabOwnerLabel !== "undefined") _vocabOwnerLabel = hostileOwnerLabel;
+_vocabRows = sample;
+_pbpVocabApplyView(true);
+const ownerFull = $id("vocab-count").querySelector(".lib-count-full");
+const ownerFullText = ownerFull ? ownerFull.textContent : "";
+const ownerTitle = $id("vocab-count").title;
+const ownerNoImg = !$id("vocab-count").querySelector("img");
 _vocabRows = [];
 _pbpVocabApplyView(true);
 check("current-account total and empty state render the non-secret owner as text",
-  $id("vocab-count").textContent.includes("<img") && $id("vocab-empty").textContent.includes("<img") &&
-  !$id("vocab-count").querySelector("img") && !$id("vocab-empty").querySelector("img"));
+  ownerFullText.includes("<img") && ownerTitle.includes("<img") && ownerNoImg &&
+  $id("vocab-empty").textContent.includes("<img") && !$id("vocab-empty").querySelector("img"),
+  ownerFullText);
 _pbpVocabClearVisibleState();
 check("account-switch clearing removes the previous owner scope before the next read",
   !$id("vocab-count").textContent && $id("vocab-empty").hidden &&
@@ -204,6 +211,8 @@ check("equal sort keys preserve source order", ids(pbpVocabFilterSort(tied,"",""
   check("stats: added7 inclusive boundary", s.added7 === 2);
   check("stats: added30", s.added30 === 3);
   check("stats: empty rows", pbpVocabStats([], NOW).total === 0);
+  check("stats: latestCreatedAt is the newest createdAt (0 for none)",
+    s.latestCreatedAt === NOW - 1 * D && pbpVocabStats([], NOW).latestCreatedAt === 0);
 })();
 
 setStatusIcon($id("vocab-status"), false, "read failed");
@@ -308,32 +317,70 @@ check("exactly 100 rows fills one render batch without exposing Load more",
     time);
 }
 
-// Stats strip: total/learning/known counts, chip status-filter linkage, and
-// hide-on-clear (Task 1: vocabulary stats strip).
+// Count row + status toggles (spec §3.2 / §3.5). Before the clearing check:
+// the narrow "Filter" button's two readings (§3.4).
 const statsSample = [
-  { id:"stat-a", term:"alpha", status:"new",   groups:["G1"], contexts:[], updatedAt:1 },
-  { id:"stat-b", term:"beta",  status:"known", groups:["G1"], contexts:[], updatedAt:2 },
-  { id:"stat-c", term:"gamma", status:"known", groups:[],     contexts:[], updatedAt:3 },
+  { id:"stat-a", term:"alpha", status:"new",   language:"en", groups:["G1"], contexts:[], updatedAt:1, createdAt: Date.now() },
+  { id:"stat-b", term:"beta",  status:"known", language:"de", groups:["G1"], contexts:[], updatedAt:2, createdAt: 1 },
+  { id:"stat-c", term:"gamma", status:"known",                groups:[],     contexts:[], updatedAt:3, createdAt: 1 },
 ];
+const countItems = () => [...$id("vocab-count").querySelectorAll(".lib-count-item")].map((el) => el.textContent).join("|");
+$id("vocab-status-filter").value = "";
 _vocabRows = statsSample;
 _pbpVocabApplyView(true);
-check("stats strip becomes visible once rows exist", $id("vocab-stats").hidden === false);
-check("stats strip reports total, learning and known counts",
-  $id("vocab-stat-total").textContent === "libraryStatsWords:3" &&
+check("status toggles appear once rows exist, with All pressed",
+  ["vocab-stat-all", "vocab-stat-learning", "vocab-stat-known"].every((id) => $id(id).hidden === false) &&
+  $id("vocab-stat-all").getAttribute("aria-pressed") === "true" &&
+  $id("vocab-stat-learning").getAttribute("aria-pressed") === "false");
+check("the count row lists words, groups, languages and the 7-day gain as separate items",
+  countItems() === "libraryStatsWords:3|libraryStatsGroups:1|libraryStatsLanguages:2|libraryStatsRecent7:1", countItems());
+check("the learning and known toggles keep their number in a .lib-toggle-count span",
   $id("vocab-stat-learning").textContent === "libraryStatsLearning:1" &&
-  $id("vocab-stat-known").textContent === "libraryStatsKnown:2");
-$id("vocab-stat-learning").click();
-check("learning chip click sets the status filter and re-filters the visible list",
+  $id("vocab-stat-learning").querySelector(".lib-toggle-count")?.textContent === "1" &&
+  $id("vocab-stat-known").querySelector(".lib-toggle-count")?.textContent === "2");
+check("the full sentence (owner included) is the sr-only text and the title; the compact items are aria-hidden",
+  !!$id("vocab-count").querySelector(".lib-count-full.sr-only")?.textContent.startsWith("vocabResultCount:3,3,") &&
+  $id("vocab-count").title === $id("vocab-count").querySelector(".lib-count-full").textContent &&
+  $id("vocab-count").querySelector(".lib-count-items")?.getAttribute("aria-hidden") === "true");
+check("only the first item's number is bold",
+  $id("vocab-count").querySelectorAll(".lib-count-items b").length === 1 &&
+  $id("vocab-count").querySelector(".lib-count-item b")?.textContent === "3");
+$id("vocab-stat-learning")?.click();
+check("learning toggle click sets the status filter and re-filters the visible list",
   $id("vocab-status-filter").value === "new" &&
   $id("vocab-list").querySelectorAll(".vocab-card").length === 1 &&
-  $id("vocab-stat-learning").getAttribute("aria-pressed") === "true");
-$id("vocab-stat-learning").click();
-check("a second click on the active chip clears the filter back to all statuses",
+  $id("vocab-stat-learning").getAttribute("aria-pressed") === "true" &&
+  $id("vocab-stat-all").getAttribute("aria-pressed") === "false");
+check("a filtered list leads the count row with shown / total, the shown number bold",
+  countItems().startsWith("libraryStatsWordsFiltered:1,3|") &&
+  $id("vocab-count").querySelector(".lib-count-item b")?.textContent === "1", countItems());
+$id("vocab-stat-learning")?.click();
+check("a second click on the pressed toggle returns to All",
   $id("vocab-status-filter").value === "" &&
   $id("vocab-list").querySelectorAll(".vocab-card").length === 3 &&
-  $id("vocab-stat-learning").getAttribute("aria-pressed") === "false");
+  $id("vocab-stat-all").getAttribute("aria-pressed") === "true");
+$id("vocab-stat-known")?.click();
+$id("vocab-stat-all")?.click();
+check("All clears a status filter",
+  $id("vocab-status-filter").value === "" && $id("vocab-stat-all").getAttribute("aria-pressed") === "true");
+$id("vocab-group-filter").appendChild(new Option("G1", "G1"));
+$id("vocab-group-filter").value = "";
+if (typeof _pbpVocabSyncFilterNarrow === "function") _pbpVocabSyncFilterNarrow();
+const narrowLabel = () => $id("vocab-filter-narrow").lastElementChild.textContent;
+check("the narrow Filter button reads Filter while nothing is filtered",
+  narrowLabel() === "libraryFilterNarrow" && !("filtered" in $id("vocab-filter-narrow").dataset), narrowLabel());
+$id("vocab-group-filter").value = "G1";
+$id("vocab-status-filter").value = "known";
+if (typeof _pbpVocabSyncFilterNarrow === "function") _pbpVocabSyncFilterNarrow();
+check("the narrow Filter button counts each non-default filter and marks itself filtered",
+  narrowLabel() === "libraryFilterNarrowActive:2" && $id("vocab-filter-narrow").dataset.filtered === "true", narrowLabel());
+$id("vocab-group-filter").value = "";
+$id("vocab-status-filter").value = "";
+$id("vocab-group-filter").lastElementChild.remove();
 _pbpVocabClearVisibleState();
-check("account-switch clearing hides the stats strip with the rest of the list", $id("vocab-stats").hidden === true);
+check("account-switch clearing hides the toggles and empties the count row",
+  ["vocab-stat-all", "vocab-stat-learning", "vocab-stat-known"].every((id) => $id(id).hidden === true) &&
+  !$id("vocab-count").textContent && !$id("vocab-count").hasAttribute("title"));
 
 // Free dictionary lookup (Task 3): pure fold-match for the "already saved"
 // hint, then the full submit -> result-view -> hint-click round trip.
@@ -709,7 +756,8 @@ _pbpVocabApplyView(true);
 check("5000 rows remain in the in-memory result set", _vocabViewRows.length === 5000);
 check("initial large-list DOM is capped at 100 cards", $id("vocab-list").querySelectorAll(".vocab-card").length === 100);
 check("large-list render exposes Load more", !$id("vocab-load-more").hidden);
-check("result count reports all 5000 matches rather than 100 rendered cards", $id("vocab-count").textContent.startsWith("vocabResultCount:5000,5000"));
+check("result count reports all 5000 matches rather than 100 rendered cards",
+  !!$id("vocab-count").querySelector(".lib-count-full")?.textContent.startsWith("vocabResultCount:5000,5000"));
 const firstLargeCard = $id("vocab-list").firstElementChild;
 firstLargeCard.querySelector(".notes-card-head").click();
 _vocabSelected = pbpVocabSelectResults(new Set(), _vocabViewRows, "all");
@@ -1662,22 +1710,18 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     <div class="vocab-list-pane">
       <div class="notes-toolbar vocab-filter-toolbar"><input type="search"></div>
       <div class="vocab-filter-row">
-        <select><option></option></select>
-        <button type="button" class="vocab-stat-chip" data-label="stat-learning"></button>
-        <button type="button" class="vocab-stat-chip" data-label="stat-known"></button>
+        <button type="button" class="btn ghost" id="vocab-filter-narrow" data-label="filter-narrow"><svg width="16" height="16" viewBox="0 0 24 24"></svg><span></span></button>
+        <div class="vocab-filter-set" popover="auto">
+          <select><option></option></select>
+          <span class="vocab-status-toggles" role="group"><button type="button" class="lib-toggle" data-label="stat-all"></button><button type="button" class="lib-toggle" data-label="stat-learning"></button><button type="button" class="lib-toggle" data-label="stat-known"></button></span>
+        </div>
         <span class="vocab-sort-seg" role="group">
           <button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
           <button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
         </span>
         <button type="button" class="btn btn-sm vocab-lookup-narrow"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
       </div>
-      <div class="vocab-stats">
-        <span class="vocab-stat" data-label="stat-total"></span>
-        <span class="vocab-stat" data-label="stat-groups"></span>
-        <span class="vocab-stat" data-label="stat-languages"></span>
-        <span class="vocab-stat vocab-stat-trend" data-label="stat-recent"></span>
-      </div>
-      <div class="vocab-context-bar"><span class="vocab-ctx-text"><span class="notes-count">5000</span></span><div class="lib-cluster"><button class="btn btn-sm" data-label="all"></button></div><span class="save-status vocab-main-status">Saved just now</span></div>
+      <div class="vocab-context-bar lib-count-row"><span class="vocab-ctx-text"><span class="notes-count"><span class="lib-count-items" aria-hidden="true"><span class="lib-count-item" data-label="ci-0"></span><span class="lib-count-item" data-label="ci-1"></span><span class="lib-count-item" data-label="ci-2"></span><span class="lib-count-item" data-label="ci-3"></span></span></span></span><span class="save-status vocab-main-status">Saved just now</span><div class="lib-cluster"><button class="btn btn-sm ghost lib-hang-end" data-label="all"></button></div></div>
       <div class="vocab-list-region">
       <article class="notes-card vocab-card"><div class="notes-card-top"><button class="notes-card-head"><span class="notes-card-main"><span class="vocab-row-headline"><span class="notes-row-title">Wortzusammensetzung mit außergewöhnlich langem ausgewähltem Begriff</span><span class="notes-row-meta"><span class="notes-meta-chip">Außergewöhnlich lange Gruppe</span></span></span><span class="vocab-row-gloss">Außergewöhnlich lange Definition, die auf einer Zeile bleiben muss</span></span></button><button class="btn btn-sm notes-row-del" data-label="remove"></button></div></article>
       <div class="vocab-batch-bar selecting"><span class="notes-count" data-label="selected-count">5000</span><button class="btn btn-sm" data-label="invert"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><span class="vocab-group-unit"><input type="text"><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><span class="lib-cluster"><button class="btn btn-sm" data-label="known"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm" data-label="learning"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><button class="btn btn-sm danger" data-label="batch-delete"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm vocab-clear-selection"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></div>
@@ -1696,7 +1740,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
   document.body.appendChild(frame);
   await new Promise((resolve) => frame.addEventListener("load", resolve, { once:true }));
   const overflows = [], unreachable = [];
-  let germanLongCountFits = false;
+  let germanCountWhole = false;
   for (const width of [320, 360, 1280]) {
     frame.style.width = width + "px";
     for (const theme of ["github-light", "flexoki-dark"]) {
@@ -1711,8 +1755,6 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         panel.querySelector('[data-label="selected-count"]').textContent = m.vocabSelectedCount.message.replace("$COUNT$", "5000");
         panel.querySelector('[data-label="batch-delete"]').title = m.vocabBatchDelete.message;
         panel.querySelector('[data-label="remove"]').textContent = m.delete.message;
-        panel.querySelector(".vocab-ctx-text > .notes-count").textContent = m.vocabResultCount.message
-          .replace("$RESULTS$", "5000").replace("$TOTAL$", "5000");
         panel.querySelector('input[type="text"]').placeholder = m.vocabGroupNamePlaceholder.message;
         panel.querySelector("select option").textContent = m.vocabAllGroups.message;
         // Task 3 fix round 1 (Minor 7): the lookup bar and stats strip joined
@@ -1721,6 +1763,14 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         // sweep that caught the German long-compound-word row overflow).
         panel.querySelector('[data-label="lookup-input"]').placeholder = m.libraryLookupPlaceholder.message;
         panel.querySelector('[data-label="lookup-go"]').title = m.libraryLookupGo.message;
+        panel.querySelector('[data-label="filter-narrow"] span').textContent = m.libraryFilterNarrowActive.message.replace("$COUNT$", "2");
+        panel.querySelector('[data-label="stat-all"]').textContent = m.libraryFilterAll.message;
+        panel.querySelector('[data-label="stat-learning"]').textContent = m.libraryStatsLearning.message.replace("$COUNT$", "2500");
+        panel.querySelector('[data-label="stat-known"]').textContent = m.libraryStatsKnown.message.replace("$COUNT$", "2500");
+        panel.querySelector('[data-label="ci-0"]').textContent = m.libraryStatsWords.message.replace("$COUNT$", "5000");
+        panel.querySelector('[data-label="ci-1"]').textContent = m.libraryStatsGroups.message.replace("$COUNT$", "42");
+        panel.querySelector('[data-label="ci-2"]').textContent = m.libraryStatsLanguages.message.replace("$COUNT$", "9");
+        panel.querySelector('[data-label="ci-3"]').textContent = m.libraryStatsRecent7.message.replace("$D7$", "120");
         const bcp47 = { en: "en", de: "de", fr: "fr", pl: "pl", ru: "ru", zh_HK: "zh-Hant", zh_CN: "zh-Hans", zh_TW: "zh-Hant", ja: "ja" }[locale] || "en";
         const langSelect = panel.querySelector('[data-label="lookup-lang"]');
         try {
@@ -1731,18 +1781,15 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
             return o;
           }));
         } catch (_) {}
-        panel.querySelector('[data-label="stat-total"]').textContent = m.libraryStatsWords.message.replace("$COUNT$", "5000");
-        panel.querySelector('[data-label="stat-learning"]').textContent = m.libraryStatsLearning.message.replace("$COUNT$", "2500");
-        panel.querySelector('[data-label="stat-known"]').textContent = m.libraryStatsKnown.message.replace("$COUNT$", "2500");
-        panel.querySelector('[data-label="stat-groups"]').textContent = m.libraryStatsGroups.message.replace("$COUNT$", "42");
-        panel.querySelector('[data-label="stat-languages"]').textContent = m.libraryStatsLanguages.message.replace("$COUNT$", "9");
-        panel.querySelector('[data-label="stat-recent"]').textContent = m.libraryStatsRecent.message.replace("$D7$", "120").replace("$D30$", "480");
         await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
         if (width === 320 && theme === "github-light" && locale === "de") {
-          const count = panel.querySelector(".vocab-ctx-text > .notes-count");
-          const style = frame.contentWindow.getComputedStyle(count);
-          germanLongCountFits = style.whiteSpace === "normal" && style.minWidth === "0px" &&
-            count.scrollWidth <= count.clientWidth + 1;
+          const box = panel.querySelector(".lib-count-items").getBoundingClientRect();
+          const items = [...panel.querySelectorAll(".lib-count-item")];
+          germanCountWhole = items.length === 4 && items[0].getBoundingClientRect().top < box.bottom - 0.5 &&
+            items.every((it) => {
+              const r = it.getBoundingClientRect();
+              return (r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5 && r.right <= box.right + 0.5) || r.top >= box.bottom - 0.5;
+            });
         }
         if (panel.scrollWidth > panel.clientWidth + 1) {
           const panelRect = panel.getBoundingClientRect();
@@ -1763,8 +1810,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     overflows.length === 0, overflows.slice(0, 8).join("; "));
   check("production CSS keeps delete and every other batch control reachable across the viewport matrix",
     unreachable.length === 0, unreachable.slice(0, 8).join("; "));
-  check("production CSS lets the 320px German 5000-row count wrap within its flex component",
-    germanLongCountFits, "vocab count scrollWidth exceeded clientWidth");
+  check("production CSS keeps the 320px German count row to whole items: each one fits or folds out of sight, none is cut",
+    germanCountWhole, "a .lib-count-item crosses the count box's right or bottom edge");
   // Sticky-bar geometry contract: the bar floats only within its region
   // (a wrapper between it and the region would cap the float range at the
   // bar's own height), and the browse state reserves ZERO geometry -- the

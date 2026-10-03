@@ -121,6 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.dispatchEvent(new CustomEvent("pbp-lib-view", { detail: { view: pbpLibActiveView() } }));
     }
   });
+  pbpLibWireFilterPopover($id("vocab-filter-set"), $id("vocab-filter-narrow"), $id("vocab-list-pane"));
   _pbpLibApplyView(_pbpLibInitialView(), true);
 });
 
@@ -236,4 +237,41 @@ function pbpLibSameDay(a, b) {
   const y = new Date(Number(b));
   if (Number.isNaN(x.getTime()) || Number.isNaN(y.getTime())) return false;
   return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}
+
+// "Filter" popover on the narrow index (spec §3.4). One DOM for both forms:
+// the wide form is plain CSS (@container lib-index); this only runs the
+// popover form's open / close bookkeeping.
+function pbpLibWireFilterPopover(set, button, indexEl) {
+  if (!set || !button || set.dataset.wired) return;
+  set.dataset.wired = "1";
+  set.addEventListener("toggle", (e) => {
+    if (e.newState === "open") {
+      button.setAttribute("aria-expanded", "true");
+      if (typeof window.pbpListboxPlace === "function") window.pbpListboxPlace(set, button);
+      return;
+    }
+    button.setAttribute("aria-expanded", "false");
+    // pbpListboxPlace writes inline fixed placement (right / bottom "auto"
+    // included); left behind, it would pin the WIDE form to the viewport the
+    // next time the index widens.
+    for (const prop of ["position", "left", "top", "right", "bottom", "min-width", "max-width", "--listbox-room"]) set.style.removeProperty(prop);
+    if (!set.getAttribute("style")) set.removeAttribute("style");
+    set.removeAttribute("data-flip");
+    // A list box opened inside (T6) closes with its panel.
+    for (const open of set.querySelectorAll('[aria-expanded="true"]')) {
+      open.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    }
+  });
+  if (indexEl && typeof ResizeObserver === "function") {
+    new ResizeObserver(() => {
+      if (!set.matches(":popover-open")) return;
+      if (getComputedStyle(button).display !== "none") return;
+      try {
+        set.hidePopover();
+      } catch (err) {
+        console.warn("[library] filter popover close failed", err && err.name, err && err.message);
+      }
+    }).observe(indexEl);
+  }
 }

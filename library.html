@@ -28,37 +28,40 @@
               <button type="button" class="btn btn-sm vocab-signed-out-lookup" id="vocab-signed-out-lookup" data-i18n="libraryLookupOpen">Look up a word</button>
             </div>
           </div>
-      <!-- Header, round 2 (user ruling 2026-08-07): four bare rows, every one
-           of them full width, split by ONE seam into "filter this list" /
-           "what this list is". The lookup row that used to sit here has moved
-           into the detail pane -- it filtered nothing, and sitting next to the
-           search box it read as a second search box. -->
+      <!-- List header (spec §3.1): three rows -- search / filters / count. The
+           count row is replaced in place by the batch row while a selection
+           exists (T4d). The dictionary lookup lives in the detail pane. -->
       <div class="notes-toolbar vocab-filter-toolbar">
         <input type="search" id="vocab-search" placeholder="Search words, definitions, context, and groups" data-i18n-placeholder="vocabSearchPlaceholder" data-i18n-aria="vocabSearchPlaceholder" aria-label="Search words, definitions, context, and groups" autocomplete="off" />
       </div>
-      <!-- Filter row. The .vocab-filter-selects wrapper is gone on purpose:
-           as one non-shrinking flex unit it could only fit whole or drop
-           whole, which is what made this row fall off the header. Its members
-           are direct children now, the group select eats the slack, and the
-           row stretches so every control lands on one rung. -->
+      <!-- Filter row (spec §3.1 / §3.4). Wide index (lib-index container at or
+           above its threshold, and above the 860px single-pane break): the
+           group select and the three status toggles sit inline inside
+           .vocab-filter-set. Narrow index: the SAME nodes fold into that
+           element's popover, opened by #vocab-filter-narrow -- one DOM, never
+           a copy. library.js wires the popover (pbpLibWireFilterPopover). -->
       <div class="vocab-filter-row">
-        <label class="sr-only" for="vocab-group-filter" data-i18n="vocabGroupFilterAria">Filter by group</label>
-        <select id="vocab-group-filter" data-i18n-aria="vocabGroupFilterAria" aria-label="Filter by group"><option value="" data-i18n="vocabAllGroups">All groups</option></select>
-        <label class="sr-only" for="vocab-status-filter" data-i18n="vocabStatusFilterAria">Filter by status</label>
-        <!-- Hidden state carrier, same pattern as #vocab-sort below: the two
-             chips write into it and dispatch `change`, so every handler and
-             every test still talks to a <select>. -->
-        <select id="vocab-status-filter" data-i18n-aria="vocabStatusFilterAria" aria-label="Filter by status" hidden>
-          <option value="" data-i18n="vocabStatusAll">All statuses</option>
-          <option value="new" data-i18n="vocabStatusLearning">Learning</option>
-          <option value="known" data-i18n="vocabStatusKnown">Known</option>
-        </select>
-        <!-- `hidden` in the initial markup, same as #vocab-stats below: both
-             chips are empty until the first render fills in their counts, and
-             without this the cold page shows two blank pills for the length of
-             the IDB read. library-vocab.js clears the flag when it has counts. -->
-        <button type="button" class="vocab-stat-chip" id="vocab-stat-learning" data-status="new" aria-pressed="false" hidden></button>
-        <button type="button" class="vocab-stat-chip" id="vocab-stat-known" data-status="known" aria-pressed="false" hidden></button>
+        <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="libraryFilterNarrow">Filter</span></button>
+        <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">
+          <label class="sr-only" for="vocab-group-filter" data-i18n="vocabGroupFilterAria">Filter by group</label>
+          <select id="vocab-group-filter" data-i18n-aria="vocabGroupFilterAria" aria-label="Filter by group"><option value="" data-i18n="vocabAllGroups">All groups</option></select>
+          <label class="sr-only" for="vocab-status-filter" data-i18n="vocabStatusFilterAria">Filter by status</label>
+          <!-- Hidden state carrier, same pattern as #vocab-sort below: the three
+               toggles write into it and dispatch `change`, so every handler and
+               every test still talks to a <select>. -->
+          <select id="vocab-status-filter" data-i18n-aria="vocabStatusFilterAria" aria-label="Filter by status" hidden>
+            <option value="" data-i18n="vocabStatusAll">All statuses</option>
+            <option value="new" data-i18n="vocabStatusLearning">Learning</option>
+            <option value="known" data-i18n="vocabStatusKnown">Known</option>
+          </select>
+          <!-- `hidden` until the first render has counts (library-vocab.js
+               clears it), so the cold page never shows three empty toggles. -->
+          <span class="vocab-status-toggles" id="vocab-status-toggles" role="group" data-i18n-aria="vocabStatusFilterAria" aria-label="Filter by status">
+            <button type="button" class="lib-toggle" id="vocab-stat-all" data-status="" aria-pressed="true" data-i18n="libraryFilterAll" hidden>All</button>
+            <button type="button" class="lib-toggle" id="vocab-stat-learning" data-status="new" aria-pressed="false" hidden></button>
+            <button type="button" class="lib-toggle" id="vocab-stat-known" data-status="known" aria-pressed="false" hidden></button>
+          </span>
+        </div>
         <label class="sr-only" for="vocab-sort" data-i18n="vocabSortAria">Sort vocabulary</label>
         <!-- Hidden state carrier: every handler/test still speaks to this
              select; the two segment buttons below only proxy writes to it.
@@ -85,36 +88,20 @@
              welded three-cell control. -->
         <button type="button" class="btn btn-sm vocab-lookup-narrow" id="vocab-lookup-narrow" data-i18n-title="libraryLookupOpen" data-i18n-aria="libraryLookupOpen" aria-label="Look up a word" title="Look up a word"><span class="btn-ic" data-ic="book"></span></button>
       </div>
-      <!-- Stats strip, information only, computed from the full owner row set
-           (not the filtered view). The two status counts became filter chips
-           and moved up into the filter row; what is left is what this list
-           IS, with the trend pushed to the right edge. -->
-      <div id="vocab-stats" class="vocab-stats" hidden>
-        <!-- CSS-hidden: the count line right below already states how many
-             words are saved, and printing the number twice is what made this
-             strip read as clutter (user-approved cut). Kept in the DOM so the
-             render path and its tests keep one shape. -->
-        <span class="vocab-stat" id="vocab-stat-total"></span>
-        <span class="vocab-stat" id="vocab-stat-groups"></span>
-        <span class="vocab-stat" id="vocab-stat-languages"></span>
-        <span class="vocab-stat vocab-stat-trend" id="vocab-stat-recent"></span>
-      </div>
-      <!-- Count line: identical in browse and selection. The batch tools
-           live in the sticky bar inside .vocab-list-region below -- nothing
-           here reserves geometry for them. The status message rides inline
-           at the right edge instead of holding a line of its own. -->
-      <div class="vocab-context-bar" id="vocab-context-bar">
+      <!-- Count row (spec §3.5): compact items (aria-hidden) plus the full
+           sentence, account name included, in .sr-only and the title -- built
+           by _pbpVocabRenderStats through pbpLibRenderCount. Select all hangs
+           optically: its label ends on the search box's right edge. -->
+      <div class="vocab-context-bar lib-count-row" id="vocab-context-bar">
         <span class="vocab-ctx-text">
           <span id="vocab-count" class="notes-count" aria-live="polite"></span>
         </span>
+        <span class="save-status vocab-main-status" id="vocab-status" role="status" aria-live="polite"></span>
         <div class="lib-cluster" role="group" data-i18n-aria="vocabSelectionActions" aria-label="Selection actions">
           <!-- The multi-select hint lives here, on the one control that is
-               always on screen next to the list: a title on every row would
-               tooltip the whole list, and the batch bar only exists once a
-               selection already does. -->
-          <button type="button" class="btn btn-sm ghost" id="vocab-select-all" data-i18n="vocabSelectAll" data-i18n-title="vocabSelectHint" title="Ctrl-click a row to add it to the selection, Shift-click for a range">Select all</button>
+               always on screen next to the list. -->
+          <button type="button" class="btn btn-sm ghost lib-hang-end" id="vocab-select-all" data-i18n="vocabSelectAll" data-i18n-title="vocabSelectHint" title="Ctrl-click a row to add it to the selection, Shift-click for a range">Select all</button>
         </div>
-        <span class="save-status vocab-main-status" id="vocab-status" role="status" aria-live="polite"></span>
       </div>
       <div id="vocab-empty" class="notes-empty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
       <div id="vocab-no-results" class="notes-empty" data-i18n="vocabNoResults" hidden>No words match the current filters.</div>
@@ -247,6 +234,7 @@
 
   <script defer src="i18n.js"></script>
   <script defer src="shared.js"></script>
+  <script defer src="listbox.js"></script>
   <script defer src="vocab-store.js"></script>
   <script defer src="ai-cache.js"></script>
   <script defer src="md-dict.js"></script>

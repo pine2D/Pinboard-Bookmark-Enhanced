@@ -1699,8 +1699,15 @@ const PANE_FIT_SCAN = ({ panes, tolerance, bleed = [] }) => {
       if (el.classList.contains("sr-only") || el.closest(".sr-only")) continue;
       const r = el.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) continue;
-      if (r.right > right + tolerance) hits.push({ pane: paneSel, el: nameOf(el), kind: "pastRightEdge", over: +(r.right - right).toFixed(2) });
-      else if (r.left < left - tolerance) hits.push({ pane: paneSel, el: nameOf(el), kind: "pastLeftEdge", over: +(left - r.left).toFixed(2) });
+      // Optical hang (library .lib-hang-start / .lib-hang-end, spec §6.6): a
+      // ghost button pulled out by exactly its own inline padding keeps its
+      // CONTENT on the column edge -- only transparent padding crosses it.
+      // Category rule (the G4b offset class), not a list of names.
+      const mr = parseFloat(cs.marginRight) || 0, ml = parseFloat(cs.marginLeft) || 0;
+      const hangR = mr < 0 && Math.abs(-mr - (parseFloat(cs.paddingRight) || 0)) <= 0.5 ? -mr : 0;
+      const hangL = ml < 0 && Math.abs(-ml - (parseFloat(cs.paddingLeft) || 0)) <= 0.5 ? -ml : 0;
+      if (r.right - hangR > right + tolerance) hits.push({ pane: paneSel, el: nameOf(el), kind: "pastRightEdge", over: +(r.right - hangR - right).toFixed(2) });
+      else if (r.left + hangL < left - tolerance) hits.push({ pane: paneSel, el: nameOf(el), kind: "pastLeftEdge", over: +(left - r.left - hangL).toFixed(2) });
     }
   }
   return hits;
@@ -1822,7 +1829,19 @@ async function driveNoPageScroll(page, check, extBase, theme) {
         const region = document.querySelector(regionSel);
         region.scrollTop = 120;
         const box = region.getBoundingClientRect();
-        const x = box.left + box.width / 2, y = box.top + box.height / 2;
+        // The first row reaching past the region's middle, clicked at its own
+        // centre. The raw centre pixel can land on the few px between a row's
+        // fill and its card edge whenever the header height shifts the rows
+        // (T4b: the three-row list header put it exactly on a card's top
+        // inset) -- a coincidence of geometry, not a defect of the round trip.
+        const mid = box.top + box.height / 2;
+        const head = [...region.querySelectorAll(rowSel)].find((el) => {
+          const r = el.getBoundingClientRect();
+          return r.bottom > mid && r.top >= box.top && r.bottom <= box.bottom;
+        });
+        const hr = head ? head.getBoundingClientRect() : null;
+        const x = hr ? hr.left + hr.width / 2 : box.left + box.width / 2;
+        const y = hr ? hr.top + hr.height / 2 : mid;
         const under = document.elementFromPoint(x, y);
         return { top: region.scrollTop, x, y, onRow: !!(under && under.closest(rowSel)) };
       }, { regionSel, rowSel });
@@ -2052,8 +2071,9 @@ async function driveHeaderRows(page, check) {
   // on ANY row whose computed display was none, which is a silent exemption
   // for the loudest possible defect: a header row that disappears entirely
   // would report zero violations. Only rows the checklist NAMES as legitimately
-  // absent get the pass; #vocab-stats is the one -- it is `hidden` in the
-  // markup until the first render has counts to put in it.
+  // absent get the pass. No row may vanish any more (#vocab-stats was retired
+  // in the library redesign, T4b); the list stays here for rows that
+  // genuinely ship hidden.
   const vanishOk = new Set(mayVanish);
   const restore = page.viewportSize();
   const bad = [];
@@ -2080,6 +2100,50 @@ async function driveHeaderRows(page, check) {
     await page.waitForTimeout(250);
   }
   return { bad, worst: +worst.toFixed(2) };
+}
+
+// ---- state: "filterPopoverKeys" (library redesign T4b, spec §3.4 / §7.1) ---
+// The narrow index's "Filter" popover on the trusted keyboard path: Space on
+// the focused button opens it (aria-expanded true, pbpListboxPlace's fixed
+// placement inside the viewport); Escape closes it, keeps focus on the
+// button and leaves no inline placement behind -- a leftover `position:
+// fixed` would wreck the wide form the next time the index crosses the
+// threshold.
+async function driveFilterPopoverKeys(page, theme, check) {
+  const { set } = check.expect.filterPopoverKeys;
+  const ready = await page.evaluate(({ btnSel, setSel }) => {
+    const b = document.querySelector(btnSel), s = document.querySelector(setSel);
+    if (!b || !s) return "missing";
+    if (getComputedStyle(b).display === "none") return "wide form (button hidden)";
+    b.focus();
+    return document.activeElement === b ? "ok" : "unfocusable";
+  }, { btnSel: check.selector, setSel: set });
+  if (ready !== "ok") throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|filterPopoverKeys]: ${ready} -- the library viewport must leave the index narrow`);
+  const bad = [];
+  await page.keyboard.press("Space");
+  await settleAnimations(page);
+  const opened = await page.evaluate(({ btnSel, setSel }) => {
+    const b = document.querySelector(btnSel), s = document.querySelector(setSel);
+    const r = s.getBoundingClientRect();
+    return { open: s.matches(":popover-open"), expanded: b.getAttribute("aria-expanded"), position: getComputedStyle(s).position,
+      inside: r.left >= -0.5 && r.top >= -0.5 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5 };
+  }, { btnSel: check.selector, setSel: set });
+  if (!opened.open) bad.push("Space on the Filter button did not open the popover");
+  if (opened.expanded !== "true") bad.push(`aria-expanded is ${opened.expanded} while open`);
+  if (opened.position !== "fixed") bad.push(`open popover is position:${opened.position}, not fixed`);
+  if (!opened.inside) bad.push("open popover is not inside the viewport");
+  await page.keyboard.press("Escape");
+  await settleAnimations(page);
+  const closed = await page.evaluate(({ btnSel, setSel }) => {
+    const b = document.querySelector(btnSel), s = document.querySelector(setSel);
+    return { open: s.matches(":popover-open"), expanded: b.getAttribute("aria-expanded"), focus: document.activeElement === b, style: s.getAttribute("style") || "" };
+  }, { btnSel: check.selector, setSel: set });
+  if (closed.open) bad.push("Escape did not close the popover");
+  if (closed.expanded !== "false") bad.push(`aria-expanded is ${closed.expanded} after closing`);
+  if (!closed.focus) bad.push("focus did not stay on the Filter button");
+  if (/position|left|top|width/.test(closed.style)) bad.push(`closing left inline placement behind: ${closed.style}`);
+  await page.evaluate(() => document.activeElement?.blur?.());
+  return bad;
 }
 
 // ---- state: "gapMin" (debt-sweep 2026-08-07) -------------------------------
@@ -2384,6 +2448,12 @@ async function runOneCheck(page, theme, check, results, extBase) {
     const ok = !result.error && result.gap >= min;
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("gapMin", ok, result.error ? null : result.gap, min, result.error) });
+    return;
+  }
+  if (check.state === "filterPopoverKeys") {
+    const bad = await driveFilterPopoverKeys(page, theme, check);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("filterPopoverKeys", bad.length === 0, bad.length, 0, bad.length ? bad.join("; ") : undefined) });
     return;
   }
   if (check.state === "arrowDown") {
@@ -2756,6 +2826,28 @@ function needsBatchBarOpen(selector) { return BATCH_BAR_SELECTORS.has(selector);
 // `input` listener flip `.hidden` itself -- not toggling the DOM property
 // directly, which would exercise a path the actual UI never takes.
 function needsNoteDirty(selector) { return selector.includes("vocab-note-save"); }
+// Library redesign T4b: at the runner's 1280 viewport the index is 360 wide,
+// so the group filter and the three status toggles live in the closed
+// "Filter" popover (spec §3.4). Open it with showPopover() -- no pointer move,
+// no focus move -- right before a check that reads one of them, and close it
+// right after, so no other check ever measures under an open top-layer panel.
+// `open`-state rows open it themselves through the real button.
+const FILTER_SET_SELECTORS = new Set(["#vocab-group-filter", "#vocab-stat-all", "#vocab-stat-learning", "#vocab-stat-known"]);
+function needsFilterSetOpen(check) {
+  return FILTER_SET_SELECTORS.has(check.selector) && ["default", "hover", "focusWithin"].includes(check.state);
+}
+async function setFilterSetOpen(page, open) {
+  return page.evaluate((want) => {
+    const set = document.getElementById("vocab-filter-set");
+    const btn = document.getElementById("vocab-filter-narrow");
+    if (!set || !btn) return "missing";
+    if (getComputedStyle(btn).display === "none") return "inline";
+    const isOpen = set.matches(":popover-open");
+    if (want && !isOpen) set.showPopover();
+    if (!want && isOpen) set.hidePopover();
+    return set.matches(":popover-open") === want ? "ok" : "stuck";
+  }, open);
+}
 
 // The 11 DOM ids for popup's hidden-by-default state legs (feedback
 // card + its fallback action, URL warning + clean hint, presets/suggest
@@ -3848,7 +3940,7 @@ const VALUE_BOX_LEGS = Object.freeze({
         // permission this profile never grants, so md-dict renders its
         // connect state under the select.
         context: "vocab",
-        boxes: ["#vocab-search", "#vocab-group-filter", "#vocab-lookup-input", "#vocab-lookup-lang",
+        boxes: ["#vocab-search", "#vocab-lookup-input", "#vocab-lookup-lang",
           "#vocab-detail .xp-dict-lang", "#vocab-detail .vocab-note-input",
           "#vocab-batch-toolbar .vocab-group-unit", "#vocab-detail .vocab-group-unit"],
         focus: ["#vocab-detail .xp-dict-lang"],
@@ -3893,6 +3985,25 @@ const VALUE_BOX_LEGS = Object.freeze({
             throw new Error(`SETUP: fieldHoverContrast library: the notes view did not open (theme=${theme})`);
           }
           return null;
+        },
+      },
+      {
+        // Library redesign T4b: #vocab-group-filter sits in the "Filter"
+        // popover at this viewport (index 360). Its own leg on a fresh page,
+        // so the open top-layer panel never covers the batch row's group unit
+        // that the vocab leg hovers. The returned closer hides it again.
+        context: "vocab-filter",
+        boxes: ["#vocab-group-filter"],
+        async open(page, url, theme) {
+          await page.goto(`${url}?_ra=${encodeURIComponent(`fieldfilter-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
+          await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
+          const opened = await setFilterSetOpen(page, true);
+          if (opened === "missing" || opened === "stuck") {
+            throw new Error(`SETUP: fieldHoverContrast library: could not open #vocab-filter-set (${opened}, theme=${theme})`);
+          }
+          await page.mouse.move(0, 0);
+          await settleAnimations(page);
+          return async () => { await setFilterSetOpen(page, false); };
         },
       },
     ]),
@@ -4244,7 +4355,18 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
           await page.waitForSelector(".vocab-note-save:not([hidden])", { timeout: TIMEOUT_MS });
         }
       }
+      if (needsFilterSetOpen(check)) {
+        const opened = await setFilterSetOpen(page, true);
+        if (opened === "missing" || opened === "stuck") {
+          throw new Error(`SETUP: could not open #vocab-filter-set for ${check.selector}|${check.state} (theme=${theme}): ${opened}`);
+        }
+        await settleAnimations(page);
+      }
       await runOneCheck(page, theme, check, results, extBase);
+      if (needsFilterSetOpen(check)) {
+        await setFilterSetOpen(page, false);
+        await settleAnimations(page);
+      }
     }
   }
 
@@ -5397,7 +5519,7 @@ const SWEEP_CFG = {
     allowed: { options: [8], library: [8], popup: [8], "md-preview": [8] },
     exempt: [
       ".tabs, .lib-tabs",                                                     // tab strips
-      ".vocab-sort-seg, .source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .typo-seg", // fused shells / segmented strips
+      ".vocab-sort-seg, .source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .typo-seg, .vocab-status-toggles", // fused shells / segmented strips
       ".header-icons, .xp-window-actions, .lib-cluster", // icon-button clusters: not button rows; clusterGap (family 12) holds them to 4px instead
       ".connection-health, .theme-presets-group, .kbd-help-chips, .rail-badges, .hl-filter-row", // status-card grid, swatch-pill / chip rows, the highlight legend (gap = two 6px hit pads)
       ".notes-card-top",                                                      // card head: title + chips, the remove X is absolutely positioned
@@ -6190,6 +6312,14 @@ async function runSweep(page, sw, extBase) {
   await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS }).catch(() => {});
   await page.waitForTimeout(300);
   add(await runFamilySweep(page), "library", "vocab-list");
+  // Library redesign T4b: the "Filter" popover is interaction-only UI
+  // (ui-primitives.md: register how it opens or it is outside every family).
+  if ((await setFilterSetOpen(page, true)) === "ok") {
+    await settleAnimations(page);
+    add(await runFamilySweep(page), "library", "vocab-filter-set");
+    await setFilterSetOpen(page, false);
+    await settleAnimations(page);
+  }
   const vocabHead = page.locator("#vocab-list .vocab-card .notes-card-head").first();
   if (await vocabHead.count()) {
     await vocabHead.click(); await page.waitForTimeout(250);

@@ -394,9 +394,6 @@ export const CHIP_GEOM = { padV: 2, lineHeight: 14 };
 export const CHIP_TARGETS = [
   // C8: padding 2px 10px, radius-full; font-size NOT emitted (§5.2/C8: "字号仍继承容器").
   { ns: "lib", selector: ".vocab-group-chip", radius: "full", pressable: false, padH: 10 },
-  // C9: padding 2px 8px (not 10 — Appendix C gives this target 8px specifically),
-  // radius-sm, aria-pressed toggle; font-size unchanged from current shipped value (12px).
-  { ns: "lib", selector: ".vocab-stat-chip", radius: "sm", pressable: true, padH: 8, fontSize: "12px" },
   // Tag governance's tag chips (2026-09 review-queue redesign). `selectable`:
   // the chip is the FACE of a visually hidden radio/checkbox
   // (<label class="tag-gov-chip"><input><span class="tag-gov-chip-face">), so

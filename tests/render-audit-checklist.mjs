@@ -729,13 +729,11 @@ export const CHECKS = [
   // single-pane threshold on both sides so a row that only breaks in one
   // column width cannot hide.
   { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "headerRowsFlush",
-    expect: { headerRowsFlush: { widths: [1680, 1100, 800], tolerancePx: 1, columnSel: ".vocab-list-pane",
-      rows: [".vocab-filter-toolbar", ".vocab-filter-row", "#vocab-stats", ".vocab-context-bar"],
-      // The ONLY row allowed to be absent, and only because it ships `hidden`
-      // and stays that way until the first render has counts. Every other row
-      // going display:none is the loudest defect this gate could be asked
-      // about, so it is a failure rather than a skip (review F3, 2026-08-07).
-      mayVanish: ["#vocab-stats"] } } },
+    expect: { headerRowsFlush: { widths: [2560, 1680, 1100, 800], tolerancePx: 1, columnSel: ".vocab-list-pane",
+      rows: [".vocab-filter-toolbar", ".vocab-filter-row", ".vocab-context-bar"],
+      // #vocab-stats is gone (T4b): every row must render. T4d adds the batch
+      // row as an exclusive pair with the count row.
+      mayVanish: [] } } },
 
   { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "paneFit",
     expect: { paneFit: { widths: [420, 861, 1280, 1600, 2560], tolerancePx: 1, bleed: [".vocab-list-region"],
@@ -1028,15 +1026,30 @@ export const CHECKS = [
   // scripts/ui-render-audit.mjs's sweepProbe family-4 comment and the
   // `expect` vocabulary note near the top of this file. ----
 
-  // ---- §5 chip family: a second representative -- a NON-pill (radius-sm)
-  // chip, to catch padVMin violations pill-law-2 wouldn't (C9: current
-  // `padding: 1px 8px`, no line-height). Also the checklist's one
-  // `[aria-pressed]` chip (library.css:934-947 `.vocab-stat-chip`) -- its
-  // hover repaints ONLY the background to --lib-btn-hover (text stays
-  // --lib-fg-muted throughout), so chip-fg must clear AA against that
-  // token too, not just the resting chip-bg (§5.3/§5.4 `fgToAAMulti`). ----
-  { surface: "library", page: "library.html", selector: ".vocab-stat-chip", state: "default",
-    expect: { padVMin: 2, textContrastMulti: { ratio: 4.5, extraBgSelectorVar: "btn-hover" } } },
+  // ---- library T4b (spec §3.2 / §3.4): the status toggles are the
+  // .lib-toggle primitive, md 32 / 28 with no frame. At the runner's 1280
+  // viewport the index is 360 wide, so they live in the closed "Filter"
+  // popover; `open` focuses #vocab-filter-narrow and presses a real Space
+  // (the popovertarget path), then Escape closes it again. All is pressed at
+  // rest (btn-fg on btn-bg); its text must also clear the hover fill (btn-hover
+  // until T5 moves the toggle hover to row-bg-hover). ----
+  { surface: "library", page: "library.html", selector: "#vocab-stat-all", state: "open",
+    open: { click: "#vocab-filter-narrow" },
+    expect: { heightPx: { comfortable: 32, compact: 28 }, textContrastMulti: { ratio: 4.5, extraBgSelectorVar: "btn-hover" } } },
+  { surface: "library", page: "library.html", selector: "#vocab-stat-learning", state: "open",
+    open: { click: "#vocab-filter-narrow" },
+    expect: { heightPx: { comfortable: 32, compact: 28 }, textContrast: 4.5 } },
+  // The popover itself: the one place on this page that paints panel + 1px
+  // border + radius-lg (spec §3.4, §11 V25).
+  { surface: "library", page: "library.html", selector: "#vocab-filter-set", state: "open",
+    open: { click: "#vocab-filter-narrow" },
+    expect: { borderTopWidthPx: { value: 1 }, borderRadiusPx: { radiusVar: "radius-lg" }, bgEqVar: "panel" } },
+  // Keyboard round trip on the trusted path (spec §7.1): Space opens it with
+  // aria-expanded true and pbpListboxPlace's fixed placement inside the
+  // viewport; Escape closes it, leaves focus on the button and clears the
+  // inline placement.
+  { surface: "library", page: "library.html", selector: "#vocab-filter-narrow", state: "filterPopoverKeys",
+    expect: { filterPopoverKeys: { set: "#vocab-filter-set" } } },
 
   // ---- §1/§2 button + icon family: representative instances beyond the
   // defect-tagged selectors above, so the button-family assertions have
@@ -1105,31 +1118,11 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: ".theme-preset-btn.active", state: "default",
     expect: { outlineContrast: 3 } },
 
-  // ---- Task 14 (§6.3 rowRungEq, sweep-discovered): the vocab list's search
-  // row. #vocab-search sat 4px shorter than its row-mates -- the select's
-  // vertical padding was a bare 6px literal (no --lib-sp-* match) instead of
-  // the same var(--lib-sp-1) the search input already used; both share the
-  // browser's inherited `line-height: normal` for the same font-size, so
-  // equalizing padding alone closed the whole gap. The sort control reaches
-  // the SAME height a different way -- it's stretched to match its select
-  // siblings by its row's align-items:stretch, not by its own padding/
-  // line-height, so it's the one selector that actually exercises that
-  // stretch mechanism rather than just re-testing the select fix a second
-  // time. (The stretch used to come from .vocab-filter-selects's unset
-  // default; that wrapper was deleted in the 2026-08-07 header rebuild and
-  // .vocab-filter-row now declares `align-items: stretch` outright. Same
-  // mechanism, and it is still the only entry that tests it.)
-  // RE-POINTED 2026-08-05 (§8) from #vocab-sort-time to .vocab-sort-seg, for
-  // the same reason the group-input entry above moved to its shell: the
-  // stretch target is now the SHELL, and its 1px border means the cell
-  // inside it settles 2px shorter (23.5 vs the row's 25.5) by construction.
-  // The control still measures 25.5 and the stretch mechanism is still what
-  // is being tested -- only the element that owns the border moved. Side
-  // benefit: the two entries no longer share a keyOf()
-  // (surface|theme|selector|state|check), which had been silently collapsing
-  // them onto one known-failures key. ----
-  { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
-    expect: { heightEqWith: { selector: "#vocab-group-filter", tolerancePx: 1 } } },
+  // ---- (library redesign T4b) The #vocab-search heightEqWith
+  // #vocab-group-filter entry that stood here is gone: at the runner's 1280
+  // viewport the group select sits in the closed "Filter" popover, so there is
+  // nothing to compare against. #vocab-search keeps its own heightPx below;
+  // T6a brings the comparison back against #vocab-group-filter-btn. ----
   // Library density rung (library redesign 2026-10-03 spec §6.2, plan T1):
   // the composer's lib branch puts .btn / .btn-sm on 32/28 and 28/24, and the
   // toolbar fields follow. Per-theme rows because the sweep's controlRung

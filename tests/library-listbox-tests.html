@@ -12,6 +12,7 @@
      boot their own srcdoc copies and never touch these. -->
 <script src="../shared.js"></script>
 <script src="../listbox.js"></script>
+<script src="../library.js"></script>
 <script>
 // listbox.js primitive suite (spec 2026-10-03 library redesign §8.2 float
 // mode, §8.3 ghost face, §8.4 first-frame marker; plan Task T0b). Every
@@ -452,6 +453,61 @@ async function primitiveCases() {
     report("suite setup", error);
   }
   document.title = (fail ? "FAIL" : "PASS") + " Library Listbox Tests";   // summary line
+})();
+</script>
+<script>
+// ---- T4b: the narrow-index "Filter" popover wiring (library.js
+// pbpLibWireFilterPopover). Own fixture, no library.css: which form is
+// showing is the button's computed display, so the test flips that inline.
+(async () => {
+  const frames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const host = document.createElement("div");
+  host.innerHTML = `
+    <div id="t4-index" style="width:360px">
+      <button type="button" id="t4-narrow" popovertarget="t4-set" aria-expanded="false">Filter</button>
+      <div id="t4-set" popover="auto">
+        <select id="t4-group" data-listbox="float"><option value="">All</option><option value="a">A</option></select>
+        <button type="button" id="t4-toggle" aria-pressed="false">x</button>
+      </div>
+    </div>`;
+  document.body.appendChild(host);
+  const set = document.getElementById("t4-set");
+  const btn = document.getElementById("t4-narrow");
+  const index = document.getElementById("t4-index");
+  if (typeof pbpEnhanceListbox === "function") pbpEnhanceListbox(document.getElementById("t4-group"));
+  if (typeof pbpLibWireFilterPopover === "function") pbpLibWireFilterPopover(set, btn, index);
+
+  set.showPopover();
+  await frames();
+  const r = set.getBoundingClientRect();
+  check("T4b opening the Filter popover marks the button expanded and places it with pbpListboxPlace",
+    btn.getAttribute("aria-expanded") === "true" && set.style.position === "fixed" &&
+    r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+    `expanded=${btn.getAttribute("aria-expanded")} position=${set.style.position}`);
+
+  const lbBtn = document.getElementById("t4-group-btn");
+  if (lbBtn) lbBtn.click();
+  const lbOpenBefore = !!lbBtn && lbBtn.getAttribute("aria-expanded") === "true";
+  set.hidePopover();
+  await frames();
+  check("T4b closing the Filter popover closes the list box open inside it and clears the inline placement",
+    lbOpenBefore && lbBtn.getAttribute("aria-expanded") === "false" &&
+    btn.getAttribute("aria-expanded") === "false" && !set.getAttribute("style") && !set.hasAttribute("data-flip"),
+    `lbBefore=${lbOpenBefore} lbAfter=${lbBtn && lbBtn.getAttribute("aria-expanded")} style=${set.getAttribute("style")}`);
+
+  set.showPopover();
+  await frames();
+  index.style.width = "300px";
+  await frames();
+  check("T4b a width change that keeps the narrow form leaves the popover open", set.matches(":popover-open"));
+
+  btn.style.display = "none";
+  index.style.width = "520px";
+  await frames();
+  await frames();
+  check("T4b crossing into the wide form (button hidden) closes the popover",
+    !set.matches(":popover-open") && btn.getAttribute("aria-expanded") === "false");
+  host.remove();
 })();
 </script>
 </body></html>

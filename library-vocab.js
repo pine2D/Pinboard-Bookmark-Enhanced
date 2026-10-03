@@ -107,6 +107,7 @@ function pbpVocabStats(rows, now) {
   const groups = new Set();
   const langs = new Set();
   let learning = 0, known = 0, added7 = 0, added30 = 0;
+  let latestCreatedAt = 0;
   const d7 = now - 7 * 86400000, d30 = now - 30 * 86400000;
   for (const r of rows) {
     if (String(r.status || "new") === "known") known++; else learning++;
@@ -114,8 +115,10 @@ function pbpVocabStats(rows, now) {
     if (r.language && r.language !== "und") langs.add(r.language);
     if (r.createdAt >= d7) added7++;
     if (r.createdAt >= d30) added30++;
+    const created = Number(r.createdAt) || 0;
+    if (created > latestCreatedAt) latestCreatedAt = created;
   }
-  return { total: rows.length, learning, known, groups: groups.size, languages: langs.size, added7, added30 };
+  return { total: rows.length, learning, known, groups: groups.size, languages: langs.size, added7, added30, latestCreatedAt };
 }
 
 function pbpVocabSelectResults(selected, rows, mode) {
@@ -1109,18 +1112,25 @@ function _pbpVocabFocusNarrowBack() {
 // in the count row first: a live region wiped out with the subtree it sits in
 // is gone for good ($id memoizes by id and would keep answering with the
 // orphan), and every message after that would be written into nothing.
+let _vocabStatusDetailReady = false;
 function _pbpVocabStatusHost(detailReady) {
+  // `undefined` = re-home only (the batch row opening or closing); the
+  // detail pane's readiness is whatever the last render said it was.
+  if (detailReady !== undefined) _vocabStatusDetailReady = !!detailReady;
   const el = $id("vocab-status");
   const bar = $id("vocab-context-bar");
   if (!el || !bar) return el || null;
   // The same condition library.css hides the list pane under, not a computed
-  // style read: _pbpVocabNarrowMode mirrors the 860px threshold the CSS owns,
-  // and this runs right after a class flip where a style read would force a
-  // recalc for an answer that only depends on the viewport.
-  const listGone = detailReady && _pbpVocabNarrowMode()
+  // style read: _pbpVocabNarrowMode mirrors the 860px threshold the CSS owns.
+  const listGone = _vocabStatusDetailReady && _pbpVocabNarrowMode()
     && document.body.classList.contains("lib-narrow-detail");
   const host = (listGone && document.querySelector("#vocab-detail .vocab-detail-footer")) || bar;
-  if (el.parentNode !== host) host.appendChild(el);
+  if (el.parentNode !== host) {
+    // Back in the count row it sits before Select all, which hangs off the
+    // row's end (spec §3.5).
+    if (host === bar) bar.insertBefore(el, bar.querySelector(":scope > .lib-cluster"));
+    else host.appendChild(el);
+  }
   return el;
 }
 
@@ -1423,8 +1433,6 @@ function _pbpVocabRenderList(append) {
   const list = $id("vocab-list");
   if (!list) return;
   const rows = _vocabViewRows;
-  const count = $id("vocab-count");
-  if (count) count.textContent = t("vocabResultCount", String(rows.length), String(_vocabRows.length), _vocabOwnerLabel);
   const empty = $id("vocab-empty");
   if (empty) {
     empty.textContent = t("dictVocabEmpty", _vocabOwnerLabel);
@@ -1454,39 +1462,50 @@ function _pbpVocabRenderList(append) {
   if (!append && _pbpVocabDetailWordId) _pbpVocabMarkCurrentRow(_pbpVocabDetailWordId);
   // After the marker, not before: the current row is the stop this prefers.
   _pbpVocabSyncRowTabStops();
+  // Counts follow every full rebuild (search / filter / sort / reload /
+  // soft reload); Load more appends rows and changes no count.
+  if (!append) _pbpVocabRenderStats();
 }
 
-// Render the read-only stats strip from the full owner row set (not the
-// filtered view). Called after every _pbpVocabApplyView -- cheap, pure
-// counting -- and hidden with the rest of the list by
-// _pbpVocabClearVisibleState.
+// The count row and the three status toggles (spec §3.2 / §3.5), from the full
+// owner row set; only the first item reads the filtered view. Re-run by every
+// full list rebuild (see _pbpVocabRenderList) and cleared with the rest of
+// the list by _pbpVocabClearVisibleState.
 function _pbpVocabRenderStats() {
-  const bar = $id("vocab-stats");
-  if (!bar) return;
-  // The two status chips left this strip for the filter row (header round 2),
-  // so they no longer disappear with it -- hide them on the same condition or
-  // an owner with no words gets two empty buttons in the middle of the row.
-  const chips = [$id("vocab-stat-learning"), $id("vocab-stat-known")];
+  const count = $id("vocab-count");
+  const toggles = ["vocab-stat-all", "vocab-stat-learning", "vocab-stat-known"].map((id) => $id(id)).filter(Boolean);
+  _pbpVocabSyncFilterNarrow();
   if (!_vocabRows.length) {
-    bar.hidden = true;
-    for (const chip of chips) if (chip) chip.hidden = true;
+    for (const el of toggles) el.hidden = true;
+    pbpLibRenderCount(count, [], "");
     return;
   }
   const s = pbpVocabStats(_vocabRows, Date.now());
-  bar.hidden = false;
-  for (const chip of chips) if (chip) chip.hidden = false;
-  $id("vocab-stat-total").textContent = t("libraryStatsWords", String(s.total));
-  const filter = $id("vocab-status-filter");
-  const learningBtn = $id("vocab-stat-learning");
-  const knownBtn = $id("vocab-stat-known");
-  learningBtn.textContent = t("libraryStatsLearning", String(s.learning));
-  knownBtn.textContent = t("libraryStatsKnown", String(s.known));
-  const filterValue = filter ? filter.value : "";
-  learningBtn.setAttribute("aria-pressed", String(filterValue === "new"));
-  knownBtn.setAttribute("aria-pressed", String(filterValue === "known"));
-  $id("vocab-stat-groups").textContent = t("libraryStatsGroups", String(s.groups));
-  $id("vocab-stat-languages").textContent = t("libraryStatsLanguages", String(s.languages));
-  $id("vocab-stat-recent").textContent = t("libraryStatsRecent", String(s.added7), String(s.added30));
+  const rows = _vocabViewRows;
+  const filterValue = ($id("vocab-status-filter") || {}).value || "";
+  const numbered = { "vocab-stat-learning": ["libraryStatsLearning", s.learning], "vocab-stat-known": ["libraryStatsKnown", s.known] };
+  for (const el of toggles) {
+    el.hidden = false;
+    el.setAttribute("aria-pressed", String((el.dataset.status || "") === filterValue));
+    const spec = numbered[el.id];
+    if (!spec) { el.textContent = t("libraryFilterAll"); continue; }
+    pbpLibFillCount(el, pbpLibSplitCount((...a) => t(spec[0], ...a), [String(spec[1])]), () => "span");
+    for (const num of el.querySelectorAll(".lib-count-num")) num.classList.add("lib-toggle-count");
+  }
+  const words = rows.length !== s.total
+    ? pbpLibSplitCount((...a) => t("libraryStatsWordsFiltered", ...a), [String(rows.length), String(s.total)])
+    : pbpLibSplitCount((...a) => t("libraryStatsWords", ...a), [String(s.total)]);
+  const items = [
+    words,
+    pbpLibSplitCount((...a) => t("libraryStatsGroups", ...a), [String(s.groups)]),
+    pbpLibSplitCount((...a) => t("libraryStatsLanguages", ...a), [String(s.languages)]),
+    pbpLibSplitCount((...a) => t("libraryStatsRecent7", ...a), [String(s.added7)]),
+  ];
+  const full = [
+    t("vocabResultCount", String(rows.length), String(_vocabRows.length), _vocabOwnerLabel),
+    t("libraryStatsRecent", String(s.added7), String(s.added30)),
+  ].join(" \u00b7 ");
+  pbpLibRenderCount(count, items, full);
 }
 
 function _pbpVocabApplyView(resetLimit) {
@@ -1497,7 +1516,6 @@ function _pbpVocabApplyView(resetLimit) {
     ($id("vocab-sort") || {}).value || "latest",
     ($id("vocab-status-filter") || {}).value || "");
   _pbpVocabRenderList();
-  _pbpVocabRenderStats();
 }
 
 function _pbpVocabSetAccountState(owner) {
@@ -1524,16 +1542,13 @@ function _pbpVocabClearVisibleState() {
   const list = $id("vocab-list");
   if (list) list.replaceChildren();
   _pbpVocabSetLoading(true);
-  const count = $id("vocab-count");
-  if (count) count.textContent = "";
-  const statsBar = $id("vocab-stats");
-  if (statsBar) statsBar.hidden = true;
   // (The batch bar is class-driven, not hidden-attribute driven; its
   // .selecting class clears via _pbpVocabSyncSelectionUi right below.)
   for (const id of ["vocab-empty", "vocab-no-results", "vocab-load-more"]) {
     const el = $id(id); if (el) el.hidden = true;
   }
   _pbpVocabRefreshGroupOptions(false);
+  _pbpVocabRenderStats();
   _pbpVocabSyncSelectionUi();
 }
 
@@ -2015,10 +2030,10 @@ for (const id of ["vocab-group-filter", "vocab-status-filter"]) {
     _pbpVocabResetListScroll();
   });
 }
-// Stats-strip status chips proxy #vocab-status-filter: click sets it and
-// reuses the existing change pipeline; a second click on the active chip
-// clears the filter back to "all" instead of toggling to the other status.
-for (const chipId of ["vocab-stat-learning", "vocab-stat-known"]) {
+// The three status toggles proxy #vocab-status-filter: a click writes it and
+// reuses the existing change pipeline. A second click on the pressed Learning
+// / Known goes back to All; All's own target is "" so the same line serves it.
+for (const chipId of ["vocab-stat-all", "vocab-stat-learning", "vocab-stat-known"]) {
   const chip = $id(chipId);
   if (chip) chip.addEventListener("click", () => {
     const filter = $id("vocab-status-filter");
@@ -2028,6 +2043,22 @@ for (const chipId of ["vocab-stat-learning", "vocab-stat-known"]) {
     filter.dispatchEvent(new Event("change"));
   });
 }
+// The narrow-index Filter button names how many non-default filters are on
+// (spec §3.4, §11 V10): group not "All groups" counts 1, status not "All"
+// counts 1. Bold via data-filtered; the popover's own open state is written
+// onto the button by library.js (pbpLibWireFilterPopover).
+function _pbpVocabSyncFilterNarrow() {
+  const btn = $id("vocab-filter-narrow");
+  if (!btn) return;
+  const active = (($id("vocab-group-filter") || {}).value ? 1 : 0) + (($id("vocab-status-filter") || {}).value ? 1 : 0);
+  const label = btn.lastElementChild;
+  if (label) label.textContent = active ? t("libraryFilterNarrowActive", String(active)) : t("libraryFilterNarrow");
+  if (active) btn.dataset.filtered = "true";
+  else delete btn.dataset.filtered;
+}
+// applyI18n rewrites the label span from its static data-i18n key on every
+// language change; put the live reading back right after it.
+document.addEventListener("pbp:i18n-applied", _pbpVocabSyncFilterNarrow);
 // Free-lookup toolbar: one-time wiring alongside the stats chips above (see
 // _pbpVocabWireLookupBar's own comment -- no per-render rebuild, so no
 // "already wired" guard is needed here either).
