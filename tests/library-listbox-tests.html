@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Library Listbox Tests</title>
+<style>
+.case.pass{color:#0a0}.case.fail{color:#c00;font-weight:bold}
+.fixture{position:absolute;left:-10000px;top:0;width:800px;height:900px;border:0}
+</style>
+</head><body>
+<div id="results"></div>
+<!-- Top-level copies for the blocks that run on this page itself (T4b's
+     Filter-popover block calls pbpEnhanceListbox here; T4b adds
+     ../library.js right after ../listbox.js). The primitive cases below
+     boot their own srcdoc copies and never touch these. -->
+<script src="../shared.js"></script>
+<script src="../listbox.js"></script>
+<script>
+// listbox.js primitive suite (spec 2026-10-03 library redesign §8.2 float
+// mode, §8.3 ghost face, §8.4 first-frame marker; plan Task T0b). Every
+// primitive case boots a srcdoc iframe that loads only shared.js (PBP_ICONS,
+// setBtnIcon) and listbox.js from the repo root, with a stylesheet standing
+// in for the geometry library.css gains in T6: the UA popover reset and a
+// scroll layer capped by --listbox-room.
+//
+// Page contract for the later tasks (T4b, T6a, T6b, T7a-T7c):
+// - check(name, condition, detail) is the one row writer for appended
+//   cases (report/assert/test stay for the primitive queue).
+// - The page keeps no TOTAL: run-test.mjs counts .pass/.fail rows against
+//   EXPECTED_RESULTS, so a task that adds cases raises only that number.
+// - An independent <script> block appended before </body> (T4b) runs on
+//   its own and reports through check(); nothing awaits it.
+// - Page-level suites (T6, T7) define their constants and async functions
+//   in the function area above the main flow, and add one
+//   `await <name>();` line each at the main flow's mount point, in task
+//   order, above the summary line.
+const results = document.getElementById("results");
+let pass = 0, fail = 0;
+function report(name, error) {
+  const row = document.createElement("div");
+  if (error) fail++; else pass++;
+  row.className = "case " + (error ? "fail" : "pass");
+  row.textContent = (error ? "X " : "OK ") + name + (error ? " :: " + error.message : "");
+  results.appendChild(row);
+  // Kept current per row, so rows from an independent block that lands
+  // after the summary line still show in the title.
+  document.title = (fail ? "FAIL" : "PASS") + " Library Listbox Tests";
+}
+function check(name, condition, detail) {
+  report(name, condition ? null : new Error(detail || "condition is false"));
+}
+function assert(condition, message) { if (!condition) throw new Error(message); }
+const queue = [];
+function test(name, fn) { queue.push([name, fn]); }
+
+const FIXTURE_CSS = [
+  "html, body { margin: 0; font: 14px/20px sans-serif; }",
+  ".scroller { position: absolute; inset: 0; overflow-y: auto; }",
+  ".pad-top { height: 300px; }",
+  ".pad-bottom { height: 1200px; }",
+  ".listbox { display: inline-block; }",
+  ".listbox-btn, .listbox-trigger { height: 32px; }",
+  ".listbox-sizer { display: block; height: 0; overflow: hidden; visibility: hidden; white-space: nowrap; }",
+  ".listbox-pop[popover] { position: fixed; inset: auto; margin: 0; padding: 0; width: max-content; height: auto; box-sizing: border-box; border: 1px solid; overflow: hidden; }",
+  ".listbox-pop[hidden] { display: none; }",
+  ".listbox-list { max-height: min(320px, calc(var(--listbox-room, 100vh) - 2px)); overflow: auto; margin: 0; padding: 0; list-style: none; }",
+  ".listbox-opt { display: block; height: 28px; line-height: 28px; white-space: nowrap; }",
+  ".anchor { position: fixed; width: 100px; height: 32px; margin: 0; padding: 0; }",
+  ".probe-pop { position: fixed; inset: auto; margin: 0; padding: 0; border: 0; width: max-content; overflow: hidden; max-height: var(--listbox-room, none); }",
+  ".probe-body { width: 300px; height: 400px; }",
+].join("\n");
+
+const OPTIONS_30 = Array.from({ length: 30 }, (_, i) => '<option value="g' + i + '">Group ' + i + "</option>").join("");
+const MAIN_BODY = [
+  '<div class="scroller" id="scroller">',
+  '<div class="pad-top"></div>',
+  '<label id="fl-label" for="fl">Group</label>',
+  '<select id="fl" data-listbox="float">' + OPTIONS_30 + "</select>",
+  '<label for="abs">Plain</label>',
+  '<select id="abs" data-listbox><option value="a">A</option><option value="b">B</option></select>',
+  '<span id="sort-label">Sort</span><span id="sort-face">Time, recently updated</span>',
+  '<select id="gh" data-listbox="float" data-listbox-face="ghost" aria-labelledby="sort-label sort-face">',
+  '<option value="latest" data-face-label="Time" data-face-icon="arrowDown" selected>Recently updated</option>',
+  '<option value="oldest" data-face-label="Time" data-face-icon="arrowUp">Oldest first</option>',
+  '<option value="az">A to Z</option>',
+  "</select>",
+  '<div class="pad-bottom"></div>',
+  "</div>",
+  '<button id="anchor" class="anchor" type="button">anchor</button>',
+  '<div id="probe-pop" class="probe-pop" popover="manual"><div id="probe-body" class="probe-body"></div></div>',
+].join("\n");
+
+function frames(win, n) {
+  return new Promise((resolve) => {
+    let left = n;
+    const tick = () => { if (--left <= 0) resolve(); else win.requestAnimationFrame(tick); };
+    win.requestAnimationFrame(tick);
+  });
+}
+
+// One srcdoc document per call. `before` runs after shared.js and before
+// listbox.js registers its DOMContentLoaded handler; `after` runs once it has.
+function boot({ body, before = "", after = "" }) {
+  const frame = document.createElement("iframe");
+  frame.className = "fixture";
+  frame.title = "Listbox fixture";
+  const loaded = new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+  frame.srcdoc = '<!DOCTYPE html><html><head><base href="../"><meta charset="UTF-8"><style>' + FIXTURE_CSS +
+    "</style></head><body>" + body + '<script src="shared.js"><\/script>' + before +
+    '<script src="listbox.js"><\/script>' + after + "</body></html>";
+  document.body.appendChild(frame);
+  return loaded.then(async () => {
+    const win = frame.contentWindow;
+    await frames(win, 2);   // listbox.js's own rAF re-sync
+    return { frame, win, doc: frame.contentDocument };
+  });
+}
+
+// The 13 primitive cases: one shared srcdoc document plus two fresh ones.
+async function primitiveCases() {
+  const { frame, win, doc } = await boot({ body: MAIN_BODY });
+  const $ = (id) => doc.getElementById(id);
+  const fl = $("fl");
+  const gh = $("gh");
+  const abs = $("abs");
+  const btnOf = (select) => $(select.id + "-btn");
+  const listOf = (select) => $(select.id + "-list");
+  const popOf = (select) => listOf(select)?.parentElement;
+  const itemsOf = (select) => [...(listOf(select)?.querySelectorAll('[role="option"]') || [])];
+  const activeIndex = (select) => {
+    const id = btnOf(select)?.getAttribute("aria-activedescendant") || "";
+    return itemsOf(select).findIndex((li) => li.id === id);
+  };
+  const key = (target, k, init = {}) => {
+    const ev = new win.KeyboardEvent("keydown", Object.assign({ key: k, bubbles: true, cancelable: true }, init));
+    target.dispatchEvent(ev);
+    return ev;
+  };
+  const isOpen = (pop) => !!pop && pop.matches(":popover-open");
+  const settle = () => frames(win, 2);
+  const view = () => ({ w: doc.documentElement.clientWidth, h: doc.documentElement.clientHeight });
+  const inView = (r, v) => r.left >= 7 && r.top >= 7 && r.right <= v.w - 7 && r.bottom <= v.h - 7;
+  const icon = (name) => win.eval("PBP_ICONS")[name] || "";
+  const pathsOfHtml = (html) => {
+    const tpl = doc.createElement("template");
+    tpl.innerHTML = html;
+    return [...tpl.content.querySelectorAll("path")].map((p) => p.getAttribute("d")).join("|");
+  };
+  const pathsOf = (el) => [...(el?.querySelectorAll("path") || [])].map((p) => p.getAttribute("d")).join("|");
+  // Every case starts closed, 900px tall, scrolled to the top, with any
+  // scroll/resize event from the previous case already delivered.
+  const reset = async () => {
+    for (const select of doc.querySelectorAll("select[data-listbox]")) {
+      const b = btnOf(select);
+      if (b?.getAttribute("aria-expanded") === "true") key(b, "Escape");
+    }
+    frame.style.height = "900px";
+    $("scroller").scrollTop = 0;
+    await settle();
+  };
+
+  test("float: enhance makes the shell a manual popover; plain data-listbox stays absolute", async () => {
+    await reset();
+    const pop = popOf(fl);
+    assert(pop && pop.getAttribute("popover") === "manual", "float shell popover=" + pop?.getAttribute("popover"));
+    assert(pop.hidden && !isOpen(pop), "float shell starts open");
+    assert(fl.hidden && btnOf(fl)?.classList.contains("listbox-btn"), "float select not enhanced into a value-box button");
+    assert(!popOf(abs).hasAttribute("popover"), "absolute-mode shell got a popover attribute");
+  });
+
+  test("float: click opens in the top layer, fixed, below the button, inside the viewport", async () => {
+    await reset();
+    const btn = btnOf(fl);
+    const pop = popOf(fl);
+    btn.click();
+    try {
+      assert(isOpen(pop) && !pop.hidden, "not :popover-open after click");
+      assert(btn.getAttribute("aria-expanded") === "true", "aria-expanded not true");
+      assert(win.getComputedStyle(pop).position === "fixed", "position=" + win.getComputedStyle(pop).position);
+      const r = pop.getBoundingClientRect();
+      const b = btn.getBoundingClientRect();
+      assert(!pop.hasAttribute("data-flip"), "flipped with ample room below");
+      assert(r.top >= b.bottom - 0.5, "panel not below the button");
+      assert(r.width >= b.width - 0.5, "panel narrower than its button");
+      assert(inView(r, view()), "panel outside the viewport: " + JSON.stringify(r));
+    } finally { key(btn, "Escape"); }
+  });
+
+  test("float: Escape hides the popover, then the shell; it reopens cleanly", async () => {
+    await reset();
+    const btn = btnOf(fl);
+    const pop = popOf(fl);
+    btn.click();
+    assert(isOpen(pop), "fixture: did not open");
+    key(btn, "Escape");
+    assert(!isOpen(pop) && pop.hidden, "still showing after Escape");
+    assert(btn.getAttribute("aria-expanded") === "false", "aria-expanded not false");
+    btn.click();
+    assert(isOpen(pop) && !pop.hidden, "did not reopen after a close");
+    key(btn, "Escape");
+  });
+
+  test("float: flips above when the room below is short and above is larger", async () => {
+    await reset();
+    const btn = btnOf(fl);
+    const pop = popOf(fl);
+    frame.style.height = Math.round(btn.getBoundingClientRect().bottom + 40) + "px";
+    await settle();   // deliver the iframe's own resize event before opening
+    btn.click();
+    try {
+      assert(isOpen(pop), "did not open");
+      assert(pop.getAttribute("data-flip") === "up", "data-flip=" + pop.getAttribute("data-flip"));
+      const r = pop.getBoundingClientRect();
+      const b = btn.getBoundingClientRect();
+      assert(r.bottom <= b.top + 0.5, "flipped panel overlaps the button");
+      assert(inView(r, view()), "flipped panel outside the viewport: " + JSON.stringify(r));
+    } finally {
+      key(btn, "Escape");
+      frame.style.height = "900px";
+      await settle();
+    }
+  });
+
+  test("pbpListboxPlace: side, --listbox-room, width bounds and horizontal clamp", async () => {
+    await reset();
+    assert(typeof win.pbpListboxPlace === "function", "window.pbpListboxPlace is not exported");
+    const anchor = $("anchor");
+    const pop = $("probe-pop");
+    const body = $("probe-body");
+    const v = view();
+    const at = (left, top) => { anchor.style.left = left + "px"; anchor.style.top = top + "px"; };
+    body.style.width = "300px";
+    pop.showPopover();
+    try {
+      at(20, 20);
+      let side = win.pbpListboxPlace(pop, anchor);
+      let a = anchor.getBoundingClientRect();
+      let r = pop.getBoundingClientRect();
+      assert(side === "down" && !pop.hasAttribute("data-flip"), "A: side=" + side);
+      assert(pop.style.getPropertyValue("--listbox-room") === Math.floor(v.h - a.bottom - 4 - 8) + "px",
+        "A: --listbox-room=" + pop.style.getPropertyValue("--listbox-room"));
+      assert(pop.style.position === "fixed" && pop.style.minWidth === Math.round(a.width) + "px" && pop.style.maxWidth === (v.w - 16) + "px",
+        "A: inline position / min-width / max-width: " + pop.style.cssText);
+      assert(Math.abs(r.top - (a.bottom + 4)) <= 1 && Math.abs(r.left - a.left) <= 1, "A: not 4px under the anchor's left edge");
+      at(20, v.h - 60);
+      side = win.pbpListboxPlace(pop, anchor);
+      a = anchor.getBoundingClientRect();
+      r = pop.getBoundingClientRect();
+      assert(side === "up" && pop.getAttribute("data-flip") === "up", "B: side=" + side);
+      assert(pop.style.getPropertyValue("--listbox-room") === Math.floor(a.top - 4 - 8) + "px", "B: --listbox-room=" + pop.style.getPropertyValue("--listbox-room"));
+      assert(r.bottom <= a.top - 4 + 1 && r.top >= 7, "B: not above the anchor inside the viewport: " + JSON.stringify(r));
+      at(20, 20);
+      assert(win.pbpListboxPlace(pop, anchor) === "down" && !pop.hasAttribute("data-flip"), "data-flip left set after a down placement");
+      at(v.w - 110, 20);
+      win.pbpListboxPlace(pop, anchor);
+      a = anchor.getBoundingClientRect();
+      r = pop.getBoundingClientRect();
+      assert(r.right <= v.w - 7 && Math.abs(r.right - a.right) <= 1, "C: right edge " + r.right + " (anchor " + a.right + ", viewport " + v.w + ")");
+      at(-40, 20);
+      win.pbpListboxPlace(pop, anchor);
+      r = pop.getBoundingClientRect();
+      assert(Math.abs(r.left - 8) <= 1, "D: left " + r.left);
+      body.style.width = "2000px";
+      at(20, 20);
+      win.pbpListboxPlace(pop, anchor);
+      r = pop.getBoundingClientRect();
+      assert(r.width <= v.w - 16 + 1 && r.left >= 7 && r.right <= v.w - 7, "E: " + JSON.stringify(r));
+    } finally {
+      body.style.width = "300px";
+      pop.hidePopover();
+    }
+  });
+
+  test("float: a window resize closes the open list", async () => {
+    await reset();
+    const btn = btnOf(fl);
+    const pop = popOf(fl);
+    btn.click();
+    assert(isOpen(pop), "fixture: did not open");
+    win.dispatchEvent(new win.Event("resize"));
+    assert(!isOpen(pop) && pop.hidden && btn.getAttribute("aria-expanded") === "false", "resize left the list open");
+  });
+
+  test("float: scrolling an outer container closes; scrolling the list itself does not", async () => {
+    await reset();
+    const btn = btnOf(fl);
+    const pop = popOf(fl);
+    const list = listOf(fl);
+    btn.click();
+    try {
+      assert(isOpen(pop) && list.scrollHeight > list.clientHeight, "fixture: list not open or not scrollable");
+      list.scrollTop = 60;
+      await settle();
+      assert(list.scrollTop > 0, "fixture: list did not scroll");
+      assert(isOpen(pop), "scrolling the list closed it");
+      $("scroller").scrollTop = 40;
+      await settle();
+      assert(!isOpen(pop) && pop.hidden, "an outer scroll left the list open");
+    } finally { key(btn, "Escape"); }
+  });
+
+  test("float: close removes exactly the resize and scroll listeners open added", async () => {
+    await reset();
+    const btn = btnOf(fl);
+    const calls = [];
+    const spy = (target, tag) => {
+      const add = target.addEventListener;
+      const remove = target.removeEventListener;
+      target.addEventListener = function (type, fn, opt) { calls.push([tag, "add", type, fn, opt]); return add.call(this, type, fn, opt); };
+      target.removeEventListener = function (type, fn, opt) { calls.push([tag, "remove", type, fn, opt]); return remove.call(this, type, fn, opt); };
+    };
+    spy(win, "window");
+    spy(doc, "document");
+    try {
+      btn.click();
+      key(btn, "Escape");
+    } finally {
+      delete win.addEventListener; delete win.removeEventListener;
+      delete doc.addEventListener; delete doc.removeEventListener;
+    }
+    const pick = (tag, op, type) => calls.filter((c) => c[0] === tag && c[1] === op && c[2] === type);
+    const ra = pick("window", "add", "resize");
+    const rr = pick("window", "remove", "resize");
+    const sa = pick("document", "add", "scroll");
+    const sr = pick("document", "remove", "scroll");
+    assert(ra.length === 1 && rr.length === 1 && ra[0][3] === rr[0][3], "resize listener add/remove: " + ra.length + "/" + rr.length);
+    assert(sa.length === 1 && sr.length === 1 && sa[0][3] === sr[0][3], "scroll listener add/remove: " + sa.length + "/" + sr.length);
+    assert(sa[0][4] === true && sr[0][4] === true, "the scroll listener is not capture-phase on both ends");
+  });
+
+  test("ghost: a btn ghost trigger with the face label and icon, no value-box parts", async () => {
+    await reset();
+    const btn = btnOf(gh);
+    assert(btn && btn.className === "listbox-trigger btn ghost", "className=" + btn?.className);
+    assert(!btn.classList.contains("listbox-btn"), "the ghost trigger carries .listbox-btn (a value box)");
+    assert(btn.getAttribute("role") === "combobox" && btn.getAttribute("aria-haspopup") === "listbox" &&
+      btn.getAttribute("aria-expanded") === "false" && btn.getAttribute("aria-controls") === "gh-list",
+      "combobox ARIA differs from the value-box mode");
+    assert(btn.getAttribute("aria-labelledby") === "sort-label sort-face" && listOf(gh).getAttribute("aria-labelledby") === "sort-label sort-face",
+      "the select's own aria-labelledby was not carried over");
+    assert(!btn.querySelector(".listbox-sizer") && !btn.querySelector(".listbox-value"), "the ghost trigger built value-box parts");
+    assert(btn.lastElementChild?.textContent === "Time", "face label=" + btn.lastElementChild?.textContent);
+    const shown = pathsOf(btn.querySelector(".btn-ic"));
+    assert(shown !== "" && shown === pathsOfHtml(icon("arrowDown")), "face icon is not PBP_ICONS.arrowDown");
+    assert(popOf(gh).getAttribute("popover") === "manual", "the ghost float shell is not a popover");
+  });
+
+  test("ghost: face follows the value (keyboard pick, programmatic sync); option text is the fallback; title untouched", async () => {
+    await reset();
+    const btn = btnOf(gh);
+    btn.title = "consumer title";
+    try {
+      key(btn, "ArrowDown");
+      assert(isOpen(popOf(gh)), "ArrowDown did not open the ghost list");
+      key(btn, "ArrowDown");
+      key(btn, "Enter");
+      assert(gh.value === "oldest" && !isOpen(popOf(gh)), "Enter did not commit oldest and close, value=" + gh.value);
+      assert(btn.lastElementChild?.textContent === "Time" && pathsOf(btn.querySelector(".btn-ic")) === pathsOfHtml(icon("arrowUp")),
+        "face did not switch to the arrowUp icon");
+      gh.value = "az";
+      win.pbpListboxSync(gh);
+      assert(btn.lastElementChild?.textContent === "A to Z", "fallback label=" + btn.lastElementChild?.textContent);
+      assert(!btn.querySelector(".btn-ic svg"), "an option without data-face-icon still shows an icon");
+      assert(btn.title === "consumer title", "listbox.js rewrote the consumer's title: " + btn.title);
+    } finally {
+      gh.value = "latest";
+      win.pbpListboxSync(gh);
+      btn.removeAttribute("title");
+    }
+  });
+
+  test("float: End/Home scroll only the list; the outer scroller stays put and the list stays open", async () => {
+    await reset();
+    const btn = btnOf(fl);
+    const pop = popOf(fl);
+    const list = listOf(fl);
+    const scroller = $("scroller");
+    const before = scroller.scrollTop + "," + doc.scrollingElement.scrollTop;
+    btn.click();
+    try {
+      assert(isOpen(pop) && list.scrollHeight > list.clientHeight, "fixture: list not open or not scrollable");
+      key(btn, "End");
+      await settle();
+      const items = itemsOf(fl);
+      assert(activeIndex(fl) === items.length - 1, "End did not reach the last option");
+      const box = list.getBoundingClientRect();
+      const last = items[items.length - 1].getBoundingClientRect();
+      assert(list.scrollTop > 0 && last.top >= box.top - 0.5 && last.bottom <= box.top + list.clientTop + list.clientHeight + 0.5,
+        "the last option is not visible inside the list");
+      assert(isOpen(pop), "End closed the list (an outer scroll fired)");
+      key(btn, "Home");
+      await settle();
+      assert(items[0].getBoundingClientRect().top >= box.top - 0.5, "Home did not bring the first option back into view");
+      assert(scroller.scrollTop + "," + doc.scrollingElement.scrollTop === before, "an outer container scrolled");
+      assert(isOpen(pop), "Home closed the list");
+    } finally { key(btn, "Escape"); }
+  });
+
+  test("data-listbox-ready is set in the enhancement pass, after the selects are enhanced", async () => {
+    const f = await boot({
+      body: '<label for="a">A</label><select id="a" data-listbox="float"><option>1</option></select>',
+      before: '<script>window.__probe = {}; document.addEventListener("DOMContentLoaded", () => {' +
+        ' __probe.readyBefore = document.documentElement.hasAttribute("data-listbox-ready");' +
+        ' __probe.hiddenBefore = document.getElementById("a").hidden; });<\/script>',
+      after: '<script>document.addEventListener("DOMContentLoaded", () => {' +
+        ' __probe.readyAfter = document.documentElement.hasAttribute("data-listbox-ready");' +
+        ' __probe.btnAfter = !!document.getElementById("a-btn"); });<\/script>',
+    });
+    try {
+      const p = f.win.__probe;
+      assert(p.readyBefore === false && p.hiddenBefore === false, "marker or enhancement present before listbox.js's handler ran: " + JSON.stringify(p));
+      assert(p.readyAfter === true && p.btnAfter === true, "marker missing or select not enhanced right after listbox.js's handler: " + JSON.stringify(p));
+    } finally { f.frame.remove(); }
+  });
+
+  test("one enhance throwing still sets data-listbox-ready; the rest enhance; the failed native keeps its label", async () => {
+    const one = (id) => '<label for="' + id + '" id="' + id + '-lab">' + id + '</label><select id="' + id + '" data-listbox="float"><option>1</option></select>';
+    const f = await boot({
+      body: one("a") + one("boom") + one("c"),
+      before: "<script>window.__warns = []; { const warn = console.warn;" +
+        ' console.warn = function (...args) { __warns.push(args.map(String).join(" ")); return warn.apply(this, args); }; }' +
+        ' document.getElementById("boom").after = function () { throw new Error("fixture boom"); };<\/script>',
+    });
+    try {
+      const d = f.doc;
+      assert(d.documentElement.hasAttribute("data-listbox-ready"), "data-listbox-ready missing after a failed enhance");
+      assert(d.getElementById("a-btn") && d.getElementById("c-btn"), "a select after the failing one was not enhanced");
+      assert(!d.getElementById("boom-btn") && d.getElementById("boom").hidden === false, "the failed select is hidden or half-built");
+      assert(d.getElementById("boom-lab").htmlFor === "boom", "the failed select's label points at a button that is not in the page: for=" + d.getElementById("boom-lab").htmlFor);
+      assert(f.win.__warns.some((w) => w.includes("fixture boom")), "the failure was swallowed without a console.warn: " + JSON.stringify(f.win.__warns));
+    } finally { f.frame.remove(); }
+  });
+
+  for (const [name, fn] of queue) {
+    try { await fn(); report(name); } catch (error) { report(name, error); }
+  }
+}
+
+// ---- Function area: page-level suites. T6a adds LIB_FRAME_TOKEN,
+// loadLibraryFrame, libFrames, libWaitFor and libraryPageGroupCases here;
+// T6b, T7a, T7b and T7c add theirs below them. Keep this area above the main
+// flow, so every constant is initialised before the flow can reach it.
+
+// ---- Main flow (last thing in this script). A setup error that escapes a
+// suite becomes one failed row; the row count then falls short and
+// run-test.mjs reports the stall, which is the red it should be.
+(async () => {
+  try {
+    await primitiveCases();
+    // Mount point: page-level suites, one `await <name>();` per line, in task
+    // order (T6a libraryPageGroupCases, T6b libraryPageSortCases, T7a
+    // libraryPageLookupLangCases, T7b libraryPageLongContentCases +
+    // libraryPageDetailLocaleCases, T7c libraryPageAutoLookupLangCases).
+  } catch (error) {
+    report("suite setup", error);
+  }
+  document.title = (fail ? "FAIL" : "PASS") + " Library Listbox Tests";   // summary line
+})();
+</script>
+</body></html>

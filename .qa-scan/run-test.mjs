@@ -55,6 +55,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/i18n-parity-tests.html": 217,
   "tests/icon-state-tests.html": 11,
   "tests/jina-cache-tests.html": 28,
+  "tests/library-listbox-tests.html": 13,
   "tests/library-notes-tests.html": 120,
   "tests/library-vocab-tests.html": 208,
   "tests/md-ai-tests.html": 984,
