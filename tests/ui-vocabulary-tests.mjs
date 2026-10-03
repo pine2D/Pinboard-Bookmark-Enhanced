@@ -91,6 +91,30 @@ check(existsSync(hookSettings) && /ui-consumer-lint\.mjs/.test(readFileSync(hook
 // the registry itself must parse and every registered surface file must exist
 const reg = JSON.parse(readFileSync(resolve(root, "docs/theme-surface/ui-vocabulary.json"), "utf8"));
 for (const [name, s] of Object.entries(reg.surfaces)) for (const f of s.files) check(existsSync(resolve(root, f)), `ui-vocabulary.json: surface ${name} lists missing file ${f}`);
+// listbox.js (spec 2026-10-03 library redesign §8.1) is a UI file with no
+// page prefix. Every file a registry surface lists must reach the vocabulary
+// gate at commit time (UI_VOCAB_RE) and at edit time (ui-consumer-lint's
+// GOVERNED) -- a registered file the regexes miss is scanned only in verify.
+// The shared listbox primitive must also reach ui-contract (UI_HTML_RE);
+// before the rename it rode the `options-*.js` arm of that regex.
+const regexFrom = (source, pattern, what) => {
+  const m = pattern.exec(source);
+  check(!!m, `cannot find ${what}`);
+  return m ? new RegExp(m[1]) : /$^/;
+};
+const uiHtmlRe = regexFrom(preCommit, /^UI_HTML_RE='([^']+)'$/m, "UI_HTML_RE in scripts/pre-commit-hook.sh");
+const uiVocabRe = regexFrom(preCommit, /^UI_VOCAB_RE='([^']+)'$/m, "UI_VOCAB_RE in scripts/pre-commit-hook.sh");
+const consumerLint = readFileSync(resolve(root, "scripts/ui-consumer-lint.mjs"), "utf8");
+const governedRe = regexFrom(consumerLint, /^const GOVERNED = \/(.+)\/;$/m, "GOVERNED in scripts/ui-consumer-lint.mjs");
+for (const [name, s] of Object.entries(reg.surfaces)) {
+  for (const f of s.files) {
+    check(uiVocabRe.test(f), `pre-commit UI_VOCAB_RE does not trigger on ${f} (surface ${name}); its class tokens would meet the vocabulary gate only in verify`);
+    check(governedRe.test(f), `ui-consumer-lint GOVERNED does not cover ${f} (surface ${name}); the edit-time hook would skip it`);
+  }
+}
+check(Object.values(reg.surfaces).some((s) => s.files.includes("listbox.js")),
+  "ui-vocabulary.json: no surface lists listbox.js (the shared listbox primitive mints the listbox-* classes)");
+check(uiHtmlRe.test("listbox.js"), "pre-commit UI_HTML_RE must trigger on listbox.js (layout-lint + ui-contract), as the options-prefixed file did");
 
 if (fail.length) { console.error(fail.map((m) => `FAIL ${m}`).join("\n")); process.exit(1); }
 console.log("ui vocabulary tests ok");

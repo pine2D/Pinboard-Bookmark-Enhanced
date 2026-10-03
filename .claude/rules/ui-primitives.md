@@ -9,6 +9,7 @@ paths:
   - "library.css"
   - "md-preview.css"
   - "shared.js"
+  - "listbox.js"
   - "docs/theme-surface/ui-vocabulary.json"
   - "scripts/ui-vocabulary-baseline.json"
 ---

@@ -843,7 +843,7 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
   `#opt-ai-tag-lang`、`#opt-ai-summary-lang`、`#opt-ai-tag-separator`、`#translate-target-lang`、
   `#opt-selection-trigger`、`#opt-md-image-policy`、`#opt-theme`；另有 Send-to 构建器在运行时生成的
   Obsidian「route」一处，由 options.js 插入后调用 `pbpEnhanceListbox`），静态的 9 处由
-  `options-listbox.js` 在 DOMContentLoaded 时增强。成立条件——每条对应自绘控件会丢的一样东西：
+  `listbox.js` 在 DOMContentLoaded 时增强。成立条件——每条对应自绘控件会丢的一样东西：
   1. **native `<select>` 保留为值载体**：不删、不换，只加 `hidden`（增强器加，JS 未运行时原生 select
      可见可用）。options.js 照旧读写 `.value`、监听 `change`；程序化改值后调用
      `window.pbpListboxSync(select)`（options.js 的 `syncTranslateLangCustomState()` 与

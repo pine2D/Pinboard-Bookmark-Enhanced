@@ -38,7 +38,7 @@ import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const GOVERNED = /^(?:(?:popup|options|library|md-preview)\.html|(?:popup|options|library)(?:-[a-z-]+)?\.js|md-[a-z-]+\.js|shared\.js|md-preview\.css|docs\/theme-surface\/ui-vocabulary\.json|scripts\/ui-vocabulary-baseline\.json)$/;
+const GOVERNED = /^(?:(?:popup|options|library|md-preview)\.html|(?:popup|options|library)(?:-[a-z-]+)?\.js|listbox\.js|md-[a-z-]+\.js|shared\.js|md-preview\.css|docs\/theme-surface\/ui-vocabulary\.json|scripts\/ui-vocabulary-baseline\.json)$/;
 const THEME_CSS_GOVERNED = /^(?:popup|options|library)\.css$/;
 const THEME_JS_GOVERNED = /^pinboard-themes\.js$/;
 

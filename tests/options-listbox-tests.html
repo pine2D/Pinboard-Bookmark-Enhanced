@@ -11,13 +11,13 @@
 // The listbox primitive (spec stage2 §3, COMPONENTS.md §6.4 exception 2) is
 // exercised on the REAL options page: options.html is loaded into an iframe
 // with every one of its own <script> tags kept (a <base> points them at the
-// repo root), so i18n.js, shared.js, options-listbox.js and options.js all
+// repo root), so i18n.js, shared.js, listbox.js and options.js all
 // boot exactly as they do in the extension. The only thing the fixture adds
 // is a chrome.* stub (empty storage, no permissions, English messages from
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 38;
+const TOTAL = 41;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -38,7 +38,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // (setTimeout(0) for callback style, a bare Promise.resolve for the
   // promise style -- no macrotask at all). Only the dedicated load-order
   // test below passes a real delay, to push chrome.storage's resolution
-  // past options-listbox.js's own one-shot DOMContentLoaded rAF sync.
+  // past listbox.js's own one-shot DOMContentLoaded rAF sync.
   const done = (args, value) => {
     const cb = args.length && typeof args[args.length - 1] === "function" ? args[args.length - 1] : null;
     if (cb) { setTimeout(() => cb(value), storageDelayMs); return undefined; }
@@ -528,7 +528,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     assert(got === opt.textContent.trim(), "button text=" + got + ", want " + opt.textContent.trim());
   });
 
-  // Stage-3b Task 5, S1 pin: options-listbox.js's own DOMContentLoaded
+  // Stage-3b Task 5, S1 pin: listbox.js's own DOMContentLoaded
   // handler enhances every data-listbox select then, one rAF later, re-syncs
   // all of them once -- specifically to "absorb" options.js's OWN async
   // settings-load writes (chrome.storage round trip). That single rAF is a
@@ -537,7 +537,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // and proves every listbox button is still correctly synced once the page
   // settles -- pinned by this task's dedicated post-load sync call (options.js,
   // right after the settings fieldMap loop's last select write), not by the
-  // timing of options-listbox.js's own boot-time pass.
+  // timing of listbox.js's own boot-time pass.
   test("cold load with a late (macrotask) storage resolution leaves every listbox synced (S1)", async () => {
     const frame2 = document.createElement("iframe");
     frame2.id = "fixture2";
@@ -563,7 +563,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       // applyI18n() re-sync, an early theme probe, a couple of provider/
       // credential probes, ...) -- each one awaited in turn, so the delay is
       // cumulative. 40ms per hop is comfortably >> one requestAnimationFrame
-      // tick (~16ms, all options-listbox.js's own boot sync gets), so even
+      // tick (~16ms, all listbox.js's own boot sync gets), so even
       // the FIRST hop alone already loses that race; the full chain lands
       // the real settings load at roughly the 800ms mark below.
       const stub2 = "<script>window.chrome = (" + pbpTestChromeStub.toString() + ")(" +
@@ -789,6 +789,53 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     assert(win.getComputedStyle(pop).position === "absolute" && win.getComputedStyle(listOf(provider())).position === "static", "positioning not owned by the shell");
   });
 
+  // Spec 2026-10-03 library redesign §8.1: moving the active option scrolls
+  // the list's own scroll layer and nothing else. li.scrollIntoView() also
+  // scrolled every scrollable ancestor -- here the options document; in the
+  // library's two scroll containers the whole column jumped. The 260px
+  // viewport makes the open list overrun the bottom edge without flipping,
+  // which is exactly where scrollIntoView reached past the list.
+  test("keyboard moves of the active option scroll only the list, never the page", async () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const btn = btnOf(provider());
+    const list = listOf(provider());
+    const pop = popOf(provider());
+    const oldHeight = frame.style.height;
+    const scrollers = () => {
+      const tops = [doc.scrollingElement.scrollTop];
+      for (let el = pop.parentElement; el; el = el.parentElement) tops.push(el.scrollTop);
+      return tops.join(",");
+    };
+    try {
+      frame.style.height = "260px";
+      await nextFrame(); await nextFrame();
+      btn.scrollIntoView({ block: "start" });
+      await nextFrame(); await nextFrame();
+      const before = scrollers();
+      btn.click();
+      assert(!pop.hidden && pop.getAttribute("data-flip") !== "up", "fixture: the list did not open downward (data-flip=" + pop.getAttribute("data-flip") + ")");
+      assert(pop.getBoundingClientRect().bottom > win.innerHeight, "fixture: the open list fits the 260px viewport, so an ancestor scroll could not show");
+      key(btn, "End");
+      const items = itemsOf(provider());
+      assert(activeIndex(provider()) === items.length - 1, "End did not reach the last option");
+      const box = list.getBoundingClientRect();
+      const lastRect = items[items.length - 1].getBoundingClientRect();
+      assert(list.scrollTop > 0, "the list did not scroll to the last option");
+      assert(lastRect.top >= box.top - 0.5 && lastRect.bottom <= box.top + list.clientTop + list.clientHeight + 0.5,
+        "the last option is outside the list's visible box");
+      assert(scrollers() === before, "an ancestor scrolled on End: " + before + " -> " + scrollers());
+      key(btn, "Home");
+      assert(items[0].getBoundingClientRect().top >= list.getBoundingClientRect().top - 0.5, "Home did not bring the first option back into view");
+      assert(scrollers() === before, "an ancestor scrolled on Home: " + before + " -> " + scrollers());
+    } finally {
+      close(provider());
+      frame.style.height = oldHeight;
+      win.scrollTo(0, 0);
+      setValue(provider(), "gemini");
+    }
+  });
+
   // Fixwave stage2 product-bug fix: options.js debounces autosave 500ms
   // (scheduleAutoSave) with no teardown flush, so a change made <500ms
   // before the tab closed/hid was silently discarded. options.js now flushes
@@ -842,7 +889,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // block like every OTHER listbox this file drives -- clicking an option
   // must still update `select.value` and dispatch a real `change` (the event
   // options.js's autosave listener is bound to), the same underlying path
-  // options-listbox.js's chooseOption always takes (~line 163-164: `new
+  // listbox.js's chooseOption always takes (~line 163-164: `new
   // Event("input"/"change", { bubbles: true })`), proven generically for the
   // provider/translate selects elsewhere in this file but never yet pinned
   // for this one. Spy via addEventListener BEFORE the click, so the count
@@ -891,7 +938,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // requires a TRUSTED, OS-level key event and silently no-ops otherwise),
   // even though `.click()` DOES trigger the native label-forwarding default
   // action for an untrusted event (proven by the next test). This is
-  // unrelated to options-listbox.js's OWN keydown handling elsewhere in this
+  // unrelated to listbox.js's OWN keydown handling elsewhere in this
   // file working fine with synthetic events -- that is a page JS listener,
   // which runs for any dispatched event regardless of trust; radio-group
   // arrow navigation is UA-internal, gated on isTrusted. So the only thing a

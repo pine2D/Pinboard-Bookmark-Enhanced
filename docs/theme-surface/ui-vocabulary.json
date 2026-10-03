@@ -139,13 +139,6 @@
         "fg",
         "fg-actions",
         "hint",
-        "listbox",
-        "listbox-btn",
-        "listbox-list",
-        "listbox-opt",
-        "listbox-pop",
-        "listbox-sizer",
-        "listbox-value",
         "pf",
         "pick",
         "pick-box",
@@ -303,6 +296,25 @@
         "xp-dict-local",
         "xp-dict-online",
         "xp-dict-slot"
+      ]
+    },
+    "listbox": {
+      "files": [
+        "listbox.js"
+      ],
+      "exactStructural": [],
+      "primitives": [
+        "listbox"
+      ],
+      "regions": [],
+      "components": [
+        "listbox-btn",
+        "listbox-list",
+        "listbox-opt",
+        "listbox-pop",
+        "listbox-sizer",
+        "listbox-trigger",
+        "listbox-value"
       ]
     },
     "md-preview": {

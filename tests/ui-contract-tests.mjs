@@ -1709,7 +1709,7 @@ function forcedColorsBodyRanges(css) {
 // "checkbox"])` is still a text box, and `.fg :is(input[type="checkbox"],
 // textarea)` still reaches the textarea. Value boxes addressed by id count
 // too: the ids come from the text-entry controls options.html ships, plus
-// each data-listbox select's runtime `<id>-btn` button (options-listbox.js).
+// each data-listbox select's runtime `<id>-btn` button (listbox.js).
 // Search inputs count too (stage 4, spec 2026-09-30-ui-fields-stage4-design
 // §3.1): the sidebar search box joined the field family -- rest and focus;
 // it has no hover by design -- so every value-box scan below reads it.
@@ -7849,7 +7849,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     const prefix = sel.slice(0, sel.length - subject.length);
     const visible = subjectAlternatives(subject).some((compound) => {
       const c = classifyCompound(compound);
-      // a listbox button by id: options-listbox.js names it `<select id>-btn`
+      // a listbox button by id: listbox.js names it `<select id>-btn`
       const listboxId = c.ids.some((id) => id.endsWith("-btn") && OPTIONS_VALUE_BOX_IDS.selectIds.has(id.slice(0, -4)));
       return c.classes.includes("listbox-btn") || listboxId || (c.tag === "input" && c.type === "search") ||
         c.ids.includes("options-search-input") || c.ids.includes("mobile-tab-select") ||

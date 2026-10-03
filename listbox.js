@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Enhanced - Options listbox primitive
+// Pinboard Bookmark Enhanced - Listbox primitive (options + library)
 // ============================================================
 // The one drawn <select> the settings page allows (COMPONENTS.md §6.4
 // exception 2, spec stage2 §3). It enhances only `select[data-listbox]`:
@@ -72,6 +72,20 @@
 
   function optionText(opt) { return (opt?.textContent || "").trim(); }
 
+  // Keep the active option in view by moving the scroll layer's own
+  // scrollTop, with scrollIntoView's "nearest" rule (only when it is outside,
+  // by the least amount). Never li.scrollIntoView(): that also scrolls every
+  // scrollable ancestor -- the options document, or in the library the list
+  // and detail columns, which jumped (spec 2026-10-03 library redesign §8.1).
+  function reveal(list, li) {
+    const box = list.getBoundingClientRect();
+    const top = box.top + list.clientTop;
+    const bottom = top + list.clientHeight;
+    const r = li.getBoundingClientRect();
+    if (r.top < top) list.scrollTop -= top - r.top;
+    else if (r.bottom > bottom) list.scrollTop += r.bottom - bottom;
+  }
+
   function setActive(state, i) {
     const items = state.list.children;
     if (items[state.active]) items[state.active].removeAttribute("data-active");
@@ -80,7 +94,7 @@
     if (!li) { state.btn.removeAttribute("aria-activedescendant"); return; }
     li.setAttribute("data-active", "");
     state.btn.setAttribute("aria-activedescendant", li.id);
-    if (!state.pop.hidden && typeof li.scrollIntoView === "function") li.scrollIntoView({ block: "nearest" });
+    if (!state.pop.hidden) reveal(state.list, li);
   }
 
   function sync(state) {

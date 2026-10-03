@@ -1813,7 +1813,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           // Stage-3b Task 3: a Send-to select field (currently only Obsidian's
           // "route") takes the same drawn listbox every other <select> on this
           // page does. Enhanced further down, once `det` is in the live DOM --
-          // options-listbox.js's enhance() re-points a `label[for]` by
+          // listbox.js's enhance() re-points a `label[for]` by
           // querying `document`, which only finds connected elements.
           inp.setAttribute("data-listbox", "");
         }
@@ -1973,7 +1973,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       det.appendChild(head); det.appendChild(card);
       host.appendChild(det);
       // Enhance any select-type field's listbox now that `det` is connected
-      // to the document -- options-listbox.js's enhance() re-points a
+      // to the document -- listbox.js's enhance() re-points a
       // `label[for]` by querying `document`, which only finds connected
       // elements, so this cannot run any earlier in the loop body.
       card.querySelectorAll("select[data-listbox]").forEach((sel) => window.pbpEnhanceListbox?.(sel));
@@ -2437,7 +2437,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // opt-theme, the three ai-behavior selects, this one) fires no 'change'
   // event, so a listbox button enhanced before this async settings load
   // resolves would otherwise keep showing whatever it displayed at
-  // options-listbox.js's own one-shot DOMContentLoaded rAF sync (which race-
+  // listbox.js's own one-shot DOMContentLoaded rAF sync (which race-
   // condition-loses whenever chrome.storage.local.get resolves on a later
   // macrotask than that rAF). One generic re-sync right after the load
   // path's last select write closes the race for every current and future

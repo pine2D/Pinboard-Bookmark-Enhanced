@@ -2300,7 +2300,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // until revealed, driven via a REAL keyboard Space press on the focused
     // `open.click` target rather than a raw `.click()` -- this doubles as a
     // real-keyboard-path gate (the listbox's WAI-ARIA "select-only
-    // combobox" contract, options-listbox.js's onKeydown " " branch) rather
+    // combobox" contract, listbox.js's onKeydown " " branch) rather
     // than only exercising the mouse click listener the way `page.click()`
     // would. Script-focus + one real key is the same idiom focusWithin uses
     // above.
@@ -2334,7 +2334,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     }, { selector: check.selector, cls: check.addClass });
   }
   if (check.state === "open") {
-    // Close it again (real Escape, the same key options-listbox.js's
+    // Close it again (real Escape, the same key listbox.js's
     // onKeydown already handles) so a left-open popover does not leak into
     // whatever the NEXT check on this page reads -- same leave-no-state-
     // behind discipline as classState/focusWithin/hover around this block.
@@ -4353,7 +4353,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       || c.selector.includes(".listbox-pop") || c.selector.includes(".listbox-opt")
       // Fix round 1 (review MINOR finding 2): Appearance's theme select
       // coverage row. Stage-3b Task 4 re-pinned the checklist row's own
-      // selector from `#opt-theme` to `#opt-theme-btn` (options-listbox.js
+      // selector from `#opt-theme` to `#opt-theme-btn` (listbox.js
       // hides the native select and builds the button in its place). The
       // vocab AnkiConnect key row that used to be sniffed here by a
       // `.key-wrap:has(` substring now names its tab in the checklist

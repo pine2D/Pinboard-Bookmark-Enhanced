@@ -313,7 +313,7 @@
 //                      so the state this reveals is reached through the
 //                      SAME code path a keyboard user's Tab + Space takes
 //                      (a `select-only combobox`'s onKeydown " " branch,
-//                      options-listbox.js), a materially different path from
+//                      listbox.js), a materially different path from
 //                      a mouse click listener. Throws a SETUP ERROR if the
 //                      target cannot be focused or the press did not flip
 //                      its `aria-expanded` to "true". Closed again (Escape)
@@ -1657,7 +1657,7 @@ export const CHECKS = [
   // bare `.fg select`, leaning on "#opt-lang is the first `<select>` inside
   // a `.fg` in DOM order" -- true only while #opt-lang was still a plain
   // native select. This task turned #opt-lang into the row model's OWN
-  // second `data-listbox` consumer (spec §3): options-listbox.js hides the
+  // second `data-listbox` consumer (spec §3): listbox.js hides the
   // native `<select>` (`select.hidden = true`) and builds `#opt-lang-btn`
   // as its visible replacement, so the bare selector kept matching the now-
   // invisible native element and read a zero-size FAIL (`.fg select|
@@ -1696,7 +1696,7 @@ export const CHECKS = [
   // #opt-lang/#opt-pinboard-token (Task 2) and #fields-openai's key-wrap
   // (Task 4, ui-system-stage2) -- same re-pin, same reason, done here for
   // the last two representative ids.
-  // #opt-theme -> #opt-theme-btn (options-listbox.js hides the native
+  // #opt-theme -> #opt-theme-btn (listbox.js hides the native
   // <select> and builds the button as its visible replacement, the same
   // swap #opt-lang got above): widthPx.min:240 still holds (the stage-0
   // rule only lifts max-width, not the select-exception's own floor);
@@ -1757,7 +1757,7 @@ export const CHECKS = [
   // there, see scripts/ui-render-audit.mjs's rung.densityComponents: a
   // `.listbox-btn` reads `var(--opt-control-h)` unconditionally, not gated
   // by the marker). The native <select> is `hidden` by the enhancer
-  // (options-listbox.js), so a width/height row against the OLD select id
+  // (listbox.js), so a width/height row against the OLD select id
   // would read a zero-size element -- both rows below target the visible
   // `button.listbox-btn` instead. widthPx.min 240 + widthLteWith mirror the
   // `.fg select` exception row above (content-sized, never full-width);
@@ -1826,7 +1826,7 @@ export const CHECKS = [
     expect: { heightPx: { comfortable: 28, compact: 24 } } },
   // Open state (Controller ruling C): a real keyboard Space press on the
   // focused #opt-ai-provider-btn (scripts/ui-render-audit.mjs's new "open"
-  // state, next to the seedChecked machinery) exercises options-listbox.js's
+  // state, next to the seedChecked machinery) exercises listbox.js's
   // onKeydown " " branch -- a DIFFERENT code path from the mouse click the
   // aiProviderChecks group's own provider switch already drives -- keeping a
   // real-keyboard assertion in the gate, not only a mouse one. Both rows
@@ -1852,7 +1852,7 @@ export const CHECKS = [
   // #opt-ai-provider-btn", since the runner switched to #tab-general -- the
   // panel #opt-lang's popover actually belongs to -- instead of #tab-ai).
   // `#opt-ai-provider-btn + .listbox-pop` (root.append(btn, pop) in
-  // options-listbox.js makes pop the button's own next sibling) and
+  // listbox.js makes pop the button's own next sibling) and
   // `#opt-ai-provider-list .listbox-opt` (`list.id = \`${id}-list\``, same
   // file) are both anchored to #opt-ai-provider's own unique IDs, so they
   // stay correct no matter how many more `.listbox-pop`/`.listbox-opt`
@@ -2068,7 +2068,7 @@ export const CHECKS = [
   // coverage for its text/password branch until now.
 
   // #opt-md-image-policy-btn: the markdown panel's own listbox button
-  // (options-listbox.js hides the native <select>, same swap #opt-lang/
+  // (listbox.js hides the native <select>, same swap #opt-lang/
   // #opt-theme already got) -- same shape as #opt-ai-provider-btn/
   // #translate-target-lang-btn above.
   { surface: "options", page: "options.html", selector: "#opt-md-image-policy-btn", state: "default",

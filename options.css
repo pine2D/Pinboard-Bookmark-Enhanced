@@ -315,7 +315,7 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 .options-search-empty { padding: var(--opt-sp-4); color: var(--opt-fg-hint); font-size: 11px; }
 /* ---- Listbox (COMPONENTS.md §6.4 exception 2, spec stage2 §3): the native
    <select> stays as the value carrier and is hidden; the combobox button is
-   the field, the popover list is the picker (options-listbox.js). Sibling of
+   the field, the popover list is the picker (listbox.js). Sibling of
    the search dropdown above: same panel / border / shadow chrome, one z rung
    higher (popover, not menu) because it can open over the sticky nav column.
    Width follows the select exception (§10.2 .fg.entry-block row): content-

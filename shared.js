@@ -71,7 +71,7 @@ const PBP_ICONS = {
   // 24-box reader family; at 14px its stroke read lighter than its neighbours.
   obsidian: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h8l2.7 4L8 14.7 1.3 6Z"/><path d="M7.3 2 5.3 6l2.7 8.7L10.7 6 8.7 2"/><path d="M1.3 6h13.4"/></svg>',
   arrowDown: '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
-  // chevronDown: the options listbox button's affordance (options-listbox.js).
+  // chevronDown: the listbox button's affordance (listbox.js).
   // Same Lucide chevron-down path as arrowDown, under its own key so the
   // listbox can size it (16px) without touching arrowDown's consumers.
   chevronDown: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
