@@ -2244,17 +2244,6 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
     .map(([, sel]) => sel.trim().split("\n").pop().trim());
   check(unbrokenProse.length === 0,
     `library.css: a pre-wrap prose rule declares no break policy — inside the detail column an unbreakable run overflows the pane instead of wrapping: ${unbrokenProse.join(" | ")}`);
-  // The five colour-filter dots are real <button>s (library-notes.js), the one
-  // interactive family on this page that used to fall through to the UA focus
-  // ring. The ring must also be legible in the OFF state, and `outline` paints
-  // at its own element's opacity, so the "filtered out" dimming belongs on the
-  // swatch inside the button, never on the button itself. (T4 replaces these
-  // dots with .lib-toggle and rewrites both checks.)
-  check(/\.notes-filter-dot:focus-visible \{/.test(libraryCss),
-    "library.css: .notes-filter-dot has no :focus-visible rule — the colour dots fall back to the UA default ring while every neighbouring family declares a themed one");
-  check(!/\.notes-filter-dot\[aria-pressed="false"\]\s*\{[^}]*opacity/.test(libraryCss) &&
-    /\.notes-filter-dot\[aria-pressed="false"\] \.note-dot \{[^}]*opacity/.test(libraryCss),
-    "library.css: the colour dot's off-state opacity is back on the BUTTON — a focus ring paints at its own element's opacity (border and box-shadow alike), so it would render at a third strength on exactly the dots a keyboard user is about to re-enable");
   // Both panes end the same way: one closing row, destructive action pushed
   // to its right end. (The footers' class names move off .lib-section in T7 /
   // T8, which rewrite the two className halves of this check.)
@@ -8744,6 +8733,29 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "library.js: the Filter popover is not wired, or closing it leaves pbpListboxPlace's inline position behind (the wide form would render fixed)");
   check(/document\.addEventListener\("pbp:i18n-applied", _pbpVocabSyncFilterNarrow\)/.test(libraryVocabJs),
     "library-vocab.js: applyI18n rewrites the Filter button's label to the plain key on a language change; _pbpVocabSyncFilterNarrow must re-run after it");
+}
+
+// ---- library redesign T4c (spec §3.1 / §3.2 / §3.7): the notes header and rows. ----
+{
+  const notesJs = read("library-notes.js");
+  const hand = stripGeneratedRegions(libraryCss);
+  check(/<div class="notes-toolbar">\s*<input type="search" id="notes-filter"[^>]*\/>\s*<\/div>/.test(libraryHtml) &&
+    /<div id="notes-color-filters" class="notes-color-filters" role="group"/.test(libraryHtml) &&
+    /<div class="lib-count-row" id="notes-context-bar">/.test(libraryHtml) &&
+    /class="btn btn-sm ghost lib-hang-end" id="notes-select-all"/.test(libraryHtml),
+    "library.html: the notes list header is not the three rows of spec §3.1 (filter / colour toggles / count row with a hung Select all)");
+  check(/let _notesActiveColors = new Set\(\);/.test(notesJs) && !/_notesActiveColors\.size > 1/.test(notesJs) &&
+    /_notesActiveColors = new Set\(\);\s*\n\s*_pbpNotesRender\(true\);\s*\n\s*renderNotesPanel\(\)/.test(notesJs) &&
+    /function pbpNotesToggleColor\(active, color\)/.test(notesJs),
+    "library-notes.js: the colour filter must be additive from an empty set (= All), with the account switch resetting it (user ruling 10-03, spec §3.2)");
+  check(!/notes-hit-bar|notes-filter-dot/.test(libraryCss + notesJs + libraryHtml),
+    "library: the retired colour bar / colour dot filter classes are back (spec §3.2 / §3.7)");
+  check(/function pbpNotesStats\(hits, now\)/.test(notesJs) && /pbpLibRenderCount\(count, items, full\)/.test(notesJs),
+    "library-notes.js: the notes count row must come from pbpNotesStats through pbpLibRenderCount");
+  check(/\.notes-hit-btn \{[^}]*grid-template-columns:\s*10px minmax\(0, 1fr\)/.test(hand) &&
+    /\.notes-hit-dot \{[^}]*width:\s*10px;[^}]*height:\s*10px;[^}]*border-radius:\s*var\(--lib-radius-full\)/.test(hand) &&
+    /@media \(forced-colors: active\) \{\s*\.notes-hit-dot \{ forced-color-adjust: none; box-shadow: 0 0 0 1px CanvasText; \}/.test(hand),
+    "library.css: the notes row must lead with a 10px radius-full dot that keeps its colour under forced colours (spec §3.7 / §7.3)");
 }
 
 if (fail.length) {

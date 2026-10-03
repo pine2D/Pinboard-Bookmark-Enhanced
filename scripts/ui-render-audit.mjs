@@ -1918,7 +1918,7 @@ async function driveFilterScrollReset(page, check, extBase, theme) {
 // The page's three numbers, recomputed here from the spec's own table (never
 // read back from the CSS that implements them): P = 48 / 32 / 24 at >=1920 /
 // 1280-1919 / <=1279, L = clamp(360, 20vw, 520), G = 64 / 48 at >=1920 / below.
-// The search box starts at P, the detail axis sits at P + L + G, and the first
+// Both filter fields (vocabulary search, notes filter) span [P, P + L], the detail axis sits at P + L + G, and the first
 // row's fill spans exactly the index column [P, P + L] -- which only holds if
 // --lib-sb-w equals the region's real scrollbar gutter. Runs in the page.
 const LIB_AXIS_SCAN = (view) => {
@@ -2009,7 +2009,10 @@ async function driveLibAxis(page, check, extBase, theme) {
           const near = (a, b) => Math.abs(a - b) <= tolerancePx;
           const indexRight = m.P + m.L;
           if (!near(m.searchLeft, m.P)) hits.push(`${where}: search box left ${m.searchLeft.toFixed(2)} != P ${m.P}`);
-          if (view === "vocab" && !near(m.searchRight, indexRight)) hits.push(`${where}: search box right ${m.searchRight.toFixed(2)} != P + L ${indexRight.toFixed(2)}`);
+          // Both filter fields span the index column: the notes one too, now
+          // that T4c split its header into three rows (in T3 it was one of
+          // three toolbar columns).
+          if (!near(m.searchRight, indexRight)) hits.push(`${where}: ${view === "notes" ? "notes filter" : "search box"} right ${m.searchRight.toFixed(2)} != P + L ${indexRight.toFixed(2)}`);
           if (!near(m.axis, indexRight + m.G)) hits.push(`${where}: detail axis ${m.axis.toFixed(2)} != P + L + G ${(indexRight + m.G).toFixed(2)}`);
           if (!near(m.rowLeft, m.P) || !near(m.rowRight, indexRight)) {
             hits.push(`${where}: row fill ${m.rowLeft.toFixed(2)}-${m.rowRight.toFixed(2)} != index column ${m.P}-${indexRight.toFixed(2)} (--lib-sb-w ${m.sbVar || "unset"}, gutter ${m.gutter}px)`);
@@ -5519,7 +5522,7 @@ const SWEEP_CFG = {
     allowed: { options: [8], library: [8], popup: [8], "md-preview": [8] },
     exempt: [
       ".tabs, .lib-tabs",                                                     // tab strips
-      ".vocab-sort-seg, .source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .typo-seg, .vocab-status-toggles", // fused shells / segmented strips
+      ".vocab-sort-seg, .source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .typo-seg, .vocab-status-toggles, .notes-color-filters", // fused shells / segmented strips
       ".header-icons, .xp-window-actions, .lib-cluster", // icon-button clusters: not button rows; clusterGap (family 12) holds them to 4px instead
       ".connection-health, .theme-presets-group, .kbd-help-chips, .rail-badges, .hl-filter-row", // status-card grid, swatch-pill / chip rows, the highlight legend (gap = two 6px hit pads)
       ".notes-card-top",                                                      // card head: title + chips, the remove X is absolutely positioned
@@ -5594,7 +5597,7 @@ const SWEEP_CFG = {
   //     6 + inset 4; reader section count = 24px button + gap; options sidebar
   //     group label = tab inset sp-5 + the tab's 2px indicator border; popup
   //     form footer = .row inset sp-5 + label column 52 + gap sp-4 = 72px,
-  //     --pp-label-indent) --
+  //     --pp-label-indent; library notes dot = (body line 20 - dot 10) / 2 = 5) --
   //     computed from a sibling's width, so never a scale value by
   //     construction. `hairline`: 1px is border compensation.
   spacingScale: {
@@ -5618,7 +5621,7 @@ const SWEEP_CFG = {
       ".token-badge", ".bookmark-badge", ".kbd-help-chip", ".hl-item-lang", ".ask-chip", // reader chips/badges (md-preview is not composed)
     ].join(", "),
     shells: ["html", "body", "main", ".rail", ".empty-state", ".preview-loading"],
-    derivedOffsets: [".hl-item-note", "#hl-rail-section .rail-sec-count", ".tab-group-label", ".form-body > .bottom-bar", ".form-body > .submit-bar", ".form-body > .status-msg"],
+    derivedOffsets: [".hl-item-note", "#hl-rail-section .rail-sec-count", ".tab-group-label", ".form-body > .bottom-bar", ".form-body > .submit-bar", ".form-body > .status-msg", ".notes-hit-dot"],
   },
 };
 

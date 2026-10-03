@@ -172,15 +172,17 @@
            (lib-narrow-notes), so the two views never fight over one flag. -->
       <div class="notes-workbench">
         <div class="notes-list-pane">
+          <!-- List header (spec §3.1): filter / colour toggles / count row. The
+               count row is replaced in place by the batch row while a
+               selection exists (T4d). -->
           <div class="notes-toolbar">
             <input type="search" id="notes-filter" placeholder="Filter highlights and notes" data-i18n-placeholder="notesFilterPlaceholder" data-i18n-aria="notesFilterPlaceholder" aria-label="Filter highlights and notes" />
+          </div>
+          <div id="notes-color-filters" class="notes-color-filters" role="group" data-i18n-aria="hlFilterGroupAria" aria-label="Filter highlights by color"></div>
+          <div class="lib-count-row" id="notes-context-bar">
             <span id="notes-count" class="notes-count" aria-live="polite"></span>
-            <div id="notes-color-filters" class="notes-color-filters" role="group" data-i18n-aria="hlFilterGroupAria" aria-label="Filter highlights by color"></div>
-            <!-- Same placement as the vocabulary view's Select all: beside the
-                 count, outside the batch bar, so it exists before a selection
-                 does. It also carries the multi-select hint. -->
             <div class="lib-cluster" role="group" data-i18n-aria="vocabSelectionActions" aria-label="Selection actions">
-              <button type="button" class="btn ghost" id="notes-select-all" data-i18n="vocabSelectAll" data-i18n-title="vocabSelectHint" title="Ctrl-click a row to add it to the selection, Shift-click for a range">Select all</button>
+              <button type="button" class="btn btn-sm ghost lib-hang-end" id="notes-select-all" data-i18n="vocabSelectAll" data-i18n-title="vocabSelectHint" title="Ctrl-click a row to add it to the selection, Shift-click for a range">Select all</button>
             </div>
           </div>
           <!-- Sticky boundary, identical contract to .vocab-list-region: the

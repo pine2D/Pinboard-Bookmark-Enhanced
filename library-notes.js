@@ -96,6 +96,23 @@ function pbpNotesEntryHasColor(rec, colorSet) {
   });
 }
 
+// Notes count-row statistics over the owner's highlight hits (spec §3.5).
+// `hits` are _pbpNotesHits() entries ({ row, ts, ... }); `now` injected.
+function pbpNotesStats(hits, now) {
+  const list = Array.isArray(hits) ? hits : [];
+  const pages = new Set();
+  let added7 = 0, added30 = 0, latestTs = 0;
+  const d7 = now - 7 * 86400000, d30 = now - 30 * 86400000;
+  for (const hit of list) {
+    if (hit && hit.row && hit.row.key) pages.add(hit.row.key);
+    const ts = Number(hit && hit.ts) || 0;
+    if (ts >= d7) added7++;
+    if (ts >= d30) added30++;
+    if (ts > latestTs) latestTs = ts;
+  }
+  return { highlights: list.length, pages: pages.size, added7, added30, latestTs };
+}
+
 // ============================================================
 // Render / interaction layer (DOM + chrome.storage). Invoked by the
 // pbp-lib-view mount below on every "notes" view activation -- same
@@ -120,7 +137,18 @@ let _notesAllRows = []; // [{ row, rec }], last full scan, sorted lastTs desc
 // both stay stale (not reset to a wrong "nothing hidden") across a failed
 // rescan, and both are reset together on an account switch below.
 let _notesHiddenByOwner = false;
-let _notesActiveColors = new Set(PBP_NOTES_COLORS);
+// Colour filter, additive (user ruling 10-03, spec §3.2): the empty set is
+// "All". pbpNotesEntryHasColor already reads empty and full sets as "all".
+let _notesActiveColors = new Set();
+// Next set after a click on `color` (1-5, or "all"): All clears; a colour
+// toggles in or out; emptying the set or filling all five is All again.
+function pbpNotesToggleColor(active, color) {
+  if (color === "all") return new Set();
+  const next = new Set(active || []);
+  if (next.has(color)) next.delete(color);
+  else next.add(color);
+  return PBP_NOTES_COLORS.every((c) => next.has(c)) ? new Set() : next;
+}
 // Render cap, the vocabulary list's contract (library-vocab.js's
 // _vocabRenderLimit / PBP_VOCAB_RENDER_BATCH): the two lists on this page grow
 // the same way. A heavy highlighter has hundreds of hits and every one of them
@@ -195,6 +223,8 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
         // screen -- and that button targets the previous account's record.
         // Same gap, same fix, as library-vocab.js's account-switch path.
         _pbpNotesRenderDetail(null);
+        _pbpNotesResetListScroll(); // spec §7.6: a new owner's list starts at the top
+        _notesActiveColors = new Set();
         _pbpNotesRender(true);
         renderNotesPanel().catch(() => {});
       }
@@ -376,8 +406,8 @@ function _pbpNotesFilterQuery() {
   return filterInput ? filterInput.value : "";
 }
 
-// Compact left row: colour bar, two clamped lines of highlight (with the note
-// trailing inline in italics), then host + date. No inline delete -- the one
+// Compact left row (spec §3.7): colour dot, two clamped lines of highlight,
+// the note on its own line after a pencil, then host · date. No inline delete -- the one
 // destructive action lives in the detail pane, where its scope is spelled out.
 function _pbpNotesBuildRow(hit) {
   const rowEl = document.createElement("div");
@@ -412,29 +442,43 @@ function _pbpNotesBuildRow(hit) {
   // the tab order, and exactly one is put back after the render.
   btn.tabIndex = -1;
 
-  const bar = document.createElement("span");
-  bar.className = "notes-hit-bar notes-c" + _pbpNotesColorOf(hit.item);
-  bar.setAttribute("aria-hidden", "true");
-  btn.appendChild(bar);
+  const color = _pbpNotesColorOf(hit.item);
+  const dot = document.createElement("span");
+  dot.className = "notes-hit-dot notes-c" + color;
+  dot.setAttribute("aria-hidden", "true");
+  btn.appendChild(dot);
 
   const body = document.createElement("span");
   body.className = "notes-hit-body";
+  // The dot is decorative; the colour's meaning reaches the accessible name
+  // as text (spec §3.7).
+  const colorName = document.createElement("span");
+  colorName.className = "sr-only";
+  colorName.textContent = t(PBP_NOTES_COLOR_KEYS[color - 1]);
+  body.appendChild(colorName);
 
   const q = _pbpNotesFilterQuery();
   const text = document.createElement("span");
   text.className = "notes-hit-text";
   _pbpNotesMarkText(text, typeof hit.item.quote === "string" ? hit.item.quote : "", q);
+  body.appendChild(text);
   const note = typeof hit.item.note === "string" ? hit.item.note : "";
   if (note.trim()) {
-    // Explicit separator, not just the italic style: the two run together in
-    // the accessible name (and in any copy of the row) without it.
-    text.appendChild(document.createTextNode(" — "));
+    // Own line, after a pencil (spec §3.7). The separator stays as text for
+    // the accessible name (and any copy of the row), visually hidden.
+    const sep = document.createElement("span");
+    sep.className = "sr-only";
+    sep.textContent = " — ";
+    body.appendChild(sep);
     const noteEl = document.createElement("span");
     noteEl.className = "notes-hit-note";
-    _pbpNotesMarkText(noteEl, note, q);
-    text.appendChild(noteEl);
+    // Static PBP_ICONS constant (already aria-hidden), never page content.
+    noteEl.insertAdjacentHTML("afterbegin", PBP_ICONS.pencil);
+    const noteText = document.createElement("span");
+    _pbpNotesMarkText(noteText, note, q);
+    noteEl.appendChild(noteText);
+    body.appendChild(noteEl);
   }
-  body.appendChild(text);
 
   const meta = document.createElement("span");
   meta.className = "notes-hit-meta";
@@ -442,7 +486,7 @@ function _pbpNotesBuildRow(hit) {
   site.className = "notes-meta-chip";
   site.textContent = _pbpNotesHostname(hit.row.url) || t("notesUnknownPage");
   meta.appendChild(site);
-  const dateText = _pbpNotesFormatDate(hit.ts);
+  const dateText = pbpLibFormatDay(hit.ts);
   if (dateText) {
     const dateSpan = document.createElement("span");
     dateSpan.className = "notes-meta-chip";
@@ -797,66 +841,89 @@ function _pbpNotesResultCountText(visible, total) {
     : msg;
 }
 
-// #notes-count is aria-live, and "12 / 340" announces as an unlabelled pair of
-// numbers -- the vocabulary view's twin counter has said a full sentence since
-// it shipped (t("vocabResultCount")). The compact pair stays the VISIBLE text:
-// .notes-toolbar is a fixed three-column grid already carrying four children,
-// and a sentence in that cell pushes the colour filters and Select all onto
-// another row in the longer locales. The sentence rides in an .sr-only sibling
-// instead (the utility library.html already uses for the vocabulary toolbar's
-// labels), so the announcement gains words at zero layout cost.
-function _pbpNotesRenderToolbar(total, visible) {
+// The count row (spec §3.5): "N highlights · N pages · +N in 7 days", the
+// first item becoming "shown / total" while a filter or colour narrows the
+// list. The full sentence keeps notesResultCount for the live region.
+function _pbpNotesRenderToolbar(total, visible, allHits) {
   const count = $id("notes-count");
   if (!count) return;
-  let compact = count.querySelector(".notes-count-compact");
-  let spoken = count.querySelector(".notes-count-spoken");
-  if (!compact || !spoken) {
-    compact = document.createElement("span");
-    compact.className = "notes-count-compact";
-    compact.setAttribute("aria-hidden", "true");
-    spoken = document.createElement("span");
-    spoken.className = "sr-only notes-count-spoken";
-    count.replaceChildren(compact, spoken);
-  }
-  // textContent on the existing nodes, never a rebuild: replacing a live
-  // region's children on every keystroke re-announces the whole thing.
-  compact.textContent = String(visible) + " / " + String(total);
-  spoken.textContent = _pbpNotesResultCountText(visible, total);
+  if (!total) { pbpLibRenderCount(count, [], ""); return; }
+  const s = pbpNotesStats(allHits || _pbpNotesHits(), Date.now());
+  const items = [
+    visible !== total
+      ? pbpLibSplitCount((...a) => t("libraryStatsHighlightsFiltered", ...a), [String(visible), String(total)])
+      : pbpLibSplitCount((...a) => t("libraryStatsHighlights", ...a), [String(total)]),
+    pbpLibSplitCount((...a) => t("libraryStatsPages", ...a), [String(s.pages)]),
+    pbpLibSplitCount((...a) => t("libraryStatsRecent7", ...a), [String(s.added7)]),
+  ];
+  const full = [_pbpNotesResultCountText(visible, total), t("libraryStatsRecent", String(s.added7), String(s.added30))].join(" \u00b7 ");
+  pbpLibRenderCount(count, items, full);
 }
 
 function _pbpNotesBuildColorFilters() {
   const wrap = $id("notes-color-filters");
   if (!wrap || wrap.dataset.ready) return;
   wrap.dataset.ready = "1";
-  PBP_NOTES_COLORS.forEach((c, idx) => {
+  const all = document.createElement("button");
+  all.type = "button";
+  all.className = "lib-toggle sm";
+  all.dataset.color = "all";
+  all.setAttribute("aria-pressed", "true");
+  all.textContent = t("libraryFilterAll");
+  all.addEventListener("click", () => _pbpNotesApplyColor("all"));
+  wrap.appendChild(all);
+  PBP_NOTES_COLORS.forEach((c) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "notes-filter-dot";
-    b.setAttribute("aria-pressed", "true");
-    // Icon-only button: title AND aria-label, per CLAUDE.md's icon contract.
-    // The 8px swatch is the whole visible content, so without the title the
-    // five meanings (quote / definition / example / doubt / todo) reach screen
-    // readers only and a pointer user has to click each dot to find out.
-    const label = t(PBP_NOTES_COLOR_KEYS[idx]);
-    b.setAttribute("aria-label", label);
-    b.title = label;
+    b.className = "lib-toggle sm";
+    b.dataset.color = String(c);
+    b.setAttribute("aria-pressed", "false");
     const dot = document.createElement("span");
-    dot.className = "note-dot c" + c;
+    dot.className = "notes-hit-dot notes-c" + c;
     dot.setAttribute("aria-hidden", "true");
-    b.appendChild(dot);
-    b.addEventListener("click", () => {
-      if (_notesActiveColors.has(c) && _notesActiveColors.size > 1) _notesActiveColors.delete(c);
-      else _notesActiveColors.add(c);
-      b.setAttribute("aria-pressed", _notesActiveColors.has(c) ? "true" : "false");
-      // A colour filter is a filter: same rule as the search box, it clears
-      // the batch selection rather than leaving rows selected off-screen, and
-      // it starts the list back at the first batch.
-      _pbpNotesClearSelection();
-      _pbpNotesRender(true);
-      _pbpNotesResetListScroll();
-    });
+    const num = document.createElement("span");
+    num.className = "lib-toggle-count";
+    b.append(dot, num);
+    b.addEventListener("click", () => _pbpNotesApplyColor(c));
     wrap.appendChild(b);
   });
+}
+
+// A colour filter is a filter: it clears the batch selection, starts the list
+// back at the first batch and at its top (spec §2.5 row 1).
+function _pbpNotesApplyColor(color) {
+  _notesActiveColors = pbpNotesToggleColor(_notesActiveColors, color);
+  _pbpNotesClearSelection();
+  _pbpNotesResetListScroll();
+  _pbpNotesRender(true);
+}
+
+// Counts per colour over every hit of this account (not the filtered view),
+// plus each toggle's pressed state; title = aria-label = "Quote, 3
+// highlights" (spec §3.2, §11 V22).
+function _pbpNotesSyncColorFilters(allHits) {
+  const wrap = $id("notes-color-filters");
+  if (!wrap) return;
+  const counts = new Map(PBP_NOTES_COLORS.map((c) => [c, 0]));
+  for (const hit of allHits || []) {
+    const c = _pbpNotesColorOf(hit.item);
+    counts.set(c, counts.get(c) + 1);
+  }
+  for (const b of wrap.querySelectorAll(".lib-toggle")) {
+    if (b.dataset.color === "all") {
+      b.textContent = t("libraryFilterAll");
+      b.setAttribute("aria-pressed", String(_notesActiveColors.size === 0));
+      continue;
+    }
+    const c = Number(b.dataset.color);
+    const n = counts.get(c) || 0;
+    const label = t("libraryColorFilterAria", t(PBP_NOTES_COLOR_KEYS[c - 1]), String(n));
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.setAttribute("aria-pressed", String(_notesActiveColors.has(c)));
+    const num = b.querySelector(".lib-toggle-count");
+    if (num) num.textContent = String(n);
+  }
 }
 
 // Filters change WHICH rows exist, so the list starts again from its first
@@ -934,8 +1001,10 @@ function _pbpNotesLoadMore() {
 function _pbpNotesRenderList(hits, allHits, append) {
   const list = $id("notes-list");
   if (!list) return;
-  const total = (allHits || _pbpNotesHits()).length;
-  _pbpNotesRenderToolbar(total, hits.length);
+  const all = allHits || _pbpNotesHits();
+  const total = all.length;
+  _pbpNotesRenderToolbar(total, hits.length, all);
+  _pbpNotesSyncColorFilters(all);
   if (!append) list.replaceChildren();
   // The empty state is a SIBLING of the list, never a child: #notes-list is
   // role="grid", whose only valid children are rows (same placement the
@@ -993,7 +1062,7 @@ function _pbpNotesRenderList(hits, allHits, append) {
 //    stale sentence next to #vocab-search on the way back.
 // 2. Below the two-pane threshold this view shows the list OR the detail, and
 //    the hidden half is `display: none` (`body.lib-narrow-notes
-//    .notes-list-pane`). The list toolbar is the right home whenever it is on
+//    .notes-list-pane`). The count row is the right home whenever it is on
 //    the page -- it is also the ONLY home for batch failures, since clearing
 //    the selection collapses the batch bar to height 0 and takes the button
 //    that was pressed with it -- but when the list pane is gone the detail's
@@ -1001,11 +1070,11 @@ function _pbpNotesRenderList(hits, allHits, append) {
 function _pbpNotesStatusHost() {
   const view = $id("view-notes");
   if (!view) return null;
-  const toolbar = view.querySelector(".notes-toolbar");
+  const bar = $id("notes-context-bar");
   // offsetParent is null exactly for a display:none subtree here (nothing in
   // this view is position:fixed).
-  if (toolbar && toolbar.offsetParent) return toolbar;
-  return view.querySelector(".notes-detail-footer") || toolbar;
+  if (bar && bar.offsetParent) return bar;
+  return view.querySelector(".notes-detail-footer") || bar;
 }
 
 // Delete failures used to be colour only: a red edge on the row, or on the

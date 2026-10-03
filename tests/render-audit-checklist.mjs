@@ -1050,6 +1050,13 @@ export const CHECKS = [
   // inline placement.
   { surface: "library", page: "library.html", selector: "#vocab-filter-narrow", state: "filterPopoverKeys",
     expect: { filterPopoverKeys: { set: "#vocab-filter-set" } } },
+  // ---- library T4c (spec §3.1 / §3.2): the notes header's md filter field
+  // and its sm colour toggles. Selectors start with ".notes-" so the runner
+  // switches to the notes tab. The first toggle is All, pressed at rest. ----
+  { surface: "library", page: "library.html", selector: ".notes-toolbar #notes-filter", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  { surface: "library", page: "library.html", selector: ".notes-color-filters .lib-toggle", state: "default",
+    expect: { heightPx: { comfortable: 28, compact: 24 }, textContrast: 4.5 } },
 
   // ---- §1/§2 button + icon family: representative instances beyond the
   // defect-tagged selectors above, so the button-family assertions have

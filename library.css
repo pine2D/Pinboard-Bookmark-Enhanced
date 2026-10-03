@@ -577,7 +577,7 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
    literals with a comment, same convention Task 2 used. ---- */
 .notes-toolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: var(--lib-sp-2);
   margin: 0 0 var(--lib-sp-3);
@@ -645,42 +645,9 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
 .vocab-account-empty p { margin: 0 0 var(--lib-sp-3); line-height: 1.55; }
 .vocab-account-actions { display: flex; align-items: center; gap: var(--lib-sp-2); flex-wrap: wrap; }
 .vocab-signed-out-lookup { display: none; }
-.notes-color-filters { display: flex; align-items: center; gap: var(--lib-sp-2); }
-.notes-filter-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--lib-control-h); /* md rung: the toolbar's search field and Select all are control-h tall (32 / 28); a shorter cell sits proud of the row (rowHeightEq) */
-  height: var(--lib-control-h);
-  border: 1px solid color-mix(in srgb, var(--lib-border, #ccc) 70%, transparent);
-  border-radius: var(--lib-radius-sm, 3px);
-  background: transparent;
-  cursor: pointer;
-  margin: 0;
-  padding: 0;
-}
-/* The themed focus ring every other interactive family on this page declares;
-   without it these five dots were the one family left on the UA default ring.
-   COMPONENTS.md §7.3 `bordered`, not the rows' `inset` or .chip-remove's
-   `borderless`: this is not a row or a cell in a fused control, and the 1px
-   edge it already wears is neutral chrome derived from --lib-border, not a
-   semantic (danger / currentColor) edge -- so focus recolours that edge and
-   adds the themed glow, losing no information. */
-.notes-filter-dot:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
-/* Hover feedback, the surface's ghost-tier recipe (.lib-cluster > .btn.ghost
-   .btn:hover, and the generated .btn.ghost:hover emit the same mix): these
-   five dots were the one filter family on the page with no pointer feedback
-   at all. background-color joins the transition below, which until now
-   animated opacity only. */
-.notes-filter-dot { transition: background-color var(--motion-state) ease; }
-.notes-filter-dot:hover:not(:disabled) { background: color-mix(in srgb, var(--lib-fg) 6%, var(--lib-bg)); }
-/* The "filtered out" dimming sits on the SWATCH, not on the button. A focus
-   ring paints at its own element's opacity -- border and box-shadow alike --
-   so dimming the button would render the ring above at a third strength on
-   exactly the dots a keyboard user is about to switch back on, while a blanket
-   `opacity: 1` on focus would erase the pressed-state readout instead. */
-.notes-filter-dot[aria-pressed="false"] .note-dot { opacity: .32; }
-.notes-filter-dot .note-dot { margin-top: 0; transition: opacity var(--motion-state) ease; }
+/* Colour toggles (spec §3.2): All + five sm .lib-toggle, 2px apart. */
+.notes-color-filters { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--lib-sp-0); min-width: 0; margin-bottom: var(--lib-sp-3); }
+.lib-count-row > .notes-count { flex: 1 1 auto; min-width: 0; white-space: normal; }
 
 .notes-card {
   /* Soft Fill (COMPONENTS.md §9 law 4): list rows separate by spacing and
@@ -939,7 +906,7 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
    fine because it happens to sit after .save-status.) */
 #view-notes .notes-main-status { flex: 1 1 100%; min-width: 0; margin-left: 0; }
 
-/* Highlight colour as one carrier property: the row's bar and the detail
+/* Highlight colour as one carrier property: the row's dot and the detail
    quote's edge both read --hl-color, so the five colours are declared once. */
 .notes-c1 { --hl-color: var(--lib-note-c1); }
 .notes-c2 { --hl-color: var(--lib-note-c2); }
@@ -960,10 +927,11 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
 .notes-hit { border-radius: var(--lib-radius-md); margin: var(--lib-sp-0) var(--lib-sp-1); }
 .notes-hit-btn {
   display: grid;
-  grid-template-columns: 3px minmax(0, 1fr);
-  gap: var(--lib-sp-2);
+  grid-template-columns: 10px minmax(0, 1fr);
+  column-gap: var(--lib-sp-3);
+  row-gap: 0;
   width: 100%;
-  padding: var(--lib-sp-2);
+  padding: var(--lib-row-pad-y) var(--lib-row-pad-x);
   border: 0;
   border-radius: inherit;
   text-align: left;
@@ -1031,22 +999,59 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
    background here and wipe the failure mark on the next pointer pass. */
 .notes-detail-delete.is-error,
 #notes-batch-delete.is-error { box-shadow: inset 0 0 0 1px var(--lib-danger); }
-.notes-hit-bar { border-radius: var(--lib-radius-full); background: var(--hl-color, var(--lib-note-c1)); }
-.notes-hit-body { display: grid; gap: var(--lib-sp-0); min-width: 0; }
+/* Row colour (spec §3.7): a 10px dot, its centre on the first text line's
+   middle. The 5px offset is (body line 20 - dot 10) / 2, registered in the
+   render audit's spacingScale.derivedOffsets. */
+.notes-hit-dot {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--lib-radius-full);
+  background: var(--hl-color, var(--lib-note-c1));
+}
+.notes-hit-btn > .notes-hit-dot { margin-top: calc((var(--lib-lh-body) - 10px) / 2); }
+@media (forced-colors: active) {
+  .notes-hit-dot { forced-color-adjust: none; box-shadow: 0 0 0 1px CanvasText; }
+}
+.notes-hit-body { display: grid; gap: 0; min-width: 0; }
 .notes-hit-text {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--lib-text-body);
+  line-height: var(--lib-lh-body);
   overflow-wrap: anywhere;
 }
-/* The " \2014 " separator before this span is a text node in the row (see
-   library-notes.js) -- CSS styling alone leaves quote and note running
-   together in the accessible name. */
-.notes-hit-note { color: var(--lib-fg-muted); }   /* upright: CJK has no true italic */
-.notes-hit-meta { display: flex; gap: var(--lib-sp-2); font-size: 11px; color: var(--lib-fg-muted); }
+/* The note gets its own line (spec §3.7): 12px pencil, 4px gap, 13/18 muted,
+   one line. The " — " before it is .sr-only text in the row (library-notes.js)
+   so quote and note stay apart in the accessible name. */
+.notes-hit-note {
+  display: flex;
+  align-items: center;
+  gap: var(--lib-sp-1);
+  min-width: 0;
+  margin-top: var(--lib-sp-1);
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+  color: var(--lib-fg-muted);
+}
+.notes-hit-note > svg { flex: none; width: 12px; height: 12px; }
+.notes-hit-note > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.notes-hit-meta {
+  display: flex;
+  gap: 0;
+  min-width: 0;
+  margin-top: var(--lib-sp-1);
+  font-size: var(--lib-text-meta);
+  line-height: var(--lib-lh-meta);
+  color: var(--lib-fg-muted);
+}
+.notes-hit-meta > .notes-meta-chip + .notes-meta-chip::before { content: "\00a0·\00a0"; }
 
 /* Reading pane (library redesign §2.3-§2.4): its own scroll container and the
    `lib-detail` size container the T7/T8 sheets query (two longhands: the
