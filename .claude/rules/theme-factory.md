@@ -26,7 +26,7 @@ paths:
 
 ## 间距边界（design-uplift 修订）
 
-「组件原语 generated，页面布局手写」。**几何/间距 token 是主题不变量**（不逐主题覆盖——这也是 render-audit 单次扫描覆盖全部主题的前提）。间距 token（`--pp-sp-*` / `--opt-sp-*` / `--lib-sp-*`、reader 的 `--prose-fs` 族）**定义**落各文件手维护的 `:root`，不进 composer；配方经 `SPACING` adapter（ui-components.mjs 的 `sp(ns, px)`）把配方声明的像素语义映射到既有 token 档位——**禁止跨表面同名 `--sp-N` 直译**（三表面标尺刻度不同：popup/options 7 档、library 5 档）。页面级布局、reader prose 体系、单表面一次性特例仍手写。
+「组件原语 generated，页面布局手写」。**几何/间距 token 是主题不变量**（不逐主题覆盖——这也是 render-audit 单次扫描覆盖全部主题的前提）。间距 token（`--pp-sp-*` / `--opt-sp-*` / `--lib-sp-*`、reader 的 `--prose-fs` 族）**定义**落各文件手维护的 `:root`，不进 composer；配方经 `SPACING` adapter（ui-components.mjs 的 `sp(ns, px)`）把配方声明的像素语义映射到既有 token 档位——**禁止跨表面同名 `--sp-N` 直译**（三表面标尺刻度不同：popup 7 档、options 8 档 2..32、library 10 档 2/4/8/12/16/24/32/48/64/96）。密度档同样是几何轴、不是主题：options 与 library 都在手写区定义 `html[data-density="compact"]` 块（由 options-theme-early.js 写入属性），配方只引用 `--opt-control-h` / `--lib-control-h` 这类 token 名、不写死高度。library 的布局宽度（`--lib-page-pad` / `--lib-index-w` / `--lib-gap` 等）也只在手写 `:root` 定义，ui-contract 钉住。页面级布局、reader prose 体系、单表面一次性特例仍手写。
 
 ## 质量门地图
 

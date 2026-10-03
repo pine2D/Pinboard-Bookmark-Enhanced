@@ -22,7 +22,8 @@
 - 颜色一律**无 fallback** 的 `var(--{ns}-x)`。带 fallback 的 `var(--x, #fff)` 会被 `ui-token-coverage`
   的正则排除出 used 集合，静默逃门——生成区内禁止出现。
 - **间距一律写像素值**（`padding: 4px 16px`）。三表面 `--sp-*` 刻度不同（popup/options 7 档 2..24，
-  library 6 档 2/4/8/12/16/24——sp-0 是 2026-09-06 补的 hairline，没有 6 档），配方**不得**引用 `--{ns}-sp-N`；
+  library 10 档 2/4/8/12/16/24/32/48/64/96——sp-0 是 2026-09-06 补的 hairline，sp-6..9 是 2026-10-03 重新设计补的
+  布局档，没有 6 档），配方**不得**引用 `--{ns}-sp-N`；
   由 `ui-components.mjs` 的 SPACING adapter 在发射时映射到该表面**数值相等**的 token，无对应档位发射字面 px。
 - **圆角写 token 名**（`var(--{ns}-radius-md)`）。radius 三表面同名同角色（sm 在 options 是 3px、library 是
   4px，属刻度差异，与间距不同的是它不需要跨表面数值相等），直接引用不会算错。
@@ -107,9 +108,13 @@ YaHei/PingFang 时行盒比 Latin 高一截，同一颗按钮在 zh-CN 和 en �
 （如 `.fg input[type="number"]`：`height: var(--opt-control-h); padding: 0 var(--opt-control-pad-x)`）。
 旧阶（26/20 列，迁移期）才是 padding + line-height + 边框拼出来的：md = 4+4+16 + 边框 2 = 26，
 sm = 2+2+14 + 边框 2 = 20（§1.2 结构配方的 padding/line-height 字面值）。按钮族阶段 2 切换前维持旧阶，
-`controlRung` 在 options 表面按密度单契约（comfortable 32/28、compact 28/24，主题→密度取自 pilots `ui.density`）；
+`controlRung` 在 options 与 library 两个表面按密度单契约（comfortable 32/28、compact 28/24，主题→密度取自
+pilots `ui.density`，`html[data-density]` 由 options-theme-early.js 在两页首帧写入）；
 `btnRules(ns)` 在 `ns === "opt"` 内发射 `.btn:not(.context-help-toggle)` / `.btn-sm:not(.context-help-toggle)`，
-`.context-help-toggle` 除外（仍走旧 sm 阶，保留 24px 命中区）；popup/library 仍是 26/20。
+`.context-help-toggle` 除外（仍走旧 sm 阶，保留 24px 命中区）；在 `ns === "lib"` 内发射 `.btn` / `.btn-sm`，
+读 `--lib-control-h` / `--lib-control-pad-x(-sm)` / `--lib-text-body`，**并带 `box-sizing: border-box`**——library
+没有全局 `*` 规则，`<a class="btn btn-sm">` 在 UA 下是 content-box，不带就比 `<button>` 高 2px。library 的字段
+（搜索框、筛选 select、查词条、分组融合壳里的输入）在手写区读同一组 token。popup 仍是 26/20。
 
 旧阶两档各允许一段字号区间，不是单值：**md 阶** line-height 16px、padding-block 4px，字号
 12–13px（`.btn` 12 / `.fg input` `.fg select` 13，都落回 26）；**sm 阶** line-height 14px、
@@ -249,7 +254,7 @@ composer 一旦开始发射 `color: var(--opt-btn-fg)`，它们会逐条覆盖�
 
 | ID | 断言 | 层 |
 |---|---|---|
-| `btnRung` | **options**（密度轨）：`.btn` 32/28，`.btn-sm` 28/24；popup/library 读 26/20 | `[render]` |
+| `btnRung` | **options / library**（密度轨）：`.btn` 32/28，`.btn-sm` 28/24（舒适 / 紧凑）；popup 读 26/20 | `[render]` |
 | `btnPairedFg` | 配方里任何声明 `background` 的按钮规则，其组件族基类必须声明 `color` | `[static]` |
 | `textContrast` | 按钮文字色 vs 实际合成背景 ≥4.5:1（`:disabled` 除外，WCAG 1.4.3 豁免禁用控件） | `[render]` |
 | `iconContrast` | 按钮内 SVG 描边色 vs 实际合成背景 ≥3:1（WCAG 1.4.11） | `[render]` |
@@ -640,8 +645,8 @@ z-index 抬升、forced-colors 兜底仍手写在 library.css。手写区不得�
   background-color: var(--opt-field-bg-hover); border-color: var(--opt-field-border-hover);
 }
 
-/* 工具条里的字段（sm 阶，与同行的 .btn-sm 等高 = 20px） */
-.<toolbar> input[type="text"] { padding: 2px 8px; font-size: 12px; line-height: 14px; }
+/* 融合壳里的字段（library 分组输入，sm 阶：壳 1px 边 + 输入 control-h − 6 = 28 / 24，与同行的 .btn-sm 等高） */
+.vocab-group-unit input[type="text"] { height: calc(var(--lib-control-h) - 6px); padding: 0 var(--lib-control-pad-x-sm); font-size: calc(var(--lib-text-body) - 1px); line-height: calc(var(--lib-control-h) - 6px); }
 
 /* 原生控件着色（三表面） */
 input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); }
@@ -782,7 +787,7 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
 | ID | 断言 | 层 |
 |---|---|---|
 | `rowRungEq` | 同一 flex 行内并排的 `.btn` / `.btn-sm` / `input` / `select`，两两计算高度差 ≤1px | `[render]` |
-| `controlRung` | 字段与按钮同一把尺：计算高度 ∈ {26±1（md）, 20±1（sm）}，豁免清单见 §10.4 与 `SWEEP_CFG.rung.exempt`。**这里不另立 `fieldRung`**——字段没有自己的一把尺，2026-09-15 前门表列的那一行全仓无实现 | `[render]` family 6 |
+| `controlRung` | 字段与按钮同一把尺：popup / md-preview 计算高度 ∈ {26±1（md）, 20±1（sm）}；options 与 library 按主题密度 ∈ {32, 28}（舒适）/ {28, 24}（紧凑），±1（`SWEEP_CFG.rung.density.surface`）。豁免清单见 §10.4 与 `SWEEP_CFG.rung.exempt`。**这里不另立 `fieldRung`**——字段没有自己的一把尺，2026-09-15 前门表列的那一行全仓无实现 | `[render]` family 6 |
 | `fieldPairedFg` | 声明 `background-color` 的字段规则所在组件族必须声明 `color` | `[static]` |
 | `fieldWidthKind` | 新原语（`.entry-block` / `.edit-area`）内控件占满内容列；数字输入 96；旧 `.fg` 的 320/420/520 分档已于阶段 3c 退役；select 例外 240 地板保留。评估器不变。 | `[render]` |
 
@@ -1581,7 +1586,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | `fgRhythm` | options `.fg` 内 label → 控件 = `--opt-label-gap`（8/4，按主题密度）；任何动作行上方 ≥4px | `[render]` family 5 |
 | `noInlineSpacing` | 四个表面 HTML 不得出现 `style="…margin/padding/gap…"` | `[static]` layout-lint RULE 5 |
 | `vocabRegistered` | 结构类名必须在注册表或遗留基线；基线只减不增 | `[static]` ui-vocabulary-lint |
-| `controlRung` | 所有可见 `input/select/.btn`/融合壳 高度 ∈ {26±1, 20±1}；控件字面也是 px（md 13、次级 12、sm 11），em 只给正文；结构性豁免：页签 32、textarea、设置搜索框、链接态按钮、整行可点元素与状态卡、无边框色板药丸、融合内层；options 表面 ∈ {control-h, control-h−4}±1，按主题密度 | `[render]` family 6 |
+| `controlRung` | 所有可见 `input/select/.btn`/融合壳 高度 ∈ {26±1, 20±1}；控件字面也是 px（popup / md-preview：md 13、次级 12、sm 11；options / library 读密度 token：md 14、sm 13，紧凑档各减 1），em 只给正文；结构性豁免：页签 32、textarea、设置搜索框、链接态按钮、整行可点元素与状态卡、无边框色板药丸、融合内层；options 与 library 表面 ∈ {control-h, control-h−4}±1，按主题密度（sweep 只量默认主题即舒适档；紧凑档由逐主题的 heightPx `{comfortable, compact}` 条目覆盖） | `[render]` family 6 |
 | `headerFace` | 同表面分区标题集（options：h2 + `.disclosure > summary`；md-preview：`.rail-label` + `.rail-sec-head`）computed 面唯一 | `[render]` family 7 |
 | `actionRowGap` | 含按钮的 flex/grid 行 column-gap **= 8px**（`--opt-sp-4` / `--pp-sp-4` / `--lib-sp-2` / `--sp-2`），四表面同一值；space-between 行、页签、融合壳、图标簇、色板/chip 行、分段条豁免 | `[render]` family 8 |
 | `clusterGap` | 图标簇（library `.lib-cluster`、popup `.header-icons`、md-preview `.xp-window-actions`）column-gap **= 4px**，四表面同值；这三处是同一形状的三个名字，门锁形状、名字留在各表面 | `[render]` family 12 |
@@ -1604,21 +1609,22 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 密度是第二根轴，与主题正交：主题只调色彩与外形（圆角），密度只管几何——字号、行高、控件高、内距、
 行间距，只有两档，由 pilot `ui.density` 声明。
 
-| 角色 / token | comfortable | compact | 出处 |
-|---|---|---|---|
-| `--opt-text-body` / `--opt-lh-body` | 14 / 20 | 13 / 18 | Firefox Acorn 15、Obsidian 15、Claude 14 → 取 14 |
-| `--opt-text-helper` / `--opt-lh-helper` | 12 / 18 | 12 / 16 | Obsidian 12 |
-| `--opt-text-section` / `--opt-lh-section` | 16 / 24 | 15 / 20 | Obsidian 16 |
-| `--opt-control-h` / `--opt-control-pad-x` | 32 / 12 | 28 / 10 | Firefox 32、Chrome 输入 32 |
-| `--opt-row-pad-y` / `--opt-row-min-h` | 12 / 44 | 8 / 36 | Chrome 设置行 ≥48、Obsidian 46 |
-| `--opt-label-gap` | 8 | 4 | Obsidian 8–12 |
-| `--opt-section-gap` | 32 | 24 | Obsidian 32 / Claude 24 |
-| 刻度 `--opt-sp-1..8` | 2/4/6/8/12/16/24/32 | 同 | 4px 网格；2/6 只用于组件内 inset |
+| 角色 / token（options） | comfortable | compact | library 对应 token：舒适 · 紧凑 | 出处 |
+|---|---|---|---|---|
+| `--opt-text-body` / `--opt-lh-body` | 14 / 20 | 13 / 18 | `--lib-text-body` / `--lib-lh-body`：14 / 20 · 13 / 18 | Firefox Acorn 15、Obsidian 15、Claude 14 → 取 14 |
+| `--opt-text-helper` / `--opt-lh-helper` | 12 / 18 | 12 / 16 | `--lib-text-secondary` / `--lib-lh-secondary`：13 / 18 · 12 / 16；`--lib-text-meta` / `--lib-lh-meta`：12 / 16 · 同 | Obsidian 12 |
+| `--opt-text-section` / `--opt-lh-section` | 16 / 24 | 15 / 20 | `--lib-text-row-title` / `--lib-lh-row-title`（列表行标题）：15 / 20 · 14 / 18 | Obsidian 16 |
+| `--opt-control-h` / `--opt-control-pad-x` | 32 / 12 | 28 / 10 | `--lib-control-h` / `--lib-control-pad-x`：32 / 12 · 28 / 10；sm 横内距 `--lib-control-pad-x-sm`：10 · 8 | Firefox 32、Chrome 输入 32 |
+| `--opt-row-pad-y` / `--opt-row-min-h` | 12 / 44 | 8 / 36 | `--lib-row-pad-y` / `--lib-row-pad-x`（列表行）：8 / 12 · 4 / 8 | Chrome 设置行 ≥48、Obsidian 46 |
+| `--opt-label-gap` | 8 | 4 | — | Obsidian 8–12 |
+| `--opt-section-gap` | 32 | 24 | — | Obsidian 32 / Claude 24 |
+| 刻度 `--opt-sp-1..8` | 2/4/6/8/12/16/24/32 | 同 | `--lib-sp-0..9`：2/4/8/12/16/24/32/48/64/96 · 同 | 4px 网格；2/6 只用于组件内 inset |
 
 归属：pilot 字段 `ui.density`（枚举 `comfortable` | `compact`，缺省 comfortable）；当前 compact =
-`terminal`、`gruvbox-dark`。`html[data-density="compact"]` 由 options-theme-early.js 首帧写入；其映射表
+`terminal`、`gruvbox-dark`。`html[data-density="compact"]` 由 options-theme-early.js 首帧写入（options 与 library
+两页都加载它，library 在 storage 变化时也实时重写）；其映射表
 必须与 pilots 一致（契约测试从 pilots 读真值）。主题只调色彩与外形（圆角），密度不随主题自由定义，
-只有两档。
+只有两档。library 的紧凑档只收 UI 字阶（正文、次要、行标题）；阅读与展示字阶（词头、引文、释义）两档相同（spec §6.1）。
 
 ## 附录 A：人审清单（不可自动化的判断）
 
