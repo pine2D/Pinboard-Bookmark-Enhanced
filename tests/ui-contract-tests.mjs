@@ -2256,6 +2256,51 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
     /footer\.className = "lib-section notes-detail-footer"/.test(read("library-notes.js")),
     "library.css/library-{vocab,notes}.js: the detail panes' shared closing action row is gone or asymmetric");
 }
+// Flat canvas (library redesign 2026-10-03, user ruling: "不要用色块分隔，
+// 强行制造视觉束缚分区"): the page skeleton paints nothing of its own -- no
+// fill but the page's, no line, no shadow, no outline outside a keyboard
+// focus. Sections are divided by type, space, column alignment, hanging
+// labels and section heads. The class list is read from the registry key the
+// gate consumes, so a skeleton class registered later is covered the moment
+// it is registered (T4 / T7 / T8 append theirs). Interactive primitives
+// (.lib-toggle, .lib-mark, row fills) and the list-box family are not
+// skeleton and are not listed.
+{
+  const registry = JSON.parse(read("docs/theme-surface/ui-vocabulary.json"));
+  const structures = registry.surfaces?.library?.canvasStructures;
+  const T3_SKELETON = ["lib-header", "vocab-workbench", "notes-workbench", "vocab-list-region", "notes-list-region", "vocab-detail-pane", "notes-detail-pane", "lib-section", "lib-block"];
+  check(Array.isArray(structures) && T3_SKELETON.every((c) => structures.includes(c)),
+    `ui-vocabulary.json: library.canvasStructures must list the page skeleton (at least ${T3_SKELETON.join(", ")}) — got ${JSON.stringify(structures)}`);
+  const skeleton = new Set(Array.isArray(structures) ? structures : []);
+  const BACKGROUND_OK = new Set(["var(--lib-bg)", "transparent", "none"]);
+  const offenders = [];
+  let subjects = 0;
+  for (const rule of parseStyleRules(stripGeneratedRegions(libraryCss))) {
+    const declarations = parseDeclarations(rule.body);
+    for (const selector of rule.selectors) {
+      const isSkeleton = subjectAlternatives(subjectOf(selector)).some((compound) => {
+        const { classes, ids } = classifyCompound(compound);
+        return classes.some((c) => skeleton.has(c)) || ids.some((id) => skeleton.has(id));
+      });
+      if (!isSkeleton) continue;
+      subjects += 1;
+      const focus = /:focus-visible/.test(selector);
+      for (const { property, value } of declarations) {
+        const paints =
+          (/^background(-color)?$/.test(property) && !BACKGROUND_OK.has(value)) ||
+          (property === "background-image" && value !== "none") ||
+          (/^border(-|$)/.test(property) && !/^(0|none)$/.test(value)) ||
+          (property === "box-shadow" && value !== "none") ||
+          (/^outline(-|$)/.test(property) && !focus && !/^(0|none)$/.test(value));
+        if (paints) offenders.push(`${selector} { ${property}: ${value} }${rule.context.length ? ` in ${rule.context.join(" > ")}` : ""}`);
+      }
+    }
+  }
+  check(subjects >= 10,
+    `ui-contract-tests.mjs: the flat-canvas gate matched only ${subjects} hand-written skeleton selector(s) — the subject model or the registry key broke, and an empty scan passes anything`);
+  check(offenders.length === 0,
+    `library.css: the page skeleton paints a surface, a line or a shadow (flat canvas, user ruling 2026-10-03 — divide with type, space, column alignment, hanging labels and section heads instead): ${offenders.join(" | ")}`);
+}
 // List header, round 2 (2026-08-07). Four bare rows that each run the full
 // width of the list column; the geometry itself is measured live by the render
 // oracle's headerRowsFlush entry. What is asserted here is the wiring the

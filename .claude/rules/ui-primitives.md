@@ -20,9 +20,13 @@ paths:
 
 ## 新增任何 UI 元素，先答三问
 
-1. **它属于哪个既有原语？** 先查注册表该表面的 `primitives`（options：`.fg` / `.fg-actions` / `.hint` / `.section-title` / `section.settings-section` / `.pref-group` / `.pref-row` / `.fg.entry-block` / `.fg.edit-area` / `.switch` / `.pick` / `.listbox` / `details.disclosure` + `.disclosure-body` / `.context-help-host` / `.pf`；popup：`.row` / `.label` / `.field` / `.suggest-area` / `.divider` / `.actions`（按钮行，gap sp-4）；library：`.notes-toolbar` / `.vocab-batch-bar` + `.notes-batch-bar` / `.notes-empty` / `.lib-cluster`（紧凑控件簇，gap sp-1）/ `.lib-section` / `.lib-block` / `.lib-quote`（详情面板的分节 / 文本块 / 引文）；md-preview：`.rail-section` / `.rail-label` / `.rail-sec-head` / `.msg-bar` / `.send-menu` / `.send-mi` / `.pop-panel`（浮层面板 chrome + sp-3 内距）/ `.row`（控件行，gap sp-2）/ `.panel-head`（面板标题行））。能用就用，不新造包装类。
+1. **它属于哪个既有原语？** 先查注册表该表面的 `primitives`（options：`.fg` / `.fg-actions` / `.hint` / `.section-title` / `section.settings-section` / `.pref-group` / `.pref-row` / `.fg.entry-block` / `.fg.edit-area` / `.switch` / `.pick` / `.listbox` / `details.disclosure` + `.disclosure-body` / `.context-help-host` / `.pf`；popup：`.row` / `.label` / `.field` / `.suggest-area` / `.divider` / `.actions`（按钮行，gap sp-4）；library：`.notes-toolbar` / `.vocab-batch-bar` + `.notes-batch-bar` / `.notes-empty` / `.lib-cluster`（紧凑控件簇，gap sp-1）/ `.lib-section` / `.lib-block`（详情区的分节 / 文本块）；md-preview：`.rail-section` / `.rail-label` / `.rail-sec-head` / `.msg-bar` / `.send-menu` / `.send-mi` / `.pop-panel`（浮层面板 chrome + sp-3 内距）/ `.row`（控件行，gap sp-2）/ `.panel-head`（面板标题行））。能用就用，不新造包装类。
 2. **它的几何落在哪个阶梯？** 按钮/字段高度按表面分：options 与 library 在密度阶上（md 32 / sm 28，紧凑档 28 / 24，读 `--opt-control-h` / `--lib-control-h`，library 的按钮阶由 composer `btnRules` 的 lib 分支发射），popup 与 md-preview 仍是 md 26px 与 sm 20px 两阶（COMPONENTS.md §1.1 / §6.3）；图标按钮命中区 ≥24px；按钮行 gap 一律 8px、图标簇 gap 一律 4px；可见文字 ≥11px；间距只用本表面的 `--*-sp-N` 刻度（md-preview 是 `--sp-N`）——margin、以及条/面板/弹层/行的 padding 与 gap 都算；控件与 chip 自身的竖向 inset 是组件几何（阶梯算术），可以是字面 px；圆角只用 `--*-radius-*` token。刻度外的字面 px 是缺陷，不是微调。
 3. **它的间距由谁拥有？** 关系规则（容器 margin-bottom、`.fg > .fg-actions` 这类相邻规则）拥有间距；元素自身不带 margin，HTML 不写内联 `style="margin/padding/gap"`（layout-lint RULE 5 会 BLOCK）。
+
+## library 是平铺画布（2026-10-03 起）
+
+library 整页一个底色，分区只靠字阶、留白、栏位对齐、悬挂标签与节首小标题。页面骨架类登记在 `ui-vocabulary.json` 的 `library.canvasStructures`：它们不画底色（`--lib-bg` 除外）、不画任何 `border*`、`box-shadow`，`outline` 只许出现在 `:focus-visible` 上。可交互行与切换按钮的悬停填充是状态反馈，不算分区；弹层（列表框、「筛选」、确认）是唯一画 panel 底、1px 边与 `radius-lg` 的东西。新增骨架类时同一提交追加进 `canvasStructures`（必须先登记在 primitives / regions / components 之一，lint 会拦），ui-contract 的平铺画布门随即覆盖它。
 
 ## 真要新造一个结构类
 

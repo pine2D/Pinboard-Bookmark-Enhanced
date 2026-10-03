@@ -70,6 +70,26 @@ try {
   r = run();
   check(r.status === 1, "swapping one legacy token for another (flat count) must block");
 
+  // 7. canvasStructures (optional key, library redesign 2026-10-03): the
+  //    flat-canvas gate in ui-contract reads it, so every entry must be a
+  //    class the vocabulary already knows -- a typo would silently match
+  //    nothing and leave the gate empty.
+  const withCanvas = (list) => writeFileSync(registryPath, JSON.stringify({
+    ...registry, surfaces: { demo: { ...registry.surfaces.demo, canvasStructures: list } },
+  }));
+  write('<div class="fg"></div>', "");
+  withCanvas(["header-bar", "fg"]);
+  r = run();
+  check(r.status === 0, `canvasStructures naming registered classes must pass, got ${r.status}:\n${r.stdout}${r.stderr}`);
+  withCanvas(["header-bar", "page-sheet"]);
+  r = run();
+  check(r.status === 1 && /canvasStructures lists unregistered class\(es\): page-sheet/.test(r.stderr),
+    `an unregistered canvasStructures entry must fail and name it, got ${r.status}:\n${r.stderr}`);
+  withCanvas("header-bar");
+  r = run();
+  check(r.status === 1 && /canvasStructures must be a string array/.test(r.stderr), `a non-array canvasStructures must fail, got ${r.status}:\n${r.stderr}`);
+  writeFileSync(registryPath, JSON.stringify(registry));
+
   // 6. malformed baseline / unknown flag fail loudly
   writeFileSync(baselinePath, JSON.stringify({ version: 2, entries: [] }));
   r = run();

@@ -295,6 +295,17 @@
         "xp-dict-local",
         "xp-dict-online",
         "xp-dict-slot"
+      ],
+      "canvasStructures": [
+        "lib-header",
+        "vocab-workbench",
+        "notes-workbench",
+        "vocab-list-region",
+        "notes-list-region",
+        "vocab-detail-pane",
+        "notes-detail-pane",
+        "lib-section",
+        "lib-block"
       ]
     },
     "listbox": {

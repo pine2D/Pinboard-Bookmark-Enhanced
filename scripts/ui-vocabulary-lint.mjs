@@ -100,6 +100,20 @@ function readRegistry(path) {
     for (const key of ["files", "exactStructural", "primitives", "regions", "components"]) {
       if (!Array.isArray(s[key]) || !s[key].every((x) => typeof x === "string")) throw new Error(`${path}: surface ${name}.${key} must be a string array`);
     }
+    // Optional (library redesign 2026-10-03): the page-skeleton classes that
+    // tests/ui-contract-tests.mjs's flat-canvas gate reads. Each must already
+    // be a registered class -- an entry the vocabulary does not know is a
+    // typo the gate would silently never match.
+    if (s.canvasStructures !== undefined) {
+      if (!Array.isArray(s.canvasStructures) || !s.canvasStructures.every((x) => typeof x === "string")) {
+        throw new Error(`${path}: surface ${name}.canvasStructures must be a string array`);
+      }
+      const registered = new Set([...s.primitives, ...s.regions, ...s.components]);
+      const stray = s.canvasStructures.filter((x) => !registered.has(x));
+      if (stray.length) {
+        throw new Error(`${path}: surface ${name}.canvasStructures lists unregistered class(es): ${stray.join(", ")} -- register each in primitives / regions / components first`);
+      }
+    }
   }
   return data;
 }
