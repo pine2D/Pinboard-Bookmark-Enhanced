@@ -685,12 +685,16 @@ function evaluateCheck(check, raw, theme) {
   const hostZero = raw.rect.width === 0 || raw.rect.height === 0;
   const zeroNote = "zero-size element (width or height is 0) -- not actually rendered/visible; fixture setup or a display:none regression";
   // Density-tiered specs ({ comfortable, compact }): the tier is the theme's
-  // pilot ui.density (options only; every other surface is single-tier). The
+  // pilot ui.density (options and library; popup and md-preview are single-tier). The
   // page's own html[data-density] must agree -- a disagreement is its own FAIL
   // row, not silently absorbed by reading the page.
-  const densityTier = check.surface === "options" ? OPTIONS_DENSITY.densityOf(theme) : "comfortable";
+  // Surfaces on the density rung (options since stage 0, library since the
+  // 2026-10-03 redesign) -- one list, SWEEP_CFG.rung.density.surface, read at
+  // call time (main() runs after the whole module has evaluated).
+  const onDensitySurface = SWEEP_CFG.rung.density.surface.includes(check.surface);
+  const densityTier = onDensitySurface ? OPTIONS_DENSITY.densityOf(theme) : "comfortable";
   const usesDensitySpec = Object.values(exp).some((s) => s && typeof s === "object" && "comfortable" in s && "compact" in s);
-  if (usesDensitySpec && check.surface === "options" && raw.density !== densityTier) {
+  if (usesDensitySpec && onDensitySurface && raw.density !== densityTier) {
     out.push(verdict("densityTier", false, raw.density, densityTier,
       "html[data-density] disagrees with the pilots' ui.density for this theme (PBP_OPTIONS_DENSITY_MAP drift, or a setup step re-derived the theme)"));
   }
@@ -5004,17 +5008,20 @@ const SWEEP_CFG = {
   // Prose in the reader is typography, not chrome: excluded wholesale.
   excludeWithin: ".doc-body",
   // 6. controlRung -- COMPONENTS.md §1.1 / §6.3: two control heights (md 26,
-  //    sm 20) besides the 24px icon target (family 4 owns icon-only buttons).
+  //    sm 20 on popup / md-preview; the density rung on options and library)
+  //    besides the 24px icon target (family 4 owns icon-only buttons).
   //    Exemptions are structural, each a family with its own rung, not a
-  //    per-instance allowlist. Options controls read the density rung, see
-  //    rung.density.
+  //    per-instance allowlist. See rung.density.
   rung: {
     values: [26, 20], tol: 1,
-    // Options density rung (COMPONENTS.md §1.1 comfortable/compact columns).
-    // Since stage 3c every control on the options surface is on it; the
-    // tier comes from the pilots via densityTier below. `labelGap` is family
-    // 5's label->control contract for the same tier (8 / 4).
-    density: { surface: "options", values: { comfortable: [32, 28], compact: [28, 24] }, labelGap: { comfortable: 8, compact: 4 } },
+    // Density rung (COMPONENTS.md §1.1 comfortable/compact columns). Since
+    // stage 3c every control on options is on it, and since the 2026-10-03
+    // redesign every control on library (composer btnRules' lib branch +
+    // the hand-written fields reading --lib-control-h). The sweep runs on
+    // the default theme, so it measures the comfortable tier; per-theme
+    // heightPx {comfortable, compact} CHECKS rows cover compact. `labelGap`
+    // is family 5's label->control contract (.fg only exists on options).
+    density: { surface: ["options", "library"], values: { comfortable: [32, 28], compact: [28, 24] }, labelGap: { comfortable: 8, compact: 4 } },
     // densityComponents (Task 4, ui-system-stage2, Controller ruling B):
     // `.listbox-btn` / `.listbox-opt` read `var(--opt-control-h)` directly
     // (options.css, unconditional -- wherever they render), so they
@@ -5445,7 +5452,7 @@ function sweepProbe(cfg) {
       return rb.top < ra.bottom - 0.5 ? null : Math.round((rb.top - ra.bottom) * 100) / 100; // null = side by side
     };
     const push = (el, rel, gap) => hits.push({ kind: "fgRhythm", path: pathOf(el), rel, gap });
-    const onDensitySurface = location.pathname.endsWith(`/${cfg.rung.density.surface}.html`);
+    const onDensitySurface = cfg.rung.density.surface.some((name) => location.pathname.endsWith(`/${name}.html`));
     const labelControlOffScale = (gap) => (onDensitySurface
       ? Math.abs(gap - cfg.rung.density.labelGap[cfg.densityTier]) > cfg.rung.tol
       : gap < cfg.rhythmLabelMin || gap > cfg.rhythmLabelMax);
@@ -5488,14 +5495,15 @@ function sweepProbe(cfg) {
       if (el.matches("button, .btn, a.btn") && !el.matches(shellSel) && !iconLabel(el)) continue; // icon-only (x counts as an icon): family 4
       if (!el.matches(shellSel) && el.closest(shellSel)) continue; // inner of a fused shell: the shell is measured
       const h = el.getBoundingClientRect().height;
-      // Options (every panel, stage 3c) and the density components wherever
-      // they render sit on the comfortable/compact rung of the theme's pilot
-      // density; popup/library/md-preview stay on 26/20.
+      // Options and library (every control) and the density components
+      // wherever they render sit on the comfortable/compact rung of the
+      // theme's pilot density; popup/md-preview stay on 26/20.
       const isDensityComponent = cfg.rung.densityComponents.some((sel) => el.matches(sel));
-      const onDensityRung = isDensityComponent || surface === cfg.rung.density.surface;
+      const onDensityRung = isDensityComponent || cfg.rung.density.surface.includes(surface);
       const allowedRungs = onDensityRung ? cfg.rung.density.values[cfg.densityTier] : cfg.rung.values;
       if (!allowedRungs.some((v) => Math.abs(h - v) <= cfg.rung.tol)) {
-        hits.push({ kind: "controlRung", path: pathOf(el), height: Math.round(h * 100) / 100, detail: `${Math.round(h)}px` });
+        hits.push({ kind: "controlRung", path: pathOf(el), height: Math.round(h * 100) / 100, detail: `${Math.round(h)}px`,
+          expected: allowedRungs.map((v) => `${v}±${cfg.rung.tol}`).join(" | ") });
       }
     }
     const headerSel = cfg.headerSets[surface];
@@ -6538,7 +6546,7 @@ async function main() {
     }
     // ---- families 6-9 (design-language class scans): same gating shape.
     const FAMILY = {
-      controlRung: (h) => ({ actual: h.height, expected: "26±1 | 20±1", note: "control height (COMPONENTS.md §1.1/§6.3); icon-only buttons are family 4" }),
+      controlRung: (h) => ({ actual: h.height, expected: h.expected, note: "control height (COMPONENTS.md §1.1/§6.3; density rung on options and library); icon-only buttons are family 4" }),
       headerFace: (h) => ({ actual: h.face, expected: h.majority, note: "section heading face differs from the surface majority" }),
       actionRowGap: (h) => ({ actual: h.gap, expected: h.allowed.join("|"), note: "column-gap of a button row (px)" }),
       radiusScale: (h) => ({ actual: h.radius, expected: h.tokens.map((t) => t + "px").join("|"), note: "border-radius off the surface's token scale" }),

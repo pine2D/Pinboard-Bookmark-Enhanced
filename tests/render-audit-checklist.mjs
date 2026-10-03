@@ -1086,6 +1086,18 @@ export const CHECKS = [
   // them onto one known-failures key. ----
   { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
     expect: { heightEqWith: { selector: "#vocab-group-filter", tolerancePx: 1 } } },
+  // Library density rung (library redesign 2026-10-03 spec §6.2, plan T1):
+  // the composer's lib branch puts .btn / .btn-sm on 32/28 and 28/24, and the
+  // toolbar fields follow. Per-theme rows because the sweep's controlRung
+  // runs on the default theme only (comfortable): these are what proves
+  // terminal and gruvbox-dark actually render the compact tier. One md
+  // field, one sm text button, one sm icon button in the batch bar.
+  { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  { surface: "library", page: "library.html", selector: "#vocab-select-all", state: "default",
+    expect: { heightPx: { comfortable: 28, compact: 24 } } },
+  { surface: "library", page: "library.html", selector: "#vocab-batch-delete", state: "default",
+    expect: { heightPx: { comfortable: 28, compact: 24 } } },
   { surface: "library", page: "library.html", selector: ".vocab-sort-seg", state: "default",
     expect: { heightEqWith: { selector: "#vocab-search", tolerancePx: 1 } } },
 

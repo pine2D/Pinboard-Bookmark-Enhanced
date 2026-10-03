@@ -339,6 +339,20 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
 .btn.primary:focus-visible {
   border-color: var(--lib-focus-bd);
 }
+.btn {
+  box-sizing: border-box;
+  height: var(--lib-control-h);
+  padding: 0 var(--lib-control-pad-x);
+  font-size: var(--lib-text-body);
+  line-height: calc(var(--lib-control-h) - 2px);
+}
+.btn-sm {
+  box-sizing: border-box;
+  height: calc(var(--lib-control-h) - 4px);
+  padding: 0 var(--lib-control-pad-x-sm);
+  font-size: calc(var(--lib-text-body) - 1px);
+  line-height: calc(var(--lib-control-h) - 6px);
+}
 
 .btn-ic {
   display: inline-flex;
@@ -496,9 +510,10 @@ input[type="checkbox"], input[type="radio"] {
   accent-color: var(--lib-accent);
 }
 .vocab-group-unit input[type="text"] {
-  padding: var(--lib-sp-0) var(--lib-sp-2);
-  font-size: 12px;
-  line-height: 14px;
+  height: calc(var(--lib-control-h) - 6px);
+  padding: 0 var(--lib-control-pad-x-sm);
+  font-size: calc(var(--lib-text-body) - 1px);
+  line-height: calc(var(--lib-control-h) - 6px);
 }
 /* @generated:ui-components end (library) */
 
@@ -623,12 +638,17 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
 .notes-toolbar input[type="search"],
 .vocab-lookup-bar input[type="search"] {
   width: 100%;
-  padding: var(--lib-sp-1) var(--lib-sp-2);
-  line-height: 16px; /* md rung in px: 4+16+4+2 = 26 under any font -- a CJK placeholder on a fallback font gave 24.67 with `normal`; .vocab-lookup-bar re-pins 14px for its sm rung below */
+  /* md rung, density-tiered (32 / 28, plan T1): an explicit border-box height
+     with a px line-height, never `normal` -- a CJK placeholder on a fallback
+     font measured 24.67 under `normal`. .vocab-lookup-bar re-pins the sm rung
+     below. */
+  height: var(--lib-control-h);
+  padding: 0 var(--lib-sp-2);
+  line-height: calc(var(--lib-control-h) - 2px);
   border-width: 1px;
   border-style: solid;
   border-radius: var(--lib-radius-md);
-  font-size: 13px;
+  font-size: var(--lib-text-body);
   box-sizing: border-box;
   -webkit-appearance: none;
   appearance: none;
@@ -674,8 +694,8 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px; /* md rung: the toolbar's search field, filter select and Select all are 26; a 24px cell sat 1px proud on each side */
-  height: 26px;
+  width: var(--lib-control-h); /* md rung: the toolbar's search field and Select all are control-h tall (32 / 28); a shorter cell sits proud of the row (rowHeightEq) */
+  height: var(--lib-control-h);
   border: 1px solid color-mix(in srgb, var(--lib-border, #ccc) 70%, transparent);
   border-radius: var(--lib-radius-sm, 3px);
   background: transparent;
@@ -1384,14 +1404,6 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
 /* Detail pane content (Task 6). */
 .vocab-detail-head { display: flex; align-items: center; gap: var(--lib-sp-2); flex-wrap: wrap; }
 .vocab-detail-term { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -0.01em; }
-/* §1.5 hit-area expansion, vertical-only: .vocab-detail-speak measures 36x20
-   (width already clears 24px via setBtnIcon's icon+gap+empty-label shape,
-   only the 20px sm-rung height is short). .vocab-detail-head is a plain flex
-   row with a real 8px gap to its left neighbour (the language chip) and no
-   clip -- not a fused unit, so the pad is free to grow past the button's own
-   border box without touching anything. */
-.vocab-detail-speak { position: relative; }
-.vocab-detail-speak::before { content: ""; position: absolute; inset: -3.5px 0; }
 .vocab-detail-actions { display: flex; gap: var(--lib-sp-2); margin: var(--lib-sp-3) 0; flex-wrap: wrap; }
 /* Group chips get their own row, always (vocab-group-inspect-report.md
    2026-08-05 Finding 6): flex-basis:100% on a flex-wrap item forces a wrap
@@ -1759,7 +1771,7 @@ html.motion-ready .vocab-note-save {
   margin: 0 0 var(--lib-sp-3);
   padding-bottom: var(--lib-sp-2);
   /* The row's three controls are meant to read as a plain toolbar with
-     visible gaps (§8.1, and the #vocab-lookup-go note below) -- but
+     visible gaps (§8.1) -- but
      .vocab-filter-toolbar's recipe carries no gap, so the input and the
      language select were flush (measured 0px live, 2026-08-25) and the
      select painted over the focused input's right border + focus ring.
@@ -1875,23 +1887,21 @@ html.motion-ready .vocab-note-save {
      and parks every select on its own full-width row. Content-sized is the
      point. */
   width: auto;
-  /* block padding matches `.notes-toolbar input[type="search"]`'s
-     var(--lib-sp-1) (4px), NOT the 6px this literal used to carry -- Task 14
-     sweep (rowHeightEq) caught #vocab-search sitting 4px shorter than
-     #vocab-group-filter/#vocab-status-filter in the same row: both share the
-     same font-size and inherited `line-height: normal`, so equal block
-     padding is sufficient for the two formulas to land on the same computed
-     height, no explicit line-height needed. .vocab-sort-btn's height comes
-     along for free too -- .vocab-filter-row's align-items: stretch matches
-     it to whichever sibling there is tallest. */
-  padding: var(--lib-sp-1) 26px var(--lib-sp-1) var(--lib-sp-3); line-height: 16px; /* md rung in px (see the search field above) */
+  /* md rung, density-tiered like the search field above (32 / 28, plan T1):
+     explicit height + px line-height, so #vocab-search and this select land
+     on one height under any font. 26px inline-end = the chevron's room.
+     .vocab-sort-seg reaches the same height through .vocab-filter-row's
+     align-items: stretch plus its own cell height. */
+  height: var(--lib-control-h);
+  padding: 0 26px 0 var(--lib-sp-3);
+  line-height: calc(var(--lib-control-h) - 2px);
   border-width: 1px;
   border-style: solid;
   border-radius: var(--lib-radius-md);
   background-repeat: no-repeat;
   background-position: right 8px center;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--lib-text-body);
   cursor: pointer;
   box-sizing: border-box;
   -webkit-appearance: none;
@@ -1916,33 +1926,20 @@ html.motion-ready .vocab-note-save {
   box-shadow: var(--lib-focus-ring);
 }
 /* #vocab-lookup-go is a bare icon .btn-sm (COMPONENTS.md §1.5's "dense
-   toolbar -> sm" clause, not the "beside a field -> md" one -- this bar is a
-   compact single-purpose search tool, same shape call already made for
-   .vocab-batch-bar's own input+.btn-sm row above). Bring the field/select
-   DOWN to the sm-rung formula instead of promoting the button up to md,
-   mirroring .vocab-batch-bar input[type="text"]'s already-shipped precedent
-   (2px block padding + 14px line-height = the same height math .btn-sm
-   uses) -- vertical-only longhands so the horizontal padding (chevron room,
-   general h-spacing) from the base rules above stays untouched. MUST sit
-   after the base `.notes-toolbar input[type="search"]` / `.vocab-filter-
-   toolbar select` rules above (same specificity, source order decides) --
-   Task 14 sweep caught this row's 3-way height mismatch (input/select/
-   button all different) before this override existed. */
+   toolbar -> sm" clause): this bar is a compact single-purpose search tool,
+   so the field and the language select come DOWN to the sm rung (28 / 24
+   since the library density rung, plan T1) instead of the button going up
+   to md. Same specificity as the base `.notes-toolbar input[type="search"]` /
+   `.vocab-filter-toolbar select` rules above, so this MUST stay after them.
+   No hit-pad on the button any more: the sm rung clears 24px on its own. */
 .vocab-lookup-bar input[type="search"],
 .vocab-lookup-bar select {
-  padding-top: var(--lib-sp-0);
-  padding-bottom: var(--lib-sp-0);
-  font-size: 12px;
-  line-height: 14px;
+  height: calc(var(--lib-control-h) - 4px);
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: calc(var(--lib-text-body) - 1px);
+  line-height: calc(var(--lib-control-h) - 6px);
 }
-/* §1.5 hit-area expansion, vertical-only: #vocab-lookup-go measures 33x21
-   (short on height only), and #vocab-lookup-bar is a plain toolbar row
-   (§8.1 -- visible gaps between its three controls, not a fused unit), so
-   there is no seam or clip to respect. `inset: -3px 0` never reaches past
-   this button's own 33px width, so the 4px row gap to the language select
-   on its left (#vocab-lookup-bar's gap, 2026-08-25) is untouched. */
-#vocab-lookup-go { position: relative; }
-#vocab-lookup-go::before { content: ""; position: absolute; inset: -3px 0; }
 /* The eight dark themes: 20% of a dark theme's foreground on its near-black
    panel reads as a lit bar rather than a seam (measured on terminal, whose fg
    is a saturated #33ff33). */
@@ -2007,7 +2004,7 @@ html[data-theme="rose-pine"] { --lib-seam-mix: 24%; }
      reason to be positioned. */
   position: relative;
   width: 34px;
-  height: 24px; /* fused inner of the 26px shell, in px: the icon's line box was a font metric */
+  height: calc(var(--lib-control-h) - 2px); /* fused inner of the md shell (30 / 26 inside 32 / 28), in px: the icon's line box was a font metric */
   padding: 0;
   /* Same centering recipe as .vocab-group-step above -- one rule for both
      segment families. These two happen to render correctly under inline-grid
@@ -2054,13 +2051,12 @@ html[data-theme="rose-pine"] { --lib-seam-mix: 24%; }
    the seam divides two cells of ONE control, it does not frame anything
    (COMPONENTS.md §9 law 4). */
 .vocab-sort-seg > .vocab-sort-btn + .vocab-sort-btn { border-left: 1px solid color-mix(in srgb, var(--lib-fg) 14%, var(--lib-btn-bg)); }
-/* §1.5 hit-area expansion, vertical-only (§8's fused-control law: a hit-pad
-   may never cross the seam between cells, and this cell's 34px width already
-   clears the 24px floor -- only the 23.5px height is short). `border: 0`
-   above means this cell's padding box already equals its border box, so a
-   1px inset here is the whole gap to the shell's `overflow-clip-margin: 2px`
-   above -- the pad reaches 25.5px effective height, 1px inside the allowed
-   margin, not at its edge. */
+/* Edge reach, vertical-only (§8's fused-control law: a pad may never cross
+   the seam between cells). The cells are no longer short of 24px (30 / 26
+   since the density rung), but this 1px pad still carries the shell's border
+   band: checklist's .vocab-sort-seg `edgeClickable` asserts a point on the
+   shell's top edge resolves to the cell, and without the pad it resolves to
+   the shell. Stays until T6 retires the sort segment. */
 .vocab-sort-seg > .vocab-sort-btn::before { content: ""; position: absolute; inset: -1px 0; }
 /* background: --lib-btn-hover, not the old color-mix(--lib-fg 6%, --lib-btn-bg)
    -- --lib-btn-fg-muted is only AA-derived against [--lib-btn-bg,
@@ -2276,61 +2272,13 @@ html.motion-ready .notes-batch-bar.selecting {
 .vocab-batch-bar .notes-count,
 .notes-batch-bar .notes-count { flex: none; font-weight: 500; color: var(--lib-fg); }
 /* Icon-only action cells (user-ratified: no labels -- width thrift + long-
-   locale safety). Names live in title/aria. Width alone clears >=24px, but
-   the sm rung's height (20px, COMPONENTS.md §1.1) doesn't -- see the
-   #vocab-invert-selection hit-area expansion just below for the one
-   USER-RULING-mandated instance. */
+   locale safety). Names live in title/aria. Since the library density rung
+   (plan T1) the sm cell is 28 / 24 tall on its own, so the old ::before
+   hit-pads on #vocab-invert-selection, the four batch actions and the notes
+   batch bar are gone; hitAreaMin (family 4) still sweeps every icon-only
+   button. */
 .vocab-batch-bar .btn:not(.vocab-group-step),
-.notes-batch-bar .btn { padding-inline: 6px; } /* icon-only sm cell: component inset (6 + glyph + 6 = the 24px hit width), not a rhythm value -- spacingScale checks a control's margins only */
-/* §1.5 hit-area expansion (same recipe as .row-del-x above, vertical-only
-   here: the row's align-items:center means only THIS button would grow,
-   with no horizontal neighbor to collide with). USER RULING hard-asserts
-   24px for this specific icon-only button; a real height increase was
-   rejected (it would re-break the #vocab-group-input rowRungEq alignment
-   defect 2 just fixed, since .btn-sm siblings must stay height-equal) so
-   the fix expands the CLICKABLE area without expanding the VISUAL box --
-   content:"" + position:absolute still participates in pointer hit-testing
-   despite painting nothing. Math: the containing block for an absolutely
-   positioned descendant is the host's PADDING box, not its border box --
-   this host's 20px sm-rung border-box height (line-height 14 + padding
-   2+2 + border 1+1) is only an 18px padding box once that 1+1 border is
-   excluded, so `inset` needs -3px (not -2px) each side to land on 24
-   (18 + 3 + 3), matching .row-del-x::before's own -3px. scripts/ui-render-
-   audit.mjs's hitAreaMin check reads this: Chromium's own
-   getComputedStyle(el, "::before").width/height already resolves to that
-   same 24px used value (verified live), instead of relying on
-   getBoundingClientRect() (which a ::before overlay never changes on its
-   own host), so this key is a genuine, verified pass now -- not a known
-   limitation. */
-#vocab-invert-selection,
-.notes-batch-bar > .btn { position: relative; }
-#vocab-invert-selection::before,
-.notes-batch-bar > .btn::before { content: ""; position: absolute; inset: -3px 0; }
-/* Same fix, same row, same math, for the four .vocab-batch-bar actions the
-   hit-area debt sweep found still under 24px (hit-area-debt battle). Not
-   folded into the -3px rule above: #vocab-clear-selection's "cross" glyph is
-   13x13 against these three's 14x14, one padding-box pixel shorter (17px vs
-   18px), so -3px alone would land it at 23px, not 24 -- -3.5px clears all
-   four with the same padding-box math the comment above already spells out.
-   No clip risk (verified live): this row is align-items:center, not stretch,
-   so even the 20px-tall siblings sit with ~7px of slack before touching
-   .vocab-batch-bar's own `overflow: clip` edge -- nothing like
-   .vocab-sort-seg/.vocab-group-unit's zero-slack stretch shape above.
-   #notes-clear-selection joins this group (independent review F3): it is
-   the exact same "cross" glyph on the exact same -3px rule above, but the
-   render-audit sweep only single-clicks a notes row (never Ctrl+clicks to
-   open .notes-batch-bar.selecting), so this 23px debt was invisible to the
-   gate -- fixed here alongside the widened sweep coverage below. */
-#vocab-mark-known,
-#vocab-mark-learning,
-#vocab-batch-delete,
-#vocab-clear-selection,
-#notes-clear-selection { position: relative; }
-#notes-clear-selection::before { content: ""; position: absolute; inset: -3.5px 0; }
-#vocab-mark-known::before,
-#vocab-mark-learning::before,
-#vocab-batch-delete::before,
-#vocab-clear-selection::before { content: ""; position: absolute; inset: -3.5px 0; }
+.notes-batch-bar .btn { padding-inline: 6px; } /* icon-only sm cell: component inset (6 + glyph + 6 + border = a square cell at the comfortable rung), not a rhythm value -- spacingScale checks a control's margins only */
 .vocab-batch-bar input[type="text"] { flex: 1 1 120px; min-width: 0; }
 /* Input + stepper unit -- FUSED CONTROL (COMPONENTS.md §8). The shell owns
    the entire chrome: one border, one radius, one background, one focus ring.
@@ -2402,6 +2350,10 @@ html.motion-ready .notes-batch-bar.selecting {
   position: relative;
   flex: none;
   width: 28px;
+  /* Stretch to the shell's content box (the input's calc(control-h - 6px)):
+     these cells are .btn-sm, whose generated rung height (control-h - 4px)
+     would otherwise make the fused unit 2px taller than its row-mates. */
+  height: auto;
   /* Centering: inherit .btn's own `inline-flex + align-items:center +
      justify-content:center` and just zero the gap. This used to be
      `display: inline-grid; place-items: center`, which measured the icon
@@ -2453,14 +2405,12 @@ html.motion-ready .notes-batch-bar.selecting {
 .vocab-group-unit > .vocab-group-step:last-child {
   border-radius: 0 calc(var(--lib-radius-md) - 1px) calc(var(--lib-radius-md) - 1px) 0;
 }
-/* §1.5 hit-area expansion, vertical-only (§8's fused-control law: a hit-pad
-   may never cross the seam between the input and a cell, or between the two
-   cells -- and this cell's 28px width already clears the 24px floor, only
-   its 18px height is short). `border: 0` above (the border-left divider is
-   the only exception, and doesn't affect height) means this cell's padding
-   box already equals its border box, so -3.5px lands the pad 0.5px inside
-   the shell's `overflow-clip-margin: 4px` above rather than at its edge. */
-.vocab-group-unit > .vocab-group-step::before { content: ""; position: absolute; inset: -3.5px 0; }
+/* Hit-pad, vertical-only (§8's fused-control law: a pad may never cross the
+   seam between the input and a cell, or between the two cells). The cells
+   are 26 tall comfortable but only 22 compact, so -1px lands them on 24 there;
+   it also carries the shell's border band for checklist's `edgeClickable`.
+   Well inside the shell's `overflow-clip-margin: 4px`. */
+.vocab-group-unit > .vocab-group-step::before { content: ""; position: absolute; inset: -1px 0; }
 /* §8 law 4: passengers give ghost feedback, not .btn feedback. scale(0.97)
    on a segment welded to its neighbours tears open the seams, so press is a
    background step with no transition (§3.2's row-press language) and the

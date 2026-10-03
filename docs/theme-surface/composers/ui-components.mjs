@@ -232,8 +232,8 @@ function btnRules(ns) {
     ]),
     // Options density rung (COMPONENTS.md §1.1 two tiers): the options button
     // family reads the density tokens; the help toggle keeps its 24px icon
-    // target and the legacy sm rung. Emitted for options only -- popup/library
-    // migrate in stage 4.
+    // target and the legacy sm rung. Library takes its own branch below;
+    // popup stays on the legacy 26/20 rung.
     ...(ns === "opt" ? [
       rule(".btn:not(.context-help-toggle)", [
         ["height", "var(--opt-control-h)"],
@@ -251,6 +251,31 @@ function btnRules(ns) {
         // .btn-sm the SAME size as .btn under comfortable density.
         ["font-size", "calc(var(--opt-text-body) - 1px)"],
         ["line-height", "calc(var(--opt-control-h) - 6px)"],
+      ]),
+    ] : []),
+    // Library density rung (library redesign 2026-10-03 spec §6.2): the same
+    // two tiers as options, read from the --lib-* density tokens
+    // (html[data-density="compact"] is written on library.html by
+    // options-theme-early.js too). Plain `.btn` / `.btn-sm`, emitted after
+    // the base rules above so the same specificity resolves by order inside
+    // this one generated region -- library has no help toggle to exclude.
+    // box-sizing is load-bearing: library has no global `*` rule, and its two
+    // <a class="btn btn-sm"> links are content-box under the UA, so a bare
+    // height would render them 2px taller than every <button>.
+    ...(ns === "lib" ? [
+      rule(".btn", [
+        ["box-sizing", "border-box"],
+        ["height", "var(--lib-control-h)"],
+        ["padding", "0 var(--lib-control-pad-x)"],
+        ["font-size", "var(--lib-text-body)"],
+        ["line-height", "calc(var(--lib-control-h) - 2px)"],
+      ]),
+      rule(".btn-sm", [
+        ["box-sizing", "border-box"],
+        ["height", "calc(var(--lib-control-h) - 4px)"],
+        ["padding", "0 var(--lib-control-pad-x-sm)"],
+        ["font-size", "calc(var(--lib-text-body) - 1px)"],
+        ["line-height", "calc(var(--lib-control-h) - 6px)"],
       ]),
     ] : []),
   ];
@@ -609,7 +634,9 @@ function formRules(ns) {
     ]));
   }
   // §6.1 toolbar-scoped field variant (sm rung, matches the row's .btn-sm
-  // height). Concrete selector per COMPONENTS.md Appendix C3 — the only named
+  // height: the shell's 1px border + this input's calc(control-h - 6px) =
+  // 28 / 24 since the library density rung, plan T1). Concrete selector per
+  // COMPONENTS.md Appendix C3 — the only named
   // target this campaign (library.css:834, "本战役排期"); options has no
   // equivalent named in Appendix C, so this only emits for lib.
   //
@@ -627,9 +654,10 @@ function formRules(ns) {
   // focus ring) rather than just the wrong size.
   if (ns === "lib") {
     out.push(rule('.vocab-group-unit input[type="text"]', [
-      ["padding", `${sp(ns, 2)} ${sp(ns, 8)}`],
-      ["font-size", "12px"],
-      ["line-height", "14px"],
+      ["height", "calc(var(--lib-control-h) - 6px)"],
+      ["padding", "0 var(--lib-control-pad-x-sm)"],
+      ["font-size", "calc(var(--lib-text-body) - 1px)"],
+      ["line-height", "calc(var(--lib-control-h) - 6px)"],
     ]));
   }
   return out;

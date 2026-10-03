@@ -300,6 +300,34 @@ const libHandRoot = declarationValueMap(libHandCss, ":root");
   check(libHandRoot.get("--lib-gap") === "var(--lib-sp-7)" && !at1280.has("--lib-gap") && at1920.get("--lib-gap") === "var(--lib-sp-8)",
     "--lib-gap (G) must be 48 below 1920 and 64 from 1920 (spec §2.3)");
 }
+// The composer's lib branch of btnRules (ui-components.mjs, plan T1b): the
+// button rung reads the density tokens, and carries box-sizing because
+// library has no global `*` rule -- its two <a class="btn btn-sm"> links are
+// content-box under the UA and would render 2px taller without it. The
+// group unit's text entry is the sm rung minus the shell's 1px border.
+{
+  const genStart = libraryCss.indexOf("/* @generated:ui-components start (library) */");
+  const genEnd = libraryCss.indexOf("/* @generated:ui-components end (library) */");
+  check(genStart >= 0 && genEnd > genStart, "library.css: cannot find the @generated:ui-components (library) region");
+  const libGen = libraryCss.slice(genStart, genEnd);
+  const LIB_RUNG = {
+    ".btn": { "box-sizing": "border-box", height: "var(--lib-control-h)", padding: "0 var(--lib-control-pad-x)",
+      "font-size": "var(--lib-text-body)", "line-height": "calc(var(--lib-control-h) - 2px)" },
+    ".btn-sm": { "box-sizing": "border-box", height: "calc(var(--lib-control-h) - 4px)", padding: "0 var(--lib-control-pad-x-sm)",
+      "font-size": "calc(var(--lib-text-body) - 1px)", "line-height": "calc(var(--lib-control-h) - 6px)" },
+    '.vocab-group-unit input[type="text"]': { height: "calc(var(--lib-control-h) - 6px)", padding: "0 var(--lib-control-pad-x-sm)",
+      "font-size": "calc(var(--lib-text-body) - 1px)", "line-height": "calc(var(--lib-control-h) - 6px)" },
+  };
+  for (const [selector, want] of Object.entries(LIB_RUNG)) {
+    const got = declarationValueMap(libGen, selector);
+    for (const [property, value] of Object.entries(want)) {
+      check(got.get(property) === value,
+        `generated ui-components (library) must resolve ${selector} { ${property}: ${value} } (lib density rung, spec §6.2); got ${got.get(property) ?? "nothing"}`);
+    }
+    check(!declarationValueMap(libHandCss, selector).has("height"),
+      `library.css hand layer must not set a height on bare ${selector}: the rung lives in the composer's lib branch (a same-specificity hand rule wins by source order)`);
+  }
+}
 {
   // Registry-driven, not enumerated: options-theme-early.js's
   // PBP_OPTIONS_DENSITY_MAP must name exactly the DATA-THEME TARGETS that
