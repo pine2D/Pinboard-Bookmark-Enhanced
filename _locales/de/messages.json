@@ -3797,6 +3797,7 @@
   "libraryOpen": { "message": "Notizen & Vokabeln öffnen" },
   "libraryDetailTitle": { "message": "Wortdetails" },
   "libraryNotesDetailEmpty": { "message": "Wähle eine Markierung aus der Liste, um sie ganz zu lesen." },
+  "libraryPageCount": { "message": "$COUNT$ auf dieser Seite", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "Markierungen und Notizen liegen nur auf diesem Gerät und werden nicht synchronisiert. Um sie auf ein anderes Gerät zu übertragen, exportiere auf der Einstellungsseite eine Sicherung und importiere sie dort." },
   "libraryNotesScopeOpenBackup": { "message": "Sicherungseinstellungen öffnen" },
   "libraryRelookup": { "message": "Erneut nachschlagen" },

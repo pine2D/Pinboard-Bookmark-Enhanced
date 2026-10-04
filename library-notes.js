@@ -162,12 +162,15 @@ let _notesRenderLimit = PBP_NOTES_RENDER_BATCH;
 // Same job _pbpVocabDetailWordId does for the vocabulary view: it outlives
 // every rebuild, so a rescan can put the selection back where it was.
 let _pbpNotesSelectedKey = null;
-// The key the detail pane was last RENDERED with, which is not the same thing
-// as the selection: a refresh (_pbpNotesRefreshPreservingState, fired by every
-// pbp_hl_ write from an open reader) re-renders the SAME key, and only an
-// actual entry change may reset the pane's scroll position. Twin of the
-// `sameWord` guard in library-vocab.js's _pbpVocabRenderDetail.
-let _notesRenderedDetailKey = null;
+// The PAGE the detail last rendered (its pbp_hl_ storage key), which is not
+// the same thing as the selection: a refresh (_pbpNotesRefreshPreservingState,
+// fired by every pbp_hl_ write from an open reader) re-renders the same page,
+// and jumping between excerpts of one page is reading on, not opening
+// something new -- so only a change of PAGE resets the pane's scroll position
+// (spec 2026-10-03-library-redesign §5.4); a change of highlight inside the
+// page only nudges the new current excerpt into view. Twin of the `sameWord`
+// guard in library-vocab.js's _pbpVocabRenderDetail.
+let _notesRenderedPageKey = null;
 // Batch selection (2026-08-06), same model as the vocabulary list: a Set of
 // hit keys plus the anchor a Shift gesture spans from. Distinct from
 // _pbpNotesSelectedKey above, which is "the one the detail pane is reading" --
@@ -300,21 +303,6 @@ async function _pbpNotesScan() {
   return rows;
 }
 
-// Follows the extension UI language, not the browser's: this date sits inside
-// a row whose every other word is already translated, and en-US 9/2/2026 next
-// to de-DE 2.9.2026 is the disagreement users read first. uiLangToBCP47() ends
-// in split("-")[0] over an arbitrary stored tag, so a malformed one can reach
-// Intl and throw -- fall back to the browser default rather than losing the
-// date, and keep the outer catch for an unparseable timestamp.
-function _pbpNotesFormatDate(ts) {
-  if (!ts) return "";
-  try {
-    const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined;
-    try { return new Date(ts).toLocaleDateString(locale); }
-    catch (_) { return new Date(ts).toLocaleDateString(); }
-  } catch (_) { return ""; }
-}
-
 function _pbpNotesColorOf(it) {
   const c = Number(it && it.color);
   return c >= 1 && c <= 5 ? c : 1;
@@ -369,6 +357,31 @@ function _pbpNotesVisibleHits(all) {
 // same-page section can hand back a highlight the current filter hides.
 function _pbpNotesFindHit(key) {
   return key ? _pbpNotesHits().find((hit) => hit.key === key) || null : null;
+}
+
+// Every highlight of ONE page, unfiltered by the list's search box and colour
+// toggles (the detail reads the page, the list is only how you got there),
+// oldest first. Built from the stored item order so two highlights with the
+// same ts keep the order they were saved in, and an item with no ts of its own
+// borrows the page's last one -- the same fallback _pbpNotesHits uses, so the
+// keys match the list rows exactly.
+function _pbpNotesPageHits(rowKey) {
+  const entry = _notesAllRows.find((e) => e.row.key === rowKey);
+  if (!entry) return [];
+  const items = Array.isArray(entry.rec.items) ? entry.rec.items : [];
+  const hits = [];
+  items.forEach((it, idx) => {
+    if (!it || typeof it !== "object") return;
+    hits.push({
+      key: _pbpNotesHitKey(entry.row.key, it, idx),
+      row: entry.row,
+      rec: entry.rec,
+      item: it,
+      ts: typeof it.ts === "number" ? it.ts : entry.row.lastTs,
+      idx,
+    });
+  });
+  return hits.sort((a, b) => (a.ts - b.ts) || (a.idx - b.idx));
 }
 
 function _pbpNotesHostname(url) {
@@ -693,10 +706,228 @@ function _pbpNotesBuildBackBtn() {
   return back;
 }
 
-// Reading pane for one highlight, or the empty state for null (nothing
-// selected, selection deleted, back button). `enterNarrow` is opt-in exactly
-// as in library-vocab.js: only a user activation may swap narrow mode from the
-// list to the detail, so a background refresh never yanks a narrow reader.
+// The UI language as a BCP 47 tag, or "" -- uiLangToBCP47() ends in a split
+// over an arbitrary stored tag and can throw on a malformed one.
+function _pbpNotesUiLang() {
+  try { return typeof uiLangToBCP47 === "function" ? String(uiLangToBCP47() || "") : ""; }
+  catch (_) { return ""; }
+}
+
+// Page head (spec §5.3): the source title (the whole line is the link when the
+// url is safe), then one muted meta line. The meta's page count only shows
+// below C 1200, where the "this page" column is absent (CSS decides).
+function _pbpNotesBuildHead(hit, count) {
+  const head = document.createElement("header");
+  head.className = "notes-detail-head";
+  const title = document.createElement("h2");
+  title.className = "notes-detail-source lib-first-line";
+  const href = typeof pbpDictSafeUrl === "function" ? pbpDictSafeUrl(hit.row.url) : "";
+  const label = hit.row.title || _pbpNotesHostname(hit.row.url) || t("notesUnknownPage");
+  if (href) {
+    const link = document.createElement("a");
+    link.className = "notes-detail-link";
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = label;
+    // Static PBP_ICONS constant (already aria-hidden), never page content.
+    link.insertAdjacentHTML("beforeend", PBP_ICONS.extOpen.replace('<svg ', '<svg class="ext-icon" '));
+    title.appendChild(link);
+  } else {
+    title.textContent = label;
+  }
+  head.appendChild(title);
+  if (!hit.row.url) {
+    const hint = document.createElement("p");
+    hint.className = "notes-unknown-hint";
+    hint.textContent = t("notesUnknownHint");
+    head.appendChild(hint);
+  }
+  const meta = document.createElement("p");
+  meta.className = "notes-detail-meta";
+  const items = [];
+  const site = _pbpNotesHostname(hit.row.url);
+  if (site) items.push(["notes-meta-site", site]);
+  const pageDay = pbpLibFormatDay(hit.row.lastTs);
+  if (pageDay) items.push(["notes-meta-day", pageDay]);
+  items.push(["notes-meta-pagecount", t("libraryPageCount", String(count))]);
+  if (hit.item.side === "tr" && hit.item.lang) items.push(["notes-meta-lang", String(hit.item.lang)]);
+  for (const [cls, text] of items) {
+    const span = document.createElement("span");
+    span.className = cls;
+    span.textContent = text;
+    meta.appendChild(span);
+  }
+  head.appendChild(meta);
+  return head;
+}
+
+// One excerpt's label (spec §5.4): time, then the colour's dot and name; the
+// day too when it is not the page's own day. Two spans for day and time so a
+// label that does not fit the 96px hang column can stack them
+// (_pbpNotesStackLabels). It carries the UI language for hyphens: auto, and
+// takes programmatic focus when a same-page jump makes its excerpt current.
+function _pbpNotesExcerptLabel(hit, pageTs) {
+  const label = document.createElement("h3");
+  label.className = "notes-excerpt-label";
+  label.tabIndex = -1;
+  label.dataset.notesKey = hit.key;
+  const lang = _pbpNotesUiLang();
+  if (lang) label.lang = lang;
+  if (!pbpLibSameDay(hit.ts, pageTs)) {
+    const dayText = pbpLibFormatDay(hit.ts);
+    if (dayText) {
+      const span = document.createElement("span");
+      span.className = "notes-excerpt-date";
+      span.textContent = dayText;
+      label.appendChild(span);
+    }
+  }
+  const timeText = pbpLibFormatTime(hit.ts);
+  if (timeText) {
+    const span = document.createElement("span");
+    span.className = "notes-excerpt-time";
+    span.textContent = timeText;
+    label.appendChild(span);
+  }
+  const c = _pbpNotesColorOf(hit.item);
+  const color = document.createElement("span");
+  color.className = "notes-excerpt-color";
+  const dot = document.createElement("span");
+  dot.className = "notes-hit-dot notes-c" + c;
+  dot.setAttribute("aria-hidden", "true");
+  const name = document.createElement("span");
+  name.className = "notes-excerpt-color-name";
+  name.textContent = t(PBP_NOTES_COLOR_KEYS[c - 1]);
+  color.append(dot, name);
+  label.appendChild(color);
+  return label;
+}
+
+// One highlight of the page (spec §5.4). The current one is a blockquote; the
+// others are buttons that make themselves current. Every quote wears the
+// half-height highlighter (.lib-mark) in its own colour; the filter query is
+// still marked inside it. A translated-side quote carries its own language.
+function _pbpNotesBuildExcerpt(h, index, isCurrent, pageTs, q) {
+  const sec = document.createElement("section");
+  sec.className = "notes-excerpt";
+  sec.dataset.notesKey = h.key;
+  if (isCurrent) sec.setAttribute("aria-current", "true");
+  const label = _pbpNotesExcerptLabel(h, pageTs);
+  label.id = "notes-excerpt-label-" + index;
+  sec.setAttribute("aria-labelledby", label.id);
+  sec.appendChild(label);
+  const body = document.createElement("div");
+  body.className = "notes-excerpt-body";
+  const mark = document.createElement("span");
+  mark.className = "lib-mark notes-c" + _pbpNotesColorOf(h.item);
+  _pbpNotesMarkText(mark, typeof h.item.quote === "string" ? h.item.quote : "", q);
+  const quoteLang = h.item.side === "tr" && h.item.lang ? String(h.item.lang) : "";
+  if (isCurrent) {
+    const quote = document.createElement("blockquote");
+    quote.className = "notes-excerpt-quote";
+    if (quoteLang) quote.lang = quoteLang;
+    quote.appendChild(mark);
+    body.appendChild(quote);
+  } else {
+    const jump = document.createElement("button");
+    jump.type = "button";
+    jump.className = "notes-excerpt-jump";
+    jump.dataset.notesKey = h.key;
+    const quote = document.createElement("span");
+    quote.className = "notes-excerpt-quote";
+    if (quoteLang) quote.lang = quoteLang;
+    quote.appendChild(mark);
+    jump.appendChild(quote);
+    jump.addEventListener("click", () => _pbpNotesJumpTo(h.key));
+    body.appendChild(jump);
+  }
+  const note = typeof h.item.note === "string" ? h.item.note : "";
+  if (note.trim()) {
+    const p = document.createElement("p");
+    p.className = "notes-excerpt-note";
+    const ic = document.createElement("span");
+    ic.className = "notes-note-ic";
+    ic.innerHTML = PBP_ICONS.pencil;
+    const text = document.createElement("span");
+    text.className = "notes-excerpt-note-text";
+    _pbpNotesMarkText(text, note, q);
+    p.append(ic, text);
+    body.appendChild(p);
+  }
+  sec.appendChild(body);
+  return sec;
+}
+
+// The page delete. Scope is the PAGE's record -- the confirm popover names the
+// page before anything is removed. notes-detail-delete stays the LAST class:
+// the refresh finds a focused detail control again by its last class.
+function _pbpNotesBuildDeleteBtn(row) {
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "btn btn-sm danger ghost lib-hang-start notes-detail-delete";
+  setBtnIcon(del, "trash", t("notesDeleteBtn"));
+  del.addEventListener("click", () => _pbpNotesDelete(row, del));
+  return del;
+}
+
+// A same-page jump (spec §5.4): the clicked highlight becomes current (list row
+// included, when the list filter shows it), the pane keeps its scroll, the new
+// current excerpt is brought into view only as far as needed, and focus moves
+// to its label so a keyboard user lands where the reading continues.
+function _pbpNotesJumpTo(key) {
+  _pbpNotesSelectRow(key);
+  const detail = $id("notes-detail");
+  const cur = detail && detail.querySelector(':scope > .notes-excerpt[aria-current="true"]');
+  if (!cur) return;
+  cur.scrollIntoView({ block: "nearest" });
+  _pbpNotesFocus(cur.querySelector(".notes-excerpt-label"));
+}
+
+// Hang labels (spec §5.4): in the hang column (C >= 1000, where the excerpt is
+// a subgrid) a label gets 96px; one that does not fit on one line stacks day,
+// time and colour on their own lines, flush right, still counted as ONE 16px
+// line so the quote's row does not grow. If the stack then hangs past the
+// excerpt's own bottom, the excerpt gets a min-height so the next one still
+// starts 32px below the label's last line. Measured after every render and,
+// coalesced to one frame, on resize and on a density / theme flip.
+function _pbpNotesStackLabels(detail) {
+  const host = detail || $id("notes-detail");
+  if (!host || host.hidden) return;
+  for (const ex of host.querySelectorAll(":scope > .notes-excerpt")) {
+    const label = ex.querySelector(":scope > .notes-excerpt-label");
+    if (!label) continue;
+    label.classList.remove("is-stacked");
+    ex.style.removeProperty("min-height");
+    if (getComputedStyle(ex).display !== "grid") continue; // label above its quote: never stacks
+    const cs = getComputedStyle(label);
+    const room = label.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    const parts = [...label.children];
+    const gap = parseFloat(cs.columnGap) || 0;
+    const need = parts.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0) + gap * Math.max(0, parts.length - 1);
+    if (need <= room + 0.5) continue;
+    label.classList.add("is-stacked");
+    const inkBottom = Math.max(...parts.flatMap((el) => [...el.getClientRects()].map((r) => r.bottom)));
+    const exRect = ex.getBoundingClientRect();
+    const overhang = inkBottom - exRect.bottom;
+    if (overhang > 0.5) ex.style.minHeight = Math.ceil(exRect.height + overhang) + "px";
+  }
+}
+
+let _notesStackFrame = 0;
+function _pbpNotesScheduleStack() {
+  if (_notesStackFrame) return;
+  _notesStackFrame = requestAnimationFrame(() => {
+    _notesStackFrame = 0;
+    _pbpNotesStackLabels();
+  });
+}
+
+// Reading pane for one PAGE, opened at one of its highlights (spec 2026-10-03-
+// library-redesign §5), or the cover for null (nothing selected, selection
+// deleted, back button). `enterNarrow` is opt-in exactly as in
+// library-vocab.js: only a user activation may swap narrow mode from the list
+// to the detail, so a background refresh never yanks a narrow reader.
 function _pbpNotesRenderDetail(hit, enterNarrow) {
   const empty = $id("notes-detail-empty");
   const detail = $id("notes-detail");
@@ -705,139 +936,41 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
   detail.hidden = !hit;
   if (!hit) {
     _pbpNotesSelectedKey = null;
-    _notesRenderedDetailKey = null;
+    _notesRenderedPageKey = null;
     document.body.classList.remove("lib-narrow-notes");
     detail.replaceChildren();
     _pbpNotesMarkCurrentRow();
     return;
   }
-  const sameHit = hit.key === _notesRenderedDetailKey;
+  const samePage = hit.row.key === _notesRenderedPageKey;
   if (enterNarrow) document.body.classList.add("lib-narrow-notes");
 
   const q = _pbpNotesFilterQuery();
+  const found = _pbpNotesPageHits(hit.row.key);
+  const pageHits = found.some((h) => h.key === hit.key) ? found : [hit];
+  const pageTs = hit.row.lastTs;
   const frag = document.createDocumentFragment();
-
   // 0. Back button (narrow mode only -- CSS decides, see .notes-detail-back)
   frag.appendChild(_pbpNotesBuildBackBtn());
-
-  // 1. Source line: page title (linked when the url is safe) + date + language
-  const head = document.createElement("div");
-  head.className = "notes-detail-head";
-  const href = typeof pbpDictSafeUrl === "function" ? pbpDictSafeUrl(hit.row.url) : "";
-  const label = hit.row.title || _pbpNotesHostname(hit.row.url) || t("notesUnknownPage");
-  if (href) {
-    const link = document.createElement("a");
-    link.className = "notes-detail-source";
-    link.href = href;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = label;
-    // External-link mark, same idiom as options.js's .wayback-log-url:
-    // static PBP_ICONS constant (already aria-hidden), never page content.
-    link.insertAdjacentHTML("beforeend", PBP_ICONS.extOpen.replace('<svg ', '<svg class="ext-icon" '));
-    head.appendChild(link);
-  } else {
-    const plain = document.createElement("span");
-    plain.className = "notes-detail-source";
-    plain.textContent = label;
-    head.appendChild(plain);
-  }
-  const dateText = _pbpNotesFormatDate(hit.ts);
-  if (dateText) {
-    const dateSpan = document.createElement("span");
-    dateSpan.className = "notes-meta-chip";
-    dateSpan.textContent = dateText;
-    head.appendChild(dateSpan);
-  }
-  if (hit.item.side === "tr" && hit.item.lang) {
-    const langSpan = document.createElement("span");
-    langSpan.className = "notes-meta-chip";
-    langSpan.textContent = String(hit.item.lang);
-    head.appendChild(langSpan);
-  }
-  frag.appendChild(head);
-
-  // 2. The highlight itself, in full
-  const quote = document.createElement("blockquote");
-  quote.className = "notes-detail-quote notes-c" + _pbpNotesColorOf(hit.item);
-  _pbpNotesMarkText(quote, typeof hit.item.quote === "string" ? hit.item.quote : "", q);
-  frag.appendChild(quote);
-
-  // 3. Note, in full (the reader's Notebook still owns editing it)
-  const note = typeof hit.item.note === "string" ? hit.item.note : "";
-  if (note.trim()) {
-    const noteEl = document.createElement("p");
-    noteEl.className = "notes-detail-note";
-    _pbpNotesMarkText(noteEl, note, q);
-    frag.appendChild(noteEl);
-  }
-
-  if (!hit.row.url) {
-    const hint = document.createElement("p");
-    hint.className = "notes-unknown-hint";
-    hint.textContent = t("notesUnknownHint");
-    frag.appendChild(hint);
-  }
-
-  // 4. Closing action row (variant C), symmetrical with the vocabulary pane's.
-  // Only one control lives here, and it is right-aligned like its twin --
-  // the row exists so both panes end the same way, not because this view has
-  // two actions to separate.
-  // Delete: scope is the PAGE's record (the only unit storage has, and the
-  // unit the reader writes) -- the confirm popover names that page before
-  // anything is removed, which is where the scope is disclosed.
+  // 1. Page head: title, (hint,) meta
+  frag.appendChild(_pbpNotesBuildHead(hit, pageHits.length));
+  // 2. Every highlight of the page, oldest first; the opened one is current
+  pageHits.forEach((h, i) => frag.appendChild(_pbpNotesBuildExcerpt(h, i, h.key === hit.key, pageTs, q)));
+  // 3. Closing row: the page delete, hanging at the main column's start
   const footer = document.createElement("div");
-  footer.className = "lib-section notes-detail-footer";
-  const del = document.createElement("button");
-  del.type = "button";
-  del.className = "btn btn-sm danger ghost notes-detail-delete";
-  setBtnIcon(del, "trash", t("notesDeleteBtn"));
-  del.addEventListener("click", () => _pbpNotesDelete(hit.row, del));
-  footer.appendChild(del);
+  footer.className = "notes-detail-footer";
+  footer.appendChild(_pbpNotesBuildDeleteBtn(hit.row));
   frag.appendChild(footer);
-
-  // 5. The rest of this page's highlights, as a jump list
-  const siblings = _pbpNotesHits().filter((h) => h.row.key === hit.row.key && h.key !== hit.key);
-  if (siblings.length) {
-    const section = document.createElement("section");
-    section.className = "lib-section";
-    const title = document.createElement("h2");
-    title.className = "notes-detail-sib-title";
-    title.textContent = t("hlSectionTitle");
-    section.appendChild(title);
-    for (const sib of siblings) {
-      const sibBtn = document.createElement("button");
-      sibBtn.type = "button";
-      sibBtn.className = "notes-sib";
-      sibBtn.dataset.notesKey = sib.key;
-      const dot = document.createElement("span");
-      dot.className = "note-dot c" + _pbpNotesColorOf(sib.item);
-      dot.setAttribute("aria-hidden", "true");
-      sibBtn.appendChild(dot);
-      const sibText = document.createElement("span");
-      sibText.className = "notes-sib-text";
-      sibText.textContent = typeof sib.item.quote === "string" ? sib.item.quote : "";
-      sibBtn.appendChild(sibText);
-      sibBtn.addEventListener("click", () => _pbpNotesSelectRow(sib.key));
-      section.appendChild(sibBtn);
-    }
-    frag.appendChild(section);
-  }
 
   detail.replaceChildren(frag);
   if (enterNarrow) _pbpNotesFocusNarrowBack(detail);
-  // The scroll container is the PANE, not this inner div: library.css caps
-  // .notes-detail-pane and gives it overflow-y:auto, and replaceChildren is
-  // one atomic mutation, so it keeps the previous highlight's scrollTop. After
-  // the handoff above, not before -- same ordering as the vocabulary twin.
-  // Only on an actual ENTRY CHANGE, though: _pbpNotesRefreshPreservingState
-  // re-renders the same key on every pbp_hl_ write an open reader makes and on
-  // every view re-entry, and it restores the list region's scrollTop and
-  // focus right afterwards -- resetting the pane there throws away what it
-  // preserves.
+  // The scroll container is the PANE, not this div: replaceChildren is one
+  // atomic mutation and keeps the previous scrollTop. Reset it only when the
+  // PAGE changed -- a same-page jump or a refresh keeps the reader's place.
   const pane = $id("notes-detail-pane");
-  if (pane && !sameHit) pane.scrollTop = 0;
-  _notesRenderedDetailKey = hit.key;
+  if (pane && !samePage) pane.scrollTop = 0;
+  _notesRenderedPageKey = hit.row.key;
+  _pbpNotesStackLabels(detail);
 }
 
 // Same guard the two failure sentences above use: t() echoes an unknown key
@@ -1544,6 +1677,23 @@ if (typeof $id === "function") {
     _pbpNotesSetRowTabStop(next);
     next.focus();
   });
+  // Hang labels are measured against the live layout, so anything that moves
+  // the detail's container width or the label metrics re-measures them:
+  // window resizes (the index column is clamp()ed to the viewport) and a
+  // density / theme flip from another tab (options-theme-early.js rewrites
+  // html[data-density] / [data-theme] in place). One frame, coalesced.
+  window.addEventListener("resize", _pbpNotesScheduleStack);
+  if (typeof MutationObserver === "function") {
+    new MutationObserver(_pbpNotesScheduleStack).observe(document.documentElement,
+      { attributes: true, attributeFilter: ["data-density", "data-theme"] });
+  }
+  // A language switch rewrites colour names and the page count, which are
+  // built from t() at render time: re-render the open detail (same page, so
+  // the pane keeps its scroll); the render ends with a fresh measurement.
+  document.addEventListener("pbp:i18n-applied", () => {
+    const hit = _pbpNotesFindHit(_pbpNotesSelectedKey);
+    if (hit) _pbpNotesRenderDetail(hit);
+  });
 }
 
 // Re-scan and re-render without throwing away what the user was reading.
@@ -1564,14 +1714,18 @@ async function _pbpNotesRefreshPreservingState() {
   // _pbpNotesFocusAfterDelete just placed falls to <body> a quarter second
   // later (measured on the real page). In narrow mode that is a dead end: the
   // list is display:none, so there is nothing left to Tab to. Snapshot the row
-  // by key, and the detail control by its own class (the detail's controls are
-  // all built here, one specific class each, last in the list).
+  // by key, and the detail control by its last class plus, for an excerpt
+  // control, its highlight key (every jump button shares one class).
   const active = document.activeElement;
   const focusedRow = active && active.closest ? active.closest("#notes-list .notes-hit") : null;
   const focusedKey = focusedRow ? focusedRow.dataset.notesKey : null;
   const inDetail = !focusedRow && active && active.closest && active.closest("#notes-detail");
   const detailClass = inDetail && active.classList.length
     ? active.classList[active.classList.length - 1] : null;
+  // An excerpt control is found again by its highlight's key, never by class
+  // alone: every jump button shares one class, and "the first one" is the
+  // wrong excerpt (spec §5.1).
+  const detailKey = inDetail && active.dataset ? active.dataset.notesKey || null : null;
   await renderNotesPanel();
   const hit = _pbpNotesFindHit(selected);
   if (hit) {
@@ -1589,8 +1743,11 @@ async function _pbpNotesRefreshPreservingState() {
     // only way back to the list. (_pbpNotesFocus reports a no-op focus, so a
     // control the rebuild dropped falls through.)
     const host = $id("notes-detail");
-    const same = host && !host.hidden ? host.querySelector("." + CSS.escape(detailClass)) : null;
-    if (!_pbpNotesFocus(same) && host) _pbpNotesFocus(host.querySelector(".notes-detail-back"));
+    const sel = "." + CSS.escape(detailClass) + (detailKey ? '[data-notes-key="' + CSS.escape(detailKey) + '"]' : "");
+    // Several matches are possible (two page deletes, only one displayed):
+    // _pbpNotesFocus reports a focus that did not take, so try them in order.
+    const candidates = host && !host.hidden ? [...host.querySelectorAll(sel)] : [];
+    if (!candidates.some((el) => _pbpNotesFocus(el)) && host) _pbpNotesFocus(host.querySelector(".notes-detail-back"));
   }
   if (region && listScroll) region.scrollTop = listScroll;
 }

@@ -1972,6 +1972,27 @@ function auditLibraryNoteMarks(theme, get) {
     const over = resolveColor(String(v).trim(), bg);
     console.log(check("library", theme, `fg vs note-mark-c${n}`, cr(fg, over), 4.5));
   }
+  // A non-current excerpt is a jump button whose hover paints --lib-row-bg-hover
+  // under the same mark (library.css `.notes-excerpt-jump:hover`, spec §5.4 /
+  // §11 V24), so the text also sits on mark-over-hover-fill. The composer caps
+  // the alpha against the page bg only, and on T8c's first run 13 of these 75
+  // pairs landed at 4.10-4.48 (solarized-dark all five, solarized-light c2-c5,
+  // the c1 yellow on nord-night / flexoki-dark / catppuccin-mocha /
+  // gruvbox-dark). ADVISORY until the hover-vs-cap conflict is decided (keep
+  // the V24 fill and cap the marks against it too, or one of V24's no-fill
+  // alternatives); the decision turns this row blocking.
+  const hoverS = get("row-bg-hover");
+  if (!isHex(hoverS ?? "")) {
+    const line = "  " + "library".padEnd(10) + " " + theme.padEnd(20) + " " + "highlighter on hover".padEnd(28) + " FAIL (missing or non-hex: --lib-row-bg-hover)";
+    console.log(line);
+    violations.push(line);
+    return;
+  }
+  const hover = hexRgb(hoverS);
+  for (const [n, v] of marks) {
+    const over = resolveColor(String(v).trim(), hover);
+    console.log(warnCheck("library", theme, `fg vs note-mark-c${n} over row-bg-hover`, cr(fg, over), 4.5));
+  }
 }
 auditLibraryThemes(resolve(ROOT, "library.css"));
 

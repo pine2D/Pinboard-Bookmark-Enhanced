@@ -3791,6 +3791,7 @@
   "libraryOpen": { "message": "打开笔记与生词本" },
   "libraryDetailTitle": { "message": "词条详情" },
   "libraryNotesDetailEmpty": { "message": "从列表里选一条高亮，就能读到全文。" },
+  "libraryPageCount": { "message": "本页 $COUNT$ 条", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "高亮和笔记只保存在本设备，不参与同步。要迁移到别的设备，请在设置页导出备份，再在那台设备导入。" },
   "libraryNotesScopeOpenBackup": { "message": "打开备份设置" },
   "libraryRelookup": { "message": "重新查词典" },

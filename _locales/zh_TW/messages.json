@@ -3797,6 +3797,7 @@
   "libraryOpen": { "message": "開啟筆記與生詞本" },
   "libraryDetailTitle": { "message": "詞條詳情" },
   "libraryNotesDetailEmpty": { "message": "從清單中選一則標記，就能讀到全文。" },
+  "libraryPageCount": { "message": "本頁 $COUNT$ 筆", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "標記與筆記只儲存在本裝置，不會同步。要移到其他裝置，請在設定頁匯出備份，再到那台裝置匯入。" },
   "libraryNotesScopeOpenBackup": { "message": "開啟備份設定" },
   "libraryRelookup": { "message": "重新查詞典" },

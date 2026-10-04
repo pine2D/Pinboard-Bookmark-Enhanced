@@ -3797,6 +3797,7 @@
   "libraryOpen": { "message": "Открыть заметки и словарик" },
   "libraryDetailTitle": { "message": "Подробности о слове" },
   "libraryNotesDetailEmpty": { "message": "Выберите выделение из списка, чтобы прочитать его целиком." },
+  "libraryPageCount": { "message": "На этой странице: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "Выделения и заметки хранятся только на этом устройстве и не синхронизируются. Чтобы перенести их на другое устройство, экспортируйте резервную копию на странице настроек и импортируйте её там." },
   "libraryNotesScopeOpenBackup": { "message": "Открыть настройки резервного копирования" },
   "libraryRelookup": { "message": "Найти снова" },

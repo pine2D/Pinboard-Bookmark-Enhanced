@@ -13,7 +13,13 @@ body.test-narrow-back .notes-detail-back{display:inline-flex}
    without this the pane is a scroll container on paper only. Scoped to the one
    test that needs a real scrollTop, same convention as the rule above. */
 body.test-scroll-pane #notes-detail-pane{max-height:60px;overflow-y:auto}
+/* T8: a pane tall enough to hold several excerpts and still scroll, for the
+   same-page jump check (the excerpt must be fully visible before the jump). */
+body.test-scroll-pane-tall #notes-detail-pane{height:360px;max-height:360px;overflow-y:auto}
 body.test-scroll-region .notes-list-region{max-height:60px;overflow-y:auto}
+/* Stands in for the <=860px rule that takes the list pane off screen while the
+   detail is open (narrow round trip; the runner cannot resize the viewport). */
+body.test-narrow-hide.lib-narrow-notes .notes-list-pane{display:none}
 </style></head>
 <body>
 <!-- notes-workbench two-pane skeleton, copied from library.html (minus the
@@ -59,7 +65,7 @@ body.test-scroll-region .notes-list-region{max-height:60px;overflow-y:auto}
     </div>
     <aside class="notes-detail-pane" id="notes-detail-pane" aria-label="Notes">
       <div class="notes-detail-empty" id="notes-detail-empty">Select a highlight on the left to read it.</div>
-      <div class="notes-detail" id="notes-detail" hidden></div>
+      <div class="notes-sheet" id="notes-detail" hidden></div>
     </aside>
   </div>
 </div>
@@ -223,7 +229,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     rowEl("pbp_hl_alpha#a2").hasAttribute("aria-current"));
   check("the detail pane replaces the empty state",
     $id("notes-detail-empty").hidden === true && detail().hidden === false);
-  const source = detail().querySelector("a.notes-detail-source");
+  const source = detail().querySelector(".notes-detail-source a.notes-detail-link");
   check("the detail names the source page and links to it",
     source && source.getAttribute("href") === "https://alpha.example/post" &&
     source.textContent === "Alpha article" && source.target === "_blank" &&
@@ -233,29 +239,32 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     source && source.querySelectorAll(".ext-icon").length === 1 &&
     source.querySelector(".ext-icon").getAttribute("aria-hidden") === "true",
     source && source.outerHTML);
+  const currentQuote = () => detail().querySelector('.notes-excerpt[aria-current="true"] .notes-excerpt-quote');
   check("the detail quotes the full highlight",
-    detail().querySelector(".notes-detail-quote").textContent === "second alpha highlight about beta",
-    detail().querySelector(".notes-detail-quote").textContent);
+    currentQuote()?.textContent === "second alpha highlight about beta",
+    currentQuote()?.textContent);
   check("the detail shows the note in full",
-    detail().querySelector(".notes-detail-note").textContent === "note on a2");
+    detail().querySelector('.notes-excerpt[aria-current="true"] .notes-excerpt-note-text')?.textContent === "note on a2");
   check("the detail offers the delete action", !!detail().querySelector(".notes-detail-delete"));
-  check("the detail dates the highlight", !!detail().querySelector(".notes-detail-head .notes-meta-chip"));
+  check("the detail dates the page",
+    detail().querySelector(".notes-detail-head .notes-meta-day")?.textContent === pbpLibFormatDay(500),
+    detail().querySelector(".notes-detail-head .notes-detail-meta")?.textContent);
 
-  // ---- same-page siblings ----
-  const sibs = () => [...detail().querySelectorAll(".notes-sib")];
-  check("the same-page section lists the page's other highlights only",
-    sibs().length === 2 &&
+  // ---- the page's other highlights, as excerpts ----
+  const sibs = () => [...detail().querySelectorAll(".notes-excerpt-jump")];
+  check("the detail lays out every highlight of the page, the open one as the current excerpt",
+    detail().querySelectorAll(".notes-excerpt").length === 3 && sibs().length === 2 &&
     sibs().every((b) => b.dataset.notesKey !== "pbp_hl_alpha#a2" && b.dataset.notesKey.startsWith("pbp_hl_alpha#")),
     sibs().map((b) => b.dataset.notesKey).join(","));
-  sibs().find((b) => b.dataset.notesKey === "pbp_hl_alpha#a1").click();
-  check("clicking a sibling switches the selection and the detail",
+  sibs().find((b) => b.dataset.notesKey === "pbp_hl_alpha#a1")?.click();
+  check("clicking another excerpt switches the selection and the detail",
     _pbpNotesSelectedKey === "pbp_hl_alpha#a1" &&
     rowEl("pbp_hl_alpha#a1").hasAttribute("aria-current") &&
     document.querySelectorAll("#notes-list .notes-hit[aria-current]").length === 1 &&
-    detail().querySelector(".notes-detail-quote").textContent === "first alpha highlight");
-  check("a single-highlight page shows no same-page section", (() => {
+    currentQuote()?.textContent === "first alpha highlight");
+  check("a single-highlight page is one excerpt and no jump buttons", (() => {
     rowEl("pbp_hl_beta#b1").querySelector(".notes-hit-btn").click();
-    return sibs().length === 0;
+    return detail().querySelectorAll(".notes-excerpt").length === 1 && sibs().length === 0;
   })());
 
   // ---- switching entries resets the reading pane's scroll ----
@@ -270,8 +279,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   const scrollPane = $id("notes-detail-pane");
   scrollPane.scrollTop = 40;
   const scrolled = scrollPane.scrollTop;
-  rowEl("pbp_hl_alpha#a1").querySelector(".notes-hit-btn").click();
-  check("rendering another highlight returns the reading pane to the top",
+  rowEl("pbp_hl_beta#b1").querySelector(".notes-hit-btn").click();
+  check("rendering a highlight of another page returns the reading pane to the top",
     scrolled > 0 && scrollPane.scrollTop === 0,
     "scrolled=" + scrolled + " after=" + scrollPane.scrollTop);
   // A REFRESH render of the SAME highlight must not:
@@ -280,7 +289,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   // re-entry, and it restores the list region's scrollTop and focus right afterwards.
   scrollPane.scrollTop = 40;
   const scrolledSame = scrollPane.scrollTop;
-  _pbpNotesRenderDetail(_pbpNotesFindHit("pbp_hl_alpha#a1"));
+  _pbpNotesRenderDetail(_pbpNotesFindHit("pbp_hl_beta#b1"));
   check("a refresh render of the same highlight keeps the reading position",
     scrolledSame > 0 && scrollPane.scrollTop === scrolledSame,
     "scrolled=" + scrolledSame + " after=" + scrollPane.scrollTop);
@@ -289,15 +298,245 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   // ---- url-less and hostile-url records ----
   rowEl("pbp_hl_orphan#c1").querySelector(".notes-hit-btn").click();
   check("a url-less record renders no link and explains itself",
-    !detail().querySelector("a.notes-detail-source") &&
-    detail().querySelector("span.notes-detail-source") &&
-    detail().textContent.includes("notesUnknownHint"));
-  check("the non-interactive span fallback carries no external-link icon",
+    !detail().querySelector("a.notes-detail-link") &&
+    detail().querySelector("h2.notes-detail-source")?.textContent === "notesUnknownPage" &&
+    detail().querySelector(".notes-detail-head .notes-unknown-hint")?.textContent === "notesUnknownHint");
+  check("the plain-text title fallback carries no external-link icon",
     detail().querySelectorAll(".notes-detail-source .ext-icon").length === 0);
   rowEl("pbp_hl_evil#e1").querySelector(".notes-hit-btn").click();
   check("a javascript: source url never reaches an href",
-    !detail().querySelector("a[href^='javascript']") && !detail().querySelector("a.notes-detail-source"),
+    !detail().querySelector("a[href^='javascript']") && !detail().querySelector("a.notes-detail-link"),
     detail().innerHTML.slice(0, 200));
+
+  // ---- T8: one page read as a continuous excerpt flow (spec 2026-10-03
+  //      library-redesign §5; Review Focus 1, 4, 5) ----
+  {
+    const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    const frames = async () => { await nextFrame(); await nextFrame(); };
+    const pane = $id("notes-detail-pane");
+    const paneC = () => { const cs = getComputedStyle(pane); return pane.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight); };
+    const fixtureWidth = (px) => { $id("view-notes").style.width = px + "px"; };
+    const excerpts = () => [...detail().querySelectorAll(":scope > .notes-excerpt")];
+    const idOf = (el) => String(el.dataset.notesKey || "").split("#")[1];
+    const excerptOf = (id) => excerpts().find((s) => idOf(s) === id) || null;
+    const labelOf = (id) => excerptOf(id)?.querySelector(".notes-excerpt-label") || null;
+    const today = new Date();
+    const at = (dayOffset, h, m) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + dayOffset, h, m).getTime();
+    const lastYear = new Date(today.getFullYear() - 1, 5, 1, 10, 0).getTime();
+    const pageTs = at(0, 0, 10);
+    const day = (ts) => pbpLibFormatDay(ts), time = (ts) => pbpLibFormatTime(ts);
+    const realT = t;
+    // Stored order deliberately differs from time order; x5 has no ts of its
+    // own; x4 and x3 share one; x2 sits just before midnight the day before;
+    // x1 is from last year.
+    store["pbp_hl_times"] = { v: 1, url: "https://times.example/page", title: "Times page", items: [
+      { id: "x6", n: 1, quote: "latest of the page", color: 1, note: "", ts: at(0, 0, 10) },
+      { id: "x4", n: 2, quote: "tie stored first", color: 2, note: "", ts: at(0, 0, 7) },
+      { id: "x1", n: 3, quote: "from last year", color: 3, note: "", ts: lastYear },
+      { id: "x5", n: 4, quote: "no own timestamp", color: 4, note: "has a note" },
+      { id: "x3", n: 5, quote: "tie stored second", color: 5, note: "", ts: at(0, 0, 7) },
+      { id: "x2", n: 6, quote: "just before midnight", color: 1, note: "", ts: at(-1, 23, 58), side: "tr", lang: "de" },
+    ] };
+    store["pbp_hl_longtitle"] = { v: 1, url: "https://long.example/t", title: "A".repeat(120), items: [
+      { id: "l1", n: 1, quote: "a page whose title has no break opportunity", color: 2, note: "", ts: at(0, 9, 0) },
+    ] };
+    await renderNotesPanel();
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+
+    // -- order and labels (Review Focus 5) --
+    check("a page's excerpts run oldest first, whatever order storage holds them in",
+      excerpts().map(idOf).join(",") === "x1,x2,x4,x3,x6,x5", excerpts().map(idOf).join(","));
+    check("two highlights saved at the same instant keep their stored order",
+      excerpts().findIndex((s) => idOf(s) === "x4") < excerpts().findIndex((s) => idOf(s) === "x3"));
+    check("a highlight from the page's own day is labelled with its time only",
+      !!labelOf("x6") && !labelOf("x6").querySelector(".notes-excerpt-date") &&
+      labelOf("x6").querySelector(".notes-excerpt-time")?.textContent === time(pageTs), labelOf("x6")?.outerHTML);
+    check("a highlight with no timestamp of its own borrows the page's last one",
+      !!labelOf("x5") && !labelOf("x5").querySelector(".notes-excerpt-date") &&
+      labelOf("x5").querySelector(".notes-excerpt-time")?.textContent === time(pageTs), labelOf("x5")?.outerHTML);
+    check("a highlight from another day writes the day and the time as two spans",
+      labelOf("x2")?.querySelector(".notes-excerpt-date")?.textContent === day(at(-1, 23, 58)) &&
+      labelOf("x2")?.querySelector(".notes-excerpt-time")?.textContent === time(at(-1, 23, 58)), labelOf("x2")?.outerHTML);
+    check("a highlight from another year carries the year in its day",
+      !!labelOf("x1")?.querySelector(".notes-excerpt-date")?.textContent.includes(String(today.getFullYear() - 1)),
+      labelOf("x1")?.outerHTML);
+    check("every label ends with the colour's dot and the colour's name",
+      excerpts().length === 6 && excerpts().every((s) => {
+        const item = store["pbp_hl_times"].items.find((it) => it.id === idOf(s));
+        const c = s.querySelector(".notes-excerpt-label > .notes-excerpt-color");
+        return !!c && c.querySelector(".notes-hit-dot.notes-c" + item.color)?.getAttribute("aria-hidden") === "true" &&
+          c.querySelector(".notes-excerpt-color-name")?.textContent === PBP_NOTES_COLOR_KEYS[item.color - 1];
+      }));
+    let localeThrew = null;
+    try {
+      window.uiLangToBCP47 = () => "not a tag!!";
+      _pbpNotesSelectRow("pbp_hl_times#x2");
+      window.uiLangToBCP47 = () => { throw new RangeError("bad tag"); };
+      _pbpNotesSelectRow("pbp_hl_times#x6");
+    } catch (e) { localeThrew = e; } finally { delete window.uiLangToBCP47; }
+    check("a malformed or throwing UI language never breaks the labels",
+      !localeThrew && excerpts().length === 6 && (labelOf("x2")?.querySelector(".notes-excerpt-time")?.textContent || "").length > 0,
+      String(localeThrew));
+
+    // -- the current excerpt and the highlighter --
+    check("exactly the opened highlight is the current excerpt, quoted in a blockquote; the others are jump buttons",
+      excerpts().filter((s) => s.getAttribute("aria-current") === "true").map(idOf).join(",") === "x6" &&
+      excerptOf("x6")?.querySelector(".notes-excerpt-body > blockquote.notes-excerpt-quote") &&
+      excerpts().filter((s) => idOf(s) !== "x6").every((s) => s.querySelector(`.notes-excerpt-body > button.notes-excerpt-jump[data-notes-key="${s.dataset.notesKey}"] > span.notes-excerpt-quote`)));
+    check("every quote sits inside a highlighter span of its own colour",
+      excerpts().every((s) => {
+        const item = store["pbp_hl_times"].items.find((it) => it.id === idOf(s));
+        return s.querySelector(`.notes-excerpt-quote > .lib-mark.notes-c${item.color}`)?.textContent === item.quote;
+      }));
+    check("each excerpt is a section named by its own label, and the label takes programmatic focus",
+      excerpts().every((s) => {
+        const label = s.querySelector(".notes-excerpt-label");
+        return s.tagName === "SECTION" && label && label.tagName === "H3" && label.tabIndex === -1 &&
+          label.id && s.getAttribute("aria-labelledby") === label.id && label.dataset.notesKey === s.dataset.notesKey;
+      }));
+
+    // -- same-page jump: no scroll reset, focus on the new current label --
+    document.body.classList.add("test-scroll-pane-tall");
+    _pbpNotesSelectRow("pbp_hl_times#x1");
+    pane.scrollTop = 120;
+    const before = pane.scrollTop;
+    const pr = pane.getBoundingClientRect();
+    const target = [...detail().querySelectorAll(".notes-excerpt-jump")].find((b) => {
+      const r = b.closest(".notes-excerpt").getBoundingClientRect();
+      return r.top >= pr.top + 8 && r.bottom <= pr.bottom - 40;
+    });
+    const targetId = target ? String(target.dataset.notesKey).split("#")[1] : null;
+    if (target) target.click();
+    const cur = detail().querySelector(':scope > .notes-excerpt[aria-current="true"]');
+    const curRect = cur ? cur.getBoundingClientRect() : null;
+    check("jumping to another highlight of the same page keeps the pane where it was and only brings the new current into view",
+      before > 0 && !!target && pane.scrollTop > 0 && cur && idOf(cur) === targetId &&
+      curRect.top >= pr.top - 1 && curRect.bottom <= pr.bottom + 1,
+      `before=${before} after=${pane.scrollTop} target=${targetId}`);
+    check("the jump hands focus to the new current excerpt's label",
+      !!cur && document.activeElement === cur.querySelector(".notes-excerpt-label"),
+      document.activeElement && (document.activeElement.className || document.activeElement.tagName));
+    document.body.classList.remove("test-scroll-pane-tall");
+
+    // -- a new current the list filter hides --
+    $id("notes-filter").value = "tie stored first";
+    $id("notes-filter").dispatchEvent(new Event("input"));
+    rowEl("pbp_hl_times#x4")?.querySelector(".notes-hit-btn").click();
+    detail().querySelector('.notes-excerpt-jump[data-notes-key="pbp_hl_times#x6"]')?.click();
+    check("a new current highlight the list filter hides leaves the list with no current row",
+      _pbpNotesSelectedKey === "pbp_hl_times#x6" && !document.querySelector("#notes-list .notes-hit[aria-current]") &&
+      rowKeys() === "pbp_hl_times#x4", rowKeys());
+    $id("notes-filter").value = "";
+    $id("notes-filter").dispatchEvent(new Event("input"));
+
+    // -- focus restore by data-notes-key, not by "first element with that class" --
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    detail().querySelector('.notes-excerpt-jump[data-notes-key="pbp_hl_times#x3"]')?.focus();
+    await _pbpNotesRefreshPreservingState();
+    check("a refresh puts focus back on the same excerpt's jump button, not the first one with that class",
+      document.activeElement?.dataset?.notesKey === "pbp_hl_times#x3" && document.activeElement.classList.contains("notes-excerpt-jump"),
+      document.activeElement && document.activeElement.outerHTML.slice(0, 160));
+
+    // -- hang labels (C >= 1000): stack when they do not fit (Review Focus 1) --
+    fixtureWidth(2400);
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    const wide = paneC() >= 1000;
+    const contentRight = (label) => label.getBoundingClientRect().right - parseFloat(getComputedStyle(label).paddingRight);
+    const spills = (label) => [...label.querySelectorAll("span")].some((s) => [...s.getClientRects()].some((r) => r.right > contentRight(label) + 0.5));
+    check("a label too wide for the 96px hang column stacks instead of spilling out of it",
+      wide && labelOf("x6")?.classList.contains("is-stacked") && excerpts().every((s) => !spills(s.querySelector(".notes-excerpt-label"))),
+      `C=${paneC()} ${labelOf("x6")?.className}`);
+    const quoteToNote = () => {
+      const s = excerptOf("x5");
+      const q = s?.querySelector(".notes-excerpt-quote")?.getBoundingClientRect();
+      const n = s?.querySelector(".notes-excerpt-note")?.getBoundingClientRect();
+      return q && n ? n.top - q.bottom : NaN;
+    };
+    check("a stacked label leaves the 8px between a quote and its note alone",
+      labelOf("x5")?.classList.contains("is-stacked") && Math.abs(quoteToNote() - 8) <= 0.5, String(quoteToNote()));
+    const inkBottom = (label) => Math.max(...[...label.querySelectorAll("span")].flatMap((sp) => [...sp.getClientRects()].map((r) => r.bottom)));
+    check("a stacked label that hangs below its excerpt still leaves 32px before the next one",
+      excerpts().some((s) => s.style.minHeight) &&
+      excerpts().every((s, i, all) => i === all.length - 1 ||
+        all[i + 1].getBoundingClientRect().top - inkBottom(s.querySelector(".notes-excerpt-label")) >= 32 - 0.5),
+      excerpts().map((s) => s.style.minHeight || "-").join(","));
+    t = (key, ...values) => (String(key).startsWith("hlColor") ? "Q" : realT(key, ...values));
+    document.dispatchEvent(new Event("pbp:i18n-applied"));
+    check("a language switch re-renders the labels and re-measures them: a label that fits stays on one line",
+      labelOf("x6")?.querySelector(".notes-excerpt-color-name")?.textContent === "Q" &&
+      !labelOf("x6").classList.contains("is-stacked") && labelOf("x2")?.classList.contains("is-stacked"),
+      `${labelOf("x6")?.className} | ${labelOf("x2")?.className}`);
+    const x2Day = labelOf("x2")?.querySelector(".notes-excerpt-date");
+    if (x2Day) x2Day.textContent = "";
+    const staleBefore = !!labelOf("x2")?.classList.contains("is-stacked");
+    document.documentElement.setAttribute("data-density", "compact");
+    await frames();
+    check("a density flip re-measures the hang labels",
+      staleBefore && !labelOf("x2")?.classList.contains("is-stacked"), labelOf("x2")?.className);
+    document.documentElement.removeAttribute("data-density");
+    await frames();
+    if (x2Day) x2Day.textContent = "a much longer stand-in for the day";
+    window.dispatchEvent(new Event("resize"));
+    await frames();
+    check("a window resize re-measures the hang labels too",
+      !!labelOf("x2")?.classList.contains("is-stacked"), labelOf("x2")?.className);
+    t = realT;
+    fixtureWidth(960);
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    check("below the hang width labels sit above their quote and never stack",
+      paneC() < 1000 && excerpts().length === 6 && getComputedStyle(excerpts()[0]).display !== "grid" &&
+      excerpts().every((s) => !s.querySelector(".notes-excerpt-label").classList.contains("is-stacked")),
+      `C=${paneC()}`);
+    // §11 V21: a narrow detail keeps the display sizes -- nothing shrinks.
+    const px = (el, prop) => (el ? parseFloat(getComputedStyle(el)[prop]) : NaN);
+    const sizeOf = (el) => px(el, "fontSize") + "/" + px(el, "lineHeight");
+    const curQ = excerptOf("x6")?.querySelector(".notes-excerpt-quote");
+    const otherQ = excerptOf("x1")?.querySelector(".notes-excerpt-quote");
+    const titleEl = detail().querySelector(".notes-detail-head > .notes-detail-source");
+    check("below the hang width the type keeps its sizes: title 32/40, current quote 26/42, the others 18/30",
+      sizeOf(titleEl) === "32/40" && sizeOf(curQ) === "26/42" && sizeOf(otherQ) === "18/30",
+      `${sizeOf(titleEl)} ${sizeOf(curQ)} ${sizeOf(otherQ)}`);
+
+    // -- an unbreakable 120-character title (Review Focus 4) --
+    _pbpNotesSelectRow("pbp_hl_longtitle#l1");
+    const narrowFits = pane.scrollWidth <= pane.clientWidth + 1;
+    fixtureWidth(2400);
+    const wideFits = pane.scrollWidth <= pane.clientWidth + 1;
+    fixtureWidth(960);
+    check("a 120-character unbreakable title wraps instead of scrolling the pane sideways",
+      narrowFits && wideFits, `${pane.scrollWidth} / ${pane.clientWidth}`);
+
+    // -- page head meta and the translated side --
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    const meta = detail().querySelector(".notes-detail-head > .notes-detail-meta");
+    const metaText = (cls) => meta?.querySelector(":scope > ." + cls)?.textContent;
+    check("the page head's meta reads site, page day and the page's highlight count",
+      metaText("notes-meta-site") === "times.example" && metaText("notes-meta-day") === day(pageTs) &&
+      metaText("notes-meta-pagecount") === "libraryPageCount:6" && !meta.querySelector(".notes-meta-lang"),
+      meta && meta.textContent);
+    _pbpNotesSelectRow("pbp_hl_times#x2");
+    check("a translated-side highlight adds its language to the meta and tags its own quote",
+      detail().querySelector(".notes-detail-meta > .notes-meta-lang")?.textContent === "de" &&
+      excerptOf("x2")?.querySelector(".notes-excerpt-quote")?.lang === "de" &&
+      excerptOf("x6")?.querySelector(".notes-excerpt-quote")?.lang === "",
+      detail().querySelector(".notes-detail-meta")?.textContent);
+
+    // -- the page delete --
+    const footer = detail().querySelector(":scope > .notes-detail-footer");
+    const footerDel = footer?.querySelector(".notes-detail-delete");
+    check("the page delete sits in a plain footer and hangs at the start of the main column",
+      !!footer && !footer.classList.contains("lib-section") && !!footerDel &&
+      footerDel.classList.contains("lib-hang-start") && footerDel.classList[footerDel.classList.length - 1] === "notes-detail-delete",
+      footer && footer.outerHTML.slice(0, 200));
+
+    // ---- T8 block cleanup ----
+    t = realT;
+    fixtureWidth(960);
+    delete store["pbp_hl_times"];
+    delete store["pbp_hl_longtitle"];
+    _pbpNotesRenderDetail(null);
+    await renderNotesPanel();
+  }
 
   // ---- search marking (textContent-only construction) ----
   $id("notes-filter").value = "beta";
@@ -312,7 +551,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     rowEl("pbp_hl_alpha#a2").querySelector("mark").textContent === "beta");
   rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-btn").click();
   check("matches are marked in the detail too",
-    !!detail().querySelector(".notes-detail-quote mark"));
+    !!detail().querySelector('.notes-excerpt[aria-current="true"] .notes-excerpt-quote mark'));
   $id("notes-filter").value = "script";
   $id("notes-filter").dispatchEvent(new Event("input"));
   const evilRow = rowEl("pbp_hl_alpha#a3");
@@ -323,9 +562,9 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     evilRow.innerHTML.slice(0, 200));
   check("highlight text that looks like markup stays text in the detail",
     !detail().querySelector("script") &&
-    detail().querySelector(".notes-detail-quote").textContent === "third alpha <script>alert(1)<\/script> highlight" &&
-    [...detail().querySelector(".notes-detail-quote").children].every((el) => el.tagName === "MARK"),
-    detail().querySelector(".notes-detail-quote").innerHTML);
+    currentQuote()?.textContent === "third alpha <script>alert(1)<\/script> highlight" &&
+    [...(currentQuote()?.querySelector(".lib-mark")?.children || [])].every((el) => el.tagName === "MARK"),
+    currentQuote()?.innerHTML);
   $id("notes-filter").value = "";
   $id("notes-filter").dispatchEvent(new Event("input"));
 
@@ -390,6 +629,36 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   await _pbpNotesRefreshPreservingState();
   check("a refresh keeps the list region's scroll position",
     refreshBefore > 0 && notesRegion.scrollTop === refreshBefore, `before=${refreshBefore} after=${notesRegion.scrollTop}`);
+  // The narrow round trip (T3c review carry-over): at <=860px opening a
+  // highlight takes the whole list pane off screen, so a refresh that lands
+  // meanwhile (a reader write in another tab) reads the region's scrollTop as
+  // 0 and rebuilds every row while it is hidden. Back to the list must still
+  // land where the user left it. test-narrow-hide stands in for the media
+  // query's display rule (the runner cannot resize the viewport).
+  {
+    notesRegion.scrollTop = 40;
+    const narrowBefore = notesRegion.scrollTop;
+    const realNarrowMode = _pbpNotesNarrowMode;
+    let hiddenDuringRefresh = false;
+    try {
+      document.body.classList.add("test-narrow-hide", "test-narrow-back");
+      _pbpNotesNarrowMode = () => true;
+      rowEl("pbp_hl_alpha#a1").querySelector(".notes-hit-btn").click();
+      store["pbp_hl_narrowwrite"] = { v: 1, url: "https://narrow.example/", title: "Narrow", items: [
+        { id: "n1", n: 1, quote: "written in another tab", color: 2, note: "", ts: 50 } ] };
+      hiddenDuringRefresh = getComputedStyle(document.querySelector(".notes-list-pane")).display === "none";
+      await _pbpNotesRefreshPreservingState();
+      detail().querySelector(".notes-detail-back").click();
+    } finally {
+      _pbpNotesNarrowMode = realNarrowMode;
+      document.body.classList.remove("test-narrow-hide", "test-narrow-back");
+    }
+    check("narrow: a refresh while the detail is open leaves the list where it was on the way back",
+      narrowBefore > 0 && hiddenDuringRefresh && !!rowEl("pbp_hl_narrowwrite#n1") && notesRegion.scrollTop === narrowBefore,
+      `before=${narrowBefore} after=${notesRegion.scrollTop} hidden=${hiddenDuringRefresh}`);
+    delete store["pbp_hl_narrowwrite"];
+    await _pbpNotesRefreshPreservingState();
+  }
   document.body.classList.remove("test-scroll-region");
 
   // ---- selection survives a refresh ----
@@ -410,7 +679,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     _pbpNotesSelectedKey === "pbp_hl_alpha#a2" &&
     rowEl("pbp_hl_alpha#a2").hasAttribute("aria-current") &&
     detail().hidden === false &&
-    detail().querySelector(".notes-detail-quote").textContent === "second alpha highlight about beta");
+    currentQuote()?.textContent === "second alpha highlight about beta");
   delete store["pbp_hl_gamma"];
   await _pbpNotesRefreshPreservingState();
 

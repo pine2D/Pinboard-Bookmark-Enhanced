@@ -3791,6 +3791,7 @@
   "libraryOpen": { "message": "Open notes and vocabulary" },
   "libraryDetailTitle": { "message": "Word details" },
   "libraryNotesDetailEmpty": { "message": "Pick a highlight from the list to read it in full." },
+  "libraryPageCount": { "message": "$COUNT$ on this page", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "Highlights and notes are stored on this device only and are not synced. To move them to another device, export a backup on the settings page and import it there." },
   "libraryNotesScopeOpenBackup": { "message": "Open backup settings" },
   "libraryRelookup": { "message": "Look up again" },

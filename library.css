@@ -540,7 +540,7 @@ html[data-theme] .confirm-popover { color: var(--lib-fg); background: var(--lib-
 html[data-theme] .confirm-popover .confirm-no { color: var(--lib-fg); border-color: var(--lib-border); background: none; }
 html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-hover); }
 
-/* ---- Notes tab (ported from options.css; note-dot colors match md-preview's
+/* ---- Notes tab (ported from options.css; the colour dots match md-preview's
    5-color highlight tokens). --opt-sp-N spacing tokens are mapped to the
    --lib-sp-N step with the SAME pixel value (library's 5-step scale is a
    subset of options' 7-step scale) rather than by index; values with no
@@ -768,31 +768,12 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
   outline-offset: 2px;
   box-shadow: var(--lib-focus-ring);
 }
-/* Same 10px mark as options' .wayback-log-url .ext-icon -- both are a link
-   label followed by an icon glyph, not a button. There is no `.btn
-   .ext-icon` sibling rule on this surface (removed 2026-09-22, Ruling 23
-   carry-over: zero .btn consumers in library.html/js -- grep-proven, both
-   .ext-icon consumers are the plain <a> links below). `.notes-row-open`'s
-   gap (above) now supplies its icon's spacing, so only the detail-source
-   sibling still needs its own margin-left. */
-.notes-detail-source .ext-icon {
-  width: 10px;
-  height: 10px;
-  vertical-align: -1px;
-  margin-left: var(--lib-sp-1);
-}
 .notes-row-open .ext-icon {
   width: 10px;
   height: 10px;
   flex: none;
 }
-.notes-unknown-hint { font-size: 11px; color: var(--lib-fg-muted); margin: var(--lib-sp-2) 0 0 0; }
-.note-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: var(--lib-sp-1); }
-.note-dot.c1 { background: var(--lib-note-c1, #facc15); }
-.note-dot.c2 { background: var(--lib-note-c2, #4ade80); }
-.note-dot.c3 { background: var(--lib-note-c3, #60a5fa); }
-.note-dot.c4 { background: var(--lib-note-c4, #f87171); }
-.note-dot.c5 { background: var(--lib-note-c5, #c084fc); }
+.notes-unknown-hint { margin: var(--lib-sp-2) 0 0; font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); color: var(--lib-fg-muted); }
 /* The list regions' notices: no words / no matches / signed out on the
    vocabulary side (#vocab-empty, #vocab-no-results, #vocab-no-account), no
    highlights and the scope note on the notes side (#notes-empty,
@@ -1045,14 +1026,15 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
    sticky offset -- the page is one surface (§2.1). 16 of start padding with
    an equal negative margin keeps the text axis on P + L + G while giving
    hanging buttons, highlighter ends and focus glows room the scroller would
-   otherwise clip (§11 I11); P at the end, 96 at the bottom. Until T8's
-   .notes-sheet the content is one column that starts on that axis -- never
-   centred (§0.2). */
+   otherwise clip (§11 I11); P at the end, 96 at the bottom. One full-width
+   track: .notes-sheet lays out its own columns by the pane's width (spec
+   §5.2), starting on that axis -- never centred (§0.2). The empty state
+   keeps the main column's cap until T8d's cover replaces it. */
 .notes-detail-pane {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, var(--lib-main-max));
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -1063,8 +1045,7 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   font-size: 15px;
   line-height: 1.65;
 }
-.notes-detail-empty { color: var(--lib-fg-hint); padding: var(--lib-sp-5) 0; text-align: center; }
-.notes-detail-pane .notes-meta-chip { font-size: 12px; line-height: normal; }
+.notes-detail-empty { max-width: var(--lib-main-max); color: var(--lib-fg-hint); padding: var(--lib-sp-5) 0; text-align: center; }
 /* Detail-pane primitives (COMPONENTS.md §10.2), two shapes:
    .lib-section  a section of the pane's flow: one rung of air above and an
                  sp-3 lead-in. No rule: on the flat page sections are divided
@@ -1072,80 +1053,174 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
    .lib-block    a prose block in the pane's flow: sp-3 above and below. */
 .lib-section { margin-top: var(--lib-sp-4); padding-top: var(--lib-sp-3); }
 .lib-block { margin: var(--lib-sp-3) 0; }
-.notes-detail-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--lib-sp-2); margin-bottom: var(--lib-sp-3); }
-/* Read as body text at rest (D4: a link-blue title over-signalled "this is
-   the important thing" when its only job is attribution); underline only
-   surfaces on interaction. `.notes-detail-source` is also a bare <span> when
-   the page has no safe href (library-notes.js:670-688) -- the hover/focus
-   rule is scoped to the <a> case only so that non-interactive fallback never
-   gains an underline that would imply it's clickable. */
+/* ---- Notes detail (spec docs/superpowers/specs/2026-10-03-library-redesign-
+   design.md §5): one source page read as a continuous flow of its
+   highlights, oldest first. Hierarchy is type size and position only -- no
+   panel, card, rule or tint (10-03 user ruling): the current excerpt is
+   26/42, the others 18/30, and every quote wears the same half-height
+   highlighter. Columns follow the detail pane's container width C
+   (container lib-detail): below 1000 one column, each label above its quote;
+   from 1000 a 112px hang column for the labels, 16 short of the text axis.
+   The page-level "this page" column for C >= 1200 is a separate block. ---- */
+#notes-detail[hidden] { display: none; }
+.notes-sheet {
+  display: grid;
+  grid-template-columns: minmax(0, var(--lib-excerpt-max));
+  justify-content: start;
+  align-items: start;
+}
+.notes-sheet > .notes-detail-back { grid-column: 1 / -1; justify-self: start; }
+.notes-sheet > .notes-detail-head,
+.notes-sheet > .notes-detail-footer { grid-column: 1; min-width: 0; }
+.notes-sheet > .notes-excerpt { grid-column: 1 / -1; min-width: 0; margin-top: var(--lib-sp-6); }
+.notes-sheet > .notes-detail-head + .notes-excerpt { margin-top: var(--lib-sp-7); }
+.notes-sheet > .notes-detail-footer { margin-top: var(--lib-sp-7); }
+@container lib-detail (min-width: 1000px) {
+  .notes-sheet { grid-template-columns: var(--lib-hang-w) minmax(0, var(--lib-excerpt-max)); }
+  .notes-sheet > .notes-detail-head,
+  .notes-sheet > .notes-detail-footer { grid-column: 2; }
+  .notes-sheet > .notes-excerpt { grid-column: 1 / 3; display: grid; grid-template-columns: subgrid; align-items: baseline; }
+  .notes-excerpt > .notes-excerpt-label { grid-column: 1; margin-bottom: 0; justify-content: flex-end; text-align: end; padding-inline-end: var(--lib-sp-4); }
+  .notes-excerpt > .notes-excerpt-body { grid-column: 2; }
+}
+
+/* Page head (§5.3). The title's first line is pulled up by half its leading
+   (§6.5), never more: CJK and accented capitals must not be clipped by the
+   pane's top edge. Body text at rest, underline on interaction (D4). */
+.notes-detail-head { min-width: 0; }
 .notes-detail-source {
+  --fs: 32px;
+  --lh: 40px;
+  margin: calc((var(--fs) - var(--lh)) / 2) 0 0;
+  font-size: var(--fs);
+  line-height: var(--lh);
   font-weight: bold;
   color: var(--lib-fg);
-  text-decoration: none;
-  /* Flex item of .notes-detail-head above; default `min-width: auto` pins
-     the floor to the title's min-content size, which for an unbreakable run
-     (no spaces -- a URL-as-title, a hash) is its full intrinsic width, and
-     `flex-wrap: wrap` only moves whole ITEMS to a new line, it cannot break
-     inside one. Probed during the 2026-09-22 T2 fix round (paneFit): an
-     unbreakable synthetic title reproduced the same overflow class as
-     .notes-row-open's (704px paneScroll / 728px past the pane's right edge
-     at 900px) even though the seeded real fixture's spaced title never
-     trips it today. */
+  text-wrap: balance;
   min-width: 0;
   overflow-wrap: anywhere;
 }
-a.notes-detail-source:hover,
-a.notes-detail-source:focus-visible {
-  text-decoration: underline;
-}
-/* Same focus recipe as .notes-row-open above / the dictionary pane's
-   .xp-dict-more / .xp-dict-lemma-link (Ruling 23 carry-over). Scoped to the
-   <a> variant only, same as the hover/focus underline rule above it -- the
-   <span> fallback (no safe href) is never focusable. */
-a.notes-detail-source:focus-visible {
+.notes-detail-source:not(:lang(zh)):not(:lang(ja)):not(:lang(ko)) { letter-spacing: -0.01em; }
+.notes-detail-link { color: var(--lib-fg); text-decoration: none; }
+.notes-detail-link:hover,
+.notes-detail-link:focus-visible { text-decoration: underline; }
+.notes-detail-link:focus-visible {
   outline: 1px solid var(--lib-accent);
   outline-offset: 2px;
   box-shadow: var(--lib-focus-ring);
 }
-.notes-detail-quote {
-  margin: 0;
-  white-space: pre-wrap;
-  /* Same break policy the list side already applies to this exact quote
-     (.notes-hit-text): a highlight can carry an unbreakable run -- a data
-     URI, a hash, a long identifier -- and the pane's `minmax(0, 66ch)` column
-     shrinks rather than widening, so without this the run paints straight
-     through the pane's border instead of wrapping. */
+.notes-detail-link .ext-icon { width: 20px; height: 20px; margin-left: var(--lib-sp-2); vertical-align: -1px; color: var(--lib-fg-muted); }
+.notes-detail-meta {
+  margin: var(--lib-sp-2) 0 0;
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+  color: var(--lib-fg-muted);
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-.notes-detail-note { margin: var(--lib-sp-3) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--lib-fg-muted); }
-.notes-detail-sib-title {
+.notes-detail-meta > span + span::before { content: "\00a0·\00a0"; }
+
+/* Excerpt label (§5.4): "14:12 ● Quote", the day too when it is not the
+   page's own. Stacked (JS-measured, _pbpNotesStackLabels) it keeps the height
+   of one line and lets the extra lines hang below. */
+.notes-excerpt-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: var(--lib-sp-2);
   margin: 0 0 var(--lib-sp-2);
-  font-size: 12px; line-height: normal; font-weight: 600;
-  letter-spacing: 0.04em; text-transform: uppercase;
+  font-size: var(--lib-text-meta);
+  line-height: var(--lib-lh-meta);
+  font-weight: normal;
   color: var(--lib-fg-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.notes-sib {
-  display: flex; align-items: center; gap: var(--lib-sp-2);
-  width: 100%;
+.notes-excerpt-label > * { flex: none; }
+.notes-excerpt-label:focus-visible {
+  outline: 1px solid var(--lib-accent);
+  outline-offset: 2px;
+  box-shadow: var(--lib-focus-ring);
+}
+.notes-excerpt-color { display: inline-flex; align-items: baseline; gap: var(--lib-sp-1); max-width: 100%; }
+.notes-excerpt-color > .notes-hit-dot { flex: none; margin-top: 0; }
+.notes-excerpt-label.is-stacked {
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-end;
+  row-gap: 0;
+  height: var(--lib-lh-meta);
+  white-space: normal;
+}
+.notes-excerpt-label.is-stacked .notes-excerpt-color-name { min-width: 0; overflow-wrap: anywhere; hyphens: auto; text-align: end; }
+
+/* Quotes: the current one is the loudest thing on the page by size alone. */
+.notes-excerpt-body { min-width: 0; }
+.notes-excerpt-quote {
+  display: block;
+  margin: 0;
+  font-size: 18px;
+  line-height: 30px;
+  color: var(--lib-fg);
+  text-wrap: pretty;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.notes-excerpt[aria-current="true"] .notes-excerpt-quote { font-size: 26px; line-height: 42px; }
+/* Another highlight of the same page: the whole quote is the button. Its
+   inset is cancelled by an equal negative margin, so the text keeps the axis
+   and only the hover fill reaches past it. */
+.notes-excerpt-jump {
+  display: block;
+  width: calc(100% + 2 * var(--lib-sp-2));
+  margin: calc(-1 * var(--lib-sp-1)) calc(-1 * var(--lib-sp-2));
   padding: var(--lib-sp-1) var(--lib-sp-2);
   border: 0;
-  border-radius: var(--lib-radius-sm);
+  border-radius: var(--lib-radius-md);
   background: transparent;
   color: inherit;
-  font-size: 13px; line-height: normal;
-  text-align: left; cursor: pointer;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: start;
+  cursor: pointer;
 }
-html.motion-ready .notes-sib { transition: background-color var(--motion-state) ease; }
-.notes-sib:hover { background: color-mix(in srgb, var(--lib-fg) 5%, var(--lib-bg)); }
-/* Press feedback (Emil review, Task 5): every other pressable row in this file
-   has one (.notes-hit-btn:active, .notes-card-top:active) -- this jump button
-   was the one left silent. Same instant color-mix + transition-duration:0
-   recipe, not the .btn family's scale(0.97): a row button, not a dialog action. */
-.notes-sib:active { background: color-mix(in srgb, var(--lib-fg) 9%, var(--lib-bg)); transition-duration: 0s; }
-.notes-sib:focus-visible { outline: 2px solid var(--lib-focus-bd); outline-offset: -2px; box-shadow: none; }
-.notes-sib .note-dot { margin-top: 0; }
-.notes-sib-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html.motion-ready .notes-excerpt-jump { transition: background-color var(--motion-state) ease; }
+.notes-excerpt-jump:hover { background: var(--lib-row-bg-hover); }
+.notes-excerpt-jump:focus-visible { outline: 2px solid var(--lib-focus-bd); outline-offset: -2px; box-shadow: none; }
+.notes-excerpt-note {
+  display: flex;
+  gap: var(--lib-sp-2);
+  margin: var(--lib-sp-2) 0 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--lib-fg);
+  text-wrap: pretty;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.notes-note-ic { flex: none; display: inline-flex; margin-top: var(--lib-sp-1); color: var(--lib-fg-muted); }
+.notes-note-ic svg { width: 14px; height: 14px; }
+.notes-excerpt-note-text { min-width: 0; }
+
+/* Highlighter (§5.4 / §6.4): the lower half of the line, both ends slightly
+   past the glyphs (padding cancelled by margin, so the text does not move),
+   cloned on every wrapped line. The colours are composer roles capped to keep
+   --lib-fg at 4.5:1 on the composite. */
+.lib-mark {
+  background: linear-gradient(transparent 0 48%, var(--hl-mark) 48% 88%, transparent 88%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0 var(--lib-sp-0);
+  margin: 0 calc(-1 * var(--lib-sp-0));
+}
+.lib-mark.notes-c1 { --hl-mark: var(--lib-note-mark-c1); }
+.lib-mark.notes-c2 { --hl-mark: var(--lib-note-mark-c2); }
+.lib-mark.notes-c3 { --hl-mark: var(--lib-note-mark-c3); }
+.lib-mark.notes-c4 { --hl-mark: var(--lib-note-mark-c4); }
+.lib-mark.notes-c5 { --hl-mark: var(--lib-note-mark-c5); }
+@media (forced-colors: active) {
+  .lib-mark { background: none; text-decoration: underline 2px; text-underline-offset: 2px; }
+}
 /* Back button default state: hidden by default, shown only at narrow widths.
    Order is load-bearing: this rule must come BEFORE the media query so that
    the media query's inline-flex can override it via cascade (same 0,1,0
@@ -1317,18 +1392,16 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
 /* Closing action row. The vocabulary one is the detail's tail since the
    library redesign (T7a, spec §4.7): delete hung on the left, the status
    sentence, Save at the right end -- "Look up again" moved under the
-   dictionary result. The notes footer keeps the older shape (delete pushed
-   right) until T8. */
+   dictionary result. The notes footer is the page delete alone, hung at the
+   start of the main column (T8, spec §5.6). */
 .vocab-detail-footer,
 .notes-detail-footer {
   display: flex;
   align-items: center;
   gap: var(--lib-sp-2);
 }
-/* The vocabulary tail reads delete | air | status | Save (spec §4.7); the
-   notes footer keeps its delete on the right until T8 rebuilds that pane. */
+/* The vocabulary tail reads delete | air | status | Save (spec §4.7). */
 .vocab-detail-footer > .vocab-detail-delete { margin-inline-end: auto; }
-.notes-detail-footer > .notes-detail-delete { margin-left: auto; }
 /* Below the two-pane threshold the list pane is taken off the page while a
    detail is open, so the delete-failure live region follows the pressed
    control into this row (_pbpNotesStatusHost in library-notes.js,

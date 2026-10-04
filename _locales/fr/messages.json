@@ -3797,6 +3797,7 @@
   "libraryOpen": { "message": "Ouvrir le bloc-notes et le vocabulaire" },
   "libraryDetailTitle": { "message": "Détails du mot" },
   "libraryNotesDetailEmpty": { "message": "Choisissez un surlignage dans la liste pour le lire en entier." },
+  "libraryPageCount": { "message": "$COUNT$ sur cette page", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "Les surlignages et les notes sont stockés uniquement sur cet appareil et ne sont pas synchronisés. Pour les transférer sur un autre appareil, exportez une sauvegarde depuis la page des paramètres, puis importez-la sur celui-ci." },
   "libraryNotesScopeOpenBackup": { "message": "Ouvrir les paramètres de sauvegarde" },
   "libraryRelookup": { "message": "Chercher à nouveau" },

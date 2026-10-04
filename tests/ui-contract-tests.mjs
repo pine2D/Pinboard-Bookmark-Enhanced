@@ -1100,10 +1100,10 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
     return !!rule && parseDeclarations(rule.body)
       .some((d) => d.property === "color" && /--lib-fg(?![\w-])/.test(d.value));
   };
-  const sourceLinkSelectors = [".notes-detail-source", ".notes-row-open"];
+  const sourceLinkSelectors = [".notes-detail-source", ".notes-detail-link", ".notes-row-open"];
   const missing = sourceLinkSelectors.filter((s) => !usesLibFg(s));
   check(missing.length === 0,
-    "library.css: .notes-detail-source/.notes-row-open no longer read --lib-fg for their resting text color (D4: source links read as body text with hover-only underline, not the page link color) -- missing: " + missing.join(", "));
+    "library.css: .notes-detail-source/.notes-detail-link/.notes-row-open no longer read --lib-fg for their resting text color (D4: source links read as body text with hover-only underline, not the page link color) -- missing: " + missing.join(", "));
 }
 
 check(/id="vocab-no-account"[^>]*role="region"[^>]*aria-labelledby="vocab-no-account-title"/.test(libraryHtml) &&
@@ -2514,7 +2514,7 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
   // The reading measure belongs to the detail column, not to each child: a
   // child that carries its own cap re-creates the left-hugging prose the pane
   // column replaced.
-  const paneChildCaps = (libraryCss.match(/\.(notes-detail-quote|notes-detail-note|vocab-detail-gloss|vocab-detail-context|vocab-context-quote|vocab-note-edit|vocab-note-input)\b[^{}]*\{[^}]*max-width:\s*6[68]ch/g) || []);
+  const paneChildCaps = (libraryCss.match(/\.(notes-excerpt-quote|notes-excerpt-note|vocab-detail-gloss|vocab-detail-context|vocab-context-quote|vocab-note-edit|vocab-note-input)\b[^{}]*\{[^}]*max-width:\s*6[68]ch/g) || []);
   check(paneChildCaps.length === 0,
     `library.css: per-child reading-measure caps are back inside the detail panes — the detail column already sets the measure: ${paneChildCaps.join(" | ")}`);
   // Prose that keeps its own newlines (`white-space: pre-wrap`) sits in a
@@ -2528,14 +2528,13 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
     .map(([, sel]) => sel.trim().split("\n").pop().trim());
   check(unbrokenProse.length === 0,
     `library.css: a pre-wrap prose rule declares no break policy — inside the detail column an unbreakable run overflows the pane instead of wrapping: ${unbrokenProse.join(" | ")}`);
-  // Both panes end the same way: one closing row, destructive action pushed
-  // to its right end. (The footers' class names move off .lib-section in T7 /
-  // T8, which rewrite the two className halves of this check.)
+  // The vocabulary tail: delete first, air pushing the rest to the right end
+  // (spec §4.7). The notes footer's own shape -- the page delete alone, hung
+  // at the main column's start, off .lib-section -- is pinned in the T8 block
+  // at the end of this file (spec §5.6).
   check(/\.vocab-detail-footer > \.vocab-detail-delete \{ margin-inline-end: auto; \}/.test(libraryCss) &&
-    /\.notes-detail-footer > \.notes-detail-delete \{ margin-left: auto; \}/.test(libraryCss) &&
-    /footer\.className = "vocab-detail-footer";/.test(libraryVocabJs) &&
-    /footer\.className = "lib-section notes-detail-footer"/.test(read("library-notes.js")),
-    "library.css/library-{vocab,notes}.js: the detail panes' shared closing action row is gone or asymmetric");
+    /footer\.className = "vocab-detail-footer";/.test(libraryVocabJs),
+    "library.css/library-vocab.js: the vocabulary detail's closing action row is gone or lost its delete-first shape");
 }
 // Flat canvas (library redesign 2026-10-03, user ruling: "不要用色块分隔，
 // 强行制造视觉束缚分区"): the page skeleton paints nothing of its own -- no
@@ -9338,6 +9337,29 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     privacy.includes("opening a saved word on the Notes & Vocabulary page can also look it up automatically") &&
     !privacy.includes("The lookup is never contacted automatically or in the background"),
     "docs/privacy.md: the Free Dictionary API passages no longer describe open-to-look-up (spec §4.10; the Summary, Network Requests, Permissions and Third-Party change with the code)");
+}
+
+// ---- T8 notes detail (spec docs/superpowers/specs/2026-10-03-library-
+// redesign-design.md §5). Static wiring the render oracle and the test page
+// cannot see on their own. ----
+{
+  const notesJs = read("library-notes.js");
+  const hand = stripGeneratedRegions(libraryCss);
+  check(/\n\.notes-sheet \{\n  display: grid;\n  grid-template-columns: minmax\(0, var\(--lib-excerpt-max\)\);/.test(hand) &&
+    /@container lib-detail \(min-width: 1000px\) \{\n  \.notes-sheet \{ grid-template-columns: var\(--lib-hang-w\) minmax\(0, var\(--lib-excerpt-max\)\); \}/.test(hand),
+    "library.css: the notes sheet lost its one-column (C < 1000) or hang-column (C >= 1000) template -- spec §5.2");
+  check(!/_pbpNotesFormatDate/.test(notesJs) && !/notes-sib\b/.test(notesJs) && !/\.notes-sib\b/.test(hand),
+    "library-notes.js/library.css: the retired date helper or the old same-page jump list is back -- every date goes through pbpLibFormatDay/Time (spec §5.3) and the page's other highlights are excerpts (§5.4)");
+  check([1, 2, 3, 4, 5].every((n) => hand.includes(`.lib-mark.notes-c${n} { --hl-mark: var(--lib-note-mark-c${n}); }`)) &&
+    /\.lib-mark \{\n  background: linear-gradient\(transparent 0 48%, var\(--hl-mark\) 48% 88%, transparent 88%\);/.test(hand) &&
+    /@media \(forced-colors: active\) \{\n  \.lib-mark \{ background: none; text-decoration: underline 2px; text-underline-offset: 2px; \}/.test(hand),
+    "library.css: the highlighter no longer reads the composer's capped --lib-note-mark-cN, lost its half-height band, or lost its forced-colours underline (spec §5.4 / §6.4 / §7.3)");
+  check(!/\.notes-detail-footer > \.notes-detail-delete[^{]*\{[^}]*margin-left:\s*auto/.test(libraryCss) &&
+    /footer\.className = "notes-detail-footer"/.test(notesJs) && !/lib-section notes-detail-footer/.test(notesJs),
+    "library.css/library-notes.js: the notes footer delete is pushed right again or the footer is back on .lib-section -- it hangs at the start of the main column (spec §5.6)");
+  check((notesJs.match(/className = "btn btn-sm danger ghost lib-hang-start notes-detail-delete"/g) || []).length === 1 &&
+    /function _pbpNotesRefreshPreservingState[\s\S]*?data-notes-key/.test(notesJs),
+    "library-notes.js: the page delete lost its identity class in the last position, or the refresh stopped finding excerpt controls by data-notes-key (spec §5.1)");
 }
 
 if (fail.length) {
