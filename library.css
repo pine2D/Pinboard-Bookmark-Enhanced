@@ -986,9 +986,11 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
    radius down: .notes-hit-btn takes `border-radius: inherit`, so a wrapper
    with no radius of its own would square off every row. */
 .notes-hit-cell { border-radius: inherit; }
-/* A failed delete, pinned to the row it happened on. is-error always lands
-   on the CURRENT row (library-notes.js), and S2 gave that row no marker of
-   its own, so the failure fill has to out-rank every state it can meet --
+/* A failed delete, pinned to the row it happened on. is-error lands on
+   the row being acted on (library-notes.js) -- the current row when the
+   action starts, which may stop being current while the mark stays -- and
+   S2 gives a row no marker of its own, so the failure fill has to out-rank
+   every state it can meet, current or not --
    one class more than each (spec §3.10; tests/ui-contract-tests.mjs checks
    every pair with selectorSpecificity). The bare first selector covers a
    failed row that is not current; the two .is-error.selected selectors cover
@@ -2526,9 +2528,11 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
 .vocab-card.selected .vocab-row-groups,
 .vocab-card.selected .notes-row-meta,
 .vocab-card.selected .row-del-x:not(:hover) { color: var(--lib-row-selected-fg); }
-/* A failed save / delete, pinned to the row it happened on. is-error always
-   lands on the CURRENT row (library-vocab.js), and S2 gave that row no marker
-   of its own, so the failure fill has to out-rank every state it can meet --
+/* A failed save / delete, pinned to the row it happened on. is-error lands
+   on the row being acted on (library-vocab.js) -- the current row when the
+   action starts, which may stop being current while the mark stays -- and
+   S2 gives a row no marker of its own, so the failure fill has to out-rank
+   every state it can meet, current or not --
    one class more than each (spec §3.10; tests/ui-contract-tests.mjs checks
    every pair with selectorSpecificity). The bare first selector covers a
    failed row that is not current; the two .is-error.selected selectors cover

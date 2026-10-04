@@ -1022,35 +1022,18 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
   check(inkBad.length === 0,
     "library.css: a row text / delete-X ink no longer follows its state (current -> --lib-row-current-fg-muted, selected -> --lib-row-selected-fg; spec §3.8 / §7.5):\n    " + inkBad.join("\n    "));
   // .lib-toggle's unpressed hover reads the plain row hover fill (spec §3.2).
-  // Bracket-aware (closeOfBracket): `:not(...)` goes whole, so a negated
-  // [aria-pressed="true"] does not read as a pressed toggle; every other
-  // functional pseudo-class (:is / :where / :has) keeps its name but loses
-  // its argument, so the comma-space or combinator INSIDE `:is(.a, .b)` is
-  // not taken for a combinator of the selector itself.
-  // keepArgs: drop only the :not() groups and leave every other argument in
-  // place -- the form the pressed-state test reads, so a positive
-  // `:is([aria-pressed="true"])` still counts as pressed.
-  const stripPseudoArgs = (s, keepArgs = false) => {
-    let out = "";
-    for (let i = 0; i < s.length; i += 1) {
-      const fn = /^:(not|is|where|has)\(/.exec(s.slice(i));
-      if (fn && (fn[1] === "not" || !keepArgs)) {
-        const close = closeOfBracket(s, i + fn[0].length - 1);
-        if (fn[1] !== "not") out += `:${fn[1]}()`;
-        i = close;
-        continue;
-      }
-      if (s[i] === "[") { const close = closeOfBracket(s, i); out += s.slice(i, close + 1); i = close; continue; }
-      out += s[i];
-    }
-    return out;
-  };
   // Any non-forced context: T4 may have wrapped the hover in @media (hover: hover).
   // Subject = the toggle itself (one compound, no combinator): the companion
   // `.lib-toggle:hover:not(...) .lib-toggle-count` rule only re-inks the count.
+  // Two readings of each selector (stripPseudoArgs below): `flat` has every
+  // functional pseudo-class argument gone, so a space, `+` or comma inside
+  // :is(.a, .b) or :nth-child(2n + 1) is not taken for a combinator of the
+  // selector itself; `positive` drops only the :not() groups, so a :hover or
+  // a pressed state written inside :is() / :where() still counts.
   const toggleHoverRules = (css) => handRules(css).filter((r) => r.selectors.some((s) => {
     const flat = stripPseudoArgs(s).trim();
-    return s.startsWith(".lib-toggle") && flat.includes(":hover") && !/[\s>+~]/.test(flat) && !stripPseudoArgs(s, true).includes('[aria-pressed="true"]');
+    const positive = stripPseudoArgs(s, { keepArgs: true });
+    return s.startsWith(".lib-toggle") && positive.includes(":hover") && !/[\s>+~]/.test(flat) && !positive.includes('[aria-pressed="true"]');
   }));
   const paintsRowHover = (r) => parseDeclarations(r.body).some((d) => /^background(?:-color)?$/.test(d.property) && d.value === "var(--lib-row-bg-hover)");
   // Discrimination: an :is() list on the subject compound is still the
@@ -1061,10 +1044,17 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
     ".lib-toggle:hover:not(.x, .y) .lib-toggle-count { color: red; }",
     '.lib-toggle:hover:is([aria-pressed="true"]) { background: red; }',
     ".lib-toggle:hover:where(.a > .b):not(:disabled) { background: var(--lib-row-bg-hover); }",
+    // Any functional pseudo-class, not only the four logical ones: the
+    // spaces and `+` inside :nth-child(2n + 1) are not combinators either.
+    ".lib-toggle:hover:nth-child(2n + 1) { background: var(--lib-btn-hover); }",
+    // A :hover written inside :is() is still the toggle's hover.
+    ".lib-toggle:is(:hover) { background: var(--lib-btn-hover); }",
   ].join("\n");
-  const sampled = toggleHoverRules(toggleSamples).map((r) => r.selectorText);
-  check(sampled.length === 2 && sampled[0] === ".lib-toggle:hover:is(.a, .b)" && sampled[1].startsWith(".lib-toggle:hover:where(") &&
-    !paintsRowHover(toggleHoverRules(toggleSamples)[0]) && paintsRowHover(toggleHoverRules(toggleSamples)[1]),
+  const sampledRules = toggleHoverRules(toggleSamples);
+  const sampled = sampledRules.map((r) => r.selectorText);
+  const SAMPLED_WANT = [".lib-toggle:hover:is(.a, .b)", ".lib-toggle:hover:where(.a > .b):not(:disabled)", ".lib-toggle:hover:nth-child(2n + 1)", ".lib-toggle:is(:hover)"];
+  check(sampled.join(" | ") === SAMPLED_WANT.join(" | ") &&
+    sampledRules.map(paintsRowHover).join(",") === "false,true,false,false",
     "ui-contract-tests.mjs: the .lib-toggle hover scan no longer reads a functional pseudo-class's argument as part of the subject compound -- got " + sampled.join(" | "));
   const toggleHover = toggleHoverRules(libraryCss);
   check(toggleHover.length > 0 && toggleHover.every(paintsRowHover),
@@ -2257,13 +2247,26 @@ check(isValueBoxSelector('.fg input:not([type="checkbox"])') && isValueBoxSelect
   cmpSpecificity(selectorSpecificity("#opt-custom-css.over-limit"), [1, 1, 0]) === 0 &&
   cmpSpecificity(selectorSpecificity(".x:where(.a .b) p::before"), [0, 1, 2]) === 0,
   "ui-contract-tests.mjs: the B+ value-box selector model (subject compound / :is() arguments / ids / specificity) no longer discriminates");
-// Drops every :not(...) argument (nested parentheses included) from ONE
-// complex selector, so "is this a focus rule?" can be asked of the positive
-// part only. `closeOfBracket` is css-syntax.mjs's shared bracket matcher.
-function stripNotArgs(selector) {
+// Functional pseudo-class arguments, removed from ONE complex selector so a
+// gate can ask about its positive, top-level part. Bracket-aware throughout
+// (css-syntax.mjs's shared closeOfBracket), so nested parentheses and quoted
+// attribute values ([title="a (b)"]) never end a group early.
+// - default: every :not(...) goes whole; every other function (:is, :where,
+//   :has, :nth-child, :lang, :dir, ...) keeps its name and loses its
+//   argument -- the form to look for combinators in;
+// - keepArgs: only the :not(...) groups go; every other argument stays, so a
+//   :hover or :focus-visible written inside :is() / :has() still reads as
+//   positive (a :not() nested inside one is still dropped).
+function stripPseudoArgs(selector, { keepArgs = false } = {}) {
   let out = "";
   for (let i = 0; i < selector.length; i += 1) {
-    if (selector.startsWith(":not(", i)) { i = closeOfBracket(selector, i + 4); continue; }
+    if (selector[i] === "[") { const close = closeOfBracket(selector, i); out += selector.slice(i, close + 1); i = close; continue; }
+    const fn = /^:([a-z-]+)\(/i.exec(selector.slice(i, i + 64));
+    if (fn) {
+      const name = fn[1].toLowerCase();
+      if (name === "not") { i = closeOfBracket(selector, i + fn[0].length - 1); continue; }
+      if (!keepArgs) { out += `:${fn[1]}()`; i = closeOfBracket(selector, i + fn[0].length - 1); continue; }
+    }
     out += selector[i];
   }
   return out;
@@ -2327,7 +2330,7 @@ function focusShapeOffenders(css, ns) {
     // 2026-10-03-library-redesign §7.3), not a focus adaptation. Normal-mode
     // rules keep the old trigger test, so nothing outside forced colours
     // drops out of this scan.
-    const trigger = forcedColors ? stripNotArgs(selector) : selector;
+    const trigger = forcedColors ? stripPseudoArgs(selector, { keepArgs: true }) : selector;
     if (!/:focus-visible/.test(trigger) && !(forcedColors && /:focus-within\b/.test(trigger))) continue;
     if (FOCUS_SHAPE_EXEMPT.ring.some(re => re.test(selector))) continue;
     const BORDERED_CORES = coresFor(selector), INSET_CORES = BORDERED_CORES, coreRe = coreReFor(BORDERED_CORES);
