@@ -1929,7 +1929,7 @@ function auditLibraryThemes(cssPath) {
 const LIB_ROW_HIGHLIGHT_FILLS = ["row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover", "row-band-current-bg", "row-band-current-bg-hover"];
 const LIB_ROW_FOCUS_WARN_FILLS = ["row-current-bg", "row-band-current-bg", "row-band-current-bg-hover", "row-band-bg"];
 function auditLibraryRowStates(theme, get) {
-  const need = ["fg-muted", "focus-bd", "row-bg-hover", "row-selected-fg", "row-current-fg-muted", ...LIB_ROW_HIGHLIGHT_FILLS];
+  const need = ["fg-muted", "btn-fg", "focus-bd", "row-bg-hover", "row-selected-fg", "row-current-fg-muted", ...LIB_ROW_HIGHLIGHT_FILLS];
   const missing = need.filter((k) => !isHex(get(k) ?? ""));
   if (missing.length) {
     const line = "  " + "library".padEnd(10) + " " + theme.padEnd(20) + " " + "row states".padEnd(28) + " FAIL (missing or non-hex: " + missing.map((k) => `--lib-${k}`).join(", ") + ")";
@@ -1941,6 +1941,8 @@ function auditLibraryRowStates(theme, get) {
   for (const fill of LIB_ROW_HIGHLIGHT_FILLS) console.log(check("library", theme, `row-selected-fg vs ${fill}`, cr(rgb("row-selected-fg"), rgb(fill)), 4.5));
   for (const fill of ["row-current-bg", "row-current-bg-hover"]) console.log(check("library", theme, `row-current-fg-muted vs ${fill}`, cr(rgb("row-current-fg-muted"), rgb(fill)), 4.5));
   console.log(check("library", theme, "fg-muted vs row-bg-hover", cr(rgb("fg-muted"), rgb("row-bg-hover")), 4.5));
+  // .lib-toggle:hover paints btn-fg on row-bg-hover (library.css `.lib-toggle:hover:not([aria-pressed="true"])`), and is the only text tier that does.
+  console.log(check("library", theme, "btn-fg vs row-bg-hover", cr(rgb("btn-fg"), rgb("row-bg-hover")), 4.5));
   for (const fill of LIB_ROW_FOCUS_WARN_FILLS) console.log(warnCheck("library", theme, `focus-bd vs ${fill}`, cr(rgb("focus-bd"), rgb(fill)), 3));
 }
 auditLibraryThemes(resolve(ROOT, "library.css"));

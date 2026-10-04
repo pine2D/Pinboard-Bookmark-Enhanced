@@ -192,7 +192,11 @@ produced past regressions:
 | `options.fg-hint vs bg` | 4.5:1 | inline hint text |
 | `options.fg-muted vs bg` | 4.5:1 | tab labels, accordion headers |
 | `library.fg / fg-muted vs bg` **and** `vs panel` (`--lib-*`) | 4.5:1 | library body text sits on both the page bg and the elevated pane, so both are checked |
-| `library.row-selected-fg vs row-selected-bg` | 4.5:1 | selected list row: own fill, own text, not composited over bg |
+| `library.row-selected-fg vs` the six highlight row fills (`row-current-bg`, `row-current-bg-hover`, `row-band-bg`, `row-band-bg-hover`, `row-band-current-bg`, `row-band-current-bg-hover`) | 4.5:1 | the current row's title and every text on a batch-selected row (S2, COMPONENTS.md C55); all six fills are composer tokens, read off each block |
+| `library.row-current-fg-muted vs row-current-bg / row-current-bg-hover` | 4.5:1 | secondary text and the delete X on the current row |
+| `library.fg-muted vs row-bg-hover` | 4.5:1 | secondary text on a hovered row |
+| `library.btn-fg vs row-bg-hover` | 4.5:1 | a hovered `.lib-toggle` (btn-fg on the row hover fill; lowest 5.23 across the 15 blocks) |
+| `library.focus-bd vs row-current-bg / row-band-current-bg / row-band-current-bg-hover / row-band-bg` | 3:1, advisory (WARN, never blocks) | the row focus core's inner edge; accepted below 3:1 (library redesign spec §7.5): the ring's outer edge meets bg at >= 3.32 on every block |
 | `library.save / danger / warn vs bg` | 4.5:1 | flat status text (library has no tinted status fills) |
 
 **Component-layer pairs (2026-08 design-uplift addition).** A second table,

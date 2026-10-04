@@ -335,7 +335,7 @@ mode in the tokens file — values win over `_ui-derive.mjs`:
   "popup":   { "light": { "on-accent": "#001014", "radius-tag": "4px" },
                "dark":  { "focus-ring": "0 0 0 2px #268bd280" } },
   "options": { "light": { "danger": "#c5221f" } },
-  "library": { "dark":  { "row-selected-bg": "#1c2733" } }
+  "library": { "dark":  { "link": "#8ab4f8" } }
 }
 ```
 
@@ -366,7 +366,12 @@ final-fix wave:
   plus the value-box field family on all three surfaces (8 roles:
   `field-bg`, `field-border`, `field-bg-hover`, `field-border-hover`,
   `field-bg-focus`, `field-border-focus`, `field-placeholder`, `field-fg`,
-  plus `field-chevron` on options and library and the popup chip inks
+  plus `field-chevron` on options and library, plus library's nine S2 row-state
+  roles (`row-bg-hover`, `row-current-bg`, `row-current-bg-hover`,
+  `row-band-bg`, `row-band-bg-hover`, `row-band-current-bg`,
+  `row-band-current-bg-hover`, `row-current-fg-muted`, `row-selected-fg` —
+  `deriveRowStates` and library-chrome.mjs, from the final `bg` / `fg` /
+  `accent` / `fg-muted`), and the popup chip inks
   `tag-chip-fg` / `tag-chip-icon` / `tag-chip-icon-hover` — `deriveFieldRoles`
   and popup-chrome.mjs, derived from `input-bg` / the surface's frame key /
   `focus-bd` / `accent` / `fg` / `fg-hint` / `fg-muted` / `danger` / `tag-fg` / `tag-bg` / `tag-hover` and the
