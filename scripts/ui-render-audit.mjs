@@ -852,13 +852,16 @@ function evaluateCheck(check, raw, theme) {
   // must have been captured (a misspelt or uncaptured name would otherwise
   // skip its pair in silence), every state's painted fill must equal its
   // derived token, and every textSelector must clear minTextContrast on its
-  // own band in every state. Reported `actual` is the worst non-step pair.
+  // own band in every state. Reported actual is the worst pair the fill
+  // alone must carry (fillOnlyPairs and same-marker pairs), so OK implies
+  // actual >= minDelta; ring-separated pairs are reported as markerPairMin.
   if ("bandDistinct" in exp) {
     const bd = exp.bandDistinct;
     const minDelta = bd.minDelta;
     const samples = raw.bandSamples || [];
     const notes = [];
     let worst = null;
+    let worstMarked = null;
     if (samples.length < 2) notes.push("fewer than two states captured -- runOneCheck's rowStates driver failed");
     if ("textSelector" in bd) notes.push("bandDistinct.textSelector (one selector) is retired -- list every row text in textSelectors");
     const captured = new Set(samples.filter((s) => s.found).map((s) => s.state));
@@ -905,7 +908,8 @@ function evaluateCheck(check, raw, theme) {
         }
         const fillMustCarry = fillOnly.has(key);
         const markerDiffers = !fillMustCarry && (a.boxShadow !== b.boxShadow || a.outline !== b.outline);
-        if (worst === null || delta < worst) worst = delta;
+        if (markerDiffers) { if (worstMarked === null || delta < worstMarked) worstMarked = delta; }
+        else if (worst === null || delta < worst) worst = delta;
         if (delta < minDelta && !markerDiffers) {
           notes.push(fillMustCarry
             ? `"${a.state}" and "${b.state}" must be told apart by FILL alone: delta ${round2(delta)} < ${minDelta} (this pair's marker is excluded on purpose -- the band is the whole signal)`
@@ -913,8 +917,13 @@ function evaluateCheck(check, raw, theme) {
         }
       }
     }
-    out.push(verdict("bandDistinct", notes.length === 0, worst === null ? null : round2(worst), minDelta,
-      notes.length ? notes.join("; ") : undefined));
+    // Every pair separated by a marker would leave `actual` empty and the
+    // fill unmeasured: an all-ring design is not S2, so say so.
+    if (samples.length >= 2 && samples.every((s) => s.found) && worst === null) {
+      notes.push("no pair is told apart by fill alone (every pair differs by marker) -- the fill gate measured nothing");
+    }
+    out.push({ ...verdict("bandDistinct", notes.length === 0, worst === null ? null : round2(worst), minDelta,
+      notes.length ? notes.join("; ") : undefined), markerPairMin: worstMarked === null ? null : round2(worstMarked) });
   }
   // COMPONENTS.md §9 law 7: a tab is a label plus a selection edge, never a
   // button wearing a tab label. Selected = an accent underline of at least
@@ -1586,7 +1595,7 @@ const ROW_STATE_TOKENS = Object.freeze({
 // puts exactly that back in a `finally`, so no later check in the same theme
 // pass inherits a selection, a current row or a hovered row it did not ask
 // for -- including after a failed read.
-const ROW_STATE_SNAPSHOT = (cardSel) => {
+const rowStateSnapshot = (cardSel) => {
   const cards = [...document.querySelectorAll(cardSel)];
   return {
     current: cards.findIndex((c) => c.hasAttribute("aria-current")),
@@ -1601,7 +1610,7 @@ async function driveRowStates(page, extBase, theme, selector, textSelectors) {
   const rowSel = view === "notes" ? "#notes-list .notes-hit-btn" : "#vocab-list .vocab-card .notes-card-head";
   const cardSel = view === "notes" ? "#notes-list .notes-hit" : "#vocab-list .vocab-card";
   const paneSel = view === "notes" ? "#notes-detail-pane" : "#vocab-detail-pane";
-  const before = await page.evaluate(ROW_STATE_SNAPSHOT, cardSel);
+  const before = await page.evaluate(rowStateSnapshot, cardSel);
   // The query carries the VIEW as well as the theme: without it the notes
   // pass and the vocab pass differ only by fragment, Chromium treats the
   // second goto as same-document and never reloads, and the notes driver
@@ -1617,8 +1626,8 @@ async function driveRowStates(page, extBase, theme, selector, textSelectors) {
   // the two verbs never touch each other's state (library-vocab.js /
   // library-notes.js row click handlers).
   const restore = async () => {
-    let now = await page.evaluate(ROW_STATE_SNAPSHOT, cardSel);
-    if (before.current < 0 && now.current >= 0) { await load("band-restore"); now = await page.evaluate(ROW_STATE_SNAPSHOT, cardSel); }
+    let now = await page.evaluate(rowStateSnapshot, cardSel);
+    if (before.current < 0 && now.current >= 0) { await load("band-restore"); now = await page.evaluate(rowStateSnapshot, cardSel); }
     if (before.current >= 0 && now.current !== before.current) await page.locator(rowSel).nth(before.current).click();
     const was = new Set(before.selected), is = new Set(now.selected);
     for (const i of new Set([...was, ...is])) {
@@ -1627,7 +1636,7 @@ async function driveRowStates(page, extBase, theme, selector, textSelectors) {
     await page.mouse.move(0, 0);
     await page.evaluate(() => { const a = document.activeElement; if (a && a !== document.body && typeof a.blur === "function") a.blur(); });
     await settleAnimations(page);
-    const after = await page.evaluate(ROW_STATE_SNAPSHOT, cardSel);
+    const after = await page.evaluate(rowStateSnapshot, cardSel);
     if (JSON.stringify(after) !== JSON.stringify(before)) {
       throw new Error(`SETUP: rowStates ${selector} could not restore the ${view} view (theme=${theme}): wanted ${JSON.stringify(before)}, left ${JSON.stringify(after)}`);
     }
