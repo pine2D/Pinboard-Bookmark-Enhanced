@@ -3947,6 +3947,10 @@
   "libraryVocabSignedOutTitle": { "message": "単語帳を使うにはログインしてください" },
   "libraryVocabSignedOutHint": { "message": "単語帳は Pinboard アカウントごとに分けて保存されます。ログインしなくても辞書検索は利用できます。" },
   "libraryVocabOpenSettings": { "message": "アカウント設定を開く" },
-  "libraryLookupSignedOutHint": { "message": "上で単語を検索できます。単語帳に保存するにはログインしてください。" },
-  "mdPreviewClose": { "message": "リーダーを閉じる" }
+  "libraryLookupSignedOutHint": { "message": "「辞書」欄で単語を調べられます。単語帳に保存するにはログインしてください。" },
+  "mdPreviewClose": { "message": "リーダーを閉じる" },
+  "librarySectionDict": { "message": "辞書" },
+  "libraryLookupOther": { "message": "ほかの単語を調べる" },
+  "libraryDictIdle": { "message": "この単語を辞書で調べる" },
+  "libraryDictIdleFree": { "message": "任意の単語を入力すると、辞書で意味を調べられます" }
 }

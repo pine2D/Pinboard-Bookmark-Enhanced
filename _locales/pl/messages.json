@@ -3947,6 +3947,10 @@
   "libraryVocabSignedOutTitle": { "message": "Zaloguj się, aby korzystać ze słownictwa" },
   "libraryVocabSignedOutHint": { "message": "Słownictwo jest przechowywane osobno dla każdego konta Pinboard. Wyszukiwanie w słowniku działa również bez logowania." },
   "libraryVocabOpenSettings": { "message": "Otwórz ustawienia konta" },
-  "libraryLookupSignedOutHint": { "message": "Wyszukaj słowo powyżej. Zaloguj się, aby zapisać je w słownictwie." },
-  "mdPreviewClose": { "message": "Zamknij czytnik" }
+  "libraryLookupSignedOutHint": { "message": "Wyszukaj słowo w sekcji „Słownik”. Zaloguj się, aby zapisać je w słówkach." },
+  "mdPreviewClose": { "message": "Zamknij czytnik" },
+  "librarySectionDict": { "message": "Słownik" },
+  "libraryLookupOther": { "message": "Sprawdź inne słowo" },
+  "libraryDictIdle": { "message": "Sprawdź to słowo w słowniku" },
+  "libraryDictIdleFree": { "message": "Wpisz dowolne słowo, aby sprawdzić je w słowniku" }
 }

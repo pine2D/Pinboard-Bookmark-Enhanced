@@ -99,19 +99,31 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
     </div>
     <aside class="vocab-detail-pane" id="vocab-detail-pane" aria-label="Word details">
       <button type="button" class="btn btn-sm ghost vocab-detail-back" id="vocab-detail-back" aria-label="Back to list" title="Back to list"><span class="btn-ic" data-ic="arrowLeft"></span><span>Back to list</span></button>
-      <div id="vocab-lookup-bar" class="vocab-filter-toolbar vocab-lookup-bar" role="search" aria-label="Dictionary lookup">
-        <input type="search" id="vocab-lookup-input" aria-label="Look up any word" autocomplete="off" />
-        <select id="vocab-lookup-lang" aria-label="Dictionary language"></select>
-        <button type="button" class="btn btn-sm" id="vocab-lookup-go" aria-label="Look up" title="Look up"><span class="btn-ic" data-ic="book"></span></button>
+      <div class="vocab-sheet">
+        <div class="vocab-detail-empty" id="vocab-detail-empty">Pick a word from the list to see its details.</div>
+        <div class="vocab-detail" id="vocab-detail" hidden></div>
+        <section id="vocab-ref" class="vocab-ref" aria-labelledby="vocab-ref-label">
+          <h3 id="vocab-ref-label" class="lib-hang-label lib-first-line">Dictionary</h3>
+          <div id="vocab-lookup-bar" class="vocab-filter-toolbar vocab-lookup-bar" role="search" aria-label="Dictionary lookup">
+            <input type="search" id="vocab-lookup-input" aria-label="Look up any word" autocomplete="off" />
+            <label class="sr-only" for="vocab-lookup-lang">Dictionary language</label>
+            <select id="vocab-lookup-lang" data-listbox="float"></select>
+            <button type="button" class="btn" id="vocab-lookup-go">Look up</button>
+          </div>
+          <div id="vocab-ref-result"></div>
+        </section>
+        <div id="vocab-detail-tail"></div>
       </div>
-      <div class="vocab-detail-empty" id="vocab-detail-empty">Pick a word from the list to see its details.</div>
-      <div class="vocab-detail" id="vocab-detail" hidden></div>
     </aside>
   </div>
 </div>
 <div id="results"></div>
 <script>
 function t(key, ...values) { return key + (values.length ? ":" + values.join(",") : ""); }
+// listbox.js is not loaded on this page, so nothing marks the page ready and
+// library.css keeps every select[data-listbox] invisible -- a native select
+// that is the fallback here has to be focusable and measurable.
+document.documentElement.setAttribute("data-listbox-ready", "");
 </script>
 <script src="../shared.js"></script>
 <script src="../vocab-store.js"></script>
@@ -487,145 +499,187 @@ check("lookup bar wiring populates the language select with no Auto leg",
   !$id("vocab-lookup-lang").querySelector('option[value="auto"]'));
 
 {
+  // ---- Library redesign T7a (spec §4.8 submit rules, §4.10 language
+  // semantics): a lookup renders into the reference column. The main column,
+  // the current row and the open word never move for it.
   const lookupSample = [
-    { id: "lk-hello", term: "Hello", status: "new", groups: [], contexts: [], updatedAt: 1 },
-    { id: "lk-other", term: "Other", status: "new", groups: [], contexts: [], updatedAt: 2 },
+    { id: "lk-hello", term: "Hello", language: "en", status: "new", groups: [], contexts: [], updatedAt: 1 },
+    { id: "lk-other", term: "Other", language: "de", status: "new", groups: [], contexts: [{ quote: "Das Other im Satz." }], updatedAt: 2 },
   ];
   _vocabRows = lookupSample;
   _pbpVocabApplyView(true);
-
+  const result = $id("vocab-ref-result");
   const realDictRun = _pbpVocabDictRun;
   const runCalls = [];
-  _pbpVocabDictRun = (term, lang, els, sentence, rerun) => { runCalls.push({ term, lang, rerun }); };
+  _pbpVocabDictRun = (term, lang, els, sentence, rerun, opts) => { runCalls.push({ term, lang, els, sentence, rerun, opts }); };
   try {
-    // MANDATORY AMENDMENT coverage: cold start, i.e. _pbpVocabDictCtrl has
-    // never been touched by a word-detail relookup -- forced explicitly so
-    // this assertion never silently depends on earlier test ordering in
-    // this file. Without the amendment's ctrl-reset, _pbpVocabDictRun's
-    // `_pbpVocabDictCtrl.signal.aborted` read throws on a null ctrl.
+    _pbpVocabRenderDetail(null);
+    // Cold start: nothing ever created the session controller before.
     _pbpVocabDictCtrl = null;
     $id("vocab-lookup-input").value = "hello";
     let threw = false;
     try { _pbpVocabFreeLookup(); } catch (_) { threw = true; }
-    check("cold-start free lookup (no word ever opened first) does not throw",
-      !threw && _pbpVocabDictCtrl !== null);
-    check("free lookup renders the result view and forwards the submitted term/lang",
-      !$id("vocab-detail").hidden && $id("vocab-detail-empty").hidden &&
-      runCalls.length === 1 && runCalls[0].term === "hello" && runCalls[0].lang === "en");
-    check("free lookup shows the already-saved hint for a case-folded match",
-      !!$id("vocab-detail").querySelector(".vocab-lookup-saved"));
-    check("free lookup drops the word-detail linkage and clears aria-current",
-      _pbpVocabDetailWordId === null &&
-      $id("vocab-list").querySelectorAll(".vocab-card[aria-current]").length === 0);
+    check("T7 cold-start free lookup (no word ever opened) does not throw", !threw && _pbpVocabDictCtrl !== null);
+    check("T7 a free lookup renders into the reference column and leaves the cover in place",
+      $id("vocab-detail-empty").hidden === false && $id("vocab-detail").hidden === true &&
+      result.dataset.refState === "other" && result.dataset.refTerm === "hello" &&
+      runCalls.length === 1 && runCalls[0].term === "hello" && runCalls[0].lang === "en" &&
+      (result.querySelector(".vocab-ref-head .vocab-ref-term") || {}).textContent === "hello" &&
+      !!result.querySelector(".xp-dict > .xp-dict-slot > .xp-dict-local + .xp-dict-online") &&
+      !!result.querySelector(".vocab-ref-foot .vocab-ref-relookup"),
+      result.innerHTML.slice(0, 300));
+    check("T7 the result head offers the saved-word hint for a case-folded match",
+      !!result.querySelector(".vocab-ref-head .vocab-lookup-saved"));
+
+    _pbpVocabRenderDetail(lookupSample[1]);
+    const detailBefore = $id("vocab-detail").innerHTML;
+    runCalls.length = 0;
+    $id("vocab-lookup-input").value = "hello";
+    _pbpVocabFreeLookup();
+    check("T7 with a word open, a non-empty submit writes only #vocab-ref-result (main column, open word and current row stay)",
+      _pbpVocabDetailWordId === "lk-other" && $id("vocab-detail").innerHTML === detailBefore &&
+      result.dataset.refState === "other" && runCalls.length === 1 && runCalls[0].term === "hello");
 
     runCalls.length = 0;
     $id("vocab-lookup-input").value = "   ";
     _pbpVocabFreeLookup();
-    check("blank/whitespace-only submit is a no-op", runCalls.length === 0);
+    check("T7 an empty submit looks up the open word, in the open word's language, with its first context",
+      runCalls.length === 1 && runCalls[0].term === "Other" && runCalls[0].lang === "de" &&
+      runCalls[0].sentence === "Das Other im Satz." && result.dataset.refState === "word" &&
+      "sameWord" in result.dataset && _pbpVocabRelookedWordId === "lk-other",
+      JSON.stringify(runCalls.map((c) => c.term + "/" + c.lang)));
 
-    $id("vocab-detail").querySelector(".vocab-lookup-saved").click();
-    const savedCard = $id("vocab-list").querySelector('.vocab-card[data-vocab-id="lk-hello"]');
-    check("clicking the saved-word hint hands the detail pane back to that word",
-      _pbpVocabDetailWordId === "lk-hello" && !!savedCard && savedCard.getAttribute("aria-current") === "true");
-
-    // Important 4 (fix round 1): the hint can outlive a mutation reload that
-    // happens while the lookup result stays on screen -- clicking it after
-    // the underlying word vanished elsewhere (deleted/edited from another
-    // path) must not render a ghost detail from the stale captured snapshot.
+    _pbpVocabRenderDetail(null);
     runCalls.length = 0;
+    $id("vocab-lookup-input").value = "";
+    _pbpVocabFreeLookup();
+    check("T7 an empty submit on the cover sends nothing and puts the caret in the box",
+      runCalls.length === 0 && document.activeElement === $id("vocab-lookup-input"));
+
     $id("vocab-lookup-input").value = "hello";
     _pbpVocabFreeLookup();
-    const staleHint = $id("vocab-detail").querySelector(".vocab-lookup-saved");
-    _vocabRows = lookupSample.filter((r) => r.id !== "lk-hello"); // simulate a delete elsewhere
+    result.querySelector(".vocab-lookup-saved").click();
+    const savedCard = $id("vocab-list").querySelector('.vocab-card[data-vocab-id="lk-hello"]');
+    check("T7 the saved-word hint opens that word, marks its row current and resets the column for it",
+      _pbpVocabDetailWordId === "lk-hello" && !!savedCard && savedCard.getAttribute("aria-current") === "true" &&
+      result.dataset.refState !== "other" && $id("vocab-lookup-input").value === "");
+
+    _pbpVocabRenderDetail(null);
+    $id("vocab-lookup-input").value = "hello";
+    _pbpVocabFreeLookup();
+    const staleHint = result.querySelector(".vocab-lookup-saved");
+    _vocabRows = lookupSample.filter((r) => r.id !== "lk-hello"); // deleted elsewhere
     let staleThrew = false;
     try { staleHint.click(); } catch (_) { staleThrew = true; }
-    check("clicking a saved-word hint after the word vanished elsewhere is a safe no-op",
+    check("T7 clicking a saved-word hint after the word vanished elsewhere is a safe no-op",
       !staleThrew && _pbpVocabDetailWordId === null &&
       $id("vocab-list").querySelectorAll(".vocab-card[aria-current]").length === 0);
-    _vocabRows = lookupSample; // restore for the remaining checks below
+    _vocabRows = lookupSample;
 
     $id("vocab-lookup-input").value = "nonexistent-term";
     _pbpVocabFreeLookup();
-    check("free lookup with no stored match shows no saved-word hint",
-      !$id("vocab-detail").querySelector(".vocab-lookup-saved"));
+    check("T7 a lookup with no stored match shows no saved-word hint", !result.querySelector(".vocab-lookup-saved"));
 
-    // Phase C (7): md-dict's rerun callback fires long after submit (retry
-    // link, cache miss). Reading the <select> then would answer a different
-    // question than the result heading names -- the language belongs to the
-    // submitted query, not to whatever the dropdown says later.
+    // md-dict's rerun fires long after submit (retry, permission grant): it
+    // answers the submitted question, not whatever the list box names now.
     runCalls.length = 0;
     $id("vocab-lookup-lang").value = "en";
     $id("vocab-lookup-input").value = "drift";
     _pbpVocabFreeLookup();
     const submittedRerun = runCalls[0] && runCalls[0].rerun;
-    $id("vocab-lookup-lang").value = "de"; // user re-aims the dropdown for the NEXT lookup
+    $id("vocab-lookup-lang").value = "de";
     if (submittedRerun) submittedRerun();
-    check("a lookup rerun stays on the language the query was submitted with",
+    check("T7 a lookup rerun stays on the language the query was submitted with",
       runCalls.length === 2 && runCalls[1].term === "drift" && runCalls[1].lang === "en",
       JSON.stringify(runCalls.map((c) => c.term + "/" + c.lang)));
 
-    // Phase C (9a): narrow mode just replaced the list with this result, so
-    // focus has to follow it -- otherwise the next Tab starts from <body> and
-    // the one control that gets back to the list is never reached.
+    runCalls.length = 0;
+    $id("vocab-lookup-lang").value = "fr";
+    $id("vocab-lookup-lang").dispatchEvent(new Event("change"));
+    check("T7 changing the language while another word's result shows re-submits that word and remembers the language",
+      runCalls.length === 1 && runCalls[0].term === "drift" && runCalls[0].lang === "fr" && _vocabLookupLang === "fr");
+
+    _pbpVocabRenderDetail(lookupSample[1]);
+    $id("vocab-lookup-input").value = "";
+    _pbpVocabFreeLookup(); // manual lookup of "Other"
+    runCalls.length = 0;
+    $id("vocab-lookup-lang").value = "en";
+    $id("vocab-lookup-lang").dispatchEvent(new Event("change"));
+    check("T7 changing the language after a manual lookup of the open word re-runs the full chain and leaves the session language",
+      runCalls.length === 1 && runCalls[0].term === "Other" && runCalls[0].lang === "en" &&
+      _vocabLookupLang === "fr" && $id("vocab-lookup-lang").value === "en");
+
+    $id("vocab-lookup-input").value = "typed";
+    _pbpVocabRenderDetail(lookupSample[0]);
+    check("T7 opening another word clears the box, drops the manual mark and follows the word's language",
+      $id("vocab-lookup-input").value === "" && _pbpVocabRelookedWordId === null &&
+      $id("vocab-lookup-lang").value === "en" && result.dataset.refState !== "other" &&
+      !result.querySelector(".vocab-ref-head"));
+
+    $id("vocab-lookup-lang").value = "pl";
+    _pbpVocabRenderDetail({ id: "lk-und", term: "zzz", language: "und", groups: [], contexts: [] });
+    check("T7 an open word saved as und leaves the list box value alone", $id("vocab-lookup-lang").value === "pl");
+
+    _pbpVocabRenderDetail(null);
+    check("T7 back on the cover the list box shows the session language and the column offers the free-lookup line",
+      $id("vocab-lookup-lang").value === _vocabLookupLang && result.dataset.refState === "free" &&
+      !!result.querySelector(".vocab-ref-free"));
+
+    _pbpVocabRenderDetail(lookupSample[1]);
+    $id("vocab-lookup-input").value = "";
+    _pbpVocabFreeLookup();
+    const ctrlBefore = _pbpVocabDictCtrl;
+    _pbpVocabRenderDetail(lookupSample[1], true); // a second activation of the shown word
+    check("T7 activating the word already shown keeps its dictionary result and its run",
+      _pbpVocabDictCtrl === ctrlBefore && !ctrlBefore.signal.aborted && result.dataset.refState === "word");
+    document.body.classList.remove("lib-narrow-detail");
+
+    // Narrow mode. The runner cannot resize the viewport: stand up the mode
+    // predicate and the back button's media rule explicitly.
     const realNarrow = _pbpVocabNarrowMode;
     try {
-      // Two things are true below 860px: the mode predicate reads the hidden
-      // list pane, AND library.css un-hides the back button (it is
-      // display:none at this harness's 1280px viewport, and focus() on a
-      // display:none element is a no-op). The runner cannot resize the
-      // viewport, so stand both signals up explicitly -- the media query
-      // itself is covered by the responsive sweep further down.
       document.body.classList.add("test-narrow-back");
       _pbpVocabNarrowMode = () => true;
+      document.body.classList.add("lib-narrow-detail");
+      $id("vocab-lookup-input").focus();
       $id("vocab-lookup-input").value = "focusme";
       _pbpVocabFreeLookup();
-      check("a narrow-mode lookup moves focus to the pane's back button",
-        document.activeElement === $id("vocab-detail-back"));
-      // The PRIMARY narrow entry, and the one the lookup-only fix missed: a
-      // row click hides the list the head button it started from lives in.
-      const narrowRow = $id("vocab-list").querySelector('.vocab-card[data-vocab-id="lk-other"] .notes-card-head');
+      check("T7 a narrow-mode lookup keeps the caret in the lookup box (the box is in the pane the result fills)",
+        document.activeElement === $id("vocab-lookup-input"));
+      document.body.classList.remove("lib-narrow-detail");
+      const narrowRow = $id("vocab-list").querySelector('.vocab-card[data-vocab-id="lk-hello"] .notes-card-head');
       narrowRow.focus();
       narrowRow.click();
-      check("a narrow-mode row click moves focus to the pane's back button",
-        _pbpVocabDetailWordId === "lk-other" &&
-        document.activeElement === $id("vocab-detail-back"),
+      check("T7 a narrow-mode row click moves focus to the pane's back button",
+        _pbpVocabDetailWordId === "lk-hello" && document.activeElement === $id("vocab-detail-back"),
         document.activeElement && (document.activeElement.className || document.activeElement.tagName));
-      // The narrow-screen door. It opens the tool, it does not run it: the
-      // pane comes forward and the caret lands in the lookup box, with no
-      // lookup fired and no word activated.
-      _pbpVocabNarrowMode = () => true;
       document.body.classList.remove("lib-narrow-detail");
       _pbpVocabRenderDetail(null);
       $id("vocab-lookup-narrow").click();
-      check("the narrow lookup door opens the pane and focuses the lookup box",
-        document.body.classList.contains("lib-narrow-detail") &&
-        document.activeElement === $id("vocab-lookup-input") &&
+      check("T7 the narrow lookup door opens the pane and focuses the lookup box without running anything",
+        document.body.classList.contains("lib-narrow-detail") && document.activeElement === $id("vocab-lookup-input") &&
         $id("vocab-detail").hidden === true && _pbpVocabDetailWordId === null,
         document.activeElement && (document.activeElement.id || document.activeElement.tagName));
-      // ...and that state must not be a dead end. The back button used to be
-      // built only when #vocab-detail rendered CONTENT, so arriving here with
-      // an empty pane left no way back to the list.
-      check("the empty pane still offers a way back to the list",
-        !!$id("vocab-detail-back") &&
+      check("T7 the empty pane still offers a way back to the list",
         $id("vocab-detail-pane").contains($id("vocab-detail-back")) &&
         getComputedStyle($id("vocab-detail-back")).display !== "none");
       $id("vocab-detail-back").click();
-      check("the back button returns to the list from the empty pane",
-        !document.body.classList.contains("lib-narrow-detail"));
+      check("T7 the back button returns to the list from the empty pane", !document.body.classList.contains("lib-narrow-detail"));
       _pbpVocabNarrowMode = () => false;
       $id("vocab-lookup-input").focus();
       $id("vocab-lookup-input").value = "stayput";
       _pbpVocabFreeLookup();
-      check("a two-pane lookup leaves focus in the lookup box",
-        document.activeElement === $id("vocab-lookup-input"));
+      check("T7 a two-pane lookup leaves focus in the lookup box", document.activeElement === $id("vocab-lookup-input"));
     } finally {
       _pbpVocabNarrowMode = realNarrow;
       document.body.classList.remove("test-narrow-back");
     }
   } finally {
     _pbpVocabDictRun = realDictRun;
+    $id("vocab-lookup-input").value = "";
   }
   _pbpVocabClearVisibleState();
+  _pbpVocabRenderDetail(null);
 }
 
 _pbpVocabClearVisibleState();
@@ -1299,23 +1353,22 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("a rendered row activates into the detail pane",
         _pbpVocabDetailWordId === "d1" && !detailEl().hidden);
 
-      // Variant C + save v2b: the pane ends in ONE closing row -- re-lookup,
-      // then the destructive action, then Save at the far right -- and the
-      // note editor keeps only the field. Asserted on the built DOM, not just
-      // on the stylesheet, because the placement is decided in the assembly.
+      // The closing row is the tail's own footer now (spec §4.1 / §4.7):
+      // delete, then the status sentence, then Save -- nothing from the
+      // reading flow, and no relookup (that moved under the dictionary result).
       {
-        const footer = detailEl().querySelector(".vocab-detail-footer");
-        const order = footer ? [...footer.children].map((el) => el.className.split(" ").pop()) : [];
-        check("the detail pane ends in one closing row: re-lookup, delete, save",
-          !!footer &&
-          order.join(",") === "vocab-detail-relookup,vocab-detail-delete,vocab-note-save" &&
-          detailEl().lastElementChild === footer,
-          order.join(","));
+        const tail = $id("vocab-detail-tail");
+        const footer = tail.querySelector(".vocab-detail-footer");
+        const kinds = footer ? [...footer.children].map((el) =>
+          ["vocab-detail-delete", "vocab-main-status", "vocab-note-save"].find((c) => el.classList.contains(c)) || el.className) : [];
+        check("T7 the detail ends in the tail's closing row: delete, status, save",
+          !!footer && tail.firstElementChild === footer && footer.tagName === "FOOTER" &&
+          !footer.classList.contains("lib-section") &&
+          kinds.join(",") === "vocab-detail-delete,vocab-main-status,vocab-note-save",
+          kinds.join(","));
         check("the note editor keeps only its field once Save moved out",
           detailEl().querySelectorAll(".vocab-note-edit > *").length === 1 &&
           !!detailEl().querySelector(".vocab-note-edit > .vocab-note-input"));
-        // The zero-shift contract: hidden Save still occupies its slot, so
-        // the first keystroke cannot move the buttons beside it.
         const save = footer.querySelector(".vocab-note-save");
         check("a hidden Save still holds its place in the row",
           save.hidden === true && save.getBoundingClientRect().width > 0);
@@ -1335,7 +1388,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("a detail mutation reaches the store", (cStore.find((row) => row.id === "d1") || {}).status === "known");
       check("a detail mutation keeps unsaved note text and its save button",
         detailEl().querySelector(".vocab-note-input").value === "half-typed" &&
-        detailEl().querySelector(".vocab-note-save").hidden === false,
+        $id("vocab-detail-tail").querySelector(".vocab-note-save").hidden === false,
         JSON.stringify(detailEl().querySelector(".vocab-note-input").value));
       check("a detail mutation keeps the typed group name",
         detailEl().querySelector(".vocab-group-unit input").value === "Draft group");
@@ -1465,10 +1518,9 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       plain.marks.length === 2 && plain.marks.every((text) => text === "cat"));
   }
 
-  // ---- Narrow-mode feedback (#87). Below 860px with a word open the whole
-  // list pane is display:none, and #vocab-status is markup inside it -- so
-  // every single-word action's success AND failure landed in a subtree that
-  // is invisible and, being unrendered, silent to a screen reader too. -----
+  // ---- Status host (spec §4.7 table, a behaviour change): multi-select ->
+  // the batch row's slot; a ready detail -> the tail's footer at ANY width;
+  // otherwise (cover, a rebuild in progress, signed out) -> the count row. ---
   {
     const realNarrow = _pbpVocabNarrowMode;
     const realDictRun = _pbpVocabDictRun;
@@ -1476,35 +1528,98 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       _pbpVocabDictRun = () => {};
       const word = { id: "st1", term: "statusword", groups: [], contexts: [], note: "" };
       _vocabRows = [word];
-      _pbpVocabNarrowMode = () => true;
-      _pbpVocabRenderDetail(word, true);
-      const footer = $id("vocab-detail").querySelector(".vocab-detail-footer");
-      check("narrow mode moves the status live region into the open detail's closing row",
-        !!footer && $id("vocab-status").parentNode === footer,
-        $id("vocab-status").parentNode && $id("vocab-status").parentNode.className);
-      _pbpVocabFlashStatus(true, "saved in the narrow pane");
-      check("a detail action's feedback is on screen instead of inside the hidden list pane",
-        $id("vocab-status").textContent.includes("saved in the narrow pane") &&
-        !$id("vocab-status").closest(".vocab-list-pane"));
-      check("the relocated region is still the same live region",
-        $id("vocab-status").getAttribute("role") === "status" &&
-        $id("vocab-status").getAttribute("aria-live") === "polite");
-      // The result view replaces the detail host wholesale: a live region
-      // wiped out with the subtree it sits in is silent for good.
-      $id("vocab-lookup-input").value = "rescue";
-      _pbpVocabFreeLookup();
-      check("a rebuild of the detail host never orphans the status region",
-        $id("vocab-status").isConnected &&
-        $id("vocab-status").parentNode === $id("vocab-context-bar"));
+      _pbpVocabApplyView(true);
+      const footer = () => $id("vocab-detail-tail").querySelector(".vocab-detail-footer");
       _pbpVocabNarrowMode = () => false;
       _pbpVocabRenderDetail(word);
-      check("the two-pane layout keeps the status region in the list's count row",
+      check("T7 a ready detail hosts the status region in the tail's footer in the two-pane layout, right before Save",
+        !!footer() && $id("vocab-status").parentNode === footer() &&
+        $id("vocab-status").nextElementSibling === footer().querySelector(".vocab-note-save"));
+      _pbpVocabFlashStatus(true, "saved in the tail");
+      check("T7 a detail action's feedback lands beside the control that caused it",
+        $id("vocab-status").textContent.includes("saved in the tail") && !$id("vocab-status").closest(".vocab-list-pane"));
+      check("T7 the relocated region is still the same live region",
+        $id("vocab-status").getAttribute("role") === "status" && $id("vocab-status").getAttribute("aria-live") === "polite");
+      _pbpVocabNarrowMode = () => true;
+      _pbpVocabRenderDetail(word, true);
+      check("T7 narrow mode keeps it in the tail's footer", $id("vocab-status").parentNode === footer());
+      document.body.classList.remove("lib-narrow-detail");
+      _vocabSelected = new Set([word.id]);
+      _pbpVocabSyncSelectionUi();
+      _pbpVocabStatusHost(true);
+      const slot = $id("vocab-batch-toolbar").querySelector(".lib-batch-status");
+      check("T7 with a selection the status rides the batch row's slot", !!slot && $id("vocab-status").parentNode === slot);
+      // Narrow detail takes the list pane -- and the batch row in it -- off
+      // the page while the selection survives: the slot is no host then, the
+      // ready detail's footer is (spec §4.7 "batch row visible").
+      const listPane = $id("vocab-list-pane");
+      const paneDisplay = listPane.style.display;
+      listPane.style.display = "none";
+      _pbpVocabStatusHost();
+      check("T7 a selection behind a hidden list pane (narrow detail) leaves the status in the tail's footer, a visible host",
+        $id("vocab-status").parentNode === footer() && $id("vocab-status").getClientRects().length > 0,
+        `parent=${$id("vocab-status").parentNode && $id("vocab-status").parentNode.className}`);
+      listPane.style.display = paneDisplay;
+      _pbpVocabStatusHost();
+      _pbpVocabClearSelection();
+      _pbpVocabSyncSelectionUi();
+      _pbpVocabStatusHost(false);
+      check("T7 a rebuild parks the region in the count row first (a live region removed with its subtree is gone)",
         $id("vocab-status").parentNode === $id("vocab-context-bar"));
+      _pbpVocabRenderDetail(null);
+      check("T7 the cover hosts it in the count row", $id("vocab-status").isConnected && $id("vocab-status").parentNode === $id("vocab-context-bar"));
     } finally {
       _pbpVocabNarrowMode = realNarrow;
       _pbpVocabDictRun = realDictRun;
+      _pbpVocabClearSelection();
       _pbpVocabRenderDetail(null);
-      $id("vocab-lookup-input").value = "";
+    }
+  }
+
+  // ---- The lookup button (spec §4.8 "未查询"): an opened word with nothing
+  // local and no grant shows one button and sends nothing; clicking it asks
+  // for the grant FIRST (the gesture is spent by any earlier await), then runs
+  // the manual chain. This page has no chrome mock: one is stood up here. ----
+  {
+    const realDictRun = _pbpVocabDictRun;
+    const hadChrome = "chrome" in window;
+    const realChrome = window.chrome;
+    const runs = [];
+    let requests = 0, grant = false;
+    try {
+      _pbpVocabDictRun = (term, lang) => { runs.push(term + "/" + lang); };
+      window.chrome = { permissions: {
+        request: async () => { requests++; return grant; },
+        contains: async () => grant,
+      } };
+      const word = { id: "idle1", term: "idle", language: "en", groups: [], contexts: [] };
+      _vocabRows = [word];
+      _pbpVocabRenderDetail(null);
+      _pbpVocabRenderDetail(word);
+      await settle();
+      const idleBtn = () => $id("vocab-ref-result").querySelector(".vocab-ref-idle");
+      check("T7 an opened word with nothing local and no grant shows the lookup button and sends nothing",
+        !!idleBtn() && runs.length === 0 && requests === 0 && $id("vocab-ref-result").dataset.refState === "idle" &&
+        idleBtn().textContent.includes("libraryDictIdle"));
+      idleBtn().click();
+      check("T7 the lookup button asks for the dictionary grant before anything else", requests === 1 && runs.length === 0);
+      await settle();
+      check("T7 a declined grant leaves the button in place and sends nothing", runs.length === 0 && !!idleBtn());
+      grant = true;
+      idleBtn().click();
+      await settle();
+      const langTarget = $id("vocab-lookup-lang-btn") || $id("vocab-lookup-lang");
+      check("T7 a granted lookup runs the manual chain for the open word and hands focus to the language list box",
+        requests === 2 && runs.join(",") === "idle/en" && $id("vocab-ref-result").dataset.refState === "word" &&
+        _pbpVocabRelookedWordId === "idle1" && document.activeElement === langTarget,
+        runs.join(",") + " active=" + (document.activeElement && document.activeElement.id));
+      $id("vocab-ref-result").querySelector(".vocab-ref-relookup").click();
+      check("T7 Look up again re-runs the open word and focus stays on the language list box (the button it came from is gone)",
+        runs.join(",") === "idle/en,idle/en" && document.activeElement === langTarget);
+    } finally {
+      _pbpVocabDictRun = realDictRun;
+      if (hadChrome) window.chrome = realChrome; else delete window.chrome;
+      _pbpVocabRenderDetail(null);
     }
   }
 
@@ -1568,8 +1683,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
   // render replaces: replaceChildren is one atomic mutation, so the pane keeps
   // whatever scrollTop the previous entry was left at and the next one opens
   // with its own term heading above the fold. Both exits that replace the
-  // host are covered -- the word detail and the free-lookup result render
-  // into the same pane. `scrolled > 0` is the anti-vacuity guard: if the
+  // host are covered -- a lookup of another word renders into the reference
+  // column and leaves the main column where it was. `scrolled > 0` is the anti-vacuity guard: if the
   // stand-in rule above ever stops making the pane scrollable these fail
   // instead of passing on a constant 0.
   {
@@ -1600,8 +1715,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     const scrolledLookup = pane.scrollTop;
     $id("vocab-lookup-input").value = "scrollthree";
     _pbpVocabFreeLookup();
-    check("a free-lookup result returns the reading pane to the top",
-      scrolledLookup > 0 && pane.scrollTop === 0,
+    check("T7 a lookup of another word leaves the reading position alone (the main column did not change)",
+      scrolledLookup > 0 && pane.scrollTop === scrolledLookup,
       "scrolled=" + scrolledLookup + " after=" + pane.scrollTop);
     $id("vocab-lookup-input").value = "";
     _pbpVocabRenderDetail(null);
@@ -1726,7 +1841,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       _pbpVocabApplyView(true);
       _pbpVocabRenderDetail(word);
       const field = () => $id("vocab-detail").querySelector(".vocab-note-input");
-      const saveBtn = () => $id("vocab-detail").querySelector(".vocab-note-save");
+      const saveBtn = () => $id("vocab-detail-tail").querySelector(".vocab-note-save");
       const type = (text) => {
         field().value = text;
         field().dispatchEvent(new Event("input", { bubbles: true }));
@@ -1822,12 +1937,18 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     </div>
     <aside class="vocab-detail-pane">
       <button type="button" class="btn btn-sm ghost vocab-detail-back"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
-      <div class="vocab-filter-toolbar vocab-lookup-bar">
-        <input type="search" data-label="lookup-input">
-        <select data-label="lookup-lang"></select>
-        <button type="button" class="btn btn-sm" data-label="lookup-go"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
+      <div class="vocab-sheet">
+        <div class="vocab-detail-empty">Pick a word from the list to see its details.</div>
+        <section class="vocab-ref">
+          <h3 class="lib-hang-label" data-label="ref-label"></h3>
+          <div class="vocab-filter-toolbar vocab-lookup-bar">
+            <input type="search" data-label="lookup-input">
+            <div class="listbox"><button type="button" class="listbox-btn" data-label="lookup-lang"><span class="listbox-value"></span><span class="btn-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24"></svg></span><span class="listbox-sizer" aria-hidden="true"></span></button></div>
+            <button type="button" class="btn" data-label="lookup-go"></button>
+          </div>
+          <div id="vocab-ref-result"><p class="vocab-ref-free" data-label="ref-free"></p></div>
+        </section>
       </div>
-      <div class="vocab-detail-empty">Pick a word from the list to see its details.</div>
     </aside>
     </div></div></body></html>`;
   document.body.appendChild(frame);
@@ -1861,7 +1982,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         // same discipline as every other element above (this is exactly the
         // sweep that caught the German long-compound-word row overflow).
         panel.querySelector('[data-label="lookup-input"]').placeholder = m.libraryLookupPlaceholder.message;
-        panel.querySelector('[data-label="lookup-go"]').title = m.libraryLookupGo.message;
+        panel.querySelector('[data-label="lookup-go"]').textContent = m.libraryLookupGo.message;
         panel.querySelector('[data-label="filter-narrow"] span').textContent = m.libraryFilterNarrowActive.message.replace("$COUNT$", "2");
         panel.querySelector('[data-label="stat-all"]').textContent = m.libraryFilterAll.message;
         panel.querySelector('[data-label="stat-learning"]').textContent = m.libraryStatsLearning.message.replace("$COUNT$", "2500");
@@ -1875,15 +1996,15 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         // (T4d): language + "known" as plain text, groups at line two's end.
         panel.querySelector('[data-label="row-lang"]').textContent = pbpDictLanguageLabel("de", bcp47) || "Deutsch";
         panel.querySelector('[data-label="row-known"]').textContent = m.vocabStatusKnown.message;
-        const langSelect = panel.querySelector('[data-label="lookup-lang"]');
+        const langBtn = panel.querySelector('[data-label="lookup-lang"]');
         try {
           const names = new Intl.DisplayNames([bcp47], { type: "language" });
-          langSelect.replaceChildren(...["en", "de", "fr", "es", "it", "pt", "nl", "ru", "pl", "ja", "ko", "zh"].map((code) => {
-            const o = doc.createElement("option");
-            o.textContent = names.of(code) || code;
-            return o;
-          }));
+          const labels = ["en", "de", "fr", "es", "it", "pt", "nl", "ru", "pl", "ja", "ko", "zh"].map((code) => names.of(code) || code);
+          langBtn.querySelector(".listbox-value").textContent = labels[0];
+          langBtn.querySelector(".listbox-sizer").textContent = labels.reduce((a, b) => (b.length > a.length ? b : a), "");
         } catch (_) {}
+        panel.querySelector('[data-label="ref-label"]').textContent = m.librarySectionDict.message;
+        panel.querySelector('[data-label="ref-free"]').textContent = m.libraryDictIdleFree.message;
         await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
         if (width === 320 && theme === "github-light" && locale === "de") {
           const box = panel.querySelector(".lib-count-items").getBoundingClientRect();

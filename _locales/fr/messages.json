@@ -3947,6 +3947,10 @@
   "libraryVocabSignedOutTitle": { "message": "Connectez-vous pour utiliser le vocabulaire" },
   "libraryVocabSignedOutHint": { "message": "Le vocabulaire est séparé pour chaque compte Pinboard. La recherche dans le dictionnaire reste disponible sans connexion." },
   "libraryVocabOpenSettings": { "message": "Ouvrir les paramètres du compte" },
-  "libraryLookupSignedOutHint": { "message": "Recherchez un mot ci-dessus. Connectez-vous pour l’enregistrer dans votre vocabulaire." },
-  "mdPreviewClose": { "message": "Fermer le lecteur" }
+  "libraryLookupSignedOutHint": { "message": "Recherchez un mot dans la section « Dictionnaire ». Connectez-vous pour l’enregistrer dans votre vocabulaire." },
+  "mdPreviewClose": { "message": "Fermer le lecteur" },
+  "librarySectionDict": { "message": "Dictionnaire" },
+  "libraryLookupOther": { "message": "Rechercher un autre mot" },
+  "libraryDictIdle": { "message": "Chercher ce mot dans le dictionnaire" },
+  "libraryDictIdleFree": { "message": "Saisissez n’importe quel mot pour consulter sa définition" }
 }

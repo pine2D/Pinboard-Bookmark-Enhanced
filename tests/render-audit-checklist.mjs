@@ -641,9 +641,11 @@ export const CHECKS = [
   // ---- defect 1/4: .btn declares no `color`; text + currentColor icon fall
   // to the UA ButtonText system color instead of a themed, AA-derived value.
   // library has zero `html[data-theme] .btn` override so ALL 13 presets +
-  // the default state are exposed (COMPONENTS.md §1.3). ----
-  { surface: "library", page: "library.html", selector: ".vocab-detail-relookup", state: "default",
-    expect: { textContrast: 4.5, iconContrast: 3 } },
+  // the default state are exposed (COMPONENTS.md §1.3). Since T7 the
+  // instance is the dictionary column's md "Look up" button (text only);
+  // T7b adds .vocab-detail-status for the icon half. ----
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-go", state: "default",
+    expect: { textContrast: 4.5 } },
 
   // ---- COMPONENTS.md §9 law 3 (Soft Fill, inset selection). Both of
   // library's lists paint a hover/selected band; before the uplift the
@@ -1196,23 +1198,15 @@ export const CHECKS = [
   { surface: "library", page: "library.html", selector: "#vocab-sort-btn", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
 
-  // ---- Task 14 (§6.3 rowRungEq, sweep-discovered): the free-lookup bar.
-  // #vocab-lookup-go is a bare-icon .btn-sm (COMPONENTS.md §1.5's "dense
-  // toolbar" clause) -- opposite resolution direction from the row above:
-  // here the field/select come DOWN to the sm-rung formula (mirroring
-  // .vocab-batch-bar input[type="text"]'s already-shipped precedent)
-  // instead of the button going up to md, since this is a compact
-  // single-purpose search tool, not a standalone form field. ----
-  // The lookup row moved into the detail panel 2026-08-07; these two entries
-  // follow it there. Three controls, so two comparisons -- the field against
-  // the button was the pair that was mismatched when this row was first
-  // written, and the language <select> is the third leg that a single pair
-  // cannot see (it reaches the same height through the row's own stretch, not
-  // through its own padding, so it can drift independently).
+  // ---- Library redesign T7 (spec §4.8): the lookup row is three md controls
+  // -- field, the language listbox button, the "Look up" text button -- all
+  // on the md rung (32 / 28). ----
   { surface: "library", page: "library.html", selector: "#vocab-lookup-input", state: "default",
     expect: { heightEqWith: { selector: "#vocab-lookup-go", tolerancePx: 1 } } },
-  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang", state: "default",
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang-btn", state: "default",
     expect: { heightEqWith: { selector: "#vocab-lookup-go", tolerancePx: 1 } } },
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-go", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
 
   // ---- COMPONENTS.md §8: fused controls (design-uplift 2026-08-05, user
   // checkpoint round 4 -- "同类型的问题肯定不止这一处" after the group row was
@@ -1396,10 +1390,8 @@ export const CHECKS = [
   // selectors contain "-detail-" (needsDetailOpen); the batch-bar shell is in
   // BATCH_BAR_SELECTORS (needsBatchBarOpen); `.notes-toolbar #notes-filter`
   // starts with ".notes-" so the runner opens the notes view for it. The
-  // relookup .xp-dict-lang has no row: it exists only behind the relookup
-  // click, which family 14's library leg makes: rest / hover tokens, four
-  // corners, and a keyboard-focused read (focus fill, four focus sides, the
-  // ring) on every theme, held by VALUE_BOX_FOCUS_REQUIRED.library. ----
+  // dictionary language is a listbox button since T7 (rows below); family
+  // 14's library leg reads it focused, held by VALUE_BOX_FOCUS_REQUIRED.library. ----
   { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
     expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
   { surface: "library", page: "library.html", selector: "#vocab-search", state: "hover",
@@ -1414,11 +1406,11 @@ export const CHECKS = [
     expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
   { surface: "library", page: "library.html", selector: "#vocab-lookup-input", state: "hover",
     expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
-  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang", state: "default",
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang-btn", state: "default",
     expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
-  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang", state: "hover",
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang-btn", state: "hover",
     expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
-  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang", state: "focusWithin", focusTarget: ":scope",
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang-btn", state: "focusWithin", focusTarget: ":scope",
     expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   { surface: "library", page: "library.html", selector: ".notes-toolbar #notes-filter", state: "default",
     expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
@@ -1464,7 +1456,7 @@ export const CHECKS = [
   // 15 theme states, including that `border-color` actually lands (a themed rest
   // rule out-ranking the focus rule is the failure mode this catches, and it
   // is exactly what popup's 5 bordered sites needed twins for).
-  { surface: "library", page: "library.html", selector: ".vocab-detail-relookup", state: "focusWithin",
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-go", state: "focusWithin",
     focusTarget: ":scope", expect: { focusRecipe: "bordered" } },
   // `inset` on a list row. Outline-only by contract: .notes-hit[aria-current]
   // already paints `box-shadow: inset 0 0 0 1px` as its "you are here" edge,
@@ -1935,6 +1927,27 @@ export const CHECKS = [
   { surface: "library", page: "library.html", selector: "#vocab-group-filter-list .listbox-opt", state: "open",
     open: { click: "#vocab-group-filter-btn" },
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  // ---- Library redesign T7a (spec §4.8, §8.2): the dictionary column. The
+  // language list box opens in float mode like the group filter; the idle
+  // "look up this word" button exists once a word is open ("-ref" in the
+  // selector makes the runner open one). ----
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang-btn", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang-btn + .listbox-pop", state: "open",
+    open: { click: "#vocab-lookup-lang-btn" },
+    expect: { borderTopWidthPx: { value: 1 }, borderRadiusPx: { radiusVar: "radius-lg" }, computedPosition: "fixed", inViewport: {} } },
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-lang-list .listbox-opt", state: "open",
+    open: { click: "#vocab-lookup-lang-btn" },
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  { surface: "library", page: "library.html", selector: "#vocab-lookup-input", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  { surface: "library", page: "library.html", selector: "#vocab-ref-result .vocab-ref-idle", state: "default",
+    expect: { textContrast: 4.5, iconContrast: 3, heightPx: { comfortable: 28, compact: 24 } } },
+  // spec §9.2 (checklist :716-721 rewrite): paneFit's panes also cover the
+  // dictionary column holding ANOTHER word's result. "-detail-" opens a word
+  // first; the driver submits the other word and puts the column back after.
+  { surface: "library", page: "library.html", selector: "#vocab-detail-pane (other word)", state: "paneFit",
+    expect: { paneFit: { widths: [420, 861, 1280, 1600, 2560], tolerancePx: 1, panes: ["#vocab-detail-pane"], vocabLookupOther: "serendipity" } } },
   // The sort menu button's popover (T6b): the same panel family. Its trigger
   // is always on the filter row, never inside the Filter popover.
   { surface: "library", page: "library.html", selector: "#vocab-sort-btn + .listbox-pop", state: "open",

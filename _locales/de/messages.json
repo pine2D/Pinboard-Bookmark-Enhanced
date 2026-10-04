@@ -3947,6 +3947,10 @@
   "libraryVocabSignedOutTitle": { "message": "Für Vokabeln anmelden" },
   "libraryVocabSignedOutHint": { "message": "Vokabeln werden für jedes Pinboard-Konto getrennt gespeichert. Die Wörterbuchsuche bleibt ohne Anmeldung verfügbar." },
   "libraryVocabOpenSettings": { "message": "Kontoeinstellungen öffnen" },
-  "libraryLookupSignedOutHint": { "message": "Schlag oben ein Wort nach. Melde dich an, um es in den Vokabeln zu speichern." },
-  "mdPreviewClose": { "message": "Leser schließen" }
+  "libraryLookupSignedOutHint": { "message": "Schlag Wörter im Bereich „Wörterbuch“ nach. Melde dich an, um sie in den Vokabeln zu speichern." },
+  "mdPreviewClose": { "message": "Leser schließen" },
+  "librarySectionDict": { "message": "Wörterbuch" },
+  "libraryLookupOther": { "message": "Anderes Wort nachschlagen" },
+  "libraryDictIdle": { "message": "Dieses Wort im Wörterbuch nachschlagen" },
+  "libraryDictIdleFree": { "message": "Gib ein beliebiges Wort ein, um es im Wörterbuch nachzuschlagen" }
 }

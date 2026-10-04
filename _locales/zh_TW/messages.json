@@ -3947,6 +3947,10 @@
   "libraryVocabSignedOutTitle": { "message": "登入後使用生字簿" },
   "libraryVocabSignedOutHint": { "message": "生字會依 Pinboard 帳號分開儲存；未登入時仍可使用字典查詢。" },
   "libraryVocabOpenSettings": { "message": "開啟帳號設定" },
-  "libraryLookupSignedOutHint": { "message": "可在上方查詢單字；登入後即可儲存到生字簿。" },
-  "mdPreviewClose": { "message": "關閉閱讀器" }
+  "libraryLookupSignedOutHint": { "message": "可在「詞典」欄查詢單字；登入後即可儲存到生字簿。" },
+  "mdPreviewClose": { "message": "關閉閱讀器" },
+  "librarySectionDict": { "message": "詞典" },
+  "libraryLookupOther": { "message": "查其他詞語" },
+  "libraryDictIdle": { "message": "查詢這個詞的詞典釋義" },
+  "libraryDictIdleFree": { "message": "輸入任何詞語，查詢它的詞典釋義" }
 }

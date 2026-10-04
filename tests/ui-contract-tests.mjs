@@ -2116,10 +2116,10 @@ check(OPTIONS_VALUE_BOX_IDS.ids.has("dict-anki-deck") && OPTIONS_VALUE_BOX_IDS.i
 // design §1.2 / §3.3). Static ones are harvested from library.html: every
 // text-entry input (TEXT_ENTRY_TYPES, search included), textarea and select
 // that carries an id and is not one of the `hidden` state carriers
-// (#vocab-status-filter / #vocab-sort are driven by chip / segment proxies and
-// never render). Runtime ones are the elements library-vocab.js builds -- the
-// note editor (.vocab-note-input), the relookup language select
-// (.xp-dict-lang) and the detail pane's group-unit text input -- harvested
+// (#vocab-status-filter is driven by the status toggles and never renders; the
+// select[data-listbox] carriers render as their `<id>-btn`). Runtime ones are
+// the elements library-vocab.js builds -- the note editor (.vocab-note-input)
+// and the detail pane's group-unit text input -- harvested
 // from every createElement("input" | "select" | "textarea") site of the
 // library scripts and pinned below, so a new runtime value box fails here
 // instead of silently escaping the class-level scans. The fused shell
@@ -2161,17 +2161,17 @@ const LIBRARY_VALUE_BOX = (() => {
     selectClasses: new Set(built.filter((b) => /:select\./.test(b)).map(classOf)),
   };
 })();
-check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["notes-filter", "vocab-group-filter", "vocab-group-filter-btn", "vocab-group-input", "vocab-lookup-input", "vocab-lookup-lang", "vocab-search"]),
+check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["notes-filter", "vocab-group-filter", "vocab-group-filter-btn", "vocab-group-input", "vocab-lookup-input", "vocab-lookup-lang", "vocab-lookup-lang-btn", "vocab-search"]),
   `ui-contract-tests.mjs: the library.html value-box id harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort())}. ` +
   "A new value box must join composers/ui-components.mjs FIELD_TARGETS.lib and scripts/ui-render-audit.mjs's VALUE_BOX_LEGS.library in the same commit; then update this list.");
 check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.stringify(["vocab-sort-btn"]) &&
   ![...LIBRARY_VALUE_BOX.ghostTriggers].some((id) => LIBRARY_VALUE_BOX.ids.has(id)),
   `ui-contract-tests.mjs: the library ghost-trigger harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort())}. ` +
   "A select with data-listbox-face=\"ghost\" renders a .btn trigger, not a value box: it must never also land in LIBRARY_VALUE_BOX.ids.");
-check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-vocab.js:input[type="text"]', "library-vocab.js:select.xp-dict-lang", "library-vocab.js:textarea.vocab-note-input"]) &&
+check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-vocab.js:input[type="text"]', "library-vocab.js:textarea.vocab-note-input"]) &&
   /groupUnit\.className = "vocab-group-unit";[\s\S]{0,400}groupUnit\.appendChild\(groupInput\);/.test(libraryVocabJs),
   `ui-contract-tests.mjs: the runtime library value-box harvest drifted -- got ${JSON.stringify(LIBRARY_VALUE_BOX.built)} ` +
-  "(expected the note editor textarea, the relookup language select and the detail pane's group-unit text input). " +
+  "(expected the note editor textarea and the detail pane's group-unit text input; the relookup language select merged into #vocab-lookup-lang in T7). " +
   "A new runtime value box must join FIELD_TARGETS.lib and VALUE_BOX_LEGS.library; then update this list.");
 function isValueBoxCompound(compound) {
   const c = classifyCompound(compound);
@@ -2289,7 +2289,7 @@ function focusShapeOffenders(css, ns) {
   // the hand rule keeps only the glow / outline suppression. So a hand rule is
   // judged on the generated declarations of the SAME selector text merged
   // under its own (hand wins, as in the cascade: it comes later) -- library's
-  // .xp-dict-lang suppresses its outline on the very selector whose generated
+  // listbox button suppresses its outline on the very selector whose generated
   // rule paints the core -- and a glow-only rule's :focus partner is looked up
   // in both regions (bySelector above already reads the whole file).
   const generatedBySelector = new Map();
@@ -2423,10 +2423,10 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
     }
   }
   const generatedCore = (core) => `/* @generated:ui-components start (library) */
-.xp-dict-lang:focus-visible:not(:disabled) { background-color: var(--lib-field-bg-focus); border-color: ${core}; }
+.listbox-btn:focus-visible:not(:disabled) { background-color: var(--lib-field-bg-focus); border-color: ${core}; }
 .vocab-note-input:focus:not(:disabled) { background-color: var(--lib-field-bg-focus); border-color: ${core}; }
 /* @generated:ui-components end (library) */
-.xp-dict-lang:focus-visible:not(:disabled) { outline: none; box-shadow: var(--lib-focus-ring); }
+.listbox-btn:focus-visible:not(:disabled) { outline: none; box-shadow: var(--lib-focus-ring); }
 .vocab-note-input:focus-visible:not(:disabled) { box-shadow: var(--lib-focus-ring); }
 `;
   const mergedOwn = focusShapeOffenders(generatedCore("var(--lib-field-border-focus)"), "lib");
@@ -2518,8 +2518,9 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
   // Both panes end the same way: one closing row, destructive action pushed
   // to its right end. (The footers' class names move off .lib-section in T7 /
   // T8, which rewrite the two className halves of this check.)
-  check(/\.vocab-detail-footer > \.vocab-detail-delete,\s*\n\.notes-detail-footer > \.notes-detail-delete \{ margin-left: auto; \}/.test(libraryCss) &&
-    /footer\.className = "lib-section vocab-detail-footer"/.test(libraryVocabJs) &&
+  check(/\.vocab-detail-footer > \.vocab-detail-delete \{ margin-inline-end: auto; \}/.test(libraryCss) &&
+    /\.notes-detail-footer > \.notes-detail-delete \{ margin-left: auto; \}/.test(libraryCss) &&
+    /footer\.className = "vocab-detail-footer";/.test(libraryVocabJs) &&
     /footer\.className = "lib-section notes-detail-footer"/.test(read("library-notes.js")),
     "library.css/library-{vocab,notes}.js: the detail panes' shared closing action row is gone or asymmetric");
 }
@@ -2637,7 +2638,7 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
     "library.css: .vocab-ctx-text stopped taking the count row's slack — Select all drifts back to the middle of the line");
 }
 // Lookup row moved into the detail panel (2026-08-07, L1). It filters nothing,
-// and its result renders in #vocab-detail -- a control belongs where its
+// and its result renders in #vocab-ref-result beside it -- a control belongs where its
 // output appears, and beside the search box it read as a second search box.
 {
   const paneStart = libraryHtml.indexOf('id="vocab-detail-pane"');
@@ -2661,9 +2662,12 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
   check(/@media \(max-width: 860px\) \{[\s\S]*?\.vocab-filter-row > \.vocab-lookup-narrow \{ display: inline-flex; \}[\s\S]*?\n\}/.test(libraryCss) &&
     /\.vocab-filter-row > \.vocab-lookup-narrow \{ display: none;/.test(libraryCss),
     "library.css: the narrow lookup door is not media-gated to the single-pane range (it is the door to a pane that is only hidden down there)");
-  check(/function _pbpVocabOpenLookupPane\(\) \{\s*\n\s*document\.body\.classList\.add\("lib-narrow-detail"\);[\s\S]{0,220}?input\.focus\(/.test(libraryVocabJs) &&
+  // The narrow door (spec §2.5 row 3): the lookup row lives in the reference
+  // column now, which on one column sits under the word -- bring the column
+  // into view first, then put the caret in the box without scrolling again.
+  check(/function _pbpVocabOpenLookupPane\(\) \{\s*\n\s*document\.body\.classList\.add\("lib-narrow-detail"\);[\s\S]{0,160}?\$id\("vocab-ref"\)[\s\S]{0,80}?scrollIntoView\(\{ block: "start" \}\)[\s\S]{0,200}?input\.focus\(\{ preventScroll: true \}\)/.test(libraryVocabJs) &&
     /\["vocab-lookup-narrow", "vocab-signed-out-lookup"\][\s\S]{0,160}?addEventListener\("click", _pbpVocabOpenLookupPane\)/.test(libraryVocabJs),
-    "library-vocab.js: a narrow lookup door stopped opening the pane and focusing the lookup box");
+    "library-vocab.js: a narrow lookup door stopped bringing #vocab-ref into view before focusing the lookup box (preventScroll)");
   check(/id="vocab-lookup-narrow"[^>]*data-i18n-title=/.test(libraryHtml) &&
     /id="vocab-lookup-narrow"[^>]*aria-label=/.test(libraryHtml) &&
     /id="vocab-lookup-narrow"[^>]*title=/.test(libraryHtml),
@@ -3373,7 +3377,7 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
   }
 }
 // The ladder grammar must discriminate -- on popup's shapes AND on the two
-// library shapes Task 7 registered (spec §2.1: .xp-dict-lang keeps
+// library shapes Task 7 registered (spec §2.1: the listbox button keeps
 // :focus-visible; the group unit's trigger is `:has(> input[type="text"]
 // :focus)` and a disabled input takes no hover) -- FIELD_TARGETS.lib uses
 // exactly the two passing shapes below. [rest, hover, focus, must pass]
@@ -3382,11 +3386,11 @@ for (const [ns, targets] of Object.entries(FIELD_TARGETS)) {
     // popup shapes
     [".tags-input-wrap", ".tags-input-wrap:hover:where(:not(:focus-within, :disabled))", ".tags-input-wrap:focus-within:not(:disabled)", true],
     ['.login-body .secret-field > input[type="password"]', '.login-body .secret-field:hover:where(:not(:focus-within)) > input[type="password"]:where(:not(:disabled))', '.login-body .secret-field:focus-within > input[type="password"]:not(:disabled)', true],
-    // an .xp-dict-lang-like entry
-    [".xp-dict-lang", ".xp-dict-lang:hover:where(:not(:focus-visible, :disabled))", ".xp-dict-lang:focus-visible:not(:disabled)", true],
-    [".xp-dict-lang", ".xp-dict-lang:hover:where(:not(:focus, :disabled))", ".xp-dict-lang:focus-visible:not(:disabled)", false],
-    [".xp-dict-lang", ".xp-dict-lang:hover:where(:not(:focus-visible))", ".xp-dict-lang:focus-visible:not(:disabled)", false],
-    [".xp-dict-lang", ".xp-dict-lang:where(:hover:not(:focus-visible):not(:disabled))", ".xp-dict-lang:focus-visible", false],
+    // a listbox-button-like entry (focus on :focus-visible)
+    [".listbox-btn", ".listbox-btn:hover:where(:not(:focus-visible, :disabled))", ".listbox-btn:focus-visible:not(:disabled)", true],
+    [".listbox-btn", ".listbox-btn:hover:where(:not(:focus, :disabled))", ".listbox-btn:focus-visible:not(:disabled)", false],
+    [".listbox-btn", ".listbox-btn:hover:where(:not(:focus-visible))", ".listbox-btn:focus-visible:not(:disabled)", false],
+    [".listbox-btn", ".listbox-btn:where(:hover:not(:focus-visible):not(:disabled))", ".listbox-btn:focus-visible", false],
     // the old `includes` prefix trap: :focus-visible does not excuse :focus
     ['.field > input[type="text"]', '.field > input[type="text"]:hover:where(:not(:focus-visible, :disabled))', '.field > input[type="text"]:focus:not(:disabled)', false],
     // a group-unit-like entry
@@ -7311,10 +7315,8 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
 // site from this batch or a future regression re-introducing one.
 {
   const ITALIC_ALLOWLIST = {
-    "library.css": {
-      ".xp-dict-pos": 'part-of-speech tags are English-normalised by the API across query languages (sampled ja/ko); local packs write pos:"" (dict-pack.js:75,388)',
-      ".xp-dict-sense-tag": "sense tags are English-normalised by the API across query languages (sampled ja/ko); local packs write them empty (dict-pack.js:75,388)",
-    },
+    // library.css has none since the redesign's dictionary column (T7a):
+    // its part-of-speech and sense tags are upright muted text there.
     "md-preview.css": {
       ".xp-dict-pos": 'part-of-speech tags are English-normalised by the API across query languages (sampled ja/ko); local packs write pos:"" (dict-pack.js:75,388)',
       ".xp-dict-sense-tag": "sense tags are English-normalised by the API across query languages (sampled ja/ko); local packs write them empty (dict-pack.js:75,388)",
@@ -8596,20 +8598,20 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
   const listboxBtnNodes = listboxGraftNodes.filter((n) => n.tag === "button");
   const LIB_NODES = [...LIB_TREE, ...runtimeNodes, ...listboxGraftNodes];
-  check(!!detailNode && runtimeNodes.length === 4,
-    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes under #vocab-detail (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 4)`);
+  check(!!detailNode && runtimeNodes.length === 3,
+    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes under #vocab-detail (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 3)`);
   const libCov = valueBoxCoverage(LIB_NODES, LIB);
   check(libCov.entries === 6 && libCov.uncovered.length === 0,
     `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 6); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
   check(libCov.dead.length === 0, `ui-components.mjs: FIELD_TARGETS.lib entries whose rest selector reaches nothing in library.html + the runtime boxes: ${libCov.dead.map((t) => t.id).join(", ")}`);
   const libSelects = LIB_NODES.filter((n) => n.tag === "select" && !Object.hasOwn(n.attrs, "hidden") && !Object.hasOwn(n.attrs, "data-listbox"));
   const selectMiss = libSelects.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
-  check(libSelects.length === 2 && selectMiss.length === 0,
-    `library.html + runtime boxes / FIELD_TARGETS.lib: every rendered <select> must be the rest box of exactly one entry -- ${libSelects.length} select(s) (expected 2: #vocab-lookup-lang until T7, .xp-dict-lang), unpainted or doubly painted: ${selectMiss.map((n) => n.attrs.id ? `#${n.attrs.id}` : `select.${n.classes.join(".")}`).join(", ") || "none"}`);
+  check(libSelects.length === 0 && selectMiss.length === 0,
+    `library.html + runtime boxes / FIELD_TARGETS.lib: every rendered <select> must be the rest box of exactly one entry -- ${libSelects.length} select(s) (expected 0: every rendered select is a listbox carrier since T7), unpainted or doubly painted: ${selectMiss.map((n) => n.attrs.id ? `#${n.attrs.id}` : `select.${n.classes.join(".")}`).join(", ") || "none"}`);
   const listboxMiss = listboxBtnNodes.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
-  check(listboxBtnNodes.length === 1 && listboxMiss.length === 0,
+  check(listboxBtnNodes.length === 2 && listboxMiss.length === 0,
     `library.html + listbox.js / FIELD_TARGETS.lib: every listbox button must be the rest box of exactly one entry -- ${listboxBtnNodes.length} button(s) ` +
-    `(expected 1: #vocab-group-filter-btn; T7 adds #vocab-lookup-lang-btn), unpainted or doubly painted: ${listboxMiss.map((n) => `#${n.attrs.id}`).join(", ") || "none"}`);
+    `(expected 2: #vocab-group-filter-btn, #vocab-lookup-lang-btn), unpainted or doubly painted: ${listboxMiss.map((n) => `#${n.attrs.id}`).join(", ") || "none"}`);
   // The ghost trigger is a .btn: no registry entry may name it, in any role,
   // on any surface (spec §8.3) -- judged on each selector's subject compound.
   const triggerInRegistry = Object.entries(FIELD_TARGETS).flatMap(([ns, entries]) => entries.flatMap((t) =>
@@ -8621,13 +8623,13 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // The two entries T6 reshaped, pinned by value: the button family, and the
   // native-select family narrowed to the lookup language (T7 deletes it).
   const lbEntry = LIB.find((t) => t.id === "lib-listbox");
-  const tsEntry = LIB.find((t) => t.id === "lib-toolbar-select");
   check(!!lbEntry && lbEntry.rest === ".listbox-btn" && lbEntry.hover === ".listbox-btn:hover:where(:not(:focus-visible, :disabled))" &&
     lbEntry.focus === ".listbox-btn:focus-visible:not(:disabled)" && lbEntry.placeholder === null && lbEntry.passenger === null && lbEntry.chevron === null,
     `ui-components.mjs FIELD_TARGETS.lib: lib-listbox must paint .listbox-btn on :focus-visible with no placeholder / passenger / chevron -- got ${JSON.stringify(lbEntry)}`);
-  check(!!tsEntry && tsEntry.rest === ".vocab-lookup-bar select" && tsEntry.chevron === tsEntry.rest &&
-    tsEntry.hover === ".vocab-lookup-bar select:hover:where(:not(:focus, :disabled))" && tsEntry.focus === ".vocab-lookup-bar select:focus:not(:disabled)",
-    `ui-components.mjs FIELD_TARGETS.lib: lib-toolbar-select must cover only the lookup language select until T7 -- got ${JSON.stringify(tsEntry)}`);
+  // T7 merged the relookup select into #vocab-lookup-lang and made that a
+  // listbox: no native select is left for a select-family entry to paint.
+  check(!LIB.some((t) => t.id === "lib-toolbar-select" || t.id === "lib-dict-lang"),
+    `ui-components.mjs FIELD_TARGETS.lib: lib-toolbar-select / lib-dict-lang are back -- library has no native select since T7 (got ${JSON.stringify(LIB.map((t) => t.id))})`);
   const LIB_BOX_NODES = new Set([...libCov.boxes, ...libSelects, ...listboxBtnNodes]);
   const libReaches = (sel, node) => selectorReaches(sel, node, LIB_SCOPE);
   // Scan mode vs strict mode on library (final fix wave; the popup block
@@ -8635,11 +8637,13 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   {
     const libNode = (key) => LIB_NODES.find((n) => (key.startsWith("#") ? n.attrs.id === key.slice(1) : n.classes.includes(key.slice(1))));
     const LIB_SCAN_CASES = [
-      ["#vocab-lookup-input + select", "#vocab-lookup-lang", true, false],
+      // (T7a: the select's sr-only label sits between the two now)
+      ["#vocab-lookup-input + label + select", "#vocab-lookup-lang", true, false],
       ["#vocab-lookup-input ~ select", "#vocab-lookup-lang", true, false],
-      // a runtime box's siblings are unknown (library-vocab.js builds them):
-      // scan mode lets any sibling compound precede it
-      ["#vocab-lookup-input + select", ".xp-dict-lang", true, false],
+      // a grafted listbox's siblings are unknown (listbox.js builds it):
+      // scan mode lets any sibling compound precede it, strict mode never
+      // follows a sibling combinator
+      ["#vocab-lookup-input ~ .listbox > .listbox-btn", "#vocab-lookup-lang-btn", true, false],
       ['html[data-theme="dracula"] .vocab-filter-row select', "#vocab-group-filter", true, false],
       ["#vocab-detail[aria-busy] .vocab-note-input", ".vocab-note-input", true, false],
       ['[role="search"] select', "#vocab-lookup-lang", true, true],
@@ -8746,7 +8750,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // Discrimination: [hand rule appended, caught by the colour scan].
   const CHEVRON = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><path stroke='%23888'/></svg>")`;
   const LIB_CASES = [
-    [`.xp-dict-lang { background-image: ${CHEVRON}; }`, true],
+    [`.listbox-btn { background-image: ${CHEVRON}; }`, true],
     [`html[data-theme="dracula"] .vocab-filter-row select { background-image: ${CHEVRON}; }`, true],
     [".vocab-note-input { background: inherit; }", true],
     [".notes-toolbar input[type=\"search\"] { border: 1px solid; }", true],
@@ -8756,14 +8760,14 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".vocab-group-unit > input[type=\"text\"] { color: var(--lib-fg); }", true],
     [".vocab-note-input::placeholder { color: var(--lib-fg-hint); }", true],
     ["#vocab-search { --lib-field-bg: #fff; }", true],
-    ["@media (forced-colors: none) { .xp-dict-lang { background-color: var(--lib-btn-bg); } }", true],
+    ["@media (forced-colors: none) { .listbox-btn { background-color: var(--lib-btn-bg); } }", true],
     // final fix wave: a sibling combinator and a runtime attribute off the subject
     ["#vocab-lookup-input + select { background-color: var(--lib-bg2); }", true],
     [':root[data-theme] .vocab-lookup-bar input[type="search"] { color: var(--lib-fg); }', true],
     // must stay clean
     [".vocab-group-unit > input[type=\"text\"] { background: transparent; border: 0; }", false],
     [".vocab-group-unit > .vocab-group-step { border-left: 1px solid var(--lib-field-border); }", false],
-    [".xp-dict-lang { border-width: 1px; border-style: solid; background-position: right 6px center; }", false],
+    [".listbox-btn { border-width: 1px; border-style: solid; background-position: right 6px center; }", false],
     [".vocab-note-input:focus-visible:not(:disabled) { box-shadow: var(--lib-focus-ring); }", false],
     ["@media (forced-colors: active) { .notes-toolbar input[type=\"search\"]:focus-visible { outline: 1px solid Highlight; outline-offset: 2px; } }", false],
     [`.listbox-trigger { background-image: ${CHEVRON}; }`, false],
@@ -8793,7 +8797,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(libShapeBad.length === 0,
     "library.css: a hand-written value-box rule draws a bottom edge or splits the radius (stage 4: one frame colour on all four sides, one md radius on all four corners; only the group-unit text passenger's concentric left corners are exempt): " + libShapeBad.join(" | "));
   const LIB_SHAPE_CASES = [
-    [".xp-dict-lang { border-radius: var(--lib-radius-md) var(--lib-radius-md) 0 0; }", true],
+    [".listbox-btn { border-radius: var(--lib-radius-md) var(--lib-radius-md) 0 0; }", true],
     [".vocab-note-input { border-bottom: 1px solid var(--lib-field-border-focus); }", true],
     [".vocab-group-unit { border-top-left-radius: 0; }", true],
     ["#vocab-search { border-bottom-color: var(--lib-accent); }", true],
@@ -8820,21 +8824,21 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const libUrlOffenders = (css) => valueBoxUrlColourOffenders(css, isValueBoxSelector);
   check(libUrlOffenders(libNoComments).length === 0,
     "library.css: a value-box rule carries a colour literal inside url() -- the chevron is var(--lib-field-chevron): " + libUrlOffenders(libNoComments).join(" | "));
-  check(libUrlOffenders(`.xp-dict-lang { background-image: ${CHEVRON}; }`).length === 1 &&
+  check(libUrlOffenders(`.listbox-btn { background-image: ${CHEVRON}; }`).length === 1 &&
     libUrlOffenders(`html[data-theme="dracula"] .vocab-filter-row select { background-image: ${CHEVRON}; }`).length === 1 &&
     libUrlOffenders(`.listbox-trigger { background-image: ${CHEVRON}; }`).length === 0 &&
-    libUrlOffenders(".xp-dict-lang { background-image: var(--lib-field-chevron); }").length === 0,
+    libUrlOffenders(".listbox-btn { background-image: var(--lib-field-chevron); }").length === 0,
     "ui-contract-tests.mjs: the library url() colour scan no longer discriminates");
 
   // The value-box model itself must tell library's boxes from their neighbours.
-  check(isValueBoxSelector(".vocab-note-input:focus") && isValueBoxSelector(".xp-dict-lang") && isValueBoxSelector("#vocab-group-filter") &&
+  check(isValueBoxSelector(".vocab-note-input:focus") && isValueBoxSelector(".listbox-btn") && isValueBoxSelector("#vocab-lookup-lang-btn:hover") &&
     isValueBoxSelector('.notes-toolbar input[type="search"]') && isValueBoxSelector('.vocab-group-unit:has(> input[type="text"]:focus)') &&
     !isValueBoxSelector(".vocab-group-unit > .vocab-group-step") && !isValueBoxSelector("#vocab-status-filter") &&
-    !isValueBoxSelector(".xp-dict-lang option:checked") && !isValueBoxSelector(".listbox-trigger") &&
-    acceptsFieldFocusCore(".vocab-note-input:focus:not(:disabled)") && acceptsFieldFocusCore(".xp-dict-lang:focus-visible:not(:disabled)") &&
+    !isValueBoxSelector('.listbox-opt[aria-selected="true"]') && !isValueBoxSelector(".vocab-ref-relookup") &&
+    acceptsFieldFocusCore(".vocab-note-input:focus:not(:disabled)") && acceptsFieldFocusCore(".listbox-btn:focus-visible:not(:disabled)") &&
     acceptsFieldFocusCore('.notes-toolbar input[type="search"]:focus-visible:not(:disabled), .vocab-lookup-bar input[type="search"]:focus-visible:not(:disabled)') &&
     !acceptsFieldFocusCore(".vocab-group-unit > .vocab-group-step:focus-visible"),
-    "ui-contract-tests.mjs: the value-box model no longer tells library's value boxes (toolbar search, selects, .xp-dict-lang, note editor, group-unit shell) from their neighbours");
+    "ui-contract-tests.mjs: the value-box model no longer tells library's value boxes (toolbar search, listbox buttons, note editor, group-unit shell) from their neighbours");
 
   // (e) §8 law 3 under stage 4: the stepper dividers are the shell's frame
   // colour at rest and follow the shell into its hover state under exactly
@@ -8876,7 +8880,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const LIB_FORCED_CASES = [
     // appended to the shipped file: [rule, must be caught]
     ["#vocab-search:focus { outline: none !important; }", true],
-    [".xp-dict-lang:focus-visible:not(:disabled) { outline: none; }", true],
+    ["#vocab-lookup-lang-btn:focus-visible:not(:disabled) { outline: none; }", true],
     [".vocab-note-input:focus:not(:disabled):not(.a):not(.b) { outline-style: none; }", true],
     ["@media (forced-colors: active) { .vocab-group-unit:has(> input[type=\"text\"]:focus):not(:disabled):not(.x) { outline: 0; } }", true],
     // (T6: the group filter's box is listbox.js's .listbox-btn now; this case
@@ -8895,21 +8899,21 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     // final fix wave: a sibling combinator and a runtime attribute off the
     // subject reach the box in the browser; a :not(:focus-within) on a
     // SIBLING compound excludes nothing
-    ["#vocab-lookup-input + select { outline: none !important; }", true],
+    ["#vocab-lookup-input ~ .listbox > .listbox-btn { outline: none !important; }", true],
     [":root[data-theme] .vocab-note-input { outline: none !important; }", true],
     ['#vocab-detail[aria-busy="true"] .vocab-group-unit { outline: none !important; }', true],
-    [".vocab-lookup-bar > #vocab-lookup-input:not(:focus-within) + select:focus { outline: none !important; }", true],
+    [".vocab-lookup-bar > #vocab-lookup-input:not(:focus-within) ~ .listbox > .listbox-btn:focus { outline: none !important; }", true],
     // must stay clean
-    [".vocab-lookup-bar:not(:focus-within) > #vocab-lookup-input + select:focus { outline: none !important; }", false],
+    [".vocab-lookup-bar:not(:focus-within) > #vocab-lookup-input ~ .listbox > .listbox-btn:focus { outline: none !important; }", false],
     ["#vocab-lookup-lang + input[type=\"search\"] { outline: none !important; }", false],
-    ["@media (forced-colors: none) { .xp-dict-lang:focus-visible { outline: none !important; } }", false],
+    ["@media (forced-colors: none) { .listbox-btn:focus-visible { outline: none !important; } }", false],
     [".vocab-group-unit > input[type=\"text\"]:focus { outline: none !important; }", false],
     [".notes-toolbar input[type=\"search\"]:focus { outline: none; }", false],
     [".vocab-note-input { outline: none; }", false],
     [".vocab-note-input:not(:focus) { outline: none !important; }", false],
     [".vocab-group-unit:not(:focus-within) { outline: none !important; }", false],
     ['.vocab-group-unit:not(:has(> input[type="text"]:focus)) { outline: none !important; }', false],
-    ["#vocab-detail:not(:focus-within) .xp-dict-lang { outline: none !important; }", false],
+    ["#vocab-lookup-bar:not(:focus-within) .listbox-btn { outline: none !important; }", false],
     // a multi-argument :where() is an OR: no exclusion is credited from it
     [".vocab-note-input:where(:not(:focus), .never) { outline: none !important; }", true],
   ];
@@ -9191,6 +9195,57 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "library.css: .listbox-trigger must put the word before the arrow (row-reverse) and never break it (nowrap -- a CJK word's min-content is one character, so the G7 oracle's min-content row under-measured the button)");
   check(!isValueBoxSelector("#vocab-sort-btn") && !isValueBoxSelector(".listbox-trigger") && !isValueBoxSelector(".listbox-trigger.btn.ghost:hover"),
     "ui-contract-tests.mjs: the value-box model treats the ghost sort trigger as a value box -- it is a .btn (spec §8.3)");
+}
+
+// ---- Library redesign T7a (spec §4.1, §4.8-§4.10, §8.4): the dictionary
+// reference column. One static section in the detail sheet holds the lookup
+// row and one result host; the word's own language and the lookup language
+// are one list box (the relookup select is gone); the tail with the
+// destructive action follows it. DOM order is the Tab order.
+{
+  const fnBody = (src, sig) => (src.split(sig)[1] || "").split("\n}\n")[0];
+  const paneStart = libraryHtml.indexOf('id="vocab-detail-pane"');
+  const pane = paneStart < 0 ? "" : libraryHtml.slice(paneStart, libraryHtml.indexOf("</aside>", paneStart));
+  const order = ['class="vocab-sheet"', 'id="vocab-detail-empty"', 'id="vocab-detail"', 'id="vocab-ref"', 'id="vocab-ref-label"',
+    'id="vocab-lookup-bar"', 'id="vocab-ref-result"', 'id="vocab-detail-tail"'].map((needle) => pane.indexOf(needle));
+  check(order.every((at, i) => at > 0 && (i === 0 || at > order[i - 1])),
+    `library.html: the detail pane lost the spec §4.1 order (.vocab-sheet > cover, #vocab-detail, #vocab-ref > label + lookup row + #vocab-ref-result, then #vocab-detail-tail) -- DOM order is the Tab order: ${JSON.stringify(order)}`);
+  const langTag = (/<select\b[^>]*\bid="vocab-lookup-lang"[^>]*>/.exec(libraryHtml) || [""])[0];
+  check(/\sdata-listbox="float"/.test(langTag) && !/\sdata-listbox-face=/.test(langTag) &&
+    /<label class="sr-only" for="vocab-lookup-lang" data-i18n="dictLangAria">/.test(libraryHtml),
+    "library.html: #vocab-lookup-lang must be a float value-box listbox named by its sr-only label[for] (spec §8.4)");
+  const goTag = (/<button\b[^>]*\bid="vocab-lookup-go"[^>]*>/.exec(libraryHtml) || [""])[0];
+  check(/\bclass="btn"/.test(goTag) && /\bdata-i18n="libraryLookupGo"/.test(goTag),
+    "library.html: #vocab-lookup-go must be the md text button \"Look up\" (spec §4.8), not an sm icon button");
+  check(!/className = "xp-dict-(?:lang|head)"/.test(libraryVocabJs) && !/\bslot\.replaceChildren\(/.test(libraryVocabJs),
+    "library-vocab.js: the relookup language select / head is built again, or a slot is replaceChildren()'d (rules/dict.md slot invariant)");
+  check(/detail\.replaceChildren\(frag\);\s*\n\s*\$id\("vocab-detail-tail"\)\.replaceChildren\(footer\);/.test(libraryVocabJs) &&
+    /footer\.className = "vocab-detail-footer";/.test(libraryVocabJs),
+    "library-vocab.js: the closing row is no longer the tail's own footer.vocab-detail-footer, rebuilt right after #vocab-detail (spec §4.1)");
+  const host = fnBody(libraryVocabJs, "function _pbpVocabStatusHost(detailReady) {");
+  check(host.includes('document.querySelector("#vocab-detail-tail .vocab-detail-footer")') &&
+    !host.includes("#vocab-detail .vocab-detail-footer") && !host.includes("_pbpVocabNarrowMode()") &&
+    /insertBefore\(el, save\)/.test(host),
+    "library-vocab.js: _pbpVocabStatusHost must host #vocab-status in the tail's footer whenever the detail is ready, at any width, between the delete and Save (spec §4.7)");
+  check(/const listGone = [^;]*getClientRects\(\)\.length === 0/.test(host) && /!listGone && batch/.test(host) &&
+    /if \(detailReady !== undefined\) _vocabStatusDetailReady = !!detailReady;/.test(host),
+    "library-vocab.js: _pbpVocabStatusHost must take the batch row's slot only while the list pane is rendered -- narrow detail takes it off the page (spec §4.7 \"batch row visible\") -- and an undefined detailReady must keep the last readiness (T4b re-home)");
+  const idle = fnBody(libraryVocabJs, "function _pbpVocabRenderRefIdle(mode) {");
+  const click = idle.slice(idle.indexOf('addEventListener("click", async'));
+  const firstAwait = (/await\s+([^;]+);/.exec(click) || [])[1] || "";
+  check(/^chrome\.permissions\.request\(\{ origins: \[PBP_DICT_ORIGIN \+ "\/\*"\] \}\)$/.test(firstAwait.trim()),
+    `library-vocab.js: the lookup button's first await must be chrome.permissions.request (the user gesture is spent by any earlier await) -- got ${JSON.stringify(firstAwait)}`);
+  check(!fnBody(libraryVocabJs, "function _pbpVocabReconcileDetail() {").includes("vocab-detail-dict"),
+    "library-vocab.js: _pbpVocabReconcileDetail still carries dictionary nodes -- #vocab-ref-result is static and a same-word refresh never rebuilds it");
+  check(/function _pbpVocabRenderDetail\(w, enterNarrow\) \{[\s\S]{0,2400}?const changed = nextId !== _pbpVocabDetailWordId;[\s\S]{0,200}?if \(changed\) _pbpVocabResetRef\(w \|\| null\);/.test(libraryVocabJs),
+    "library-vocab.js: only a CHANGE of the open entry may reset the dictionary column (a refresh or a second activation of the same word keeps the result and its run)");
+  const hand = stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, "");
+  check(!/\.xp-dict-(?:lang|head)\b/.test(hand) && !/\.vocab-lookup-bar select\b/.test(hand) && !/\.vocab-filter-toolbar select\b/.test(hand),
+    "library.css: a hand rule still styles the retired relookup select / head or a native lookup select");
+  check(declarationValueMap(hand, "#vocab-ref-result[data-same-word] :is(.xp-dict-ipa, .xp-dict-ipa-tag)").get("display") === "none",
+    "library.css: a lookup of the open word repeats its IPA in the dictionary result (spec §4.9: hide .xp-dict-ipa / -tag under #vocab-ref-result[data-same-word])");
+  check(!/border-radius:\s*6px/.test((/#vocab-ref-result :is\(\.xp-retry, \.xp-dict-connect\)\s*\{([^}]*)\}/.exec(hand) || [, "border-radius: 6px"])[1]),
+    "library.css: the dictionary retry / connect buttons lost their scoped rule or went back to a literal 6px radius (spec §4.9: --lib-radius-md)");
 }
 
 if (fail.length) {

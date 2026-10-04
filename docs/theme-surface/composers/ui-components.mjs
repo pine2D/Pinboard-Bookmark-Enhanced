@@ -771,20 +771,8 @@ export const FIELD_TARGETS = Object.freeze({
       passenger: null,
       chevron: null,
     }),
-    // #vocab-lookup-lang, the last native select (spec §8.4; T7 turns it into
-    // a listbox and deletes this entry). The group filter left this entry for
-    // lib-listbox below (library redesign T6). Focus on :focus.
-    Object.freeze({
-      id: "lib-toolbar-select",
-      rest: ".vocab-lookup-bar select",
-      hover: ".vocab-lookup-bar select:hover:where(:not(:focus, :disabled))",
-      focus: ".vocab-lookup-bar select:focus:not(:disabled)",
-      placeholder: null,
-      passenger: null,
-      chevron: ".vocab-lookup-bar select",
-    }),
     // listbox.js's value-box button (library redesign T6, spec §8.4): the
-    // group filter, and the lookup language from T7. Its ghost face
+    // group filter and the dictionary lookup language. Its ghost face
     // (.listbox-trigger, the sort menu button) is a .btn and never an entry
     // here. Focus on :focus-visible, the shipped listbox trigger (options').
     Object.freeze({
@@ -795,18 +783,6 @@ export const FIELD_TARGETS = Object.freeze({
       placeholder: null,
       passenger: null,
       chevron: null,
-    }),
-    // The word relookup's language select (library-vocab.js). Focus stays on
-    // :focus-visible (spec §2.1). md-preview's own .xp-dict-lang lives in
-    // md-preview.css and is untouched.
-    Object.freeze({
-      id: "lib-dict-lang",
-      rest: ".xp-dict-lang",
-      hover: ".xp-dict-lang:hover:where(:not(:focus-visible, :disabled))",
-      focus: ".xp-dict-lang:focus-visible:not(:disabled)",
-      placeholder: null,
-      passenger: null,
-      chevron: ".xp-dict-lang",
     }),
     // The detail pane's note editor (library-vocab.js); it used to inherit
     // the pane's paint (transparent).

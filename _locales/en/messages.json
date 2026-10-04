@@ -3941,6 +3941,10 @@
   "libraryVocabSignedOutTitle": { "message": "Sign in to use Vocabulary" },
   "libraryVocabSignedOutHint": { "message": "Vocabulary is kept separate for each Pinboard account. Dictionary lookup remains available without signing in." },
   "libraryVocabOpenSettings": { "message": "Open account settings" },
-  "libraryLookupSignedOutHint": { "message": "Look up a word above. Sign in to save it to your vocabulary." },
-  "mdPreviewClose": { "message": "Close reader" }
+  "libraryLookupSignedOutHint": { "message": "Look up any word in the Dictionary section. Sign in to save words to your vocabulary." },
+  "mdPreviewClose": { "message": "Close reader" },
+  "librarySectionDict": { "message": "Dictionary" },
+  "libraryLookupOther": { "message": "Look up another word" },
+  "libraryDictIdle": { "message": "Look up this word in the dictionary" },
+  "libraryDictIdleFree": { "message": "Type any word to look up its dictionary entry" }
 }

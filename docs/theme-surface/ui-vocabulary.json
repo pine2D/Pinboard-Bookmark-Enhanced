@@ -232,7 +232,9 @@
         "lib-block",
         "lib-cluster",
         "lib-count-row",
+        "lib-first-line",
         "lib-hang-end",
+        "lib-hang-label",
         "lib-hang-start",
         "lib-section",
         "notes-batch-bar",
@@ -254,6 +256,8 @@
         "vocab-detail-pane",
         "vocab-list-pane",
         "vocab-list-region",
+        "vocab-ref",
+        "vocab-sheet",
         "vocab-workbench"
       ],
       "components": [
@@ -297,12 +301,17 @@
         "vocab-load-more",
         "vocab-note-input",
         "vocab-note-save",
+        "vocab-ref-foot",
+        "vocab-ref-free",
+        "vocab-ref-head",
+        "vocab-ref-idle",
+        "vocab-ref-relookup",
+        "vocab-ref-speak",
+        "vocab-ref-term",
         "vocab-row-groups",
         "vocab-row-headline",
         "vocab-status-toggles",
         "xp-dict",
-        "xp-dict-head",
-        "xp-dict-lang",
         "xp-dict-local",
         "xp-dict-online",
         "xp-dict-slot"
@@ -318,7 +327,9 @@
         "lib-section",
         "lib-block",
         "vocab-batch-bar",
-        "notes-batch-bar"
+        "notes-batch-bar",
+        "vocab-sheet",
+        "vocab-ref"
       ]
     },
     "listbox": {

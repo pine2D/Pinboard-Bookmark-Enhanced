@@ -3947,6 +3947,10 @@
   "libraryVocabSignedOutTitle": { "message": "Войдите, чтобы пользоваться словарём" },
   "libraryVocabSignedOutHint": { "message": "Словарь хранится отдельно для каждого аккаунта Pinboard. Поиск определений доступен и без входа." },
   "libraryVocabOpenSettings": { "message": "Открыть настройки аккаунта" },
-  "libraryLookupSignedOutHint": { "message": "Найдите слово выше. Войдите, чтобы сохранить его в словарь." },
-  "mdPreviewClose": { "message": "Закрыть режим чтения" }
+  "libraryLookupSignedOutHint": { "message": "Найдите слово в разделе «Словарь». Войдите, чтобы сохранить его в словарик." },
+  "mdPreviewClose": { "message": "Закрыть режим чтения" },
+  "librarySectionDict": { "message": "Словарь" },
+  "libraryLookupOther": { "message": "Найти другое слово" },
+  "libraryDictIdle": { "message": "Найти это слово в словаре" },
+  "libraryDictIdleFree": { "message": "Введите любое слово, чтобы найти его в словаре" }
 }

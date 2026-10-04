@@ -386,22 +386,6 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
 .notes-toolbar input[type="search"]::placeholder, .vocab-lookup-bar input[type="search"]::placeholder {
   color: var(--lib-field-placeholder);
 }
-.vocab-lookup-bar select {
-  background-color: var(--lib-field-bg);
-  border-color: var(--lib-field-border);
-  color: var(--lib-field-fg);
-}
-.vocab-lookup-bar select:hover:where(:not(:focus, :disabled)) {
-  background-color: var(--lib-field-bg-hover);
-  border-color: var(--lib-field-border-hover);
-}
-.vocab-lookup-bar select:focus:not(:disabled) {
-  background-color: var(--lib-field-bg-focus);
-  border-color: var(--lib-field-border-focus);
-}
-.vocab-lookup-bar select {
-  background-image: var(--lib-field-chevron);
-}
 .listbox-btn {
   background-color: var(--lib-field-bg);
   border-color: var(--lib-field-border);
@@ -414,22 +398,6 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
 .listbox-btn:focus-visible:not(:disabled) {
   background-color: var(--lib-field-bg-focus);
   border-color: var(--lib-field-border-focus);
-}
-.xp-dict-lang {
-  background-color: var(--lib-field-bg);
-  border-color: var(--lib-field-border);
-  color: var(--lib-field-fg);
-}
-.xp-dict-lang:hover:where(:not(:focus-visible, :disabled)) {
-  background-color: var(--lib-field-bg-hover);
-  border-color: var(--lib-field-border-hover);
-}
-.xp-dict-lang:focus-visible:not(:disabled) {
-  background-color: var(--lib-field-bg-focus);
-  border-color: var(--lib-field-border-focus);
-}
-.xp-dict-lang {
-  background-image: var(--lib-field-chevron);
 }
 .vocab-note-input {
   background-color: var(--lib-field-bg);
@@ -486,9 +454,8 @@ input[type="checkbox"], input[type="radio"] {
    FIELD_TARGETS.lib (stage 4, spec 2026-09-30-ui-fields-stage4-design §3.3)
    paints fill, frame, typed text, placeholder, hover and focus from the
    --lib-field-* roles on the toolbar search fields (.notes-toolbar /
-   .vocab-lookup-bar input[type="search"]), the lookup-language select
-   (.vocab-lookup-bar select) and .xp-dict-lang, which also take
-   --lib-field-chevron, listbox.js's .listbox-btn, the .vocab-group-unit shell
+   .vocab-lookup-bar input[type="search"]), listbox.js's .listbox-btn (the
+   group filter and the dictionary language), the .vocab-group-unit shell
    and its passengers, and the note editor (.vocab-note-input).
    What stays hand-written below is the SHAPE half only: height, padding,
    radius, width, border width/style, the sm-rung toolbar geometry
@@ -1288,9 +1255,7 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
    applies, and it has neither font-size nor line-height pinned anywhere else
    in the file, so both need resetting (the plain, unpilled "language" chip
    in .vocab-detail-head would otherwise render at full 15px prose size next
-   to a 22px term). .xp-dict-lang is the third case: a <select> that opts
-   BACK into inheritance with its own `font: inherit`, which pulls the
-   unitless 1.65 along with it -- reset at its own rule below, not here. */
+   to a 22px term). */
 .vocab-detail-pane .notes-meta-chip { font-size: 12px; line-height: normal; }
 /* vocab-group-inspect-report.md 2026-08-05 Finding 8: the rule above is
    written for the plain unpilled language chip in .vocab-detail-head (see
@@ -1429,22 +1394,20 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
 .vocab-detail-gloss { white-space: pre-wrap; overflow-wrap: anywhere; } /* placement: .lib-block */
 .vocab-gloss-ipa { color: var(--lib-fg-muted); }
 .vocab-detail-context mark { background: transparent; color: var(--lib-accent); font-weight: 600; }
-/* Closing action row (USER RULING 2026-08-06, variant C). "Look up again"
-   and "Remove from vocabulary" used to be two separate full-width-ish rows
-   stacked at the bottom of the pane, each with its own top margin; they are
-   both "things you do to this word when you are done reading it", so they
-   share one rule-topped row. The re-lookup stays left (additive, safe), the
-   destructive one is pushed right by `margin-left: auto` -- the two are as
-   far apart as the row allows, which is the point.
-   The save button joins this row at its right end; see the note-editor block
-   further down for the seam that separates it from the delete. */
+/* Closing action row. The vocabulary one is the detail's tail since the
+   library redesign (T7a, spec §4.7): delete hung on the left, the status
+   sentence, Save at the right end -- "Look up again" moved under the
+   dictionary result. The notes footer keeps the older shape (delete pushed
+   right) until T8. */
 .vocab-detail-footer,
 .notes-detail-footer {
   display: flex;
   align-items: center;
-  gap: var(--lib-sp-2); /* the rule-topped separator above the row is .lib-section */
+  gap: var(--lib-sp-2);
 }
-.vocab-detail-footer > .vocab-detail-delete,
+/* The vocabulary tail reads delete | air | status | Save (spec §4.7); the
+   notes footer keeps its delete on the right until T8 rebuilds that pane. */
+.vocab-detail-footer > .vocab-detail-delete { margin-inline-end: auto; }
 .notes-detail-footer > .notes-detail-delete { margin-left: auto; }
 /* Below the two-pane threshold the list pane is taken off the page while a
    detail is open, so the delete-failure live region follows the pressed
@@ -1457,146 +1420,14 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
 .vocab-detail-footer,
 .notes-detail-footer { flex-wrap: wrap; }
 .vocab-detail-footer > .vocab-main-status {
-  flex: 1 1 100%;
-  margin-left: 0;
-  white-space: normal;
-}
-/* `.btn`'s author-origin `display: inline-flex` outranks the UA
-   `[hidden] { display: none }` rule (origin beats specificity), so
-   `lookupBtn.hidden = true` in library-vocab.js -- which is how the button
-   retires itself after one lookup -- did not actually hide it. Invisible
-   while the button sat alone on its own line; a dead control stranded at the
-   left end of a shared row now. Same mechanism the note-save button
-   documents below, opposite resolution: this one really should leave. */
-.vocab-detail-relookup[hidden] { display: none; }
-/* Dictionary region back down to a 14px scale (Task 2): a step below the
-   15px prose baseline (this is reference/lookup material, not the word's own
-   stored definition) and a step above the 12px control scale. Scoped to the
-   whole .vocab-detail-dict wrapper -- not just .xp-dict-slot -- so the
-   language <select> in .xp-dict-head and the results below it read at one
-   consistent size instead of the select sitting at the 15px ambient while
-   the results below it sit at 14px. Every .xp-dict-* size below this point
-   is relative (em) to whatever lands here. */
-.vocab-detail-dict { font-size: 14px; } /* separator: .lib-section */
-/* The host exists on every render but stays empty until "Look up again" is
-   pressed, and an empty box still paints its own separator: with the closing
-   row's rule now sitting right under it, that was two horizontal lines with
-   nothing between them. A separator with nothing to separate is an artefact,
-   not a rule. */
-.vocab-detail-dict:empty { display: none; }
-/* Free lookup (Task 3): "already in your vocabulary" hint sits between the
-   result head and the dictionary slot, same .btn-sm family as relookup. */
-.vocab-lookup-saved { margin: var(--lib-sp-2) 0; }
-
-/* On-demand dictionary re-lookup (Task 7): subset of md-preview.css's
-   .xp-dict-* rendering classes (md-dict.js's _pbpDictSlotRun /
-   _pbpDictEcdictSide / _pbpDictSlotSkeleton write these class names
-   directly and are shared, unmodified, with md-preview -- this file only
-   supplies the paint). md-preview's light-dark() tokens are replaced per
-   the library mapping: body text -> --lib-fg, secondary/annotation text
-   -> --lib-fg-muted, hint/status copy (.xp-dict-msg) -> --lib-fg-hint,
-   border/divider -> --lib-border, link/emphasis -> --lib-accent, block
-   background -> --lib-code-bg (retry/connect buttons) or --lib-btn-bg
-   (the select, see below). .xp-dict-lang and .xp-dict-connect/.xp-retry are
-   NOT .btn-classed by md-dict.js, so they need their own paint here.
-   .xp-dict-lang is a value box: its colours (field fill, frame, typed text,
-   hover, focus border and the per-theme --lib-field-chevron) come from the
-   generated field recipe, the same FIELD_TARGETS.lib family as the toolbar
-   selects below, so it reads as the same control on this page; only its
-   shape stays here. Its focus stays on :focus-visible (stage 4 §2.1). */
-.xp-dict-head { display: flex; align-items: center; gap: var(--lib-sp-2); margin-bottom: var(--lib-sp-2); }
-.xp-dict-lang {
   flex: 0 1 auto;
-  -webkit-appearance: none;
-  appearance: none;
-  padding: 3px 22px 3px var(--lib-sp-2);
-  border-width: 1px;
-  border-style: solid;
-  border-radius: var(--lib-radius-md);
-  background-repeat: no-repeat;
-  background-position: right 6px center;
-  font: inherit;
-  font-size: 0.8em;
-  /* `font: inherit` above also sets line-height: inherit, pulling in the
-     detail pane's unitless 1.65 -- unlike a plain <button> (see the .btn
-     comment above), a <select> that opts into font inheritance opts into
-     line-height inheritance too. Reset it (fix round 1: verified inflated
-     box height without this, back to a normal ~1-line control height with
-     it). */
-  line-height: normal;
-  cursor: pointer;
-  box-sizing: border-box;
-  box-shadow: none;
-  transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease;
+  min-width: 0;
+  margin: 0;
+  white-space: normal;
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+  color: var(--lib-fg-muted);
 }
-.xp-dict-lang:focus-visible:not(:disabled) { outline: none; box-shadow: var(--lib-focus-ring); }
-.xp-dict-slot { min-height: 20px; }
-.xp-dict-match { color: var(--lib-fg-muted); font-size: 0.8em; margin: 0 0 var(--lib-sp-2); }
-.xp-dict-entry { margin: 0 0 var(--lib-sp-2); }
-.xp-dict-ipa-line { display: flex; flex-wrap: wrap; gap: var(--lib-sp-2); align-items: baseline; }
-.xp-dict-pos { font-style: italic; color: var(--lib-fg-muted); }   /* italic kept: part-of-speech is English-normalised by the API across query languages (sampled ja/ko); local packs write pos:"" (dict-pack.js:75,388) */
-.xp-dict-ipa-tag { font-size: 0.75em; color: var(--lib-fg-muted); }
-.xp-dict-forms { font-size: 0.8em; color: var(--lib-fg-muted); margin-top: var(--lib-sp-1); }
-.xp-dict-senses { margin: var(--lib-sp-2) 0 0; padding-left: 1.4em; }
-.xp-dict-senses li { margin: var(--lib-sp-1) 0; }
-/* A lone sense needs no "1." -- see md-preview.css's twin rule for the reasoning. */
-.xp-dict-senses li:only-child { list-style: none; margin-left: -1.4em; }
-.xp-dict-example { font-size: 0.85em; color: var(--lib-fg-muted); }   /* upright: Free Dictionary API returns example sentences in the query language -- ja/ko are user-selectable and CJK examples are confirmed live, not Latin-only (dict-pack.js:75,388) */
-.xp-dict-sense-tag { font-size: 0.85em; color: var(--lib-fg-muted); font-style: italic; }   /* italic kept: sense tags are English-normalised by the API across query languages (sampled ja/ko); local packs write them empty (dict-pack.js:75,388) */
-/* Stable containers inside .xp-dict-slot: the local pack writes the first,
-   every online path writes the second. Empty until something lands in them. */
-.xp-dict-local:not(:empty) { margin-bottom: var(--lib-sp-2); }
-.xp-dict-local-title { font-size: 0.8em; color: var(--lib-fg-muted); }   /* upright: CJK has no true italic (dictZhBlockTitle renders "中文 · ECDICT") */
-.xp-dict-subsense { font-size: 0.95em; margin-top: var(--lib-sp-1); padding-left: 0.9em; }
-.xp-dict-rel { font-size: 0.85em; color: var(--lib-fg-muted); margin-top: var(--lib-sp-1); }
-/* .xp-dict-rel-label: no rule of its own -- upright (CJK has no true
-   italic), inheriting --lib-fg-muted from .xp-dict-rel above. Renders
-   dictSynonyms/dictAntonyms ("近义词"/"反义词" in zh-CN). */
-.xp-dict-src { font-size: 0.75em; color: var(--lib-fg-muted); margin-top: var(--lib-sp-2); }
-.xp-dict-src a { color: inherit; }
-.xp-dict-msg { color: var(--lib-fg-hint); padding: 4px 0; }
-.xp-dict-more {
-  display: block; margin: 4px 0 0; padding: 0; border: none; background: none;
-  cursor: pointer; font-size: 0.85em; color: var(--lib-accent);
-}
-.xp-dict-more:hover { text-decoration: underline; }
-.xp-dict-more:focus-visible { text-decoration: underline; outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
-/* Clickable lemma inside a form-of pointer: reads as a link, is a button. */
-.xp-dict-lemma-link {
-  padding: 0; border: none; background: none; cursor: pointer; font: inherit;
-  color: var(--lib-accent); text-decoration: underline;
-}
-.xp-dict-lemma-link:hover { color: var(--lib-accent); }
-.xp-dict-lemma-link:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
-/* Loading skeleton (_pbpDictSlotSkeleton) -- shimmering gradient bar, matches
-   md-preview's .xp-skel, renamed keyframe to stay scoped to this file. */
-.xp-skel {
-  height: 0.7em;
-  margin: 0.55em 0;
-  border-radius: 6px;
-  background: linear-gradient(90deg, var(--lib-border) 25%, var(--lib-fg-hint) 50%, var(--lib-border) 75%);
-  background-size: 200% 100%;
-  animation: xp-dict-shimmer 1.2s linear infinite;
-}
-.xp-skel:nth-child(3) { width: 62%; }
-@keyframes xp-dict-shimmer { to { background-position: -200% 0; } }
-/* Permission-connect button + failure retry button: same small pill family. */
-.xp-retry, .xp-dict-connect {
-  padding: var(--lib-sp-1) var(--lib-sp-2);
-  border: 1px solid var(--lib-btn-border);
-  border-radius: 6px;
-  background: var(--lib-code-bg);
-  color: var(--lib-fg);
-  font-size: 0.8em;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background-color var(--motion-state) ease;
-}
-.xp-retry:hover, .xp-dict-connect:hover:not(:disabled) { background: var(--lib-btn-hover, var(--lib-code-bg)); }
-.xp-retry:focus-visible, .xp-dict-connect:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
-.xp-retry:active, .xp-dict-connect:active:not(:disabled) { transform: translateY(1px); }
-.xp-retry svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; }
-.xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
 
 /* Note editor, ported from options.css's .vocab-note-edit/-input/-save family
    (--opt-* tokens translated to their --lib-* equivalents; same closed-field
@@ -1670,11 +1501,11 @@ html.motion-ready .vocab-note-save {
               translate var(--motion-pop) var(--ease-out),
               visibility var(--motion-pop) var(--ease-out);
 }
-/* Save sits at the right end of the closing row, separated from the
-   destructive control beside it. Twice the row's own 8px gap, on top of it:
-   a delete and a commit should not read as two halves of one control. */
+/* Save sits at the right end of the tail (spec §4.7). The delete is hung on
+   the far left with all the free space after it, so the row's own gap is the
+   only space Save needs from the status sentence beside it. */
 .vocab-detail-footer > .vocab-note-save {
-  margin-left: var(--lib-sp-4);
+  margin-left: 0;
 }
 
 /* The vocab variant carries a fourth control (status filter). Flex, not a
@@ -1695,18 +1526,157 @@ html.motion-ready .vocab-note-save {
    These declarations were the mockup's number-one trap: they live on an ID
    selector, so a class-level override is silently outranked no matter how
    many classes it stacks. The fix is to delete them here, not to fight them
-   from a class. (Its seam went with the flat page, 2026-10-03.) */
+   from a class. The row's three controls read as a plain toolbar with
+   visible gaps: sp-2 like .notes-toolbar, one button-row gap on the surface
+   (actionRowGap). */
 #vocab-lookup-bar {
-  margin: 0 0 var(--lib-sp-3);
-  padding-bottom: var(--lib-sp-2);
-  /* The row's three controls are meant to read as a plain toolbar with
-     visible gaps (§8.1) -- but
-     .vocab-filter-toolbar's recipe carries no gap, so the input and the
-     language select were flush (measured 0px live, 2026-08-25) and the
-     select painted over the focused input's right border + focus ring.
-     sp-2 like .notes-toolbar: one button-row gap on the surface (actionRowGap). */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--lib-sp-2);
+  margin: 0;
 }
+/* ---- Detail sheet and dictionary reference column (library redesign T7a,
+   spec §4.1, §4.8, §4.9). T7b adds the container tiers; until then the sheet
+   is one column. Flat canvas: no fill, frame, rule or radius on any of these
+   (the ui-contract canvas gate reads canvasStructures). ---- */
+.vocab-sheet { display: grid; grid-template-columns: minmax(0, var(--lib-main-max)); justify-content: start; align-items: start; }
+/* Author `display` would out-rank the UA [hidden] rule. */
+.vocab-sheet > [hidden] { display: none; }
+.vocab-ref { min-width: 0; margin-top: var(--lib-sp-6); }
+#vocab-detail-tail { min-width: 0; margin-top: var(--lib-sp-6); }
+#vocab-detail-tail:empty { display: none; }
+.lib-hang-label {
+  margin: 0 0 var(--lib-sp-3);
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+  font-weight: 700;
+  color: var(--lib-fg-muted);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+/* md rung for the whole row (spec §4.8): the field states its own height so
+   it cannot drift from the button and the listbox beside it. */
+#vocab-lookup-bar > input[type="search"] { flex: 1 1 160px; min-width: 0; width: auto; height: var(--lib-control-h); box-sizing: border-box; }
+#vocab-lookup-bar > select[data-listbox],
+#vocab-lookup-bar > .listbox { flex: none; width: max-content; }
+#vocab-lookup-go { flex: none; }
+/* Result host (spec §4.8 table): 12 above the idle line / button, 24 above a
+   run or a result. */
+#vocab-ref-result { margin-top: var(--lib-sp-5); font-size: var(--lib-text-body); line-height: var(--lib-lh-body); }
+#vocab-ref-result:empty { display: none; }
+#vocab-ref-result:is([data-ref-state="free"], [data-ref-state="idle"]) { margin-top: var(--lib-sp-3); }
+.vocab-ref-free { margin: 0; font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); color: var(--lib-fg-muted); }
+.vocab-ref-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-1); margin-bottom: var(--lib-sp-4); }
+.vocab-ref-term { min-width: 0; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--lib-fg); overflow-wrap: anywhere; }
+.vocab-ref-head > .vocab-lookup-saved { margin-inline-start: auto; }
+.vocab-ref-foot { margin-top: var(--lib-sp-1); }
+/* md-dict output, scoped to the column (md-dict.js is shared with the reader
+   and untouched; md-preview.css keeps its own .xp-dict-* rules). Every size is
+   px (the reader's em scale was relative to a pane font this page no longer
+   sets), every radius a token. */
+#vocab-ref-result .xp-dict-slot { min-height: 20px; }
+#vocab-ref-result .xp-dict-local:not(:empty) + .xp-dict-online:not(:empty) { margin-top: var(--lib-sp-5); }
+#vocab-ref-result .xp-dict-match { margin: 0 0 var(--lib-sp-2); font-size: 13px; line-height: 18px; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-entry + .xp-dict-entry { margin-top: var(--lib-sp-5); }
+#vocab-ref-result .xp-dict-ipa-line { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--lib-sp-1); }
+#vocab-ref-result .xp-dict-pos { font-size: 13px; line-height: 18px; font-weight: 700; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-ipa { font-size: 14px; line-height: 20px; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-ipa-tag { font-size: 12px; line-height: 16px; color: var(--lib-fg-muted); }
+/* Looking up the open word: its IPA is already on the pronunciation line. */
+#vocab-ref-result[data-same-word] :is(.xp-dict-ipa, .xp-dict-ipa-tag) { display: none; }
+#vocab-ref-result .xp-dict-forms { margin-top: var(--lib-sp-1); font-size: 12px; line-height: 16px; color: var(--lib-fg-muted); }
+/* Numbered senses: a 24px number column drawn by a counter, the text in the
+   rest. Absolute ::before, not a grid: md-dict writes each sense as mixed
+   inline content (tag span, text, lemma button), which a grid would split
+   into separate cells. A single sense is not numbered. */
+#vocab-ref-result .xp-dict-senses { counter-reset: xp-sense; margin: var(--lib-sp-2) 0 0; padding: 0; list-style: none; }
+#vocab-ref-result .xp-dict-senses > li {
+  counter-increment: xp-sense;
+  position: relative;
+  margin: 0;
+  padding-inline-start: var(--lib-sp-5);
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--lib-fg);
+  text-wrap: pretty;
+}
+#vocab-ref-result .xp-dict-senses > li + li { margin-top: var(--lib-sp-3); }
+#vocab-ref-result .xp-dict-senses > li::before {
+  content: counter(xp-sense);
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--lib-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+#vocab-ref-result .xp-dict-senses > li:only-child { padding-inline-start: 0; }
+#vocab-ref-result .xp-dict-senses > li:only-child::before { content: none; }
+#vocab-ref-result .xp-dict-sense-tag { margin-inline-end: var(--lib-sp-1); font-size: 13px; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-example { margin-top: var(--lib-sp-0); font-size: 14px; line-height: 22px; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-subsense { margin-top: var(--lib-sp-1); padding-inline-start: var(--lib-sp-5); font-size: 14px; line-height: 22px; }
+#vocab-ref-result .xp-dict-rel { margin-top: var(--lib-sp-4); font-size: 14px; line-height: 22px; color: var(--lib-fg); }
+#vocab-ref-result .xp-dict-rel + .xp-dict-rel { margin-top: var(--lib-sp-1); }
+#vocab-ref-result .xp-dict-rel-label { display: inline-block; min-width: 40px; font-size: 13px; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-lemma-link {
+  padding: 0; border: none; background: none; cursor: pointer; font: inherit;
+  font-size: 13px; line-height: 18px; color: var(--lib-link); text-decoration: underline;
+}
+#vocab-ref-result .xp-dict-lemma-link:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
+/* "Show N more": a ghost sm button hung on the text edge (spec §6.6). */
+#vocab-ref-result .xp-dict-more {
+  display: block;
+  height: calc(var(--lib-control-h) - 4px);
+  margin: var(--lib-sp-2) 0 0;
+  margin-inline-start: calc(-1 * var(--lib-control-pad-x-sm));
+  padding: 0 var(--lib-control-pad-x-sm);
+  border: none;
+  border-radius: var(--lib-radius-md);
+  background: none;
+  font: inherit;
+  font-size: calc(var(--lib-text-body) - 1px);
+  color: var(--lib-fg);
+  cursor: pointer;
+}
+#vocab-ref-result .xp-dict-more:hover { background: var(--lib-btn-hover); }
+#vocab-ref-result .xp-dict-more:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
+#vocab-ref-result .xp-dict-src { margin-top: var(--lib-sp-5); font-size: 12px; line-height: 16px; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-src a { color: inherit; text-decoration: underline; }
+#vocab-ref-result .xp-dict-msg { padding: var(--lib-sp-1) 0; font-size: 13px; line-height: 18px; color: var(--lib-fg-muted); }
+/* The local pack's block: no fill, no frame -- a small bold title and its senses. */
+#vocab-ref-result .xp-dict-local-title { margin-bottom: var(--lib-sp-2); font-size: 13px; line-height: 18px; font-weight: 700; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-skel {
+  height: 10px;
+  margin: var(--lib-sp-2) 0;
+  border-radius: var(--lib-radius-sm);
+  background: linear-gradient(90deg, var(--lib-border) 25%, var(--lib-fg-hint) 50%, var(--lib-border) 75%);
+  background-size: 200% 100%;
+  animation: xp-dict-shimmer 1.2s linear infinite;
+}
+#vocab-ref-result .xp-skel:nth-child(3) { width: 62%; }
+@keyframes xp-dict-shimmer { to { background-position: -200% 0; } }
+/* Connect (manual path only) and retry: sm buttons in md-dict's own classes. */
+#vocab-ref-result :is(.xp-retry, .xp-dict-connect) {
+  height: calc(var(--lib-control-h) - 4px);
+  margin-top: var(--lib-sp-2);
+  padding: 0 var(--lib-control-pad-x-sm);
+  border: 1px solid var(--lib-btn-border);
+  border-radius: var(--lib-radius-md);
+  background: var(--lib-code-bg);
+  color: var(--lib-fg);
+  font: inherit;
+  font-size: calc(var(--lib-text-body) - 1px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+#vocab-ref-result :is(.xp-retry, .xp-dict-connect):hover:not(:disabled) { background: var(--lib-btn-hover, var(--lib-code-bg)); }
+/* Spelled out, not :is(): the §7.3 focus-placement gate reads each subject. */
+#vocab-ref-result .xp-retry:focus-visible,
+#vocab-ref-result .xp-dict-connect:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
+#vocab-ref-result .xp-retry svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: var(--lib-sp-1); }
+#vocab-ref-result .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
 .vocab-filter-toolbar input[type="search"] {
   flex: 1 1 220px;
   width: auto;
@@ -1728,7 +1698,6 @@ html.motion-ready .vocab-note-save {
    (Its display lives up beside .vocab-detail-back's, next to the media query
    that flips both -- same specificity, so source order decides.) */
 .vocab-filter-row > .vocab-lookup-narrow { flex: none; margin-left: var(--lib-sp-1); }
-.vocab-filter-toolbar select { flex: 0 1 auto; min-width: 0; }
 /* font-family comes from the page-wide `button, input, select, textarea {
    font-family: inherit }` rule near the top of this file regardless of the
    `font: inherit` below, so nothing is lost by that shorthand. */
@@ -1780,71 +1749,6 @@ html.motion-ready .vocab-note-save {
 .vocab-group-unit > input[type="text"]:focus,
 .vocab-group-unit > input[type="text"]:focus-visible {
   outline: none;
-}
-/* A toolbar select is still a select: the same closed-control recipe that
-   COMPONENTS.md §6.1 spells `.fg select` on the options surface (this surface
-   has no `.fg` at all -- see the note just below the @generated:ui-components
-   end marker). Colours -- field fill, frame, typed text, hover, focus border
-   and the per-theme --lib-field-chevron -- come from the generated field
-   recipe (FIELD_TARGETS.lib, stage 4 §3.3), so there is no themed twin and no
-   literal chevron any more; only the shape and the chevron's position stay.
-   Since T6 only the lookup language select is still native (T7 enhances
-   it); the group filter is listbox.js's .listbox-btn, styled in the Listbox
-   block below. */
-.vocab-lookup-bar select {
-  min-width: 0;
-  /* width:auto, NOT 100%: under a flex toolbar 100% becomes the flex basis
-     and parks every select on its own full-width row. Content-sized is the
-     point. */
-  width: auto;
-  /* md rung, density-tiered like the search field above (32 / 28, plan T1):
-     explicit height + px line-height, so #vocab-search and this select land
-     on one height under any font. 26px inline-end = the chevron's room. */
-  height: var(--lib-control-h);
-  padding: 0 26px 0 var(--lib-sp-3);
-  line-height: calc(var(--lib-control-h) - 2px);
-  border-width: 1px;
-  border-style: solid;
-  border-radius: var(--lib-radius-md);
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  font: inherit;
-  font-size: var(--lib-text-body);
-  cursor: pointer;
-  box-sizing: border-box;
-  -webkit-appearance: none;
-  appearance: none;
-  box-shadow: none;
-  transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
-}
-/* §7.3: a <select> is an input-class field, so it takes the FIELD recipe --
-   `outline: none` + focus border + the focus-ring shadow -- not the button
-   recipe. The `:focus` half was already correct; `:focus-visible` used to
-   stack a 2px accent outline on top of it, which made these three selects
-   the only fields on the surface wearing a hard rectangle, and put two
-   different focus languages side by side in one row (#vocab-lookup-input,
-   an <input> two elements away, has always drawn the shadow). Covers
-   #vocab-lookup-lang. */
-.vocab-lookup-bar select:focus {
-  outline: none;
-}
-.vocab-lookup-bar select:focus-visible:not(:disabled) {
-  box-shadow: var(--lib-focus-ring);
-}
-/* #vocab-lookup-go is a bare icon .btn-sm (COMPONENTS.md §1.5's "dense
-   toolbar -> sm" clause): this bar is a compact single-purpose search tool,
-   so the field and the language select come DOWN to the sm rung (28 / 24
-   since the library density rung, plan T1) instead of the button going up
-   to md. Same specificity as the base `.notes-toolbar input[type="search"]` /
-   `.vocab-lookup-bar select` rules above, so this MUST stay after them.
-   No hit-pad on the button any more: the sm rung clears 24px on its own. */
-.vocab-lookup-bar input[type="search"],
-.vocab-lookup-bar select {
-  height: calc(var(--lib-control-h) - 4px);
-  padding-top: 0;
-  padding-bottom: 0;
-  font-size: calc(var(--lib-text-body) - 1px);
-  line-height: calc(var(--lib-control-h) - 6px);
 }
 /* flex: 1 so the count text takes the whole slack and "Select all" lands on
    the row's right edge. Before this the slack went to .vocab-main-status's
@@ -2660,15 +2564,13 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
    generated focus border, so each value box draws a system-colour outline
    on its FIELD_TARGETS.lib entry's ring selector (the toolbar search fields
    carry theirs beside their own rules above). Kept at the end of the hand
-   region on purpose: `.xp-dict-lang:focus-visible:not(:disabled)` suppresses
-   its outline at this same specificity, so source order is what lets this
+   region on purpose: a box's own focus rule may suppress its outline at
+   this same specificity, so source order is what lets this
    win (tests/ui-contract-tests.mjs checks every ring selector is covered and
    that no outline-suppressing focus rule out-ranks it). The group-unit shell
    keeps its :has() trigger; its text passenger draws nothing (§8 law 2). */
 @media (forced-colors: active) {
-  .vocab-lookup-bar select:focus-visible:not(:disabled),
   .listbox-btn:focus-visible:not(:disabled),
-  .xp-dict-lang:focus-visible:not(:disabled),
   .vocab-note-input:focus-visible:not(:disabled),
   .vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) {
     outline: 1px solid Highlight;

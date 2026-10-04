@@ -1821,7 +1821,14 @@ const PANE_FIT_SCAN = ({ panes, tolerance, bleed = [] }) => {
 };
 
 async function drivePaneFit(page, check) {
-  const { widths, panes, tolerancePx = 1, resetNarrowDetail = false, bleed = [] } = check.expect.paneFit;
+  const { widths, panes, tolerancePx = 1, resetNarrowDetail = false, bleed = [], vocabLookupOther = null } = check.expect.paneFit;
+  // T7a: measure the dictionary column showing ANOTHER word's result (its
+  // head row + slot), not the open word's idle button. The audit profile
+  // never grants the dictionary origin, so the slot renders md-dict's connect
+  // state -- zero network, same geometry host as a real result.
+  const otherWordOn = vocabLookupOther
+    ? await page.evaluate(() => document.body.classList.contains("lib-narrow-detail"))
+    : null;
   const restore = page.viewportSize();
   const found = [];
   try {
@@ -1838,6 +1845,14 @@ async function drivePaneFit(page, check) {
     // deliberately probing the single-pane DETAIL state (existing 900+
     // width entries testing both panes together) must NOT set this.
     if (resetNarrowDetail) await page.evaluate(() => document.body.classList.remove("lib-narrow-detail"));
+    if (vocabLookupOther) {
+      await page.evaluate((term) => {
+        document.body.classList.add("lib-narrow-detail"); // the pane must be the visible view at 420
+        _pbpVocabLookupOther(term, "en");
+      }, vocabLookupOther);
+      await page.waitForSelector("#vocab-ref-result .vocab-ref-head", { timeout: TIMEOUT_MS });
+      await settleAnimations(page);
+    }
     for (const width of widths) {
       await page.setViewportSize({ width, height: restore ? restore.height : 900 });
       await page.waitForTimeout(250);
@@ -1848,6 +1863,13 @@ async function drivePaneFit(page, check) {
   } finally {
     if (restore) await page.setViewportSize(restore);
     await page.waitForTimeout(250);
+    if (vocabLookupOther) {
+      await page.evaluate((wasNarrow) => {
+        const w = _vocabRows.find((r) => r.id === _pbpVocabDetailWordId) || null;
+        _pbpVocabResetRef(w);
+        document.body.classList.toggle("lib-narrow-detail", wasNarrow);
+      }, otherWordOn);
+    }
   }
   return found;
 }
@@ -3443,10 +3465,12 @@ async function runOneCheck(page, theme, check, results, extBase) {
 
 // ---- library.html has two independent master-detail views behind one tab
 // strip; a selector's prefix tells us which view to be on and whether a row
-// needs clicking open first (every "*-detail-*" selector lives in a detail
-// pane that starts empty). ----
+// needs clicking open first. Every "*-detail-*" selector lives in a detail
+// pane that starts on its cover, and so does every "*-ref*" one: the
+// dictionary column's result host only holds a word's state once a word is
+// open (library redesign T7). ----
 function libraryView(selector) { return selector.startsWith(".notes-") ? "notes" : "vocab"; }
-function needsDetailOpen(selector) { return selector.includes("-detail-"); }
+function needsDetailOpen(selector) { return selector.includes("-detail-") || selector.includes("-ref"); }
 // .vocab-batch-bar (library.css:986-1010, ".selecting") is height:0/hidden
 // until a row is selected. Every id living in that bar needs the same
 // precondition -- named explicitly rather than inferred from `expect`
@@ -4115,8 +4139,7 @@ const FIELD_HOVER_REQUIRED_KINDS = ['input[type="text"]', 'input[type="password"
 // three search fields, the group filter's listbox button (family 9 meets it
 // in the sweep's vocab-filter-set context), the note editor and the
 // .vocab-group-unit shells (keyed by tag/type, or by class for the <span>
-// shell). The relookup .xp-dict-lang (a select) only exists behind a click
-// the sweep does not make; family 14's library leg holds its four corners.
+// shell).
 const RADIUS_VALUE_BOX_REQUIRED = Object.freeze({
   options: Object.freeze([...FIELD_HOVER_REQUIRED_KINDS, 'input[type="search"]']),
   popup: Object.freeze(["#url-input", "#title-input", "#description-input", ".tags-input-wrap", "#token-input", "#search-input"]),
@@ -4634,22 +4657,21 @@ const VALUE_BOX_LEGS = Object.freeze({
       },
     ]),
   }),
-  // library (stage 4 Task 7, spec §5.2): the nine value boxes -- the three
-  // search fields, the group filter's listbox button, the two native selects
-  // (the lookup language until T7, the relookup .xp-dict-lang), the two
+  // library (stage 4 Task 7, spec §5.2): the eight value boxes -- the three
+  // search fields, the two listbox buttons (the group filter and, since
+  // library redesign T7, the dictionary language), the two
   // .vocab-group-unit shells (the shell carries the look; its text input is
   // a transparent passenger) and the note editor. Named rather than class-scanned, like
   // popup's. The vocab leg navigates fresh instead of inheriting whatever the
   // CHECKS loop left open (a typed note, an open tab); the notes leg then
   // reuses that fresh page and only switches it to the notes tab. The vocab
-  // leg also reads .xp-dict-lang FOCUSED (`focus`): the relookup fixture it
-  // builds is the only way to reach that select, so no checklist row can.
+  // leg also reads the dictionary language's listbox button FOCUSED (`focus`).
   library: Object.freeze({
     ns: "lib",
     radiusVar: "--lib-radius-md",
     boxes: Object.freeze([
-      ["#vocab-search", null], ["#vocab-group-filter-btn", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang", null],
-      ["#vocab-detail .xp-dict-lang", null], ["#vocab-detail .vocab-note-input", null],
+      ["#vocab-search", null], ["#vocab-group-filter-btn", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang-btn", null],
+      ["#vocab-detail .vocab-note-input", null],
       ["#vocab-batch-toolbar .vocab-group-unit", null], ["#vocab-detail .vocab-group-unit", null],
       ["#notes-filter", null],
     ]),
@@ -4660,17 +4682,12 @@ const VALUE_BOX_LEGS = Object.freeze({
         // (Control+click adds the row to the selection; library-vocab.js
         // keeps the two verbs apart) and NOT busy (#vocab-group-input is
         // disabled while a batch mutation runs -- an inactive control, whose
-        // shell the hover recipe excludes, so it could never be measured),
-        // and the word's dictionary relookup, whose run builds the only
-        // .xp-dict-lang (library-vocab.js _pbpVocabRelookup). The relookup
-        // makes no request: the dictionary origin is an optional host
-        // permission this profile never grants, so md-dict renders its
-        // connect state under the select.
+        // shell the hover recipe excludes, so it could never be measured).
         context: "vocab",
-        boxes: ["#vocab-search", "#vocab-lookup-input", "#vocab-lookup-lang",
-          "#vocab-detail .xp-dict-lang", "#vocab-detail .vocab-note-input",
+        boxes: ["#vocab-search", "#vocab-lookup-input", "#vocab-lookup-lang-btn",
+          "#vocab-detail .vocab-note-input",
           "#vocab-batch-toolbar .vocab-group-unit", "#vocab-detail .vocab-group-unit"],
-        focus: ["#vocab-detail .xp-dict-lang"],
+        focus: ["#vocab-lookup-lang-btn"],
         async open(page, url, theme) {
           await page.goto(`${url}?_ra=${encodeURIComponent(`fieldhover-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
@@ -4682,12 +4699,6 @@ const VALUE_BOX_LEGS = Object.freeze({
           await page.waitForSelector("#vocab-detail:not([hidden]) .vocab-group-unit", { timeout: TIMEOUT_MS });
           await head.click({ modifiers: ["Control"] });
           await page.waitForSelector("#vocab-batch-toolbar.selecting", { timeout: TIMEOUT_MS });
-          const relookup = page.locator("#vocab-detail .vocab-detail-relookup:not([hidden])");
-          if (!(await relookup.count())) {
-            throw new Error(`SETUP: fieldHoverContrast library: no visible "#vocab-detail .vocab-detail-relookup" to build .xp-dict-lang (theme=${theme})`);
-          }
-          await relookup.click();
-          await page.waitForSelector("#vocab-detail .xp-dict-lang", { timeout: TIMEOUT_MS });
           if (await page.$eval("#vocab-group-input", (el) => el.disabled)) {
             throw new Error(`SETUP: fieldHoverContrast library: #vocab-group-input is disabled (a batch mutation is running) -- the leg must measure the batch-bar group unit enabled (theme=${theme})`);
           }
@@ -4746,7 +4757,7 @@ const VALUE_BOX_LEGS = Object.freeze({
 // requires every entry here to be named by some leg's `focus` and measured on
 // every theme it ran.
 const VALUE_BOX_FOCUS_REQUIRED = Object.freeze({
-  library: Object.freeze(["#vocab-detail .xp-dict-lang"]),
+  library: Object.freeze(["#vocab-lookup-lang-btn"]),
 });
 const valueBoxHoverLog = [];
 // One colour parser for every read of this leg (Task 7 fix round 1): a hex
@@ -5049,6 +5060,10 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
         throw new Error(`SETUP: no "#vocab-list .vocab-card .notes-card-head" to open the vocab detail pane (theme=${theme}) -- seed fixture broken or markup renamed`);
       }
       await head.click(); await page.waitForTimeout(250);
+      await page.waitForFunction(() => {
+        const host = document.getElementById("vocab-ref-result");
+        return !host || host.dataset.refState !== "word" || !!host.querySelector(".xp-dict-entry, .xp-dict-msg, .xp-dict-local-box");
+      }, null, { timeout: TIMEOUT_MS }).catch(() => {});
     }
     for (const check of vocabChecks) {
       // The batch row, per check (T4d review): since it REPLACES the count row
@@ -5172,11 +5187,11 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
 
   // ---- fieldHoverContrast (family 14), the library value-box leg (stage 4
   // Task 7, spec §5.2; R7: the same functions as popup's leg). Last on
-  // purpose: its vocab leg reloads the page and opens the relookup fixture
+  // purpose: its vocab leg reloads the page and opens a word with a selection
   // (the notes leg then reuses that page), which must not widen family 13's
   // vocab / notes scans above; the run-level valueBoxLegCoverage /
-  // valueBoxFocusCoverage checks hold every theme to all nine boxes measured
-  // and .xp-dict-lang read focused.
+  // valueBoxFocusCoverage checks hold every theme to all eight boxes measured
+  // and the dictionary language's listbox button read focused.
   await recordValueBoxHover(page, "library", `${extBase}library.html`, theme, results, null);
 }
 
@@ -6307,7 +6322,7 @@ const SWEEP_CFG = {
     valueBoxes: {
       options: '.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg textarea, .fg select, .listbox-btn, .mobile-tab-picker select, .options-search input[type="search"]',
       popup: "#url-input, #title-input, #description-input, .tags-input-wrap, #token-input, #search-input",
-      library: "#vocab-search, #notes-filter, #vocab-lookup-input, .listbox-btn, #vocab-lookup-lang, .xp-dict-lang, .vocab-group-unit, .vocab-note-input",
+      library: "#vocab-search, #notes-filter, #vocab-lookup-input, .listbox-btn, .vocab-group-unit, .vocab-note-input",
     },
     valueBoxExempt: '.theme-name-popover input[type="text"], .tags-input-wrap.ac-open',
     // Surfaces whose value-box KIND is the valueBoxes entry a box matches
@@ -8008,7 +8023,7 @@ async function main() {
         status: "SETUP", setup: "legVacuous",
         actual: `no VALUE_BOX_LEGS.${surface} leg names ${focusUnpinned.join(" / ")} in its \`focus\` list`,
         expected: `every VALUE_BOX_FOCUS_REQUIRED.${surface} box read focused by a leg`,
-        note: "the focused read was removed from the leg -- restore its `focus` key (the relookup .xp-dict-lang is reachable only through that leg's fixture)",
+        note: "the focused read was removed from the leg -- restore its `focus` key",
       });
     }
     const focusBoxes = new Set([...focusRequired, ...focusDeclared]).size;

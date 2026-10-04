@@ -3941,6 +3941,10 @@
   "libraryVocabSignedOutTitle": { "message": "登录后使用生词本" },
   "libraryVocabSignedOutHint": { "message": "生词按 Pinboard 账号分别保存；未登录时仍可使用词典查询。" },
   "libraryVocabOpenSettings": { "message": "打开账号设置" },
-  "libraryLookupSignedOutHint": { "message": "可在上方查询单词；登录后即可保存到生词本。" },
-  "mdPreviewClose": { "message": "关闭阅读器" }
+  "libraryLookupSignedOutHint": { "message": "可在「词典」栏查询单词；登录后即可保存到生词本。" },
+  "mdPreviewClose": { "message": "关闭阅读器" },
+  "librarySectionDict": { "message": "词典" },
+  "libraryLookupOther": { "message": "查其他词" },
+  "libraryDictIdle": { "message": "查询这个词的词典释义" },
+  "libraryDictIdleFree": { "message": "输入任意词，查询它的词典释义" }
 }

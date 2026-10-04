@@ -497,8 +497,8 @@ function _pbpVocabMarkCurrentRow(id) {
 // back to the empty state for null, e.g. after a delete). Reassigned onto
 // _pbpVocabOnRowActivate above; also called directly by the reload-after-
 // mutation and delete-linkage paths.
-// `enterNarrow` is opt-in: only a user activation (row click, free-lookup
-// submit) may swap narrow mode from the list to the detail. Refresh renders
+// `enterNarrow` is opt-in: only a user activation (row click, the saved-word
+// hint under a lookup result) may swap narrow mode from the list to the detail. Refresh renders
 // (mutation reload, view re-entry) keep whichever pane the user is on --
 // otherwise every sibling mutation would yank a narrow reader into the
 // detail, and library.js's view switch could never hand the list back.
@@ -509,32 +509,28 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   // builder (and thus this hook) also runs inside tests/options-vocab-tests.html,
   // which co-loads both vocab halves but only ever mounts options.html's
   // expandable-card markup (no #vocab-detail-*).
-  if (!empty || !detail) return;
+  if (!empty || !detail || !$id("vocab-detail-tail")) return;
   // Every exit from here rebuilds or empties #vocab-detail, so rescue the
   // status live region out of the closing row it may be parked in before the
   // subtree goes (see _pbpVocabStatusHost); the rebuilt row re-adopts it below.
   _pbpVocabStatusHost(false);
-  // Switching (or clearing) the shown word invalidates any in-flight
-  // re-lookup immediately: opening a fresh word must fire zero network
-  // requests on its own, and a stale online/local chain must never write
-  // into a dict area that now belongs to a different word. A REFRESH render
-  // of the SAME word is not that case: _pbpVocabReconcileDetail carries the
-  // rendered results (and the run still filling them) across the rebuild, so
-  // aborting here cancelled a lookup nobody asked to cancel -- switching tabs
-  // and back was enough to wipe a definition off the pane. A user activation
-  // still starts clean, even when it lands on the word already shown.
-  const sameWord = !!w && w.id === _pbpVocabDetailWordId;
-  if (_pbpVocabDictCtrl && (!sameWord || enterNarrow)) {
-    _pbpVocabDictCtrl.abort();
-    _pbpVocabDictCtrl = null;
-  }
-  _pbpVocabDetailWordId = w ? w.id : null;
+  // Only a CHANGE of the open entry resets the dictionary column (spec §4.8):
+  // a refresh of the same word (_pbpVocabSoftReload, _pbpVocabReconcileDetail)
+  // and a second activation of the word already shown keep the result and the
+  // run still filling it -- #vocab-ref-result is static and nothing below
+  // rebuilds it. Cover -> cover is no change either: a lookup typed on the
+  // cover survives the signed-out page's refreshes.
+  const nextId = w ? w.id : null;
+  const changed = nextId !== _pbpVocabDetailWordId;
+  _pbpVocabDetailWordId = nextId;
+  if (changed) _pbpVocabResetRef(w || null);
   empty.hidden = !!w;
   detail.hidden = !w;
   if (!w) document.body.classList.remove("lib-narrow-detail");
   else if (enterNarrow) document.body.classList.add("lib-narrow-detail");
   if (!w) {
     detail.replaceChildren();
+    $id("vocab-detail-tail").replaceChildren();
     // Without this the list keeps a "you are here" row pointing at a pane
     // that now says nothing -- painted as the selected fill plus an accent
     // edge, and still announced as `current`.
@@ -709,49 +705,26 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   const noteEditor = _pbpVocabBuildNoteEditor(w);
   frag.appendChild(noteEditor.wrap);
 
-  // 6. Dictionary results host. Stays in the READING flow even though the
-  // button that fills it now sits in the closing row below: a definition is
-  // material to read, not an action, and hanging it under the actions would
-  // put the row's rule in the middle of the pane.
-  const dictHost = document.createElement("div");
-  dictHost.className = "lib-section vocab-detail-dict";
-  frag.appendChild(dictHost);
-
-  // 7. Closing action row (variant C): re-lookup left, delete right. Both are
-  // "what you do with this word once you are done reading it", so they share
-  // one rule-topped row instead of stacking as two.
-  const footer = document.createElement("div");
-  footer.className = "lib-section vocab-detail-footer";
-
-  // On-demand dictionary re-lookup: zero network until clicked. One live
-  // lookup per detail render -- the button hides itself on click, and a
-  // fresh render (word switch) always rebuilds an unclicked button.
-  const lookupBtn = document.createElement("button");
-  lookupBtn.type = "button";
-  lookupBtn.className = "btn btn-sm vocab-detail-relookup";
-  setBtnIcon(lookupBtn, "book", t("libraryRelookup"));
-  lookupBtn.addEventListener("click", () => {
-    lookupBtn.hidden = true;
-    _pbpVocabRelookup(w, dictHost);
-  });
-  footer.appendChild(lookupBtn);
-
-  // Delete (confirm popover family; on success the detail pane resets)
+  // 6. The tail (spec §4.7): remove on the left, hung on the column's left
+  // edge, then the status sentence (_pbpVocabStatusHost puts it before Save),
+  // then Save at the right end. It renders into #vocab-detail-tail, after the
+  // dictionary column, so the destructive action is the last stop of a Tab
+  // walk. "Look up again" moved under the dictionary result.
+  const footer = document.createElement("footer");
+  footer.className = "vocab-detail-footer";
   const del = document.createElement("button");
   del.type = "button";
-  del.className = "btn btn-sm danger ghost vocab-detail-delete";
+  del.className = "btn btn-sm danger ghost vocab-detail-delete lib-hang-start";
   setBtnIcon(del, "trash", t("dictDeleteWord"));
   del.addEventListener("click", () => _pbpVocabDeleteRow(w, del));
   footer.appendChild(del);
-  // Save, at the far right of the row. It stays in layout while hidden
-  // (visibility, not display -- see .vocab-note-save[hidden] in library.css),
-  // so becoming dirty moves nothing else in the row by even a subpixel.
+  // Save stays in layout while hidden (visibility, see .vocab-note-save[hidden]
+  // in library.css), so becoming dirty moves nothing in the row.
   footer.appendChild(noteEditor.save);
-  frag.appendChild(footer);
 
   detail.replaceChildren(frag);
-  // Same focus handoff the free-lookup result does, at the root every
-  // activation passes through: a row click is the primary way into narrow
+  $id("vocab-detail-tail").replaceChildren(footer);
+  // Focus handoff at the root every activation passes through: a row click is the primary way into narrow
   // mode, and the head button it started from has just been hidden with the
   // rest of the list.
   if (enterNarrow) _pbpVocabFocusNarrowBack();
@@ -766,10 +739,9 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   // path (_pbpVocabSoftReload on tab re-entry, _pbpVocabReconcileDetail after
   // a mutation), and those exist precisely to keep the user where they were.
   // Resetting there undoes the same render's other state-preserving work --
-  // the carried-over .vocab-detail-dict nodes and the focus({preventScroll})
-  // handoff both assume the viewport does not move.
+  // the focus({preventScroll}) handoff assumes the viewport does not move.
   const pane = $id("vocab-detail-pane");
-  if (pane && !sameWord) pane.scrollTop = 0;
+  if (pane && changed) pane.scrollTop = 0;
   // The closing row exists now, so the status region can take its narrow-mode
   // home -- this render's callers all write into it AFTER returning from here,
   // so the region is settled in the accessibility tree before any sentence
@@ -778,7 +750,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   _pbpVocabStatusHost(true);
 }
 
-// On-demand dictionary re-lookup inside the detail pane. Reuses md-dict's
+// Dictionary reference column (library redesign T7, spec §4.8-§4.10). Reuses md-dict's
 // pure query seams (_pbpDictSlotRun online chain + _pbpDictEcdictSide local
 // pack) with NO AI leg: the lemma promise resolves empty immediately (ai.js
 // is not loaded on this page). Participates in md-dict's staleness token so
@@ -857,215 +829,275 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun) {
     .catch((err) => console.warn("library relookup failed:", err.name, err.message));
 }
 
-function _pbpVocabRelookup(w, host) {
-  if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
-  const ctrl = new AbortController();
-  _pbpVocabDictCtrl = ctrl;
+// Session-only memory of the language the cover lookup uses -- never
+// persisted, and independent of any saved word's own language (spec §4.10).
+let _vocabLookupLang = "en";
+// The open word's id once the user looked it up by hand (the lookup button,
+// an empty submit, Look up again). A language change re-runs the full chain
+// only for a word looked up by hand; the open-to-look-up path never sets it.
+let _pbpVocabRelookedWordId = null;
+// The owner the column's content belongs to (spec §7.6). undefined until the
+// first _pbpVocabSetAccountState, which therefore always renders the column.
+let _pbpVocabRefOwner;
 
+function _pbpVocabSyncLookupPlaceholder() {
+  const input = $id("vocab-lookup-input");
+  if (!input) return;
+  const label = t(_pbpVocabDetailWordId ? "libraryLookupOther" : "libraryLookupPlaceholder");
+  input.placeholder = label;
+  input.setAttribute("aria-label", label);
+}
+
+// After a relookup the button the user pressed is gone with the old result;
+// hand focus to the list box that decides the next one (spec §4.9), and keep
+// the column on screen without a smooth scroll.
+function _pbpVocabFocusLookupLang() {
+  const target = $id("vocab-lookup-lang-btn") || $id("vocab-lookup-lang");
+  if (target) {
+    try { target.focus({ preventScroll: true }); } catch (_) { target.focus(); }
+  }
+  const ref = $id("vocab-ref");
+  if (ref) ref.scrollIntoView({ block: "nearest" });
+}
+
+// The slot pair md-dict writes into, plus the column's own foot. Slot
+// invariant (rules/dict.md): two stable children, and nothing here ever
+// replaceChildren()s the slot itself -- only #vocab-ref-result is replaced.
+function _pbpVocabRefSlot() {
+  const host = $id("vocab-ref-result");
   const wrap = document.createElement("div");
   wrap.className = "xp-dict";
-  const head = document.createElement("div");
-  head.className = "xp-dict-head";
-  const sel = document.createElement("select");
-  sel.className = "xp-dict-lang";
-  sel.setAttribute("aria-label", t("dictLangAria"));
-  const locale = document.documentElement.lang;
-  for (const code of PBP_DICT_LANGS) {
-    if (code === "auto") continue; // stored words carry a language; no Auto leg here
-    const o = document.createElement("option");
-    o.value = code;
-    o.textContent = pbpDictLanguageLabel(code, locale) || code;
-    sel.appendChild(o);
-  }
-  const startLang = w.language && w.language !== "und" ? w.language : "";
-  if (startLang && [...sel.options].some((o) => o.value === startLang)) sel.value = startLang;
-  head.appendChild(sel);
-  wrap.appendChild(head);
-
   const slot = document.createElement("div");
   slot.className = "xp-dict-slot";
-  // Slot invariant: two stable children; nothing ever replaceChildren()s
-  // the slot itself (md-dict render paths target the children).
   const localEl = document.createElement("div");
   localEl.className = "xp-dict-local";
   const onlineEl = document.createElement("div");
   onlineEl.className = "xp-dict-online";
-  slot.appendChild(localEl);
-  slot.appendChild(onlineEl);
+  slot.append(localEl, onlineEl);
   wrap.appendChild(slot);
-  host.replaceChildren(wrap); // host is .vocab-detail-dict, never the slot
-
-  function startRun(lang) {
-    const sentence = (w.contexts && w.contexts[0] && w.contexts[0].quote) || "";
-    _pbpVocabDictRun(w.term, lang, { localEl, onlineEl }, sentence, () => startRun(sel.value));
-  }
-  sel.addEventListener("change", () => startRun(sel.value));
-  startRun(sel.value || startLang);
+  // "Look up again" gets its own line under md-dict's source line (spec §4.9,
+  // V18): the source line is md-dict's node, and this file never inserts into
+  // md-dict's nodes. `refresh` = re-run the same action (icon contract).
+  const foot = document.createElement("div");
+  foot.className = "vocab-ref-foot";
+  const again = document.createElement("button");
+  again.type = "button";
+  again.className = "btn btn-sm ghost vocab-ref-relookup lib-hang-start";
+  setBtnIcon(again, "refresh", t("libraryRelookup"));
+  again.addEventListener("click", () => {
+    if (host && host.dataset.refState === "other") {
+      _pbpVocabLookupOther(host.dataset.refTerm || "", host.dataset.refLang || _vocabLookupLang);
+    } else {
+      const w = _vocabRows.find((row) => row.id === _pbpVocabDetailWordId);
+      if (!w) return;
+      _pbpVocabRelookup(w);
+    }
+    _pbpVocabFocusLookupLang();
+  });
+  foot.appendChild(again);
+  if (host) host.replaceChildren(wrap, foot);
+  return { localEl, onlineEl };
 }
 
-// Free dictionary lookup box (list-pane toolbar): any word, not just a saved
-// one, walks the same md-dict query seams as relookup above. Session-only
-// memory of the last chosen language -- never persisted, and independent of
-// any saved word's own language.
-let _vocabLookupLang = "en";
+// The column at rest. "word": an opened word with nothing to show yet and no
+// grant -- one button, zero network until it is clicked. "free": the cover
+// and the signed-out page -- one line saying the box takes any word.
+function _pbpVocabRenderRefIdle(mode) {
+  const host = $id("vocab-ref-result");
+  if (!host) return;
+  delete host.dataset.sameWord;
+  delete host.dataset.refTerm;
+  delete host.dataset.refLang;
+  if (mode !== "word") {
+    host.dataset.refState = "free";
+    const line = document.createElement("p");
+    line.className = "vocab-ref-free";
+    line.textContent = t("libraryDictIdleFree");
+    host.replaceChildren(line);
+    return;
+  }
+  host.dataset.refState = "idle";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn btn-sm ghost vocab-ref-idle";
+  setBtnIcon(btn, "book", t("libraryDictIdle"));
+  btn.addEventListener("click", async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const wordId = _pbpVocabDetailWordId;
+    // The grant request is the first thing this click waits on: waiting on
+    // anything before it would spend the user gesture Chrome requires
+    // (md-dict's connect button follows the same rule). Read at the call site, never
+    // cached: a grant revoked in chrome://extensions has to be seen.
+    let granted = false;
+    try {
+      granted = await chrome.permissions.request({ origins: [PBP_DICT_ORIGIN + "/*"] });
+    } catch (err) {
+      console.warn("library dictionary grant failed:", err.name, err.message);
+    }
+    btn.disabled = false;
+    if (!granted || _pbpVocabDetailWordId !== wordId) return;
+    const w = _vocabRows.find((row) => row.id === wordId);
+    if (!w) return;
+    _pbpVocabRelookup(w);
+    _pbpVocabFocusLookupLang();
+  });
+  host.replaceChildren(btn);
+}
 
-// One-time wiring for #vocab-lookup-bar, called once at module load from the
-// same guarded top-level section as the status toggles (bottom of this file) --
-// there is no per-render rebuild of this toolbar, so it only ever needs to
-// be wired once.
+// A word change (or the cover, or an account change on the cover) starts the
+// column clean: the run stops, the box empties, the manual mark drops, and
+// the list box shows the open word's language (spec §4.10 -- an "und" word
+// leaves it alone) or, on the cover, the session language.
+function _pbpVocabResetRef(w) {
+  if (_pbpVocabDictCtrl) { _pbpVocabDictCtrl.abort(); _pbpVocabDictCtrl = null; }
+  _pbpVocabRelookedWordId = null;
+  const input = $id("vocab-lookup-input");
+  if (input) input.value = "";
+  const sel = $id("vocab-lookup-lang");
+  if (sel) {
+    const code = w && w.language && w.language !== "und" ? w.language : "";
+    if (!w) sel.value = _vocabLookupLang;
+    else if (code && [...sel.options].some((o) => o.value === code)) sel.value = code;
+    window.pbpListboxSync?.(sel);
+  }
+  _pbpVocabSyncLookupPlaceholder();
+  _pbpVocabRenderRefIdle(w ? "word" : "free");
+}
+
+// The manual full chain for the open word: local pack + cache + online,
+// exactly today's "Look up again". The list box decides the language.
+function _pbpVocabRelookup(w) {
+  const host = $id("vocab-ref-result");
+  const sel = $id("vocab-lookup-lang");
+  if (!w || !host || !sel) return;
+  _pbpVocabRelookedWordId = w.id;
+  if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
+  _pbpVocabDictCtrl = new AbortController();
+  const els = _pbpVocabRefSlot();
+  host.dataset.refState = "word";
+  host.dataset.sameWord = "";
+  delete host.dataset.refTerm;
+  delete host.dataset.refLang;
+  const lang = sel.value || (w.language && w.language !== "und" ? w.language : "") || _vocabLookupLang;
+  const sentence = (w.contexts && w.contexts[0] && w.contexts[0].quote) || "";
+  const run = () => _pbpVocabDictRun(w.term, lang, els, sentence, run);
+  run();
+}
+
+// Another word's result, in the column (spec §4.8 submit rules, V6): the main
+// column, the open word and the current row stay. Its own head names the word
+// (with Pronounce, kept from the old free-lookup view) and, when that word is
+// saved, the "In your vocabulary · view" door.
+function _pbpVocabLookupOther(term, lang) {
+  const host = $id("vocab-ref-result");
+  if (!host || !term) return;
+  _pbpVocabRelookedWordId = null;
+  if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
+  _pbpVocabDictCtrl = new AbortController();
+  const els = _pbpVocabRefSlot();
+  host.dataset.refState = "other";
+  host.dataset.refTerm = term;
+  host.dataset.refLang = lang;
+  delete host.dataset.sameWord;
+  const head = document.createElement("div");
+  head.className = "vocab-ref-head";
+  const termEl = document.createElement("span");
+  termEl.className = "vocab-ref-term";
+  termEl.lang = lang;
+  termEl.textContent = term;
+  head.appendChild(termEl);
+  const speak = document.createElement("button");
+  speak.type = "button";
+  speak.className = "btn btn-sm ghost vocab-ref-speak";
+  setBtnIcon(speak, "speaker", "");
+  speak.title = t("dictSpeak");
+  speak.setAttribute("aria-label", t("dictSpeak"));
+  speak.addEventListener("click", () => pbpDictSpeak(term, lang));
+  head.appendChild(speak);
+  const folded = pbpVocabSearchText(term);
+  const saved = _vocabRows.find((r) => pbpVocabSearchText(r.term) === folded);
+  if (saved) {
+    const hint = document.createElement("button");
+    hint.type = "button";
+    hint.className = "btn btn-sm ghost vocab-lookup-saved";
+    setBtnIcon(hint, "bookMarked", t("libraryLookupSaved"));
+    hint.addEventListener("click", () => {
+      // The hint outlives reloads while this result stays on screen: re-read
+      // the CURRENT rows, and a vanished id is a no-op, never a ghost detail.
+      const fresh = _vocabRows.find((r) => r.id === saved.id);
+      if (!fresh) return;
+      _pbpVocabRenderDetail(fresh, true);
+      _pbpVocabMarkCurrentRow(fresh.id);
+      const row = document.querySelector(`#vocab-list .vocab-card[data-vocab-id="${CSS.escape(fresh.id)}"]`);
+      if (row) row.scrollIntoView({ block: "nearest" });
+    });
+    head.appendChild(hint);
+  }
+  host.prepend(head);
+  // `lang`, not the list box: md-dict's rerun fires long after submit, and by
+  // then the list box may name the language picked for the NEXT lookup.
+  const run = () => _pbpVocabDictRun(term, lang, els, "", run);
+  run();
+}
+
+// Submit (Enter or "Look up"). Empty = the open word by hand (spec §4.8);
+// on the cover an empty submit sends nothing and only puts the caret back.
+function _pbpVocabFreeLookup() {
+  const input = $id("vocab-lookup-input");
+  const sel = $id("vocab-lookup-lang");
+  if (!input || !sel) return;
+  const term = (input.value || "").trim();
+  if (!term) {
+    const w = _pbpVocabDetailWordId ? _vocabRows.find((row) => row.id === _pbpVocabDetailWordId) : null;
+    if (w) _pbpVocabRelookup(w);
+    else { try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); } }
+    return;
+  }
+  _pbpVocabLookupOther(term, sel.value || _vocabLookupLang);
+}
+
+// spec §4.10: only the cover and "another word's result" write the session
+// language. With a word open, a hand lookup re-runs the full chain in the new
+// language; T7c gives the untouched word its open-to-look-up re-run.
+function _pbpVocabLookupLangChanged() {
+  const sel = $id("vocab-lookup-lang");
+  const host = $id("vocab-ref-result");
+  if (!sel) return;
+  if (host && host.dataset.refState === "other") {
+    _vocabLookupLang = sel.value;
+    _pbpVocabLookupOther(host.dataset.refTerm || "", sel.value);
+    return;
+  }
+  const w = _pbpVocabDetailWordId ? _vocabRows.find((row) => row.id === _pbpVocabDetailWordId) : null;
+  if (!w) { _vocabLookupLang = sel.value; return; }
+  if (_pbpVocabRelookedWordId === w.id) _pbpVocabRelookup(w);
+}
+
+// One-time wiring for the lookup row, from the guarded top-level section at
+// the bottom of this file. Option labels use uiLangToBCP47(), not <html lang>:
+// this runs before library.js's applyI18n sets the page language.
 function _pbpVocabWireLookupBar() {
   const input = $id("vocab-lookup-input");
   const sel = $id("vocab-lookup-lang");
   const go = $id("vocab-lookup-go");
-  if (!input || !sel || !go) return; // absent on pages/fixtures with no lookup bar
-  // Fix round 1 (Important 2): this wiring runs at deferred-script parse
-  // time, before library.js's applyI18n() sets document.documentElement.lang
-  // -- reading it here would always see the raw <html lang="en"> attribute
-  // and mislabel every language option. uiLangToBCP47() computes the real
-  // UI locale independently of that timing (same precedent as md-dict.js's
-  // xp-dict-lang build), so it is correct even this early; the relookup
-  // select below builds on click, well after applyI18n has already run, so
-  // document.documentElement.lang is safe there.
+  if (!input || !sel || !go) return; // absent on pages/fixtures with no lookup row
   const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang;
   for (const code of PBP_DICT_LANGS) {
-    if (code === "auto") continue; // free lookup mirrors relookup: no Auto leg
+    if (code === "auto") continue; // a stored word carries a language; no Auto leg here
     const o = document.createElement("option");
     o.value = code;
     o.textContent = pbpDictLanguageLabel(code, locale) || code;
     sel.appendChild(o);
   }
   sel.value = _vocabLookupLang;
-  sel.addEventListener("change", () => { _vocabLookupLang = sel.value; });
+  sel.addEventListener("change", _pbpVocabLookupLangChanged);
   go.addEventListener("click", _pbpVocabFreeLookup);
   input.addEventListener("keydown", (e) => {
-    // IME guard (Important 3): Chrome dispatches a key="Enter" keydown with
-    // isComposing=true (keyCode 229 as a fallback signal) when the user
-    // confirms an IME candidate -- that Enter must never submit a lookup for
-    // the still-uncommitted composition text (md-ask.js / popup-tags.js).
+    // IME guard: the Enter that confirms a candidate belongs to the composition.
     if (e.isComposing || e.keyCode === 229) return;
     if (e.key === "Enter") _pbpVocabFreeLookup();
   });
-}
-
-// Free dictionary lookup: renders a lookup-result view into the detail host.
-// Lookup-only by design -- no save path (spec: context/save semantics are a
-// separate, later design question). Mutually exclusive with the word-detail
-// view: submitting a lookup drops any activated word's aria-current/id
-// linkage, and activating a row (or the saved-word hint below) hands the
-// detail host back to _pbpVocabRenderDetail.
-function _pbpVocabFreeLookup() {
-  const input = $id("vocab-lookup-input");
-  const sel = $id("vocab-lookup-lang");
-  if (!input || !sel) return;
-  const term = (input.value || "").trim();
-  if (!term) return;
-  const lang = sel.value || _vocabLookupLang;
-
-  // The lookup result owns the detail host: drop any word-detail linkage so
-  // reload paths do not resurrect a word over the result (they no-op on null).
-  _pbpVocabDetailWordId = null;
-  _pbpVocabMarkCurrentRow(null);
-  const empty = $id("vocab-detail-empty");
-  const detail = $id("vocab-detail");
-  if (!empty || !detail) return;
-  // This view owns the detail host outright and replaces its children below;
-  // the status region may be parked in the word-detail closing row that is
-  // about to go with them (see _pbpVocabStatusHost). The result view has no
-  // closing row of its own, so its home is the list pane's count row.
-  _pbpVocabStatusHost(false);
-  empty.hidden = true;
-  detail.hidden = false;
-  document.body.classList.add("lib-narrow-detail"); // narrow mode shows the result pane
-
-  const frag = document.createDocumentFragment();
-
-  const head = document.createElement("div");
-  head.className = "vocab-detail-head";
-  const termEl = document.createElement("h2");
-  termEl.className = "vocab-detail-term";
-  termEl.textContent = term;
-  head.appendChild(termEl);
-  const langChip = document.createElement("span");
-  langChip.className = "notes-meta-chip";
-  langChip.textContent = pbpDictLanguageLabel(lang, document.documentElement.lang) || lang;
-  head.appendChild(langChip);
-  const speak = document.createElement("button");
-  speak.type = "button";
-  speak.className = "btn btn-sm vocab-detail-speak";
-  setBtnIcon(speak, "speaker", "");
-  speak.title = t("dictSpeak");
-  speak.setAttribute("aria-label", t("dictSpeak"));
-  speak.addEventListener("click", () => pbpDictSpeak(term, lang));
-  head.appendChild(speak);
-  frag.appendChild(head);
-
-  // Saved-word hint: case-folded match against the current owner's rows.
-  const folded = pbpVocabSearchText(term);
-  const saved = _vocabRows.find((r) => pbpVocabSearchText(r.term) === folded);
-  if (saved) {
-    const hint = document.createElement("button");
-    hint.type = "button";
-    hint.className = "btn btn-sm vocab-lookup-saved";
-    setBtnIcon(hint, "bookMarked", t("libraryLookupSaved"));
-    hint.addEventListener("click", () => {
-      // Fix round 1 (Important 4): the hint (and this closure) survives
-      // mutation reloads that happen while the lookup result stays on
-      // screen -- `saved` can be a deleted/edited row by click time. Re-
-      // resolve from the CURRENT _vocabRows instead of rendering the
-      // captured snapshot; a vanished id is a no-op, not a ghost detail.
-      const fresh = _vocabRows.find((r) => r.id === saved.id);
-      if (!fresh) return;
-      // An activation like a row click: it replaces this whole pane, so the
-      // hint button focus sits on goes with it.
-      _pbpVocabRenderDetail(fresh, true);
-      _pbpVocabMarkCurrentRow(fresh.id);
-    });
-    frag.appendChild(hint);
-  }
-
-  const host = document.createElement("div");
-  host.className = "lib-section vocab-detail-dict";
-  frag.appendChild(host);
-  detail.replaceChildren(frag);
-  // Same reason as _pbpVocabRenderDetail's own reset: the pane is the scroll
-  // container, and replaceChildren preserves its scrollTop.
-  const resultPane = $id("vocab-detail-pane");
-  if (resultPane) resultPane.scrollTop = 0;
-
-  // AMENDMENT (Task 2 review defect): _pbpVocabDictRun dereferences
-  // _pbpVocabDictCtrl.signal.aborted, but nothing on this path ever created
-  // it -- a cold page load (free lookup submitted before any word-detail
-  // relookup ever ran) leaves it null and this throws. Fix: do exactly what
-  // _pbpVocabRelookup does at its own call site -- abort any existing
-  // session controller and start a fresh one. This also gives free lookup
-  // its own session identity, so it and a word-detail relookup mutually
-  // abort each other through the same _pbpVocabDictCtrl.
-  if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
-  _pbpVocabDictCtrl = new AbortController();
-
-  // Slot pair per the md-dict invariant: two stable children, never
-  // replaceChildren() on the slot itself.
-  const wrap = document.createElement("div");
-  wrap.className = "xp-dict";
-  const slot = document.createElement("div");
-  slot.className = "xp-dict-slot";
-  const localEl = document.createElement("div");
-  localEl.className = "xp-dict-local";
-  const onlineEl = document.createElement("div");
-  onlineEl.className = "xp-dict-online";
-  slot.appendChild(localEl);
-  slot.appendChild(onlineEl);
-  wrap.appendChild(slot);
-  host.replaceChildren(wrap);
-
-  // `lang`, not sel.value: this run belongs to the submitted query. md-dict's
-  // rerun callback fires long after submit (retry link, cache miss), and by
-  // then the dropdown may name a language the user picked for the NEXT
-  // lookup -- rerunning under it would silently answer a different question
-  // than the result heading claims. A language change re-submits on its own.
-  const run = () => _pbpVocabDictRun(term, lang, { localEl, onlineEl }, "", run);
-  run();
-  _pbpVocabFocusNarrowBack();
 }
 
 // Narrow (single-pane) mode. Mirrors library.css's 860px threshold -- the CSS
@@ -1103,41 +1135,36 @@ function _pbpVocabFocusNarrowBack() {
 // _pbpVocabFlashStatus: that function is a byte-identical twin of
 // options-vocab.js's copy (tests/ui-contract-tests.mjs pins it), and the
 // options page has no detail pane to move anything into.
-//
-// The row it lands in has to WRAP for the sentence to survive the trip:
-// .vocab-main-status is `margin-left: auto` + `nowrap` + ellipsis, cut for the
-// count row's spare end slot, and .vocab-detail-footer already spends that slot
-// on Delete. Without `.vocab-detail-footer { flex-wrap: wrap }` and a
-// full-line rule for the status beside it (library.css, the resolution the
-// notes toolbar already carries for its own twin), the failure sentences this
-// move exists to deliver -- 74 characters for "saved, but the list could not
-// refresh" -- arrive as one clipped fragment, and a sentence ellipsised down
-// to nothing is not a message.
-//
-// `detailReady` says the detail pane is in its FINAL shape for this render.
-// Callers about to replaceChildren() it pass false, which parks the node back
-// in the count row first: a live region wiped out with the subtree it sits in
-// is gone for good ($id memoizes by id and would keep answering with the
-// orphan), and every message after that would be written into nothing.
 let _vocabStatusDetailReady = false;
 function _pbpVocabStatusHost(detailReady) {
-  // `undefined` = re-home only (the batch row opening or closing); the
-  // detail pane's readiness is whatever the last render said it was.
+  // `undefined` = re-home only (the batch row opening or closing, T4b); the
+  // detail's readiness is whatever the last render said it was.
   if (detailReady !== undefined) _vocabStatusDetailReady = !!detailReady;
   const el = $id("vocab-status");
   const bar = $id("vocab-context-bar");
   if (!el || !bar) return el || null;
-  // The same condition library.css hides the list pane under, not a computed
-  // style read: _pbpVocabNarrowMode mirrors the 860px threshold the CSS owns.
-  const listGone = _vocabStatusDetailReady && _pbpVocabNarrowMode()
-    && document.body.classList.contains("lib-narrow-detail");
-  // Tier 1 (spec §4.7): the batch row is up AND on the page -- its status slot.
+  // spec §4.7, first match wins: a selection whose batch row is on screen ->
+  // its slot (T4); a detail in its final shape -> the tail's footer, at ANY
+  // width (a behaviour change: the two-pane layout used to keep it in the
+  // count row), between the delete and Save; otherwise -> the count row,
+  // before Select all. The batch row lives in the list pane, which narrow
+  // detail takes off the page (display: none at <=860): "on screen" is read
+  // from what is rendered, not from _pbpVocabNarrowMode, so a selection kept
+  // across that switch never parks the live region in an invisible slot.
+  // `detailReady` false is the caller about to replaceChildren() the detail
+  // or the tail: park the node in the count row first, or it is removed with
+  // that subtree and every later message is written into nothing ($id would
+  // re-query and miss).
+  const pane = $id("vocab-list-pane");
+  const listGone = !pane || pane.getClientRects().length === 0;
   const batch = $id("vocab-batch-toolbar");
   const slot = !listGone && batch && batch.classList.contains("selecting") ? batch.querySelector(".lib-batch-status") : null;
-  const host = slot || (listGone && document.querySelector("#vocab-detail .vocab-detail-footer")) || bar;
-  if (el.parentNode !== host) {
-    // Back in the count row it sits before Select all, which hangs off the
-    // row's end (spec §3.5).
+  const footer = _vocabStatusDetailReady ? document.querySelector("#vocab-detail-tail .vocab-detail-footer") : null;
+  const host = slot || footer || bar;
+  if (host === footer) {
+    const save = footer.querySelector(".vocab-note-save");
+    if (el.parentNode !== footer || el.nextElementSibling !== save) footer.insertBefore(el, save);
+  } else if (el.parentNode !== host) {
     if (host === bar) bar.insertBefore(el, bar.querySelector(":scope > .lib-cluster"));
     else host.appendChild(el);
   }
@@ -1548,6 +1575,19 @@ function _pbpVocabSetAccountState(owner) {
   const empty = $id("vocab-no-account");
   if (pane) pane.classList.toggle("vocab-signed-out", signedOut);
   if (empty) empty.hidden = !signedOut;
+  // spec §7.6: a different owner starts the page over. A word was open ->
+  // every account-change path renders the cover first, which already reset
+  // the column; on the cover nothing renders, so reset it here. The filters go
+  // back to their defaults and the list returns to its top.
+  if (owner !== _pbpVocabRefOwner) {
+    _pbpVocabRefOwner = owner;
+    if (_pbpVocabDetailWordId === null) _pbpVocabResetRef(null);
+    const status = $id("vocab-status-filter");
+    if (status) status.value = "";
+    const group = $id("vocab-group-filter");
+    if (group) { group.value = ""; window.pbpListboxSync?.(group); }
+    _pbpVocabResetListScroll();
+  }
   const detailEmpty = $id("vocab-detail-empty");
   if (detailEmpty && signedOut) detailEmpty.textContent = t("libraryLookupSignedOutHint");
   else if (detailEmpty && !_pbpVocabDetailWordId) detailEmpty.textContent = t("libraryDetailEmpty");
@@ -1589,7 +1629,6 @@ function _pbpVocabDetailFocusTargets(el) {
   if (el.classList.contains("vocab-note-save")) return [".vocab-note-save", ".vocab-note-input"];
   if (el.closest(".vocab-note-edit")) return [".vocab-note-input"];
   if (el.closest(".vocab-group-unit") || el.classList.contains("chip-remove")) return [".vocab-group-unit input"];
-  if (el.classList.contains("vocab-detail-relookup")) return [".vocab-detail-relookup"];
   if (el.classList.contains("vocab-detail-delete")) return [".vocab-detail-delete"];
   if (el.closest(".vocab-detail-actions")) return [".vocab-detail-actions .btn"];
   return [];
@@ -1609,7 +1648,12 @@ function _pbpVocabDetailFocusTargets(el) {
 function _pbpVocabReconcileDetail() {
   if (!_pbpVocabDetailWordId) return;
   const detail = $id("vocab-detail");
-  if (!detail) return;
+  const tail = $id("vocab-detail-tail");
+  if (!detail || !tail) return;
+  // The rebuild replaces BOTH #vocab-detail and the tail (Save and the delete
+  // live there now), so "in the pane" and "find the counterpart" span both.
+  const inPane = (el) => !!el && (detail.contains(el) || tail.contains(el));
+  const find = (sel) => detail.querySelector(sel) || tail.querySelector(sel);
   // Focus is user context too, and the one piece this reconcile used to drop.
   // The button the mutation was fired from is inside the subtree the rebuild
   // below replaces, so Chrome lands on <body> -- and below 860px the list is
@@ -1617,24 +1661,12 @@ function _pbpVocabReconcileDetail() {
   // Every list-side mutation in this file already restores focus (see
   // _pbpVocabFocusStable's callers); the detail pane's four were the gap.
   const wasFocused = document.activeElement;
-  const focusTargets = wasFocused && detail.contains(wasFocused)
+  const focusTargets = inPane(wasFocused)
     ? _pbpVocabDetailFocusTargets(wasFocused) : [];
   const liveNote = detail.querySelector(".vocab-note-input");
   const liveGroup = detail.querySelector(".vocab-group-unit input");
   const draftNote = liveNote ? liveNote.value : null;
   const draftGroup = liveGroup ? liveGroup.value : "";
-  // A loaded definition is the user's too, and an expensive one: it cost a
-  // network round trip that only an explicit click may start. Carry the
-  // rendered nodes across the rebuild instead of re-querying -- the in-flight
-  // run writes into these very elements, so moving them keeps a slow lookup
-  // landing where it was aimed (nothing awaits between here and the
-  // re-insert, so md-dict's isConnected liveness checks never see the
-  // detached window). Without it, any sibling mutation -- or just leaving the
-  // tab and coming back, which library.js turns into a refresh -- emptied the
-  // dictionary area the user had just filled.
-  const dictHost = detail.querySelector(".vocab-detail-dict");
-  const dictNodes = dictHost ? [...dictHost.childNodes] : [];
-  const lookupSpent = !!detail.querySelector(".vocab-detail-relookup[hidden]");
   // The owner's FULL row set, not the filtered view: the detail pane is not
   // inside the filter's scope. With the list filtered to "learning", marking
   // the open word as known drops it out of _vocabViewRows, and reading the
@@ -1646,21 +1678,10 @@ function _pbpVocabReconcileDetail() {
   // past the load-more depth) -- the pane still reads it, the list just has
   // no row to mark.
   _pbpVocabMarkCurrentRow(fresh.id);
-  if (dictNodes.length) {
-    const host = detail.querySelector(".vocab-detail-dict");
-    if (host) host.replaceChildren(...dictNodes);
-  }
-  // One live lookup per detail render (see the button's own comment): a
-  // rebuild must not hand back a second one over results that are already
-  // there.
-  if (lookupSpent) {
-    const lookupBtn = detail.querySelector(".vocab-detail-relookup");
-    if (lookupBtn) lookupBtn.hidden = true;
-  }
   const note = detail.querySelector(".vocab-note-input");
   if (note && draftNote !== null && draftNote !== note.value) {
     note.value = draftNote;
-    const save = detail.querySelector(".vocab-note-save");
+    const save = tail.querySelector(".vocab-note-save");
     if (save) save.hidden = false;
   }
   const group = detail.querySelector(".vocab-group-unit input");
@@ -1669,12 +1690,12 @@ function _pbpVocabReconcileDetail() {
   // and a full IDB re-read, and the user may well have clicked into the note
   // box and started typing meanwhile -- taking that focus away would be worse
   // than the bug. A counterpart that exists but is hidden (Save, once the note
-  // is committed; re-lookup, once it is spent) is no landing spot either, so
+  // is committed) is no landing spot either, so
   // fall through to the next one and finally to the same two fallbacks the
   // list-side mutations use.
   if (!focusTargets.length) return;
   if (document.activeElement && document.activeElement !== document.body) return;
-  const next = focusTargets.map((sel) => detail.querySelector(sel)).find((el) => el && !el.hidden);
+  const next = focusTargets.map(find).find((el) => el && !el.hidden && el.getClientRects().length);
   if (next) {
     try { next.focus({ preventScroll: true }); } catch (_) { next.focus(); }
   } else if (_pbpVocabNarrowMode()) {
@@ -2087,12 +2108,25 @@ document.addEventListener("pbp:i18n-applied", _pbpVocabSyncFilterNarrow);
 // _pbpVocabWireLookupBar's own comment -- no per-render rebuild, so no
 // "already wired" guard is needed here either).
 _pbpVocabWireLookupBar();
+// The column's idle copy and the box's placeholder are written by JS (they
+// depend on state), so they follow a language switch the way applyI18n's
+// data-i18n attributes do.
+document.addEventListener("pbp:i18n-applied", () => {
+  const host = $id("vocab-ref-result");
+  if (host && host.dataset.refState === "free") _pbpVocabRenderRefIdle("free");
+  else if (host && host.dataset.refState === "idle") _pbpVocabRenderRefIdle("word");
+  _pbpVocabSyncLookupPlaceholder();
+});
 // Narrow-screen door to the lookup row. Below 860px the detail pane is
 // display:none until `lib-narrow-detail` is on the body, so the list needs
 // one control that flips into the pane and puts the caret where the user was
 // heading. Nothing is looked up here -- it opens the tool, it does not run it.
 function _pbpVocabOpenLookupPane() {
   document.body.classList.add("lib-narrow-detail");
+  // The lookup row is in the reference column, under the word on one
+  // column: show the column first (instant, spec §2.5 row 3).
+  const ref = $id("vocab-ref");
+  if (ref) ref.scrollIntoView({ block: "start" });
   const input = $id("vocab-lookup-input");
   if (!input) return;
   try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }

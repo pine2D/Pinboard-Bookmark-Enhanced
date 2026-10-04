@@ -777,9 +777,87 @@ async function libraryPageSortCases() {
       `label=${labelText} face=${faceText} title=${trigger && trigger.title}`);
     const visibleSelects = [...doc.querySelectorAll("select")]
       .filter((el) => el.getClientRects().length > 0 && win.getComputedStyle(el).visibility !== "hidden").map((el) => el.id);
-    check("T6 no native select is visible on the page except the lookup language (T7 converts it)",
-      JSON.stringify(visibleSelects) === JSON.stringify(["vocab-lookup-lang"]), JSON.stringify(visibleSelects));
+    check("T6 no native select is visible on the page (T7 converted the lookup language, the last one)",
+      JSON.stringify(visibleSelects) === JSON.stringify([]), JSON.stringify(visibleSelects));
   } finally {
+    frame.remove();
+  }
+}
+
+// ---- Library redesign T7a (spec §4.10, §8.4, §9.5): the one dictionary
+// language list box, on the real page.
+async function libraryPageLookupLangCases() {
+  const { frame, win, doc } = await loadLibraryFrame({ width: 1280, height: 800 });
+  try {
+    const booted = await libWaitFor(win, () => win.eval("_vocabCurrentOwner") === "acct_listboxtest");
+    check("T7 library.html boots signed in for the lookup-language cases",
+      booted && win.__bootErrors.length === 0, `booted=${booted} errors=${win.__bootErrors.slice(0, 3).join(" | ")}`);
+    const sel = doc.getElementById("vocab-lookup-lang");
+    const btn = doc.getElementById("vocab-lookup-lang-btn");
+    const pop = btn && btn.nextElementSibling;
+    check("T7 #vocab-lookup-lang is enhanced into a float value-box listbox",
+      !!btn && btn.classList.contains("listbox-btn") && !btn.classList.contains("listbox-trigger") && sel.hidden &&
+      !!pop && pop.getAttribute("popover") === "manual",
+      `btn=${btn && btn.className} carrierHidden=${sel.hidden} popover=${pop && pop.getAttribute("popover")}`);
+    if (!btn || !pop) return;
+    const value = () => btn.querySelector(".listbox-value").textContent;
+    const label = (code) => win.eval(`pbpDictLanguageLabel(${JSON.stringify(code)}, uiLangToBCP47())`) || code;
+    win.eval(`_vocabRows = [
+      { id: "ll-de", term: "Haus", language: "de", groups: [], contexts: [], createdAt: 2, updatedAt: 2 },
+      { id: "ll-und", term: "zzz", language: "und", groups: [], contexts: [], createdAt: 1, updatedAt: 1 },
+    ]; _pbpVocabApplyView(true);`);
+    win.eval("_pbpVocabRenderDetail(_vocabRows[0], true)");
+    await libFrames(win);
+    check("T7 opening a saved word moves the list box to the word's language and the button follows",
+      sel.value === "de" && value() === label("de"), `value=${sel.value} button=${value()}`);
+    win.eval("_pbpVocabRenderDetail(_vocabRows[1], true)");
+    await libFrames(win);
+    check("T7 a word saved as und leaves the list box where it was", sel.value === "de" && value() === label("de"));
+    win.eval("_pbpVocabRenderDetail(null)");
+    await libFrames(win);
+    check("T7 back on the cover the list box shows the session language",
+      sel.value === win.eval("_vocabLookupLang") && value() === label(sel.value));
+
+    win.__runs = [];
+    win.eval("window.__realDictRun = _pbpVocabDictRun; _pbpVocabDictRun = (term, lang) => { window.__runs.push(term + '/' + lang); };");
+    win.eval("_pbpVocabRenderDetail(_vocabRows[0], true); _pbpVocabRelookup(_vocabRows[0]);");
+    await libFrames(win);
+    doc.querySelector("#vocab-ref-result .vocab-ref-relookup").click();
+    await libFrames(win);
+    check("T7 Look up again re-runs the open word and hands focus to the language list box button",
+      win.__runs.join(",") === "Haus/de,Haus/de" && doc.activeElement === btn,
+      `${win.__runs.join(",")} active=${doc.activeElement && doc.activeElement.id}`);
+    btn.click();
+    await libFrames(win);
+    doc.querySelector('#vocab-lookup-lang-list .listbox-opt[data-value="fr"]').click();
+    await libFrames(win);
+    check("T7 picking a language after a manual lookup re-runs the full chain in that language",
+      win.__runs.join(",") === "Haus/de,Haus/de,Haus/fr" && sel.value === "fr", win.__runs.join(","));
+
+    // Opened at the bottom of the detail pane, the list must flip up and stay
+    // whole: it is a top-layer popover, the pane's overflow cannot clip it.
+    frame.style.height = `${Math.ceil(btn.getBoundingClientRect().bottom + 24)}px`;
+    await libFrames(win, 3);
+    btn.click();
+    await libFrames(win);
+    const pr = pop.getBoundingClientRect();
+    check("T7 opened at the bottom of the viewport, the language list flips up inside the viewport",
+      pop.matches(":popover-open") && pop.getAttribute("data-flip") === "up" &&
+      pr.top >= -0.5 && pr.bottom <= win.innerHeight + 0.5 && win.getComputedStyle(pop).position === "fixed",
+      `open=${pop.matches(":popover-open")} flip=${pop.getAttribute("data-flip")} rect=${pr.top},${pr.bottom} vh=${win.innerHeight}`);
+    // T6 closes on an outer scroll only when it carries the button (> 1px),
+    // so this really scrolls the pane -- whichever way it still has room.
+    const paneEl = doc.getElementById("vocab-detail-pane");
+    const topBefore = btn.getBoundingClientRect().top;
+    const room = paneEl.scrollHeight - paneEl.clientHeight;
+    paneEl.scrollTop = paneEl.scrollTop < room ? Math.min(room, paneEl.scrollTop + 40) : Math.max(0, paneEl.scrollTop - 40);
+    await libFrames(win, 3);
+    const moved = Math.abs(btn.getBoundingClientRect().top - topBefore);
+    check("T7 scrolling the detail pane closes the language list",
+      moved > 1 && !pop.matches(":popover-open") && pop.hidden,
+      `moved=${moved.toFixed(1)} room=${room} open=${pop.matches(":popover-open")}`);
+  } finally {
+    try { win.eval("if (window.__realDictRun) _pbpVocabDictRun = window.__realDictRun;"); } catch (_) {}
     frame.remove();
   }
 }
@@ -796,6 +874,7 @@ async function libraryPageSortCases() {
     // libraryPageDetailLocaleCases, T7c libraryPageAutoLookupLangCases).
     await libraryPageGroupCases();
     await libraryPageSortCases();
+    await libraryPageLookupLangCases();
   } catch (error) {
     report("suite setup", error);
   }

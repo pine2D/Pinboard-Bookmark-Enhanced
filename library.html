@@ -157,19 +157,30 @@
                is load-bearing -- the pane is a grid and would otherwise
                stretch this button across the whole reading column. -->
           <button type="button" class="btn btn-sm ghost vocab-detail-back" id="vocab-detail-back" data-i18n-title="libraryBack" data-i18n-aria="libraryBack" aria-label="Back to list" title="Back to list"><span class="btn-ic" data-ic="arrowLeft"></span><span data-i18n="libraryBack">Back to list</span></button>
-          <!-- Free dictionary lookup (lookup-only, no save path). It lives at
-               the top of the panel, not in the list header: it filters
-               nothing, and its result renders right below it in #vocab-detail.
-               Bare row, no island -- it sits directly on the panel and shares
-               the panel's reading column, so its right edge lines up with the
-               word head, the note box and the closing action row. -->
-          <div id="vocab-lookup-bar" class="vocab-filter-toolbar vocab-lookup-bar" role="search" data-i18n-aria="libraryLookupAria" aria-label="Dictionary lookup">
-            <input type="search" id="vocab-lookup-input" data-i18n-placeholder="libraryLookupPlaceholder" data-i18n-aria="libraryLookupPlaceholder" aria-label="Look up any word" placeholder="Look up any word" autocomplete="off" />
-            <select id="vocab-lookup-lang" data-i18n-aria="dictLangAria" aria-label="Dictionary language"></select>
-            <button type="button" class="btn btn-sm" id="vocab-lookup-go" data-i18n-title="libraryLookupGo" data-i18n-aria="libraryLookupGo" aria-label="Look up" title="Look up"><span class="btn-ic" data-ic="book"></span></button>
+          <!-- One sheet, one DOM order = one Tab order (spec §4.1): the word (or
+               the cover), the dictionary reference column, then the tail with
+               the destructive action. library.css puts the reference column on
+               the right only when the pane is wide enough; nothing here moves. -->
+          <div class="vocab-sheet">
+            <div class="vocab-detail-empty" id="vocab-detail-empty" data-i18n="libraryDetailEmpty">Pick a word from the list to see its details.</div>
+            <div class="vocab-detail" id="vocab-detail" hidden></div>
+            <!-- Dictionary reference column (spec §4.8). Static on purpose: a
+                 word switch clears #vocab-ref-result explicitly, so a refresh of
+                 the same word never touches a result or the run still filling
+                 it. The lookup row moved here from the top of the pane: it
+                 belongs where its result renders. -->
+            <section id="vocab-ref" class="vocab-ref" aria-labelledby="vocab-ref-label">
+              <h3 id="vocab-ref-label" class="lib-hang-label lib-first-line" data-i18n="librarySectionDict">Dictionary</h3>
+              <div id="vocab-lookup-bar" class="vocab-filter-toolbar vocab-lookup-bar" role="search" data-i18n-aria="libraryLookupAria" aria-label="Dictionary lookup">
+                <input type="search" id="vocab-lookup-input" data-i18n-placeholder="libraryLookupPlaceholder" data-i18n-aria="libraryLookupPlaceholder" aria-label="Look up any word" placeholder="Look up any word" autocomplete="off" />
+                <label class="sr-only" for="vocab-lookup-lang" data-i18n="dictLangAria">Dictionary language</label>
+                <select id="vocab-lookup-lang" data-listbox="float"></select>
+                <button type="button" class="btn" id="vocab-lookup-go" data-i18n="libraryLookupGo">Look up</button>
+              </div>
+              <div id="vocab-ref-result"></div>
+            </section>
+            <div id="vocab-detail-tail"></div>
           </div>
-          <div class="vocab-detail-empty" id="vocab-detail-empty" data-i18n="libraryDetailEmpty">Pick a word from the list to see its details.</div>
-          <div class="vocab-detail" id="vocab-detail" hidden></div>
         </aside>
       </div>
     </section>
