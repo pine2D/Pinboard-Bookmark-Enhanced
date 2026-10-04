@@ -258,7 +258,15 @@
           </div>
         </div>
         <aside class="notes-detail-pane" id="notes-detail-pane" data-i18n-aria="tabNotes" aria-label="Notes">
-          <div class="notes-detail-empty" id="notes-detail-empty" data-i18n="libraryNotesDetailEmpty">Select a highlight on the left to read it.</div>
+          <!-- Cover (spec §5.7): same anatomy as the vocabulary cover. data-i18n
+               sits on the title and the hint, never on the container --
+               applyI18n would flatten the three parts into one sentence. The
+               statistics sentence is written by library-notes.js. -->
+          <div class="lib-cover" id="notes-detail-empty">
+            <h2 class="lib-cover-title lib-first-line" data-i18n="tabNotes">Notes</h2>
+            <p class="lib-cover-lead" id="notes-cover-lead"></p>
+            <p class="lib-cover-hint" data-i18n="libraryNotesDetailEmpty">Pick a highlight from the list to read it in full.</p>
+          </div>
           <div class="notes-sheet" id="notes-detail" hidden></div>
         </aside>
       </div>

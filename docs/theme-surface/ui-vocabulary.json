@@ -243,6 +243,7 @@
         "notes-batch-bar",
         "notes-empty",
         "notes-excerpt",
+        "notes-page-side",
         "notes-toolbar",
         "vocab-batch-bar"
       ],
@@ -312,9 +313,12 @@
         "notes-meta-pagecount",
         "notes-meta-site",
         "notes-note-ic",
+        "notes-open-original",
         "notes-row-del",
         "notes-row-meta",
         "notes-row-open-text",
+        "notes-side-facts",
+        "notes-side-title",
         "row-del-x",
         "save-status",
         "vocab-card",
@@ -370,7 +374,8 @@
         "lib-hang-sec",
         "lib-cover",
         "notes-sheet",
-        "notes-excerpt"
+        "notes-excerpt",
+        "notes-page-side"
       ]
     },
     "listbox": {

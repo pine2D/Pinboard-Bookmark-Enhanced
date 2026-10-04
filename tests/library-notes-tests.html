@@ -64,7 +64,11 @@ body.test-narrow-hide.lib-narrow-notes .notes-list-pane{display:none}
       </div>
     </div>
     <aside class="notes-detail-pane" id="notes-detail-pane" aria-label="Notes">
-      <div class="notes-detail-empty" id="notes-detail-empty">Select a highlight on the left to read it.</div>
+      <div class="lib-cover" id="notes-detail-empty">
+        <h2 class="lib-cover-title lib-first-line">Notes</h2>
+        <p class="lib-cover-lead" id="notes-cover-lead"></p>
+        <p class="lib-cover-hint">Pick a highlight from the list to read it in full.</p>
+      </div>
       <div class="notes-sheet" id="notes-detail" hidden></div>
     </aside>
   </div>
@@ -134,6 +138,9 @@ function check(name, condition, detail) {
 const rowKeys = () => [...document.querySelectorAll("#notes-list .notes-hit")].map((el) => el.dataset.notesKey).join(",");
 const rowEl = (key) => [...document.querySelectorAll("#notes-list .notes-hit")].find((el) => el.dataset.notesKey === key);
 const detail = () => $id("notes-detail");
+// Two page deletes exist from T8d on (the "this page" column's and the
+// footer's); exactly one is displayed at any width.
+const visibleDelete = () => [...detail().querySelectorAll(".notes-detail-delete")].find((b) => b.offsetParent !== null) || null;
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 // Deleting a highlight now happens inside that record's cross-context Web Lock
 // (library.html and every reader tab write the same pbp_hl_<page> key, and
@@ -245,7 +252,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     currentQuote()?.textContent);
   check("the detail shows the note in full",
     detail().querySelector('.notes-excerpt[aria-current="true"] .notes-excerpt-note-text')?.textContent === "note on a2");
-  check("the detail offers the delete action", !!detail().querySelector(".notes-detail-delete"));
+  check("the detail offers the delete action", !!visibleDelete());
   check("the detail dates the page",
     detail().querySelector(".notes-detail-head .notes-meta-day")?.textContent === pbpLibFormatDay(500),
     detail().querySelector(".notes-detail-head .notes-detail-meta")?.textContent);
@@ -543,6 +550,63 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("a window resize re-measures the hang labels too",
       !!labelOf("x2")?.classList.contains("is-stacked"), labelOf("x2")?.className);
     t = realT;
+    // -- the stack decision is CSS's own wrap decision (T8c review) --
+    // The unmeasured hang label wraps by CSS (flex-wrap) exactly when its
+    // parts plus gaps exceed the column's content box; the measurement must
+    // draw the same line, or a label a fraction of a pixel too wide is left
+    // as two CSS lines with the 8px gap between them instead of the stacked
+    // form. Parts sized to a quarter pixel either side of the column.
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    {
+      const label = labelOf("x6");
+      const parts = label ? [...label.children] : [];
+      const cs = label ? getComputedStyle(label) : null;
+      const room = label ? label.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) : NaN;
+      const gap = cs ? parseFloat(cs.columnGap) || 0 : 0;
+      const probe = (delta) => {
+        const lead = parts.length - 1;
+        parts.forEach((p, i) => { p.style.width = (i < lead ? 20 : room - 20 * lead - gap * lead + delta) + "px"; });
+        label.classList.remove("is-stacked");
+        const tops = parts.map((p) => p.getBoundingClientRect().top);
+        const cssWraps = Math.max(...tops) - Math.min(...tops) > 8;
+        _pbpNotesStackLabels(detail());
+        return { cssWraps, stacked: label.classList.contains("is-stacked") };
+      };
+      const over = parts.length >= 2 ? probe(0.25) : null;
+      const under = parts.length >= 2 ? probe(-0.25) : null;
+      parts.forEach((p) => p.style.removeProperty("width"));
+      check("a hang label stacks exactly when CSS would wrap it: a quarter pixel over stacks, a quarter under stays on one line",
+        paneC() >= 1000 && !!over && over.cssWraps && over.stacked && !under.cssWraps && !under.stacked,
+        `room=${room} over=${JSON.stringify(over)} under=${JSON.stringify(under)}`);
+    }
+    // -- a detail width change with no window resize re-measures (T8c review) --
+    // Showing or hiding the list pane, a view switch or a narrow-mode flip
+    // moves the detail's width without a resize event.
+    fixtureWidth(960);
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    await frames();
+    const stackedNarrow = !!labelOf("x6")?.classList.contains("is-stacked");
+    fixtureWidth(2400);
+    await frames(); await frames();
+    check("a change of the detail's width with no window resize still re-measures the hang labels",
+      !stackedNarrow && paneC() >= 1000 && !!labelOf("x6")?.classList.contains("is-stacked"),
+      `${stackedNarrow} | C=${paneC()} | ${labelOf("x6")?.className}`);
+    {
+      // The measurement writes min-heights; a height-only change must not
+      // come back as another measurement (the observer would feed itself).
+      const realStack = _pbpNotesStackLabels;
+      let measured = 0;
+      _pbpNotesStackLabels = (...a) => { measured++; return realStack(...a); };
+      try {
+        excerpts()[0].style.paddingBottom = "40px";
+        await frames(); await frames();
+      } finally {
+        _pbpNotesStackLabels = realStack;
+        excerpts()[0]?.style.removeProperty("padding-bottom");
+      }
+      check("a height-only change of the detail does not re-measure (the observer never answers its own writes)",
+        measured === 0, String(measured));
+    }
     fixtureWidth(960);
     _pbpNotesSelectRow("pbp_hl_times#x6");
     check("below the hang width labels sit above their quote and never stack",
@@ -590,6 +654,96 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       !!footer && !footer.classList.contains("lib-section") && !!footerDel &&
       footerDel.classList.contains("lib-hang-start") && footerDel.classList[footerDel.classList.length - 1] === "notes-detail-delete",
       footer && footer.outerHTML.slice(0, 200));
+
+    // -- the "this page" column and the two page deletes (T8d) --
+    store["pbp_hl_twin"] = { v: 1, url: "https://twin.example/p", title: "Twin page", items: [
+      { id: "w1", n: 1, quote: "first twin", color: 1, note: "", ts: at(0, 8, 0) },
+      { id: "w2", n: 2, quote: "second twin", color: 2, note: "", ts: at(0, 8, 5) },
+    ] };
+    await renderNotesPanel();
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    const side = () => detail().querySelector(":scope > .notes-page-side");
+    const shown = (el) => !!el && el.offsetParent !== null;
+    check("the 'this page' column sits after the last excerpt and before the footer in the DOM",
+      !!side() && side().previousElementSibling === excerpts()[excerpts().length - 1] &&
+      side().nextElementSibling?.classList.contains("notes-detail-footer"));
+    check("the sheet carries --notes-rows = excerpts + 2 for the column's explicit row span",
+      detail().style.getPropertyValue("--notes-rows").trim() === "8", detail().getAttribute("style"));
+    const metaCount = () => detail().querySelector(".notes-meta-pagecount");
+    check("below C 1200 the column is absent, the footer delete is the one delete shown, and the meta counts the page",
+      paneC() < 1200 && !shown(side()) && visibleDelete()?.parentElement?.classList.contains("notes-detail-footer") &&
+      [...detail().querySelectorAll(".notes-detail-delete")].filter(shown).length === 1 && shown(metaCount()),
+      `C=${paneC()}`);
+    fixtureWidth(2400);
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    check("from C 1200 the column shows, its delete is the one delete shown, and the meta drops the page count",
+      paneC() >= 1200 && shown(side()) && visibleDelete()?.parentElement === side() &&
+      [...detail().querySelectorAll(".notes-detail-delete")].filter(shown).length === 1 && !shown(metaCount()),
+      `C=${paneC()}`);
+    const headRect = detail().querySelector(":scope > .notes-detail-head")?.getBoundingClientRect();
+    const sideRect = side()?.getBoundingClientRect();
+    check("the column starts level with the page head, right of the main column (placed by grid lines, not DOM order)",
+      !!headRect && !!sideRect && Math.abs(sideRect.top - headRect.top) <= 1 && sideRect.left >= headRect.right + 64 - 1,
+      `side ${sideRect?.top},${sideRect?.left} head ${headRect?.top},${headRect?.right}`);
+    const focusOrder = [...detail().querySelectorAll("a[href], button")].filter(shown)
+      .map((el) => el.classList[el.classList.length - 1]);
+    check("Tab order is title link, the other excerpts, open original, then delete",
+      focusOrder.join(",") === ["notes-detail-link", ...Array(5).fill("notes-excerpt-jump"), "notes-open-original", "notes-detail-delete"].join(","),
+      focusOrder.join(","));
+    const facts = () => [...(side()?.querySelectorAll(".notes-side-facts > span") || [])].map((s) => s.textContent);
+    check("the column's facts count the page's highlights and notes and give its first and last time",
+      facts()[0] === "libraryPageFacts:6,1" &&
+      facts()[1] === `libraryPageSpan:${day(lastYear)} ${time(lastYear)},${time(pageTs)}`, facts().join(" | "));
+    const openOriginal = side()?.querySelector(":scope > a.notes-open-original");
+    check("Open original is a real link to the page's safe url, in a new tab",
+      openOriginal?.getAttribute("href") === "https://times.example/page" && openOriginal.target === "_blank" &&
+      openOriginal.rel.includes("noopener") && openOriginal.classList.contains("btn") && !!openOriginal.querySelector(".btn-ic svg"),
+      openOriginal && openOriginal.outerHTML.slice(0, 200));
+    _pbpNotesSelectRow("pbp_hl_twin#w1");
+    check("a page without notes states only its highlight count",
+      facts()[0] === "libraryStatsHighlights:2", facts().join(" | "));
+    _pbpNotesSelectRow("pbp_hl_longtitle#l1");
+    check("a single highlight says when it was saved",
+      facts()[0] === "libraryStatsHighlights:1" && facts()[1] === `libraryPageSavedAt:${time(at(0, 9, 0))}`, facts().join(" | "));
+    _pbpNotesSelectRow("pbp_hl_orphan#c1");
+    check("a page with no url offers no Open original and explains itself",
+      !side()?.querySelector(".notes-open-original") && !!detail().querySelector(".notes-detail-head .notes-unknown-hint"));
+    const listPane = document.querySelector(".notes-list-pane");
+    const workbench = document.querySelector(".notes-workbench");
+    const realNarrowMode = _pbpNotesNarrowMode;
+    let narrowHost = null, wideHost = null;
+    try {
+      _pbpNotesNarrowMode = () => true;
+      // The <=860px rule's single track as well as its hidden list pane:
+      // with only the pane gone, the detail would auto-place into the index
+      // column and never reach C 1200.
+      listPane.style.display = "none";
+      workbench.style.gridTemplateColumns = "minmax(0, 1fr)";
+      fixtureWidth(960); _pbpNotesSelectRow("pbp_hl_times#x6"); narrowHost = _pbpNotesStatusHost();
+      fixtureWidth(2400); _pbpNotesSelectRow("pbp_hl_times#x6"); wideHost = _pbpNotesStatusHost();
+    } finally {
+      _pbpNotesNarrowMode = realNarrowMode;
+      listPane.style.display = "";
+      workbench.style.removeProperty("grid-template-columns");
+      fixtureWidth(960);
+    }
+    check("with the list off screen the status sentence sits beside the one visible page delete",
+      !!narrowHost?.classList.contains("notes-detail-footer") && !!wideHost?.classList.contains("notes-page-side"),
+      `${narrowHost?.className} | ${wideHost?.className}`);
+    delete store["pbp_hl_twin"];
+
+    // -- the notes cover (T8d) --
+    _pbpNotesRenderDetail(null);
+    const allHits = _pbpNotesHits();
+    const stats = pbpNotesStats(allHits, Date.now());
+    check("the cover states how many highlights from how many pages, and when the latest was saved",
+      $id("notes-cover-lead").textContent === `libraryNotesCoverLead:${stats.highlights},${stats.pages},${pbpLibFormatDay(stats.latestTs)}`,
+      $id("notes-cover-lead").textContent);
+    t = (key, ...values) => (key === "libraryNotesCoverLead" ? "relabelled" : realT(key, ...values));
+    document.dispatchEvent(new Event("pbp:i18n-applied"));
+    check("a language switch rewrites the cover sentence", $id("notes-cover-lead").textContent === "relabelled");
+    t = realT;
+    document.dispatchEvent(new Event("pbp:i18n-applied"));
 
     // ---- T8 block cleanup ----
     t = realT;
@@ -977,7 +1131,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-btn").click();
   const before = rowKeys().split(",");
   const deletePosition = before.indexOf("pbp_hl_alpha#a2");
-  detail().querySelector(".notes-detail-delete").click();
+  visibleDelete().click();
   const popover = document.querySelector(".confirm-popover");
   check("delete asks first, naming the page it removes",
     popover && popover.querySelector(".confirm-msg").textContent.includes("Alpha article"),
@@ -997,10 +1151,10 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   // ---- refresh keeps focus inside the detail pane (narrow mode has no list
   //      to fall back to, so <body> there is a keyboard dead end) ----
   rowEl("pbp_hl_beta#b1").querySelector(".notes-hit-btn").click();
-  detail().querySelector(".notes-detail-delete").focus();
+  visibleDelete().focus();
   await _pbpNotesRefreshPreservingState();
   check("a refresh restores focus to the equivalent control in the detail",
-    document.activeElement === detail().querySelector(".notes-detail-delete"),
+    document.activeElement === visibleDelete(),
     document.activeElement && (document.activeElement.className || document.activeElement.tagName));
 
   // ---- delete failure that cannot be pinned to a row falls back to the
@@ -1011,7 +1165,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     $id("notes-filter").value = "orphan"; // hides the selected row from the list
     $id("notes-filter").dispatchEvent(new Event("input"));
     check("the selected row is not rendered while filtered out", !rowEl("pbp_hl_beta#b1"));
-    const failBtn = detail().querySelector(".notes-detail-delete");
+    const failBtn = visibleDelete();
     failBtn.click();
     document.querySelector(".confirm-popover .confirm-yes").click();
     await settle(() => failBtn.classList.contains("is-error"));
@@ -1038,7 +1192,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("an item owned by another account never becomes a row",
     rowKeys().includes("pbp_hl_shared#s1") && !rowKeys().includes("pbp_hl_shared#s2"), rowKeys());
   rowEl("pbp_hl_shared#s1").querySelector(".notes-hit-btn").click();
-  detail().querySelector(".notes-detail-delete").click();
+  visibleDelete().click();
   document.querySelector(".confirm-popover .confirm-yes").click();
   await settle(() => !rowKeys().includes("pbp_hl_shared#"));
   check("deleting a page keeps the highlights this account cannot see",
@@ -1054,7 +1208,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     { id: "o1", n: 1, quote: "sole highlight", color: 1, note: "", ts: 750 } ] };
   await renderNotesPanel();
   rowEl("pbp_hl_solo#o1").querySelector(".notes-hit-btn").click();
-  detail().querySelector(".notes-detail-delete").click();
+  visibleDelete().click();
   document.querySelector(".confirm-popover .confirm-yes").click();
   await settle(() => !("pbp_hl_solo" in store));
   check("deleting a page with no foreign items drops the record itself",
@@ -1087,6 +1241,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     detail().hidden + " | " + _pbpNotesSelectedKey + " | excerpts=" + detail().querySelectorAll(".notes-excerpt").length);
   check("an account switch drops the previous account's rows before the rescan",
     $id("notes-list").children.length === 0, rowKeys());
+  check("an account switch blanks the cover sentence until the new account's first count arrives",
+    $id("notes-cover-lead").textContent === "", $id("notes-cover-lead").textContent);
   await settle(() => rowKeys().includes("pbp_hl_beta#b1"));
   check("the rescan repopulates the list and leaves the reading pane closed",
     rowKeys().includes("pbp_hl_beta#b1") && detail().hidden === true, rowKeys());
@@ -1116,7 +1272,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("only the signed-in account's item on a shared page becomes a row",
       rowKeys().includes("pbp_hl_switch#w1") && !rowKeys().includes("pbp_hl_switch#w2"), rowKeys());
     rowEl("pbp_hl_switch#w1").querySelector(".notes-hit-btn").click();
-    detail().querySelector(".notes-detail-delete").click();
+    visibleDelete().click();
     const staleYes = document.querySelector(".confirm-popover .confirm-yes");
     stubbedOwner = "acct_two";
     fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "sync");
@@ -1133,6 +1289,18 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     window.pbpVocabCurrentOwner = realOwnerFn;
     delete store["pbp_hl_switch"];
     _notesOwnerCache = null;
+    _pbpNotesSetStatus("");
+    await renderNotesPanel();
+  }
+
+  // ---- the cover before any successful read says the read failed ----
+  {
+    const realGet = chrome.storage.local.get;
+    _notesScanDone = false;
+    chrome.storage.local.get = async () => { throw new Error("io"); };
+    try { await renderNotesPanel(); } finally { chrome.storage.local.get = realGet; }
+    check("a read failure before the first count puts the failure sentence on the cover",
+      $id("notes-cover-lead").textContent === _pbpNotesLoadFailedText(), $id("notes-cover-lead").textContent);
     _pbpNotesSetStatus("");
     await renderNotesPanel();
   }
@@ -1271,6 +1439,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     $id("notes-scope-note").hidden === false &&
     $id("notes-scope-note").querySelector("#notes-open-backup-settings"),
     String($id("notes-scope-note").hidden));
+  check("an empty store's cover says how to make a first highlight",
+    $id("notes-cover-lead").textContent === "notesEmpty", $id("notes-cover-lead").textContent);
   check("a truly empty store never claims the boolean it did not earn",
     _notesHiddenByOwner === false, String(_notesHiddenByOwner));
 
@@ -1298,6 +1468,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       check("the storage-scope backup note is suppressed -- the data is hidden, not absent",
         $id("notes-scope-note").hidden === true,
         String($id("notes-scope-note").hidden));
+      check("a cover over owner-hidden highlights says they are hidden, not absent",
+        $id("notes-cover-lead").textContent === "notesHiddenByOwner", $id("notes-cover-lead").textContent);
     } finally {
       window.pbpVocabCurrentOwner = realOwnerFn2;
       delete store["pbp_hl_foreign"];

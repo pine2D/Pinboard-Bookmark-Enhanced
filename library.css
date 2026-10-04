@@ -1028,8 +1028,8 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
    hanging buttons, highlighter ends and focus glows room the scroller would
    otherwise clip (§11 I11); P at the end, 96 at the bottom. One full-width
    track: .notes-sheet lays out its own columns by the pane's width (spec
-   §5.2), starting on that axis -- never centred (§0.2). The empty state
-   keeps the main column's cap until T8d's cover replaces it. */
+   §5.2), starting on that axis -- never centred (§0.2); so does the cover
+   (#notes-detail-empty, its own block after the notes detail). */
 .notes-detail-pane {
   min-width: 0;
   min-height: 0;
@@ -1045,7 +1045,6 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   font-size: 15px;
   line-height: 1.65;
 }
-.notes-detail-empty { max-width: var(--lib-main-max); color: var(--lib-fg-hint); padding: var(--lib-sp-5) 0; text-align: center; }
 /* Detail-pane primitives (COMPONENTS.md §10.2), two shapes:
    .lib-section  a section of the pane's flow: one rung of air above and an
                  sp-3 lead-in. No rule: on the flat page sections are divided
@@ -1209,6 +1208,53 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
 .notes-note-ic { flex: none; display: inline-flex; margin-top: var(--lib-sp-1); color: var(--lib-fg-muted); }
 .notes-note-ic svg { width: 14px; height: 14px; }
 .notes-excerpt-note-text { min-width: 0; }
+
+/* "This page" column (spec §5.5) and the two page deletes (I4). The column is
+   placed by explicit grid lines, not DOM order: its DOM follows the excerpts
+   so keyboard and screen readers reach the content before the destructive
+   action (I12). --notes-rows (= excerpts + 2) is written by library-notes.js;
+   "1 / -1" would only reach the end of the EXPLICIT grid, and this grid has
+   no explicit rows. Exactly one of the two deletes is ever displayed. */
+.notes-page-side { display: none; min-width: 0; }
+@container lib-detail (min-width: 1200px) {
+  .notes-sheet { grid-template-columns: var(--lib-hang-w) minmax(0, var(--lib-excerpt-max)) var(--lib-sp-8) minmax(var(--lib-side-min), var(--lib-side-max)); }
+  .notes-sheet > .notes-page-side { display: block; grid-column: 4; grid-row: 1 / span var(--notes-rows); align-self: start; }
+  .notes-sheet > .notes-detail-footer { display: none; }
+  .notes-detail-meta > .notes-meta-pagecount { display: none; }
+}
+.notes-page-side > .notes-side-title {
+  --fs: var(--lib-text-secondary);
+  --lh: var(--lib-lh-secondary);
+  margin: calc((var(--fs) - var(--lh)) / 2) 0 0;
+  padding: 0;
+  font-size: var(--fs);
+  line-height: var(--lh);
+  font-weight: bold;
+  text-align: start;
+  color: var(--lib-fg-muted);
+}
+.notes-page-side > .notes-open-original { margin-top: var(--lib-sp-3); }
+.notes-page-side > .notes-side-facts {
+  display: grid;
+  gap: var(--lib-sp-1);
+  margin: var(--lib-sp-4) 0 0;
+  font-size: var(--lib-text-meta);
+  line-height: var(--lib-lh-meta);
+  color: var(--lib-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.notes-page-side > .notes-side-title + .notes-side-facts { margin-top: var(--lib-sp-3); }
+.notes-page-side > .notes-detail-delete { margin-top: var(--lib-sp-5); }
+
+/* Notes cover (spec §5.7): the vocabulary cover's type, leading and pull-up
+   (the .lib-cover family); this only puts it on the main column's axis --
+   it lives outside .notes-sheet's grid. */
+#notes-detail-empty { display: grid; grid-template-columns: minmax(0, var(--lib-excerpt-max)); justify-content: start; }
+#notes-detail-empty[hidden] { display: none; }
+#notes-detail-empty > * { grid-column: -2 / -1; min-width: 0; }
+@container lib-detail (min-width: 1000px) {
+  #notes-detail-empty { grid-template-columns: var(--lib-hang-w) minmax(0, var(--lib-excerpt-max)); }
+}
 
 /* Highlighter (§5.4 / §6.4): the lower half of the line, both ends slightly
    past the glyphs (padding cancelled by margin, so the text does not move),

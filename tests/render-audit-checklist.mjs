@@ -812,7 +812,10 @@ export const CHECKS = [
     expect: { tabChrome: { activeUnderline: false }, textContrast: 4.5 } },
   { surface: "library", page: "library.html", selector: ".vocab-detail-delete", state: "default",
     expect: { textContrast: 4.5, iconContrast: 3, iconVCenter: 1 } },   // also defect 5
-  { surface: "library", page: "library.html", selector: ".notes-detail-delete", state: "default",
+  // Two page deletes from T8d on ("this page" column + footer, spec §5.1 I4);
+  // the runner's 1280 viewport is C < 1200, where the footer copy is the one
+  // displayed -- a bare .notes-detail-delete would select the hidden column copy.
+  { surface: "library", page: "library.html", selector: ".notes-detail-footer > .notes-detail-delete", state: "default",
     expect: { textContrast: 4.5 } },
 
   // ---- defect 6: quiet-tier danger (COMPONENTS.md §4.4 `dangerQuietContrast`
@@ -831,7 +834,7 @@ export const CHECKS = [
   // not a class-toggle stand-in). ----
   { surface: "library", page: "library.html", selector: ".vocab-detail-delete", state: "hover",
     expect: { textContrast: 4.5 } },
-  { surface: "library", page: "library.html", selector: ".notes-detail-delete", state: "hover",
+  { surface: "library", page: "library.html", selector: ".notes-detail-footer > .notes-detail-delete", state: "hover",
     expect: { textContrast: 4.5 } },
 
   // ---- primary tier (COMPONENTS.md §1.2, Task 4 taste-uplift-batch2):

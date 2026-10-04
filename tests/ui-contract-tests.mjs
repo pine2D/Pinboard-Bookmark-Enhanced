@@ -9370,6 +9370,14 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     /c !== "is-stacked"/.test(fnBody("_pbpNotesDetailFocusSnapshot")) &&
     /\[data-notes-key=/.test(fnBody("_pbpNotesRestoreDetailFocus")),
     "library-notes.js: the page delete lost its identity class in the last position, or the detail focus restore stopped keying excerpt controls on data-notes-key / started keying on the layout-only is-stacked (spec §5.1)");
+  check(/@container lib-detail \(min-width: 1200px\) \{\n  \.notes-sheet \{ grid-template-columns: var\(--lib-hang-w\) minmax\(0, var\(--lib-excerpt-max\)\) var\(--lib-sp-8\) minmax\(var\(--lib-side-min\), var\(--lib-side-max\)\); \}/.test(hand) &&
+    hand.includes(".notes-sheet > .notes-page-side { display: block; grid-column: 4; grid-row: 1 / span var(--notes-rows); align-self: start; }") &&
+    notesJs.includes('detail.style.setProperty("--notes-rows", String(pageHits.length + 2));'),
+    "library.css/library-notes.js: the 'this page' column lost its explicit placement (column 4, rows 1 / span --notes-rows = excerpts + 2) -- left to DOM order it would follow the excerpts (spec §5.2, I12)");
+  check(/<div class="lib-cover" id="notes-detail-empty">/.test(libraryHtml) &&
+    /<h2 class="lib-cover-title lib-first-line" data-i18n="tabNotes">/.test(libraryHtml) &&
+    /<p class="lib-cover-hint" data-i18n="libraryNotesDetailEmpty">/.test(libraryHtml),
+    "library.html: the notes cover lost its title / statistics / hint anatomy, or data-i18n moved back onto #notes-detail-empty (applyI18n would flatten the cover into one sentence, spec §4.11 / §5.7)");
 }
 
 if (fail.length) {

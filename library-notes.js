@@ -171,6 +171,10 @@ let _pbpNotesSelectedKey = null;
 // page only nudges the new current excerpt into view. Twin of the `sameWord`
 // guard in library-vocab.js's _pbpVocabRenderDetail.
 let _notesRenderedPageKey = null;
+// True once a scan has succeeded for the current account; the cover's
+// statistics sentence stays empty until then (spec §4.11 / §5.7: no number
+// before the first count), and an account switch sets it back.
+let _notesScanDone = false;
 // The HIGHLIGHT the detail last rendered. Inside one page a change of
 // highlight -- from the list or from a jump button -- must bring the new
 // current excerpt into view (spec §5.4), while a refresh of the same highlight
@@ -231,6 +235,7 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
         // screen -- and that button targets the previous account's record.
         // Same gap, same fix, as library-vocab.js's account-switch path.
         _pbpNotesRenderDetail(null);
+        _notesScanDone = false;
         _pbpNotesResetListScroll(); // spec §7.6: a new owner's list starts at the top
         _notesActiveColors = new Set();
         _pbpNotesRender(true);
@@ -876,6 +881,69 @@ function _pbpNotesBuildDeleteBtn(row) {
   return del;
 }
 
+// "This page" column (spec §5.5), shown from C 1200. Its DOM sits AFTER the
+// excerpts -- keyboard and screen-reader order reach the content before the
+// destructive action (I12); CSS grid lines put it at the top right.
+function _pbpNotesBuildSide(hit, pageHits, pageTs) {
+  const side = document.createElement("aside");
+  side.className = "notes-page-side";
+  side.setAttribute("aria-labelledby", "notes-side-title");
+  const title = document.createElement("h3");
+  title.id = "notes-side-title";
+  title.className = "lib-hang-label notes-side-title lib-first-line";
+  title.textContent = t("libraryThisPage");
+  side.appendChild(title);
+  const href = typeof pbpDictSafeUrl === "function" ? pbpDictSafeUrl(hit.row.url) : "";
+  if (href) {
+    const open = document.createElement("a");
+    open.className = "btn btn-sm notes-open-original";
+    open.href = href;
+    open.target = "_blank";
+    open.rel = "noopener noreferrer";
+    setBtnIcon(open, "extOpen", t("libraryOpenOriginal"));
+    side.appendChild(open);
+  }
+  const n = pageHits.length;
+  const noted = pageHits.filter((h) => typeof h.item.note === "string" && h.item.note.trim()).length;
+  // A moment on the page's own day is its time; any other day carries the day.
+  const stamp = (ts) => {
+    const time = pbpLibFormatTime(ts);
+    return pbpLibSameDay(ts, pageTs) ? time : [pbpLibFormatDay(ts), time].filter(Boolean).join(" ");
+  };
+  const facts = document.createElement("p");
+  facts.className = "notes-side-facts";
+  const count = document.createElement("span");
+  count.textContent = noted ? t("libraryPageFacts", String(n), String(noted)) : t("libraryStatsHighlights", String(n));
+  facts.appendChild(count);
+  // A record without any timestamp (never written by the reader, only by a
+  // hand-edited backup) has no moment to state: the time line is left out
+  // rather than written around an empty value.
+  const first = stamp(pageHits[0].ts), last = stamp(pageHits[n - 1].ts);
+  if (first && last) {
+    const span = document.createElement("span");
+    span.textContent = n > 1 ? t("libraryPageSpan", first, last) : t("libraryPageSavedAt", first);
+    facts.appendChild(span);
+  }
+  side.appendChild(facts);
+  side.appendChild(_pbpNotesBuildDeleteBtn(hit.row));
+  return side;
+}
+
+// The cover's statistics sentence (spec §5.7). Empty before the first count;
+// a read that fails before any success says so; a later failed read keeps the
+// last good sentence (the list's own rule); zero highlights reuse the list's
+// three-way empty wording, so owner-hidden highlights are not "none".
+function _pbpNotesRenderCover(failed, all) {
+  const lead = $id("notes-cover-lead");
+  if (!lead) return;
+  if (!_notesScanDone) { lead.textContent = failed ? _pbpNotesLoadFailedText() : ""; return; }
+  if (failed) return;
+  const hits = all || _pbpNotesHits();
+  if (!hits.length) { lead.textContent = _notesHiddenByOwner ? t("notesHiddenByOwner") : t("notesEmpty"); return; }
+  const stats = pbpNotesStats(hits, Date.now());
+  lead.textContent = t("libraryNotesCoverLead", String(stats.highlights), String(stats.pages), pbpLibFormatDay(stats.latestTs));
+}
+
 // A same-page jump (spec §5.4): the clicked highlight becomes current (list row
 // included, when the list filter shows it). The render keeps the pane's scroll
 // and brings the new current excerpt into view only as far as needed -- the
@@ -911,12 +979,17 @@ function _pbpNotesStackLabels(detail) {
   }
   const stacked = rows.filter(({ ex, label }) => {
     if (getComputedStyle(ex).display !== "grid") return false; // label above its quote: never stacks
+    // The same comparison flex-wrap makes for the unmeasured label (parts +
+    // gaps against the content box), on the same unrounded layout values --
+    // clientWidth rounds, and any slack here would leave a label CSS has
+    // already wrapped onto two lines (8px apart) unstacked.
     const cs = getComputedStyle(label);
-    const room = label.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    const room = label.getBoundingClientRect().width - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0) -
+      (parseFloat(cs.borderLeftWidth) || 0) - (parseFloat(cs.borderRightWidth) || 0);
     const parts = [...label.children];
     const gap = parseFloat(cs.columnGap) || 0;
     const need = parts.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0) + gap * Math.max(0, parts.length - 1);
-    return need > room + 0.5;
+    return need > room;
   });
   for (const { label } of stacked) label.classList.add("is-stacked");
   const heights = stacked.map(({ ex, label }) => {
@@ -954,6 +1027,7 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
     _notesRenderedDetailKey = null;
     document.body.classList.remove("lib-narrow-notes");
     detail.replaceChildren();
+    detail.style.removeProperty("--notes-rows");
     _pbpNotesMarkCurrentRow();
     return;
   }
@@ -972,12 +1046,16 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
   frag.appendChild(_pbpNotesBuildHead(hit, pageHits.length));
   // 2. Every highlight of the page, oldest first; the opened one is current
   pageHits.forEach((h, i) => frag.appendChild(_pbpNotesBuildExcerpt(h, i, h.key === hit.key, pageTs, q)));
-  // 3. Closing row: the page delete, hanging at the main column's start
+  // 3. "This page" column (C >= 1200; CSS places it, DOM keeps it last but one)
+  frag.appendChild(_pbpNotesBuildSide(hit, pageHits, pageTs));
+  // 4. Closing row (shown below C 1200): the page delete, hanging at the main column's start
   const footer = document.createElement("div");
   footer.className = "notes-detail-footer";
   footer.appendChild(_pbpNotesBuildDeleteBtn(hit.row));
   frag.appendChild(footer);
 
+  // The column spans every row of the sheet: head + excerpts + footer.
+  detail.style.setProperty("--notes-rows", String(pageHits.length + 2));
   detail.replaceChildren(frag);
   if (enterNarrow) _pbpNotesFocusNarrowBack(detail);
   // Labels first: a stacked label's min-height moves every excerpt below it,
@@ -1207,6 +1285,7 @@ function _pbpNotesRenderList(hits, allHits, append) {
   const all = allHits || _pbpNotesHits();
   const total = all.length;
   _pbpNotesRenderToolbar(total, hits.length, all);
+  _pbpNotesRenderCover(false, all);
   _pbpNotesSyncColorFilters(all);
   if (!append) list.replaceChildren();
   // The empty state is a SIBLING of the list, never a child: #notes-list is
@@ -1283,6 +1362,10 @@ function _pbpNotesStatusHost() {
   // offsetParent is null exactly for a display:none subtree here (nothing in
   // this view is position:fixed).
   if (bar && bar.offsetParent) return bar;
+  // Last tier (spec §5.1): beside the ONE page delete that is displayed --
+  // the "this page" column from C 1200, the footer below that.
+  const shownDelete = [...view.querySelectorAll("#notes-detail .notes-detail-delete")].find((b) => b.offsetParent !== null);
+  if (shownDelete) return shownDelete.parentElement;
   return view.querySelector(".notes-detail-footer") || bar;
 }
 
@@ -1619,6 +1702,7 @@ async function renderNotesPanel() {
     // same situation, through this view's own live region.
     _pbpNotesSetStatus(_pbpNotesLoadFailedText());
     _notesLoadFailed = true;
+    _pbpNotesRenderCover(true);
     return;
   }
   // The read worked. Nothing else ever clears that sentence, so without this
@@ -1626,6 +1710,7 @@ async function renderNotesPanel() {
   // over a fully rendered list for the rest of the page's life, and the screen
   // reader is never told the failure is over. Only ours -- see _notesLoadFailed.
   if (_notesLoadFailed) _pbpNotesSetStatus("");
+  _notesScanDone = true;
   _notesAllRows = rows;
   // No limit reset: a rescan is a refresh, not a filter change, and the 250ms
   // pbp_hl_ debounce fires one behind every write the reader makes in another
@@ -1739,11 +1824,27 @@ if (typeof $id === "function") {
     new MutationObserver(_pbpNotesScheduleStack).observe(document.documentElement,
       { attributes: true, attributeFilter: ["data-density", "data-theme"] });
   }
+  // The detail's own width also moves with no window resize: the list pane
+  // shown or hidden in narrow mode, a view switch (display:none and back),
+  // the index column settling its width. Only a change of WIDTH re-measures:
+  // the measurement itself writes min-heights, and answering those would be a
+  // loop. Same one-frame coalescing as the two triggers above.
+  const notesDetail = $id("notes-detail");
+  if (notesDetail && typeof ResizeObserver === "function") {
+    let lastWidth = -1;
+    new ResizeObserver((entries) => {
+      const width = entries[entries.length - 1].contentRect.width;
+      if (width === lastWidth) return;
+      lastWidth = width;
+      if (width > 0) _pbpNotesScheduleStack();
+    }).observe(notesDetail);
+  }
   // A language switch rewrites colour names and the page count, which are
   // built from t() at render time: re-render the open detail (same highlight,
   // so the pane keeps its scroll and keyboard focus is put back where it
   // was); the render ends with a fresh measurement.
   document.addEventListener("pbp:i18n-applied", () => {
+    _pbpNotesRenderCover(false);
     const hit = _pbpNotesFindHit(_pbpNotesSelectedKey);
     if (!hit) return;
     const focus = _pbpNotesDetailFocusSnapshot();
