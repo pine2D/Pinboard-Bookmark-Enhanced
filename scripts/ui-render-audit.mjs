@@ -1987,7 +1987,14 @@ const FILTER_SCROLL_INPUTS = {
     // (T2 seeds 19 words into it, enough to keep the list scrolling). ctx
     // carries the theme and the rows array the nested-popover row
     // (filterSetSurvivesPick) lands in.
-    act: async (p, ctx) => { await libPickListboxOption(p, ctx.rows, ctx.theme, "vocab-group-filter", 1); return true; },
+    act: async (p, ctx) => {
+      await libPickListboxOption(p, ctx.rows, ctx.theme, "vocab-group-filter", 1);
+      // Index 1 is picked blind; read the carrier back so a reordered or
+      // renamed seed group fails as setup, never as a silent other filter.
+      const picked = await p.$eval("#vocab-group-filter", (el) => el.value);
+      if (picked !== "Reading") throw new Error(`SETUP: G6 picked option 1 of #vocab-group-filter and got ${JSON.stringify(picked)}, not "Reading" (theme=${ctx.theme}) -- seed groups changed`);
+      return true;
+    },
   },
   // Every seeded highlight lives under example.com, and the notes filter
   // matches page URLs too: the list stays full length.
@@ -3516,7 +3523,17 @@ async function libPickListboxOption(page, results, theme, selectId, index) {
   await opt.waitFor({ state: "visible", timeout: TIMEOUT_MS });
   await opt.click();
   await settleAnimations(page);
-  if (!revealed) return;
+  if (!revealed) {
+    // Never a silent skip (T6a fix round 1): the nested-popover row only
+    // means something when the pick happened inside the Filter popover. A
+    // wide-form index (the button inline) cannot exercise it, so the row
+    // reports that instead of vanishing.
+    const fit = await page.evaluate(() => document.getElementById("vocab-list-pane")?.dataset.headerFit ?? null);
+    results.push({ surface: "library", theme, selector: "#vocab-filter-set", state: "filterScrollReset",
+      ...verdict("filterSetSurvivesPick", false, `not revealed (data-header-fit=${fit})`, "picked inside the open Filter popover",
+        `${btnSel} was not inside a closed Filter popover, so the nested-popover pick was never made -- the probe viewport must leave the index narrow`) });
+    return;
+  }
   const stillOpen = await page.$eval("#vocab-filter-set", (el) => el.matches(":popover-open"));
   results.push({ surface: "library", theme, selector: "#vocab-filter-set", state: "filterScrollReset",
     ...verdict("filterSetSurvivesPick", stillOpen, stillOpen ? "open" : "light-dismissed", `open after picking ${btnSel}'s option ${index}`) });

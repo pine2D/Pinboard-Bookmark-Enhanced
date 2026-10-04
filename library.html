@@ -35,14 +35,19 @@
         <input type="search" id="vocab-search" placeholder="Search words, definitions, context, and groups" data-i18n-placeholder="vocabSearchPlaceholder" data-i18n-aria="vocabSearchPlaceholder" aria-label="Search words, definitions, context, and groups" autocomplete="off" />
       </div>
       <!-- Filter row (spec §3.1 / §3.4). Wide form (the pane's
-           data-header-fit="wide": the row's content fits the index on one
-           line, above the 860px single-pane break): the group select and the
-           three status toggles sit inline inside .vocab-filter-set. Narrow
-           form: the SAME nodes fold into that element's popover, opened by
-           #vocab-filter-narrow -- one DOM, never a copy. library.js decides
-           the form (pbpLibWireVocabHeaderFit; undecided -- no attribute,
-           neither form shown -- until the first counts land) and wires the
-           popover (pbpLibWireFilterPopover). -->
+           data-header-fit="wide": the row's content -- measured with the
+           group listbox at its 120px floor -- fits the index on one line,
+           above the 860px single-pane break): the group filter, a float
+           listbox (listbox.js renders #vocab-group-filter as the
+           #vocab-group-filter-btn value box; the select stays the hidden
+           value carrier), and the three status toggles sit inline inside
+           .vocab-filter-set. Narrow form: the SAME nodes fold into that
+           element's popover, opened by #vocab-filter-narrow -- one DOM, never
+           a copy; the listbox's own panel then opens as a second top-layer
+           popover above it. library.js decides the form
+           (pbpLibWireVocabHeaderFit; undecided -- no attribute, neither form
+           shown -- until the first counts land) and wires the popover
+           (pbpLibWireFilterPopover). -->
       <div class="vocab-filter-row">
         <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="libraryFilterNarrow">Filter</span></button>
         <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">

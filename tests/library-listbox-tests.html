@@ -114,7 +114,7 @@ function boot({ body, before = "", after = "" }) {
   });
 }
 
-// The 13 primitive cases: one shared srcdoc document plus two fresh ones.
+// The 14 primitive cases: one shared srcdoc document plus two fresh ones.
 async function primitiveCases() {
   const { frame, win, doc } = await boot({ body: MAIN_BODY });
   const $ = (id) => doc.getElementById(id);
@@ -279,7 +279,9 @@ async function primitiveCases() {
     assert(!isOpen(pop) && pop.hidden && btn.getAttribute("aria-expanded") === "false", "resize left the list open");
   });
 
-  test("float: scrolling an outer container closes; scrolling the list itself does not", async () => {
+  // An outer scroll closes the list only when it moves the button (> 1px):
+  // here the button lives in #scroller, so scrolling it carries the anchor.
+  test("float: scrolling an outer container that carries the button closes; scrolling the list itself does not", async () => {
     await reset();
     const btn = btnOf(fl);
     const pop = popOf(fl);
@@ -294,6 +296,23 @@ async function primitiveCases() {
       $("scroller").scrollTop = 40;
       await settle();
       assert(!isOpen(pop) && pop.hidden, "an outer scroll left the list open");
+    } finally { key(btn, "Escape"); }
+  });
+
+  // A scroll event that moves nothing -- one still queued from before the
+  // open, or touchpad inertia in a pane beside the button -- must not snap a
+  // list the user just opened shut (library redesign T6a fix round 1).
+  test("float: an outer scroll event that does not move the button leaves the list open", async () => {
+    await reset();
+    const btn = btnOf(fl);
+    const pop = popOf(fl);
+    btn.click();
+    try {
+      assert(isOpen(pop), "fixture: did not open");
+      $("scroller").dispatchEvent(new win.Event("scroll"));
+      doc.dispatchEvent(new win.Event("scroll"));
+      await settle();
+      assert(isOpen(pop) && !pop.hidden && btn.getAttribute("aria-expanded") === "true", "a scroll that left the button in place closed the list");
     } finally { key(btn, "Escape"); }
   });
 
@@ -573,6 +592,47 @@ async function libraryPageGroupCases() {
       wb.width >= 120 - 0.5 && Math.abs(wb.height - controlH) <= 0.5 && wb.left >= rr.left - 0.5 && wb.right <= rr.right + 0.5,
       `fit=${pane.dataset.headerFit} need=${need} room=${indexRoom} narrowBtn=${win.getComputedStyle(narrowBtn).display} btn=${wb.left},${wb.width}x${wb.height} row=${rr.left},${rr.right}`);
 
+    // The wide form's open state: the inline button opens the same float
+    // panel -- top layer, fixed, inside the viewport -- and a pick closes it.
+    // (The carrier is put back to All groups afterwards, so the narrow-form
+    // pick below still changes it.)
+    btn.click();
+    await libFrames(win);
+    const wpr = pop.getBoundingClientRect();
+    const wideOpen = pop.matches(":popover-open") && win.getComputedStyle(pop).position === "fixed" &&
+      wpr.left >= -0.5 && wpr.top >= -0.5 && wpr.right <= doc.documentElement.clientWidth + 0.5 && wpr.bottom <= doc.documentElement.clientHeight + 0.5;
+    doc.querySelector('#vocab-group-filter-list .listbox-opt[data-value="Close reading"]').click();
+    await libFrames(win);
+    check("T6 wide form: the inline group listbox opens fixed inside the viewport, and picking an option writes the carrier and closes it",
+      wideOpen && filter.value === "Close reading" && !pop.matches(":popover-open") && pop.hidden && btn.getAttribute("aria-expanded") === "false",
+      `open=${wideOpen} pop=${wpr.left},${wpr.top},${wpr.right},${wpr.bottom} carrier=${filter.value} stillOpen=${pop.matches(":popover-open")}`);
+    filter.value = "";
+    filter.dispatchEvent(new win.Event("change", { bubbles: true }));
+    await libFrames(win);
+
+    // Opened while another pane is still coasting (T6a fix round 1): a smooth
+    // scroll of the detail pane in flight -- touchpad inertia -- keeps firing
+    // scroll events after the list opens, but none of them moves the button,
+    // so the list must stay open (it used to snap shut within a frame).
+    const detailPane = doc.getElementById("vocab-detail-pane");
+    const spacer = doc.createElement("div");
+    spacer.style.height = "4000px";
+    detailPane.appendChild(spacer);
+    detailPane.scrollTop = 0;
+    await libFrames(win, 3);
+    detailPane.scrollBy({ top: 1500, behavior: "smooth" });
+    await libFrames(win, 2);
+    btn.click();
+    await libFrames(win, 20);
+    const coastedTo = detailPane.scrollTop;
+    check("T6 a list opened while another pane is still scrolling (inertia) stays open: the coasting scroll never moved the button",
+      coastedTo > 0 && pop.matches(":popover-open") && !pop.hidden && btn.getAttribute("aria-expanded") === "true",
+      `paneScrollTop=${coastedTo} open=${pop.matches(":popover-open")} expanded=${btn.getAttribute("aria-expanded")}`);
+    btn.click();
+    spacer.remove();
+    detailPane.scrollTop = 0;
+    await libFrames(win, 3);
+
     // The narrow form (<=860px: always the Filter popover, spec §3.4): the
     // group listbox lives in the closed popover until the Filter button
     // opens it.
@@ -615,8 +675,10 @@ async function libraryPageGroupCases() {
     doc.getElementById("vocab-group-filter-list").dispatchEvent(new Event("scroll"));
     check("T6 scrolling inside the option list keeps the listbox open", pop.matches(":popover-open"));
     doc.getElementById("vocab-detail-pane").dispatchEvent(new Event("scroll"));
-    check("T6 a scroll anywhere else (the detail pane) closes it",
-      !pop.matches(":popover-open") && pop.hidden && btn.getAttribute("aria-expanded") === "false");
+    check("T6 a scroll elsewhere that leaves the button in place (the detail pane) keeps it open -- only a scroll that moves the button closes it",
+      pop.matches(":popover-open") && !pop.hidden && btn.getAttribute("aria-expanded") === "true");
+    btn.click();   // close it again with its own button
+    await libFrames(win);
     frame.style.height = fullHeight;   // the listbox is closed, so this resize closes nothing
     await libFrames(win, 3);
     btn.click();

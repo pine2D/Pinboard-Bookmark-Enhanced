@@ -36,8 +36,13 @@
 //   data-listbox="float"     the shell is a popover="manual" in the top layer,
 //                            placed with position: fixed by pbpListboxPlace(),
 //                            so no scroll container can clip it (library). A
-//                            window resize or any outer scroll closes it;
-//                            scrolling the list itself does not.
+//                            window resize closes it; an outer scroll closes
+//                            it only when it moved the button (> 1px from
+//                            where open() placed the panel), so a scroll that
+//                            was still queued or coasting (touchpad inertia)
+//                            when the list opened cannot snap it shut, and a
+//                            pane scrolling beside the button leaves it be.
+//                            Scrolling the list itself never closes it.
 //
 // Behaviour is the WAI-ARIA APG "select-only combobox": focus never leaves the
 // button, aria-activedescendant names the active option, and moving it only
@@ -228,6 +233,8 @@
       try { pop.showPopover(); }
       catch (err) { console.warn("[listbox] showPopover failed:", err?.name, err?.message); }
       place(pop, btn);
+      // The anchor's box the panel was placed against: onScroll compares.
+      state.anchorRect = btn.getBoundingClientRect();
       window.addEventListener("resize", state.onResize);
       document.addEventListener("scroll", state.onScroll, true);
     } else {
@@ -422,11 +429,20 @@
 
     const state = {
       select, root, btn, pop, list, value, sizer, float, ghost, face: "",
-      active: -1, typed: "", typedTimer: 0, outside: null, onResize: null, onScroll: null,
+      active: -1, typed: "", typedTimer: 0, outside: null, onResize: null, onScroll: null, anchorRect: null,
     };
     state.outside = (ev) => onOutside(state, ev);
     state.onResize = () => close(state);
-    state.onScroll = (ev) => { if (ev.target !== state.list) close(state); };
+    // An outer scroll closes the panel only when it carried the button away
+    // from where the panel was placed (> 1px either axis): a scroll event
+    // still queued from before the open, or touchpad inertia in another pane,
+    // moves nothing here and must not close a list the user just opened.
+    state.onScroll = (ev) => {
+      if (ev.target === state.list) return;
+      const was = state.anchorRect;
+      const now = state.btn.getBoundingClientRect();
+      if (!was || Math.abs(now.left - was.left) > 1 || Math.abs(now.top - was.top) > 1) close(state);
+    };
 
     btn.addEventListener("click", () => {
       if (state.pop.hidden) open(state); else close(state);
