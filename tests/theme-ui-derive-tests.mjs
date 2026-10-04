@@ -32,6 +32,10 @@ import {
   ROW_HOVER_STEP_MIN,
   ROW_STATE_MIN_DELTA,
   TIER_DISTINCT_MIN_DE,
+  deriveNoteMarks,
+  NOTE_MARK_ALPHA_DARK,
+  NOTE_MARK_ALPHA_FLOOR,
+  NOTE_MARK_ALPHA_LIGHT,
   UI_DERIVED_OUTPUT_ROLES,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
@@ -1970,6 +1974,39 @@ function f8Failures(id, out, hosts) {
       `${m[1]} --opt-field-chevron ${decl("field-chevron")} is not fieldChevronUri(its --opt-field-placeholder ${placeholder})`);
   }
   check(chevrons === 15, `field-chevron check visited ${chevrons} options blocks, expected 15 (14 themes + :root)`);
+}
+
+// --- Highlighter marks (spec docs/superpowers/specs/2026-10-03-library-
+// redesign-design.md §5.4 / §6.4): deriveNoteMarks' contract -- start at the
+// target alpha rounded to /255, step down 1/255 until fg clears 4.5:1 on the
+// hex-rounded composite over bg, throw under the floor -- plus the two faces
+// the spec states in numbers: the default light :root (no hue capped) and the
+// default dark preset flexoki-dark (yellow capped to 0x69 = 41%). The floor is
+// the 10-03 D1 ruling (0.14; spec said 0.25, which leaves solarized-dark with
+// no answer). The per-theme CATEGORY block lives further down (T8b) and never
+// calls deriveNoteMarks. ---
+{
+  const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+  const LIGHT_HUES = ["#facc15", "#4ade80", "#60a5fa", "#f87171", "#c084fc"].map((h) => hexToRgbLoose(h));
+  const DARK_HUES = ["#D9A441", "#5E9C69", "#5689B6", "#B86F8C", "#8B72AF"].map((h) => hexToRgbLoose(h));
+  const DARK_TARGETS = [0, 0, 0, 0, 0].map(() => NOTE_MARK_ALPHA_DARK);
+  check(JSON.stringify(NOTE_MARK_ALPHA_LIGHT) === "[0.45,0.4,0.4,0.4,0.4]" && Object.isFrozen(NOTE_MARK_ALPHA_LIGHT) &&
+    NOTE_MARK_ALPHA_DARK === 0.45 && NOTE_MARK_ALPHA_FLOOR === 0.14,
+    `highlighter constants drifted from spec §6.4 / ruling D1: ${JSON.stringify([NOTE_MARK_ALPHA_LIGHT, NOTE_MARK_ALPHA_DARK, NOTE_MARK_ALPHA_FLOOR])}`);
+  const light = deriveNoteMarks(hexToRgbLoose("#f7f7f8"), hexToRgbLoose("#1a1a2e"), LIGHT_HUES, NOTE_MARK_ALPHA_LIGHT);
+  check(JSON.stringify(light) === JSON.stringify(["#facc1573", "#4ade8066", "#60a5fa66", "#f8717166", "#c084fc66"]),
+    `deriveNoteMarks over the default light :root (bg #f7f7f8, fg #1a1a2e) must keep every target (45 / 40 / 40 / 40 / 40 %); got ${light.join(" ")}`);
+  const dark = deriveNoteMarks(hexToRgbLoose("#1c1b1a"), hexToRgbLoose("#cecdc3"), DARK_HUES, DARK_TARGETS);
+  check(JSON.stringify(dark) === JSON.stringify(["#d9a44169", "#5e9c6973", "#5689b673", "#b86f8c73", "#8b72af73"]),
+    `deriveNoteMarks over flexoki-dark (bg #1c1b1a, fg #cecdc3) must cap yellow to 0x69 (45% gives 4.15:1) and keep the other four at 0x73; got ${dark.join(" ")}`);
+  check(throws(() => deriveNoteMarks([0, 0, 0], [0x77, 0x77, 0x77], [0, 0, 0, 0, 0].map(() => [255, 255, 255]), DARK_TARGETS)),
+    "deriveNoteMarks must throw when even the floor alpha drops fg under 4.5:1 -- never fall back to some fixed alpha");
+  check(throws(() => deriveNoteMarks([0, 0, 0], [255, 255, 255], LIGHT_HUES.slice(0, 4), NOTE_MARK_ALPHA_LIGHT)) &&
+    throws(() => deriveNoteMarks([0, 0, 0], [255, 255, 255], LIGHT_HUES, [0.45, 0.4, 0.4, 0.4])) &&
+    throws(() => deriveNoteMarks("#000000", [255, 255, 255], LIGHT_HUES, NOTE_MARK_ALPHA_LIGHT)) &&
+    throws(() => deriveNoteMarks([0, 0, 0], [255, 255, 255], LIGHT_HUES, [0.1, 0.4, 0.4, 0.4, 0.4])) &&
+    throws(() => deriveNoteMarks([0, 0, 0], [255, 255, 255], LIGHT_HUES, [1.2, 0.4, 0.4, 0.4, 0.4])),
+    "deriveNoteMarks must reject anything but five hues, five targets in [floor, 1] and [r, g, b] colours");
 }
 
 if (failures.length) {

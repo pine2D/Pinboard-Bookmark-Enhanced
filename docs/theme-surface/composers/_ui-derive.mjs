@@ -590,6 +590,49 @@ export function deriveRowStates(bgRgb, fgRgb, accentRgb) {
   };
 }
 
+// Highlighter marks (spec docs/superpowers/specs/2026-10-03-library-redesign-
+// design.md §5.4 / §6.4): the library's notes excerpts paint the lower half of
+// every quote with a translucent mark, and the quote's text is plain --lib-fg.
+// So the mark is not a free colour choice: fg has to clear 4.5:1 on the mark
+// composited over the page bg. The hue is fixed per mode (library-chrome.mjs);
+// the ALPHA is what gives -- it starts at the target and steps down 1/255 until
+// the composite (hex-rounded, the same arithmetic contrast-audit.mjs's
+// composite() uses) clears 4.5:1. Dark presets target 45% for every hue (the
+// prototype's second round raised the reader's 0x59 to 0x73); light targets
+// yellow 45%, the rest 40% (= the reader's own light highlighter alphas).
+// The floor is a ruling, not a taste: at the spec's 25% solarized-dark had no
+// answer for any hue (fg #94a3a4 is only 5.74:1 on its bg), and the 10-03 D1
+// ruling chose "lighter marks on that one theme" -- 14% lets its five hues
+// land at 14.5-21.6% while every other block stays at or above 0x44. Under
+// the floor this throws: a new theme that cannot carry a mark must come back
+// for a decision, never ship a silent fallback.
+export const NOTE_MARK_ALPHA_LIGHT = Object.freeze([0.45, 0.40, 0.40, 0.40, 0.40]);
+export const NOTE_MARK_ALPHA_DARK = 0.45;
+export const NOTE_MARK_ALPHA_FLOOR = 0.14;
+const NOTE_MARK_MIN_CONTRAST = 4.5;
+const isNoteMarkRgb = (v) => Array.isArray(v) && v.length === 3 && v.every((c) => Number.isFinite(c) && c >= 0 && c <= 255);
+
+export function deriveNoteMarks(bgRgb, fgRgb, hueRgbs, targets) {
+  if (!isNoteMarkRgb(bgRgb) || !isNoteMarkRgb(fgRgb)) throw new TypeError("deriveNoteMarks: bg and fg must be [r, g, b]");
+  if (!Array.isArray(hueRgbs) || hueRgbs.length !== 5 || !hueRgbs.every(isNoteMarkRgb)) {
+    throw new TypeError("deriveNoteMarks: hueRgbs must be five [r, g, b]");
+  }
+  if (!Array.isArray(targets) || targets.length !== 5 ||
+      !targets.every((t) => Number.isFinite(t) && t >= NOTE_MARK_ALPHA_FLOOR && t <= 1)) {
+    throw new RangeError(`deriveNoteMarks: targets must be five alphas in [${NOTE_MARK_ALPHA_FLOOR}, 1]`);
+  }
+  const bg = bgRgb.map(Math.round), fg = fgRgb.map(Math.round);
+  const floor = Math.ceil(NOTE_MARK_ALPHA_FLOOR * 255);
+  return hueRgbs.map((hueRgb, i) => {
+    const hue = hueRgb.map(Math.round);
+    for (let a = Math.round(targets[i] * 255); a >= floor; a -= 1) {
+      const over = hue.map((c, k) => Math.round((a / 255) * c + (1 - a / 255) * bg[k]));
+      if (contrast(fg, over) >= NOTE_MARK_MIN_CONTRAST) return rgbToHex(hue) + a.toString(16).padStart(2, "0");
+    }
+    throw new Error(`deriveNoteMarks: ${rgbToHex(hue)} over ${rgbToHex(bg)} keeps ${rgbToHex(fg)} under ${NOTE_MARK_MIN_CONTRAST}:1 at every alpha down to ${floor}/255 -- pick another hue or lower the floor (a user ruling, spec §14)`);
+  });
+}
+
 // Hover frame of a FRAMED value box whose fill is NOT separated from its
 // hosts (terminal; rose-pine on options): the fill keeps its pilot value on
 // hover (§9.5: a framed control does not need its fill to carry affordance),
