@@ -924,18 +924,30 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
     }
     return out;
   }
+  // A failed row meets each state rule twice: while it is still the current
+  // row, and after the selection moved on (a failed row stays .is-error until
+  // the next attempt, so Ctrl-click can leave it selected but not current).
+  // For each such row state, the is-error rules that MATCH it (their state
+  // set is a subset of the row's) are the ones the cascade can pick; the
+  // strongest of them must out-rank the state rule, or hovering a failed
+  // selected row repaints it as a plain band.
   function isErrorSpecificityOffenders(css) {
     const rows = rowFillRules(css).filter((r) => !r.wrapped);
     const out = [];
     for (const s of rows) {
       if (s.states.includes(".is-error")) continue;
-      const want = stateKey(new Set([...s.states, ".is-error", "[aria-current]"]));
-      const e = rows.find((r) => r.subject === s.subject && r.states.includes(".is-error") && stateKey(r.states) === want);
-      if (!e) { out.push(`${s.sel}: no is-error rule for {${want}}`); continue; }
-      const es = selectorSpecificity(e.sel), ss = selectorSpecificity(s.sel);
-      if (cmpSpecificity(es, ss) <= 0) out.push(`${e.sel} (${es.join(",")}) does not out-rank ${s.sel} (${ss.join(",")})`);
+      const ss = selectorSpecificity(s.sel);
+      for (const extra of [[".is-error", "[aria-current]"], [".is-error"]]) {
+        const rowState = new Set([...s.states, ...extra]);
+        const want = stateKey(rowState);
+        const matching = rows.filter((r) => r.subject === s.subject && r.states.includes(".is-error") && r.states.every((t) => rowState.has(t)));
+        if (!matching.length) { out.push(`${s.sel}: no is-error rule matches a failed row in state {${want}}`); continue; }
+        const e = matching.reduce((a, b) => (cmpSpecificity(selectorSpecificity(b.sel), selectorSpecificity(a.sel)) > 0 ? b : a));
+        const es = selectorSpecificity(e.sel);
+        if (cmpSpecificity(es, ss) <= 0) out.push(`{${want}}: ${e.sel} (${es.join(",")}) does not out-rank ${s.sel} (${ss.join(",")})`);
+      }
     }
-    return out;
+    return [...new Set(out)];
   }
   function currentMarkerOffenders(css) {
     const out = [];
@@ -966,7 +978,7 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
     `${row}.selected ${subject}:hover { --row-bg: var(--lib-row-band-bg-hover); }`,
     `${row}.selected[aria-current] ${subject} { --row-bg: var(--lib-row-band-current-bg); }`,
     `${row}.selected[aria-current] ${subject}:hover { --row-bg: var(--lib-row-band-current-bg-hover); }`,
-    `${row}.is-error ${subject}, ${row}.is-error[aria-current] ${subject}, ${row}.is-error[aria-current] ${subject}:hover, ${row}.is-error.selected[aria-current] ${subject}, ${row}.is-error.selected[aria-current] ${subject}:hover { --row-bg: ${IS_ERROR_FILL}; }`,
+    `${row}.is-error ${subject}, ${row}.is-error[aria-current] ${subject}, ${row}.is-error[aria-current] ${subject}:hover, ${row}.is-error.selected ${subject}, ${row}.is-error.selected ${subject}:hover, ${row}.is-error.selected[aria-current] ${subject}, ${row}.is-error.selected[aria-current] ${subject}:hover { --row-bg: ${IS_ERROR_FILL}; }`,
     `@media (forced-colors: active) { ${row}[aria-current] ${subject}::before { content: ""; width: 3px; background: Highlight; } }`,
   ].join("\n");
   const good = listCss(".notes-hit", ".notes-hit-btn") + "\n" + listCss(".vocab-card", ".notes-card-top");
@@ -976,9 +988,13 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
   const handMix = good.replace("var(--lib-row-current-bg-hover)", "color-mix(in srgb, var(--lib-fg) 5%, var(--lib-row-current-bg))");
   const press = good + "\n.notes-hit-btn:active { --row-bg: color-mix(in srgb, var(--lib-fg) 9%, var(--lib-bg)); }";
   const tie = good.replace(".notes-hit.is-error.selected[aria-current] .notes-hit-btn:hover", ".is-error.selected[aria-current] .notes-hit-btn:hover");
+  // A failed row that is selected but no longer current (T5b shipped this
+  // gap): without its own .is-error.selected hover rule, the plain band hover
+  // (0,4,0) beats the bare .is-error rule (0,3,0).
+  const selHover = good.replace(", .vocab-card.is-error.selected .notes-card-top:hover,", ",");
   check(counts(good) === "0/0/0" && counts(bar) === "1/0/0" && counts(pseudo) === "1/0/0" && counts(handMix) === "0/1/0" &&
-    counts(press).startsWith("0/1/") && counts(tie) === "0/0/1",
-    `ui-contract-tests.mjs: the S2 gates no longer discriminate (marker/fill/is-error offender counts) -- good ${counts(good)}, bar ${counts(bar)}, pseudo ${counts(pseudo)}, hand mix ${counts(handMix)}, press ${counts(press)}, tie ${counts(tie)}`);
+    counts(press).startsWith("0/1/") && counts(tie) === "0/0/1" && selHover !== good && counts(selHover) === "0/0/1",
+    `ui-contract-tests.mjs: the S2 gates no longer discriminate (marker/fill/is-error offender counts) -- good ${counts(good)}, bar ${counts(bar)}, pseudo ${counts(pseudo)}, hand mix ${counts(handMix)}, press ${counts(press)}, tie ${counts(tie)}, selected hover ${counts(selHover)}`);
   // The shipped page.
   const marker = currentMarkerOffenders(libraryCss), fill = rowFillOffenders(libraryCss), err = isErrorSpecificityOffenders(libraryCss);
   check(marker.length === 0,
@@ -1006,12 +1022,52 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
   check(inkBad.length === 0,
     "library.css: a row text / delete-X ink no longer follows its state (current -> --lib-row-current-fg-muted, selected -> --lib-row-selected-fg; spec §3.8 / §7.5):\n    " + inkBad.join("\n    "));
   // .lib-toggle's unpressed hover reads the plain row hover fill (spec §3.2).
-  const stripNot = (s) => s.replace(/:not\([^()]*(?:\([^()]*\)[^()]*)*\)/g, "");
+  // Bracket-aware (closeOfBracket): `:not(...)` goes whole, so a negated
+  // [aria-pressed="true"] does not read as a pressed toggle; every other
+  // functional pseudo-class (:is / :where / :has) keeps its name but loses
+  // its argument, so the comma-space or combinator INSIDE `:is(.a, .b)` is
+  // not taken for a combinator of the selector itself.
+  // keepArgs: drop only the :not() groups and leave every other argument in
+  // place -- the form the pressed-state test reads, so a positive
+  // `:is([aria-pressed="true"])` still counts as pressed.
+  const stripPseudoArgs = (s, keepArgs = false) => {
+    let out = "";
+    for (let i = 0; i < s.length; i += 1) {
+      const fn = /^:(not|is|where|has)\(/.exec(s.slice(i));
+      if (fn && (fn[1] === "not" || !keepArgs)) {
+        const close = closeOfBracket(s, i + fn[0].length - 1);
+        if (fn[1] !== "not") out += `:${fn[1]}()`;
+        i = close;
+        continue;
+      }
+      if (s[i] === "[") { const close = closeOfBracket(s, i); out += s.slice(i, close + 1); i = close; continue; }
+      out += s[i];
+    }
+    return out;
+  };
   // Any non-forced context: T4 may have wrapped the hover in @media (hover: hover).
   // Subject = the toggle itself (one compound, no combinator): the companion
   // `.lib-toggle:hover:not(...) .lib-toggle-count` rule only re-inks the count.
-  const toggleHover = handRules(libraryCss).filter((r) => r.selectors.some((s) => s.startsWith(".lib-toggle") && s.includes(":hover") && !/[\s>+~]/.test(stripNot(s).trim()) && !stripNot(s).includes('[aria-pressed="true"]')));
-  check(toggleHover.length > 0 && toggleHover.every((r) => parseDeclarations(r.body).some((d) => /^background(?:-color)?$/.test(d.property) && d.value === "var(--lib-row-bg-hover)")),
+  const toggleHoverRules = (css) => handRules(css).filter((r) => r.selectors.some((s) => {
+    const flat = stripPseudoArgs(s).trim();
+    return s.startsWith(".lib-toggle") && flat.includes(":hover") && !/[\s>+~]/.test(flat) && !stripPseudoArgs(s, true).includes('[aria-pressed="true"]');
+  }));
+  const paintsRowHover = (r) => parseDeclarations(r.body).some((d) => /^background(?:-color)?$/.test(d.property) && d.value === "var(--lib-row-bg-hover)");
+  // Discrimination: an :is() list on the subject compound is still the
+  // toggle's own hover (it used to fall out of the scan on the space after
+  // the comma); a descendant rule and a pressed-only rule still do not count.
+  const toggleSamples = [
+    ".lib-toggle:hover:is(.a, .b) { background: var(--lib-btn-hover); }",
+    ".lib-toggle:hover:not(.x, .y) .lib-toggle-count { color: red; }",
+    '.lib-toggle:hover:is([aria-pressed="true"]) { background: red; }',
+    ".lib-toggle:hover:where(.a > .b):not(:disabled) { background: var(--lib-row-bg-hover); }",
+  ].join("\n");
+  const sampled = toggleHoverRules(toggleSamples).map((r) => r.selectorText);
+  check(sampled.length === 2 && sampled[0] === ".lib-toggle:hover:is(.a, .b)" && sampled[1].startsWith(".lib-toggle:hover:where(") &&
+    !paintsRowHover(toggleHoverRules(toggleSamples)[0]) && paintsRowHover(toggleHoverRules(toggleSamples)[1]),
+    "ui-contract-tests.mjs: the .lib-toggle hover scan no longer reads a functional pseudo-class's argument as part of the subject compound -- got " + sampled.join(" | "));
+  const toggleHover = toggleHoverRules(libraryCss);
+  check(toggleHover.length > 0 && toggleHover.every(paintsRowHover),
     "library.css: the unpressed .lib-toggle hover no longer paints --lib-row-bg-hover (spec §3.2) -- found " + toggleHover.map((r) => r.selectorText).join(" | "));
   // Retired roles stay retired: no declaration defines or reads them anywhere
   // in the file (hand region or generated).
@@ -1020,6 +1076,36 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
     .filter((d) => RETIRED.includes(d.property) || RETIRED.some((t) => new RegExp(`var\\(\\s*${t}\\s*[,)]`).test(d.value)))
     .map((d) => `${r.selectorText} { ${d.property}: ${d.value} }`));
   check(retiredHits.length === 0, "library.css: a retired S2 predecessor is back (row-selected-bg / band-mix):\n    " + retiredHits.join("\n    "));
+}
+// ---- S2 under forced colours (spec 2026-10-03-library-redesign §7.3, §11
+// V26). Forced colours repaint every --row-bg fill to Canvas and drop
+// box-shadow, so the whole S2 signal collapses. Pinned: the current row's
+// 3px Highlight bar (a ::before, out of flow and straight-edged -- never a
+// border, which bends with the radius and shoves the text 3px), the selected
+// row's 1px Highlight outline that steps aside for the focus ring, and a
+// ButtonText frame on the value boxes and filled sm buttons that lose their
+// fill. ----
+{
+  const forced = parseStyleRules(stripGeneratedRegions(libraryCss)).filter(inForcedColors);
+  const declsFor = (sel) => forced.filter((r) => r.selectors.includes(sel)).flatMap((r) => parseDeclarations(r.body));
+  const has = (sel, prop, value) => declsFor(sel).some((d) => d.property === prop && d.value === value);
+  const bad = [];
+  for (const sel of [".vocab-card[aria-current] .notes-card-top::before", ".notes-hit[aria-current] .notes-hit-btn::before"]) {
+    for (const [p, v] of [["content", '""'], ["position", "absolute"], ["inset-inline-start", "0"], ["top", "0"], ["bottom", "0"], ["width", "3px"], ["forced-color-adjust", "none"], ["background", "Highlight"]]) {
+      if (!has(sel, p, v)) bad.push(`${sel} lacks ${p}: ${v}`);
+    }
+  }
+  if (!has(".notes-hit[aria-current] .notes-hit-btn", "position", "relative")) bad.push(".notes-hit[aria-current] .notes-hit-btn lacks position: relative (the bar's containing block)");
+  for (const sel of [".vocab-card.selected .notes-card-top:not(:has(> .notes-card-head:focus-visible))", ".notes-hit.selected .notes-hit-btn:not(:focus-visible)"]) {
+    if (!has(sel, "outline", "1px solid Highlight") || !has(sel, "outline-offset", "-1px")) bad.push(`${sel} lacks outline: 1px solid Highlight / outline-offset: -1px`);
+  }
+  for (const sel of ['.notes-toolbar input[type="search"]', '.vocab-lookup-bar input[type="search"]', ".vocab-group-unit", ".btn.btn-sm:not(.ghost, .vocab-group-step)"]) {
+    if (!has(sel, "border-color", "ButtonText")) bad.push(`${sel} lacks border-color: ButtonText`);
+  }
+  const borderBar = forced.filter((r) => r.selectors.some((s) => s.includes("[aria-current]")) &&
+    parseDeclarations(r.body).some((d) => /^border(?:-(?:inline-start|left))?(?:-(?:width|style|color))?$/.test(d.property)));
+  if (borderBar.length) bad.push("a forced-colours current-row rule draws a border (it bends with the radius and shifts the text): " + borderBar.map((r) => r.selectorText).join(" | "));
+  check(bad.length === 0, "library.css: the S2 forced-colours cues are incomplete:\n    " + bad.join("\n    "));
 }
 
 // ---- D4 (batch3 T2): the notes/vocab source links read body fg at rest,
@@ -2171,6 +2257,17 @@ check(isValueBoxSelector('.fg input:not([type="checkbox"])') && isValueBoxSelect
   cmpSpecificity(selectorSpecificity("#opt-custom-css.over-limit"), [1, 1, 0]) === 0 &&
   cmpSpecificity(selectorSpecificity(".x:where(.a .b) p::before"), [0, 1, 2]) === 0,
   "ui-contract-tests.mjs: the B+ value-box selector model (subject compound / :is() arguments / ids / specificity) no longer discriminates");
+// Drops every :not(...) argument (nested parentheses included) from ONE
+// complex selector, so "is this a focus rule?" can be asked of the positive
+// part only. `closeOfBracket` is css-syntax.mjs's shared bracket matcher.
+function stripNotArgs(selector) {
+  let out = "";
+  for (let i = 0; i < selector.length; i += 1) {
+    if (selector.startsWith(":not(", i)) { i = closeOfBracket(selector, i + 4); continue; }
+    out += selector[i];
+  }
+  return out;
+}
 // The scan is a function (P12, B+ field family 2026-09-28) so its widening
 // below can be run against synthetic CSS, not only the shipped files.
 function focusShapeOffenders(css, ns) {
@@ -2225,7 +2322,13 @@ function focusShapeOffenders(css, ns) {
     // A forced-colours focus adaptation keyed on a fused shell's
     // :focus-within (popup's tags shell / token field, stage 4 R5) is judged
     // by the forced-colours branch below like a :focus-visible one.
-    if (!/:focus-visible/.test(selector) && !(forcedColors && /:focus-within\b/.test(selector))) continue;
+    // In a forced-colours block, a :focus-visible / :focus-within that only
+    // sits inside :not() is a state cue keeping clear of the ring (spec
+    // 2026-10-03-library-redesign §7.3), not a focus adaptation. Normal-mode
+    // rules keep the old trigger test, so nothing outside forced colours
+    // drops out of this scan.
+    const trigger = forcedColors ? stripNotArgs(selector) : selector;
+    if (!/:focus-visible/.test(trigger) && !(forcedColors && /:focus-within\b/.test(trigger))) continue;
     if (FOCUS_SHAPE_EXEMPT.ring.some(re => re.test(selector))) continue;
     const BORDERED_CORES = coresFor(selector), INSET_CORES = BORDERED_CORES, coreRe = coreReFor(BORDERED_CORES);
     const s = parseFocusShape(`${generatedBySelector.get(selector) ?? ""};${body}`);
@@ -2286,6 +2389,17 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
   check(bad.length === 0,
     `${file}: hand-written focus rule(s) do not match any §7.3 placement (bordered / borderless / inset):\n    ${bad.join("\n    ")}`);
 }
+// A selector whose :focus-visible sits only inside :not() EXCLUDES the
+// focused state. Inside @media (forced-colors: active) that is a state cue
+// written to stay out of the focus ring's way (library's selected-row
+// outline, spec 2026-10-03-library-redesign §7.3), not a focus adaptation --
+// the forced branch must not hold it to the focus-outline shape. A positive
+// :focus-visible next to a :not() is still a focus rule.
+check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:focus-visible) { outline: 1px solid Highlight; outline-offset: -1px; } }", "lib").length === 0 &&
+  focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:has(> .h:focus-visible)) { outline: 1px solid Highlight; outline-offset: -1px; } }", "lib").length === 0 &&
+  focusShapeOffenders("@media (forced-colors: active) { .r .b:focus-visible { outline: 1px solid Highlight; outline-offset: -1px; } }", "lib").length === 1 &&
+  focusShapeOffenders("@media (forced-colors: active) { .r .b:not(.x):focus-visible { outline: 1px solid Highlight; outline-offset: -1px; } }", "lib").length === 1,
+  "ui-contract-tests.mjs: the forced-colours focus scan no longer tells a focus-EXCLUDING state cue (:not(:focus-visible)) from a real focus adaptation");
 // P12 discrimination for the field-core widening, on synthetic CSS (value-box
 // selectors throughout, so a rejection below is about the CORE, not the
 // selector). Stage 4 end state: every surface accepts ITS OWN derived focus

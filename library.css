@@ -991,10 +991,14 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
    its own, so the failure fill has to out-rank every state it can meet --
    one class more than each (spec §3.10; tests/ui-contract-tests.mjs checks
    every pair with selectorSpecificity). The bare first selector covers a
-   failed row that is not current. */
+   failed row that is not current; the two .is-error.selected selectors cover
+   one that is still in the batch selection after the current row moved on
+   (without them the band hover, one class up, wiped the failure fill). */
 .notes-hit.is-error .notes-hit-btn,
 .notes-hit.is-error[aria-current] .notes-hit-btn,
 .notes-hit.is-error[aria-current] .notes-hit-btn:hover,
+.notes-hit.is-error.selected .notes-hit-btn,
+.notes-hit.is-error.selected .notes-hit-btn:hover,
 .notes-hit.is-error.selected[aria-current] .notes-hit-btn,
 .notes-hit.is-error.selected[aria-current] .notes-hit-btn:hover { --row-bg: color-mix(in srgb, var(--lib-danger) 10%, var(--lib-bg)); }
 /* Same signal when the row is filtered out and only the pressed button is on
@@ -2527,10 +2531,14 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
    of its own, so the failure fill has to out-rank every state it can meet --
    one class more than each (spec §3.10; tests/ui-contract-tests.mjs checks
    every pair with selectorSpecificity). The bare first selector covers a
-   failed row that is not current. */
+   failed row that is not current; the two .is-error.selected selectors cover
+   one that is still in the batch selection after the current row moved on
+   (without them the band hover, one class up, wiped the failure fill). */
 .vocab-card.is-error .notes-card-top,
 .vocab-card.is-error[aria-current] .notes-card-top,
 .vocab-card.is-error[aria-current] .notes-card-top:hover,
+.vocab-card.is-error.selected .notes-card-top,
+.vocab-card.is-error.selected .notes-card-top:hover,
 .vocab-card.is-error.selected[aria-current] .notes-card-top,
 .vocab-card.is-error.selected[aria-current] .notes-card-top:hover { --row-bg: color-mix(in srgb, var(--lib-danger) 10%, var(--lib-bg)); }
 /* Vocabulary row (spec §3.6): two fixed lines -- term 15/20 Bold + language
@@ -2662,6 +2670,50 @@ body { display: flex; flex-direction: column; }
   .lib-header, .vocab-list-pane, .notes-list-pane, #vocab-lookup-bar, .vocab-detail-back, .notes-detail-back,
   #vocab-detail-pane .btn, #notes-detail-pane .btn { display: none; }
   #vocab-detail-pane, #notes-detail-pane { display: block; overflow: visible; margin: 0; padding: 0; }
+}
+/* ---- Forced colours: the S2 row states (spec 2026-10-03-library-redesign
+   §7.3, §11 V26). Forced colours repaint every --row-bg fill to Canvas and
+   drop box-shadow, so S2's whole signal -- current = neutral fill, selected =
+   band + 1px ring -- collapses into one look. Two system-colour cues stand
+   in, one shape per state:
+   - current: a 3px Highlight bar on the row's start edge. A ::before, out of
+     flow and straight-edged: a border-inline-start would bend with the row's
+     radius and push the text 3px right. The ONLY bar S2 allows, and only
+     here (tests/ui-contract-tests.mjs's no-marker gate skips this block).
+     On the vocabulary side it hangs off .notes-card-top, never the head:
+     .notes-card-head::before is the row's transparent full-card hit area, and
+     it paints after (above) this bar, so a click on the bar still opens the
+     row;
+   - selected: a 1px Highlight outline, skipped while the row carries the
+     focus outline (same subject and argument as the focus rules above, so
+     neither replaces the other). The vocab side's :has() is the one :has()
+     this redesign adds.
+   Value boxes and filled sm buttons lose their fill as well, so their 1px
+   frame (already 1px wide at rest, so no geometry moves) takes ButtonText,
+   the options.css .listbox-btn precedent. The group unit's +/- steppers are
+   fused passengers (COMPONENTS.md §8 law 2): the shell draws their frame. */
+@media (forced-colors: active) {
+  .notes-hit[aria-current] .notes-hit-btn { position: relative; }
+  .vocab-card[aria-current] .notes-card-top::before,
+  .notes-hit[aria-current] .notes-hit-btn::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+  .vocab-card.selected .notes-card-top:not(:has(> .notes-card-head:focus-visible)),
+  .notes-hit.selected .notes-hit-btn:not(:focus-visible) {
+    outline: 1px solid Highlight;
+    outline-offset: -1px;
+  }
+  .notes-toolbar input[type="search"],
+  .vocab-lookup-bar input[type="search"],
+  .vocab-group-unit,
+  .btn.btn-sm:not(.ghost, .vocab-group-step) { border-color: ButtonText; }
 }
 /* ---- Forced colours: the value boxes' focus edge (stage 4 §6 item 10,
    ruling R5). Forced colours drop the --lib-focus-ring glow and remap the
