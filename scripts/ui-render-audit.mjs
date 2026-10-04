@@ -845,52 +845,65 @@ function evaluateCheck(check, raw, theme) {
     }
   }
   // ---- bandDistinct: the row states a user has to tell apart at a glance
-  // must actually LOOK different, on every theme. Written for the vocabulary
-  // list's 2026-08-06 selection rebuild, where "selected" stopped being a
-  // checkbox and became the row's own fill -- at which point "selected" and
-  // "current" (the row the detail pane is reading) are two accent-tinted
-  // fills a token change could quietly collapse into one.
-  //
-  // A pair passes if EITHER the composited fill differs by at least
-  // `minDelta` per-channel-max, OR the two carry different markers
-  // (box-shadow/outline). Both halves are needed: the fills are legitimately
-  // close on some themes and it is the accent edge that separates them there,
-  // while on others there is no edge at all and the fill is the whole signal.
-  // Reported `actual` is the WORST pair, so a fix moves the number that is
-  // actually failing.
+  // (S2, spec 2026-10-03-library-redesign §9.3). A pair passes on a fill gap
+  // >= minDelta OR on a different marker (box-shadow / outline) -- except the
+  // fillOnlyPairs, whose marker escape hatch is off, and the stepPairs (one
+  // row's own hover step), which need >= minStep instead. Every named state
+  // must have been captured (a misspelt or uncaptured name would otherwise
+  // skip its pair in silence), every state's painted fill must equal its
+  // derived token, and every textSelector must clear minTextContrast on its
+  // own band in every state. Reported `actual` is the worst non-step pair.
   if ("bandDistinct" in exp) {
-    const minDelta = exp.bandDistinct.minDelta;
+    const bd = exp.bandDistinct;
+    const minDelta = bd.minDelta;
     const samples = raw.bandSamples || [];
     const notes = [];
     let worst = null;
     if (samples.length < 2) notes.push("fewer than two states captured -- runOneCheck's rowStates driver failed");
-    const minText = exp.bandDistinct.minTextContrast;
+    if ("textSelector" in bd) notes.push("bandDistinct.textSelector (one selector) is retired -- list every row text in textSelectors");
+    const captured = new Set(samples.filter((s) => s.found).map((s) => s.state));
+    for (const name of new Set([...(bd.fillOnlyPairs || []), ...(bd.stepPairs || [])].flat())) {
+      if (!captured.has(name)) notes.push(`"${name}" is named by fillOnlyPairs / stepPairs but the driver did not capture it -- its pair would be skipped silently`);
+    }
+    const steps = new Set((bd.stepPairs || []).map((pair) => [...pair].sort().join("~")));
+    if (steps.size && !(bd.minStep > 0)) notes.push("stepPairs needs a positive minStep");
+    const minText = bd.minTextContrast;
     if (minText) {
       for (const sm of samples) {
         if (!sm.found) continue;
-        if (!sm.text) { notes.push(`"${sm.state}": textSelector matched nothing`); continue; }
-        const tbg = compositeStack(sm.text.bgStack);
-        const fg = resolveColor(sm.text.color, tbg);
-        const ratio = fg ? cr(fg, tbg) : 0;
-        if (ratio < minText) notes.push(`"${sm.state}": row text ${round2(ratio)}:1 < ${minText}:1 against its own band`);
+        for (const tx of sm.texts || []) {
+          if (!tx.found) { notes.push(`"${sm.state}": textSelector ${tx.sel} matched nothing in the driven row`); continue; }
+          const tbg = compositeStack(tx.bgStack);
+          const fg = resolveColor(tx.color, tbg);
+          const ratio = fg ? cr(fg, tbg) : 0;
+          if (ratio < minText) notes.push(`"${sm.state}": ${tx.sel} ${round2(ratio)}:1 < ${minText}:1 against its own band`);
+        }
       }
     }
-    // Pairs the checklist names as FILL-ONLY: the marker escape hatch is
-    // switched off for them, so the fill itself has to clear minDelta.
-    // Without this the "OR a different marker" clause silently disarms the
-    // check for exactly the pair whose fill was the thing being tuned --
-    // independent review proved it by reverting the selected band from 18%
-    // to 10% and watching the gate stay green, because `selected` carries a
-    // ring that `rest` does not and the delta branch was therefore never
-    // reached. Ask what the simplest missed counter-example looks like.
-    const fillOnly = new Set((exp.bandDistinct.fillOnlyPairs || []).map((pair) => [...pair].sort().join("~")));
+    for (const sm of samples) {
+      if (!sm.found || !sm.tokenRole) continue;
+      const want = parseSolidColor(sm.tokenRaw);
+      if (!want) { notes.push(`"${sm.state}": --lib-${sm.tokenRole} does not resolve (${JSON.stringify(sm.tokenRaw)})`); continue; }
+      const got = compositeStack(sm.bgStack);
+      const off = Math.max(Math.abs(got[0] - want[0]), Math.abs(got[1] - want[1]), Math.abs(got[2] - want[2]));
+      if (off > 1) notes.push(`"${sm.state}": painted fill rgb(${got.map((c) => Math.round(c)).join(", ")}) is not --lib-${sm.tokenRole} ${sm.tokenRaw} (off by ${round2(off)}) -- the state rule stopped reading its derived token`);
+    }
+    // fillOnlyPairs: the marker escape hatch is switched off for these, so
+    // the fill itself has to clear minDelta (independent review once reverted
+    // the band from 18% to 10% and watched a marker-only pass stay green).
+    const fillOnly = new Set((bd.fillOnlyPairs || []).map((pair) => [...pair].sort().join("~")));
     for (let i = 0; i < samples.length; i++) {
       for (let j = i + 1; j < samples.length; j++) {
         const a = samples[i], b = samples[j];
         if (!a.found || !b.found) { notes.push(`state not rendered: ${a.found ? b.state : a.state}`); continue; }
         const abg = compositeStack(a.bgStack), bbg = compositeStack(b.bgStack);
         const delta = Math.max(Math.abs(abg[0] - bbg[0]), Math.abs(abg[1] - bbg[1]), Math.abs(abg[2] - bbg[2]));
-        const fillMustCarry = fillOnly.has([a.state, b.state].sort().join("~"));
+        const key = [a.state, b.state].sort().join("~");
+        if (steps.has(key)) {
+          if (delta < bd.minStep) notes.push(`hover step "${a.state}" -> "${b.state}" is ${round2(delta)} < ${bd.minStep}: the pointer passing over this row does not show`);
+          continue;
+        }
+        const fillMustCarry = fillOnly.has(key);
         const markerDiffers = !fillMustCarry && (a.boxShadow !== b.boxShadow || a.outline !== b.outline);
         if (worst === null || delta < worst) worst = delta;
         if (delta < minDelta && !markerDiffers) {
@@ -1546,90 +1559,157 @@ function evaluateCheck(check, raw, theme) {
 // actual custom-property name to read).
 const NS_BY_SURFACE = { library: "lib", options: "opt", popup: "pp" };
 
-// ---- state: "rowStates" (2026-08-06 selection rebuild) -------------------
-// Reads ONE row's band four times, driving it through every state a user can
-// put it in with the real gestures: nothing, Ctrl+click (selected), plain
-// click (activates the detail -> selected AND current), Ctrl+click again
-// (current only). aria-current is exclusive and the fixture seeds one word,
-// so the states cannot coexist on screen -- but they do not need to: what
-// has to be true is that a user can TELL THEM APART, which is a statement
-// about four fills and four markers, not about four simultaneous rows.
-//
-// Everything here is a real product gesture, including the reload that gets
-// back to "rest" (there is no un-activate control above 860px). The sequence
-// ends on selected+current, byte-for-byte the state runLibraryTheme's own
-// setup clicks produce, so every later check in the same theme pass sees the
-// page it expects.
-async function driveRowStates(page, extBase, theme, selector, textSelector) {
-  const read = (sel, textSel, state) => page.evaluate(({ sel, textSel, state }) => {
-    const stackOf = (node) => {
-      const out = [];
-      for (let n = node; n && n.nodeType === 1; n = n.parentElement) out.push(getComputedStyle(n).backgroundColor);
-      return out;
-    };
-    const el = document.querySelector(sel);
-    if (!el) return { state, found: false };
-    const cs = getComputedStyle(el);
-    // The row's text has to stay readable in EVERY state, not just the one
-    // the page happens to load in -- a band fill that gets strong enough to
-    // separate two states can just as easily eat its own label.
-    const textEl = textSel ? el.querySelector(textSel) : null;
-    return {
-      state, found: true, bgStack: stackOf(el), boxShadow: cs.boxShadow,
-      outline: `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}`,
-      text: textEl ? { color: getComputedStyle(textEl).color, bgStack: stackOf(textEl) } : null,
-    };
-  }, { sel, textSel, state });
+// The token each S2 row state must paint (spec 2026-10-03-library-redesign
+// §6.4). `rest` is the page bg: the vocab row paints var(--lib-bg) itself, the
+// notes row is transparent over a canvas that is --lib-bg -- both composite to
+// the same colour.
+const ROW_STATE_TOKENS = Object.freeze({
+  rest: "bg", hover: "row-bg-hover", current: "row-current-bg", "current+hover": "row-current-bg-hover",
+  selected: "row-band-bg", "selected+hover": "row-band-bg-hover",
+  "selected+current": "row-band-current-bg", "selected+current+hover": "row-band-current-bg-hover",
+});
 
-  // Both library lists share one selection grammar, so one driver serves both;
-  // the view is read off the selector the same way runLibraryTheme reads it.
+// ---- state: "rowStates" (S2, spec 2026-10-03-library-redesign §9.3) -------
+// Reads ONE row's band eight times with the real gestures: rest, Ctrl+click
+// (selected), click (selected + current), Ctrl+click (current only -- the
+// state that is neither rest nor a selection, so it is driven, not assumed),
+// each read once with the pointer parked in the detail pane and once hovering
+// the row. aria-current is exclusive, so the states are not on screen at once
+// -- they do not need to be: the question is whether a user can tell them
+// apart. The driven row is the first one that carries every textSelector
+// (secondary text only exists on some rows).
+//
+// The driver owns the selection it makes. It snapshots the view's state
+// before its own reload (which row is current, which rows are in the batch
+// selection -- runLibraryTheme runs vocab checks with the batch row CLOSED
+// since T4d and opens the notes batch row once for the whole notes pass) and
+// puts exactly that back in a `finally`, so no later check in the same theme
+// pass inherits a selection, a current row or a hovered row it did not ask
+// for -- including after a failed read.
+const ROW_STATE_SNAPSHOT = (cardSel) => {
+  const cards = [...document.querySelectorAll(cardSel)];
+  return {
+    current: cards.findIndex((c) => c.hasAttribute("aria-current")),
+    selected: cards.flatMap((c, i) => (c.classList.contains("selected") ? [i] : [])),
+  };
+};
+async function driveRowStates(page, extBase, theme, selector, textSelectors) {
+  if (!Array.isArray(textSelectors) || !textSelectors.length) {
+    throw new Error(`SETUP: rowStates ${selector} needs expect.bandDistinct.textSelectors (a non-empty array)`);
+  }
   const view = libraryView(selector);
   const rowSel = view === "notes" ? "#notes-list .notes-hit-btn" : "#vocab-list .vocab-card .notes-card-head";
-  // The query carries the VIEW as well as the theme. Without it the notes pass
-  // and the vocab pass differ only by fragment, and Chromium then treats the
-  // second goto as a same-document navigation and never reloads -- so the
-  // notes driver would inherit whatever aria-current the vocab pass (and the
-  // setup clicks before it) had already put on a row, and read its very first
-  // "rest" sample out of an already-current row. Same footgun runLibraryTheme
-  // documents at its own goto.
-  await page.goto(`${extBase}library.html?_ra=${encodeURIComponent(theme)}-band-${view}#${view}`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.waitForSelector(rowSel, { timeout: TIMEOUT_MS });
-  await page.waitForTimeout(300);
-  const head = page.locator(rowSel).first();
-  if (!(await head.count())) {
-    throw new Error(`SETUP: no ${view} row to drive rowStates on (theme=${theme})`);
+  const cardSel = view === "notes" ? "#notes-list .notes-hit" : "#vocab-list .vocab-card";
+  const paneSel = view === "notes" ? "#notes-detail-pane" : "#vocab-detail-pane";
+  const before = await page.evaluate(ROW_STATE_SNAPSHOT, cardSel);
+  // The query carries the VIEW as well as the theme: without it the notes
+  // pass and the vocab pass differ only by fragment, Chromium treats the
+  // second goto as same-document and never reloads, and the notes driver
+  // would read its "rest" out of a row the vocab pass already made current.
+  const load = async (tag) => {
+    await page.goto(`${extBase}library.html?_ra=${encodeURIComponent(theme)}-${tag}-${view}#${view}`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForSelector(rowSel, { timeout: TIMEOUT_MS });
+    await page.waitForTimeout(300);
+  };
+  // Put the snapshot back: reload only if a row is current that must not be
+  // (there is no un-activate control above 860px), then a plain click for the
+  // current row and a Ctrl+click for every row whose selection differs --
+  // the two verbs never touch each other's state (library-vocab.js /
+  // library-notes.js row click handlers).
+  const restore = async () => {
+    let now = await page.evaluate(ROW_STATE_SNAPSHOT, cardSel);
+    if (before.current < 0 && now.current >= 0) { await load("band-restore"); now = await page.evaluate(ROW_STATE_SNAPSHOT, cardSel); }
+    if (before.current >= 0 && now.current !== before.current) await page.locator(rowSel).nth(before.current).click();
+    const was = new Set(before.selected), is = new Set(now.selected);
+    for (const i of new Set([...was, ...is])) {
+      if (was.has(i) !== is.has(i)) await page.locator(rowSel).nth(i).click({ modifiers: ["Control"] });
+    }
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => { const a = document.activeElement; if (a && a !== document.body && typeof a.blur === "function") a.blur(); });
+    await settleAnimations(page);
+    const after = await page.evaluate(ROW_STATE_SNAPSHOT, cardSel);
+    if (JSON.stringify(after) !== JSON.stringify(before)) {
+      throw new Error(`SETUP: rowStates ${selector} could not restore the ${view} view (theme=${theme}): wanted ${JSON.stringify(before)}, left ${JSON.stringify(after)}`);
+    }
+  };
+  await load("band");
+  const samples = [];
+  let failed = true;
+  try {
+    const pick = await page.evaluate(({ sel, rowSel, texts }) => {
+      const probes = [...document.querySelectorAll(sel)];
+      return { idx: probes.findIndex((el) => texts.every((t) => el.querySelector(t))), probes: probes.length, rows: document.querySelectorAll(rowSel).length };
+    }, { sel: selector, rowSel, texts: textSelectors });
+    if (pick.probes !== pick.rows) throw new Error(`SETUP: ${selector} (${pick.probes}) and ${rowSel} (${pick.rows}) no longer pair up one per row (theme=${theme})`);
+    if (pick.idx < 0) {
+      throw new Error(`SETUP: no ${selector} row carries every textSelector ${JSON.stringify(textSelectors)} (theme=${theme}) -- give one seeded ${view} row all of them (LIB_SEED in this file)`);
+    }
+    const head = page.locator(rowSel).nth(pick.idx);
+    const read = (state) => page.evaluate(({ sel, idx, texts, state, tokenRole }) => {
+      const stackOf = (node) => {
+        const out = [];
+        for (let n = node; n && n.nodeType === 1; n = n.parentElement) out.push(getComputedStyle(n).backgroundColor);
+        return out;
+      };
+      const el = document.querySelectorAll(sel)[idx];
+      if (!el) return { state, found: false };
+      const cs = getComputedStyle(el);
+      return {
+        state, found: true, bgStack: stackOf(el), boxShadow: cs.boxShadow,
+        // outline-color defaults to currentColor, and the notes row button
+        // changes `color` between states: with no outline drawn, comparing
+        // width/colour would invent a marker difference (facts-s2 R3-2).
+        outline: cs.outlineStyle === "none" ? "none" : `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}`,
+        tokenRole, tokenRaw: getComputedStyle(document.documentElement).getPropertyValue(`--lib-${tokenRole}`).trim(),
+        texts: texts.map((t) => {
+          const n = el.querySelector(t);
+          return n ? { sel: t, found: true, color: getComputedStyle(n).color, bgStack: stackOf(n) } : { sel: t, found: false };
+        }),
+      };
+    }, { sel: selector, idx: pick.idx, texts: textSelectors, state, tokenRole: ROW_STATE_TOKENS[state] });
+    // Park the pointer on a neutral point of the detail pane (its bottom
+    // padding) before every resting read: a click leaves the cursor ON the
+    // row, and each state's hover is a different fill. settleAnimations waits
+    // out the background-color transition page-wide (verify.sh's parallel
+    // shards once read two states mid-fade at exactly the same colour).
+    const park = async () => {
+      const pt = await page.evaluate((s) => {
+        const r = document.querySelector(s)?.getBoundingClientRect();
+        return r && r.width > 0 && r.height > 0 ? { x: r.left + r.width / 2, y: r.bottom - 8 } : null;
+      }, paneSel);
+      if (!pt) throw new Error(`SETUP: ${paneSel} has no box to park the pointer in (theme=${theme})`);
+      await page.mouse.move(pt.x, pt.y);
+      await settleAnimations(page);
+    };
+    const hovered = async (state) => { await head.hover(); await settleAnimations(page); return read(state); };
+    // Each gesture is checked against the attribute it is supposed to flip,
+    // so a renamed handler cannot quietly hand the gate a mislabelled state.
+    const expectRow = async (state, current, selected) => {
+      const got = await page.evaluate(({ cardSel, idx }) => {
+        const c = document.querySelectorAll(cardSel)[idx];
+        return c ? { current: c.hasAttribute("aria-current"), selected: c.classList.contains("selected") } : null;
+      }, { cardSel, idx: pick.idx });
+      if (!got || got.current !== current || got.selected !== selected) {
+        throw new Error(`SETUP: rowStates ${selector} expected "${state}" (current=${current}, selected=${selected}) but the row reads ${JSON.stringify(got)} (theme=${theme})`);
+      }
+    };
+    await park(); await expectRow("rest", false, false);
+    samples.push(await read("rest"), await hovered("hover"));
+    await head.click({ modifiers: ["Control"] }); await park(); await expectRow("selected", false, true);
+    samples.push(await read("selected"), await hovered("selected+hover"));
+    await head.click(); await park(); await expectRow("selected+current", true, true);
+    samples.push(await read("selected+current"), await hovered("selected+current+hover"));
+    await head.click({ modifiers: ["Control"] }); await park(); await expectRow("current", true, false);
+    samples.push(await read("current"), await hovered("current+hover"));
+    failed = false;
+  } finally {
+    if (failed) {
+      // The read already threw: restore best-effort, never mask that error.
+      try { await restore(); } catch (err) { console.warn(`[render-audit] rowStates restore after failure: ${err.message}`); }
+    } else {
+      await restore();
+    }
   }
-  // Park the pointer in a dead corner before every read. A click leaves the
-  // cursor sitting ON the row, so without this each sample is really that
-  // state's HOVER variant -- and each state has a different hover formula, so
-  // the whole comparison would be between four numbers none of which is the
-  // state it claims to be. (Found the hard way: "current" measured 4.45:1
-  // text contrast, which is the hover mix, while the token derivation that
-  // actually guarantees 4.5:1 targets the resting fill.)
-  //
-  // The wait after that park used to be a fixed 280ms -- long enough on a
-  // single shard, but under scripts/verify.sh's 4-parallel-shard run the
-  // click-driven `background-color var(--motion-state)` transition on
-  // `.notes-card-top`/`.notes-hit-btn` (library.css, `html.motion-ready
-  // .notes-card-top` / `.notes-hit-btn`) can still be mid-fade at 280ms, so
-  // two states' bands both read partway toward their target instead of
-  // AT it -- bandDistinct's `minDelta` then measures whatever gap two
-  // still-animating fills happen to have, which can land on exactly 0 when
-  // both samples are read from the same interpolation frame. settleAnimations
-  // waits page-wide (F1, stage-1 fix wave), so it settles this regardless of
-  // whether the band-painting rule targets `selector` directly or an
-  // ancestor row.
-  const settle = async () => { await page.mouse.move(0, 0); await settleAnimations(page); };
-  await settle();
-  const samples = [await read(selector, textSelector, "rest")];
-  await head.click({ modifiers: ["Control"] }); await settle();
-  samples.push(await read(selector, textSelector, "selected"));
-  await head.click(); await settle();
-  samples.push(await read(selector, textSelector, "selected+current"));
-  await head.click({ modifiers: ["Control"] }); await settle();
-  samples.push(await read(selector, textSelector, "current"));
-  // Restore the state the rest of this theme's checks were set up in.
-  await head.click({ modifiers: ["Control"] }); await page.waitForTimeout(300);
   return samples;
 }
 
@@ -2970,7 +3050,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
   }
   if (check.state === "rowStates") {
     if (!extBase) throw new Error(`rowStates check on ${check.selector} reached a runner that has no extBase`);
-    const samples = await driveRowStates(page, extBase, theme, check.selector, check.expect.bandDistinct?.textSelector || null);
+    const samples = await driveRowStates(page, extBase, theme, check.selector, check.expect.bandDistinct?.textSelectors);
     const evald = evaluateCheck(check, { found: true, rect: { width: 1, height: 1 }, bgStack: [], bandSamples: samples }, theme);
     if (evald.setupError) {
       throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ${evald.setupError}`);
@@ -4805,10 +4885,10 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
       // needsDetailOpen/needsBatchBarOpen above: `state: "rowStates"`
       // (driveRowStates) does its OWN full `page.goto()` reload partway
       // through this loop and restores only the "current row" / "selected
-      // for batch" flags it knows about (its own click sequence happens to
-      // reconstruct both, which is why the detail-open and batch-bar groups
-      // above survive it untouched) -- it has no notion of "the note field
-      // was typed into" and silently drops that JS-runtime-only state.
+      // for batch" flags it snapshots before that reload (which is why the
+      // detail-open and batch-bar groups above survive it untouched) -- it
+      // has no notion of "the note field was typed into" and silently drops
+      // that JS-runtime-only state.
       // Re-assert idempotently right before every check that needs it
       // instead of trusting a group-wide setup to survive a reload it
       // doesn't know is coming.
