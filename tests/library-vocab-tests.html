@@ -2048,6 +2048,41 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       await until(() => !!online());
       check("T7 an offline pack in an error state falls through to the online step like a miss (one request, no dictLoadFailed)",
         calls.fetch.join(",") === "alpha" && !result.textContent.includes("dictLoadFailed"), JSON.stringify(calls));
+      pbpEcdictLookup = async () => ({ state: "unavailable" });
+
+      // An account change starts with renderVocabPanel clearing the owner to
+      // null; the abort only comes with the reconcile after the re-read. The
+      // dwell can end inside that window: nothing may go online for the old
+      // account's word, and nothing may be written for it.
+      granted = true;
+      reset();
+      open("a5");
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      _vocabCurrentOwner = null;
+      await dwell();
+      await dwell();
+      const heldFetches = calls.fetch.length;
+      _vocabCurrentOwner = "acct_other";
+      await dwell();
+      await settle();
+      check("T7 the dwell ending inside an account change's re-read sends nothing and writes nothing (owner null, then another account)",
+        heldFetches === 0 && calls.fetch.length === 0 && !online() && !result.querySelector(".xp-dict-local-box"),
+        `held=${heldFetches} ${JSON.stringify(calls.fetch)}`);
+      _vocabCurrentOwner = "acct_auto";
+      _pbpVocabRenderDetail(null); // the reconcile that follows a real account change
+
+      reset();
+      open("a7");
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      _vocabCurrentOwner = null;
+      await dwell();
+      await dwell();
+      const waited = calls.fetch.length;
+      _vocabCurrentOwner = "acct_auto"; // the same account's re-read lands
+      await until(() => !!online());
+      check("T7 a same-account re-read across the dwell waits for the owner, then completes with one request (never stuck on the skeleton)",
+        waited === 0 && calls.fetch.join(",") === "zeta" && !!online() && !result.querySelector(".xp-skel"),
+        `waited=${waited} ${JSON.stringify(calls.fetch)}`);
     } finally {
       if (hadChrome) window.chrome = realChrome; else delete window.chrome;
       window.fetch = realFetch;

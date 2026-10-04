@@ -1229,12 +1229,12 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
   font-size: var(--lib-text-body);
   line-height: var(--lib-lh-body);
 }
-/* Prose width moved to the pane itself (2026-08-06 canvas layout): the pane
-   is now a single centred minmax(0, 68ch) grid column, so every child is
-   capped AND centred by the container instead of each child capping itself
-   and then sitting left-aligned in a wider box. The per-child caps that used
-   to live here (and on .notes-detail-quote / -note / .vocab-note-edit) are
-   gone as redundant. */
+/* Reading width is not capped per element and not by the pane: the pane is
+   one full-width track (above), and .vocab-sheet's grid sets the columns by
+   the pane's width -- the hang column, the main column up to --lib-main-max
+   and, wide enough, the dictionary column (spec §4.2, the @container
+   lib-detail tiers). Children fill their column; only the note box
+   restates --lib-main-max as a cap of its own. */
 /* Chips in the detail stay at chip scale. Whether an element picks up the
    pane's body size (--lib-text-body / --lib-lh-body) at all depends on what
    it is: a <button class="btn"> takes its font from its own recipe (form

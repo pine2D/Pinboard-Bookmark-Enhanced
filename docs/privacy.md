@@ -5,11 +5,11 @@ title: Privacy Policy
 
 # Privacy Policy: Pinboard Bookmark Enhanced
 
-**Last updated:** 2026-08-26
+**Last updated:** 2026-10-04
 
 ## Summary
 
-Pinboard Bookmark Enhanced is local-first and bring-your-own-key. It has no developer servers, no analytics, no tracking, and no telemetry; the developer never receives your data. The extension uses Pinboard for its core bookmark features and contacts other services only as described below. Bookmark-status checks and offline-save retries can run automatically; separately enabled features such as Wayback archiving and key-points skim can also make automatic requests.
+Pinboard Bookmark Enhanced is local-first and bring-your-own-key. It has no developer servers, no analytics, no tracking, and no telemetry; the developer never receives your data. The extension uses Pinboard for its core bookmark features and contacts other services only as described below. Bookmark-status checks and offline-save retries can run automatically; separately enabled features such as Wayback archiving and key-points skim can also make automatic requests. After you have granted access to the online dictionary, opening a saved word on the Notes & Vocabulary page can also look it up automatically.
 
 Google Drive vocabulary sync remains off until you explicitly connect it on a device. Once connected, it syncs only the current Pinboard account's vocabulary through the extension's private Google Drive application-data folder. It does not sync settings, credentials, reader highlights, or dictionary packs.
 

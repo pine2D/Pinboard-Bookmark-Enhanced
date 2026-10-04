@@ -1020,11 +1020,23 @@ async function _pbpVocabAutoLookup(w) {
   _pbpVocabDictCtrl = ctrl;
   const signal = ctrl.signal;
   const wordId = w.id;
-  // _vocabCurrentOwner is null only inside a re-read (renderVocabPanel clears
-  // it first, then restores the same owner); a real account change aborts
-  // this run before that, so null is no mismatch -- any other owner is.
+  // _vocabCurrentOwner is null while renderVocabPanel re-reads: it clears the
+  // owner on its first line and puts one back only once the rows land, and an
+  // account change aborts this run later still (the reconcile that closes the
+  // word). Null is therefore not an answer either way. Before each step that
+  // writes or goes online, ownerBack() waits the re-read out; every way out
+  // of it either restores an owner or closes the word (aborting this run).
+  // Then stale() compares strictly: the same account's re-read carries on,
+  // anyone else -- or nobody -- ends the run without a request or a write.
+  const ownerBack = () => new Promise((resolve) => {
+    const tick = () => {
+      if (signal.aborted || _vocabCurrentOwner !== null) resolve();
+      else setTimeout(tick, 25);
+    };
+    tick();
+  });
   const stale = () => signal.aborted || _pbpVocabDetailWordId !== wordId ||
-    (_vocabCurrentOwner !== null && _vocabCurrentOwner !== owner);
+    _vocabCurrentOwner !== owner;
   const lang = sel.value || (w.language && w.language !== "und" ? w.language : "") || _vocabLookupLang;
   const sentence = (w.contexts && w.contexts[0] && w.contexts[0].quote) || "";
   const begin = () => {
@@ -1042,6 +1054,7 @@ async function _pbpVocabAutoLookup(w) {
   } catch (err) {
     console.warn("library auto lookup: probe failed:", err.name, err.message);
   }
+  await ownerBack();
   if (stale()) return "stale";
   if (hit) {
     // An ECDICT hit shows its block alone (online: false). A CC-CEDICT or a
@@ -1060,6 +1073,7 @@ async function _pbpVocabAutoLookup(w) {
   } catch (err) {
     console.warn("library auto lookup: grant check failed:", err.name, err.message);
   }
+  await ownerBack();
   if (stale()) return "stale";
   if (!granted) { _pbpVocabRenderRefIdle("word"); return "idle"; }
   const { els, again } = begin();
@@ -1069,6 +1083,7 @@ async function _pbpVocabAutoLookup(w) {
     _pbpVocabAutoTimer = timer;
     signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
   });
+  await ownerBack();
   if (stale()) return "stale";
   _pbpVocabDictRun(w.term, lang, els, sentence, again);
   return "online";

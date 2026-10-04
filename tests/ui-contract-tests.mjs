@@ -9335,8 +9335,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(privacy.includes("opening a saved word on that page also looks it up automatically when no installed offline dictionary has an entry for it") &&
     privacy.includes("(opening a saved word never asks for this grant)") &&
     privacy.includes("which also runs automatically when you open a saved word there once you have granted access") &&
+    privacy.includes("opening a saved word on the Notes & Vocabulary page can also look it up automatically") &&
     !privacy.includes("The lookup is never contacted automatically or in the background"),
-    "docs/privacy.md: the three Free Dictionary API passages no longer describe open-to-look-up (spec §4.10; Network Requests, Permissions and Third-Party change with the code)");
+    "docs/privacy.md: the Free Dictionary API passages no longer describe open-to-look-up (spec §4.10; the Summary, Network Requests, Permissions and Third-Party change with the code)");
 }
 
 if (fail.length) {
