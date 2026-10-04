@@ -2469,6 +2469,7 @@ async function driveListHeaderFit(page, extBase, theme, check) {
   const bad = [];
   const needs = [];
   let need = { px: 0, locale: null };
+  let notesNeedText = "";
   const scratch = await libScratchPage(page, extBase, theme, "g7", "vocab", { width, height });
   const setIndex = async (w) => {
     await scratch.evaluate((px) => document.documentElement.style.setProperty("--lib-index-w", `${px}px`), w);
@@ -2541,11 +2542,11 @@ async function driveListHeaderFit(page, extBase, theme, check) {
       notesNeeds.push(`${locale} ${round2(n)}`);
       await pass("notes", locale, n, selectNotes);
     }
-    needs.push(`| notes colour row: ${notesNeeds.join(", ")}`);
+    notesNeedText = notesNeeds.join(", ");
   } finally {
     await closeLibScratch(page, scratch);
   }
-  return { bad, need, needs };
+  return { bad, need, needs, notesNeedText };
 }
 
 // G6 for the two toggle families T3's filterScrollReset does not drive. Each
@@ -2898,11 +2899,11 @@ async function runOneCheck(page, theme, check, results, extBase) {
   if (check.state === "listHeaderFit") {
     // `actual` carries the width the wide filter row needs at its widest
     // locale; the note lists every locale's, and the notes colour row's.
-    const { bad, need, needs } = await driveListHeaderFit(page, extBase, theme, check);
+    const { bad, need, needs, notesNeedText } = await driveListHeaderFit(page, extBase, theme, check);
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("listHeaderFit", bad.length === 0, `wide filter row needs ${round2(need.px)}px (${need.locale})`,
         "every header child inside the index and its group, no overlaps; count items whole; vocabulary batch row 64/56, notes one or two sm rows; form = measured fit",
-        [bad.length ? bad.slice(0, 4).join("; ") : null, `needs: ${needs.join(", ")}`].filter(Boolean).join(" | ")) });
+        [bad.length ? bad.slice(0, 4).join("; ") : null, `needs: ${needs.join(", ")}`, `notes colour row: ${notesNeedText}`].filter(Boolean).join(" | ")) });
     return;
   }
   if (check.state === "filterScrollResetToggles") {

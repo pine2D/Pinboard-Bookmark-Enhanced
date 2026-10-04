@@ -1040,7 +1040,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
         [...row.querySelectorAll('[data-color]:not([data-color="all"])')].every((b) => /2000/.test(b.title) && /2000/.test(b.getAttribute("aria-label"))),
         `${pane.dataset.headerFit} ${pane.style.width}`);
       check("notes header fit: a dot-only toggle keeps a >=24px square hit area",
-        [...row.querySelectorAll('[data-color]:not([data-color="all"])')].every((b) => b.getBoundingClientRect().width >= 24));
+        [...row.querySelectorAll('[data-color]:not([data-color="all"])')].every((b) => { const r = b.getBoundingClientRect(); return r.width >= 24 && r.height >= 24; }),
+        [...row.querySelectorAll('[data-color]:not([data-color="all"])')].map((b) => { const r = b.getBoundingClientRect(); return `${r.width}x${r.height}`; }).join(" "));
       check("notes header fit: the need is measured with the numbers showing, in either form",
         Math.abs(pbpLibNotesColorNeed(row) - need) < 0.5 && pane.children.length === 1, String(pbpLibNotesColorNeed(row)));
       pane.style.width = `${Math.ceil(need)}px`;
@@ -1048,7 +1049,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       check("notes header fit: widening back to the need brings the numbers back", pane.dataset.headerFit === "wide" &&
         counts().every((n) => getComputedStyle(n).display !== "none"), pane.dataset.headerFit);
       for (const n of counts()) n.textContent = "200000";
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
       check("notes header fit: bigger numbers are re-measured at once", pane.dataset.headerFit === "narrow", pane.dataset.headerFit);
     } finally {
       host.remove();

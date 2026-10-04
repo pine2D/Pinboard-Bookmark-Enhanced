@@ -1227,6 +1227,12 @@ function _pbpVocabFlashStatus(ok, text) {
 function _pbpVocabSetLoading(loading) {
   const list = $id("vocab-list");
   if (list) list.setAttribute("aria-busy", loading ? "true" : "false");
+  // The filter row's wide / narrow form is decided once the counts have
+  // landed (library.js pbpLibVocabFilterNeed): every path that ends a load
+  // renders its final counts in the same task, so the decision lands with
+  // them -- and an empty word list still gets one.
+  const toggles = $id("vocab-status-toggles");
+  if (toggles) toggles.toggleAttribute("data-counts-ready", !loading);
   const status = $id("vocab-status");
   if (!status) return;
   if (loading) {

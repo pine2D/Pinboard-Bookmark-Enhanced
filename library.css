@@ -2069,6 +2069,11 @@ html.motion-ready .vocab-note-save {
    reset (spec §3.4): without width/height/overflow/color the group select's
    flex:1 would collapse to fit-content, its focus glow would be clipped and
    the text would turn CanvasText. */
+/* Undecided (no data-header-fit yet: the counts have not landed, see
+   library.js): neither form shows -- the closed popover already hides the
+   set, and the Filter button keeps its box (no height jump) but not its ink,
+   so a window wide enough for the wide form never flashes the narrow one. */
+.vocab-list-pane:not([data-header-fit]) #vocab-filter-narrow { visibility: hidden; }
 .vocab-list-pane[data-header-fit="wide"] #vocab-filter-narrow { display: none; }
 .vocab-list-pane[data-header-fit="wide"] .vocab-filter-set[popover]:not(:popover-open) {
   display: flex;

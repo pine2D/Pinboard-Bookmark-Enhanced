@@ -8736,14 +8736,21 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(declarationValueMap(hand, ".vocab-list-pane[data-header-fit] #vocab-filter-narrow", narrow860).get("display") === "inline-flex" &&
     declarationValueMap(hand, ".vocab-list-pane[data-header-fit] .vocab-filter-set[popover]:not(:popover-open)", narrow860).get("display") === "none",
     "library.css: below the 860px single-pane break the vocabulary filters must always fold into the Filter popover, at the wide rule's specificity");
-  check(/<div class="vocab-list-pane" id="vocab-list-pane" data-header-fit="narrow">/.test(libraryHtml) &&
-    /<div class="notes-list-pane" data-header-fit="wide">/.test(libraryHtml),
-    "library.html: the list panes must start in a decided form (vocabulary narrow until the first count, notes with numbers)");
+  // Vocabulary starts UNDECIDED (no attribute: neither form shows -- the
+  // Filter button keeps its box, not its ink) until the counts land, so a
+  // wide window never flashes the narrow form first; notes start with their
+  // numbers (the colour row itself is hidden until its counts).
+  check(/<div class="vocab-list-pane" id="vocab-list-pane">/.test(libraryHtml) &&
+    /<div class="notes-list-pane" data-header-fit="wide">/.test(libraryHtml) &&
+    declarationValueMap(hand, ".vocab-list-pane:not([data-header-fit]) #vocab-filter-narrow").get("visibility") === "hidden" &&
+    /toggles\.toggleAttribute\("data-counts-ready", !loading\)/.test(libraryVocabJs) &&
+    /if \(toggles && !toggles\.hasAttribute\("data-counts-ready"\)\) return NaN;/.test(libJs),
+    "library: the vocabulary list pane must start undecided (no data-header-fit, Filter button visibility:hidden) and decide when _pbpVocabSetLoading marks the counts ready; notes start with numbers");
   check(/function pbpLibWireHeaderFit\(pane, row, measureNeed, opts = \{\}\)/.test(libJs) &&
     /pbpLibWireVocabHeaderFit\(\$id\("vocab-list-pane"\)\);/.test(libJs) &&
     /pbpLibWireNotesHeaderFit\(document\.querySelector\("\.notes-list-pane"\)\);/.test(libJs) &&
     /narrowMedia: "\(max-width: 860px\)"/.test(libJs) &&
-    /new ResizeObserver\(update\)\.observe\(pane\)/.test(libJs),
+    /new ResizeObserver\(\(entries\) => \{[\s\S]*?schedule\([\s\S]*?\}\)\.observe\(pane\)/.test(libJs),
     "library.js: both list panes must be wired to the one header-fit measurement (ResizeObserver on the pane, <=860px always narrow for the vocabulary row)");
   check(declarationValueMap(hand, '.notes-list-pane[data-header-fit="narrow"] .notes-color-filters .lib-toggle-count').get("display") === "none",
     "library.css: a notes colour row too narrow for its numbers must show dots only (user ruling 10-04)");

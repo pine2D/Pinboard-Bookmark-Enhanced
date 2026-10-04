@@ -19,7 +19,7 @@
   <main class="lib-main">
     <section id="view-vocab" class="lib-view" role="tabpanel" aria-labelledby="lib-tab-vocab">
       <div class="vocab-workbench">
-        <div class="vocab-list-pane" id="vocab-list-pane" data-header-fit="narrow">
+        <div class="vocab-list-pane" id="vocab-list-pane">
           <div id="vocab-no-account" class="notes-empty vocab-account-empty" role="region" aria-labelledby="vocab-no-account-title" hidden>
             <h2 id="vocab-no-account-title" data-i18n="libraryVocabSignedOutTitle">Sign in to use Vocabulary</h2>
             <p data-i18n="libraryVocabSignedOutHint">Vocabulary is kept separate for each Pinboard account. Dictionary lookup remains available without signing in.</p>
@@ -40,8 +40,9 @@
            three status toggles sit inline inside .vocab-filter-set. Narrow
            form: the SAME nodes fold into that element's popover, opened by
            #vocab-filter-narrow -- one DOM, never a copy. library.js decides
-           the form (pbpLibWireVocabHeaderFit, starts narrow until the first
-           count) and wires the popover (pbpLibWireFilterPopover). -->
+           the form (pbpLibWireVocabHeaderFit; undecided -- no attribute,
+           neither form shown -- until the first counts land) and wires the
+           popover (pbpLibWireFilterPopover). -->
       <div class="vocab-filter-row">
         <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="libraryFilterNarrow">Filter</span></button>
         <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">

@@ -1969,6 +1969,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
   // never flaps; re-decided on resize and on any change to the row's text.
   {
     const fitFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // Observers hand off to one shared microtask: a task boundary lets both run.
+    const fitTicks = () => new Promise((resolve) => setTimeout(resolve, 0));
     const host = document.createElement("div");
     host.innerHTML = `
       <div class="vocab-list-pane" data-header-fit="narrow" style="position:fixed;left:-9999px;top:0;width:520px">
@@ -1976,7 +1978,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
           <button type="button" class="btn ghost" popovertarget="fit-set" aria-expanded="false"><span>Filter</span></button>
           <div class="vocab-filter-set" id="fit-set" popover="auto">
             <select><option>All groups</option></select>
-            <span class="vocab-status-toggles"><button type="button" class="lib-toggle" aria-pressed="true">All</button><button type="button" class="lib-toggle" aria-pressed="false">Learning 12</button><button type="button" class="lib-toggle" aria-pressed="false">Known 3</button></span>
+            <span class="vocab-status-toggles" data-counts-ready><button type="button" class="lib-toggle" aria-pressed="true">All</button><button type="button" class="lib-toggle" aria-pressed="false">Learning 12</button><button type="button" class="lib-toggle" aria-pressed="false">Known 3</button></span>
           </div>
           <span class="vocab-sort-seg"><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span>
           <button type="button" class="btn btn-sm vocab-lookup-narrow"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
@@ -2006,11 +2008,11 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       await fitFrames();
       check("header fit: widening back to the need returns to wide", pane.dataset.headerFit === "wide", `${pane.style.width} ${pane.dataset.headerFit}`);
       known.textContent = "Bereits sicher gelernt: 5000";
-      await Promise.resolve();
+      await fitTicks();
       check("header fit: longer labels (a language change) are re-measured at once and fold the row",
         pane.dataset.headerFit === "narrow" && pbpLibVocabFilterNeed(row) > need, `${pane.dataset.headerFit} ${pbpLibVocabFilterNeed(row)}`);
       known.textContent = "Known 3";
-      await Promise.resolve();
+      await fitTicks();
       check("header fit: and the short labels coming back unfold it", pane.dataset.headerFit === "wide", pane.dataset.headerFit);
       pane.style.width = "300px";
       await fitFrames();
@@ -2019,11 +2021,44 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       await fitFrames();
       check("header fit: turning wide closes an open Filter popover", pane.dataset.headerFit === "wide" && !set.matches(":popover-open"),
         `${pane.dataset.headerFit} open=${set.matches(":popover-open")}`);
-      for (const b of set.querySelectorAll(".lib-toggle")) b.hidden = true;
+      // Signature: nothing the measurement depends on changed -> no copy is
+      // built; one language change (three triggers in one task) -> one copy.
+      const realCopy = pbpLibMeasureCopyWidth, realState = pbpLibRowState;
+      let copies = 0, passes = 0;
+      pbpLibMeasureCopyWidth = (r, prep) => { if (r === row) copies++; return realCopy(r, prep); };
+      pbpLibRowState = (r) => { if (r === row) passes++; return realState(r); };
+      const lang0 = document.documentElement.lang;
+      try {
+        update();
+        update();
+        known.setAttribute("title", "a tooltip is not layout");
+        await fitTicks();
+        check("header fit: an unchanged row, language, density and room are not re-measured", copies === 0, `${copies} copies`);
+        passes = 0;
+        document.documentElement.lang = "de";
+        document.dispatchEvent(new Event("pbp:i18n-applied"));
+        known.textContent = "Gelernt: 3";
+        await fitTicks();
+        check("header fit: a language change (html lang + i18n-applied + relabel in one task) runs one pass and measures once",
+          copies === 1 && passes === 1, `${copies} copies, ${passes} passes`);
+      } finally {
+        pbpLibMeasureCopyWidth = realCopy;
+        pbpLibRowState = realState;
+        document.documentElement.lang = lang0;
+        known.textContent = "Known 3";
+        await fitTicks();
+      }
+      set.querySelector(".vocab-status-toggles").removeAttribute("data-counts-ready");
       pane.style.width = "200px";
       await fitFrames();
-      check("header fit: before the first count (toggles hidden) the form is left as it is",
+      check("header fit: before the counts land (no data-counts-ready) the form is left as it is",
         Number.isNaN(pbpLibVocabFilterNeed(row)) && pane.dataset.headerFit === "wide", pane.dataset.headerFit);
+      set.querySelector(".vocab-status-toggles").setAttribute("data-counts-ready", "");
+      for (const b of set.querySelectorAll(".lib-toggle")) b.hidden = true;
+      pane.style.width = "520px";
+      await fitFrames();
+      check("header fit: counts landed with no words (toggles stay hidden) still decide a form",
+        Number.isFinite(pbpLibVocabFilterNeed(row)) && pane.dataset.headerFit === "wide", `${pbpLibVocabFilterNeed(row)} ${pane.dataset.headerFit}`);
       const forcedPane = pane.cloneNode(true);
       host.appendChild(forcedPane);
       forcedPane.style.width = "900px";
@@ -2034,6 +2069,47 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         pbpLibHeaderFitForm(NaN, 440) === "narrow");
     } finally {
       host.remove();
+    }
+    // First frame (review round 1): before the counts land the pane carries
+    // no data-header-fit and the Filter button keeps its box but not its ink,
+    // at ANY width -- a window wide enough for the wide form never paints the
+    // narrow one first. The id is the real one: library.css keys the button
+    // rules on it.
+    const host2 = document.createElement("div");
+    host2.innerHTML = `
+      <div class="vocab-list-pane" style="position:fixed;left:-9999px;top:0;width:520px">
+        <div class="vocab-filter-row">
+          <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="fit-set2" aria-expanded="false"><span>Filter</span></button>
+          <div class="vocab-filter-set" id="fit-set2" popover="auto">
+            <select><option>All groups</option></select>
+            <span class="vocab-status-toggles"><button type="button" class="lib-toggle" hidden>All</button><button type="button" class="lib-toggle" hidden></button><button type="button" class="lib-toggle" hidden></button></span>
+          </div>
+          <span class="vocab-sort-seg"><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span>
+        </div>
+      </div>`;
+    document.body.appendChild(host2);
+    const pane2 = host2.firstElementChild;
+    const filterBtn = pane2.querySelector("#vocab-filter-narrow");
+    try {
+      pbpLibWireVocabHeaderFit(pane2);
+      const seen = [];
+      for (const w of [360, 520, 2000]) {
+        pane2.style.width = `${w}px`;
+        await fitFrames();
+        const cs = getComputedStyle(filterBtn);
+        seen.push(`${w}:${pane2.getAttribute("data-header-fit")}/${cs.visibility}/${cs.display}/${filterBtn.getBoundingClientRect().height}`);
+      }
+      check("header fit: before the counts land, no width shows the Filter button (box kept, ink hidden, form undecided)",
+        seen.every((v) => /^\d+:null\/hidden\/(?!none)[a-z-]+\/[1-9]/.test(v)), seen.join(" "));
+      const toggles2 = pane2.querySelector(".vocab-status-toggles");
+      for (const b of toggles2.children) { b.hidden = false; b.textContent ||= "Known 3"; }
+      toggles2.setAttribute("data-counts-ready", "");
+      await fitTicks();
+      check("header fit: the counts landing decide the form in the same turn (wide at 2000px, Filter button gone)",
+        pane2.dataset.headerFit === "wide" && getComputedStyle(filterBtn).display === "none",
+        `${pane2.dataset.headerFit} ${getComputedStyle(filterBtn).display}`);
+    } finally {
+      host2.remove();
     }
   }
   document.title = fail ? "FAIL library-vocab Tests" : "PASS library-vocab Tests";

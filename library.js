@@ -342,14 +342,16 @@ function pbpLibMeasureCopyWidth(row, prepare) {
 // single-pane lookup door out, the .vocab-filter-set laid out inline (the
 // popover's nodes in a row, gap = the row's), and any shrinkable child with a
 // px floor (the group filter's min-width) at that floor -- the wide form lets
-// it shrink there. NaN while the status toggles wait for their first count
-// (all hidden): the form is left as it is rather than decided on a row that
-// is about to grow.
+// it shrink there. NaN until library-vocab.js marks the counts as landed
+// (data-counts-ready on .vocab-status-toggles, set once the list has loaded,
+// cleared while it reloads): the form is not decided on a row that is about
+// to grow. Landed with no words at all, the toggles stay hidden and the row
+// is measured without them -- a decided form either way.
 function pbpLibVocabFilterNeed(row) {
   const set = row && row.querySelector(".vocab-filter-set");
   if (!set) return NaN;
-  const toggles = [...row.querySelectorAll(".vocab-status-toggles > .lib-toggle")];
-  if (toggles.length && toggles.every((b) => b.hidden)) return NaN;
+  const toggles = row.querySelector(".vocab-status-toggles");
+  if (toggles && !toggles.hasAttribute("data-counts-ready")) return NaN;
   const gap = getComputedStyle(row).columnGap;
   return pbpLibMeasureCopyWidth(row, (copy, counterpart) => {
     for (const el of row.querySelectorAll(":scope > [popovertarget], :scope > .vocab-lookup-narrow")) {
@@ -380,35 +382,88 @@ function pbpLibNotesColorNeed(row) {
 // narrowMedia -- a media query under which the form is always narrow (the
 // <=860px single-pane layout); onChange(form) -- after the attribute flips.
 // Returns the update function (also run by the triggers).
+// What the measurement depends on inside the row, as one string: its text
+// plus, per element, exactly the attributes the row observer below watches.
+function pbpLibRowState(row) {
+  let out = row.textContent;
+  for (const el of row.querySelectorAll("*")) {
+    out += `\u0001${el.hidden ? "h" : ""}${el.getAttribute("aria-pressed") || ""}:${el.getAttribute("class") || ""}${el.hasAttribute("data-counts-ready") ? ":r" : ""}`;
+  }
+  return out;
+}
+
 function pbpLibWireHeaderFit(pane, row, measureNeed, opts = {}) {
   if (!pane || !row || typeof measureNeed !== "function") return null;
   if (pane._pbpHeaderFit) return pane._pbpHeaderFit;
   const { narrowMedia = "", onChange = null } = opts;
-  const update = () => {
-    let form = null;
+  const html = document.documentElement;
+  // Hot path: a vocabulary re-render (every keystroke in the undebounced
+  // search box) rewrites the count text, which fires the row observer. The
+  // measurement only runs when something it depends on changed -- the row's
+  // state (pbpLibRowState: text, hidden / pressed / class, counts-ready),
+  // <html> language / theme / density, or the room -- and otherwise only
+  // re-asserts the last verdict.
+  let lastSig = null, lastForm = null;
+  const apply = (form) => {
+    if (!form || pane.dataset.headerFit === form) return;
+    pane.dataset.headerFit = form;
+    if (onChange) onChange(form);
+  };
+  const update = (roomHint) => {
     try {
-      if (narrowMedia && window.matchMedia(narrowMedia).matches) form = "narrow";
-      else {
-        const need = measureNeed(row);
-        if (Number.isFinite(need)) form = pbpLibHeaderFitForm(need, pbpLibContentWidth(pane));
+      if (narrowMedia && window.matchMedia(narrowMedia).matches) {
+        lastSig = null;
+        apply("narrow");
+        return pane.dataset.headerFit || null;
+      }
+      // The room first: read while layout is still the page's own, before
+      // the measuring copy dirties it.
+      const room = Number.isFinite(roomHint) ? roomHint : pbpLibContentWidth(pane);
+      const sig = `${pbpLibRowState(row)}\u0000${html.lang}\u0000${html.dataset.theme || ""}\u0000${html.dataset.density || ""}\u0000${room.toFixed(2)}`;
+      if (sig === lastSig) {
+        apply(lastForm);
+        return pane.dataset.headerFit || null;
+      }
+      const need = measureNeed(row);
+      if (Number.isFinite(need)) {
+        lastSig = sig;
+        lastForm = pbpLibHeaderFitForm(need, room);
+        apply(lastForm);
       }
     } catch (err) {
       console.warn("[library] header fit measure failed", err && err.name, err && err.message);
     }
-    if (form && pane.dataset.headerFit !== form) {
-      pane.dataset.headerFit = form;
-      if (onChange) onChange(form);
-    }
     return pane.dataset.headerFit || null;
   };
+  // Every trigger lands here: one language change fires the <html> observer,
+  // the row observer and pbp:i18n-applied in the same task -- they share one
+  // microtask and one measurement. A resize hands over the observer's own
+  // content-box width, so that path reads no layout at all.
+  let queued = false, pendingRoom;
+  const schedule = (roomHint) => {
+    if (Number.isFinite(roomHint)) pendingRoom = roomHint;
+    if (queued) return;
+    queued = true;
+    queueMicrotask(() => {
+      queued = false;
+      const r = pendingRoom;
+      pendingRoom = undefined;
+      update(r);
+    });
+  };
   pane._pbpHeaderFit = update;
-  if (typeof ResizeObserver === "function") new ResizeObserver(update).observe(pane);
-  if (typeof MutationObserver === "function") {
-    new MutationObserver(update).observe(row, { subtree: true, childList: true, characterData: true,
-      attributes: true, attributeFilter: ["hidden", "aria-pressed", "class"] });
-    new MutationObserver(update).observe(document.documentElement, { attributes: true, attributeFilter: ["lang", "data-theme", "data-density"] });
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver((entries) => {
+      const box = entries[entries.length - 1];
+      schedule(box && box.contentRect ? box.contentRect.width : undefined);
+    }).observe(pane);
   }
-  document.addEventListener("pbp:i18n-applied", update);
+  if (typeof MutationObserver === "function") {
+    new MutationObserver(() => schedule()).observe(row, { subtree: true, childList: true, characterData: true,
+      attributes: true, attributeFilter: ["hidden", "aria-pressed", "class", "data-counts-ready"] });
+    new MutationObserver(() => schedule()).observe(html, { attributes: true, attributeFilter: ["lang", "data-theme", "data-density"] });
+  }
+  document.addEventListener("pbp:i18n-applied", () => schedule());
   update();
   return update;
 }
