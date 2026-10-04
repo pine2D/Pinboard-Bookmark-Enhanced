@@ -1999,14 +1999,95 @@ function f8Failures(id, out, hosts) {
   const dark = deriveNoteMarks(hexToRgbLoose("#1c1b1a"), hexToRgbLoose("#cecdc3"), DARK_HUES, DARK_TARGETS);
   check(JSON.stringify(dark) === JSON.stringify(["#d9a44169", "#5e9c6973", "#5689b673", "#b86f8c73", "#8b72af73"]),
     `deriveNoteMarks over flexoki-dark (bg #1c1b1a, fg #cecdc3) must cap yellow to 0x69 (45% gives 4.15:1) and keep the other four at 0x73; got ${dark.join(" ")}`);
-  check(throws(() => deriveNoteMarks([0, 0, 0], [0x77, 0x77, 0x77], [0, 0, 0, 0, 0].map(() => [255, 255, 255]), DARK_TARGETS)),
-    "deriveNoteMarks must throw when even the floor alpha drops fg under 4.5:1 -- never fall back to some fixed alpha");
+  // The floor case must throw THE floor error, not just any error: a TypeError
+  // / RangeError here would mean the input guards fired first and the stepping
+  // loop never ran, so "it threw" would prove nothing about the floor.
+  const floorError = (() => {
+    try { deriveNoteMarks([0, 0, 0], [0x77, 0x77, 0x77], [0, 0, 0, 0, 0].map(() => [255, 255, 255]), DARK_TARGETS); return null; } catch (e) { return e; }
+  })();
+  const floorAlpha = Math.ceil(NOTE_MARK_ALPHA_FLOOR * 255);
+  check(floorError instanceof Error && !(floorError instanceof TypeError) && !(floorError instanceof RangeError) &&
+    String(floorError.message).includes(`down to ${floorAlpha}/255`),
+    `deriveNoteMarks must throw the floor error (plain Error naming "down to ${floorAlpha}/255") when even the floor alpha drops fg under 4.5:1 -- never fall back to some fixed alpha; got ${floorError ? `${floorError.name}: ${floorError.message}` : "no throw"}`);
   check(throws(() => deriveNoteMarks([0, 0, 0], [255, 255, 255], LIGHT_HUES.slice(0, 4), NOTE_MARK_ALPHA_LIGHT)) &&
     throws(() => deriveNoteMarks([0, 0, 0], [255, 255, 255], LIGHT_HUES, [0.45, 0.4, 0.4, 0.4])) &&
     throws(() => deriveNoteMarks("#000000", [255, 255, 255], LIGHT_HUES, NOTE_MARK_ALPHA_LIGHT)) &&
     throws(() => deriveNoteMarks([0, 0, 0], [255, 255, 255], LIGHT_HUES, [0.1, 0.4, 0.4, 0.4, 0.4])) &&
     throws(() => deriveNoteMarks([0, 0, 0], [255, 255, 255], LIGHT_HUES, [1.2, 0.4, 0.4, 0.4, 0.4])),
     "deriveNoteMarks must reject anything but five hues, five targets in [floor, 1] and [r, g, b] colours");
+}
+
+// --- Highlighter marks, CATEGORY assertions over the shipped pipeline (spec
+// §6.4 / §9.3): every library block -- the 14 composed theme maps plus the
+// folded default :root (hand :root + the generated DEFAULT_LIGHT block) --
+// carries five #rrggbbaa marks; each mark's hue is its mode's hue, its alpha
+// never exceeds the target nor drops under the floor, fg clears 4.5:1 on the
+// mark composited over bg, and the alpha is MAXIMAL (one more 1/255 already
+// fails, unless it sits at the target). Computed independently: deriveNoteMarks
+// is never called here. Anchors pin the spec's numbers and the D1 ruling. ---
+{
+  const ROLES = [1, 2, 3, 4, 5].map((n) => `note-mark-c${n}`);
+  check(ROLES.every((r) => UI_DERIVED_OUTPUT_ROLES.library.includes(r)),
+    `UI_DERIVED_OUTPUT_ROLES.library lacks a highlighter role (${ROLES.filter((r) => !UI_DERIVED_OUTPUT_ROLES.library.includes(r)).join(", ")}) -- validate-contracts would let a pilot override it`);
+  const HUES = {
+    light: ["#facc15", "#4ade80", "#60a5fa", "#f87171", "#c084fc"],
+    dark: ["#d9a441", "#5e9c69", "#5689b6", "#b86f8c", "#8b72af"],
+  };
+  const TARGET = {
+    light: NOTE_MARK_ALPHA_LIGHT.map((t) => Math.round(t * 255)),
+    dark: [0, 0, 0, 0, 0].map(() => Math.round(NOTE_MARK_ALPHA_DARK * 255)),
+  };
+  const FLOOR = Math.ceil(NOTE_MARK_ALPHA_FLOOR * 255);
+  const parts = (v) => {
+    const m = /^#([0-9a-f]{6})([0-9a-f]{2})$/i.exec(String(v ?? "").trim());
+    return m ? { hue: "#" + m[1].toLowerCase(), a: parseInt(m[2], 16) } : null;
+  };
+  const over = (hue, a, bg) => {
+    const h = hexToRgb(hue), b = hexToRgb(bg);
+    return rgbToHex(h.map((c, k) => Math.round((a / 255) * c + (1 - a / 255) * b[k])));
+  };
+  const pilots = new Map();
+  const pilot = (slug) => {
+    if (!pilots.has(slug)) pilots.set(slug, JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${slug}.tokens.json`, import.meta.url), "utf8")));
+    return pilots.get(slug);
+  };
+  const blocks = POPUP_THEME_MAP.map((e) => [e.id, e.mode, composeLibraryThemeMap(pilot(e.pilot), e.mode, e.useDarkMode).map]);
+  const root = {};
+  for (const rule of parseStyleRules(readFileSync(new URL("../library.css", import.meta.url), "utf8"))) {
+    if (rule.context.length !== 0 || !rule.selectors.includes(":root")) continue;
+    for (const d of parseDeclarations(rule.body)) if (d.property.startsWith("--lib-")) root[d.property.slice(6)] = d.value;
+  }
+  blocks.push([":root", "light", root]);
+  let measured = 0;
+  for (const [id, mode, m] of blocks) {
+    const label = `library ${id}`;
+    if (!isHex(m.bg ?? "") || !isHex(m.fg ?? "")) { check(false, `${label}: bg / fg missing or not #rgb / #rrggbb`); continue; }
+    ROLES.forEach((role, i) => {
+      const p = parts(m[role]);
+      if (!p) { check(false, `${label}: --lib-${role} ${m[role]} is not #rrggbbaa`); return; }
+      measured++;
+      check(p.hue === HUES[mode][i], `${label}: --lib-${role} hue ${p.hue} is not the ${mode} hue ${HUES[mode][i]}`);
+      check(p.a <= TARGET[mode][i] && p.a >= FLOOR, `${label}: --lib-${role} alpha ${p.a}/255 is outside [${FLOOR}, ${TARGET[mode][i]}]`);
+      const r = ratio(m.fg, over(p.hue, p.a, m.bg));
+      check(r >= 4.5, `${label}: fg ${m.fg} on --lib-${role} over bg ${m.bg} = ${r.toFixed(2)}:1, need 4.5`);
+      if (p.a < TARGET[mode][i]) {
+        const next = ratio(m.fg, over(p.hue, p.a + 1, m.bg));
+        check(next < 4.5, `${label}: --lib-${role} alpha ${p.a}/255 is not maximal -- ${p.a + 1}/255 still gives ${next.toFixed(2)}:1`);
+      }
+    });
+  }
+  check(measured === (POPUP_THEME_MAP.length + 1) * 5, `highlighter category block measured ${measured} marks, expected ${(POPUP_THEME_MAP.length + 1) * 5} (15 blocks x 5)`);
+  const byId = Object.fromEntries(blocks.map(([id, , m]) => [id, m]));
+  const ANCHORS = {
+    ":root": ["#facc1573", "#4ade8066", "#60a5fa66", "#f8717166", "#c084fc66"],
+    "flexoki-dark": ["#d9a44169", "#5e9c6973", "#5689b673", "#b86f8c73", "#8b72af73"],
+    "solarized-light": ["#facc1573", "#4ade8066", "#60a5fa4d", "#f8717144", "#c084fc4a"],
+    "solarized-dark": ["#d9a44125", "#5e9c692c", "#5689b62f", "#b86f8c36", "#8b72af37"],
+  };
+  for (const [id, want] of Object.entries(ANCHORS)) {
+    const got = ROLES.map((r) => String(byId[id]?.[r] ?? "").trim().toLowerCase());
+    check(JSON.stringify(got) === JSON.stringify(want), `${id} highlighter marks drifted from the spec / D1 anchors: ${got.join(" ")} (want ${want.join(" ")})`);
+  }
 }
 
 if (failures.length) {

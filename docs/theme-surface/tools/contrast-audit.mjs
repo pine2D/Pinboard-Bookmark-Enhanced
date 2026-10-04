@@ -1902,6 +1902,7 @@ function auditLibraryThemes(cssPath) {
       }
     }
     auditLibraryRowStates(theme, grab);
+    auditLibraryNoteMarks(theme, grab);
     // save/danger/warn are flat text colors on the page bg (unlike popup/options'
     // tinted warn-bg/banner-bg pairs — library has no such tinted-fill roles yet).
     for (const key of ["save", "danger", "warn"]) {
@@ -1945,6 +1946,32 @@ function auditLibraryRowStates(theme, get) {
   // .lib-toggle:hover paints btn-fg on row-bg-hover (library.css `.lib-toggle:hover:not([aria-pressed="true"])`). (fg-muted and the hovered row's title fg sit on the same fill; fg-muted has its own row above.)
   console.log(check("library", theme, "btn-fg vs row-bg-hover", cr(rgb("btn-fg"), rgb("row-bg-hover")), 4.5));
   for (const fill of LIB_ROW_FOCUS_WARN_FILLS) console.log(warnCheck("library", theme, `focus-bd vs ${fill}`, cr(rgb("focus-bd"), rgb(fill)), 3));
+}
+
+// Highlighter marks (spec docs/superpowers/specs/2026-10-03-library-redesign-
+// design.md §6.4 / §9.3). The notes excerpts paint plain --lib-fg text on a
+// translucent --lib-note-mark-cN laid over the page bg, so the pair to gate is
+// fg vs the COMPOSITE (resolveColor composites an #rrggbbaa over bg and rounds
+// to hex, the same arithmetic deriveNoteMarks uses). BLOCKING: the composer
+// caps each alpha to clear 4.5:1 by construction; a FAIL here is a derivation
+// bug or a stale DEFAULT_LIGHT literal. Shared by the 14 themed blocks and the
+// default (:root) surface.
+function auditLibraryNoteMarks(theme, get) {
+  const bgS = get("bg"), fgS = get("fg");
+  const marks = [1, 2, 3, 4, 5].map((n) => [n, get(`note-mark-c${n}`)]);
+  const bad = marks.filter(([, v]) => !/^#[0-9a-f]{8}$/i.test(String(v ?? "").trim())).map(([n]) => `--lib-note-mark-c${n}`);
+  if (!isHex(bgS ?? "") || !isHex(fgS ?? "") || bad.length) {
+    const line = "  " + "library".padEnd(10) + " " + theme.padEnd(20) + " " + "highlighter marks".padEnd(28) +
+      " FAIL (missing or malformed: " + [...(!isHex(bgS ?? "") ? ["--lib-bg"] : []), ...(!isHex(fgS ?? "") ? ["--lib-fg"] : []), ...bad].join(", ") + ")";
+    console.log(line);
+    violations.push(line);
+    return;
+  }
+  const bg = hexRgb(bgS), fg = hexRgb(fgS);
+  for (const [n, v] of marks) {
+    const over = resolveColor(String(v).trim(), bg);
+    console.log(check("library", theme, `fg vs note-mark-c${n}`, cr(fg, over), 4.5));
+  }
 }
 auditLibraryThemes(resolve(ROOT, "library.css"));
 
@@ -2088,6 +2115,7 @@ auditComponentPairsDefault("popup", "pp", resolve(ROOT, "popup.css"), ":root", "
 {
   const dict = foldSelectorBlocks(readFileSync(resolve(ROOT, "library.css"), "utf8"), ":root");
   auditLibraryRowStates("default", (k) => dict[`lib-${k}`] ?? null);
+  auditLibraryNoteMarks("default", (k) => dict[`lib-${k}`] ?? null);
 }
 
 // Default-surface .preset-btn text (design-uplift Task 13 review round):

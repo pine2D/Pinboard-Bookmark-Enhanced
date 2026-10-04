@@ -1,12 +1,22 @@
 import { expandPalette } from "./_util.mjs";
 import { mergeTokens } from "./compose-theme.mjs";
-import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, FIELD_HOST_ROLES, fieldChevronUri, deriveRowStates } from "./_ui-derive.mjs";
+import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, FIELD_HOST_ROLES, fieldChevronUri, deriveRowStates, deriveNoteMarks, NOTE_MARK_ALPHA_LIGHT, NOTE_MARK_ALPHA_DARK } from "./_ui-derive.mjs";
 import { POPUP_THEME_MAP } from "./popup-chrome.mjs";
 
 // The six S2 fills a row's TEXT can sit on (spec 2026-10-03-library-redesign
 // §6.4): every state except plain hover, whose text keeps --lib-fg /
 // --lib-fg-muted (fg-muted is pushed against that fill below).
 const ROW_HIGHLIGHT_FILLS = ["row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover", "row-band-current-bg", "row-band-current-bg-hover"];
+
+// Highlighter hues for the notes excerpts (spec 2026-10-03-library-redesign
+// §6.4). Light = the five --lib-note-c1..5 dot colours (library.css hand
+// :root), so a row's dot and its excerpt's mark read as the same colour; dark
+// = the reader's dark highlighter set (md-preview.css --hl-1..5 dark half).
+// Declared here, not imported from either file: isolated contexts may repeat a
+// constant (CLAUDE.md), and the reader's palette must not move when the
+// library's does. Only the ALPHA is derived (deriveNoteMarks).
+export const LIB_NOTE_MARK_HUES_LIGHT = Object.freeze(["#facc15", "#4ade80", "#60a5fa", "#f87171", "#c084fc"]);
+export const LIB_NOTE_MARK_HUES_DARK = Object.freeze(["#D9A441", "#5E9C69", "#5689B6", "#B86F8C", "#8B72AF"]);
 
 // Default-surface (no preset selected) component-layer baseline — Task 5,
 // step ① of the composer color migration. Every value below is copied
@@ -98,6 +108,16 @@ const DEFAULT_LIGHT = {
   "row-band-current-bg-hover": "#bbc3d3", // + fg 5%: 8
   "row-current-fg-muted": "#505458",      // fg-muted #5f6368 pushed to 4.5 on current and current+hover
   "row-selected-fg": "#1a1a2e",           // = fg, already >= 4.5 on all six highlight fills (moved here from the hand :root, value unchanged)
+  // Highlighter marks (spec 2026-10-03-library-redesign §6.4). NOT hand-
+  // picked: deriveNoteMarks over library.css's hand :root (bg #f7f7f8, fg
+  // #1a1a2e) with the light hues and targets -- no hue needs capping on the
+  // default surface (13.41 / 12.87 / 11.45 / 10.85 / 11.32 :1).
+  // tests/theme-ui-derive-tests.mjs re-checks them against the folded :root.
+  "note-mark-c1": "#facc1573",
+  "note-mark-c2": "#4ade8066",
+  "note-mark-c3": "#60a5fa66",
+  "note-mark-c4": "#f8717166",
+  "note-mark-c5": "#c084fc66",
 };
 
 // Map canonical UI colors to --lib-* names for the standalone library page
@@ -196,6 +216,14 @@ function emitLib(ui, palette, overrides, radius, focus = {}, mode) {
   // Secondary text (and the delete X) on the current, not-selected row:
   // fg-muted falls under 4.5 on the current fill on 12 of 15 blocks.
   map["row-current-fg-muted"] = rgbToHex(fgToAAMulti(hexToRgb(map["fg-muted"]), [rows["row-current-bg"], rows["row-current-bg-hover"]]));
+  // Notes highlighter marks (spec 2026-10-03-library-redesign §5.4 / §6.4).
+  // Last, from the bg and fg this block ships: the quote under a mark is plain
+  // fg, so the alpha is capped until fg clears 4.5:1 on the composite.
+  const markDark = mode === "dark";
+  const marks = deriveNoteMarks(hexToRgb(map.bg), hexToRgb(map.fg),
+    (markDark ? LIB_NOTE_MARK_HUES_DARK : LIB_NOTE_MARK_HUES_LIGHT).map((h) => hexToRgb(h)),
+    markDark ? [0, 0, 0, 0, 0].map(() => NOTE_MARK_ALPHA_DARK) : NOTE_MARK_ALPHA_LIGHT);
+  marks.forEach((hex, i) => { map[`note-mark-c${i + 1}`] = hex; });
 
   // Returns the computed map alongside the rendered text (not just text) --
   // same shape as options-chrome.mjs's emitOpt, for the same reason: a

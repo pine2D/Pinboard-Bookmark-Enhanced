@@ -61,12 +61,16 @@ export const FIELD_ROLES = Object.freeze([
 // library also derives its seven list-row fills (deriveRowStates, after the
 // finalizer) and the two text roles painted on them -- row-selected-fg was a
 // hand-carried role with a pilot-shaped seed before; it is an output now.
+// The five notes highlighter marks (note-mark-c1..5, §5.4 / §6.4) are derived
+// last, from the shipped bg and fg, by deriveNoteMarks: a pilot cannot set
+// them either.
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
   popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg", ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"]),
   options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
   library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron",
     "row-bg-hover", "row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover",
-    "row-band-current-bg", "row-band-current-bg-hover", "row-current-fg-muted", "row-selected-fg"]),
+    "row-band-current-bg", "row-band-current-bg-hover", "row-current-fg-muted", "row-selected-fg",
+    "note-mark-c1", "note-mark-c2", "note-mark-c3", "note-mark-c4", "note-mark-c5"]),
 });
 
 export function hexToRgb(h) {
