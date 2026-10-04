@@ -1010,6 +1010,51 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     }
   }
 
+  // ---- Header fit, notes half (user ruling 10-04, library.js
+  // pbpLibWireNotesHeaderFit): a colour row too narrow for its numbers shows
+  // dots only, keeps one line, and keeps every count in title / aria-label;
+  // the need is measured with the numbers showing, whichever form is up.
+  {
+    const fitFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const host = document.createElement("div");
+    const toggles = [1, 2, 3, 4, 5].map((c) =>
+      `<button type="button" class="lib-toggle sm" data-color="${c}" aria-pressed="false" title="Colour ${c}: 2000" aria-label="Colour ${c}: 2000"><span class="notes-hit-dot notes-c${c}" aria-hidden="true"></span><span class="lib-toggle-count">2000</span></button>`).join("");
+    host.innerHTML = `<div class="notes-list-pane" data-header-fit="wide" style="position:fixed;left:-9999px;top:0;width:520px">
+      <div class="notes-color-filters" role="group"><button type="button" class="lib-toggle sm" data-color="all" aria-pressed="true">Wszystkie</button>${toggles}</div></div>`;
+    document.body.appendChild(host);
+    const pane = host.firstElementChild;
+    const row = pane.querySelector(".notes-color-filters");
+    const counts = () => [...row.querySelectorAll(".lib-toggle-count")];
+    try {
+      pbpLibWireNotesHeaderFit(pane);
+      const need = pbpLibNotesColorNeed(row);
+      check("notes header fit: room for the numbers keeps them", pane.dataset.headerFit === "wide" &&
+        counts().every((n) => getComputedStyle(n).display !== "none"), `${need} ${pane.dataset.headerFit}`);
+      pane.style.width = `${Math.floor(need) - 1}px`;
+      await fitFrames();
+      const r = row.getBoundingClientRect();
+      const btns = [...row.children].map((b) => b.getBoundingClientRect());
+      check("notes header fit: 1px short of the need -> dots only, one line, inside the pane, counts still named",
+        pane.dataset.headerFit === "narrow" && counts().every((n) => getComputedStyle(n).display === "none") &&
+        btns.every((b) => Math.abs(b.top - btns[0].top) < 0.5 && b.right <= r.right + 0.5) &&
+        [...row.querySelectorAll('[data-color]:not([data-color="all"])')].every((b) => /2000/.test(b.title) && /2000/.test(b.getAttribute("aria-label"))),
+        `${pane.dataset.headerFit} ${pane.style.width}`);
+      check("notes header fit: a dot-only toggle keeps a >=24px square hit area",
+        [...row.querySelectorAll('[data-color]:not([data-color="all"])')].every((b) => b.getBoundingClientRect().width >= 24));
+      check("notes header fit: the need is measured with the numbers showing, in either form",
+        Math.abs(pbpLibNotesColorNeed(row) - need) < 0.5 && pane.children.length === 1, String(pbpLibNotesColorNeed(row)));
+      pane.style.width = `${Math.ceil(need)}px`;
+      await fitFrames();
+      check("notes header fit: widening back to the need brings the numbers back", pane.dataset.headerFit === "wide" &&
+        counts().every((n) => getComputedStyle(n).display !== "none"), pane.dataset.headerFit);
+      for (const n of counts()) n.textContent = "200000";
+      await Promise.resolve();
+      check("notes header fit: bigger numbers are re-measured at once", pane.dataset.headerFit === "narrow", pane.dataset.headerFit);
+    } finally {
+      host.remove();
+    }
+  }
+
   document.title = fail ? "FAIL library-notes Tests" : "PASS library-notes Tests";
 })();
 </script></body></html>

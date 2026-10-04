@@ -652,6 +652,15 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
 .notes-color-filters { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--lib-sp-0); min-width: 0; margin-bottom: var(--lib-sp-3); }
 /* display:flex above outranks the UA [hidden] rule. */
 .notes-color-filters[hidden] { display: none; }
+/* Too narrow for the numbers (user ruling 10-04, data-header-fit from
+   library.js): the five colour toggles show their dot only -- the count stays
+   in each one's title and accessible name -- and keep one line. Square at the
+   sm rung so a dot-only toggle still clears the 24px hit area in compact. */
+.notes-list-pane[data-header-fit="narrow"] .notes-color-filters .lib-toggle-count { display: none; }
+.notes-list-pane[data-header-fit="narrow"] .notes-color-filters .lib-toggle[data-color]:not([data-color="all"]) {
+  justify-content: center;
+  min-width: calc(var(--lib-control-h) - 4px);
+}
 .lib-count-row > .notes-count { flex: 1 1 auto; min-width: 0; white-space: normal; }
 
 .notes-card {
@@ -2004,13 +2013,14 @@ html.motion-ready .vocab-note-save {
 /* ============================================================
    Index list header (library redesign T4b, spec §3.1-§3.5).
    ============================================================ */
-/* The index column is a size container: the filter row folds into the
-   "Filter" popover by the index's own width (spec §3.4), not the viewport's.
-   Inline-size containment also makes it the containing block for fixed
-   descendants -- harmless here: both popovers on this row live in the top
-   layer, whose containing block is always the viewport. */
+/* Which form a list-header row shows is decided by its own content (spec
+   appendix, user ruling 10-04): library.js measures the wide form's intrinsic
+   width against the index and writes data-header-fit="wide|narrow" on the
+   pane (pbpLibWireHeaderFit). No fixed width threshold: the vocabulary filter
+   row folds into the "Filter" popover, the notes colour row drops its
+   numbers, exactly when the wide form would not fit on one line. */
 .vocab-list-pane,
-.notes-list-pane { container: lib-index / inline-size; padding-bottom: var(--lib-sp-4); }
+.notes-list-pane { padding-bottom: var(--lib-sp-4); }
 /* Both list searches are md fields (32 / 28), like every other control in
    the header. The detail pane's lookup field keeps its own rung until T7. */
 .notes-toolbar > input[type="search"] {
@@ -2055,36 +2065,35 @@ html.motion-ready .vocab-note-save {
   font-size: var(--lib-text-body);
 }
 .vocab-status-toggles { display: inline-flex; flex: none; align-items: center; gap: var(--lib-sp-0); }
-/* Wide index: the same nodes inline. All UA [popover] styles reset (spec
-   §3.4): without width/height/overflow/color the group select's flex:1 would
-   collapse to fit-content, its focus glow would be clipped and the text would
-   turn CanvasText. */
-@container lib-index (min-width: 440px) {
-  #vocab-filter-narrow { display: none; }
-  .vocab-filter-set[popover]:not(:popover-open) {
-    display: flex;
-    position: static;
-    inset: auto;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    background: none;
-    width: auto;
-    height: auto;
-    overflow: visible;
-    color: inherit;
-    flex: 1 1 auto;
-    min-width: 0;
-    align-items: center;
-    gap: var(--lib-sp-2);
-  }
+/* Wide form (the row fits): the same nodes inline. All UA [popover] styles
+   reset (spec §3.4): without width/height/overflow/color the group select's
+   flex:1 would collapse to fit-content, its focus glow would be clipped and
+   the text would turn CanvasText. */
+.vocab-list-pane[data-header-fit="wide"] #vocab-filter-narrow { display: none; }
+.vocab-list-pane[data-header-fit="wide"] .vocab-filter-set[popover]:not(:popover-open) {
+  display: flex;
+  position: static;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  color: inherit;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: var(--lib-sp-2);
 }
-/* Single-pane (<=860px): always the popover. The row also carries the lookup
-   door there, which the container threshold is not measured against. Same
-   selectors as the container block, later in the file, so these win. */
+/* Single-pane (<=860px): always the popover (library.js decides narrow there
+   too; this holds it if the attribute is ever stale). The row also carries
+   the lookup door there. Same specificity as the two rules above, later in
+   the file, so these win. */
 @media (max-width: 860px) {
-  #vocab-filter-narrow { display: inline-flex; }
-  .vocab-filter-set[popover]:not(:popover-open) { display: none; }
+  .vocab-list-pane[data-header-fit] #vocab-filter-narrow { display: inline-flex; }
+  .vocab-list-pane[data-header-fit] .vocab-filter-set[popover]:not(:popover-open) { display: none; }
 }
 
 /* .lib-toggle (spec §3.2): the one toggle language for the status filter and
@@ -2168,7 +2177,9 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
    with the search box) and scrollbar gutter + 4px at the end, into the gap,
    so the row fill's right edge meets the column's right edge too. The gutter
    is measured, not assumed: library.js writes --lib-sb-w (T3c); the fallback
-   is library's own 10px ::-webkit-scrollbar. */
+   is library's own 10px ::-webkit-scrollbar. scroll-padding-block keeps a
+   keyboard-focused row 8px off the region's top and bottom edges (spec
+   §3.9). */
 .vocab-list-region,
 .notes-list-region {
   position: relative;
@@ -2176,6 +2187,7 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
   min-height: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
+  scroll-padding-block: var(--lib-sp-2);
   margin-inline: calc(-1 * var(--lib-sp-1)) calc(-1 * (var(--lib-sb-w, 10px) + var(--lib-sp-1)));
 }
 /* Batch rows (spec §3.9): while a selection exists they REPLACE the count

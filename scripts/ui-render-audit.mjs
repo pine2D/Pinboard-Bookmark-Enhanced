@@ -2175,6 +2175,410 @@ async function driveFilterPopoverKeys(page, theme, check) {
   return bad;
 }
 
+// ---- library index gates (redesign T4e, spec §9.2 G2 / G3 / G7, G6 toggles)
+// All four use a scratch page in the same extension context: the theme is in
+// storage, so it loads the same theme, and nothing they do (locale swaps,
+// synthetic rows, viewport sizes, selections) reaches the shared page the
+// CHECKS loop keeps reading. Only density changes geometry here, so their
+// checklist entries carry `themes: ["", "terminal"]` (comfortable / compact)
+// like the other T3 scratch-page gates.
+const LIB_INDEX_LOCALES = Object.freeze(["en", "de", "fr", "pl", "ru", "zh_HK", "zh_CN", "zh_TW", "ja"]);
+
+async function libScratchPage(page, extBase, theme, tag, view, viewport) {
+  const scratch = await page.context().newPage();
+  try {
+    await scratch.setViewportSize(viewport);
+    await openLibraryView(scratch, extBase, theme, view, tag);
+    await settleAnimations(scratch);
+  } catch (err) {
+    await scratch.close().catch(() => {});
+    throw err;
+  }
+  return scratch;
+}
+
+async function closeLibScratch(page, scratch) {
+  await scratch.close().catch(() => {});
+  await page.bringToFront().catch(() => {});
+}
+
+// What a language change does on the real page, minus the storage trip (a
+// localStorage write would reach the shared page -- same origin): swap
+// i18n.js's table, re-apply data-i18n, re-render the visible view. applyI18n
+// writes <html lang> from the stored language, so the tag that drives the
+// CJK :lang() rules is written after it.
+async function setLibraryLocale(p, extBase, locale) {
+  await p.evaluate(async ({ url, lang }) => {
+    const msgs = await (await fetch(url)).json();
+    _i18nMessages = msgs;
+    applyI18n();
+    document.documentElement.lang = lang;
+    if (!document.getElementById("view-vocab").hidden) _pbpVocabApplyView(false);
+    if (!document.getElementById("view-notes").hidden) _pbpNotesRender();
+  }, { url: `${extBase}_locales/${locale}/messages.json`,
+    lang: { zh_HK: "zh-Hant", zh_TW: "zh-Hant", zh_CN: "zh-Hans" }[locale] || locale });
+  await settleAnimations(p);
+}
+
+// G3: how many whole rows a 900px-tall window shows, and at what pitch.
+async function driveVisibleRowCount(page, extBase, theme, check) {
+  const { width, height, comfortable, compact } = check.expect.visibleRowCount;
+  const scratch = await libScratchPage(page, extBase, theme, "g3", "vocab", { width, height });
+  try {
+    const m = await scratch.evaluate(() => {
+      const region = document.querySelector(".vocab-list-region");
+      const cards = [...document.querySelectorAll("#vocab-list > .vocab-card")];
+      if (!region || cards.length < 3) return { error: `${cards.length} rendered rows -- LIB_SEED.wordCount did not reach the list` };
+      return {
+        pitch: cards[1].getBoundingClientRect().top - cards[0].getBoundingClientRect().top,
+        visible: region.clientHeight,
+        compact: document.documentElement.dataset.density === "compact",
+      };
+    });
+    if (m.error) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|visibleRowCount]: ${m.error}`);
+    const tier = m.compact ? compact : comfortable;
+    const rows = Math.floor(m.visible / m.pitch);
+    const range = `${tier.min}${tier.max != null ? `-${tier.max}` : "+"}`;
+    const bad = [];
+    if (Math.abs(m.pitch - tier.pitch) > 0.5) bad.push(`row pitch ${round2(m.pitch)}px, expected ${tier.pitch}px`);
+    if (rows < tier.min || (tier.max != null && rows > tier.max)) bad.push(`${rows} rows in ${round2(m.visible)}px, expected ${range}`);
+    return { ok: bad.length === 0, actual: `${rows} rows @ ${round2(m.pitch)}px (${m.compact ? "compact" : "comfortable"})`,
+      expected: `${range} rows @ ${tier.pitch}px`, note: bad.join("; ") || undefined };
+  } finally {
+    await closeLibScratch(page, scratch);
+  }
+}
+
+// G2: ArrowDown from the first row, `steps` times; after every press the
+// focused row must lie wholly inside the list region.
+async function driveFocusRowVisible(page, extBase, theme, check) {
+  const { width, height, steps, passes } = check.expect.focusRowVisible;
+  const scratch = await libScratchPage(page, extBase, theme, "g2", "vocab", { width, height });
+  const bad = [];
+  try {
+    for (const pass of passes) {
+      if (pass.locale) await setLibraryLocale(scratch, extBase, pass.locale);
+      await scratch.evaluate((w) => {
+        if (w) document.documentElement.style.setProperty("--lib-index-w", `${w}px`);
+        else document.documentElement.style.removeProperty("--lib-index-w");
+      }, pass.indexW || 0);
+      await settleAnimations(scratch);
+      const head = scratch.locator("#vocab-list .vocab-card .notes-card-head").first();
+      if (pass.select) {
+        await head.click({ modifiers: ["Control"] });
+        await scratch.waitForSelector("#vocab-batch-toolbar.selecting", { timeout: TIMEOUT_MS });
+        await scratch.mouse.move(0, 0);
+        await settleAnimations(scratch);
+      }
+      const setup = await scratch.evaluate(() => {
+        const r = document.querySelector(".vocab-list-region");
+        r.scrollTop = 0;
+        return { sh: r.scrollHeight, ch: r.clientHeight };
+      });
+      if (setup.sh <= setup.ch + 200) {
+        throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|focusRowVisible]: .vocab-list-region overflows by only ${setup.sh - setup.ch}px (${pass.name}) -- LIB_SEED must overflow it by >200px`);
+      }
+      await head.focus();
+      for (let i = 1; i <= steps; i++) {
+        await scratch.keyboard.press("ArrowDown");
+        const v = await scratch.evaluate(() => {
+          const el = document.activeElement;
+          const row = el && el.closest ? el.closest("#vocab-list .notes-card-top") : null;
+          const region = document.querySelector(".vocab-list-region");
+          if (!row || !region) return null;
+          const r = row.getBoundingClientRect(), g = region.getBoundingClientRect();
+          return { above: g.top - r.top, below: r.bottom - g.bottom };
+        });
+        if (!v) { bad.push(`${pass.name}: focus left the list after ArrowDown #${i}`); break; }
+        if (v.above > 0.5 || v.below > 0.5) {
+          bad.push(`${pass.name}: row ${i + 1} is ${v.above > 0.5 ? `${round2(v.above)}px above` : `${round2(v.below)}px below`} the list region after ArrowDown #${i}`);
+          break;
+        }
+      }
+      if (pass.select) {
+        await scratch.click("#vocab-clear-selection");
+        await scratch.waitForFunction(() => !document.querySelector("#vocab-batch-toolbar.selecting"), null, { timeout: TIMEOUT_MS });
+      }
+    }
+  } finally {
+    await closeLibScratch(page, scratch);
+  }
+  return bad;
+}
+
+// One list header, in page. Four things per header row:
+// - edge: every rendered descendant ends inside the index's content box;
+// - group: inside every flex / grid box of the row, each in-flow child stays
+//   inside that box and no two children's boxes intersect (user ruling
+//   10-04: the edge check alone missed status toggles spilling out of their
+//   set and under the sort control at a 440px German index);
+// - count items: each wholly inside its fixed-height box or wholly below it
+//   (that box clips on purpose, so it is exempt from the group check);
+// - batch rows: with an empty status slot, vocabulary is exactly 2 x sm + 8;
+//   notes is one sm row or, when it does not fit, two (2 x sm + 8).
+// An optical hang (a negative margin of exactly the element's own padding,
+// the G4b offset category) may cross its box by that much. It also reports
+// which form each header shows and the pane's data-header-fit, for the
+// driver's form-vs-measurement comparison.
+const LIST_HEADER_FIT_SCAN = ({ view }) => {
+  const vocab = view === "vocab";
+  const pane = document.querySelector(vocab ? ".vocab-list-pane" : ".notes-list-pane");
+  if (!pane) return { error: "list pane missing" };
+  const pr = pane.getBoundingClientRect(), pcs = getComputedStyle(pane);
+  const left = pr.left + (parseFloat(pcs.paddingLeft) || 0) + (parseFloat(pcs.borderLeftWidth) || 0);
+  const right = pr.right - (parseFloat(pcs.paddingRight) || 0) - (parseFloat(pcs.borderRightWidth) || 0);
+  const rows = vocab
+    ? ["#view-vocab .notes-toolbar", "#view-vocab .vocab-filter-row", "#vocab-context-bar", "#vocab-batch-toolbar"]
+    : ["#view-notes .notes-toolbar", "#notes-color-filters", "#notes-context-bar", "#notes-batch-toolbar"];
+  const shown = (el) => { const cs = getComputedStyle(el); return cs.display !== "none" && cs.visibility !== "hidden"; };
+  const nameOf = (el) => el.id ? `#${el.id}` : `${el.tagName.toLowerCase()}.${String(el.getAttribute("class") || "").trim().split(/\s+/).join(".")}`;
+  const hangOf = (cs) => {
+    const one = (m, p) => (m < 0 && Math.abs(-m - p) <= 0.5 ? -m : 0);
+    return { l: one(parseFloat(cs.marginLeft) || 0, parseFloat(cs.paddingLeft) || 0), r: one(parseFloat(cs.marginRight) || 0, parseFloat(cs.paddingRight) || 0) };
+  };
+  const skipped = (el) => el.closest(".sr-only") || (el.closest("svg") && el.tagName.toLowerCase() !== "svg");
+  const bad = [];
+  let measured = 0;
+  for (const sel of rows) {
+    const row = document.querySelector(sel);
+    if (!row || !shown(row)) continue;
+    measured++;
+    for (const el of [row, ...row.querySelectorAll("*")]) {
+      if (skipped(el)) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden" || cs.position === "fixed") continue;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) continue;
+      const hang = hangOf(cs);
+      if (r.right - hang.r > right + 0.5) bad.push(`${sel} ${nameOf(el)} ends ${(r.right - hang.r - right).toFixed(1)}px past the index`);
+      if (r.left + hang.l < left - 0.5) bad.push(`${sel} ${nameOf(el)} starts ${(left - r.left - hang.l).toFixed(1)}px before the index`);
+      // The group check: flex / grid boxes that do not clip.
+      if (!/flex|grid/.test(cs.display) || cs.overflowX !== "visible" || cs.overflowY !== "visible") continue;
+      const kids = [...el.children].filter((k) => {
+        if (skipped(k)) return false;
+        const kc = getComputedStyle(k);
+        if (kc.display === "none" || kc.visibility === "hidden" || kc.position === "absolute" || kc.position === "fixed") return false;
+        const kr = k.getBoundingClientRect();
+        return kr.width > 0.5 && kr.height > 0.5;
+      });
+      for (const k of kids) {
+        const kr = k.getBoundingClientRect(), kh = hangOf(getComputedStyle(k));
+        if (kr.left + kh.l < r.left - 0.5 || kr.right - kh.r > r.right + 0.5) {
+          bad.push(`${sel} ${nameOf(k)} spills ${Math.max(r.left - kr.left - kh.l, kr.right - kh.r - r.right).toFixed(1)}px out of its group ${nameOf(el)}`);
+        }
+      }
+      for (let i = 0; i < kids.length; i++) {
+        for (let j = i + 1; j < kids.length; j++) {
+          const a = kids[i].getBoundingClientRect(), b = kids[j].getBoundingClientRect();
+          const x = Math.min(a.right, b.right) - Math.max(a.left, b.left), y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (x > 0.5 && y > 0.5) bad.push(`${sel} ${nameOf(kids[i])} and ${nameOf(kids[j])} overlap by ${x.toFixed(1)} x ${y.toFixed(1)}px`);
+        }
+      }
+    }
+  }
+  const items = document.querySelector(vocab ? "#vocab-count .lib-count-items" : "#notes-count .lib-count-items");
+  if (items && shown(items) && items.getClientRects().length) {
+    const box = items.getBoundingClientRect();
+    for (const it of items.children) {
+      const r = it.getBoundingClientRect();
+      const inside = r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5 && r.right <= box.right + 0.5;
+      if (!inside && r.top < box.bottom - 0.5) bad.push(`count item "${it.textContent}" is cut by its box`);
+    }
+  }
+  const batch = document.querySelector(vocab ? "#vocab-batch-toolbar" : "#notes-batch-toolbar");
+  if (batch && shown(batch)) {
+    const busy = !!batch.querySelector(".lib-batch-status .save-status:not(:empty)") ||
+      [...batch.querySelectorAll(".vocab-group-help")].some((h) => !h.hidden);
+    const sm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lib-control-h")) - 4;
+    const wants = vocab ? [2 * sm + 8] : [sm, 2 * sm + 8];
+    const h = batch.getBoundingClientRect().height;
+    if (!busy && !wants.some((w) => Math.abs(h - w) <= 1)) bad.push(`${batch.id} is ${h.toFixed(1)}px tall, expected ${wants.join(" or ")}px`);
+  }
+  // The form showing: vocabulary = narrow while the Filter button renders;
+  // notes = narrow while the colour toggles' numbers are hidden.
+  let form;
+  if (vocab) {
+    const btn = document.getElementById("vocab-filter-narrow");
+    form = btn && getComputedStyle(btn).display !== "none" ? "narrow" : "wide";
+  } else {
+    const num = document.querySelector("#notes-color-filters .lib-toggle-count");
+    form = num && getComputedStyle(num).display === "none" ? "narrow" : "wide";
+  }
+  return { bad, measured, form, fit: pane.dataset.headerFit || null, room: right - left };
+};
+
+// What the wide forms need, measured here independently of library.js's own
+// measurement (the oracle the form is checked against). Vocabulary: lay the
+// popover's nodes out inline as the wide rule does, every shrinkable child
+// with a px floor (the group filter's min-width) at that floor, on a
+// min-content row. Notes: the colour row at max-content with every number
+// showing. Every inline style is restored before returning.
+const FILTER_ROW_NEED = () => {
+  const row = document.querySelector("#view-vocab .vocab-filter-row");
+  const set = document.getElementById("vocab-filter-set");
+  const btn = document.getElementById("vocab-filter-narrow");
+  const door = document.getElementById("vocab-lookup-narrow");
+  if (!row || !set || !btn) return null;
+  const saved = new Map();
+  const keep = (el) => { if (el && !saved.has(el)) saved.set(el, el.getAttribute("style")); };
+  [row, set, btn, door].forEach(keep);
+  btn.style.display = "none";
+  if (door) door.style.display = "none";
+  Object.assign(set.style, { display: "flex", position: "static", inset: "auto", margin: "0", padding: "0", border: "0",
+    background: "none", width: "auto", height: "auto", overflow: "visible", flex: "1 1 auto", minWidth: "0",
+    alignItems: "center", gap: getComputedStyle(row).columnGap });
+  for (const kid of set.children) {
+    const cs = getComputedStyle(kid);
+    const floor = parseFloat(cs.minWidth);
+    if (cs.display === "none" || cs.position === "absolute" || !(parseFloat(cs.flexShrink) > 0) || !(floor > 0)) continue;
+    keep(kid);
+    Object.assign(kid.style, { flex: "none", width: `${floor}px` });
+  }
+  row.style.width = "min-content";
+  const need = row.getBoundingClientRect().width;
+  for (const [el, style] of saved) {
+    if (style == null) el.removeAttribute("style");
+    else el.setAttribute("style", style);
+  }
+  return need;
+};
+const NOTES_ROW_NEED = () => {
+  const row = document.getElementById("notes-color-filters");
+  if (!row || row.hidden) return null;
+  const nums = [...row.querySelectorAll(".lib-toggle-count")];
+  const saved = [row, ...nums].map((el) => el.getAttribute("style"));
+  nums.forEach((n) => { n.style.display = "inline"; });
+  row.style.width = "max-content";
+  const need = row.getBoundingClientRect().width;
+  [row, ...nums].forEach((el, i) => {
+    if (saved[i] == null) el.removeAttribute("style");
+    else el.setAttribute("style", saved[i]);
+  });
+  return need;
+};
+
+// G7. Per view and locale, the index widths are the checklist's fixed ones
+// plus the two either side of that locale's own need (when inside [min, max]),
+// so both sides of every locale's switch point are walked. At each width, in
+// browse and select state: the scan above, plus the form check -- the form
+// showing (and data-header-fit) must be the one the measured need calls for
+// (skipped within 1px of the need, where rounding owns the call).
+async function driveListHeaderFit(page, extBase, theme, check) {
+  const { width, height, indexWidths, count } = check.expect.listHeaderFit;
+  const lo = Math.min(...indexWidths), hi = Math.max(...indexWidths);
+  const bad = [];
+  const needs = [];
+  let need = { px: 0, locale: null };
+  const scratch = await libScratchPage(page, extBase, theme, "g7", "vocab", { width, height });
+  const setIndex = async (w) => {
+    await scratch.evaluate((px) => document.documentElement.style.setProperty("--lib-index-w", `${px}px`), w);
+    await settleAnimations(scratch);
+  };
+  const widthsAround = (n) => [...new Set([...indexWidths, Math.floor(n - 1), Math.ceil(n + 1)].filter((w) => w >= lo && w <= hi))].sort((a, b) => a - b);
+  const pass = async (view, locale, n, select) => {
+    for (const w of widthsAround(n)) {
+      await setIndex(w);
+      for (const selecting of [false, true]) {
+        await select(selecting);
+        await settleAnimations(scratch);
+        const label = `${view} ${locale} index ${w}${selecting ? " selecting" : ""}`;
+        const res = await scratch.evaluate(LIST_HEADER_FIT_SCAN, { view });
+        if (res.error) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: ${res.error}`);
+        // Search, filter / colour row and one of count row / batch row: a
+        // header that rendered fewer rows than that measured nothing.
+        if (res.measured < 3) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: only ${res.measured} header rows rendered (${label})`);
+        for (const b of res.bad) bad.push(`${label}: ${b}`);
+        const want = n <= res.room + 0.5 ? "wide" : "narrow";
+        if (Math.abs(n - res.room) > 1 && (res.form !== want || res.fit !== want)) {
+          bad.push(`${label}: shows the ${res.form} form (data-header-fit ${res.fit}) but needs ${round2(n)}px in ${round2(res.room)}px -> ${want}`);
+        }
+      }
+    }
+  };
+  try {
+    await scratch.evaluate((n) => {
+      const langs = ["en", "de", "fr", "es", "it", "ja", "zh", "ru", "pl"];
+      const now = Date.now();
+      _vocabRows = Array.from({ length: n }, (_, i) => ({
+        id: `g7-${i}`, term: `term${i}`, gloss: `gloss ${i}`, language: langs[i % langs.length],
+        status: i % 2 ? "known" : "new", groups: [`G${i % 12}`], contexts: [], createdAt: now - i * 60000, updatedAt: now - i * 60000,
+      }));
+      _pbpVocabApplyView(true);
+    }, count);
+    const selectVocab = (on) => scratch.evaluate((v) => {
+      _vocabSelected = v ? pbpVocabSelectResults(new Set(), _vocabViewRows, "all") : new Set();
+      _vocabLastSelectedId = null;
+      _pbpVocabSyncSelectionUi();
+    }, on);
+    for (const locale of LIB_INDEX_LOCALES) {
+      await setLibraryLocale(scratch, extBase, locale);
+      const n = await scratch.evaluate(FILTER_ROW_NEED);
+      if (n == null) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: the filter row's nodes are missing`);
+      needs.push(`${locale} ${round2(n)}`);
+      if (n > need.px) need = { px: n, locale };
+      await pass("vocab", locale, n, selectVocab);
+    }
+    await scratch.evaluate(() => document.documentElement.style.removeProperty("--lib-index-w"));
+    await scratch.click("#lib-tab-notes");
+    await scratch.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS });
+    await scratch.evaluate((n) => {
+      const now = Date.now();
+      const items = Array.from({ length: n }, (_, i) => ({ id: `g7n${i}`, n: i + 1, quote: `quote ${i}`, color: (i % 5) + 1, note: "", ts: now - i * 60000 }));
+      _notesAllRows = [{ row: { key: "pbp_hl_g7", url: "https://example.com/g7", title: "G7", lastTs: now },
+        rec: { v: 1, url: "https://example.com/g7", title: "G7", items } }];
+      _pbpNotesRender(true);
+    }, count);
+    const selectNotes = (on) => scratch.evaluate((v) => {
+      _notesSelected = v ? new Set(_pbpNotesVisibleHits().map((h) => h.key)) : new Set();
+      _notesLastSelectedKey = null;
+      _pbpNotesSyncSelectionUi();
+    }, on);
+    const notesNeeds = [];
+    for (const locale of LIB_INDEX_LOCALES) {
+      await setLibraryLocale(scratch, extBase, locale);
+      const n = await scratch.evaluate(NOTES_ROW_NEED);
+      if (n == null) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: the notes colour row is missing or hidden`);
+      notesNeeds.push(`${locale} ${round2(n)}`);
+      await pass("notes", locale, n, selectNotes);
+    }
+    needs.push(`| notes colour row: ${notesNeeds.join(", ")}`);
+  } finally {
+    await closeLibScratch(page, scratch);
+  }
+  return { bad, need, needs };
+}
+
+// G6 for the two toggle families T3's filterScrollReset does not drive. Each
+// clicks the PRESSED "All" (status) / "All" (colours): the list content stays
+// the same, so a scrollTop of 0 afterwards proves the handler's reset, not a
+// shorter list.
+async function driveScrollResetToggles(page, extBase, theme, check) {
+  const bad = [];
+  const cases = [
+    { view: "vocab", viewport: { width: 1280, height: 900 }, region: ".vocab-list-region", click: "#vocab-stat-all", popover: true },
+    { view: "notes", viewport: { width: 1280, height: 360 }, region: ".notes-list-region", click: '#notes-color-filters .lib-toggle[data-color="all"]', popover: false },
+  ];
+  for (const c of cases) {
+    const scratch = await libScratchPage(page, extBase, theme, `g6t-${c.view}`, c.view, c.viewport);
+    try {
+      if (c.popover) {
+        const opened = await setFilterSetOpen(scratch, true);
+        if (opened === "missing" || opened === "stuck") throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|filterScrollResetToggles]: #vocab-filter-set ${opened}`);
+        await settleAnimations(scratch);
+      }
+      const before = await scratch.evaluate((sel) => { const r = document.querySelector(sel); r.scrollTop = r.scrollHeight; return r.scrollTop; }, c.region);
+      if (!(before > 0)) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|filterScrollResetToggles]: ${c.region} does not scroll at ${c.viewport.width}x${c.viewport.height} (LIB_SEED too small)`);
+      await scratch.click(c.click);
+      await settleAnimations(scratch);
+      const after = await scratch.evaluate((sel) => document.querySelector(sel).scrollTop, c.region);
+      if (after !== 0) bad.push(`${c.click}: ${c.region} scrollTop ${after} after the click (was ${before})`);
+    } finally {
+      await closeLibScratch(page, scratch);
+    }
+  }
+  return bad;
+}
+
 // ---- state: "gapMin" (debt-sweep 2026-08-07) -------------------------------
 // The narrow-screen lookup door's 12px clearance from the sort segment
 // (library.css, ".vocab-filter-row > .vocab-lookup-narrow") had no assertion
@@ -2477,6 +2881,34 @@ async function runOneCheck(page, theme, check, results, extBase) {
     const ok = !result.error && result.gap >= min;
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("gapMin", ok, result.error ? null : result.gap, min, result.error) });
+    return;
+  }
+  if (check.state === "visibleRowCount") {
+    const r = await driveVisibleRowCount(page, extBase, theme, check);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("visibleRowCount", r.ok, r.actual, r.expected, r.note) });
+    return;
+  }
+  if (check.state === "focusRowVisible") {
+    const bad = await driveFocusRowVisible(page, extBase, theme, check);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("focusRowVisible", bad.length === 0, bad.length, 0, bad.length ? bad.slice(0, 4).join("; ") : undefined) });
+    return;
+  }
+  if (check.state === "listHeaderFit") {
+    // `actual` carries the width the wide filter row needs at its widest
+    // locale; the note lists every locale's, and the notes colour row's.
+    const { bad, need, needs } = await driveListHeaderFit(page, extBase, theme, check);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("listHeaderFit", bad.length === 0, `wide filter row needs ${round2(need.px)}px (${need.locale})`,
+        "every header child inside the index and its group, no overlaps; count items whole; vocabulary batch row 64/56, notes one or two sm rows; form = measured fit",
+        [bad.length ? bad.slice(0, 4).join("; ") : null, `needs: ${needs.join(", ")}`].filter(Boolean).join(" | ")) });
+    return;
+  }
+  if (check.state === "filterScrollResetToggles") {
+    const bad = await driveScrollResetToggles(page, extBase, theme, check);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("filterScrollResetToggles", bad.length === 0, bad.length, 0, bad.length ? bad.join("; ") : undefined) });
     return;
   }
   if (check.state === "filterPopoverKeys") {

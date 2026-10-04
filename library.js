@@ -122,6 +122,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   pbpLibWireFilterPopover($id("vocab-filter-set"), $id("vocab-filter-narrow"), $id("vocab-list-pane"));
+  pbpLibWireVocabHeaderFit($id("vocab-list-pane"));
+  pbpLibWireNotesHeaderFit(document.querySelector(".notes-list-pane"));
   _pbpLibApplyView(_pbpLibInitialView(), true);
 });
 
@@ -240,8 +242,9 @@ function pbpLibSameDay(a, b) {
 }
 
 // "Filter" popover on the narrow index (spec §3.4). One DOM for both forms:
-// the wide form is plain CSS (@container lib-index); this only runs the
-// popover form's open / close bookkeeping.
+// which form shows is the index's data-header-fit (pbpLibWireVocabHeaderFit
+// below, read by CSS); this only runs the popover form's open / close
+// bookkeeping.
 function pbpLibWireFilterPopover(set, button, indexEl) {
   if (!set || !button || set.dataset.wired) return;
   set.dataset.wired = "1";
@@ -274,4 +277,160 @@ function pbpLibWireFilterPopover(set, button, indexEl) {
       }
     }).observe(indexEl);
   }
+}
+
+// ---- Header fit (spec appendix, user ruling 10-04) --------------------------
+// A list-header row with a wide and a narrow form switches by its own content,
+// not by a fixed width: wide when the wide form's content fits the index on
+// one line, narrow when it does not. The vocabulary filter row folds into the
+// Filter popover; the notes colour row drops its numbers (dots only, the
+// count stays in each toggle's title / accessible name). The verdict is
+// written to the list pane as data-header-fit="wide|narrow" and CSS does the
+// rest.
+//
+// No flapping: `need` is the wide form's intrinsic width, measured on a
+// hidden copy of the row laid out in that form, so it is the same number
+// whichever form is showing; `room` is the pane's content box, which neither
+// form changes. Re-measured when the pane resizes, when the row's content
+// changes (counts, labels -- a language change rewrites them), when <html>
+// changes language or density, and after applyI18n.
+function pbpLibHeaderFitForm(need, room) {
+  return Number.isFinite(need) && Number.isFinite(room) && need <= room + 0.5 ? "wide" : "narrow";
+}
+
+// Fractional, like the need it is compared with (clientWidth rounds).
+function pbpLibContentWidth(el) {
+  const cs = getComputedStyle(el);
+  const px = (v) => parseFloat(v) || 0;
+  return el.getBoundingClientRect().width - px(cs.paddingLeft) - px(cs.paddingRight) - px(cs.borderLeftWidth) - px(cs.borderRightWidth);
+}
+
+// The width `row` needs laid out on one line at max-content, measured on a
+// copy placed next to it (same ancestors, so the same rules match). The copy
+// has no ids, no popover wiring, is inert and invisible, and is gone before
+// this returns -- one synchronous layout, never painted. `prepare(copy,
+// counterpart)` reshapes the copy into the form being measured;
+// counterpart(original) finds an original descendant's copy.
+function pbpLibMeasureCopyWidth(row, prepare) {
+  const copy = row.cloneNode(true);
+  const counterpart = (orig) => {
+    const path = [];
+    for (let n = orig; n && n !== row; n = n.parentElement) path.unshift([...n.parentElement.children].indexOf(n));
+    let c = copy;
+    for (const i of path) c = c && c.children[i];
+    return c || null;
+  };
+  // Never two elements with one id, not even for this one layout (no rule
+  // in the measured rows is keyed on an id).
+  for (const el of [copy, ...copy.querySelectorAll("[id], [popover], [popovertarget], [for]")]) {
+    for (const attr of ["id", "popover", "popovertarget", "for"]) el.removeAttribute(attr);
+  }
+  copy.setAttribute("aria-hidden", "true");
+  copy.inert = true;
+  Object.assign(copy.style, { position: "absolute", visibility: "hidden", left: "0", top: "0",
+    width: "max-content", maxWidth: "none", flexWrap: "nowrap", pointerEvents: "none" });
+  row.after(copy);
+  try {
+    if (prepare) prepare(copy, counterpart);
+    return copy.getBoundingClientRect().width;
+  } finally {
+    copy.remove();
+  }
+}
+
+// The vocabulary filter row's wide form: the Filter button and the
+// single-pane lookup door out, the .vocab-filter-set laid out inline (the
+// popover's nodes in a row, gap = the row's), and any shrinkable child with a
+// px floor (the group filter's min-width) at that floor -- the wide form lets
+// it shrink there. NaN while the status toggles wait for their first count
+// (all hidden): the form is left as it is rather than decided on a row that
+// is about to grow.
+function pbpLibVocabFilterNeed(row) {
+  const set = row && row.querySelector(".vocab-filter-set");
+  if (!set) return NaN;
+  const toggles = [...row.querySelectorAll(".vocab-status-toggles > .lib-toggle")];
+  if (toggles.length && toggles.every((b) => b.hidden)) return NaN;
+  const gap = getComputedStyle(row).columnGap;
+  return pbpLibMeasureCopyWidth(row, (copy, counterpart) => {
+    for (const el of row.querySelectorAll(":scope > [popovertarget], :scope > .vocab-lookup-narrow")) {
+      const c = counterpart(el);
+      if (c) c.remove();
+    }
+    const cset = copy.querySelector(".vocab-filter-set");
+    Object.assign(cset.style, { display: "flex", position: "static", inset: "auto", margin: "0", padding: "0", border: "0",
+      width: "auto", height: "auto", overflow: "visible", flex: "none", minWidth: "0", alignItems: "center", gap });
+    for (const kid of cset.children) {
+      const cs = getComputedStyle(kid);
+      const floor = parseFloat(cs.minWidth);
+      if (cs.display === "none" || cs.position === "absolute" || !(parseFloat(cs.flexShrink) > 0) || !(floor > 0)) continue;
+      Object.assign(kid.style, { flex: "none", width: `${floor}px` });
+    }
+  });
+}
+
+// The notes colour row's wide form: every toggle with its number showing.
+function pbpLibNotesColorNeed(row) {
+  if (!row || row.hidden) return NaN;
+  return pbpLibMeasureCopyWidth(row, (copy) => {
+    for (const num of copy.querySelectorAll(".lib-toggle-count")) num.style.display = "inline";
+  });
+}
+
+// Wires one pane: decides now, then again on every trigger above. `opts`:
+// narrowMedia -- a media query under which the form is always narrow (the
+// <=860px single-pane layout); onChange(form) -- after the attribute flips.
+// Returns the update function (also run by the triggers).
+function pbpLibWireHeaderFit(pane, row, measureNeed, opts = {}) {
+  if (!pane || !row || typeof measureNeed !== "function") return null;
+  if (pane._pbpHeaderFit) return pane._pbpHeaderFit;
+  const { narrowMedia = "", onChange = null } = opts;
+  const update = () => {
+    let form = null;
+    try {
+      if (narrowMedia && window.matchMedia(narrowMedia).matches) form = "narrow";
+      else {
+        const need = measureNeed(row);
+        if (Number.isFinite(need)) form = pbpLibHeaderFitForm(need, pbpLibContentWidth(pane));
+      }
+    } catch (err) {
+      console.warn("[library] header fit measure failed", err && err.name, err && err.message);
+    }
+    if (form && pane.dataset.headerFit !== form) {
+      pane.dataset.headerFit = form;
+      if (onChange) onChange(form);
+    }
+    return pane.dataset.headerFit || null;
+  };
+  pane._pbpHeaderFit = update;
+  if (typeof ResizeObserver === "function") new ResizeObserver(update).observe(pane);
+  if (typeof MutationObserver === "function") {
+    new MutationObserver(update).observe(row, { subtree: true, childList: true, characterData: true,
+      attributes: true, attributeFilter: ["hidden", "aria-pressed", "class"] });
+    new MutationObserver(update).observe(document.documentElement, { attributes: true, attributeFilter: ["lang", "data-theme", "data-density"] });
+  }
+  document.addEventListener("pbp:i18n-applied", update);
+  update();
+  return update;
+}
+
+function pbpLibWireVocabHeaderFit(pane) {
+  const row = pane && pane.querySelector(".vocab-filter-row");
+  const set = row && row.querySelector(".vocab-filter-set");
+  return pbpLibWireHeaderFit(pane, row, pbpLibVocabFilterNeed, {
+    narrowMedia: "(max-width: 860px)",
+    // Widened past the need while the popover is open: its nodes go back
+    // inline, so the panel closes (its toggle handler clears the placement).
+    onChange: (form) => {
+      if (form !== "wide" || !set || !set.matches(":popover-open")) return;
+      try {
+        set.hidePopover();
+      } catch (err) {
+        console.warn("[library] filter popover close failed", err && err.name, err && err.message);
+      }
+    },
+  });
+}
+
+function pbpLibWireNotesHeaderFit(pane) {
+  return pbpLibWireHeaderFit(pane, pane && pane.querySelector(".notes-color-filters"), pbpLibNotesColorNeed);
 }

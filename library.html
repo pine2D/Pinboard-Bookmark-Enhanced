@@ -19,7 +19,7 @@
   <main class="lib-main">
     <section id="view-vocab" class="lib-view" role="tabpanel" aria-labelledby="lib-tab-vocab">
       <div class="vocab-workbench">
-        <div class="vocab-list-pane" id="vocab-list-pane">
+        <div class="vocab-list-pane" id="vocab-list-pane" data-header-fit="narrow">
           <div id="vocab-no-account" class="notes-empty vocab-account-empty" role="region" aria-labelledby="vocab-no-account-title" hidden>
             <h2 id="vocab-no-account-title" data-i18n="libraryVocabSignedOutTitle">Sign in to use Vocabulary</h2>
             <p data-i18n="libraryVocabSignedOutHint">Vocabulary is kept separate for each Pinboard account. Dictionary lookup remains available without signing in.</p>
@@ -34,12 +34,14 @@
       <div class="notes-toolbar vocab-filter-toolbar">
         <input type="search" id="vocab-search" placeholder="Search words, definitions, context, and groups" data-i18n-placeholder="vocabSearchPlaceholder" data-i18n-aria="vocabSearchPlaceholder" aria-label="Search words, definitions, context, and groups" autocomplete="off" />
       </div>
-      <!-- Filter row (spec §3.1 / §3.4). Wide index (lib-index container at or
-           above its threshold, and above the 860px single-pane break): the
-           group select and the three status toggles sit inline inside
-           .vocab-filter-set. Narrow index: the SAME nodes fold into that
-           element's popover, opened by #vocab-filter-narrow -- one DOM, never
-           a copy. library.js wires the popover (pbpLibWireFilterPopover). -->
+      <!-- Filter row (spec §3.1 / §3.4). Wide form (the pane's
+           data-header-fit="wide": the row's content fits the index on one
+           line, above the 860px single-pane break): the group select and the
+           three status toggles sit inline inside .vocab-filter-set. Narrow
+           form: the SAME nodes fold into that element's popover, opened by
+           #vocab-filter-narrow -- one DOM, never a copy. library.js decides
+           the form (pbpLibWireVocabHeaderFit, starts narrow until the first
+           count) and wires the popover (pbpLibWireFilterPopover). -->
       <div class="vocab-filter-row">
         <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="libraryFilterNarrow">Filter</span></button>
         <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">
@@ -173,7 +175,7 @@
            full on the right. Narrow mode is driven by its OWN body class
            (lib-narrow-notes), so the two views never fight over one flag. -->
       <div class="notes-workbench">
-        <div class="notes-list-pane">
+        <div class="notes-list-pane" data-header-fit="wide">
           <!-- List header (spec §3.1): filter / colour toggles / count row. The
                count row is replaced in place by the batch row while a
                selection exists (T4d). -->

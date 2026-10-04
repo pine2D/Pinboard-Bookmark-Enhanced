@@ -1818,7 +1818,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       <div class="vocab-context-bar lib-count-row"><span class="vocab-ctx-text"><span class="notes-count"><span class="lib-count-items" aria-hidden="true"><span class="lib-count-item" data-label="ci-0"></span><span class="lib-count-item" data-label="ci-1"></span><span class="lib-count-item" data-label="ci-2"></span><span class="lib-count-item" data-label="ci-3"></span></span></span></span><span class="save-status vocab-main-status">Saved just now</span><div class="lib-cluster"><button class="btn btn-sm ghost lib-hang-end" data-label="all"></button></div></div>
       <div class="vocab-batch-bar selecting"><span class="notes-count" id="vocab-selected-count" data-label="selected-count">5000</span><button class="btn btn-sm ghost" id="vocab-batch-select-all" data-label="batch-all"></button><span class="lib-cluster"><button class="btn btn-sm ghost" data-label="invert"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm danger ghost" data-label="batch-delete"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm ghost vocab-clear-selection"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><span class="vocab-group-unit"><input type="text"><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><button class="btn btn-sm" id="vocab-mark-known" data-label="known"></button><button class="btn btn-sm" id="vocab-mark-learning" data-label="learning"></button><span class="lib-batch-status"></span></div>
       <div class="vocab-list-region">
-      <article class="notes-card vocab-card"><div class="notes-card-top"><button class="notes-card-head"><span class="notes-card-main"><span class="vocab-row-headline"><span class="notes-row-title">Wortzusammensetzung mit außergewöhnlich langem ausgewähltem Begriff</span><span class="notes-row-meta"><span class="notes-meta-chip">Außergewöhnlich lange Gruppe</span></span></span><span class="vocab-row-gloss">Außergewöhnlich lange Definition, die auf einer Zeile bleiben muss</span></span></button><button class="btn btn-sm notes-row-del" data-label="remove"></button></div></article>
+      <article class="notes-card vocab-card"><div class="notes-card-top"><button class="notes-card-head"><span class="notes-card-main"><span class="vocab-row-headline"><span class="notes-row-title">Wortzusammensetzung mit außergewöhnlich langem ausgewähltem Begriff</span><span class="notes-row-meta"><span class="notes-meta-chip" data-label="row-lang"></span><span class="notes-meta-chip vocab-status-chip" data-label="row-known"></span></span></span><span class="vocab-row-gloss">Außergewöhnlich lange Definition, die auf einer Zeile bleiben muss</span><span class="vocab-row-groups" data-label="row-groups"><span>Außergewöhnlich lange Gruppe für Fachbegriffe</span><span>Wiederholung vor der Prüfung</span></span></span></button><button class="btn btn-sm notes-row-del" data-label="remove"></button></div></article>
       </div>
     </div>
     <aside class="vocab-detail-pane">
@@ -1833,7 +1833,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     </div></div></body></html>`;
   document.body.appendChild(frame);
   await new Promise((resolve) => frame.addEventListener("load", resolve, { once:true }));
-  const overflows = [], unreachable = [];
+  const overflows = [], unreachable = [], groupsBad = [];
   let germanCountWhole = false;
   for (const width of [320, 360, 1280]) {
     frame.style.width = width + "px";
@@ -1869,6 +1869,10 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         panel.querySelector('[data-label="ci-2"]').textContent = m.libraryStatsLanguages.message.replace("$COUNT$", "9");
         panel.querySelector('[data-label="ci-3"]').textContent = m.libraryStatsRecent7.message.replace("$D7$", "120");
         const bcp47 = { en: "en", de: "de", fr: "fr", pl: "pl", ru: "ru", zh_HK: "zh-Hant", zh_CN: "zh-Hans", zh_TW: "zh-Hant", ja: "ja" }[locale] || "en";
+        // The row's line one / line two as library-vocab.js builds them
+        // (T4d): language + "known" as plain text, groups at line two's end.
+        panel.querySelector('[data-label="row-lang"]').textContent = pbpDictLanguageLabel("de", bcp47) || "Deutsch";
+        panel.querySelector('[data-label="row-known"]').textContent = m.vocabStatusKnown.message;
         const langSelect = panel.querySelector('[data-label="lookup-lang"]');
         try {
           const names = new Intl.DisplayNames([bcp47], { type: "language" });
@@ -1887,6 +1891,16 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
               const r = it.getBoundingClientRect();
               return (r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5 && r.right <= box.right + 0.5) || r.top >= box.bottom - 0.5;
             });
+        }
+        {
+          // The long group names: capped at a third of the index (they
+          // really are cut there -- the fixture text is longer than any cap),
+          // and never past the row head that holds them.
+          const groups = panel.querySelector('[data-label="row-groups"]');
+          const gr = groups.getBoundingClientRect(), hr = groups.closest(".notes-card-head").getBoundingClientRect();
+          const cap = parseFloat(frame.contentWindow.getComputedStyle(groups).maxWidth);
+          if (!(gr.width > 0) || !Number.isFinite(cap) || gr.width > cap + 0.5 || gr.right > hr.right + 0.5 || !(groups.scrollWidth > groups.clientWidth))
+            groupsBad.push(`${width}/${theme}/${locale}:w${gr.width.toFixed(1)} cap${cap} right${gr.right.toFixed(1)}>${hr.right.toFixed(1)}? cut=${groups.scrollWidth > groups.clientWidth}`);
         }
         if (panel.scrollWidth > panel.clientWidth + 1) {
           const panelRect = panel.getBoundingClientRect();
@@ -1907,6 +1921,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     overflows.length === 0, overflows.slice(0, 8).join("; "));
   check("production CSS keeps delete and every other batch control reachable across the viewport matrix",
     unreachable.length === 0, unreachable.slice(0, 8).join("; "));
+  check("production CSS caps a row's long group names at a third of the index, inside the row, across the viewport matrix",
+    groupsBad.length === 0, groupsBad.slice(0, 8).join("; "));
   check("production CSS keeps the 320px German count row to whole items: each one fits or folds out of sight, none is cut",
     germanCountWhole, "a .lib-count-item crosses the count box's right or bottom edge");
   // The batch row replaces the count row in place (spec §3.9): next sibling
@@ -1947,6 +1963,79 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     `quote.left=${quoteRect.left.toFixed(1)} link.left=${linkRect.left.toFixed(1)} ` +
     `quote.top=${quoteRect.top.toFixed(1)} context.top=${contextRect.top.toFixed(1)}`);
   frame.remove();
+  // ---- Header fit (user ruling 10-04, library.js pbpLibWireVocabHeaderFit):
+  // the filter row is wide exactly when its wide form's own width fits the
+  // pane -- measured on the content, not on whichever form is showing, so it
+  // never flaps; re-decided on resize and on any change to the row's text.
+  {
+    const fitFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const host = document.createElement("div");
+    host.innerHTML = `
+      <div class="vocab-list-pane" data-header-fit="narrow" style="position:fixed;left:-9999px;top:0;width:520px">
+        <div class="vocab-filter-row">
+          <button type="button" class="btn ghost" popovertarget="fit-set" aria-expanded="false"><span>Filter</span></button>
+          <div class="vocab-filter-set" id="fit-set" popover="auto">
+            <select><option>All groups</option></select>
+            <span class="vocab-status-toggles"><button type="button" class="lib-toggle" aria-pressed="true">All</button><button type="button" class="lib-toggle" aria-pressed="false">Learning 12</button><button type="button" class="lib-toggle" aria-pressed="false">Known 3</button></span>
+          </div>
+          <span class="vocab-sort-seg"><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span>
+          <button type="button" class="btn btn-sm vocab-lookup-narrow"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
+        </div>
+      </div>`;
+    document.body.appendChild(host);
+    const pane = host.firstElementChild;
+    const row = pane.querySelector(".vocab-filter-row");
+    const set = pane.querySelector(".vocab-filter-set");
+    const known = set.querySelectorAll(".lib-toggle")[2];
+    try {
+      const update = pbpLibWireVocabHeaderFit(pane);
+      const need = pbpLibVocabFilterNeed(row);
+      check("header fit: the wide form's need is a real width, under 520 for short English labels",
+        typeof update === "function" && need > 200 && need < 520, String(need));
+      check("header fit: a pane wider than the need is wide", pane.dataset.headerFit === "wide", pane.dataset.headerFit);
+      pane.dataset.headerFit = "narrow";
+      const needNarrow = pbpLibVocabFilterNeed(row);
+      check("header fit: the need does not depend on the form showing (no flapping)",
+        Math.abs(needNarrow - need) < 0.5 && pane.querySelectorAll(".vocab-filter-row").length === 1 && pane.children.length === 1,
+        `${needNarrow} vs ${need}; ${pane.children.length} children (the measuring copy must be gone)`);
+      update();
+      pane.style.width = `${Math.floor(need) - 1}px`;
+      await fitFrames();
+      check("header fit: a pane 1px short of the need turns narrow on resize", pane.dataset.headerFit === "narrow", `${pane.style.width} ${pane.dataset.headerFit}`);
+      pane.style.width = `${Math.ceil(need)}px`;
+      await fitFrames();
+      check("header fit: widening back to the need returns to wide", pane.dataset.headerFit === "wide", `${pane.style.width} ${pane.dataset.headerFit}`);
+      known.textContent = "Bereits sicher gelernt: 5000";
+      await Promise.resolve();
+      check("header fit: longer labels (a language change) are re-measured at once and fold the row",
+        pane.dataset.headerFit === "narrow" && pbpLibVocabFilterNeed(row) > need, `${pane.dataset.headerFit} ${pbpLibVocabFilterNeed(row)}`);
+      known.textContent = "Known 3";
+      await Promise.resolve();
+      check("header fit: and the short labels coming back unfold it", pane.dataset.headerFit === "wide", pane.dataset.headerFit);
+      pane.style.width = "300px";
+      await fitFrames();
+      set.showPopover();
+      pane.style.width = "520px";
+      await fitFrames();
+      check("header fit: turning wide closes an open Filter popover", pane.dataset.headerFit === "wide" && !set.matches(":popover-open"),
+        `${pane.dataset.headerFit} open=${set.matches(":popover-open")}`);
+      for (const b of set.querySelectorAll(".lib-toggle")) b.hidden = true;
+      pane.style.width = "200px";
+      await fitFrames();
+      check("header fit: before the first count (toggles hidden) the form is left as it is",
+        Number.isNaN(pbpLibVocabFilterNeed(row)) && pane.dataset.headerFit === "wide", pane.dataset.headerFit);
+      const forcedPane = pane.cloneNode(true);
+      host.appendChild(forcedPane);
+      forcedPane.style.width = "900px";
+      pbpLibWireHeaderFit(forcedPane, forcedPane.querySelector(".vocab-filter-row"), () => 100, { narrowMedia: "(min-width: 1px)" });
+      check("header fit: under the single-pane media query the form is always narrow", forcedPane.dataset.headerFit === "narrow", forcedPane.dataset.headerFit);
+      check("header fit: the decision rule is need <= room (half-pixel slack)",
+        pbpLibHeaderFitForm(440, 440) === "wide" && pbpLibHeaderFitForm(440.4, 440) === "wide" && pbpLibHeaderFitForm(441, 440) === "narrow" &&
+        pbpLibHeaderFitForm(NaN, 440) === "narrow");
+    } finally {
+      host.remove();
+    }
+  }
   document.title = fail ? "FAIL library-vocab Tests" : "PASS library-vocab Tests";
 })();
 </script></body></html>

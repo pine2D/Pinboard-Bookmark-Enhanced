@@ -8721,14 +8721,32 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     /<div class="vocab-filter-set" id="vocab-filter-set" popover="auto">/.test(libraryHtml) &&
     (libraryHtml.match(/id="vocab-group-filter"/g) || []).length === 1,
     "library.html: the narrow-index Filter button / popover is missing, or the group filter was copied instead of moved (one DOM for both forms, spec §3.4)");
-  const wide = /@container lib-index \(min-width: (\d+)px\) \{[\s\S]*?\.vocab-filter-set\[popover\]:not\(:popover-open\) \{([^}]*)\}/.exec(hand);
-  const threshold = wide ? Number(wide[1]) : NaN;
-  check(!!wide && threshold >= 440 && threshold <= 520 &&
-    ["display: flex", "position: static", "inset: auto", "margin: 0", "padding: 0", "border: 0", "background: none",
-      "width: auto", "height: auto", "overflow: visible", "color: inherit", "flex: 1 1 auto", "min-width: 0"].every((d) => wide[2].includes(d)),
-    `library.css: the wide-index reset of .vocab-filter-set[popover] is missing a UA override (spec §3.4 lists all of them) or its threshold ${threshold} is outside 440-520`);
-  check(/@media \(max-width: 860px\) \{\s*#vocab-filter-narrow \{ display: inline-flex; \}\s*\.vocab-filter-set\[popover\]:not\(:popover-open\) \{ display: none; \}/.test(hand),
-    "library.css: below the 860px single-pane break the vocabulary filters must always fold into the Filter popover");
+  // The wide / narrow form follows the pane's data-header-fit (user ruling
+  // 10-04: fits on one line -> wide, otherwise the Filter popover), never a
+  // fixed @container width.
+  const wideSet = declarationValueMap(hand, '.vocab-list-pane[data-header-fit="wide"] .vocab-filter-set[popover]:not(:popover-open)');
+  const wideDecl = { display: "flex", position: "static", inset: "auto", margin: "0", padding: "0", border: "0", background: "none",
+    width: "auto", height: "auto", overflow: "visible", color: "inherit", flex: "1 1 auto", "min-width": "0" };
+  check(Object.entries(wideDecl).every(([k, v]) => wideSet.get(k) === v) &&
+    declarationValueMap(hand, '.vocab-list-pane[data-header-fit="wide"] #vocab-filter-narrow').get("display") === "none",
+    `library.css: the wide form (.vocab-list-pane[data-header-fit="wide"]) must hide the Filter button and reset every UA [popover] style on .vocab-filter-set (spec §3.4) -- got ${JSON.stringify(Object.fromEntries(wideSet))}`);
+  check(!/@container\s+lib-index\b/.test(hand) && !/container:\s*lib-index\b/.test(hand),
+    "library.css: the fixed @container lib-index threshold is back -- the filter row's form is decided by its content (data-header-fit, user ruling 10-04)");
+  const narrow860 = { context: ["@media (max-width: 860px)"] };
+  check(declarationValueMap(hand, ".vocab-list-pane[data-header-fit] #vocab-filter-narrow", narrow860).get("display") === "inline-flex" &&
+    declarationValueMap(hand, ".vocab-list-pane[data-header-fit] .vocab-filter-set[popover]:not(:popover-open)", narrow860).get("display") === "none",
+    "library.css: below the 860px single-pane break the vocabulary filters must always fold into the Filter popover, at the wide rule's specificity");
+  check(/<div class="vocab-list-pane" id="vocab-list-pane" data-header-fit="narrow">/.test(libraryHtml) &&
+    /<div class="notes-list-pane" data-header-fit="wide">/.test(libraryHtml),
+    "library.html: the list panes must start in a decided form (vocabulary narrow until the first count, notes with numbers)");
+  check(/function pbpLibWireHeaderFit\(pane, row, measureNeed, opts = \{\}\)/.test(libJs) &&
+    /pbpLibWireVocabHeaderFit\(\$id\("vocab-list-pane"\)\);/.test(libJs) &&
+    /pbpLibWireNotesHeaderFit\(document\.querySelector\("\.notes-list-pane"\)\);/.test(libJs) &&
+    /narrowMedia: "\(max-width: 860px\)"/.test(libJs) &&
+    /new ResizeObserver\(update\)\.observe\(pane\)/.test(libJs),
+    "library.js: both list panes must be wired to the one header-fit measurement (ResizeObserver on the pane, <=860px always narrow for the vocabulary row)");
+  check(declarationValueMap(hand, '.notes-list-pane[data-header-fit="narrow"] .notes-color-filters .lib-toggle-count').get("display") === "none",
+    "library.css: a notes colour row too narrow for its numbers must show dots only (user ruling 10-04)");
   const at = (src) => libraryHtml.indexOf(`<script defer src="${src}"></script>`);
   check(at("shared.js") > 0 && at("shared.js") < at("listbox.js") && at("listbox.js") < at("library-notes.js"),
     "library.html: listbox.js must load after shared.js and before library-notes.js (spec §8.1)");
@@ -8786,6 +8804,18 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const touchX = touchBlocks.map((b) => /\.row-del-x \{([^}]*)\}/.exec(b)).find(Boolean);
   check(!!touchX && /position:\s*relative/.test(touchX[1]) && !/position:\s*static/.test(touchX[1]),
     "library.css: under @media (hover: none) .row-del-x must stay positioned (relative, offsets cleared), never static -- a static X sits under the row head's full-card hit area");
+}
+
+// Library redesign T4e (spec §3.9): a keyboard row move scrolls the list
+// region only far enough to keep the focused row one sp-2 (8px) off its top
+// and bottom edges -- the region's scroll-padding, not each row's margin.
+{
+  const hand = stripGeneratedRegions(libraryCss);
+  for (const region of [".vocab-list-region", ".notes-list-region"]) {
+    const got = declarationValueMap(hand, region).get("scroll-padding-block");
+    check(got === "var(--lib-sp-2)",
+      `library.css: ${region} must carry scroll-padding-block: var(--lib-sp-2) (spec §3.9) -- a keyboard row move stops 8px short of the region's edge; got ${got ?? "nothing"}`);
+  }
 }
 
 if (fail.length) {

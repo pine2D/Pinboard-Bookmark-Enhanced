@@ -41,6 +41,19 @@
 //   libAxis           -- { sizes, tolerancePx, scrollbarPx }: P / L / G
 //                        geometry and the row fill against the index column,
 //                        at DPR 1 and 1.5 and after a re-measure (T3c).
+//   visibleRowCount   -- { width, height, comfortable, compact }: whole rows
+//                        the list region shows, and the row pitch, per
+//                        density tier (G3, T4e).
+//   focusRowVisible   -- { width, height, steps, passes }: ArrowDown never
+//                        leaves the focused row outside the list region (G2).
+//   listHeaderFit     -- { width, height, count, indexWidths }: nine locales
+//                        x index widths (+ each locale's need -1 / +1),
+//                        browse / select, both views: no header child past
+//                        the index or out of its group, no overlapping
+//                        siblings, and the form shown = the measured fit
+//                        (G7); `actual` reports the widest need.
+//   filterScrollResetToggles -- true: the status and colour toggles put
+//                        their list back at the top (G6, T4e).
 // paneFit's optional `bleed: [selector]` names a list region that hangs out
 // of its pane by design: its own box is exempt; what it contains is measured
 // against the region's content box. Its overhang is allowed in the pane's
@@ -1076,6 +1089,39 @@ export const CHECKS = [
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
   { surface: "library", page: "library.html", selector: ".notes-color-filters .lib-toggle", state: "default",
     expect: { heightPx: { comfortable: 28, compact: 24 }, textContrast: 4.5 } },
+  // ---- library T4e (spec §9.2). Each state runs on a scratch page in the
+  // same extension context (same theme in storage), so locale injection,
+  // synthetic rows and viewport sizes never leak into the shared page. Only
+  // density changes geometry, so they measure "" (comfortable) and terminal
+  // (compact) -- the top-level `themes` key, as for the T3 gates.
+  // G3: at 900px tall the list shows 12-13 rows at a 56px pitch, >=15 at 44.
+  { surface: "library", page: "library.html", selector: "#vocab-list", state: "visibleRowCount", themes: ["", "terminal"],
+    expect: { visibleRowCount: { width: 1280, height: 900, comfortable: { pitch: 56, min: 12, max: 13 }, compact: { pitch: 44, min: 15 } } } },
+  // G2: ArrowDown from the first row never leaves the focused row outside the
+  // list region -- browsing, with the batch row in the header, and on a 360px
+  // German index.
+  { surface: "library", page: "library.html", selector: "#vocab-list", state: "focusRowVisible", themes: ["", "terminal"],
+    expect: { focusRowVisible: { width: 1280, height: 900, steps: 20, passes: [
+      { name: "browse" }, { name: "multi-select", select: true }, { name: "index-360-de", locale: "de", indexW: 360 },
+    ] } } },
+  // G7: nine locales x index widths x 9999-sized counts, browse and select,
+  // vocabulary and notes (the notes colour row is nowrap: All + five
+  // toggles): no header child past the index's edge or out of its own group
+  // box, no two siblings overlapping (optical hangs excepted by category),
+  // count items whole, the vocabulary batch row 64 / 56 and the notes one
+  // one or two sm rows. The form each header shows -- filter row inline or
+  // folded into the Filter popover, colour toggles with or without their
+  // numbers -- must be the one the runner's own measurement of the wide
+  // form's need calls for (user ruling 10-04: no fixed threshold, it fits or
+  // it folds). indexWidths are the fixed probes across the index's range;
+  // the runner adds each locale's own need -1 / +1 so both sides of every
+  // switch point are walked.
+  { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "listHeaderFit", themes: ["", "terminal"],
+    expect: { listHeaderFit: { width: 1600, height: 900, count: 9999, indexWidths: [360, 440, 512, 520] } } },
+  // G6, the toggles T3's filterScrollReset does not drive: the status toggle
+  // and the notes colour toggle each return their list to the top.
+  { surface: "library", page: "library.html", selector: "#vocab-stat-all", state: "filterScrollResetToggles", themes: ["", "terminal"],
+    expect: { filterScrollResetToggles: true } },
 
   // ---- §1/§2 button + icon family: representative instances beyond the
   // defect-tagged selectors above, so the button-family assertions have
