@@ -3796,7 +3796,6 @@
   "libraryTitle": { "message": "メモと単語帳" },
   "libraryOpen": { "message": "メモと単語帳を開く" },
   "libraryDetailTitle": { "message": "単語の詳細" },
-  "libraryDetailEmpty": { "message": "一覧から単語を選ぶと、詳細が表示されます。" },
   "libraryNotesDetailEmpty": { "message": "一覧からハイライトを選ぶと、全文が表示されます。" },
   "libraryNotesScopeHint": { "message": "ハイライトとメモはこのデバイスにのみ保存され、同期されません。別のデバイスに移すには、設定ページでバックアップを書き出し、そのデバイスで読み込んでください。" },
   "libraryNotesScopeOpenBackup": { "message": "バックアップ設定を開く" },
@@ -3952,5 +3951,12 @@
   "librarySectionDict": { "message": "辞書" },
   "libraryLookupOther": { "message": "ほかの単語を調べる" },
   "libraryDictIdle": { "message": "この単語を辞書で調べる" },
-  "libraryDictIdleFree": { "message": "任意の単語を入力すると、辞書で意味を調べられます" }
+  "libraryDictIdleFree": { "message": "任意の単語を入力すると、辞書で意味を調べられます" },
+  "librarySectionContext": { "message": "文脈" },
+  "librarySectionMyNote": { "message": "自分のメモ" },
+  "libraryEditGroups": { "message": "グループを編集" },
+  "libraryNotePlaceholder": { "message": "連想、紛らわしい語、使い方のメモなどを書けます。入力欄から離れると自動で保存されます" },
+  "libraryVocabCoverTitle": { "message": "単語帳" },
+  "libraryVocabCoverLead": { "message": "$TOTAL$ 語（学習中 $LEARNING$ 語、習得済み $KNOWN$ 語）、$LANGS$ 言語。最後に追加したのは $DATE$ です。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverHint": { "message": "単語を選ぶと、文脈、自分のメモ、辞書の意味が表示されます。任意の単語を直接調べることもできます。" }
 }

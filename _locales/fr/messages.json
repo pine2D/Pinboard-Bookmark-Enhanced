@@ -3796,7 +3796,6 @@
   "libraryTitle": { "message": "Bloc-notes et vocabulaire" },
   "libraryOpen": { "message": "Ouvrir le bloc-notes et le vocabulaire" },
   "libraryDetailTitle": { "message": "Détails du mot" },
-  "libraryDetailEmpty": { "message": "Choisissez un mot dans la liste pour afficher ses détails." },
   "libraryNotesDetailEmpty": { "message": "Choisissez un surlignage dans la liste pour le lire en entier." },
   "libraryNotesScopeHint": { "message": "Les surlignages et les notes sont stockés uniquement sur cet appareil et ne sont pas synchronisés. Pour les transférer sur un autre appareil, exportez une sauvegarde depuis la page des paramètres, puis importez-la sur celui-ci." },
   "libraryNotesScopeOpenBackup": { "message": "Ouvrir les paramètres de sauvegarde" },
@@ -3952,5 +3951,12 @@
   "librarySectionDict": { "message": "Dictionnaire" },
   "libraryLookupOther": { "message": "Rechercher un autre mot" },
   "libraryDictIdle": { "message": "Chercher ce mot dans le dictionnaire" },
-  "libraryDictIdleFree": { "message": "Saisissez n’importe quel mot pour consulter sa définition" }
+  "libraryDictIdleFree": { "message": "Saisissez n’importe quel mot pour consulter sa définition" },
+  "librarySectionContext": { "message": "Contexte" },
+  "librarySectionMyNote": { "message": "Ma note" },
+  "libraryEditGroups": { "message": "Modifier les groupes" },
+  "libraryNotePlaceholder": { "message": "Notez ce qui vous aide : associations, mots à ne pas confondre, rappels d’usage. Enregistré quand vous quittez le champ" },
+  "libraryVocabCoverTitle": { "message": "Vocabulaire" },
+  "libraryVocabCoverLead": { "message": "$TOTAL$ mots, dont $LEARNING$ en cours d’apprentissage et $KNOWN$ acquis, dans $LANGS$ langues. Dernier ajout le $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverHint": { "message": "Choisissez un mot pour voir son contexte, votre note et sa définition, ou recherchez directement n’importe quel mot." }
 }

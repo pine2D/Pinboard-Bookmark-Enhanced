@@ -2939,7 +2939,7 @@
     "message": "存入生词本"
   },
   "vocabNoteSaved": {
-    "message": "备注已保存"
+    "message": "笔记已保存"
   },
   "vocabMarkKnown": {
     "message": "标记为已掌握"
@@ -3063,7 +3063,7 @@
     "message": "生词"
   },
     "vocabSearchPlaceholder": {
-      "message": "搜索单词、释义、上下文和分组"
+      "message": "搜索单词、释义、语境和分组"
     },
     "vocabGroupFilterAria": {
       "message": "按分组筛选"
@@ -3790,7 +3790,6 @@
   "libraryTitle": { "message": "笔记与生词本" },
   "libraryOpen": { "message": "打开笔记与生词本" },
   "libraryDetailTitle": { "message": "词条详情" },
-  "libraryDetailEmpty": { "message": "从列表里选一个词，就能看到它的详情。" },
   "libraryNotesDetailEmpty": { "message": "从列表里选一条高亮，就能读到全文。" },
   "libraryNotesScopeHint": { "message": "高亮和笔记只保存在本设备，不参与同步。要迁移到别的设备，请在设置页导出备份，再在那台设备导入。" },
   "libraryNotesScopeOpenBackup": { "message": "打开备份设置" },
@@ -3946,5 +3945,12 @@
   "librarySectionDict": { "message": "词典" },
   "libraryLookupOther": { "message": "查其他词" },
   "libraryDictIdle": { "message": "查询这个词的词典释义" },
-  "libraryDictIdleFree": { "message": "输入任意词，查询它的词典释义" }
+  "libraryDictIdleFree": { "message": "输入任意词，查询它的词典释义" },
+  "librarySectionContext": { "message": "语境" },
+  "librarySectionMyNote": { "message": "我的笔记" },
+  "libraryEditGroups": { "message": "编辑分组" },
+  "libraryNotePlaceholder": { "message": "写点什么：联想、易混词、用法提醒。离开输入框时自动保存" },
+  "libraryVocabCoverTitle": { "message": "生词本" },
+  "libraryVocabCoverLead": { "message": "$TOTAL$ 个词，学习中 $LEARNING$ 个、已掌握 $KNOWN$ 个，来自 $LANGS$ 种语言；最近一次收录在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverHint": { "message": "选一个词，查看它的语境、你的笔记和词典释义；也可以直接查任意词。" }
 }

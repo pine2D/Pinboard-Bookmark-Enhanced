@@ -372,8 +372,10 @@ function _pbpVocabBuildNoteEditor(w) {
   noteInput.className = "vocab-note-input";
   noteInput.rows = 2;
   noteInput.maxLength = 500;
-  noteInput.placeholder = t("hlNotePlaceholder");
-  noteInput.setAttribute("aria-label", t("hlNotePlaceholder"));
+  // The visible label is the section's "My note"; the placeholder says what
+  // goes in and that leaving the box saves it (spec §4.6).
+  noteInput.placeholder = t("libraryNotePlaceholder");
+  noteInput.setAttribute("aria-label", t("librarySectionMyNote"));
   noteInput.value = w.note || "";
   // Announced, not labelled: the chord has no visible affordance of its own,
   // and the page already declares its shortcuts this way (the row head's
@@ -410,6 +412,19 @@ function _pbpVocabBuildNoteEditor(w) {
     e.preventDefault();
     e.stopPropagation();
     noteSave.click();
+  });
+  // Leaving the box saves (spec §4.6; the placeholder promises it). The same
+  // gate as the chord: inert while nothing is dirty or a save is running. A
+  // blur caused by pressing Save starts the save here; the click that follows
+  // lands on a disabled button and does nothing. Read one microtask later:
+  // Chrome also fires blur while a rebuild removes the focused box (a sibling
+  // mutation, a soft reload), with isConnected still true at that moment --
+  // that is a refresh, not the user leaving, and the rebuild keeps the draft.
+  noteInput.addEventListener("blur", () => {
+    queueMicrotask(() => {
+      if (noteSave.hidden || noteSave.disabled || !noteInput.isConnected) return;
+      noteSave.click();
+    });
   });
   noteSave.addEventListener("click", async () => {
     if (noteSave.disabled) return;
@@ -493,6 +508,47 @@ function _pbpVocabMarkCurrentRow(id) {
   if (el) el.setAttribute("aria-current", "true");
 }
 
+// One hang section (spec §4.3): a real h3 that names the section, and the
+// section's body. On a wide detail the sheet's subgrid hangs the label in the
+// 112px column; narrower, the same label sits above its content.
+function _pbpVocabHangSection(cls, labelKey) {
+  const sec = document.createElement("section");
+  sec.className = "lib-hang-sec " + cls;
+  const label = document.createElement("h3");
+  label.className = "lib-hang-label";
+  label.id = cls + "-label";
+  label.textContent = t(labelKey);
+  sec.setAttribute("aria-labelledby", label.id);
+  const body = document.createElement("div");
+  body.className = "lib-hang-body";
+  sec.append(label, body);
+  return { sec, body };
+}
+
+// "Edit groups" (spec §4.5, V5): a disclosure. Open: the group box and the
+// removable chips appear under the manage row, the plain group text hides (a
+// name never shows twice), the button takes the pressed fill, the caret goes
+// to the box. Closed again by the button or by Esc in the box, focus back on
+// the button. `moveFocus` false is the rebuild path (_pbpVocabReconcileDetail),
+// which hands the editor back open without taking focus. Queried inside
+// #vocab-detail, never through $id: every render replaces these nodes.
+function _pbpVocabToggleGroupEditor(open, moveFocus = true) {
+  const detail = $id("vocab-detail");
+  if (!detail) return;
+  const editor = detail.querySelector("#vocab-group-editor");
+  const btn = detail.querySelector(".vocab-edit-groups");
+  if (!editor || !btn) return;
+  editor.hidden = !open;
+  btn.setAttribute("aria-expanded", String(open));
+  const groupsText = detail.querySelector(".vocab-manage-groups");
+  if (groupsText) groupsText.hidden = open;
+  if (!moveFocus) return;
+  const target = open ? editor.querySelector('.vocab-group-unit > input[type="text"]') : btn;
+  if (target) {
+    try { target.focus({ preventScroll: true }); } catch (_) { target.focus(); }
+  }
+}
+
 // Renders the master-detail right pane for the activated word (or clears it
 // back to the empty state for null, e.g. after a delete). Reassigned onto
 // _pbpVocabOnRowActivate above; also called directly by the reload-after-
@@ -532,54 +588,95 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
     detail.replaceChildren();
     $id("vocab-detail-tail").replaceChildren();
     // Without this the list keeps a "you are here" row pointing at a pane
-    // that now says nothing -- painted as the selected fill plus an accent
-    // edge, and still announced as `current`.
+    // that now says nothing.
     _pbpVocabMarkCurrentRow(null);
     return;
   }
 
   const frag = document.createDocumentFragment();
+  const langCode = w.language && w.language !== "und" ? w.language : "";
 
-  // (The narrow-mode back button is static markup at the top of the PANE now,
-  // so it survives every state this host can be in -- including empty.)
-
-  // 1. Word head: term + language chip + speak
-  const head = document.createElement("div");
+  // 1. Head (spec §4.4-§4.5): the word, its pronunciation line, the stored
+  // gloss, the manage row and the (collapsed) group editor.
+  const head = document.createElement("header");
   head.className = "vocab-detail-head";
   const term = document.createElement("h2");
-  term.className = "vocab-detail-term";
+  term.className = "vocab-detail-term lib-first-line";
+  if (langCode) term.lang = langCode;
   term.textContent = w.term;
   head.appendChild(term);
+
+  const pron = document.createElement("div");
+  pron.className = "vocab-pron-row";
+  if (w.ipa) {
+    const ipa = document.createElement("span");
+    ipa.className = "vocab-pron-ipa";
+    ipa.textContent = w.ipa;
+    pron.appendChild(ipa);
+  }
   const langLabel = pbpDictLanguageLabel(w.language, document.documentElement.lang);
   if (langLabel) {
-    const chip = document.createElement("span");
-    chip.className = "notes-meta-chip";
-    chip.textContent = langLabel;
-    head.appendChild(chip);
+    const lang = document.createElement("span");
+    lang.className = "vocab-pron-lang";
+    lang.textContent = langLabel;
+    pron.appendChild(lang);
   }
   const speak = document.createElement("button");
   speak.type = "button";
-  speak.className = "btn btn-sm vocab-detail-speak";
+  speak.className = "btn btn-sm ghost vocab-detail-speak";
   setBtnIcon(speak, "speaker", "");
   speak.title = t("dictSpeak");
   speak.setAttribute("aria-label", t("dictSpeak"));
-  speak.addEventListener("click", () => pbpDictSpeak(w.term, w.language === "und" ? "" : w.language));
-  head.appendChild(speak);
-  frag.appendChild(head);
+  speak.addEventListener("click", () => pbpDictSpeak(w.term, langCode));
+  pron.appendChild(speak);
+  head.appendChild(pron);
 
-  // 2. Status toggle + group management
-  const actions = document.createElement("div");
-  actions.className = "vocab-detail-actions";
+  if (w.gloss) {
+    const gloss = document.createElement("p");
+    gloss.className = "vocab-detail-gloss";
+    gloss.textContent = w.gloss;
+    head.appendChild(gloss);
+  }
+
+  const manage = document.createElement("div");
+  manage.className = "vocab-manage-row";
   const known = String(w.status || "new") === "known";
   const statusBtn = document.createElement("button");
   statusBtn.type = "button";
-  statusBtn.className = "btn btn-sm";
-  setBtnIcon(statusBtn, known ? "rotateCcw" : "checkCircle",
-    t(known ? "vocabMarkLearning" : "vocabMarkKnown"));
+  statusBtn.className = "btn btn-sm vocab-detail-status";
+  setBtnIcon(statusBtn, "checkCircle", t(known ? "vocabMarkLearning" : "vocabMarkKnown"));
   statusBtn.addEventListener("click", () => _pbpVocabDetailMutate(w, (owner) =>
     pbpVocabBatchSetStatus([w.id], owner, known ? "new" : "known")));
-  actions.appendChild(statusBtn);
-  // Group unit: same input+stepper family as the batch bar, scoped to [w.id].
+  manage.appendChild(statusBtn);
+  const currentGroups = pbpVocabGroups(w);
+  if (currentGroups.length) {
+    // Plain text, one span per name; the " · " between them is CSS.
+    const groupsText = document.createElement("span");
+    groupsText.className = "vocab-manage-groups";
+    for (const group of currentGroups) {
+      const name = document.createElement("span");
+      name.textContent = group;
+      groupsText.appendChild(name);
+    }
+    manage.appendChild(groupsText);
+  }
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "btn btn-sm ghost vocab-edit-groups lib-hang-start";
+  editBtn.setAttribute("aria-expanded", "false");
+  editBtn.setAttribute("aria-controls", "vocab-group-editor");
+  setBtnIcon(editBtn, "pencil", t("libraryEditGroups"));
+  editBtn.addEventListener("click", () => _pbpVocabToggleGroupEditor(editBtn.getAttribute("aria-expanded") !== "true"));
+  manage.appendChild(editBtn);
+  head.appendChild(manage);
+
+  // The group editor: same input + stepper unit as the batch row, scoped to
+  // [w.id], plus a removable chip per current group (Finding 5) whose x is
+  // always shown here (V5) -- a hover-only x is not findable while editing.
+  const editor = document.createElement("div");
+  editor.id = "vocab-group-editor";
+  editor.className = "vocab-group-editor";
+  editor.hidden = true;
   const groupUnit = document.createElement("span");
   groupUnit.className = "vocab-group-unit";
   const groupInput = document.createElement("input");
@@ -589,6 +686,11 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   groupInput.setAttribute("aria-label", t("vocabGroupNamePlaceholder"));
   groupInput.autocomplete = "off";
   groupUnit.appendChild(groupInput);
+  groupInput.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.isComposing) return;
+    e.preventDefault();
+    _pbpVocabToggleGroupEditor(false);
+  });
   const addGroup = document.createElement("button");
   addGroup.type = "button";
   addGroup.className = "btn btn-sm vocab-group-step";
@@ -611,15 +713,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
     if (name) _pbpVocabDetailMutate(w, (owner) => pbpVocabBatchRemoveGroup([w.id], owner, name));
   });
   groupUnit.appendChild(removeGroup);
-  actions.appendChild(groupUnit);
-  // Current group chips get their own row (vocab-group-inspect-report.md
-  // 2026-08-05 Finding 6/vocab-detail-group-chips CSS) and, unlike the
-  // read-only list-row instance, a per-chip "x" (Finding 5): the group name
-  // is already known here, so removing one is a single click on the chip
-  // itself instead of retyping it into the input above and hitting the "-"
-  // stepper. Reuses the exact same mutation primitive that stepper already
-  // calls -- same owner/gen discipline, no new code path.
-  const currentGroups = pbpVocabGroups(w);
+  editor.appendChild(groupUnit);
   if (currentGroups.length) {
     const chipList = document.createElement("span");
     chipList.className = "vocab-detail-group-chips";
@@ -631,9 +725,8 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
       removeChip.type = "button";
       removeChip.className = "chip-remove";
       setBtnIcon(removeChip, "cross", "");
-      // Reuses the existing localized "Remove from group" label rather than
-      // adding a new per-group-name locale key across all 9 locales -- the
-      // group name itself is user data, not translatable UI text.
+      // The group name is user data, not translatable UI text: the existing
+      // "Remove from group" label plus the name, no new locale key.
       removeChip.title = t("vocabRemoveFromGroup") + ": " + group;
       removeChip.setAttribute("aria-label", t("vocabRemoveFromGroup") + ": " + group);
       removeChip.addEventListener("click", (e) => {
@@ -643,73 +736,73 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
       chip.appendChild(removeChip);
       chipList.appendChild(chip);
     }
-    actions.appendChild(chipList);
+    editor.appendChild(chipList);
   }
-  frag.appendChild(actions);
+  head.appendChild(editor);
+  frag.appendChild(head);
 
-  // 3. Stored gloss + IPA
-  if (w.ipa || w.gloss) {
-    const glossBox = document.createElement("div");
-    glossBox.className = "lib-block vocab-detail-gloss";
-    if (w.ipa) {
-      const ipa = document.createElement("div");
-      ipa.className = "vocab-gloss-ipa";
-      ipa.textContent = w.ipa;
-      glossBox.appendChild(ipa);
+  // 2. Context (spec §4.6): each saved sentence with the word in bold, then
+  // its source link and "site · date". No section at all without one.
+  const contexts = (Array.isArray(w.contexts) ? w.contexts : []).filter(Boolean);
+  if (contexts.length) {
+    const { sec, body } = _pbpVocabHangSection("vocab-sec-context", "librarySectionContext");
+    for (const c of contexts) {
+      const fig = document.createElement("figure");
+      fig.className = "vocab-detail-context";
+      const quote = document.createElement("blockquote");
+      quote.className = "vocab-context-quote";
+      _pbpVocabHighlightTerm(quote, c.quote || "", w.term);
+      fig.appendChild(quote);
+      const source = document.createElement("figcaption");
+      source.className = "vocab-context-source";
+      const safeHref = pbpDictSafeUrl(c.articleUrl);
+      if (safeHref) {
+        const link = document.createElement("a");
+        link.className = "notes-row-open";
+        link.href = safeHref;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        // Title text in its own span so the ellipsis has a box it owns and
+        // the icon stays a flex sibling (2026-09-22 T2 fix round).
+        const linkText = document.createElement("span");
+        linkText.className = "notes-row-open-text";
+        linkText.textContent = c.articleTitle || safeHref;
+        link.appendChild(linkText);
+        // Static PBP_ICONS constant (already aria-hidden), never page content.
+        link.insertAdjacentHTML("beforeend", PBP_ICONS.extOpen.replace('<svg ', '<svg class="ext-icon" '));
+        source.appendChild(link);
+      }
+      const meta = document.createElement("span");
+      meta.className = "vocab-context-meta";
+      let site = "";
+      if (safeHref) {
+        try { site = new URL(safeHref).hostname.replace(/^www\./, ""); } catch (_) {}
+      }
+      const day = typeof pbpLibFormatDay === "function" ? pbpLibFormatDay(c.createdAt) : "";
+      for (const part of [site, day]) {
+        if (!part) continue;
+        const item = document.createElement("span");
+        item.textContent = part;
+        meta.appendChild(item);
+      }
+      if (meta.childElementCount) source.appendChild(meta);
+      if (source.childElementCount) fig.appendChild(source);
+      body.appendChild(fig);
     }
-    if (w.gloss) {
-      const def = document.createElement("div");
-      def.className = "vocab-gloss-text";
-      def.textContent = w.gloss;
-      glossBox.appendChild(def);
-    }
-    frag.appendChild(glossBox);
+    frag.appendChild(sec);
   }
 
-  // 4. Contexts: quote with the term highlighted + source link
-  for (const c of (Array.isArray(w.contexts) ? w.contexts : [])) {
-    if (!c) continue;
-    const item = document.createElement("div");
-    item.className = "lib-block vocab-detail-context";
-    const quote = document.createElement("blockquote");
-    quote.className = "notes-item-quote";
-    _pbpVocabHighlightTerm(quote, c.quote || "", w.term);
-    item.appendChild(quote);
-    const safeHref = pbpDictSafeUrl(c.articleUrl);
-    if (safeHref) {
-      const link = document.createElement("a");
-      link.className = "notes-row-open";
-      link.href = safeHref;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      // Title text lives in its own span (library.css's .notes-row-open-text)
-      // so the ellipsis has a box it actually owns and the icon below stays
-      // a flex sibling that can never be laid out past the link's own width
-      // (2026-09-22 T2 fix round: an unbreakable long title used to carry
-      // the appended icon's real layout position ~500px past the pane).
-      const linkText = document.createElement("span");
-      linkText.className = "notes-row-open-text";
-      linkText.textContent = c.articleTitle || safeHref;
-      link.appendChild(linkText);
-      // External-link mark, same idiom as options.js's .wayback-log-url:
-      // static PBP_ICONS constant (already aria-hidden), never page content.
-      link.insertAdjacentHTML("beforeend", PBP_ICONS.extOpen.replace('<svg ', '<svg class="ext-icon" '));
-      item.appendChild(link);
-    }
-    frag.appendChild(item);
-  }
-
-  // 5. Note editor. The field goes here, in the reading flow; its Save lands
-  // in the closing row below (v2b) so a commit control sits with the other
-  // commit controls instead of hanging off the textarea's edge.
+  // 3. My note (spec §4.6). Save lives in the tail (v2b); the field stays here.
   const noteEditor = _pbpVocabBuildNoteEditor(w);
-  frag.appendChild(noteEditor.wrap);
+  const { sec: noteSec, body: noteBody } = _pbpVocabHangSection("vocab-sec-note", "librarySectionMyNote");
+  noteBody.appendChild(noteEditor.wrap);
+  frag.appendChild(noteSec);
 
-  // 6. The tail (spec §4.7): remove on the left, hung on the column's left
+  // 4. The tail (spec §4.7): remove on the left, hung on the column's left
   // edge, then the status sentence (_pbpVocabStatusHost puts it before Save),
   // then Save at the right end. It renders into #vocab-detail-tail, after the
   // dictionary column, so the destructive action is the last stop of a Tab
-  // walk. "Look up again" moved under the dictionary result.
+  // walk. "Look up again" lives under the dictionary result.
   const footer = document.createElement("footer");
   footer.className = "vocab-detail-footer";
   const del = document.createElement("button");
@@ -724,29 +817,17 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
 
   detail.replaceChildren(frag);
   $id("vocab-detail-tail").replaceChildren(footer);
-  // Focus handoff at the root every activation passes through: a row click is the primary way into narrow
-  // mode, and the head button it started from has just been hidden with the
-  // rest of the list.
+  // Same focus handoff the lookup door does, at the root every activation
+  // passes through: a row click hides the list the head button lives in.
   if (enterNarrow) _pbpVocabFocusNarrowBack();
-  // The scroll container is the PANE, not the #vocab-detail div this render
-  // replaces: library.css caps .vocab-detail-pane and gives it overflow-y,
-  // and replaceChildren is one atomic mutation, so the pane keeps the
-  // previous word's scrollTop and the next one would open wherever the last
-  // was left scrolled to. After the handoff above, not before: that is the
-  // one thing here that can move focus, and a reset it could undo would be
-  // no reset at all.
-  // Only when the ENTRY CHANGED, though: this function is also the refresh
-  // path (_pbpVocabSoftReload on tab re-entry, _pbpVocabReconcileDetail after
-  // a mutation), and those exist precisely to keep the user where they were.
-  // Resetting there undoes the same render's other state-preserving work --
-  // the focus({preventScroll}) handoff assumes the viewport does not move.
+  // The scroll container is the PANE: replaceChildren keeps its scrollTop, so
+  // a new entry would open where the last one was left. Only when the entry
+  // CHANGED -- the refresh paths exist to keep the reader where they were,
+  // and the focus({ preventScroll }) handoff assumes the viewport stays put.
   const pane = $id("vocab-detail-pane");
   if (pane && changed) pane.scrollTop = 0;
-  // The closing row exists now, so the status region can take its narrow-mode
-  // home -- this render's callers all write into it AFTER returning from here,
-  // so the region is settled in the accessibility tree before any sentence
-  // lands in it (moving a live region in the same breath as its text is what
-  // library-notes.js's twin avoids by repositioning while clearing).
+  // The closing row exists now; the status region takes its home before any
+  // caller writes a sentence into it.
   _pbpVocabStatusHost(true);
 }
 
@@ -1567,6 +1648,42 @@ function _pbpVocabApplyView(resetLimit) {
     ($id("vocab-sort") || {}).value || "latest",
     ($id("vocab-status-filter") || {}).value || "");
   _pbpVocabRenderList();
+  _pbpVocabRenderCover();
+}
+
+// The cover (spec §4.11): a display title, one stats sentence, one hint. The
+// sentence waits for the first count (no flash of zeroes), says so when the
+// read failed, names the account when there are no words, and points at the
+// Dictionary column when signed out. Numbers are bolded by the sentinel split
+// (library.js), never by building markup.
+function _pbpVocabRenderCover() {
+  const cover = $id("vocab-detail-empty");
+  if (!cover) return;
+  const title = cover.querySelector(".lib-cover-title");
+  const lead = cover.querySelector(".lib-cover-lead");
+  const hint = cover.querySelector(".lib-cover-hint");
+  if (title) title.textContent = t("libraryVocabCoverTitle");
+  if (!lead || !hint) return;
+  lead.replaceChildren();
+  hint.hidden = true;
+  const pane = $id("vocab-list-pane");
+  if (pane && pane.classList.contains("vocab-signed-out")) { lead.textContent = t("libraryLookupSignedOutHint"); return; }
+  if (cover.dataset.loadFailed === "true") { lead.textContent = t("vocabLoadFailed"); return; }
+  if (!String(_vocabCurrentOwner || "").startsWith("acct_")) return;
+  if (!_vocabRows.length) { lead.textContent = t("dictVocabEmpty", _vocabOwnerLabel); return; }
+  hint.hidden = false;
+  if (typeof pbpLibSplitCount !== "function" || typeof pbpLibFillCount !== "function") return;
+  const s = pbpVocabStats(_vocabRows, Date.now());
+  const day = typeof pbpLibFormatDay === "function" ? pbpLibFormatDay(s.latestCreatedAt) : "";
+  const parts = pbpLibSplitCount((...a) => t("libraryVocabCoverLead", ...a),
+    [String(s.total), String(s.learning), String(s.known), String(s.languages), day]);
+  pbpLibFillCount(lead, parts, (index) => (index >= 0 && index < 4 ? "b" : null));
+}
+
+function _pbpVocabCoverLoadFailed() {
+  const cover = $id("vocab-detail-empty");
+  if (cover) cover.dataset.loadFailed = "true";
+  _pbpVocabRenderCover();
 }
 
 function _pbpVocabSetAccountState(owner) {
@@ -1588,9 +1705,7 @@ function _pbpVocabSetAccountState(owner) {
     if (group) { group.value = ""; window.pbpListboxSync?.(group); }
     _pbpVocabResetListScroll();
   }
-  const detailEmpty = $id("vocab-detail-empty");
-  if (detailEmpty && signedOut) detailEmpty.textContent = t("libraryLookupSignedOutHint");
-  else if (detailEmpty && !_pbpVocabDetailWordId) detailEmpty.textContent = t("libraryDetailEmpty");
+  _pbpVocabRenderCover();
 }
 
 function _pbpVocabClearVisibleState() {
@@ -1614,12 +1729,15 @@ function _pbpVocabClearVisibleState() {
   _pbpVocabRefreshGroupOptions(false);
   _pbpVocabRenderStats();
   _pbpVocabSyncSelectionUi();
+  const cover = $id("vocab-detail-empty");
+  if (cover) delete cover.dataset.loadFailed;
+  _pbpVocabRenderCover();
 }
 
 // Which control in the REBUILT pane inherits the focus the rebuild is about
 // to destroy, in preference order. Class-based, because every node in the pane
-// is replaced: the status toggle keeps its slot in .vocab-detail-actions while
-// its icon and label flip, the group stepper's input is rebuilt with the draft
+// is replaced: the status toggle keeps its slot in the manage row while its
+// label flips, the group stepper's input is rebuilt with the draft
 // name already carried into it, and Save is hidden again the moment the note
 // it committed matches the store -- so the field it belongs to is the honest
 // landing spot. A removed group chip has no counterpart at all; the input on
@@ -1628,9 +1746,10 @@ function _pbpVocabDetailFocusTargets(el) {
   if (!el) return [];
   if (el.classList.contains("vocab-note-save")) return [".vocab-note-save", ".vocab-note-input"];
   if (el.closest(".vocab-note-edit")) return [".vocab-note-input"];
-  if (el.closest(".vocab-group-unit") || el.classList.contains("chip-remove")) return [".vocab-group-unit input"];
+  if (el.closest(".vocab-group-unit") || el.classList.contains("chip-remove")) return [".vocab-group-unit input", ".vocab-edit-groups"];
+  if (el.classList.contains("vocab-edit-groups")) return [".vocab-edit-groups"];
   if (el.classList.contains("vocab-detail-delete")) return [".vocab-detail-delete"];
-  if (el.closest(".vocab-detail-actions")) return [".vocab-detail-actions .btn"];
+  if (el.classList.contains("vocab-detail-status")) return [".vocab-detail-status"];
   return [];
 }
 
@@ -1667,6 +1786,9 @@ function _pbpVocabReconcileDetail() {
   const liveGroup = detail.querySelector(".vocab-group-unit input");
   const draftNote = liveNote ? liveNote.value : null;
   const draftGroup = liveGroup ? liveGroup.value : "";
+  // The group editor is the user's open tool, not store state: a mutation
+  // fired from inside it (a chip's x, + / -) hands it back open.
+  const editorOpen = !!detail.querySelector("#vocab-group-editor:not([hidden])");
   // The owner's FULL row set, not the filtered view: the detail pane is not
   // inside the filter's scope. With the list filtered to "learning", marking
   // the open word as known drops it out of _vocabViewRows, and reading the
@@ -1678,6 +1800,7 @@ function _pbpVocabReconcileDetail() {
   // past the load-more depth) -- the pane still reads it, the list just has
   // no row to mark.
   _pbpVocabMarkCurrentRow(fresh.id);
+  if (editorOpen) _pbpVocabToggleGroupEditor(true, false);
   const note = detail.querySelector(".vocab-note-input");
   if (note && draftNote !== null && draftNote !== note.value) {
     note.value = draftNote;
@@ -1739,6 +1862,10 @@ async function _pbpVocabReloadAfterMutation(expectedOwner, requestedGen, broadca
       return false;
     }
     _vocabRows = rows;
+    // A read that lands clears an earlier failure's cover sentence (the
+    // soft-reload failure path marks it; this path never runs the full clear).
+    const cover = $id("vocab-detail-empty");
+    if (cover) delete cover.dataset.loadFailed;
     _vocabOwnerLabel = pbpVocabOwnerLabel(expectedOwner);
     _vocabCurrentOwner = expectedOwner;
     _pbpVocabClearSelection();
@@ -1817,6 +1944,7 @@ async function renderVocabPanel() {
       _pbpVocabRenderDetail(null); // I1: the clear never touched the detail pane
       _pbpVocabSetLoading(false);
       _pbpVocabFlashStatus(false, t("vocabLoadFailed"));
+      _pbpVocabCoverLoadFailed();
     }
     return;
   }
@@ -1856,6 +1984,7 @@ async function _pbpVocabSoftReload() {
       _pbpVocabRenderDetail(null);
       _pbpVocabSetLoading(false);
       _pbpVocabFlashStatus(false, t("vocabLoadFailed"));
+      _pbpVocabCoverLoadFailed();
     }
     return;
   }
@@ -1893,6 +2022,7 @@ async function _pbpVocabSoftReload() {
     // failure -- indistinguishable from actually losing every word. Say the
     // read failed instead and leave #vocab-empty hidden.
     _pbpVocabFlashStatus(false, t("vocabLoadFailed"));
+    _pbpVocabCoverLoadFailed();
     return;
   }
   _vocabSelected = savedSelection;
@@ -2116,6 +2246,7 @@ document.addEventListener("pbp:i18n-applied", () => {
   if (host && host.dataset.refState === "free") _pbpVocabRenderRefIdle("free");
   else if (host && host.dataset.refState === "idle") _pbpVocabRenderRefIdle("word");
   _pbpVocabSyncLookupPlaceholder();
+  _pbpVocabRenderCover();
 });
 // Narrow-screen door to the lookup row. Below 860px the detail pane is
 // display:none until `lib-narrow-detail` is on the body, so the list needs

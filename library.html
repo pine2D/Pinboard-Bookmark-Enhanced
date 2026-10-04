@@ -162,7 +162,15 @@
                the destructive action. library.css puts the reference column on
                the right only when the pane is wide enough; nothing here moves. -->
           <div class="vocab-sheet">
-            <div class="vocab-detail-empty" id="vocab-detail-empty" data-i18n="libraryDetailEmpty">Pick a word from the list to see its details.</div>
+            <!-- The cover (spec §4.11): a display title, one stats sentence, one
+                 hint. data-i18n sits on the hint alone -- on the container,
+                 applyI18n would overwrite all three with one string. The title
+                 and the stats are written by _pbpVocabRenderCover. -->
+            <div id="vocab-detail-empty" class="lib-cover">
+              <h2 class="lib-cover-title lib-first-line"></h2>
+              <p class="lib-cover-lead"></p>
+              <p class="lib-cover-hint" data-i18n="libraryVocabCoverHint">Pick a word to see its context, your note and its dictionary entry, or look up any word directly.</p>
+            </div>
             <div class="vocab-detail" id="vocab-detail" hidden></div>
             <!-- Dictionary reference column (spec §4.8). Static on purpose: a
                  word switch clears #vocab-ref-result explicitly, so a refresh of

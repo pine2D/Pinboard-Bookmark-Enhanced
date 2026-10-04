@@ -2939,7 +2939,7 @@
     "message": "存入生詞本"
   },
   "vocabNoteSaved": {
-    "message": "備註已儲存"
+    "message": "筆記已儲存"
   },
   "vocabMarkKnown": {
     "message": "標記為已掌握"
@@ -3063,7 +3063,7 @@
     "message": "生詞"
   },
     "vocabSearchPlaceholder": {
-      "message": "搜尋單字、釋義、文章內容與群組"
+      "message": "搜尋單字、釋義、語境與群組"
     },
     "vocabGroupFilterAria": {
       "message": "依群組篩選"
@@ -3796,7 +3796,6 @@
   "libraryTitle": { "message": "筆記與生詞本" },
   "libraryOpen": { "message": "開啟筆記與生詞本" },
   "libraryDetailTitle": { "message": "詞條詳情" },
-  "libraryDetailEmpty": { "message": "從清單中選一個詞，就能看到它的詳細內容。" },
   "libraryNotesDetailEmpty": { "message": "從清單中選一則標記，就能讀到全文。" },
   "libraryNotesScopeHint": { "message": "標記與筆記只儲存在本裝置，不會同步。要移到其他裝置，請在設定頁匯出備份，再到那台裝置匯入。" },
   "libraryNotesScopeOpenBackup": { "message": "開啟備份設定" },
@@ -3952,5 +3951,12 @@
   "librarySectionDict": { "message": "詞典" },
   "libraryLookupOther": { "message": "查其他詞語" },
   "libraryDictIdle": { "message": "查詢這個詞的詞典釋義" },
-  "libraryDictIdleFree": { "message": "輸入任何詞語，查詢它的詞典釋義" }
+  "libraryDictIdleFree": { "message": "輸入任何詞語，查詢它的詞典釋義" },
+  "librarySectionContext": { "message": "語境" },
+  "librarySectionMyNote": { "message": "我的筆記" },
+  "libraryEditGroups": { "message": "編輯群組" },
+  "libraryNotePlaceholder": { "message": "寫點什麼：聯想、易混淆的詞、用法提醒。離開輸入框時會自動儲存" },
+  "libraryVocabCoverTitle": { "message": "生詞本" },
+  "libraryVocabCoverLead": { "message": "$TOTAL$ 個詞，學習中 $LEARNING$ 個、已掌握 $KNOWN$ 個，來自 $LANGS$ 種語言；最近一次收錄在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverHint": { "message": "選一個詞，查看它的語境、你的筆記和詞典釋義；也可以直接查任何詞語。" }
 }

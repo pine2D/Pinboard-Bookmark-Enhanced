@@ -3796,7 +3796,6 @@
   "libraryTitle": { "message": "Notizen & Vokabeln" },
   "libraryOpen": { "message": "Notizen & Vokabeln öffnen" },
   "libraryDetailTitle": { "message": "Wortdetails" },
-  "libraryDetailEmpty": { "message": "Wähle ein Wort aus der Liste, um Details zu sehen." },
   "libraryNotesDetailEmpty": { "message": "Wähle eine Markierung aus der Liste, um sie ganz zu lesen." },
   "libraryNotesScopeHint": { "message": "Markierungen und Notizen liegen nur auf diesem Gerät und werden nicht synchronisiert. Um sie auf ein anderes Gerät zu übertragen, exportiere auf der Einstellungsseite eine Sicherung und importiere sie dort." },
   "libraryNotesScopeOpenBackup": { "message": "Sicherungseinstellungen öffnen" },
@@ -3952,5 +3951,12 @@
   "librarySectionDict": { "message": "Wörterbuch" },
   "libraryLookupOther": { "message": "Anderes Wort nachschlagen" },
   "libraryDictIdle": { "message": "Dieses Wort im Wörterbuch nachschlagen" },
-  "libraryDictIdleFree": { "message": "Gib ein beliebiges Wort ein, um es im Wörterbuch nachzuschlagen" }
+  "libraryDictIdleFree": { "message": "Gib ein beliebiges Wort ein, um es im Wörterbuch nachzuschlagen" },
+  "librarySectionContext": { "message": "Kontext" },
+  "librarySectionMyNote": { "message": "Meine Notiz" },
+  "libraryEditGroups": { "message": "Gruppen bearbeiten" },
+  "libraryNotePlaceholder": { "message": "Schreib etwas dazu: Assoziationen, Verwechslungsgefahr, Hinweise zur Verwendung. Wird beim Verlassen des Felds gespeichert" },
+  "libraryVocabCoverTitle": { "message": "Vokabeln" },
+  "libraryVocabCoverLead": { "message": "$TOTAL$ Wörter, davon $LEARNING$ im Lernen und $KNOWN$ gelernt, in $LANGS$ Sprachen. Zuletzt hinzugefügt am $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverHint": { "message": "Wähle ein Wort, um Kontext, deine Notiz und den Wörterbucheintrag zu sehen, oder schlag direkt ein beliebiges Wort nach." }
 }

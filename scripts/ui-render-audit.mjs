@@ -195,6 +195,7 @@ const SEED_OWNER = "acct_" + encodeURIComponent(SEED_TOKEN_ACCOUNT);
 const LIB_SEED = Object.freeze({
   richTerm: "constraint",            // two contexts + a note, language "en", ipa "/kənˈstreɪnt/"
   cjkTerms: ["曖昧", "呼吸"],          // language "ja" / "zh"
+  cjkLangs: ["ja", "zh"],            // cjkTerms' languages, pinned by the seed-shape check (G4 reads :lang)
   latinTerm: "constraint",           // G4 Latin head
   wordCount: 30,                     // >= 30 saved words, >= 10 without any group
   multiUrl: "https://example.com/reading/attention",   // >= 3 highlights, one carries a note
@@ -1874,6 +1875,334 @@ async function drivePaneFit(page, check) {
   return found;
 }
 
+// ---- states "displayInkTop" / "detailNegMargin" / "libGeometry" (library
+// redesign T7, spec §9.2 G4 / G4b / G5). Driven through the page's own render
+// functions (the LIB_SEED words, T2) at fixed window sizes. Each driver notes
+// which word the pane showed and puts it back, so the "-detail-" rows after it
+// still read the word runLibraryTheme opened. `cases` entries are LIB_SEED
+// terms or "cover"; T8 adds the notes half to the same drivers.
+async function libSnapshotVocab(page) {
+  return page.evaluate(() => ({
+    id: typeof _pbpVocabDetailWordId === "undefined" ? null : _pbpVocabDetailWordId,
+    narrow: document.body.classList.contains("lib-narrow-detail"),
+  }));
+}
+async function libShowVocab(page, target) {
+  const got = await page.evaluate((t) => {
+    if (typeof _pbpVocabRenderDetail !== "function") return "no _pbpVocabRenderDetail";
+    if (t === "cover") {
+      _pbpVocabRenderDetail(null);
+    } else {
+      const w = (typeof _vocabRows === "undefined" ? [] : _vocabRows).find((row) => row.term === t);
+      if (!w) return `no saved word ${JSON.stringify(t)}`;
+      _pbpVocabRenderDetail(w);
+      _pbpVocabMarkCurrentRow(w.id);
+      // The case must be the word it names, in the language it was saved in:
+      // a CJK case that lost its lang would measure the Latin letter-spacing
+      // branch and still pass.
+      const head = document.querySelector("#vocab-detail .vocab-detail-term");
+      const want = w.language && w.language !== "und" ? w.language : "";
+      if (!head || head.textContent !== t || head.lang !== want) {
+        return `headword ${JSON.stringify(head && head.textContent)} lang ${JSON.stringify(head && head.lang)}, want ${JSON.stringify(t)} lang ${JSON.stringify(want)}`;
+      }
+    }
+    const pane = document.getElementById("vocab-detail-pane");
+    if (pane) pane.scrollTop = 0;
+    return "ok";
+  }, target);
+  if (got !== "ok") throw new Error(`SETUP: libShowVocab(${JSON.stringify(target)}): ${got} -- LIB_SEED (T2) broken or library-vocab.js renamed`);
+  // From T7c an opened word looks itself up (IndexedDB probes, then the grant
+  // check -- never granted here); wait until the column has settled so a scan
+  // does not race the idle button in.
+  await page.waitForFunction(() => {
+    const host = document.getElementById("vocab-ref-result");
+    return !host || host.dataset.refState !== "word" || !!host.querySelector(".xp-dict-entry, .xp-dict-msg, .xp-dict-local-box");
+  }, null, { timeout: TIMEOUT_MS }).catch(() => {});
+  await settleAnimations(page);
+}
+async function libRestoreVocab(page, snap) {
+  await page.evaluate((s) => {
+    const w = s.id ? (typeof _vocabRows === "undefined" ? [] : _vocabRows).find((row) => row.id === s.id) : null;
+    _pbpVocabRenderDetail(w || null);
+    if (w) _pbpVocabMarkCurrentRow(w.id);
+    document.body.classList.toggle("lib-narrow-detail", !!s.narrow);
+  }, snap).catch(() => {});
+  await settleAnimations(page);
+}
+
+// G4: ink, not the content area. A zero-width inline-block probe before the
+// first character gives the baseline; canvas measureText (same font fallback
+// as the DOM) gives the first line's ink ascent. Range rects are the content
+// area (ascent + descent), which a correct half-leading pull-up necessarily
+// lifts above the scroll box -- they would fail the right layout and still
+// not see a clipped glyph.
+const INK_TOP_SCAN = ({ paneSel }) => {
+  const pane = document.querySelector(paneSel);
+  if (!pane) return { error: `no ${paneSel}` };
+  const top = pane.getBoundingClientRect().top;
+  const ctx = document.createElement("canvas").getContext("2d");
+  const rows = [];
+  for (const el of pane.querySelectorAll(".lib-first-line")) {
+    if (!el.getClientRects().length) continue;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT,
+      { acceptNode: (n) => (n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+    const text = walker.nextNode();
+    if (!text) continue;
+    const probe = document.createElement("span");
+    probe.style.cssText = "display:inline-block;width:0;height:0;margin:0;padding:0;border:0;vertical-align:baseline";
+    text.parentNode.insertBefore(probe, text);
+    const baseline = probe.getBoundingClientRect().bottom;
+    probe.remove();
+    const range = document.createRange();
+    let first = "", lineTop = null;
+    for (let i = 0; i < text.length; i++) {
+      range.setStart(text, i);
+      range.setEnd(text, i + 1);
+      const r = range.getClientRects()[0];
+      if (!r) continue;
+      if (lineTop === null) lineTop = r.top;
+      else if (r.top > lineTop + 1) break;
+      first += text.nodeValue[i];
+    }
+    const cs = getComputedStyle(text.parentElement);
+    ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const ascent = ctx.measureText(first.trim()).actualBoundingBoxAscent;
+    const inkTop = baseline - ascent;
+    rows.push({
+      el: [...el.classList].join("."), text: first.trim().slice(0, 24),
+      inkTop: Math.round(inkTop * 100) / 100, paneTop: Math.round(top * 100) / 100,
+      over: Math.round((top - 0.5 - inkTop) * 100) / 100,
+    });
+  }
+  return { rows };
+};
+// The screenshot cross-check: the first line's band, rendered as is and with
+// the pane at overflow: visible (right padding + the gutter it loses, so
+// nothing rewraps). Equal bytes = nothing was clipped. null = no first line.
+async function libInkScreenshotSame(page, paneSel) {
+  const clip = await page.evaluate((sel) => {
+    const pane = document.querySelector(sel);
+    const first = pane && [...pane.querySelectorAll(".lib-first-line")].find((el) => el.getClientRects().length);
+    if (!first) return null;
+    const p = pane.getBoundingClientRect(), r = first.getBoundingClientRect();
+    const x = Math.max(0, Math.floor(r.left - 4)), y = Math.max(0, Math.floor(p.top - 24));
+    return { x, y, width: Math.max(1, Math.ceil(Math.min(r.right, p.right) - x + 4)), height: Math.max(1, Math.ceil(r.bottom - y)) };
+  }, paneSel);
+  if (!clip) return null;
+  const normal = await page.screenshot({ clip });
+  await page.evaluate((sel) => {
+    const pane = document.querySelector(sel);
+    const cs = getComputedStyle(pane);
+    const gutter = pane.offsetWidth - pane.clientWidth - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth);
+    window.__libInkRestore = { overflow: pane.style.overflow, paddingRight: pane.style.paddingRight };
+    pane.style.overflow = "visible";
+    pane.style.paddingRight = `calc(${cs.paddingRight} + ${gutter}px)`;
+  }, paneSel);
+  await page.waitForTimeout(50);
+  const visible = await page.screenshot({ clip });
+  await page.evaluate((sel) => {
+    const pane = document.querySelector(sel);
+    Object.assign(pane.style, window.__libInkRestore || {});
+    delete window.__libInkRestore;
+  }, paneSel);
+  return normal.equals(visible);
+}
+// One G4 driver for both detail panes. `view` picks the pane and how a case
+// is put on screen; `cases` are that view's scenario names (vocab: "cover" or
+// a LIB_SEED term). T8e adds a `notes` entry here (its scenarios open seeded
+// notes states) instead of a second scan / driver. `coverPx` optionally pins
+// the cover title's size per window width, read on the view's cover case.
+const LIB_INK_VIEWS = {
+  vocab: {
+    paneSel: "#vocab-detail-pane", coverCase: "cover", coverSel: "#vocab-detail-empty .lib-cover-title",
+    snapshot: libSnapshotVocab, show: libShowVocab, restore: libRestoreVocab,
+  },
+};
+async function driveDisplayInkTop(page, check) {
+  const { view = "vocab", sizes, cases, coverPx = null } = check.expect.displayInkTop;
+  const v = LIB_INK_VIEWS[view];
+  if (!v) throw new Error(`SETUP: displayInkTop has no view ${JSON.stringify(view)} in LIB_INK_VIEWS`);
+  const paneSel = check.expect.displayInkTop.paneSel || v.paneSel;
+  const restore = page.viewportSize();
+  const snap = await v.snapshot(page);
+  const bad = [];
+  try {
+    for (const [width, height] of sizes) {
+      await page.setViewportSize({ width, height });
+      await page.waitForTimeout(250);
+      for (const target of cases) {
+        await v.show(page, target);
+        const scan = await page.evaluate(INK_TOP_SCAN, { paneSel });
+        if (scan.error) throw new Error(`SETUP: displayInkTop ${scan.error}`);
+        if (!scan.rows.length) throw new Error(`SETUP: displayInkTop found no visible .lib-first-line in ${paneSel} for ${target} at ${width}px`);
+        for (const r of scan.rows) {
+          if (r.over > 0) bad.push(`${width}/${target}: ${r.el} "${r.text}" ink top ${r.inkTop} is above the scroll box top ${r.paneTop}`);
+        }
+        if (coverPx && coverPx[width] != null && target === v.coverCase) {
+          const px = await page.evaluate((sel) => {
+            const el = document.querySelector(sel);
+            return el && el.getClientRects().length ? parseFloat(getComputedStyle(el).fontSize) : null;
+          }, v.coverSel);
+          if (px !== coverPx[width]) bad.push(`${width}/${target}: cover title ${px}px, spec §4.2 / §5.7 say ${coverPx[width]}px`);
+        }
+        if ((await libInkScreenshotSame(page, paneSel)) === false) {
+          bad.push(`${width}/${target}: the first line paints differently once ${paneSel} stops clipping (overflow: visible)`);
+        }
+      }
+    }
+  } finally {
+    if (restore) await page.setViewportSize(restore);
+    await page.waitForTimeout(250);
+    await v.restore(page, snap);
+  }
+  return bad;
+}
+
+// G4b: every negative margin inside a detail pane is one of two kinds, judged
+// on computed values, never on a class list. (a) Cancelling: the side's
+// margin is minus the same side's padding (a hung button, the highlighter's
+// overhang, the pane's own -16 / 16). (b) Pull-up: margin-top on a
+// .lib-first-line element, at most its half-leading. Visually hidden 1x1
+// boxes (sr-only) move nothing and are skipped.
+const NEG_MARGIN_SCAN = ({ paneSels }) => {
+  const bad = new Set();
+  let checked = 0;
+  for (const sel of paneSels) {
+    const pane = document.querySelector(sel);
+    if (!pane || !pane.getClientRects().length) continue;
+    for (const el of [pane, ...pane.querySelectorAll("*")]) {
+      if (!el.getClientRects().length || el.closest("svg")) continue;
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      if (cs.position === "absolute" && r.width <= 1 && r.height <= 1) continue;
+      for (const side of ["Top", "Right", "Bottom", "Left"]) {
+        const m = parseFloat(cs[`margin${side}`]);
+        if (!(m < 0)) continue;
+        checked++;
+        const p = parseFloat(cs[`padding${side}`]);
+        if (Math.abs(m + p) <= 0.5) continue;
+        if (side === "Top" && el.classList.contains("lib-first-line")) {
+          const fs = parseFloat(cs.fontSize), lh = parseFloat(cs.lineHeight);
+          if (Number.isFinite(lh) && -m <= (lh - fs) / 2 + 0.5) continue;
+        }
+        bad.add(`${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}.${[...el.classList].join(".")} margin-${side.toLowerCase()} ${m}px (padding ${p}px, font ${cs.fontSize}/${cs.lineHeight})`);
+      }
+    }
+  }
+  return { checked, bad: [...bad] };
+};
+async function driveDetailNegMargin(page, check) {
+  const { sizes, cases, panes, openEditor = false } = check.expect.detailNegMargin;
+  const restore = page.viewportSize();
+  const snap = await libSnapshotVocab(page);
+  const bad = [];
+  let checked = 0;
+  try {
+    for (const [width, height] of sizes) {
+      await page.setViewportSize({ width, height });
+      await page.waitForTimeout(250);
+      for (const target of cases) {
+        await libShowVocab(page, target);
+        if (openEditor && target !== "cover") {
+          await page.evaluate(() => _pbpVocabToggleGroupEditor(true, false));
+          await settleAnimations(page);
+        }
+        const scan = await page.evaluate(NEG_MARGIN_SCAN, { paneSels: panes });
+        checked += scan.checked;
+        for (const b of scan.bad) bad.push(`${width}/${target}: ${b}`);
+      }
+    }
+  } finally {
+    if (restore) await page.setViewportSize(restore);
+    await page.waitForTimeout(250);
+    await libRestoreVocab(page, snap);
+  }
+  // Anti-vacuity: the pane's own -16 and the hung buttons are always there.
+  if (checked === 0) throw new Error("SETUP: detailNegMargin saw no negative margin at all -- the pane's -16 / 16 offset or the hung buttons are gone, or the scan never ran");
+  return bad;
+}
+
+// G5, vocabulary half: the headword tier, where the dictionary column sits,
+// the hang label's right edge, the tail's distance from the note box, and
+// focus rings that stay inside the pane.
+const LIB_GEOMETRY_VOCAB_SCAN = () => {
+  const pane = document.getElementById("vocab-detail-pane");
+  const main = document.getElementById("vocab-detail");
+  const ref = document.getElementById("vocab-ref");
+  const tail = document.getElementById("vocab-detail-tail");
+  const term = main && main.querySelector(".vocab-detail-term");
+  const note = main && main.querySelector(".vocab-note-input");
+  if (!pane || !main || main.hidden || !ref || !tail || !term || !note) {
+    return { error: "the rich LIB_SEED word is not open (head, note box, dictionary column or tail missing)" };
+  }
+  const cs = getComputedStyle(pane);
+  const axis = pane.getBoundingClientRect().left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
+  const m = main.getBoundingClientRect(), rf = ref.getBoundingClientRect();
+  const out = {
+    headPx: parseFloat(getComputedStyle(term).fontSize),
+    refBeside: rf.left >= m.right - 0.5 && Math.abs(rf.top - m.top) <= 1,
+    refBelow: rf.top >= m.bottom - 0.5,
+    tailGap: Math.round((tail.getBoundingClientRect().top - note.getBoundingClientRect().bottom) * 100) / 100,
+    labelRight: null,
+  };
+  const label = main.querySelector(".vocab-sec-context > .lib-hang-label");
+  if (label) {
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    out.labelRight = Math.round((range.getBoundingClientRect().right - axis) * 100) / 100;
+  }
+  return out;
+};
+async function driveLibGeometry(page, check) {
+  const { cases } = check.expect.libGeometry;
+  const restore = page.viewportSize();
+  const snap = await libSnapshotVocab(page);
+  const bad = [];
+  try {
+    for (const c of cases) {
+      const at = `${c.width}x${c.height}`;
+      await page.setViewportSize({ width: c.width, height: c.height });
+      await page.waitForTimeout(250);
+      await libShowVocab(page, c.term);
+      const g = await page.evaluate(LIB_GEOMETRY_VOCAB_SCAN);
+      if (g.error) throw new Error(`SETUP: libGeometry ${at}: ${g.error}`);
+      if (Math.abs(g.headPx - c.headPx) > 0.5) bad.push(`${at}: headword ${g.headPx}px, want ${c.headPx}`);
+      if (c.ref === "beside" && !g.refBeside) bad.push(`${at}: #vocab-ref is not beside the main column on its first row`);
+      if (c.ref === "below" && !g.refBelow) bad.push(`${at}: #vocab-ref is not below the main column`);
+      if (c.labelRightFromAxis != null && (g.labelRight == null || Math.abs(g.labelRight - c.labelRightFromAxis) > 1)) {
+        bad.push(`${at}: the context label ends ${g.labelRight}px right of the axis, want ${c.labelRightFromAxis}`);
+      }
+      if (c.tailGap != null && Math.abs(g.tailGap - c.tailGap) > 1) bad.push(`${at}: tail top - note box bottom = ${g.tailGap}, want ${c.tailGap}`);
+      for (const sel of c.ringInside || []) {
+        await page.keyboard.press("Shift"); // a keyboard modality, so .focus() matches :focus-visible
+        const ring = await page.evaluate((s) => {
+          const el = document.querySelector(s);
+          const pane = document.getElementById("vocab-detail-pane");
+          if (!el || !pane) return { error: `no ${s}` };
+          el.focus();
+          if (document.activeElement !== el) return { error: `${s} did not take focus` };
+          const shadow = getComputedStyle(el).boxShadow;
+          let extent = 0;
+          for (const mm of shadow.matchAll(/(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px(?:\s+(-?[\d.]+)px)?/g)) {
+            extent = Math.max(extent, Math.abs(parseFloat(mm[1])) + parseFloat(mm[3]) + parseFloat(mm[4] || "0"));
+          }
+          const r = el.getBoundingClientRect(), p = pane.getBoundingClientRect();
+          return { outer: r.left - extent, paneLeft: p.left, visible: el.matches(":focus-visible"), shadow };
+        }, sel);
+        await page.evaluate(() => document.activeElement?.blur?.());
+        if (ring.error) throw new Error(`SETUP: libGeometry ${at}: ${ring.error}`);
+        if (!ring.visible) throw new Error(`SETUP: libGeometry ${at}: ${sel} took focus without :focus-visible (box-shadow ${ring.shadow})`);
+        if (ring.outer < ring.paneLeft - 0.5) bad.push(`${at}: ${sel}'s focus ring reaches ${ring.outer.toFixed(1)}, left of the detail pane ${ring.paneLeft.toFixed(1)}`);
+      }
+    }
+  } finally {
+    if (restore) await page.setViewportSize(restore);
+    await page.waitForTimeout(250);
+    await libRestoreVocab(page, snap);
+  }
+  return bad;
+}
+
 
 // ---- Library layout states (library redesign 2026-10-03, plan T3) ---------
 // Each runs in a FRESH page of the same context (same extension origin, same
@@ -3049,6 +3378,16 @@ async function runOneCheck(page, theme, check, results, extBase) {
         bad.length ? bad.slice(0, 4).join("; ") : undefined) });
     return;
   }
+  if (check.state === "displayInkTop" || check.state === "detailNegMargin" || check.state === "libGeometry") {
+    // Default and terminal only: the checklist rows carry T3's top-level
+    // `themes: ["", "terminal"]`, which main() filters on before this runs
+    // (spec §9.2, same matrix as G1).
+    const drive = { displayInkTop: driveDisplayInkTop, detailNegMargin: driveDetailNegMargin, libGeometry: driveLibGeometry }[check.state];
+    const bad = await drive(page, check);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict(check.state, bad.length === 0, bad.length, 0, bad.length ? bad.slice(0, 4).join("; ") : undefined) });
+    return;
+  }
   if (check.state === "paneFit") {
     const hits = await drivePaneFit(page, check);
     const worst = hits.reduce((m, h) => Math.max(m, h.over), 0);
@@ -3524,6 +3863,13 @@ async function setVocabBatchOpen(page, theme, open) {
 // `input` listener flip `.hidden` itself -- not toggling the DOM property
 // directly, which would exercise a path the actual UI never takes.
 function needsNoteDirty(selector) { return selector.includes("vocab-note-save"); }
+// The detail's group editor (library redesign T7, spec §4.5) starts collapsed:
+// its fused group unit and the removable chips render only after "Edit
+// groups". Re-asserted per row, like needsNoteDirty, because driveRowStates
+// reloads the page partway through the batch.
+function needsGroupEditorOpen(selector) {
+  return /\.vocab-detail-pane \.vocab-group-(?:unit|step)|\.vocab-detail-group-chips|#vocab-detail \.vocab-group-unit|\.vocab-edit-groups\[aria-expanded="true"\]/.test(selector);
+}
 // Library redesign T4b: at the runner's 1280 viewport the index is 360 wide,
 // so the group filter and the three status toggles live in the closed
 // "Filter" popover (spec §3.4). Open it with showPopover() -- no pointer move,
@@ -4691,12 +5037,17 @@ const VALUE_BOX_LEGS = Object.freeze({
         async open(page, url, theme) {
           await page.goto(`${url}?_ra=${encodeURIComponent(`fieldhover-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
-          const head = page.locator("#vocab-list .vocab-card .notes-card-head").first();
+          // The rich LIB_SEED word: the detail's value boxes include its note
+          // and its group editor's unit.
+          const head = page.locator("#vocab-list .vocab-card")
+            .filter({ has: page.locator(".notes-row-title", { hasText: new RegExp(`^${LIB_SEED.richTerm}$`) }) })
+            .locator(".notes-card-head").first();
           if (!(await head.count())) {
-            throw new Error(`SETUP: fieldHoverContrast library: no "#vocab-list .vocab-card .notes-card-head" (theme=${theme}) -- seed fixture broken or markup renamed`);
+            throw new Error(`SETUP: fieldHoverContrast library: no vocabulary row titled ${JSON.stringify(LIB_SEED.richTerm)} (theme=${theme}) -- LIB_SEED broken or the row title class renamed`);
           }
           await head.click();
-          await page.waitForSelector("#vocab-detail:not([hidden]) .vocab-group-unit", { timeout: TIMEOUT_MS });
+          await page.click("#vocab-detail .vocab-edit-groups");
+          await page.waitForSelector("#vocab-detail #vocab-group-editor:not([hidden]) .vocab-group-unit", { timeout: TIMEOUT_MS });
           await head.click({ modifiers: ["Control"] });
           await page.waitForSelector("#vocab-batch-toolbar.selecting", { timeout: TIMEOUT_MS });
           if (await page.$eval("#vocab-group-input", (el) => el.disabled)) {
@@ -5055,9 +5406,14 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
     // make this whole run fail loudly (exit 2), not quietly leave every
     // downstream check reading a zero-size/never-opened element as "PASS".
     if (vocabChecks.some((c) => needsDetailOpen(c.selector))) {
-      const head = page.locator("#vocab-list .vocab-card .notes-card-head").first();
+      // The rich LIB_SEED word (groups, two contexts, a note): every detail
+      // row needs one of those parts to exist, and the first row of the
+      // "latest" sort is whichever word the seed wrote last.
+      const head = page.locator("#vocab-list .vocab-card")
+        .filter({ has: page.locator(".notes-row-title", { hasText: new RegExp(`^${LIB_SEED.richTerm}$`) }) })
+        .locator(".notes-card-head").first();
       if (!(await head.count())) {
-        throw new Error(`SETUP: no "#vocab-list .vocab-card .notes-card-head" to open the vocab detail pane (theme=${theme}) -- seed fixture broken or markup renamed`);
+        throw new Error(`SETUP: no vocabulary row titled ${JSON.stringify(LIB_SEED.richTerm)} to open the detail pane (theme=${theme}) -- LIB_SEED broken or the row title class renamed`);
       }
       await head.click(); await page.waitForTimeout(250);
       await page.waitForFunction(() => {
@@ -5092,8 +5448,41 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
           if (!(await noteInput.count())) {
             throw new Error(`SETUP: no ".vocab-note-input" to dirty .vocab-note-save (theme=${theme}) -- seed fixture broken or markup renamed`);
           }
-          await noteInput.fill("render-audit probe");
+          // Typed without taking focus (T7b): the note box saves when it loses
+          // focus, so a fill() would commit the probe to the seed the moment a
+          // later row moved focus -- and the next dirtying fill of the same
+          // text would then change nothing. Same `input` listener, no blur.
+          await noteInput.evaluate((el) => {
+            el.value = `${el.value} render-audit probe`;
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+          });
           await page.waitForSelector(".vocab-note-save:not([hidden])", { timeout: TIMEOUT_MS });
+        }
+      } else {
+        // And undone for every other row: a dirty box that a later row
+        // focuses and leaves would save the probe into the seed mid-run.
+        await page.evaluate(() => {
+          const el = document.querySelector("#vocab-detail .vocab-note-input");
+          const probe = " render-audit probe";
+          if (!el || !el.value.endsWith(probe)) return;
+          el.value = el.value.slice(0, -probe.length);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+      }
+      if (needsGroupEditorOpen(check.selector)) {
+        const open = await page.evaluate(() => !!document.querySelector("#vocab-detail #vocab-group-editor:not([hidden])"));
+        if (!open) {
+          const edit = page.locator("#vocab-detail .vocab-edit-groups").first();
+          if (!(await edit.count())) {
+            throw new Error(`SETUP: no "#vocab-detail .vocab-edit-groups" to open the group editor (theme=${theme}) -- the detail is not open or the markup was renamed`);
+          }
+          await edit.click();
+          await page.waitForSelector("#vocab-detail #vocab-group-editor:not([hidden]) .vocab-group-unit", { timeout: TIMEOUT_MS });
+          // Opening puts the caret in the group box; a default-state row must
+          // not read the focus fill.
+          await page.evaluate(() => document.activeElement?.blur?.());
+          await page.mouse.move(0, 0);
+          await settleAnimations(page);
         }
       }
       // The Filter popover, one wrapper for both openers (T4b / T6a): rows in
@@ -6287,6 +6676,12 @@ const SWEEP_CFG = {
       ".header-icons, .xp-window-actions, .lib-cluster", // icon-button clusters: not button rows; clusterGap (family 12) holds them to 4px instead
       ".connection-health, .theme-presets-group, .kbd-help-chips, .rail-badges, .hl-filter-row", // status-card grid, swatch-pill / chip rows, the highlight legend (gap = two 6px hit pads)
       ".notes-card-top",                                                      // card head: title + chips, the remove X is absolutely positioned
+      // Library word head (T7b): text lines that carry a button, not button
+      // rows. The pronunciation line is "IPA · language" + Pronounce 4px
+      // after it (spec §4.4); the manage row's 16px column gap is what the
+      // Edit groups hang is computed from (16 - 10 = 6 from the group text,
+      // spec §4.5).
+      ".vocab-pron-row, .vocab-manage-row",
     ].join(", "),
   },
   // 12. clusterGap -- the icon-button cluster rung: 4px on every surface. The
@@ -6358,7 +6753,8 @@ const SWEEP_CFG = {
   //     6 + inset 4; reader section count = 24px button + gap; options sidebar
   //     group label = tab inset sp-5 + the tab's 2px indicator border; popup
   //     form footer = .row inset sp-5 + label column 52 + gap sp-4 = 72px,
-  //     --pp-label-indent; library notes dot = (body line 20 - dot 10) / 2 = 5) --
+  //     --pp-label-indent; library notes dot = (body line 20 - dot 10) / 2 = 5;
+  //     library "My note" hang label = the note box's 10px inner inset (spec §4.3)) --
   //     computed from a sibling's width, so never a scale value by
   //     construction. `hairline`: 1px is border compensation.
   spacingScale: {
@@ -6382,7 +6778,7 @@ const SWEEP_CFG = {
       ".token-badge", ".bookmark-badge", ".kbd-help-chip", ".hl-item-lang", ".ask-chip", // reader chips/badges (md-preview is not composed)
     ].join(", "),
     shells: ["html", "body", "main", ".rail", ".empty-state", ".preview-loading"],
-    derivedOffsets: [".hl-item-note", "#hl-rail-section .rail-sec-count", ".tab-group-label", ".form-body > .bottom-bar", ".form-body > .submit-bar", ".form-body > .status-msg", ".notes-hit-dot"],
+    derivedOffsets: [".hl-item-note", "#hl-rail-section .rail-sec-count", ".tab-group-label", ".form-body > .bottom-bar", ".form-body > .submit-bar", ".form-body > .status-msg", ".notes-hit-dot", ".vocab-sec-note > .lib-hang-label"],
   },
 };
 
@@ -7772,10 +8168,10 @@ async function main() {
       ungrouped: rows.filter((r) => !pbpVocabGroups(r).length).length,
       fixtureWordNewest: !!fixture && others.every((r) => (Number(r.updatedAt) || 0) < (Number(fixture.updatedAt) || 0)),
       richShape: !!rich && rich.language === "en" && !!rich.ipa && rich.contexts.length === 2 && !!String(rich.note || "").trim(),
-      cjkTerms: seed.cjkTerms.every((term) => rows.some((r) => r.term === term)),
+      cjkTerms: seed.cjkTerms.every((term, i) => rows.some((r) => r.term === term && r.language === seed.cjkLangs[i])),
       highlights: items.length,
       fixtureHighlightNewest: !!newest && items.every((it) => it === newest || it.ts < newest.ts),
-      multiShape: !!multi && multi.items.length >= 3 && multi.items.some((it) => String(it.note || "").trim()),
+      multiShape: !!multi && multi.title === seed.multiTitle && multi.items.length >= 3 && multi.items.some((it) => String(it.note || "").trim()),
       soloShape: !!solo && solo.items.length === 1 && solo.title === seed.cjkTitle,
     };
   }, { owner: SEED_OWNER, seed: LIB_SEED });
@@ -7784,10 +8180,10 @@ async function main() {
     seedShape.ungrouped >= 10 ? null : `ungrouped words ${seedShape.ungrouped} (want >= 10)`,
     seedShape.fixtureWordNewest ? null : "renderAuditFixture is not the newest word",
     seedShape.richShape ? null : `${LIB_SEED.richTerm} lacks two contexts / a note / an ipa`,
-    seedShape.cjkTerms ? null : `missing a CJK term (${LIB_SEED.cjkTerms.join(", ")})`,
+    seedShape.cjkTerms ? null : `missing a CJK term or its language (${LIB_SEED.cjkTerms.map((term, i) => `${term}:${LIB_SEED.cjkLangs[i]}`).join(", ")})`,
     seedShape.highlights >= 14 ? null : `highlights ${seedShape.highlights} (want >= 14)`,
     seedShape.fixtureHighlightNewest ? null : "the fixture highlight is not the newest",
-    seedShape.multiShape ? null : `${LIB_SEED.multiUrl} lacks >= 3 highlights with one note`,
+    seedShape.multiShape ? null : `${LIB_SEED.multiUrl} is not titled ${LIB_SEED.multiTitle} or lacks >= 3 highlights with one note`,
     seedShape.soloShape ? null : `${LIB_SEED.soloUrl} is not exactly one highlight titled ${LIB_SEED.cjkTitle}`,
   ].filter(Boolean);
   if (seedProblems.length) {

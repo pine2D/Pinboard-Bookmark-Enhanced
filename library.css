@@ -795,12 +795,6 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
 .note-dot.c5 { background: var(--lib-note-c5, #c084fc); }
 /* Kept for the vocabulary detail pane's context quotes (the notes list no
    longer builds .notes-item* rows -- see the master-detail block below). */
-/* `margin: 0` first, exactly like .notes-detail-quote below: this is a real
-   <blockquote>, so the UA's `margin: 1em 40px` otherwise pushes the quote 40px
-   right of the .vocab-detail-context rule it belongs to and of the source link
-   underneath it, and steals another 40px from an already narrow reading column
-   on the single-pane layout. */
-.notes-item-quote { margin: 0; color: var(--lib-fg-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .notes-empty { font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); color: var(--lib-fg-muted); padding: var(--lib-sp-2) var(--lib-sp-3) 0; }
 /* Inside a list region (which starts 4px outboard of the search box) the
    same 12px text inset needs the rows' 4px margin first. */
@@ -1095,8 +1089,7 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
      unbreakable synthetic title reproduced the same overflow class as
      .notes-row-open's (704px paneScroll / 728px past the pane's right edge
      at 900px) even though the seeded real fixture's spaced title never
-     trips it today. Same two declarations as the sibling .notes-item-quote
-     rule below already carries for the same reason. */
+     trips it today. */
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -1219,10 +1212,10 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
   min-width: 0;
   min-height: 0;
   /* Same scroller / size-container / hanging-room contract as
-     .notes-detail-pane (see its comment); T7's .vocab-sheet replaces this
-     interim single column. */
+     .notes-detail-pane (see its comment). One full-width track: .vocab-sheet
+     lays out its own columns by the pane's width (spec §4.2). */
   display: grid;
-  grid-template-columns: minmax(0, var(--lib-main-max));
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -1230,15 +1223,10 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
   container-name: lib-detail;
   padding: 0 var(--lib-page-pad) var(--lib-sp-9) var(--lib-sp-4);
   margin-inline-start: calc(-1 * var(--lib-sp-4));
-  /* Reading typography (Task 2): the list column is compact scan/skim scale,
-     the detail pane is where a definition or a context sentence actually gets
-     READ. line-height is unitless on purpose so it stays a ratio; every
-     descendant that must stay at UI/control scale resets its own font-size
-     AND line-height explicitly further down. */
-  font-size: 15px;
-  line-height: 1.65;
+  /* UI scale by default; every reading element in the sheet states its own size (spec §6.1). */
+  font-size: var(--lib-text-body);
+  line-height: var(--lib-lh-body);
 }
-.vocab-detail-empty { color: var(--lib-fg-hint); padding: var(--lib-sp-5) 0; text-align: center; }
 /* Prose width moved to the pane itself (2026-08-06 canvas layout): the pane
    is now a single centred minmax(0, 68ch) grid column, so every child is
    capped AND centred by the container instead of each child capping itself
@@ -1259,7 +1247,7 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
 .vocab-detail-pane .notes-meta-chip { font-size: 12px; line-height: normal; }
 /* vocab-group-inspect-report.md 2026-08-05 Finding 8: the rule above is
    written for the plain unpilled language chip in .vocab-detail-head (see
-   comment above), but ALSO matches .vocab-detail-actions's group chips
+   comment above), but ALSO matches .vocab-group-editor's group chips
    (they carry the same notes-meta-chip class) -- and its font-size:12px
    reset turns out to be something group chips genuinely need too (their own
    recipe, ui-components.mjs's chipRules, deliberately omits font-size --
@@ -1327,73 +1315,6 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
   .vocab-list-pane > .vocab-filter-row { flex-wrap: wrap; }
 }
 
-/* Detail pane content (Task 6). */
-.vocab-detail-head { display: flex; align-items: center; gap: var(--lib-sp-2); flex-wrap: wrap; }
-.vocab-detail-term { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -0.01em; }
-.vocab-detail-actions { display: flex; gap: var(--lib-sp-2); margin: var(--lib-sp-3) 0; flex-wrap: wrap; }
-/* Group chips get their own row, always (vocab-group-inspect-report.md
-   2026-08-05 Finding 6): flex-basis:100% on a flex-wrap item forces a wrap
-   onto a new line regardless of available width, so the control cluster
-   (status button + fused input/stepper) and the chip cluster never share a
-   line with only incidental whitespace implying a boundary between them.
-   Only rendered when the word actually has groups (library-vocab.js) -- an
-   always-present empty row would just be dead margin. */
-.vocab-detail-group-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2); flex-basis: 100%; }
-/* .vocab-group-chip is otherwise a plain read-only pill (list-view instance,
-   .notes-row-meta): cursor:default so it doesn't inherit a misleading
-   text-select I-beam over a non-editable label (Finding 4 baseline). The
-   detail pane's instance additionally carries .removable and a nested
-   .chip-remove button (Finding 5) -- hovering/focusing the chip reveals a
-   ghost "x" using the same opacity-reveal language as .row-del-x, laid out
-   as a normal flex child rather than that recipe's absolute-position
-   overlay (a pill has no fixed row height to anchor an overlay against).
-   Row-language background feedback (§3.2) on the removable variant signals
-   "this pill has an action" without claiming the whole pill is clickable --
-   only .chip-remove itself is. */
-.vocab-group-chip { cursor: default; }
-.vocab-group-chip.removable { padding-right: 4px; gap: 4px; }
-.vocab-group-chip.removable:hover { background: color-mix(in srgb, var(--lib-fg) 5%, var(--lib-chip-bg)); }
-/* Visual box is 14x14 -- exactly the chip's own line-height (COMPONENTS.md
-   §5.2), NOT bigger: a flex row's height is the tallest flex item, so a
-   16px button here silently grew the WHOLE pill to 20px in the detail pane
-   only, a real 2px drift from the list-row instance caught by this task's
-   own new heightEqWith regression check (render-audit-checklist.mjs) before
-   it shipped. Hit-area expansion (COMPONENTS.md §1.5's ::before pattern,
-   same recipe as .row-del-x) makes up the difference without growing the
-   box that sets the row height. */
-.vocab-group-chip .chip-remove {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  flex: none;
-  width: 14px;
-  height: 14px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--motion-state) ease, background var(--motion-state) ease, color var(--motion-state) ease;
-}
-/* inset -5px on a 14x14 box = 24x24 effective hit area (COMPONENTS.md
-   §1.4/§1.5's ::before hit-area expansion recipe) -- the 14px box itself is
-   untouched so heightEqWith comparisons against it don't move. */
-.chip-remove::before { content: ""; position: absolute; inset: -5px; }
-.chip-remove svg { width: 9px; height: 9px; }
-.vocab-group-chip:hover .chip-remove,
-.chip-remove:focus-visible { opacity: 1; }
-.chip-remove:hover { color: var(--lib-danger); background: color-mix(in srgb, var(--lib-danger) 14%, transparent); }
-.chip-remove:active { transform: scale(0.97); }
-.chip-remove:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
-/* Touch has no :hover to reveal the remove "x" -- same fallback .row-del-x
-   already uses (library.css, @media (hover:none) block). */
-@media (hover: none) { .chip-remove { opacity: 1; } }
-.vocab-detail-gloss { white-space: pre-wrap; overflow-wrap: anywhere; } /* placement: .lib-block */
-.vocab-gloss-ipa { color: var(--lib-fg-muted); }
-.vocab-detail-context mark { background: transparent; color: var(--lib-accent); font-weight: 600; }
 /* Closing action row. The vocabulary one is the detail's tail since the
    library redesign (T7a, spec §4.7): delete hung on the left, the status
    sentence, Save at the right end -- "Look up again" moved under the
@@ -1433,42 +1354,6 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
    (--opt-* tokens translated to their --lib-* equivalents; same closed-field
    and motion-pop recipes used elsewhere on this page) -- this pane is the
    first place on the library page that renders it. */
-/* max-width lives on the ROW, not the input (fix round 1): .vocab-note-input
-   alone capping at 68ch left .vocab-note-edit (the flex row) uncapped, so it
-   kept growing with the pane and the save button floated away from the
-   input's trailing edge -- measured gap 25px->368px between 1280 and 1600px
-   viewports. Capping the row instead caps everything in it; the input's
-   flex:1 1 auto fills the now-bounded row and the button stays flush. */
-/* One child now (v2b moved Save into the pane's closing row), so the field
-   fills the reading column instead of stopping short of a reserved button
-   slot. Kept as a flex row rather than collapsed to the bare textarea: the
-   textarea's own `flex: 1 1 auto` is what makes it fill, and swapping the
-   display would mean re-deriving its width -- which is the mockup's known
-   trap (a `width: 100%` textarea overshoots this content-box surface by its
-   own padding+border). */
-.vocab-note-edit { display: flex; gap: var(--lib-sp-4); align-items: flex-start; margin-top: var(--lib-sp-2); }
-.vocab-note-input {
-  flex: 1 1 auto; min-width: 0; resize: vertical;
-  font: inherit; font-size: 12px; line-height: 1.5;
-  /* Grows with what is typed instead of parking a 2-row box and then
-     scrolling inside it. `rows="2"` (library-vocab.js) stops driving the
-     height once this is on, so the floor is restated here; the ceiling stops
-     a 500-char note from pushing the rest of the detail pane off-screen, and
-     `resize: vertical` still lets the user override both by hand.
-     Content-box, so these are 2 and 20 lines of TEXT -- there is no global
-     border-box reset on this surface. */
-  field-sizing: content;
-  min-height: 2lh;
-  max-height: min(40vh, 20lh);
-  padding: 4px var(--lib-sp-2);
-  border-width: 1px;
-  border-style: solid;
-  border-radius: var(--lib-radius-md);
-  /* Fill, frame, typed text, placeholder, hover and focus colours come from
-     the generated field recipe (FIELD_TARGETS.lib, stage 4 §3.3): the editor
-     used to inherit the pane's paint and read as a hole in it. */
-  transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
-}
 .vocab-note-input:focus { outline: none; }
 .vocab-note-input:focus-visible:not(:disabled) { box-shadow: var(--lib-focus-ring); }
 /* Zero-shift reveal. The button used to be `display: none` while hidden, so
@@ -1536,6 +1421,226 @@ html.motion-ready .vocab-note-save {
   gap: var(--lib-sp-2);
   margin: 0;
 }
+/* ---- The word's main column (library redesign T7b, spec §4.2-§4.7, §6.5).
+   Hierarchy is type size, space and the column axis -- no fill, frame, rule or
+   radius on any structure (flat canvas). Tiers come from the pane's content
+   width (container lib-detail): one column below 1000, a 112px hang column +
+   the 840 main column from 1000, and the dictionary column on the right from
+   1280 (the @container blocks after the reference column block). ---- */
+.vocab-detail-head { min-width: 0; }
+.vocab-detail-term,
+.lib-cover-title {
+  margin: 0;
+  font-size: 36px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--lib-fg);
+  overflow-wrap: anywhere;
+}
+.vocab-detail-term:not(:lang(zh)):not(:lang(ja)):not(:lang(ko)),
+.lib-cover-title:not(:lang(zh)):not(:lang(ja)):not(:lang(ko)) { letter-spacing: -0.02em; }
+/* §6.5: a first line pulls up by at most its half-leading -- 0.075em at line
+   height 1.15. More than that and the scroll box clips CJK ink. */
+.vocab-detail-term.lib-first-line,
+.lib-cover-title.lib-first-line { margin-top: calc(-0.5 * (1.15 - 1) * 1em); }
+/* CJK first lines do not pull up at all. The half-leading bound assumes the
+   font's ascent + descent is 1em; a CJK face's is larger (WenQuanYi Micro Hei,
+   the CI font: at 0.075em the ideographs' ink rose 1.3-1.4px above the scroll
+   box at 72 and 44, caught by render-audit G4 by ink and by screenshot), so
+   the em box sits 0.075em lower here and nothing is clipped (V12: CJK never
+   clipped comes first). (0,3,0) over the rule above. */
+.vocab-detail-term.lib-first-line:lang(zh),
+.vocab-detail-term.lib-first-line:lang(ja),
+.vocab-detail-term.lib-first-line:lang(ko),
+.lib-cover-title.lib-first-line:lang(zh),
+.lib-cover-title.lib-first-line:lang(ja),
+.lib-cover-title.lib-first-line:lang(ko) { margin-top: 0; }
+.vocab-pron-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: calc(var(--lib-control-h) - 4px);
+  margin-top: var(--lib-sp-3);
+  font-size: var(--lib-text-body);
+  line-height: var(--lib-lh-body);
+  color: var(--lib-fg-muted);
+}
+.vocab-pron-ipa + .vocab-pron-lang::before { content: "\00a0·\00a0"; }
+.vocab-pron-row > .vocab-detail-speak { margin-inline-start: var(--lib-sp-1); }
+.vocab-detail-gloss {
+  margin: var(--lib-sp-3) 0 0;
+  font-size: 24px;
+  line-height: 36px;
+  color: var(--lib-fg);
+  text-wrap: pretty;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.vocab-manage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lib-sp-2) var(--lib-sp-4);
+  margin-top: var(--lib-sp-5);
+}
+.vocab-manage-row > [hidden] { display: none; }
+.vocab-manage-groups {
+  min-width: 0;
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+  color: var(--lib-fg-muted);
+  overflow-wrap: anywhere;
+}
+.vocab-manage-groups > span + span::before { content: "\00a0·\00a0"; }
+/* "Edit groups" hangs only right after the group text (box 6 from the text,
+   icon 16 from it); first in the row or with the text hidden it sits flush. */
+.vocab-manage-row > .vocab-edit-groups { margin-inline-start: 0; }
+.vocab-manage-row > .vocab-manage-groups:not([hidden]) + .vocab-edit-groups { margin-inline-start: calc(-1 * var(--lib-control-pad-x-sm)); }
+.vocab-edit-groups[aria-expanded="true"] { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
+.vocab-group-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lib-sp-2);
+  margin-top: var(--lib-sp-2);
+}
+.vocab-group-editor[hidden] { display: none; }
+.vocab-group-editor > .vocab-group-unit { flex: none; width: 168px; }
+.vocab-group-editor > .vocab-detail-group-chips { flex: 0 1 auto; }
+/* (0,3,0): outranks .vocab-group-chip .chip-remove's resting opacity 0
+   whatever the source order -- in the editor the x is always shown (V5). */
+.vocab-group-editor .vocab-group-chip .chip-remove { opacity: 1; }
+.lib-hang-sec { min-width: 0; margin-top: var(--lib-sp-6); }
+.lib-hang-body { min-width: 0; }
+.vocab-detail-context { margin: 0; }
+.vocab-detail-context + .vocab-detail-context { margin-top: var(--lib-sp-5); }
+.vocab-context-quote {
+  margin: 0;
+  font-size: 16px;
+  line-height: 26px;
+  color: var(--lib-fg);
+  text-wrap: pretty;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.vocab-context-quote mark { background: transparent; color: inherit; font-weight: 700; }
+.vocab-context-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--lib-sp-1) var(--lib-sp-2);
+  margin-top: var(--lib-sp-2);
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+}
+.vocab-context-source > .notes-row-open { max-width: 100%; color: var(--lib-link); }
+.vocab-context-source .ext-icon { width: 13px; height: 13px; }
+.vocab-context-meta { color: var(--lib-fg-muted); }
+.vocab-context-meta > span + span::before { content: "\00a0·\00a0"; }
+/* My note, three heights (spec §4.6). Empty and unfocused: exactly one line
+   (not field-sizing -- an empty field sizes to its placeholder, which wraps to
+   two or three lines in de / ru). Focused: room to write. With content: grows
+   with it from 64. The inner inset counts the 1px frame, so the text sits
+   10 / 12 from the box edge and the hang label's 10px top lines up with it. */
+.vocab-note-edit { display: block; margin: 0; }
+.vocab-note-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--lib-main-max);
+  min-width: 0;
+  resize: vertical;
+  font: inherit;
+  font-size: var(--lib-text-body);
+  line-height: var(--lib-lh-body);
+  field-sizing: content;
+  min-height: 64px;
+  max-height: min(40vh, 480px);
+  padding: 9px 11px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: var(--lib-radius-md);
+  /* Fill, frame, text, placeholder, hover and focus colours: FIELD_TARGETS.lib. */
+  transition: min-height 160ms ease-out, border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
+}
+.vocab-note-input:placeholder-shown:not(:focus) {
+  field-sizing: fixed;
+  height: calc(var(--lib-lh-body) + 20px);
+  min-height: 0;
+  overflow: hidden;
+  resize: none;
+}
+.vocab-note-input:focus { min-height: 96px; }
+/* The cover (spec §4.11; the notes cover reuses these in T8). */
+.lib-cover { min-width: 0; }
+.lib-cover-lead {
+  min-height: 26px;
+  margin: var(--lib-sp-4) 0 0;
+  font-size: 16px;
+  line-height: 26px;
+  color: var(--lib-fg-muted);
+  font-variant-numeric: tabular-nums;
+  text-wrap: pretty;
+}
+.lib-cover-lead b { font-weight: 700; color: var(--lib-fg); }
+.lib-cover-hint { margin: var(--lib-sp-2) 0 0; font-size: 14px; line-height: 20px; color: var(--lib-fg-muted); }
+.lib-cover-hint[hidden] { display: none; }
+/* The editor's removable group chips (Finding 5). In the editor the x is
+   always shown (V5, the (0,3,0) rule above); elsewhere the reveal below
+   still applies. */
+.vocab-detail-group-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2); }
+/* .vocab-group-chip is otherwise a plain read-only pill (list-view instance,
+   .notes-row-meta): cursor:default so it doesn't inherit a misleading
+   text-select I-beam over a non-editable label (Finding 4 baseline). The
+   detail pane's instance additionally carries .removable and a nested
+   .chip-remove button (Finding 5) -- hovering/focusing the chip reveals a
+   ghost "x" using the same opacity-reveal language as .row-del-x, laid out
+   as a normal flex child rather than that recipe's absolute-position
+   overlay (a pill has no fixed row height to anchor an overlay against).
+   Row-language background feedback (§3.2) on the removable variant signals
+   "this pill has an action" without claiming the whole pill is clickable --
+   only .chip-remove itself is. */
+.vocab-group-chip { cursor: default; }
+.vocab-group-chip.removable { padding-right: 4px; gap: 4px; }
+.vocab-group-chip.removable:hover { background: color-mix(in srgb, var(--lib-fg) 5%, var(--lib-chip-bg)); }
+/* Visual box is 14x14 -- exactly the chip's own line-height (COMPONENTS.md
+   §5.2), NOT bigger: a flex row's height is the tallest flex item, so a
+   16px button here silently grew the WHOLE pill to 20px in the detail pane
+   only, a real 2px drift from the list-row instance caught by this task's
+   own new heightEqWith regression check (render-audit-checklist.mjs) before
+   it shipped. Hit-area expansion (COMPONENTS.md §1.5's ::before pattern,
+   same recipe as .row-del-x) makes up the difference without growing the
+   box that sets the row height. */
+.vocab-group-chip .chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--motion-state) ease, background var(--motion-state) ease, color var(--motion-state) ease;
+}
+/* inset -5px on a 14x14 box = 24x24 effective hit area (COMPONENTS.md
+   §1.4/§1.5's ::before hit-area expansion recipe) -- the 14px box itself is
+   untouched so heightEqWith comparisons against it don't move. */
+.chip-remove::before { content: ""; position: absolute; inset: -5px; }
+.chip-remove svg { width: 9px; height: 9px; }
+.vocab-group-chip:hover .chip-remove,
+.chip-remove:focus-visible { opacity: 1; }
+.chip-remove:hover { color: var(--lib-danger); background: color-mix(in srgb, var(--lib-danger) 14%, transparent); }
+.chip-remove:active { transform: scale(0.97); }
+.chip-remove:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
+/* Touch has no :hover to reveal the remove "x" -- same fallback .row-del-x
+   already uses (library.css, @media (hover:none) block). */
+@media (hover: none) { .chip-remove { opacity: 1; } }
 /* ---- Detail sheet and dictionary reference column (library redesign T7a,
    spec §4.1, §4.8, §4.9). T7b adds the container tiers; until then the sheet
    is one column. Flat canvas: no fill, frame, rule or radius on any of these
@@ -1677,6 +1782,52 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-connect:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
 #vocab-ref-result .xp-retry svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
+/* ---- Sheet tiers (spec §4.2). The pane is the container (it cannot query
+   itself); every rule below is on the sheet or its descendants. ---- */
+@container lib-detail (min-width: 640px) {
+  .vocab-detail-term,
+  .lib-cover-title { font-size: 44px; }
+}
+@container lib-detail (min-width: 1000px) {
+  .vocab-sheet { grid-template-columns: var(--lib-hang-w) minmax(0, var(--lib-main-max)); }
+  .vocab-sheet > #vocab-detail,
+  .vocab-sheet > #vocab-detail-empty { grid-column: 1 / 3; }
+  /* :not([hidden]) -- an id selector here would out-rank the sheet's
+     [hidden] guard and paint the hidden cover (or detail) as a grid. */
+  .vocab-sheet > #vocab-detail:not([hidden]),
+  .vocab-sheet > #vocab-detail-empty:not([hidden]) { display: grid; grid-template-columns: subgrid; align-items: start; }
+  #vocab-detail > .vocab-detail-head,
+  #vocab-detail-empty > * { grid-column: 2; }
+  #vocab-detail > .lib-hang-sec { grid-column: 1 / 3; display: grid; grid-template-columns: subgrid; align-items: baseline; }
+  .lib-hang-sec > .lib-hang-label { grid-column: 1; margin: 0; padding-inline-end: var(--lib-sp-4); text-align: end; }
+  .lib-hang-sec > .lib-hang-body { grid-column: 2; }
+  /* A textarea has no baseline to share: hang from the top, dropped by the
+     field's inner inset (spacingScale.derivedOffsets). */
+  .vocab-sec-note { align-items: start; }
+  .vocab-sec-note > .lib-hang-label { padding-top: 10px; line-height: var(--lib-lh-body); }
+  .vocab-sheet > .vocab-ref { grid-column: 1 / 3; display: grid; grid-template-columns: subgrid; align-items: start; }
+  .vocab-ref > .lib-hang-label { grid-column: 1; grid-row: 1 / span 2; margin: 0; padding-inline-end: var(--lib-sp-4); text-align: end; line-height: var(--lib-control-h); }
+  .vocab-ref > #vocab-lookup-bar,
+  .vocab-ref > #vocab-ref-result { grid-column: 2; }
+  .vocab-sheet > #vocab-detail-tail { grid-column: 2; }
+  .vocab-detail-term,
+  .lib-cover-title { font-size: 56px; }
+}
+@container lib-detail (min-width: 1280px) {
+  .vocab-sheet {
+    grid-template-columns: var(--lib-hang-w) minmax(0, var(--lib-main-max)) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max));
+    grid-template-rows: auto 1fr;
+  }
+  .vocab-sheet > #vocab-detail,
+  .vocab-sheet > #vocab-detail-empty { grid-row: 1; }
+  .vocab-sheet > #vocab-detail-tail { grid-row: 2; align-self: start; }
+  .vocab-sheet > .vocab-ref { grid-column: 4; grid-row: 1 / 3; display: block; margin-top: 0; align-self: start; }
+  .vocab-ref > .lib-hang-label { margin: 0 0 var(--lib-sp-3); padding: 0; text-align: start; font-size: 16px; line-height: 24px; color: var(--lib-fg); }
+  /* §6.5: the column title is the column's first line -- 4px is half of 24 - 16. */
+  .vocab-ref > .lib-hang-label.lib-first-line { margin-top: calc((16px - 24px) / 2); }
+  .vocab-detail-term,
+  .lib-cover-title { font-size: 72px; }
+}
 .vocab-filter-toolbar input[type="search"] {
   flex: 1 1 220px;
   width: auto;
@@ -2423,7 +2574,9 @@ body { display: flex; flex-direction: column; }
   html, body, .lib-main, .lib-view:not([hidden]), .vocab-workbench, .notes-workbench { height: auto; display: block; }
   .vocab-list-region, .notes-list-region { overflow: visible; }
   .lib-header, .vocab-list-pane, .notes-list-pane, #vocab-lookup-bar, .vocab-detail-back, .notes-detail-back,
-  #vocab-detail-pane .btn, #notes-detail-pane .btn { display: none; }
+  #vocab-detail-pane .btn, #notes-detail-pane .btn,
+  #vocab-ref-result .vocab-ref-foot, #vocab-ref-result .vocab-ref-idle, .vocab-edit-groups, .vocab-group-editor,
+  .vocab-detail-status, .vocab-detail-speak, #vocab-detail-tail { display: none; }
   #vocab-detail-pane, #notes-detail-pane { display: block; overflow: visible; margin: 0; padding: 0; }
 }
 /* ---- Listbox (library redesign T6, spec §8.2 / §8.4): listbox.js draws

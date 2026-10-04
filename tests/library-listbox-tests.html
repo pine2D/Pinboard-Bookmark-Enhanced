@@ -862,6 +862,138 @@ async function libraryPageLookupLangCases() {
   }
 }
 
+// Hand-written in freedictionaryapi.com's response shape (tests/md-dict-tests.html
+// FDA_SAMPLE is the captured reference) -- never produced by our normalizer.
+const FDA_CONSTRAINT = {
+  word: "constraint",
+  entries: [{
+    language: { code: "en", name: "English" },
+    partOfSpeech: "noun",
+    pronunciations: [{ type: "ipa", text: "/kənˈstreɪnt/", tags: ["Received Pronunciation"] }],
+    forms: [{ word: "constraints", tags: ["plural"] }],
+    senses: [
+      { definition: "Something that constrains; a restriction.", examples: ["Time is the main constraint."],
+        synonyms: ["limitation", "restriction"], antonyms: ["freedom"] },
+      { definition: "Unnatural restraint in manner.", examples: [] },
+      { definition: "Compulsion; coercion.", examples: [] },
+    ],
+  }],
+  source: { url: "https://en.wiktionary.org/wiki/constraint", license: { name: "CC BY-SA 4.0", url: "https://creativecommons.org/licenses/by-sa/4.0/" } },
+};
+
+// ---- Library redesign T7b (Review Focus 4): content real data carries -- a
+// 60-character word with no break opportunity, an 80-character group name --
+// at a wide and a narrow window, on the real page.
+async function libraryPageLongContentCases() {
+  const term = "Pneumonoultramicroscopicsilicovolcanoconiosis" + "Supercalifragil";
+  const group = "Sehr lange Gruppenbezeichnung für Lektüre, Wiederholung und Prüfungsvorbereitung im Herbstsemester".slice(0, 80);
+  for (const width of [2200, 600]) {
+    const { frame, win, doc } = await loadLibraryFrame({ width, height: 900 });
+    try {
+      const booted = await libWaitFor(win, () => win.eval("_vocabCurrentOwner") === "acct_listboxtest");
+      check(`T7 RF4 ${width}px: library.html boots`, booted && win.__bootErrors.length === 0 && term.length === 60 && group.length === 80,
+        `booted=${booted} errors=${win.__bootErrors.slice(0, 3).join(" | ")}`);
+      if (!booted) continue;
+      win.eval(`_vocabRows = [{ id: "rf4", term: ${JSON.stringify(term)}, language: "en", gloss: "", note: "", status: "new",
+        groups: [${JSON.stringify(group)}], contexts: [], createdAt: 1, updatedAt: 1 }];
+        _pbpVocabRefreshGroupOptions(false); _pbpVocabApplyView(true);`);
+      const filter = doc.getElementById("vocab-group-filter");
+      filter.value = group;
+      win.pbpListboxSync(filter);
+      // The header fit re-decides wide / narrow from the row's content (the
+      // long group widens the listbox): let it settle before choosing how to
+      // reveal the set.
+      await libFrames(win);
+      const set = doc.getElementById("vocab-filter-set");
+      if (!set.getClientRects().length && !set.matches(":popover-open")) doc.getElementById("vocab-filter-narrow").click();
+      await libFrames(win);
+      const region = doc.querySelector(".vocab-list-region");
+      const sr = set.getBoundingClientRect();
+      const gr = doc.getElementById("vocab-group-filter-btn").getBoundingClientRect();
+      check(`T7 RF4 ${width}px: the long word and group keep the list region from scrolling sideways`,
+        region.scrollWidth <= region.clientWidth + 1, `${region.scrollWidth} > ${region.clientWidth}`);
+      check(`T7 RF4 ${width}px: the group listbox button stays inside the filter set`,
+        gr.width > 0 && gr.left >= sr.left - 0.5 && gr.right <= sr.right + 0.5, `button ${gr.left}-${gr.right} set ${sr.left}-${sr.right}`);
+      if (set.matches(":popover-open")) set.hidePopover();
+      if (width <= 860) doc.body.classList.add("lib-narrow-detail");
+      win.eval("_pbpVocabRenderDetail(_vocabRows[0], true)");
+      await libFrames(win);
+      const pane = doc.getElementById("vocab-detail-pane");
+      check(`T7 RF4 ${width}px: the detail pane does not scroll sideways for the long word`,
+        pane.scrollWidth <= pane.clientWidth + 1, `${pane.scrollWidth} > ${pane.clientWidth}`);
+      win.eval("_pbpVocabToggleGroupEditor(true, false)");
+      await libFrames(win);
+      check(`T7 RF4 ${width}px: nor with the group editor open on the long group`,
+        pane.scrollWidth <= pane.clientWidth + 1, `${pane.scrollWidth} > ${pane.clientWidth}`);
+    } finally {
+      frame.remove();
+    }
+  }
+}
+
+// ---- Library redesign T7b (spec §7.7, §9.4): every locale at a 2200px window
+// (C >= 1280: the hang column and the dictionary column are both live), on
+// the real page -- the detail is built by library-vocab.js, so a hand-copied
+// srcdoc would only test what its author remembered.
+async function libraryPageDetailLocaleCases() {
+  const locales = ["en", "de", "fr", "pl", "ru", "zh_HK", "zh_CN", "zh_TW", "ja"];
+  const messages = {};
+  for (const locale of locales) messages[locale] = await (await fetch(`../_locales/${locale}/messages.json`)).json();
+  const { frame, win, doc } = await loadLibraryFrame({ width: 2200, height: 1000 });
+  const bad = [];
+  try {
+    const booted = await libWaitFor(win, () => win.eval("_vocabCurrentOwner") === "acct_listboxtest");
+    check("T7 library.html boots at 2200px for the nine-locale detail scan", booted && win.__bootErrors.length === 0,
+      win.__bootErrors.slice(0, 3).join(" | "));
+    if (!booted) return;
+    win.eval(`_vocabRows = [{ id: "loc1", term: "constraint", language: "en", ipa: "/kənˈstreɪnt/",
+      gloss: "a limitation or restriction", note: "", status: "new", groups: ["Reading", "Close reading"],
+      contexts: [{ quote: "The constraint shaped the design.", articleTitle: "On constraints in design",
+        articleUrl: "https://example.com/reading/attention", createdAt: Date.now() - 86400000 }],
+      createdAt: 1, updatedAt: 1 }]; _pbpVocabApplyView(true);`);
+    // The dict2_ cache answers, so the source line renders without a request;
+    // the page's own normalizer builds the record from the server's shape.
+    const cached = win.pbpDictNormalizeEntry(JSON.parse(JSON.stringify(FDA_CONSTRAINT)));
+    win.pbpAiCacheGet = async () => ({ result: cached });
+    for (const locale of locales) {
+      win.__pbpEn = messages[locale];
+      win.applyI18n();
+      win.eval("_pbpVocabRenderDetail(null); _pbpVocabRenderDetail(_vocabRows[0], false); _pbpVocabRelookup(_vocabRows[0]);");
+      const landed = await libWaitFor(win, () => !!doc.querySelector("#vocab-ref-result .xp-dict-src"));
+      win.eval("_pbpVocabToggleGroupEditor(true, false)");
+      await libFrames(win);
+      if (!landed) { bad.push(`${locale}: the cached result never rendered`); continue; }
+      const pane = doc.getElementById("vocab-detail-pane");
+      const cs = win.getComputedStyle(pane);
+      const axis = pane.getBoundingClientRect().left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
+      const mainRight = doc.querySelector("#vocab-detail .vocab-detail-head").getBoundingClientRect().right;
+      const refRight = doc.getElementById("vocab-ref").getBoundingClientRect().right;
+      for (const label of doc.querySelectorAll("#vocab-detail .lib-hang-label")) {
+        const range = doc.createRange();
+        range.selectNodeContents(label);
+        const r = range.getBoundingClientRect();
+        if (r.left < axis - 0.5 || r.right > axis + 96 + 0.5) {
+          bad.push(`${locale}: label "${label.textContent}" ${r.left.toFixed(1)}-${r.right.toFixed(1)} outside [${axis.toFixed(1)}, ${(axis + 96).toFixed(1)}]`);
+        }
+      }
+      for (const el of doc.querySelectorAll("#vocab-detail .vocab-manage-row > *, #vocab-group-editor > *, #vocab-detail-tail .vocab-detail-footer > *")) {
+        if (!el.getClientRects().length) continue;
+        const r = el.getBoundingClientRect();
+        if (r.right > mainRight + 0.5) bad.push(`${locale}: ${el.className || el.tagName} ends at ${r.right.toFixed(1)}, past the main column ${mainRight.toFixed(1)}`);
+      }
+      for (const el of doc.querySelectorAll("#vocab-ref-result .xp-dict-src, #vocab-ref-result .vocab-ref-foot > *")) {
+        const r = el.getBoundingClientRect();
+        if (r.right > refRight + 0.5) bad.push(`${locale}: ${el.className} ends at ${r.right.toFixed(1)}, past the dictionary column ${refRight.toFixed(1)}`);
+      }
+      if (pane.scrollWidth > pane.clientWidth + 1) bad.push(`${locale}: the pane scrolls sideways (${pane.scrollWidth} > ${pane.clientWidth})`);
+    }
+    check("T7 at 2200px every locale keeps the hang labels in their 96px column and the manage row, group editor, tail and source line in their columns",
+      bad.length === 0, bad.slice(0, 6).join("; "));
+  } finally {
+    frame.remove();
+  }
+}
+
 // ---- Main flow (last thing in this script). A setup error that escapes a
 // suite becomes one failed row; the row count then falls short and
 // run-test.mjs reports the stall, which is the red it should be.
@@ -875,6 +1007,8 @@ async function libraryPageLookupLangCases() {
     await libraryPageGroupCases();
     await libraryPageSortCases();
     await libraryPageLookupLangCases();
+    await libraryPageLongContentCases();
+    await libraryPageDetailLocaleCases();
   } catch (error) {
     report("suite setup", error);
   }

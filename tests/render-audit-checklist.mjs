@@ -1948,6 +1948,29 @@ export const CHECKS = [
   // first; the driver submits the other word and puts the column back after.
   { surface: "library", page: "library.html", selector: "#vocab-detail-pane (other word)", state: "paneFit",
     expect: { paneFit: { widths: [420, 861, 1280, 1600, 2560], tolerancePx: 1, panes: ["#vocab-detail-pane"], vocabLookupOther: "serendipity" } } },
+  // ---- Library redesign T7b (spec §4.5, §9.2 G4 / G4b / G5): the word's
+  // main column. The status button is the detail's one plain .btn (text +
+  // icon on the sm rung); Edit groups wears the pressed fill while open. The
+  // three geometry states drive LIB_SEED words at 2560x1300 and 1280x800
+  // through their own drivers (scripts/ui-render-audit.mjs), default and
+  // terminal only; "-detail-" in the selector opens the rich word first. ----
+  { surface: "library", page: "library.html", selector: ".vocab-detail-status", state: "default",
+    expect: { textContrast: 4.5, iconContrast: 3, iconVCenter: 1, heightPx: { comfortable: 28, compact: 24 } } },
+  { surface: "library", page: "library.html", selector: ".vocab-detail-status", state: "focusWithin",
+    focusTarget: ":scope", expect: { focusRecipe: "bordered" } },
+  { surface: "library", page: "library.html", selector: '.vocab-detail-pane .vocab-edit-groups[aria-expanded="true"]', state: "default",
+    expect: { bgEqVar: "btn-hover", textContrast: 4.5 } },
+  { surface: "library", page: "library.html", selector: "#vocab-detail-pane", state: "displayInkTop", themes: ["", "terminal"],
+    expect: { displayInkTop: { view: "vocab", sizes: [[2560, 1300], [1280, 800]],
+      cases: ["cover", "曖昧", "呼吸", "constraint"] } } },
+  { surface: "library", page: "library.html", selector: "#vocab-detail-pane", state: "detailNegMargin", themes: ["", "terminal"],
+    expect: { detailNegMargin: { sizes: [[2560, 1300], [1280, 800]], panes: ["#vocab-detail-pane"],
+      cases: ["cover", "constraint"], openEditor: true } } },
+  { surface: "library", page: "library.html", selector: "#vocab-detail-pane", state: "libGeometry", themes: ["", "terminal"],
+    expect: { libGeometry: { cases: [
+      { width: 2560, height: 1300, term: "constraint", headPx: 72, ref: "beside", labelRightFromAxis: 96, tailGap: 32 },
+      { width: 1280, height: 800, term: "constraint", headPx: 44, ref: "below", ringInside: [".vocab-detail-delete", ".vocab-note-input"] },
+    ] } } },
   // The sort menu button's popover (T6b): the same panel family. Its trigger
   // is always on the filter row, never inside the Filter popover.
   { surface: "library", page: "library.html", selector: "#vocab-sort-btn + .listbox-pop", state: "open",

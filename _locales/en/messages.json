@@ -3790,7 +3790,6 @@
   "libraryTitle": { "message": "Notes & Vocabulary" },
   "libraryOpen": { "message": "Open notes and vocabulary" },
   "libraryDetailTitle": { "message": "Word details" },
-  "libraryDetailEmpty": { "message": "Pick a word from the list to see its details." },
   "libraryNotesDetailEmpty": { "message": "Pick a highlight from the list to read it in full." },
   "libraryNotesScopeHint": { "message": "Highlights and notes are stored on this device only and are not synced. To move them to another device, export a backup on the settings page and import it there." },
   "libraryNotesScopeOpenBackup": { "message": "Open backup settings" },
@@ -3946,5 +3945,12 @@
   "librarySectionDict": { "message": "Dictionary" },
   "libraryLookupOther": { "message": "Look up another word" },
   "libraryDictIdle": { "message": "Look up this word in the dictionary" },
-  "libraryDictIdleFree": { "message": "Type any word to look up its dictionary entry" }
+  "libraryDictIdleFree": { "message": "Type any word to look up its dictionary entry" },
+  "librarySectionContext": { "message": "Context" },
+  "librarySectionMyNote": { "message": "My note" },
+  "libraryEditGroups": { "message": "Edit groups" },
+  "libraryNotePlaceholder": { "message": "Write anything: associations, easily confused words, usage reminders. Saved when you leave the box" },
+  "libraryVocabCoverTitle": { "message": "Vocabulary" },
+  "libraryVocabCoverLead": { "message": "$TOTAL$ words, $LEARNING$ learning and $KNOWN$ known, in $LANGS$ languages. Last added on $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverHint": { "message": "Pick a word to see its context, your note and its dictionary entry, or look up any word directly." }
 }

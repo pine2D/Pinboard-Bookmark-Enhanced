@@ -1302,7 +1302,14 @@ check(libraryVocabJs.includes('card.setAttribute("aria-selected", isSelected ? "
   /id="vocab-list"[^>]*role="grid"[^>]*aria-multiselectable="true"/.test(libraryHtml) &&
   libraryVocabJs.includes('card.setAttribute("aria-current", "true")') &&
   libraryVocabJs.includes("_pbpVocabOnRowActivate(w)") &&
-  !libraryVocabJs.includes("aria-expanded"),
+  // The one disclosure on this page is the detail's "Edit groups" (T7b, spec
+  // §4.5): its writes live in _pbpVocabToggleGroupEditor and on editBtn's own
+  // lines. Every other aria-expanded in the file is still the row lie.
+  !libraryVocabJs
+    .replace(/\nfunction _pbpVocabToggleGroupEditor\([^)]*\) \{[\s\S]*?\n\}\n/, "\n")
+    .split("\n").filter((line) => !/^\s*editBtn\./.test(line)).join("\n")
+    .includes("aria-expanded") &&
+  /\nfunction _pbpVocabToggleGroupEditor\(/.test(libraryVocabJs),
   "library-vocab.js/library.html: vocabulary rows lost the grid/aria-selected selection path or master-detail activation state");
 // The keyboard half of that ruling. Ctrl/Shift+click has no keyboard twin
 // unless something intercepts Space BEFORE the button's own activation, so
@@ -2501,7 +2508,7 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
   // The reading measure belongs to the detail column, not to each child: a
   // child that carries its own cap re-creates the left-hugging prose the pane
   // column replaced.
-  const paneChildCaps = (libraryCss.match(/\.(notes-detail-quote|notes-detail-note|vocab-detail-gloss|vocab-detail-context|vocab-note-edit)\b[^{}]*\{[^}]*max-width:\s*6[68]ch/g) || []);
+  const paneChildCaps = (libraryCss.match(/\.(notes-detail-quote|notes-detail-note|vocab-detail-gloss|vocab-detail-context|vocab-context-quote|vocab-note-edit|vocab-note-input)\b[^{}]*\{[^}]*max-width:\s*6[68]ch/g) || []);
   check(paneChildCaps.length === 0,
     `library.css: per-child reading-measure caps are back inside the detail panes — the detail column already sets the measure: ${paneChildCaps.join(" | ")}`);
   // Prose that keeps its own newlines (`white-space: pre-wrap`) sits in a
@@ -2678,10 +2685,18 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
   // and its own empty-state string, which stayed wrong for a day because this
   // pin named one key instead of the class of strings it was defending
   // (independent review F3, 2026-08-07).
+  // Asked as a CATEGORY (every library*Empty, library*Cover*, library*Hint key),
+  // not as named keys: a new cover or hint string must not be able to slip a
+  // direction past this gate, and a deleted key (libraryDetailEmpty, T7) must
+  // not turn the loop into a TypeError.
   const enMsgs = JSON.parse(read("_locales/en/messages.json"));
-  for (const key of ["libraryDetailEmpty", "libraryNotesDetailEmpty"]) {
-    check(!/\bleft\b/i.test(enMsgs[key].message),
-      `_locales/en: ${key} points at a direction again — in the single-pane layout there is nothing to the left of anything`);
+  const zhMsgs = JSON.parse(read("_locales/zh_CN/messages.json"));
+  const directional = Object.keys(enMsgs).filter((key) => /^library\w*(?:Empty|Cover\w*|Hint)$/.test(key));
+  check(directional.length >= 7 && directional.includes("libraryVocabCoverHint") && !("libraryDetailEmpty" in enMsgs),
+    `_locales: the direction-word gate lost its category (got ${JSON.stringify(directional)}) or libraryDetailEmpty came back`);
+  for (const key of directional) {
+    check(!/\b(?:left|right)\b/i.test(enMsgs[key].message) && !/[左右]/.test((zhMsgs[key] || {}).message || ""),
+      `_locales: ${key} points at a direction -- in the single-pane layout there is nothing to the left or right of anything`);
   }
 }
 // Note editor (2026-08-06): the save button must stay IN LAYOUT while hidden.
@@ -9246,6 +9261,50 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "library.css: a lookup of the open word repeats its IPA in the dictionary result (spec §4.9: hide .xp-dict-ipa / -tag under #vocab-ref-result[data-same-word])");
   check(!/border-radius:\s*6px/.test((/#vocab-ref-result :is\(\.xp-retry, \.xp-dict-connect\)\s*\{([^}]*)\}/.exec(hand) || [, "border-radius: 6px"])[1]),
     "library.css: the dictionary retry / connect buttons lost their scoped rule or went back to a literal 6px radius (spec §4.9: --lib-radius-md)");
+}
+
+// ---- Library redesign T7b (spec §4.2-§4.7, §4.11, §6.5): the word's main
+// column, the cover and the sheet's container tiers.
+{
+  const fnBody = (src, sig) => (src.split(sig)[1] || "").split("\n}\n")[0];
+  const hand = stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, "");
+  // css-syntax's declarationValueMap matches one selector of a rule's list, in
+  // one at-rule context: the tier rules live inside @container blocks.
+  const tier = (w, sel) => declarationValueMap(hand, sel, { context: [`@container lib-detail (min-width: ${w}px)`] });
+  check(tier(1000, ".vocab-sheet").get("grid-template-columns") === "var(--lib-hang-w) minmax(0, var(--lib-main-max))" &&
+    tier(1280, ".vocab-sheet").get("grid-template-columns") === "var(--lib-hang-w) minmax(0, var(--lib-main-max)) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max))" &&
+    tier(1280, ".vocab-sheet").get("grid-template-rows") === "auto 1fr" &&
+    declarationValueMap(hand, ".vocab-sheet > [hidden]").get("display") === "none",
+    "library.css: the vocabulary sheet lost its spec §4.2 tiers (1000: 112 | 840; 1280: 112 | 840 | 64 | 360-720 with rows auto 1fr) or its [hidden] guard");
+  for (const [w, px] of [[640, 44], [1000, 56], [1280, 72]]) {
+    check(tier(w, ".vocab-detail-term").get("font-size") === `${px}px` && tier(w, ".lib-cover-title").get("font-size") === `${px}px`,
+      `library.css: the headword / cover title is not ${px}px from a ${w}px detail (spec §4.2 display tiers)`);
+  }
+  check(declarationValueMap(hand, ".vocab-detail-term.lib-first-line").get("margin-top") === "calc(-0.5 * (1.15 - 1) * 1em)" &&
+    declarationValueMap(hand, ".lib-cover-title.lib-first-line").get("margin-top") === "calc(-0.5 * (1.15 - 1) * 1em)" &&
+    tier(1280, ".vocab-ref > .lib-hang-label.lib-first-line").get("margin-top") === "calc((16px - 24px) / 2)",
+    "library.css: a display first line pulls up by something other than its half-leading (spec §6.5: 0.075em at line-height 1.15, 4px for 16/24) -- more clips CJK ink in the scroll box");
+  check(["zh", "ja", "ko"].every((lang) => [".vocab-detail-term", ".lib-cover-title"].every((el) =>
+    declarationValueMap(hand, `${el}.lib-first-line:lang(${lang})`).get("margin-top") === "0")),
+    "library.css: a CJK display first line pulls up again -- a CJK face's ascent + descent exceeds 1em, and under the CI font even the half-leading pull-up clipped its ink (render-audit G4, T7b)");
+  check(declarationValueMap(hand, ".vocab-note-input:placeholder-shown:not(:focus)").get("overflow") === "hidden" &&
+    /^calc\(var\(--lib-lh-body\) \+ 20px\)$/.test(declarationValueMap(hand, ".vocab-note-input:placeholder-shown:not(:focus)").get("height") || "") &&
+    declarationValueMap(hand, ".vocab-note-input:focus").get("min-height") === "96px" &&
+    declarationValueMap(hand, ".vocab-note-input").get("min-height") === "64px",
+    "library.css: the note box lost one of its three heights (one line empty and unfocused, 96 focused, content-sized from 64; spec §4.6)");
+  const note = fnBody(libraryVocabJs, "function _pbpVocabBuildNoteEditor(w) {");
+  check(note.includes('noteInput.placeholder = t("libraryNotePlaceholder");') &&
+    /noteInput\.addEventListener\("blur", \(\) => \{[\s\S]{0,200}noteSave\.click\(\)/.test(note),
+    "library-vocab.js: the note box lost its My note placeholder or its save-on-leave (the placeholder promises it)");
+  check(!/id="vocab-detail-empty"[^>]*data-i18n=/.test(libraryHtml) &&
+    /<div id="vocab-detail-empty" class="lib-cover">\s*<h2 class="lib-cover-title lib-first-line"><\/h2>\s*<p class="lib-cover-lead"><\/p>\s*<p class="lib-cover-hint" data-i18n="libraryVocabCoverHint">/.test(libraryHtml),
+    "library.html: the vocabulary cover must be title + stats + hint with data-i18n on the hint only (applyI18n would overwrite a container whole; spec §4.11)");
+  const cover = fnBody(libraryVocabJs, "function _pbpVocabRenderCover() {");
+  check(cover.includes("pbpLibSplitCount(") && cover.includes("pbpLibFillCount(") && !/innerHTML/.test(cover),
+    "library-vocab.js: the cover's numbers must be bolded by the sentinel split, never by string building or innerHTML (spec §3.5)");
+  check(fnBody(libraryVocabJs, "function _pbpVocabDetailFocusTargets(el) {").includes('".vocab-detail-status"') &&
+    !libraryVocabJs.includes("vocab-detail-actions"),
+    "library-vocab.js: the status button lost its vocab-detail-status focus target, or the retired .vocab-detail-actions row is back");
 }
 
 if (fail.length) {

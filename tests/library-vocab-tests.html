@@ -100,7 +100,11 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
     <aside class="vocab-detail-pane" id="vocab-detail-pane" aria-label="Word details">
       <button type="button" class="btn btn-sm ghost vocab-detail-back" id="vocab-detail-back" aria-label="Back to list" title="Back to list"><span class="btn-ic" data-ic="arrowLeft"></span><span>Back to list</span></button>
       <div class="vocab-sheet">
-        <div class="vocab-detail-empty" id="vocab-detail-empty">Pick a word from the list to see its details.</div>
+        <div id="vocab-detail-empty" class="lib-cover">
+          <h2 class="lib-cover-title lib-first-line"></h2>
+          <p class="lib-cover-lead"></p>
+          <p class="lib-cover-hint">Pick a word to see its context, your note and its dictionary entry, or look up any word directly.</p>
+        </div>
         <div class="vocab-detail" id="vocab-detail" hidden></div>
         <section id="vocab-ref" class="vocab-ref" aria-labelledby="vocab-ref-label">
           <h3 id="vocab-ref-label" class="lib-hang-label lib-first-line">Dictionary</h3>
@@ -952,7 +956,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("signed-out Vocabulary shows one actionable account state without reading ownerless words, while lookup remains available",
         reads === 0 && $id("vocab-list-pane").classList.contains("vocab-signed-out") &&
         !$id("vocab-no-account").hidden && $id("vocab-list").children.length === 0 &&
-        !$id("vocab-lookup-bar").hidden && $id("vocab-detail-empty").textContent.includes("libraryLookupSignedOutHint"));
+        !$id("vocab-lookup-bar").hidden && $id("vocab-detail-empty").querySelector(".lib-cover-lead").textContent === "libraryLookupSignedOutHint");
       document.body.classList.remove("lib-narrow-detail");
       $id("vocab-signed-out-lookup").click();
       check("signed-out narrow state has a direct route to dictionary lookup",
@@ -1383,7 +1387,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       detailEl().querySelector(".vocab-group-unit input").value = "Draft group";
       _vocabSelected = new Set(["d1", "d2", "d3"]);
       _pbpVocabSyncSelectionUi();
-      detailEl().querySelector(".vocab-detail-actions .btn").click();
+      detailEl().querySelector(".vocab-detail-status").click();
       await settle();
       check("a detail mutation reaches the store", (cStore.find((row) => row.id === "d1") || {}).status === "known");
       check("a detail mutation keeps unsaved note text and its save button",
@@ -1631,15 +1635,18 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     _vocabRows = [word];
     _pbpVocabRenderDetail(word);
     const detail = $id("vocab-detail");
-    detail.querySelector(".vocab-group-unit input").focus();
+    detail.querySelector(".vocab-edit-groups").click(); // opens the editor, caret in the group box
     _pbpVocabReconcileDetail();
     check("a rebuild hands focus to the rebuilt counterpart of the control that had it",
       document.activeElement === detail.querySelector(".vocab-group-unit input"),
       document.activeElement && (document.activeElement.className || document.activeElement.tagName));
-    detail.querySelector(".vocab-detail-actions .btn").focus();
+    check("T7 the group editor stays open across a rebuild (a chip's x or +/- fires one)",
+      detail.querySelector("#vocab-group-editor").hidden === false &&
+      detail.querySelector(".vocab-edit-groups").getAttribute("aria-expanded") === "true");
+    detail.querySelector(".vocab-detail-status").focus();
     _pbpVocabReconcileDetail();
     check("the status toggle keeps focus on its own rebuilt slot",
-      document.activeElement === detail.querySelector(".vocab-detail-actions .btn"),
+      document.activeElement === detail.querySelector(".vocab-detail-status"),
       document.activeElement && (document.activeElement.className || document.activeElement.tagName));
     detail.querySelector(".vocab-detail-group-chips .chip-remove").focus();
     _vocabRows = [{ ...word, groups: [] }];
@@ -1647,14 +1654,145 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     check("a removed group chip falls back to the input on its own row",
       document.activeElement === detail.querySelector(".vocab-group-unit input"),
       document.activeElement && (document.activeElement.className || document.activeElement.tagName));
-    // These paths await an owner read and a full IDB re-read; the user may
-    // have clicked away and started typing meanwhile.
     _vocabRows = [word];
     $id("vocab-search").focus();
     _pbpVocabReconcileDetail();
-    check("a rebuild never takes focus the user moved out of the pane",
-      document.activeElement === $id("vocab-search"));
+    check("a rebuild never takes focus the user moved out of the pane", document.activeElement === $id("vocab-search"));
     _pbpVocabRenderDetail(null);
+  }
+
+  // ---- Library redesign T7b (spec §4.3-§4.6, §4.11): the word's main column
+  // and the cover. --------------------------------------------------------
+  {
+    const realDictRun = _pbpVocabDictRun;
+    const mRealOwner = pbpVocabCurrentOwner, mRealAll = pbpVocabAll, mRealSetNote = pbpVocabSetNote;
+    const mRealCurrentOwner = _vocabCurrentOwner, mRealOwnerLabel = _vocabOwnerLabel;
+    try {
+      _pbpVocabDictRun = () => {};
+      const store = {
+        lay1: { id: "lay1", owner: "acct_layout", term: "constraint", language: "en", ipa: "/kənˈstreɪnt/",
+          gloss: "a limitation or restriction", note: "", status: "new", groups: ["Reading", "Close reading"],
+          contexts: [{ quote: "The constraint shaped the design.", articleTitle: "On design",
+            articleUrl: "https://www.example.com/a", createdAt: Date.now() - 86400000 }], createdAt: 1, updatedAt: 1 },
+        lay2: { id: "lay2", owner: "acct_layout", term: "bare", language: "fr", gloss: "", note: "", status: "known",
+          groups: [], contexts: [], createdAt: 2, updatedAt: 2 },
+      };
+      const rows = () => Object.values(store).map((r) => ({ ...r, groups: [...r.groups], contexts: [...r.contexts] }));
+      _vocabRows = rows();
+      _pbpVocabApplyView(true);
+      _pbpVocabRenderDetail(_vocabRows[0]);
+      const d = $id("vocab-detail");
+      const kinds = [...d.children].map((el) => el.matches("header.vocab-detail-head") ? "head"
+        : el.matches("section.lib-hang-sec.vocab-sec-context") ? "context"
+        : el.matches("section.lib-hang-sec.vocab-sec-note") ? "note" : el.className);
+      const sectionsNamed = [...d.querySelectorAll("section.lib-hang-sec")].every((sec) => {
+        const label = sec.querySelector(":scope > h3.lib-hang-label");
+        return !!label && sec.getAttribute("aria-labelledby") === label.id && !!sec.querySelector(":scope > .lib-hang-body");
+      });
+      check("T7 the detail reads head, context, my note -- each section named by a real h3 label",
+        kinds.join(",") === "head,context,note" && sectionsNamed, kinds.join(","));
+      const pron = d.querySelector(".vocab-detail-head > .vocab-pron-row");
+      const pronKinds = pron ? [...pron.children].map((el) => el.classList.contains("vocab-pron-ipa") ? "ipa"
+        : el.classList.contains("vocab-pron-lang") ? "lang" : el.classList.contains("vocab-detail-speak") ? "speak" : el.className) : [];
+      const term = d.querySelector(".vocab-detail-term");
+      check("T7 the headword is the first line and carries the word's language; the pronunciation line is IPA, language, Pronounce",
+        term.classList.contains("lib-first-line") && term.lang === "en" && pronKinds.join(",") === "ipa,lang,speak" &&
+        pron.querySelector(".vocab-pron-ipa").textContent === "/kənˈstreɪnt/", pronKinds.join(","));
+      check("T7 the stored gloss is its own paragraph under the pronunciation line",
+        (d.querySelector(".vocab-detail-head > p.vocab-detail-gloss") || {}).textContent === "a limitation or restriction");
+      const manage = d.querySelector(".vocab-detail-head > .vocab-manage-row");
+      const status = manage && manage.querySelector(".vocab-detail-status");
+      const groupsText = manage && manage.querySelector(".vocab-manage-groups");
+      const edit = manage && manage.querySelector(".vocab-edit-groups");
+      check("T7 the manage row: status button, the groups as plain text, then a collapsed Edit groups",
+        !!status && status.textContent.includes("vocabMarkKnown") && !status.classList.contains("ghost") &&
+        !!groupsText && [...groupsText.children].map((s) => s.textContent).join("|") === "Reading|Close reading" &&
+        !!edit && edit.getAttribute("aria-expanded") === "false" && edit.getAttribute("aria-controls") === "vocab-group-editor" &&
+        edit.textContent.includes("libraryEditGroups") && d.querySelector("#vocab-group-editor").hidden === true);
+      edit.click();
+      const editor = d.querySelector("#vocab-group-editor");
+      check("T7 Edit groups opens the editor, hides the plain group text, shows each chip's x and puts the caret in the group box",
+        edit.getAttribute("aria-expanded") === "true" && editor.hidden === false && groupsText.hidden === true &&
+        document.activeElement === editor.querySelector('.vocab-group-unit > input[type="text"]') &&
+        editor.querySelectorAll(".vocab-group-chip.removable").length === 2 &&
+        getComputedStyle(editor.querySelector(".chip-remove")).opacity === "1");
+      document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      check("T7 Esc in the group box closes the editor and hands focus back to Edit groups",
+        editor.hidden === true && edit.getAttribute("aria-expanded") === "false" && groupsText.hidden === false &&
+        document.activeElement === edit);
+      _pbpVocabRenderDetail(_vocabRows[1]);
+      const bareDetail = $id("vocab-detail");
+      const pron2 = bareDetail.querySelector(".vocab-pron-row");
+      check("T7 a word with no IPA, gloss, groups or context keeps language + Pronounce and skips the rest",
+        !pron2.querySelector(".vocab-pron-ipa") && !!pron2.querySelector(".vocab-pron-lang") && !!pron2.querySelector(".vocab-detail-speak") &&
+        !bareDetail.querySelector(".vocab-detail-gloss, .vocab-manage-groups, .vocab-sec-context") &&
+        bareDetail.querySelector(".vocab-detail-status").textContent.includes("vocabMarkLearning"));
+      const note = bareDetail.querySelector(".vocab-sec-note .vocab-note-input");
+      check("T7 the note box is named My note and invites a note",
+        !!note && note.placeholder === "libraryNotePlaceholder" && note.getAttribute("aria-label") === "librarySectionMyNote");
+      const saved = [];
+      pbpVocabCurrentOwner = async () => "acct_layout";
+      pbpVocabAll = async () => rows();
+      pbpVocabSetNote = async (id, owner, value) => { saved.push(`${id}:${value}`); store[id].note = value; return true; };
+      note.focus();
+      note.value = "blur me";
+      note.dispatchEvent(new Event("input", { bubbles: true }));
+      note.blur();
+      await settle();
+      check("T7 leaving the note box with an unsaved note saves it once", saved.join("|") === "lay2:blur me", saved.join("|"));
+      const note2 = $id("vocab-detail").querySelector(".vocab-note-input");
+      note2.focus();
+      note2.blur();
+      await settle();
+      check("T7 leaving an unchanged note box writes nothing", saved.length === 1, saved.join("|"));
+      // A rebuild under a focused, dirty box (another tab's write, a sibling
+      // mutation) removes it -- Chrome fires blur on that removal -- and is
+      // not the user leaving: nothing is written, the draft and Save survive.
+      const note3 = $id("vocab-detail").querySelector(".vocab-note-input");
+      note3.focus();
+      note3.value = "still typing";
+      note3.dispatchEvent(new Event("input", { bubbles: true }));
+      _vocabRows = rows();
+      _pbpVocabReconcileDetail();
+      await settle();
+      check("T7 a rebuild that removes the focused note box saves nothing and keeps the draft and Save",
+        saved.length === 1 && $id("vocab-detail").querySelector(".vocab-note-input").value === "still typing" &&
+        $id("vocab-detail-tail").querySelector(".vocab-note-save").hidden === false, saved.join("|"));
+
+      _pbpVocabRenderDetail(null);
+      _vocabCurrentOwner = "acct_layout";
+      _vocabOwnerLabel = "layout";
+      _vocabRows = rows();
+      _pbpVocabRenderCover();
+      const cover = $id("vocab-detail-empty");
+      const lead = cover.querySelector(".lib-cover-lead");
+      check("T7 the cover: big title, a stats sentence with bold numbers built from text nodes, and the hint",
+        cover.querySelector("h2.lib-cover-title.lib-first-line").textContent === "libraryVocabCoverTitle" &&
+        lead.textContent.startsWith("libraryVocabCoverLead:2,1,1,2,") &&
+        [...lead.querySelectorAll("b")].map((b) => b.textContent).join(",") === "2,1,1,2" &&
+        cover.querySelector(".lib-cover-hint").hidden === false && !cover.hasAttribute("data-i18n"),
+        lead.textContent);
+      _vocabRows = [];
+      _pbpVocabRenderCover();
+      check("T7 the cover with no words says so with the account, and drops the hint",
+        lead.textContent === "dictVocabEmpty:layout" && cover.querySelector(".lib-cover-hint").hidden === true, lead.textContent);
+      $id("vocab-list-pane").classList.add("vocab-signed-out");
+      _pbpVocabRenderCover();
+      check("T7 the signed-out cover points at the Dictionary column instead",
+        lead.textContent === "libraryLookupSignedOutHint" && cover.querySelector(".lib-cover-hint").hidden === true);
+      $id("vocab-list-pane").classList.remove("vocab-signed-out");
+      _vocabCurrentOwner = null;
+      _pbpVocabRenderCover();
+      check("T7 before the first count arrives the stats sentence stays empty (no flash of zeroes)", lead.textContent === "");
+    } finally {
+      _pbpVocabDictRun = realDictRun;
+      pbpVocabCurrentOwner = mRealOwner;
+      pbpVocabAll = mRealAll;
+      pbpVocabSetNote = mRealSetNote;
+      _vocabCurrentOwner = mRealCurrentOwner;
+      _vocabOwnerLabel = mRealOwnerLabel;
+      _pbpVocabRenderDetail(null);
+    }
   }
 
   // ---- D4: context source links carry a decorative external-link icon ----
@@ -1938,7 +2076,11 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     <aside class="vocab-detail-pane">
       <button type="button" class="btn btn-sm ghost vocab-detail-back"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
       <div class="vocab-sheet">
-        <div class="vocab-detail-empty">Pick a word from the list to see its details.</div>
+        <div class="lib-cover">
+          <h2 class="lib-cover-title lib-first-line" data-label="cover-title"></h2>
+          <p class="lib-cover-lead" data-label="cover-lead"></p>
+          <p class="lib-cover-hint" data-label="cover-hint"></p>
+        </div>
         <section class="vocab-ref">
           <h3 class="lib-hang-label" data-label="ref-label"></h3>
           <div class="vocab-filter-toolbar vocab-lookup-bar">
@@ -2005,6 +2147,11 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         } catch (_) {}
         panel.querySelector('[data-label="ref-label"]').textContent = m.librarySectionDict.message;
         panel.querySelector('[data-label="ref-free"]').textContent = m.libraryDictIdleFree.message;
+        panel.querySelector('[data-label="cover-title"]').textContent = m.libraryVocabCoverTitle.message;
+        panel.querySelector('[data-label="cover-lead"]').textContent = m.libraryVocabCoverLead.message
+          .replace("$TOTAL$", "5000").replace("$LEARNING$", "2500").replace("$KNOWN$", "2500")
+          .replace("$LANGS$", "12").replace("$DATE$", "October 3, 2026");
+        panel.querySelector('[data-label="cover-hint"]').textContent = m.libraryVocabCoverHint.message;
         await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
         if (width === 320 && theme === "github-light" && locale === "de") {
           const box = panel.querySelector(".lib-count-items").getBoundingClientRect();
@@ -2060,31 +2207,32 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
   batchBar.classList.remove("selecting");
   await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
   check("the browse-state batch row is display:none", frame.contentWindow.getComputedStyle(batchBar).display === "none");
-  // The detail pane's context quote is a real <blockquote> (library-vocab.js
-  // builds it that way), so the UA's `margin: 1em 40px` applies unless the rule
-  // resets it -- the quote then paints 40px right of the .vocab-detail-context
-  // rule that owns it and of the source link beneath it. Measured against the
-  // sibling link, which is the alignment a reader actually compares.
+  // The context is a <figure> with a <blockquote> and a <figcaption> (spec
+  // §4.6): both elements carry UA margins (figure 40px, blockquote 1em 40px),
+  // and an unreset one paints the quote right of its own source line.
   const detailPane = frame.contentDocument.querySelector(".vocab-detail-pane");
-  const contextProbe = frame.contentDocument.createElement("div");
-  contextProbe.className = "lib-block vocab-detail-context";
+  const contextProbe = frame.contentDocument.createElement("figure");
+  contextProbe.className = "vocab-detail-context";
   const probeQuote = frame.contentDocument.createElement("blockquote");
-  probeQuote.className = "notes-item-quote";
+  probeQuote.className = "vocab-context-quote";
   probeQuote.textContent = "context sentence";
+  const probeSource = frame.contentDocument.createElement("figcaption");
+  probeSource.className = "vocab-context-source";
   const probeLink = frame.contentDocument.createElement("a");
   probeLink.className = "notes-row-open";
   probeLink.href = "https://example.com/";
   probeLink.textContent = "Source article";
-  contextProbe.append(probeQuote, probeLink);
+  probeSource.appendChild(probeLink);
+  contextProbe.append(probeQuote, probeSource);
   detailPane.appendChild(contextProbe);
   const contextRect = contextProbe.getBoundingClientRect();
   const quoteRect = probeQuote.getBoundingClientRect();
   const linkRect = probeLink.getBoundingClientRect();
-  check("context quote aligns with its own rule and source link (no UA blockquote margin)",
+  check("context quote aligns with its figure and its source link (no UA figure / blockquote margin)",
     quoteRect.width > 0 && Math.abs(quoteRect.left - linkRect.left) <= 1 &&
-    Math.abs(quoteRect.top - contextRect.top) <= 1,
-    `quote.left=${quoteRect.left.toFixed(1)} link.left=${linkRect.left.toFixed(1)} ` +
-    `quote.top=${quoteRect.top.toFixed(1)} context.top=${contextRect.top.toFixed(1)}`);
+    Math.abs(quoteRect.left - contextRect.left) <= 1 && Math.abs(quoteRect.top - contextRect.top) <= 1,
+    `quote.left=${quoteRect.left.toFixed(1)} link.left=${linkRect.left.toFixed(1)} figure.left=${contextRect.left.toFixed(1)} ` +
+    `quote.top=${quoteRect.top.toFixed(1)} figure.top=${contextRect.top.toFixed(1)}`);
   frame.remove();
   // ---- Header fit (user ruling 10-04, library.js pbpLibWireVocabHeaderFit):
   // the filter row is wide exactly when its wide form's own width fits the
