@@ -3958,5 +3958,6 @@
   "libraryNotePlaceholder": { "message": "Запишите ассоциации, похожие слова, подсказки по употреблению. Сохраняется, когда вы уходите из поля" },
   "libraryVocabCoverTitle": { "message": "Словарик" },
   "libraryVocabCoverLead": { "message": "Слов: $TOTAL$ (изучаются: $LEARNING$, выучены: $KNOWN$), языков: $LANGS$. Последнее добавлено $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverLeadNoDate": { "message": "Слов: $TOTAL$ (изучаются: $LEARNING$, выучены: $KNOWN$), языков: $LANGS$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
   "libraryVocabCoverHint": { "message": "Выберите слово, чтобы увидеть контекст, свою заметку и словарную статью, или сразу найдите любое слово." }
 }

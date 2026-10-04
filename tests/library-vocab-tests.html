@@ -1320,6 +1320,13 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
   // fire-and-forget mutation chains (click handlers are not awaitable) without
   // waitFor's throw-on-timeout, which would abort the remaining suite.
   const settle = async () => { for (let i = 0; i < 25; i++) await task(); };
+  // Real-time waits for paths that cross IndexedDB or a 250ms dwell: poll a
+  // predicate instead of counting macrotasks. Returns whether it held.
+  const until = async (predicate, ms = 3000) => {
+    const start = performance.now();
+    while (!predicate() && performance.now() - start < ms) await new Promise((resolve) => setTimeout(resolve, 10));
+    return !!predicate();
+  };
   {
     const cRealOwner = pbpVocabCurrentOwner;
     const cRealAll = pbpVocabAll;
@@ -1590,7 +1597,14 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     const realChrome = window.chrome;
     const runs = [];
     let requests = 0, grant = false;
+    const realOwnerIdle = _vocabCurrentOwner;
+    const realEcdictIdle = pbpEcdictLookup;
     try {
+      // From T7c opening a word runs open-to-look-up: the local probe (stubbed
+      // empty here), then the grant check -- a signed-in owner, so the button
+      // this block tests is the open-to-look-up "no grant" answer.
+      pbpEcdictLookup = async () => ({ state: "unavailable" });
+      _vocabCurrentOwner = "acct_idle";
       _pbpVocabDictRun = (term, lang) => { runs.push(term + "/" + lang); };
       window.chrome = { permissions: {
         request: async () => { requests++; return grant; },
@@ -1600,7 +1614,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       _vocabRows = [word];
       _pbpVocabRenderDetail(null);
       _pbpVocabRenderDetail(word);
-      await settle();
+      await until(() => !!$id("vocab-ref-result").querySelector(".vocab-ref-idle"));
       const idleBtn = () => $id("vocab-ref-result").querySelector(".vocab-ref-idle");
       check("T7 an opened word with nothing local and no grant shows the lookup button and sends nothing",
         !!idleBtn() && runs.length === 0 && requests === 0 && $id("vocab-ref-result").dataset.refState === "idle" &&
@@ -1609,12 +1623,21 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("T7 the lookup button asks for the dictionary grant before anything else", requests === 1 && runs.length === 0);
       await settle();
       check("T7 a declined grant leaves the button in place and sends nothing", runs.length === 0 && !!idleBtn());
+      // Keyboard path: the button keeps focus through a declined prompt (a
+      // disabled button would have dropped it to <body>).
+      idleBtn().focus();
+      idleBtn().click();
+      const focusedDuring = document.activeElement === idleBtn();
+      await settle();
+      check("T7 a declined grant hands focus back to the lookup button (no disabled hop to <body>)",
+        requests === 2 && focusedDuring && document.activeElement === idleBtn() && !$id("vocab-ref-result").hasAttribute("aria-busy"),
+        `requests=${requests} during=${focusedDuring} active=${document.activeElement && (document.activeElement.className || document.activeElement.tagName)}`);
       grant = true;
       idleBtn().click();
       await settle();
       const langTarget = $id("vocab-lookup-lang-btn") || $id("vocab-lookup-lang");
       check("T7 a granted lookup runs the manual chain for the open word and hands focus to the language list box",
-        requests === 2 && runs.join(",") === "idle/en" && $id("vocab-ref-result").dataset.refState === "word" &&
+        requests === 3 && runs.join(",") === "idle/en" && $id("vocab-ref-result").dataset.refState === "word" &&
         _pbpVocabRelookedWordId === "idle1" && document.activeElement === langTarget,
         runs.join(",") + " active=" + (document.activeElement && document.activeElement.id));
       $id("vocab-ref-result").querySelector(".vocab-ref-relookup").click();
@@ -1622,6 +1645,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         runs.join(",") === "idle/en,idle/en" && document.activeElement === langTarget);
     } finally {
       _pbpVocabDictRun = realDictRun;
+      pbpEcdictLookup = realEcdictIdle;
+      _vocabCurrentOwner = realOwnerIdle;
       if (hadChrome) window.chrome = realChrome; else delete window.chrome;
       _pbpVocabRenderDetail(null);
     }
@@ -1678,6 +1703,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
           groups: [], contexts: [], createdAt: 2, updatedAt: 2 },
       };
       const rows = () => Object.values(store).map((r) => ({ ...r, groups: [...r.groups], contexts: [...r.contexts] }));
+      _vocabCurrentOwner = "acct_layout"; // the owner the detail's writes are checked against
       _vocabRows = rows();
       _pbpVocabApplyView(true);
       _pbpVocabRenderDetail(_vocabRows[0]);
@@ -1772,6 +1798,13 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         [...lead.querySelectorAll("b")].map((b) => b.textContent).join(",") === "2,1,1,2" &&
         cover.querySelector(".lib-cover-hint").hidden === false && !cover.hasAttribute("data-i18n"),
         lead.textContent);
+      // Older rows carry no creation time: no "last added" day to name, so the
+      // sentence stops after the counts (never "... on ." with an empty date).
+      _vocabRows = rows().map(({ createdAt, ...rest }) => rest);
+      _pbpVocabRenderCover();
+      check("T7 the cover's stats sentence drops its date clause when no word has a creation time",
+        lead.textContent === "libraryVocabCoverLeadNoDate:2,1,1,2" &&
+        [...lead.querySelectorAll("b")].map((b) => b.textContent).join(",") === "2,1,1,2", lead.textContent);
       _vocabRows = [];
       _pbpVocabRenderCover();
       check("T7 the cover with no words says so with the account, and drops the hint",
@@ -1791,6 +1824,394 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       pbpVocabSetNote = mRealSetNote;
       _vocabCurrentOwner = mRealCurrentOwner;
       _vocabOwnerLabel = mRealOwnerLabel;
+      _pbpVocabRenderDetail(null);
+    }
+  }
+
+  // Hand-written in freedictionaryapi.com's response shape (tests/md-dict-tests.html
+  // FDA_SAMPLE is the captured reference) -- never produced by our normalizer.
+  const FDA_CONSTRAINT = {
+    word: "constraint",
+    entries: [{
+      language: { code: "en", name: "English" },
+      partOfSpeech: "noun",
+      pronunciations: [{ type: "ipa", text: "/kənˈstreɪnt/", tags: ["Received Pronunciation"] }],
+      forms: [{ word: "constraints", tags: ["plural"] }],
+      senses: [
+        { definition: "Something that constrains; a restriction.", examples: ["Time is the main constraint."],
+          synonyms: ["limitation", "restriction"], antonyms: ["freedom"] },
+        { definition: "Unnatural restraint in manner.", examples: [] },
+      ],
+    }],
+    source: { url: "https://en.wiktionary.org/wiki/constraint", license: { name: "CC BY-SA 4.0", url: "https://creativecommons.org/licenses/by-sa/4.0/" } },
+  };
+
+  // ---- Library redesign T7c: open-to-look-up (spec §4.8, user ruling 10-03;
+  // Review Focus 2 and 3). Every outside dependency is stubbed and counts what
+  // it was asked: chrome.permissions, fetch, the dict2_ cache, both offline
+  // packs. A held response models a slow server that ignores the abort. -----
+  {
+    const hadChrome = "chrome" in window, realChrome = window.chrome;
+    const realFetch = window.fetch;
+    const realEcdict = pbpEcdictLookup, realPack = pbpPackLookup;
+    const hadCacheGet = "pbpAiCacheGet" in window, realCacheGet = window.pbpAiCacheGet;
+    const hadCacheSet = "pbpAiCacheSet" in window, realCacheSet = window.pbpAiCacheSet;
+    const realOwner = _vocabCurrentOwner;
+    const calls = { contains: 0, request: 0, fetch: [] };
+    let granted = false;
+    let holdTerms = new Set();
+    const held = [];
+    const cache = new Map();
+    const HIT_TERMS = new Set(["constraint", "eta", "epsilon"]);
+    const respond = (term) => ({
+      status: 200, ok: true,
+      json: async () => (HIT_TERMS.has(term) ? { ...JSON.parse(JSON.stringify(FDA_CONSTRAINT)), word: term } : { word: term, entries: [] }),
+    });
+    try {
+      window.chrome = { permissions: {
+        contains: async () => { calls.contains++; return granted; },
+        request: async () => { calls.request++; return granted; },
+      } };
+      window.fetch = (url) => {
+        const term = decodeURIComponent(String(url).split("/").pop());
+        calls.fetch.push(term);
+        if (!holdTerms.has(term)) return Promise.resolve(respond(term));
+        return new Promise((resolve) => held.push({ term, release: () => resolve(respond(term)) }));
+      };
+      window.pbpAiCacheGet = async (key) => (cache.has(key) ? { result: cache.get(key) } : null);
+      window.pbpAiCacheSet = async (key, value) => { cache.set(key, value); };
+      pbpEcdictLookup = async () => ({ state: "unavailable" });
+      pbpPackLookup = async () => ({ state: "unavailable" });
+      _vocabCurrentOwner = "acct_auto";
+      const word = (id, term) => ({ id, owner: "acct_auto", term, language: "en", groups: [], contexts: [], note: "", status: "new", createdAt: 1, updatedAt: 1 });
+      const rows = [word("a1", "constraint"), word("a2", "alpha"), word("a3", "beta"), word("a4", "gamma"), word("a5", "delta"),
+        word("a6", "epsilon"), word("a7", "zeta"), word("a8", "ephemeral"), word("a9", "eta")];
+      _vocabRows = rows;
+      _pbpVocabApplyView(true);
+      const result = $id("vocab-ref-result");
+      const open = (id) => _pbpVocabRenderDetail(rows.find((row) => row.id === id));
+      const dwell = () => new Promise((resolve) => setTimeout(resolve, PBP_VOCAB_AUTO_ONLINE_DELAY_MS + 80));
+      const reset = () => { calls.contains = 0; calls.request = 0; calls.fetch.length = 0; };
+      const online = () => result.querySelector(".xp-dict-online .xp-dict-entry, .xp-dict-online .xp-dict-msg");
+
+      _pbpVocabRenderDetail(null);
+      reset();
+      open("a2");
+      await dwell();
+      await settle();
+      check("T7 open-to-look-up without the grant: zero requests, no prompt, the lookup button",
+        calls.fetch.length === 0 && calls.request === 0 && calls.contains >= 1 &&
+        result.dataset.refState === "idle" && !!result.querySelector(".vocab-ref-idle"), JSON.stringify(calls));
+
+      granted = true;
+      reset();
+      open("a1");
+      await dwell();
+      await until(() => !!result.querySelector(".xp-dict-online .xp-dict-entry"));
+      check("T7 with the grant and nothing local or cached, a plain lowercase word costs exactly one request and renders",
+        calls.fetch.join(",") === "constraint" && calls.request === 0 &&
+        !!result.querySelector(".xp-dict-online .xp-dict-entry") && "sameWord" in result.dataset, JSON.stringify(calls));
+
+      open("a2");
+      await dwell();
+      await settle();
+      reset();
+      open("a1");
+      await until(() => !!result.querySelector(".xp-dict-online .xp-dict-entry"), 200);
+      check("T7 a word already in the dict2_ cache renders at once with zero requests",
+        calls.fetch.length === 0 && !!result.querySelector(".xp-dict-online .xp-dict-entry"), JSON.stringify(calls));
+
+      pbpEcdictLookup = async (t) => (t === "ephemeral"
+        ? { state: "hit", matched: "ephemeral", rows: [{ word: "ephemeral", translation: "a. 朝生暮死的, 短命的, 短暂的\\n[医] 暂时的" }] }
+        : { state: "ready-miss" });
+      reset();
+      open("a8");
+      await until(() => !!result.querySelector(".xp-dict-local .xp-dict-local-box"));
+      await dwell();
+      check("T7 an installed offline dictionary answers first: the local block and zero requests, grant or not",
+        calls.fetch.length === 0 && !!result.querySelector(".xp-dict-local .xp-dict-local-box") &&
+        !result.querySelector(".xp-dict-online .xp-dict-entry") && !!result.querySelector(".vocab-ref-foot .vocab-ref-relookup"),
+        JSON.stringify(calls));
+      result.querySelector(".vocab-ref-relookup").click();
+      await until(() => calls.fetch.length > 0 && !!online());
+      check("T7 Look up again after a local-only answer runs the full chain: the local block plus one request",
+        calls.fetch.join(",") === "ephemeral" && !!result.querySelector(".xp-dict-local .xp-dict-local-box") &&
+        _pbpVocabRelookedWordId === "a8", JSON.stringify(calls));
+      pbpEcdictLookup = async () => ({ state: "unavailable" });
+
+      reset();
+      for (const id of ["a3", "a4", "a5", "a6", "a7"]) {
+        open(id);
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      }
+      await dwell();
+      await settle();
+      check("T7 arrowing through five words inside the dwell sends one request, for the word the user stopped on",
+        calls.fetch.join(",") === "zeta", JSON.stringify(calls.fetch));
+
+      holdTerms = new Set(["eta"]);
+      reset();
+      open("a9");
+      await dwell();
+      await until(() => held.length === 1);
+      const inFlightCtrl = _pbpVocabDictCtrl;
+      const busyInFlight = result.getAttribute("aria-busy");
+      open("a2");
+      check("T7 a word switch aborts the previous word's run controller",
+        !!inFlightCtrl && inFlightCtrl.signal.aborted === true && _pbpVocabDictCtrl !== inFlightCtrl);
+      await dwell();
+      await until(() => !!online());
+      held.splice(0).forEach((h) => h.release());
+      await settle();
+      check("T7 switching words aborts the run in flight, and its late answer never lands in the column",
+        calls.fetch.join(",") === "eta,alpha" && _pbpVocabDetailWordId === "a2" &&
+        !result.querySelector(".xp-dict-entry") && !!result.querySelector(".xp-dict-online .xp-dict-msg"), JSON.stringify(calls.fetch));
+      check("T7 the dictionary column is aria-busy while a lookup runs and not once it has answered",
+        busyInFlight === "true" && !result.hasAttribute("aria-busy"), `inFlight=${busyInFlight} after=${result.getAttribute("aria-busy")}`);
+      holdTerms = new Set();
+
+      granted = false;
+      reset();
+      open("a3");
+      await until(() => !!result.querySelector(".vocab-ref-idle"));
+      let grantNext = true;
+      window.chrome.permissions.request = async () => { calls.request++; granted = grantNext; return granted; };
+      result.querySelector(".vocab-ref-idle").click();
+      const requestedFirst = calls.request === 1 && calls.fetch.length === 0;
+      await until(() => calls.fetch.length > 0 && !!online());
+      check("T7 the lookup button asks for the grant first, then looks the word up with one request",
+        requestedFirst && calls.fetch.join(",") === "beta" && result.dataset.refState === "word", JSON.stringify(calls));
+      granted = false;
+      grantNext = false;
+      reset();
+      open("a4");
+      await until(() => !!result.querySelector(".vocab-ref-idle"));
+      result.querySelector(".vocab-ref-idle").click();
+      await settle();
+      check("T7 a declined grant sends nothing and keeps the button",
+        calls.request === 1 && calls.fetch.length === 0 && !!result.querySelector(".vocab-ref-idle"), JSON.stringify(calls));
+
+      reset();
+      _pbpVocabRenderDetail(null);
+      await dwell();
+      check("T7 the cover never looks anything up on its own",
+        calls.contains === 0 && calls.fetch.length === 0 && result.dataset.refState === "free", JSON.stringify(calls));
+
+      granted = true;
+      reset();
+      open("a5");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      _pbpVocabReconcileDetail(); // a soft reload / another tab's write, inside the dwell
+      await dwell();
+      await until(() => !!online());
+      check("T7 a refresh inside the dwell (Review Focus 2) keeps the one pending request and its result",
+        calls.fetch.join(",") === "delta" && result.dataset.refState === "word" && !!online(), JSON.stringify(calls.fetch));
+
+      holdTerms = new Set(["epsilon"]);
+      reset();
+      open("a6");
+      await dwell();
+      await until(() => held.length === 1);
+      _pbpVocabReconcileDetail(); // while the request is in flight
+      held.splice(0).forEach((h) => h.release());
+      await until(() => !!result.querySelector(".xp-dict-online .xp-dict-entry"));
+      check("T7 a refresh while the request is in flight (Review Focus 2) neither repeats nor drops it",
+        calls.fetch.join(",") === "epsilon" && !!result.querySelector(".xp-dict-online .xp-dict-entry"), JSON.stringify(calls.fetch));
+      holdTerms = new Set();
+
+      granted = true;
+      reset();
+      open("a7");
+      await dwell();
+      await until(() => !!online());
+      const withGrant = calls.fetch.length;
+      granted = false;
+      open("a3");
+      await dwell();
+      await until(() => !!result.querySelector(".vocab-ref-idle"));
+      check("T7 the grant is read again at every open (Review Focus 3): granted -> one request; revoked -> none and the button",
+        withGrant === 1 && calls.fetch.length === 1 && result.dataset.refState === "idle", JSON.stringify(calls));
+
+      pbpEcdictLookup = async () => { throw new DOMException("pack mid-import", "InvalidStateError"); };
+      reset();
+      open("a4");
+      await dwell();
+      await until(() => !!result.querySelector(".vocab-ref-idle"));
+      check("T7 an offline pack that throws falls through quietly: no dictLoadFailed, no request without the grant, the button",
+        calls.fetch.length === 0 && result.dataset.refState === "idle" && !result.textContent.includes("dictLoadFailed"), JSON.stringify(calls));
+
+      pbpEcdictLookup = async () => ({ state: "error" });
+      granted = true;
+      reset();
+      open("a2");
+      await dwell();
+      await until(() => !!online());
+      check("T7 an offline pack in an error state falls through to the online step like a miss (one request, no dictLoadFailed)",
+        calls.fetch.join(",") === "alpha" && !result.textContent.includes("dictLoadFailed"), JSON.stringify(calls));
+    } finally {
+      if (hadChrome) window.chrome = realChrome; else delete window.chrome;
+      window.fetch = realFetch;
+      pbpEcdictLookup = realEcdict;
+      pbpPackLookup = realPack;
+      if (hadCacheGet) window.pbpAiCacheGet = realCacheGet; else delete window.pbpAiCacheGet;
+      if (hadCacheSet) window.pbpAiCacheSet = realCacheSet; else delete window.pbpAiCacheSet;
+      _vocabCurrentOwner = realOwner;
+      _pbpVocabRenderDetail(null);
+    }
+  }
+
+  // ---- Account change on the cover (spec §7.6): a different owner starts the
+  // page over -- another word's result goes, its run stops, the filters return
+  // to their defaults and the lookup box empties. The same owner again keeps
+  // what the user typed. ---------------------------------------------------
+  {
+    const realDictRun = _pbpVocabDictRun;
+    const realRefOwner = _pbpVocabRefOwner;
+    const realRows = _vocabRows;
+    try {
+      _pbpVocabDictRun = () => {};
+      _vocabRows = [{ id: "ac1", owner: "acct_ac_a", term: "account", language: "en", groups: ["Trip"], contexts: [], createdAt: 1, updatedAt: 1 }];
+      _pbpVocabRefreshGroupOptions(false);
+      _pbpVocabRenderDetail(null);
+      _pbpVocabSetAccountState("acct_ac_a");
+      const input = $id("vocab-lookup-input");
+      const result = $id("vocab-ref-result");
+      const status = $id("vocab-status-filter");
+      const group = $id("vocab-group-filter");
+      input.value = "harbour";
+      _pbpVocabFreeLookup();
+      const otherCtrl = _pbpVocabDictCtrl;
+      status.value = "known";
+      group.value = "Trip";
+      const setUp = result.dataset.refState === "other" && !!result.querySelector(".vocab-ref-head") &&
+        status.value === "known" && group.value === "Trip" && !!otherCtrl && !otherCtrl.signal.aborted;
+      input.value = "harb";
+      _pbpVocabSetAccountState("acct_ac_a");
+      const sameOwnerKept = input.value === "harb" && result.dataset.refState === "other" && status.value === "known";
+      _pbpVocabSetAccountState("acct_ac_b");
+      check("T7 an account change on the cover clears another word's result, stops its run, resets both filters and empties the box",
+        setUp && sameOwnerKept && otherCtrl.signal.aborted === true && result.dataset.refState === "free" &&
+        !result.querySelector(".vocab-ref-head") && status.value === "" && group.value === "" && input.value === "",
+        `setUp=${setUp} kept=${sameOwnerKept} aborted=${otherCtrl && otherCtrl.signal.aborted} state=${result.dataset.refState} status=${status.value} group=${group.value} input=${input.value}`);
+    } finally {
+      _pbpVocabDictRun = realDictRun;
+      _pbpVocabRefOwner = realRefOwner;
+      _vocabRows = realRows;
+      _pbpVocabRefreshGroupOptions(false);
+      $id("vocab-lookup-input").value = "";
+      $id("vocab-status-filter").value = "";
+      $id("vocab-group-filter").value = "";
+      _pbpVocabRenderDetail(null);
+    }
+  }
+
+  // ---- Account isolation for the detail's writes (CLAUDE.md): a click whose
+  // owner read comes back as another account writes nothing for either one,
+  // and the page re-renders for whoever is signed in now. -------------------
+  {
+    const realDictRun = _pbpVocabDictRun;
+    const realOwnerFn = pbpVocabCurrentOwner, realSetNote = pbpVocabSetNote, realStatus = pbpVocabBatchSetStatus;
+    const realAddGroup = pbpVocabBatchAddGroup, realRenderPanel = renderVocabPanel, realCur = _vocabCurrentOwner;
+    const realAll = pbpVocabAll;
+    const writes = [];
+    let rerenders = 0;
+    try {
+      _pbpVocabDictRun = () => {};
+      _vocabCurrentOwner = "acct_iso_a";
+      const word = { id: "iso1", owner: "acct_iso_a", term: "isolate", language: "en", groups: [], contexts: [], note: "", status: "new", createdAt: 1, updatedAt: 1 };
+      _vocabRows = [word];
+      _pbpVocabRenderDetail(word);
+      pbpVocabCurrentOwner = async () => "acct_iso_b";
+      pbpVocabAll = async () => [{ ...word }]; // a write that slipped through would reload this
+      pbpVocabSetNote = async (id, owner) => { writes.push("note:" + owner); return true; };
+      pbpVocabBatchSetStatus = async (ids, owner) => { writes.push("status:" + owner); return true; };
+      pbpVocabBatchAddGroup = async (ids, owner) => { writes.push("group:" + owner); return true; };
+      renderVocabPanel = async () => { rerenders++; };
+      const d = $id("vocab-detail");
+      d.querySelector(".vocab-detail-status").click();
+      await settle();
+      _pbpVocabRenderDetail(null);
+      _pbpVocabRenderDetail(word);
+      d.querySelector(".vocab-edit-groups").click();
+      d.querySelector(".vocab-group-unit input").value = "Trip";
+      d.querySelector(".vocab-group-step").click();
+      await settle();
+      check("T7 a status or group write whose owner read returns another account is abandoned and the panel re-renders",
+        writes.length === 0 && rerenders === 2, `writes=${writes.join(",")} rerenders=${rerenders}`);
+      const note = d.querySelector(".vocab-note-input");
+      note.value = "for account a";
+      note.dispatchEvent(new Event("input", { bubbles: true }));
+      $id("vocab-detail-tail").querySelector(".vocab-note-save").click();
+      await settle();
+      check("T7 a note save (Save, the chord or leaving the box) whose owner read returns another account writes nothing",
+        writes.length === 0 && rerenders === 3 && $id("vocab-detail-tail").querySelector(".vocab-note-save").disabled === false,
+        `writes=${writes.join(",")} rerenders=${rerenders}`);
+    } finally {
+      _pbpVocabDictRun = realDictRun;
+      pbpVocabCurrentOwner = realOwnerFn;
+      pbpVocabSetNote = realSetNote;
+      pbpVocabBatchSetStatus = realStatus;
+      pbpVocabBatchAddGroup = realAddGroup;
+      renderVocabPanel = realRenderPanel;
+      pbpVocabAll = realAll;
+      _vocabCurrentOwner = realCur;
+      _pbpVocabRenderDetail(null);
+    }
+  }
+
+  // ---- Save on leaving the note box (T7b, user ruling 10-03): the edges. ---
+  {
+    const realDictRun = _pbpVocabDictRun;
+    const realOwnerFn = pbpVocabCurrentOwner, realAll = pbpVocabAll, realSetNote = pbpVocabSetNote, realCur = _vocabCurrentOwner;
+    try {
+      _pbpVocabDictRun = () => {};
+      _vocabCurrentOwner = "acct_leave";
+      const store = { lv1: { id: "lv1", owner: "acct_leave", term: "leave", language: "en", groups: [], contexts: [], note: "", status: "new", createdAt: 1, updatedAt: 1 } };
+      const rows = () => Object.values(store).map((r) => ({ ...r, groups: [...r.groups], contexts: [...r.contexts] }));
+      const saved = [];
+      pbpVocabCurrentOwner = async () => "acct_leave";
+      pbpVocabAll = async () => rows();
+      pbpVocabSetNote = async (id, owner, value) => { saved.push(value); store[id].note = value; return true; };
+      _vocabRows = rows();
+      const field = () => $id("vocab-detail").querySelector(".vocab-note-input");
+      const saveBtn = () => $id("vocab-detail-tail").querySelector(".vocab-note-save");
+      const type = (text) => { field().value = text; field().dispatchEvent(new Event("input", { bubbles: true })); };
+
+      _pbpVocabRenderDetail(_vocabRows[0]);
+      field().focus();
+      type("closing the word");
+      _pbpVocabRenderDetail(null);
+      await settle();
+      check("T7 closing the word under a focused, dirty note box (the box is removed, not left) writes nothing",
+        saved.length === 0, saved.join("|"));
+
+      _pbpVocabRenderDetail(_vocabRows[0]);
+      $id("vocab-status").textContent = "";
+      field().focus();
+      type("left by Tab");
+      field().blur();
+      await settle();
+      check("T7 a save on leaving the box says so in the status line (vocabNoteSaved)",
+        saved.join("|") === "left by Tab" && $id("vocab-status").textContent.includes("vocabNoteSaved"),
+        `${saved.join("|")} status=${$id("vocab-status").textContent}`);
+
+      field().focus();
+      type("pressed Save");
+      const pressed = saveBtn();
+      pressed.focus(); // mousedown on Save moves focus: the box's blur starts the save
+      await Promise.resolve();
+      await Promise.resolve();
+      const disabledAtClick = pressed.disabled;
+      pressed.click(); // the click that follows lands on the disabled button
+      await settle();
+      check("T7 pressing Save with the mouse saves once: the blur saves, the click after it lands on a disabled button",
+        saved.join("|") === "left by Tab|pressed Save" && disabledAtClick === true, `${saved.join("|")} disabledAtClick=${disabledAtClick}`);
+    } finally {
+      _pbpVocabDictRun = realDictRun;
+      pbpVocabCurrentOwner = realOwnerFn;
+      pbpVocabAll = realAll;
+      pbpVocabSetNote = realSetNote;
+      _vocabCurrentOwner = realCur;
       _pbpVocabRenderDetail(null);
     }
   }
@@ -1969,9 +2390,13 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     const rRealOwner = pbpVocabCurrentOwner;
     const rRealAll = pbpVocabAll;
     const rRealSetNote = pbpVocabSetNote;
+    const rRealCurrentOwner = _vocabCurrentOwner;
     try {
       const word = { id: "ce1", owner: "acct_chord", term: "chord", groups: [], contexts: [], note: "old", updatedAt: 1 };
       const saved = [];
+      // The detail is rendered for the signed-in owner (its writes are checked
+      // against it -- account isolation).
+      _vocabCurrentOwner = "acct_chord";
       pbpVocabCurrentOwner = async () => "acct_chord";
       pbpVocabAll = async () => [{ ...word }];
       pbpVocabSetNote = async (id, owner, value) => { saved.push(value); return true; };
@@ -2028,6 +2453,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       pbpVocabCurrentOwner = rRealOwner;
       pbpVocabAll = rRealAll;
       pbpVocabSetNote = rRealSetNote;
+      _vocabCurrentOwner = rRealCurrentOwner;
       _pbpVocabRenderDetail(null);
     }
   }

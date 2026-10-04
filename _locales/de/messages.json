@@ -3958,5 +3958,6 @@
   "libraryNotePlaceholder": { "message": "Schreib etwas dazu: Assoziationen, Verwechslungsgefahr, Hinweise zur Verwendung. Wird beim Verlassen des Felds gespeichert" },
   "libraryVocabCoverTitle": { "message": "Vokabeln" },
   "libraryVocabCoverLead": { "message": "$TOTAL$ Wörter, davon $LEARNING$ im Lernen und $KNOWN$ gelernt, in $LANGS$ Sprachen. Zuletzt hinzugefügt am $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$ Wörter, davon $LEARNING$ im Lernen und $KNOWN$ gelernt, in $LANGS$ Sprachen.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
   "libraryVocabCoverHint": { "message": "Wähle ein Wort, um Kontext, deine Notiz und den Wörterbucheintrag zu sehen, oder schlag direkt ein beliebiges Wort nach." }
 }

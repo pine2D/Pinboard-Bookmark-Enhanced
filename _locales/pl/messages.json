@@ -3958,5 +3958,6 @@
   "libraryNotePlaceholder": { "message": "Zapisz skojarzenia, mylone słowa, wskazówki użycia. Zapisuje się po opuszczeniu pola" },
   "libraryVocabCoverTitle": { "message": "Słówka" },
   "libraryVocabCoverLead": { "message": "Słówka: $TOTAL$ (w nauce: $LEARNING$, opanowane: $KNOWN$), języki: $LANGS$. Ostatnio dodane: $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverLeadNoDate": { "message": "Słówka: $TOTAL$ (w nauce: $LEARNING$, opanowane: $KNOWN$), języki: $LANGS$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
   "libraryVocabCoverHint": { "message": "Wybierz słowo, aby zobaczyć kontekst, swoją notatkę i hasło ze słownika, albo od razu sprawdź dowolne słowo." }
 }

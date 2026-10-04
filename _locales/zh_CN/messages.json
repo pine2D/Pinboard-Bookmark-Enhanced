@@ -3952,5 +3952,6 @@
   "libraryNotePlaceholder": { "message": "写点什么：联想、易混词、用法提醒。离开输入框时自动保存" },
   "libraryVocabCoverTitle": { "message": "生词本" },
   "libraryVocabCoverLead": { "message": "$TOTAL$ 个词，学习中 $LEARNING$ 个、已掌握 $KNOWN$ 个，来自 $LANGS$ 种语言；最近一次收录在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$ 个词，学习中 $LEARNING$ 个、已掌握 $KNOWN$ 个，来自 $LANGS$ 种语言。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
   "libraryVocabCoverHint": { "message": "选一个词，查看它的语境、你的笔记和词典释义；也可以直接查任意词。" }
 }

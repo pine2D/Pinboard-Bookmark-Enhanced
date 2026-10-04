@@ -366,6 +366,8 @@ function _pbpVocabBuildRow(w) {
 // are built together because the save button's whole existence is derived
 // from the field's dirty state.
 function _pbpVocabBuildNoteEditor(w) {
+  // The owner this editor was rendered for (see _pbpVocabOwnerMoved).
+  const renderOwner = _vocabCurrentOwner;
   const noteWrap = document.createElement("div");
   noteWrap.className = "vocab-note-edit";
   const noteInput = document.createElement("textarea");
@@ -434,6 +436,7 @@ function _pbpVocabBuildNoteEditor(w) {
     const restoreSelection = _pbpVocabHoldSelection(gen);
     try {
       owner = await pbpVocabCurrentOwner();
+      if (_pbpVocabOwnerMoved(owner, renderOwner, gen)) return;
       const ok = await pbpVocabSetNote(w.id, owner, noteInput.value);
       const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
       restoreSelection();
@@ -595,6 +598,8 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
 
   const frag = document.createDocumentFragment();
   const langCode = w.language && w.language !== "und" ? w.language : "";
+  // Every write this detail can fire is checked against this owner.
+  const renderOwner = _vocabCurrentOwner;
 
   // 1. Head (spec §4.4-§4.5): the word, its pronunciation line, the stored
   // gloss, the manage row and the (collapsed) group editor.
@@ -646,7 +651,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   statusBtn.className = "btn btn-sm vocab-detail-status";
   setBtnIcon(statusBtn, "checkCircle", t(known ? "vocabMarkLearning" : "vocabMarkKnown"));
   statusBtn.addEventListener("click", () => _pbpVocabDetailMutate(w, (owner) =>
-    pbpVocabBatchSetStatus([w.id], owner, known ? "new" : "known")));
+    pbpVocabBatchSetStatus([w.id], owner, known ? "new" : "known"), renderOwner));
   manage.appendChild(statusBtn);
   const currentGroups = pbpVocabGroups(w);
   if (currentGroups.length) {
@@ -699,7 +704,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   addGroup.setAttribute("aria-label", t("vocabAddToGroup"));
   addGroup.addEventListener("click", () => {
     const name = pbpVocabNormalizeGroupName(groupInput.value);
-    if (name) _pbpVocabDetailMutate(w, (owner) => pbpVocabBatchAddGroup([w.id], owner, name));
+    if (name) _pbpVocabDetailMutate(w, (owner) => pbpVocabBatchAddGroup([w.id], owner, name), renderOwner);
   });
   groupUnit.appendChild(addGroup);
   const removeGroup = document.createElement("button");
@@ -710,7 +715,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   removeGroup.setAttribute("aria-label", t("vocabRemoveFromGroup"));
   removeGroup.addEventListener("click", () => {
     const name = pbpVocabNormalizeGroupName(groupInput.value);
-    if (name) _pbpVocabDetailMutate(w, (owner) => pbpVocabBatchRemoveGroup([w.id], owner, name));
+    if (name) _pbpVocabDetailMutate(w, (owner) => pbpVocabBatchRemoveGroup([w.id], owner, name), renderOwner);
   });
   groupUnit.appendChild(removeGroup);
   editor.appendChild(groupUnit);
@@ -731,7 +736,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
       removeChip.setAttribute("aria-label", t("vocabRemoveFromGroup") + ": " + group);
       removeChip.addEventListener("click", (e) => {
         e.stopPropagation();
-        _pbpVocabDetailMutate(w, (owner) => pbpVocabBatchRemoveGroup([w.id], owner, group));
+        _pbpVocabDetailMutate(w, (owner) => pbpVocabBatchRemoveGroup([w.id], owner, group), renderOwner);
       });
       chip.appendChild(removeChip);
       chipList.appendChild(chip);
@@ -862,7 +867,10 @@ let _pbpVocabDictChildCleanup = null;
 // slot-invariant comment at each call site). `rerun` is the caller's "run
 // this exact query again" callback (e.g. re-read a language <select> and
 // call its own startRun); it only fires if this run is still the live one.
-function _pbpVocabDictRun(term, lang, els, sentence, rerun) {
+// `online: false` runs the local ECDICT block alone (open-to-look-up, T7).
+// #vocab-ref-result is aria-busy while the live run fills it; only the run
+// still live when its legs settle takes the flag down.
+function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true } = {}) {
   const { localEl, onlineEl } = els;
   if (_pbpVocabDictChildCtrl) _pbpVocabDictChildCtrl.abort();
   if (_pbpVocabDictChildCleanup) { _pbpVocabDictChildCleanup(); _pbpVocabDictChildCleanup = null; }
@@ -904,10 +912,23 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun) {
     again();
   };
   _pbpDictCurrent = cur;
+  const host = $id("vocab-ref-result");
+  if (host && host.contains(onlineEl)) host.setAttribute("aria-busy", "true");
+  const settled = () => {
+    if (host && _pbpVocabDictChildCtrl === child && !child.signal.aborted) host.removeAttribute("aria-busy");
+  };
+  if (!online) {
+    // Open-to-look-up after an offline-pack hit: the local block only. The
+    // online chain does not start, so it neither renders nor sends anything;
+    // "Look up again" runs the full chain.
+    _pbpDictEcdictSide(localEl, term, lang, signal, cur).finally(settled);
+    return;
+  }
   _pbpDictSlotSkeleton(onlineEl);
-  _pbpDictEcdictSide(localEl, term, lang, signal, cur);
-  _pbpDictSlotRun(onlineEl, term, lang, signal, Promise.resolve(""), cur.rerun, cur.sentence)
+  const local = _pbpDictEcdictSide(localEl, term, lang, signal, cur);
+  const remote = _pbpDictSlotRun(onlineEl, term, lang, signal, Promise.resolve(""), cur.rerun, cur.sentence)
     .catch((err) => console.warn("library relookup failed:", err.name, err.message));
+  Promise.allSettled([local, remote]).then(settled);
 }
 
 // Session-only memory of the language the cover lookup uses -- never
@@ -920,6 +941,138 @@ let _pbpVocabRelookedWordId = null;
 // The owner the column's content belongs to (spec §7.6). undefined until the
 // first _pbpVocabSetAccountState, which therefore always renders the column.
 let _pbpVocabRefOwner;
+
+// Open-to-look-up (spec §4.8, user ruling 10-03). Opening a saved word looks
+// it up on its own, local first: an installed offline dictionary (ECDICT for
+// en, CC-CEDICT for zh), then the dict2_ result cache -- both zero network,
+// and either one answering ends it. Only when neither has the word AND the
+// freedictionaryapi grant already exists (permissions.contains -- this path
+// never calls permissions.request) does it go online, and only after the word
+// has stayed open for PBP_VOCAB_AUTO_ONLINE_DELAY_MS, so arrowing through the
+// list never sends the words it passes. Without the grant the column shows
+// the one button that asks. A word switch, the cover or an account change
+// aborts the run, and nothing late is written: every write re-checks the
+// run's signal, the open word and the owner. No AI leg, as before.
+const PBP_VOCAB_AUTO_ONLINE_DELAY_MS = 250;
+let _pbpVocabAutoTimer = 0;
+
+// Zero-network: what the device already knows about this word. A pack that is
+// importing, deleted or failing says nothing in the UI (rules/dict.md -- the
+// local side is UI-silent) and the lookup falls through to the cache.
+async function _pbpVocabLocalProbe(term, lang, signal) {
+  const exact = pbpDictNormalizeTerm(term);
+  if (!exact || !lang) return null;
+  if (lang === "en" || lang === "zh") {
+    try {
+      const loaded = await _pbpDictLoadPack();
+      if (signal.aborted) return null;
+      if (loaded && lang === "en" && typeof pbpEcdictLookup === "function") {
+        let local = await pbpEcdictLookup(exact);
+        if (signal.aborted) return null;
+        // Exact first ("e.g." is a headword); on a genuine miss, the cleaned form.
+        if (local && local.state === "ready-miss") {
+          const cleaned = pbpDictCleanCandidate(exact, lang);
+          if (cleaned) {
+            local = await pbpEcdictLookup(cleaned);
+            if (signal.aborted) return null;
+          }
+        }
+        if (local && local.state === "hit") {
+          const norm = pbpEcdictEntryToNorm(local.rows, local.matched);
+          if (norm.entries.length) return { source: "ecdict", norm, matched: local.matched };
+        }
+      }
+      if (loaded && lang === "zh" && typeof pbpPackLookup === "function" && typeof pbpCedictLookupKeys === "function") {
+        const local = await pbpPackLookup(pbpCedictLookupKeys(pbpDictCleanCandidate(exact, lang) || exact));
+        if (signal.aborted) return null;
+        if (local && local.state === "hit") {
+          return { source: "cedict", norm: pbpCedictEntryToNorm(local.rows, local.matched), matched: local.matched };
+        }
+      }
+    } catch (err) {
+      console.warn("library auto lookup: local pack failed:", err.name, err.message);
+    }
+  }
+  const cached = await _pbpDictCacheGet(lang, exact); // swallows its own errors (returns null)
+  if (signal.aborted) return null;
+  return cached ? { source: "cache", norm: cached, matched: exact } : null;
+}
+
+async function _pbpVocabAutoLookup(w) {
+  const host = $id("vocab-ref-result");
+  const sel = $id("vocab-lookup-lang");
+  if (!w || !host || !sel) return "stale";
+  // While this runs the column is empty -- never the previous word's result,
+  // never the previous language's. aria-busy until it lands on an answer or
+  // the button (_pbpVocabRenderRefIdle / _pbpVocabDictRun clear it).
+  host.replaceChildren();
+  delete host.dataset.sameWord;
+  delete host.dataset.refTerm;
+  delete host.dataset.refLang;
+  host.dataset.refState = "word";
+  const owner = _vocabCurrentOwner;
+  // The cover and the signed-out page never look anything up on their own.
+  if (!String(owner || "").startsWith("acct_")) { _pbpVocabRenderRefIdle("word"); return "idle"; }
+  host.setAttribute("aria-busy", "true");
+  if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
+  clearTimeout(_pbpVocabAutoTimer);
+  const ctrl = new AbortController();
+  _pbpVocabDictCtrl = ctrl;
+  const signal = ctrl.signal;
+  const wordId = w.id;
+  // _vocabCurrentOwner is null only inside a re-read (renderVocabPanel clears
+  // it first, then restores the same owner); a real account change aborts
+  // this run before that, so null is no mismatch -- any other owner is.
+  const stale = () => signal.aborted || _pbpVocabDetailWordId !== wordId ||
+    (_vocabCurrentOwner !== null && _vocabCurrentOwner !== owner);
+  const lang = sel.value || (w.language && w.language !== "und" ? w.language : "") || _vocabLookupLang;
+  const sentence = (w.contexts && w.contexts[0] && w.contexts[0].quote) || "";
+  const begin = () => {
+    const els = _pbpVocabRefSlot();
+    host.dataset.refState = "word";
+    host.dataset.sameWord = "";
+    delete host.dataset.refTerm;
+    delete host.dataset.refLang;
+    const again = () => { if (!stale()) _pbpVocabDictRun(w.term, lang, els, sentence, again); };
+    return { els, again };
+  };
+  let hit = null;
+  try {
+    hit = await _pbpVocabLocalProbe(w.term, lang, signal);
+  } catch (err) {
+    console.warn("library auto lookup: probe failed:", err.name, err.message);
+  }
+  if (stale()) return "stale";
+  if (hit) {
+    // An ECDICT hit shows its block alone (online: false). A CC-CEDICT or a
+    // cache hit goes through the normal chain, which answers it before the
+    // grant check -- still zero network.
+    const { els, again } = begin();
+    _pbpVocabDictRun(w.term, lang, els, sentence, again, { online: hit.source !== "ecdict" });
+    return hit.source === "cache" ? "cache" : "local";
+  }
+  let granted = false;
+  try {
+    // Read at the call site, never cached: a grant revoked in
+    // chrome://extensions while the page is open has to be seen.
+    const perms = typeof chrome !== "undefined" ? chrome.permissions : undefined;
+    granted = !!perms && await perms.contains({ origins: [PBP_DICT_ORIGIN + "/*"] });
+  } catch (err) {
+    console.warn("library auto lookup: grant check failed:", err.name, err.message);
+  }
+  if (stale()) return "stale";
+  if (!granted) { _pbpVocabRenderRefIdle("word"); return "idle"; }
+  const { els, again } = begin();
+  _pbpDictSlotSkeleton(els.onlineEl);
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, PBP_VOCAB_AUTO_ONLINE_DELAY_MS);
+    _pbpVocabAutoTimer = timer;
+    signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+  });
+  if (stale()) return "stale";
+  _pbpVocabDictRun(w.term, lang, els, sentence, again);
+  return "online";
+}
 
 function _pbpVocabSyncLookupPlaceholder() {
   const input = $id("vocab-lookup-input");
@@ -986,6 +1139,7 @@ function _pbpVocabRefSlot() {
 function _pbpVocabRenderRefIdle(mode) {
   const host = $id("vocab-ref-result");
   if (!host) return;
+  host.removeAttribute("aria-busy");
   delete host.dataset.sameWord;
   delete host.dataset.refTerm;
   delete host.dataset.refLang;
@@ -1002,9 +1156,13 @@ function _pbpVocabRenderRefIdle(mode) {
   btn.type = "button";
   btn.className = "btn btn-sm ghost vocab-ref-idle";
   setBtnIcon(btn, "book", t("libraryDictIdle"));
+  // A local busy flag, not `disabled`: disabling the focused button drops
+  // focus to <body>, and a declined prompt would leave the keyboard user
+  // nowhere. Declined, focus is simply still on this button.
+  let busy = false;
   btn.addEventListener("click", async () => {
-    if (btn.disabled) return;
-    btn.disabled = true;
+    if (busy) return;
+    busy = true;
     const wordId = _pbpVocabDetailWordId;
     // The grant request is the first thing this click waits on: waiting on
     // anything before it would spend the user gesture Chrome requires
@@ -1016,7 +1174,7 @@ function _pbpVocabRenderRefIdle(mode) {
     } catch (err) {
       console.warn("library dictionary grant failed:", err.name, err.message);
     }
-    btn.disabled = false;
+    busy = false;
     if (!granted || _pbpVocabDetailWordId !== wordId) return;
     const w = _vocabRows.find((row) => row.id === wordId);
     if (!w) return;
@@ -1029,9 +1187,11 @@ function _pbpVocabRenderRefIdle(mode) {
 // A word change (or the cover, or an account change on the cover) starts the
 // column clean: the run stops, the box empties, the manual mark drops, and
 // the list box shows the open word's language (spec §4.10 -- an "und" word
-// leaves it alone) or, on the cover, the session language.
+// leaves it alone) or, on the cover, the session language. For a word,
+// open-to-look-up takes over the column (T7c).
 function _pbpVocabResetRef(w) {
   if (_pbpVocabDictCtrl) { _pbpVocabDictCtrl.abort(); _pbpVocabDictCtrl = null; }
+  clearTimeout(_pbpVocabAutoTimer);
   _pbpVocabRelookedWordId = null;
   const input = $id("vocab-lookup-input");
   if (input) input.value = "";
@@ -1043,7 +1203,8 @@ function _pbpVocabResetRef(w) {
     window.pbpListboxSync?.(sel);
   }
   _pbpVocabSyncLookupPlaceholder();
-  _pbpVocabRenderRefIdle(w ? "word" : "free");
+  if (w) _pbpVocabAutoLookup(w).catch((err) => console.warn("library auto lookup failed:", err.name, err.message));
+  else _pbpVocabRenderRefIdle("free");
 }
 
 // The manual full chain for the open word: local pack + cache + online,
@@ -1054,6 +1215,7 @@ function _pbpVocabRelookup(w) {
   if (!w || !host || !sel) return;
   _pbpVocabRelookedWordId = w.id;
   if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
+  clearTimeout(_pbpVocabAutoTimer);
   _pbpVocabDictCtrl = new AbortController();
   const els = _pbpVocabRefSlot();
   host.dataset.refState = "word";
@@ -1075,6 +1237,7 @@ function _pbpVocabLookupOther(term, lang) {
   if (!host || !term) return;
   _pbpVocabRelookedWordId = null;
   if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
+  clearTimeout(_pbpVocabAutoTimer);
   _pbpVocabDictCtrl = new AbortController();
   const els = _pbpVocabRefSlot();
   host.dataset.refState = "other";
@@ -1140,7 +1303,8 @@ function _pbpVocabFreeLookup() {
 
 // spec §4.10: only the cover and "another word's result" write the session
 // language. With a word open, a hand lookup re-runs the full chain in the new
-// language; T7c gives the untouched word its open-to-look-up re-run.
+// language; a word not looked up by hand re-runs open-to-look-up in the new
+// language (local, cache, then online only with the grant).
 function _pbpVocabLookupLangChanged() {
   const sel = $id("vocab-lookup-lang");
   const host = $id("vocab-ref-result");
@@ -1153,6 +1317,7 @@ function _pbpVocabLookupLangChanged() {
   const w = _pbpVocabDetailWordId ? _vocabRows.find((row) => row.id === _pbpVocabDetailWordId) : null;
   if (!w) { _vocabLookupLang = sel.value; return; }
   if (_pbpVocabRelookedWordId === w.id) _pbpVocabRelookup(w);
+  else _pbpVocabAutoLookup(w).catch((err) => console.warn("library auto lookup failed:", err.name, err.message));
 }
 
 // One-time wiring for the lookup row, from the guarded top-level section at
@@ -1295,14 +1460,30 @@ function _pbpVocabHoldSelection(gen) {
   };
 }
 
+// The detail's writes (status, groups, note) act for the owner the detail was
+// rendered for, never for whoever is signed in by the time the click's owner
+// read returns (CLAUDE.md account isolation). On a mismatch nothing is
+// written; this click took the render generation, so it re-renders the panel
+// for the account that is signed in now. Returns whether to abandon.
+function _pbpVocabOwnerMoved(owner, renderOwner, gen) {
+  if (owner === renderOwner && String(owner || "").startsWith("acct_")) return false;
+  console.warn("vocab detail write abandoned: the account changed under the open word");
+  if (gen === _vocabRenderGen) renderVocabPanel();
+  return true;
+}
+
 // Shared single-word mutation wrapper: owner + generation discipline identical
 // to the batch actions (mutation at confirm, reload after, stale writes dropped).
-async function _pbpVocabDetailMutate(w, mutate) {
+// `renderOwner` is the owner the detail was rendered for: a click whose owner
+// read comes back as someone else (the account moved under the open word)
+// writes nothing and hands the page to the account-change render.
+async function _pbpVocabDetailMutate(w, mutate, renderOwner) {
   const gen = ++_vocabRenderGen;
   let owner = null;
   const restoreSelection = _pbpVocabHoldSelection(gen);
   try {
     owner = await pbpVocabCurrentOwner();
+    if (_pbpVocabOwnerMoved(owner, renderOwner, gen)) return;
     const ok = await mutate(owner);
     const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
     restoreSelection();
@@ -1675,8 +1856,12 @@ function _pbpVocabRenderCover() {
   if (typeof pbpLibSplitCount !== "function" || typeof pbpLibFillCount !== "function") return;
   const s = pbpVocabStats(_vocabRows, Date.now());
   const day = typeof pbpLibFormatDay === "function" ? pbpLibFormatDay(s.latestCreatedAt) : "";
-  const parts = pbpLibSplitCount((...a) => t("libraryVocabCoverLead", ...a),
-    [String(s.total), String(s.learning), String(s.known), String(s.languages), day]);
+  // Rows that carry no creation time (older imports) have no "last added"
+  // day: the sentence ends after the counts instead of "on ." with nothing.
+  const counts = [String(s.total), String(s.learning), String(s.known), String(s.languages)];
+  const parts = day
+    ? pbpLibSplitCount((...a) => t("libraryVocabCoverLead", ...a), [...counts, day])
+    : pbpLibSplitCount((...a) => t("libraryVocabCoverLeadNoDate", ...a), counts);
   pbpLibFillCount(lead, parts, (index) => (index >= 0 && index < 4 ? "b" : null));
 }
 

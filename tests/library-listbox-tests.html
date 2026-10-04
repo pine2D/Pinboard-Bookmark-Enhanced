@@ -994,6 +994,56 @@ async function libraryPageDetailLocaleCases() {
   }
 }
 
+// ---- Library redesign T7c (spec §4.10, the "open a saved word" row): with
+// the word open and never looked up by hand, a language change re-runs
+// open-to-look-up in the new language -- local, then cache, online only with
+// the grant and after the dwell.
+async function libraryPageAutoLookupLangCases() {
+  const { frame, win, doc } = await loadLibraryFrame({ width: 1280, height: 800 });
+  try {
+    const booted = await libWaitFor(win, () => win.eval("_vocabCurrentOwner") === "acct_listboxtest");
+    check("T7 library.html boots for the open-to-look-up language cases", booted && win.__bootErrors.length === 0,
+      win.__bootErrors.slice(0, 3).join(" | "));
+    if (!booted) return;
+    const fetched = [];
+    win.fetch = (url) => { fetched.push(String(url)); return Promise.resolve({ status: 200, ok: true, json: async () => ({ word: "maison", entries: [] }) }); };
+    win.pbpEcdictLookup = async () => ({ state: "unavailable" });
+    win.pbpPackLookup = async () => ({ state: "unavailable" });
+    win.pbpAiCacheGet = async () => null;
+    win.eval(`_vocabRows = [{ id: "al-fr", term: "maison", language: "fr", groups: [], contexts: [], createdAt: 1, updatedAt: 1 }]; _pbpVocabApplyView(true);`);
+    const sel = doc.getElementById("vocab-lookup-lang");
+    const btn = doc.getElementById("vocab-lookup-lang-btn");
+    const result = doc.getElementById("vocab-ref-result");
+    const pick = async (code) => {
+      btn.click();
+      await libFrames(win);
+      doc.querySelector(`#vocab-lookup-lang-list .listbox-opt[data-value="${code}"]`).click();
+      await libFrames(win);
+    };
+    win.eval("_pbpVocabRenderDetail(_vocabRows[0], true)");
+    await libWaitFor(win, () => result.dataset.refState === "idle");
+    await pick("it");
+    await new Promise((resolve) => win.setTimeout(resolve, 400));
+    check("T7 without the grant, picking another language re-runs open-to-look-up locally and sends nothing",
+      fetched.length === 0 && result.dataset.refState === "idle" && sel.value === "it", `${fetched.join(" ")} state=${result.dataset.refState}`);
+    win.chrome.permissions.contains = () => Promise.resolve(true);
+    const cached = win.pbpDictNormalizeEntry({ ...JSON.parse(JSON.stringify(FDA_CONSTRAINT)), word: "maison" });
+    const esKey = win.pbpDictQueryCacheKey("es", "maison");
+    win.pbpAiCacheGet = async (key) => (key === esKey ? { result: cached } : null);
+    await pick("es");
+    await libWaitFor(win, () => !!result.querySelector(".xp-dict-online .xp-dict-entry"));
+    check("T7 with the grant, a language whose result is cached renders from the cache with zero requests",
+      fetched.length === 0 && !!result.querySelector(".xp-dict-online .xp-dict-entry"), fetched.join(" "));
+    await pick("nl");
+    await new Promise((resolve) => win.setTimeout(resolve, 450));
+    await libWaitFor(win, () => fetched.length > 0);
+    check("T7 with the grant and nothing cached, the new language costs one request after the dwell",
+      fetched.length === 1 && /\/nl\/maison$/.test(fetched[0]), fetched.join(" "));
+  } finally {
+    frame.remove();
+  }
+}
+
 // ---- Main flow (last thing in this script). A setup error that escapes a
 // suite becomes one failed row; the row count then falls short and
 // run-test.mjs reports the stall, which is the red it should be.
@@ -1009,6 +1059,7 @@ async function libraryPageDetailLocaleCases() {
     await libraryPageLookupLangCases();
     await libraryPageLongContentCases();
     await libraryPageDetailLocaleCases();
+    await libraryPageAutoLookupLangCases();
   } catch (error) {
     report("suite setup", error);
   }

@@ -3958,5 +3958,6 @@
   "libraryNotePlaceholder": { "message": "寫點什麼：聯想、易混淆的詞、用法提醒。離開輸入框時會自動儲存" },
   "libraryVocabCoverTitle": { "message": "生詞本" },
   "libraryVocabCoverLead": { "message": "$TOTAL$ 個詞，學習中 $LEARNING$ 個、已掌握 $KNOWN$ 個，來自 $LANGS$ 種語言；最近一次收錄在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$ 個詞，學習中 $LEARNING$ 個、已掌握 $KNOWN$ 個，來自 $LANGS$ 種語言。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
   "libraryVocabCoverHint": { "message": "選一個詞，查看它的語境、你的筆記和詞典釋義；也可以直接查任何詞語。" }
 }

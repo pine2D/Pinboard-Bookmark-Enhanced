@@ -3958,5 +3958,6 @@
   "libraryNotePlaceholder": { "message": "連想、紛らわしい語、使い方のメモなどを書けます。入力欄から離れると自動で保存されます" },
   "libraryVocabCoverTitle": { "message": "単語帳" },
   "libraryVocabCoverLead": { "message": "$TOTAL$ 語（学習中 $LEARNING$ 語、習得済み $KNOWN$ 語）、$LANGS$ 言語。最後に追加したのは $DATE$ です。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$ 語（学習中 $LEARNING$ 語、習得済み $KNOWN$ 語）、$LANGS$ 言語。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
   "libraryVocabCoverHint": { "message": "単語を選ぶと、文脈、自分のメモ、辞書の意味が表示されます。任意の単語を直接調べることもできます。" }
 }

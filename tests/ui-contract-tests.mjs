@@ -9313,6 +9313,32 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "library-vocab.js: the status button lost its vocab-detail-status focus target, or the retired .vocab-detail-actions row is back");
 }
 
+// ---- Library redesign T7c (spec §4.8 open-to-look-up, user ruling 10-03):
+// opening a saved word looks it up local-first; online only with a grant that
+// already exists, after a 250ms dwell; nothing late is ever written; and the
+// privacy page says so in the same commit.
+{
+  const fnBody = (src, sig) => (src.split(sig)[1] || "").split("\n}\n")[0];
+  const auto = fnBody(libraryVocabJs, "async function _pbpVocabAutoLookup(w) {");
+  const probe = fnBody(libraryVocabJs, "async function _pbpVocabLocalProbe(term, lang, signal) {");
+  check(auto.length > 0 && probe.length > 0 && auto.includes(".contains({ origins: [PBP_DICT_ORIGIN + \"/*\"] })") &&
+    !/permissions\.request\(|\.request\(\{/.test(auto + probe) && !/\bfetch\(/.test(probe) && !/_pbpVocabDictRun\(/.test(probe),
+    "library-vocab.js: open-to-look-up may only ask permissions.contains (never request), and its local probe neither fetches nor runs the chain (spec §4.8 rules 1-3)");
+  check(/const PBP_VOCAB_AUTO_ONLINE_DELAY_MS = 250;/.test(libraryVocabJs) && auto.includes("PBP_VOCAB_AUTO_ONLINE_DELAY_MS"),
+    "library-vocab.js: the online step of open-to-look-up lost its 250ms dwell (spec §11 I13)");
+  const staleChecks = (auto.match(/if \(stale\(\)\) return "stale";/g) || []).length;
+  check(/const stale = \(\) => signal\.aborted \|\| _pbpVocabDetailWordId !== wordId \|\|/.test(auto) && staleChecks >= 3,
+    `library-vocab.js: open-to-look-up must re-check the run, the open word and the owner after every await before it writes (found ${staleChecks} re-checks)`);
+  check(!/_pbpVocabRelookedWordId = /.test(auto) && /if \(w\) _pbpVocabAutoLookup\(w\)\.catch\(/.test(fnBody(libraryVocabJs, "function _pbpVocabResetRef(w) {")),
+    "library-vocab.js: a word switch must start open-to-look-up, and that path must never mark the word as looked up by hand");
+  const privacy = read("docs/privacy.md");
+  check(privacy.includes("opening a saved word on that page also looks it up automatically when no installed offline dictionary has an entry for it") &&
+    privacy.includes("(opening a saved word never asks for this grant)") &&
+    privacy.includes("which also runs automatically when you open a saved word there once you have granted access") &&
+    !privacy.includes("The lookup is never contacted automatically or in the background"),
+    "docs/privacy.md: the three Free Dictionary API passages no longer describe open-to-look-up (spec §4.10; Network Requests, Permissions and Third-Party change with the code)");
+}
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);
