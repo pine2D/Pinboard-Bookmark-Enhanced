@@ -793,8 +793,10 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
 .note-dot.c3 { background: var(--lib-note-c3, #60a5fa); }
 .note-dot.c4 { background: var(--lib-note-c4, #f87171); }
 .note-dot.c5 { background: var(--lib-note-c5, #c084fc); }
-/* Kept for the vocabulary detail pane's context quotes (the notes list no
-   longer builds .notes-item* rows -- see the master-detail block below). */
+/* The list regions' notices: no words / no matches / signed out on the
+   vocabulary side (#vocab-empty, #vocab-no-results, #vocab-no-account), no
+   highlights and the scope note on the notes side (#notes-empty,
+   #notes-scope-note). */
 .notes-empty { font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); color: var(--lib-fg-muted); padding: var(--lib-sp-2) var(--lib-sp-3) 0; }
 /* Inside a list region (which starts 4px outboard of the search box) the
    same 12px text inset needs the rows' 4px margin first. */
@@ -1233,26 +1235,23 @@ html.motion-ready .notes-sib { transition: background-color var(--motion-state) 
    and then sitting left-aligned in a wider box. The per-child caps that used
    to live here (and on .notes-detail-quote / -note / .vocab-note-edit) are
    gone as redundant. */
-/* Controls stay at UI scale, not prose scale -- but whether an element even
-   PICKS UP the ambient 15px/1.65 in the first place depends on what kind of
-   element it is (fix round 1: verified A/B, computed boxes identical with
-   and without a reset on .btn). A plain <button class="btn"> gets its own
-   UA-default font/line-height and never inherits the pane's font at all
-   (form controls don't inherit font by default), so no reset is needed or
-   applied here. .notes-meta-chip is an ordinary <span> -- normal inheritance
-   applies, and it has neither font-size nor line-height pinned anywhere else
-   in the file, so both need resetting (the plain, unpilled "language" chip
-   in .vocab-detail-head would otherwise render at full 15px prose size next
-   to a 22px term). */
+/* Chips in the detail stay at chip scale. Whether an element picks up the
+   pane's body size (--lib-text-body / --lib-lh-body) at all depends on what
+   it is: a <button class="btn"> takes its font from its own recipe (form
+   controls don't inherit font by default), so it needs no reset here.
+   .notes-meta-chip is an ordinary <span> and inherits, and nothing else in
+   this file pins its font-size. Since T7b the word's language is plain text
+   in the pronunciation line, so the only chips left in the detail are the
+   group editor's removable ones (next rule). */
 .vocab-detail-pane .notes-meta-chip { font-size: 12px; line-height: normal; }
-/* vocab-group-inspect-report.md 2026-08-05 Finding 8: the rule above is
-   written for the plain unpilled language chip in .vocab-detail-head (see
-   comment above), but ALSO matches .vocab-group-editor's group chips
-   (they carry the same notes-meta-chip class) -- and its font-size:12px
+/* vocab-group-inspect-report.md 2026-08-05 Finding 8: the rule above was
+   written for a language chip the head no longer has, and it also matches
+   .vocab-group-editor's group chips (they carry the same notes-meta-chip
+   class) -- and its font-size:12px
    reset turns out to be something group chips genuinely need too (their own
    recipe, ui-components.mjs's chipRules, deliberately omits font-size --
    Appendix C8 "字号仍继承容器" -- so WITHOUT some ambient reset they inherit
-   the pane's 15px prose scale instead of a UI-scale size; narrowing the
+   the pane's body size instead of a chip-scale size; narrowing the
    rule's selector to exclude them, tried first, measurably broke chip
    height across every theme: verified via scripts/ui-render-audit.mjs, the
    detail-pane instance grew to 20px vs the list-row instance's 18px).

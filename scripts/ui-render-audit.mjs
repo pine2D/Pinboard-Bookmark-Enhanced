@@ -1913,11 +1913,15 @@ async function libShowVocab(page, target) {
   if (got !== "ok") throw new Error(`SETUP: libShowVocab(${JSON.stringify(target)}): ${got} -- LIB_SEED (T2) broken or library-vocab.js renamed`);
   // From T7c an opened word looks itself up (IndexedDB probes, then the grant
   // check -- never granted here); wait until the column has settled so a scan
-  // does not race the idle button in.
+  // does not race the idle button in. A timeout does not fail the run (the
+  // checks below still measure whatever is there), but it is said out loud:
+  // a silent full-TIMEOUT_MS wait per open would be an invisible slowdown.
   await page.waitForFunction(() => {
     const host = document.getElementById("vocab-ref-result");
     return !host || host.dataset.refState !== "word" || !!host.querySelector(".xp-dict-entry, .xp-dict-msg, .xp-dict-local-box");
-  }, null, { timeout: TIMEOUT_MS }).catch(() => {});
+  }, null, { timeout: TIMEOUT_MS }).catch((err) => {
+    console.warn(`[render-audit] WARN libShowVocab(${JSON.stringify(target)}): the dictionary column never settled (${err && err.name}) -- open-to-look-up stuck in "word"?`);
+  });
   await settleAnimations(page);
 }
 async function libRestoreVocab(page, snap) {
@@ -5419,7 +5423,9 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
       await page.waitForFunction(() => {
         const host = document.getElementById("vocab-ref-result");
         return !host || host.dataset.refState !== "word" || !!host.querySelector(".xp-dict-entry, .xp-dict-msg, .xp-dict-local-box");
-      }, null, { timeout: TIMEOUT_MS }).catch(() => {});
+      }, null, { timeout: TIMEOUT_MS }).catch((err) => {
+        console.warn(`[render-audit] WARN library/${theme || "default"}: the dictionary column never settled after opening ${JSON.stringify(LIB_SEED.richTerm)} (${err && err.name}) -- open-to-look-up stuck in "word"?`);
+      });
     }
     for (const check of vocabChecks) {
       // The batch row, per check (T4d review): since it REPLACES the count row
@@ -6680,7 +6686,11 @@ const SWEEP_CFG = {
       // rows. The pronunciation line is "IPA · language" + Pronounce 4px
       // after it (spec §4.4); the manage row's 16px column gap is what the
       // Edit groups hang is computed from (16 - 10 = 6 from the group text,
-      // spec §4.5).
+      // spec §4.5). A word with no groups puts the status button and Edit
+      // groups side by side 16px apart -- also spec §4.5's ruling, not a
+      // stray gap. This exemption covers these two lines only: a button
+      // group added to either one later goes in its own container, which
+      // this rule then measures at 8.
       ".vocab-pron-row, .vocab-manage-row",
     ].join(", "),
   },
