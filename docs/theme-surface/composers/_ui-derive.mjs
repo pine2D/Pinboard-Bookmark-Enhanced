@@ -518,6 +518,71 @@ export function fillDistinct(fill, others, toward, hosts = [], minDE = TIER_DIST
 export const PRIMARY_HOVER_FG_MIX = 0.12;
 export const primaryHoverFill = (accentRgb, fgRgb) => mix(accentRgb, fgRgb, PRIMARY_HOVER_FG_MIX);
 
+// S2 list-row states (spec docs/superpowers/specs/2026-10-03-library-redesign-
+// design.md §3.8 / §6.4; facts-s2 §2, re-verified 15/15). USER RULING
+// 2026-10-03: the current row is a neutral fill and nothing else -- no edge,
+// no bar -- and a batch-selected row is a lighter accent band plus a 1px ring.
+// Every fill is "the lightest one that clears the gate": walk a mix in 1%
+// steps from a starting point and stop at the first percent whose
+// HEX-ROUNDED result (what the browser paints) is at least the floor away,
+// per channel, from every reference colour. The floors are the render
+// oracle's bandDistinct: same-marker pairs >= 24 (ROW_STATE_MIN_DELTA = 24 +
+// one unit of rounding headroom) and any hover step >= 8.
+//   hover      = mix(bg, fg)           from 5%,       >= 8  from bg
+//   current    = mix(bg, fg)           from 1%,       >= 25 from bg AND from hover
+//   current-h  = mix(current, fg)      from 5%,       >= 8  from current
+//   band       = mix(bg, accent)       from 1%,       >= 25 from bg
+//   band-h     = mix(bg, accent)       from band + 6, >= 8  from band
+//   band-cur   = mix(band, fg)         from 1%,       >= 25 from band AND from band-h
+//   band-cur-h = mix(band-cur, fg)     from 5%,       >= 8  from band-cur
+// "Current" is one rule applied twice: the least fg on top of its base that
+// leaves both the base and the base's hover behind. Nothing falls back
+// silently: no answer by 60% throws (sync-all then fails loudly).
+export const ROW_STATE_MIN_DELTA = 25;
+export const ROW_HOVER_STEP_MIN = 8;
+export const ROW_HOVER_FG_MIX = 0.05;
+export const ROW_BAND_HOVER_STEP = 0.06;
+const ROW_MIX_MAX = 0.60;
+const rowRound = (rgb) => hexToRgb(rgbToHex(rgb));
+const rowDelta = (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+const isRgbTriple = (v) => Array.isArray(v) && v.length === 3 && v.every((c) => Number.isFinite(c));
+
+export function mixUntilDistinct(base, toward, lo, min, froms) {
+  if (!isRgbTriple(base) || !isRgbTriple(toward)) throw new TypeError("mixUntilDistinct: base and toward must be [r, g, b]");
+  if (!Array.isArray(froms) || !froms.length || !froms.every(isRgbTriple)) throw new TypeError("mixUntilDistinct: froms must be a non-empty array of [r, g, b]");
+  if (!(Number.isFinite(lo) && lo >= 0 && lo <= ROW_MIX_MAX)) throw new RangeError(`mixUntilDistinct: lo ${lo} is outside [0, ${ROW_MIX_MAX}]`);
+  if (!(Number.isFinite(min) && min > 0)) throw new RangeError(`mixUntilDistinct: min ${min} must be > 0`);
+  const b = rowRound(base), t = rowRound(toward), refs = froms.map(rowRound);
+  const top = Math.round(ROW_MIX_MAX * 100);
+  for (let pct = Math.round(lo * 100); pct <= top; pct += 1) {
+    const c = rowRound(mix(b, t, pct / 100));
+    if (refs.every((r) => rowDelta(c, r) >= min)) return pct / 100;
+  }
+  throw new Error(`mixUntilDistinct: no mix of ${rgbToHex(b)} toward ${rgbToHex(t)} up to ${top}% is ${min} away from ${refs.map(rgbToHex).join(", ")}`);
+}
+
+export function deriveRowStates(bgRgb, fgRgb, accentRgb) {
+  const bg = rowRound(bgRgb), fg = rowRound(fgRgb), accent = rowRound(accentRgb);
+  const at = (base, toward, t) => rowRound(mix(base, toward, t));
+  const hover = at(bg, fg, mixUntilDistinct(bg, fg, ROW_HOVER_FG_MIX, ROW_HOVER_STEP_MIN, [bg]));
+  const current = at(bg, fg, mixUntilDistinct(bg, fg, 0.01, ROW_STATE_MIN_DELTA, [bg, hover]));
+  const currentHover = at(current, fg, mixUntilDistinct(current, fg, ROW_HOVER_FG_MIX, ROW_HOVER_STEP_MIN, [current]));
+  const bandMix = mixUntilDistinct(bg, accent, 0.01, ROW_STATE_MIN_DELTA, [bg]);
+  const band = at(bg, accent, bandMix);
+  const bandHover = at(bg, accent, mixUntilDistinct(bg, accent, bandMix + ROW_BAND_HOVER_STEP, ROW_HOVER_STEP_MIN, [band]));
+  const bandCurrent = at(band, fg, mixUntilDistinct(band, fg, 0.01, ROW_STATE_MIN_DELTA, [band, bandHover]));
+  const bandCurrentHover = at(bandCurrent, fg, mixUntilDistinct(bandCurrent, fg, ROW_HOVER_FG_MIX, ROW_HOVER_STEP_MIN, [bandCurrent]));
+  return {
+    "row-bg-hover": hover,
+    "row-current-bg": current,
+    "row-current-bg-hover": currentHover,
+    "row-band-bg": band,
+    "row-band-bg-hover": bandHover,
+    "row-band-current-bg": bandCurrent,
+    "row-band-current-bg-hover": bandCurrentHover,
+  };
+}
+
 // Hover frame of a FRAMED value box whose fill is NOT separated from its
 // hosts (terminal; rose-pine on options): the fill keeps its pilot value on
 // hover (§9.5: a framed control does not need its fill to carry affordance),

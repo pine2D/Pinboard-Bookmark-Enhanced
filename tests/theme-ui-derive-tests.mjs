@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import {
   contrast,
   deltaE2000,
+  deriveRowStates,
   deriveFieldRoles,
   FIELD_HOST_ROLES,
   FIELD_ROLES,
@@ -18,6 +19,7 @@ import {
   hslToRgb,
   isHex,
   mix,
+  mixUntilDistinct,
   primaryHoverFill,
   PRIMARY_HOVER_FG_MIX,
   relLum,
@@ -25,6 +27,10 @@ import {
   resolveOpaqueBg,
   rgbToHex,
   rgbToHsl,
+  ROW_BAND_HOVER_STEP,
+  ROW_HOVER_FG_MIX,
+  ROW_HOVER_STEP_MIN,
+  ROW_STATE_MIN_DELTA,
   TIER_DISTINCT_MIN_DE,
   UI_DERIVED_OUTPUT_ROLES,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
@@ -603,6 +609,42 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
 // the captured RED output. Left as a comment, not code, because a
 // self-mutating test would have to un-import/re-import the module under
 // test at runtime, which this file's other tests do not do either.
+
+// --- S2 row-state primitives (spec docs/superpowers/specs/2026-10-03-
+// library-redesign-design.md §3.8 / §6.4): mixUntilDistinct's contract --
+// first integer percent from `lo`, measured on the hex that ships, against
+// EVERY reference colour, hard stop at 60% -- and deriveRowStates' shape,
+// with two golden faces the spec states (the default light :root and
+// terminal, whose fg IS its accent). The per-theme CATEGORY assertions live
+// in the composer-level block further down and never call deriveRowStates. ---
+{
+  const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+  const W = [255, 255, 255], K = [0, 0, 0];
+  check(ROW_STATE_MIN_DELTA === 25 && ROW_HOVER_STEP_MIN === 8 && ROW_HOVER_FG_MIX === 0.05 && ROW_BAND_HOVER_STEP === 0.06,
+    `S2 constants drifted from spec §6.4 (25 / 8 / 0.05 / 0.06): ${JSON.stringify([ROW_STATE_MIN_DELTA, ROW_HOVER_STEP_MIN, ROW_HOVER_FG_MIX, ROW_BAND_HOVER_STEP])}`);
+  check(mixUntilDistinct(W, K, 0.01, 25, [W]) === 0.1,
+    `mixUntilDistinct(white -> black, >= 25 from white) must be 0.1 -- 9% ships #e8e8e8 (23 away), 10% ships #e6e6e6 (25 away); got ${mixUntilDistinct(W, K, 0.01, 25, [W])}`);
+  check(mixUntilDistinct(W, K, 0.05, 1, [W]) === 0.05,
+    "mixUntilDistinct must start at `lo` -- 1% already clears a floor of 1, the answer is still 5%");
+  check(mixUntilDistinct(W, K, 0.01, 25, [W, [230, 230, 230]]) === 0.2,
+    "mixUntilDistinct must clear EVERY entry of `froms` -- white and #e6e6e6 together first clear at 20% (#cccccc); 19% ships #cfcfcf, 23 from #e6e6e6");
+  check(throws(() => mixUntilDistinct(W, [250, 250, 250], 0.01, 25, [W])),
+    "mixUntilDistinct must throw when nothing up to 60% clears the floor -- never fall back to some fixed mix");
+  check(throws(() => mixUntilDistinct(W, K, 0.61, 1, [W])) && throws(() => mixUntilDistinct(W, K, 0.01, 25, [])) &&
+    throws(() => mixUntilDistinct("#ffffff", K, 0.01, 25, [W])) && throws(() => mixUntilDistinct(W, K, 0.01, 0, [W])),
+    "mixUntilDistinct must reject lo above 60%, an empty froms list, a non-[r, g, b] base and a non-positive floor");
+  const S2_FILLS = ["row-bg-hover", "row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover", "row-band-current-bg", "row-band-current-bg-hover"];
+  const hexOf = (states) => S2_FILLS.map((r) => rgbToHex(states[r]));
+  const dflt = deriveRowStates(hexToRgb("#f7f7f8"), hexToRgb("#1a1a2e"), hexToRgb("#1a73e8"));
+  check(JSON.stringify(Object.keys(dflt)) === JSON.stringify(S2_FILLS) &&
+    S2_FILLS.every((r) => Array.isArray(dflt[r]) && dflt[r].length === 3 && dflt[r].every((c) => Number.isInteger(c) && c >= 0 && c <= 255)),
+    `deriveRowStates must return exactly ${S2_FILLS.join(", ")} (in that order), each an integer [r, g, b]; got ${JSON.stringify(dflt)}`);
+  check(JSON.stringify(hexOf(dflt)) === JSON.stringify(["#ececee", "#d1d1d6", "#c8c8ce", "#dce7f6", "#cfdff5", "#c3ccdc", "#bbc3d3"]),
+    `deriveRowStates over the default :root (bg #f7f7f8, fg #1a1a2e, accent #1a73e8) drifted from spec §6.4: ${hexOf(dflt).join(" ")}`);
+  const term = deriveRowStates(hexToRgb("#0a0a0a"), hexToRgb("#33ff33"), hexToRgb("#33ff33"));
+  check(JSON.stringify(hexOf(term)) === JSON.stringify(["#0c160c", "#102f10", "#123912", "#0e230e", "#113111", "#154b15", "#175417"]),
+    `deriveRowStates over terminal (bg #0a0a0a, fg = accent = #33ff33) drifted from facts-s2 §3.1: ${hexOf(term).join(" ")}`);
+}
 
 // --- row-selected-fg vs the batch-selection bands (weak-text-on-fill batch,
 // D6 follow-up / Ruling 17): library.css's .selected (batch) state paints
