@@ -416,6 +416,37 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("the jump hands focus to the new current excerpt's label",
       !!cur && document.activeElement === cur.querySelector(".notes-excerpt-label"),
       document.activeElement && (document.activeElement.className || document.activeElement.tagName));
+    // A same-page pick from the LIST, not a jump button, reads on just the
+    // same: the pane is not reset to the top, and the new current excerpt --
+    // scrolled out above the fold first, so a render that only "keeps" the
+    // offset cannot pass -- is brought fully into view. Wide and narrow.
+    const listPick = (narrow) => {
+      const realMode = _pbpNotesNarrowMode;
+      if (narrow) { document.body.classList.add("test-narrow-back"); _pbpNotesNarrowMode = () => true; }
+      try {
+        _pbpNotesSelectRow("pbp_hl_times#x6");
+        pane.scrollTop = pane.scrollHeight;
+        const before = pane.scrollTop;
+        const above = (excerptOf("x1")?.getBoundingClientRect().bottom ?? Infinity) <= pane.getBoundingClientRect().top;
+        rowEl("pbp_hl_times#x1")?.querySelector(".notes-hit-btn").click();
+        const r = pane.getBoundingClientRect(), c = excerptOf("x1")?.getBoundingClientRect();
+        return { before, above, after: pane.scrollTop,
+          visible: !!c && c.top >= r.top - 1 && c.bottom <= r.bottom + 1,
+          current: excerptOf("x1")?.getAttribute("aria-current") === "true",
+          backFocused: document.activeElement === detail().querySelector(".notes-detail-back") };
+      } finally {
+        _pbpNotesNarrowMode = realMode;
+        document.body.classList.remove("test-narrow-back");
+      }
+    };
+    const wideP = listPick(false);
+    check("picking another highlight of the same page in the list keeps the pane off the top and brings the new current fully into view",
+      wideP.before > 0 && wideP.above && wideP.current && wideP.visible && wideP.after > 0 && wideP.after < wideP.before,
+      JSON.stringify(wideP));
+    const narrowP = listPick(true);
+    check("narrow: the same list pick also brings the new current into view, with focus handed to the back button",
+      narrowP.before > 0 && narrowP.above && narrowP.current && narrowP.visible && narrowP.after > 0 && narrowP.backFocused,
+      JSON.stringify(narrowP));
     document.body.classList.remove("test-scroll-pane-tall");
 
     // -- a new current the list filter hides --
@@ -460,12 +491,26 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       excerpts().every((s, i, all) => i === all.length - 1 ||
         all[i + 1].getBoundingClientRect().top - inkBottom(s.querySelector(".notes-excerpt-label")) >= 32 - 0.5),
       excerpts().map((s) => s.style.minHeight || "-").join(","));
+    // is-stacked is layout state appended after the label's own class; the
+    // focus snapshot must never key a focused label on it, or a refresh that
+    // measures differently loses the focus.
+    labelOf("x6")?.focus();
+    const stackedSnap = _pbpNotesDetailFocusSnapshot();
+    await _pbpNotesRefreshPreservingState();
+    check("a focused stacked label is remembered by its own class and key, and a refresh puts focus back on it",
+      !!stackedSnap && stackedSnap.cls === "notes-excerpt-label" && stackedSnap.key === "pbp_hl_times#x6" &&
+      document.activeElement === labelOf("x6"),
+      JSON.stringify(stackedSnap) + " | " + (document.activeElement && document.activeElement.className));
+    detail().querySelector('.notes-excerpt-jump[data-notes-key="pbp_hl_times#x3"]')?.focus();
     t = (key, ...values) => (String(key).startsWith("hlColor") ? "Q" : realT(key, ...values));
     document.dispatchEvent(new Event("pbp:i18n-applied"));
     check("a language switch re-renders the labels and re-measures them: a label that fits stays on one line",
       labelOf("x6")?.querySelector(".notes-excerpt-color-name")?.textContent === "Q" &&
       !labelOf("x6").classList.contains("is-stacked") && labelOf("x2")?.classList.contains("is-stacked"),
       `${labelOf("x6")?.className} | ${labelOf("x2")?.className}`);
+    check("a language switch puts keyboard focus back on the control it was on",
+      document.activeElement?.dataset?.notesKey === "pbp_hl_times#x3" && document.activeElement.classList.contains("notes-excerpt-jump"),
+      document.activeElement && document.activeElement.outerHTML.slice(0, 160));
     const x2Day = labelOf("x2")?.querySelector(".notes-excerpt-date");
     if (x2Day) x2Day.textContent = "";
     const staleBefore = !!labelOf("x2")?.classList.contains("is-stacked");
@@ -1020,8 +1065,9 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("an account switch empties the reading pane at once",
     detail().hidden === true && $id("notes-detail-empty").hidden === false &&
     _pbpNotesSelectedKey === null &&
-    !document.querySelector("#notes-list .notes-hit[aria-current]"),
-    detail().hidden + " | " + _pbpNotesSelectedKey);
+    !document.querySelector("#notes-list .notes-hit[aria-current]") &&
+    !detail().querySelector(".notes-excerpt"),
+    detail().hidden + " | " + _pbpNotesSelectedKey + " | excerpts=" + detail().querySelectorAll(".notes-excerpt").length);
   check("an account switch drops the previous account's rows before the rescan",
     $id("notes-list").children.length === 0, rowKeys());
   await settle(() => rowKeys().includes("pbp_hl_beta#b1"));

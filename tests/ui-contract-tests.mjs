@@ -9357,9 +9357,19 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(!/\.notes-detail-footer > \.notes-detail-delete[^{]*\{[^}]*margin-left:\s*auto/.test(libraryCss) &&
     /footer\.className = "notes-detail-footer"/.test(notesJs) && !/lib-section notes-detail-footer/.test(notesJs),
     "library.css/library-notes.js: the notes footer delete is pushed right again or the footer is back on .lib-section -- it hangs at the start of the main column (spec §5.6)");
+  // Focus restore: both rebuild paths (refresh, language switch) go through
+  // one snapshot / restore pair; the snapshot skips the layout-only is-stacked
+  // and the restore keys excerpt controls on data-notes-key. Read off the two
+  // function bodies, not the file, so a comment cannot satisfy it.
+  const noComments = (src) => src.replace(/^\s*\/\/.*$/gm, "");
+  const fnBody = (name) => noComments((notesJs.split("\nfunction " + name + "(")[1] || "").split("\n}\n")[0]);
+  const refreshBody = noComments((notesJs.split("\nasync function _pbpNotesRefreshPreservingState(")[1] || "").split("\n}\n")[0]);
   check((notesJs.match(/className = "btn btn-sm danger ghost lib-hang-start notes-detail-delete"/g) || []).length === 1 &&
-    /function _pbpNotesRefreshPreservingState[\s\S]*?data-notes-key/.test(notesJs),
-    "library-notes.js: the page delete lost its identity class in the last position, or the refresh stopped finding excerpt controls by data-notes-key (spec §5.1)");
+    /_pbpNotesDetailFocusSnapshot\(\)/.test(refreshBody) &&
+    /_pbpNotesRestoreDetailFocus\(/.test(refreshBody) &&
+    /c !== "is-stacked"/.test(fnBody("_pbpNotesDetailFocusSnapshot")) &&
+    /\[data-notes-key=/.test(fnBody("_pbpNotesRestoreDetailFocus")),
+    "library-notes.js: the page delete lost its identity class in the last position, or the detail focus restore stopped keying excerpt controls on data-notes-key / started keying on the layout-only is-stacked (spec §5.1)");
 }
 
 if (fail.length) {

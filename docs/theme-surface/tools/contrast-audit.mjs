@@ -1975,12 +1975,11 @@ function auditLibraryNoteMarks(theme, get) {
   // A non-current excerpt is a jump button whose hover paints --lib-row-bg-hover
   // under the same mark (library.css `.notes-excerpt-jump:hover`, spec §5.4 /
   // §11 V24), so the text also sits on mark-over-hover-fill. The composer caps
-  // the alpha against the page bg only, and on T8c's first run 13 of these 75
-  // pairs landed at 4.10-4.48 (solarized-dark all five, solarized-light c2-c5,
-  // the c1 yellow on nord-night / flexoki-dark / catppuccin-mocha /
-  // gruvbox-dark). ADVISORY until the hover-vs-cap conflict is decided (keep
-  // the V24 fill and cap the marks against it too, or one of V24's no-fill
-  // alternatives); the decision turns this row blocking.
+  // the alpha against the page bg only; on T8c's run 13 of these 75 pairs sat
+  // at 4.10-4.48 while every resting pair clears 4.5. User ruling 2026-10-04
+  // (spec "附：10-04 荧光笔叠悬停填充的对比"): accept the slightly lower hover
+  // contrast -- neither the mark strength nor the hover fill changes, and this
+  // row stays ADVISORY (WARN, never blocking) for good.
   const hoverS = get("row-bg-hover");
   if (!isHex(hoverS ?? "")) {
     const line = "  " + "library".padEnd(10) + " " + theme.padEnd(20) + " " + "highlighter on hover".padEnd(28) + " FAIL (missing or non-hex: --lib-row-bg-hover)";

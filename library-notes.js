@@ -171,6 +171,11 @@ let _pbpNotesSelectedKey = null;
 // page only nudges the new current excerpt into view. Twin of the `sameWord`
 // guard in library-vocab.js's _pbpVocabRenderDetail.
 let _notesRenderedPageKey = null;
+// The HIGHLIGHT the detail last rendered. Inside one page a change of
+// highlight -- from the list or from a jump button -- must bring the new
+// current excerpt into view (spec §5.4), while a refresh of the same highlight
+// must not move the pane at all; this key tells the two apart.
+let _notesRenderedDetailKey = null;
 // Batch selection (2026-08-06), same model as the vocabulary list: a Set of
 // hit keys plus the anchor a Shift gesture spans from. Distinct from
 // _pbpNotesSelectedKey above, which is "the one the detail pane is reading" --
@@ -872,16 +877,15 @@ function _pbpNotesBuildDeleteBtn(row) {
 }
 
 // A same-page jump (spec §5.4): the clicked highlight becomes current (list row
-// included, when the list filter shows it), the pane keeps its scroll, the new
-// current excerpt is brought into view only as far as needed, and focus moves
-// to its label so a keyboard user lands where the reading continues.
+// included, when the list filter shows it). The render keeps the pane's scroll
+// and brings the new current excerpt into view only as far as needed -- the
+// same as a same-page pick from the list; what a jump adds is focus on the new
+// label, so a keyboard user lands where the reading continues.
 function _pbpNotesJumpTo(key) {
   _pbpNotesSelectRow(key);
   const detail = $id("notes-detail");
   const cur = detail && detail.querySelector(':scope > .notes-excerpt[aria-current="true"]');
-  if (!cur) return;
-  cur.scrollIntoView({ block: "nearest" });
-  _pbpNotesFocus(cur.querySelector(".notes-excerpt-label"));
+  if (cur) _pbpNotesFocus(cur.querySelector(".notes-excerpt-label"));
 }
 
 // Hang labels (spec §5.4): in the hang column (C >= 1000, where the excerpt is
@@ -891,27 +895,37 @@ function _pbpNotesJumpTo(key) {
 // excerpt's own bottom, the excerpt gets a min-height so the next one still
 // starts 32px below the label's last line. Measured after every render and,
 // coalesced to one frame, on resize and on a density / theme flip.
+// Batched so the whole page costs two layouts, not one per excerpt: clear
+// every label, read every fit, write every stack; then read every overhang
+// (which needs the stacked layout) and write every min-height.
 function _pbpNotesStackLabels(detail) {
   const host = detail || $id("notes-detail");
   if (!host || host.hidden) return;
+  const rows = [];
   for (const ex of host.querySelectorAll(":scope > .notes-excerpt")) {
     const label = ex.querySelector(":scope > .notes-excerpt-label");
     if (!label) continue;
     label.classList.remove("is-stacked");
     ex.style.removeProperty("min-height");
-    if (getComputedStyle(ex).display !== "grid") continue; // label above its quote: never stacks
+    rows.push({ ex, label });
+  }
+  const stacked = rows.filter(({ ex, label }) => {
+    if (getComputedStyle(ex).display !== "grid") return false; // label above its quote: never stacks
     const cs = getComputedStyle(label);
     const room = label.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
     const parts = [...label.children];
     const gap = parseFloat(cs.columnGap) || 0;
     const need = parts.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0) + gap * Math.max(0, parts.length - 1);
-    if (need <= room + 0.5) continue;
-    label.classList.add("is-stacked");
-    const inkBottom = Math.max(...parts.flatMap((el) => [...el.getClientRects()].map((r) => r.bottom)));
+    return need > room + 0.5;
+  });
+  for (const { label } of stacked) label.classList.add("is-stacked");
+  const heights = stacked.map(({ ex, label }) => {
+    const inkBottom = Math.max(...[...label.children].flatMap((el) => [...el.getClientRects()].map((r) => r.bottom)));
     const exRect = ex.getBoundingClientRect();
     const overhang = inkBottom - exRect.bottom;
-    if (overhang > 0.5) ex.style.minHeight = Math.ceil(exRect.height + overhang) + "px";
-  }
+    return overhang > 0.5 ? Math.ceil(exRect.height + overhang) : 0;
+  });
+  stacked.forEach(({ ex }, i) => { if (heights[i]) ex.style.minHeight = heights[i] + "px"; });
 }
 
 let _notesStackFrame = 0;
@@ -937,12 +951,14 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
   if (!hit) {
     _pbpNotesSelectedKey = null;
     _notesRenderedPageKey = null;
+    _notesRenderedDetailKey = null;
     document.body.classList.remove("lib-narrow-notes");
     detail.replaceChildren();
     _pbpNotesMarkCurrentRow();
     return;
   }
   const samePage = hit.row.key === _notesRenderedPageKey;
+  const sameHit = samePage && hit.key === _notesRenderedDetailKey;
   if (enterNarrow) document.body.classList.add("lib-narrow-notes");
 
   const q = _pbpNotesFilterQuery();
@@ -964,13 +980,49 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
 
   detail.replaceChildren(frag);
   if (enterNarrow) _pbpNotesFocusNarrowBack(detail);
+  // Labels first: a stacked label's min-height moves every excerpt below it,
+  // and the scroll decisions below must see the final layout.
+  _pbpNotesStackLabels(detail);
   // The scroll container is the PANE, not this div: replaceChildren is one
   // atomic mutation and keeps the previous scrollTop. Reset it only when the
-  // PAGE changed -- a same-page jump or a refresh keeps the reader's place.
+  // PAGE changed. Another highlight of the same page -- picked in the list or
+  // by a jump button -- keeps the reader's place and only nudges the new
+  // current excerpt into view; a refresh of the same highlight moves nothing.
   const pane = $id("notes-detail-pane");
   if (pane && !samePage) pane.scrollTop = 0;
+  else if (!sameHit) {
+    const cur = detail.querySelector(':scope > .notes-excerpt[aria-current="true"]');
+    if (cur) cur.scrollIntoView({ block: "nearest" });
+  }
   _notesRenderedPageKey = hit.row.key;
-  _pbpNotesStackLabels(detail);
+  _notesRenderedDetailKey = hit.key;
+}
+
+// Focus inside the detail, captured before a rebuild and put back after it
+// (a refresh, a language switch). A control is found again by its last class
+// -- the layout-only is-stacked never counts, it comes and goes with a
+// measurement -- plus, for an excerpt control, its highlight key: every jump
+// button shares one class, and "the first one" is the wrong excerpt (spec
+// §5.1). null when focus is not in the detail.
+function _pbpNotesDetailFocusSnapshot() {
+  const active = document.activeElement;
+  if (!active || !active.closest || !active.closest("#notes-detail")) return null;
+  const classes = [...active.classList].filter((c) => c !== "is-stacked");
+  if (!classes.length) return null;
+  return { cls: classes[classes.length - 1], key: (active.dataset && active.dataset.notesKey) || null };
+}
+
+// The equivalent control in the rebuilt detail, else the back button -- which
+// is the one control that always exists and, in narrow mode, the only way
+// back to the list. Several matches are possible (two page deletes, only one
+// displayed): _pbpNotesFocus reports a focus that did not take, so they are
+// tried in order and a control the rebuild dropped falls through.
+function _pbpNotesRestoreDetailFocus(snap) {
+  if (!snap) return;
+  const host = $id("notes-detail");
+  if (!host || host.hidden) return;
+  const sel = "." + CSS.escape(snap.cls) + (snap.key ? '[data-notes-key="' + CSS.escape(snap.key) + '"]' : "");
+  if (![...host.querySelectorAll(sel)].some((el) => _pbpNotesFocus(el))) _pbpNotesFocus(host.querySelector(".notes-detail-back"));
 }
 
 // Same guard the two failure sentences above use: t() echoes an unknown key
@@ -1688,11 +1740,15 @@ if (typeof $id === "function") {
       { attributes: true, attributeFilter: ["data-density", "data-theme"] });
   }
   // A language switch rewrites colour names and the page count, which are
-  // built from t() at render time: re-render the open detail (same page, so
-  // the pane keeps its scroll); the render ends with a fresh measurement.
+  // built from t() at render time: re-render the open detail (same highlight,
+  // so the pane keeps its scroll and keyboard focus is put back where it
+  // was); the render ends with a fresh measurement.
   document.addEventListener("pbp:i18n-applied", () => {
     const hit = _pbpNotesFindHit(_pbpNotesSelectedKey);
-    if (hit) _pbpNotesRenderDetail(hit);
+    if (!hit) return;
+    const focus = _pbpNotesDetailFocusSnapshot();
+    _pbpNotesRenderDetail(hit);
+    _pbpNotesRestoreDetailFocus(focus);
   });
 }
 
@@ -1714,18 +1770,13 @@ async function _pbpNotesRefreshPreservingState() {
   // _pbpNotesFocusAfterDelete just placed falls to <body> a quarter second
   // later (measured on the real page). In narrow mode that is a dead end: the
   // list is display:none, so there is nothing left to Tab to. Snapshot the row
-  // by key, and the detail control by its last class plus, for an excerpt
-  // control, its highlight key (every jump button shares one class).
+  // by key, and the detail control through _pbpNotesDetailFocusSnapshot (its
+  // last class plus, for an excerpt control, its highlight key -- every jump
+  // button shares one class; checked below for data-notes-key).
   const active = document.activeElement;
   const focusedRow = active && active.closest ? active.closest("#notes-list .notes-hit") : null;
   const focusedKey = focusedRow ? focusedRow.dataset.notesKey : null;
-  const inDetail = !focusedRow && active && active.closest && active.closest("#notes-detail");
-  const detailClass = inDetail && active.classList.length
-    ? active.classList[active.classList.length - 1] : null;
-  // An excerpt control is found again by its highlight's key, never by class
-  // alone: every jump button shares one class, and "the first one" is the
-  // wrong excerpt (spec §5.1).
-  const detailKey = inDetail && active.dataset ? active.dataset.notesKey || null : null;
+  const detailFocus = focusedRow ? null : _pbpNotesDetailFocusSnapshot();
   await renderNotesPanel();
   const hit = _pbpNotesFindHit(selected);
   if (hit) {
@@ -1737,18 +1788,7 @@ async function _pbpNotesRefreshPreservingState() {
   }
   const refocus = focusedKey && _pbpNotesRowEl(focusedKey);
   if (refocus) _pbpNotesFocus(refocus.querySelector(".notes-hit-btn"));
-  else if (detailClass) {
-    // The equivalent control in the rebuilt detail, else the back button --
-    // which is the one control that always exists and, in narrow mode, the
-    // only way back to the list. (_pbpNotesFocus reports a no-op focus, so a
-    // control the rebuild dropped falls through.)
-    const host = $id("notes-detail");
-    const sel = "." + CSS.escape(detailClass) + (detailKey ? '[data-notes-key="' + CSS.escape(detailKey) + '"]' : "");
-    // Several matches are possible (two page deletes, only one displayed):
-    // _pbpNotesFocus reports a focus that did not take, so try them in order.
-    const candidates = host && !host.hidden ? [...host.querySelectorAll(sel)] : [];
-    if (!candidates.some((el) => _pbpNotesFocus(el)) && host) _pbpNotesFocus(host.querySelector(".notes-detail-back"));
-  }
+  else _pbpNotesRestoreDetailFocus(detailFocus);
   if (region && listScroll) region.scrollTop = listScroll;
 }
 
