@@ -1081,6 +1081,14 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   .notes-sheet > .notes-detail-footer { grid-column: 2; }
   .notes-sheet > .notes-excerpt { grid-column: 1 / 3; display: grid; grid-template-columns: subgrid; align-items: baseline; }
   .notes-excerpt > .notes-excerpt-label { grid-column: 1; margin-bottom: 0; justify-content: flex-end; text-align: end; padding-inline-end: var(--lib-sp-4); }
+  /* Until _pbpNotesStackLabels has measured this width (a resize is answered
+     one frame later), a label that does not fit wraps inside its column
+     instead of running out of its left edge; the measurement then turns it
+     into the stacked form below. A colour name wider than the whole column
+     breaks inside itself in either state. */
+  .notes-excerpt > .notes-excerpt-label { flex-wrap: wrap; white-space: normal; }
+  .notes-excerpt > .notes-excerpt-label > * { max-width: 100%; }
+  .notes-excerpt > .notes-excerpt-label .notes-excerpt-color-name { min-width: 0; overflow-wrap: anywhere; hyphens: auto; text-align: end; }
   .notes-excerpt > .notes-excerpt-body { grid-column: 2; }
 }
 
@@ -1146,13 +1154,13 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 .notes-excerpt-color > .notes-hit-dot { flex: none; margin-top: 0; }
 .notes-excerpt-label.is-stacked {
   flex-direction: column;
+  flex-wrap: nowrap;
   justify-content: flex-start;
   align-items: flex-end;
   row-gap: 0;
   height: var(--lib-lh-meta);
   white-space: normal;
 }
-.notes-excerpt-label.is-stacked .notes-excerpt-color-name { min-width: 0; overflow-wrap: anywhere; hyphens: auto; text-align: end; }
 
 /* Quotes: the current one is the loudest thing on the page by size alone. */
 .notes-excerpt-body { min-width: 0; }

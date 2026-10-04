@@ -469,13 +469,30 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       document.activeElement && document.activeElement.outerHTML.slice(0, 160));
 
     // -- hang labels (C >= 1000): stack when they do not fit (Review Focus 1) --
-    fixtureWidth(2400);
-    _pbpNotesSelectRow("pbp_hl_times#x6");
-    const wide = paneC() >= 1000;
     const contentRight = (label) => label.getBoundingClientRect().right - parseFloat(getComputedStyle(label).paddingRight);
     const spills = (label) => [...label.querySelectorAll("span")].some((s) => [...s.getClientRects()].some((r) => r.right > contentRight(label) + 0.5));
+    const contentLeft = (label) => label.getBoundingClientRect().left + parseFloat(getComputedStyle(label).paddingLeft);
+    const spillsLeft = (label) => [...label.querySelectorAll("span")].some((s) => [...s.getClientRects()].some((r) => r.left < contentLeft(label) - 0.5));
+    // The frame between a width change and the measurement that answers it
+    // (a window resize is measured one frame later; the render audit's
+    // paneFit scan once caught exactly that frame at 1600px and saw a time
+    // span 19.75px past the pane's left edge). Rendered in one column, then
+    // widened into the hang tier with NO frame and no event, so nothing has
+    // re-measured: the unmeasured labels must already keep inside their
+    // column on CSS alone.
+    fixtureWidth(960);
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    fixtureWidth(2400);
+    const unmeasured = excerpts().map((s) => s.querySelector(".notes-excerpt-label"));
+    check("before any re-measure, a hang label that does not fit already keeps inside its column",
+      paneC() >= 1000 && unmeasured.length === 6 && unmeasured.every((l) => !l.classList.contains("is-stacked")) &&
+      unmeasured.every((l) => !spills(l) && !spillsLeft(l)),
+      unmeasured.filter((l) => spills(l) || spillsLeft(l)).map((l) => l.dataset.notesKey).join(","));
+    _pbpNotesSelectRow("pbp_hl_times#x6");
+    const wide = paneC() >= 1000;
     check("a label too wide for the 96px hang column stacks instead of spilling out of it",
-      wide && labelOf("x6")?.classList.contains("is-stacked") && excerpts().every((s) => !spills(s.querySelector(".notes-excerpt-label"))),
+      wide && labelOf("x6")?.classList.contains("is-stacked") &&
+        excerpts().every((s) => !spills(s.querySelector(".notes-excerpt-label")) && !spillsLeft(s.querySelector(".notes-excerpt-label"))),
       `C=${paneC()} ${labelOf("x6")?.className}`);
     const quoteToNote = () => {
       const s = excerptOf("x5");
