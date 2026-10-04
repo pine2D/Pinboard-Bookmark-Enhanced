@@ -3086,6 +3086,23 @@
     "vocabSortZa": {
       "message": "Z–A"
     },
+    "librarySortTime": {
+      "message": "Date"
+    },
+    "librarySortAlpha": {
+      "message": "Alphabétique"
+    },
+    "librarySortFaceAria": {
+      "message": "$SHORT$, $FULL$",
+      "placeholders": {
+        "short": {
+          "content": "$1"
+        },
+        "full": {
+          "content": "$2"
+        }
+      }
+    },
     "vocabSelectionActions": {
       "message": "Actions de sélection"
     },

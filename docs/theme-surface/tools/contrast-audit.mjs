@@ -393,8 +393,9 @@ export const COMPONENT_PAIR_SPEC = [
   // surface -- options'/library's/popup's `.theme-name-popover input[type
   // =text]` / `.login-body input` / `.search-field`
   // (`color: fg; background: input-bg`) and `.connection-health-row` /
-  // `.vocab-sort-seg` / `.qbtn`-family containers (`color: fg; background:
-  // btn-bg`) -- so this is real coverage, not a speculative row. Caught
+  // `.qbtn`-family containers (`color: fg; background: btn-bg`; the retired
+  // sort segment was one too) -- so this is real coverage, not a speculative
+  // row. Caught
   // live (tests/options-vocab-tests.html's `.theme-name-popover input`
   // probe) at solarized-light 4.47:1 / solarized-dark 4.39:1 on
   // --opt-input-bg, with zero red anywhere in this file, because this

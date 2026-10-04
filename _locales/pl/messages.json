@@ -3086,6 +3086,23 @@
     "vocabSortZa": {
       "message": "Z–A"
     },
+    "librarySortTime": {
+      "message": "Data"
+    },
+    "librarySortAlpha": {
+      "message": "Alfabetycznie"
+    },
+    "librarySortFaceAria": {
+      "message": "$SHORT$, $FULL$",
+      "placeholders": {
+        "short": {
+          "content": "$1"
+        },
+        "full": {
+          "content": "$2"
+        }
+      }
+    },
     "vocabSelectionActions": {
       "message": "Operacje zaznaczania"
     },

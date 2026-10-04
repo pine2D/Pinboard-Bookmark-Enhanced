@@ -20,7 +20,9 @@
 //                                       entry). Its content is setBtnIcon() of
 //                                       the selected option's data-face-icon
 //                                       (a PBP_ICONS key) and data-face-label
-//                                       (default: the option text); no sizer.
+//                                       (default: the option text) -- just the
+//                                       label span when there is no icon to
+//                                       draw; no sizer.
 //                                       The consumer owns its title.
 //     div.listbox-pop[hidden]        <- popover shell: border, radius, shadow,
 //                                       overflow hidden (clips the scrollbar
@@ -172,16 +174,25 @@
   }
 
   // Ghost face: icon + short label of the selected option. Rebuilt only when
-  // either changes; the button's title belongs to the consumer.
+  // either changes; the button's title belongs to the consumer. An option
+  // with no drawable icon (no data-face-icon, or a key PBP_ICONS lacks) gets
+  // its label span alone: setBtnIcon would still write an empty .btn-ic, and
+  // the .btn family's gap would open a blank slot beside the label.
   function syncFace(state) {
     const opt = state.select.selectedOptions[0] || null;
     const label = opt?.dataset.faceLabel || optionText(opt);
-    const icon = opt?.dataset.faceIcon || "";
+    const key = opt?.dataset.faceIcon || "";
+    const icon = key && typeof PBP_ICONS === "object" && PBP_ICONS && PBP_ICONS[key] ? key : "";
     const face = `${icon}\n${label}`;
     if (state.face === face) return;
     state.face = face;
-    if (typeof setBtnIcon === "function") setBtnIcon(state.btn, icon, label);
-    else state.btn.textContent = label;
+    if (icon && typeof setBtnIcon === "function") {
+      setBtnIcon(state.btn, icon, label);
+    } else {
+      const text = document.createElement("span");
+      text.textContent = label;
+      state.btn.replaceChildren(text);
+    }
   }
 
   function sync(state) {

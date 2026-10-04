@@ -777,7 +777,7 @@ export const CHECKS = [
   // covers the search box, the group filter and the notes filter; T4 appends
   // "status" and "color", T6 appends "sort" (same entry, longer `inputs`).
   { surface: "library", page: "library.html", selector: "#vocab-search (filterScrollReset)", state: "filterScrollReset", themes: ["", "terminal"],
-    expect: { filterScrollReset: { inputs: ["search", "group", "notesFilter"], viewport: [1280, 700], probeOffset: 200 } } },
+    expect: { filterScrollReset: { inputs: ["search", "group", "sort", "notesFilter"], viewport: [1280, 700], probeOffset: 200 } } },
   // ---- §9.2 G5, the axis subset (plan T3, Review Focus 1): the search box
   // at P, the detail axis at P + L + G, the row fill on the index column --
   // at 2560x1300 and 1280x800, at DPR 1 and 1.5 with a 17px scrollbar, and
@@ -790,11 +790,11 @@ export const CHECKS = [
   // lookup door (library.css ".vocab-filter-row > .vocab-lookup-narrow")
   // never had a gate (debt-sweep 2026-08-07). 500px: comfortably inside the
   // <860px band where the door is display:inline-flex, and measured (this
-  // task) to keep the sort segment and door on one flex line without
+  // task) to keep the sort menu button and door on one flex line without
   // wrapping at every width down to 320 -- 500 is not a magic number, just a
   // representative point in that always-one-line range.
   { surface: "library", page: "library.html", selector: ".vocab-filter-row", state: "gapMin",
-    expect: { gapMin: { width: 500, fromSel: ".vocab-sort-seg", toSel: ".vocab-lookup-narrow", min: 12 } } },
+    expect: { gapMin: { width: 500, fromSel: "#vocab-sort-btn", toSel: ".vocab-lookup-narrow", min: 12 } } },
 
   // ---- COMPONENTS.md §9 law 7 (real tabs). The header's two tabs used to be
   // buttons in tab clothing -- fill, border, radius-md -- which is what the
@@ -1191,8 +1191,10 @@ export const CHECKS = [
     expect: { heightPx: { comfortable: 28, compact: 24 } } },
   { surface: "library", page: "library.html", selector: "#vocab-batch-delete", state: "default",
     expect: { heightPx: { comfortable: 28, compact: 24 } } },
-  { surface: "library", page: "library.html", selector: ".vocab-sort-seg", state: "default",
-    expect: { heightEqWith: { selector: "#vocab-search", tolerancePx: 1 } } },
+  // Sort menu button (spec §3.3): listbox.js's ghost trigger, a .btn on the
+  // md rung -- the same height as the row's group listbox and toggles.
+  { surface: "library", page: "library.html", selector: "#vocab-sort-btn", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
 
   // ---- Task 14 (§6.3 rowRungEq, sweep-discovered): the free-lookup bar.
   // #vocab-lookup-go is a bare-icon .btn-sm (COMPONENTS.md §1.5's "dense
@@ -1273,8 +1275,8 @@ export const CHECKS = [
       edgeClickable: { children: [".vocab-group-step:nth-of-type(1)", ".vocab-group-step:nth-of-type(2)"] } } },
   { surface: "library", page: "library.html", selector: ".vocab-detail-pane .vocab-group-unit", state: "focusWithin",
     focusTarget: 'input[type="text"]', expect: { fusedFocusRing: true } },
-  // The two steppers moved to fusedSegmentRing for the same reason the sort
-  // cells did: the shell's ring is now scoped to the TEXT INPUT, so tabbing
+  // The two steppers moved to fusedSegmentRing for the same reason the
+  // retired sort segment's cells did: the shell's ring is now scoped to the TEXT INPUT, so tabbing
   // to a stepper must light the cell and leave the shell alone. Keeping the
   // input on fusedFocusRing is the point of the split -- a text field's focus
   // belongs on the frame around it, a button cell's belongs inside the cell,
@@ -1284,30 +1286,6 @@ export const CHECKS = [
     focusTarget: ".vocab-group-step:nth-of-type(1)", expect: { fusedSegmentRing: true } },
   { surface: "library", page: "library.html", selector: ".vocab-detail-pane .vocab-group-unit", state: "focusWithin",
     focusTarget: ".vocab-group-step:nth-of-type(2)", expect: { fusedSegmentRing: true } },
-  // Sort segment: the same law in its button flavour (§7.3's outline recipe
-  // on the shell rather than the field's box-shadow, because nothing here
-  // takes text entry). Its pre-fix divider colour was driven by aria-pressed,
-  // so fusedChildrenFlat's "dividers agree" clause is the live guard against
-  // a state re-colouring the seam.
-  // concentricEnds: true (independent review F1, hit-area-debt): both cells
-  // are shell ends here (only 2 cells total), so both round their own OUTER
-  // corners -- #vocab-sort-time's left pair, #vocab-sort-alpha's right pair.
-  // edgeClickable (F2): same real-pointer-event assertion as the group unit
-  // above. RED-verified by reverting .vocab-sort-seg's overflow to `hidden`.
-  { surface: "library", page: "library.html", selector: ".vocab-sort-seg", state: "default",
-    expect: { fusedChildrenFlat: { children: ["#vocab-sort-time", "#vocab-sort-alpha"], concentricEnds: true },
-      edgeClickable: { children: ["#vocab-sort-time", "#vocab-sort-alpha"] } } },
-  // 2026-08-06: these two flipped from fusedFocusRing to fusedSegmentRing.
-  // The shell ring is GONE by ruling, and the expectation had to move with
-  // it -- a check still demanding "the shell shows an indicator" would have
-  // failed the fix. What replaces it is not weaker: fusedSegmentRing asserts
-  // BOTH that the shell stayed inert AND that the focused cell drew an inset
-  // ring, so neither of the two reported defects (a box lighting up on plain
-  // mouse-down; two stacked rectangles on Tab) can come back unnoticed.
-  { surface: "library", page: "library.html", selector: ".vocab-sort-seg", state: "focusWithin",
-    focusTarget: "#vocab-sort-time", expect: { fusedSegmentRing: true } },
-  { surface: "library", page: "library.html", selector: ".vocab-sort-seg", state: "focusWithin",
-    focusTarget: "#vocab-sort-alpha", expect: { fusedSegmentRing: true } },
   // ---- COMPONENTS.md §8 law 6: rest <-> focus state stability (user
   // checkpoint round 5: "底色变白、眼睛图标偏移、眼睛段看着独立不融合").
   // Focus may change border-COLOUR and add a ring. It may not move anything,
@@ -1323,9 +1301,6 @@ export const CHECKS = [
     focusTarget: ".vocab-group-step:nth-of-type(1)",
     expect: { fusedStateStable: true,
       fusedStateStableChildren: ['input[type="text"]', ".vocab-group-step:nth-of-type(1)", ".vocab-group-step:nth-of-type(2)"] } },
-  { surface: "library", page: "library.html", selector: ".vocab-sort-seg", state: "focusWithin",
-    focusTarget: "#vocab-sort-alpha",
-    expect: { fusedStateStable: true, fusedStateStableChildren: ["#vocab-sort-time", "#vocab-sort-alpha"] } },
   { surface: "options", page: "options.html", selector: ".key-wrap", state: "focusWithin",
     focusTarget: ".key-toggle",
     expect: { fusedStateStable: true, fusedStateStableChildren: ["input", ".key-toggle"] } },
@@ -1959,6 +1934,14 @@ export const CHECKS = [
     expect: { borderTopWidthPx: { value: 1 }, borderRadiusPx: { radiusVar: "radius-lg" }, computedPosition: "fixed", inViewport: {} } },
   { surface: "library", page: "library.html", selector: "#vocab-group-filter-list .listbox-opt", state: "open",
     open: { click: "#vocab-group-filter-btn" },
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  // The sort menu button's popover (T6b): the same panel family. Its trigger
+  // is always on the filter row, never inside the Filter popover.
+  { surface: "library", page: "library.html", selector: "#vocab-sort-btn + .listbox-pop", state: "open",
+    open: { click: "#vocab-sort-btn" },
+    expect: { borderTopWidthPx: { value: 1 }, borderRadiusPx: { radiusVar: "radius-lg" }, computedPosition: "fixed", inViewport: {} } },
+  { surface: "library", page: "library.html", selector: "#vocab-sort-list .listbox-opt", state: "open",
+    open: { click: "#vocab-sort-btn" },
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
   // input[type=number] 96 (a handful of digits). #opt-ai-cache-duration lives
   // on the AI Behavior tab; scripts/ui-render-audit.mjs's aiBehaviorChecks

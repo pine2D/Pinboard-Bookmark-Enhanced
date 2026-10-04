@@ -86,12 +86,14 @@ document.addEventListener("DOMContentLoaded", () => {
   initI18n();
   applyI18n();
   document.title = t("libraryTitle");
-  // library-vocab.js labels the sort segment at its own parse time -- before
-  // initI18n has loaded the manually chosen locale, so those labels came out
-  // in the browser UI language. Re-run it here, where t() is finally correct,
-  // and it also restores the labels applyI18n just wrote from the static
-  // (default-state) keys to the ones the live select value calls for.
-  if (typeof _pbpVocabSyncSortSeg === "function") _pbpVocabSyncSortSeg();
+  // library-vocab.js writes the sort trigger's face words at its own parse
+  // time -- before initI18n has loaded a manually chosen locale. Re-run it
+  // here, where t() is final: it rewrites each option's data-face-label, the
+  // accessible-name span and the trigger's title, then redraws listbox.js's
+  // ghost trigger. (applyI18n's pbp:i18n-applied already reached its listener
+  // in library-vocab.js; this explicit call keeps the ordering independent of
+  // that listener.)
+  if (typeof _pbpVocabSyncSortFace === "function") _pbpVocabSyncSortFace();
   // Roving tabindex (active tab 0, others -1, set by _pbpLibApplyView) needs
   // its arrow-key half too -- same pattern as options.js's activateTab
   // keydown handler, ArrowLeft/ArrowRight (this tab strip is horizontal, not
@@ -347,6 +349,12 @@ function pbpLibMeasureCopyWidth(row, prepare) {
 // cleared while it reloads): the form is not decided on a row that is about
 // to grow. Landed with no words at all, the toggles stay hidden and the row
 // is measured without them -- a decided form either way.
+// Two listbox details (T6b): a listbox's popover never takes row width (it
+// is a top-layer panel; in the copy it would lose [popover] and lay out in
+// flow), so the copies drop every .listbox-pop. And a ghost trigger (the
+// sort menu button) is measured with the widest face word any of its options
+// can show -- its options' words stacked in one grid cell -- so picking
+// another sort never folds or unfolds the row under the user.
 function pbpLibVocabFilterNeed(row) {
   const set = row && row.querySelector(".vocab-filter-set");
   if (!set) return NaN;
@@ -354,10 +362,24 @@ function pbpLibVocabFilterNeed(row) {
   if (toggles && !toggles.hasAttribute("data-counts-ready")) return NaN;
   const gap = getComputedStyle(row).columnGap;
   return pbpLibMeasureCopyWidth(row, (copy, counterpart) => {
-    for (const el of row.querySelectorAll(":scope > [popovertarget], :scope > .vocab-lookup-narrow")) {
-      const c = counterpart(el);
-      if (c) c.remove();
+    // Resolve every copy before removing any: counterpart() walks child
+    // indices, which a removal shifts.
+    const doomed = [...row.querySelectorAll(":scope > [popovertarget], :scope > .vocab-lookup-narrow, .listbox-pop")].map(counterpart);
+    for (const trigger of row.querySelectorAll(".listbox-trigger")) {
+      const select = trigger.parentElement && trigger.parentElement.previousElementSibling;
+      const copyTrigger = counterpart(trigger);
+      const stack = copyTrigger && copyTrigger.lastElementChild;
+      if (!select || select.tagName !== "SELECT" || !stack) continue;
+      const words = new Set([...select.options].map((o) => o.dataset.faceLabel || (o.textContent || "").trim()));
+      stack.replaceChildren(...[...words].map((word) => {
+        const span = document.createElement("span");
+        span.textContent = word;
+        span.style.gridArea = "1 / 1";
+        return span;
+      }));
+      stack.style.display = "inline-grid";
     }
+    for (const c of doomed) if (c) c.remove();
     const cset = copy.querySelector(".vocab-filter-set");
     Object.assign(cset.style, { display: "flex", position: "static", inset: "auto", margin: "0", padding: "0", border: "0",
       width: "auto", height: "auto", overflow: "visible", flex: "none", minWidth: "0", alignItems: "center", gap });

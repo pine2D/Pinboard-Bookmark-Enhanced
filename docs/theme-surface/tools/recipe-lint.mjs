@@ -296,7 +296,6 @@ for (const ns of NS_LIST) {
 {
   const NESTED_RADIUS = [
     // [ns, outer selector, inner selector] -- both as they appear in the css
-    ["lib", ".vocab-sort-seg", ".vocab-sort-seg > .vocab-sort-btn"],
     ["lib", ".vocab-group-unit", ".vocab-group-unit > .vocab-group-step"],
     ["lib", ".notes-hit", ".notes-hit-btn"],
   ];

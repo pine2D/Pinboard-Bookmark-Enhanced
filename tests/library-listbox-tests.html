@@ -114,7 +114,7 @@ function boot({ body, before = "", after = "" }) {
   });
 }
 
-// The 14 primitive cases: one shared srcdoc document plus two fresh ones.
+// The 15 primitive cases: one shared srcdoc document plus two fresh ones.
 async function primitiveCases() {
   const { frame, win, doc } = await boot({ body: MAIN_BODY });
   const $ = (id) => doc.getElementById(id);
@@ -383,6 +383,34 @@ async function primitiveCases() {
       gh.value = "latest";
       win.pbpListboxSync(gh);
       btn.removeAttribute("title");
+    }
+  });
+
+  // T6b (controller follow-up to T0b): a face without a drawable icon -- no
+  // data-face-icon, or a key PBP_ICONS does not have -- must not leave an
+  // empty .btn-ic behind: the .btn family's gap would still open a blank
+  // icon-sized slot beside the label.
+  test("ghost: an option without a drawable face icon gets its label alone, no empty icon slot", async () => {
+    await reset();
+    const btn = btnOf(gh);
+    const az = gh.querySelector('option[value="az"]');
+    try {
+      gh.value = "az";
+      win.pbpListboxSync(gh);
+      assert(btn.children.length === 1 && !btn.querySelector(".btn-ic") && btn.lastElementChild?.textContent === "A to Z",
+        "no data-face-icon: " + btn.innerHTML.slice(0, 120));
+      az.dataset.faceIcon = "noSuchIconKey";
+      win.pbpListboxSync(gh);
+      assert(btn.children.length === 1 && !btn.querySelector(".btn-ic") && btn.lastElementChild?.textContent === "A to Z",
+        "unknown icon key: " + btn.innerHTML.slice(0, 120));
+      gh.value = "latest";
+      win.pbpListboxSync(gh);
+      assert(btn.querySelectorAll(".btn-ic svg").length === 1 && btn.lastElementChild?.textContent === "Time",
+        "back on an iconed option the icon slot did not return: " + btn.innerHTML.slice(0, 120));
+    } finally {
+      delete az.dataset.faceIcon;
+      gh.value = "latest";
+      win.pbpListboxSync(gh);
     }
   });
 
@@ -699,6 +727,63 @@ async function libraryPageGroupCases() {
   }
 }
 
+// ---- T6b: the sort menu button (spec §3.3 / §8.3). listbox.js draws the
+// hidden #vocab-sort with its ghost face: the selected option's short word and
+// straight arrow (↓ descending, ↑ ascending), no sizer, and the accessible
+// name label + face span (library-vocab.js _pbpVocabSyncSortFace).
+async function libraryPageSortCases() {
+  const { frame, win, doc } = await loadLibraryFrame({ width: 1280, height: 800 });
+  try {
+    await libWaitFor(win, () => win.eval("_vocabCurrentOwner") === "acct_listboxtest");
+    const select = doc.getElementById("vocab-sort");
+    const trigger = doc.getElementById("vocab-sort-btn");
+    const iconHtml = (key) => { const box = doc.createElement("span"); box.innerHTML = win.eval(`PBP_ICONS[${JSON.stringify(key)}] || ""`); return box.innerHTML; };
+    const words = { latest: win.eval('t("librarySortTime")'), oldest: win.eval('t("librarySortTime")'), az: win.eval('t("librarySortAlpha")'), za: win.eval('t("librarySortAlpha")') };
+    const arrows = { latest: "arrowDownLine", oldest: "arrowUpLine", az: "arrowUpLine", za: "arrowDownLine" };
+    let widthOk = true;
+    const widthLog = [];
+    for (const value of ["oldest", "az", "za", "latest"]) {
+      if (trigger) {
+        trigger.click();
+        await libFrames(win);
+        doc.querySelector(`#vocab-sort-list .listbox-opt[data-value="${value}"]`)?.click();
+        await libFrames(win);
+      }
+      const label = trigger && trigger.lastElementChild;
+      const ic = trigger && trigger.querySelector(".btn-ic");
+      check(`T6 the sort trigger shows "${words[value]}" + ${arrows[value]} for ${value}`,
+        !!trigger && trigger.classList.contains("listbox-trigger") && !trigger.classList.contains("listbox-btn") &&
+        select.value === value && !!label && label.textContent === words[value] && !!ic && ic.innerHTML === iconHtml(arrows[value]),
+        `carrier=${select.value} text=${label && label.textContent} icon=${ic && ic.innerHTML.slice(0, 60)}`);
+      if (trigger && label && ic) {
+        const cs = win.getComputedStyle(trigger);
+        const bound = label.getBoundingClientRect().width + ic.getBoundingClientRect().width + (parseFloat(cs.columnGap) || 0) +
+          parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth) + 1;
+        const w = trigger.getBoundingClientRect().width;
+        widthLog.push(`${value}:${w.toFixed(1)}<=${bound.toFixed(1)}`);
+        if (w > bound) widthOk = false;
+      } else {
+        widthOk = false;
+      }
+    }
+    check("T6 the sort trigger is as wide as its short word + arrow + padding (no sizer from the longest full option)",
+      !!trigger && widthOk && !trigger.querySelector(".listbox-sizer"), widthLog.join(" "));
+    const labelText = doc.getElementById("vocab-sort-label").textContent.trim();
+    const faceText = doc.getElementById("vocab-sort-face").textContent.trim();
+    check("T6 the sort trigger's name is label + face span, contains its visible word, and its title is the face text",
+      !!trigger && trigger.getAttribute("aria-labelledby") === "vocab-sort-label vocab-sort-face" &&
+      labelText === win.eval('t("vocabSortAria")') && faceText === win.eval(`t("librarySortFaceAria", ${JSON.stringify(words.latest)}, ${JSON.stringify(select.selectedOptions[0].textContent.trim())})`) &&
+      faceText.includes(trigger.lastElementChild.textContent) && trigger.title === faceText,
+      `label=${labelText} face=${faceText} title=${trigger && trigger.title}`);
+    const visibleSelects = [...doc.querySelectorAll("select")]
+      .filter((el) => el.getClientRects().length > 0 && win.getComputedStyle(el).visibility !== "hidden").map((el) => el.id);
+    check("T6 no native select is visible on the page except the lookup language (T7 converts it)",
+      JSON.stringify(visibleSelects) === JSON.stringify(["vocab-lookup-lang"]), JSON.stringify(visibleSelects));
+  } finally {
+    frame.remove();
+  }
+}
+
 // ---- Main flow (last thing in this script). A setup error that escapes a
 // suite becomes one failed row; the row count then falls short and
 // run-test.mjs reports the stall, which is the red it should be.
@@ -710,6 +795,7 @@ async function libraryPageGroupCases() {
     // libraryPageLookupLangCases, T7b libraryPageLongContentCases +
     // libraryPageDetailLocaleCases, T7c libraryPageAutoLookupLangCases).
     await libraryPageGroupCases();
+    await libraryPageSortCases();
   } catch (error) {
     report("suite setup", error);
   }

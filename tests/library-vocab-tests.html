@@ -53,16 +53,14 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
             <button type="button" class="lib-toggle" id="vocab-stat-known" data-status="known" aria-pressed="false" hidden></button>
           </span>
         </div>
-        <select id="vocab-sort" aria-label="Sort vocabulary" hidden>
-          <option value="latest">Recently updated</option>
-          <option value="oldest">Least recently updated</option>
-          <option value="az">A-Z</option>
-          <option value="za">Z-A</option>
+        <label class="sr-only" id="vocab-sort-label" for="vocab-sort">Sort vocabulary</label>
+        <span class="sr-only" id="vocab-sort-face"></span>
+        <select id="vocab-sort" data-listbox="float" data-listbox-face="ghost" aria-labelledby="vocab-sort-label vocab-sort-face" aria-label="Sort vocabulary" hidden>
+          <option value="latest" data-face-label="Date" data-face-icon="arrowDownLine">Recently updated</option>
+          <option value="oldest" data-face-label="Date" data-face-icon="arrowUpLine">Least recently updated</option>
+          <option value="az" data-face-label="Alphabetical" data-face-icon="arrowUpLine">A-Z</option>
+          <option value="za" data-face-label="Alphabetical" data-face-icon="arrowDownLine">Z-A</option>
         </select>
-        <span class="vocab-sort-seg" role="group" aria-label="Sort vocabulary">
-          <button type="button" class="btn btn-sm vocab-sort-btn" id="vocab-sort-time" aria-pressed="true" data-i18n-title="vocabSortOldest" data-i18n-aria="vocabSortOldest" aria-label="Least recently updated" title="Least recently updated"><span class="btn-ic" data-ic="clockArrowDown"></span></button>
-          <button type="button" class="btn btn-sm vocab-sort-btn" id="vocab-sort-alpha" aria-pressed="false" data-i18n-title="vocabSortAz" data-i18n-aria="vocabSortAz" aria-label="A-Z" title="A-Z"><span class="btn-ic" data-ic="arrowDownAZ"></span></button>
-        </span>
         <button type="button" class="btn btn-sm vocab-lookup-narrow" id="vocab-lookup-narrow" aria-label="Look up a word" title="Look up a word"><span class="btn-ic" data-ic="book"></span></button>
       </div>
       <div class="vocab-context-bar lib-count-row" id="vocab-context-bar">
@@ -790,19 +788,23 @@ check("sort change keeps the current selection", _vocabSelected.size === 2);
 check("sort change resets the shift anchor", _vocabLastSelectedId === null);
 $id("vocab-group-filter").dispatchEvent(new Event("change"));
 check("group filter still clears the selection", _vocabSelected.size === 0);
-// Sort segment buttons proxy the hidden select -- the state carrier every
-// existing handler speaks (2026-08-02 dropdown -> toggle-pair redesign).
+// Sort menu button (spec §3.3): listbox.js draws the hidden #vocab-sort as a
+// ghost trigger. This page does not load listbox.js, so it pins the half
+// library-vocab.js owns: each option's short face word, and the
+// accessible-name / title text for the carrier's current value.
+_pbpVocabSyncSortFace();
+check("sort faces: one short word per dimension on every option",
+  [...$id("vocab-sort").options].map((o) => `${o.value}=${o.dataset.faceLabel}`).join(",") ===
+    "latest=librarySortTime,oldest=librarySortTime,az=librarySortAlpha,za=librarySortAlpha",
+  [...$id("vocab-sort").options].map((o) => `${o.value}=${o.dataset.faceLabel}`).join(","));
+$id("vocab-sort").value = "az";
+$id("vocab-sort").dispatchEvent(new Event("change"));
+check("a sort change re-labels the face span with the short word and the full option text",
+  $id("vocab-sort-face").textContent === "librarySortFaceAria:librarySortAlpha,A-Z", $id("vocab-sort-face").textContent);
 $id("vocab-sort").value = "latest";
 $id("vocab-sort").dispatchEvent(new Event("change"));
-$id("vocab-sort-alpha").click();
-check("alpha sort button enters A-Z", $id("vocab-sort").value === "az");
-$id("vocab-sort-alpha").click();
-check("second alpha click flips to Z-A", $id("vocab-sort").value === "za");
-check("active alpha button is pressed and time is not",
-  $id("vocab-sort-alpha").getAttribute("aria-pressed") === "true" &&
-  $id("vocab-sort-time").getAttribute("aria-pressed") === "false");
-$id("vocab-sort-time").click();
-check("time button re-enters latest-first", $id("vocab-sort").value === "latest");
+check("back to latest: the face span names the time dimension and its full order",
+  $id("vocab-sort-face").textContent === "librarySortFaceAria:librarySortTime,Recently updated", $id("vocab-sort-face").textContent);
 
 // List-region scroll reset (library redesign spec §2.5 #1): the list region
 // is the scroll container, and the four USER inputs put it back at the top --
@@ -1809,10 +1811,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
           <div class="listbox"><button type="button" class="listbox-btn" data-label="group-filter"><span class="listbox-value"></span><span class="btn-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24"></svg></span><span class="listbox-sizer" aria-hidden="true"></span></button></div>
           <span class="vocab-status-toggles" role="group"><button type="button" class="lib-toggle" data-label="stat-all"></button><button type="button" class="lib-toggle" data-label="stat-learning"></button><button type="button" class="lib-toggle" data-label="stat-known"></button></span>
         </div>
-        <span class="vocab-sort-seg" role="group">
-          <button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
-          <button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
-        </span>
+        <div class="listbox"><button type="button" class="listbox-trigger btn ghost" data-label="sort"><span class="btn-ic"><svg width="14" height="14" viewBox="0 0 24 24"></svg></span><span></span></button></div>
         <button type="button" class="btn btn-sm vocab-lookup-narrow"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
       </div>
       <div class="vocab-context-bar lib-count-row"><span class="vocab-ctx-text"><span class="notes-count"><span class="lib-count-items" aria-hidden="true"><span class="lib-count-item" data-label="ci-0"></span><span class="lib-count-item" data-label="ci-1"></span><span class="lib-count-item" data-label="ci-2"></span><span class="lib-count-item" data-label="ci-3"></span></span></span></span><span class="save-status vocab-main-status">Saved just now</span><div class="lib-cluster"><button class="btn btn-sm ghost lib-hang-end" data-label="all"></button></div></div>
@@ -1843,6 +1842,9 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         const doc = frame.contentDocument, m = messages[locale], panel = doc.getElementById("view-vocab");
         doc.documentElement.lang = locale;
         panel.querySelector('[data-label="all"]').textContent = m.vocabSelectAll.message;
+        // The sort trigger's short word: the longer of the two dimensions in this locale.
+        panel.querySelector('[data-label="sort"]').lastElementChild.textContent =
+          [m.librarySortTime.message, m.librarySortAlpha.message].sort((a, b) => b.length - a.length)[0];
         panel.querySelector('[data-label="invert"]').title = m.vocabInvertSelection.message;
         panel.querySelector('[data-label="known"]').title = m.vocabMarkKnown.message;
         panel.querySelector('[data-label="learning"]').title = m.vocabMarkLearning.message;
@@ -1973,7 +1975,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     const fitTicks = () => new Promise((resolve) => setTimeout(resolve, 0));
     const host = document.createElement("div");
     host.innerHTML = `
-      <div class="vocab-list-pane" data-header-fit="narrow" style="position:fixed;left:-9999px;top:0;width:520px">
+      <div class="vocab-list-pane" data-header-fit="narrow" style="position:fixed;left:-9999px;top:0;width:640px">
         <div class="vocab-filter-row">
           <button type="button" class="btn ghost" popovertarget="fit-set" aria-expanded="false"><span>Filter</span></button>
           <div class="vocab-filter-set" id="fit-set" popover="auto">
@@ -1981,7 +1983,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
             <select data-listbox="float" hidden><option>All groups</option></select><div class="listbox"><button type="button" class="listbox-btn"><span class="listbox-value">All groups</span><span class="btn-ic"></span><span class="listbox-sizer">All groups</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">All groups</li></ul></div></div>
             <span class="vocab-status-toggles" data-counts-ready><button type="button" class="lib-toggle" aria-pressed="true">All</button><button type="button" class="lib-toggle" aria-pressed="false">Learning 12</button><button type="button" class="lib-toggle" aria-pressed="false">Known 3</button></span>
           </div>
-          <span class="vocab-sort-seg"><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span>
+          <!-- The sort control as listbox.js leaves it (T6b): hidden carrier + ghost trigger. -->
+          <select data-listbox="float" data-listbox-face="ghost" hidden><option value="latest" data-face-label="Date" selected>Recently updated</option><option value="oldest" data-face-label="Date">Least recently updated</option><option value="az" data-face-label="Alphabetical">A-Z</option><option value="za" data-face-label="Alphabetical">Z-A</option></select><div class="listbox"><button type="button" class="listbox-trigger btn ghost"><span class="btn-ic"><svg width="14" height="14" viewBox="0 0 24 24"></svg></span><span>Date</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">Recently updated</li></ul></div></div>
           <button type="button" class="btn btn-sm vocab-lookup-narrow"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
         </div>
       </div>`;
@@ -1993,8 +1996,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     try {
       const update = pbpLibWireVocabHeaderFit(pane);
       const need = pbpLibVocabFilterNeed(row);
-      check("header fit: the wide form's need is a real width, under 520 for short English labels",
-        typeof update === "function" && need > 200 && need < 520, String(need));
+      check("header fit: the wide form's need is a real width, under 640 for short English labels (the sort trigger counts at its widest word)",
+        typeof update === "function" && need > 200 && need < 640, String(need));
       check("header fit: a pane wider than the need is wide", pane.dataset.headerFit === "wide", pane.dataset.headerFit);
       pane.dataset.headerFit = "narrow";
       const needNarrow = pbpLibVocabFilterNeed(row);
@@ -2024,6 +2027,40 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       lbPop.firstElementChild.innerHTML = '<li class="listbox-opt">All groups</li>';
       check("header fit: an open group listbox (shown, fixed, 30 long options) moves neither the need nor the form",
         Math.abs(needOpen - need) < 0.5 && formOpen === "wide", `${needOpen} vs ${need}; form ${formOpen}`);
+      // The sort menu button (T6b) has no sizer: its face is the selected
+      // option's short word. The need counts the widest word any option can
+      // show, so a sort change never folds or unfolds the row; and its open
+      // popover takes no row width, like the group listbox's.
+      const sortSelect = row.querySelector("select[data-listbox-face]");
+      const sortFace = row.querySelector(".listbox-trigger").lastElementChild;
+      sortFace.textContent = "Alphabetical";
+      const needAlpha = pbpLibVocabFilterNeed(row);
+      sortFace.textContent = "Date";
+      const needDate = pbpLibVocabFilterNeed(row);
+      for (const o of sortSelect.options) o.dataset.faceLabel = "Date";
+      const needShortWords = pbpLibVocabFilterNeed(row);
+      for (const o of sortSelect.options) o.dataset.faceLabel = /^(az|za)$/.test(o.value) ? "Alphabetical" : "Date";
+      check("header fit: the sort trigger counts at its widest face word -- either sort shows the same need, wider than short words alone",
+        Math.abs(needAlpha - need) < 0.5 && Math.abs(needDate - need) < 0.5 && needShortWords < need - 10,
+        `alpha ${needAlpha} date ${needDate} need ${need} short-only ${needShortWords}`);
+      const sortPop = row.querySelector(".listbox-trigger").nextElementSibling;
+      // As listbox.js opens it: unhidden, shown as a manual popover, and
+      // placed by pbpListboxPlace's inline left / top / min- and max-width
+      // (position: fixed comes from library.css's [popover] rule, which the
+      // measuring copy -- stripped of [popover] -- no longer matches).
+      sortPop.hidden = false;
+      sortPop.showPopover();
+      sortPop.style.cssText = "left:0;top:0;min-width:300px;max-width:900px";
+      sortPop.firstElementChild.innerHTML = Array.from({ length: 4 }, (_, i) => `<li class="listbox-opt">A very long sort order description number ${i}</li>`).join("");
+      const needSortOpen = pbpLibVocabFilterNeed(row);
+      update();
+      const formSortOpen = pane.dataset.headerFit;
+      sortPop.hidePopover();
+      sortPop.hidden = true;
+      sortPop.removeAttribute("style");
+      sortPop.firstElementChild.innerHTML = '<li class="listbox-opt">Recently updated</li>';
+      check("header fit: an open sort list (shown, fixed, long options) moves neither the need nor the form",
+        Math.abs(needSortOpen - need) < 0.5 && formSortOpen === "wide", `${needSortOpen} vs ${need}; form ${formSortOpen}`);
       update();
       pane.style.width = `${Math.floor(need) - 1}px`;
       await fitFrames();
@@ -2041,7 +2078,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       pane.style.width = "300px";
       await fitFrames();
       set.showPopover();
-      pane.style.width = "520px";
+      pane.style.width = "640px";
       await fitFrames();
       check("header fit: turning wide closes an open Filter popover", pane.dataset.headerFit === "wide" && !set.matches(":popover-open"),
         `${pane.dataset.headerFit} open=${set.matches(":popover-open")}`);
@@ -2079,7 +2116,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         Number.isNaN(pbpLibVocabFilterNeed(row)) && pane.dataset.headerFit === "wide", pane.dataset.headerFit);
       set.querySelector(".vocab-status-toggles").setAttribute("data-counts-ready", "");
       for (const b of set.querySelectorAll(".lib-toggle")) b.hidden = true;
-      pane.style.width = "520px";
+      pane.style.width = "640px";
       await fitFrames();
       check("header fit: counts landed with no words (toggles stay hidden) still decide a form",
         Number.isFinite(pbpLibVocabFilterNeed(row)) && pane.dataset.headerFit === "wide", `${pbpLibVocabFilterNeed(row)} ${pane.dataset.headerFit}`);
@@ -2108,7 +2145,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
             <select data-listbox="float" hidden><option>All groups</option></select><div class="listbox"><button type="button" class="listbox-btn"><span class="listbox-value">All groups</span><span class="btn-ic"></span><span class="listbox-sizer">All groups</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">All groups</li></ul></div></div>
             <span class="vocab-status-toggles"><button type="button" class="lib-toggle" hidden>All</button><button type="button" class="lib-toggle" hidden></button><button type="button" class="lib-toggle" hidden></button></span>
           </div>
-          <span class="vocab-sort-seg"><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span>
+          <!-- The sort control as listbox.js leaves it (T6b): hidden carrier + ghost trigger. -->
+          <select data-listbox="float" data-listbox-face="ghost" hidden><option value="latest" data-face-label="Date" selected>Recently updated</option><option value="oldest" data-face-label="Date">Least recently updated</option><option value="az" data-face-label="Alphabetical">A-Z</option><option value="za" data-face-label="Alphabetical">Z-A</option></select><div class="listbox"><button type="button" class="listbox-trigger btn ghost"><span class="btn-ic"><svg width="14" height="14" viewBox="0 0 24 24"></svg></span><span>Date</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">Recently updated</li></ul></div></div>
         </div>
       </div>`;
     document.body.appendChild(host2);

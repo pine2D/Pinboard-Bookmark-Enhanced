@@ -2109,45 +2109,42 @@ if (_vocabSortSelect) _vocabSortSelect.addEventListener("change", () => {
   _vocabLastSelectedId = null;
   _pbpVocabApplyView(true);
   _pbpVocabResetListScroll();
-  _pbpVocabSyncSortSeg();
+  _pbpVocabSyncSortFace();
 });
-// Sort segment: two direction-toggle buttons proxying the hidden #vocab-sort
-// select (the state carrier every existing handler and test already speaks).
-// Click an inactive dimension = enter it at its default direction; click the
-// active one = flip. Icons show the CURRENT direction, title/aria the sort a
-// click will apply next (reuses the four existing option strings).
-const PBP_VOCAB_SORT_DIMS = [
-  { btn: "vocab-sort-time", states: ["latest", "oldest"], icons: ["clockArrowDown", "clockArrowUp"], labels: ["vocabSortLatest", "vocabSortOldest"] },
-  { btn: "vocab-sort-alpha", states: ["az", "za"], icons: ["arrowDownAZ", "arrowDownZA"], labels: ["vocabSortAz", "vocabSortZa"] },
-];
-function _pbpVocabSyncSortSeg() {
+// Sort menu button (spec §3.3, user ruling 2026-10-03): #vocab-sort stays the
+// hidden state carrier; listbox.js draws it as a ghost trigger
+// (data-listbox-face="ghost"). The trigger shows a short dimension word and a
+// direction arrow -- down always descending, up always ascending -- read from
+// the selected option's data-face-label / data-face-icon. The full option text
+// is in the popover and, after the label, in the accessible name
+// (aria-labelledby="vocab-sort-label vocab-sort-face", WCAG 2.5.3) and the
+// title. Runs at parse time (browser-language t()), again from library.js
+// after applyI18n, where t() is final, and on every later pbp:i18n-applied
+// (the async manual-language refresh re-applies option text; listbox.js's own
+// re-sync, registered earlier, would otherwise redraw the stale face words).
+const PBP_VOCAB_SORT_FACE_KEYS = Object.freeze({ latest: "librarySortTime", oldest: "librarySortTime", az: "librarySortAlpha", za: "librarySortAlpha" });
+function _pbpVocabSyncSortFace() {
   const select = $id("vocab-sort");
   if (!select) return;
-  const value = select.value || "latest";
-  for (const dim of PBP_VOCAB_SORT_DIMS) {
-    const btn = $id(dim.btn);
-    if (!btn) continue;
-    const idx = dim.states.indexOf(value);
-    const active = idx !== -1;
-    btn.setAttribute("aria-pressed", active ? "true" : "false");
-    const ic = btn.querySelector(".btn-ic");
-    if (ic && typeof PBP_ICONS !== "undefined") ic.innerHTML = PBP_ICONS[dim.icons[active ? idx : 0]] || "";
-    const label = t(dim.labels[active ? 1 - idx : 0]);
-    btn.title = label;
-    btn.setAttribute("aria-label", label);
+  for (const option of select.options) {
+    const key = PBP_VOCAB_SORT_FACE_KEYS[option.value];
+    if (key) option.dataset.faceLabel = t(key);
   }
+  const current = select.selectedOptions[0] || null;
+  const short = current ? current.dataset.faceLabel || "" : "";
+  const full = current ? (current.textContent || "").trim() : "";
+  const name = t("librarySortFaceAria", short, full);
+  const face = $id("vocab-sort-face");
+  if (face) face.textContent = name;
+  // listbox.js builds #vocab-sort-btn at DOMContentLoaded and never touches
+  // its title; absent at parse time and on the test pages.
+  const trigger = $id("vocab-sort-btn");
+  if (trigger) trigger.title = name;
+  // A programmatic data-face-label write fires nothing; redraw the trigger.
+  window.pbpListboxSync?.(select);
 }
-for (const dim of PBP_VOCAB_SORT_DIMS) {
-  const btn = $id(dim.btn);
-  if (btn) btn.addEventListener("click", () => {
-    const select = $id("vocab-sort");
-    if (!select) return;
-    const idx = dim.states.indexOf(select.value);
-    select.value = idx === -1 ? dim.states[0] : dim.states[1 - idx];
-    select.dispatchEvent(new Event("change"));
-  });
-}
-_pbpVocabSyncSortSeg();
+_pbpVocabSyncSortFace();
+document.addEventListener("pbp:i18n-applied", _pbpVocabSyncSortFace);
 // Select all, from either row. The count row hides the moment a selection
 // exists, taking a focused "Select all" with it -- hand focus to the batch
 // row's Clear, the control that undoes what was just done.

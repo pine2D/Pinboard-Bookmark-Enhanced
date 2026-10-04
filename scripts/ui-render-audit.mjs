@@ -1382,7 +1382,7 @@ function evaluateCheck(check, raw, theme) {
   // read the ::before pad's COMPUTED width/height -- proof the BOX grew,
   // not that a pointer event landed there. A fused shell's `overflow`
   // clips exactly that silently (F1's own root cause: reverting
-  // `.vocab-sort-seg`/`.vocab-group-unit` to `overflow: hidden` leaves
+  // the retired sort segment / `.vocab-group-unit` to `overflow: hidden` leaves
   // hitAreaMin's computed-style number unchanged while real clicks 1-2px
   // past the border-box start missing). probeSelector already sampled two
   // points just past each named cell's own top edge (§1.5's pads on these
@@ -1553,7 +1553,7 @@ function evaluateCheck(check, raw, theme) {
   // indicator. Both halves are asserted, because either one alone is the
   // defect the user reported -- a shell ring with no cell ring cannot say
   // WHICH cell has focus, and a shell ring PLUS a cell ring is the double
-  // rectangle that got .vocab-sort-seg rejected.
+  // rectangle that got the retired sort segment (T6) rejected.
   if (exp.fusedSegmentRing === true) {
     const bad = [];
     const base = raw.focusBaseline;
@@ -1993,6 +1993,19 @@ const FILTER_SCROLL_INPUTS = {
       // renamed seed group fails as setup, never as a silent other filter.
       const picked = await p.$eval("#vocab-group-filter", (el) => el.value);
       if (picked !== "Reading") throw new Error(`SETUP: G6 picked option 1 of #vocab-group-filter and got ${JSON.stringify(picked)}, not "Reading" (theme=${ctx.theme}) -- seed groups changed`);
+      return true;
+    },
+  },
+  // The sort menu button (T6b): a real pick through its ghost listbox.
+  // Index 2 = "az"; the view loads on the default "latest", so this is a
+  // real value change. The trigger shows on the filter row at every index
+  // width (never inside the Filter popover), so no nested-popover row.
+  sort: {
+    view: "vocab",
+    act: async (p, ctx) => {
+      await libPickListboxOption(p, ctx.rows, ctx.theme, "vocab-sort", 2, { nested: false });
+      const picked = await p.$eval("#vocab-sort", (el) => el.value);
+      if (picked !== "az") throw new Error(`SETUP: G6 picked option 2 of #vocab-sort and got ${JSON.stringify(picked)}, not "az" (theme=${ctx.theme})`);
       return true;
     },
   },
@@ -2544,8 +2557,10 @@ const LIST_HEADER_FIT_SCAN = ({ view }) => {
 // measurement (the oracle the form is checked against). Vocabulary: lay the
 // popover's nodes out inline as the wide rule does, every shrinkable child
 // with a px floor (the group filter's min-width) at that floor, on a
-// min-content row. Notes: the colour row at max-content with every number
-// showing. Every inline style is restored before returning.
+// min-content row, with the sort menu button (T6b) showing the widest face
+// word any of its options can show -- the form must not change with the
+// sort. Notes: the colour row at max-content with every number showing.
+// Every inline style and face text is restored before returning.
 const FILTER_ROW_NEED = () => {
   const row = document.querySelector("#view-vocab .vocab-filter-row");
   const set = document.getElementById("vocab-filter-set");
@@ -2567,8 +2582,25 @@ const FILTER_ROW_NEED = () => {
     keep(kid);
     Object.assign(kid.style, { flex: "none", width: `${floor}px` });
   }
+  const faces = [];
+  for (const trigger of row.querySelectorAll(".listbox-trigger")) {
+    const select = trigger.parentElement?.previousElementSibling;
+    const face = trigger.lastElementChild;
+    if (!select || select.tagName !== "SELECT" || !face) continue;
+    faces.push([face, face.textContent]);
+    keep(face);
+    const words = [...new Set([...select.options].map((o) => o.dataset.faceLabel || o.textContent.trim()))];
+    face.replaceChildren(...words.map((w) => {
+      const span = document.createElement("span");
+      span.textContent = w;
+      span.style.gridArea = "1 / 1";
+      return span;
+    }));
+    face.style.display = "inline-grid";
+  }
   row.style.width = "min-content";
   const need = row.getBoundingClientRect().width;
+  for (const [face, text] of faces) face.textContent = text;
   for (const [el, style] of saved) {
     if (style == null) el.removeAttribute("style");
     else el.setAttribute("style", style);
@@ -2650,7 +2682,21 @@ async function driveListHeaderFit(page, extBase, theme, check) {
       if (n == null) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: the filter row's nodes are missing`);
       needs.push(`${locale} ${round2(n)}`);
       if (n > need.px) need = { px: n, locale };
-      await pass("vocab", locale, n, selectVocab);
+      // The sort menu button (T6b) has no sizer: its width is the selected
+      // dimension's short word. Scan with each dimension showing (the need
+      // above already counts the wider word, so the form check is the same
+      // for both). The change event re-runs _pbpVocabSyncSortFace too.
+      for (const sortValue of ["latest", "az"]) {
+        await scratch.evaluate((v) => {
+          const select = document.getElementById("vocab-sort");
+          select.value = v;
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        }, sortValue);
+        await settleAnimations(scratch);
+        const face = await scratch.evaluate(() => document.getElementById("vocab-sort-btn")?.lastElementChild?.textContent ?? null);
+        if (!face) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: #vocab-sort-btn shows no face word (${locale} ${sortValue})`);
+        await pass("vocab", `${locale} ${sortValue} "${face}"`, n, selectVocab);
+      }
     }
     await scratch.evaluate(() => document.documentElement.style.removeProperty("--lib-index-w"));
     await scratch.click("#lib-tab-notes");
@@ -2731,7 +2777,7 @@ const GAP_MIN_SCAN = ({ fromSel, toSel }) => {
   // checked `b`. A hidden `a` collapses to an all-zero rect too, and
   // `br.left - 0` reads as a large POSITIVE number -- a false PASS, not the
   // false FAIL a missing check usually produces. Simplest counter-example:
-  // hide fromSel (`.vocab-sort-seg`) at this width and the old code read a
+  // hide fromSel (the retired sort segment, then) at this width and the old code read a
   // comfortably-over-12px gap instead of erroring.
   if (getComputedStyle(a).display === "none") return { error: `${fromSel} is display:none at this width` };
   if (getComputedStyle(b).display === "none") return { error: `${toSel} is display:none at this width` };
@@ -3515,7 +3561,9 @@ async function libHideFilterSet(page) {
 // popover around the nested listbox (spec §14: the option is a DOM descendant
 // of the auto popover) -- recorded as its own row, because the defect only
 // shows with trusted pointer events, which no test page can send.
-async function libPickListboxOption(page, results, theme, selectId, index) {
+// `nested: false` is for a listbox that never lives in the Filter popover
+// (the sort menu button, T6b): no reveal is expected and no row is recorded.
+async function libPickListboxOption(page, results, theme, selectId, index, { nested = true } = {}) {
   const btnSel = `#${selectId}-btn`;
   const revealed = await libRevealFilterSet(page, btnSel);
   await page.click(btnSel);
@@ -3523,6 +3571,7 @@ async function libPickListboxOption(page, results, theme, selectId, index) {
   await opt.waitFor({ state: "visible", timeout: TIMEOUT_MS });
   await opt.click();
   await settleAnimations(page);
+  if (!nested) return;
   if (!revealed) {
     // Never a silent skip (T6a fix round 1): the nested-popover row only
     // means something when the pick happened inside the Filter popover. A
@@ -3736,7 +3785,7 @@ function weakTextProbe(cfg) {
     // parseColor returned null for any color-mix() background, and the walk
     // silently skipped past it to whatever plain-hex ancestor came next --
     // misattributing a mixed fill's role to an unrelated shell one level up
-    // (caught live: #vocab-sort-time's own [aria-pressed="true"] mix was
+    // (caught live: the retired sort segment's pressed-cell mix was
     // skipped this way, reporting its shell's plain --lib-btn-bg instead).
     m = /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)$/i.exec(s);
     if (m) {
@@ -4982,8 +5031,8 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
 
   // ---- weakTextOnFill (family 13, T5): the vocab list's true rest state --
   // no detail pane open, no row selected -- captured BEFORE anything below
-  // opens either for some OTHER check's sake. Covers .vocab-sort-seg's
-  // unpressed cell (D6/T4's real consumer).
+  // opens either for some OTHER check's sake. (It covered the retired sort
+  // segment's unpressed cell, D6/T4's real consumer, until T6.)
   await recordWeakTextHits(page, "library", theme, results, "vocab-rest");
 
   const vocabChecks = checks.filter((c) => libraryView(c.selector) === "vocab");
@@ -6203,7 +6252,7 @@ const SWEEP_CFG = {
       ".tags-input-wrap > input", ".vocab-group-unit > input", ".source-badge > .src-seg", // fused-shell inners: the shell is measured instead
     ],
     // fused shells measured as the control they are (COMPONENTS.md §8)
-    shells: ".tags-input-wrap, .source-badge, .vocab-group-unit, .vocab-sort-seg",
+    shells: ".tags-input-wrap, .source-badge, .vocab-group-unit",
   },
   // 7. headerFace -- one computed face (size/weight/colour/transform/tracking)
   //    per surface for its section-heading set; anything off the majority is a hit.
@@ -6219,7 +6268,7 @@ const SWEEP_CFG = {
     allowed: { options: [8], library: [8], popup: [8], "md-preview": [8] },
     exempt: [
       ".tabs, .lib-tabs",                                                     // tab strips
-      ".vocab-sort-seg, .source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .typo-seg, .vocab-status-toggles, .notes-color-filters", // fused shells / segmented strips
+      ".source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .typo-seg, .vocab-status-toggles, .notes-color-filters", // fused shells / segmented strips
       ".header-icons, .xp-window-actions, .lib-cluster", // icon-button clusters: not button rows; clusterGap (family 12) holds them to 4px instead
       ".connection-health, .theme-presets-group, .kbd-help-chips, .rail-badges, .hl-filter-row", // status-card grid, swatch-pill / chip rows, the highlight legend (gap = two 6px hit pads)
       ".notes-card-top",                                                      // card head: title + chips, the remove X is absolutely positioned
@@ -6254,7 +6303,7 @@ const SWEEP_CFG = {
     prefix: { options: "--opt-radius-", popup: "--pp-radius-", library: "--lib-radius-", "md-preview": "--radius-" },
     names: ["sm", "md", "lg", "full", "tag"],
     tokens: { options: [3, 8, 10], popup: [3, 8, 10], library: [4, 8, 12], "md-preview": [4, 8, 12] },
-    exemptWithin: ".vocab-sort-seg, .source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split",
+    exemptWithin: ".source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split",
     valueBoxes: {
       options: '.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg textarea, .fg select, .listbox-btn, .mobile-tab-picker select, .options-search input[type="search"]',
       popup: "#url-input, #title-input, #description-input, .tags-input-wrap, #token-input, #search-input",
@@ -6474,8 +6523,8 @@ function sweepProbe(cfg) {
   // ---- 3. rowHeightEq: pairwise height compare among interactive controls
   // (input/select/button/textarea) collected from a flex/grid container's
   // direct children, flattening ONE level into a child that is itself a
-  // flex/grid wrapper (e.g. .vocab-sort-seg, a span wrapping two buttons, or
-  // .vocab-group-unit wrapping a field and its two steppers) so the
+  // flex/grid wrapper (e.g. .vocab-group-unit wrapping a field and its two
+  // steppers; the retired sort segment was a span wrapping two buttons) so the
   // comparison reaches controls that aren't literal DOM siblings but ARE the
   // same visual row. ----
   // input[type=radio/checkbox/range/color/file] are native OS-sized toggle

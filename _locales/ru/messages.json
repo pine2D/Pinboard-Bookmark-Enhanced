@@ -3086,6 +3086,23 @@
     "vocabSortZa": {
       "message": "Я–А"
     },
+    "librarySortTime": {
+      "message": "Дата"
+    },
+    "librarySortAlpha": {
+      "message": "По алфавиту"
+    },
+    "librarySortFaceAria": {
+      "message": "$SHORT$, $FULL$",
+      "placeholders": {
+        "short": {
+          "content": "$1"
+        },
+        "full": {
+          "content": "$2"
+        }
+      }
+    },
     "vocabSelectionActions": {
       "message": "Действия с выделением"
     },

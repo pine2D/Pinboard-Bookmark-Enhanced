@@ -752,31 +752,23 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
 
 // ---- weak-text-on-fill (T4, COMPONENTS.md §9.1 law 8, D6): --lib-fg-hint /
 // --lib-fg-muted / --lib-link must never paint text that rests on a control
-// fill (--lib-btn-bg / --lib-btn-hover). .vocab-sort-seg > .vocab-sort-btn's
-// unpressed rest state is this batch's one real consumer -- its `background`
-// is `transparent`, so the fill it actually sits on is the shell's own
-// --lib-btn-bg, and the raw --lib-fg-muted it used to read is not AA-derived
-// against that (or --lib-btn-hover, which its own :hover/:active rules paint
-// after T4's fix). Same theme-factory CSS-syntax scanner as the T2/T3 checks
-// above (not a text-grep regex) over the HAND-WRITTEN region only.
+// fill (--lib-btn-bg / --lib-btn-hover). The sort segment that was this
+// check's one named consumer retired in T6; the same-rule pairing scan below
+// still runs. Same theme-factory CSS-syntax scanner as the T2/T3 checks above
+// (not a text-grep regex) over the HAND-WRITTEN region only.
 //
 // STATED BLIND SPOTS (same shape as the T2/T3 checks above): this is a
 // STATIC source scan, not a render probe.
 //   - It cannot see the CASCADE. A higher-specificity rule restating `color`
-//     on the SAME selector (library.css has none for .vocab-sort-btn today,
-//     verified -- `grep -c 'html\[data-theme\][^{]*vocab-sort' library.css`
-//     is 0) can silently win at runtime -- that is
+//     on the SAME selector can silently win at runtime -- that is
 //     scripts/ui-render-audit.mjs's `weakTextOnFill` family's job (T5), not
 //     this one's.
 //   - It cannot see INHERITANCE across rules. A selector with no `background`
-//     of its own is invisible to a same-rule pairing check -- exactly
-//     .vocab-sort-btn's OWN shape (background: transparent, resting on its
-//     ancestor .vocab-sort-seg's fill), which is why this check pins the
-//     specific selector by name (Check 1) rather than relying on the generic
-//     same-rule pairing scan (Check 2) to catch it. Check 2 only catches a
-//     single rule declaring BOTH `color` and `background` on the same
-//     selector -- the four D6 batch-selection-band consumers
-//     (.vocab-row-gloss / .notes-row-meta / .notes-hit-note /
+//     of its own (a transparent cell resting on an ancestor's fill, the
+//     retired sort segment's shape) is invisible to a same-rule pairing
+//     check, which only catches a single rule declaring BOTH `color` and
+//     `background` on the same selector -- the four D6 batch-selection-band
+//     consumers (.vocab-row-gloss / .notes-row-meta / .notes-hit-note /
 //     .notes-hit-meta) are a THIRD blind spot this static scan cannot see at
 //     all: their fill is a runtime color-mix() composed from a CSS custom
 //     property the row sets, not a `background`/`background-color` literal
@@ -785,18 +777,11 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
 //     26% band on 2/15 blocks, so the plan's own stop line applied).
 // No render-audit-checklist.mjs CHECKS row is added for this task, same
 // reasoning as the T3 popup check above: T5's `weakTextOnFill` family is a
-// class-scan (including .vocab-sort-seg's unpressed cell AND the four D6
-// batch-band consumers this static scan's third blind spot names above),
-// not a hand-enumerated selector list.
+// class-scan (including the four D6 batch-band consumers this static scan's
+// third blind spot names above), not a hand-enumerated selector list.
 {
   const hand = stripGeneratedRegions(libraryCss);
   const rules = parseStyleRules(hand);
-
-  const sortBtnRule = rules.find((r) => r.context.length === 0 && r.selectors.includes(".vocab-sort-seg > .vocab-sort-btn"));
-  const sortBtnUsesBtnFgMuted = !!sortBtnRule && parseDeclarations(sortBtnRule.body)
-    .some((d) => d.property === "color" && d.value.includes("--lib-btn-fg-muted"));
-  check(sortBtnUsesBtnFgMuted,
-    "library.css: .vocab-sort-seg > .vocab-sort-btn's base rule no longer reads --lib-btn-fg-muted for its resting text color");
 
   const offendersLib = [];
   for (const rule of rules) {
@@ -1257,7 +1242,7 @@ check(vocabGdriveJs.includes("function pbpCreateVocabDriveSyncRunner("),
 for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-select-all",
   "vocab-invert-selection", "vocab-batch-toolbar", "vocab-group-input", "vocab-add-group",
   "vocab-batch-delete", "vocab-no-results", "vocab-load-more", "vocab-list",
-  "vocab-sort-time", "vocab-sort-alpha", "vocab-stat-all", "vocab-filter-narrow", "vocab-filter-set", "vocab-context-bar"]) {
+  "vocab-sort-label", "vocab-sort-face", "vocab-stat-all", "vocab-filter-narrow", "vocab-filter-set", "vocab-context-bar"]) {
   check(libraryHtml.includes(`id="${id}"`), `library.html: scalable vocabulary control #${id} is missing`);
 }
 // options.html no longer renders the word list (retired for the library
@@ -1439,15 +1424,6 @@ check(!read("anki-connect.js").includes("PBP_ANKI_ENDPOINT"),
 {
   const libraryJs = read("library.js");
   const libraryNotesJs = read("library-notes.js");
-  // The sort segment is labelled by _pbpVocabSyncSortSeg at library-vocab.js
-  // parse time -- before initI18n loads a manually chosen locale, so those
-  // labels come out in the BROWSER's language. The static keys give applyI18n
-  // something to translate; the re-run afterwards puts the live select value's
-  // label back on top of it.
-  check(/id="vocab-sort-time"[^>]*data-i18n-title="vocabSortOldest"[^>]*data-i18n-aria="vocabSortOldest"/.test(libraryHtml) &&
-    /id="vocab-sort-alpha"[^>]*data-i18n-title="vocabSortAz"[^>]*data-i18n-aria="vocabSortAz"/.test(libraryHtml) &&
-    /applyI18n\(\);[\s\S]{0,600}_pbpVocabSyncSortSeg\(\)/.test(libraryJs),
-    "library: the sort segment is not translated by applyI18n or not re-synced after it");
   // Narrow mode: only a genuine view switch hands the list back. The
   // visibilitychange re-fire dispatches pbp-lib-view WITHOUT going through
   // _pbpLibApplyView, which is exactly what keeps an open detail alive.
@@ -2188,7 +2164,7 @@ const LIBRARY_VALUE_BOX = (() => {
 check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["notes-filter", "vocab-group-filter", "vocab-group-filter-btn", "vocab-group-input", "vocab-lookup-input", "vocab-lookup-lang", "vocab-search"]),
   `ui-contract-tests.mjs: the library.html value-box id harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort())}. ` +
   "A new value box must join composers/ui-components.mjs FIELD_TARGETS.lib and scripts/ui-render-audit.mjs's VALUE_BOX_LEGS.library in the same commit; then update this list.");
-check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.stringify([]) &&
+check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.stringify(["vocab-sort-btn"]) &&
   ![...LIBRARY_VALUE_BOX.ghostTriggers].some((id) => LIBRARY_VALUE_BOX.ids.has(id)),
   `ui-contract-tests.mjs: the library ghost-trigger harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort())}. ` +
   "A select with data-listbox-face=\"ghost\" renders a .btn trigger, not a value box: it must never also land in LIBRARY_VALUE_BOX.ids.");
@@ -2470,12 +2446,12 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
   check(btnBad.length === 3 && [".btn:focus-visible ", ".tab-btn:focus-visible ", ".pick-mark:focus-visible "].every((sel, i) => btnBad[i].startsWith(sel)),
     "ui-contract-tests.mjs: §7.3 accepts var(--opt-field-border-focus) on a non-value-box selector (GI-5: the field core is for value boxes and the key-wrap eye only) -- got [" + btnBad.join(" | ") + "]");
 }
-// The two same-specificity deletions this sweep made must stay deleted --
-// both were measured, not eyeballed (CLAUDE.md's two-way cascade rule).
-// .lib-tab had TWO (0,2,0) :focus-visible rules; the later one won `outline`
-// while the earlier kept supplying `box-shadow`, shipping a hard rectangle
-// with a glow behind it. .vocab-sort-seg's shell ring fired on mouse-down
-// (`:focus-within` has no keyboard gate) and stacked outside the cell ring.
+// The same-specificity deletion this sweep made must stay deleted -- it was
+// measured, not eyeballed (CLAUDE.md's two-way cascade rule). .lib-tab had
+// TWO (0,2,0) :focus-visible rules; the later one won `outline` while the
+// earlier kept supplying `box-shadow`, shipping a hard rectangle with a glow
+// behind it. (The sweep's second deletion, the retired sort segment's shell
+// ring, went with the segment in T6; the T6b block pins it gone.)
 // Flat window-filling page (library redesign spec 2026-10-03 §2.3-§2.4; the
 // 2026-08-06 fixed 1164px canvas is overturned, §0.2): one index column and
 // one detail column on the page itself, two scroll containers per tab and
@@ -2746,8 +2722,6 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
   const libRules = libraryCss.replace(/\/\*[\s\S]*?\*\//g, "");
   check((libRules.match(/\.lib-tab:focus-visible/g) || []).length === 1,
     "library.css: .lib-tab has more than one :focus-visible rule again — the later same-specificity one silently wins `outline` while the earlier still supplies `box-shadow`");
-  check(!/\.vocab-sort-seg:focus-within/.test(libRules),
-    "library.css: the .vocab-sort-seg shell focus ring is back — it lights on plain mouse-down and double-rings on Tab (the cell's own inset ring is the indicator)");
 }
 // ---- Stage 4 Task 6 (spec 2026-09-30-ui-fields-stage4-design §2.1 / §3.2 /
 // §5.1): popup's value boxes are one fill-only field family. Colour comes
@@ -8792,7 +8766,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".xp-dict-lang { border-width: 1px; border-style: solid; background-position: right 6px center; }", false],
     [".vocab-note-input:focus-visible:not(:disabled) { box-shadow: var(--lib-focus-ring); }", false],
     ["@media (forced-colors: active) { .notes-toolbar input[type=\"search\"]:focus-visible { outline: 1px solid Highlight; outline-offset: 2px; } }", false],
-    [`.vocab-sort-seg { background-image: ${CHEVRON}; }`, false],
+    [`.listbox-trigger { background-image: ${CHEVRON}; }`, false],
   ];
   const libMisjudged = LIB_CASES.filter(([css, want]) => (libHandColourOffenders(`${libHand}\n${css}`).length > shippedColour.length) !== want);
   check(libMisjudged.length === 0,
@@ -8832,7 +8806,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".vocab-group-unit > input[type=\"text\"] { border-radius: calc(var(--lib-radius-md) - 1px) 0 0 calc(var(--lib-radius-md) - 1px); }", false],
     [".vocab-group-unit > .vocab-group-step:last-child { border-radius: 0 calc(var(--lib-radius-md) - 1px) calc(var(--lib-radius-md) - 1px) 0; }", false],
     [".vocab-note-input { border-radius: var(--lib-radius-md); }", false],
-    [".vocab-sort-seg > .vocab-sort-btn:first-child { border-radius: 3px 0 0 3px; }", false],
+    [".listbox-trigger:first-child { border-radius: 3px 0 0 3px; }", false],
   ];
   const libShapeMisjudged = LIB_SHAPE_CASES.filter(([css, want]) => (libShapeOffenders(css).length > 0) !== want);
   check(libShapeMisjudged.length === 0,
@@ -8848,7 +8822,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "library.css: a value-box rule carries a colour literal inside url() -- the chevron is var(--lib-field-chevron): " + libUrlOffenders(libNoComments).join(" | "));
   check(libUrlOffenders(`.xp-dict-lang { background-image: ${CHEVRON}; }`).length === 1 &&
     libUrlOffenders(`html[data-theme="dracula"] .vocab-filter-row select { background-image: ${CHEVRON}; }`).length === 1 &&
-    libUrlOffenders(`.vocab-sort-seg { background-image: ${CHEVRON}; }`).length === 0 &&
+    libUrlOffenders(`.listbox-trigger { background-image: ${CHEVRON}; }`).length === 0 &&
     libUrlOffenders(".xp-dict-lang { background-image: var(--lib-field-chevron); }").length === 0,
     "ui-contract-tests.mjs: the library url() colour scan no longer discriminates");
 
@@ -8856,7 +8830,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(isValueBoxSelector(".vocab-note-input:focus") && isValueBoxSelector(".xp-dict-lang") && isValueBoxSelector("#vocab-group-filter") &&
     isValueBoxSelector('.notes-toolbar input[type="search"]') && isValueBoxSelector('.vocab-group-unit:has(> input[type="text"]:focus)') &&
     !isValueBoxSelector(".vocab-group-unit > .vocab-group-step") && !isValueBoxSelector("#vocab-status-filter") &&
-    !isValueBoxSelector(".xp-dict-lang option:checked") && !isValueBoxSelector(".vocab-sort-seg") &&
+    !isValueBoxSelector(".xp-dict-lang option:checked") && !isValueBoxSelector(".listbox-trigger") &&
     acceptsFieldFocusCore(".vocab-note-input:focus:not(:disabled)") && acceptsFieldFocusCore(".xp-dict-lang:focus-visible:not(:disabled)") &&
     acceptsFieldFocusCore('.notes-toolbar input[type="search"]:focus-visible:not(:disabled), .vocab-lookup-bar input[type="search"]:focus-visible:not(:disabled)') &&
     !acceptsFieldFocusCore(".vocab-group-unit > .vocab-group-step:focus-visible"),
@@ -9180,9 +9154,43 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(forcedEdge,
     "library.css: forced colours drop the listbox button's and popover's edge -- `.listbox-btn, .listbox-pop { border-color: ButtonText; }` belongs inside @media (forced-colors: active) (spec §7.3)");
   // A deleted selector stays deleted (comments stripped above, same reasoning
-  // as the .lib-tab / .vocab-sort-seg pair further up).
+  // as the .lib-tab check further up).
   check(!/\.vocab-filter-row select\b/.test(hand),
     "library.css: a hand rule still targets `.vocab-filter-row select` -- the group filter renders as .listbox-btn since T6, and the lookup language is `.vocab-lookup-bar select` until T7");
+}
+
+// ---- Library redesign T6b (spec §3.3 / §8.3): the sort control is one menu
+// button -- the hidden #vocab-sort carrier drawn by listbox.js's ghost face.
+// ↓ is always descending and ↑ always ascending; the short word and the arrow
+// come from the selected option, and the accessible name is the label plus a
+// hidden span naming the short word and the full order (WCAG 2.5.3).
+{
+  const libraryJs = read("library.js");
+  const sortTag = (/<select\b[^>]*\bid="vocab-sort"[^>]*>/.exec(libraryHtml) || [""])[0];
+  check(/\sdata-listbox="float"/.test(sortTag) && /\sdata-listbox-face="ghost"/.test(sortTag) &&
+    /\saria-labelledby="vocab-sort-label vocab-sort-face"/.test(sortTag) && /\shidden(?=[\s>])/.test(sortTag),
+    "library.html: #vocab-sort must be the hidden carrier of a ghost float listbox labelled by \"vocab-sort-label vocab-sort-face\"");
+  check(/<label class="sr-only" id="vocab-sort-label" for="vocab-sort" data-i18n="vocabSortAria">/.test(libraryHtml) &&
+    /<span class="sr-only" id="vocab-sort-face"><\/span>/.test(libraryHtml),
+    "library.html: the sort trigger's name parts are missing (sr-only label#vocab-sort-label, empty span#vocab-sort-face)");
+  const faces = Object.fromEntries([...libraryHtml.matchAll(/<option value="(latest|oldest|az|za)"([^>]*)>/g)]
+    .map((m) => [m[1], { icon: (/\sdata-face-icon="([^"]+)"/.exec(m[2]) || [])[1], label: (/\sdata-face-label="([^"]+)"/.exec(m[2]) || [])[1] }]));
+  check(JSON.stringify(Object.fromEntries(Object.entries(faces).map(([k, v]) => [k, v.icon]))) === JSON.stringify({ latest: "arrowDownLine", oldest: "arrowUpLine", az: "arrowUpLine", za: "arrowDownLine" }) &&
+    Object.values(faces).every((f) => !!f.label) && faces.latest.label === faces.oldest.label && faces.az.label === faces.za.label && faces.latest.label !== faces.az.label,
+    `library.html: the sort options' faces drifted (spec §3.3: ↓ descending, ↑ ascending -- latest / za arrowDownLine, oldest / az arrowUpLine; one English data-face-label per dimension) -- got ${JSON.stringify(faces)}`);
+  check(/function _pbpVocabSyncSortFace\(\) \{[\s\S]{0,900}t\("librarySortFaceAria", short, full\)[\s\S]{0,400}window\.pbpListboxSync\?\.\(select\);/.test(libraryVocabJs) &&
+    /_vocabSortSelect\.addEventListener\("change", \(\) => \{[\s\S]{0,400}_pbpVocabSyncSortFace\(\);/.test(libraryVocabJs) &&
+    /applyI18n\(\);[\s\S]{0,600}_pbpVocabSyncSortFace\(\)/.test(libraryJs),
+    "library: the sort trigger's face is not re-synced on change, or not re-run after applyI18n (library-vocab.js labels it at parse time, before a manual UI language is loaded)");
+  check(!/vocab-sort-seg|vocab-sort-time|vocab-sort-alpha|class="[^"]*\bvocab-sort-btn\b/.test(libraryHtml) &&
+    !/_pbpVocabSyncSortSeg|PBP_VOCAB_SORT_DIMS/.test(libraryVocabJs + libraryJs) &&
+    !/\.vocab-sort-seg\b|\.vocab-sort-btn\b/.test(stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, "")),
+    "library: the retired sort segment is back (markup, sync function, direction table or CSS)");
+  const trig = declarationValueMap(stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, ""), ".listbox-trigger");
+  check(trig.get("flex-direction") === "row-reverse" && trig.get("white-space") === "nowrap",
+    "library.css: .listbox-trigger must put the word before the arrow (row-reverse) and never break it (nowrap -- a CJK word's min-content is one character, so the G7 oracle's min-content row under-measured the button)");
+  check(!isValueBoxSelector("#vocab-sort-btn") && !isValueBoxSelector(".listbox-trigger") && !isValueBoxSelector(".listbox-trigger.btn.ghost:hover"),
+    "ui-contract-tests.mjs: the value-box model treats the ghost sort trigger as a value box -- it is a .btn (spec §8.3)");
 }
 
 if (fail.length) {
