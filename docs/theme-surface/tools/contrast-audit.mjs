@@ -12,16 +12,9 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, isCompositableBg, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, FIELD_TEXT_PLACEHOLDER_MIN, FIELD_HOST_ROLES, primaryHoverFill, mix, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
+import { isHex, isCompositableBg, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, FIELD_TEXT_PLACEHOLDER_MIN, FIELD_HOST_ROLES, primaryHoverFill, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
-// LIB_BATCH_BAND_MIX: library.css paints a batch-selected row's fill as an
-// accent-over-bg color-mix at these two percentages (rest/hover), not a
-// static token -- the row-selected-fg vs batch-band checks below (weak-
-// text-on-fill batch, D6 follow-up / Ruling 17) compute that fill from the
-// SAME exported constant library-chrome.mjs's own derivation uses, so the
-// two can never drift apart (see that file's comment on the constant).
-import { LIB_BATCH_BAND_MIX } from "../composers/library-chrome.mjs";
 import { POPUP_THEME_MAP } from "../composers/popup-chrome.mjs";
 import { parseDeclarations, parseStyleRules } from "./css-syntax.mjs";
 
@@ -158,6 +151,14 @@ function check(scope, theme, label, ratio, min) {
   if (!ok && flag === "FAIL") violations.push(line);
   else if (!ok && flag === "KNOWN") known.push(line);
   return line;
+}
+
+// Advisory row: printed with OK / WARN, never pushed to `violations`. For
+// pairs a ruling ACCEPTED below the floor and wants kept visible (the S2 row
+// focus core, spec 2026-10-03-library-redesign §7.5). Precedent: the
+// pinboard private-bg advisory line.
+function warnCheck(scope, theme, label, ratio, min) {
+  return "  " + scope.padEnd(10) + " " + theme.padEnd(20) + " " + label.padEnd(28) + " " + ratio.toFixed(2) + ":1  (advisory " + min + ") " + (ratio >= min ? "OK " : "WARN");
 }
 
 // ============================================================
@@ -1067,9 +1068,10 @@ const ORPHAN_ALLOWLIST = new Set([
   // it's a real COMPONENT_PAIR_SPEC row for all 3 surfaces, so
   // COMPONENT_PAIR_ROLES already short-circuits it above -- same
   // "unreachable dead code" reason warn-fg's entry was removed for.
-  // --lib-row-selected-fg: audited by the "row-selected-fg vs
-  // row-selected-bg" check in auditLibraryThemes -- real coverage, not a
-  // COMPONENT_PAIR_SPEC role.
+  // --lib-row-selected-fg: audited by auditLibraryRowStates' six
+  // "row-selected-fg vs row-*" rows (S2) -- real coverage, not a
+  // COMPONENT_PAIR_SPEC role. (row-current-fg-muted ends in -muted, so the
+  // orphan regex never lists it; its two rows sit beside these.)
   "lib:row-selected-fg",
 ]);
 // Stage-4 field sections must have measured every block (see
@@ -1898,34 +1900,7 @@ function auditLibraryThemes(cssPath) {
         if (onPanel) console.log(check("library", theme, "link vs panel", cr(onPanel, panel), 4.5));
       }
     }
-    // Selected-row pair: its own fill, its own text — not composited over bg/panel.
-    const rowBgS = grab("row-selected-bg"), rowFgS = grab("row-selected-fg");
-    if (rowBgS && rowFgS && rowBgS.startsWith("#")) {
-      const rowBg = hexRgb(rowBgS);
-      const rowFg = resolveColor(rowFgS, rowBg);
-      if (rowFg) console.log(check("library", theme, "row-selected-fg vs row-selected-bg", cr(rowFg, rowBg), 4.5));
-    }
-    // Batch-selected band pair (weak-text-on-fill batch, D6 follow-up /
-    // Ruling 17): .vocab-row-gloss/.notes-row-meta/.notes-hit-note/
-    // .notes-hit-meta read --lib-row-selected-fg in the .selected (batch)
-    // state, whose fill is NOT row-selected-bg above but an accent-over-bg
-    // color-mix at LIB_BATCH_BAND_MIX's two percentages (library.css's own
-    // --lib-band-mix / --lib-band-mix-hover :root tokens) -- computed here
-    // from the same exported constant the composer derived row-selected-fg
-    // against, so this can never silently drift from what was actually
-    // guaranteed. BLOCKING: row-selected-fg is derived to clear both bands
-    // by construction (library-chrome.mjs), so a FAIL here is a derivation
-    // bug, not a legitimate gap.
-    const accentS = grab("accent");
-    if (rowFgS && bg && accentS && accentS.startsWith("#")) {
-      const accentRgb = hexRgb(accentS);
-      for (const t of LIB_BATCH_BAND_MIX) {
-        const pct = Math.round(t * 100);
-        const bandBg = mix(bg, accentRgb, t).map(Math.round);
-        const rowFgOnBand = resolveColor(rowFgS, bandBg);
-        if (rowFgOnBand) console.log(check("library", theme, `row-selected-fg vs batch-band-${pct}`, cr(rowFgOnBand, bandBg), 4.5));
-      }
-    }
+    auditLibraryRowStates(theme, grab);
     // save/danger/warn are flat text colors on the page bg (unlike popup/options'
     // tinted warn-bg/banner-bg pairs — library has no such tinted-fill roles yet).
     for (const key of ["save", "danger", "warn"]) {
@@ -1937,6 +1912,36 @@ function auditLibraryThemes(cssPath) {
     // Component-layer paired tokens (Task 5) — same rationale as auditCssThemes.
     auditComponentPairs("library", "lib", theme, tokenDict(body), true);
   }
+}
+
+// S2 row states (spec docs/superpowers/specs/2026-10-03-library-redesign-
+// design.md §6.4 / §9.3; COMPONENTS.md C55). Every fill is a token the
+// composer emits (deriveRowStates), so the hosts are READ off the block, never
+// re-mixed here -- the retired batch-band mix rows re-derived the band in
+// this file and stayed honest only while two copies of a percentage agreed.
+// BLOCKING: the two text roles derived against these fills, and fg-muted on
+// the plain hover fill (secondary text on a hovered row; github-light was
+// 4.47 before library-chrome.mjs added that host). WARN: the row focus core
+// (focus-bd, 2px inside the band) against the four strongest highlight fills
+// -- accepted below 3:1 (spec §7.5, facts-s2 R3-3, lowest 1.53 on rose-pine):
+// the ring is a closed 2px frame whose outer edge meets the page bg at
+// >= 3.32 on all 15 blocks. Shared by the 14 themed blocks and the default.
+const LIB_ROW_HIGHLIGHT_FILLS = ["row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover", "row-band-current-bg", "row-band-current-bg-hover"];
+const LIB_ROW_FOCUS_WARN_FILLS = ["row-current-bg", "row-band-current-bg", "row-band-current-bg-hover", "row-band-bg"];
+function auditLibraryRowStates(theme, get) {
+  const need = ["fg-muted", "focus-bd", "row-bg-hover", "row-selected-fg", "row-current-fg-muted", ...LIB_ROW_HIGHLIGHT_FILLS];
+  const missing = need.filter((k) => !isHex(get(k) ?? ""));
+  if (missing.length) {
+    const line = "  " + "library".padEnd(10) + " " + theme.padEnd(20) + " " + "row states".padEnd(28) + " FAIL (missing or non-hex: " + missing.map((k) => `--lib-${k}`).join(", ") + ")";
+    console.log(line);
+    violations.push(line);
+    return;
+  }
+  const rgb = (k) => hexRgb(get(k));
+  for (const fill of LIB_ROW_HIGHLIGHT_FILLS) console.log(check("library", theme, `row-selected-fg vs ${fill}`, cr(rgb("row-selected-fg"), rgb(fill)), 4.5));
+  for (const fill of ["row-current-bg", "row-current-bg-hover"]) console.log(check("library", theme, `row-current-fg-muted vs ${fill}`, cr(rgb("row-current-fg-muted"), rgb(fill)), 4.5));
+  console.log(check("library", theme, "fg-muted vs row-bg-hover", cr(rgb("fg-muted"), rgb("row-bg-hover")), 4.5));
+  for (const fill of LIB_ROW_FOCUS_WARN_FILLS) console.log(warnCheck("library", theme, `focus-bd vs ${fill}`, cr(rgb("focus-bd"), rgb(fill)), 3));
 }
 auditLibraryThemes(resolve(ROOT, "library.css"));
 
@@ -2071,41 +2076,15 @@ auditComponentPairsDefault("options", "opt", resolve(ROOT, "options.css"), ":roo
 auditComponentPairsDefault("library", "lib", resolve(ROOT, "library.css"), ":root", "default");
 auditComponentPairsDefault("popup", "pp", resolve(ROOT, "popup.css"), ":root", "default-light");
 
-// library's default-surface row-selected-fg trio (weak-text-on-fill batch,
-// D6 follow-up / Ruling 17): auditLibraryThemes above checks all 14 preset
-// blocks' "row-selected-fg vs row-selected-bg"/"vs batch-band-*" rows, but
-// its regex only matches `[data-theme="..."]` blocks -- the default (:root)
-// surface emits the same three roles (library.css's hand-written --lib-bg/
-// -accent/-row-selected-bg/-row-selected-fg, none of which DEFAULT_LIGHT
-// re-derives) and was never covered here, same class of gap
-// auditDefaultTextTiers exists to close for fg-hint/fg-muted. Not a
-// COMPONENT_PAIR_SPEC row (row-selected-fg isn't one -- see that registry's
-// own comment) and not fg-hint/fg-muted shaped, so it gets its own bespoke
-// block, the same pattern popup's default preset-fg trio below uses.
-// BLOCKING: same reasoning as the themed rows -- a FAIL here is a
-// derivation bug, not a legitimate gap.
+// library's default (:root) surface: the same S2 rows as the 14 themed
+// blocks. auditLibraryThemes' regex only matches [data-theme="..."] blocks,
+// so the default surface -- hand :root (bg, fg-muted, focus-bd) folded with
+// the generated DEFAULT_LIGHT block (the nine row roles) -- is fed through
+// auditLibraryRowStates here. BLOCKING, same reasoning: a FAIL is a
+// derivation bug or a stale DEFAULT_LIGHT literal, not a legitimate gap.
 {
-  const text = readFileSync(resolve(ROOT, "library.css"), "utf8");
-  const dict = foldSelectorBlocks(text, ":root");
-  const rowBgS = dict["lib-row-selected-bg"], rowFgS = dict["lib-row-selected-fg"];
-  const bgS = dict["lib-bg"], accentS = dict["lib-accent"];
-  if (!rowBgS || !rowFgS || !bgS || !accentS) {
-    const line = "  library    default              row-selected-fg vs *".padEnd(48) +
-      "FAIL (missing --lib-row-selected-bg/-row-selected-fg/-bg/-accent)";
-    console.log(line);
-    violations.push(line);
-  } else if (isHex(rowBgS) && isHex(rowFgS) && isHex(bgS) && isHex(accentS)) {
-    const rowBg = hexRgb(rowBgS);
-    const rowFg = resolveColor(rowFgS, rowBg);
-    if (rowFg) console.log(check("library", "default", "row-selected-fg vs row-selected-bg", cr(rowFg, rowBg), 4.5));
-    const bg = hexRgb(bgS), accentRgb = hexRgb(accentS);
-    for (const t of LIB_BATCH_BAND_MIX) {
-      const pct = Math.round(t * 100);
-      const bandBg = mix(bg, accentRgb, t).map(Math.round);
-      const rowFgOnBand = resolveColor(rowFgS, bandBg);
-      if (rowFgOnBand) console.log(check("library", "default", `row-selected-fg vs batch-band-${pct}`, cr(rowFgOnBand, bandBg), 4.5));
-    }
-  }
+  const dict = foldSelectorBlocks(readFileSync(resolve(ROOT, "library.css"), "utf8"), ":root");
+  auditLibraryRowStates("default", (k) => dict[`lib-${k}`] ?? null);
 }
 
 // Default-surface .preset-btn text (design-uplift Task 13 review round):

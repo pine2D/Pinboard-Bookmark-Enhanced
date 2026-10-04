@@ -75,8 +75,6 @@
      were #ffffff/#eef2f9 against a #ffffff panel. Derived there by the same
      fillSeparate() the 14 themed blocks use. */
   --lib-code-bg: #f2f2f4;
-  --lib-row-selected-bg: #eef2f9;
-  --lib-row-selected-fg: #1a1a2e;
   /* Universal 5-color highlight palette (matches md-preview's .pb-hl-dot-N /
      note dot colors) -- theme-invariant by design, so this is the only place
      these five literals are declared; no themed block overrides them. */
@@ -85,13 +83,6 @@
   --lib-note-c3: #60a5fa;
   --lib-note-c4: #f87171;
   --lib-note-c5: #c084fc;
-  /* Selected-row band mix (notes list + vocab list share this language,
-     see the "TWO SIGNALS" comment near .vocab-card.selected below for how
-     the render oracle's bandDistinct probe calibrated these two numbers).
-     Named once here instead of repeating the literals at each of the two
-     write sites. */
-  --lib-band-mix: 20%;
-  --lib-band-mix-hover: 26%;
   --lib-radius-sm: 4px;
   --lib-radius-md: 8px;
   --lib-radius-lg: 12px;
@@ -691,8 +682,10 @@ html.motion-ready .notes-card.card-exit {
   background: var(--row-bg);
 }
 html.motion-ready .notes-card-top { transition: background-color var(--motion-state) ease, box-shadow var(--motion-state) ease; }
-.notes-card-top:hover { --row-bg: color-mix(in srgb, var(--lib-fg) 5%, var(--lib-bg)); }
-.notes-card-top:active { --row-bg: color-mix(in srgb, var(--lib-fg) 9%, var(--lib-bg)); transition-duration: 0s; }
+/* Row fills are composer tokens (S2, spec 2026-10-03-library-redesign §3.8):
+   nothing below mixes a colour. Press reuses the hover value -- no :active
+   fill (tests/ui-contract-tests.mjs pins the state -> token map). */
+.notes-card-top:hover { --row-bg: var(--lib-row-bg-hover); }
 .notes-card-head {
   display: flex;
   align-items: center;
@@ -709,9 +702,9 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
 /* §7.3 `inset`. Drawn on the whole row, not on the head: the head is only
    the first of .notes-card-top's three grid columns. `:has(> ...)` keeps the
    selector at (0,3,0) -- deliberately NOT a box-shadow ring, because
-   .vocab-card[aria-current] .notes-card-top (also (0,3,0)) already owns
-   box-shadow for the "you are here" accent edge and the later of two
-   same-specificity rules would silently erase the other. */
+   .vocab-card.selected .notes-card-top (also (0,3,0)) owns box-shadow for
+   the batch-selection ring and the later of two same-specificity rules
+   would silently erase the other. */
 .notes-card-top:has(> .notes-card-head:focus-visible) {
   outline: 2px solid var(--lib-focus-bd);
   outline-offset: -2px;
@@ -954,59 +947,56 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
   background: var(--row-bg);
 }
 html.motion-ready .notes-hit-btn { transition: background-color var(--motion-state) ease, box-shadow var(--motion-state) ease; }
-.notes-hit-btn:hover { --row-bg: color-mix(in srgb, var(--lib-fg) 5%, var(--lib-bg)); }
-.notes-hit-btn:active { --row-bg: color-mix(in srgb, var(--lib-fg) 9%, var(--lib-bg)); transition-duration: 0s; }
+.notes-hit-btn:hover { --row-bg: var(--lib-row-bg-hover); }
 .notes-hit-btn:focus-visible { outline: 2px solid var(--lib-focus-bd); outline-offset: -2px; box-shadow: none; }
-/* "You are here", same --row-bg mechanism AND the same marker the vocabulary
-   rows use: a 2px inset accent edge.
-   IT USED TO BE A RING, and the note under that version said the left edge
-   "already belongs to the highlight's own colour bar". That was measured
-   wrong rather than reasoned wrong: the bar starts after the button's own 8px
-   padding-inline, so a 2px inset edge paints in that gutter and stops 6px
-   short of it -- they never touch. The ring had to move because this list
-   gained a second state (2026-08-06: batch selection), and the ring is what
-   THAT state uses in both views. Sharing one shape between "selected" and
-   "current" here would have been indistinguishable in practice: the two fills
-   are 7 units apart on gruvbox-dark and 9 on terminal. */
+/* S2 (USER RULING 2026-10-03; spec 2026-10-03-library-redesign §3.8):
+   "you are here" is the neutral fill alone -- no edge, no bar. Every fill is
+   a token library-chrome.mjs derives per theme (deriveRowStates: the lightest
+   fill that clears the render gate), so the current row is the loudest
+   resting fill and the batch band is lighter than it on all 15 blocks. The
+   label reads --lib-row-selected-fg, derived against all six highlight fills. */
 .notes-hit[aria-current] .notes-hit-btn {
-  --row-bg: var(--lib-row-selected-bg);
+  --row-bg: var(--lib-row-current-bg);
   color: var(--lib-row-selected-fg);
-  box-shadow: inset 2px 0 0 var(--lib-accent);
 }
-.notes-hit[aria-current] .notes-hit-btn:hover { --row-bg: color-mix(in srgb, var(--lib-fg) 5%, var(--lib-row-selected-bg)); }
-/* Batch selection, one grammar with the vocabulary list: accent 18% fill
-   (hover 24%) + a 1px inset accent ring. Both are inset shadows, so the
-   combined state composes them -- with an explicit (0,3,0) rule rather than a
-   bet on source order, since aria-current now paints box-shadow too. */
+.notes-hit[aria-current] .notes-hit-btn:hover { --row-bg: var(--lib-row-current-bg-hover); }
+/* Batch selection: the accent band plus a 1px inset ring, same grammar as the
+   vocabulary list. Selected AND current layers the neutral fill on the band;
+   the ring comes from .selected (the combined rule sets only the fill), and
+   the combined hover is its own (0,5,0) rule -- without it the (0,4,0)
+   .selected hover would repaint a current+selected row as a plain band. */
 .notes-hit.selected .notes-hit-btn {
-  --row-bg: color-mix(in srgb, var(--lib-accent) var(--lib-band-mix), var(--lib-bg));
+  --row-bg: var(--lib-row-band-bg);
   color: var(--lib-row-selected-fg);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lib-accent) 55%, transparent);
 }
-.notes-hit.selected .notes-hit-btn:hover { --row-bg: color-mix(in srgb, var(--lib-accent) var(--lib-band-mix-hover), var(--lib-bg)); }
-.notes-hit.selected[aria-current] .notes-hit-btn {
-  box-shadow: inset 2px 0 0 var(--lib-accent),
-              inset 0 0 0 1px color-mix(in srgb, var(--lib-accent) 55%, transparent);
-}
-/* --lib-row-selected-fg (weak-text-on-fill batch, D6 follow-up / Ruling 17):
-   .notes-hit-note/.notes-hit-meta paint their own `color` below, which
-   blocks inheritance from .notes-hit-btn's `color` set above -- same reason
-   .notes-card-head needs its own row-selected-fg rule for the vocab list
-   (see that one near .vocab-card.selected). Scoped to .selected (the batch
-   band) ONLY: the plain [aria-current] state above already reads fg-muted
-   at AA against --lib-row-selected-bg on all 15 blocks and is untouched.
-   --lib-row-selected-fg is already derived against BOTH the rest (20%) and
-   hover (26%) band mixes (library-chrome.mjs's LIB_BATCH_BAND_MIX), so no
-   separate :hover rule is needed -- the token itself clears both. */
+.notes-hit.selected .notes-hit-btn:hover { --row-bg: var(--lib-row-band-bg-hover); }
+.notes-hit.selected[aria-current] .notes-hit-btn { --row-bg: var(--lib-row-band-current-bg); }
+.notes-hit.selected[aria-current] .notes-hit-btn:hover { --row-bg: var(--lib-row-band-current-bg-hover); }
+/* Secondary text paints its own colour (blocking inheritance from the
+   button), so each state names its ink: on the current fill
+   --lib-row-current-fg-muted (fg-muted falls under 4.5 there on 12 of 15
+   blocks), on any band --lib-row-selected-fg. :not(.selected) keeps the two
+   apart on specificity, not on source order. */
+.notes-hit[aria-current]:not(.selected) .notes-hit-note,
+.notes-hit[aria-current]:not(.selected) .notes-hit-meta { color: var(--lib-row-current-fg-muted); }
 .notes-hit.selected .notes-hit-note,
 .notes-hit.selected .notes-hit-meta { color: var(--lib-row-selected-fg); }
 /* The gridcell wrapper the row button sits in. Its only job is to carry the
    radius down: .notes-hit-btn takes `border-radius: inherit`, so a wrapper
    with no radius of its own would square off every row. */
 .notes-hit-cell { border-radius: inherit; }
-/* A failed delete, pinned to the row it happened on (the signal .notes-card's
-   .is-error gives on the vocabulary side). */
-.notes-hit.is-error .notes-hit-btn { --row-bg: color-mix(in srgb, var(--lib-danger) 10%, var(--lib-bg)); }
+/* A failed delete, pinned to the row it happened on. is-error always lands
+   on the CURRENT row (library-notes.js), and S2 gave that row no marker of
+   its own, so the failure fill has to out-rank every state it can meet --
+   one class more than each (spec §3.10; tests/ui-contract-tests.mjs checks
+   every pair with selectorSpecificity). The bare first selector covers a
+   failed row that is not current. */
+.notes-hit.is-error .notes-hit-btn,
+.notes-hit.is-error[aria-current] .notes-hit-btn,
+.notes-hit.is-error[aria-current] .notes-hit-btn:hover,
+.notes-hit.is-error.selected[aria-current] .notes-hit-btn,
+.notes-hit.is-error.selected[aria-current] .notes-hit-btn:hover { --row-bg: color-mix(in srgb, var(--lib-danger) 10%, var(--lib-bg)); }
 /* Same signal when the row is filtered out and only the pressed button is on
    screen. box-shadow, not background: .btn.danger:hover would outrank a
    background here and wipe the failure mark on the next pointer pass. */
@@ -2131,7 +2121,8 @@ html.motion-ready .vocab-note-save {
 .lib-toggle[hidden] { display: none; }
 .lib-toggle-count { font-size: var(--lib-text-secondary); color: var(--lib-fg-muted); }
 .lib-toggle.sm .lib-toggle-count { font-size: var(--lib-text-meta); line-height: var(--lib-lh-meta); }
-.lib-toggle:hover:not([aria-pressed="true"]):not(:disabled) { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
+/* Hover is the plain row hover fill (spec §3.2): a toggle in the list header steps like a row, not like a filled button. */
+.lib-toggle:hover:not([aria-pressed="true"]):not(:disabled) { background: var(--lib-row-bg-hover); color: var(--lib-btn-fg); }
 .lib-toggle:hover:not([aria-pressed="true"]):not(:disabled) .lib-toggle-count { color: var(--lib-btn-fg); }
 .lib-toggle[aria-pressed="true"] { background: var(--lib-btn-bg); color: var(--lib-btn-fg); font-weight: bold; }
 .lib-toggle[aria-pressed="true"] .lib-toggle-count { color: var(--lib-btn-fg); font-weight: bold; }
@@ -2480,18 +2471,10 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
    line instead of centering against whatever height the row happens to
    reach -- on a tall card a centered control floated mid-air. */
 .vocab-card .notes-card-top { align-items: start; }
-/* COMPONENTS.md §9 law 3 (inset selection). The vocabulary list was the worse
-   of the two: square corners AND full-bleed, so a selected row ran edge to
-   edge and its corners cut the list container's own. Class-only selector on
-   purpose -- an id prefix here would outrank .selected and invert the
-   --row-bg precedence the block below depends on. The accent edge needs no
-   rule of its own: inset box-shadows follow border-radius, so
-   .vocab-card[aria-current]'s `inset 2px 0 0` rounds with the band.
-   Four-sided `margin` and radius-md for the same two reasons the notes list
-   carries them (see its comment ~line 563). The wrapping .notes-card's own
-   frame collapses in the same commit -- a rounded band inside a rounded
-   bordered card is two competing arcs 4px apart, and the outer one wins the
-   eye, which is the other half of why the inset read as ~2px. */
+/* COMPONENTS.md §9.1 law 3 (inset selection): the band never reaches the
+   list's corners -- four-sided margin and radius-md in every state.
+   Class-only selectors on purpose: an id prefix would outrank the state
+   rules below and invert their order of precedence. */
 .vocab-card .notes-card-top { border-radius: var(--lib-radius-md); margin: var(--lib-sp-0) var(--lib-sp-1); }
 .vocab-card .notes-card-head { align-items: start; }
 /* The whole card is the row button (spec §3.6): the head's hit area spreads
@@ -2505,77 +2488,51 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
   position: absolute;
   inset: calc(var(--lib-sp-0) / -2) calc(-1 * var(--lib-sp-1));
 }
-/* The row whose word the detail pane is currently showing. Distinct from
-   .selected (a batch-operation membership) -- this is "you are here".
-   Drives the CHILD's --row-bg rather than painting the article: .notes-card-top
-   spans the whole card and paints an opaque var(--row-bg) over it, so a
-   background on the parent is never visible.
-   PRECEDENCE, deliberate: when a row is both selected and current, the
-   .selected band must win the background (batch context stays legible) while
-   this rule's accent edge still shows. Both base selectors are (0,3,0) and
-   both hover companions below are (0,4,0), so ORDER decides at each tier --
-   .selected's rules come after and win --row-bg. Keep the aria-current rules
-   first, and keep the id off every selector here (a #vocab-list prefix would
-   outrank .selected and invert the intent).
-   box-shadow is the ONE property both states now paint (2026-08-06: .selected
-   gained a ring of its own, see below), so the combined state can no longer
-   be left to source order -- it gets its own (0,4,0) rule that composes both
-   markers explicitly. §8.6's "don't bet on source order", applied. */
-.vocab-card[aria-current] .notes-card-top {
-  --row-bg: var(--lib-row-selected-bg);
-  box-shadow: inset 2px 0 0 var(--lib-accent);
-}
-/* Hover companion an aria-current-only row was missing: .notes-card-top:hover
-   above is (0,2,0), so the base rule right above (0,3,0) always outranked it
-   and hovering a current-but-unselected row showed no hover step at all.
-   Mirrors the plain hover formula (mix --lib-fg 5% into the base) rather than
-   .selected's accent mix, since the base color here is already the
-   selected-bg token, not a color-mix expression to step further into. */
-.vocab-card[aria-current] .notes-card-top:hover { --row-bg: color-mix(in srgb, var(--lib-fg) 5%, var(--lib-row-selected-bg)); }
-/* --lib-row-selected-fg: .notes-card-head (child of .notes-card-top) sets its
-   own `color` (base rule above, ~line 247), which blocks inheritance from
-   anything set on .notes-card-top -- so the token has to be assigned on the
-   element that actually paints .notes-row-title, not on the row-bg element. */
+/* S2, same grammar as the notes list (see .notes-hit[aria-current] above):
+   the current row is the neutral fill alone, the batch band is the lighter
+   accent fill plus a 1px ring, and the combination layers the neutral fill
+   on the band. The rules drive the CHILD's --row-bg: .notes-card-top spans
+   the whole card and paints an opaque var(--row-bg) over it. Every fill is a
+   composer token; the combined states have their own (0,4,0) / (0,5,0)
+   rules, so nothing here depends on source order. */
+.vocab-card[aria-current] .notes-card-top { --row-bg: var(--lib-row-current-bg); }
+.vocab-card[aria-current] .notes-card-top:hover { --row-bg: var(--lib-row-current-bg-hover); }
+/* .notes-card-head sets its own `color`, blocking inheritance from
+   .notes-card-top, so the label colour is assigned on the head itself. */
 .vocab-card[aria-current] .notes-card-head { color: var(--lib-row-selected-fg); }
-/* Selected rows read as a scannable accent band (declared after :hover so
-   selection wins, with a deeper hover step layered on top).
-   TWO SIGNALS, not one, and both were forced by measurement rather than
-   taste. When the per-row checkbox went away (2026-08-06) the fill became the
-   entire "this row is in the batch" cue, and the render oracle's bandDistinct
-   probe reported it was not carrying that weight: at accent 10% the fill sat
-   19 units from plain rest on rose-pine and 18 on solarized-dark, and -- far
-   worse -- only 4 units from --lib-row-selected-bg on rose-pine, i.e. "queued
-   for a batch action" and "open in the detail pane" were the same colour.
-   So: the mix goes to 20% (hover 26%), AND selection gets a marker of its own.
-   The marker is a full 1px inset ring, deliberately a different SHAPE from
-   aria-current's 2px left edge -- two intensities of the same shape is what
-   collapsed in the first place. Both are inset shadows, so they compose, and
-   both follow the band's border-radius for free. */
 .vocab-card.selected .notes-card-top {
-  --row-bg: color-mix(in srgb, var(--lib-accent) var(--lib-band-mix), var(--lib-bg));
+  --row-bg: var(--lib-row-band-bg);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lib-accent) 55%, transparent);
 }
-.vocab-card.selected .notes-card-top:hover { --row-bg: color-mix(in srgb, var(--lib-accent) var(--lib-band-mix-hover), var(--lib-bg)); }
-/* Both at once: the selection ring AND the "you are here" edge. (0,4,0), so
-   it out-ranks both (0,3,0) base rules on specificity instead of on where it
-   happens to sit in the file. */
-.vocab-card.selected[aria-current] .notes-card-top {
-  box-shadow: inset 2px 0 0 var(--lib-accent),
-              inset 0 0 0 1px color-mix(in srgb, var(--lib-accent) 55%, transparent);
-}
+.vocab-card.selected .notes-card-top:hover { --row-bg: var(--lib-row-band-bg-hover); }
+.vocab-card.selected[aria-current] .notes-card-top { --row-bg: var(--lib-row-band-current-bg); }
+.vocab-card.selected[aria-current] .notes-card-top:hover { --row-bg: var(--lib-row-band-current-bg-hover); }
 .vocab-card.selected .notes-card-head { color: var(--lib-row-selected-fg); }
-/* Same reasoning as .notes-hit's pair above: .vocab-row-gloss/.notes-row-meta
-   (defined below) paint their own `color`, blocking inheritance from
-   .notes-card-head. Scoped to .selected (the batch band) ONLY -- the
-   [aria-current] rule above is not touched, its row-selected-bg fill
-   already clears AA with fg-muted. */
+/* Secondary text and the hover-revealed delete X paint their own colour, so
+   each state names its ink (spec §3.8 / §7.5): --lib-row-current-fg-muted on
+   the current fill, --lib-row-selected-fg on any band. :not(:hover) leaves
+   the X's own danger hover alone; :not(.selected) keeps the two inks apart on
+   specificity. fg-muted on selected+current+hover fell under 3:1 on five dark
+   themes before this (facts-s2 §6.2). */
+.vocab-card[aria-current]:not(.selected) .vocab-row-gloss,
+.vocab-card[aria-current]:not(.selected) .vocab-row-groups,
+.vocab-card[aria-current]:not(.selected) .notes-row-meta,
+.vocab-card[aria-current]:not(.selected) .row-del-x:not(:hover) { color: var(--lib-row-current-fg-muted); }
 .vocab-card.selected .vocab-row-gloss,
+.vocab-card.selected .vocab-row-groups,
 .vocab-card.selected .notes-row-meta,
-.vocab-card.selected .vocab-row-groups { color: var(--lib-row-selected-fg); }
-/* A failed save / delete (spec §3.10): fill only, on the current row, above
-   every state rule here (T5 replaces these with its specificity table). */
+.vocab-card.selected .row-del-x:not(:hover) { color: var(--lib-row-selected-fg); }
+/* A failed save / delete, pinned to the row it happened on. is-error always
+   lands on the CURRENT row (library-vocab.js), and S2 gave that row no marker
+   of its own, so the failure fill has to out-rank every state it can meet --
+   one class more than each (spec §3.10; tests/ui-contract-tests.mjs checks
+   every pair with selectorSpecificity). The bare first selector covers a
+   failed row that is not current. */
 .vocab-card.is-error .notes-card-top,
-.vocab-card.is-error .notes-card-top:hover { --row-bg: color-mix(in srgb, var(--lib-danger) 10%, var(--lib-bg)); }
+.vocab-card.is-error[aria-current] .notes-card-top,
+.vocab-card.is-error[aria-current] .notes-card-top:hover,
+.vocab-card.is-error.selected[aria-current] .notes-card-top,
+.vocab-card.is-error.selected[aria-current] .notes-card-top:hover { --row-bg: color-mix(in srgb, var(--lib-danger) 10%, var(--lib-bg)); }
 /* Vocabulary row (spec §3.6): two fixed lines -- term 15/20 Bold + language
    and "known" as plain 12px text on the title's baseline; gloss 13/18 left,
    groups 12/18 right. 8 + 20 + 18 + 8 = 54 plus the 2px row gap = a 56 pitch
@@ -2746,8 +2703,6 @@ html[data-theme="modern-card"] {
   --lib-btn-bg: #e7e7e9;
   --lib-btn-hover: #d5ddeb;
   --lib-code-bg: #ffffff;
-  --lib-row-selected-bg: #e8f0fe;
-  --lib-row-selected-fg: #1a1a2e;
   --lib-radius-sm: 4px;
   --lib-radius-md: 8px;
   --lib-radius-lg: 12px;
@@ -2769,6 +2724,15 @@ html[data-theme="modern-card"] {
   --lib-field-placeholder: #585e64;
   --lib-field-fg: #1a1a2e;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23585e64' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #e5e7eb;
+  --lib-row-current-bg: #cccdd3;
+  --lib-row-current-bg-hover: #c3c4cb;
+  --lib-row-band-bg: #d6e3f3;
+  --lib-row-band-bg-hover: #c9dbf3;
+  --lib-row-band-current-bg: #bec9d9;
+  --lib-row-band-current-bg-hover: #b6c0d0;
+  --lib-row-selected-fg: #1a1a2e;
+  --lib-row-current-fg-muted: #4c4f53;
 }
 html[data-theme="nord-night"] {
   color-scheme: dark;
@@ -2788,8 +2752,6 @@ html[data-theme="nord-night"] {
   --lib-btn-bg: #424959;
   --lib-btn-hover: #3b4252;
   --lib-code-bg: #3b4252;
-  --lib-row-selected-bg: #3b4252;
-  --lib-row-selected-fg: #d8dee9;
   --lib-radius-sm: 4px;
   --lib-radius-md: 4px;
   --lib-radius-lg: 4px;
@@ -2811,6 +2773,15 @@ html[data-theme="nord-night"] {
   --lib-field-placeholder: #b6c8da;
   --lib-field-fg: #e5e9f0;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23b6c8da' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #373d48;
+  --lib-row-current-bg: #505662;
+  --lib-row-current-bg-hover: #585e6a;
+  --lib-row-band-bg: #3e4d5a;
+  --lib-row-band-bg-hover: #445663;
+  --lib-row-band-current-bg: #5d6a77;
+  --lib-row-band-current-bg-hover: #66727f;
+  --lib-row-selected-fg: #f9fafb;
+  --lib-row-current-fg-muted: #ccd9e6;
 }
 html[data-theme="terminal"] {
   color-scheme: dark;
@@ -2830,8 +2801,6 @@ html[data-theme="terminal"] {
   --lib-btn-bg: #111111;
   --lib-btn-hover: #1a3a1a;
   --lib-code-bg: #111111;
-  --lib-row-selected-bg: #1a3a1a;
-  --lib-row-selected-fg: #33ff33;
   --lib-focus-bd: #33ff33;
   --lib-focus-ring: 0 0 6px 1px rgba(51,255,51,0.4);
   --lib-radius-sm: 4px;
@@ -2854,6 +2823,15 @@ html[data-theme="terminal"] {
   --lib-field-placeholder: #5bae5b;
   --lib-field-fg: #33ff33;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235bae5b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #0c160c;
+  --lib-row-current-bg: #102f10;
+  --lib-row-current-bg-hover: #123912;
+  --lib-row-band-bg: #0e230e;
+  --lib-row-band-bg-hover: #113111;
+  --lib-row-band-current-bg: #154b15;
+  --lib-row-band-current-bg-hover: #175417;
+  --lib-row-selected-fg: #33ff33;
+  --lib-row-current-fg-muted: #24b324;
 }
 html[data-theme="paper-ink"] {
   color-scheme: light;
@@ -2873,8 +2851,6 @@ html[data-theme="paper-ink"] {
   --lib-btn-bg: #eae5de;
   --lib-btn-hover: #f5f0e8;
   --lib-code-bg: #f5f0e8;
-  --lib-row-selected-bg: #f5f0e8;
-  --lib-row-selected-fg: #2c2c2c;
   --lib-focus-bd: #1a3a5c;
   --lib-focus-ring: 0 0 0 1px #1a3a5c;
   --lib-radius-sm: 2px;
@@ -2897,6 +2873,15 @@ html[data-theme="paper-ink"] {
   --lib-field-placeholder: #5c5c5c;
   --lib-field-fg: #2c2c2c;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235c5c5c' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #f0eeeb;
+  --lib-row-current-bg: #d7d5d3;
+  --lib-row-current-bg-hover: #cecdcb;
+  --lib-row-band-bg: #e1e3e4;
+  --lib-row-band-bg-hover: #d4d8db;
+  --lib-row-band-current-bg: #bfc0c1;
+  --lib-row-band-current-bg-hover: #b6b7b8;
+  --lib-row-selected-fg: #2c2c2c;
+  --lib-row-current-fg-muted: #6b4c3b;
 }
 html[data-theme="dracula"] {
   color-scheme: dark;
@@ -2916,8 +2901,6 @@ html[data-theme="dracula"] {
   --lib-btn-bg: #30313a;
   --lib-btn-hover: #21222c;
   --lib-code-bg: #21222c;
-  --lib-row-selected-bg: #21222c;
-  --lib-row-selected-fg: #f8f8f2;
   --lib-radius-sm: 2px;
   --lib-radius-md: 4px;
   --lib-radius-lg: 4px;
@@ -2939,6 +2922,15 @@ html[data-theme="dracula"] {
   --lib-field-placeholder: #bcc3d8;
   --lib-field-fg: #f8f8f2;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23bcc3d8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #32343f;
+  --lib-row-current-bg: #4b4d56;
+  --lib-row-current-bg-hover: #54565e;
+  --lib-row-band-bg: #354350;
+  --lib-row-band-bg-hover: #3b4e5c;
+  --lib-row-band-current-bg: #54606a;
+  --lib-row-band-current-bg-hover: #5c6871;
+  --lib-row-selected-fg: #f8f8f2;
+  --lib-row-current-fg-muted: #dbc3fc;
 }
 html[data-theme="flexoki-light"] {
   color-scheme: light;
@@ -2958,8 +2950,6 @@ html[data-theme="flexoki-light"] {
   --lib-btn-bg: #e7e5da;
   --lib-btn-hover: #f2f0e5;
   --lib-code-bg: #F2F0E5;
-  --lib-row-selected-bg: #F2F0E5;
-  --lib-row-selected-fg: #100f0f;
   --lib-radius-sm: 3px;
   --lib-radius-md: 6px;
   --lib-radius-lg: 6px;
@@ -2981,6 +2971,15 @@ html[data-theme="flexoki-light"] {
   --lib-field-placeholder: #615f55;
   --lib-field-fg: #100f0f;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23615f55' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #f3f0e5;
+  --lib-row-current-bg: #d9d6cc;
+  --lib-row-current-bg-hover: #cfccc3;
+  --lib-row-band-bg: #e6ebe8;
+  --lib-row-band-bg-hover: #d9e1e3;
+  --lib-row-band-current-bg: #c8ccca;
+  --lib-row-band-current-bg-hover: #bfc3c1;
+  --lib-row-selected-fg: #100f0f;
+  --lib-row-current-fg-muted: #555450;
 }
 html[data-theme="flexoki-dark"] {
   color-scheme: dark;
@@ -3000,8 +2999,6 @@ html[data-theme="flexoki-dark"] {
   --lib-btn-bg: #2f2e2d;
   --lib-btn-hover: #363532;
   --lib-code-bg: #282726;
-  --lib-row-selected-bg: #343331;
-  --lib-row-selected-fg: #cecdc3;
   --lib-radius-sm: 3px;
   --lib-radius-md: 6px;
   --lib-radius-lg: 6px;
@@ -3023,6 +3020,15 @@ html[data-theme="flexoki-dark"] {
   --lib-field-placeholder: #a09e9a;
   --lib-field-fg: #cecdc3;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23a09e9a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #252422;
+  --lib-row-current-bg: #3e3d3a;
+  --lib-row-current-bg-hover: #474642;
+  --lib-row-band-bg: #222b33;
+  --lib-row-band-bg-hover: #24313c;
+  --lib-row-band-current-bg: #3e454a;
+  --lib-row-band-current-bg-hover: #474d51;
+  --lib-row-selected-fg: #cecdc3;
+  --lib-row-current-fg-muted: #b9b7b4;
 }
 html[data-theme="solarized-light"] {
   color-scheme: light;
@@ -3042,8 +3048,6 @@ html[data-theme="solarized-light"] {
   --lib-btn-bg: #e2decd;
   --lib-btn-hover: #eee8d5;
   --lib-code-bg: #eee8d5;
-  --lib-row-selected-bg: #eee8d5;
-  --lib-row-selected-fg: #4b5e63;
   --lib-radius-sm: 2px;
   --lib-radius-md: 4px;
   --lib-radius-lg: 4px;
@@ -3065,6 +3069,15 @@ html[data-theme="solarized-light"] {
   --lib-field-placeholder: #525d5d;
   --lib-field-fg: #39474b;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23525d5d' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #f4efdd;
+  --lib-row-current-bg: #dad9cb;
+  --lib-row-current-bg-hover: #d2d2c5;
+  --lib-row-band-bg: #e3e9e1;
+  --lib-row-band-bg-hover: #d6e3e0;
+  --lib-row-band-current-bg: #c3ccc7;
+  --lib-row-band-current-bg-hover: #bbc5c0;
+  --lib-row-selected-fg: #435358;
+  --lib-row-current-fg-muted: #47595e;
 }
 html[data-theme="solarized-dark"] {
   color-scheme: dark;
@@ -3084,8 +3097,6 @@ html[data-theme="solarized-dark"] {
   --lib-btn-bg: #103d48;
   --lib-btn-hover: #073642;
   --lib-code-bg: #073642;
-  --lib-row-selected-bg: #073642;
-  --lib-row-selected-fg: #a4b1b2;
   --lib-focus-bd: #268bd2;
   --lib-focus-ring: 0 0 0 2px rgba(38,139,210,0.25);
   --lib-radius-sm: 2px;
@@ -3108,6 +3119,15 @@ html[data-theme="solarized-dark"] {
   --lib-field-placeholder: #9aacb2;
   --lib-field-fg: #c1cacb;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%239aacb2' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #09323d;
+  --lib-row-current-bg: #22474f;
+  --lib-row-current-bg-hover: #2a4d55;
+  --lib-row-band-bg: #063a4f;
+  --lib-row-band-bg-hover: #084058;
+  --lib-row-band-current-bg: #214e5f;
+  --lib-row-band-current-bg-hover: #295464;
+  --lib-row-selected-fg: #bbc4c5;
+  --lib-row-current-fg-muted: #aebdc2;
 }
 html[data-theme="catppuccin-latte"] {
   color-scheme: light;
@@ -3127,8 +3147,6 @@ html[data-theme="catppuccin-latte"] {
   --lib-btn-bg: #dbdee6;
   --lib-btn-hover: #d0d4de;
   --lib-code-bg: #e6e9ef;
-  --lib-row-selected-bg: #dce0e8;
-  --lib-row-selected-fg: #4c4f69;
   --lib-radius-sm: 8px;
   --lib-radius-md: 10px;
   --lib-radius-lg: 12px;
@@ -3150,6 +3168,15 @@ html[data-theme="catppuccin-latte"] {
   --lib-field-placeholder: #575b6c;
   --lib-field-fg: #41445a;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23575b6c' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #e7e9ee;
+  --lib-row-current-bg: #ced1d9;
+  --lib-row-current-bg-hover: #c6c9d2;
+  --lib-row-band-bg: #d6e0f5;
+  --lib-row-band-bg-hover: #c9d8f5;
+  --lib-row-band-current-bg: #bdc6dc;
+  --lib-row-band-current-bg-hover: #b5bed4;
+  --lib-row-selected-fg: #484b63;
+  --lib-row-current-fg-muted: #505363;
 }
 html[data-theme="catppuccin-mocha"] {
   color-scheme: dark;
@@ -3169,8 +3196,6 @@ html[data-theme="catppuccin-mocha"] {
   --lib-btn-bg: #37394b;
   --lib-btn-hover: #313244;
   --lib-code-bg: #313244;
-  --lib-row-selected-bg: #313244;
-  --lib-row-selected-fg: #cdd6f4;
   --lib-radius-sm: 8px;
   --lib-radius-md: 12px;
   --lib-radius-lg: 12px;
@@ -3192,6 +3217,15 @@ html[data-theme="catppuccin-mocha"] {
   --lib-field-placeholder: #a2a4b5;
   --lib-field-fg: #cdd6f4;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23a2a4b5' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #272738;
+  --lib-row-current-bg: #3e3f52;
+  --lib-row-current-bg-hover: #45475a;
+  --lib-row-band-bg: #2c3249;
+  --lib-row-band-bg-hover: #323b55;
+  --lib-row-band-current-bg: #4b5169;
+  --lib-row-band-current-bg-hover: #535971;
+  --lib-row-selected-fg: #cdd6f4;
+  --lib-row-current-fg-muted: #b3b9d0;
 }
 html[data-theme="gruvbox-dark"] {
   color-scheme: dark;
@@ -3211,8 +3245,6 @@ html[data-theme="gruvbox-dark"] {
   --lib-btn-bg: #433f3b;
   --lib-btn-hover: #3c3836;
   --lib-code-bg: #3c3836;
-  --lib-row-selected-bg: #3c3836;
-  --lib-row-selected-fg: #ebdbb2;
   --lib-radius-sm: 2px;
   --lib-radius-md: 2px;
   --lib-radius-lg: 2px;
@@ -3234,6 +3266,15 @@ html[data-theme="gruvbox-dark"] {
   --lib-field-placeholder: #b6ada7;
   --lib-field-fg: #ebdbb2;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23b6ada7' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #32312f;
+  --lib-row-current-bg: #4b4841;
+  --lib-row-current-bg-hover: #534f47;
+  --lib-row-band-bg: #3a413e;
+  --lib-row-band-bg-hover: #404945;
+  --lib-row-band-current-bg: #5a5d53;
+  --lib-row-band-current-bg-hover: #636559;
+  --lib-row-selected-fg: #efe3c2;
+  --lib-row-current-fg-muted: #c9c1b4;
 }
 html[data-theme="rose-pine"] {
   color-scheme: dark;
@@ -3253,8 +3294,6 @@ html[data-theme="rose-pine"] {
   --lib-btn-bg: #272536;
   --lib-btn-hover: #2f2c43;
   --lib-code-bg: #1f1d2e;
-  --lib-row-selected-bg: #26233a;
-  --lib-row-selected-fg: #e0def4;
   --lib-radius-sm: 4px;
   --lib-radius-md: 6px;
   --lib-radius-lg: 8px;
@@ -3276,13 +3315,22 @@ html[data-theme="rose-pine"] {
   --lib-field-placeholder: #9996ac;
   --lib-field-fg: #e0def4;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%239996ac' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #23212e;
+  --lib-row-current-bg: #3b3947;
+  --lib-row-current-bg-hover: #434150;
+  --lib-row-band-bg: #2f2a3d;
+  --lib-row-band-bg-hover: #393249;
+  --lib-row-band-current-bg: #514c60;
+  --lib-row-band-current-bg-hover: #5a5569;
+  --lib-row-selected-fg: #e0def4;
+  --lib-row-current-fg-muted: #b2afc4;
 }
 html[data-theme="github-light"] {
   color-scheme: light;
   --lib-bg: #f6f8fa;
   --lib-panel: #ffffff;
   --lib-fg: #1f2328;
-  --lib-fg-muted: #656d76;
+  --lib-fg-muted: #606871;
   --lib-fg-hint: #636c76;
   --lib-accent: #0969da;
   --lib-link: #0969da;
@@ -3295,8 +3343,6 @@ html[data-theme="github-light"] {
   --lib-btn-bg: #ececed;
   --lib-btn-hover: #d0e5f0;
   --lib-code-bg: #ffffff;
-  --lib-row-selected-bg: #ddf4ff;
-  --lib-row-selected-fg: #1f2328;
   --lib-radius-sm: 3px;
   --lib-radius-md: 6px;
   --lib-radius-lg: 6px;
@@ -3318,6 +3364,15 @@ html[data-theme="github-light"] {
   --lib-field-placeholder: #5a626b;
   --lib-field-fg: #1f2328;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235a626b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #ebedf0;
+  --lib-row-current-bg: #d1d4d6;
+  --lib-row-current-bg-hover: #c8cbcd;
+  --lib-row-band-bg: #dce8f6;
+  --lib-row-band-bg-hover: #cee0f5;
+  --lib-row-band-current-bg: #c3cedb;
+  --lib-row-band-current-bg-hover: #bbc5d2;
+  --lib-row-selected-fg: #1f2328;
+  --lib-row-current-fg-muted: #4d545b;
 }
 :root {
   color-scheme: light;
@@ -3343,5 +3398,14 @@ html[data-theme="github-light"] {
   --lib-field-placeholder: #5c636a;
   --lib-field-fg: #1a1a2e;
   --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235c636a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --lib-row-bg-hover: #ececee;
+  --lib-row-current-bg: #d1d1d6;
+  --lib-row-current-bg-hover: #c8c8ce;
+  --lib-row-band-bg: #dce7f6;
+  --lib-row-band-bg-hover: #cfdff5;
+  --lib-row-band-current-bg: #c3ccdc;
+  --lib-row-band-current-bg-hover: #bbc3d3;
+  --lib-row-current-fg-muted: #505458;
+  --lib-row-selected-fg: #1a1a2e;
 }
 /* @generated:ui-themes end */

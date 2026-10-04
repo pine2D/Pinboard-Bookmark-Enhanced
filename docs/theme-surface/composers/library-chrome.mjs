@@ -1,18 +1,12 @@
 import { expandPalette } from "./_util.mjs";
 import { mergeTokens } from "./compose-theme.mjs";
-import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, mix, hexToRgb, rgbToHex, FIELD_HOST_ROLES, fieldChevronUri } from "./_ui-derive.mjs";
+import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, FIELD_HOST_ROLES, fieldChevronUri, deriveRowStates } from "./_ui-derive.mjs";
 import { POPUP_THEME_MAP } from "./popup-chrome.mjs";
 
-// Accent-over-bg mixes library.css paints behind a row that is SELECTED for a
-// batch action (rest, then :hover). Mirrors library.css's `--lib-band-mix` /
-// `--lib-band-mix-hover` :root tokens (debt-sweep 2026-08-07 named those --
-// before that, the same two numbers were separate unnamed literals at each of
-// notes-hit's and vocab-card's two write sites) -- see the row-selected-fg
-// comment below for why THIS copy can't just reference that CSS var(): this
-// runs in Node at build time and needs the literal percentage to do
-// arithmetic, not a browser-resolved custom property. Keep the two numbers in
-// step by hand; the render oracle's bandDistinct entry is what catches a drift.
-export const LIB_BATCH_BAND_MIX = [0.20, 0.26];
+// The six S2 fills a row's TEXT can sit on (spec 2026-10-03-library-redesign
+// §6.4): every state except plain hover, whose text keeps --lib-fg /
+// --lib-fg-muted (fg-muted is pushed against that fill below).
+const ROW_HIGHLIGHT_FILLS = ["row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover", "row-band-current-bg", "row-band-current-bg-hover"];
 
 // Default-surface (no preset selected) component-layer baseline — Task 5,
 // step ① of the composer color migration. Every value below is copied
@@ -89,6 +83,21 @@ const DEFAULT_LIGHT = {
   "field-placeholder": "#5c636a",   // fg-hint #61686f (4.29:1 on the hover fill) pushed to 4.62:1
   "field-fg": "#1a1a2e",            // = fg: already 2.80:1 from the placeholder
   "field-chevron": fieldChevronUri("#5c636a"), // the native <select> chevron, stroked in field-placeholder
+  // S2 row states (spec 2026-10-03-library-redesign §6.4, C55). NOT hand-
+  // picked: deriveRowStates over library.css's hand :root (bg #f7f7f8, fg
+  // #1a1a2e, accent #1a73e8), then the two text roles over the same :root
+  // (fg-muted #5f6368). tests/theme-ui-derive-tests.mjs re-checks every one
+  // against the folded shipped :root by category (floors + minimality), and
+  // pins these nine as spec anchors.
+  "row-bg-hover": "#ececee",              // fg 5%: 11 from bg (hover step >= 8)
+  "row-current-bg": "#d1d1d6",            // fg 17%: 38 from bg, 27 from the hover fill (>= 25 from both)
+  "row-current-bg-hover": "#c8c8ce",      // + fg 5% on current: 9
+  "row-band-bg": "#dce7f6",               // accent 12%: 27 from bg
+  "row-band-bg-hover": "#cfdff5",         // accent 18% (band + 6 points): 13 from the band
+  "row-band-current-bg": "#c3ccdc",       // band + fg 13%: 27 from the band, 25 from its hover
+  "row-band-current-bg-hover": "#bbc3d3", // + fg 5%: 8
+  "row-current-fg-muted": "#505458",      // fg-muted #5f6368 pushed to 4.5 on current and current+hover
+  "row-selected-fg": "#1a1a2e",           // = fg, already >= 4.5 on all six highlight fills (moved here from the hand :root, value unchanged)
 };
 
 // Map canonical UI colors to --lib-* names for the standalone library page
@@ -123,13 +132,16 @@ function emitLib(ui, palette, overrides, radius, focus = {}, mode) {
   // theme until a pilot declares one.
   const danger = rgbToHex(fgToAA(hexToRgb(palette.destroy || "#d93025"), hexToRgb(ui.bg)));
   const warn = rgbToHex(fgToAA(hexToRgb("#b06000"), hexToRgb(ui.bg)));
-  // fg/fg-muted must clear AA against bg, panel AND row-selected-bg (accent-soft) —
-  // deriveUiColors only guarantees AA against bg. 7 of 14 themes failed fg-muted
-  // vs panel (nord-night, flexoki x2, solarized x2, catppuccin-latte, gruvbox-dark)
-  // and 2 also failed fg vs panel / row-selected-fg vs row-selected-bg (solarized
-  // x2) before this fix — verified via contrast-audit.mjs.
-  const rowSelectedBgRgb = hexToRgb(ui["drop-hover"]);
-  const fg = rgbToHex(fgToAAMulti(hexToRgb(ui.fg), [hexToRgb(ui.bg), hexToRgb(ui.bg2), rowSelectedBgRgb]));
+  // fg/fg-muted must clear AA against bg and panel — deriveUiColors only
+  // guarantees bg. 7 of 14 themes failed fg-muted vs panel (nord-night,
+  // flexoki x2, solarized x2, catppuccin-latte, gruvbox-dark) and 2 also
+  // failed fg vs panel (solarized x2) before this fix — verified via
+  // contrast-audit.mjs. fg additionally keeps accent-soft (drop-hover) as a
+  // host: that was the old "current row" fill; S2 retired it as a row fill,
+  // but dropping the host now would move fg on several themes for no
+  // reason. Retire it in its own change, with its own token diff.
+  const dropHoverRgb = hexToRgb(ui["drop-hover"]);
+  const fg = rgbToHex(fgToAAMulti(hexToRgb(ui.fg), [hexToRgb(ui.bg), hexToRgb(ui.bg2), dropHoverRgb]));
   const fgMuted = rgbToHex(fgToAAMulti(hexToRgb(ui["fg-muted"]), [hexToRgb(ui.bg), hexToRgb(ui.bg2)]));
   // Link text sits on both the page bg and the elevated panel/pane surface (the
   // same two-background constraint fg/fg-muted above already enforce) -- a plain
@@ -143,23 +155,6 @@ function emitLib(ui, palette, overrides, radius, focus = {}, mode) {
     "input-bg": ui["input-bg"], "input-border": ui.border,
     "btn-bg": ui.bg2, "btn-hover": ui["drop-hover"],
     "code-bg": ui.bg2,
-    "row-selected-bg": ui["drop-hover"],
-    // Not plain `fg` any more (2026-08-06 selection rebuild). --lib-row-selected-fg
-    // is the label colour for BOTH row states now: "current" (--lib-row-selected-bg,
-    // which `fg` above already derives against) and "selected for a batch action",
-    // whose band is mixed at runtime from accent over bg. Those two live in
-    // library.css's hand-written page layer, so the percentages are duplicated
-    // here on purpose -- LIB_BATCH_BAND_MIX above and library.css's
-    // `--lib-band-mix` / `--lib-band-mix-hover` :root tokens must stay in step.
-    // Nothing lints that pairing statically; what catches a drift is the render
-    // oracle's bandDistinct entry, which measures the label against the band the
-    // browser actually painted (it is what found this cliff: solarized's
-    // row-selected-fg had 4.71:1 of headroom at the old 10% mix and fell straight
-    // through AA at the shipped mix).
-    "row-selected-fg": rgbToHex(fgToAAMulti(hexToRgb(fg), [
-      rowSelectedBgRgb,
-      ...LIB_BATCH_BAND_MIX.map((t) => mix(hexToRgb(ui.bg), hexToRgb(ui.accent), t).map(Math.round)),
-    ])),
     ...(focus["focus-bd"] != null ? { "focus-bd": focus["focus-bd"] } : {}),
     ...(focus["focus-ring"] != null ? { "focus-ring": focus["focus-ring"] } : {}),
     ...deriveUiRadius(radius),
@@ -180,6 +175,27 @@ function emitLib(ui, palette, overrides, radius, focus = {}, mode) {
     fieldHostRoles: FIELD_HOST_ROLES.lib,
     fieldChevron: true,
   });
+
+  // S2 row states (spec 2026-10-03-library-redesign §3.8 / §6.4; COMPONENTS.md
+  // §9.1 law 3, C55). After the finalizer, from the bg / fg / accent this block
+  // actually ships: the finalizer moves fg on solarized x2, and a row fill
+  // derived from the pre-gap-fill fg would sit a step off what is painted.
+  const rows = deriveRowStates(hexToRgb(map.bg), hexToRgb(map.fg), hexToRgb(map.accent));
+  for (const [role, rgb] of Object.entries(rows)) map[role] = rgbToHex(rgb);
+  // fg-muted is painted on the plain hover fill too (row gloss / meta /
+  // groups, toggle counts): add it as a host so a hovered row cannot drop its
+  // secondary text under AA (github-light 4.47 -> #606871 4.82; the other 14
+  // blocks are unchanged). A pilot fg-muted override is a TEXT input and wins
+  // verbatim (NEW_THEME.md). btn-fg-muted was derived inside the finalizer
+  // from the unpushed value and still clears its own two hosts -- left alone.
+  if (overrides?.["fg-muted"] == null) {
+    map["fg-muted"] = rgbToHex(fgToAAMulti(hexToRgb(map["fg-muted"]), [hexToRgb(map.bg), hexToRgb(map.panel), rows["row-bg-hover"]]));
+  }
+  // Title of the current row and every text on a selected row.
+  map["row-selected-fg"] = rgbToHex(fgToAAMulti(hexToRgb(map.fg), ROW_HIGHLIGHT_FILLS.map((role) => rows[role])));
+  // Secondary text (and the delete X) on the current, not-selected row:
+  // fg-muted falls under 4.5 on the current fill on 12 of 15 blocks.
+  map["row-current-fg-muted"] = rgbToHex(fgToAAMulti(hexToRgb(map["fg-muted"]), [rows["row-current-bg"], rows["row-current-bg-hover"]]));
 
   // Returns the computed map alongside the rendered text (not just text) --
   // same shape as options-chrome.mjs's emitOpt, for the same reason: a

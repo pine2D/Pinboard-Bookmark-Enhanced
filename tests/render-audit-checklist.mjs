@@ -446,11 +446,9 @@
 //     paint their own background; others, e.g. `.connection-health-state`,
 //     inherit it from a parent) is compared against the same theme's live
 //     `--{ns}-btn-bg` / `--{ns}-btn-hover` / `--{ns}-input-bg` /
-//     `--{ns}-chip-bg` -- and, library only, its two batch-selection accent
-//     bands (D6 follow-up / Ruling 17), computed from the live
-//     `--lib-bg`/`--lib-accent` tokens and the composer's OWN exported
-//     `LIB_BATCH_BAND_MIX` percentages (never a hand-typed 0.20/0.26). A
-//     match on both sides is a FAIL.
+//     `--{ns}-chip-bg` -- and, library only, its seven S2 row fills
+//     (`--lib-row-bg-hover` … `--lib-row-band-current-bg-hover`), live
+//     tokens like the rest. A match on both sides is a FAIL.
 //   REST STATE ONLY -- hover is explicitly OUT of scope. This family covers
 //     the cascade shape a static same-selector scan (tests/ui-contract-
 //     tests.mjs) structurally cannot see (colour on one rule, the fill on an
@@ -502,7 +500,8 @@
 //       to the same rule, Ruling 16).
 //     - identity -- the scanned colour ALSO equals one of the tokens
 //       COMPONENTS.md §9.1 law 8 itself sanctions as text-on-fill: `fg`,
-//       `btn-fg`, `btn-fg-muted`, and (library only) `--lib-row-selected-fg`.
+//       `btn-fg`, `btn-fg-muted`, and (library only) `--lib-row-selected-fg` /
+//       `--lib-row-current-fg-muted`.
 //       Every matching role name is recorded (not first-match-wins) so a
 //       collapse across more than one sanctioned token is labelled
 //       correctly.

@@ -92,12 +92,6 @@ import { cr, hexRgb, parseRgba, composite } from "../docs/theme-surface/tools/co
 // The chip family is defined once, in the composer; spacingScale reads it from
 // there (not from a hand-copied list) to know whose inset is component geometry.
 import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
-// weakTextOnFill (family 13) gates library's two batch-selection bands
-// alongside the four control fills; the band is a runtime color-mix(), not a
-// token, so its expected RGB has to be computed from the same percentages
-// library-chrome.mjs derives --lib-row-selected-fg against -- imported, never
-// hand-typed 0.20/0.26 in this file (see WEAK_TEXT_CFG.library below).
-import { LIB_BATCH_BAND_MIX } from "../docs/theme-surface/composers/library-chrome.mjs";
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 // Family 14's fill-separation floor (spec 2026-09-30-ui-fields-stage4-design
@@ -3440,27 +3434,28 @@ const WEAK_TEXT_CFG = {
     safeHostRoles: ["bg", "panel", "pf-bg", "code-bg"],
     safeHostExcludeTextRoles: ["link"],
   },
-  // library additionally gates its two batch-selection bands (D6 follow-up /
-  // Ruling 17): see the file-header import comment for why the percentages
-  // come from LIB_BATCH_BAND_MIX instead of being retyped here. library's
-  // fg-hint/fg-muted are gated (auditLibraryThemes) only against bg/panel --
-  // no drop-hover-equivalent (row-selected-bg) row exists for those two
-  // roles, only for row-selected-fg, a role outside this family's text set.
-  // link IS gated vs bg/panel here (auditLibraryThemes :1427-1434), so it
-  // stays eligible for the safe-host exemption -- no exclusion list.
+  // library additionally gates its seven S2 row fills (spec 2026-10-03-
+  // library-redesign §6.4 / §9.3), read LIVE as tokens like every other fill
+  // -- since S2 the composer emits them (deriveRowStates), so there is no
+  // runtime color-mix() left to re-derive here. library's fg-hint/fg-muted are
+  // gated (auditLibraryThemes) only against bg/panel; link IS gated vs
+  // bg/panel (auditLibraryThemes), so it stays eligible for the safe-host
+  // exemption -- no exclusion list.
   // Stage 4 Task 7 (T7-f): library's value boxes paint the field fills now.
   library: {
-    prefix: "lib", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg", "field-bg", "field-bg-hover", "field-bg-focus"],
-    batchBandMix: LIB_BATCH_BAND_MIX, bgRole: "bg", accentRole: "accent",
+    prefix: "lib", textRoles: ["fg-hint", "fg-muted", "link"],
+    fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg", "field-bg", "field-bg-hover", "field-bg-focus",
+      "row-bg-hover", "row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover", "row-band-current-bg", "row-band-current-bg-hover"],
     safeHostRoles: ["bg", "panel"],
-    // --lib-row-selected-fg is DERIVED specifically to clear both batch bands
-    // (D6 follow-up / Ruling 17, fgToAAMulti(fg, [row-selected-bg, band-20,
-    // band-26])) -- an element that reads it (.notes-row-title/.vocab-row-
-    // headline inherit it from .notes-card-head's `.selected` rule, verified
-    // real on terminal, whose whole palette collapses fg/accent/link/row-
-    // selected-fg to the same #33ff33) is correctly painted regardless of
-    // which OTHER role's current value it happens to also equal.
-    safeTextRoles: ["row-selected-fg"],
+    // --lib-row-selected-fg / --lib-row-current-fg-muted are DERIVED
+    // specifically for the row fills (library-chrome.mjs, fgToAAMulti over
+    // the six highlight fills / the current pair): an element that reads one
+    // of them is correctly painted regardless of which OTHER role's value it
+    // happens to also equal (terminal collapses fg / accent / link /
+    // row-selected-fg to #33ff33; paper-ink and terminal keep
+    // row-current-fg-muted == fg-muted). Still ratio-gated in
+    // recordWeakTextHits like every identity trigger.
+    safeTextRoles: ["row-selected-fg", "row-current-fg-muted"],
   },
 };
 
@@ -3578,22 +3573,6 @@ function weakTextProbe(cfg) {
   const readToken = (role) => parseColor(rootCs.getPropertyValue(`--${cfg.prefix}-${role}`));
   const textTargets = cfg.textRoles.map((role) => ({ role, rgb: readToken(role) })).filter((t) => t.rgb);
   const fillTargets = cfg.fillRoles.map((role) => ({ role, rgb: readToken(role) })).filter((t) => t.rgb);
-  if (cfg.batchBandMix && cfg.batchBandMix.length) {
-    const bg = readToken(cfg.bgRole || "bg");
-    const accent = readToken(cfg.accentRole || "accent");
-    if (bg && accent) {
-      // Linear blend in sRGB channel space -- matches CSS's
-      // `color-mix(in srgb, accent T%, bg)` (library.css's --row-bg), which
-      // is exactly what library-chrome.mjs's own `mix(a, b, t)` computes at
-      // build time for the same two bands (see the file-header import
-      // comment). `t` values come from cfg.batchBandMix, i.e. from the
-      // imported LIB_BATCH_BAND_MIX -- never a literal here.
-      for (const t of cfg.batchBandMix) {
-        const mixed = [0, 1, 2].map((i) => Math.round(bg[i] + (accent[i] - bg[i]) * t));
-        fillTargets.push({ role: `batch-band-${Math.round(t * 100)}`, rgb: mixed });
-      }
-    }
-  }
   // Page-level surfaces fg-hint/fg-muted (and, for options, pf-bg/code-bg)
   // are ALREADY guaranteed AA against on every themed block (contrast-
   // audit.mjs's auditCssThemes/auditLibraryThemes -- see WEAK_TEXT_CFG's
@@ -3625,8 +3604,8 @@ function weakTextProbe(cfg) {
   // report: 2/45 blocks; this run found more collapses than that static
   // count once options'/library's per-block identity was checked live) --
   // the fix is real, the false alarm was this family not yet knowing its own
-  // sanctioned tokens. library's --lib-row-selected-fg is unconditional for
-  // the same reason (D6 follow-up / Ruling 17); `accent` is conditional on
+  // sanctioned tokens. library's --lib-row-selected-fg / --lib-row-current-fg-muted are
+  // unconditional for the same reason (S2, derived against the row fills); `accent` is conditional on
   // isSelectionIndicator below -- `link`'s own derivation (fgToAAMulti(accent,
   // [bg, bg2])) starts FROM accent and stays IDENTITY to it whenever accent
   // already clears AA, so a GENUINE `--{ns}-link` consumer (e.g.

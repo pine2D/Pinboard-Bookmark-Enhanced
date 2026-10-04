@@ -828,20 +828,14 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
 // ---- weak-text-on-fill (D6 follow-up / Ruling 17): the batch-selected
 // (.selected) state's four text consumers named in the T4 comment above as
 // its THIRD blind spot -- .vocab-row-gloss / .notes-row-meta /
-// .notes-hit-note / .notes-hit-meta -- must read --lib-row-selected-fg
-// while sitting on the batch-selection accent band (a runtime color-mix()
-// set via a custom property on an ancestor, invisible to Check 1/2's
-// same-rule `background` scan above). D6 itself stopped short of this
-// (plan's own stop line: `fg` failed the 26% band on 2/15 blocks); Ruling
-// 17 ships it with the EXISTING --lib-row-selected-fg role instead, already
-// derived against both bands by construction (library-chrome.mjs's
-// LIB_BATCH_BAND_MIX; see contrast-audit.mjs's "row-selected-fg vs
-// batch-band-*" rows and tests/theme-ui-derive-tests.mjs's independent
-// category assertion for the derivation-side guarantee). This check is the
-// CSS-consumer-side guard: it does not re-derive contrast, only that the
-// four selectors' `.selected`-scoped rule actually reads the role. The
-// plain [aria-current] rules are untouched (fg-muted already clears AA
-// against --lib-row-selected-bg) and are deliberately NOT asserted here. ----
+// .notes-hit-note / .notes-hit-meta -- must read --lib-row-selected-fg,
+// which library-chrome.mjs derives against all six highlight row fills (S2,
+// spec 2026-10-03-library-redesign §6.4; contrast-audit's
+// auditLibraryRowStates gates it). This check is the CSS-consumer-side
+// guard: it does not re-derive contrast, only that the selectors'
+// `.selected`-scoped rule actually reads the role. The plain [aria-current]
+// rules read --lib-row-current-fg-muted instead and are pinned by the S2
+// block below, not here. ----
 {
   const hand = stripGeneratedRegions(libraryCss);
   const rules = parseStyleRules(hand);
@@ -860,6 +854,172 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
   const missing = batchSelectedConsumers.filter((s) => !usesRowSelectedFg(s));
   check(missing.length === 0,
     "library.css: the batch-selected (.selected) state for .vocab-row-gloss/.notes-row-meta/.vocab-row-groups/.notes-hit-note/.notes-hit-meta no longer reads --lib-row-selected-fg -- weak text on the batch-selection accent band (COMPONENTS.md §9.1 law 8, D6 follow-up / Ruling 17); missing: " + missing.join(", "));
+}
+
+// ---- S2 row states (spec docs/superpowers/specs/2026-10-03-library-redesign-
+// design.md §3.8 / §3.10 / §9.3; COMPONENTS.md §9.1 law 3, C55). Three
+// category gates over library.css's hand region, each with a synthetic
+// discrimination proof:
+//   (a) no current-row marker: outside @media (forced-colors: active), a rule
+//       whose selector carries [aria-current] paints no box-shadow, border*,
+//       background-image / gradient / url() background, or outline (unless
+//       the selector is a positive :focus-visible), and no selector carrying
+//       [aria-current] may name ::before / ::after -- "fill only" (S2);
+//   (b) row fills read their derived token: every rule that sets --row-bg on
+//       a row (.notes-hit-btn / .notes-card-top) is a plain state compound
+//       whose state set maps to exactly one --lib-row-* token (rest: --lib-bg
+//       or transparent; press has no rule of its own -- it reuses hover);
+//       is-error rules read the one danger mix; all eight states exist per
+//       list;
+//   (c) is-error out-ranks every state: for each non-error rule S, the error
+//       rule for S's states + .is-error + [aria-current] exists and
+//       selectorSpecificity(E) > selectorSpecificity(S). is-error always lands
+//       on the CURRENT row (library-notes.js / library-vocab.js) and S2 left
+//       that row no marker of its own (facts-s2 R3-1). ----
+{
+  const ROW_SUBJECTS = [".notes-hit-btn", ".notes-card-top"];
+  const STATE_TOKENS = [".selected", "[aria-current]", ":hover", ":active", ".is-error"];
+  const IS_ERROR_FILL = "color-mix(in srgb, var(--lib-danger) 10%, var(--lib-bg))";
+  const stateKey = (states) => [...states].sort().join(" ");
+  const STATE_FILL = new Map([
+    ["", ["var(--lib-bg)", "transparent"]],
+    [":hover", ["var(--lib-row-bg-hover)"]],
+    ["[aria-current]", ["var(--lib-row-current-bg)"]],
+    [":hover [aria-current]", ["var(--lib-row-current-bg-hover)"]],
+    [".selected", ["var(--lib-row-band-bg)"]],
+    [".selected :hover", ["var(--lib-row-band-bg-hover)"]],
+    [".selected [aria-current]", ["var(--lib-row-band-current-bg)"]],
+    [".selected :hover [aria-current]", ["var(--lib-row-band-current-bg-hover)"]],
+  ]);
+  const handRules = (css) => parseStyleRules(stripGeneratedRegions(css)).filter((r) => !inForcedColors(r));
+  function rowFillRules(css) {
+    const out = [];
+    for (const r of handRules(css)) {
+      const fills = parseDeclarations(r.body).filter((d) => d.property === "--row-bg");
+      if (!fills.length) continue;
+      for (const sel of r.selectors) {
+        const subject = ROW_SUBJECTS.find((s) => sel.includes(s));
+        if (!subject) continue;
+        out.push({ sel, subject, value: fills.at(-1).value, states: STATE_TOKENS.filter((t) => sel.includes(t)), wrapped: /:(?:not|is|where|has)\(/.test(sel) });
+      }
+    }
+    return out;
+  }
+  function rowFillOffenders(css) {
+    const rows = rowFillRules(css);
+    const out = [];
+    for (const r of rows) {
+      if (r.wrapped) { out.push(`${r.sel}: a row-fill rule must be a plain state compound (no :not / :is / :where / :has) so its state set and specificity stay readable`); continue; }
+      if (r.states.includes(".is-error")) {
+        if (r.value !== IS_ERROR_FILL) out.push(`${r.sel} { --row-bg: ${r.value} } -- the failure fill is ${IS_ERROR_FILL}`);
+        continue;
+      }
+      const want = STATE_FILL.get(stateKey(r.states));
+      if (!want) out.push(`${r.sel}: no derived row token for state {${r.states.join(" ")}} -- press and other transient states reuse the hover value (spec §3.8)`);
+      else if (!want.includes(r.value)) out.push(`${r.sel} { --row-bg: ${r.value} } -- state {${r.states.join(" ")}} reads ${want.join(" or ")}`);
+    }
+    for (const subject of ROW_SUBJECTS) {
+      const seen = new Set(rows.filter((r) => r.subject === subject && !r.wrapped && !r.states.includes(".is-error")).map((r) => stateKey(r.states)));
+      for (const key of STATE_FILL.keys()) if (!seen.has(key)) out.push(`${subject}: no --row-bg rule for state {${key}}`);
+    }
+    return out;
+  }
+  function isErrorSpecificityOffenders(css) {
+    const rows = rowFillRules(css).filter((r) => !r.wrapped);
+    const out = [];
+    for (const s of rows) {
+      if (s.states.includes(".is-error")) continue;
+      const want = stateKey(new Set([...s.states, ".is-error", "[aria-current]"]));
+      const e = rows.find((r) => r.subject === s.subject && r.states.includes(".is-error") && stateKey(r.states) === want);
+      if (!e) { out.push(`${s.sel}: no is-error rule for {${want}}`); continue; }
+      const es = selectorSpecificity(e.sel), ss = selectorSpecificity(s.sel);
+      if (cmpSpecificity(es, ss) <= 0) out.push(`${e.sel} (${es.join(",")}) does not out-rank ${s.sel} (${ss.join(",")})`);
+    }
+    return out;
+  }
+  function currentMarkerOffenders(css) {
+    const out = [];
+    for (const r of handRules(css)) {
+      const decls = parseDeclarations(r.body);
+      for (const sel of r.selectors) {
+        if (!sel.includes("[aria-current]")) continue;
+        if (/::?(?:before|after)\b/.test(sel)) { out.push(`${sel}: a pseudo-element on a current-row selector (only the forced-colors bar may draw one)`); continue; }
+        for (const d of decls) {
+          const p = d.property;
+          const paints = p === "box-shadow" || /^border(?:-|$)/.test(p) || p === "background-image" ||
+            (p === "background" && /gradient\(|url\(/i.test(d.value)) ||
+            (/^outline(?:-|$)/.test(p) && !/:focus-visible/.test(sel.replace(/:not\([^()]*(?:\([^()]*\)[^()]*)*\)/g, "")));
+          if (paints) out.push(`${sel} { ${p}: ${d.value} }`);
+        }
+      }
+    }
+    return out;
+  }
+  // Discrimination on synthetic CSS: the shipped shape passes all three; each
+  // single regression trips exactly the gate meant for it.
+  const listCss = (row, subject) => [
+    `${subject} { --row-bg: var(--lib-bg); }`,
+    `${subject}:hover { --row-bg: var(--lib-row-bg-hover); }`,
+    `${row}[aria-current] ${subject} { --row-bg: var(--lib-row-current-bg); }`,
+    `${row}[aria-current] ${subject}:hover { --row-bg: var(--lib-row-current-bg-hover); }`,
+    `${row}.selected ${subject} { --row-bg: var(--lib-row-band-bg); box-shadow: inset 0 0 0 1px var(--lib-accent); }`,
+    `${row}.selected ${subject}:hover { --row-bg: var(--lib-row-band-bg-hover); }`,
+    `${row}.selected[aria-current] ${subject} { --row-bg: var(--lib-row-band-current-bg); }`,
+    `${row}.selected[aria-current] ${subject}:hover { --row-bg: var(--lib-row-band-current-bg-hover); }`,
+    `${row}.is-error ${subject}, ${row}.is-error[aria-current] ${subject}, ${row}.is-error[aria-current] ${subject}:hover, ${row}.is-error.selected[aria-current] ${subject}, ${row}.is-error.selected[aria-current] ${subject}:hover { --row-bg: ${IS_ERROR_FILL}; }`,
+    `@media (forced-colors: active) { ${row}[aria-current] ${subject}::before { content: ""; width: 3px; background: Highlight; } }`,
+  ].join("\n");
+  const good = listCss(".notes-hit", ".notes-hit-btn") + "\n" + listCss(".vocab-card", ".notes-card-top");
+  const counts = (css) => [currentMarkerOffenders(css).length, rowFillOffenders(css).length, isErrorSpecificityOffenders(css).length].join("/");
+  const bar = good + "\n.notes-hit[aria-current] .notes-hit-btn { box-shadow: inset 2px 0 0 var(--lib-accent); }";
+  const pseudo = good + "\n.vocab-card[aria-current] .notes-card-top::before { content: \"\"; }";
+  const handMix = good.replace("var(--lib-row-current-bg-hover)", "color-mix(in srgb, var(--lib-fg) 5%, var(--lib-row-current-bg))");
+  const press = good + "\n.notes-hit-btn:active { --row-bg: color-mix(in srgb, var(--lib-fg) 9%, var(--lib-bg)); }";
+  const tie = good.replace(".notes-hit.is-error.selected[aria-current] .notes-hit-btn:hover", ".is-error.selected[aria-current] .notes-hit-btn:hover");
+  check(counts(good) === "0/0/0" && counts(bar) === "1/0/0" && counts(pseudo) === "1/0/0" && counts(handMix) === "0/1/0" &&
+    counts(press).startsWith("0/1/") && counts(tie) === "0/0/1",
+    `ui-contract-tests.mjs: the S2 gates no longer discriminate (marker/fill/is-error offender counts) -- good ${counts(good)}, bar ${counts(bar)}, pseudo ${counts(pseudo)}, hand mix ${counts(handMix)}, press ${counts(press)}, tie ${counts(tie)}`);
+  // The shipped page.
+  const marker = currentMarkerOffenders(libraryCss), fill = rowFillOffenders(libraryCss), err = isErrorSpecificityOffenders(libraryCss);
+  check(marker.length === 0,
+    "library.css: a current-row rule paints a marker -- S2 is fill only (user ruling 2026-10-03; the forced-colors bar is the one exception and lives in that media block):\n    " + marker.join("\n    "));
+  check(fill.length === 0,
+    "library.css: a row-fill rule does not read its derived S2 token (or a state is missing) -- the composer owns every row fill:\n    " + fill.join("\n    "));
+  check(err.length === 0,
+    "library.css: the failed-row fill does not out-rank a row state it can meet (spec §3.10):\n    " + err.join("\n    "));
+  // Ink per state (category: every secondary text node of a row, and the
+  // row's delete X while it is not itself hovered).
+  const hand = parseStyleRules(stripGeneratedRegions(libraryCss)).filter((r) => r.context.length === 0);
+  const colorOf = (selector) => {
+    const r = hand.filter((x) => x.selectors.includes(selector)).at(-1);
+    return r ? parseDeclarations(r.body).filter((d) => d.property === "color").at(-1)?.value : undefined;
+  };
+  const INK = [
+    ...[".vocab-row-gloss", ".vocab-row-groups", ".notes-row-meta", ".row-del-x:not(:hover)"].map((t) => [`.vocab-card[aria-current]:not(.selected) ${t}`, "var(--lib-row-current-fg-muted)"]),
+    ...[".notes-hit-note", ".notes-hit-meta"].map((t) => [`.notes-hit[aria-current]:not(.selected) ${t}`, "var(--lib-row-current-fg-muted)"]),
+    ...[".vocab-row-gloss", ".vocab-row-groups", ".notes-row-meta", ".row-del-x:not(:hover)"].map((t) => [`.vocab-card.selected ${t}`, "var(--lib-row-selected-fg)"]),
+    ...[".notes-hit-note", ".notes-hit-meta"].map((t) => [`.notes-hit.selected ${t}`, "var(--lib-row-selected-fg)"]),
+    [".vocab-card[aria-current] .notes-card-head", "var(--lib-row-selected-fg)"],
+    [".notes-hit[aria-current] .notes-hit-btn", "var(--lib-row-selected-fg)"],
+  ];
+  const inkBad = INK.filter(([sel, want]) => colorOf(sel) !== want).map(([sel, want]) => `${sel} reads ${colorOf(sel)}, want ${want}`);
+  check(inkBad.length === 0,
+    "library.css: a row text / delete-X ink no longer follows its state (current -> --lib-row-current-fg-muted, selected -> --lib-row-selected-fg; spec §3.8 / §7.5):\n    " + inkBad.join("\n    "));
+  // .lib-toggle's unpressed hover reads the plain row hover fill (spec §3.2).
+  const stripNot = (s) => s.replace(/:not\([^()]*(?:\([^()]*\)[^()]*)*\)/g, "");
+  // Any non-forced context: T4 may have wrapped the hover in @media (hover: hover).
+  // Subject = the toggle itself (one compound, no combinator): the companion
+  // `.lib-toggle:hover:not(...) .lib-toggle-count` rule only re-inks the count.
+  const toggleHover = handRules(libraryCss).filter((r) => r.selectors.some((s) => s.startsWith(".lib-toggle") && s.includes(":hover") && !/[\s>+~]/.test(stripNot(s).trim()) && !stripNot(s).includes('[aria-pressed="true"]')));
+  check(toggleHover.length > 0 && toggleHover.every((r) => parseDeclarations(r.body).some((d) => /^background(?:-color)?$/.test(d.property) && d.value === "var(--lib-row-bg-hover)")),
+    "library.css: the unpressed .lib-toggle hover no longer paints --lib-row-bg-hover (spec §3.2) -- found " + toggleHover.map((r) => r.selectorText).join(" | "));
+  // Retired roles stay retired: no declaration defines or reads them anywhere
+  // in the file (hand region or generated).
+  const RETIRED = ["--lib-row-selected-bg", "--lib-band-mix", "--lib-band-mix-hover"];
+  const retiredHits = parseStyleRules(libraryCss).flatMap((r) => parseDeclarations(r.body)
+    .filter((d) => RETIRED.includes(d.property) || RETIRED.some((t) => new RegExp(`var\\(\\s*${t}\\s*[,)]`).test(d.value)))
+    .map((d) => `${r.selectorText} { ${d.property}: ${d.value} }`));
+  check(retiredHits.length === 0, "library.css: a retired S2 predecessor is back (row-selected-bg / band-mix):\n    " + retiredHits.join("\n    "));
 }
 
 // ---- D4 (batch3 T2): the notes/vocab source links read body fg at rest,
@@ -2356,8 +2516,8 @@ for (const [file, css, ns] of [["popup.css", popupCss, "pp"], ["options.css", op
     /border:\s*0/.test(toggleRest) && /height:\s*var\(--lib-control-h\)/.test(toggleRest) &&
     /border-radius:\s*var\(--lib-radius-md\)/.test(toggleRest) &&
     /background:\s*var\(--lib-btn-bg\)/.test(togglePressed) && /color:\s*var\(--lib-btn-fg\)/.test(togglePressed) &&
-    /font-weight:\s*bold/.test(togglePressed),
-    "library.css: .lib-toggle lost its spec §3.2 look -- rest is transparent + --lib-fg-muted with no frame, pressed is --lib-btn-bg + --lib-btn-fg + bold");
+    /font-weight:\s*bold/.test(togglePressed) && !/row-current-bg/.test(togglePressed),
+    "library.css: .lib-toggle lost its spec §3.2 look -- rest is transparent + --lib-fg-muted with no frame, pressed is --lib-btn-bg + --lib-btn-fg + bold, and it must not borrow the current-row fill");
   check(!/vocab-stat-chip/.test(libraryCss + libraryHtml + libraryVocabJs),
     "library: .vocab-stat-chip came back -- the status filter is the .lib-toggle primitive now (spec §3.2)");
   // An empty status span still carried its 8px margin and stole 16px off the

@@ -56,10 +56,17 @@ export const FIELD_ROLES = Object.freeze([
 // reject a pilot writing ui.popup/library.<mode>.<role> for any of them, and
 // what makes contrast-audit.mjs's default (:root) block FAIL, not SKIP, when
 // a DEFAULT_LIGHT literal goes missing.
+//
+// S2 (spec docs/superpowers/specs/2026-10-03-library-redesign-design.md §6.4):
+// library also derives its seven list-row fills (deriveRowStates, after the
+// finalizer) and the two text roles painted on them -- row-selected-fg was a
+// hand-carried role with a pilot-shaped seed before; it is an output now.
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
   popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg", ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"]),
   options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
-  library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
+  library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron",
+    "row-bg-hover", "row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover",
+    "row-band-current-bg", "row-band-current-bg-hover", "row-current-fg-muted", "row-selected-fg"]),
 });
 
 export function hexToRgb(h) {

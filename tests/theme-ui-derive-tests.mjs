@@ -36,7 +36,7 @@ import {
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
-import { composeLibraryThemeMap, LIB_BATCH_BAND_MIX } from "../docs/theme-surface/composers/library-chrome.mjs";
+import { composeLibraryThemeMap } from "../docs/theme-surface/composers/library-chrome.mjs";
 import { parseDeclarations, parseStyleRules } from "../docs/theme-surface/tools/css-syntax.mjs";
 // COMPONENT_PAIR_SPEC / DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS /
 // isOutputRoleForDefault (final fix wave, Ruling 29 F3): safe to import for
@@ -646,42 +646,109 @@ check(popupNoOnAccent["on-accent"] != null && ratio(popupNoOnAccent["on-accent"]
     `deriveRowStates over terminal (bg #0a0a0a, fg = accent = #33ff33) drifted from facts-s2 §3.1: ${hexOf(term).join(" ")}`);
 }
 
-// --- row-selected-fg vs the batch-selection bands (weak-text-on-fill batch,
-// D6 follow-up / Ruling 17): library.css's .selected (batch) state paints
-// .vocab-row-gloss/.notes-row-meta/.notes-hit-note/.notes-hit-meta with
-// --lib-row-selected-fg, whose fill there is NOT --lib-row-selected-bg but
-// an accent-over-bg color-mix at LIB_BATCH_BAND_MIX's two percentages
-// (rest/hover). This is a category assertion computed INDEPENDENTLY of
-// contrast-audit.mjs's own new rows -- same pilot x mode walk as the
-// btn-fg-muted category test above, but the band mix and contrast are
-// recomputed here from _ui-derive.mjs's own `mix`/`contrast`, not by
-// importing or re-running the audit tool. ---
+// --- S2 row states, CATEGORY assertions over the real composer pipeline
+// (spec docs/superpowers/specs/2026-10-03-library-redesign-design.md §6.4 /
+// §9.3). Computed INDEPENDENTLY of deriveRowStates (never called in this
+// block): per block, the emitted fills are checked against the floors the
+// ruling names, the rest~current > rest~selected hierarchy, and MINIMALITY --
+// each fill is the hex-rounded mix of its base toward fg / accent at some
+// integer percent at or above its starting point, and one percent less
+// already breaks a floor. Floors plus minimality pin every value to "the
+// lightest fill that clears the gate", so a hard-coded percentage that still
+// clears every floor goes red here. 15 blocks: the 14 composed theme maps +
+// the folded shipped default :root (hand :root + the generated DEFAULT_LIGHT
+// block). ---
 {
-  const pilotCache2 = new Map();
-  const loadPilot2 = (slug) => {
-    if (!pilotCache2.has(slug)) {
-      pilotCache2.set(slug, JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${slug}.tokens.json`, import.meta.url), "utf8")));
-    }
-    return pilotCache2.get(slug);
+  const FILLS = ["row-bg-hover", "row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover", "row-band-current-bg", "row-band-current-bg-hover"];
+  const HIGHLIGHT = FILLS.slice(1);
+  const ROLES = [...FILLS, "row-current-fg-muted", "row-selected-fg"];
+  check(ROLES.every((r) => UI_DERIVED_OUTPUT_ROLES.library.includes(r)),
+    `UI_DERIVED_OUTPUT_ROLES.library lacks an S2 role (${ROLES.filter((r) => !UI_DERIVED_OUTPUT_ROLES.library.includes(r)).join(", ")}) -- validate-contracts would let a pilot override it`);
+  const delta = (a, b) => { const x = hexToRgb(a), y = hexToRgb(b); return Math.max(Math.abs(x[0] - y[0]), Math.abs(x[1] - y[1]), Math.abs(x[2] - y[2])); };
+  const at = (base, toward, pct) => rgbToHex(mix(hexToRgb(base), hexToRgb(toward), pct / 100));
+  const pctOf = (base, toward, emitted, lo) => {
+    for (let p = lo; p <= 60; p++) if (at(base, toward, p) === emitted.toLowerCase()) return p;
+    return null;
   };
-  let bandAssertionCount = 0;
-  for (const entry of POPUP_THEME_MAP) {
-    const tk = loadPilot2(entry.pilot);
-    const map = composeLibraryThemeMap(tk, entry.mode, entry.useDarkMode).map;
-    const bgRgb = hexToRgb(map.bg);
-    const accentRgb = hexToRgb(map.accent);
-    const fgSelRgb = hexToRgb(map["row-selected-fg"]);
-    for (const t of LIB_BATCH_BAND_MIX) {
-      const bandRgb = mix(bgRgb, accentRgb, t).map(Math.round);
-      const c = contrast(fgSelRgb, bandRgb);
-      bandAssertionCount++;
-      check(c >= 4.5,
-        `library theme=${entry.id} pilot=${entry.pilot} mode=${entry.mode} row-selected-fg=${map["row-selected-fg"]} vs batch-band-${Math.round(t * 100)} (bg=${map.bg} accent=${map.accent}) = ${c.toFixed(3)}, need 4.5`);
+  const pilots = new Map();
+  const pilot = (slug) => {
+    if (!pilots.has(slug)) pilots.set(slug, JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${slug}.tokens.json`, import.meta.url), "utf8")));
+    return pilots.get(slug);
+  };
+  const blocks = POPUP_THEME_MAP.map((e) => [e.id, composeLibraryThemeMap(pilot(e.pilot), e.mode, e.useDarkMode).map]);
+  const root = {};
+  for (const rule of parseStyleRules(readFileSync(new URL("../library.css", import.meta.url), "utf8"))) {
+    if (rule.context.length !== 0 || !rule.selectors.includes(":root")) continue;
+    for (const d of parseDeclarations(rule.body)) if (d.property.startsWith("--lib-")) root[d.property.slice(6)] = d.value;
+  }
+  blocks.push([":root", root]);
+  const STEPS = new Set(["rest~hover", "current~current+hover", "selected~selected+hover", "selected+current~selected+current+hover"]);
+  let measured = 0;
+  for (const [id, m] of blocks) {
+    const label = `library ${id}`;
+    const missing = ["bg", "fg", "fg-muted", "accent", ...ROLES].filter((r) => !isHex(m[r] ?? ""));
+    if (missing.length) { check(false, `${label}: S2 roles missing or not #rgb / #rrggbb: ${missing.join(", ")}`); continue; }
+    measured++;
+    const bg = m.bg.toLowerCase(), fg = m.fg, ac = m.accent;
+    const [hov, cur, curH, band, bandH, bandCur, bandCurH] = FILLS.map((r) => m[r].toLowerCase());
+    // (1) floors. Inside each marker group every pair needs >= 24 of fill,
+    // except the four hover steps (>= 8); rest~selected is a fill-only pair
+    // by user ruling even though the two groups differ by the ring.
+    const groups = [
+      { rest: bg, hover: hov, current: cur, "current+hover": curH },
+      { selected: band, "selected+hover": bandH, "selected+current": bandCur, "selected+current+hover": bandCurH },
+    ];
+    for (const group of groups) {
+      const names = Object.keys(group);
+      for (let i = 0; i < names.length; i++) {
+        for (let j = i + 1; j < names.length; j++) {
+          const key = `${names[i]}~${names[j]}`, dd = delta(group[names[i]], group[names[j]]);
+          if (STEPS.has(key)) check(dd >= 8, `${label}: hover step ${key} is ${dd} < 8`);
+          else check(dd >= 24, `${label}: same-marker pair ${key} is ${dd} < 24 -- only the fill can tell them apart`);
+        }
+      }
+    }
+    check(delta(bg, band) >= 24, `${label}: rest~selected is ${delta(bg, band)} < 24 (a fill-only pair by user ruling)`);
+    // (2) hierarchy: the current row is the loudest resting fill.
+    check(delta(bg, cur) > delta(bg, band), `${label}: current (${delta(bg, cur)} from rest) must sit further from rest than the selection band (${delta(bg, band)})`);
+    // (3) minimality.
+    const lightest = (name, base, toward, emitted, lo, clears) => {
+      const p = pctOf(base, toward, emitted, lo);
+      if (p === null) { check(false, `${label}: ${name} ${emitted} is not ${base} mixed toward ${toward} at an integer percent >= ${lo}`); return null; }
+      if (p > lo) check(!clears(at(base, toward, p - 1)), `${label}: ${name} is not the lightest fill that clears its floor -- ${p - 1}% (${at(base, toward, p - 1)}) clears it too`);
+      return p;
+    };
+    lightest("row-bg-hover", bg, fg, hov, 5, (c) => delta(c, bg) >= 8);
+    lightest("row-current-bg", bg, fg, cur, 1, (c) => delta(c, bg) >= 25 && delta(c, hov) >= 25);
+    lightest("row-current-bg-hover", cur, fg, curH, 5, (c) => delta(c, cur) >= 8);
+    const bandPct = lightest("row-band-bg", bg, ac, band, 1, (c) => delta(c, bg) >= 25);
+    if (bandPct !== null) lightest("row-band-bg-hover", bg, ac, bandH, bandPct + 6, (c) => delta(c, band) >= 8);
+    lightest("row-band-current-bg", band, fg, bandCur, 1, (c) => delta(c, band) >= 25 && delta(c, bandH) >= 25);
+    lightest("row-band-current-bg-hover", bandCur, fg, bandCurH, 5, (c) => delta(c, bandCur) >= 8);
+    // (4) text on the fills, and the two text roles are exactly the
+    // multi-host derivation over this block's own fills.
+    for (const f of HIGHLIGHT) check(ratio(m["row-selected-fg"], m[f]) >= 4.5, `${label}: row-selected-fg ${m["row-selected-fg"]} vs ${f} ${m[f]} = ${ratio(m["row-selected-fg"], m[f]).toFixed(2)}, need 4.5`);
+    for (const f of ["row-current-bg", "row-current-bg-hover"]) check(ratio(m["row-current-fg-muted"], m[f]) >= 4.5, `${label}: row-current-fg-muted ${m["row-current-fg-muted"]} vs ${f} ${m[f]} = ${ratio(m["row-current-fg-muted"], m[f]).toFixed(2)}, need 4.5`);
+    check(ratio(m["fg-muted"], hov) >= 4.5, `${label}: fg-muted ${m["fg-muted"]} vs row-bg-hover ${hov} = ${ratio(m["fg-muted"], hov).toFixed(2)}, need 4.5 (secondary text on a hovered row)`);
+    check(m["row-selected-fg"].toLowerCase() === rgbToHex(fgToAAMulti(hexToRgb(fg), HIGHLIGHT.map((f) => hexToRgb(m[f])))),
+      `${label}: row-selected-fg ${m["row-selected-fg"]} is not fgToAAMulti(fg, the six highlight fills)`);
+    check(m["row-current-fg-muted"].toLowerCase() === rgbToHex(fgToAAMulti(hexToRgb(m["fg-muted"]), [hexToRgb(cur), hexToRgb(curH)])),
+      `${label}: row-current-fg-muted ${m["row-current-fg-muted"]} is not fgToAAMulti(fg-muted, [row-current-bg, row-current-bg-hover])`);
+  }
+  check(measured === POPUP_THEME_MAP.length + 1, `S2 category block measured ${measured} blocks, expected ${POPUP_THEME_MAP.length + 1} (14 themes + :root)`);
+  // (5) anchors the spec states in numbers (§6.4, facts-s2 §3.1 / §3.3 / §6.3).
+  const byId = Object.fromEntries(blocks);
+  const ANCHORS = {
+    ":root": { "row-bg-hover": "#ececee", "row-current-bg": "#d1d1d6", "row-current-bg-hover": "#c8c8ce", "row-band-bg": "#dce7f6", "row-band-bg-hover": "#cfdff5", "row-band-current-bg": "#c3ccdc", "row-band-current-bg-hover": "#bbc3d3", "row-current-fg-muted": "#505458", "row-selected-fg": "#1a1a2e" },
+    "flexoki-dark": { "row-bg-hover": "#252422", "row-current-bg": "#3e3d3a", "row-band-bg": "#222b33", "row-current-fg-muted": "#b9b7b4" },
+    "github-light": { "fg-muted": "#606871" },
+    "nord-night": { "row-selected-fg": "#f9fafb" },
+  };
+  for (const [id, want] of Object.entries(ANCHORS)) {
+    for (const [role, hex] of Object.entries(want)) {
+      check(String(byId[id]?.[role] ?? "").toLowerCase() === hex, `library ${id} --lib-${role} = ${byId[id]?.[role]}, spec anchor ${hex}`);
     }
   }
-  // Guard against the loop silently degenerating to zero iterations.
-  check(bandAssertionCount === POPUP_THEME_MAP.length * LIB_BATCH_BAND_MIX.length,
-    `expected ${POPUP_THEME_MAP.length * LIB_BATCH_BAND_MIX.length} (theme x band) assertions, ran ${bandAssertionCount}`);
 }
 
 // --- popup chip family: chip-bg tinted + ai-chip-fg (Task 4, taste-uplift-
