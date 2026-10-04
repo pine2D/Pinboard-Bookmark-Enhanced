@@ -493,9 +493,10 @@ function chipRules(ns) {
 // this guard landed).
 //
 // library's value boxes (stage 4, spec 2026-09-30 §3.3) take the COLOUR half
-// from FIELD_TARGETS.lib like popup's: the toolbar search fields, the native
-// selects and .xp-dict-lang (plus the per-theme chevron), the
-// .vocab-group-unit shell and its passengers, and the note editor. Their
+// from FIELD_TARGETS.lib like popup's: the toolbar search fields, the
+// lookup-language select and .xp-dict-lang (plus the per-theme chevron),
+// listbox.js's .listbox-btn, the .vocab-group-unit shell and its
+// passengers, and the note editor. Their
 // SHAPE half stays hand-written in library.css -- including the sm 20px
 // toolbar rung §6.4 records as a user decision (the .fg recipe's md 26px would
 // grow the sticky batch bar by 7px), the focus-ring glow with its z-index
@@ -770,17 +771,30 @@ export const FIELD_TARGETS = Object.freeze({
       passenger: null,
       chevron: null,
     }),
-    // #vocab-group-filter, #vocab-lookup-lang (and the two `hidden` state
-    // carriers, which never render). The fill moves off --lib-btn-bg
-    // (spec §6 item 8); focus on :focus.
+    // #vocab-lookup-lang, the last native select (spec §8.4; T7 turns it into
+    // a listbox and deletes this entry). The group filter left this entry for
+    // lib-listbox below (library redesign T6). Focus on :focus.
     Object.freeze({
       id: "lib-toolbar-select",
-      rest: ".vocab-filter-toolbar select, .vocab-filter-row select",
-      hover: ".vocab-filter-toolbar select:hover:where(:not(:focus, :disabled)), .vocab-filter-row select:hover:where(:not(:focus, :disabled))",
-      focus: ".vocab-filter-toolbar select:focus:not(:disabled), .vocab-filter-row select:focus:not(:disabled)",
+      rest: ".vocab-lookup-bar select",
+      hover: ".vocab-lookup-bar select:hover:where(:not(:focus, :disabled))",
+      focus: ".vocab-lookup-bar select:focus:not(:disabled)",
       placeholder: null,
       passenger: null,
-      chevron: ".vocab-filter-toolbar select, .vocab-filter-row select",
+      chevron: ".vocab-lookup-bar select",
+    }),
+    // listbox.js's value-box button (library redesign T6, spec §8.4): the
+    // group filter, and the lookup language from T7. Its ghost face
+    // (.listbox-trigger, the sort menu button) is a .btn and never an entry
+    // here. Focus on :focus-visible, the shipped listbox trigger (options').
+    Object.freeze({
+      id: "lib-listbox",
+      rest: ".listbox-btn",
+      hover: ".listbox-btn:hover:where(:not(:focus-visible, :disabled))",
+      focus: ".listbox-btn:focus-visible:not(:disabled)",
+      placeholder: null,
+      passenger: null,
+      chevron: null,
     }),
     // The word relookup's language select (library-vocab.js). Focus stays on
     // :focus-visible (spec §2.1). md-preview's own .xp-dict-lang lives in

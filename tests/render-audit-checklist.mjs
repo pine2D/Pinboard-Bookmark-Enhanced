@@ -1169,7 +1169,8 @@ export const CHECKS = [
   // #vocab-group-filter entry that stood here is gone: at the runner's 1280
   // viewport the group select sits in the closed "Filter" popover, so there is
   // nothing to compare against. #vocab-search keeps its own heightPx below;
-  // T6a brings the comparison back against #vocab-group-filter-btn. ----
+  // T6a brought the comparison back against #vocab-group-filter-btn (right
+  // after that heightPx row). ----
   // Library density rung (library redesign 2026-10-03 spec §6.2, plan T1):
   // the composer's lib branch puts .btn / .btn-sm on 32/28 and 28/24, and the
   // toolbar fields follow. Per-theme rows because the sweep's controlRung
@@ -1178,6 +1179,10 @@ export const CHECKS = [
   // field, one sm text button, one sm icon button in the batch bar.
   { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  // Library redesign T6: the group filter is a listbox button now; it and
+  // the search field stay on one md rung (the vocab row's two value boxes).
+  { surface: "library", page: "library.html", selector: "#vocab-search", state: "default",
+    expect: { heightEqWith: { selector: "#vocab-group-filter-btn", tolerancePx: 1 } } },
   { surface: "library", page: "library.html", selector: "#vocab-select-all", state: "default",
     expect: { heightPx: { comfortable: 28, compact: 24 } } },
   // Its twin in the batch row (T4d): the runner opens the batch row for this
@@ -1380,8 +1385,10 @@ export const CHECKS = [
   // it guards. ----
   // A <select> is an input-class field; this one used to stack a 2px
   // button-style outline on top of the field recipe's focus border, putting
-  // two focus languages side by side in one toolbar row.
-  { surface: "library", page: "library.html", selector: "#vocab-group-filter", state: "focusWithin",
+  // two focus languages side by side in one toolbar row. Since T6 the group
+  // filter renders as listbox.js's .listbox-btn, a value box on the same
+  // field recipe.
+  { surface: "library", page: "library.html", selector: "#vocab-group-filter-btn", state: "focusWithin",
     focusTarget: ":scope", expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   // The lookup field, added 2026-08-07 by independent review F1. When the row
   // moved into the detail pane it dropped the `notes-toolbar` class, and with
@@ -1410,7 +1417,7 @@ export const CHECKS = [
   // repainting a box with a non-field token -- the pre-stage-4 shapes: search
   // fields hovered to --lib-fg-muted, selects filled with --lib-btn-bg, the
   // note editor transparent. The two focusRecipe rows just above carry the
-  // focus assertions for #vocab-group-filter / #vocab-lookup-input. Detail-pane
+  // focus assertions for #vocab-group-filter-btn / #vocab-lookup-input. Detail-pane
   // selectors contain "-detail-" (needsDetailOpen); the batch-bar shell is in
   // BATCH_BAR_SELECTORS (needsBatchBarOpen); `.notes-toolbar #notes-filter`
   // starts with ".notes-" so the runner opens the notes view for it. The
@@ -1424,9 +1431,9 @@ export const CHECKS = [
     expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
   { surface: "library", page: "library.html", selector: "#vocab-search", state: "focusWithin", focusTarget: ":scope",
     expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
-  { surface: "library", page: "library.html", selector: "#vocab-group-filter", state: "default",
+  { surface: "library", page: "library.html", selector: "#vocab-group-filter-btn", state: "default",
     expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
-  { surface: "library", page: "library.html", selector: "#vocab-group-filter", state: "hover",
+  { surface: "library", page: "library.html", selector: "#vocab-group-filter-btn", state: "hover",
     expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
   { surface: "library", page: "library.html", selector: "#vocab-lookup-input", state: "default",
     expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
@@ -1936,6 +1943,22 @@ export const CHECKS = [
     expect: { borderTopWidthPx: { value: 1 }, borderRadiusPx: { radiusVar: "radius-lg" } } },
   { surface: "options", page: "options.html", selector: "#opt-ai-provider-list .listbox-opt", state: "open",
     open: { click: "#opt-ai-provider-btn" },
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  // ---- Library redesign T6 (spec §8.2, §9.2 last rows): the group filter is
+  // a float listbox -- its popover is position: fixed in the top layer,
+  // placed by pbpListboxPlace inside the viewport, so the detail pane's
+  // overflow can no longer clip it. Opened by the runner's real Space press
+  // (the `open` state); in the index's narrow form the button sits in the
+  // Filter popover, which the runner reveals first (libRevealFilterSet).
+  // Anchored to the select's own ids (`<id>-btn + .listbox-pop`,
+  // `#<id>-list .listbox-opt`), same reason as the #opt-ai-provider rows. ----
+  { surface: "library", page: "library.html", selector: "#vocab-group-filter-btn", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 } } },
+  { surface: "library", page: "library.html", selector: "#vocab-group-filter-btn + .listbox-pop", state: "open",
+    open: { click: "#vocab-group-filter-btn" },
+    expect: { borderTopWidthPx: { value: 1 }, borderRadiusPx: { radiusVar: "radius-lg" }, computedPosition: "fixed", inViewport: {} } },
+  { surface: "library", page: "library.html", selector: "#vocab-group-filter-list .listbox-opt", state: "open",
+    open: { click: "#vocab-group-filter-btn" },
     expect: { heightPx: { comfortable: 32, compact: 28 } } },
   // input[type=number] 96 (a handful of digits). #opt-ai-cache-duration lives
   // on the AI Behavior tab; scripts/ui-render-audit.mjs's aiBehaviorChecks

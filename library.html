@@ -47,7 +47,7 @@
         <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="libraryFilterNarrow">Filter</span></button>
         <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">
           <label class="sr-only" for="vocab-group-filter" data-i18n="vocabGroupFilterAria">Filter by group</label>
-          <select id="vocab-group-filter" data-i18n-aria="vocabGroupFilterAria" aria-label="Filter by group"><option value="" data-i18n="vocabAllGroups">All groups</option></select>
+          <select id="vocab-group-filter" data-listbox="float" data-i18n-aria="vocabGroupFilterAria" aria-label="Filter by group"><option value="" data-i18n="vocabAllGroups">All groups</option></select>
           <label class="sr-only" for="vocab-status-filter" data-i18n="vocabStatusFilterAria">Filter by status</label>
           <!-- Hidden state carrier, same pattern as #vocab-sort below: the three
                toggles write into it and dispatch `change`, so every handler and

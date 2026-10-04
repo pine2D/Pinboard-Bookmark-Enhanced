@@ -386,21 +386,34 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
 .notes-toolbar input[type="search"]::placeholder, .vocab-lookup-bar input[type="search"]::placeholder {
   color: var(--lib-field-placeholder);
 }
-.vocab-filter-toolbar select, .vocab-filter-row select {
+.vocab-lookup-bar select {
   background-color: var(--lib-field-bg);
   border-color: var(--lib-field-border);
   color: var(--lib-field-fg);
 }
-.vocab-filter-toolbar select:hover:where(:not(:focus, :disabled)), .vocab-filter-row select:hover:where(:not(:focus, :disabled)) {
+.vocab-lookup-bar select:hover:where(:not(:focus, :disabled)) {
   background-color: var(--lib-field-bg-hover);
   border-color: var(--lib-field-border-hover);
 }
-.vocab-filter-toolbar select:focus:not(:disabled), .vocab-filter-row select:focus:not(:disabled) {
+.vocab-lookup-bar select:focus:not(:disabled) {
   background-color: var(--lib-field-bg-focus);
   border-color: var(--lib-field-border-focus);
 }
-.vocab-filter-toolbar select, .vocab-filter-row select {
+.vocab-lookup-bar select {
   background-image: var(--lib-field-chevron);
+}
+.listbox-btn {
+  background-color: var(--lib-field-bg);
+  border-color: var(--lib-field-border);
+  color: var(--lib-field-fg);
+}
+.listbox-btn:hover:where(:not(:focus-visible, :disabled)) {
+  background-color: var(--lib-field-bg-hover);
+  border-color: var(--lib-field-border-hover);
+}
+.listbox-btn:focus-visible:not(:disabled) {
+  background-color: var(--lib-field-bg-focus);
+  border-color: var(--lib-field-border-focus);
 }
 .xp-dict-lang {
   background-color: var(--lib-field-bg);
@@ -473,10 +486,10 @@ input[type="checkbox"], input[type="radio"] {
    FIELD_TARGETS.lib (stage 4, spec 2026-09-30-ui-fields-stage4-design §3.3)
    paints fill, frame, typed text, placeholder, hover and focus from the
    --lib-field-* roles on the toolbar search fields (.notes-toolbar /
-   .vocab-lookup-bar input[type="search"]), the native selects
-   (.vocab-filter-toolbar + .vocab-filter-row select, .xp-dict-lang, which also
-   take --lib-field-chevron), the .vocab-group-unit shell and its passengers,
-   and the note editor (.vocab-note-input).
+   .vocab-lookup-bar input[type="search"]), the lookup-language select
+   (.vocab-lookup-bar select) and .xp-dict-lang, which also take
+   --lib-field-chevron, listbox.js's .listbox-btn, the .vocab-group-unit shell
+   and its passengers, and the note editor (.vocab-note-input).
    What stays hand-written below is the SHAPE half only: height, padding,
    radius, width, border width/style, the sm-rung toolbar geometry
    COMPONENTS.md §6.4 records as a user decision, the focus-ring box-shadow
@@ -574,14 +587,15 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
   margin: 0 0 var(--lib-sp-3);
 }
 /* `.vocab-lookup-bar` JOINS this selector list rather than getting its own
-   copy -- the same call `.vocab-filter-row select` made below when the group
-   select left the toolbar. When the lookup row moved into the detail pane
-   (2026-08-07) it dropped the `notes-toolbar` class, and every declaration
-   here is scoped to that class, so the field silently fell back to the UA's
-   own search box: 2px inset bevel, hard white fill, square corners, platform
-   focus ring. The row's two heightEqWith probes could not see it -- the row
-   stretches, so its select and button were pulled DOWN to the broken input's
-   height and measured equal to it. */
+   copy -- the same call the filter-row select made below when the group
+   select left the toolbar (until T6 turned it into a listbox). When the
+   lookup row moved into the detail pane (2026-08-07) it dropped the
+   `notes-toolbar` class, and every declaration here is scoped to that class,
+   so the field silently fell back to the UA's own search box: 2px inset
+   bevel, hard white fill, square corners, platform focus ring. The row's
+   two heightEqWith probes could not see it -- the row stretches, so its
+   select and button were pulled DOWN to the broken input's height and
+   measured equal to it. */
 .notes-toolbar input[type="search"],
 .vocab-lookup-bar input[type="search"] {
   width: 100%;
@@ -1775,12 +1789,10 @@ html.motion-ready .vocab-note-save {
    and the per-theme --lib-field-chevron -- come from the generated field
    recipe (FIELD_TARGETS.lib, stage 4 §3.3), so there is no themed twin and no
    literal chevron any more; only the shape and the chevron's position stay.
-   .vocab-filter-row joins the selector list rather than getting a copy: when
-   the header rebuild moved the group select out of the toolbar wrapper it
-   silently lost this whole recipe -- measured 20.5px tall with a native
-   chevron next to a 25.5px search box. */
-.vocab-filter-toolbar select,
-.vocab-filter-row select {
+   Since T6 only the lookup language select is still native (T7 enhances
+   it); the group filter is listbox.js's .listbox-btn, styled in the Listbox
+   block below. */
+.vocab-lookup-bar select {
   min-width: 0;
   /* width:auto, NOT 100%: under a flex toolbar 100% becomes the flex basis
      and parks every select on its own full-width row. Content-sized is the
@@ -1815,13 +1827,11 @@ html.motion-ready .vocab-note-save {
    the only fields on the surface wearing a hard rectangle, and put two
    different focus languages side by side in one row (#vocab-lookup-input,
    an <input> two elements away, has always drawn the shadow). Covers
-   #vocab-group-filter / #vocab-status-filter / #vocab-lookup-lang. */
-.vocab-filter-toolbar select:focus,
-.vocab-filter-row select:focus {
+   #vocab-lookup-lang. */
+.vocab-lookup-bar select:focus {
   outline: none;
 }
-.vocab-filter-toolbar select:focus-visible:not(:disabled),
-.vocab-filter-row select:focus-visible:not(:disabled) {
+.vocab-lookup-bar select:focus-visible:not(:disabled) {
   box-shadow: var(--lib-focus-ring);
 }
 /* #vocab-lookup-go is a bare icon .btn-sm (COMPONENTS.md §1.5's "dense
@@ -1829,7 +1839,7 @@ html.motion-ready .vocab-note-save {
    so the field and the language select come DOWN to the sm rung (28 / 24
    since the library density rung, plan T1) instead of the button going up
    to md. Same specificity as the base `.notes-toolbar input[type="search"]` /
-   `.vocab-filter-toolbar select` rules above, so this MUST stay after them.
+   `.vocab-lookup-bar select` rules above, so this MUST stay after them.
    No hit-pad on the button any more: the sm rung clears 24px on its own. */
 .vocab-lookup-bar input[type="search"],
 .vocab-lookup-bar select {
@@ -2049,16 +2059,6 @@ html.motion-ready .vocab-note-save {
   color: var(--lib-fg);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--lib-fg) 22%, transparent), 0 2px 4px color-mix(in srgb, var(--lib-fg) 12%, transparent);
   overflow: visible;
-}
-/* The group filter stays a native select until T6; md like its neighbours,
-   with a 120px floor so the wide form can never crush it to an arrow. */
-.vocab-filter-set > select {
-  flex: 1 1 auto;
-  min-width: 120px;
-  height: var(--lib-control-h);
-  padding-block: 0;
-  line-height: calc(var(--lib-control-h) - 2px);
-  font-size: var(--lib-text-body);
 }
 .vocab-status-toggles { display: inline-flex; flex: none; align-items: center; gap: var(--lib-sp-0); }
 /* Wide form (the row fits): the same nodes inline. All UA [popover] styles
@@ -2675,6 +2675,82 @@ body { display: flex; flex-direction: column; }
   #vocab-detail-pane .btn, #notes-detail-pane .btn { display: none; }
   #vocab-detail-pane, #notes-detail-pane { display: block; overflow: visible; margin: 0; padding: 0; }
 }
+/* ---- Listbox (library redesign T6, spec §8.2 / §8.4): listbox.js draws
+   select[data-listbox] as a button + a popover list. Geometry only: the
+   button's fill, frame and text come from FIELD_TARGETS.lib's lib-listbox
+   entry (@generated:ui-components); the popover is the confirm popover's
+   panel family (--lib-panel, --lib-border, the popover shadow) at the lg
+   radius. Library opens it in float mode -- a manual popover in the top
+   layer, placed fixed by pbpListboxPlace -- so the detail pane's overflow
+   never clips it; options keeps its absolute mode. The button's and the
+   panel's forced-colours frame joins the S2 block's ButtonText rule below;
+   their focus outline joins the value boxes' focus-edge block at the end. ---- */
+/* First frame: the native select stays invisible until listbox.js has swapped
+   it (listbox.js marks <html data-listbox-ready> in a finally, so one failed
+   enhance still releases the page and the native control is the fallback),
+   and it holds the button's height, so the swap moves nothing. */
+html:not([data-listbox-ready]) select[data-listbox] { visibility: hidden; }
+select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
+.listbox { position: relative; display: inline-block; min-width: 0; max-width: 100%; }
+.listbox-btn {
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--lib-sp-2);
+  width: 100%;
+  height: var(--lib-control-h);
+  box-sizing: border-box;
+  padding: 0 var(--lib-sp-2) 0 var(--lib-control-pad-x);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: var(--lib-radius-md);
+  font: inherit;
+  font-size: var(--lib-text-body);
+  line-height: 20px;
+  text-align: start;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .listbox-btn { transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, box-shadow var(--motion-state) ease; }
+}
+.listbox-btn:focus-visible:not(:disabled) { outline: none; box-shadow: var(--lib-focus-ring); }
+.listbox-value { grid-row: 1; grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.listbox-btn .btn-ic { grid-row: 1; grid-column: 2; width: 16px; height: 16px; color: var(--lib-field-placeholder); }
+.listbox-sizer { grid-row: 2; grid-column: 1; display: block; height: 0; overflow: hidden; visibility: hidden; white-space: nowrap; }
+/* UA reset for the float mode's popover (Chrome's [popover] defaults: inset 0
+   + margin auto would centre it, padding / border / CanvasText would restyle
+   it); pbpListboxPlace writes left / top / min-width / max-width inline. */
+.listbox-pop[popover] { position: fixed; inset: auto; margin: 0; padding: 0; width: max-content; height: auto; color: var(--lib-fg); }
+.listbox-pop {
+  overflow: hidden;
+  background: var(--lib-panel);
+  border: 1px solid var(--lib-border);
+  border-radius: var(--lib-radius-lg);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--lib-fg) 22%, transparent), 0 2px 4px color-mix(in srgb, var(--lib-fg) 12%, transparent);
+}
+.listbox-pop[hidden] { display: none; }
+/* --listbox-room is the free height pbpListboxPlace measured beside the
+   button (already minus its 4px gap and 8px viewport margin) for the
+   popover's whole border box (T0b contract). The list is content-box, so its
+   cap takes off everything else in that box: the popover's 1px frame top and
+   bottom (2px) and the list's own sp-1 padding top and bottom. The 330px
+   fallback is the 320px cap plus those 10px. */
+.listbox-list { max-height: min(320px, calc(var(--listbox-room, 330px) - 2px - 2 * var(--lib-sp-1))); overflow: auto; margin: 0; padding: var(--lib-sp-1); list-style: none; }
+.listbox-opt { display: block; height: var(--lib-control-h); line-height: var(--lib-control-h); padding: 0 var(--lib-sp-3); border-radius: var(--lib-radius-md); font-size: var(--lib-text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.listbox-opt[data-active] { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
+.listbox-opt[aria-selected="true"] { background: var(--lib-accent); color: var(--lib-on-accent); }
+.listbox-opt[aria-disabled="true"] { color: var(--lib-fg-hint); cursor: default; }
+/* The group filter takes the filter set's slack (spec §8.4) -- inline on a
+   wide index, inside the Filter popover on a narrow one; the 120px floor
+   keeps a long group name ellipsed instead of squeezed away. The carrier
+   holds the same slot before the swap. */
+.vocab-filter-set > select[data-listbox],
+.vocab-filter-set > .listbox { flex: 1 1 0; min-width: 120px; }
+@media (forced-colors: active) {
+  .listbox-opt[data-active] { outline: 1px solid Highlight; outline-offset: -1px; }
+  .listbox-opt[aria-selected="true"] { background: Highlight; color: HighlightText; }
+  .listbox-opt[aria-disabled="true"] { color: GrayText; }
+}
 /* ---- Forced colours: the S2 row states (spec 2026-10-03-library-redesign
    §7.3, §11 V26). Forced colours repaint every --row-bg fill to Canvas and
    drop box-shadow, so S2's whole signal -- current = neutral fill, selected =
@@ -2694,8 +2770,10 @@ body { display: flex; flex-direction: column; }
      this redesign adds.
    Value boxes and filled sm buttons lose their fill as well, so their 1px
    frame (already 1px wide at rest, so no geometry moves) takes ButtonText,
-   the options.css .listbox-btn precedent. The group unit's +/- steppers are
-   fused passengers (COMPONENTS.md §8 law 2): the shell draws their frame. */
+   the options.css .listbox-btn precedent -- library's own .listbox-btn
+   (T6) and its popover panel included, written as options.css writes them.
+   The group unit's +/- steppers are fused passengers (COMPONENTS.md §8
+   law 2): the shell draws their frame. */
 @media (forced-colors: active) {
   .notes-hit[aria-current] .notes-hit-btn { position: relative; }
   .vocab-card[aria-current] .notes-card-top::before,
@@ -2717,7 +2795,8 @@ body { display: flex; flex-direction: column; }
   .notes-toolbar input[type="search"],
   .vocab-lookup-bar input[type="search"],
   .vocab-group-unit,
-  .btn.btn-sm:not(.ghost, .vocab-group-step) { border-color: ButtonText; }
+  .btn.btn-sm:not(.ghost, .vocab-group-step),
+  .listbox-btn, .listbox-pop { border-color: ButtonText; }
 }
 /* ---- Forced colours: the value boxes' focus edge (stage 4 §6 item 10,
    ruling R5). Forced colours drop the --lib-focus-ring glow and remap the
@@ -2730,8 +2809,8 @@ body { display: flex; flex-direction: column; }
    that no outline-suppressing focus rule out-ranks it). The group-unit shell
    keeps its :has() trigger; its text passenger draws nothing (§8 law 2). */
 @media (forced-colors: active) {
-  .vocab-filter-toolbar select:focus-visible:not(:disabled),
-  .vocab-filter-row select:focus-visible:not(:disabled),
+  .vocab-lookup-bar select:focus-visible:not(:disabled),
+  .listbox-btn:focus-visible:not(:disabled),
   .xp-dict-lang:focus-visible:not(:disabled),
   .vocab-note-input:focus-visible:not(:disabled),
   .vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) {

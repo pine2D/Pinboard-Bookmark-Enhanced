@@ -2150,11 +2150,20 @@ check(OPTIONS_VALUE_BOX_IDS.ids.has("dict-anki-deck") && OPTIONS_VALUE_BOX_IDS.i
 // .vocab-group-unit is its unit's value box (COMPONENTS.md §8 law 1); its
 // children are passengers.
 const LIBRARY_VALUE_BOX = (() => {
-  const ids = new Set();
+  const ids = new Set(), ghostTriggers = new Set();
   for (const m of libraryHtml.matchAll(/<(input|textarea|select)\b([^>]*)>/gi)) {
     const tag = m[1].toLowerCase(), attrs = m[2];
     const id = (/\bid="([^"]+)"/.exec(attrs) || [])[1];
-    if (!id || /\shidden(?=[\s/]|$)/.test(attrs)) continue;
+    if (!id) continue;
+    // listbox.js (library redesign T6, spec §8.4) renders a select[data-listbox]
+    // as the button it builds, `<id>-btn`, whether or not the carrier itself is
+    // `hidden`. That button is a value box unless the select wears the ghost
+    // face (the sort menu button: a .btn, never a value box), which is
+    // harvested apart so the gates below can say so.
+    if (tag === "select" && /\sdata-listbox="/.test(attrs)) {
+      (/\sdata-listbox-face="ghost"/.test(attrs) ? ghostTriggers : ids).add(`${id}-btn`);
+    }
+    if (/\shidden(?=[\s/]|$)/.test(attrs)) continue;
     if (tag === "input" && !TEXT_ENTRY_TYPES.has(((/\btype="([^"]+)"/.exec(attrs) || [])[1] || "text").toLowerCase())) continue;
     ids.add(id);
   }
@@ -2171,14 +2180,18 @@ const LIBRARY_VALUE_BOX = (() => {
   const shells = new Set(["vocab-group-unit"]);
   const classOf = (b) => (/\.([\w-]+)$/.exec(b) || [])[1];
   return {
-    ids, built: built.sort(), shells,
+    ids, ghostTriggers, built: built.sort(), shells,
     classes: new Set([...shells, ...built.map(classOf).filter(Boolean)]),
     selectClasses: new Set(built.filter((b) => /:select\./.test(b)).map(classOf)),
   };
 })();
-check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["notes-filter", "vocab-group-filter", "vocab-group-input", "vocab-lookup-input", "vocab-lookup-lang", "vocab-search"]),
+check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["notes-filter", "vocab-group-filter", "vocab-group-filter-btn", "vocab-group-input", "vocab-lookup-input", "vocab-lookup-lang", "vocab-search"]),
   `ui-contract-tests.mjs: the library.html value-box id harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort())}. ` +
   "A new value box must join composers/ui-components.mjs FIELD_TARGETS.lib and scripts/ui-render-audit.mjs's VALUE_BOX_LEGS.library in the same commit; then update this list.");
+check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.stringify([]) &&
+  ![...LIBRARY_VALUE_BOX.ghostTriggers].some((id) => LIBRARY_VALUE_BOX.ids.has(id)),
+  `ui-contract-tests.mjs: the library ghost-trigger harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort())}. ` +
+  "A select with data-listbox-face=\"ghost\" renders a .btn trigger, not a value box: it must never also land in LIBRARY_VALUE_BOX.ids.");
 check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-vocab.js:input[type="text"]', "library-vocab.js:select.xp-dict-lang", "library-vocab.js:textarea.vocab-note-input"]) &&
   /groupUnit\.className = "vocab-group-unit";[\s\S]{0,400}groupUnit\.appendChild\(groupInput\);/.test(libraryVocabJs),
   `ui-contract-tests.mjs: the runtime library value-box harvest drifted -- got ${JSON.stringify(LIBRARY_VALUE_BOX.built)} ` +
@@ -8592,18 +8605,56 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     if (n.parent?.tag === "#root") n.parent = detailNode;
     n.unplaced = true;
   }
-  const LIB_NODES = [...LIB_TREE, ...runtimeNodes];
+  // listbox.js (library redesign T6, spec §8.4): each value-box
+  // select[data-listbox] renders as div.listbox > button.listbox-btn#<id>-btn
+  // right after it. The button is the value box the user sees, so it joins
+  // the tree beside its carrier (sibling order unknown: `unplaced`, as above);
+  // the carrier stops being a colour entry -- it never paints once enhanced,
+  // and the first-frame gate keeps it invisible until then. A ghost face
+  // (data-listbox-face="ghost", the sort menu button) is a .btn: not grafted.
+  const listboxGraftNodes = [];
+  for (const carrier of LIB_TREE.filter((n) => n.tag === "select" && Object.hasOwn(n.attrs, "data-listbox") && n.attrs["data-listbox-face"] !== "ghost")) {
+    for (const n of htmlNodes(`<div class="listbox"><button type="button" class="listbox-btn" id="${carrier.attrs.id}-btn"></button></div>`)) {
+      if (n.parent?.tag === "#root") n.parent = carrier.parent;
+      n.unplaced = true;
+      listboxGraftNodes.push(n);
+    }
+  }
+  const listboxBtnNodes = listboxGraftNodes.filter((n) => n.tag === "button");
+  const LIB_NODES = [...LIB_TREE, ...runtimeNodes, ...listboxGraftNodes];
   check(!!detailNode && runtimeNodes.length === 4,
     `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes under #vocab-detail (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 4)`);
   const libCov = valueBoxCoverage(LIB_NODES, LIB);
   check(libCov.entries === 6 && libCov.uncovered.length === 0,
     `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 6); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
   check(libCov.dead.length === 0, `ui-components.mjs: FIELD_TARGETS.lib entries whose rest selector reaches nothing in library.html + the runtime boxes: ${libCov.dead.map((t) => t.id).join(", ")}`);
-  const libSelects = LIB_NODES.filter((n) => n.tag === "select" && !Object.hasOwn(n.attrs, "hidden"));
+  const libSelects = LIB_NODES.filter((n) => n.tag === "select" && !Object.hasOwn(n.attrs, "hidden") && !Object.hasOwn(n.attrs, "data-listbox"));
   const selectMiss = libSelects.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
-  check(libSelects.length === 3 && selectMiss.length === 0,
-    `library.html + runtime boxes / FIELD_TARGETS.lib: every rendered <select> must be the rest box of exactly one entry -- ${libSelects.length} select(s) (expected 3), unpainted or doubly painted: ${selectMiss.map((n) => n.attrs.id ? `#${n.attrs.id}` : `select.${n.classes.join(".")}`).join(", ") || "none"}`);
-  const LIB_BOX_NODES = new Set([...libCov.boxes, ...libSelects]);
+  check(libSelects.length === 2 && selectMiss.length === 0,
+    `library.html + runtime boxes / FIELD_TARGETS.lib: every rendered <select> must be the rest box of exactly one entry -- ${libSelects.length} select(s) (expected 2: #vocab-lookup-lang until T7, .xp-dict-lang), unpainted or doubly painted: ${selectMiss.map((n) => n.attrs.id ? `#${n.attrs.id}` : `select.${n.classes.join(".")}`).join(", ") || "none"}`);
+  const listboxMiss = listboxBtnNodes.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
+  check(listboxBtnNodes.length === 1 && listboxMiss.length === 0,
+    `library.html + listbox.js / FIELD_TARGETS.lib: every listbox button must be the rest box of exactly one entry -- ${listboxBtnNodes.length} button(s) ` +
+    `(expected 1: #vocab-group-filter-btn; T7 adds #vocab-lookup-lang-btn), unpainted or doubly painted: ${listboxMiss.map((n) => `#${n.attrs.id}`).join(", ") || "none"}`);
+  // The ghost trigger is a .btn: no registry entry may name it, in any role,
+  // on any surface (spec §8.3) -- judged on each selector's subject compound.
+  const triggerInRegistry = Object.entries(FIELD_TARGETS).flatMap(([ns, entries]) => entries.flatMap((t) =>
+    ["rest", "hover", "focus", "placeholder", "passenger", "chevron"].flatMap((k) => selectorListOf(t[k]))
+      .filter((sel) => subjects(sel).some((c) => c.classes.includes("listbox-trigger")))
+      .map((sel) => `${ns}:${t.id}: ${sel}`)));
+  check(triggerInRegistry.length === 0,
+    `ui-components.mjs FIELD_TARGETS names the ghost listbox trigger (.listbox-trigger is a .btn, not a value box): ${triggerInRegistry.join(" | ")}`);
+  // The two entries T6 reshaped, pinned by value: the button family, and the
+  // native-select family narrowed to the lookup language (T7 deletes it).
+  const lbEntry = LIB.find((t) => t.id === "lib-listbox");
+  const tsEntry = LIB.find((t) => t.id === "lib-toolbar-select");
+  check(!!lbEntry && lbEntry.rest === ".listbox-btn" && lbEntry.hover === ".listbox-btn:hover:where(:not(:focus-visible, :disabled))" &&
+    lbEntry.focus === ".listbox-btn:focus-visible:not(:disabled)" && lbEntry.placeholder === null && lbEntry.passenger === null && lbEntry.chevron === null,
+    `ui-components.mjs FIELD_TARGETS.lib: lib-listbox must paint .listbox-btn on :focus-visible with no placeholder / passenger / chevron -- got ${JSON.stringify(lbEntry)}`);
+  check(!!tsEntry && tsEntry.rest === ".vocab-lookup-bar select" && tsEntry.chevron === tsEntry.rest &&
+    tsEntry.hover === ".vocab-lookup-bar select:hover:where(:not(:focus, :disabled))" && tsEntry.focus === ".vocab-lookup-bar select:focus:not(:disabled)",
+    `ui-components.mjs FIELD_TARGETS.lib: lib-toolbar-select must cover only the lookup language select until T7 -- got ${JSON.stringify(tsEntry)}`);
+  const LIB_BOX_NODES = new Set([...libCov.boxes, ...libSelects, ...listboxBtnNodes]);
   const libReaches = (sel, node) => selectorReaches(sel, node, LIB_SCOPE);
   // Scan mode vs strict mode on library (final fix wave; the popup block
   // above holds the model's full case list): [selector, node, scan, strict].
@@ -8854,7 +8905,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     [".xp-dict-lang:focus-visible:not(:disabled) { outline: none; }", true],
     [".vocab-note-input:focus:not(:disabled):not(.a):not(.b) { outline-style: none; }", true],
     ["@media (forced-colors: active) { .vocab-group-unit:has(> input[type=\"text\"]:focus):not(:disabled):not(.x) { outline: 0; } }", true],
-    ["html[data-theme] .vocab-filter-row select:focus-visible:not(:disabled) { outline: none; }", true],
+    // (T6: the group filter's box is listbox.js's .listbox-btn now; this case
+    // used to name the native `.vocab-filter-row select`)
+    ["html[data-theme] .listbox-btn:focus-visible:not(:disabled) { outline: none; }", true],
     // Task 7 fix round 1: a hover rule applies while the pointer rests on a
     // keyboard-focused box, a stateless one always
     [".vocab-note-input:hover { outline: none !important; }", true],
@@ -9100,6 +9153,36 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     check(got === "var(--lib-sp-2)",
       `library.css: ${region} must carry scroll-padding-block: var(--lib-sp-2) (spec §3.9) -- a keyboard row move stops 8px short of the region's edge; got ${got ?? "nothing"}`);
   }
+}
+
+// ---- Library redesign T6a (spec §8.2 / §8.4): the group filter is a
+// listbox.js float listbox. The select stays the value carrier (every handler
+// and test still writes .value and listens for change); the button listbox.js
+// builds is what renders, and a first-frame gate keeps the native control from
+// flashing before that button exists.
+{
+  const groupTag = (/<select\b[^>]*\bid="vocab-group-filter"[^>]*>/.exec(libraryHtml) || [""])[0];
+  check(/\sdata-listbox="float"/.test(groupTag) && !/\sdata-listbox-face=/.test(groupTag) &&
+    /<label class="sr-only" for="vocab-group-filter"/.test(libraryHtml),
+    "library.html: #vocab-group-filter must be a float listbox (data-listbox=\"float\", the value-box face) named by its sr-only label[for]");
+  check(/filter\.value = groups\.includes\(previous\) \? previous : "";\s*\n(?:\s*\/\/[^\n]*\n)*\s*window\.pbpListboxSync\?\.\(filter\);/.test(libraryVocabJs),
+    "library-vocab.js: _pbpVocabRefreshGroupOptions must re-sync the group listbox right after it rewrites the options and the value -- a refresh that drops the chosen group would otherwise leave the button naming it");
+  const hand = stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, "");
+  check(declarationValueMap(hand, "html:not([data-listbox-ready]) select[data-listbox]").get("visibility") === "hidden" &&
+    declarationValueMap(hand, "select[data-listbox]").get("height") === "var(--lib-control-h)" &&
+    declarationValueMap(hand, ".listbox-btn").get("height") === "var(--lib-control-h)",
+    "library.css: the listbox first-frame gate is gone, or the native select and its button no longer share one height (spec §8.4: invisible until listbox.js marks <html data-listbox-ready>, then swapped without a shift)");
+  const pop = declarationValueMap(hand, ".listbox-pop[popover]");
+  check(pop.get("position") === "fixed" && pop.get("inset") === "auto" && pop.get("margin") === "0" && pop.get("color") === "var(--lib-fg)",
+    "library.css: .listbox-pop[popover] lost its UA reset (fixed, inset / margin reset) or its --lib-fg ink -- the UA's CanvasText would repaint the option text");
+  const forcedEdge = parseStyleRules(hand).filter(inForcedColors).some((r) => r.selectors.includes(".listbox-btn") && r.selectors.includes(".listbox-pop") &&
+    parseDeclarations(r.body).some((d) => d.property === "border-color" && d.value.trim() === "ButtonText"));
+  check(forcedEdge,
+    "library.css: forced colours drop the listbox button's and popover's edge -- `.listbox-btn, .listbox-pop { border-color: ButtonText; }` belongs inside @media (forced-colors: active) (spec §7.3)");
+  // A deleted selector stays deleted (comments stripped above, same reasoning
+  // as the .lib-tab / .vocab-sort-seg pair further up).
+  check(!/\.vocab-filter-row select\b/.test(hand),
+    "library.css: a hand rule still targets `.vocab-filter-row select` -- the group filter renders as .listbox-btn since T6, and the lookup language is `.vocab-lookup-bar select` until T7");
 }
 
 if (fail.length) {

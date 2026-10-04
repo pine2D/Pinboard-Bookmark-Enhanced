@@ -34,10 +34,11 @@ library 整页一个底色，分区只靠字阶、留白、栏位对齐、悬挂
 
 ## 值盒子（阶段 4 起）
 
-popup / library 的值盒子（文本、搜索、密钥输入框，textarea，原生 select，以及 `.tags-input-wrap`、`.vocab-group-unit` 这类融合壳）只有一种字段语言：只有填充，四边同一框色，**不画底边**，四角同一个 `--*-radius-md`；聚焦 = 四边 `field-border-focus` + 手写光晕，另在 `@media (forced-colors: active)` 里补 `outline: 1px solid Highlight`（非负 offset）。
+popup / library 的值盒子（文本、搜索、密钥输入框，textarea，`listbox.js` 画出的列表框按钮 `.listbox-btn`（library 在 T7 前还剩查词语言一个原生 select），以及 `.tags-input-wrap`、`.vocab-group-unit` 这类融合壳）只有一种字段语言：只有填充，四边同一框色，**不画底边**，四角同一个 `--*-radius-md`；聚焦 = 四边 `field-border-focus` + 手写光晕，另在 `@media (forced-colors: active)` 里补 `outline: 1px solid Highlight`（非负 offset）。
 
 - **颜色只来自生成的注册表**：`docs/theme-surface/composers/ui-components.mjs` 的 `FIELD_TARGETS.pp` / `FIELD_TARGETS.lib`（options 是 `.fg` 配方）。手写区只写几何（高度、内距、宽度、`border-width` + `border-style`、圆角、光晕、`outline: none`），不写任何颜色，也不写 `border` 简写（它把框色重置成 currentColor）。
 - **新增值盒子要在同一提交里登记进 `FIELD_TARGETS`** 并跑 `sync-all`。library 在运行时创建的盒子，必须写成 `tests/ui-contract-tests.mjs` 收割得到的形式：在被收割的脚本（`library-vocab.js` / `library-notes.js` / `library.js`）里写 `const X = document.createElement("input" | "select" | "textarea")`；换写法或换文件就先扩展收割，否则这个盒子不在门内。
+- **列表框**：`select[data-listbox]` 由 `listbox.js` 换成 `#<id>-btn` 的 `.listbox-btn`（值盒子，library 的颜色来自 `FIELD_TARGETS.lib` 的 `lib-listbox`）；ui-contract 按 `${id}-btn` 收割它，并把按钮嫁接进覆盖树（原生 select 不再算颜色条目）。`data-listbox-face="ghost"` 的触发器（`.listbox-trigger btn ghost`，library 的排序菜单按钮）是按钮不是值盒子，不进 `FIELD_TARGETS`，收割进单独的 ghost 集合。library 用浮层模式（`data-listbox="float"`：top layer 里的 manual popover，`pbpListboxPlace` 定位）；它的开启方式登记在 render-audit 的 `open` 状态行与 sweep 的 `vocab-listbox-open` 上下文，位于「筛选」弹层里的元素由 runner 的 `libRevealFilterSet` 先揭示。
 - ui-contract 的覆盖、颜色、形状、`url()` 与强制色扫描会拦下漏登记、手写颜色、底边与分段圆角。
 
 ## 门在哪里响

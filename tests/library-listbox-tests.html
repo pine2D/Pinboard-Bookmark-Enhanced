@@ -439,6 +439,204 @@ async function primitiveCases() {
 // T6b, T7a, T7b and T7c add theirs below them. Keep this area above the main
 // flow, so every constant is initialised before the flow can reach it.
 
+// ---- Library redesign T6: the library page itself (spec §9.5). One
+// library.html in an iframe -- the shipped markup, library.css, listbox.js
+// and the library scripts -- so these cases see the DOM, cascade and listeners
+// a user does. An http test page has no chrome.*: the stub below answers the
+// extension calls the scripts make while booting (one signed-in token so the
+// list header renders, empty storage otherwise, no host permissions, English
+// messages read from _locales/en), and the first-frame gate is released up
+// front because options-theme-early.js -- which would do that after a storage
+// read -- is swapped out for the stub. history.replaceState (the tab hash)
+// is a no-op here: an about:srcdoc document may not take an http URL.
+const LIB_FRAME_TOKEN = "listboxtest:0123456789ABCDEF0123";
+async function loadLibraryFrame({ width = 1280, height = 800 } = {}) {
+  const [html, en] = await Promise.all([
+    fetch("../library.html").then((r) => r.text()),
+    fetch("../_locales/en/messages.json").then((r) => r.json()),
+  ]);
+  const stub = `<base href="../"><script>
+window.__bootErrors = [];
+window.addEventListener("error", (e) => { window.__bootErrors.push(String(e.message)); });
+window.addEventListener("unhandledrejection", (e) => { window.__bootErrors.push(String((e.reason && e.reason.message) || e.reason)); });
+window.__pbpEn = ${JSON.stringify(en).replace(/</g, "\\u003c")};
+(() => {
+  const area = {
+    get(keys, cb) { const out = { pinboardToken: ${JSON.stringify(LIB_FRAME_TOKEN)} }; if (typeof cb === "function") { cb(out); return undefined; } return Promise.resolve(out); },
+    set(items, cb) { if (typeof cb === "function") { cb(); return undefined; } return Promise.resolve(); },
+    remove(keys, cb) { if (typeof cb === "function") { cb(); return undefined; } return Promise.resolve(); },
+  };
+  const getMessage = (key, subs) => {
+    const m = window.__pbpEn[key];
+    if (!m) return "";
+    const list = subs == null ? [] : [].concat(subs).map(String);
+    return m.message.replace(/\\$([A-Za-z0-9_@]+)\\$/g, (all, name) => {
+      const ph = m.placeholders && m.placeholders[name.toLowerCase()];
+      return ph ? String(ph.content).replace(/\\$(\\d)/g, (_, d) => list[Number(d) - 1] ?? "") : all;
+    });
+  };
+  window.chrome = {
+    runtime: { id: "library-listbox-tests", lastError: undefined, getURL: (p) => new URL(p, document.baseURI).href, getManifest: () => ({ version: "0.0.0" }), sendMessage: () => Promise.resolve(undefined), onMessage: { addListener() {} } },
+    storage: { local: area, sync: area, session: area, onChanged: { addListener() {} } },
+    permissions: { contains: () => Promise.resolve(false), request: () => Promise.resolve(false) },
+    i18n: { getMessage, getUILanguage: () => "en" },
+  };
+})();
+history.replaceState = () => {};
+document.documentElement.dataset.optionsReady = "1";
+</` + `script>`;
+  const frame = document.createElement("iframe");
+  frame.style.cssText = `width:${width}px;height:${height}px;border:0`;
+  // `<\/script>`: a literal close tag would end this page's own script.
+  frame.srcdoc = html.replace('<script src="options-theme-early.js"><\/script>', stub);
+  document.body.appendChild(frame);
+  await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+  const win = frame.contentWindow;
+  await libFrames(win);
+  return { frame, win, doc: frame.contentDocument };
+}
+function libFrames(win, n = 2) {
+  return new Promise((resolve) => { const step = (k) => (k ? win.requestAnimationFrame(() => step(k - 1)) : resolve()); step(n); });
+}
+async function libWaitFor(win, predicate, ms = 5000) {
+  const start = performance.now();
+  while (performance.now() - start < ms) {
+    try { if (predicate()) return true; } catch (_) { /* the page has not defined it yet */ }
+    await new Promise((resolve) => win.setTimeout(resolve, 25));
+  }
+  return false;
+}
+
+async function libraryPageGroupCases() {
+  const { frame, win, doc } = await loadLibraryFrame({ width: 1280, height: 800 });
+  try {
+    const booted = await libWaitFor(win, () => win.eval("_vocabCurrentOwner") === "acct_listboxtest");
+    check("T6 library.html boots in the harness signed in, without a script error",
+      booted && win.__bootErrors.length === 0, `booted=${booted} errors=${win.__bootErrors.slice(0, 3).join(" | ")}`);
+    const filter = doc.getElementById("vocab-group-filter");
+    const btn = doc.getElementById("vocab-group-filter-btn");
+    const pop = btn && btn.nextElementSibling;
+    check("T6 #vocab-group-filter is enhanced into a float listbox (value-box button, hidden carrier, manual popover)",
+      !!btn && btn.classList.contains("listbox-btn") && filter.hidden && !!pop && pop.classList.contains("listbox-pop") && pop.getAttribute("popover") === "manual",
+      `btn=${btn && btn.className} carrierHidden=${filter.hidden} popover=${pop && pop.getAttribute("popover")}`);
+    if (!btn || !pop) return;
+    const value = () => btn.querySelector(".listbox-value").textContent;
+    const allGroups = win.eval('t("vocabAllGroups")');
+    win.eval(`_vocabRows = [
+      { id: "w1", term: "alpha", groups: ["Reading"], contexts: [], createdAt: 2, updatedAt: 2 },
+      { id: "w2", term: "beta", groups: ["Close reading"], contexts: [], createdAt: 1, updatedAt: 1 },
+    ]; _pbpVocabRefreshGroupOptions(false);`);
+    check("T6 a group refresh rebuilds the listbox: the button names All groups and the list holds every group",
+      value() === allGroups && doc.querySelectorAll("#vocab-group-filter-list .listbox-opt").length === 3,
+      `value=${value()} options=${doc.querySelectorAll("#vocab-group-filter-list .listbox-opt").length}`);
+    filter.value = "Reading";
+    win.eval("_pbpVocabRefreshGroupOptions(true)");
+    check("T6 a preserving refresh keeps the chosen group on the button", value() === "Reading", `value=${value()}`);
+    win.eval('_vocabRows = _vocabRows.filter((row) => row.id !== "w1"); _pbpVocabRefreshGroupOptions(true);');
+    check("T6 a refresh that drops the chosen group falls back, and the button follows (no stale name)",
+      filter.value === "" && value() === allGroups, `carrier=${JSON.stringify(filter.value)} value=${value()}`);
+
+    // First frame (spec §8.4): a select[data-listbox] stays invisible until
+    // listbox.js marks the page ready, and holds one control height so the
+    // swap moves nothing. Probed on a fresh select outside the popover, so
+    // the computed box is real.
+    const probe = doc.createElement("select");
+    probe.setAttribute("data-listbox", "float");
+    probe.innerHTML = "<option>probe</option>";
+    doc.body.appendChild(probe);
+    doc.documentElement.removeAttribute("data-listbox-ready");
+    const hiddenBefore = win.getComputedStyle(probe).visibility === "hidden";
+    doc.documentElement.setAttribute("data-listbox-ready", "");
+    const controlH = parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue("--lib-control-h"));
+    const shownAfter = win.getComputedStyle(probe).visibility === "visible";
+    const probeH = probe.getBoundingClientRect().height;
+    probe.remove();
+    check("T6 before data-listbox-ready a select[data-listbox] is invisible", hiddenBefore);
+    check("T6 after data-listbox-ready it shows, one control tall (the swap does not move anything)",
+      shownAfter && Math.abs(probeH - controlH) <= 0.5, `visible=${shownAfter} height=${probeH} control=${controlH}`);
+
+    // Header fit (user ruling 10-04): the form follows the filter row's own
+    // content, measured on a copy with the listbox at its 120px floor. A
+    // 1280 frame gives a 360px index (clamp(360px, 20vw, 520px)), and with no
+    // words there are no status counts: the row fits, so the group listbox
+    // sits inline -- rendered, at least its floor wide, inside the row.
+    const pane = doc.getElementById("vocab-list-pane");
+    const row = pane.querySelector(".vocab-filter-row");
+    const set = doc.getElementById("vocab-filter-set");
+    const narrowBtn = doc.getElementById("vocab-filter-narrow");
+    const need = win.pbpLibVocabFilterNeed(row);
+    const indexRoom = win.pbpLibContentWidth(pane);
+    const wb = btn.getBoundingClientRect();
+    const rr = row.getBoundingClientRect();
+    check("T6 header fit: the 360px index with no counts takes the wide form (need <= room), the group listbox button inline, one control tall, inside the row",
+      pane.dataset.headerFit === "wide" && need <= indexRoom + 0.5 && win.getComputedStyle(narrowBtn).display === "none" && !set.matches(":popover-open") &&
+      wb.width >= 120 - 0.5 && Math.abs(wb.height - controlH) <= 0.5 && wb.left >= rr.left - 0.5 && wb.right <= rr.right + 0.5,
+      `fit=${pane.dataset.headerFit} need=${need} room=${indexRoom} narrowBtn=${win.getComputedStyle(narrowBtn).display} btn=${wb.left},${wb.width}x${wb.height} row=${rr.left},${rr.right}`);
+
+    // The narrow form (<=860px: always the Filter popover, spec §3.4): the
+    // group listbox lives in the closed popover until the Filter button
+    // opens it.
+    frame.style.width = "800px";
+    const narrowed = await libWaitFor(win, () => pane.dataset.headerFit === "narrow");
+    await libFrames(win);
+    const hiddenInNarrow = btn.getClientRects().length === 0;
+    narrowBtn.click();
+    await libFrames(win);
+    const bw = btn.getBoundingClientRect();
+    check("T6 in the narrow form the group listbox is out of sight until the Filter popover opens; then it is inside, wider than 120px and one control tall",
+      narrowed && hiddenInNarrow && set.matches(":popover-open") && bw.width > 120 && Math.abs(bw.height - controlH) <= 0.5,
+      `narrowed=${narrowed} hiddenBefore=${hiddenInNarrow} open=${set.matches(":popover-open")} width=${bw.width} height=${bw.height}`);
+    // A long list in a short window (controller ruling R9 / D3): 30 more
+    // groups, and the frame cut so the room below the button is 40px more
+    // than above it (so the list stays below) yet well short of the 320px
+    // cap. The list must stop at --listbox-room, read at its own bottom edge
+    // -- the viewport's 8px margin may not absorb an overrun.
+    win.eval(`_vocabRows = _vocabRows.concat(Array.from({ length: 30 }, (_, i) => ({ id: "lg" + i, term: "lg" + i, groups: ["Group " + String(i).padStart(2, "0")], contexts: [], createdAt: 0, updatedAt: 0 }))); _pbpVocabRefreshGroupOptions(true);`);
+    const fullHeight = frame.style.height;
+    const b0 = btn.getBoundingClientRect();
+    frame.style.height = `${Math.ceil(b0.bottom + 4 + 8 + (b0.top - 4 - 8) + 40)}px`;
+    await libFrames(win, 3);
+    btn.click();
+    await libFrames(win);
+    check("T6 the group listbox opens as a top-layer popover nested in the open Filter popover (both open)",
+      pop.matches(":popover-open") && set.matches(":popover-open") && btn.getAttribute("aria-expanded") === "true",
+      `pop=${pop.matches(":popover-open")} set=${set.matches(":popover-open")} expanded=${btn.getAttribute("aria-expanded")}`);
+    const list = doc.getElementById("vocab-group-filter-list");
+    const pr = pop.getBoundingClientRect();
+    const lr = list.getBoundingClientRect();
+    const room = parseFloat(pop.style.getPropertyValue("--listbox-room"));
+    const vw = doc.documentElement.clientWidth;
+    const usableBottom = doc.documentElement.clientHeight - 8;   // pbpListboxPlace's viewport margin
+    check("T6 its popover is position: fixed below the button, and a long list stops at --listbox-room: the list's bottom edge (and the frame under it) stays above the viewport's usable bottom",
+      win.getComputedStyle(pop).position === "fixed" && !pop.hasAttribute("data-flip") && room < 320 &&
+      list.scrollHeight > list.clientHeight && lr.bottom <= usableBottom - 1 + 0.5 && pr.bottom <= usableBottom + 0.5 &&
+      pr.left >= 8 - 0.5 && pr.right <= vw - 8 + 0.5,
+      `flip=${pop.getAttribute("data-flip")} room=${room} list=${lr.top},${lr.bottom} pop=${pr.top},${pr.bottom} usableBottom=${usableBottom} scroll=${list.scrollHeight}/${list.clientHeight} x=${pr.left},${pr.right}/${vw}`);
+    doc.getElementById("vocab-group-filter-list").dispatchEvent(new Event("scroll"));
+    check("T6 scrolling inside the option list keeps the listbox open", pop.matches(":popover-open"));
+    doc.getElementById("vocab-detail-pane").dispatchEvent(new Event("scroll"));
+    check("T6 a scroll anywhere else (the detail pane) closes it",
+      !pop.matches(":popover-open") && pop.hidden && btn.getAttribute("aria-expanded") === "false");
+    frame.style.height = fullHeight;   // the listbox is closed, so this resize closes nothing
+    await libFrames(win, 3);
+    btn.click();
+    await libFrames(win);
+    doc.querySelector('#vocab-group-filter-list .listbox-opt[data-value="Close reading"]').click();
+    await libFrames(win);
+    check("T6 picking an option writes the carrier, closes the listbox and leaves the Filter popover open",
+      filter.value === "Close reading" && !pop.matches(":popover-open") && set.matches(":popover-open"),
+      `carrier=${filter.value} pop=${pop.matches(":popover-open")} set=${set.matches(":popover-open")}`);
+    btn.click();
+    await libFrames(win);
+    set.hidePopover();
+    await libFrames(win);
+    check("T6 closing the Filter popover closes the listbox inside it",
+      !pop.matches(":popover-open") && btn.getAttribute("aria-expanded") === "false");
+  } finally {
+    frame.remove();
+  }
+}
+
 // ---- Main flow (last thing in this script). A setup error that escapes a
 // suite becomes one failed row; the row count then falls short and
 // run-test.mjs reports the stall, which is the red it should be.
@@ -449,6 +647,7 @@ async function primitiveCases() {
     // order (T6a libraryPageGroupCases, T6b libraryPageSortCases, T7a
     // libraryPageLookupLangCases, T7b libraryPageLongContentCases +
     // libraryPageDetailLocaleCases, T7c libraryPageAutoLookupLangCases).
+    await libraryPageGroupCases();
   } catch (error) {
     report("suite setup", error);
   }

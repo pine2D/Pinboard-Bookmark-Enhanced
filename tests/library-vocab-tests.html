@@ -41,7 +41,7 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
       <div class="vocab-filter-row">
         <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"><span class="btn-ic" data-ic="chevronDown"></span><span>Filter</span></button>
         <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">
-          <select id="vocab-group-filter" aria-label="Filter by group"><option value="">All groups</option></select>
+          <select id="vocab-group-filter" data-listbox="float" aria-label="Filter by group"><option value="">All groups</option></select>
           <select id="vocab-status-filter" aria-label="Filter by status" hidden>
             <option value="">All statuses</option>
             <option value="new">Learning</option>
@@ -1806,7 +1806,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       <div class="vocab-filter-row">
         <button type="button" class="btn ghost" id="vocab-filter-narrow" data-label="filter-narrow"><svg width="16" height="16" viewBox="0 0 24 24"></svg><span></span></button>
         <div class="vocab-filter-set" popover="auto">
-          <select><option></option></select>
+          <div class="listbox"><button type="button" class="listbox-btn" data-label="group-filter"><span class="listbox-value"></span><span class="btn-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24"></svg></span><span class="listbox-sizer" aria-hidden="true"></span></button></div>
           <span class="vocab-status-toggles" role="group"><button type="button" class="lib-toggle" data-label="stat-all"></button><button type="button" class="lib-toggle" data-label="stat-learning"></button><button type="button" class="lib-toggle" data-label="stat-known"></button></span>
         </div>
         <span class="vocab-sort-seg" role="group">
@@ -1853,7 +1853,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         panel.querySelector('[data-label="batch-delete"]').title = m.vocabBatchDelete.message;
         panel.querySelector('[data-label="remove"]').textContent = m.delete.message;
         panel.querySelector('input[type="text"]').placeholder = m.vocabGroupNamePlaceholder.message;
-        panel.querySelector("select option").textContent = m.vocabAllGroups.message;
+        for (const el of panel.querySelectorAll('[data-label="group-filter"] .listbox-value, [data-label="group-filter"] .listbox-sizer')) el.textContent = m.vocabAllGroups.message;
         // Task 3 fix round 1 (Minor 7): the lookup bar and stats strip joined
         // the sweep -- real translated strings at representative lengths,
         // same discipline as every other element above (this is exactly the
@@ -1977,7 +1977,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         <div class="vocab-filter-row">
           <button type="button" class="btn ghost" popovertarget="fit-set" aria-expanded="false"><span>Filter</span></button>
           <div class="vocab-filter-set" id="fit-set" popover="auto">
-            <select><option>All groups</option></select>
+            <!-- The group filter as listbox.js leaves it (T6): hidden carrier + listbox. -->
+            <select data-listbox="float" hidden><option>All groups</option></select><div class="listbox"><button type="button" class="listbox-btn"><span class="listbox-value">All groups</span><span class="btn-ic"></span><span class="listbox-sizer">All groups</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">All groups</li></ul></div></div>
             <span class="vocab-status-toggles" data-counts-ready><button type="button" class="lib-toggle" aria-pressed="true">All</button><button type="button" class="lib-toggle" aria-pressed="false">Learning 12</button><button type="button" class="lib-toggle" aria-pressed="false">Known 3</button></span>
           </div>
           <span class="vocab-sort-seg"><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span>
@@ -2000,6 +2001,29 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("header fit: the need does not depend on the form showing (no flapping)",
         Math.abs(needNarrow - need) < 0.5 && pane.querySelectorAll(".vocab-filter-row").length === 1 && pane.children.length === 1,
         `${needNarrow} vs ${need}; ${pane.children.length} children (the measuring copy must be gone)`);
+      // The group listbox (T6) is measured at its 120px floor: the wide form
+      // lets it shrink there, so neither its longest option (the sizer) nor
+      // its open popover -- shown, placed fixed, a long list -- may move the
+      // need. Opening it flips the pop's `hidden`, which the row observer
+      // sees, so a need that moved here would flip the form under the user.
+      const sizer = set.querySelector(".listbox-sizer");
+      const lbPop = set.querySelector(".listbox-pop");
+      sizer.textContent = "An exceptionally long group name for the specialist vocabulary";
+      const needLongSizer = pbpLibVocabFilterNeed(row);
+      sizer.textContent = "All groups";
+      check("header fit: the group listbox counts at its 120px floor -- a long longest option does not widen the need",
+        Math.abs(needLongSizer - need) < 0.5, `${needLongSizer} vs ${need}`);
+      lbPop.hidden = false;
+      lbPop.style.cssText = "position:fixed;left:0;top:0;min-width:300px;max-width:900px";
+      lbPop.firstElementChild.innerHTML = Array.from({ length: 30 }, (_, i) => `<li class="listbox-opt">Group number ${i} with a fairly long name</li>`).join("");
+      const needOpen = pbpLibVocabFilterNeed(row);
+      update();
+      const formOpen = pane.dataset.headerFit;
+      lbPop.hidden = true;
+      lbPop.removeAttribute("style");
+      lbPop.firstElementChild.innerHTML = '<li class="listbox-opt">All groups</li>';
+      check("header fit: an open group listbox (shown, fixed, 30 long options) moves neither the need nor the form",
+        Math.abs(needOpen - need) < 0.5 && formOpen === "wide", `${needOpen} vs ${need}; form ${formOpen}`);
       update();
       pane.style.width = `${Math.floor(need) - 1}px`;
       await fitFrames();
@@ -2081,7 +2105,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         <div class="vocab-filter-row">
           <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="fit-set2" aria-expanded="false"><span>Filter</span></button>
           <div class="vocab-filter-set" id="fit-set2" popover="auto">
-            <select><option>All groups</option></select>
+            <select data-listbox="float" hidden><option>All groups</option></select><div class="listbox"><button type="button" class="listbox-btn"><span class="listbox-value">All groups</span><span class="btn-ic"></span><span class="listbox-sizer">All groups</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">All groups</li></ul></div></div>
             <span class="vocab-status-toggles"><button type="button" class="lib-toggle" hidden>All</button><button type="button" class="lib-toggle" hidden></button><button type="button" class="lib-toggle" hidden></button></span>
           </div>
           <span class="vocab-sort-seg"><button type="button" class="btn btn-sm vocab-sort-btn"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span>

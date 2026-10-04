@@ -1439,6 +1439,10 @@ function _pbpVocabRefreshGroupOptions(preserveSelection) {
       filter.appendChild(option);
     }
     filter.value = groups.includes(previous) ? previous : "";
+    // A programmatic .value write fires no change event; listbox.js's button
+    // would keep naming a group this refresh just dropped. Optional call: the
+    // test pages do not load listbox.js.
+    window.pbpListboxSync?.(filter);
   }
   if (datalist) {
     datalist.replaceChildren(...groups.map((group) => {

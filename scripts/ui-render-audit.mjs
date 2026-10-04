@@ -612,6 +612,11 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     stability,
     bgStack,
     rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+    // computedPosition / inViewport (library redesign T6): a float listbox's
+    // popover is position: fixed in the top layer and must land inside the
+    // viewport. Cheap and selector-independent, like rect above.
+    position: cs.position,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
     effRect,
     parentRect,
     svg,
@@ -1003,6 +1008,22 @@ function evaluateCheck(check, raw, theme) {
     const { value, tolerancePx } = resolvePxSpec(exp.borderTopWidthPx, 0.5);
     if (hostZero) out.push(verdict("borderTopWidthPx", false, null, value, zeroNote));
     else out.push(verdict("borderTopWidthPx", Math.abs(raw.borderTopWidth - value) <= tolerancePx, round2(raw.borderTopWidth), value));
+  }
+  // computedPosition / inViewport (library redesign T6, spec §9.2 last row):
+  // the float listbox exists so the detail pane's overflow can no longer clip
+  // its popover -- position: fixed in the top layer, placed by
+  // pbpListboxPlace inside the viewport. An absolute popover, or one placed
+  // off-screen, fails here.
+  if ("computedPosition" in exp) {
+    if (hostZero) out.push(verdict("computedPosition", false, null, exp.computedPosition, zeroNote));
+    else out.push(verdict("computedPosition", raw.position === exp.computedPosition, raw.position, exp.computedPosition));
+  }
+  if ("inViewport" in exp) {
+    const tol = exp.inViewport.tolerancePx ?? 0.5;
+    const r = raw.rect, v = raw.viewport;
+    const inside = r.left >= -tol && r.top >= -tol && r.left + r.width <= v.width + tol && r.top + r.height <= v.height + tol;
+    if (hostZero) out.push(verdict("inViewport", false, null, "inside the viewport", zeroNote));
+    else out.push(verdict("inViewport", inside, `${round2(r.left)},${round2(r.top)} ${round2(r.width)}x${round2(r.height)} in ${v.width}x${v.height}`, "inside the viewport"));
   }
   // paddingLeftPx (Task 3, ui-system-stage3a-design §3): the stage-0 indent
   // mechanism -- .pref-row-sub/.entry-block-sub read a fixed --opt-sp-7 (24px)
@@ -1961,13 +1982,12 @@ const FILTER_SCROLL_INPUTS = {
   search: { view: "vocab", act: async (p) => { await p.fill("#vocab-search", "e"); return true; } },
   group: {
     view: "vocab",
-    act: (p) => p.evaluate(() => {
-      const select = document.getElementById("vocab-group-filter");
-      if (![...select.options].some((o) => o.value === "Reading")) return false;
-      select.value = "Reading";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-      return true;
-    }),
+    // A real pick through the enhanced listbox (library redesign T6), the
+    // way a user changes the group; index 1 = the first real group, "Reading"
+    // (T2 seeds 19 words into it, enough to keep the list scrolling). ctx
+    // carries the theme and the rows array the nested-popover row
+    // (filterSetSurvivesPick) lands in.
+    act: async (p, ctx) => { await libPickListboxOption(p, ctx.rows, ctx.theme, "vocab-group-filter", 1); return true; },
   },
   // Every seeded highlight lives under example.com, and the notes filter
   // matches page URLs too: the list stays full length.
@@ -1977,6 +1997,7 @@ const FILTER_SCROLL_INPUTS = {
 async function driveFilterScrollReset(page, check, extBase, theme) {
   const { inputs, viewport = [1280, 700], probeOffset = 200 } = check.expect.filterScrollReset;
   const hits = [];
+  const pickRows = [];
   const p = await page.context().newPage();
   try {
     await p.setViewportSize({ width: viewport[0], height: viewport[1] });
@@ -1987,7 +2008,7 @@ async function driveFilterScrollReset(page, check, extBase, theme) {
       const regionSel = input.view === "notes" ? ".notes-list-region" : ".vocab-list-region";
       const before = await p.evaluate(({ sel, y }) => { const r = document.querySelector(sel); r.scrollTop = y; return r.scrollTop; }, { sel: regionSel, y: probeOffset });
       if (before !== probeOffset) throw new Error(`SETUP: ${regionSel} could not be scrolled to ${probeOffset} before "${name}" (got ${before}, theme=${theme}) -- the seeded list is too short for this probe`);
-      if (!(await input.act(p))) throw new Error(`SETUP: the "${name}" input could not be performed (theme=${theme})`);
+      if (!(await input.act(p, { theme, rows: pickRows }))) throw new Error(`SETUP: the "${name}" input could not be performed (theme=${theme})`);
       await p.waitForTimeout(200);
       const after = await p.evaluate((sel) => { const r = document.querySelector(sel); return { top: r.scrollTop, room: r.scrollHeight - r.clientHeight }; }, regionSel);
       if (after.room < probeOffset) throw new Error(`SETUP: after "${name}" the list scrolls only ${after.room}px, under the ${probeOffset}px probe -- a clamp would pass for a reset (theme=${theme})`);
@@ -1997,6 +2018,7 @@ async function driveFilterScrollReset(page, check, extBase, theme) {
     await p.close().catch(() => {});
     await page.bringToFront().catch(() => {});
   }
+  hits.pickRows = pickRows;
   return hits;
 }
 
@@ -2244,6 +2266,27 @@ async function driveFilterPopoverKeys(page, theme, check) {
   if (opened.expanded !== "true") bad.push(`aria-expanded is ${opened.expanded} while open`);
   if (opened.position !== "fixed") bad.push(`open popover is position:${opened.position}, not fixed`);
   if (!opened.inside) bad.push("open popover is not inside the viewport");
+  // Library redesign T6: the group listbox now lives inside the open Filter
+  // popover. Escape must close only the top layer: the listbox first (its
+  // keydown handler preventDefault()s Escape, which also cancels the close
+  // request), the Filter popover on the next Escape (below).
+  if (await page.$("#vocab-group-filter-btn")) {
+    await page.focus("#vocab-group-filter-btn");
+    await page.keyboard.press("Space");
+    await settleAnimations(page);
+    const listOpen = await page.$eval("#vocab-group-filter-list", (el) => el.getClientRects().length > 0);
+    if (!listOpen) bad.push("Space on the group listbox inside the Filter popover did not open its list");
+    await page.keyboard.press("Escape");
+    await settleAnimations(page);
+    const layer = await page.evaluate((setSel) => ({
+      list: document.getElementById("vocab-group-filter-list").getClientRects().length > 0,
+      set: document.querySelector(setSel).matches(":popover-open"),
+      focus: document.activeElement?.id || "",
+    }), set);
+    if (layer.list) bad.push("first Escape left the group listbox open");
+    if (!layer.set) bad.push("first Escape closed the Filter popover too (it must close only the listbox)");
+    if (layer.focus !== "vocab-group-filter-btn") bad.push(`after the first Escape focus is on #${layer.focus}, not the group listbox button`);
+  }
   await page.keyboard.press("Escape");
   await settleAnimations(page);
   const closed = await page.evaluate(({ btnSel, setSel }) => {
@@ -2951,6 +2994,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     const hits = await driveFilterScrollReset(page, check, extBase, theme);
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("filterScrollReset", hits.length === 0, hits.length, 0, hits.length ? hits.slice(0, 4).join("; ") : undefined) });
+    for (const row of hits.pickRows || []) results.push(row);
     return;
   }
   if (check.state === "libAxis") {
@@ -3409,7 +3453,9 @@ function needsNoteDirty(selector) { return selector.includes("vocab-note-save");
 // no focus move -- right before a check that reads one of them, and close it
 // right after, so no other check ever measures under an open top-layer panel.
 // `open`-state rows open it themselves through the real button.
-const FILTER_SET_SELECTORS = new Set(["#vocab-group-filter", "#vocab-stat-all", "#vocab-stat-learning", "#vocab-stat-known"]);
+// T6: the group filter is measured as its listbox button (the native select
+// is the hidden carrier).
+const FILTER_SET_SELECTORS = new Set(["#vocab-group-filter-btn", "#vocab-stat-all", "#vocab-stat-learning", "#vocab-stat-known"]);
 function needsFilterSetOpen(check) {
   return FILTER_SET_SELECTORS.has(check.selector) && ["default", "hover", "focusWithin"].includes(check.state);
 }
@@ -3424,6 +3470,57 @@ async function setFilterSetOpen(page, open) {
     if (!want && isOpen) set.hidePopover();
     return set.matches(":popover-open") === want ? "ok" : "stuck";
   }, open);
+}
+
+// ---- The Filter popover (spec §3.4, library redesign T4/T6). Whenever the
+// index takes its narrow form (data-header-fit="narrow": the filter row's
+// own content does not fit it on one line -- the runner's 1280 viewport with
+// the seeded counts, and everything at or under 860px), the group listbox
+// (and T4's status toggles) live in the closed #vocab-filter-set auto
+// popover. A row that reads anything inside it opens it first, the way a
+// user does (a real click on #vocab-filter-narrow), and closes it again so it
+// never covers the next row's element. Returns whether it opened the popover
+// (false in the wide form, where the element is inline and rendered).
+async function libRevealFilterSet(page, selector) {
+  const needs = await page.evaluate((sel) => {
+    let el = null;
+    try { el = document.querySelector(sel); } catch (_) { return false; } // a label-style selector ("x (narrow)") is no CSS
+    const set = document.getElementById("vocab-filter-set");
+    if (!el || !set || !set.contains(el)) return false;
+    return !set.matches(":popover-open") && el.getClientRects().length === 0;
+  }, selector);
+  if (!needs) return false;
+  await page.click("#vocab-filter-narrow");
+  await page.waitForFunction(() => document.getElementById("vocab-filter-set")?.matches(":popover-open"), null, { timeout: TIMEOUT_MS });
+  await settleAnimations(page);
+  return true;
+}
+async function libHideFilterSet(page) {
+  await page.evaluate(() => {
+    const set = document.getElementById("vocab-filter-set");
+    if (set && set.matches(":popover-open")) set.hidePopover();
+  });
+  await settleAnimations(page);
+}
+// Picks option `index` of an enhanced select the way a user does: real
+// clicks on its button and on the option, revealing the Filter popover first
+// when the select lives in it. That pick must not light-dismiss the Filter
+// popover around the nested listbox (spec §14: the option is a DOM descendant
+// of the auto popover) -- recorded as its own row, because the defect only
+// shows with trusted pointer events, which no test page can send.
+async function libPickListboxOption(page, results, theme, selectId, index) {
+  const btnSel = `#${selectId}-btn`;
+  const revealed = await libRevealFilterSet(page, btnSel);
+  await page.click(btnSel);
+  const opt = page.locator(`#${selectId}-list .listbox-opt`).nth(index);
+  await opt.waitFor({ state: "visible", timeout: TIMEOUT_MS });
+  await opt.click();
+  await settleAnimations(page);
+  if (!revealed) return;
+  const stillOpen = await page.$eval("#vocab-filter-set", (el) => el.matches(":popover-open"));
+  results.push({ surface: "library", theme, selector: "#vocab-filter-set", state: "filterScrollReset",
+    ...verdict("filterSetSurvivesPick", stillOpen, stillOpen ? "open" : "light-dismissed", `open after picking ${btnSel}'s option ${index}`) });
+  await libHideFilterSet(page);
 }
 
 // The 11 DOM ids for popup's hidden-by-default state legs (feedback
@@ -3949,14 +4046,15 @@ const FIELD_HOVER_REQUIRED_KINDS = ['input[type="text"]', 'input[type="password"
 // matches (radiusScale.valueBoxKindByEntry), since three of them are plain
 // text inputs a tag/type kind could not tell apart.
 // Library (stage 4 Task 7, T7-b): the kinds its sweep legs render -- the
-// three search fields, the two toolbar selects, the note editor and the
+// three search fields, the group filter's listbox button (family 9 meets it
+// in the sweep's vocab-filter-set context), the note editor and the
 // .vocab-group-unit shells (keyed by tag/type, or by class for the <span>
 // shell). The relookup .xp-dict-lang (a select) only exists behind a click
 // the sweep does not make; family 14's library leg holds its four corners.
 const RADIUS_VALUE_BOX_REQUIRED = Object.freeze({
   options: Object.freeze([...FIELD_HOVER_REQUIRED_KINDS, 'input[type="search"]']),
   popup: Object.freeze(["#url-input", "#title-input", "#description-input", ".tags-input-wrap", "#token-input", "#search-input"]),
-  library: Object.freeze(['input[type="search"]', "select", "textarea", ".vocab-group-unit"]),
+  library: Object.freeze(['input[type="search"]', "button.listbox-btn", "textarea", ".vocab-group-unit"]),
 });
 // Themes whose value boxes are framed and NOT separated from their hosts, per
 // surface (spec 2026-09-30-ui-fields-stage4-design §2.2 / §2.4): the fill
@@ -4471,9 +4569,10 @@ const VALUE_BOX_LEGS = Object.freeze({
     ]),
   }),
   // library (stage 4 Task 7, spec §5.2): the nine value boxes -- the three
-  // search fields, the three native selects, the two .vocab-group-unit
-  // shells (the shell carries the look; its text input is a transparent
-  // passenger) and the note editor. Named rather than class-scanned, like
+  // search fields, the group filter's listbox button, the two native selects
+  // (the lookup language until T7, the relookup .xp-dict-lang), the two
+  // .vocab-group-unit shells (the shell carries the look; its text input is
+  // a transparent passenger) and the note editor. Named rather than class-scanned, like
   // popup's. The vocab leg navigates fresh instead of inheriting whatever the
   // CHECKS loop left open (a typed note, an open tab); the notes leg then
   // reuses that fresh page and only switches it to the notes tab. The vocab
@@ -4483,7 +4582,7 @@ const VALUE_BOX_LEGS = Object.freeze({
     ns: "lib",
     radiusVar: "--lib-radius-md",
     boxes: Object.freeze([
-      ["#vocab-search", null], ["#vocab-group-filter", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang", null],
+      ["#vocab-search", null], ["#vocab-group-filter-btn", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang", null],
       ["#vocab-detail .xp-dict-lang", null], ["#vocab-detail .vocab-note-input", null],
       ["#vocab-batch-toolbar .vocab-group-unit", null], ["#vocab-detail .vocab-group-unit", null],
       ["#notes-filter", null],
@@ -4550,12 +4649,13 @@ const VALUE_BOX_LEGS = Object.freeze({
         },
       },
       {
-        // Library redesign T4b: #vocab-group-filter sits in the "Filter"
-        // popover at this viewport (index 360). Its own leg on a fresh page,
+        // Library redesign T4b / T6: the group filter's listbox button
+        // (#vocab-group-filter-btn) sits in the "Filter" popover in the
+        // narrow form (inline in the wide one). Its own leg on a fresh page,
         // so the open top-layer panel never covers the batch row's group unit
         // that the vocab leg hovers. The returned closer hides it again.
         context: "vocab-filter",
-        boxes: ["#vocab-group-filter"],
+        boxes: ["#vocab-group-filter-btn"],
         async open(page, url, theme) {
           await page.goto(`${url}?_ra=${encodeURIComponent(`fieldfilter-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
@@ -4565,6 +4665,9 @@ const VALUE_BOX_LEGS = Object.freeze({
           }
           await page.mouse.move(0, 0);
           await settleAnimations(page);
+          if (!(await page.$eval("#vocab-group-filter-btn", (el) => el.getClientRects().length > 0))) {
+            throw new Error(`SETUP: fieldHoverContrast library: #vocab-group-filter-btn is not rendered after opening the Filter popover (theme=${theme})`);
+          }
           return async () => { await setFilterSetOpen(page, false); };
         },
       },
@@ -4912,18 +5015,33 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
           await page.waitForSelector(".vocab-note-save:not([hidden])", { timeout: TIMEOUT_MS });
         }
       }
+      // The Filter popover, one wrapper for both openers (T4b / T6a): rows in
+      // FILTER_SET_SELECTORS open it with showPopover() (no pointer or focus
+      // move); any other row whose element -- or its height / width
+      // comparison -- sits in the closed popover is revealed by a real click
+      // (libRevealFilterSet). A row with its own `open` click is revealed
+      // only when that click target sits in the popover (the group listbox
+      // button): its element appears through that click, and when the click
+      // target is #vocab-filter-narrow itself (T4b's open-state rows) a
+      // reveal first would make its Space press close the popover again.
+      // Opened once, closed once; nothing opens in the wide form.
+      let filterSetOpened = false;
       if (needsFilterSetOpen(check)) {
         const opened = await setFilterSetOpen(page, true);
         if (opened === "missing" || opened === "stuck") {
           throw new Error(`SETUP: could not open #vocab-filter-set for ${check.selector}|${check.state} (theme=${theme}): ${opened}`);
         }
+        filterSetOpened = opened === "ok";
         await settleAnimations(page);
+      } else {
+        const revealTargets = check.open?.click ? [check.open.click]
+          : [check.selector, check.expect?.heightEqWith?.selector, check.expect?.widthLteWith?.selector];
+        for (const sel of revealTargets) {
+          if (sel && await libRevealFilterSet(page, sel)) { filterSetOpened = true; break; }
+        }
       }
       await runOneCheck(page, theme, check, results, extBase);
-      if (needsFilterSetOpen(check)) {
-        await setFilterSetOpen(page, false);
-        await settleAnimations(page);
-      }
+      if (filterSetOpened) await libHideFilterSet(page);
     }
   }
 
@@ -6123,7 +6241,7 @@ const SWEEP_CFG = {
     valueBoxes: {
       options: '.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg textarea, .fg select, .listbox-btn, .mobile-tab-picker select, .options-search input[type="search"]',
       popup: "#url-input, #title-input, #description-input, .tags-input-wrap, #token-input, #search-input",
-      library: "#vocab-search, #notes-filter, #vocab-lookup-input, #vocab-group-filter, #vocab-lookup-lang, .xp-dict-lang, .vocab-group-unit, .vocab-note-input",
+      library: "#vocab-search, #notes-filter, #vocab-lookup-input, .listbox-btn, #vocab-lookup-lang, .xp-dict-lang, .vocab-group-unit, .vocab-note-input",
     },
     valueBoxExempt: '.theme-name-popover input[type="text"], .tags-input-wrap.ac-open',
     // Surfaces whose value-box KIND is the valueBoxes entry a box matches
@@ -6885,6 +7003,19 @@ async function runSweep(page, sw, extBase) {
     await setFilterSetOpen(page, false);
     await settleAnimations(page);
   }
+  // The group listbox renders inside the closed Filter popover whenever the
+  // index takes its narrow form (inline in the wide one): open the popover
+  // once, the way a user does, then the listbox itself -- the one place its
+  // option rows render (ui-primitives: interaction-only UI must be reachable
+  // by the gates) -- and sweep that state. T4b's block right above already
+  // swept the open Filter popover as "vocab-filter-set"; here only the open
+  // listbox is new.
+  const filterSetRevealed = await libRevealFilterSet(page, "#vocab-group-filter-btn");
+  await page.click("#vocab-group-filter-btn");
+  await page.waitForSelector("#vocab-group-filter-list .listbox-opt", { state: "visible", timeout: TIMEOUT_MS });
+  add(await runFamilySweep(page), "library", "vocab-listbox-open");
+  await page.keyboard.press("Escape");
+  if (filterSetRevealed) await libHideFilterSet(page);
   const vocabHead = page.locator("#vocab-list .vocab-card .notes-card-head").first();
   if (await vocabHead.count()) {
     await vocabHead.click(); await page.waitForTimeout(250);
