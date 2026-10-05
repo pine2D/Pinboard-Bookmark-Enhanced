@@ -223,14 +223,20 @@ const LIB_SEED = Object.freeze({
   cjkTerms: ["曖昧", "呼吸"],          // language "ja" / "zh"
   cjkLangs: ["ja", "zh"],            // cjkTerms' languages, pinned by the seed-shape check (G4 reads :lang)
   latinTerm: "constraint",           // G4 Latin head
-  wordCount: 30,                     // >= 30 saved words, >= 10 without any group
+  // G4 by glyph class (final review #10): a capital whose diacritic rises
+  // above the em box, the case the pull-up's "never clip" promise names
+  // (spec §6.5 #3). A de word in the vocabulary, an É-titled page in notes.
+  diacriticTerm: "Übung",            // language "de", no group
+  diacriticUrl: "https://example.com/reading/elan-vital",
+  diacriticTitle: "Élan vital and the drift of attention",
+  wordCount: 31,                     // >= 30 saved words, >= 10 without any group
   multiUrl: "https://example.com/reading/attention",   // >= 3 highlights, one carries a note
   multiTitle: "Attention is a scarce resource",
   soloUrl: "https://example.com/quiet-ui",             // exactly 1 highlight
   cjkTitle: "安静的界面",                               // soloUrl's page title (CJK G4 case)
 });
-// 27 plain Latin words; with richTerm and the two CJK terms that is
-// LIB_SEED.wordCount. The first 17 join "Reading" (so a one-group filter still
+// 27 plain Latin words; with richTerm, the two CJK terms and diacriticTerm
+// that is LIB_SEED.wordCount. The first 17 join "Reading" (so a one-group filter still
 // leaves a list that scrolls at 700px), the last 10 join no group.
 const LIB_SEED_FILLER_TERMS = Object.freeze([
   "ambient", "brevity", "cadence", "candor", "clarity", "coherent", "diligent", "elision", "ephemeral",
@@ -1774,7 +1780,8 @@ async function driveRowStates(page, extBase, theme, selector, textSelectors) {
 // ---- library notes scenarios (T8e, spec 2026-10-03-library-redesign §9.2 G4 /
 // G5 notes half). Opens one state the notes half measures, on the SEEDED data
 // (LIB_SEED, T2): the cover (nothing selected), the CJK-titled single-
-// highlight page, or the >= 3-highlight page opened at its SECOND-oldest
+// highlight page, the É-titled single-highlight page ("notes-diacritic",
+// final review #10), or the >= 3-highlight page opened at its SECOND-oldest
 // highlight (excerpts above and below the current one). Selection goes through
 // the page's own _pbpNotesSelectRow -- the path a row click takes -- and every
 // miss is a SETUP error, never a quiet measurement of the wrong state. The
@@ -1789,11 +1796,12 @@ async function libOpenNotesScenario(page, scenario) {
       if (pane) pane.scrollTop = 0;
       return { ok: !document.getElementById("notes-detail-empty").hidden, why: "the cover did not show" };
     }
-    const url = scenario === "notes-multi" ? seed.multiUrl : scenario === "notes-solo" ? seed.soloUrl : null;
+    const url = { "notes-multi": seed.multiUrl, "notes-solo": seed.soloUrl, "notes-diacritic": seed.diacriticUrl }[scenario] || null;
     if (!url) return { ok: false, why: `unknown scenario ${scenario}` };
     const hits = _pbpNotesHits().filter((h) => h.row.url === url).sort((a, b) => a.ts - b.ts);
     if (scenario === "notes-multi" && hits.length < 3) return { ok: false, why: `${hits.length} highlight(s) on ${url}, need >= 3` };
-    if (scenario === "notes-solo" && (hits.length !== 1 || hits[0].row.title !== seed.cjkTitle)) {
+    const wantTitle = { "notes-solo": seed.cjkTitle, "notes-diacritic": seed.diacriticTitle }[scenario];
+    if (wantTitle && (hits.length !== 1 || hits[0].row.title !== wantTitle)) {
       return { ok: false, why: `${hits.length} highlight(s) on ${url} titled ${JSON.stringify(hits[0] && hits[0].row.title)}` };
     }
     const want = hits[scenario === "notes-multi" ? 1 : 0].key;
@@ -2238,13 +2246,22 @@ const LIB_INK_VIEWS = {
     snapshot: libSnapshotNotes, show: libOpenNotesScenario, restore: libRestoreNotesSelection,
   },
 };
-async function driveDisplayInkTop(page, check) {
-  const { view = "vocab", sizes, cases, coverPx = null } = check.expect.displayInkTop;
+// `locale` (final review #10/#5): measure under that UI language in a scratch
+// page of its own -- the column titles ("词典", "这一页") are UI copy, and the
+// shared page stays in English for every row after this one.
+async function driveDisplayInkTop(shared, check, extBase, theme) {
+  const { view = "vocab", sizes, cases, coverPx = null, locale = null } = check.expect.displayInkTop;
   const v = LIB_INK_VIEWS[view];
   if (!v) throw new Error(`SETUP: displayInkTop has no view ${JSON.stringify(view)} in LIB_INK_VIEWS`);
   const paneSel = check.expect.displayInkTop.paneSel || v.paneSel;
+  let page = shared;
+  if (locale) {
+    const [w0, h0] = sizes[0];
+    page = await libScratchPage(shared, extBase, theme, `g4-${locale}`, view, { width: w0, height: h0 });
+    try { await setLibraryLocale(page, extBase, locale); } catch (err) { await closeLibScratch(shared, page); throw err; }
+  }
   const restore = page.viewportSize();
-  const snap = await v.snapshot(page);
+  const snap = locale ? null : await v.snapshot(page);
   const bad = [];
   try {
     for (const [width, height] of sizes) {
@@ -2271,9 +2288,13 @@ async function driveDisplayInkTop(page, check) {
       }
     }
   } finally {
-    if (restore) await page.setViewportSize(restore);
-    await page.waitForTimeout(250);
-    await v.restore(page, snap);
+    if (locale) {
+      await closeLibScratch(shared, page);
+    } else {
+      if (restore) await page.setViewportSize(restore);
+      await page.waitForTimeout(250);
+      await v.restore(page, snap);
+    }
   }
   return bad;
 }
@@ -2311,10 +2332,15 @@ const NEG_MARGIN_SCAN = ({ paneSels }) => {
   }
   return { checked, bad: [...bad] };
 };
+// `view` picks the pane's driver through LIB_INK_VIEWS, the same table G4
+// uses: "vocab" (LIB_SEED words) or "notes" (the seeded scenarios; final
+// review #12 -- the notes half of G4b, spec §9.2, never landed with T8e).
 async function driveDetailNegMargin(page, check) {
-  const { sizes, cases, panes, openEditor = false } = check.expect.detailNegMargin;
+  const { view = "vocab", sizes, cases, panes, openEditor = false } = check.expect.detailNegMargin;
+  const v = LIB_INK_VIEWS[view];
+  if (!v) throw new Error(`SETUP: detailNegMargin has no view ${JSON.stringify(view)} in LIB_INK_VIEWS`);
   const restore = page.viewportSize();
-  const snap = await libSnapshotVocab(page);
+  const snap = await v.snapshot(page);
   const bad = [];
   let checked = 0;
   try {
@@ -2322,8 +2348,8 @@ async function driveDetailNegMargin(page, check) {
       await page.setViewportSize({ width, height });
       await page.waitForTimeout(250);
       for (const target of cases) {
-        await libShowVocab(page, target);
-        if (openEditor && target !== "cover") {
+        await v.show(page, target);
+        if (openEditor && view === "vocab" && target !== "cover") {
           await page.evaluate(() => _pbpVocabToggleGroupEditor(true, false));
           await settleAnimations(page);
         }
@@ -2335,7 +2361,7 @@ async function driveDetailNegMargin(page, check) {
   } finally {
     if (restore) await page.setViewportSize(restore);
     await page.waitForTimeout(250);
-    await libRestoreVocab(page, snap);
+    await v.restore(page, snap);
   }
   // Anti-vacuity: the pane's own -16 and the hung buttons are always there.
   if (checked === 0) throw new Error("SETUP: detailNegMargin saw no negative margin at all -- the pane's -16 / 16 offset or the hung buttons are gone, or the scan never ran");
@@ -3343,8 +3369,19 @@ async function driveFilterPopoverKeys(page, theme, check) {
   // Library redesign T6: the group listbox now lives inside the open Filter
   // popover. Escape must close only the top layer: the listbox first (its
   // keydown handler preventDefault()s Escape, which also cancels the close
-  // request), the Filter popover on the next Escape (below).
-  if (await page.$("#vocab-group-filter-btn")) {
+  // request), the Filter popover on the next Escape (below). A missing
+  // button is a SETUP, like every other precondition here: skipping would
+  // drop all three layer checks and still report the row OK (final review
+  // #13).
+  {
+    const groupBtn = await page.evaluate((setSel) => {
+      const b = document.getElementById("vocab-group-filter-btn");
+      if (!b) return "missing";
+      return document.querySelector(setSel)?.contains(b) ? "ok" : "not inside the Filter popover";
+    }, set);
+    if (groupBtn !== "ok") {
+      throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|filterPopoverKeys]: #vocab-group-filter-btn ${groupBtn} -- listbox.js id or the T6 filter-set markup changed`);
+    }
     await page.focus("#vocab-group-filter-btn");
     await page.keyboard.press("Space");
     await settleAnimations(page);
@@ -3536,20 +3573,26 @@ async function driveFocusRowVisible(page, extBase, theme, check) {
 //   (that box clips on purpose, so it is exempt from the group check);
 // - batch rows: with an empty status slot, vocabulary is exactly 2 x sm + 8;
 //   notes is one sm row or, when it does not fit, two (2 x sm + 8).
+// - text (final review #11): element boxes cannot see text that overflows its
+//   own box -- a fixed-height button whose label wrapped onto two lines kept
+//   its 28px rect while the text spilled out of it. Every rendered text node
+//   is measured by its line boxes (Range.getClientRects): one line, or every
+//   line inside the content box of the box that holds it (its nearest
+//   non-inline ancestor); and no painted line reaches the list region.
 // An optical hang (a negative margin of exactly the element's own padding,
 // the G4b offset category) may cross its box by that much. It also reports
 // which form each header shows and the pane's data-header-fit, for the
 // driver's form-vs-measurement comparison.
-const LIST_HEADER_FIT_SCAN = ({ view }) => {
+const LIST_HEADER_FIT_SCAN = ({ view, extraRows = [] }) => {
   const vocab = view === "vocab";
   const pane = document.querySelector(vocab ? ".vocab-list-pane" : ".notes-list-pane");
   if (!pane) return { error: "list pane missing" };
   const pr = pane.getBoundingClientRect(), pcs = getComputedStyle(pane);
   const left = pr.left + (parseFloat(pcs.paddingLeft) || 0) + (parseFloat(pcs.borderLeftWidth) || 0);
   const right = pr.right - (parseFloat(pcs.paddingRight) || 0) - (parseFloat(pcs.borderRightWidth) || 0);
-  const rows = vocab
+  const rows = (vocab
     ? ["#view-vocab .notes-toolbar", "#view-vocab .vocab-filter-row", "#vocab-context-bar", "#vocab-batch-toolbar"]
-    : ["#view-notes .notes-toolbar", "#notes-color-filters", "#notes-context-bar", "#notes-batch-toolbar"];
+    : ["#view-notes .notes-toolbar", "#notes-color-filters", "#notes-context-bar", "#notes-batch-toolbar"]).concat(extraRows);
   const shown = (el) => { const cs = getComputedStyle(el); return cs.display !== "none" && cs.visibility !== "hidden"; };
   const nameOf = (el) => el.id ? `#${el.id}` : `${el.tagName.toLowerCase()}.${String(el.getAttribute("class") || "").trim().split(/\s+/).join(".")}`;
   const hangOf = (cs) => {
@@ -3575,10 +3618,63 @@ const LIST_HEADER_FIT_SCAN = ({ view }) => {
   };
   const bad = [];
   let measured = 0;
+  let textNodes = 0;
+  // Clipping ancestors inside the row cap what a text line paints (the count
+  // items' hidden second line is clipped on purpose, never painted).
+  const clipOf = (node, row) => {
+    let top = -Infinity, bottom = Infinity;
+    for (let a = node.parentElement; a && row.contains(a); a = a.parentElement) {
+      const acs = getComputedStyle(a);
+      if (acs.overflowY !== "visible" || acs.overflowX !== "visible") {
+        const ar = a.getBoundingClientRect();
+        top = Math.max(top, ar.top); bottom = Math.min(bottom, ar.bottom);
+      }
+    }
+    return { top, bottom };
+  };
+  const textHost = (node) => {
+    for (let a = node.parentElement; a; a = a.parentElement) {
+      if (getComputedStyle(a).display !== "inline") return a;
+    }
+    return null;
+  };
+  const scanText = (sel, row) => {
+    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT,
+      { acceptNode: (n) => (n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+    const range = document.createRange();
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (!parent || skipped(parent)) continue;
+      const pcs = getComputedStyle(parent);
+      if (pcs.visibility === "hidden" || !parent.getClientRects().length) continue;
+      range.selectNodeContents(node);
+      const clip = clipOf(node, row);
+      const lines = [...range.getClientRects()].filter((r) => r.width > 0.5 && r.height > 0.5 && r.bottom > clip.top + 0.5 && r.top < clip.bottom - 0.5);
+      if (!lines.length) continue;
+      textNodes++;
+      const tops = [];
+      for (const r of lines) if (!tops.some((t) => Math.abs(t - r.top) <= 1)) tops.push(r.top);
+      const host = textHost(node);
+      const text = JSON.stringify(node.nodeValue.trim().slice(0, 32));
+      if (tops.length > 1 && host) {
+        const hr = host.getBoundingClientRect(), hcs = getComputedStyle(host);
+        const cTop = hr.top + (parseFloat(hcs.borderTopWidth) || 0) + (parseFloat(hcs.paddingTop) || 0);
+        const cBottom = hr.bottom - (parseFloat(hcs.borderBottomWidth) || 0) - (parseFloat(hcs.paddingBottom) || 0);
+        const out = lines.filter((r) => r.top < cTop - 0.5 || r.bottom > cBottom + 0.5);
+        if (out.length) {
+          const worst = Math.max(...out.map((r) => Math.max(cTop - r.top, r.bottom - cBottom)));
+          bad.push(`${sel} text ${text} wraps onto ${tops.length} lines and spills ${worst.toFixed(1)}px out of ${nameOf(host)}`);
+        }
+      }
+      const painted = Math.max(...lines.map((r) => Math.min(r.bottom, clip.bottom)));
+      if (painted > regionTop + 0.5) bad.push(`${sel} text ${text} paints ${(painted - regionTop).toFixed(1)}px into the list region below the header`);
+    }
+  };
   for (const sel of rows) {
     const row = document.querySelector(sel);
     if (!row || !shown(row)) continue;
     measured++;
+    scanText(sel, row);
     for (const el of [row, ...row.querySelectorAll("*")]) {
       if (skipped(el)) continue;
       const cs = getComputedStyle(el);
@@ -3642,7 +3738,7 @@ const LIST_HEADER_FIT_SCAN = ({ view }) => {
     const num = document.querySelector("#notes-color-filters .lib-toggle-count");
     form = num && getComputedStyle(num).display === "none" ? "narrow" : "wide";
   }
-  return { bad, measured, form, fit: pane.dataset.headerFit || null, room: right - left };
+  return { bad, measured, textNodes, form, fit: pane.dataset.headerFit || null, room: right - left };
 };
 
 // What the wide forms need, measured here independently of library.js's own
@@ -3768,6 +3864,37 @@ async function driveListHeaderFit(page, extBase, theme, check) {
       _vocabLastSelectedId = null;
       _pbpVocabSyncSelectionUi();
     }, on);
+    // Standing counter-example for the text half (final review #11): a
+    // fixed-height sm button squeezed narrower than its two-word label, the
+    // shape "Zaznacz wszystko" had at a 360px Polish index. Its element box
+    // never moves, so only the text scan can see it; if the scan stops
+    // reporting it, the scan has gone blind and the row fails.
+    {
+      await setIndex(lo);
+      await selectVocab(false);
+      const planted = await scratch.evaluate(() => {
+        const host = document.querySelector("#vocab-context-bar .lib-cluster");
+        if (!host) return false;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.id = "g7-counter-example";
+        b.className = "btn btn-sm ghost";
+        b.style.cssText = "white-space: normal; width: 48px";
+        b.textContent = "Zaznacz wszystko";
+        host.prepend(b);
+        return true;
+      });
+      if (!planted) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: no #vocab-context-bar .lib-cluster to plant the counter-example in`);
+      await settleAnimations(scratch);
+      const res = await scratch.evaluate(LIST_HEADER_FIT_SCAN, { view: "vocab" });
+      await scratch.evaluate(() => document.getElementById("g7-counter-example")?.remove());
+      await settleAnimations(scratch);
+      if (res.error) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: ${res.error}`);
+      if (!res.bad.some((b) => b.includes("wraps onto") && b.includes("#g7-counter-example"))) {
+        bad.push(`the text scan missed its counter-example (a 48px sm button with a two-line label): ${res.bad.slice(0, 2).join("; ") || "no finding"}`);
+      }
+      if (!(res.textNodes > 0)) bad.push("the text scan measured no text node at all");
+    }
     for (const locale of LIB_INDEX_LOCALES) {
       await setLibraryLocale(scratch, extBase, locale);
       const n = await scratch.evaluate(FILTER_ROW_NEED);
@@ -4135,7 +4262,7 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // `themes: ["", "terminal"]`, which main() filters on before this runs
     // (spec §9.2, same matrix as G1).
     const drive = { displayInkTop: driveDisplayInkTop, detailNegMargin: driveDetailNegMargin, libGeometry: driveLibGeometry }[check.state];
-    const bad = await drive(page, check);
+    const bad = await drive(page, check, extBase, theme);
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict(check.state, bad.length === 0, bad.length, 0, bad.length ? bad.slice(0, 4).join("; ") : undefined) });
     return;
@@ -7038,6 +7165,13 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
         await page.waitForSelector(".theme-name-popover", { timeout: TIMEOUT_MS });
         await recordWeakTextHits(page, "options", theme, results, "panel:tab-appearance:theme-name-popover");
         await page.evaluate(() => document.querySelector(".theme-name-popover .tnp-cancel")?.click());
+        // Wait for the cancelled popover to actually leave (options.js removes
+        // it 150ms later under motion). Its removal shrinks the document, the
+        // scrollTop the save click left is clamped back, and that scroll event
+        // dismisses whatever confirm popover is open by then -- the one opened
+        // just below. That was the 15s confirm-yes timeout, and the empty
+        // scan when the timing went the other way (final review #17).
+        await page.waitForSelector(".theme-name-popover", { state: "detached", timeout: TIMEOUT_MS });
 
         // confirm popover (`.saved-theme-del` -> the shared showConfirmPopover()
         // path -- savedThemes was seeded at the top of this function).
@@ -7147,6 +7281,12 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   // this state on popup at all (only options' "rest" existed as a scan
   // point, and even that ran before its own confirm popover ever opened).
   await page.evaluate(() => { document.getElementById("main-section")?.classList.remove("hidden"); });
+  // Scroll it into view BEFORE the click and let the scroll land: a click
+  // that has to scroll fires the scroll event after the confirm popover
+  // opens, and shared.js closes an open confirm on scroll (final review #17,
+  // same race as the options appearance leg).
+  await page.locator("#logout-link").scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.click("#logout-link");
   await page.waitForSelector(".confirm-popover .confirm-yes", { timeout: TIMEOUT_MS });
   await page.waitForTimeout(150);
@@ -7204,6 +7344,44 @@ const MEDIA_DOM_PROBE = ({ check, query, focusBaseline }) => {
   const borderVisible = (style, index, minimum = 1) => !!style
     && style.borderWidths[index] >= minimum && style.borderStyles[index] !== "none"
     && visibleColor(style.borderColors[index]);
+  // The structural carriers an element shows (outline / box-shadow / a
+  // border side >= 2px) whose colour actually stands off what is behind the
+  // element (>= 1.5:1 against the composited backdrop): a border painted in
+  // the backdrop's own colour is no line. Used to ask whether a selected
+  // element's cue is its own -- an unselected sibling showing a line on the
+  // same carrier means every element of the set carries it (final review
+  // #6: forced colours paint a transparent resting edge in CanvasText).
+  const rgbaOf = (value) => {
+    const m = String(value || "").match(/rgba?\(([^)]+)\)/);
+    if (!m) return null;
+    const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+  };
+  const over = (c, base) => c.slice(0, 3).map((v, i) => v * c[3] + base[i] * (1 - c[3]));
+  const lum = (rgb) => {
+    const [r, g, b] = rgb.map((v) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const backdropOf = (element) => {
+    const stack = [];
+    for (let node = element.parentElement; node && node.nodeType === 1; node = node.parentElement) stack.push(getComputedStyle(node).backgroundColor);
+    let base = [255, 255, 255];
+    for (let i = stack.length - 1; i >= 0; i--) { const c = rgbaOf(stack[i]); if (c && c[3] > 0) base = over(c, base); }
+    return base;
+  };
+  const standsOff = (color, backdrop) => { const c = rgbaOf(color); return !!c && c[3] > 0 && ratio(over(c, backdrop), backdrop) >= 1.5; };
+  const cueCarriers = (element, style) => {
+    if (!element || !style) return [];
+    const backdrop = backdropOf(element);
+    const out = [];
+    if (outlineVisible(style) && standsOff(style.outlineColor, backdrop)) out.push("outline");
+    if (shadowVisible(style)) out.push("shadow");
+    [0, 1, 2, 3].forEach((index) => {
+      if (borderVisible(style, index, 2) && standsOff(style.borderColors[index], backdrop)) out.push(`border${index}`);
+    });
+    return out;
+  };
   const focusCue = (before, after) => {
     if (!after) return false;
     const outlineAppeared = outlineVisible(after) && (!outlineVisible(before)
@@ -7252,6 +7430,23 @@ const MEDIA_DOM_PROBE = ({ check, query, focusBaseline }) => {
         || selectedElement.matches(":checked");
       selected.cue = outlineVisible(style) || shadowVisible(style)
         || [0, 1, 2, 3].some((index) => borderVisible(style, index, 2));
+      selected.carriers = cueCarriers(selectedElement, style);
+    }
+  }
+  // An unselected sibling (final review #6): a cue every tab carries is no
+  // selection cue -- forced colours paint a transparent resting edge in
+  // CanvasText, so the selected tab's border alone proved nothing.
+  let unselected = null;
+  if (check.unselected) {
+    const element = document.querySelector(check.unselected);
+    unselected = describe(element);
+    if (element) {
+      const ariaCurrent = element.getAttribute("aria-current");
+      unselected.selected = element.getAttribute("aria-selected") === "true"
+        || element.getAttribute("aria-pressed") === "true"
+        || (ariaCurrent != null && ariaCurrent !== "false")
+        || element.classList.contains("active");
+      unselected.carriers = cueCarriers(element, focusStyle(element));
     }
   }
 
@@ -7261,6 +7456,7 @@ const MEDIA_DOM_PROBE = ({ check, query, focusBaseline }) => {
     control,
     focus,
     selected,
+    unselected,
   };
 };
 
@@ -7309,6 +7505,7 @@ async function captureMediaProbe(page, scenario, check) {
   // Keep selection independent from the focus ring: otherwise the selected
   // cue could pass only because the selected tab also happened to be focused.
   probe.selected = baseline.selected;
+  probe.unselected = baseline.unselected;
   if (probe.text?.found) {
     const background = compositeStack(probe.text.bgStack || []);
     const foreground = resolveColor(probe.text.color, background);
@@ -7327,6 +7524,11 @@ async function runMediaPreferenceChecks(page, cdp, surface, theme, results) {
     await cdp.send("Emulation.setEmulatedMedia", { features: scenario.features });
     try {
       await page.waitForTimeout(120);
+      // The scenario switch restyles every colour at once and the tabs
+      // transition theirs (0.15s): a probe inside that window reads an
+      // in-between edge colour, which the selected / unselected comparison
+      // below would take for a line (final review #6).
+      await settleAnimations(page);
       const probe = await captureMediaProbe(page, scenario, check);
       const selectorByCheck = {
         mediaQuery: scenario.query,
@@ -8800,6 +9002,7 @@ async function main() {
         context: { quote: "曖昧な言い方は、読み手の注意を奪う。", articleTitle: seed.cjkTitle, articleUrl: seed.soloUrl },
       });
       await save({ term: seed.cjkTerms[1], language: "zh", gloss: "to breathe; breathing room" });
+      await save({ term: seed.diacriticTerm, language: "de", gloss: "exercise; practice" });
       const fill = [];
       for (const term of fillers) fill.push((await save({ term, language: "en", gloss: `Seeded filler definition for ${term}.` })).id);
       if (!(await pbpVocabBatchAddGroup([rich.id, ja.id, ...fill.slice(0, 17)], owner, "Reading"))) throw new Error("grouping Reading failed");
@@ -8905,6 +9108,14 @@ async function main() {
         title: seed.cjkTitle,
         items: [{ id: "s1", ts: now - 20 * minute, quote: "安静的界面不靠色块分区，靠留白、字号和对齐。", note: "", color: 4 }],
       },
+      // G4's Latin-title case whose capital carries a diacritic (final
+      // review #10): the title is pulled up, and É's accent is the ink that
+      // rises above the em box.
+      "pbp_hl_render-audit-diacritic": {
+        url: seed.diacriticUrl,
+        title: seed.diacriticTitle,
+        items: [{ id: "d1", ts: now - 22 * minute, quote: "Attention drifts toward whatever moved last.", note: "", color: 2 }],
+      },
     };
     for (let i = 1; i <= fillerPages; i++) {
       records[`pbp_hl_render-audit-filler-${i}`] = {
@@ -8939,6 +9150,8 @@ async function main() {
       fixtureWordNewest: !!fixture && others.every((r) => (Number(r.updatedAt) || 0) < (Number(fixture.updatedAt) || 0)),
       richShape: !!rich && rich.language === "en" && !!rich.ipa && rich.contexts.length === 2 && !!String(rich.note || "").trim(),
       cjkTerms: seed.cjkTerms.every((term, i) => rows.some((r) => r.term === term && r.language === seed.cjkLangs[i])),
+      diacriticTerm: rows.some((r) => r.term === seed.diacriticTerm && r.language === "de"),
+      diacriticPage: pages.some(([, rec]) => rec.url === seed.diacriticUrl && rec.title === seed.diacriticTitle && rec.items.length === 1),
       highlights: items.length,
       fixtureHighlightNewest: !!newest && items.every((it) => it === newest || it.ts < newest.ts),
       multiShape: !!multi && multi.title === seed.multiTitle && multi.items.length >= 3 && multi.items.some((it) => String(it.note || "").trim()),
@@ -8951,6 +9164,8 @@ async function main() {
     seedShape.fixtureWordNewest ? null : "renderAuditFixture is not the newest word",
     seedShape.richShape ? null : `${LIB_SEED.richTerm} lacks two contexts / a note / an ipa`,
     seedShape.cjkTerms ? null : `missing a CJK term or its language (${LIB_SEED.cjkTerms.map((term, i) => `${term}:${LIB_SEED.cjkLangs[i]}`).join(", ")})`,
+    seedShape.diacriticTerm ? null : `missing ${LIB_SEED.diacriticTerm} (de)`,
+    seedShape.diacriticPage ? null : `${LIB_SEED.diacriticUrl} is not exactly one highlight titled ${LIB_SEED.diacriticTitle}`,
     seedShape.highlights >= 14 ? null : `highlights ${seedShape.highlights} (want >= 14)`,
     seedShape.fixtureHighlightNewest ? null : "the fixture highlight is not the newest",
     seedShape.multiShape ? null : `${LIB_SEED.multiUrl} is not titled ${LIB_SEED.multiTitle} or lacks >= 3 highlights with one note`,

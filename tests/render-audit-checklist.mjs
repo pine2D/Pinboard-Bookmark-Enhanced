@@ -593,6 +593,7 @@ export const MEDIA_CHECKS = [
     control: "#tab-general",
     focus: "#tab-general",
     selected: "#tab-general",
+    unselected: "#tab-popup",
     minTextContrast: 4.5,
   },
   {
@@ -601,6 +602,7 @@ export const MEDIA_CHECKS = [
     control: "#vocab-search",
     focus: "#vocab-search",
     selected: "#lib-tab-vocab",
+    unselected: "#lib-tab-notes",
     minTextContrast: 4.5,
   },
 ];
@@ -646,6 +648,18 @@ export function evaluateMediaProbe(probe, check) {
     const selectedCue = selectedVisible && probe.selected.selected === true && probe.selected.cue === true;
     if (!selectedCue) {
       fail("selectedCue", selectedCue, true, `selected state lacks semantics or a structural marker: ${check.selected}`);
+    } else if (check.unselected) {
+      // The marker has to be the selected element's own: an unselected
+      // sibling showing a line on every one of the same carriers (outline,
+      // shadow or border side, in a colour that stands off its backdrop)
+      // leaves nothing that tells the two apart.
+      const sibling = probe?.unselected;
+      const siblingOk = sibling?.found === true && sibling.visible === true && sibling.selected === false;
+      const own = (probe.selected.carriers || []).filter((c) => !(sibling?.carriers || []).includes(c));
+      if (!siblingOk || own.length === 0) {
+        fail("selectedCue", siblingOk ? (sibling.carriers || []).join(" ") : "unselected sibling missing", "a carrier the unselected sibling lacks",
+          `every structural marker of ${check.selected} is also on unselected ${check.unselected}`);
+      }
     }
   }
 
@@ -780,8 +794,16 @@ export const CHECKS = [
   // change how TALL the "this page" column is, i.e. the 48 check above.
   // Labels against their quotes are hangOrder's (T8f).
   { surface: "library", page: "library.html", selector: ".notes-sheet", state: "displayInkTop", themes: ["", "terminal"],
-    expect: { displayInkTop: { view: "notes", sizes: [[2560, 1300], [1280, 800]], cases: ["notes-cover", "notes-solo"],
+    expect: { displayInkTop: { view: "notes", sizes: [[2560, 1300], [1280, 800]], cases: ["notes-cover", "notes-solo", "notes-diacritic", "notes-multi"],
       coverPx: { 2560: 72, 1280: 44 } } } },
+  // G4 by glyph class (final review #10 / #5): the cases above cover a CJK
+  // title (not pulled up), a Latin title (pulled up) and a Latin title whose
+  // capital carries a diacritic (É, the ink the half-leading pull-up has to
+  // leave room for). The column titles are UI copy, so their CJK case is a
+  // zh_CN interface: at 2560 the notes sheet shows the "这一页" column and
+  // the vocabulary sheet the "词典" column, both first-line titles.
+  { surface: "library", page: "library.html", selector: ".notes-sheet", state: "displayInkTop", themes: [""],
+    expect: { displayInkTop: { view: "notes", locale: "zh_CN", sizes: [[2560, 1300]], cases: ["notes-multi", "notes-diacritic"] } } },
   { surface: "library", page: "library.html", selector: ".notes-sheet", state: "libGeometry", themes: ["", "flexoki-dark", "terminal"],
     expect: { libGeometry: { view: "notes", scenarios: ["notes-multi", "notes-solo"], locales: ["en", "de", "fr"],
       viewports: [
@@ -2024,10 +2046,19 @@ export const CHECKS = [
     expect: { bgEqVar: "btn-hover", textContrast: 4.5 } },
   { surface: "library", page: "library.html", selector: "#vocab-detail-pane", state: "displayInkTop", themes: ["", "terminal"],
     expect: { displayInkTop: { view: "vocab", sizes: [[2560, 1300], [1280, 800]],
-      cases: ["cover", "曖昧", "呼吸", "constraint"] } } },
+      cases: ["cover", "曖昧", "呼吸", "constraint", "Übung"] } } },
+  { surface: "library", page: "library.html", selector: "#vocab-detail-pane", state: "displayInkTop", themes: [""],
+    expect: { displayInkTop: { view: "vocab", locale: "zh_CN", sizes: [[2560, 1300]], cases: ["constraint", "Übung"] } } },
   { surface: "library", page: "library.html", selector: "#vocab-detail-pane", state: "detailNegMargin", themes: ["", "terminal"],
     expect: { detailNegMargin: { sizes: [[2560, 1300], [1280, 800]], panes: ["#vocab-detail-pane"],
       cases: ["cover", "constraint"], openEditor: true } } },
+  // G4b, notes half (final review #12): the excerpt jump buttons' and the
+  // highlighter's cancelling margins, the title and "this page" column
+  // pull-ups. notes-multi carries several excerpts (jump buttons, marks)
+  // and, at 2560, the "this page" column.
+  { surface: "library", page: "library.html", selector: ".notes-sheet", state: "detailNegMargin", themes: ["", "terminal"],
+    expect: { detailNegMargin: { view: "notes", sizes: [[2560, 1300], [1280, 800]], panes: ["#notes-detail-pane"],
+      cases: ["notes-cover", "notes-multi", "notes-solo", "notes-diacritic"] } } },
   { surface: "library", page: "library.html", selector: "#vocab-detail-pane", state: "libGeometry", themes: ["", "terminal"],
     expect: { libGeometry: { cases: [
       { width: 2560, height: 1300, term: "constraint", headPx: 72, ref: "beside", labelRightFromAxis: 96, tailGap: 32, mainPx: 840, containerPx: [1464, 4000] },
