@@ -511,10 +511,37 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       labelOf("x5")?.classList.contains("is-stacked") && Math.abs(quoteToNote() - 8) <= 0.5, String(quoteToNote()));
     const inkBottom = (label) => Math.max(...[...label.querySelectorAll("span")].flatMap((sp) => [...sp.getClientRects()].map((r) => r.bottom)));
     check("a stacked label that hangs below its excerpt still leaves 32px before the next one",
-      excerpts().some((s) => s.style.minHeight) &&
+      excerpts().some((s) => s.style.getPropertyValue("--notes-hang-min")) &&
       excerpts().every((s, i, all) => i === all.length - 1 ||
         all[i + 1].getBoundingClientRect().top - inkBottom(s.querySelector(".notes-excerpt-label")) >= 32 - 0.5),
-      excerpts().map((s) => s.style.minHeight || "-").join(","));
+      excerpts().map((s) => s.style.getPropertyValue("--notes-hang-min") || "-").join(","));
+    // T8f (the 10-05 report): the width drops below the hang tier with NO
+    // frame and no event, so the stacked classes and hang min-heights of the
+    // wide layout are still on the page. They must do nothing there: every
+    // label stays a one-line row above its quote, and no excerpt keeps the
+    // measured min-height.
+    {
+      const staleLabels = excerpts().filter((s) => s.querySelector(".notes-excerpt-label").classList.contains("is-stacked")).length;
+      const staleHang = excerpts().filter((s) => s.style.getPropertyValue("--notes-hang-min")).length;
+      fixtureWidth(960);
+      const rows = excerpts().map((s) => {
+        const label = s.querySelector(".notes-excerpt-label");
+        const quote = s.querySelector(".notes-excerpt-quote");
+        const ink = [...label.querySelectorAll("span")].flatMap((sp) => [...sp.getClientRects()]);
+        return {
+          key: idOf(s),
+          above: Math.max(...ink.map((r) => r.bottom)) <= quote.getBoundingClientRect().top + 0.5,
+          row: getComputedStyle(label).flexDirection === "row",
+          minHeight: getComputedStyle(s).minHeight,
+        };
+      });
+      check("a stacked label and its hang min-height left over from the wide tier do nothing below it, even before any re-measure",
+        paneC() < 1000 && staleLabels > 0 && staleHang > 0 &&
+          rows.every((r) => r.above && r.row && (r.minHeight === "auto" || r.minHeight === "0px")),
+        `C=${paneC()} stale=${staleLabels}/${staleHang} ${JSON.stringify(rows.filter((r) => !r.above || !r.row || !(r.minHeight === "auto" || r.minHeight === "0px")))}`);
+      fixtureWidth(2400);
+      _pbpNotesStackLabels(detail());
+    }
     // is-stacked is layout state appended after the label's own class; the
     // focus snapshot must never key a focused label on it, or a refresh that
     // measures differently loses the focus.

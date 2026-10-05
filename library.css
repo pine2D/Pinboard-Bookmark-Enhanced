@@ -1089,6 +1089,23 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   .notes-excerpt > .notes-excerpt-label > * { max-width: 100%; }
   .notes-excerpt > .notes-excerpt-label .notes-excerpt-color-name { min-width: 0; overflow-wrap: anywhere; hyphens: auto; text-align: end; }
   .notes-excerpt > .notes-excerpt-body { grid-column: 2; }
+  /* The measured form (_pbpNotesStackLabels): the label keeps the height of
+     one line and lets its other lines hang below; when they hang past the
+     excerpt's bottom the measurement writes --notes-hang-min, so the next
+     excerpt still starts 32px under the label's last line. Both only in this
+     tier, where the measurement holds: a class or value left over from a
+     wider width does nothing to a label above its quote (T8f, the 10-05
+     report; ui-contract's measured-layout gate). */
+  .notes-excerpt-label.is-stacked {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: flex-end;
+    row-gap: 0;
+    height: var(--lib-lh-meta);
+    white-space: normal;
+  }
+  .notes-sheet > .notes-excerpt { min-height: var(--notes-hang-min, auto); }
 }
 
 /* Page head (§5.3). The title's first line is pulled up by half its leading
@@ -1128,8 +1145,8 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 .notes-detail-meta > span + span::before { content: "\00a0·\00a0"; }
 
 /* Excerpt label (§5.4): "14:12 ● Quote", the day too when it is not the
-   page's own. Stacked (JS-measured, _pbpNotesStackLabels) it keeps the height
-   of one line and lets the extra lines hang below. */
+   page's own. Its stacked form (JS-measured) lives in the C >= 1000 block
+   above, the only tier where the measurement holds. */
 .notes-excerpt-label {
   display: flex;
   align-items: baseline;
@@ -1151,15 +1168,6 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 }
 .notes-excerpt-color { display: inline-flex; align-items: baseline; gap: var(--lib-sp-1); max-width: 100%; }
 .notes-excerpt-color > .notes-hit-dot { flex: none; margin-top: 0; }
-.notes-excerpt-label.is-stacked {
-  flex-direction: column;
-  flex-wrap: nowrap;
-  justify-content: flex-start;
-  align-items: flex-end;
-  row-gap: 0;
-  height: var(--lib-lh-meta);
-  white-space: normal;
-}
 
 /* Quotes: the current one is the loudest thing on the page by size alone. */
 .notes-excerpt-body { min-width: 0; }

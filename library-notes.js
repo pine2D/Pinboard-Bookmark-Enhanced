@@ -976,6 +976,11 @@ function _pbpNotesJumpTo(key) {
 // excerpt's own bottom, the excerpt gets a min-height so the next one still
 // starts 32px below the label's last line. Measured after every render and,
 // coalesced to one frame, on resize and on a density / theme flip.
+// The results are a class and a custom property (--notes-hang-min), never an
+// inline layout value: library.css applies both only inside the C >= 1000
+// tier, so whatever a narrower width meets before the next measurement --
+// one frame after a resize, or for good when nothing re-measures -- is inert
+// (T8f; ui-contract's measured-layout gate).
 // Batched so the whole page costs two layouts, not one per excerpt: clear
 // every label, read every fit, write every stack; then read every overhang
 // (which needs the stacked layout) and write every min-height.
@@ -987,7 +992,7 @@ function _pbpNotesStackLabels(detail) {
     const label = ex.querySelector(":scope > .notes-excerpt-label");
     if (!label) continue;
     label.classList.remove("is-stacked");
-    ex.style.removeProperty("min-height");
+    ex.style.removeProperty("--notes-hang-min");
     rows.push({ ex, label });
   }
   const stacked = rows.filter(({ ex, label }) => {
@@ -1011,7 +1016,7 @@ function _pbpNotesStackLabels(detail) {
     const overhang = inkBottom - exRect.bottom;
     return overhang > 0.5 ? Math.ceil(exRect.height + overhang) : 0;
   });
-  stacked.forEach(({ ex }, i) => { if (heights[i]) ex.style.minHeight = heights[i] + "px"; });
+  stacked.forEach(({ ex }, i) => { if (heights[i]) ex.style.setProperty("--notes-hang-min", heights[i] + "px"); });
 }
 
 let _notesStackFrame = 0;

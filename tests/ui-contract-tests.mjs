@@ -9380,6 +9380,97 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "library.html: the notes cover lost its title / statistics / hint anatomy, or data-i18n moved back onto #notes-detail-empty (applyI18n would flatten the cover into one sentence, spec §4.11 / §5.7)");
 }
 
+// ---- Library redesign T8f (diag-hang-order §3 A / §6.6): a class or an
+// inline value written from a JS measurement is styled only where that
+// measurement holds. The 10-05 bug: _pbpNotesStackLabels stacks a label only
+// while its excerpt is a grid (C >= 1000), but the .is-stacked rule sat
+// outside that container tier -- a class left over from a wider width turned
+// the label above its quote into a right-aligned, one-line-high column whose
+// second line ran over the quote. Each registry entry names the function, the
+// line of it that decides (the premise), and the CSS that makes the premise
+// true; the gate derives the container tier from that CSS rather than typing
+// it, and requires every rule styling the class, and every consumer of the
+// custom properties the function writes, to sit inside that tier.
+{
+  const MEASURED_LAYOUT = [
+    { file: "library-notes.js", fn: "_pbpNotesStackLabels", classes: ["is-stacked"], vars: ["--notes-hang-min"],
+      premise: { js: /if \(getComputedStyle\(ex\)\.display !== "grid"\) return false;/,
+        css: { selector: ".notes-sheet > .notes-excerpt", property: "display", value: "grid" } } },
+  ];
+  const sources = { "library.js": read("library.js"), "library-vocab.js": libraryVocabJs, "library-notes.js": read("library-notes.js") };
+  const stripLineComments = (src) => src.replace(/^\s*\/\/.*$/gm, "");
+  const fnOf = (src, name) => stripLineComments((src.split("\nfunction " + name + "(")[1] || "").split("\n}\n")[0]);
+  // Contexts (at-rule chains) in which `premise.css` holds, then every rule
+  // naming one of the classes, or consuming one of the vars, outside them.
+  const measuredOffenders = (css, entry) => {
+    const rules = parseStyleRules(css);
+    const { selector, property, value } = entry.premise.css;
+    const holds = rules.filter((r) => r.selectors.includes(selector) &&
+      parseDeclarations(r.body).some((d) => d.property === property && d.value === value)).map((r) => r.context);
+    if (!holds.length) return [`no rule makes ${selector} ${property}: ${value}`];
+    const inside = (ctx) => holds.some((h) => h.length <= ctx.length && h.every((item, i) => item === ctx[i]));
+    const classRe = new RegExp(`\\.(?:${entry.classes.map((c) => c.replace(/[-]/g, "\\-")).join("|")})(?![\\w-])`);
+    const varRe = new RegExp(`var\\(\\s*(?:${entry.vars.join("|")})\\b`);
+    return rules
+      .filter((r) => (r.selectors.some((s) => classRe.test(s)) || varRe.test(r.body)) && !inside(r.context))
+      .map((r) => `${r.selectorText} at ${r.context.join(" > ") || "the top level"}`);
+  };
+  // The function writes its result only as the registered classes and
+  // custom properties: no inline layout property (a min-height left inline
+  // outlives the tier it was measured in exactly like a class does).
+  const inlineOffenders = (body, entry) => {
+    const out = [];
+    for (const m of body.matchAll(/\.style\.(?!setProperty\b|removeProperty\b|getPropertyValue\b)(\w+)\s*=(?!=)/g)) out.push(`style.${m[1]} =`);
+    for (const m of body.matchAll(/\.style\.(?:setProperty|removeProperty)\(\s*["']([^"']+)["']/g)) {
+      if (!entry.vars.includes(m[1])) out.push(`style property ${m[1]}`);
+    }
+    for (const m of body.matchAll(/classList\.(?:add|toggle)\(\s*["']([\w-]+)["']/g)) {
+      if (!entry.classes.includes(m[1])) out.push(`class ${m[1]}`);
+    }
+    return out;
+  };
+  // Synthetic proof that the gate catches the 10-05 shape and passes the fix.
+  const premiseCss = "@container lib-detail (min-width: 1000px) { .notes-sheet > .notes-excerpt { display: grid; } }\n";
+  const entry0 = MEASURED_LAYOUT[0];
+  check(measuredOffenders(premiseCss + ".notes-excerpt-label.is-stacked { height: 16px; }", entry0).length === 1 &&
+    measuredOffenders(premiseCss.replace("} }", "} .notes-excerpt-label.is-stacked { height: 16px; } }"), entry0).length === 0 &&
+    measuredOffenders(premiseCss.replace("} }", "} @media (forced-colors: active) { .notes-excerpt-label.is-stacked { color: CanvasText; } } }"), entry0).length === 0 &&
+    measuredOffenders(premiseCss + ".notes-sheet > .notes-excerpt { min-height: var(--notes-hang-min, auto); }", entry0).length === 1 &&
+    measuredOffenders(premiseCss + "@container lib-detail (min-width: 640px) { .notes-excerpt-label.is-stacked { height: 16px; } }", entry0).length === 1 &&
+    measuredOffenders(".notes-excerpt-label.is-stacked { height: 16px; }", entry0).length === 1 &&
+    inlineOffenders('ex.style.minHeight = h + "px";', entry0).length === 1 &&
+    inlineOffenders('ex.style.setProperty("min-height", h + "px");', entry0).length === 1 &&
+    inlineOffenders('ex.style.setProperty("--notes-hang-min", h + "px"); label.classList.add("is-stacked");', entry0).length === 0,
+    "ui-contract self-test: the measured-layout gate no longer flags an .is-stacked rule or a --notes-hang-min consumer outside the tier where the measurement holds, or an inline min-height (T8f)");
+  const hand = stripGeneratedRegions(libraryCss);
+  for (const entry of MEASURED_LAYOUT) {
+    const body = fnOf(sources[entry.file], entry.fn);
+    check(body.length > 0 && entry.premise.js.test(body),
+      `${entry.file}: ${entry.fn} lost its premise line (${entry.premise.js}) -- re-derive where its result may be styled before changing the gate`);
+    const css = measuredOffenders(hand, entry);
+    check(css.length === 0,
+      `library.css: styled outside the container tier where ${entry.fn} measures (${entry.premise.css.selector} ${entry.premise.css.property}: ${entry.premise.css.value}): ${css.join("; ")} -- a class or value left over from another width must do nothing there (T8f)`);
+    const inline = inlineOffenders(body, entry);
+    check(inline.length === 0,
+      `${entry.file}: ${entry.fn} writes ${inline.join(", ")} -- only its registered classes (${entry.classes.join(", ")}) and custom properties (${entry.vars.join(", ")}), which library.css consumes inside the tier (T8f)`);
+  }
+  // Completeness: every top-level function in a library script that reads
+  // layout AND writes a class literal is a registry entry -- a new measured
+  // class cannot slip past the gate by living in another function.
+  const LAYOUT_READ = /getBoundingClientRect|getClientRects|offsetWidth|offsetHeight|clientWidth|clientHeight|scrollWidth|scrollHeight/;
+  const registered = new Set(MEASURED_LAYOUT.map((e) => `${e.file}:${e.fn}`));
+  const unregistered = [];
+  for (const [file, src] of Object.entries(sources)) {
+    for (const chunk of stripLineComments(src).split(/\n(?=(?:async )?function )/)) {
+      const name = (/^(?:async )?function (\w+)/.exec(chunk) || [])[1];
+      if (!name || !LAYOUT_READ.test(chunk) || !/classList\.(?:add|toggle)\(\s*["'][\w-]+["']/.test(chunk)) continue;
+      if (!registered.has(`${file}:${name}`)) unregistered.push(`${file}:${name}`);
+    }
+  }
+  check(unregistered.length === 0,
+    `library scripts: ${unregistered.join(", ")} read layout and write a class -- register it in the measured-layout gate (ui-contract T8f) with its premise, or move the class write out of the measuring function`);
+}
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);
