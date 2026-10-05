@@ -21,11 +21,6 @@
     },
     {
       "surface": "library",
-      "token": "c",
-      "structural": false
-    },
-    {
-      "surface": "library",
       "token": "card-exit",
       "structural": false
     },
@@ -66,21 +61,6 @@
     },
     {
       "surface": "library",
-      "token": "notes-color-filters",
-      "structural": true
-    },
-    {
-      "surface": "library",
-      "token": "notes-count-compact",
-      "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "notes-count-spoken",
-      "structural": false
-    },
-    {
-      "surface": "library",
       "token": "notes-detail-back",
       "structural": false
     },
@@ -88,11 +68,6 @@
       "surface": "library",
       "token": "notes-detail-delete",
       "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "notes-detail-empty",
-      "structural": true
     },
     {
       "surface": "library",
@@ -106,28 +81,8 @@
     },
     {
       "surface": "library",
-      "token": "notes-detail-note",
-      "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "notes-detail-quote",
-      "structural": true
-    },
-    {
-      "surface": "library",
-      "token": "notes-detail-sib-title",
-      "structural": false
-    },
-    {
-      "surface": "library",
       "token": "notes-detail-source",
       "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "notes-hit-bar",
-      "structural": true
     },
     {
       "surface": "library",
@@ -138,11 +93,6 @@
       "surface": "library",
       "token": "notes-hit-text",
       "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "notes-item-quote",
-      "structural": true
     },
     {
       "surface": "library",
@@ -157,11 +107,6 @@
     {
       "surface": "library",
       "token": "notes-row-title",
-      "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "notes-sib-text",
       "structural": false
     },
     {
@@ -221,11 +166,6 @@
     },
     {
       "surface": "library",
-      "token": "vocab-detail-actions",
-      "structural": true
-    },
-    {
-      "surface": "library",
       "token": "vocab-detail-back",
       "structural": false
     },
@@ -238,16 +178,6 @@
       "surface": "library",
       "token": "vocab-detail-delete",
       "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "vocab-detail-dict",
-      "structural": true
-    },
-    {
-      "surface": "library",
-      "token": "vocab-detail-empty",
-      "structural": true
     },
     {
       "surface": "library",
@@ -271,11 +201,6 @@
     },
     {
       "surface": "library",
-      "token": "vocab-detail-relookup",
-      "structural": false
-    },
-    {
-      "surface": "library",
       "token": "vocab-detail-speak",
       "structural": false
     },
@@ -293,16 +218,6 @@
       "surface": "library",
       "token": "vocab-filter-toolbar",
       "structural": true
-    },
-    {
-      "surface": "library",
-      "token": "vocab-gloss-ipa",
-      "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "vocab-gloss-text",
-      "structural": false
     },
     {
       "surface": "library",
@@ -348,21 +263,6 @@
       "surface": "library",
       "token": "vocab-signed-out-lookup",
       "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "vocab-stat",
-      "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "vocab-stat-trend",
-      "structural": false
-    },
-    {
-      "surface": "library",
-      "token": "vocab-stats",
-      "structural": true
     },
     {
       "surface": "library",

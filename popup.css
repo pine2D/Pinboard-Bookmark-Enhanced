@@ -3202,7 +3202,7 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-h
   border-radius: var(--pp-radius-md);
   cursor: pointer;
   font-family: inherit;
-  font-size: var(--pp-text-body-sm); /* the sm type token its row neighbour .qbtn reads; before it was declared, this was the one control here inheriting the UA's 13.333px */
+  font-size: var(--pp-text-body-sm); /* the sm type token the .qbtn row above it reads; before it was declared, this was the one control here inheriting the UA's 13.333px */
 }
 .md-strip-btn .btn-ic { margin: 0; vertical-align: 0; }
 /* `.md-strip` is specificity ballast (0,3,0): the themed RESTING rule

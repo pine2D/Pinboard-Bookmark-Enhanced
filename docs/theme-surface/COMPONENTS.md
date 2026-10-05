@@ -342,6 +342,8 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
   （`.row-del-x` / `.vocab-sort-btn` / `.vocab-batch-bar .btn` / `.vocab-group-step`），详情面板里的
   `.vocab-detail-delete`、`.vocab-detail-relookup`、`.vocab-detail-speak`、`.notes-detail-delete` 全部落回
   `display: inline` 吃基线对齐。全局基础规则落地后，这四条窄例外**必须删掉**（留着只会掩盖下一次同类缺口）。
+  （2026-10 现状：全局基础规则已由生成区发射，四条窄例外已不在 library.css；其中 `.vocab-sort-btn` 与
+  `.vocab-detail-relookup` 本身也已退役，C58。）
 - 图标只从 Lucide v0.525.0 同版本取 path，24-box、stroke 2。SVG 内**禁止 `<text>` 节点**（CJK 字形会踩
   字体回退停顿）。语义分配见附录 A。
 - UI 里禁止字面 emoji / dingbat 字符（⚠ ✓ ✗ ↻ ▸ ▾ ℹ …），一律走 `PBP_ICONS` 内联 SVG。
@@ -519,8 +521,8 @@ quiet 档在 popup 目前只有 `.del-btn` 一个消费者。
 3. **垂直 padding ≥ 2px**。垂直 padding 为 0 时 chip 高度完全由行盒撑出，配上满圆角就是缺陷 3
    的确切形状（`.vocab-group-chip` 现状 `padding: 0 4px`）。
 
-定律 1、2 只约束 pill（`radius-full`）；定律 3 约束所有 chip/badge，包括用 `radius-sm` 的
-`.vocab-stat-chip`（现状 `padding: 1px 8px`）。
+定律 1、2 只约束 pill（`radius-full`）；定律 3 约束所有 chip/badge，包括用 `radius-sm` 的方角 chip
+（原例 `.vocab-stat-chip`，`padding: 1px 8px`；2026-10 已退役，状态筛选改为 `.lib-toggle`，C59）。
 
 ### 5.2 结构配方
 
@@ -544,7 +546,7 @@ quiet 档在 popup 目前只有 `.del-btn` 一个消费者。
 .<chip>[aria-pressed]:focus-visible { outline: 2px solid var(--{ns}-accent); outline-offset: 2px; }
 ```
 
-方角 chip（`radius-sm`，如 `.vocab-stat-chip`）沿用同一 padding-block（≥2px）与 line-height，
+方角 chip（`radius-sm`，原例 `.vocab-stat-chip`，2026-10 已退役，C59）沿用同一 padding-block（≥2px）与 line-height，
 只换 `border-radius`；定律 2 不适用。
 
 **可选中 chip（`selectable`）**——chip 是一颗视觉隐藏的 radio / checkbox 的**面**：
@@ -1618,7 +1620,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | md-preview | `.row` | 控件行（flex wrap，align center，gap sp-2）：导出开关行、翻译按钮行、字号步进行、高亮色板行、侧栏底部图标行；placement 归父级或 id |
 | md-preview | `.panel-head` | 面板标题行（flex，align center，gap sp-2；`> h2` flex:1、1.05em/600）：ask 面板、要点面板、词典卡头 |
 
-清点（2026-09-05 工作流，四表面 138/97/134/273 个 token）同时给出了**候选**原语——popup 的 `actions`/`field-foot`/`banner`/`card`/`list-row`、library 的 `lib-row`/`lib-cluster`/`lib-section`/`lib-block`/`lib-quote`、md-preview 的 `rail-row`/`panel-head`/`panel-actions`/`seg-row`/`stack`/`pop-body`/`scroll-list`——每个都能吸收 5～15 个遗留类。它们**尚未登记**：登记的时机是把对应遗留类真正迁过去的那次施工，不提前占名。
+清点（2026-09-05 工作流，四表面 138/97/134/273 个 token）同时给出了**候选**原语——popup 的 `actions`/`field-foot`/`banner`/`card`/`list-row`、library 的 `lib-row`/`lib-cluster`/`lib-section`/`lib-block`/`lib-quote`、md-preview 的 `rail-row`/`panel-head`/`panel-actions`/`seg-row`/`stack`/`pop-body`/`scroll-list`——每个都能吸收 5～15 个遗留类。它们**尚未登记**：登记的时机是把对应遗留类真正迁过去的那次施工，不提前占名。（2026-10 现状，library 部分：`lib-cluster` 已登记为原语；`lib-section` / `lib-block` 登记过，详情重写后无生产者，T9c 退役；`lib-quote` 已随平铺画布退役，C56。）
 
 **同形原语对照（2026-09-06）**。四份样式表各有自己的 token 命名空间，也没有一份被四个表面共同加载的 CSS（composer 只发射到三个工厂表面，md-preview 手写），所以同一形状在各表面各有一个名字；不靠名字统一，靠门锁形状：
 
