@@ -2512,8 +2512,6 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
     check(m.get("overflow-y") === "auto" && m.get("container-type") === "inline-size" && m.get("container-name") === "lib-detail" && drawn.length === 0,
       `library.css: ${pane} must be its own scroll container and the lib-detail size container — never sticky, centred or a drawn panel; stray: ${drawn.join(", ") || "none"}`);
   }
-  check(![...decl(".lib-section").keys()].some((p) => p.startsWith("border")),
-    "library.css: .lib-section draws a rule again — sections on the flat page are divided by space and type, never by a line (user ruling 2026-10-03)");
   // The reading measure belongs to the detail column, not to each child: a
   // child that carries its own cap re-creates the left-hugging prose the pane
   // column replaced.
@@ -2551,7 +2549,10 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
 {
   const registry = JSON.parse(read("docs/theme-surface/ui-vocabulary.json"));
   const structures = registry.surfaces?.library?.canvasStructures;
-  const T3_SKELETON = ["lib-header", "vocab-workbench", "notes-workbench", "vocab-list-region", "notes-list-region", "vocab-detail-pane", "notes-detail-pane", "lib-section", "lib-block"];
+  // .lib-section / .lib-block left the skeleton in T9: the detail panes
+  // stopped producing them (T7 / T8), and their rules and registry entries
+  // went with them (T9c).
+  const T3_SKELETON = ["lib-header", "vocab-workbench", "notes-workbench", "vocab-list-region", "notes-list-region", "vocab-detail-pane", "notes-detail-pane"];
   check(Array.isArray(structures) && T3_SKELETON.every((c) => structures.includes(c)),
     `ui-vocabulary.json: library.canvasStructures must list the page skeleton (at least ${T3_SKELETON.join(", ")}) — got ${JSON.stringify(structures)}`);
   const skeleton = new Set(Array.isArray(structures) ? structures : []);

@@ -23,7 +23,7 @@
   的正则排除出 used 集合，静默逃门——生成区内禁止出现。
 - **间距一律写像素值**（`padding: 4px 16px`）。三表面 `--sp-*` 刻度不同（popup/options 7 档 2..24，
   library 10 档 2/4/8/12/16/24/32/48/64/96——sp-0 是 2026-09-06 补的 hairline，sp-6..9 是 2026-10-03 重新设计补的
-  布局档，没有 6 档），配方**不得**引用 `--{ns}-sp-N`；
+  布局档，没有 6px 档），配方**不得**引用 `--{ns}-sp-N`；
   由 `ui-components.mjs` 的 SPACING adapter 在发射时映射到该表面**数值相等**的 token，无对应档位发射字面 px。
 - **圆角写 token 名**（`var(--{ns}-radius-md)`）。radius 三表面同名同角色（sm 在 options 是 3px、library 是
   4px，属刻度差异，与间距不同的是它不需要跨表面数值相等），直接引用不会算错。
@@ -101,7 +101,7 @@ YaHei/PingFang 时行盒比 Latin 高一截，同一颗按钮在 zh-CN 和 en �
 | md（字段、主按钮） | 32 | 28 | 26 |
 | sm（工具条、行内动作） | 28 | 24 | 20 |
 | 图标命中区 | 24 | 24 | 24 |
-| row | 由内容撑 | 由内容撑 | 由内容撑（`.notes-hit-btn` / `.notes-card-top` / `.notes-sib`，不属于 `.btn` 族） |
+| row | 由内容撑 | 由内容撑 | 由内容撑（`.notes-hit-btn` / `.notes-card-top` / `.notes-excerpt-jump`，不属于 `.btn` 族） |
 
 新阶（comfortable / compact 两列）不再靠 line-height 拼盒：直接钉 `height: var(--opt-control-h)`
 （`box-sizing: border-box`，全局 `*` 规则已置）、内容居中对齐——options 新原语（阶段 3c 起全部面板）已实装这套机制
@@ -599,10 +599,10 @@ library 都没有一个 `class="fg"`（`ui-vocabulary.json` 也只在 options �
 （阶段 4 起）从 `FIELD_TARGETS.pp`（`composers/ui-components.mjs`，同一个 `formRules`）拿到同一套字段
 语言的**颜色半边**：静息 / 悬停 / 聚焦三态、占位符与乘客文字，选择器一律带类型，三态特异性逐盒严格递增
 （§6.2 popup 列）；形状半边（宽、内距、圆角、`border-width` / `border-style`）与光晕留在 popup.css
-手写区，手写区在值盒子上不写任何颜色。library 的值盒子（工具条三个搜索框、`#vocab-group-filter` /
-`#vocab-lookup-lang` / `.xp-dict-lang` 三个原生 select、两处 `.vocab-group-unit` 壳与乘客、笔记框）自阶段 4 起由
+手写区，手写区在值盒子上不写任何颜色。library 的值盒子（三个搜索框、`#vocab-group-filter-btn` /
+`#vocab-lookup-lang-btn` 两个列表框按钮（2026-10 起，C58；`.xp-dict-lang` 已并入）、两处 `.vocab-group-unit` 壳与乘客、笔记框）自阶段 4 起由
 `FIELD_TARGETS.lib` 生成颜色半边（填充、四边、键入文字、占位符、悬停、聚焦边、`--lib-field-chevron`），三态同样逐盒
-严格递增；形状半边（高度、内距、圆角、宽度、边框宽度与样式）、§6.4 记录的 sm 20px 阶、焦点环 `box-shadow` 与
+严格递增；形状半边（高度、内距、圆角、宽度、边框宽度与样式）、§6.4 记录的 sm 阶（2026-10 起为 library 密度阶 28 / 24，C57）、焦点环 `box-shadow` 与
 z-index 抬升、forced-colors 兜底仍手写在 library.css。手写区不得再给值盒子写颜色、`border` 简写或 chevron
 （ui-contract 钉住）。
 **代价**：`.fg` 是 options 独占词汇，别的表面加 `class="fg"` 会静默失效——要用就先改 composer 守卫。
@@ -793,10 +793,14 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
 
 ### 6.4 使用守则
 
-- **缺陷 2 的形状**：`.vocab-batch-bar` 一行里，图标按钮吃 `.btn-sm`（垂直 2px / 11px）而分组输入吃
-  `padding: 4px 8px` / 12px，约 5px 高度差，读起来像两个控件家族硬拼。裁定：**整行统一到 sm 阶**——
-  输入框 padding-block 4px→2px、显式 `line-height: 14px`，字号保持 12px（sm 阶允许 11–12px）。
-  升到 md 阶会让用户已拍板的密集 sticky 批量条整体长高 7px，不取。
+- **批量操作行（2026-10 重写，取代原「缺陷 2」条的 sm 20 裁定，附录 C3 只作历史）**：批量操作按钮一律
+  sm 阶（舒适 28 / 紧凑 24，§1.1 的 library 密度阶），分组输入同阶。批量操作行在有选中项时**就地替换列表头的计数行**：
+  计数行设 `hidden`，批量行是它的下一个兄弟，同在不滚动的列表头里；不 sticky，不画阴影、边框、底色与圆角。
+  「已掌握」「学习中」是 sm 文字按钮（可见文字 `vocabStatusKnown` / `vocabStatusLearning`，`title` / `aria-label`
+  仍是 `vocabMarkKnown` / `vocabMarkLearning`）；删除、清除、反选仍是图标按钮。生词批量行在任何索引宽度都是两行
+  （28 + 8 + 28 = 64，紧凑 56），笔记批量行一行、放不下时允许折成两行（10-04 控制器定，与生词侧同一语言）。出处：
+  10-02 选项问答（批量条按钮 28）、10-03 采纳综合方案 S 第 6 条与原型第二轮第 3 条；spec
+  `2026-10-03-library-redesign-design.md` §3.9、§11 V8、V28、10-04 附录；附录 C59。
 - `font-family: inherit` 是**性能规则不是美学规则**，勿删：表单控件默认不继承 `font-family`，会吃 UA 的
   Arial（无中文字形）→ 中文掉到 Chrome 的 Standard 字体，高 DPI Windows 上首屏 1–3s 冻结。
   两表面的覆盖面**不同**：`options.css:93` 是 `button, input, select`（**不含 textarea**，靠
@@ -844,11 +848,12 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
   label）。成本明显大于收益（一处未被任何门检查的 HTML 语义违规），暂不做。
 - **例外 2：`.listbox`**（stage2 R4，spec `2026-09-24-ui-system-stage2-design.md` §3）。设置页其余 select 仍是原生控件（options.css 的
   `appearance: base-select` picker 样式），`.listbox` 是全仓**唯一**获准的自绘 select，只增强标了
-  `data-listbox` 的 `<select>`（目前 10 处：options.html 里 9 处——`#opt-lang`、`#opt-ai-provider`、
+  `data-listbox` 的 `<select>`（options 10 处 + library 3 处。options：options.html 里 9 处——`#opt-lang`、`#opt-ai-provider`、
   `#opt-ai-tag-lang`、`#opt-ai-summary-lang`、`#opt-ai-tag-separator`、`#translate-target-lang`、
   `#opt-selection-trigger`、`#opt-md-image-policy`、`#opt-theme`；另有 Send-to 构建器在运行时生成的
-  Obsidian「route」一处，由 options.js 插入后调用 `pbpEnhanceListbox`），静态的 9 处由
-  `listbox.js` 在 DOMContentLoaded 时增强。成立条件——每条对应自绘控件会丢的一样东西：
+  Obsidian「route」一处，由 options.js 插入后调用 `pbpEnhanceListbox`；library：`#vocab-group-filter`、
+  `#vocab-lookup-lang` 两个值盒子与 `#vocab-sort` 一个 ghost 触发器，见本条末尾的「library 部分」），两页的静态
+  select 都由 `listbox.js` 在 DOMContentLoaded 时增强（逐个 try/catch，`finally` 给 `<html>` 打 `data-listbox-ready`）。成立条件——每条对应自绘控件会丢的一样东西：
   1. **native `<select>` 保留为值载体**：不删、不换，只加 `hidden`（增强器加，JS 未运行时原生 select
      可见可用）。options.js 照旧读写 `.value`、监听 `change`；程序化改值后调用
      `window.pbpListboxSync(select)`（options.js 的 `syncTranslateLangCustomState()` 与
@@ -879,6 +884,22 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
   `--opt-fg-hint`。定位（在外壳上）：`position: absolute` 于 `.listbox` 内、`top: 100% + sp-1`、
   `z-index: --opt-z-popover`，打开时测一次，视口下方放不下且上方更宽时给外壳加 `data-flip="up"`
   （属性，不写内联 style）。不用 `:has()`、不用 Shadow DOM。其余 select 仍走原生 picker（阶段 3 再议）。
+  **library 部分（2026-10，C58）**：外观、ARIA 与键盘集同上，差别四处。① **浮层模式** `select[data-listbox="float"]`：
+  弹层外壳加 `popover="manual"`，打开时先 `pop.hidden = false` 再 `showPopover()`，由 `pbpListboxPlace(pop, anchor)`
+  定位（`position: fixed`，`minWidth` = 按钮宽、`maxWidth` = 视口宽 − 16，左右夹在视口内各留 8，下方放不下且上方更大时
+  上翻并写 `data-flip="up"`，写 `--listbox-room` 限高）；`resize` 与列表以外的捕获 `scroll` 都关闭弹层，所以在两个滚动
+  容器里、在详情区底部打开都不被裁。library.css 复位 UA 的 `[popover]` 样式并补 `color: var(--lib-fg)`；「筛选」弹层
+  （列表头第 2 行放不下时）用同一个定位函数。options 保持 absolute 模式，外观零变化。② **ghost 外观变体**
+  `data-listbox-face="ghost"`（只给排序）：按钮是 `.listbox-trigger.btn.ghost`，不是 `.listbox-btn`，**不是值盒子**、
+  不进 `FIELD_TARGETS`、不建 `.listbox-sizer`；文字取选中 option 的 `data-face-label`，图标取 `data-face-icon`（Lucide
+  arrow-down / arrow-up 直线箭头，↓ 一律降序、↑ 一律升序），可访问名 = sr-only label + 隐藏 span（`librarySortFaceAria`）。
+  ③ **颜色**只来自 `FIELD_TARGETS.lib` 的 `lib-listbox` 条目（`.listbox-btn` 三态）；弹层 `--lib-panel` / `--lib-border`
+  / `--lib-radius-lg` / 现有弹层阴影，活动项 `--lib-btn-hover`，选中项 `--lib-accent` / `--lib-on-accent`；按钮与选项高读
+  `--lib-control-h`（32 / 28）。④ **首帧**：`html:not([data-listbox-ready]) select[data-listbox] { visibility: hidden }`，
+  原生 select 与按钮同高，替换不位移；单个增强失败时原生 select 露出作回退。另：`setActive()` 两种模式都只改
+  `list.scrollTop`（`scrollIntoView` 会连带滚动祖先滚动容器，双滚动容器下整栏会跳）。`.xp-dict-lang` 已并入
+  `#vocab-lookup-lang`；查词语言的选项由 `_pbpVocabFillLookupLangs`（library-vocab.js）按界面语言统一重建，页面、测试页与
+  渲染门切换语言时都走它，量到的列表框宽度才是该语言的真实宽度。
 - **例外 3：`.pick`**（stage3b Task 1，spec `2026-09-24-ui-system-stage3b-design.md` §2，R11
   用户裁决「勾选行」）。单选组（未来经 `.pick-box` 变体覆盖多选列表，Task 2）是全仓**第三个**获准的
   自绘布尔控件，与 `.switch` 同一族技巧（隐藏原生 input 覆盖整行、状态用绘制部件表意），成立条件同样
@@ -996,10 +1017,15 @@ html[data-theme="<dark preset>"] { color-scheme: dark; }
 `--pp-field-border-focus` / `--lib-field-border-focus` 作芯（值盒子的 `bordered` 芯与眼睛钮的 `inset` 芯），颜色由
 生成配方给出，手写的焦点规则只剩光晕与 `outline: none`；手写区的光晕规则用注册表聚焦选择器的同一条（`:focus`
 换成 `:focus-visible`，`:focus-visible` 与 `:focus-within` / `:has()` 的壳原样）。§7.3 扫描把同一选择器的生成声明
-并进来判定（library 的 `.xp-dict-lang` 就在自己的聚焦选择器上压掉 outline），:focus 搭档也在整个文件（含生成区）
+并进来判定（library 原先的 `.xp-dict-lang` 就是一例，它在自己的聚焦选择器上压掉 outline；2026-10 已并入列表框，C58），:focus 搭档也在整个文件（含生成区）
 里找。外命名空间的芯与非值盒子控件（`.btn` 等）仍只接受 `--{ns}-focus-bd`。
 
 **强制色模式下的值盒子聚焦（阶段 4）**：`bordered` 落位靠改涂边框加光晕，强制色下这两样都失效（光晕被丢弃，边色被压成系统色）。所以 options 的每种值盒子另有一条 `@media (forced-colors: active)` 下的 `:focus-visible { outline: 1px solid Highlight; outline-offset: 2px }`，形状与 `.listbox-btn` 的先例相同，放在 options.css 文件末尾，保证不被写了 `outline: none` 的聚焦规则反超（ui-contract 钉住覆盖面与这条次序）。popup 自阶段 4 Task 6 起同样有一段（popup.css 文件末尾）：六个值盒子各用自己注册表条目的光晕选择器画这圈轮廓，壳（标签壳、密钥框）按壳的 `:focus-within`；ui-contract 从 `FIELD_TARGETS.pp` 推出应有的选择器逐条核对，并确认没有 `outline: none` 的聚焦规则在同一个盒子上反超它。library 自阶段 4 Task 7 起同理，共 9 个盒子、7 条光晕选择器：三个搜索框共用 2 条选择器，那段留在原处（搜索框规则之后）；其余 6 个盒子共用 5 条选择器（两个工具条 select 各一条、`.xp-dict-lang`、笔记框，两处分组单元壳共用壳的 `:has(> input[type="text"]:focus)` 一条），这段放在手写区末尾。ui-contract 从 `FIELD_TARGETS.lib` 推出这 7 条选择器逐条核对，反超检查在 library.html 加上运行时盒子（笔记框、`.xp-dict-lang`、详情窗格的分组单元）的结构树上做。三个表面的这项检查是同一个函数（`forcedOutlineReport`，Task 7 修复轮 1）：凡是能在轮廓生效的同时生效的压 outline 规则都算反超候选——聚焦规则之外，悬停规则（指针停在键盘聚焦的盒子上）与无状态规则也算，只要它是 `!important` 或特异性 / 源序胜出。豁免按与之配对的那条轮廓规则自己的触发来判（`suppressorExcludedBy`，修复轮 2）：轮廓触发是盒子自身的 `:focus` / `:focus-visible` 时，主体上的 `:not(:focus)`、`:not(:focus-within)`（`:focus-visible` 触发时另加 `:not(:focus-visible)`）才算排除；轮廓挂在壳的 `:focus-within` / `:has(…)` 上时，只有主体上的 `:not(:focus-within)` 或同一个 `:not(:has(…))` 才算——壳本身从不获得焦点，`:not(:focus)` / `:not(:focus-visible)` 写在壳上什么也排除不了；轮廓的触发在主体的祖先上时（popup 密钥框），主体上的任何 `:not()` 都不算；祖先复合上只有 `:not(:focus-within)` 算（祖先包含焦点元素，自己不获得焦点）；主体是 `:disabled` 的规则不算；多参数的 `:where()` / `:is()` 是「或」，里面的 `:not()` 不算排除。§7.3 扫描的强制色分支也审 `:focus-within` 写法的这类规则。
+
+**2026-10 更新（C58）**：library 的两个原生 select 与 `.xp-dict-lang` 已换成列表框按钮 `#vocab-group-filter-btn` /
+`#vocab-lookup-lang-btn`，它们的强制色焦点并入统一块的 `.listbox-btn` 条目（`outline: 1px solid Highlight;
+outline-offset: 2px`，写法同 options）；上文「9 个盒子、7 条光晕选择器」的条数以 ui-contract 从 `FIELD_TARGETS.lib`
+推出的选择器为准。
 
 **落位判定只问两件事**，按顺序：
 
@@ -1144,7 +1170,7 @@ chevron 探出边框——根因是同一处：一条 id 选择器规则把水�
    | 单元类型 | 容器 | 格子 |
    |---|---|---|
    | 载字段（`.vocab-group-unit`、`.key-wrap`、`.tags-input-wrap`） | **输入框**聚焦时画 §7.3 `bordered` 环 | 步进钮聚焦时容器**不动**，格子自己画 `inset` 环 |
-   | 纯按钮分段（`.vocab-sort-seg`） | **不画环** | 聚焦格子画 `inset` 环 |
+   | 纯按钮分段（`.vocab-sort-seg`，2026-10 已退役，排序改为 ghost 列表框触发器，C58；本行留作规则示例） | **不画环** | 聚焦格子画 `inset` 环 |
 
    **原修订前的写法是 `:focus-within` 一把抓，两个缺陷都出在这里**：① `:focus-within` 没有键盘
    门控，鼠标点一下分段就亮一圈框（`:focus-visible` 才只认键盘）；② tab 到格子时，容器环和格子
@@ -1246,7 +1272,7 @@ label span（`<span class="btn-ic">svg</span><span></span>`），在 grid 下它
 留出间隙，把图标左推 2px。静态 HTML 写的单子节点按钮不会暴露这个差异（同一份 CSS、不同 DOM），
 所以断言必须钉在 **JS 构建**的那一份上。
 
-**按钮组型的三处差异**（`.vocab-sort-seg`）：容器边框取 `--{ns}-border`、底取 `--{ns}-btn-bg`；
+**按钮组型的三处差异**（`.vocab-sort-seg`，2026-10 已退役，C58；规则留给今后的按钮组）：容器边框取 `--{ns}-border`、底取 `--{ns}-btn-bg`；
 **容器完全不画 focus 环**（2026-08-06 修订，见律 2 的表：没有文本录入就没有属于容器的焦点，
 聚焦格子的 inset 环即全部指示）；分隔线只画在**有左邻居**的那一格（`.<seg> + .<seg>`），
 因为容器的第一格左侧就是容器边框本身。
@@ -1302,7 +1328,7 @@ contrast-audit 的字段行（`field-fg` 对 `field-bg` / `field-bg-hover` ≥4.
 | 控件 | 表面 | 判定 | 备注 |
 |---|---|---|---|
 | `.vocab-group-unit`（批量条 + 详情面板两处） | library | **本次重建** | 输入 + 双步进钮；用户四轮打回的主案。阶段 4：壳入字段语言（生成颜色半边，悬停换填充、排除聚焦与禁用，分隔线随壳） |
-| `.vocab-sort-seg` | library | **本次重建** | 分段按钮对；分隔线原本随 `aria-pressed` 变色 |
+| `.vocab-sort-seg` | library | **2026-10 退役**（C58，排序改为 ghost 列表框触发器；此前为本次重建） | 分段按钮对；分隔线原本随 `aria-pressed` 变色 |
 | `.key-wrap`（19 个密钥字段） | options | **本次修律 2** | 容器无 chrome 变体 |
 | `.secret-field` | popup | **本次修律 2；阶段 4 入字段族** | 同上，跨表面同形。输入框承担外观（`FIELD_TARGETS.pp` 的 `pp-secret`），悬停 / 聚焦挂在壳上（`:hover:where(:not(:focus-within))` / `:focus-within`），指针移到眼睛上字段仍是悬停态；眼睛悬停底 = `field-fg` 8% 叠在当时的字段填充上 |
 | `.tags-input-wrap` | popup | **阶段 4 入字段族** | 壳持外观（`FIELD_TARGETS.pp` 的 `pp-tags`：三态填充与四边），芯 `#tags-input` 是透明、无框的乘客，文字 `field-fg`；壳的 `:focus-within` 光晕与移除钮自身的环在移除钮聚焦时叠成双环，是既有问题，另行立项（spec §1.2） |
@@ -1343,8 +1369,9 @@ contrast-audit 的字段行（`field-fg` 对 `field-bg` / `field-bg-hover` ≥4.
    **不再引用 `--{ns}-border`**——后者留给真正的结构边（浮层、表格线、滚动条）。
    options 的值盒子（`.fg` 文本/密钥/数字/textarea、`.listbox-btn`、原生 select 回退、窄屏页签选择器）
    B+ 起改用 `--opt-field-border` 作塌陷载体（§6.2），不再直接引用 `--opt-input-border`。
-   library 的值盒子（三个搜索框、三个原生 select、`.vocab-group-unit` 壳、笔记框）阶段 4 起同样以
-   `--lib-field-border` 作塌陷载体；`--lib-input-border` 只剩两个批量条外框这一处消费者，保留。
+   library 的值盒子（三个搜索框、`#vocab-group-filter-btn` / `#vocab-lookup-lang-btn` 两个列表框按钮、`.vocab-group-unit`
+   壳、笔记框；排序的 ghost 列表框触发器不是值盒子，走 `.btn.ghost`）阶段 4 起同样以 `--lib-field-border` 作塌陷载体；
+   `--lib-input-border` 自 2026-10 起在手写区已无消费者（批量操作行不再画外框，C59），仍作为 pilot 输入角色由 composer 发射。
 
 2. **填充必须与所在表面分离。** 去掉边框后，与宿主表面同色的填充 = 看不见的控件。
    派生函数 `fillSeparate(fill, surfaces, target, min)`（`composers/_ui-derive.mjs`）把混色目标
@@ -1383,9 +1410,13 @@ contrast-audit 的字段行（`field-fg` 对 `field-bg` / `field-bg-hover` ≥4.
    只取只靠填充区分的对，由环区分的对另列 `markerPairMin`）、`insetBand`，以及
    ui-contract 的「S2 不画条」「行填充只读派生 token」「is-error 特异性」三道门。
 
-4. **分隔线与卡片：不画完整包围框。** 卡片 / 分节的边降到发丝级（`--{ns}-border-section`），
-   列表行之间靠间距与填充分层、不靠线。浮层（popover / dropdown）**例外**：它盖在无关内容上，
-   那圈 3:1 的边在干实事，保留。
+4. **library 是平铺画布；其余表面的分隔线与卡片不画完整包围框。** library（2026-10 起，C56，USER RULING
+   2026-10-03「不要用色块分隔……就很丑」）：页面骨架（`ui-vocabulary.json` library 段的 `canvasStructures`）不画面板、
+   卡片、内凹井、分隔线——不画非透明底色（`--lib-bg` 除外）、任何边框、阴影，`outline` 只给 `:focus-visible`；分区只靠
+   字阶、留白、栏位对齐、悬挂标签与节首小标题。可交互行与切换按钮的悬停填充是状态反馈，不算分区。门：ui-contract
+   平铺画布门。popup / options：卡片 / 分节的边降到发丝级（`--{ns}-border-section`），列表行之间靠间距与填充分层、
+   不靠线。浮层（popover / dropdown，含 library 的列表框、「筛选」与确认弹层）**例外**：它盖在无关内容上，那圈 3:1
+   的边在干实事，保留。
 
 5. **不变的部分。** hover 加深、focus 环（§7.3）、selected accent、danger 两档（§4）
    **一律不动**。本节只改静息态。
@@ -1500,7 +1531,7 @@ contrast-audit 的字段行（`field-fg` 对 `field-bg` / `field-bg-hover` ≥4.
 | checklist 侧栏搜索框 + render family 13 / 9（阶段 4 Task 4） | `#options-search-input` 静息 `bgEqVar field-bg` + `borderSidesEqVar field-border`，聚焦 `bordered` + `field-bg-focus` + `field-border-focus`（2 行 × 15 主题）；family 13 的 options 填充集合加入 `field-bg` / `-hover` / `-focus`；family 9 的 options 必需种类加入 `input[type="search"]` |
 | render oracle family 14 `fieldHoverContrast` 的 popup 腿 + checklist popup 行（阶段 4 Task 6） | popup 六个值盒子（手写名单 `VALUE_BOX_LEGS.popup`：url / title / description / tags 壳 / search / token，token 走登出腿）逐个用真指针读静息与悬停：两态填充与四边都等于各自的 `--pp-field-*` 且四边都已绘制，四角等于 `--pp-radius-md`；类别按 `FIELD_UNSEPARATED_FRAMED.popup`（`["terminal"]`）点名判：名单外的块悬停填充对静息 ≥ `FILL_SEPARATE_MIN`，名单内的块填充不动、改看框：≥ `FIELD_FRAME_HOVER_MIN`、ΔE2000 ≥ `FIELD_FRAME_HOVER_MIN_DE`、画在填充上更强（F8）；另有一行 `fieldHoverClass` 按页面 token 与 `FIELD_HOST_ROLES.pp` 实测类别，与名单不等即 FAIL。缺盒子、不可见或禁用都是 SETUP ERROR，覆盖行打印 `fieldHoverContrast popup: N value box(es)`。函数按表面参数化（`readValueBoxPaint` / `recordValueBoxes` / `recordValueBoxHover`），library 腿复用同一套函数（下下行）。checklist 另有 5 盒 × 3 态 15 行钉 token 身份（聚焦行加 `focusRecipe: "bordered"`）；所有 `focusWithin` 行的未聚焦基线改经 `holdPointerState` 的 rest 读数（壳有了悬停填充以后，宿主指针停在壳上会读到悬停态），不成立记 `focusBaselineRest` SETUP 行。family 9 的值盒子律在 popup 按 `valueBoxes` 条目认种类，`RADIUS_VALUE_BOX_REQUIRED.popup` 要求六个盒子都量到，sweep 为此新增 popup `form` 腿（去掉 `.unsupported-url`、显示搜索行） |
 | ui-contract 的 popup 值盒子模型（阶段 4 Task 6） | 遍历导入的 `FIELD_TARGETS`（pp 与 lib 全部条目）：三态选择器平行、带类型、特异性逐盒严格递增（静息 < 悬停 < 聚焦）、悬停排除聚焦触发与 `:disabled`；popup.html 的每个文本录入控件恰被一个条目覆盖（盒子本身或壳的乘客），每个条目都命中元素；生成区逐条声明正确；手写区在值盒子 / 壳 / 乘客上不写任何颜色（乘客只许透明、无框、`field-fg`；运行期状态类如 `.ac-open` 也算命中），不许 `html[data-theme]` 颜色孪生、手写占位符；url() 里的颜色字面量走模块级 `valueBoxUrlColourOffenders`；形状走模块级 `valueBoxShapeOffenders`（仅豁免 `.tags-input-wrap.ac-open` 的两个下角归零）；光晕规则与生成的聚焦规则同选择器；强制色下六个盒子各有 1px Highlight 轮廓，且不被能与焦点同时生效的压 outline 规则反超（Task 7 修复轮 1 起含悬停与无状态规则，共用 `forcedOutlineReport`）；眼睛墨色静息 `field-placeholder`、悬停 `field-fg`，眼睛悬停底 15 块 × 2 态 ≥ `FILL_SEPARATE_MIN`（F10，最低 1.119）；`--pp-input-bd`、`--pp-fg-soft` 与 `:has()` 不得回流。§7.3 扫描的伙伴规则在整个文件里找 |
-| render oracle family 14 的 library 腿 + checklist library 行（阶段 4 Task 7） | library 九个值盒子（`VALUE_BOX_LEGS.library`：三个搜索框、`#vocab-group-filter` / `#vocab-lookup-lang` / `.xp-dict-lang`、两处 `.vocab-group-unit` 壳、笔记框）走 popup 腿同一套函数，判定相同，类别名单 `FIELD_UNSEPARATED_FRAMED.library = ["terminal"]`。vocab 腿重新导航：单击行头打开详情、Ctrl+单击打开批量条、点「再次查询」生成 `.xp-dict-lang`（本 profile 未授权词典 origin，只渲染连接态，不发请求），并断言 `#vocab-group-input` 未禁用；notes 腿沿用 vocab 腿的页面，只切到笔记页签量 `#notes-filter`。vocab 腿另以键盘方式聚焦 `.xp-dict-lang`（`fieldFocusPaint`：填充 `field-bg-focus`、四边已绘制且为 `field-border-focus`、光环存在；达不到 `:focus-visible` 记 SETUP，运行级 `valueBoxFocusCoverage` 要求每主题一次）。颜色读数共用一个解析器：盒子涂的颜色解析得出但不是不透明色（透明笔记框、半透明框）记产品 FAIL；token 或涂色解析不了都是 SETUP。运行级 `valueBoxLegCoverage` 同样覆盖 library（每主题 9 个）。checklist 另有 8 盒的静息 / 悬停 / 聚焦 token 身份行（22 行新增、2 行补断言）；`.xp-dict-lang` 没有 checklist 行（只有 vocab 腿的「再次查询」夹具能生成它），它的静息、悬停、四角与上面的聚焦读数都在这条腿里实测，聚焦读数另由 `VALUE_BOX_FOCUS_REQUIRED.library` 钉住：删掉腿的 `focus` 键，运行级 `valueBoxFocusPin` 与 `valueBoxFocusCoverage` 都报 SETUP；family 13 的 library 填充集合加入 `field-bg` / `-hover` / `-focus` |
+| render oracle family 14 的 library 腿 + checklist library 行（阶段 4 Task 7） | library 九个值盒子（`VALUE_BOX_LEGS.library`：三个搜索框、`#vocab-group-filter` / `#vocab-lookup-lang` / `.xp-dict-lang`、两处 `.vocab-group-unit` 壳、笔记框）走 popup 腿同一套函数，判定相同，类别名单 `FIELD_UNSEPARATED_FRAMED.library = ["terminal"]`。vocab 腿重新导航：单击行头打开详情、Ctrl+单击打开批量条、点「再次查询」生成 `.xp-dict-lang`（本 profile 未授权词典 origin，只渲染连接态，不发请求），并断言 `#vocab-group-input` 未禁用；notes 腿沿用 vocab 腿的页面，只切到笔记页签量 `#notes-filter`。vocab 腿另以键盘方式聚焦 `.xp-dict-lang`（`fieldFocusPaint`：填充 `field-bg-focus`、四边已绘制且为 `field-border-focus`、光环存在；达不到 `:focus-visible` 记 SETUP，运行级 `valueBoxFocusCoverage` 要求每主题一次）。颜色读数共用一个解析器：盒子涂的颜色解析得出但不是不透明色（透明笔记框、半透明框）记产品 FAIL；token 或涂色解析不了都是 SETUP。运行级 `valueBoxLegCoverage` 同样覆盖 library（每主题 9 个）。checklist 另有 8 盒的静息 / 悬停 / 聚焦 token 身份行（22 行新增、2 行补断言）；`.xp-dict-lang` 没有 checklist 行（只有 vocab 腿的「再次查询」夹具能生成它），它的静息、悬停、四角与上面的聚焦读数都在这条腿里实测，聚焦读数另由 `VALUE_BOX_FOCUS_REQUIRED.library` 钉住：删掉腿的 `focus` 键，运行级 `valueBoxFocusPin` 与 `valueBoxFocusCoverage` 都报 SETUP；family 13 的 library 填充集合加入 `field-bg` / `-hover` / `-focus`。**2026-10 更新（C58）**：两个原生 select 换成列表框按钮 `#vocab-group-filter-btn` / `#vocab-lookup-lang-btn`，`.xp-dict-lang` 与「再次查询」生成它的步骤删除，`VALUE_BOX_FOCUS_REQUIRED.library` 改为 `["#vocab-lookup-lang-btn"]`；盒子数以 runner 的 `VALUE_BOX_LEGS.library` 为准 |
 | ui-contract 的 library 值盒子模型（阶段 4 Task 7） | 收割 library.html 的值盒子 id（跳过 `hidden` 状态载体）与 library 脚本里 `createElement` 造的运行时盒子，两份名单都钉住；值盒子模型认得这些 id、类与 `.vocab-group-unit` 壳。注册表：选择器都落到值盒子、带类型、只有 select 族带 `--lib-field-chevron`；结构覆盖用 library.html 加嫁接在 `#vocab-detail` 下的运行时盒子建树：六个文本录入控件恰被一个条目覆盖（盒子或壳的乘客），三个渲染出来的 select 恰是一个条目的静息盒子，每个条目都命中元素；生成区逐条声明正确；光晕挂在注册表聚焦选择器上；手写区在值盒子上不写颜色、`border` 简写或 chevron，也不重定义 `--lib-field-*`，步进格不重述墨色；形状走 `valueBoxShapeOffenders`（仅豁免壳内输入框左侧同心圆角）；url() 颜色字面量走 `valueBoxUrlColourOffenders`；分隔线静息 `field-border`、随壳悬停换 `field-border-hover`（壳悬停同一选择器，特异性更高）；强制色下 7 条光晕选择器（9 个盒子）都有 1px Highlight 轮廓，且不被能与焦点同时生效的压 outline 规则（聚焦、悬停、无状态）反超；壳条目（静息盒子不是表单控件）的悬停必须用 `:not(:has(> input:disabled))` 排除忙碌态，裸 `:disabled` 不算；注册表生成声明、光晕、强制色、F10 这四项与 popup / options 共用同一组模块级函数（`fieldTargetEmissionProblems` / `fieldRingMissing` / `forcedOutlineReport` / `chipOverFillAcrossBlocks`）；步进格 F10：悬停 8% / 按下 10% `field-fg` 叠在壳当时的填充上，15 块 × 4 态 ≥ `FILL_SEPARATE_MIN`（最低 1.119）。§7.3 扫描把同一选择器的生成声明并进来判定，三个命名空间都接受本命名空间的 `field-border-focus` 芯。每项带正反例自检 |
 
 `fillSeparate` 本身**没有独立的门**：它的正确性由 `contrast-audit` 从下游反向约束
@@ -1561,13 +1592,25 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | popup | `.suggest-area` | chip 流容器 |
 | popup | `.divider` | 表单与快捷区之间的分隔 |
 | popup | `.actions` | 按钮行（flex wrap，align center，gap sp-4）：标签操作行、批量授权操作行、离线队列条目操作；margin 由父级关系规则拥有（`.batch-permission > .actions`、`.offline-queue-item > .actions`）。`.fc-actions` 仍是共享反馈卡的组件；`.quick-row`（space-between）与 `.submit-bar`（带内距的条）是另外两种形状 |
-| library | `.notes-toolbar` | 控件行（flex wrap，gap sp-2，margin sp-2 0 sp-3），vocab/notes 共用 |
-| library | `.vocab-batch-bar` / `.notes-batch-bar` | 粘底批量条（同一选择器列表） |
-| library | `.notes-empty` | 空态块 |
-| library | `.lib-cluster` | 紧凑控件簇（inline-flex，align center，gap sp-1，flex none）：两处「Select all」组与批量条里的标记簇。簇内 quiet 按钮走 `.btn.ghost`，只有静息前景 `--lib-fg-muted` 是簇自己的规则 |
-| library | `.lib-section` | 详情面板的分节：margin-top sp-4、padding-top sp-3、`--lib-border-section` 1px 上边线；词典区、同源高亮列表、两个收尾动作行共用 |
-| library | `.lib-block` | 详情面板流内的文本块：margin sp-3 0（释义、语境） |
-| library | `.lib-quote` | 引文：3px 左竖线（`--lib-quote-bar`，默认 `--lib-border`；高亮引文以高亮色覆盖）+ sp-3 左内距 |
+| library | `.notes-toolbar` | 列表头第 1 行：只放搜索框（生词）/ 筛选框（笔记），md 32 / 28 占满，下距 sp-3。列表头三行（搜索 / 筛选 / 计数）在列表区上方、不滚动，行距 sp-3，计数行下距 sp-2；两个页签共用 |
+| library | `.vocab-filter-set` | 生词列表头第 2 行（`.vocab-filter-row`，与排序触发器同行）：分组列表框（`flex: 1 1 0; min-width: 120px`）+ 状态三段。宽 / 窄两种形态按**内容宽度**自动切换，不设固定阈值（USER RULING 2026-10-04）：library.js 的 `pbpLibWireHeaderFit` 量宽形态所需宽度与索引宽，在列表窗格上写 `data-header-fit="wide\|narrow"`；判定前「筛选」按钮只占位不显示，不闪；单栏窗口（≤860）一律 narrow。wide 时就地内联：作者样式复位 UA 的 `[popover]`（`position: static`、无内外边距、无边框、透明、`overflow: visible`、`color: inherit`），「筛选」按钮隐藏；narrow 时是 `#vocab-filter-narrow` 打开的 auto popover：`--lib-panel` 底、`--lib-border` 1px、`--lib-radius-lg`、弹层阴影、内距 sp-3、纵排行距 sp-2，定位走 `pbpListboxPlace`，有筛选时按钮写「筛选 · N」加粗。笔记颜色行读同一个 `data-header-fit`：narrow 时颜色按钮只显示色点（数量留在 `title` 与可访问名），始终一行。弹层态正当地画 panel，所以不在平铺画布门的骨架类里；render-audit G7 按九语种逐宽核对显示的形态与实测所需宽一致 |
+| library | `.lib-count-row`（+ `.lib-count-items` / `.lib-count-item` / `.lib-count-full` / `.lib-count-num`） | 计数统计行：**单行**（`flex-wrap: nowrap`，2026-10 T8e），高 28 / 24、12/16 `--lib-fg-muted`、左右段间距 sp-4。左段 `.lib-count-items` 可收缩（`min-width: 0`），自身 `display: flex; flex-wrap: wrap` + 定高 + `overflow: hidden`，每项 `white-space: nowrap`，放不下的项整项折进被隐藏的第二行，不出半个字；右段「全选」ghost sm（`.lib-hang-end`）始终留在本行，不会折到第二行盖住列表。render-audit G7 另查表头画出的内容不越过列表区顶边、同行兄弟不重叠。项间「 · 」由 `.lib-count-item` 伪元素画；可见项 `aria-hidden`，含账号的完整句在 `title` 与 `.lib-count-full`（sr-only），`aria-live` 在 `#vocab-count` / `#notes-count`；数字经 `pbpLibSplitCount` / `pbpLibFillCount` 哨兵切分加粗（`.lib-count-num`），不拼接、不用 innerHTML。文案键按数值选单复数：`pbpLibCountKey(n, "<key>One", "<key>")`（1 取单数，法语 0 也取单数，判定语言跟随实际打印文案的语言），多计数的句子用短语键嵌套、每段各自选键 |
+| library | `.vocab-batch-bar` / `.notes-batch-bar` | 批量操作行：有选中项时就地替换计数行（计数行 `hidden`，批量行是它的下一个兄弟），在列表头里；不 sticky，不画底色、阴影、边框、圆角；按钮 sm 28 / 24，元素间距 sp-2，字 13。生词侧任何宽度都是两行网格（列 `minmax(0, auto) auto minmax(0, 1fr) auto auto`，行高 sm，28 + 8 + 28 = 64 / 紧凑 56；状态句或帮助句非空时占第 3 行）；笔记侧一行 flex，放不下时允许折成两行。`.lib-batch-status` 槽是 `display: contents`，状态节点 13/18，空时折叠不占位，多选期间 `#vocab-status` 停在这里 |
+| library | `.notes-empty` | 索引空态：13/18 `--lib-fg-muted` 一段文字，左右内距 sp-3（与行文字对齐）、上距 sp-2；未登录块标题 15/20 Bold、说明 13/18 muted、按钮 sm，块间距 sp-3 |
+| library | `.lib-cluster` | 紧凑控件簇（inline-flex，align center，gap sp-1，flex none）：计数行与批量行里的按钮簇。簇内 quiet 按钮走 `.btn.ghost`，只有静息前景 `--lib-fg-muted` 是簇自己的规则 |
+| library | `.lib-toggle`（+ `.lib-toggle-count`） | 切换按钮（可交互原语，登记在 components）：md 高 `--lib-control-h`（32 / 28），横内距 `--lib-control-pad-x-sm`（10 / 8），字 14 / 13；`.sm` 高减 4（28 / 24），横内距再减 2，字 13 / 12；`--lib-radius-md`，无边框；静息透明 + `--lib-fg-muted`；悬停 `--lib-row-bg-hover` + `--lib-btn-fg`；`aria-pressed="true"` 为 `--lib-btn-bg` + `--lib-btn-fg` + Bold（数量同 Bold）；强制色下按下态 `outline: 1px solid Highlight; outline-offset: -1px`。状态三段与笔记颜色筛选共用；颜色筛选按加法（初值空集 =「全部」） |
+| library | `.notes-hit-dot` | 10px 色点（`--lib-radius-full`，`--lib-note-cN`）；列表行里 `margin-top: calc((var(--lib-lh-body) - 10px) / 2)`（舒适 5 / 紧凑 4）对齐首行中线（spacingScale `derivedOffsets`）；`aria-hidden`，颜色名进可访问名；强制色 `forced-color-adjust: none` + `box-shadow: 0 0 0 1px CanvasText`。列表行、颜色筛选、摘录标签共用 |
+| library | `.lib-hang-start` / `.lib-hang-end` | 光学悬挂：ghost / quiet 文字按钮排在一列文字的起点 / 终点时，`margin-inline-start` / `-end: calc(-1 * var(--lib-control-pad-x-sm))`，按钮内容与该列文字缘对齐；render-audit G4b 只接受这种「抵消型」负外边距 |
+| library | `.vocab-sheet` | 生词详情网格（`#vocab-detail-pane` 是 `container: lib-detail / inline-size`）：<1000 单列 `minmax(0, var(--lib-main-max))`（节首小标题），参考栏与尾部依次纵排、上距 sp-6；C ≥1000 两列 `var(--lib-hang-w) minmax(0, var(--lib-main-max))`（悬挂标签），参考栏仍在主栏下方、标签悬挂；C ≥1464 才出参考栏：`var(--lib-hang-w) var(--lib-main-max) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max))`、`grid-template-rows: auto 1fr`，`#vocab-ref` 在第 4 列跨两行。1464 = 112 + 840 + 64 + 448：**主栏优先**（USER RULING 2026-10-05），参考栏出现时主栏固定 840，参考栏从 448 起长到 720 封顶，跨档主栏不变窄；448 是查词行九语种单行所需的最大值（实测 de 446.1）。`.vocab-sheet > [hidden] { display: none }` |
+| library | `.lib-hang-sec`（+ `.lib-hang-label` / `.lib-hang-body`） | 悬挂节：`section` + `aria-labelledby` 指向真正的 `h3`；subgrid 继承所在 sheet 的列。悬挂时标签在第 1 列，`text-align: end; padding-inline-end: 16px`，13/18 Bold muted，与正文首行同基线（textarea 节 `align-items: start`、标签 `padding-top: 10px`，`derivedOffsets`）；单列时标签是节首小标题（下距 sp-3，左对齐）；节间距 sp-6；标签可折行，不越过可用宽 96。render-audit hangOrder 守所有悬挂标签（含摘录标签）：每个标签都在内容上方或左侧，在每个档位断点 ±3px 内逐 1px、两个方向、改宽同帧与稳定后两个时相都量，并断言 C 增大时主栏 / 摘录列宽单调不减 |
+| library | `.lib-first-line` | 展示字首行上拉：`margin-top` = 负的半行距（`calc((var(--fs) - var(--lh)) / 2)` 或 `calc(-0.5 * (L - 1) * 1em)`），不得超过半行距；em 框顶落在搜索框顶线上，CJK 与带重音的大写不被滚动容器裁切；render-audit G4（量字形墨迹）与 G4b（上拉型）守 |
+| library | `.lib-cover`（+ `-title` / `-lead` / `-hint`） | 扉页（未选中）：大字与词头同档（C ≥1464 / ≥1000 / ≥640 / 其下 = 72 / 56 / 44 / 36、行高 1.15、Bold、非 CJK −0.02em，带 `.lib-first-line`）；下方 sp-4 统计句 16/26 muted（等宽数字、哨兵切分）；再下 sp-2 提示 14/20 muted；`data-i18n` 只挂在提示子元素上；提示不写方向词 |
+| library | `.vocab-pron-row` / `.vocab-manage-row` | 词头下的音标行（上距 sp-3、`min-height` 28 / 24、14/20 muted、项间「 · 」伪元素、朗读 ghost sm 图标钮）与管理行（上距 sp-5、`flex-wrap: wrap`、间距 sp-2 / sp-4：状态钮 sm、分组纯文字 13/18 muted、「编辑分组」ghost sm 展开按钮（带 `.lib-hang-start`，只在紧跟分组文字时悬挂，居行首或文字隐藏时贴齐），展开时中性填充 + `aria-expanded="true"`） |
+| library | `#vocab-ref` | 词典参考栏：标题「词典」（C ≥1464 为 16/24 Bold 栏标题，否则悬挂标签 / 节首小标题）+ 查询行（输入 md `flex: 1 1 160px` + 语言列表框 + 「查词」md；语言选项由 `_pbpVocabFillLookupLangs` 按界面语言统一重建）+ 静态结果宿主 `#vocab-ref-result`（四种状态；打开已存词时「打开即查」：本地离线词典 → `dict2_` 缓存 → 已授权才在线，250ms 防抖，换词 abort，按 owner / 词 ID / signal 丢弃过期结果）；md-dict 产出的节点只在 `#vocab-ref-result .xp-dict-*` 下改样式，em 一律换 px，md-dict.js 不改 |
+| library | `.notes-sheet` | 笔记详情网格（`container: lib-detail`）：<1000 单列 `minmax(0, var(--lib-excerpt-max))`（标签在引文上方）；C ≥1000 两列 `var(--lib-hang-w) minmax(0, var(--lib-excerpt-max))`（悬挂标签）；C ≥1312 加「这一页」栏：`var(--lib-hang-w) var(--lib-excerpt-max) var(--lib-sp-8) minmax(var(--lib-side-min), var(--lib-side-max))`。1312 = 112 + 800 + 64 + 336，同样主栏优先：摘录列固定 800，侧栏从 336 起长到 420，336 是侧栏内容单行所需的最大值（实测 fr 删除钮 335.8）。页首与摘录写明确的 `grid-column`（只占第 1–2 列），侧栏 `grid-column: 4; grid-row: 1 / span var(--notes-rows)`（JS 写本页条数 + 2）；页首到第一条摘录 sp-7；`#notes-detail[hidden] { display: none }` |
+| library | `.notes-excerpt`（+ `-label` / `-jump` / `-note`） | 摘录（本页全部高亮，`ts` 正序，条间 sp-6）：标签 12/16 muted、等宽数字「时间 ● 颜色名」（与页面日期同一天只写时间）。C ≥1000 时标签悬挂，悬挂位放不下由 `_pbpNotesStackLabels` 量后加 `.is-stacked` 分行右对齐、写 `--notes-hang-min` 保住下一条的间距，不截断、不越界、不缩字号；`.is-stacked` 规则与 `--notes-hang-min` 的消费只写在 C ≥1000 容器块里（单列档残留的类不起作用）。ui-contract 的测量布局门守这一类：JS 量出后写的布局类与自定义属性，其 CSS 必须写在 JS 前提成立的容器档里（门从前提 CSS 推出档位，不手写）。当前条 `aria-current`，`blockquote` 26/42；其他条是 `button.notes-excerpt-jump`（18/30，悬停 `--lib-row-bg-hover`、`--lib-radius-md`、内距 4 / 8 以等量负边距抵消）；笔记在引文下 sp-2，14/22，前加 14px `pencil` |
+| library | `.notes-page-side` | 「这一页」栏（C ≥1312 才显示；DOM 在最后一条摘录之后，靠明确网格放置到右侧顶部，Tab 先走完摘录）：小标题 13/18 Bold muted（`.lib-first-line`）→ sp-3「打开原文」sm 链接按钮 → sp-4 两行事实 12/16 → sp-5 删除钮 quiet danger sm `.lib-hang-start`；C <1312 时删除钮在 `.notes-detail-footer`，任何宽度只显示一份 |
+| library | `.lib-mark` | 荧光笔：引文包在 `span.lib-mark.notes-cN` 里，`linear-gradient(transparent 0 48%, var(--lib-note-mark-cN) 48% 88%, transparent 88%)`，`box-decoration-break: clone`（带 `-webkit-` 前缀），`padding: 0 2px` 以 `margin: 0 -2px` 抵消；颜色由 composer `deriveNoteMarks` 派生（fg 对合成色 ≥4.5，alpha 地板 0.14）；强制色改 2px 下划线 |
 | md-preview | `.rail-section` / `.rail-label` / `.rail-sec-head` | 侧栏分区容器 / 静态标题 / 可折叠标题（共享 margin sp-3 0 sp-2 契约） |
 | md-preview | `.msg-bar` | 状态/提示/错误条（padding sp-2 sp-3，与 `.send-status` / `.export-note` / `#ask-tip` 同一条家族；`data-state`） |
 | md-preview | `.send-menu` / `.send-mi` | 下拉菜单与菜单项 |
@@ -1789,6 +1832,11 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | C53b | **popup 值盒子入字段语言（阶段 4 Task 6）**（`.field > input[type="text"]` / `.field > textarea`（url、title、description）、`input[type="text"].search-field`、`.login-body .secret-field` 密钥框、`.tags-input-wrap` 壳与它的输入框乘客；连带密钥眼睛、标签 chip、自动补全列表） | 手写区涂色：填充 `--pp-input-bg`、框 `--pp-input-bd`、文字 `--pp-fg`，聚焦边 `--pp-focus-bd`；六个值盒子都没有悬停态，占位符是 UA 默认；预设主题下另有 10 条 `html[data-theme]` 孪生规则（(0,3,2) / (0,4,2)）重复涂色；眼睛静息墨色默认面 `--pp-fg-soft`（#666）、预设 `--pp-fg-hint`，悬停时默认面不换色、预设换 `--pp-fg`，悬停底 `--pp-fg` 8% 混在 `--pp-input-bg` 上；chip 文字 `--pp-tag-fg`，× 静息墨色 `--pp-fg-muted`；自动补全列表框 `--pp-focus-bd`；强制色下值盒子聚焦不可见 | 颜色半边由 `FIELD_TARGETS.pp` 生成（阶梯写法，静息 < 悬停 < 聚焦逐盒严格递增）：静息 `field-bg` + 四边 `field-border` + 文字 `field-fg`，悬停 `field-bg-hover` / `field-border-hover`（排除聚焦与禁用），聚焦 `field-bg-focus` / `field-border-focus`，占位符 `field-placeholder`；壳的乘客只涂 `field-fg`；手写区只留几何、光晕与 `outline: none`；10 条孪生规则删除，`--pp-input-bd` 与 `--pp-fg-soft` 退役；眼睛静息 `--pp-field-placeholder`、悬停 `--pp-field-fg`，悬停底 `--pp-field-fg` 8% 混在 `--pp-field-bg-hover` 上（壳持有焦点时混在 `--pp-field-bg-focus` 上），聚焦环芯 `--pp-field-border-focus`；chip 文字 `--pp-tag-chip-fg`、× 静息墨色 `--pp-tag-chip-icon`；自动补全列表框 `--pp-field-border-focus`；文件末尾补 `@media (forced-colors: active)` 的 `1px solid Highlight` 聚焦轮廓（offset 2px，6 条选择器，两个融合单元挂 `:focus-within`） | 15 个块下：六个值盒子第一次有悬停——无框块填充走一档（默认面 `#e9ecf0 → #dee1e6`，凹井 gruvbox-dark `#1d2021 → #141617`），terminal 填充不动、框 `#267326 → #2a9d2a`；键入文字在 nord-night（`#d8dee9 → #e5e9f0`）、solarized-light（`#506469 → #3a484c`）、solarized-dark（`#98a6a6 → #c2cbcb`）、catppuccin-latte（`#4c4f69 → #41445a`）四块变，其余同值；占位符由 UA 默认改为派生色（默认面 `#5c6167`）；眼睛静息墨色 11 块变（默认面 `#666 → #5c6167`），悬停墨色默认面 `#666 → #2a2d33`、预设在上述四块随 `field-fg` 变（悬停墨色统一为 `field-fg` 超出 spec §6 第 6 条只批准的静息墨色，待用户确认）；chip 文字 6 块变（nord-night `#aec89a → #b9cfa7`、flexoki-dark `#d0a215 → #d9a916`、solarized-light `#1e746d → #1a645e`、solarized-dark `#4aada3 → #5cb9b0`、catppuccin-latte `#116e73 → #0e5d61`、catppuccin-mocha `#94e2d5 → #9ce4d8`），× 静息墨色只有 catppuccin-mocha 变（`#a6adc8 → #acb3cc`）；自动补全列表框逐块同值，不可见；强制色下值盒子聚焦出现系统 Highlight 轮廓 | 阶段 4 Task 6 |
 | C54 | **library 值盒子入字段语言（阶段 4 Task 7）**（`.notes-toolbar` / `.vocab-lookup-bar input[type="search"]`、`.vocab-filter-toolbar` / `.vocab-filter-row select`、`.xp-dict-lang`、`.vocab-group-unit` ×2、`.vocab-note-input`） | 按工具条逐条手写：搜索框悬停整圈 `--lib-fg-muted`；select 与 `.xp-dict-lang` 填充 `--lib-btn-bg`、幽灵边、字面量箭头（`%23888` / 暗色孪生 `%23aaa`）；壳悬停不变；步进格 ghost 为 6% `fg` 混在 `--lib-input-bg` 上（solarized-light 1.074 / latte 1.083 / solarized-dark 1.095，低于 1.10）；笔记框透明 | 颜色半边由 `FIELD_TARGETS.lib` 生成（阶梯写法，静息 < 悬停 < 聚焦逐盒严格递增）：静息 `field-bg` + 四边 `field-border`，悬停 `field-bg-hover` / `field-border-hover`（排除聚焦与禁用），聚焦 `field-bg-focus` + `field-border-focus`，文字 `field-fg`，占位符 `field-placeholder`，select 箭头 `--lib-field-chevron`；分隔线随壳悬停；步进格 ghost = `field-fg` 8% / 10% 叠在壳当时的填充上（最低 1.119）；形状、sm 阶、焦点环（改挂在注册表聚焦选择器上）、forced-colors 仍手写；强制色 Highlight 轮廓：三个搜索框（2 条选择器）原有，其余 6 个盒子（5 条选择器）补上 | 16 套主题下 9 个值盒子：搜索框悬停由整圈深框改为填充步进；select 在 dracula / mocha / gruvbox 暗色上换填充（ΔE 8.6 / 6.1 / 5.8），幽灵边消失，箭头改为本主题占位符色；壳悬停整体换填充；笔记框获得填充；占位符由 UA `#757575` 改为派生色；nord-night / solarized ×2 / latte 键入文字随 R13 微调；terminal 悬停只加亮框（`#228222`） | 阶段 4 Task 7 |
 | C55 | **当前行改为只靠填充（S2）+ 行态按主题派生**（library `#vocab-list` 与 `#notes-list`）——**USER RULING 2026-10-03**：「之前我写错了，我选择S2」 | 当前行 = `row-selected-bg`（accent-soft，默认面与页面底只差 9）+ `inset 2px 0 0 accent`，竖条随 radius-md 弯成「(」；多选带固定 `accent 20%`（hover 26%）+ 环，对静息 25–49，比当前行响（层级倒置）；混色百分比在 CSS（`--lib-band-mix*`）与 composer（`LIB_BATCH_BAND_MIX`）两处手抄；按下态手写 fg 9% | 当前行无条，中性填充 `row-current-bg`（fg 15–23%，浅色 16–20%；对静息 33–38）；多选带按主题取过门最浅值（accent 10–20%，对静息 25–27）+ 1px 环；合成态再叠一层中性填充；8 个行填充（含静息）中的 7 个与 `row-current-fg-muted`、`row-selected-fg` 由 composer 发射为 hex（`deriveRowStates`，finalizer 之后）；`fg-muted` 加 `row-bg-hover` 宿主；按下沿用悬停；is-error 以多一个类的特异性压过全部状态；强制色下当前行 `.notes-card-top::before`（生词）/ `.notes-hit-btn::before`（笔记）画 3px `Highlight` 直边竖条、多选 1px `Highlight` 轮廓（焦点环优先）；`--lib-band-mix*`、`row-selected-bg`、`LIB_BATCH_BAND_MIX` 退役 | 15 个主题态下当前行成为最响的静息填充；多选带 14/15 变浅（gruvbox-dark 仍 20%）；`row-selected-fg` 在 nord-night / solarized ×2 / catppuccin-latte / gruvbox-dark 变值（nord-night 标题近白 `#f9fafb`）；当前行次要字在 13 个主题换色；github-light `fg-muted` `#656d76 → #606871`；行焦点芯内侧对多选 + 当前 + 悬停填充（`row-band-current-bg-hover`）最低 1.53（rose-pine），对 `row-current-bg` 最低 2.34（默认面），按 spec §7.5 接受并在 contrast-audit 留 WARN；强制色下 ghost 按钮显示平台强制的 1px 系统色边（已接受） | 2026-10 spec 2026-10-03-library-redesign §3.8 / §6.4 / §7.3 |
+| C56 | **平铺画布与索引 / 详情轴线**（library 外壳：页眉、两个工作台、两个列表区、两个详情区）——取代 08-06「贴合内容 + 固定 1164 画布」；USER RULING 2026-10-03「不要用色块分隔……就很丑」 | 居中 1164 画布（`--lib-canvas-max`）；详情面板 `--lib-pane-bg` 底 + 边框 + 圆角 + sticky、`max-height: calc(100vh − --lib-header-h)`；页眉 sticky + 底线；`.lib-section` 1px 上边线；三条接缝线；引文 3px 竖条 `.lib-quote` | 整页只有 `--lib-bg`；body 纵向 flex 链，每个页签两个滚动容器（列表区、详情区）；工作台 `var(--lib-index-w) minmax(0, 1fr)` + `column-gap: var(--lib-gap)`，页眉与工作台起始内距 `--lib-page-pad`（P 48 / 32 / 24，L `clamp(360px, 20vw, 520px)`，G 64 / 48）；详情区 `container-type: inline-size`、左内距 16 + 负外边距 −16、下内距 96；分区只靠字阶、留白、栏位、悬挂标签与节首小标题；ui-contract 平铺画布门（`canvasStructures`），render-audit G1 / G5 / G6。`.lib-section` / `.lib-block` 在详情重写后已无生产者，T9c 删去两条规则并撤出 `primitives` 与 `canvasStructures` | 2560 窗口内容铺满，不再在 1164 处居中留白；面板、框、阴影、线全部消失；页面不再整页滚动；`--lib-pane-bg`、`--lib-pane-divider`、library 的 `--lib-border-section`、`--lib-seam-mix`、`--lib-header-h`、`--lib-canvas-max`、`--lib-quote-bar`、`.lib-quote`、`.lib-section`、`.lib-block` 退役 | 2026-10 spec 2026-10-03-library-redesign §2 / §6.5 |
+| C57 | **library 密度档与按钮阶、刻度扩到 96** | library 没有密度档：`.btn` 26 / `.btn-sm` 20，sm 按钮靠 `::before` 命中区补丁凑到 24；间距刻度 6 档（2 … 24）；900 高约 15 行 | 手写 `:root` 舒适 / 紧凑两档 token（`--lib-control-h` 32 / 28、`--lib-text-body` 14 / 13、`--lib-row-pad-y` 8 / 4 等，§11）；`btnRules` 的 lib 分支 md `var(--lib-control-h)`、sm `calc(var(--lib-control-h) - 4px)`，带 `box-sizing: border-box`；`--lib-sp-6..9` = 32 / 48 / 64 / 96；controlRung、densityTier、spacingScale 对 library 生效 | 按钮 md +6、sm +8（紧凑档 terminal / gruvbox-dark 为 28 / 24）；生词行距 56（紧凑 44），900 高舒适 12–13 行、紧凑 ≥15 行；sm 命中区补丁删除 | 2026-10 spec §6.2 / §3.6；10-02 选项问答（舒适 12–13 行、批量条按钮 28） |
+| C58 | **列表框推广与改名、查词语言合并、排序 ghost 触发器** | `options-listbox.js` 只增强 options 的 10 处；library 有三个原生 select（分组筛选、查词语言、详情里每次重建的 `.xp-dict-lang`），排序是两颗分段按钮（`.vocab-sort-seg`） | `listbox.js` 共享（options absolute 模式不变；library `data-listbox="float"` Popover 浮层 + `pbpListboxPlace`，`setActive` 只滚列表）；分组筛选、查词语言是值盒子列表框（颜色来自 `FIELD_TARGETS.lib` 的 `lib-listbox`），`.xp-dict-lang` 并入 `#vocab-lookup-lang`，语言选项由 `_pbpVocabFillLookupLangs` 统一重建；排序是 `data-listbox-face="ghost"` 的 `.listbox-trigger.btn.ghost`（文字 + Lucide 直线箭头，不是值盒子）；`data-listbox-ready` 首帧门；§6.4 例外 2「library 部分」 | library 页面上不再有可见的原生 select；排序变成一颗「时间 ↓」菜单按钮；列表框在详情区底部打开不被裁；options 外观零变化（options-listbox-tests 41 / 41） | 2026-10 spec §8 / §3.3；10-02 选项问答（三个原生下拉一起换、改中性名 `listbox.js`） |
+| C59 | **统计并入计数行、批量操作就地替换、切换按钮、列表头按内容切换形态** | `#vocab-stats` 统计行 + 另一条计数行；状态筛选是 `.vocab-stat-chip`；笔记颜色点按减法（初值 5 色全按下）；批量条 sticky 浮在列表底、带阴影 | 列表头三行（搜索 / 筛选 / 计数）；计数行单行 28 / 24，紧凑统计项，放不下整项折进隐藏行，「全选」始终同行，含账号的完整句在 `title` 与 sr-only，数字经 `pbpLibSplitCount` 哨兵切分加粗，文案键经 `pbpLibCountKey` 按数值选单复数；`.lib-toggle` 切换按钮（状态三段 + 颜色筛选，颜色按加法）；批量操作行就地替换计数行（计数行 `hidden`），不 sticky、无阴影边框，生词侧任何宽度两行、笔记侧放不下时允许两行；列表头第 2 行按内容宽度在 wide / narrow 间自动切换（`data-header-fit`，不设固定阈值），narrow 时生词筛选收进「筛选」popover、笔记颜色行只显示色点；render-audit G2 / G3 / G7（含表头不越过列表区顶边、同行兄弟不重叠） | 统计少占一行；批量操作不再浮起；颜色筛选初值「全部」；第 2 行放得下就展开，放不下只留「筛选」按钮，有筛选时写「筛选 · N」加粗；窄索引下笔记颜色按钮只剩色点、数量进悬停提示；单个计数用单数文案 | 2026-10 spec §3、10-04 附录；USER RULING 2026-10-03（账号移进悬停提示、颜色筛选按加法）、2026-10-04（放不下就收进筛选、放不下时藏数字） |
+| C60 | **详情版式：悬挂标签、词典参考栏、按来源的摘录流、荧光笔派生、展示字上拉规则** | 生词详情是一列 `.lib-section` 分节 + 每次重建的词典区，自由查词替换整个详情；笔记详情 = 当前条 + 同源高亮列表（`.notes-sib`）；引文画 3px 竖条 | `.vocab-sheet` / `.notes-sheet` 按 `@container lib-detail` 分档（悬挂档 C ≥1000；参考栏 C ≥1464、「这一页」栏 C ≥1312，都按主栏优先：主栏 840 / 摘录列 800 固定，侧栏从实测最小宽 448 / 336 起长）；`.lib-hang-sec` 悬挂节（112 列、subgrid、同基线）；词头 72 / 56 / 44 / 36 + `.lib-first-line`（上拉不超过半行距）；词典参考栏 `#vocab-ref`（静态结果宿主；打开即查：本地 → 缓存 → 已授权才在线、250ms 防抖、过期不回写）；笔记按来源的摘录流（`ts` 正序、当前 26 / 其他 18、「这一页」栏 DOM 在摘录之后），摘录标签的 `.is-stacked` 只在 C ≥1000 档生效；荧光笔 `--lib-note-mark-c1..5` 由 `deriveNoteMarks` 派生（fg 对合成色 ≥4.5，alpha 地板 0.14，默认暗黄 `0x69`）；render-audit G4 / G4b / G5 / hangOrder，ui-contract 测量布局门 | 详情成为一张版面而不是面板；宽屏右侧出现词典参考栏，打开已存词时显示本地、缓存或已授权的在线释义；跨档时主栏不再骤然变窄；笔记详情一次读完本页全部摘录；拉丁词头的大写字顶比搜索框顶低约 9px（V12，为了不裁 CJK） | 2026-10 spec §4 / §5 / §6.4 / §6.5、10-05 附录；USER RULING 2026-10-03（打开即查）、2026-10-05（主栏优先） |
 
 **偏离实施计划之处**（Task 9/10 以本规范为准，但需知晓）：
 

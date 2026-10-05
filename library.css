@@ -1053,13 +1053,6 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   font-size: 15px;
   line-height: 1.65;
 }
-/* Detail-pane primitives (COMPONENTS.md §10.2), two shapes:
-   .lib-section  a section of the pane's flow: one rung of air above and an
-                 sp-3 lead-in. No rule: on the flat page sections are divided
-                 by space and type, never by a line (user ruling 2026-10-03).
-   .lib-block    a prose block in the pane's flow: sp-3 above and below. */
-.lib-section { margin-top: var(--lib-sp-4); padding-top: var(--lib-sp-3); }
-.lib-block { margin: var(--lib-sp-3) 0; }
 /* ---- Notes detail (spec docs/superpowers/specs/2026-10-03-library-redesign-
    design.md §5): one source page read as a continuous flow of its
    highlights, oldest first. Hierarchy is type size and position only -- no
