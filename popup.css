@@ -23,6 +23,16 @@
      derivedOffsets. */
   --pp-label-w: 52px;
   --pp-label-indent: calc(var(--pp-sp-5) + var(--pp-label-w) + var(--pp-sp-4));
+  /* Control rung and control type -- named in options' family
+     (--opt-control-h / --opt-text-body) so the three surfaces read alike
+     (library redesign spec 2026-10-03 §2.7). popup has no density tier
+     (10-02 ruling): these stay md 26 / sm 20 and 12 / 11px, pixel for pixel.
+     The generated .btn / .btn-sm (btnRules) still carry their own literal
+     12 / 11px, so --pp-text-body has no hand-written consumer yet. */
+  --pp-control-h: 26px;
+  --pp-control-h-sm: 20px;
+  --pp-text-body: 12px;
+  --pp-text-body-sm: 11px;
 
   /* Surfaces — 2026-07 "Soft Fill" palette (Claude Design pilot, AA-verified).
      Status *-bd tokens alias their bg: soft-fill surfaces are borderless by
@@ -1286,7 +1296,7 @@ input[type="text"].search-field:focus-visible:not(:disabled) { box-shadow: var(-
   justify-content: center;
   gap: var(--pp-sp-2); /* the icon-beside-label gap the .btn family and .header-icons already use; this was the one sp-1 holdout */
   padding: var(--pp-sp-2) var(--pp-sp-2);
-  font-size: 11px;
+  font-size: var(--pp-text-body-sm);
   /* --pp-btn-fg-muted, not --pp-fg-hint/--pp-fg-muted: this rests on the
      button's own --pp-btn-bg fill, a role fg-muted is never AA-derived
      against (COMPONENTS.md §9.1 law 8, weak-text-on-fill batch T3). */
@@ -1308,12 +1318,12 @@ input[type="text"].search-field:focus-visible:not(:disabled) { box-shadow: var(-
      share one 550px row with `flex: 1 1 auto` and `flex-wrap: wrap`; +12px of
      horizontal padding each would fold the row in the longer locales, and the
      wrap-not-truncate styling right above exists because that fold is real.
-     Horizontal padding and the 11px font stay hand-written; only the height
+     Horizontal padding and the sm type (--pp-text-body-sm) stay hand-written; only the height
      joins the ladder, so this button lines up with the submit bar (measured
      24.30px before, 26px after -- a render assertion pins it to #submit-btn
      rather than to a literal, because a drift off the rung is the failure
      worth naming). */
-  min-height: 26px;
+  min-height: var(--pp-control-h);
 }
 .qbtn:hover {
   /* --pp-btn-fg, not --pp-link: this is a button, not a link (D3(b),
@@ -1567,13 +1577,13 @@ html[data-theme] .batch-progress-text {
    render flush against each other. */
 .offline-clear {
   color: var(--pp-danger);
-  font-size: 11px;
+  font-size: var(--pp-text-body-sm);
   cursor: pointer;
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--pp-sp-1);
-  min-height: 20px; /* sm rung (COMPONENTS.md §1.1): link-styled, but a 15px-tall text button is a hit-area problem, and the gate now measures both of these */
+  min-height: var(--pp-control-h-sm); /* sm rung (COMPONENTS.md §1.1): link-styled, but a 15px-tall text button is a hit-area problem, and the gate now measures both of these */
 }
 /* Expand/collapse caret, CSS-drawn (a ▸/▾ glyph fell back to Segoe UI Emoji
    and stalled first paint). 2026-08: thin chevron matching the disclosure
@@ -1592,7 +1602,7 @@ html[data-theme] .batch-progress-text {
   display: inline-flex;
   align-items: center;
   gap: var(--pp-sp-2);
-  min-height: 20px; /* sm rung, same reason as .offline-clear */
+  min-height: var(--pp-control-h-sm); /* sm rung, same reason as .offline-clear */
   color: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -3175,7 +3185,7 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-h
      grows, the icon stays centered. Labels live in title/aria; feedback is
      an icon swap in popup.js. */
   flex: 1 1 0;
-  height: 26px;            /* md rung, same as the .qbtn row above it; was a fourth 32px rung */
+  height: var(--pp-control-h);            /* md rung, same as the .qbtn row above it; was a fourth 32px rung */
   display: inline-grid;
   place-items: center;
   padding: 0;
@@ -3192,7 +3202,7 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-h
   border-radius: var(--pp-radius-md);
   cursor: pointer;
   font-family: inherit;
-  font-size: 11px; /* the one control in this file with no declared size: it inherited the UA's 13.333px. 11px is its row neighbour .qbtn's */
+  font-size: var(--pp-text-body-sm); /* the one control in this file with no declared size: it inherited the UA's 13.333px. 11px is its row neighbour .qbtn's */
 }
 .md-strip-btn .btn-ic { margin: 0; vertical-align: 0; }
 /* `.md-strip` is specificity ballast (0,3,0): the themed RESTING rule

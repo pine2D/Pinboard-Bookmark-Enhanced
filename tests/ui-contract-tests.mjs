@@ -9501,6 +9501,47 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     `library scripts: ${unregistered.join(", ")} read layout and write a class -- register it in the measured-layout gate (ui-contract T8f) with its premise, or move the class write out of the measuring function`);
 }
 
+// ---- popup control-rung token names (spec 2026-10-03-library-redesign §2.7,
+// T9). popup keeps its own md 26 / sm 20 rung and its 12 / 11px control type
+// (no density tier: 10-02 ruling) but names them in the same family as
+// options' --opt-control-h / --opt-text-body, pixel for pixel. Category check,
+// not a selector list: any hand-written height / min-height sitting exactly on
+// a rung value must read the rung token, and a rule that reads a rung token
+// must not keep a literal 11 / 12px font. --pp-text-body (12px) has no
+// hand-written consumer today: the generated .btn takes its 12px from
+// btnRules, which this gate does not police.
+{
+  const hand = stripGeneratedRegions(popupCss);
+  const rules = parseStyleRules(hand);
+  const RUNG = { "26px": "--pp-control-h", "20px": "--pp-control-h-sm" };
+  const TYPE = { "12px": "--pp-text-body", "11px": "--pp-text-body-sm" };
+  const root = rules.find((r) => r.context.length === 0 && r.selectors.length === 1 && r.selectors[0] === ":root"
+    && parseDeclarations(r.body).some((d) => d.property === "--pp-sp-1"));
+  const rootDecls = root ? parseDeclarations(root.body) : [];
+  const rootVal = (prop) => (rootDecls.find((d) => d.property === prop) || {}).value;
+  for (const [px, token] of [...Object.entries(RUNG), ...Object.entries(TYPE)]) {
+    check(rootVal(token) === px,
+      `popup.css: the hand-written :root must define ${token}: ${px} (spec 2026-10-03 §2.7), got ${JSON.stringify(rootVal(token))}`);
+  }
+  const literalRung = [];
+  const literalType = [];
+  let rungRules = 0;
+  for (const r of rules) {
+    const decls = parseDeclarations(r.body);
+    const heights = decls.filter((d) => d.property === "height" || d.property === "min-height");
+    for (const d of heights) if (RUNG[d.value]) literalRung.push(`${r.selectorText} { ${d.raw} }`);
+    if (!heights.some((d) => /var\(--pp-control-h(?:-sm)?\)/.test(d.value))) continue;
+    rungRules++;
+    for (const d of decls) if (d.property === "font-size" && TYPE[d.value]) literalType.push(`${r.selectorText} { ${d.raw} }`);
+  }
+  check(literalRung.length === 0,
+    `popup.css: a hand-written height sits on the md 26 / sm 20 rung as a literal instead of var(--pp-control-h) / var(--pp-control-h-sm): ${literalRung.join("; ")}`);
+  check(literalType.length === 0,
+    `popup.css: a rule on the rung tokens still writes its control font as a literal 11 / 12px instead of var(--pp-text-body-sm) / var(--pp-text-body): ${literalType.join("; ")}`);
+  check(rungRules >= 4,
+    `popup.css: only ${rungRules} hand-written rule(s) read var(--pp-control-h / -sm); .qbtn, .offline-clear, .offline-toggle and .md-strip-btn all should (vacuity guard)`);
+}
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);
