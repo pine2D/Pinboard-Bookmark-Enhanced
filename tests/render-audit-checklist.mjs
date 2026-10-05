@@ -68,10 +68,12 @@
 //                        early pass, the monotonic main column rule, the
 //                        counter-examples and the label minimums (cost: the
 //                        two extra passes added ~250s to a 4-shard verify).
-//                        Under --shard the default theme's two rows run in
-//                        the LAST shard, not the default theme's shard 0
-//                        (which also runs the sweep): RELOCATED_ROWS in
-//                        scripts/ui-render-audit.mjs; once either way.
+//                        Under --shard the default and terminal rows run in
+//                        a named shard (4 shards: 3 and 1), not their theme's
+//                        own (shard 0, which also runs the sweep, and 2):
+//                        RELOCATED_ROWS in scripts/ui-render-audit.mjs,
+//                        falling back to the last shard for other counts;
+//                        each row runs once either way.
 // paneFit's optional `bleed: [selector]` names a list region that hangs out
 // of its pane by design: its own box is exempt; what it contains is measured
 // against the region's content box. Its overhang is allowed in the pane's
