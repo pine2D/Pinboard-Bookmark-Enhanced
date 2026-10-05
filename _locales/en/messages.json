@@ -849,6 +849,7 @@
     "message": "Delete $COUNT$ selected highlights?",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "notesBatchDeleteConfirmOne": { "message": "Delete $COUNT$ selected highlight?", "placeholders": { "count": { "content": "$1" } } },
   "notesDeleteFailed": {
     "message": "Couldn't delete these highlights. Try again."
   },
@@ -2967,6 +2968,7 @@
       }
     }
   },
+  "vocabBatchKnownDoneOne": { "message": "$COUNT$ word marked as known", "placeholders": { "count": { "content": "$1" } } },
   "vocabBatchLearningDone": {
     "message": "$COUNT$ words back to learning",
     "placeholders": {
@@ -2975,6 +2977,7 @@
       }
     }
   },
+  "vocabBatchLearningDoneOne": { "message": "$COUNT$ word back to learning", "placeholders": { "count": { "content": "$1" } } },
   "vocabFailedTerms": {
     "message": "Failed: $TERMS$",
     "placeholders": {
@@ -3317,8 +3320,12 @@
         }
       }
     },
+    "vocabResultFound": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultFoundOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSaved": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSavedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "notesResultCount": {
-      "message": "$RESULTS$ shown · $TOTAL$ highlights",
+      "message": "$RESULTS$ shown · $TOTAL$",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -3328,6 +3335,8 @@
         }
       }
     },
+    "notesResultShown": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "notesResultShownOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "vocabSelectedCount": {
       "message": "Selected: $COUNT$",
       "placeholders": {
@@ -3792,11 +3801,17 @@
   "libraryDetailTitle": { "message": "Word details" },
   "libraryNotesDetailEmpty": { "message": "Pick a highlight from the list to read it in full." },
   "libraryPageCount": { "message": "$COUNT$ on this page", "placeholders": { "count": { "content": "$1" } } },
-  "libraryNotesCoverLead": { "message": "$TOTAL$ highlights from $PAGES$ pages. The latest was saved on $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
-  "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ highlights from $PAGES$ pages.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
+  "libraryNotesCoverLead": { "message": "$TOTAL$ from $PAGES$. The latest was saved on $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
+  "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ from $PAGES$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
+  "libraryCountHighlights": { "message": "$COUNT$ highlights", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountHighlightsOne": { "message": "$COUNT$ highlight", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPages": { "message": "$COUNT$ pages", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPagesOne": { "message": "$COUNT$ page", "placeholders": { "count": { "content": "$1" } } },
   "libraryThisPage": { "message": "This page" },
   "libraryOpenOriginal": { "message": "Open original" },
-  "libraryPageFacts": { "message": "$COUNT$ highlights, $NOTED$ with notes", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
+  "libraryPageFacts": { "message": "$COUNT$, $NOTED$", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
+  "libraryCountNoted": { "message": "$COUNT$ with notes", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountNotedOne": { "message": "$COUNT$ with a note", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "First $FIRST$ · Latest $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Saved at $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "Highlights and notes are stored on this device only and are not synced. To move them to another device, export a backup on the settings page and import it there." },
@@ -3804,20 +3819,28 @@
   "libraryRelookup": { "message": "Look up again" },
   "libraryBack": { "message": "Back to list" },
   "libraryStatsWords": { "message": "$COUNT$ words", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsWordsOne": { "message": "$COUNT$ word", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLearning": { "message": "Learning $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsKnown": { "message": "Known $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "$COUNT$ groups", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsGroupsOne": { "message": "$COUNT$ group", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLanguages": { "message": "$COUNT$ languages", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsLanguagesOne": { "message": "$COUNT$ language", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "+$D7$ in 7 days · +$D30$ in 30 days", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ highlights", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsHighlightsOne": { "message": "$COUNT$ highlight", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsPages": { "message": "$COUNT$ pages", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsPagesOne": { "message": "$COUNT$ page", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsFiltered": { "message": "$SHOWN$ / $TOTAL$ highlights", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsHighlightsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ highlight", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryColorFilterAria": { "message": "$COLOR$, $COUNT$ highlights", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
+  "libraryColorFilterAriaOne": { "message": "$COLOR$, $COUNT$ highlight", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryFilterAll": { "message": "All" },
   "libraryFilterNarrow": { "message": "Filter" },
   "libraryFilterNarrowActive": { "message": "Filter · $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent7": { "message": "+$D7$ in 7 days", "placeholders": { "d7": { "content": "$1" } } },
   "libraryStatsWordsFiltered": { "message": "$SHOWN$ / $TOTAL$ words", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsWordsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ word", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryLookupAria": { "message": "Dictionary lookup" },
   "libraryLookupPlaceholder": { "message": "Look up any word" },
   "libraryLookupGo": { "message": "Look up" },
@@ -3959,7 +3982,11 @@
   "libraryEditGroups": { "message": "Edit groups" },
   "libraryNotePlaceholder": { "message": "Write anything: associations, easily confused words, usage reminders. Saved when you leave the box" },
   "libraryVocabCoverTitle": { "message": "Vocabulary" },
-  "libraryVocabCoverLead": { "message": "$TOTAL$ words, $LEARNING$ learning and $KNOWN$ known, in $LANGS$ languages. Last added on $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
-  "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$ words, $LEARNING$ learning and $KNOWN$ known, in $LANGS$ languages.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
+  "libraryVocabCoverLead": { "message": "$TOTAL$, $LEARNING$ learning and $KNOWN$ known, in $LANGS$. Last added on $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$, $LEARNING$ learning and $KNOWN$ known, in $LANGS$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
+  "libraryCountWords": { "message": "$COUNT$ words", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountWordsOne": { "message": "$COUNT$ word", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguages": { "message": "$COUNT$ languages", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguagesOne": { "message": "$COUNT$ language", "placeholders": { "count": { "content": "$1" } } },
   "libraryVocabCoverHint": { "message": "Pick a word to see its context, your note and its dictionary entry, or look up any word directly." }
 }

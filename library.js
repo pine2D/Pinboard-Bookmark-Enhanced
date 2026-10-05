@@ -163,6 +163,22 @@ function pbpLibSplitCount(format, values) {
   return parts;
 }
 
+// Counted nouns (T8g). chrome.i18n has no plural rules, so a counted noun ships
+// as two keys -- <key> and its singular twin <key>One -- and the caller picks
+// one by the real number BEFORE formatting: pbpLibSplitCount hands t()
+// sentinels, never the value. A sentence with several counts takes each one as
+// a phrase key ("12 highlights") instead of one sentence per combination; the
+// sentinel passes through the nested t() untouched. Only en / de / fr word the
+// twins differently (the other locales repeat the same text). French also puts
+// zero in the singular ("0 surlignage"; CLDR fr: one = 0 and 1), en and de do
+// not. Call sites spell both keys out: the dead-key guard in
+// tests/ui-contract-tests.mjs looks for each key's literal.
+function pbpLibCountKey(n, oneKey, otherKey) {
+  const value = Number(n);
+  const lang = String(_pbpLibLocale() || "").toLowerCase().split("-")[0];
+  return value === 1 || (value === 0 && lang === "fr") ? oneKey : otherKey;
+}
+
 function pbpLibFillCount(host, parts, tagFor) {
   if (!host) return;
   const nodes = (Array.isArray(parts) ? parts : []).map((part) => {

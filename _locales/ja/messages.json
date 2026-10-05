@@ -849,6 +849,7 @@
     "message": "選択した $COUNT$ 件のハイライトを削除しますか?",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "notesBatchDeleteConfirmOne": { "message": "選択した $COUNT$ 件のハイライトを削除しますか?", "placeholders": { "count": { "content": "$1" } } },
   "notesDeleteFailed": {
     "message": "ハイライトを削除できませんでした。もう一度お試しください。"
   },
@@ -2967,6 +2968,7 @@
       }
     }
   },
+  "vocabBatchKnownDoneOne": { "message": "$COUNT$ 語を習得済みにしました", "placeholders": { "count": { "content": "$1" } } },
   "vocabBatchLearningDone": {
     "message": "$COUNT$ 語を学習中に戻しました",
     "placeholders": {
@@ -2975,6 +2977,7 @@
       }
     }
   },
+  "vocabBatchLearningDoneOne": { "message": "$COUNT$ 語を学習中に戻しました", "placeholders": { "count": { "content": "$1" } } },
   "vocabFailedTerms": {
     "message": "失敗：$TERMS$",
     "placeholders": {
@@ -3317,6 +3320,10 @@
         }
       }
     },
+    "vocabResultFound": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultFoundOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSaved": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSavedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "notesResultCount": {
       "message": "$RESULTS$ 件表示・全 $TOTAL$ 件のハイライト",
       "placeholders": {
@@ -3328,6 +3335,8 @@
         }
       }
     },
+    "notesResultShown": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "notesResultShownOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "vocabSelectedCount": {
       "message": "選択済み：$COUNT$ 件",
       "placeholders": {
@@ -3800,9 +3809,15 @@
   "libraryPageCount": { "message": "このページ $COUNT$ 件", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "$PAGES$ ページのハイライト $TOTAL$ 件。最後の保存は $DATE$ です。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
   "libraryNotesCoverLeadNoDate": { "message": "$PAGES$ ページのハイライト $TOTAL$ 件。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
+  "libraryCountHighlights": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountHighlightsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryThisPage": { "message": "このページ" },
   "libraryOpenOriginal": { "message": "元のページを開く" },
   "libraryPageFacts": { "message": "ハイライト $COUNT$ 件（メモ付き $NOTED$ 件）", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
+  "libraryCountNoted": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最初 $FIRST$ · 最新 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "$TIME$ に保存", "placeholders": { "time": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "ハイライトとメモはこのデバイスにのみ保存され、同期されません。別のデバイスに移すには、設定ページでバックアップを書き出し、そのデバイスで読み込んでください。" },
@@ -3810,20 +3825,28 @@
   "libraryRelookup": { "message": "辞書で調べ直す" },
   "libraryBack": { "message": "一覧に戻る" },
   "libraryStatsWords": { "message": "$COUNT$ 語", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsWordsOne": { "message": "$COUNT$ 語", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLearning": { "message": "学習中 $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsKnown": { "message": "習得済み $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "$COUNT$ グループ", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsGroupsOne": { "message": "$COUNT$ グループ", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLanguages": { "message": "$COUNT$ 言語", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsLanguagesOne": { "message": "$COUNT$ 言語", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "7日間 +$D7$ · 30日間 +$D30$", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ 件のハイライト", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsHighlightsOne": { "message": "$COUNT$ 件のハイライト", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsPages": { "message": "$COUNT$ ページ", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsPagesOne": { "message": "$COUNT$ ページ", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsFiltered": { "message": "$SHOWN$ / $TOTAL$ 件のハイライト", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsHighlightsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ 件のハイライト", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryColorFilterAria": { "message": "$COLOR$、$COUNT$ 件", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
+  "libraryColorFilterAriaOne": { "message": "$COLOR$、$COUNT$ 件", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryFilterAll": { "message": "すべて" },
   "libraryFilterNarrow": { "message": "絞り込み" },
   "libraryFilterNarrowActive": { "message": "絞り込み · $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent7": { "message": "7日間 +$D7$", "placeholders": { "d7": { "content": "$1" } } },
   "libraryStatsWordsFiltered": { "message": "$SHOWN$ / $TOTAL$ 語", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsWordsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ 語", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryLookupAria": { "message": "辞書検索" },
   "libraryLookupPlaceholder": { "message": "任意の単語を調べる" },
   "libraryLookupGo": { "message": "調べる" },
@@ -3967,5 +3990,9 @@
   "libraryVocabCoverTitle": { "message": "単語帳" },
   "libraryVocabCoverLead": { "message": "$TOTAL$ 語（学習中 $LEARNING$ 語、習得済み $KNOWN$ 語）、$LANGS$ 言語。最後に追加したのは $DATE$ です。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
   "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$ 語（学習中 $LEARNING$ 語、習得済み $KNOWN$ 語）、$LANGS$ 言語。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
+  "libraryCountWords": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountWordsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryVocabCoverHint": { "message": "単語を選ぶと、文脈、自分のメモ、辞書の意味が表示されます。任意の単語を直接調べることもできます。" }
 }

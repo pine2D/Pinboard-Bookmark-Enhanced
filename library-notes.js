@@ -913,7 +913,12 @@ function _pbpNotesBuildSide(hit, pageHits, pageTs) {
   const facts = document.createElement("p");
   facts.className = "notes-side-facts";
   const count = document.createElement("span");
-  count.textContent = noted ? t("libraryPageFacts", String(n), String(noted)) : t("libraryStatsHighlights", String(n));
+  // Each count picks its own singular or plural phrase (pbpLibCountKey).
+  count.textContent = noted
+    ? t("libraryPageFacts",
+      t(pbpLibCountKey(n, "libraryCountHighlightsOne", "libraryCountHighlights"), String(n)),
+      t(pbpLibCountKey(noted, "libraryCountNotedOne", "libraryCountNoted"), String(noted)))
+    : t(pbpLibCountKey(n, "libraryStatsHighlightsOne", "libraryStatsHighlights"), String(n));
   facts.appendChild(count);
   // A record without any timestamp (never written by the reader, only by a
   // hand-edited backup) has no moment to state: the time line is left out
@@ -950,10 +955,17 @@ function _pbpNotesRenderCover(failed, all) {
   // Highlights with no time at all (only a hand-edited backup has them) have
   // no "latest" day: the sentence ends after the counts, not "on ." with nothing.
   const day = pbpLibFormatDay(stats.latestTs);
+  // Both counts are phrases picked by their own number ("1 highlight from 4
+  // pages"); the sentinels pass through the nested t() to be bolded.
   const counts = [String(stats.highlights), String(stats.pages)];
-  const parts = day
-    ? pbpLibSplitCount((...a) => t("libraryNotesCoverLead", ...a), [...counts, day])
-    : pbpLibSplitCount((...a) => t("libraryNotesCoverLeadNoDate", ...a), counts);
+  const sentence = (total, pages, date) => {
+    const args = [
+      t(pbpLibCountKey(stats.highlights, "libraryCountHighlightsOne", "libraryCountHighlights"), total),
+      t(pbpLibCountKey(stats.pages, "libraryCountPagesOne", "libraryCountPages"), pages),
+    ];
+    return day ? t("libraryNotesCoverLead", ...args, date) : t("libraryNotesCoverLeadNoDate", ...args);
+  };
+  const parts = pbpLibSplitCount(sentence, day ? [...counts, day] : counts);
   pbpLibFillCount(lead, parts, (index) => (index >= 0 && index < 2 ? "b" : null));
 }
 
@@ -1125,7 +1137,9 @@ function _pbpNotesRestoreDetailFocus(snap) {
 // straight back to the screen, and this one lands in a live region.
 const PBP_NOTES_RESULT_COUNT_KEY = "notesResultCount";
 function _pbpNotesResultCountText(visible, total) {
-  const msg = t(PBP_NOTES_RESULT_COUNT_KEY, String(visible), String(total));
+  const msg = t(PBP_NOTES_RESULT_COUNT_KEY,
+    t(pbpLibCountKey(visible, "notesResultShownOne", "notesResultShown"), String(visible)),
+    t(pbpLibCountKey(total, "libraryCountHighlightsOne", "libraryCountHighlights"), String(total)));
   return msg === PBP_NOTES_RESULT_COUNT_KEY
     ? String(visible) + " shown · " + String(total) + " highlights"
     : msg;
@@ -1139,11 +1153,13 @@ function _pbpNotesRenderToolbar(total, visible, allHits) {
   if (!count) return;
   if (!total) { pbpLibRenderCount(count, [], ""); return; }
   const s = pbpNotesStats(allHits || _pbpNotesHits(), Date.now());
+  // Singular or plural from the real number; "shown / total" reads with the
+  // total's noun.
   const items = [
     visible !== total
-      ? pbpLibSplitCount((...a) => t("libraryStatsHighlightsFiltered", ...a), [String(visible), String(total)])
-      : pbpLibSplitCount((...a) => t("libraryStatsHighlights", ...a), [String(total)]),
-    pbpLibSplitCount((...a) => t("libraryStatsPages", ...a), [String(s.pages)]),
+      ? pbpLibSplitCount((...a) => t(pbpLibCountKey(total, "libraryStatsHighlightsFilteredOne", "libraryStatsHighlightsFiltered"), ...a), [String(visible), String(total)])
+      : pbpLibSplitCount((...a) => t(pbpLibCountKey(total, "libraryStatsHighlightsOne", "libraryStatsHighlights"), ...a), [String(total)]),
+    pbpLibSplitCount((...a) => t(pbpLibCountKey(s.pages, "libraryStatsPagesOne", "libraryStatsPages"), ...a), [String(s.pages)]),
     pbpLibSplitCount((...a) => t("libraryStatsRecent7", ...a), [String(s.added7)]),
   ];
   const full = [_pbpNotesResultCountText(visible, total), t("libraryStatsRecent", String(s.added7), String(s.added30))].join(" \u00b7 ");
@@ -1216,7 +1232,7 @@ function _pbpNotesSyncColorFilters(allHits) {
     }
     const c = Number(b.dataset.color);
     const n = counts.get(c) || 0;
-    const label = t("libraryColorFilterAria", t(PBP_NOTES_COLOR_KEYS[c - 1]), String(n));
+    const label = t(pbpLibCountKey(n, "libraryColorFilterAriaOne", "libraryColorFilterAria"), t(PBP_NOTES_COLOR_KEYS[c - 1]), String(n));
     b.title = label;
     b.setAttribute("aria-label", label);
     b.setAttribute("aria-pressed", String(_notesActiveColors.has(c)));
@@ -1588,7 +1604,7 @@ function _pbpNotesBatchDelete() {
   if (!button || button.disabled || _notesBatchBusy || !_notesSelected.size) return;
   const snapshot = [..._notesSelected];
   showConfirmPopover(button, {
-    msg: t("notesBatchDeleteConfirm", String(snapshot.length)),
+    msg: t(pbpLibCountKey(snapshot.length, "notesBatchDeleteConfirmOne", "notesBatchDeleteConfirm"), String(snapshot.length)),
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {
@@ -1863,6 +1879,13 @@ if (typeof $id === "function") {
   // was); the render ends with a fresh measurement.
   document.addEventListener("pbp:i18n-applied", () => {
     _pbpNotesRenderCover(false);
+    // The count row is JS-written as well: without this a cold load whose
+    // stored language differs from the localStorage mirror kept it in the
+    // mirror's language. Before the first scan there is nothing to count.
+    if (_notesScanDone) {
+      const all = _pbpNotesHits();
+      _pbpNotesRenderToolbar(all.length, _pbpNotesVisibleHits(all).length, all);
+    }
     const hit = _pbpNotesFindHit(_pbpNotesSelectedKey);
     if (!hit) return;
     const focus = _pbpNotesDetailFocusSnapshot();

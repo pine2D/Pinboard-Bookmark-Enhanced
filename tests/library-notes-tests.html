@@ -192,7 +192,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     countItems() === "libraryStatsHighlights:6|libraryStatsPages:4|libraryStatsRecent7:0", countItems());
   check("the count row announces a localized sentence instead of a bare number pair",
     $id("notes-count").querySelector(".lib-count-items")?.getAttribute("aria-hidden") === "true" &&
-    !!countSr()?.textContent.startsWith("notesResultCount:6,6 \u00b7 libraryStatsRecent:"),
+    !!countSr()?.textContent.startsWith("notesResultCount:notesResultShown:6,libraryCountHighlights:6 \u00b7 libraryStatsRecent:"),
     $id("notes-count").innerHTML);
   check("a row shows the highlight text, its note and the source host",
     rowEl("pbp_hl_alpha#a2").textContent.includes("second alpha highlight about beta") &&
@@ -738,7 +738,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       focusOrder.join(","));
     const facts = () => [...(side()?.querySelectorAll(".notes-side-facts > span") || [])].map((s) => s.textContent);
     check("the column's facts count the page's highlights and notes and give its first and last time",
-      facts()[0] === "libraryPageFacts:6,1" &&
+      facts()[0] === "libraryPageFacts:libraryCountHighlights:6,libraryCountNotedOne:1" &&
       facts()[1] === `libraryPageSpan:${day(lastYear)} ${time(lastYear)},${time(pageTs)}`, facts().join(" | "));
     const openOriginal = side()?.querySelector(":scope > a.notes-open-original");
     check("Open original is a real link to the page's safe url, in a new tab",
@@ -749,8 +749,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("a page without notes states only its highlight count",
       facts()[0] === "libraryStatsHighlights:2", facts().join(" | "));
     _pbpNotesSelectRow("pbp_hl_longtitle#l1");
-    check("a single highlight says when it was saved",
-      facts()[0] === "libraryStatsHighlights:1" && facts()[1] === `libraryPageSavedAt:${time(at(0, 9, 0))}`, facts().join(" | "));
+    check("a single highlight says when it was saved (and counts itself in the singular)",
+      facts()[0] === "libraryStatsHighlightsOne:1" && facts()[1] === `libraryPageSavedAt:${time(at(0, 9, 0))}`, facts().join(" | "));
     _pbpNotesSelectRow("pbp_hl_orphan#c1");
     check("a page with no url offers no Open original and explains itself",
       !side()?.querySelector(".notes-open-original") && !!detail().querySelector(".notes-detail-head .notes-unknown-hint"));
@@ -783,7 +783,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     const allHits = _pbpNotesHits();
     const stats = pbpNotesStats(allHits, Date.now());
     check("the cover states how many highlights from how many pages, and when the latest was saved",
-      $id("notes-cover-lead").textContent === `libraryNotesCoverLead:${stats.highlights},${stats.pages},${pbpLibFormatDay(stats.latestTs)}`,
+      $id("notes-cover-lead").textContent === `libraryNotesCoverLead:libraryCountHighlights:${stats.highlights},libraryCountPages:${stats.pages},${pbpLibFormatDay(stats.latestTs)}`,
       $id("notes-cover-lead").textContent);
     const coverHint = () => $id("notes-detail-empty").querySelector(".lib-cover-hint");
     check("with highlights to pick from, the cover shows its hint",
@@ -803,7 +803,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       try {
         await renderNotesPanel();
         check("when no highlight carries a time, the cover sentence ends after the counts",
-          $id("notes-cover-lead").textContent === "libraryNotesCoverLeadNoDate:2,1", $id("notes-cover-lead").textContent);
+          $id("notes-cover-lead").textContent === "libraryNotesCoverLeadNoDate:libraryCountHighlights:2,libraryCountPagesOne:1", $id("notes-cover-lead").textContent);
         fixtureWidth(2400);
         _pbpNotesSelectRow("pbp_hl_nots#n1");
         check("a page with no time at all leaves the column's time line out instead of writing an empty one",
@@ -849,7 +849,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     rowKeys() === "pbp_hl_beta#b1,pbp_hl_alpha#a2", rowKeys());
   check("a filtered count row leads with shown / total highlights",
     countItems().startsWith("libraryStatsHighlightsFiltered:2,6|") &&
-    !!countSr()?.textContent.startsWith("notesResultCount:2,6"), countItems());
+    !!countSr()?.textContent.startsWith("notesResultCount:notesResultShown:2,libraryCountHighlights:6"), countItems());
   check("matches are marked in the list",
     rowEl("pbp_hl_alpha#a2").querySelector("mark") &&
     rowEl("pbp_hl_alpha#a2").querySelector("mark").textContent === "beta");
@@ -1166,6 +1166,9 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     btnOf("pbp_hl_alpha#a1").dispatchEvent(mouse({ ctrlKey: true }));
     const failBtn = $id("notes-batch-delete");
     failBtn.click();
+    check("T8g a batch delete of one highlight asks in the singular",
+      !!document.querySelector(".confirm-popover .confirm-msg")?.textContent.includes("notesBatchDeleteConfirmOne:1"),
+      document.querySelector(".confirm-popover")?.textContent);
     document.querySelector(".confirm-popover .confirm-yes").click();
     await settle(() => !_notesBatchBusy);
     check("a failed batch delete marks the button that was pressed and keeps the row",
@@ -1651,6 +1654,133 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       check("notes header fit: bigger numbers are re-measured at once", pane.dataset.headerFit === "narrow", pane.dataset.headerFit);
     } finally {
       host.remove();
+    }
+  }
+
+  // ---- T8g: a count of one reads in the singular (real en / de / fr copy) ----
+  // The stub t() above echoes keys; this block swaps in the shipped messages so
+  // the sentences are read the way a user reads them. pbpLibCountKey takes the
+  // language from uiLangToBCP47, which this page does not load: stand one in.
+  {
+    const locs = {};
+    for (const loc of ["en", "de", "fr"]) locs[loc] = await (await fetch(`../_locales/${loc}/messages.json`)).json();
+    const resolver = (m) => (key, ...values) => {
+      const entry = m[key];
+      if (!entry) return key;
+      let text = entry.message;
+      for (const [name, def] of Object.entries(entry.placeholders || {})) {
+        const i = Number(String(def.content).slice(1)) - 1;
+        text = text.replace(new RegExp("\\$" + name + "\\$", "gi"), () => String(values[i]));
+      }
+      return text;
+    };
+    const realT = t;
+    const hadLang = Object.prototype.hasOwnProperty.call(window, "uiLangToBCP47");
+    const prevLang = window.uiLangToBCP47;
+    const saved = { ...store };
+    const useLang = (loc) => { t = resolver(locs[loc]); window.uiLangToBCP47 = () => loc; };
+    const items = () => [...$id("notes-count").querySelectorAll(".lib-count-item")].map((el) => el.textContent);
+    const sr = () => $id("notes-count").querySelector(".lib-count-full")?.textContent || "";
+    const lead = () => $id("notes-cover-lead");
+    const bold = () => [...lead().querySelectorAll("b")].map((b) => b.textContent).join(",");
+    const facts = () => [...(detail().querySelector(".notes-page-side .notes-side-facts")?.children || [])].map((s) => s.textContent);
+    const filterTo = (q) => { $id("notes-filter").value = q; $id("notes-filter").dispatchEvent(new Event("input")); };
+    const TS = Date.UTC(2026, 0, 5, 10);
+    const solo = () => ({ v: 1, url: "https://solo.example/a", title: "Solo", items: [
+      { id: "s1", n: 1, quote: "the only highlight", color: 1, note: "a note", ts: TS }] });
+    const loadOnly = async (records) => {
+      for (const key of Object.keys(store)) delete store[key];
+      Object.assign(store, records);
+      _notesActiveColors = new Set();
+      $id("notes-filter").value = "";
+      _pbpNotesRenderDetail(null);
+      await renderNotesPanel();
+    };
+    try {
+      useLang("en");
+      await loadOnly({ pbp_hl_solo: solo() });
+      const day = pbpLibFormatDay(TS);
+      check("T8g en: one highlight on one page -> the count row says 1 highlight, 1 page",
+        items()[0] === "1 highlight" && items()[1] === "1 page", items().join("|"));
+      check("T8g en: the count row's full sentence says 1 shown, 1 highlight",
+        sr().startsWith("1 shown · 1 highlight · "), sr());
+      check("T8g en: the cover reads one highlight from one page, both numbers bold and the date plain",
+        lead().textContent === `1 highlight from 1 page. The latest was saved on ${day}.` && bold() === "1,1" && !!day,
+        lead().textContent + " | " + bold());
+      const quoteToggle = $id("notes-color-filters").querySelector('.lib-toggle[data-color="1"]');
+      check("T8g en: the colour toggle names one highlight",
+        /, 1 highlight$/.test(quoteToggle?.title || "") && quoteToggle.getAttribute("aria-label") === quoteToggle.title,
+        quoteToggle?.title);
+      _pbpNotesSelectRow("pbp_hl_solo#s1");
+      check("T8g en: the page column says 1 highlight, 1 with a note", facts()[0] === "1 highlight, 1 with a note", facts().join(" | "));
+      filterTo("no such words anywhere");
+      check("T8g en: a filter that hides the one highlight -> 0 / 1 highlight, 0 shown",
+        items()[0] === "0 / 1 highlight" && sr().startsWith("0 shown · 1 highlight · "), items()[0] + " | " + sr());
+      filterTo("");
+
+      // More than one: the plural, word for word as before.
+      await loadOnly({
+        pbp_hl_solo: { ...solo(), items: [...solo().items, { id: "s2", n: 2, quote: "second", color: 2, note: "two", ts: TS - 1000 }] },
+        pbp_hl_duo: { v: 1, url: "https://duo.example/b", title: "Duo", items: [{ id: "d1", n: 1, quote: "duo", color: 1, note: "", ts: TS - 2000 }] },
+        pbp_hl_trio: { v: 1, url: "https://trio.example/c", title: "Trio", items: [
+          { id: "t1", n: 1, quote: "trio one", color: 3, note: "noted", ts: TS - 3000 },
+          { id: "t2", n: 2, quote: "trio two", color: 3, note: "", ts: TS - 4000 }] },
+      });
+      check("T8g en: five highlights on three pages -> the plural on the row, in the sentence and on the cover",
+        items()[0] === "5 highlights" && items()[1] === "3 pages" && sr().startsWith("5 shown · 5 highlights · ") &&
+        lead().textContent === `5 highlights from 3 pages. The latest was saved on ${day}.` && bold() === "5,3",
+        items().join("|") + " | " + sr() + " | " + lead().textContent);
+      _pbpNotesSelectRow("pbp_hl_solo#s1");
+      const twoNoted = facts()[0];
+      _pbpNotesSelectRow("pbp_hl_trio#t1");
+      const oneNoted = facts()[0];
+      _pbpNotesSelectRow("pbp_hl_duo#d1");
+      const noneNoted = facts()[0];
+      check("T8g en: the page column counts highlights and notes each on its own number",
+        twoNoted === "2 highlights, 2 with notes" && oneNoted === "2 highlights, 1 with a note" && noneNoted === "1 highlight",
+        [twoNoted, oneNoted, noneNoted].join(" | "));
+
+      useLang("de");
+      await loadOnly({ pbp_hl_solo: solo() });
+      const dayDe = pbpLibFormatDay(TS);
+      _pbpNotesSelectRow("pbp_hl_solo#s1");
+      check("T8g de: one highlight reads Markierung / Seite on the row, the cover and the page column",
+        items()[0] === "1 Markierung" && items()[1] === "1 Seite" &&
+        sr().startsWith("1 angezeigt · 1 Markierung insgesamt · ") &&
+        lead().textContent === `1 Markierung auf 1 Seite, zuletzt gespeichert am ${dayDe}.` && bold() === "1,1" &&
+        facts()[0] === "1 Markierung, davon 1 mit Notiz",
+        [items().join("|"), sr(), lead().textContent, facts()[0]].join(" | "));
+
+      useLang("fr");
+      await loadOnly({ pbp_hl_solo: solo() });
+      const dayFr = pbpLibFormatDay(TS);
+      check("T8g fr: one highlight reads surlignage / page web on the row and surlignage / page on the cover",
+        items()[0] === "1 surlignage" && items()[1] === "1 page web" &&
+        sr().startsWith("1 affiché · 1 surlignage au total · ") &&
+        lead().textContent === `1 surlignage sur 1 page, le dernier enregistré le ${dayFr}.` && bold() === "1,1",
+        [items().join("|"), sr(), lead().textContent].join(" | "));
+      filterTo("no such words anywhere");
+      check("T8g fr: zero takes the singular in French (0 affiché, 0 / 1 surlignage)",
+        items()[0] === "0 / 1 surlignage" && sr().startsWith("0 affiché · 1 surlignage au total · "),
+        items()[0] + " | " + sr());
+      filterTo("");
+
+      // A language switch (applyI18n -> pbp:i18n-applied) redraws the count row
+      // too, not only the cover and the detail.
+      useLang("en");
+      document.dispatchEvent(new Event("pbp:i18n-applied"));
+      check("T8g a language switch redraws the count row in the new language",
+        items()[0] === "1 highlight" && items()[1] === "1 page" && sr().startsWith("1 shown · 1 highlight · "),
+        items().join("|") + " | " + sr());
+    } finally {
+      t = realT;
+      if (hadLang) window.uiLangToBCP47 = prevLang; else delete window.uiLangToBCP47;
+      for (const key of Object.keys(store)) delete store[key];
+      Object.assign(store, saved);
+      _notesActiveColors = new Set();
+      $id("notes-filter").value = "";
+      _pbpNotesRenderDetail(null);
+      await renderNotesPanel();
     }
   }
 

@@ -849,6 +849,7 @@
     "message": "Usunąć wybrane zaznaczenia ($COUNT$)?",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "notesBatchDeleteConfirmOne": { "message": "Usunąć wybrane zaznaczenia ($COUNT$)?", "placeholders": { "count": { "content": "$1" } } },
   "notesDeleteFailed": {
     "message": "Nie można usunąć tych zaznaczeń. Spróbuj ponownie."
   },
@@ -2967,6 +2968,7 @@
       }
     }
   },
+  "vocabBatchKnownDoneOne": { "message": "Oznaczono jako opanowane: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "vocabBatchLearningDone": {
     "message": "Przywrócono do nauki: $COUNT$",
     "placeholders": {
@@ -2975,6 +2977,7 @@
       }
     }
   },
+  "vocabBatchLearningDoneOne": { "message": "Przywrócono do nauki: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "vocabFailedTerms": {
     "message": "Niepowodzenie: $TERMS$",
     "placeholders": {
@@ -3317,6 +3320,10 @@
         }
       }
     },
+    "vocabResultFound": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultFoundOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSaved": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSavedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "notesResultCount": {
       "message": "Wyświetlono $RESULTS$ · łącznie $TOTAL$ zaznaczeń",
       "placeholders": {
@@ -3328,6 +3335,8 @@
         }
       }
     },
+    "notesResultShown": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "notesResultShownOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "vocabSelectedCount": {
       "message": "Zaznaczono: $COUNT$",
       "placeholders": {
@@ -3800,9 +3809,15 @@
   "libraryPageCount": { "message": "Na tej stronie: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "Zaznaczenia: $TOTAL$ (stron: $PAGES$). Ostatnie zapisano $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
   "libraryNotesCoverLeadNoDate": { "message": "Zaznaczenia: $TOTAL$ (stron: $PAGES$).", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
+  "libraryCountHighlights": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountHighlightsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryThisPage": { "message": "Ta strona" },
   "libraryOpenOriginal": { "message": "Otwórz oryginał" },
   "libraryPageFacts": { "message": "Zaznaczenia: $COUNT$, z notatką: $NOTED$", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
+  "libraryCountNoted": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "Pierwsze: $FIRST$ · ostatnie: $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Zapisano o $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "Zaznaczenia i notatki są przechowywane tylko na tym urządzeniu i nie są synchronizowane. Aby przenieść je na inne urządzenie, wyeksportuj kopię zapasową na stronie ustawień i zaimportuj ją tam." },
@@ -3810,20 +3825,28 @@
   "libraryRelookup": { "message": "Sprawdź ponownie w słowniku" },
   "libraryBack": { "message": "Wróć do listy" },
   "libraryStatsWords": { "message": "Słówka: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsWordsOne": { "message": "Słówka: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLearning": { "message": "W nauce: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsKnown": { "message": "Opanowane: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "Grupy: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsGroupsOne": { "message": "Grupy: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLanguages": { "message": "Języki: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsLanguagesOne": { "message": "Języki: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "7 dni: +$D7$ · 30 dni: +$D30$", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "Zaznaczenia: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsHighlightsOne": { "message": "Zaznaczenia: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsPages": { "message": "Strony: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsPagesOne": { "message": "Strony: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsFiltered": { "message": "Zaznaczenia: $SHOWN$ / $TOTAL$", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsHighlightsFilteredOne": { "message": "Zaznaczenia: $SHOWN$ / $TOTAL$", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryColorFilterAria": { "message": "$COLOR$, zaznaczenia: $COUNT$", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
+  "libraryColorFilterAriaOne": { "message": "$COLOR$, zaznaczenia: $COUNT$", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryFilterAll": { "message": "Wszystkie" },
   "libraryFilterNarrow": { "message": "Filtruj" },
   "libraryFilterNarrowActive": { "message": "Filtruj · $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent7": { "message": "7 dni: +$D7$", "placeholders": { "d7": { "content": "$1" } } },
   "libraryStatsWordsFiltered": { "message": "Słówka: $SHOWN$ / $TOTAL$", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsWordsFilteredOne": { "message": "Słówka: $SHOWN$ / $TOTAL$", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryLookupAria": { "message": "Wyszukiwanie w słowniku" },
   "libraryLookupPlaceholder": { "message": "Sprawdź dowolne słowo" },
   "libraryLookupGo": { "message": "Sprawdź" },
@@ -3967,5 +3990,9 @@
   "libraryVocabCoverTitle": { "message": "Słówka" },
   "libraryVocabCoverLead": { "message": "Słówka: $TOTAL$ (w nauce: $LEARNING$, opanowane: $KNOWN$), języki: $LANGS$. Ostatnio dodane: $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
   "libraryVocabCoverLeadNoDate": { "message": "Słówka: $TOTAL$ (w nauce: $LEARNING$, opanowane: $KNOWN$), języki: $LANGS$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
+  "libraryCountWords": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountWordsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryVocabCoverHint": { "message": "Wybierz słowo, aby zobaczyć kontekst, swoją notatkę i hasło ze słownika, albo od razu sprawdź dowolne słowo." }
 }

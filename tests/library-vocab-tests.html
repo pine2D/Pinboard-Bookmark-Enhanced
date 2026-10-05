@@ -441,13 +441,13 @@ check("status toggles appear once rows exist, with All pressed",
   $id("vocab-stat-all").getAttribute("aria-pressed") === "true" &&
   $id("vocab-stat-learning").getAttribute("aria-pressed") === "false");
 check("the count row lists words, groups, languages and the 7-day gain as separate items",
-  countItems() === "libraryStatsWords:3|libraryStatsGroups:1|libraryStatsLanguages:2|libraryStatsRecent7:1", countItems());
+  countItems() === "libraryStatsWords:3|libraryStatsGroupsOne:1|libraryStatsLanguages:2|libraryStatsRecent7:1", countItems());
 check("the learning and known toggles keep their number in a .lib-toggle-count span",
   $id("vocab-stat-learning").textContent === "libraryStatsLearning:1" &&
   $id("vocab-stat-learning").querySelector(".lib-toggle-count")?.textContent === "1" &&
   $id("vocab-stat-known").querySelector(".lib-toggle-count")?.textContent === "2");
 check("the full sentence (owner included) is the sr-only text and the title; the compact items are aria-hidden",
-  !!$id("vocab-count").querySelector(".lib-count-full.sr-only")?.textContent.startsWith("vocabResultCount:3,3,") &&
+  !!$id("vocab-count").querySelector(".lib-count-full.sr-only")?.textContent.startsWith("vocabResultCount:vocabResultFound:3,vocabResultSaved:3,") &&
   $id("vocab-count").title === $id("vocab-count").querySelector(".lib-count-full").textContent &&
   $id("vocab-count").querySelector(".lib-count-items")?.getAttribute("aria-hidden") === "true");
 check("only the first item's number is bold",
@@ -911,7 +911,7 @@ check("5000 rows remain in the in-memory result set", _vocabViewRows.length === 
 check("initial large-list DOM is capped at 100 cards", $id("vocab-list").querySelectorAll(".vocab-card").length === 100);
 check("large-list render exposes Load more", !$id("vocab-load-more").hidden);
 check("result count reports all 5000 matches rather than 100 rendered cards",
-  !!$id("vocab-count").querySelector(".lib-count-full")?.textContent.startsWith("vocabResultCount:5000,5000"));
+  !!$id("vocab-count").querySelector(".lib-count-full")?.textContent.startsWith("vocabResultCount:vocabResultFound:5000,vocabResultSaved:5000"));
 const firstLargeCard = $id("vocab-list").firstElementChild;
 firstLargeCard.querySelector(".notes-card-head").click();
 _vocabSelected = pbpVocabSelectResults(new Set(), _vocabViewRows, "all");
@@ -1794,7 +1794,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       const lead = cover.querySelector(".lib-cover-lead");
       check("T7 the cover: big title, a stats sentence with bold numbers built from text nodes, and the hint",
         cover.querySelector("h2.lib-cover-title.lib-first-line").textContent === "libraryVocabCoverTitle" &&
-        lead.textContent.startsWith("libraryVocabCoverLead:2,1,1,2,") &&
+        lead.textContent.startsWith("libraryVocabCoverLead:libraryCountWords:2,1,1,libraryCountLanguages:2,") &&
         [...lead.querySelectorAll("b")].map((b) => b.textContent).join(",") === "2,1,1,2" &&
         cover.querySelector(".lib-cover-hint").hidden === false && !cover.hasAttribute("data-i18n"),
         lead.textContent);
@@ -1803,7 +1803,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       _vocabRows = rows().map(({ createdAt, ...rest }) => rest);
       _pbpVocabRenderCover();
       check("T7 the cover's stats sentence drops its date clause when no word has a creation time",
-        lead.textContent === "libraryVocabCoverLeadNoDate:2,1,1,2" &&
+        lead.textContent === "libraryVocabCoverLeadNoDate:libraryCountWords:2,1,1,libraryCountLanguages:2" &&
         [...lead.querySelectorAll("b")].map((b) => b.textContent).join(",") === "2,1,1,2", lead.textContent);
       _vocabRows = [];
       _pbpVocabRenderCover();
@@ -2609,9 +2609,10 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         panel.querySelector('[data-label="ref-label"]').textContent = m.librarySectionDict.message;
         panel.querySelector('[data-label="ref-free"]').textContent = m.libraryDictIdleFree.message;
         panel.querySelector('[data-label="cover-title"]').textContent = m.libraryVocabCoverTitle.message;
+        // T8g: the word and language counts arrive as phrases ("5000 words").
         panel.querySelector('[data-label="cover-lead"]').textContent = m.libraryVocabCoverLead.message
-          .replace("$TOTAL$", "5000").replace("$LEARNING$", "2500").replace("$KNOWN$", "2500")
-          .replace("$LANGS$", "12").replace("$DATE$", "October 3, 2026");
+          .replace("$TOTAL$", m.libraryCountWords.message.replace("$COUNT$", "5000")).replace("$LEARNING$", "2500").replace("$KNOWN$", "2500")
+          .replace("$LANGS$", m.libraryCountLanguages.message.replace("$COUNT$", "12")).replace("$DATE$", "October 3, 2026");
         panel.querySelector('[data-label="cover-hint"]').textContent = m.libraryVocabCoverHint.message;
         await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
         if (width === 320 && theme === "github-light" && locale === "de") {
@@ -2902,6 +2903,153 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         `${pane2.dataset.headerFit} ${getComputedStyle(filterBtn).display}`);
     } finally {
       host2.remove();
+    }
+  }
+  // ---- T8g: a count of one reads in the singular ----
+  // Key choice first, on the stub t() (key names are the evidence), then the
+  // shipped en / de / fr copy read as a user reads it. pbpLibCountKey takes the
+  // language from uiLangToBCP47, which this page does not load: stand one in.
+  {
+    const hadLang = Object.prototype.hasOwnProperty.call(window, "uiLangToBCP47");
+    const prevLang = window.uiLangToBCP47;
+    const realT = t;
+    const saved = { rows: _vocabRows, owner: _vocabCurrentOwner, label: _vocabOwnerLabel };
+    const pane = $id("vocab-list-pane");
+    const wasSignedOut = pane.classList.contains("vocab-signed-out");
+    const cover = $id("vocab-detail-empty");
+    const lead = cover.querySelector(".lib-cover-lead");
+    const items = () => [...$id("vocab-count").querySelectorAll(".lib-count-item")].map((el) => el.textContent);
+    const sr = () => $id("vocab-count").querySelector(".lib-count-full")?.textContent || "";
+    const bold = () => [...lead.querySelectorAll("b")].map((b) => b.textContent).join(",");
+    const TS = Date.UTC(2026, 0, 5, 10);
+    const word = (id, term, status, language, groups, createdAt) =>
+      ({ id, term, status, language, groups, contexts: [], updatedAt: createdAt, createdAt });
+    const show = (rows, q = "") => {
+      $id("vocab-search").value = q;
+      $id("vocab-group-filter").value = "";
+      $id("vocab-status-filter").value = "";
+      _vocabRows = rows;
+      _pbpVocabApplyView(true);
+    };
+    const resolver = (m) => (key, ...values) => {
+      const entry = m[key];
+      if (!entry) return key;
+      let text = entry.message;
+      for (const [name, def] of Object.entries(entry.placeholders || {})) {
+        const i = Number(String(def.content).slice(1)) - 1;
+        text = text.replace(new RegExp("\\$" + name + "\\$", "gi"), () => String(values[i]));
+      }
+      return text;
+    };
+    const flashed = [];
+    const real = { flash: _pbpVocabFlashStatus, owner: pbpVocabCurrentOwner, setStatus: pbpVocabBatchSetStatus, reload: _pbpVocabReloadAfterMutation };
+    try {
+      pane.classList.remove("vocab-signed-out");
+      delete cover.dataset.loadFailed;
+      _vocabCurrentOwner = "acct_t8g";
+      _vocabOwnerLabel = "t8g";
+      window.uiLangToBCP47 = () => "en";
+      const one = [word("t8g-a", "alpha", "new", "en", ["G1"], TS)];
+      show(one);
+      check("T8g stub: one word, one group, one language take the One keys on the row and in the sentence",
+        items().slice(0, 3).join("|") === "libraryStatsWordsOne:1|libraryStatsGroupsOne:1|libraryStatsLanguagesOne:1" &&
+        sr().startsWith("vocabResultCount:vocabResultFoundOne:1,vocabResultSavedOne:1,t8g"),
+        items().join("|") + " | " + sr());
+      check("T8g stub: the cover takes the singular word and language phrases, four numbers bold",
+        lead.textContent.startsWith("libraryVocabCoverLead:libraryCountWordsOne:1,1,0,libraryCountLanguagesOne:1,") && bold() === "1,1,0,1",
+        lead.textContent + " | " + bold());
+      show(one, "no such word");
+      check("T8g stub: a filtered row over a total of one takes the filtered One key",
+        items()[0] === "libraryStatsWordsFilteredOne:0,1" && sr().startsWith("vocabResultCount:vocabResultFound:0,vocabResultSavedOne:1,"),
+        items()[0] + " | " + sr());
+
+      // Batch status flips report how many words moved.
+      _pbpVocabFlashStatus = (ok, text) => flashed.push(text);
+      pbpVocabCurrentOwner = async () => "acct_t8g";
+      pbpVocabBatchSetStatus = async () => true;
+      _pbpVocabReloadAfterMutation = async () => true;
+      const flip = async (ids, known) => {
+        show([word("t8g-a", "alpha", "new", "en", [], TS), word("t8g-b", "beta", "new", "en", [], TS)]);
+        _vocabSelected = new Set(ids);
+        _pbpVocabSyncSelectionUi();
+        await _pbpVocabApplyStatusChange(known);
+        return flashed[flashed.length - 1];
+      };
+      const knownOne = await flip(["t8g-a"], true);
+      const knownTwo = await flip(["t8g-a", "t8g-b"], true);
+      const learningOne = await flip(["t8g-b"], false);
+      check("T8g stub: a batch status flip of one word reports it in the singular",
+        knownOne === "vocabBatchKnownDoneOne:1" && knownTwo === "vocabBatchKnownDone:2" && learningOne === "vocabBatchLearningDoneOne:1",
+        [knownOne, knownTwo, learningOne].join(" | "));
+      _pbpVocabFlashStatus = real.flash;
+      pbpVocabCurrentOwner = real.owner;
+      pbpVocabBatchSetStatus = real.setStatus;
+      _pbpVocabReloadAfterMutation = real.reload;
+      _vocabSelected = new Set();
+      _pbpVocabSyncSelectionUi();
+
+      const locs = {};
+      for (const loc of ["en", "de", "fr"]) locs[loc] = await (await fetch(`../_locales/${loc}/messages.json`)).json();
+      const useLang = (loc) => { t = resolver(locs[loc]); window.uiLangToBCP47 = () => loc; };
+      useLang("en");
+      show(one);
+      const day = pbpLibFormatDay(TS);
+      check("T8g en: one word reads word / group / language on the row and in the full sentence",
+        items().slice(0, 3).join("|") === "1 word|1 group|1 language" &&
+        sr().startsWith("1 found · 1 saved for current Pinboard account: t8g"),
+        items().join("|") + " | " + sr());
+      check("T8g en: the cover reads 1 word ... in 1 language, the four counts bold and the date plain",
+        lead.textContent === `1 word, 1 learning and 0 known, in 1 language. Last added on ${day}.` && bold() === "1,1,0,1" && !!day,
+        lead.textContent + " | " + bold());
+      show(one, "no such word");
+      check("T8g en: a filter over a total of one reads 0 / 1 word", items()[0] === "0 / 1 word", items()[0]);
+      const many = [word("t8g-a", "alpha", "new", "en", ["G1"], TS), word("t8g-b", "beta", "known", "de", ["G2"], TS - 1000)];
+      show(many);
+      check("T8g en: two words keep the plural everywhere, word for word as before",
+        items().slice(0, 3).join("|") === "2 words|2 groups|2 languages" &&
+        sr().startsWith("2 found · 2 saved for current Pinboard account: t8g") &&
+        lead.textContent === `2 words, 1 learning and 1 known, in 2 languages. Last added on ${day}.` && bold() === "2,1,1,2",
+        items().join("|") + " | " + sr() + " | " + lead.textContent);
+
+      useLang("de");
+      show(one);
+      check("T8g de: one word reads Wort / Gruppe / Sprache, and in 1 Sprache on the cover",
+        items().slice(0, 3).join("|") === "1 Wort|1 Gruppe|1 Sprache" &&
+        lead.textContent === `1 Wort, davon 1 im Lernen und 0 gelernt, in 1 Sprache. Zuletzt hinzugefügt am ${pbpLibFormatDay(TS)}.` &&
+        bold() === "1,1,0,1",
+        items().join("|") + " | " + lead.textContent);
+
+      useLang("fr");
+      show(one);
+      check("T8g fr: one word reads mot / groupe / langue, and 1 résultat, 1 mot enregistré",
+        items().slice(0, 3).join("|") === "1 mot|1 groupe|1 langue" &&
+        sr().startsWith("Compte Pinboard actuel (t8g) : 1 résultat · 1 mot enregistré") &&
+        lead.textContent === `1 mot, dont 1 en cours d’apprentissage et 0 acquis, dans 1 langue. Dernier ajout le ${pbpLibFormatDay(TS)}.`,
+        items().join("|") + " | " + sr() + " | " + lead.textContent);
+      show(one, "no such word");
+      check("T8g fr: zero takes the singular in French (0 résultat, 0 / 1 mot)",
+        items()[0] === "0 / 1 mot" && sr().startsWith("Compte Pinboard actuel (t8g) : 0 résultat · 1 mot enregistré"),
+        items()[0] + " | " + sr());
+      show(one);
+
+      // A language switch (applyI18n -> pbp:i18n-applied) redraws the count row.
+      useLang("en");
+      document.dispatchEvent(new Event("pbp:i18n-applied"));
+      check("T8g a language switch redraws the count row and its full sentence in the new language",
+        items().slice(0, 3).join("|") === "1 word|1 group|1 language" &&
+        sr().startsWith("1 found · 1 saved for current Pinboard account: t8g"),
+        items().join("|") + " | " + sr());
+    } finally {
+      _pbpVocabFlashStatus = real.flash;
+      pbpVocabCurrentOwner = real.owner;
+      pbpVocabBatchSetStatus = real.setStatus;
+      _pbpVocabReloadAfterMutation = real.reload;
+      t = realT;
+      if (hadLang) window.uiLangToBCP47 = prevLang; else delete window.uiLangToBCP47;
+      _vocabCurrentOwner = saved.owner;
+      _vocabOwnerLabel = saved.label;
+      pane.classList.toggle("vocab-signed-out", wasSignedOut);
+      show(saved.rows);
     }
   }
   document.title = fail ? "FAIL library-vocab Tests" : "PASS library-vocab Tests";

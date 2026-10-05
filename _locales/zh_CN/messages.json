@@ -849,6 +849,7 @@
     "message": "删除选中的 $COUNT$ 条高亮？",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "notesBatchDeleteConfirmOne": { "message": "删除选中的 $COUNT$ 条高亮？", "placeholders": { "count": { "content": "$1" } } },
   "notesDeleteFailed": {
     "message": "删除高亮失败，请重试。"
   },
@@ -2967,6 +2968,7 @@
       }
     }
   },
+  "vocabBatchKnownDoneOne": { "message": "已将 $COUNT$ 个词标为已掌握", "placeholders": { "count": { "content": "$1" } } },
   "vocabBatchLearningDone": {
     "message": "已将 $COUNT$ 个词恢复为学习中",
     "placeholders": {
@@ -2975,6 +2977,7 @@
       }
     }
   },
+  "vocabBatchLearningDoneOne": { "message": "已将 $COUNT$ 个词恢复为学习中", "placeholders": { "count": { "content": "$1" } } },
   "vocabFailedTerms": {
     "message": "失败：$TERMS$",
     "placeholders": {
@@ -3317,6 +3320,10 @@
         }
       }
     },
+    "vocabResultFound": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultFoundOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSaved": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSavedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "notesResultCount": {
       "message": "显示 $RESULTS$ 条，共 $TOTAL$ 条高亮",
       "placeholders": {
@@ -3328,6 +3335,8 @@
         }
       }
     },
+    "notesResultShown": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "notesResultShownOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "vocabSelectedCount": {
       "message": "已选 $COUNT$ 条",
       "placeholders": {
@@ -3794,9 +3803,15 @@
   "libraryPageCount": { "message": "本页 $COUNT$ 条", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "$TOTAL$ 条高亮，来自 $PAGES$ 个网页；最近一次保存在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
   "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ 条高亮，来自 $PAGES$ 个网页。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
+  "libraryCountHighlights": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountHighlightsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryThisPage": { "message": "这一页" },
   "libraryOpenOriginal": { "message": "打开原文" },
   "libraryPageFacts": { "message": "$COUNT$ 条高亮，其中 $NOTED$ 条有笔记", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
+  "libraryCountNoted": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最早 $FIRST$ · 最近 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "保存于 $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "高亮和笔记只保存在本设备，不参与同步。要迁移到别的设备，请在设置页导出备份，再在那台设备导入。" },
@@ -3804,20 +3819,28 @@
   "libraryRelookup": { "message": "重新查词典" },
   "libraryBack": { "message": "返回列表" },
   "libraryStatsWords": { "message": "$COUNT$ 个词", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsWordsOne": { "message": "$COUNT$ 个词", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLearning": { "message": "学习中 $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsKnown": { "message": "已掌握 $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "$COUNT$ 个分组", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsGroupsOne": { "message": "$COUNT$ 个分组", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLanguages": { "message": "$COUNT$ 种语言", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsLanguagesOne": { "message": "$COUNT$ 种语言", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "7 天 +$D7$ · 30 天 +$D30$", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ 条高亮", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsHighlightsOne": { "message": "$COUNT$ 条高亮", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsPages": { "message": "$COUNT$ 个网页", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsPagesOne": { "message": "$COUNT$ 个网页", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsFiltered": { "message": "$SHOWN$ / $TOTAL$ 条高亮", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsHighlightsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ 条高亮", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryColorFilterAria": { "message": "$COLOR$，$COUNT$ 条", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
+  "libraryColorFilterAriaOne": { "message": "$COLOR$，$COUNT$ 条", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryFilterAll": { "message": "全部" },
   "libraryFilterNarrow": { "message": "筛选" },
   "libraryFilterNarrowActive": { "message": "筛选 · $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent7": { "message": "近 7 天 +$D7$", "placeholders": { "d7": { "content": "$1" } } },
   "libraryStatsWordsFiltered": { "message": "$SHOWN$ / $TOTAL$ 个词", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsWordsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ 个词", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryLookupAria": { "message": "词典查询" },
   "libraryLookupPlaceholder": { "message": "查询任意词" },
   "libraryLookupGo": { "message": "查词" },
@@ -3961,5 +3984,9 @@
   "libraryVocabCoverTitle": { "message": "生词本" },
   "libraryVocabCoverLead": { "message": "$TOTAL$ 个词，学习中 $LEARNING$ 个、已掌握 $KNOWN$ 个，来自 $LANGS$ 种语言；最近一次收录在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
   "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$ 个词，学习中 $LEARNING$ 个、已掌握 $KNOWN$ 个，来自 $LANGS$ 种语言。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
+  "libraryCountWords": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountWordsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryVocabCoverHint": { "message": "选一个词，查看它的语境、你的笔记和词典释义；也可以直接查任意词。" }
 }

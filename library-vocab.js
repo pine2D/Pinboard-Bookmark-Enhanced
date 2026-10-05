@@ -1835,17 +1835,23 @@ function _pbpVocabRenderStats() {
     pbpLibFillCount(el, pbpLibSplitCount((...a) => t(spec[0], ...a), [String(spec[1])]), () => "span");
     for (const num of el.querySelectorAll(".lib-count-num")) num.classList.add("lib-toggle-count");
   }
+  // Singular or plural is picked from the real number (pbpLibCountKey); a
+  // filtered "shown / total" reads with the total's noun.
   const words = rows.length !== s.total
-    ? pbpLibSplitCount((...a) => t("libraryStatsWordsFiltered", ...a), [String(rows.length), String(s.total)])
-    : pbpLibSplitCount((...a) => t("libraryStatsWords", ...a), [String(s.total)]);
+    ? pbpLibSplitCount((...a) => t(pbpLibCountKey(s.total, "libraryStatsWordsFilteredOne", "libraryStatsWordsFiltered"), ...a), [String(rows.length), String(s.total)])
+    : pbpLibSplitCount((...a) => t(pbpLibCountKey(s.total, "libraryStatsWordsOne", "libraryStatsWords"), ...a), [String(s.total)]);
   const items = [
     words,
-    pbpLibSplitCount((...a) => t("libraryStatsGroups", ...a), [String(s.groups)]),
-    pbpLibSplitCount((...a) => t("libraryStatsLanguages", ...a), [String(s.languages)]),
+    pbpLibSplitCount((...a) => t(pbpLibCountKey(s.groups, "libraryStatsGroupsOne", "libraryStatsGroups"), ...a), [String(s.groups)]),
+    pbpLibSplitCount((...a) => t(pbpLibCountKey(s.languages, "libraryStatsLanguagesOne", "libraryStatsLanguages"), ...a), [String(s.languages)]),
     pbpLibSplitCount((...a) => t("libraryStatsRecent7", ...a), [String(s.added7)]),
   ];
+  const found = rows.length, saved = _vocabRows.length;
   const full = [
-    t("vocabResultCount", String(rows.length), String(_vocabRows.length), _vocabOwnerLabel),
+    t("vocabResultCount",
+      t(pbpLibCountKey(found, "vocabResultFoundOne", "vocabResultFound"), String(found)),
+      t(pbpLibCountKey(saved, "vocabResultSavedOne", "vocabResultSaved"), String(saved)),
+      _vocabOwnerLabel),
     t("libraryStatsRecent", String(s.added7), String(s.added30)),
   ].join(" \u00b7 ");
   pbpLibRenderCount(count, items, full);
@@ -1883,15 +1889,22 @@ function _pbpVocabRenderCover() {
   if (!String(_vocabCurrentOwner || "").startsWith("acct_")) return;
   if (!_vocabRows.length) { lead.textContent = t("dictVocabEmpty", _vocabOwnerLabel); return; }
   hint.hidden = false;
-  if (typeof pbpLibSplitCount !== "function" || typeof pbpLibFillCount !== "function") return;
+  if (typeof pbpLibSplitCount !== "function" || typeof pbpLibFillCount !== "function" || typeof pbpLibCountKey !== "function") return;
   const s = pbpVocabStats(_vocabRows, Date.now());
   const day = typeof pbpLibFormatDay === "function" ? pbpLibFormatDay(s.latestCreatedAt) : "";
   // Rows that carry no creation time (older imports) have no "last added"
   // day: the sentence ends after the counts instead of "on ." with nothing.
+  // The word and language counts are phrases picked by their own number
+  // ("1 word", "in 4 languages"); the learning / known counts carry no noun.
   const counts = [String(s.total), String(s.learning), String(s.known), String(s.languages)];
-  const parts = day
-    ? pbpLibSplitCount((...a) => t("libraryVocabCoverLead", ...a), [...counts, day])
-    : pbpLibSplitCount((...a) => t("libraryVocabCoverLeadNoDate", ...a), counts);
+  const sentence = (total, learning, known, langs, date) => {
+    const args = [
+      t(pbpLibCountKey(s.total, "libraryCountWordsOne", "libraryCountWords"), total), learning, known,
+      t(pbpLibCountKey(s.languages, "libraryCountLanguagesOne", "libraryCountLanguages"), langs),
+    ];
+    return day ? t("libraryVocabCoverLead", ...args, date) : t("libraryVocabCoverLeadNoDate", ...args);
+  };
+  const parts = pbpLibSplitCount(sentence, day ? [...counts, day] : counts);
   pbpLibFillCount(lead, parts, (index) => (index >= 0 && index < 4 ? "b" : null));
 }
 
@@ -2379,8 +2392,10 @@ async function _pbpVocabApplyStatusChange(known) {
     _pbpVocabFocusStable();
     if (!ok) { _pbpVocabFlashStatus(false, t("vocabBatchFailed")); return; }
     if (!refreshed) { _pbpVocabFlashStatus(false, t("vocabRefreshFailed")); return; }
-    _pbpVocabFlashStatus(true,
-      t(known ? "vocabBatchKnownDone" : "vocabBatchLearningDone", String(ids.length)));
+    const n = ids.length;
+    _pbpVocabFlashStatus(true, t(known
+      ? pbpLibCountKey(n, "vocabBatchKnownDoneOne", "vocabBatchKnownDone")
+      : pbpLibCountKey(n, "vocabBatchLearningDoneOne", "vocabBatchLearningDone"), String(n)));
   } catch (_) {
     if (owner) await _pbpVocabReloadAfterMutation(owner, gen);
     else if (gen === _vocabRenderGen) {
@@ -2462,6 +2477,10 @@ document.addEventListener("pbp:i18n-applied", () => {
   else if (host && host.dataset.refState === "idle") _pbpVocabRenderRefIdle("word");
   _pbpVocabSyncLookupPlaceholder();
   _pbpVocabRenderCover();
+  // The count row and the status toggles are JS-written too; without this a
+  // cold load whose stored language differs from the localStorage mirror
+  // kept them in the mirror's language.
+  _pbpVocabRenderStats();
 });
 // Narrow-screen door to the lookup row. Below 860px the detail pane is
 // display:none until `lib-narrow-detail` is on the body, so the list needs

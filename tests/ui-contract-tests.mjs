@@ -1411,7 +1411,10 @@ check(libraryVocabJs.includes('t("vocabLoading")') &&
 check(sharedJs.includes("async function pbpVocabCurrentOwner()") &&
   sharedJs.includes("function pbpVocabOwnerLabel(owner)") &&
   libraryVocabJs.includes("pbpVocabCurrentOwner(") && optionsVocabJs.includes("pbpVocabCurrentOwner(") &&
-  libraryVocabJs.includes('t("vocabResultCount", String(rows.length), String(_vocabRows.length), _vocabOwnerLabel)') &&
+  // T8g: the two counts arrive as singular/plural phrases; the owner label is
+  // still the sentence's third argument.
+  /t\("vocabResultCount",\s*t\(pbpLibCountKey\(found, "vocabResultFoundOne", "vocabResultFound"\), String\(found\)\),\s*t\(pbpLibCountKey\(saved, "vocabResultSavedOne", "vocabResultSaved"\), String\(saved\)\),\s*_vocabOwnerLabel\)/.test(libraryVocabJs) &&
+  libraryVocabJs.includes("const found = rows.length, saved = _vocabRows.length;") &&
   libraryVocabJs.includes('empty.textContent = t("dictVocabEmpty", _vocabOwnerLabel)') &&
   !libraryVocabJs.includes('t("jinaFailed")') && !optionsVocabJs.includes('t("jinaFailed")'),
   "vocabulary account scope is absent or action errors still reuse Jina copy");

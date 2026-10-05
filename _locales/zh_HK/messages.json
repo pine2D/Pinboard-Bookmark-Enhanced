@@ -849,6 +849,7 @@
     "message": "刪除選取的 $COUNT$ 則螢光標記？",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "notesBatchDeleteConfirmOne": { "message": "刪除選取的 $COUNT$ 則螢光標記？", "placeholders": { "count": { "content": "$1" } } },
   "notesDeleteFailed": {
     "message": "未能刪除這些標記，請重試。"
   },
@@ -2967,6 +2968,7 @@
       }
     }
   },
+  "vocabBatchKnownDoneOne": { "message": "已將 $COUNT$ 個詞標為已掌握", "placeholders": { "count": { "content": "$1" } } },
   "vocabBatchLearningDone": {
     "message": "已將 $COUNT$ 個詞恢復為學習中",
     "placeholders": {
@@ -2975,6 +2977,7 @@
       }
     }
   },
+  "vocabBatchLearningDoneOne": { "message": "已將 $COUNT$ 個詞恢復為學習中", "placeholders": { "count": { "content": "$1" } } },
   "vocabFailedTerms": {
     "message": "失敗：$TERMS$",
     "placeholders": {
@@ -3317,6 +3320,10 @@
         }
       }
     },
+    "vocabResultFound": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultFoundOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSaved": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSavedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "notesResultCount": {
       "message": "顯示 $RESULTS$ 項，共 $TOTAL$ 項標記",
       "placeholders": {
@@ -3328,6 +3335,8 @@
         }
       }
     },
+    "notesResultShown": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+    "notesResultShownOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "vocabSelectedCount": {
       "message": "已選取 $COUNT$ 項",
       "placeholders": {
@@ -3800,9 +3809,15 @@
   "libraryPageCount": { "message": "本頁 $COUNT$ 項", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "$TOTAL$ 項標記，來自 $PAGES$ 個網頁；最近一次儲存在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
   "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ 項標記，來自 $PAGES$ 個網頁。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
+  "libraryCountHighlights": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountHighlightsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryThisPage": { "message": "這一頁" },
   "libraryOpenOriginal": { "message": "開啟原文" },
   "libraryPageFacts": { "message": "$COUNT$ 項標記，其中 $NOTED$ 項有筆記", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
+  "libraryCountNoted": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最早 $FIRST$ · 最近 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "儲存於 $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "標記和筆記只儲存在本裝置，不會同步。要移到其他裝置，請在設定頁匯出備份，再到那台裝置匯入。" },
@@ -3810,20 +3825,28 @@
   "libraryRelookup": { "message": "重新查詞典" },
   "libraryBack": { "message": "返回列表" },
   "libraryStatsWords": { "message": "$COUNT$ 個詞", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsWordsOne": { "message": "$COUNT$ 個詞", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLearning": { "message": "學習中 $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsKnown": { "message": "已掌握 $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "$COUNT$ 個群組", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsGroupsOne": { "message": "$COUNT$ 個群組", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLanguages": { "message": "$COUNT$ 種語言", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsLanguagesOne": { "message": "$COUNT$ 種語言", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "7 天內 +$D7$ · 30 天內 +$D30$", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ 項標記", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsHighlightsOne": { "message": "$COUNT$ 項標記", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsPages": { "message": "$COUNT$ 個網頁", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsPagesOne": { "message": "$COUNT$ 個網頁", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsFiltered": { "message": "$SHOWN$ / $TOTAL$ 項標記", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsHighlightsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ 項標記", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryColorFilterAria": { "message": "$COLOR$，$COUNT$ 項", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
+  "libraryColorFilterAriaOne": { "message": "$COLOR$，$COUNT$ 項", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryFilterAll": { "message": "全部" },
   "libraryFilterNarrow": { "message": "篩選" },
   "libraryFilterNarrowActive": { "message": "篩選 · $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent7": { "message": "7 天內 +$D7$", "placeholders": { "d7": { "content": "$1" } } },
   "libraryStatsWordsFiltered": { "message": "$SHOWN$ / $TOTAL$ 個詞", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsWordsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ 個詞", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryLookupAria": { "message": "詞典查詢" },
   "libraryLookupPlaceholder": { "message": "查詢任何詞語" },
   "libraryLookupGo": { "message": "查詞" },
@@ -3967,5 +3990,9 @@
   "libraryVocabCoverTitle": { "message": "生詞本" },
   "libraryVocabCoverLead": { "message": "$TOTAL$ 個詞，學習中 $LEARNING$ 個、已掌握 $KNOWN$ 個，來自 $LANGS$ 種語言；最近一次收錄在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
   "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$ 個詞，學習中 $LEARNING$ 個、已掌握 $KNOWN$ 個，來自 $LANGS$ 種語言。", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
+  "libraryCountWords": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountWordsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryVocabCoverHint": { "message": "選一個詞，查看它的語境、你的筆記和詞典釋義；也可以直接查任何詞語。" }
 }

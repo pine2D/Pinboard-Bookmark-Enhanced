@@ -849,6 +849,7 @@
     "message": "Supprimer les $COUNT$ surlignages sélectionnés ?",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "notesBatchDeleteConfirmOne": { "message": "Supprimer $COUNT$ surlignage sélectionné ?", "placeholders": { "count": { "content": "$1" } } },
   "notesDeleteFailed": {
     "message": "Impossible de supprimer ces surlignages. Réessayez."
   },
@@ -2967,6 +2968,7 @@
       }
     }
   },
+  "vocabBatchKnownDoneOne": { "message": "$COUNT$ mot marqué comme acquis", "placeholders": { "count": { "content": "$1" } } },
   "vocabBatchLearningDone": {
     "message": "$COUNT$ mots remis en apprentissage",
     "placeholders": {
@@ -2975,6 +2977,7 @@
       }
     }
   },
+  "vocabBatchLearningDoneOne": { "message": "$COUNT$ mot remis en apprentissage", "placeholders": { "count": { "content": "$1" } } },
   "vocabFailedTerms": {
     "message": "Échec : $TERMS$",
     "placeholders": {
@@ -3304,7 +3307,7 @@
       "message": "Ctrl+clic pour sélectionner une entrée, Maj+clic pour sélectionner une plage"
     },
     "vocabResultCount": {
-      "message": "Compte Pinboard actuel ($OWNER$) : $RESULTS$ résultats · $TOTAL$ mots enregistrés",
+      "message": "Compte Pinboard actuel ($OWNER$) : $RESULTS$ · $TOTAL$",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -3317,8 +3320,12 @@
         }
       }
     },
+    "vocabResultFound": { "message": "$COUNT$ résultats", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultFoundOne": { "message": "$COUNT$ résultat", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSaved": { "message": "$COUNT$ mots enregistrés", "placeholders": { "count": { "content": "$1" } } },
+    "vocabResultSavedOne": { "message": "$COUNT$ mot enregistré", "placeholders": { "count": { "content": "$1" } } },
     "notesResultCount": {
-      "message": "$RESULTS$ affichés · $TOTAL$ surlignages au total",
+      "message": "$RESULTS$ · $TOTAL$ au total",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -3328,6 +3335,8 @@
         }
       }
     },
+    "notesResultShown": { "message": "$COUNT$ affichés", "placeholders": { "count": { "content": "$1" } } },
+    "notesResultShownOne": { "message": "$COUNT$ affiché", "placeholders": { "count": { "content": "$1" } } },
     "vocabSelectedCount": {
       "message": "Sélection : $COUNT$",
       "placeholders": {
@@ -3798,11 +3807,17 @@
   "libraryDetailTitle": { "message": "Détails du mot" },
   "libraryNotesDetailEmpty": { "message": "Choisissez un surlignage dans la liste pour le lire en entier." },
   "libraryPageCount": { "message": "$COUNT$ sur cette page", "placeholders": { "count": { "content": "$1" } } },
-  "libraryNotesCoverLead": { "message": "$TOTAL$ surlignages sur $PAGES$ pages, le dernier enregistré le $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
-  "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ surlignages sur $PAGES$ pages.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
+  "libraryNotesCoverLead": { "message": "$TOTAL$ sur $PAGES$, le dernier enregistré le $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
+  "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ sur $PAGES$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
+  "libraryCountHighlights": { "message": "$COUNT$ surlignages", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountHighlightsOne": { "message": "$COUNT$ surlignage", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPages": { "message": "$COUNT$ pages", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountPagesOne": { "message": "$COUNT$ page", "placeholders": { "count": { "content": "$1" } } },
   "libraryThisPage": { "message": "Cette page" },
   "libraryOpenOriginal": { "message": "Ouvrir l'original" },
-  "libraryPageFacts": { "message": "$COUNT$ surlignages, dont $NOTED$ avec une note", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
+  "libraryPageFacts": { "message": "$COUNT$, dont $NOTED$ avec une note", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
+  "libraryCountNoted": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "Premier $FIRST$ · dernier $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Enregistré à $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "libraryNotesScopeHint": { "message": "Les surlignages et les notes sont stockés uniquement sur cet appareil et ne sont pas synchronisés. Pour les transférer sur un autre appareil, exportez une sauvegarde depuis la page des paramètres, puis importez-la sur celui-ci." },
@@ -3810,20 +3825,28 @@
   "libraryRelookup": { "message": "Chercher à nouveau" },
   "libraryBack": { "message": "Retour à la liste" },
   "libraryStatsWords": { "message": "$COUNT$ mots", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsWordsOne": { "message": "$COUNT$ mot", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLearning": { "message": "En cours : $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsKnown": { "message": "Acquis : $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "$COUNT$ groupes", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsGroupsOne": { "message": "$COUNT$ groupe", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLanguages": { "message": "$COUNT$ langues", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsLanguagesOne": { "message": "$COUNT$ langue", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "+$D7$ en 7 jours · +$D30$ en 30 jours", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ surlignages", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsHighlightsOne": { "message": "$COUNT$ surlignage", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsPages": { "message": "$COUNT$ pages web", "placeholders": { "count": { "content": "$1" } } },
+  "libraryStatsPagesOne": { "message": "$COUNT$ page web", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsFiltered": { "message": "$SHOWN$ / $TOTAL$ surlignages", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsHighlightsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ surlignage", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryColorFilterAria": { "message": "$COLOR$, $COUNT$ surlignages", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
+  "libraryColorFilterAriaOne": { "message": "$COLOR$, $COUNT$ surlignage", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryFilterAll": { "message": "Tous" },
   "libraryFilterNarrow": { "message": "Filtrer" },
   "libraryFilterNarrowActive": { "message": "Filtrer · $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent7": { "message": "+$D7$ en 7 jours", "placeholders": { "d7": { "content": "$1" } } },
   "libraryStatsWordsFiltered": { "message": "$SHOWN$ / $TOTAL$ mots", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
+  "libraryStatsWordsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ mot", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryLookupAria": { "message": "Recherche dans le dictionnaire" },
   "libraryLookupPlaceholder": { "message": "Rechercher n'importe quel mot" },
   "libraryLookupGo": { "message": "Rechercher" },
@@ -3965,7 +3988,11 @@
   "libraryEditGroups": { "message": "Modifier les groupes" },
   "libraryNotePlaceholder": { "message": "Notez ce qui vous aide : associations, mots à ne pas confondre, rappels d’usage. Enregistré quand vous quittez le champ" },
   "libraryVocabCoverTitle": { "message": "Vocabulaire" },
-  "libraryVocabCoverLead": { "message": "$TOTAL$ mots, dont $LEARNING$ en cours d’apprentissage et $KNOWN$ acquis, dans $LANGS$ langues. Dernier ajout le $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
-  "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$ mots, dont $LEARNING$ en cours d’apprentissage et $KNOWN$ acquis, dans $LANGS$ langues.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
+  "libraryVocabCoverLead": { "message": "$TOTAL$, dont $LEARNING$ en cours d’apprentissage et $KNOWN$ acquis, dans $LANGS$. Dernier ajout le $DATE$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" }, "date": { "content": "$5" } } },
+  "libraryVocabCoverLeadNoDate": { "message": "$TOTAL$, dont $LEARNING$ en cours d’apprentissage et $KNOWN$ acquis, dans $LANGS$.", "placeholders": { "total": { "content": "$1" }, "learning": { "content": "$2" }, "known": { "content": "$3" }, "langs": { "content": "$4" } } },
+  "libraryCountWords": { "message": "$COUNT$ mots", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountWordsOne": { "message": "$COUNT$ mot", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguages": { "message": "$COUNT$ langues", "placeholders": { "count": { "content": "$1" } } },
+  "libraryCountLanguagesOne": { "message": "$COUNT$ langue", "placeholders": { "count": { "content": "$1" } } },
   "libraryVocabCoverHint": { "message": "Choisissez un mot pour voir son contexte, votre note et sa définition, ou recherchez directement n’importe quel mot." }
 }
