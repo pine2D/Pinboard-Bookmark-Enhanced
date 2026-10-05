@@ -932,14 +932,15 @@ async function libraryPageLongContentCases() {
 }
 
 // ---- Library redesign T8f (spec appendix 10-05, "main column first"): the
-// dictionary column joins the sheet only from C = 1440 (= 112 + 840 + 64 +
-// 424, the column's minimum being the lookup row's widest one-line need
-// across the nine locales, T8f fix round 1), and then takes only what the
+// dictionary column joins the sheet only from C = 1464 (= 112 + 840 + 64 +
+// 448, the column's minimum being the lookup row's widest one-line need
+// across the nine locales with their own language names, T8f review), and
+// then takes only what the
 // 840 main column leaves. Before, it joined at 1280 and grew first, so
 // crossing 1280 dropped the main column from 840 to 384 and rewrapped every
 // line of the word. C is driven by the index column at a fixed window (no
 // resize), measured on the real page.
-const LIB_REF_TIER = 1440;
+const LIB_REF_TIER = 1464;
 async function libraryPageRefTierCases() {
   const { frame, win, doc } = await loadLibraryFrame({ width: 2200, height: 1000 });
   try {
@@ -982,10 +983,18 @@ async function libraryPageRefTierCases() {
     // (field at its 160 basis, language listbox, Look up) must still be one
     // line in every locale and both densities -- that is what the minimum is.
     const wrapped = [];
+    const firstLabel = {};
     at(LIB_REF_TIER);
     for (const locale of ["en", "de", "fr", "pl", "ru", "zh_HK", "zh_CN", "zh_TW", "ja"]) {
       win.__pbpEn = await (await fetch(`../_locales/${locale}/messages.json`)).json();
       win.applyI18n();
+      // The language options are named in the UI locale (Intl.DisplayNames):
+      // rebuilt by the page's own filler, as wiring does on a load in that
+      // locale -- German names make the listbox ~24px wider than English.
+      const langSel = doc.getElementById("vocab-lookup-lang");
+      win._pbpVocabFillLookupLangs(langSel, { zh_HK: "zh-Hant", zh_TW: "zh-Hant", zh_CN: "zh-Hans" }[locale] || locale);
+      firstLabel[locale] = langSel.options[0]?.textContent;
+      await libFrames(win);
       for (const density of ["comfortable", "compact"]) {
         if (density === "compact") html.setAttribute("data-density", "compact"); else html.removeAttribute("data-density");
         const kids = [...doc.getElementById("vocab-lookup-bar").children].filter((el) => el.getClientRects().length && win.getComputedStyle(el).position !== "absolute");
@@ -996,14 +1005,16 @@ async function libraryPageRefTierCases() {
       }
     }
     html.removeAttribute("data-density");
-    check(`T8f at C ${LIB_REF_TIER} the lookup row is one line in every locale and both densities`, wrapped.length === 0, wrapped.join("; "));
+    check(`T8f at C ${LIB_REF_TIER} the lookup row is one line in every locale and both densities, with the language names of that locale`,
+      wrapped.length === 0 && !!firstLabel.en && firstLabel.de !== firstLabel.en && firstLabel.ru !== firstLabel.en,
+      `${wrapped.join("; ")} | first option: ${JSON.stringify(firstLabel)}`);
   } finally {
     frame.remove();
   }
 }
 
 // ---- Library redesign T7b (spec §7.7, §9.4): every locale at a 2200px window
-// (C >= 1440: the hang column and the dictionary column are both live), on
+// (C >= 1464: the hang column and the dictionary column are both live), on
 // the real page -- the detail is built by library-vocab.js, so a hand-copied
 // srcdoc would only test what its author remembered.
 async function libraryPageDetailLocaleCases() {

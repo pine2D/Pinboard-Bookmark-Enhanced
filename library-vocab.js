@@ -1335,6 +1335,27 @@ function _pbpVocabLookupLangChanged() {
   else _pbpVocabAutoLookup(w).catch((err) => console.warn("library auto lookup failed:", err.name, err.message));
 }
 
+// The lookup row's language options, labelled in `locale` (Intl.DisplayNames
+// through pbpDictLanguageLabel), keeping the selected value; re-syncs the
+// listbox when it is already enhanced. The page fills them once, at wiring;
+// the test pages and the render audit call this same function when they
+// switch locale, so the listbox they measure is as wide as that locale's
+// language names (T8f review: measuring English names under every locale
+// understated the dictionary column's minimum).
+function _pbpVocabFillLookupLangs(sel, locale) {
+  const keep = sel.value;
+  sel.replaceChildren();
+  for (const code of PBP_DICT_LANGS) {
+    if (code === "auto") continue; // a stored word carries a language; no Auto leg here
+    const o = document.createElement("option");
+    o.value = code;
+    o.textContent = pbpDictLanguageLabel(code, locale) || code;
+    sel.appendChild(o);
+  }
+  if (keep) sel.value = keep;
+  if (typeof pbpListboxSync === "function") pbpListboxSync(sel);
+}
+
 // One-time wiring for the lookup row, from the guarded top-level section at
 // the bottom of this file. Option labels use uiLangToBCP47(), not <html lang>:
 // this runs before library.js's applyI18n sets the page language.
@@ -1344,13 +1365,7 @@ function _pbpVocabWireLookupBar() {
   const go = $id("vocab-lookup-go");
   if (!input || !sel || !go) return; // absent on pages/fixtures with no lookup row
   const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang;
-  for (const code of PBP_DICT_LANGS) {
-    if (code === "auto") continue; // a stored word carries a language; no Auto leg here
-    const o = document.createElement("option");
-    o.value = code;
-    o.textContent = pbpDictLanguageLabel(code, locale) || code;
-    sel.appendChild(o);
-  }
+  _pbpVocabFillLookupLangs(sel, locale);
   sel.value = _vocabLookupLang;
   sel.addEventListener("change", _pbpVocabLookupLangChanged);
   go.addEventListener("click", _pbpVocabFreeLookup);

@@ -106,15 +106,16 @@
   /* Detail sheet columns (spec §4.2 / §5.2): hang column, main and reference
      column caps, excerpt cap, notes side column. The two side columns' minimums
      are what their content needs on one line, measured across the nine
-     locales (T8f fix round 1, local fonts; the CI fonts need less): the lookup
-     row -- field at its 160 basis + language listbox + "Nachschlagen" + two
-     8px gaps -- 421.8 (de, comfortable); the page delete "Supprimer tous les
+     locales (T8f review, local fonts; the CI fonts need less): the lookup
+     row -- field at its 160 basis + the language listbox with that locale's
+     own language names ("Englisch") + "Nachschlagen" + two 8px gaps -- 446.1
+     (de, comfortable); the page delete "Supprimer tous les
      surlignages de cette page" 335.8 (fr, comfortable). Each column's tier
      starts at hang + main + 64 + its minimum, so the main column never
      shrinks to make room for it (spec appendix 10-05, main column first). */
   --lib-hang-w: 112px;
   --lib-main-max: 840px;
-  --lib-ref-min: 424px;
+  --lib-ref-min: 448px;
   --lib-ref-max: 720px;
   --lib-excerpt-max: 800px;
   --lib-side-min: 336px;
@@ -1573,7 +1574,7 @@ html.motion-ready .vocab-note-save {
    radius on any structure (flat canvas). Tiers come from the pane's content
    width (container lib-detail): one column below 1000, a 112px hang column +
    the 840 main column from 1000, and the dictionary column on the right from
-   1440 (the @container blocks after the reference column block). ---- */
+   1464 (the @container blocks after the reference column block). ---- */
 .vocab-detail-head { min-width: 0; }
 .vocab-detail-term,
 .lib-cover-title {
@@ -1965,11 +1966,11 @@ html.motion-ready .vocab-note-save {
   .lib-cover-title { font-size: 56px; }
 }
 /* The dictionary column (spec appendix 10-05, "main column first"): only
-   from C = 1440 = 112 + 840 + 64 + 424, where the main column can keep its
-   full 840 beside the column's 424 minimum; the column then takes what is
+   from C = 1464 = 112 + 840 + 64 + 448, where the main column can keep its
+   full 840 beside the column's 448 minimum; the column then takes what is
    left, up to 720. Below that it stays under the main column (the 1000
    tier), so crossing the threshold never narrows the word. */
-@container lib-detail (min-width: 1440px) {
+@container lib-detail (min-width: 1464px) {
   .vocab-sheet {
     grid-template-columns: var(--lib-hang-w) var(--lib-main-max) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max));
     grid-template-rows: auto 1fr;

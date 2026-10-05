@@ -725,7 +725,7 @@ function _pbpNotesUiLang() {
 
 // Page head (spec §5.3): the source title (the whole line is the link when the
 // url is safe), then one muted meta line. The meta's page count only shows
-// below C 1200, where the "this page" column is absent (CSS decides).
+// below C 1312, where the "this page" column is absent (CSS decides).
 function _pbpNotesBuildHead(hit, count) {
   const head = document.createElement("header");
   head.className = "notes-detail-head";
@@ -881,7 +881,7 @@ function _pbpNotesBuildDeleteBtn(row) {
   return del;
 }
 
-// "This page" column (spec §5.5), shown from C 1200. Its DOM sits AFTER the
+// "This page" column (spec §5.5), shown from C 1312. Its DOM sits AFTER the
 // excerpts -- keyboard and screen-reader order reach the content before the
 // destructive action (I12); CSS grid lines put it at the top right.
 function _pbpNotesBuildSide(hit, pageHits, pageTs) {
@@ -1064,9 +1064,9 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
   frag.appendChild(_pbpNotesBuildHead(hit, pageHits.length));
   // 2. Every highlight of the page, oldest first; the opened one is current
   pageHits.forEach((h, i) => frag.appendChild(_pbpNotesBuildExcerpt(h, i, h.key === hit.key, pageTs, q)));
-  // 3. "This page" column (C >= 1200; CSS places it, DOM keeps it last but one)
+  // 3. "This page" column (C >= 1312; CSS places it, DOM keeps it last but one)
   frag.appendChild(_pbpNotesBuildSide(hit, pageHits, pageTs));
-  // 4. Closing row (shown below C 1200): the page delete, hanging at the main column's start
+  // 4. Closing row (shown below C 1312): the page delete, hanging at the main column's start
   const footer = document.createElement("div");
   footer.className = "notes-detail-footer";
   footer.appendChild(_pbpNotesBuildDeleteBtn(hit.row));
@@ -1381,7 +1381,7 @@ function _pbpNotesStatusHost() {
   // this view is position:fixed).
   if (bar && bar.offsetParent) return bar;
   // Last tier (spec §5.1): beside the ONE page delete that is displayed --
-  // the "this page" column from C 1200, the footer below that.
+  // the "this page" column from C 1312, the footer below that.
   const shownDelete = [...view.querySelectorAll("#notes-detail .notes-detail-delete")].find((b) => b.offsetParent !== null);
   if (shownDelete) return shownDelete.parentElement;
   return view.querySelector(".notes-detail-footer") || bar;

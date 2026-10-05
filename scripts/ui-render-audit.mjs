@@ -2395,7 +2395,7 @@ const HANG_ORDER_EXEMPT = Object.freeze([
 ]);
 
 // Breakpoints per view: the @container lib-detail tiers that move a label.
-const HANG_ORDER_BREAKPOINTS = Object.freeze({ vocab: [640, 1000, 1440], notes: [1000, 1312] });
+const HANG_ORDER_BREAKPOINTS = Object.freeze({ vocab: [640, 1000, 1464], notes: [1000, 1312] });
 const HANG_ORDER_LOCALES = Object.freeze(["en", "zh_CN", "de"]);
 
 // Scenarios: each puts one state of the view's detail on screen (Node side).
@@ -3221,6 +3221,11 @@ async function setLibraryLocale(p, extBase, locale) {
     _i18nMessages = msgs;
     applyI18n();
     document.documentElement.lang = lang;
+    // The dictionary language options are named in the UI locale and the page
+    // fills them once, at load: rebuild them with the page's own filler, or
+    // every locale measures English names (T8f review).
+    const langSel = document.getElementById("vocab-lookup-lang");
+    if (langSel && typeof _pbpVocabFillLookupLangs === "function") _pbpVocabFillLookupLangs(langSel, lang);
     if (!document.getElementById("view-vocab").hidden) _pbpVocabApplyView(false);
     if (!document.getElementById("view-notes").hidden) _pbpNotesRender();
   }, { url: `${extBase}_locales/${locale}/messages.json`,

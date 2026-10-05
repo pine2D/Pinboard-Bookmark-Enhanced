@@ -1991,11 +1991,11 @@ export const CHECKS = [
       cases: ["cover", "constraint"], openEditor: true } } },
   { surface: "library", page: "library.html", selector: "#vocab-detail-pane", state: "libGeometry", themes: ["", "terminal"],
     expect: { libGeometry: { cases: [
-      { width: 2560, height: 1300, term: "constraint", headPx: 72, ref: "beside", labelRightFromAxis: 96, tailGap: 32, mainPx: 840, containerPx: [1440, 4000] },
+      { width: 2560, height: 1300, term: "constraint", headPx: 72, ref: "beside", labelRightFromAxis: 96, tailGap: 32, mainPx: 840, containerPx: [1464, 4000] },
       // T8f (spec appendix 10-05, main column first): C 1366 sat in the old
       // 1280 dictionary tier with a 470px main column; it is the 1000 tier now,
-      // 74px below the dictionary column's 1440 (fix round 1: not on the edge).
-      { width: 1920, height: 1080, term: "constraint", headPx: 56, ref: "below", mainPx: 840, containerPx: [1000, 1440] },
+      // 98px below the dictionary column's 1464 (review: not on the edge).
+      { width: 1920, height: 1080, term: "constraint", headPx: 56, ref: "below", mainPx: 840, containerPx: [1000, 1464] },
       { width: 1280, height: 800, term: "constraint", headPx: 44, ref: "below", ringInside: [".vocab-detail-delete", ".vocab-note-input"], containerPx: [640, 1000] },
     ] } } },
   // ---- Library redesign T8f (spec appendix 10-05, diag-hang-order §6): every
