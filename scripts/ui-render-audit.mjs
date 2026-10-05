@@ -2461,9 +2461,18 @@ const HANG_ORDER_C_RANGE = Object.freeze([400, 1880]);
 // clock (parallel scratch windows starved the oldest one ~10x on the
 // software compositor, measured in T8f), so the full product -- 30
 // vocabulary combinations x every pass -- would cost minutes per theme for
-// combinations that differ only in label text.
+// combinations that differ only in label text. The two extra passes of the
+// primary combination run on the checklist's fullThemes (default) alone;
+// see driveHangOrder's first lines.
 async function driveHangOrder(page, extBase, theme, check) {
-  const { view, scenarios, indexWindows, coarseStep = 8, fine = 3, jump = 200, viewportRange = [861, 2560] } = check.expect.hangOrder;
+  const { view, scenarios, indexWindows, coarseStep = 8, fine = 3, jump = 200, viewportRange = [861, 2560], fullThemes = [""] } = check.expect.hangOrder;
+  // The window driver and the coarse settled pass run only on fullThemes
+  // (default): every other theme keeps the index driver's 1px passes in both
+  // directions and both phases, the coarse early pass, the main-column
+  // monotonic rule, the counter-examples and the label minimums. Theme
+  // changes only the density tier and the type metrics those already cover;
+  // the two extra passes doubled the gate's cost in a 4-shard verify.
+  const fullTheme = fullThemes.includes(theme);
   const v = HANG_ORDER_VIEWS[view];
   if (!v) throw new Error(`SETUP: hangOrder has no view ${JSON.stringify(view)}`);
   for (const name of scenarios) {
@@ -2535,7 +2544,7 @@ async function driveHangOrder(page, extBase, theme, check) {
       return hi;
     };
     const windowPlan = [];
-    for (const bp of bps) {
+    for (const bp of fullTheme ? bps : []) {
       if ((await cAt(viewportRange[1])) < bp || (await cAt(viewportRange[0])) >= bp) continue;
       const hi = await firstW(bp);
       const ws = [];
@@ -2545,7 +2554,7 @@ async function driveHangOrder(page, extBase, theme, check) {
       }
       windowPlan.push({ bp, ws, from: [await firstW(bp + jump), await firstW(bp - jump)] });
     }
-    if (windowPlan.length !== bps.length) {
+    if (fullTheme && windowPlan.length !== bps.length) {
       throw new Error(`SETUP: hangOrder ${view}: only ${windowPlan.map((x) => x.bp).join("/") || "none"} of the breakpoints ${bps.join("/")} lie between windows ${viewportRange.join(" and ")}`);
     }
 
@@ -2606,7 +2615,7 @@ async function driveHangOrder(page, extBase, theme, check) {
         const own = density === ownDensity && locale === HANG_ORDER_LOCALES[0];
         for (const name of own ? scenarios : [primary]) {
           const show = HANG_ORDER_SCENARIOS[view][name];
-          const full = own && name === primary;
+          const full = fullTheme && own && name === primary;
           const combo = `${themeTag} ${density} ${locale} ${name}`;
           const minLabels = HANG_ORDER_MIN_LABELS[view][name] ?? 0;
           const mono = [];

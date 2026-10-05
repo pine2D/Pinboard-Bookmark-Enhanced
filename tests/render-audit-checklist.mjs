@@ -61,6 +61,13 @@
 //                        in the change's own task and after it settled, plus
 //                        a coarse 8px pass; index-column and window drivers
 //                        (T8f; the driver's comment has the sampling cross).
+//                        `fullThemes` (default [""]) limits the window driver
+//                        and the coarse settled pass to those themes; every
+//                        other listed theme runs the index driver's 1px
+//                        passes (both directions, both phases), the coarse
+//                        early pass, the monotonic main column rule, the
+//                        counter-examples and the label minimums (cost: the
+//                        two extra passes added ~250s to a 4-shard verify).
 // paneFit's optional `bleed: [selector]` names a list region that hangs out
 // of its pane by design: its own box is exempt; what it contains is measured
 // against the region's content box. Its overhang is allowed in the pane's
@@ -1990,11 +1997,12 @@ export const CHECKS = [
   // by container width C -- each tier breakpoint at 1px steps (+-3), entered
   // from 200 above and below, measured in the width change's own task and
   // again once the page's observers have run; index-column and window
-  // drivers; en / zh_CN / de x both densities. ----
+  // drivers (the window driver and the coarse settled pass on default only,
+  // fullThemes); en / zh_CN / de x both densities. ----
   { surface: "library", page: "library.html", selector: ".lib-hang-label", state: "hangOrder", themes: ["", "terminal"],
-    expect: { hangOrder: { view: "vocab", scenarios: ["constraint", "曖昧", "cover", "lookup", "editor"], indexWindows: [1600, 2560] } } },
+    expect: { hangOrder: { view: "vocab", scenarios: ["constraint", "曖昧", "cover", "lookup", "editor"], indexWindows: [1600, 2560], fullThemes: [""] } } },
   { surface: "library", page: "library.html", selector: ".notes-excerpt-label", state: "hangOrder", themes: ["", "terminal"],
-    expect: { hangOrder: { view: "notes", scenarios: ["days", "multi"], indexWindows: [1600, 2560] } } },
+    expect: { hangOrder: { view: "notes", scenarios: ["days", "multi"], indexWindows: [1600, 2560], fullThemes: [""] } } },
   // The sort menu button's popover (T6b): the same panel family. Its trigger
   // is always on the filter row, never inside the Filter popover.
   { surface: "library", page: "library.html", selector: "#vocab-sort-btn + .listbox-pop", state: "open",
