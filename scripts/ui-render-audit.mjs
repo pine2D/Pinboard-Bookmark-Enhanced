@@ -71,7 +71,7 @@
 //       --update-known-failures refuses to write and exits 2.
 
 import { createRequire } from "node:module";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { resolve, dirname, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -1771,6 +1771,183 @@ async function driveRowStates(page, extBase, theme, selector, textSelectors) {
 }
 
 
+// ---- library notes scenarios (T8e, spec 2026-10-03-library-redesign §9.2 G4 /
+// G5 notes half). Opens one state the notes half measures, on the SEEDED data
+// (LIB_SEED, T2): the cover (nothing selected), the CJK-titled single-
+// highlight page, or the >= 3-highlight page opened at its SECOND-oldest
+// highlight (excerpts above and below the current one). Selection goes through
+// the page's own _pbpNotesSelectRow -- the path a row click takes -- and every
+// miss is a SETUP error, never a quiet measurement of the wrong state. The
+// pane is put back at its top, so a first line is where a reader first sees it.
+async function libOpenNotesScenario(page, scenario) {
+  if (!(await page.$("#view-notes:not([hidden])"))) await page.click("#lib-tab-notes");
+  await page.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS });
+  const res = await page.evaluate(({ scenario, seed }) => {
+    const pane = document.getElementById("notes-detail-pane");
+    if (scenario === "notes-cover") {
+      _pbpNotesRenderDetail(null);
+      if (pane) pane.scrollTop = 0;
+      return { ok: !document.getElementById("notes-detail-empty").hidden, why: "the cover did not show" };
+    }
+    const url = scenario === "notes-multi" ? seed.multiUrl : scenario === "notes-solo" ? seed.soloUrl : null;
+    if (!url) return { ok: false, why: `unknown scenario ${scenario}` };
+    const hits = _pbpNotesHits().filter((h) => h.row.url === url).sort((a, b) => a.ts - b.ts);
+    if (scenario === "notes-multi" && hits.length < 3) return { ok: false, why: `${hits.length} highlight(s) on ${url}, need >= 3` };
+    if (scenario === "notes-solo" && (hits.length !== 1 || hits[0].row.title !== seed.cjkTitle)) {
+      return { ok: false, why: `${hits.length} highlight(s) on ${url} titled ${JSON.stringify(hits[0] && hits[0].row.title)}` };
+    }
+    const want = hits[scenario === "notes-multi" ? 1 : 0].key;
+    _pbpNotesSelectRow(want);
+    if (pane) pane.scrollTop = 0;
+    const cur = document.querySelector('#notes-detail > .notes-excerpt[aria-current="true"]');
+    return {
+      ok: !document.getElementById("notes-detail").hidden && _pbpNotesSelectedKey === want && !!cur,
+      why: `the detail did not open on ${want} (selected ${JSON.stringify(_pbpNotesSelectedKey)}, current excerpt ${!!cur})`,
+    };
+  }, { scenario, seed: LIB_SEED });
+  if (!res.ok) throw new Error(`SETUP: notes scenario "${scenario}" -- ${res.why} (LIB_SEED / T2 seed)`);
+  await settleAnimations(page);
+}
+
+// What the notes half changes on the shared page: the selected highlight and
+// the narrow-view class _pbpNotesSelectRow sets (inert above 860px, but the
+// rows after this one measure at whatever width they ask for).
+async function libSnapshotNotes(page) {
+  return page.evaluate(() => ({
+    key: _pbpNotesSelectedKey,
+    narrow: document.body.classList.contains("lib-narrow-notes"),
+  }));
+}
+async function libRestoreNotesSelection(page, snap) {
+  await page.evaluate((s) => {
+    if (s.key && _pbpNotesFindHit(s.key)) _pbpNotesSelectRow(s.key);
+    else _pbpNotesRenderDetail(null);
+    document.body.classList.toggle("lib-narrow-notes", !!s.narrow);
+  }, snap);
+  await settleAnimations(page);
+}
+
+// G5 (notes half), in-page: the numbers spec §5.2-§5.6 and the 10-05 tiers fix
+// for an open page. Widths are the boxes' own (the head fills the main
+// column; the column's width is its box), positions are border boxes.
+const NOTES_GEOMETRY_PROBE = () => {
+  const pane = document.getElementById("notes-detail-pane");
+  const d = document.getElementById("notes-detail");
+  const vis = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).display !== "none" && !el.closest("[hidden]");
+  const rect = (el) => el.getBoundingClientRect();
+  const r2 = (n) => (n == null ? null : Math.round(n * 100) / 100);
+  const head = d && d.querySelector(":scope > .notes-detail-head");
+  const side = d && d.querySelector(":scope > .notes-page-side");
+  const exs = d ? [...d.querySelectorAll(":scope > .notes-excerpt")] : [];
+  const cur = d && d.querySelector(':scope > .notes-excerpt[aria-current="true"] .notes-excerpt-quote');
+  const other = d && d.querySelector(":scope > .notes-excerpt:not([aria-current]) .notes-excerpt-quote");
+  const dels = d ? [...d.querySelectorAll(".notes-detail-delete")].filter(vis) : [];
+  const pagecount = d && d.querySelector(".notes-meta-pagecount");
+  const cs = pane && getComputedStyle(pane);
+  const sideVisible = vis(side);
+  return {
+    ok: !!(pane && d && !d.hidden && head),
+    // The width @container lib-detail resolves against (as hangOrder reads it).
+    containerPx: pane ? r2(rect(pane).width - (pane.offsetWidth - pane.clientWidth) - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) : null,
+    axis: pane ? r2(rect(pane).left + pane.clientLeft + parseFloat(cs.paddingLeft)) : null,
+    headTop: head ? r2(rect(head).top) : null,
+    headBottom: head ? r2(rect(head).bottom) : null,
+    headLeft: head ? r2(rect(head).left) : null,
+    headRight: head ? r2(rect(head).right) : null,
+    headWidth: head ? r2(rect(head).width) : null,
+    sideVisible,
+    sideTop: sideVisible ? r2(rect(side).top) : null,
+    sideLeft: sideVisible ? r2(rect(side).left) : null,
+    sideWidth: sideVisible ? r2(rect(side).width) : null,
+    sideBottom: sideVisible ? r2(rect(side).bottom) : null,
+    firstExTop: exs.length ? r2(rect(exs[0]).top) : null,
+    exCount: exs.length,
+    currentPx: cur ? parseFloat(getComputedStyle(cur).fontSize) : null,
+    otherPx: other ? parseFloat(getComputedStyle(other).fontSize) : null,
+    visibleDeletes: dels.length,
+    deleteInSide: dels.length === 1 && !!dels[0].closest(".notes-page-side"),
+    pagecountVisible: vis(pagecount),
+  };
+};
+
+// G5 (notes half). Runs in a scratch page of its own (same theme already in
+// storage): it switches the UI language, which the shared page must not see,
+// and it leaves nothing to put back. Each viewport names the tier it means by
+// its container width C (`containerPx`, a SETUP when C lands outside -- the
+// ranges keep every case >= 40px off a tier edge, so a case never sits on the
+// boundary it is about): "single" (C < 1000), "hang" (1000 <= C < 1312: the
+// labels hang left of the 800 excerpt column, no page column) and "side"
+// (C >= 1312: the "this page" column beside the full 800 excerpt column,
+// T8f "main column first"). Labels against their content are hangOrder's
+// (T8f); this measures where the columns land and what the page shows.
+const NOTES_GEOMETRY_BCP47 = Object.freeze({ en: "en", de: "de", fr: "fr", zh_CN: "zh-Hans" });
+async function driveNotesGeometry(page, extBase, theme, check) {
+  const cfg = check.expect.libGeometry;
+  const tol = cfg.tolerancePx ?? 1;
+  const locales = cfg.locales || ["en"];
+  const shots = process.env.RA_NOTES_SHOTS || "";
+  if (shots) mkdirSync(shots, { recursive: true });
+  const bad = [];
+  let measured = 0;
+  const first = cfg.viewports[0];
+  const p = await libScratchPage(page, extBase, theme, "notes-geometry", "notes", { width: first.width, height: first.height });
+  try {
+    for (const locale of locales) {
+      if (!NOTES_GEOMETRY_BCP47[locale]) throw new Error(`SETUP: libGeometry notes has no BCP 47 tag for locale ${locale}`);
+      await p.evaluate((tag) => { window.uiLangToBCP47 = () => tag; }, NOTES_GEOMETRY_BCP47[locale]);
+      await setLibraryLocale(p, extBase, locale);
+      for (const vp of cfg.viewports) {
+        await p.setViewportSize({ width: vp.width, height: vp.height });
+        await p.waitForTimeout(250);
+        for (const scenario of cfg.scenarios) {
+          await libOpenNotesScenario(p, scenario);
+          const g = await p.evaluate(NOTES_GEOMETRY_PROBE);
+          const at = `${locale} ${scenario}@${vp.width}`;
+          if (!g.ok) throw new Error(`SETUP: libGeometry ${at}: the notes detail is not open`);
+          if (!(g.containerPx >= vp.containerPx[0] && g.containerPx < vp.containerPx[1])) {
+            throw new Error(`SETUP: libGeometry ${at}: the detail's container width is ${g.containerPx}, outside the case's ${vp.tier} range [${vp.containerPx.join(", ")})`);
+          }
+          measured++;
+          const wantSide = vp.tier === "side";
+          // Where the main column starts and how wide it is, by tier: the
+          // hang column (112) only from 1000, the excerpt column never wider
+          // than 800 nor narrower than what C leaves it.
+          const hang = vp.tier === "single" ? 0 : cfg.hangPx;
+          if (Math.abs(g.headLeft - g.axis - hang) > tol) bad.push(`${at}: the head starts ${(g.headLeft - g.axis).toFixed(1)} right of the axis, want ${hang}`);
+          const mainWant = Math.min(cfg.excerptMaxPx, g.containerPx - hang);
+          if (Math.abs(g.headWidth - mainWant) > tol) bad.push(`${at}: the main column is ${g.headWidth} wide at C ${g.containerPx}, want ${mainWant}`);
+          if (g.sideVisible !== wantSide) bad.push(`${at}: .notes-page-side ${g.sideVisible ? "shown" : "hidden"} at C ${g.containerPx}, want ${wantSide ? "shown" : "hidden"}`);
+          if (wantSide && g.sideVisible) {
+            if (Math.abs(g.sideTop - g.headTop) > tol) bad.push(`${at}: column top ${g.sideTop} != head top ${g.headTop}`);
+            if (Math.abs(g.sideLeft - g.headRight - cfg.sideGapPx) > tol) bad.push(`${at}: column left ${g.sideLeft} is ${(g.sideLeft - g.headRight).toFixed(1)} right of the main column (${g.headRight}), want ${cfg.sideGapPx}`);
+            const sideWant = Math.min(cfg.sideMaxPx, Math.max(cfg.sideMinPx, g.containerPx - cfg.hangPx - cfg.excerptMaxPx - cfg.sideGapPx));
+            if (Math.abs(g.sideWidth - sideWant) > tol) bad.push(`${at}: the column is ${g.sideWidth} wide at C ${g.containerPx}, want ${sideWant}`);
+          }
+          if (g.visibleDeletes !== 1 || g.deleteInSide !== wantSide) bad.push(`${at}: ${g.visibleDeletes} page delete(s) shown, in the column: ${g.deleteInSide}`);
+          if (g.pagecountVisible === wantSide) bad.push(`${at}: the head meta's page count is ${g.pagecountVisible ? "shown" : "hidden"} with the column ${wantSide ? "present" : "absent"}`);
+          if (g.currentPx !== cfg.currentPx) bad.push(`${at}: current excerpt ${g.currentPx}px, want ${cfg.currentPx}`);
+          // Head to the first excerpt, on every page: a "this page" column
+          // taller than the head and the excerpts beside it must not push the
+          // first excerpt down (it spans their rows -- T8d review).
+          if (Math.abs(g.firstExTop - g.headBottom - cfg.headToFirstExcerptPx) > tol) {
+            bad.push(`${at}: head bottom to first excerpt ${(g.firstExTop - g.headBottom).toFixed(1)}, want ${cfg.headToFirstExcerptPx}${g.sideVisible ? ` (column ${g.sideTop}-${g.sideBottom})` : ""}`);
+          }
+          if (scenario === "notes-multi") {
+            if (g.exCount < 3) bad.push(`${at}: ${g.exCount} excerpts, want >= 3`);
+            if (g.otherPx !== cfg.otherPx) bad.push(`${at}: other excerpts ${g.otherPx}px, want ${cfg.otherPx}`);
+          } else if (g.exCount !== 1) {
+            bad.push(`${at}: ${g.exCount} excerpts on the single-highlight page`);
+          }
+          if (shots) await p.screenshot({ path: join(shots, `${scenario}--${theme || "default"}--${locale}--${vp.width}.png`) });
+        }
+      }
+    }
+  } finally {
+    await closeLibScratch(page, p);
+  }
+  return { bad, measured };
+}
+
 // ---- state: "paneFit" (2026-08-06 narrow-width overflow report) -----------
 // Walks the viewport across the widths the entry names and class-scans EVERY
 // element inside the named panes for one thing: did it escape the pane's
@@ -1848,7 +2025,8 @@ const PANE_FIT_SCAN = ({ panes, tolerance, bleed = [] }) => {
 };
 
 async function drivePaneFit(page, check) {
-  const { widths, panes, tolerancePx = 1, resetNarrowDetail = false, bleed = [], vocabLookupOther = null } = check.expect.paneFit;
+  const { widths, panes, tolerancePx = 1, resetNarrowDetail = false, bleed = [], vocabLookupOther = null, notesScenario = null } = check.expect.paneFit;
+  const prevNotes = notesScenario ? await libSnapshotNotes(page) : null;
   // T7a: measure the dictionary column showing ANOTHER word's result (its
   // head row + slot), not the open word's idle button. The audit profile
   // never grants the dictionary origin, so the slot renders md-dict's connect
@@ -1872,6 +2050,11 @@ async function drivePaneFit(page, check) {
     // deliberately probing the single-pane DETAIL state (existing 900+
     // width entries testing both panes together) must NOT set this.
     if (resetNarrowDetail) await page.evaluate(() => document.body.classList.remove("lib-narrow-detail"));
+    // T8e: measure a named notes state (the multi-highlight page with its
+    // "this page" column), not whichever highlight happened to be open. The
+    // scenario opens it the way a row click does, which also makes the
+    // detail the visible half of the narrow view at 420.
+    if (notesScenario) await libOpenNotesScenario(page, notesScenario);
     if (vocabLookupOther) {
       await page.evaluate((term) => {
         document.body.classList.add("lib-narrow-detail"); // the pane must be the visible view at 420
@@ -1897,6 +2080,7 @@ async function drivePaneFit(page, check) {
         document.body.classList.toggle("lib-narrow-detail", wasNarrow);
       }, otherWordOn);
     }
+    if (notesScenario) await libRestoreNotesSelection(page, prevNotes);
   }
   return found;
 }
@@ -2039,13 +2223,22 @@ async function libInkScreenshotSame(page, paneSel) {
 }
 // One G4 driver for both detail panes. `view` picks the pane and how a case
 // is put on screen; `cases` are that view's scenario names (vocab: "cover" or
-// a LIB_SEED term). T8e adds a `notes` entry here (its scenarios open seeded
-// notes states) instead of a second scan / driver. `coverPx` optionally pins
-// the cover title's size per window width, read on the view's cover case.
+// a LIB_SEED term; notes: a seeded scenario, libOpenNotesScenario). One scan,
+// one driver: T8e added the `notes` entry rather than a second pair.
+// `coverPx` optionally pins the cover title's size per window width, read on
+// the view's cover case.
 const LIB_INK_VIEWS = {
   vocab: {
     paneSel: "#vocab-detail-pane", coverCase: "cover", coverSel: "#vocab-detail-empty .lib-cover-title",
     snapshot: libSnapshotVocab, show: libShowVocab, restore: libRestoreVocab,
+  },
+  // T8e: the notes detail. Cases are the seeded scenarios libOpenNotesScenario
+  // opens ("notes-cover", "notes-solo", "notes-multi"); the snapshot is the
+  // selected highlight's key and the narrow-view class, put back by
+  // libRestoreNotesSelection.
+  notes: {
+    paneSel: "#notes-detail-pane", coverCase: "notes-cover", coverSel: "#notes-detail-empty .lib-cover-title",
+    snapshot: libSnapshotNotes, show: libOpenNotesScenario, restore: libRestoreNotesSelection,
   },
 };
 async function driveDisplayInkTop(page, check) {
@@ -2602,11 +2795,14 @@ async function driveHangOrder(page, extBase, theme, check) {
       }
       // The same defect through the DRIVER (notes: the only view a JS
       // measurement styles): the 10-05 rule put back at the top level, the
-      // labels stacked at C 1200, then C 999 entered with no frame between --
-      // the index driver's early read must see the overlap before the page
-      // re-measures. If it does not, "early" no longer precedes the page's
-      // own measurement and every early read below would be a settled one.
+      // labels stacked inside the hang tier (its 1000 edge + 200 -- a width
+      // within the tier, not the 1312 "this page" edge), then one pixel below
+      // the hang tier's edge entered with no frame between -- the index
+      // driver's early read must see the overlap before the page re-measures.
+      // If it does not, "early" no longer precedes the page's own measurement
+      // and every early read below would be a settled one.
       if (view === "notes") {
+        const hangEdge = HANG_ORDER_BREAKPOINTS.notes[0];
         await p.evaluate(() => {
           const style = document.createElement("style");
           style.id = "hang-order-counter";
@@ -2615,12 +2811,12 @@ async function driveHangOrder(page, extBase, theme, check) {
         });
         let caught;
         try {
-          caught = await run({ driver: "index", base: { L0: 400, C0 }, points: [{ c: 999, from: 1200, earlyOnly: true }] }, "counter driver");
+          caught = await run({ driver: "index", base: { L0: 400, C0 }, points: [{ c: hangEdge - 1, from: hangEdge + jump, earlyOnly: true }] }, "counter driver");
         } finally {
           await p.evaluate(() => document.getElementById("hang-order-counter")?.remove());
         }
         if (!caught.problems.some((pb) => pb.phase === "early" && pb.bad.some((b) => b.rel === "overlap"))) {
-          throw new Error(`SETUP: hangOrder's driver counter-example (the 10-05 rule at the top level, C 1200 -> 999 in one task) was not reported as overlap in the early read: ${JSON.stringify(caught.problems).slice(0, 400)}`);
+          throw new Error(`SETUP: hangOrder's driver counter-example (the 10-05 rule at the top level, stacked inside the hang tier at C ${hangEdge + jump}, then C ${hangEdge - 1} just below its ${hangEdge} edge in one task) was not reported as overlap in the early read: ${JSON.stringify(caught.problems).slice(0, 400)}`);
         }
         await run({ driver: "settle" }, "counter driver");
       }
@@ -3216,20 +3412,25 @@ async function closeLibScratch(page, scratch) {
 // writes <html lang> from the stored language, so the tag that drives the
 // CJK :lang() rules is written after it.
 async function setLibraryLocale(p, extBase, locale) {
-  await p.evaluate(async ({ url, lang }) => {
+  const got = await p.evaluate(async ({ url, lang }) => {
     const msgs = await (await fetch(url)).json();
     _i18nMessages = msgs;
     applyI18n();
     document.documentElement.lang = lang;
     // The dictionary language options are named in the UI locale and the page
     // fills them once, at load: rebuild them with the page's own filler, or
-    // every locale measures English names (T8f review).
+    // every locale measures English names (T8f review). A missing filler is
+    // a SETUP, never a quiet fall back to the English names it replaces.
     const langSel = document.getElementById("vocab-lookup-lang");
-    if (langSel && typeof _pbpVocabFillLookupLangs === "function") _pbpVocabFillLookupLangs(langSel, lang);
+    if (!langSel) return "no #vocab-lookup-lang";
+    if (typeof _pbpVocabFillLookupLangs !== "function") return "no _pbpVocabFillLookupLangs (library-vocab.js renamed it?)";
+    _pbpVocabFillLookupLangs(langSel, lang);
     if (!document.getElementById("view-vocab").hidden) _pbpVocabApplyView(false);
     if (!document.getElementById("view-notes").hidden) _pbpNotesRender();
+    return "ok";
   }, { url: `${extBase}_locales/${locale}/messages.json`,
     lang: { zh_HK: "zh-Hant", zh_TW: "zh-Hant", zh_CN: "zh-Hans" }[locale] || locale });
+  if (got !== "ok") throw new Error(`SETUP: setLibraryLocale(${locale}): ${got}`);
   await settleAnimations(p);
 }
 
@@ -3886,6 +4087,17 @@ async function runOneCheck(page, theme, check, results, extBase) {
     // waits page-wide (F1, stage-1 fix wave) so that no longer needs a
     // resolved row handle.
     await settleAnimations(page);
+  }
+  // T8e: the notes half of G5 (spec 2026-10-03-library-redesign §9.2). Ahead
+  // of T7's branch on purpose: the vocabulary libGeometry driver does not
+  // know `view: "notes"`. (G4's notes half needs no branch: T7b's
+  // driveDisplayInkTop dispatches on view through LIB_INK_VIEWS.)
+  if (check.state === "libGeometry" && check.expect.libGeometry?.view === "notes") {
+    const { bad, measured } = await driveNotesGeometry(page, extBase, theme, check);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("libGeometry", bad.length === 0 && measured > 0, bad.length, 0,
+        bad.length ? bad.slice(0, 4).join("; ") : `${measured} notes states measured`) });
+    return;
   }
   if (check.state === "headerRowsFlush") {
     const { bad, worst } = await driveHeaderRows(page, check, theme);

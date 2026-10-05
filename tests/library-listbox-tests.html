@@ -1037,9 +1037,16 @@ async function libraryPageDetailLocaleCases() {
     // the page's own normalizer builds the record from the server's shape.
     const cached = win.pbpDictNormalizeEntry(JSON.parse(JSON.stringify(FDA_CONSTRAINT)));
     win.pbpAiCacheGet = async () => ({ result: cached });
+    const firstLabel = {};
     for (const locale of locales) {
       win.__pbpEn = messages[locale];
       win.applyI18n();
+      // The lookup row's language names follow the UI locale: rebuilt with the
+      // page's own filler (as a load in that locale does), so each locale's
+      // row is measured with its own names, not the English ones (T8f review).
+      const langSel = doc.getElementById("vocab-lookup-lang");
+      win._pbpVocabFillLookupLangs(langSel, { zh_HK: "zh-Hant", zh_TW: "zh-Hant", zh_CN: "zh-Hans" }[locale] || locale);
+      firstLabel[locale] = langSel.options[0]?.textContent;
       win.eval("_pbpVocabRenderDetail(null); _pbpVocabRenderDetail(_vocabRows[0], false); _pbpVocabRelookup(_vocabRows[0]);");
       const landed = await libWaitFor(win, () => !!doc.querySelector("#vocab-ref-result .xp-dict-src"));
       win.eval("_pbpVocabToggleGroupEditor(true, false)");
@@ -1063,14 +1070,16 @@ async function libraryPageDetailLocaleCases() {
         const r = el.getBoundingClientRect();
         if (r.right > mainRight + 0.5) bad.push(`${locale}: ${el.className || el.tagName} ends at ${r.right.toFixed(1)}, past the main column ${mainRight.toFixed(1)}`);
       }
-      for (const el of doc.querySelectorAll("#vocab-ref-result .xp-dict-src, #vocab-ref-result .vocab-ref-foot > *")) {
+      for (const el of doc.querySelectorAll("#vocab-lookup-bar > *, #vocab-ref-result .xp-dict-src, #vocab-ref-result .vocab-ref-foot > *")) {
+        if (!el.getClientRects().length || win.getComputedStyle(el).position === "absolute") continue;
         const r = el.getBoundingClientRect();
         if (r.right > refRight + 0.5) bad.push(`${locale}: ${el.className} ends at ${r.right.toFixed(1)}, past the dictionary column ${refRight.toFixed(1)}`);
       }
       if (pane.scrollWidth > pane.clientWidth + 1) bad.push(`${locale}: the pane scrolls sideways (${pane.scrollWidth} > ${pane.clientWidth})`);
     }
-    check("T7 at 2200px every locale keeps the hang labels in their 96px column and the manage row, group editor, tail and source line in their columns",
-      bad.length === 0, bad.slice(0, 6).join("; "));
+    check("T7 at 2200px every locale keeps the hang labels in their 96px column and the manage row, group editor, tail, lookup row (that locale's language names) and source line in their columns",
+      bad.length === 0 && !!firstLabel.en && firstLabel.de !== firstLabel.en && firstLabel.ja !== firstLabel.en,
+      `${bad.slice(0, 6).join("; ")} | first option: ${JSON.stringify(firstLabel)}`);
   } finally {
     frame.remove();
   }

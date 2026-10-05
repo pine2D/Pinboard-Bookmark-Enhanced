@@ -758,6 +758,43 @@ export const CHECKS = [
   { surface: "library", page: "library.html", selector: ".notes-list-pane", state: "paneFit",
     expect: { paneFit: { widths: [420, 861, 1280, 1600, 2560], tolerancePx: 1, bleed: [".notes-list-region"],
       panes: [".notes-list-pane", "#notes-detail-pane"] } } },
+  // ---- T8e notes detail (spec 2026-10-03-library-redesign §9.2 G4 / G5, notes
+  // half). Selector .notes-sheet routes them to the notes view without the
+  // group-level detail open (no "-detail-"): each driver opens its own seeded
+  // scenario (LIB_SEED) -- G4 and paneFit on the shared page, putting the
+  // previous selection back afterwards; G5 in a scratch page of its own.
+  // G4: T7b's driver and scan (LIB_INK_VIEWS.notes): every first-line display
+  // text's INK top stays inside the detail pane (canvas measureText ascent over
+  // the DOM baseline -- not Range rects, which return the ascent+descent box),
+  // plus T7b's screenshot cross-check with the pane switched to overflow:
+  // visible, plus the cover title's size (the .lib-cover family's tiers).
+  // G5: where the columns land in each notes tier, named by its container
+  // width C and kept >= 40px off every tier edge (T8f: 1000 hang column,
+  // 1312 "this page" column beside the full 800 excerpt column): 2560 -> C
+  // ~1873 and 1920 -> ~1361 (column, 420 / ~385 wide), 1600 -> ~1113 (hang
+  // column only), 1280 -> ~793 (one column), DPR 1. Every page keeps 48 from
+  // its head to the first excerpt -- the single-highlight page too, where a
+  // "this page" column taller than its rows could push the excerpt down.
+  // en, de and fr: the longest column texts (fr's delete is the column's
+  // 336 minimum). Labels against their quotes are hangOrder's (T8f).
+  { surface: "library", page: "library.html", selector: ".notes-sheet", state: "displayInkTop", themes: ["", "terminal"],
+    expect: { displayInkTop: { view: "notes", sizes: [[2560, 1300], [1280, 800]], cases: ["notes-cover", "notes-solo"],
+      coverPx: { 2560: 72, 1280: 44 } } } },
+  { surface: "library", page: "library.html", selector: ".notes-sheet", state: "libGeometry", themes: ["", "flexoki-dark", "terminal"],
+    expect: { libGeometry: { view: "notes", scenarios: ["notes-multi", "notes-solo"], locales: ["en", "de", "fr"],
+      viewports: [
+        { width: 2560, height: 1300, tier: "side", containerPx: [1352, 4000] },
+        { width: 1920, height: 1080, tier: "side", containerPx: [1352, 4000] },
+        { width: 1600, height: 900, tier: "hang", containerPx: [1040, 1272] },
+        { width: 1280, height: 800, tier: "single", containerPx: [0, 960] },
+      ],
+      hangPx: 112, excerptMaxPx: 800, sideGapPx: 64, sideMinPx: 336, sideMaxPx: 420,
+      headToFirstExcerptPx: 48, currentPx: 26, otherPx: 18, tolerancePx: 1 } } },
+  // paneFit over the notes MULTI-highlight state (spec §9.2 checklist :716-721:
+  // panes cover the notes multi state): nothing in the excerpt flow or the
+  // "this page" column may escape the pane at any width.
+  { surface: "library", page: "library.html", selector: ".notes-sheet", state: "paneFit",
+    expect: { paneFit: { widths: [420, 861, 1280, 1600, 2560], tolerancePx: 1, panes: ["#notes-detail-pane"], notesScenario: "notes-multi" } } },
   // Separate entry, NOT folded into the one above (debt-sweep 2026-08-07):
   // headerRowsFlush only proves "flush single line" >=860px, where the
   // single-pane threshold guarantees room for one. Below it wrapping is
