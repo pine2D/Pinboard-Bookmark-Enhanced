@@ -833,11 +833,49 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     t = realT;
     document.dispatchEvent(new Event("pbp:i18n-applied"));
 
+    // -- CJK titles do not pull up (T9d fix 1). The title has no lang (S5), so
+    // the mark comes from its text: Han, kana and Hangul each count on their
+    // own; a Latin title keeps the half-leading pull-up. --
+    store["pbp_hl_cjk_zh"] = { v: 1, url: "https://cjk.example/zh", title: "安静的界面", items: [
+      { id: "c1", n: 1, quote: "zh title", color: 1, note: "", ts: at(0, 8, 0) }] };
+    store["pbp_hl_cjk_kana"] = { v: 1, url: "https://cjk.example/kana", title: "ひらがな カタカナ", items: [
+      { id: "c2", n: 1, quote: "kana-only title", color: 2, note: "", ts: at(0, 8, 1) }] };
+    store["pbp_hl_cjk_ko"] = { v: 1, url: "https://cjk.example/ko", title: "조용한 화면", items: [
+      { id: "c3", n: 1, quote: "Hangul title", color: 3, note: "", ts: at(0, 8, 2) }] };
+    store["pbp_hl_cjk_mixed"] = { v: 1, url: "https://cjk.example/mixed", title: "Notes on 曖昧 in UI copy", items: [
+      { id: "c4", n: 1, quote: "one ideograph in a Latin title", color: 4, note: "", ts: at(0, 8, 3) }] };
+    await renderNotesPanel();
+    const titleOf = () => detail().querySelector(".notes-detail-head > .notes-detail-source");
+    const pull = () => getComputedStyle(titleOf()).marginTop;
+    const cjkState = (key) => { _pbpNotesSelectRow(key); return `${titleOf()?.classList.contains("lib-cjk")}/${pull()}`; };
+    const zhState = cjkState("pbp_hl_cjk_zh#c1");
+    const latinState = cjkState("pbp_hl_times#x6");
+    check("a Chinese page title is marked CJK and its first line does not pull up",
+      zhState === "true/0px", zhState);
+    check("a Latin page title is not marked and keeps the half-leading pull-up of (32 - 40) / 2",
+      latinState === "false/-4px", latinState);
+    const kanaState = cjkState("pbp_hl_cjk_kana#c2");
+    const koState = cjkState("pbp_hl_cjk_ko#c3");
+    const mixedState = cjkState("pbp_hl_cjk_mixed#c4");
+    check("a kana-only Japanese title, a Hangul title and a Latin title with one ideograph are all marked",
+      kanaState === "true/0px" && koState === "true/0px" && mixedState === "true/0px",
+      `${kanaState} ${koState} ${mixedState}`);
+    _pbpNotesSelectRow("pbp_hl_cjk_zh#c1");
+    _pbpNotesSelectRow("pbp_hl_longtitle#l1");
+    check("switching from a CJK page to a Latin one drops the mark",
+      titleOf()?.classList.contains("lib-cjk") === false && pull() === "-4px",
+      titleOf()?.className);
+    _pbpNotesSelectRow("pbp_hl_cjk_kana#c2");
+    check("switching back to a CJK page marks the rebuilt title again",
+      titleOf()?.classList.contains("lib-cjk") === true && !titleOf()?.hasAttribute("lang"),
+      titleOf()?.outerHTML.slice(0, 120));
+
     // ---- T8 block cleanup ----
     t = realT;
     fixtureWidth(960);
     delete store["pbp_hl_times"];
     delete store["pbp_hl_longtitle"];
+    for (const k of ["pbp_hl_cjk_zh", "pbp_hl_cjk_kana", "pbp_hl_cjk_ko", "pbp_hl_cjk_mixed"]) delete store[k];
     _pbpNotesRenderDetail(null);
     await renderNotesPanel();
   }

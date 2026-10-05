@@ -270,6 +270,7 @@
         "chip-remove",
         "is-stacked",
         "lib-batch-status",
+        "lib-cjk",
         "lib-count-full",
         "lib-count-item",
         "lib-count-items",

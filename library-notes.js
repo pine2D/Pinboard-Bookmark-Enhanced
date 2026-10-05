@@ -726,6 +726,11 @@ function _pbpNotesUiLang() {
 // Page head (spec §5.3): the source title (the whole line is the link when the
 // url is safe), then one muted meta line. The meta's page count only shows
 // below C 1312, where the "this page" column is absent (CSS decides).
+// Any Han / kana / Hangul character in a title makes its first line CJK for
+// the pull-up rule (library.css .notes-detail-source.lib-cjk). Content, not
+// lang: the highlight record has no page language (spec S5).
+const PBP_NOTES_CJK_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+
 function _pbpNotesBuildHead(hit, count) {
   const head = document.createElement("header");
   head.className = "notes-detail-head";
@@ -733,6 +738,8 @@ function _pbpNotesBuildHead(hit, count) {
   title.className = "notes-detail-source lib-first-line";
   const href = typeof pbpDictSafeUrl === "function" ? pbpDictSafeUrl(hit.row.url) : "";
   const label = hit.row.title || _pbpNotesHostname(hit.row.url) || t("notesUnknownPage");
+  // The head is rebuilt on every render, so the mark follows the title shown.
+  if (PBP_NOTES_CJK_RE.test(label)) title.classList.add("lib-cjk");
   if (href) {
     const link = document.createElement("a");
     link.className = "notes-detail-link";

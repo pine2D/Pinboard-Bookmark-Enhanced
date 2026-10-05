@@ -9305,6 +9305,13 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(["zh", "ja", "ko"].every((lang) => [".vocab-detail-term", ".lib-cover-title"].every((el) =>
     declarationValueMap(hand, `${el}.lib-first-line:lang(${lang})`).get("margin-top") === "0")),
     "library.css: a CJK display first line pulls up again -- a CJK face's ascent + descent exceeds 1em, and under the CI font even the half-leading pull-up clipped its ink (render-audit G4, T7b)");
+  // The notes page title has no lang (spec S5), so library-notes.js marks a
+  // CJK title by content (classList.add, a form the vocabulary lint reads);
+  // the marked title must not pull up (T9d fix 1).
+  check(declarationValueMap(hand, ".notes-detail-source.lib-cjk").get("margin-top") === "0" &&
+    read("library-notes.js").includes("const PBP_NOTES_CJK_RE = /[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul}]/u;") &&
+    read("library-notes.js").includes('if (PBP_NOTES_CJK_RE.test(label)) title.classList.add("lib-cjk");'),
+    "library.css / library-notes.js: a CJK notes page title pulls up again, or the Han / kana / Hangul test that marks it with .lib-cjk changed -- under the CI font the 4px pull-up clipped its ink 1.3px above the pane (render-audit G4 notes-solo, T9d)");
   check(declarationValueMap(hand, ".vocab-note-input:placeholder-shown:not(:focus)").get("overflow") === "hidden" &&
     /^calc\(var\(--lib-lh-body\) \+ 20px\)$/.test(declarationValueMap(hand, ".vocab-note-input:placeholder-shown:not(:focus)").get("height") || "") &&
     declarationValueMap(hand, ".vocab-note-input:focus").get("min-height") === "96px" &&

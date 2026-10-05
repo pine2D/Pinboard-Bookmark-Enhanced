@@ -1126,6 +1126,13 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   overflow-wrap: anywhere;
 }
 .notes-detail-source:not(:lang(zh)):not(:lang(ja)):not(:lang(ko)) { letter-spacing: -0.01em; }
+/* A CJK title does not pull up, for the reason .vocab-detail-term:lang(zh)
+   does not (V12: a CJK face's ascent + descent exceeds 1em; under the CI font
+   the 4px pull-up put the ideographs' ink 1.3px above the pane's top). The
+   title has no lang to match (S5: the record has no page language, and a
+   guessed lang would change the CJK glyph choice), so library-notes.js marks
+   it by its text. (0,2,0) over .notes-detail-source. */
+.notes-detail-source.lib-cjk { margin-top: 0; }
 .notes-detail-link { color: var(--lib-fg); text-decoration: none; }
 .notes-detail-link:hover,
 .notes-detail-link:focus-visible { text-decoration: underline; }
