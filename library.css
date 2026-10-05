@@ -2203,10 +2203,15 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
 
 /* Count row (spec §3.5): 28 / 24 tall, 12/16 muted; left = compact items,
    right = Select all, 16 apart. Items never break mid-word: they wrap onto a
-   second line the fixed-height box hides. */
+   second line the fixed-height box hides. The row itself is ONE line: the
+   left segment shrinks (min-width 0) and drops whole items, Select all keeps
+   its place on the search box's right edge. A wrapping row put Select all on
+   a second line while the list pane's column squeezed the row back to its
+   min-height, so it painted over the first list row (T8e review: de / fr at
+   a 360-400px index). */
 .lib-count-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   column-gap: var(--lib-sp-4);
   min-height: calc(var(--lib-control-h) - 4px);

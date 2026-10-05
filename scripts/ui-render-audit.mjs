@@ -1880,7 +1880,6 @@ const NOTES_GEOMETRY_PROBE = () => {
 // (C >= 1312: the "this page" column beside the full 800 excerpt column,
 // T8f "main column first"). Labels against their content are hangOrder's
 // (T8f); this measures where the columns land and what the page shows.
-const NOTES_GEOMETRY_BCP47 = Object.freeze({ en: "en", de: "de", fr: "fr", zh_CN: "zh-Hans" });
 async function driveNotesGeometry(page, extBase, theme, check) {
   const cfg = check.expect.libGeometry;
   const tol = cfg.tolerancePx ?? 1;
@@ -1893,8 +1892,6 @@ async function driveNotesGeometry(page, extBase, theme, check) {
   const p = await libScratchPage(page, extBase, theme, "notes-geometry", "notes", { width: first.width, height: first.height });
   try {
     for (const locale of locales) {
-      if (!NOTES_GEOMETRY_BCP47[locale]) throw new Error(`SETUP: libGeometry notes has no BCP 47 tag for locale ${locale}`);
-      await p.evaluate((tag) => { window.uiLangToBCP47 = () => tag; }, NOTES_GEOMETRY_BCP47[locale]);
       await setLibraryLocale(p, extBase, locale);
       for (const vp of cfg.viewports) {
         await p.setViewportSize({ width: vp.width, height: vp.height });
@@ -2662,10 +2659,6 @@ const HANG_ORDER_VIEWS = {
     mainSel: "#vocab-detail:not([hidden]) > .vocab-detail-head, #vocab-detail-empty:not([hidden]) > .lib-cover-title" },
   notes: { paneSel: "#notes-detail-pane", tab: "#lib-tab-notes", mainSel: "#notes-detail:not([hidden]) > .notes-detail-head" },
 };
-// What uiLangToBCP47() answers for each locale (i18n.js), written straight
-// onto the scratch page's global: the dates in the labels follow it, and the
-// real path through localStorage would reach every page of the origin.
-const HANG_ORDER_BCP47 = Object.freeze({ en: "en", zh_CN: "zh-Hans", de: "de" });
 // The product's container widths: a 861px window gives C ~ 395, a 2560px one
 // 1873. The coarse pass stays inside them.
 const HANG_ORDER_C_RANGE = Object.freeze([400, 1880]);
@@ -2795,14 +2788,18 @@ async function driveHangOrder(page, extBase, theme, check) {
       }
       // The same defect through the DRIVER (notes: the only view a JS
       // measurement styles): the 10-05 rule put back at the top level, the
-      // labels stacked inside the hang tier (its 1000 edge + 200 -- a width
-      // within the tier, not the 1312 "this page" edge), then one pixel below
-      // the hang tier's edge entered with no frame between -- the index
-      // driver's early read must see the overlap before the page re-measures.
-      // If it does not, "early" no longer precedes the page's own measurement
-      // and every early read below would be a settled one.
+      // labels stacked inside the hang tier (its edge + `jump`, a width within
+      // the tier -- below the next, "this page" breakpoint, guarded here),
+      // then one pixel below the hang tier's edge entered with no frame
+      // between -- the index driver's early read must see the overlap before
+      // the page re-measures. If it does not, "early" no longer precedes the
+      // page's own measurement and every early read below would be a settled
+      // one.
       if (view === "notes") {
-        const hangEdge = HANG_ORDER_BREAKPOINTS.notes[0];
+        const [hangEdge, sideEdge] = HANG_ORDER_BREAKPOINTS.notes;
+        if (!(hangEdge + jump < sideEdge)) {
+          throw new Error(`SETUP: hangOrder's driver counter-example starts at C ${hangEdge + jump} (hang edge ${hangEdge} + jump ${jump}), not inside the hang tier [${hangEdge}, ${sideEdge})`);
+        }
         await p.evaluate(() => {
           const style = document.createElement("style");
           style.id = "hang-order-counter";
@@ -2832,7 +2829,6 @@ async function driveHangOrder(page, extBase, theme, check) {
         else document.documentElement.removeAttribute("data-density");
       }, density);
       for (const locale of HANG_ORDER_LOCALES) {
-        await p.evaluate((tag) => { window.uiLangToBCP47 = () => tag; }, HANG_ORDER_BCP47[locale]);
         await setLibraryLocale(p, extBase, locale);
         const own = density === ownDensity && locale === HANG_ORDER_LOCALES[0];
         for (const name of own ? scenarios : [primary]) {
@@ -3387,6 +3383,12 @@ async function driveFilterPopoverKeys(page, theme, check) {
 // checklist entries carry `themes: ["", "terminal"]` (comfortable / compact)
 // like the other T3 scratch-page gates.
 const LIB_INDEX_LOCALES = Object.freeze(["en", "de", "fr", "pl", "ru", "zh_HK", "zh_CN", "zh_TW", "ja"]);
+// The one locale -> BCP 47 table (T8e review): what uiLangToBCP47() (i18n.js)
+// answers for each locale, which is also the tag the CJK :lang() rules read
+// on <html>. setLibraryLocale writes both from it.
+const LIB_LOCALE_BCP47 = Object.freeze({
+  en: "en", de: "de", fr: "fr", pl: "pl", ru: "ru", ja: "ja", zh_CN: "zh-Hans", zh_HK: "zh-Hant", zh_TW: "zh-Hant",
+});
 
 async function libScratchPage(page, extBase, theme, tag, view, viewport) {
   const scratch = await page.context().newPage();
@@ -3410,9 +3412,14 @@ async function closeLibScratch(page, scratch) {
 // localStorage write would reach the shared page -- same origin): swap
 // i18n.js's table, re-apply data-i18n, re-render the visible view. applyI18n
 // writes <html lang> from the stored language, so the tag that drives the
-// CJK :lang() rules is written after it.
+// CJK :lang() rules is written after it. uiLangToBCP47() reads the stored
+// language too: it is overridden on this page's global (never through
+// localStorage), so dates and option names follow the locale as well.
 async function setLibraryLocale(p, extBase, locale) {
+  const tag = LIB_LOCALE_BCP47[locale];
+  if (!tag) throw new Error(`SETUP: setLibraryLocale(${locale}): no BCP 47 tag in LIB_LOCALE_BCP47`);
   const got = await p.evaluate(async ({ url, lang }) => {
+    window.uiLangToBCP47 = () => lang;
     const msgs = await (await fetch(url)).json();
     _i18nMessages = msgs;
     applyI18n();
@@ -3428,8 +3435,7 @@ async function setLibraryLocale(p, extBase, locale) {
     if (!document.getElementById("view-vocab").hidden) _pbpVocabApplyView(false);
     if (!document.getElementById("view-notes").hidden) _pbpNotesRender();
     return "ok";
-  }, { url: `${extBase}_locales/${locale}/messages.json`,
-    lang: { zh_HK: "zh-Hant", zh_TW: "zh-Hant", zh_CN: "zh-Hans" }[locale] || locale });
+  }, { url: `${extBase}_locales/${locale}/messages.json`, lang: tag });
   if (got !== "ok") throw new Error(`SETUP: setLibraryLocale(${locale}): ${got}`);
   await settleAnimations(p);
 }
@@ -3551,6 +3557,22 @@ const LIST_HEADER_FIT_SCAN = ({ view }) => {
     return { l: one(parseFloat(cs.marginLeft) || 0, parseFloat(cs.paddingLeft) || 0), r: one(parseFloat(cs.marginRight) || 0, parseFloat(cs.paddingRight) || 0) };
   };
   const skipped = (el) => el.closest(".sr-only") || (el.closest("svg") && el.tagName.toLowerCase() !== "svg");
+  // Nothing a header row paints may reach the list region below it (T8e
+  // review: a wrapped Select all sat on the first row while the count row
+  // kept its one-line box). Measured on what is PAINTED: a box inside an
+  // ancestor that clips (the count items' hidden second line) counts only
+  // down to that ancestor's bottom.
+  const region = document.querySelector(vocab ? ".vocab-list-region" : ".notes-list-region");
+  const regionTop = region && region.getClientRects().length ? region.getBoundingClientRect().top : null;
+  if (regionTop == null) return { error: `${vocab ? ".vocab-list-region" : ".notes-list-region"} is missing or not rendered` };
+  const paintedBottom = (el, row, r) => {
+    let bottom = r.bottom;
+    for (let a = el.parentElement; a && row.contains(a); a = a.parentElement) {
+      const acs = getComputedStyle(a);
+      if (acs.overflowY !== "visible" || acs.overflowX !== "visible") bottom = Math.min(bottom, a.getBoundingClientRect().bottom);
+    }
+    return bottom > r.top ? bottom : null;
+  };
   const bad = [];
   let measured = 0;
   for (const sel of rows) {
@@ -3563,6 +3585,8 @@ const LIST_HEADER_FIT_SCAN = ({ view }) => {
       if (cs.display === "none" || cs.visibility === "hidden" || cs.position === "fixed") continue;
       const r = el.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) continue;
+      const painted = paintedBottom(el, row, r);
+      if (painted != null && painted > regionTop + 0.5) bad.push(`${sel} ${nameOf(el)} paints ${(painted - regionTop).toFixed(1)}px into the list region below the header`);
       const hang = hangOf(cs);
       if (r.right - hang.r > right + 0.5) bad.push(`${sel} ${nameOf(el)} ends ${(r.right - hang.r - right).toFixed(1)}px past the index`);
       if (r.left + hang.l < left - 0.5) bad.push(`${sel} ${nameOf(el)} starts ${(left - r.left - hang.l).toFixed(1)}px before the index`);

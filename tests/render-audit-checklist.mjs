@@ -775,8 +775,10 @@ export const CHECKS = [
   // column only), 1280 -> ~793 (one column), DPR 1. Every page keeps 48 from
   // its head to the first excerpt -- the single-highlight page too, where a
   // "this page" column taller than its rows could push the excerpt down.
-  // en, de and fr: the longest column texts (fr's delete is the column's
-  // 336 minimum). Labels against their quotes are hangOrder's (T8f).
+  // The column widths asserted here follow from C alone; the three locales
+  // (en, de, fr -- fr's delete is what sets the column's 336 minimum) only
+  // change how TALL the "this page" column is, i.e. the 48 check above.
+  // Labels against their quotes are hangOrder's (T8f).
   { surface: "library", page: "library.html", selector: ".notes-sheet", state: "displayInkTop", themes: ["", "terminal"],
     expect: { displayInkTop: { view: "notes", sizes: [[2560, 1300], [1280, 800]], cases: ["notes-cover", "notes-solo"],
       coverPx: { 2560: 72, 1280: 44 } } } },
