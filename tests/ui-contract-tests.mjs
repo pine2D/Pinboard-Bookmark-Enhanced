@@ -287,8 +287,8 @@ const libHandRoot = declarationValueMap(libHandCss, ":root");
       check(hand.length === 1 && hand[0].context.length === 0, `${name} has one value at every width: exactly one top-level :root definition`);
     }
   }
-  const WIDTHS = { "--lib-hang-w": "112px", "--lib-main-max": "840px", "--lib-ref-min": "360px", "--lib-ref-max": "720px",
-    "--lib-excerpt-max": "800px", "--lib-side-min": "280px", "--lib-side-max": "420px", "--lib-index-w": "clamp(360px, 20vw, 520px)" };
+  const WIDTHS = { "--lib-hang-w": "112px", "--lib-main-max": "840px", "--lib-ref-min": "424px", "--lib-ref-max": "720px",
+    "--lib-excerpt-max": "800px", "--lib-side-min": "336px", "--lib-side-max": "420px", "--lib-index-w": "clamp(360px, 20vw, 520px)" };
   for (const [name, value] of Object.entries(WIDTHS)) {
     check(libHandRoot.get(name) === value, `library.css :root ${name} must be ${value} (spec §2.3 / §6.2); got ${libHandRoot.get(name) ?? "nothing"}`);
   }
@@ -9277,26 +9277,26 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // one at-rule context: the tier rules live inside @container blocks.
   const tier = (w, sel) => declarationValueMap(hand, sel, { context: [`@container lib-detail (min-width: ${w}px)`] });
   check(tier(1000, ".vocab-sheet").get("grid-template-columns") === "var(--lib-hang-w) minmax(0, var(--lib-main-max))" &&
-    tier(1376, ".vocab-sheet").get("grid-template-columns") === "var(--lib-hang-w) var(--lib-main-max) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max))" &&
-    tier(1376, ".vocab-sheet").get("grid-template-rows") === "auto 1fr" &&
-    !/@container lib-detail \(min-width: 1280px\)/.test(hand) &&
+    tier(1440, ".vocab-sheet").get("grid-template-columns") === "var(--lib-hang-w) var(--lib-main-max) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max))" &&
+    tier(1440, ".vocab-sheet").get("grid-template-rows") === "auto 1fr" &&
+    !/@container lib-detail \(min-width: (?:1280|1376)px\)/.test(hand) &&
     declarationValueMap(hand, ".vocab-sheet > [hidden]").get("display") === "none",
-    "library.css: the vocabulary sheet lost its spec §4.2 tiers (1000: 112 | 840; 1376: 112 | 840 fixed | 64 | 360-720 with rows auto 1fr -- spec appendix 10-05, main column first) or its [hidden] guard");
-  // 1376 = hang + main + gap + the dictionary column's minimum: the tier
+    "library.css: the vocabulary sheet lost its spec §4.2 tiers (1000: 112 | 840; 1440: 112 | 840 fixed | 64 | 360-720 with rows auto 1fr -- spec appendix 10-05, main column first) or its [hidden] guard");
+  // 1440 = hang + main + gap + the dictionary column's minimum: the tier
   // starts exactly where the fixed main column and the column's minimum fit.
-  check(1376 === [hand.match(/--lib-hang-w: (\d+)px/), hand.match(/--lib-main-max: (\d+)px/), hand.match(/--lib-sp-8: (\d+)px/), hand.match(/--lib-ref-min: (\d+)px/)]
+  check(1440 === [hand.match(/--lib-hang-w: (\d+)px/), hand.match(/--lib-main-max: (\d+)px/), hand.match(/--lib-sp-8: (\d+)px/), hand.match(/--lib-ref-min: (\d+)px/)]
     .reduce((sum, m) => sum + (m ? Number(m[1]) : NaN), 0),
-    "library.css: the dictionary column's 1376 tier no longer equals --lib-hang-w + --lib-main-max + --lib-sp-8 + --lib-ref-min -- move the @container threshold with the tokens (spec appendix 10-05)");
+    "library.css: the dictionary column's 1440 tier no longer equals --lib-hang-w + --lib-main-max + --lib-sp-8 + --lib-ref-min -- move the @container threshold with the tokens (spec appendix 10-05)");
   check(tier(1000, ".vocab-ref > #vocab-lookup-bar").get("grid-row") === "1" && tier(1000, ".vocab-ref > #vocab-ref-result").get("grid-row") === "2" &&
-    tier(1376, ".vocab-ref > .lib-hang-label").get("grid-row") === "auto" && tier(1376, ".vocab-ref > .lib-hang-label").get("grid-column") === "auto",
-    "library.css: the dictionary label's rows are left to auto-placement again (1000 tier: lookup row 1, result row 2; 1376 tier: the label's 1000-tier placement reset to auto) -- diag-hang-order §5 B");
-  for (const [w, px] of [[640, 44], [1000, 56], [1376, 72]]) {
+    tier(1440, ".vocab-ref > .lib-hang-label").get("grid-row") === "auto" && tier(1440, ".vocab-ref > .lib-hang-label").get("grid-column") === "auto",
+    "library.css: the dictionary label's rows are left to auto-placement again (1000 tier: lookup row 1, result row 2; 1440 tier: the label's 1000-tier placement reset to auto) -- diag-hang-order §5 B");
+  for (const [w, px] of [[640, 44], [1000, 56], [1440, 72]]) {
     check(tier(w, ".vocab-detail-term").get("font-size") === `${px}px` && tier(w, ".lib-cover-title").get("font-size") === `${px}px`,
       `library.css: the headword / cover title is not ${px}px from a ${w}px detail (spec §4.2 display tiers)`);
   }
   check(declarationValueMap(hand, ".vocab-detail-term.lib-first-line").get("margin-top") === "calc(-0.5 * (1.15 - 1) * 1em)" &&
     declarationValueMap(hand, ".lib-cover-title.lib-first-line").get("margin-top") === "calc(-0.5 * (1.15 - 1) * 1em)" &&
-    tier(1376, ".vocab-ref > .lib-hang-label.lib-first-line").get("margin-top") === "calc((16px - 24px) / 2)",
+    tier(1440, ".vocab-ref > .lib-hang-label.lib-first-line").get("margin-top") === "calc((16px - 24px) / 2)",
     "library.css: a display first line pulls up by something other than its half-leading (spec §6.5: 0.075em at line-height 1.15, 4px for 16/24) -- more clips CJK ink in the scroll box");
   check(["zh", "ja", "ko"].every((lang) => [".vocab-detail-term", ".lib-cover-title"].every((el) =>
     declarationValueMap(hand, `${el}.lib-first-line:lang(${lang})`).get("margin-top") === "0")),
@@ -9379,10 +9379,12 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     /c !== "is-stacked"/.test(fnBody("_pbpNotesDetailFocusSnapshot")) &&
     /\[data-notes-key=/.test(fnBody("_pbpNotesRestoreDetailFocus")),
     "library-notes.js: the page delete lost its identity class in the last position, or the detail focus restore stopped keying excerpt controls on data-notes-key / started keying on the layout-only is-stacked (spec §5.1)");
-  check(/@container lib-detail \(min-width: 1200px\) \{\n  \.notes-sheet \{ grid-template-columns: var\(--lib-hang-w\) minmax\(0, var\(--lib-excerpt-max\)\) var\(--lib-sp-8\) minmax\(var\(--lib-side-min\), var\(--lib-side-max\)\); \}/.test(hand) &&
+  check(/@container lib-detail \(min-width: 1312px\) \{\n  \.notes-sheet \{ grid-template-columns: var\(--lib-hang-w\) var\(--lib-excerpt-max\) var\(--lib-sp-8\) minmax\(var\(--lib-side-min\), var\(--lib-side-max\)\); \}/.test(hand) &&
+    1312 === [hand.match(/--lib-hang-w: (\d+)px/), hand.match(/--lib-excerpt-max: (\d+)px/), hand.match(/--lib-sp-8: (\d+)px/), hand.match(/--lib-side-min: (\d+)px/)]
+      .reduce((sum, m) => sum + (m ? Number(m[1]) : NaN), 0) &&
     hand.includes(".notes-sheet > .notes-page-side { display: block; grid-column: 4; grid-row: 1 / span var(--notes-rows); align-self: start; }") &&
     notesJs.includes('detail.style.setProperty("--notes-rows", String(pageHits.length + 2));'),
-    "library.css/library-notes.js: the 'this page' column lost its explicit placement (column 4, rows 1 / span --notes-rows = excerpts + 2) -- left to DOM order it would follow the excerpts (spec §5.2, I12)");
+    "library.css/library-notes.js: the 'this page' column lost its explicit placement (column 4, rows 1 / span --notes-rows = excerpts + 2) -- left to DOM order it would follow the excerpts (spec §5.2, I12), or its tier stopped being --lib-hang-w + --lib-excerpt-max + --lib-sp-8 + --lib-side-min = 1312 beside a fixed excerpt column (T8f fix round 1)");
   check(/<div class="lib-cover" id="notes-detail-empty">/.test(libraryHtml) &&
     /<h2 class="lib-cover-title lib-first-line" data-i18n="tabNotes">/.test(libraryHtml) &&
     /<p class="lib-cover-hint" data-i18n="libraryNotesDetailEmpty">/.test(libraryHtml),
@@ -9436,21 +9438,33 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     for (const m of body.matchAll(/classList\.(?:add|toggle)\(\s*["']([\w-]+)["']/g)) {
       if (!entry.classes.includes(m[1])) out.push(`class ${m[1]}`);
     }
+    // Whole-attribute writes bypass both lists: a class string or a style
+    // string set in one go cannot be told apart from a layout value.
+    for (const m of body.matchAll(/\.setAttribute\(\s*["'](class|style)["']/g)) out.push(`setAttribute("${m[1]}")`);
+    for (const m of body.matchAll(/\.className\s*(?:\+?=)(?!=)/g)) out.push("className =");
     return out;
   };
   // Synthetic proof that the gate catches the 10-05 shape and passes the fix.
   const premiseCss = "@container lib-detail (min-width: 1000px) { .notes-sheet > .notes-excerpt { display: grid; } }\n";
   const entry0 = MEASURED_LAYOUT[0];
-  check(measuredOffenders(premiseCss + ".notes-excerpt-label.is-stacked { height: 16px; }", entry0).length === 1 &&
+  const topLevel = measuredOffenders(premiseCss + ".notes-excerpt-label.is-stacked { height: 16px; }", entry0);
+  const noPremise = measuredOffenders(".notes-excerpt-label.is-stacked { height: 16px; }", entry0);
+  check(topLevel.length === 1 && topLevel[0].endsWith("at the top level") &&
     measuredOffenders(premiseCss.replace("} }", "} .notes-excerpt-label.is-stacked { height: 16px; } }"), entry0).length === 0 &&
     measuredOffenders(premiseCss.replace("} }", "} @media (forced-colors: active) { .notes-excerpt-label.is-stacked { color: CanvasText; } } }"), entry0).length === 0 &&
     measuredOffenders(premiseCss + ".notes-sheet > .notes-excerpt { min-height: var(--notes-hang-min, auto); }", entry0).length === 1 &&
     measuredOffenders(premiseCss + "@container lib-detail (min-width: 640px) { .notes-excerpt-label.is-stacked { height: 16px; } }", entry0).length === 1 &&
-    measuredOffenders(".notes-excerpt-label.is-stacked { height: 16px; }", entry0).length === 1 &&
+    // Without the premise rule the gate cannot place the tier at all and must
+    // say so -- not pass, and not blame the rule for the wrong reason.
+    noPremise.length === 1 && noPremise[0].startsWith("no rule makes .notes-sheet > .notes-excerpt display: grid") &&
     inlineOffenders('ex.style.minHeight = h + "px";', entry0).length === 1 &&
+    inlineOffenders('ex.style.cssText = "min-height: 40px";', entry0).join() === "style.cssText =" &&
+    inlineOffenders('ex.setAttribute("style", "min-height: 40px");', entry0).join() === 'setAttribute("style")' &&
+    inlineOffenders('label.setAttribute("class", "notes-excerpt-label is-stacked");', entry0).join() === 'setAttribute("class")' &&
+    inlineOffenders('label.className += " is-stacked";', entry0).join() === "className =" &&
     inlineOffenders('ex.style.setProperty("min-height", h + "px");', entry0).length === 1 &&
     inlineOffenders('ex.style.setProperty("--notes-hang-min", h + "px"); label.classList.add("is-stacked");', entry0).length === 0,
-    "ui-contract self-test: the measured-layout gate no longer flags an .is-stacked rule or a --notes-hang-min consumer outside the tier where the measurement holds, or an inline min-height (T8f)");
+    "ui-contract self-test: the measured-layout gate no longer flags an .is-stacked rule or a --notes-hang-min consumer outside the tier where the measurement holds (for the right reason), or an inline min-height / cssText / whole class or style attribute write (T8f)");
   const hand = stripGeneratedRegions(libraryCss);
   for (const entry of MEASURED_LAYOUT) {
     const body = fnOf(sources[entry.file], entry.fn);
@@ -9466,13 +9480,17 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // Completeness: every top-level function in a library script that reads
   // layout AND writes a class literal is a registry entry -- a new measured
   // class cannot slip past the gate by living in another function.
-  const LAYOUT_READ = /getBoundingClientRect|getClientRects|offsetWidth|offsetHeight|clientWidth|clientHeight|scrollWidth|scrollHeight/;
+  const LAYOUT_READ = /getBoundingClientRect|getClientRects|getComputedStyle|offsetWidth|offsetHeight|clientWidth|clientHeight|scrollWidth|scrollHeight/;
+  const CLASS_WRITE = /classList\.(?:add|toggle)\(\s*["'][\w-]+["']|\.setAttribute\(\s*["']class["']|\.className\s*\+?=(?!=)/;
+  check(CLASS_WRITE.test('el.setAttribute("class", "x")') && CLASS_WRITE.test("el.className = 'x'") && CLASS_WRITE.test('el.classList.toggle("x", on)') &&
+    !CLASS_WRITE.test("if (el.className === 'x') {}") && LAYOUT_READ.test("getComputedStyle(el).display"),
+    "ui-contract self-test: the measured-layout completeness scan no longer recognizes a getComputedStyle read or a setAttribute / className class write (T8f)");
   const registered = new Set(MEASURED_LAYOUT.map((e) => `${e.file}:${e.fn}`));
   const unregistered = [];
   for (const [file, src] of Object.entries(sources)) {
     for (const chunk of stripLineComments(src).split(/\n(?=(?:async )?function )/)) {
       const name = (/^(?:async )?function (\w+)/.exec(chunk) || [])[1];
-      if (!name || !LAYOUT_READ.test(chunk) || !/classList\.(?:add|toggle)\(\s*["'][\w-]+["']/.test(chunk)) continue;
+      if (!name || !LAYOUT_READ.test(chunk) || !CLASS_WRITE.test(chunk)) continue;
       if (!registered.has(`${file}:${name}`)) unregistered.push(`${file}:${name}`);
     }
   }

@@ -697,16 +697,35 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("the sheet carries --notes-rows = excerpts + 2 for the column's explicit row span",
       detail().style.getPropertyValue("--notes-rows").trim() === "8", detail().getAttribute("style"));
     const metaCount = () => detail().querySelector(".notes-meta-pagecount");
-    check("below C 1200 the column is absent, the footer delete is the one delete shown, and the meta counts the page",
-      paneC() < 1200 && !shown(side()) && visibleDelete()?.parentElement?.classList.contains("notes-detail-footer") &&
+    check("below C 1312 the column is absent, the footer delete is the one delete shown, and the meta counts the page",
+      paneC() < 1312 && !shown(side()) && visibleDelete()?.parentElement?.classList.contains("notes-detail-footer") &&
       [...detail().querySelectorAll(".notes-detail-delete")].filter(shown).length === 1 && shown(metaCount()),
       `C=${paneC()}`);
     fixtureWidth(2400);
     _pbpNotesSelectRow("pbp_hl_times#x6");
-    check("from C 1200 the column shows, its delete is the one delete shown, and the meta drops the page count",
-      paneC() >= 1200 && shown(side()) && visibleDelete()?.parentElement === side() &&
+    check("from C 1312 the column shows, its delete is the one delete shown, and the meta drops the page count",
+      paneC() >= 1312 && shown(side()) && visibleDelete()?.parentElement === side() &&
       [...detail().querySelectorAll(".notes-detail-delete")].filter(shown).length === 1 && !shown(metaCount()),
       `C=${paneC()}`);
+    // T8f fix round 1 (main column first, the notes half): the column joins
+    // only from C 1312 = 112 + 800 + 64 + 336 (its minimum is the widest
+    // delete button across the nine locales), beside a fixed 800 excerpt
+    // column. Before, it joined at 1200 and grew first: the excerpts dropped
+    // from 800 to 604 across the switch.
+    {
+      fixtureWidth(2400);
+      const w0 = 2400, c0 = paneC();
+      const rows = [1199, 1200, 1311, 1312, 1313, 1600, 1900].map((c) => {
+        fixtureWidth(w0 + c - c0);
+        const head = detail().querySelector(":scope > .notes-detail-head").getBoundingClientRect();
+        const sr = side().getBoundingClientRect();
+        return { c: Math.round(paneC() * 100) / 100, main: Math.round(head.width * 100) / 100, side: shown(side()), sideW: Math.round(sr.width * 100) / 100 };
+      });
+      fixtureWidth(2400);
+      check("the excerpt column stays 800 across the 'this page' column's tier (C 1312), and the column grows from 336 to 420",
+        rows.every((r) => Math.abs(r.main - 800) <= 0.5 && r.side === (r.c >= 1312) && (!r.side || Math.abs(r.sideW - Math.min(420, r.c - 976)) <= 0.5)),
+        JSON.stringify(rows));
+    }
     const headRect = detail().querySelector(":scope > .notes-detail-head")?.getBoundingClientRect();
     const sideRect = side()?.getBoundingClientRect();
     check("the column starts level with the page head, right of the main column (placed by grid lines, not DOM order)",
@@ -743,7 +762,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       _pbpNotesNarrowMode = () => true;
       // The <=860px rule's single track as well as its hidden list pane:
       // with only the pane gone, the detail would auto-place into the index
-      // column and never reach C 1200.
+      // column and never reach C 1312.
       listPane.style.display = "none";
       workbench.style.gridTemplateColumns = "minmax(0, 1fr)";
       fixtureWidth(960); _pbpNotesSelectRow("pbp_hl_times#x6"); narrowHost = _pbpNotesStatusHost();

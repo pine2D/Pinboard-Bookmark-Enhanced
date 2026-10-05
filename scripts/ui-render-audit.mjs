@@ -2235,7 +2235,7 @@ async function driveLibGeometry(page, check) {
 // label's own padding never counts and a stacked label's later lines may hang.
 //
 // The in-page half: one batch of points per call, no round trip per point.
-const HANG_ORDER_PAGE = async ({ paneSel, exempt, points, base, driver, counter }) => {
+const HANG_ORDER_PAGE = async ({ paneSel, mainSel, exempt, points, base, driver, counter, minLabels = 0 }) => {
   const pane = document.querySelector(paneSel);
   if (!pane) return { error: `no ${paneSel}` };
   const html = document.documentElement;
@@ -2307,11 +2307,18 @@ const HANG_ORDER_PAGE = async ({ paneSel, exempt, points, base, driver, counter 
       if (labelSet.has(el) || !visible(el) || exempt.some((sel) => el.matches(sel))) continue;
       setup.push(`unpaired heading / label ${describe(el)} (pair it as a hang label or exempt it in HANG_ORDER_EXEMPT)`);
     }
+    if (labels.length < minLabels) setup.push(`only ${labels.length} hang label(s) visible, the scenario declares at least ${minLabels} -- it rendered less than it names`);
     return { bad, setup, labels: labels.length };
   };
+  // The main column's width (the word's head / the notes head fill it): read
+  // with every scan, so the Node side can require it never shrinks as C grows.
+  const mainWidth = () => {
+    const el = [...pane.querySelectorAll(mainSel)].find(visible);
+    return el ? round(el.getBoundingClientRect().width) : null;
+  };
   const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 0))));
-  if (driver === "probe") return { C: round(contentWidth()), ...scan() };
-  if (driver === "settle") { await settle(); return { C: round(contentWidth()), ...scan() }; }
+  if (driver === "probe") return { C: round(contentWidth()), main: mainWidth(), ...scan() };
+  if (driver === "settle") { await settle(); return { C: round(contentWidth()), main: mainWidth(), ...scan() }; }
   if (driver === "counter") {
     // Anti-vacuity (diag §6.4): put a known-bad layout on screen and require
     // the scan to name it. "stacked-narrow" is the 10-05 defect itself -- the
@@ -2330,10 +2337,11 @@ const HANG_ORDER_PAGE = async ({ paneSel, exempt, points, base, driver, counter 
     return { C: round(contentWidth()), ...r, target: describe(target) };
   }
   const setC = (c) => html.style.setProperty("--lib-index-w", `${base.L0 + base.C0 - c}px`);
-  const out = { measured: 0, problems: [], labels: 0 };
+  const out = { measured: 0, problems: [], labels: 0, mono: [] };
   const record = (pt, phase) => {
     const C = contentWidth();
     const r = scan();
+    out.mono.push([round(C), mainWidth()]);
     out.measured++;
     out.labels = Math.max(out.labels, r.labels);
     const drift = Math.abs(C - pt.c) > 0.5;
@@ -2361,10 +2369,13 @@ const HANG_ORDER_EXEMPT = Object.freeze([
 ]);
 
 // Breakpoints per view: the @container lib-detail tiers that move a label.
-const HANG_ORDER_BREAKPOINTS = Object.freeze({ vocab: [640, 1000, 1376], notes: [1000, 1200] });
+const HANG_ORDER_BREAKPOINTS = Object.freeze({ vocab: [640, 1000, 1440], notes: [1000, 1312] });
 const HANG_ORDER_LOCALES = Object.freeze(["en", "zh_CN", "de"]);
 
 // Scenarios: each puts one state of the view's detail on screen (Node side).
+// HANG_ORDER_MIN_LABELS is how many hang labels each one shows at the very
+// least (at any width): a scan that sees fewer is a SETUP, never a pass over
+// a scenario that rendered less than it names.
 const HANG_ORDER_DAYS_KEY = "pbp_hl_render-audit-hang-days";
 const HANG_ORDER_SCENARIOS = {
   vocab: {
@@ -2421,9 +2432,16 @@ const HANG_ORDER_SCENARIOS = {
   },
 };
 
+const HANG_ORDER_MIN_LABELS = Object.freeze({
+  // context, my note, Dictionary; the cover keeps only the Dictionary label
+  vocab: { constraint: 3, "曖昧": 3, cover: 1, lookup: 3, editor: 3 },
+  // one per excerpt (the "this page" title only from its tier on)
+  notes: { days: 3, multi: 4 },
+});
 const HANG_ORDER_VIEWS = {
-  vocab: { paneSel: "#vocab-detail-pane", tab: null },
-  notes: { paneSel: "#notes-detail-pane", tab: "#lib-tab-notes" },
+  vocab: { paneSel: "#vocab-detail-pane", tab: null,
+    mainSel: "#vocab-detail:not([hidden]) > .vocab-detail-head, #vocab-detail-empty:not([hidden]) > .lib-cover-title" },
+  notes: { paneSel: "#notes-detail-pane", tab: "#lib-tab-notes", mainSel: "#notes-detail:not([hidden]) > .notes-detail-head" },
 };
 // What uiLangToBCP47() answers for each locale (i18n.js), written straight
 // onto the scratch page's global: the dates in the labels follow it, and the
@@ -2462,15 +2480,29 @@ async function driveHangOrder(page, extBase, theme, check) {
     `${at} ${phase}: ${b.name} is ${b.rel} its content (label ${b.label.join(",")} vs ${b.content.join(",")})`);
   const p = await libScratchPage(page, extBase, theme, `hang-${view}`, "vocab", { width: indexWindows[0], height: 900 });
   const run = async (args, tag) => {
-    const res = await p.evaluate(HANG_ORDER_PAGE, { paneSel: v.paneSel, exempt: HANG_ORDER_EXEMPT.map((e) => e.selector), ...args });
+    const res = await p.evaluate(HANG_ORDER_PAGE, { paneSel: v.paneSel, mainSel: v.mainSel, exempt: HANG_ORDER_EXEMPT.map((e) => e.selector), ...args });
     if (res.error) throw new Error(`SETUP: hangOrder ${tag}: ${res.error}`);
     return res;
   };
-  const one = (res, at, phase) => {
+  const one = (res, at, phase, mono) => {
     stats.measured++;
     stats.labels = Math.max(stats.labels, res.labels);
     if (res.setup.length) throw new Error(`SETUP: hangOrder ${at} ${phase}: ${res.setup[0]}`);
     for (const b of res.bad) noteBad(b, at, phase, "window");
+    mono.push([res.C, res.main]);
+  };
+  // "Main column first" as a class rule (T8f fix round 1): over every reading
+  // of one combination, sorted by C, the main column's width never shrinks
+  // as C grows -- a column that joins beside it must take only what it leaves.
+  const checkMonotonic = (pairs, combo) => {
+    const rows = pairs.filter(([, w]) => w != null).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    if (rows.length < 2) throw new Error(`SETUP: hangOrder ${combo}: ${rows.length} main column reading(s) -- ${v.mainSel} not on screen`);
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][1] < rows[i - 1][1] - 0.5) {
+        note(`mono|${view}`, `${combo}: the main column narrows from ${rows[i - 1][1]} at C=${rows[i - 1][0]} to ${rows[i][1]} at C=${rows[i][0]} as C grows`);
+        return;
+      }
+    }
   };
   const setIndex = (px) => p.evaluate((w) => {
     if (w == null) document.documentElement.style.removeProperty("--lib-index-w");
@@ -2483,34 +2515,43 @@ async function driveHangOrder(page, extBase, theme, check) {
       await settleAnimations(p);
     }
     // C(W) for the window driver. The pane's scrollbar gutter is stable, so C
-    // does not depend on what the pane shows: bisected once, and every W whose
-    // C lands in [bp - fine, bp + fine] is kept.
+    // does not depend on what the pane shows: bisected once per target, and
+    // every W whose C lands in [bp - fine, bp + fine] is kept. C(W) is
+    // piecewise (L is clamped below a 1800 window and P / G step at 1280 and
+    // 1920), so the far windows are bisected for C = bp +- jump too rather
+    // than taken as a fixed W offset.
     const cAt = async (w) => {
       await p.setViewportSize({ width: w, height: 900 });
       return (await run({ driver: "settle" }, `window@${w}`)).C;
     };
-    const windowPlan = [];
-    for (const bp of bps) {
+    const firstW = async (target) => {
       let lo = viewportRange[0], hi = viewportRange[1];
-      if ((await cAt(hi)) < bp || (await cAt(lo)) >= bp) continue;
+      if ((await cAt(hi)) < target) return hi;
+      if ((await cAt(lo)) >= target) return lo;
       while (hi - lo > 1) {
         const mid = (lo + hi) >> 1;
-        if ((await cAt(mid)) >= bp) hi = mid; else lo = mid;
+        if ((await cAt(mid)) >= target) hi = mid; else lo = mid;
       }
+      return hi;
+    };
+    const windowPlan = [];
+    for (const bp of bps) {
+      if ((await cAt(viewportRange[1])) < bp || (await cAt(viewportRange[0])) >= bp) continue;
+      const hi = await firstW(bp);
       const ws = [];
       for (let w = hi - 8; w <= hi + 8; w++) {
         const c = await cAt(w);
         if (c >= bp - fine - 0.5 && c <= bp + fine + 0.5) ws.push({ w, c });
       }
-      // 200 in C is about 250 in W (L is 20vw).
-      windowPlan.push({ bp, ws, from: [Math.min(viewportRange[1], hi + 250), Math.max(viewportRange[0], hi - 250)] });
+      windowPlan.push({ bp, ws, from: [await firstW(bp + jump), await firstW(bp - jump)] });
     }
     if (windowPlan.length !== bps.length) {
       throw new Error(`SETUP: hangOrder ${view}: only ${windowPlan.map((x) => x.bp).join("/") || "none"} of the breakpoints ${bps.join("/")} lie between windows ${viewportRange.join(" and ")}`);
     }
 
     // Anti-vacuity (diag §6.4): both known-bad layouts must be named before
-    // any sweep is trusted. Default density, the primary scenario.
+    // any sweep is trusted -- the primary scenario, in the density the theme
+    // loaded with.
     {
       await p.setViewportSize({ width: indexWindows[0], height: 900 });
       await setIndex(400);
@@ -2523,6 +2564,30 @@ async function driveHangOrder(page, extBase, theme, check) {
       const res = await run({ driver: "counter", counter }, `counter ${counter}`);
       if (!res.bad.some((b) => b.rel === want)) {
         throw new Error(`SETUP: hangOrder's counter-example ${counter} at C=${res.C} (${res.target}) was not reported as ${want}: ${JSON.stringify(res.bad)}`);
+      }
+      // The same defect through the DRIVER (notes: the only view a JS
+      // measurement styles): the 10-05 rule put back at the top level, the
+      // labels stacked at C 1200, then C 999 entered with no frame between --
+      // the index driver's early read must see the overlap before the page
+      // re-measures. If it does not, "early" no longer precedes the page's
+      // own measurement and every early read below would be a settled one.
+      if (view === "notes") {
+        await p.evaluate(() => {
+          const style = document.createElement("style");
+          style.id = "hang-order-counter";
+          style.textContent = ".notes-excerpt-label.is-stacked { flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; align-items: flex-end; row-gap: 0; height: var(--lib-lh-meta); white-space: normal; }";
+          document.head.appendChild(style);
+        });
+        let caught;
+        try {
+          caught = await run({ driver: "index", base: { L0: 400, C0 }, points: [{ c: 999, from: 1200, earlyOnly: true }] }, "counter driver");
+        } finally {
+          await p.evaluate(() => document.getElementById("hang-order-counter")?.remove());
+        }
+        if (!caught.problems.some((pb) => pb.phase === "early" && pb.bad.some((b) => b.rel === "overlap"))) {
+          throw new Error(`SETUP: hangOrder's driver counter-example (the 10-05 rule at the top level, C 1200 -> 999 in one task) was not reported as overlap in the early read: ${JSON.stringify(caught.problems).slice(0, 400)}`);
+        }
+        await run({ driver: "settle" }, "counter driver");
       }
       await setIndex(null);
     }
@@ -2543,6 +2608,8 @@ async function driveHangOrder(page, extBase, theme, check) {
           const show = HANG_ORDER_SCENARIOS[view][name];
           const full = own && name === primary;
           const combo = `${themeTag} ${density} ${locale} ${name}`;
+          const minLabels = HANG_ORDER_MIN_LABELS[view][name] ?? 0;
+          const mono = [];
           // Index driver: one in-page batch per window. Each breakpoint's
           // 1px pass runs in the first window that reaches bp +- (fine +
           // jump); the coarse pass runs in the last (widest) window, which
@@ -2566,7 +2633,8 @@ async function driveHangOrder(page, extBase, theme, check) {
               for (let c = Math.floor(hi / coarseStep) * coarseStep; c >= lo; c -= coarseStep) points.push({ c, earlyOnly: !full });
             }
             const tag = `index@${W} ${combo}`;
-            const res = await run({ driver: "index", base: { L0: 400, C0 }, points }, tag);
+            const res = await run({ driver: "index", base: { L0: 400, C0 }, points, minLabels }, tag);
+            mono.push(...res.mono);
             stats.measured += res.measured;
             stats.labels = Math.max(stats.labels, res.labels);
             for (const pb of res.problems) {
@@ -2579,9 +2647,14 @@ async function driveHangOrder(page, extBase, theme, check) {
           }
           const missed = bps.filter((bp) => !fined.has(bp));
           if (missed.length) throw new Error(`SETUP: hangOrder ${combo}: no index window reaches breakpoint ${missed.join("/")} +- ${fine + jump}`);
-          if (!full) continue;
-          // Window driver: each W near each breakpoint, entered from a window
-          // about 200 C above and one about 200 C below once that one settled.
+          if (!full) { checkMonotonic(mono, combo); continue; }
+          // Window driver: each W near each breakpoint, entered from the
+          // window whose C is 200 above and the one 200 below, once that one
+          // settled. Its "early" read is the first evaluate after
+          // setViewportSize returns -- a later task than the resize, so it
+          // is not guaranteed to precede the page's re-measure (that
+          // guarantee is the index driver's, and the driver counter-example
+          // above holds it); this driver adds the resize-event path.
           for (const plan of windowPlan) {
             for (const fromW of plan.from) {
               for (const { w, c } of plan.ws) {
@@ -2589,13 +2662,14 @@ async function driveHangOrder(page, extBase, theme, check) {
                 await run({ driver: "settle" }, `window@${fromW}`);
                 await p.setViewportSize({ width: w, height: 900 });
                 const at = `window@${w} ${combo} C=${c} (from window ${fromW})`;
-                const early = await run({ driver: "probe" }, at);
+                const early = await run({ driver: "probe", minLabels }, at);
                 if (Math.abs(early.C - c) > 0.5) note("drift|window", `${at}: measured C=${early.C}`);
-                one(early, at, "early");
-                one(await run({ driver: "settle" }, at), at, "settled");
+                one(early, at, "early", mono);
+                one(await run({ driver: "settle", minLabels }, at), at, "settled", mono);
               }
             }
           }
+          checkMonotonic(mono, combo);
         }
       }
     }

@@ -932,11 +932,14 @@ async function libraryPageLongContentCases() {
 }
 
 // ---- Library redesign T8f (spec appendix 10-05, "main column first"): the
-// dictionary column joins the sheet only from C = 1376 (= 112 + 840 + 64 +
-// 360), and then takes only what the 840 main column leaves. Before, it
-// joined at 1280 and grew first, so crossing 1280 dropped the main column
-// from 840 to 384 and rewrapped every line of the word. C is driven by the
-// index column at a fixed window (no resize), measured on the real page.
+// dictionary column joins the sheet only from C = 1440 (= 112 + 840 + 64 +
+// 424, the column's minimum being the lookup row's widest one-line need
+// across the nine locales, T8f fix round 1), and then takes only what the
+// 840 main column leaves. Before, it joined at 1280 and grew first, so
+// crossing 1280 dropped the main column from 840 to 384 and rewrapped every
+// line of the word. C is driven by the index column at a fixed window (no
+// resize), measured on the real page.
+const LIB_REF_TIER = 1440;
 async function libraryPageRefTierCases() {
   const { frame, win, doc } = await loadLibraryFrame({ width: 2200, height: 1000 });
   try {
@@ -965,22 +968,42 @@ async function libraryPageRefTierCases() {
       return { c: Math.round(paneC() * 100) / 100, main: Math.round(head.width * 100) / 100, refW: Math.round(ref.width * 100) / 100,
         beside: ref.left >= head.right - 0.5 && Math.abs(ref.top - head.top) <= 1, below: ref.top >= head.bottom - 0.5 };
     };
-    const edge = [1279, 1280, 1281, 1375, 1376, 1377].map(at);
-    check("T8f the dictionary column joins the sheet only from C 1376, and the main column stays 840 across the switch",
-      edge.every((r, i) => Math.abs(r.c - [1279, 1280, 1281, 1375, 1376, 1377][i]) <= 0.5 && Math.abs(r.main - 840) <= 0.5 &&
-        (r.c >= 1376 ? r.beside : r.below && !r.beside)),
+    const edgeCs = [1279, 1280, 1281, LIB_REF_TIER - 1, LIB_REF_TIER, LIB_REF_TIER + 1];
+    const edge = edgeCs.map(at);
+    check(`T8f the dictionary column joins the sheet only from C ${LIB_REF_TIER}, and the main column stays 840 across the switch`,
+      edge.every((r, i) => Math.abs(r.c - edgeCs[i]) <= 0.5 && Math.abs(r.main - 840) <= 0.5 &&
+        (r.c >= LIB_REF_TIER ? r.beside : r.below && !r.beside)),
       JSON.stringify(edge));
-    const grow = [1376, 1600, 1736, 1900].map(at);
-    check("T8f from C 1376 the dictionary column grows from 360 to its 720 cap while the main column keeps 840",
+    const grow = [LIB_REF_TIER, 1600, 1736, 1900].map(at);
+    check(`T8f from C ${LIB_REF_TIER} the dictionary column grows from ${LIB_REF_TIER - 1016} to its 720 cap while the main column keeps 840`,
       grow.every((r) => r.beside && Math.abs(r.main - 840) <= 0.5 && Math.abs(r.refW - Math.min(720, r.c - 1016)) <= 0.5),
       JSON.stringify(grow));
+    // At the tier's first width the column is at its minimum: the lookup row
+    // (field at its 160 basis, language listbox, Look up) must still be one
+    // line in every locale and both densities -- that is what the minimum is.
+    const wrapped = [];
+    at(LIB_REF_TIER);
+    for (const locale of ["en", "de", "fr", "pl", "ru", "zh_HK", "zh_CN", "zh_TW", "ja"]) {
+      win.__pbpEn = await (await fetch(`../_locales/${locale}/messages.json`)).json();
+      win.applyI18n();
+      for (const density of ["comfortable", "compact"]) {
+        if (density === "compact") html.setAttribute("data-density", "compact"); else html.removeAttribute("data-density");
+        const kids = [...doc.getElementById("vocab-lookup-bar").children].filter((el) => el.getClientRects().length && win.getComputedStyle(el).position !== "absolute");
+        const tops = kids.map((el) => Math.round(el.getBoundingClientRect().top));
+        if (kids.length !== 3 || Math.max(...tops) - Math.min(...tops) > 1) {
+          wrapped.push(`${locale}/${density}: ${kids.length} controls, tops ${tops.join(",")} (go "${doc.getElementById("vocab-lookup-go").textContent}")`);
+        }
+      }
+    }
+    html.removeAttribute("data-density");
+    check(`T8f at C ${LIB_REF_TIER} the lookup row is one line in every locale and both densities`, wrapped.length === 0, wrapped.join("; "));
   } finally {
     frame.remove();
   }
 }
 
 // ---- Library redesign T7b (spec §7.7, §9.4): every locale at a 2200px window
-// (C >= 1376: the hang column and the dictionary column are both live), on
+// (C >= 1440: the hang column and the dictionary column are both live), on
 // the real page -- the detail is built by library-vocab.js, so a hand-copied
 // srcdoc would only test what its author remembered.
 async function libraryPageDetailLocaleCases() {
