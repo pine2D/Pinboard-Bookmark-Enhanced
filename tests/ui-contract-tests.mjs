@@ -9277,17 +9277,26 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // one at-rule context: the tier rules live inside @container blocks.
   const tier = (w, sel) => declarationValueMap(hand, sel, { context: [`@container lib-detail (min-width: ${w}px)`] });
   check(tier(1000, ".vocab-sheet").get("grid-template-columns") === "var(--lib-hang-w) minmax(0, var(--lib-main-max))" &&
-    tier(1280, ".vocab-sheet").get("grid-template-columns") === "var(--lib-hang-w) minmax(0, var(--lib-main-max)) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max))" &&
-    tier(1280, ".vocab-sheet").get("grid-template-rows") === "auto 1fr" &&
+    tier(1376, ".vocab-sheet").get("grid-template-columns") === "var(--lib-hang-w) var(--lib-main-max) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max))" &&
+    tier(1376, ".vocab-sheet").get("grid-template-rows") === "auto 1fr" &&
+    !/@container lib-detail \(min-width: 1280px\)/.test(hand) &&
     declarationValueMap(hand, ".vocab-sheet > [hidden]").get("display") === "none",
-    "library.css: the vocabulary sheet lost its spec §4.2 tiers (1000: 112 | 840; 1280: 112 | 840 | 64 | 360-720 with rows auto 1fr) or its [hidden] guard");
-  for (const [w, px] of [[640, 44], [1000, 56], [1280, 72]]) {
+    "library.css: the vocabulary sheet lost its spec §4.2 tiers (1000: 112 | 840; 1376: 112 | 840 fixed | 64 | 360-720 with rows auto 1fr -- spec appendix 10-05, main column first) or its [hidden] guard");
+  // 1376 = hang + main + gap + the dictionary column's minimum: the tier
+  // starts exactly where the fixed main column and the column's minimum fit.
+  check(1376 === [hand.match(/--lib-hang-w: (\d+)px/), hand.match(/--lib-main-max: (\d+)px/), hand.match(/--lib-sp-8: (\d+)px/), hand.match(/--lib-ref-min: (\d+)px/)]
+    .reduce((sum, m) => sum + (m ? Number(m[1]) : NaN), 0),
+    "library.css: the dictionary column's 1376 tier no longer equals --lib-hang-w + --lib-main-max + --lib-sp-8 + --lib-ref-min -- move the @container threshold with the tokens (spec appendix 10-05)");
+  check(tier(1000, ".vocab-ref > #vocab-lookup-bar").get("grid-row") === "1" && tier(1000, ".vocab-ref > #vocab-ref-result").get("grid-row") === "2" &&
+    tier(1376, ".vocab-ref > .lib-hang-label").get("grid-row") === "auto" && tier(1376, ".vocab-ref > .lib-hang-label").get("grid-column") === "auto",
+    "library.css: the dictionary label's rows are left to auto-placement again (1000 tier: lookup row 1, result row 2; 1376 tier: the label's 1000-tier placement reset to auto) -- diag-hang-order §5 B");
+  for (const [w, px] of [[640, 44], [1000, 56], [1376, 72]]) {
     check(tier(w, ".vocab-detail-term").get("font-size") === `${px}px` && tier(w, ".lib-cover-title").get("font-size") === `${px}px`,
       `library.css: the headword / cover title is not ${px}px from a ${w}px detail (spec §4.2 display tiers)`);
   }
   check(declarationValueMap(hand, ".vocab-detail-term.lib-first-line").get("margin-top") === "calc(-0.5 * (1.15 - 1) * 1em)" &&
     declarationValueMap(hand, ".lib-cover-title.lib-first-line").get("margin-top") === "calc(-0.5 * (1.15 - 1) * 1em)" &&
-    tier(1280, ".vocab-ref > .lib-hang-label.lib-first-line").get("margin-top") === "calc((16px - 24px) / 2)",
+    tier(1376, ".vocab-ref > .lib-hang-label.lib-first-line").get("margin-top") === "calc((16px - 24px) / 2)",
     "library.css: a display first line pulls up by something other than its half-leading (spec §6.5: 0.075em at line-height 1.15, 4px for 16/24) -- more clips CJK ink in the scroll box");
   check(["zh", "ja", "ko"].every((lang) => [".vocab-detail-term", ".lib-cover-title"].every((el) =>
     declarationValueMap(hand, `${el}.lib-first-line:lang(${lang})`).get("margin-top") === "0")),

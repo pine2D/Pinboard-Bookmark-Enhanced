@@ -931,8 +931,56 @@ async function libraryPageLongContentCases() {
   }
 }
 
+// ---- Library redesign T8f (spec appendix 10-05, "main column first"): the
+// dictionary column joins the sheet only from C = 1376 (= 112 + 840 + 64 +
+// 360), and then takes only what the 840 main column leaves. Before, it
+// joined at 1280 and grew first, so crossing 1280 dropped the main column
+// from 840 to 384 and rewrapped every line of the word. C is driven by the
+// index column at a fixed window (no resize), measured on the real page.
+async function libraryPageRefTierCases() {
+  const { frame, win, doc } = await loadLibraryFrame({ width: 2200, height: 1000 });
+  try {
+    const booted = await libWaitFor(win, () => win.eval("_vocabCurrentOwner") === "acct_listboxtest");
+    check("T8f library.html boots at 2200px for the dictionary column tier scan", booted && win.__bootErrors.length === 0,
+      win.__bootErrors.slice(0, 3).join(" | "));
+    if (!booted) return;
+    win.eval(`_vocabRows = [{ id: "tier1", term: "constraint", language: "en", ipa: "/kənˈstreɪnt/",
+      gloss: "a limitation or restriction", note: "", status: "new", groups: [],
+      contexts: [{ quote: "The constraint shaped the design.", articleTitle: "On constraints",
+        articleUrl: "https://example.com/reading/attention", createdAt: Date.now() - 86400000 }],
+      createdAt: 1, updatedAt: 1 }]; _pbpVocabApplyView(true); _pbpVocabRenderDetail(_vocabRows[0], false);`);
+    await libFrames(win);
+    const html = doc.documentElement;
+    const pane = doc.getElementById("vocab-detail-pane");
+    const paneC = () => {
+      const cs = win.getComputedStyle(pane);
+      return pane.getBoundingClientRect().width - (pane.offsetWidth - pane.clientWidth) - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    };
+    html.style.setProperty("--lib-index-w", "400px");
+    const c0 = paneC();
+    const at = (c) => {
+      html.style.setProperty("--lib-index-w", `${400 + c0 - c}px`);
+      const head = doc.querySelector("#vocab-detail .vocab-detail-head").getBoundingClientRect();
+      const ref = doc.getElementById("vocab-ref").getBoundingClientRect();
+      return { c: Math.round(paneC() * 100) / 100, main: Math.round(head.width * 100) / 100, refW: Math.round(ref.width * 100) / 100,
+        beside: ref.left >= head.right - 0.5 && Math.abs(ref.top - head.top) <= 1, below: ref.top >= head.bottom - 0.5 };
+    };
+    const edge = [1279, 1280, 1281, 1375, 1376, 1377].map(at);
+    check("T8f the dictionary column joins the sheet only from C 1376, and the main column stays 840 across the switch",
+      edge.every((r, i) => Math.abs(r.c - [1279, 1280, 1281, 1375, 1376, 1377][i]) <= 0.5 && Math.abs(r.main - 840) <= 0.5 &&
+        (r.c >= 1376 ? r.beside : r.below && !r.beside)),
+      JSON.stringify(edge));
+    const grow = [1376, 1600, 1736, 1900].map(at);
+    check("T8f from C 1376 the dictionary column grows from 360 to its 720 cap while the main column keeps 840",
+      grow.every((r) => r.beside && Math.abs(r.main - 840) <= 0.5 && Math.abs(r.refW - Math.min(720, r.c - 1016)) <= 0.5),
+      JSON.stringify(grow));
+  } finally {
+    frame.remove();
+  }
+}
+
 // ---- Library redesign T7b (spec §7.7, §9.4): every locale at a 2200px window
-// (C >= 1280: the hang column and the dictionary column are both live), on
+// (C >= 1376: the hang column and the dictionary column are both live), on
 // the real page -- the detail is built by library-vocab.js, so a hand-copied
 // srcdoc would only test what its author remembered.
 async function libraryPageDetailLocaleCases() {
@@ -1059,6 +1107,7 @@ async function libraryPageAutoLookupLangCases() {
     await libraryPageLookupLangCases();
     await libraryPageLongContentCases();
     await libraryPageDetailLocaleCases();
+    await libraryPageRefTierCases();
     await libraryPageAutoLookupLangCases();
   } catch (error) {
     report("suite setup", error);

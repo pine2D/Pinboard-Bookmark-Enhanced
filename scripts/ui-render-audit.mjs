@@ -2144,6 +2144,9 @@ const LIB_GEOMETRY_VOCAB_SCAN = () => {
   const m = main.getBoundingClientRect(), rf = ref.getBoundingClientRect();
   const out = {
     headPx: parseFloat(getComputedStyle(term).fontSize),
+    // The main column's width, read off the head (it fills column 2).
+    mainPx: Math.round(main.querySelector(".vocab-detail-head").getBoundingClientRect().width * 100) / 100,
+    containerPx: Math.round((pane.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) * 100) / 100,
     refBeside: rf.left >= m.right - 0.5 && Math.abs(rf.top - m.top) <= 1,
     refBelow: rf.top >= m.bottom - 0.5,
     tailGap: Math.round((tail.getBoundingClientRect().top - note.getBoundingClientRect().bottom) * 100) / 100,
@@ -2171,6 +2174,13 @@ async function driveLibGeometry(page, check) {
       const g = await page.evaluate(LIB_GEOMETRY_VOCAB_SCAN);
       if (g.error) throw new Error(`SETUP: libGeometry ${at}: ${g.error}`);
       if (Math.abs(g.headPx - c.headPx) > 0.5) bad.push(`${at}: headword ${g.headPx}px, want ${c.headPx}`);
+      // A case names the tier it means by its container width, not only its
+      // window (diag-hang-order §4: G5's "1280" case had silently been in
+      // the narrow tier): the measured C must fall inside the stated range.
+      if (c.containerPx && !(g.containerPx >= c.containerPx[0] && g.containerPx < c.containerPx[1])) {
+        throw new Error(`SETUP: libGeometry ${at}: the detail's container width is ${g.containerPx}, outside the case's tier [${c.containerPx.join(", ")})`);
+      }
+      if (c.mainPx != null && Math.abs(g.mainPx - c.mainPx) > 0.5) bad.push(`${at}: main column ${g.mainPx}px wide, want ${c.mainPx}`);
       if (c.ref === "beside" && !g.refBeside) bad.push(`${at}: #vocab-ref is not beside the main column on its first row`);
       if (c.ref === "below" && !g.refBelow) bad.push(`${at}: #vocab-ref is not below the main column`);
       if (c.labelRightFromAxis != null && (g.labelRight == null || Math.abs(g.labelRight - c.labelRightFromAxis) > 1)) {

@@ -1971,8 +1971,11 @@ export const CHECKS = [
       cases: ["cover", "constraint"], openEditor: true } } },
   { surface: "library", page: "library.html", selector: "#vocab-detail-pane", state: "libGeometry", themes: ["", "terminal"],
     expect: { libGeometry: { cases: [
-      { width: 2560, height: 1300, term: "constraint", headPx: 72, ref: "beside", labelRightFromAxis: 96, tailGap: 32 },
-      { width: 1280, height: 800, term: "constraint", headPx: 44, ref: "below", ringInside: [".vocab-detail-delete", ".vocab-note-input"] },
+      { width: 2560, height: 1300, term: "constraint", headPx: 72, ref: "beside", labelRightFromAxis: 96, tailGap: 32, mainPx: 840, containerPx: [1376, 4000] },
+      // T8f (spec appendix 10-05, main column first): C 1366 sat in the old
+      // 1280 dictionary tier with a 470px main column; it is the 1000 tier now.
+      { width: 1920, height: 1080, term: "constraint", headPx: 56, ref: "below", mainPx: 840, containerPx: [1000, 1376] },
+      { width: 1280, height: 800, term: "constraint", headPx: 44, ref: "below", ringInside: [".vocab-detail-delete", ".vocab-note-input"], containerPx: [640, 1000] },
     ] } } },
   // The sort menu button's popover (T6b): the same panel family. Its trigger
   // is always on the filter row, never inside the Filter popover.

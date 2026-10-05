@@ -1563,7 +1563,7 @@ html.motion-ready .vocab-note-save {
    radius on any structure (flat canvas). Tiers come from the pane's content
    width (container lib-detail): one column below 1000, a 112px hang column +
    the 840 main column from 1000, and the dictionary column on the right from
-   1280 (the @container blocks after the reference column block). ---- */
+   1376 (the @container blocks after the reference column block). ---- */
 .vocab-detail-head { min-width: 0; }
 .vocab-detail-term,
 .lib-cover-title {
@@ -1946,20 +1946,29 @@ html.motion-ready .vocab-note-save {
   .vocab-ref > .lib-hang-label { grid-column: 1; grid-row: 1 / span 2; margin: 0; padding-inline-end: var(--lib-sp-4); text-align: end; line-height: var(--lib-control-h); }
   .vocab-ref > #vocab-lookup-bar,
   .vocab-ref > #vocab-ref-result { grid-column: 2; }
+  /* Rows stated, not left to auto-placement: the label holds rows 1-2 of
+     column 1, the lookup row is row 1 and the result row 2 beside it. */
+  .vocab-ref > #vocab-lookup-bar { grid-row: 1; }
+  .vocab-ref > #vocab-ref-result { grid-row: 2; }
   .vocab-sheet > #vocab-detail-tail { grid-column: 2; }
   .vocab-detail-term,
   .lib-cover-title { font-size: 56px; }
 }
-@container lib-detail (min-width: 1280px) {
+/* The dictionary column (spec appendix 10-05, "main column first"): only
+   from C = 1376 = 112 + 840 + 64 + 360, where the main column can keep its
+   full 840 beside the column's 360 minimum; the column then takes what is
+   left, up to 720. Below that it stays under the main column (the 1000
+   tier), so crossing the threshold never narrows the word. */
+@container lib-detail (min-width: 1376px) {
   .vocab-sheet {
-    grid-template-columns: var(--lib-hang-w) minmax(0, var(--lib-main-max)) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max));
+    grid-template-columns: var(--lib-hang-w) var(--lib-main-max) var(--lib-sp-8) minmax(var(--lib-ref-min), var(--lib-ref-max));
     grid-template-rows: auto 1fr;
   }
   .vocab-sheet > #vocab-detail,
   .vocab-sheet > #vocab-detail-empty { grid-row: 1; }
   .vocab-sheet > #vocab-detail-tail { grid-row: 2; align-self: start; }
   .vocab-sheet > .vocab-ref { grid-column: 4; grid-row: 1 / 3; display: block; margin-top: 0; align-self: start; }
-  .vocab-ref > .lib-hang-label { margin: 0 0 var(--lib-sp-3); padding: 0; text-align: start; font-size: 16px; line-height: 24px; color: var(--lib-fg); }
+  .vocab-ref > .lib-hang-label { grid-row: auto; grid-column: auto; margin: 0 0 var(--lib-sp-3); padding: 0; text-align: start; font-size: 16px; line-height: 24px; color: var(--lib-fg); }
   /* §6.5: the column title is the column's first line -- 4px is half of 24 - 16. */
   .vocab-ref > .lib-hang-label.lib-first-line { margin-top: calc((16px - 24px) / 2); }
   .vocab-detail-term,
