@@ -7184,6 +7184,13 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
         if (!(await delWrap.count())) {
           throw new Error(`SETUP: no ".saved-theme-wrap" on ${tabId} (theme=${theme}) -- weakTextOnFill cannot reach the options confirm popover`);
         }
+        // Centre the row first and let that scroll land: hover() / click()
+        // otherwise scroll it to the viewport edge, the popover then opens
+        // partly outside the viewport, its own focus() scrolls the document
+        // by those few px, and shared.js closes an open confirm on scroll
+        // (final review #17; measured: 565 -> 559 the moment it opened).
+        await delWrap.evaluate((el) => el.scrollIntoView({ block: "center" }));
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await delWrap.hover();
         const delBtn = page.locator(".saved-theme-del").first();
         if (!(await delBtn.count())) {
@@ -7281,11 +7288,12 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   // this state on popup at all (only options' "rest" existed as a scan
   // point, and even that ran before its own confirm popover ever opened).
   await page.evaluate(() => { document.getElementById("main-section")?.classList.remove("hidden"); });
-  // Scroll it into view BEFORE the click and let the scroll land: a click
-  // that has to scroll fires the scroll event after the confirm popover
-  // opens, and shared.js closes an open confirm on scroll (final review #17,
-  // same race as the options appearance leg).
-  await page.locator("#logout-link").scrollIntoViewIfNeeded();
+  // Centre it BEFORE the click and let the scroll land: a click that has to
+  // scroll, or a popover opened against the viewport edge whose focus()
+  // scrolls the document, fires a scroll after the confirm popover opens, and
+  // shared.js closes an open confirm on scroll (final review #17, same race
+  // as the options appearance leg).
+  await page.locator("#logout-link").evaluate((el) => el.scrollIntoView({ block: "center" }));
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.click("#logout-link");
   await page.waitForSelector(".confirm-popover .confirm-yes", { timeout: TIMEOUT_MS });
