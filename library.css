@@ -1035,7 +1035,16 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
    otherwise clip (§11 I11); P at the end, 96 at the bottom. One full-width
    track: .notes-sheet lays out its own columns by the pane's width (spec
    §5.2), starting on that axis -- never centred (§0.2); so does the cover
-   (#notes-detail-empty, its own block after the notes detail). */
+   (#notes-detail-empty, its own block after the notes detail).
+   The top edge gets the same treatment, by sp-2 (final review #10): the
+   first line's half-leading pull-up (.lib-first-line) puts the em box on the
+   search box's top line, and a glyph that rises above its em box -- the
+   accent of a capital (Übung, Élan), or CJK ink in some fonts -- crossed the
+   scroll box's top edge and was clipped. 8px of outset with 8px of padding
+   leaves every line exactly where it was at rest and gives that ink room
+   (measured worst case 4.4px: Verdana Bold "Ü" at 72px; 2.3px under the CI
+   fonts). What sits above is .lib-header's bottom padding (sp-5), so the
+   outset covers no control. Scrolled, content now clips 8px higher. */
 .notes-detail-pane {
   min-width: 0;
   min-height: 0;
@@ -1046,7 +1055,8 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   scrollbar-gutter: stable;
   container-type: inline-size;
   container-name: lib-detail;
-  padding: 0 var(--lib-page-pad) var(--lib-sp-9) var(--lib-sp-4);
+  padding: var(--lib-sp-2) var(--lib-page-pad) var(--lib-sp-9) var(--lib-sp-4);
+  margin-block-start: calc(-1 * var(--lib-sp-2));
   margin-inline-start: calc(-1 * var(--lib-sp-4));
   font-size: 15px;
   line-height: 1.65;
@@ -1372,7 +1382,8 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
   scrollbar-gutter: stable;
   container-type: inline-size;
   container-name: lib-detail;
-  padding: 0 var(--lib-page-pad) var(--lib-sp-9) var(--lib-sp-4);
+  padding: var(--lib-sp-2) var(--lib-page-pad) var(--lib-sp-9) var(--lib-sp-4);
+  margin-block-start: calc(-1 * var(--lib-sp-2));
   margin-inline-start: calc(-1 * var(--lib-sp-4));
   /* UI scale by default; every reading element in the sheet states its own size (spec §6.1). */
   font-size: var(--lib-text-body);
@@ -2291,6 +2302,14 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
   gap: var(--lib-sp-2);
 }
 #vocab-selected-count { grid-area: 1 / 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A text button in the list header never wraps (final review #11). The
+   buttons here are fixed-height sm cells: squeezed to their min-content width
+   (the batch row's auto track at a 360px index), "Zaznacz wszystko" broke
+   onto two lines that spilled 7px out of its 28px box, up into the filter row
+   and down over the list. Nowrap makes the button's min-content its whole
+   label; the count before it (track 1, minmax(0, auto)) is what gives way,
+   by ellipsis. Same root cause as T8e's count row, there fixed for the row. */
+:is(.notes-toolbar, .vocab-filter-row, .lib-count-row, .vocab-batch-bar, .notes-batch-bar) .btn { white-space: nowrap; }
 #vocab-batch-select-all { grid-area: 1 / 2; }
 .vocab-batch-bar > .lib-cluster { grid-area: 1 / 4 / 2 / 6; justify-self: end; }
 .vocab-batch-bar > .vocab-group-unit { grid-area: 2 / 1 / 3 / 4; max-width: none; }

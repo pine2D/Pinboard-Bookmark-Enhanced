@@ -410,6 +410,14 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 /* Focus ring: shared soft-focus recipe below the .fg focus rules. */
 .tab-btn:hover:not(.active) { color: var(--opt-fg); border-left-color: var(--opt-tab-hover-border); background: var(--opt-tab-hover-bg); }
 .tab-btn.active { color: var(--opt-fg); font-weight: 600; border-left-color: var(--opt-fg); background: var(--opt-tab-active); }
+/* Forced colours paint the resting tab's transparent edge in CanvasText (and
+   the active fill in Canvas), so every tab would wear the selection edge and
+   only the weight would be left. The resting edge takes Canvas: the edge
+   stays the current tab's alone (render-audit media selectedCue compares
+   against an unselected tab since the library final review, #6). */
+@media (forced-colors: active) {
+  .tab-btn:not(.active):not(:hover) { border-left-color: Canvas; }
+}
 .reset-tab-btn {
   margin: var(--opt-sp-6) 0 0 0; padding: var(--opt-sp-5) var(--opt-sp-5) 0;
   border: none; border-top: 1px solid var(--opt-border-section);
