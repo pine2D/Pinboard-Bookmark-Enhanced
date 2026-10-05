@@ -2310,6 +2310,16 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
    label; the count before it (track 1, minmax(0, auto)) is what gives way,
    by ellipsis. Same root cause as T8e's count row, there fixed for the row. */
 :is(.notes-toolbar, .vocab-filter-row, .lib-count-row, .vocab-batch-bar, .notes-batch-bar) .btn { white-space: nowrap; }
+/* The one exception, single-pane only (<= 860px, where the index is the
+   window minus its gutters and can drop below the 360 it never goes under
+   in two-pane mode): there Select all may shrink and clip its label as a
+   last resort. Its whole label would otherwise set the width of columns 1-3,
+   which the group unit on row 2 spans, and push Known / Learning past the
+   pane (Polish at a 360px window: 11px; 320px: every long locale). It only
+   gives anything up once the row is genuinely short of room. */
+@media (max-width: 860px) {
+  #vocab-batch-select-all { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
 #vocab-batch-select-all { grid-area: 1 / 2; }
 .vocab-batch-bar > .lib-cluster { grid-area: 1 / 4 / 2 / 6; justify-self: end; }
 .vocab-batch-bar > .vocab-group-unit { grid-area: 2 / 1 / 3 / 4; max-width: none; }
