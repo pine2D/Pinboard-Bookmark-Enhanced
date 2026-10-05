@@ -2218,6 +2218,394 @@ async function driveLibGeometry(page, check) {
 }
 
 
+// ---- state: "hangOrder" (library redesign T8f; diag-hang-order.md §6) -----
+// Every hang label in a detail pane sits ABOVE its content, or LEFT of it with
+// its first line on the content's first line -- never below, right of or over
+// it, and never out of the pane. The 10-05 bug (an excerpt label stacked by a
+// measurement that no longer held) lived one frame after a width change, or
+// for good when only the index column moved; G4 / G5 / paneFit sampled fixed
+// windows at rest and could not see it. So this samples by the CONTAINER
+// width C: around every tier breakpoint at 1px steps (bp - 3 .. bp + 3), each
+// point entered from 200px above and from 200px below, measured in the same
+// task as the width change ("early") and again after the page's observers have
+// run ("settled"), plus a coarse 8px pass. Two drivers move C: the index column
+// (--lib-index-w at a fixed window: no resize event, the path the 10-05 report
+// took) and the window itself. Pairs are read from the DOM (a label and the
+// visible siblings after it), positions from text ink (Range rects), so a
+// label's own padding never counts and a stacked label's later lines may hang.
+//
+// The in-page half: one batch of points per call, no round trip per point.
+const HANG_ORDER_PAGE = async ({ paneSel, exempt, points, base, driver, counter }) => {
+  const pane = document.querySelector(paneSel);
+  if (!pane) return { error: `no ${paneSel}` };
+  const html = document.documentElement;
+  const round = (n) => Math.round(n * 100) / 100;
+  const visible = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+  const describe = (el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${[...el.classList].map((c) => `.${c}`).join("")} "${(el.textContent || "").trim().slice(0, 24)}"`;
+  const textRects = (els) => {
+    const out = [];
+    for (const el of els) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) out.push(r);
+    }
+    return out;
+  };
+  const union = (rects) => rects.length ? {
+    l: Math.min(...rects.map((r) => r.left)), t: Math.min(...rects.map((r) => r.top)),
+    r: Math.max(...rects.map((r) => r.right)), b: Math.max(...rects.map((r) => r.bottom)),
+  } : null;
+  const contentWidth = () => {
+    const cs = getComputedStyle(pane);
+    // Border box minus borders + scrollbar gutter (offsetWidth - clientWidth)
+    // minus padding: the inline size @container lib-detail resolves against.
+    return pane.getBoundingClientRect().width - (pane.offsetWidth - pane.clientWidth) -
+      parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  };
+  // One scan: every visible label against the union of the visible siblings
+  // after it. Returns the failures and the SETUP problems only.
+  const scan = () => {
+    const bad = [];
+    const setup = [];
+    const pr = pane.getBoundingClientRect();
+    const paneLeft = pr.left + pane.clientLeft, paneRight = paneLeft + pane.clientWidth;
+    const labels = [...pane.querySelectorAll(".lib-hang-label, .notes-excerpt-label")].filter(visible);
+    const labelSet = new Set(labels);
+    for (const label of labels) {
+      const after = [];
+      for (let s = label.nextElementSibling; s; s = s.nextElementSibling) if (visible(s)) after.push(s);
+      if (!after.length) { setup.push(`${describe(label)} has no visible content after it`); continue; }
+      const L = union(textRects([label]));
+      if (!L) { setup.push(`${describe(label)} has no text ink`); continue; }
+      const B = union(after.map((el) => el.getBoundingClientRect()));
+      // b1: the content's first line -- the tallest text rect on its top row,
+      // or its line-height when the content has no text of its own.
+      const ink = textRects(after);
+      const top = ink.length ? Math.min(...ink.map((r) => r.top)) : null;
+      const b1 = ink.length ? Math.max(...ink.filter((r) => r.top < top + 1).map((r) => r.height))
+        : (parseFloat(getComputedStyle(after[0]).lineHeight) || after[0].getBoundingClientRect().height);
+      let rel;
+      if (L.b <= B.t + 0.5) rel = "above";
+      else if (L.r <= B.l + 0.5) rel = L.t >= B.t - b1 && L.t < B.t + b1 ? "left" : L.t >= B.t + b1 ? "below" : "misaligned";
+      else {
+        const ix = Math.max(0, Math.min(L.r, B.r) - Math.max(L.l, B.l));
+        const iy = Math.max(0, Math.min(L.b, B.b) - Math.max(L.t, B.t));
+        rel = ix * iy > 0.25 ? "overlap" : L.t >= B.b - 0.5 ? "below" : L.l >= B.r - 0.5 ? "right" : "overlap";
+      }
+      const name = `${describe(label)}${label.classList.contains("is-stacked") ? " [stacked]" : ""}`;
+      if (rel !== "above" && rel !== "left") {
+        bad.push({ rel, name, label: [round(L.l), round(L.t), round(L.r), round(L.b)], content: [round(B.l), round(B.t), round(B.r), round(B.b)] });
+      }
+      if (L.l < paneLeft - 0.5 || L.r > paneRight + 0.5) {
+        bad.push({ rel: "outside", name, label: [round(L.l), round(L.t), round(L.r), round(L.b)], content: [round(paneLeft), 0, round(paneRight), 0] });
+      }
+    }
+    // Completeness: every visible heading or *-label in the pane is either a
+    // hang label measured above or a named exemption -- a new label class
+    // must join one of the two, never slip past both.
+    for (const el of pane.querySelectorAll('h2, h3, [class*="-label"]')) {
+      if (labelSet.has(el) || !visible(el) || exempt.some((sel) => el.matches(sel))) continue;
+      setup.push(`unpaired heading / label ${describe(el)} (pair it as a hang label or exempt it in HANG_ORDER_EXEMPT)`);
+    }
+    return { bad, setup, labels: labels.length };
+  };
+  const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 0))));
+  if (driver === "probe") return { C: round(contentWidth()), ...scan() };
+  if (driver === "settle") { await settle(); return { C: round(contentWidth()), ...scan() }; }
+  if (driver === "counter") {
+    // Anti-vacuity (diag §6.4): put a known-bad layout on screen and require
+    // the scan to name it. "stacked-narrow" is the 10-05 defect itself -- the
+    // stacked declarations on a label above its quote; "label-after" moves
+    // the dictionary label into a grid row after its lookup row and result.
+    const target = counter === "stacked-narrow"
+      ? pane.querySelector(".notes-excerpt > .notes-excerpt-label")
+      : pane.querySelector(".vocab-ref > .lib-hang-label");
+    if (!target) return { error: `counter-example ${counter}: no target label` };
+    const saved = target.getAttribute("style");
+    target.style.cssText = counter === "stacked-narrow"
+      ? "flex-direction: column; flex-wrap: nowrap; align-items: flex-end; height: var(--lib-lh-meta); white-space: normal"
+      : "grid-row: 3; grid-column: 2";
+    const r = scan();
+    if (saved === null) target.removeAttribute("style"); else target.setAttribute("style", saved);
+    return { C: round(contentWidth()), ...r, target: describe(target) };
+  }
+  const setC = (c) => html.style.setProperty("--lib-index-w", `${base.L0 + base.C0 - c}px`);
+  const out = { measured: 0, problems: [], labels: 0 };
+  const record = (pt, phase) => {
+    const C = contentWidth();
+    const r = scan();
+    out.measured++;
+    out.labels = Math.max(out.labels, r.labels);
+    const drift = Math.abs(C - pt.c) > 0.5;
+    if (r.bad.length || r.setup.length || drift) {
+      out.problems.push({ c: pt.c, from: pt.from ?? null, phase, C: round(C), bad: r.bad, setup: r.setup, drift });
+    }
+  };
+  for (const pt of points) {
+    if (pt.from != null) { setC(pt.from); await settle(); }
+    setC(pt.c);
+    record(pt, "early");
+    if (pt.earlyOnly) continue;
+    await settle();
+    record(pt, "settled");
+  }
+  return out;
+};
+
+// Headings that are not hang labels, with why. Matched in the page.
+const HANG_ORDER_EXEMPT = Object.freeze([
+  { selector: ".vocab-detail-term", why: "the word sheet's own title (h2): the head of the column, nothing hangs from it" },
+  { selector: ".notes-detail-source", why: "the notes sheet's own title (h2): the head of the column" },
+  { selector: ".lib-cover-title", why: "either cover's display title: the cover has no hang column" },
+  { selector: ".xp-dict-rel-label", why: "md-dict's run-in label (\"Synonyms:\") inside the very line it names" },
+]);
+
+// Breakpoints per view: the @container lib-detail tiers that move a label.
+const HANG_ORDER_BREAKPOINTS = Object.freeze({ vocab: [640, 1000, 1376], notes: [1000, 1200] });
+const HANG_ORDER_LOCALES = Object.freeze(["en", "zh_CN", "de"]);
+
+// Scenarios: each puts one state of the view's detail on screen (Node side).
+const HANG_ORDER_DAYS_KEY = "pbp_hl_render-audit-hang-days";
+const HANG_ORDER_SCENARIOS = {
+  vocab: {
+    constraint: (p) => libShowVocab(p, "constraint"),
+    "曖昧": (p) => libShowVocab(p, "曖昧"),
+    cover: (p) => libShowVocab(p, "cover"),
+    lookup: async (p) => {
+      await libShowVocab(p, "constraint");
+      await p.evaluate(() => _pbpVocabLookupOther("serendipity", "en"));
+      await p.waitForSelector("#vocab-ref-result .vocab-ref-head", { timeout: TIMEOUT_MS });
+      await settleAnimations(p);
+    },
+    editor: async (p) => {
+      await libShowVocab(p, "constraint");
+      await p.evaluate(() => _pbpVocabToggleGroupEditor(true, false));
+      await settleAnimations(p);
+    },
+  },
+  notes: {
+    // The seeded several-highlight page, opened at its second highlight.
+    multi: async (p) => {
+      const got = await p.evaluate((url) => {
+        const e = _notesAllRows.find((x) => x.row.url === url);
+        if (!e) return `no notes row for ${url}`;
+        const hits = _pbpNotesPageHits(e.row.key);
+        if (hits.length < 3) return `${hits.length} highlights`;
+        _pbpNotesRenderDetail(hits[1], false);
+        return "ok";
+      }, LIB_SEED.multiUrl);
+      if (got !== "ok") throw new Error(`SETUP: hangOrder notes multi: ${got} -- LIB_SEED broken`);
+      await settleAnimations(p);
+    },
+    // A page read over several days: its older labels carry the day too, so
+    // they are wider than the hang column and stack. Built in this scratch
+    // page only, through the page's own row model (pbpNotesRow), never written
+    // to storage: the shared page and every other check keep LIB_SEED as is.
+    days: async (p) => {
+      const got = await p.evaluate((key) => {
+        const now = Date.now(), minute = 60000, day = 86400000;
+        const rec = { url: "https://example.com/reading/days", title: "A page read over several days", items: [
+          { id: "d1", ts: now - 3 * day, quote: "An older highlight on another day carries its day in the label.", note: "", color: 4 },
+          { id: "d2", ts: now - 2 * day, quote: "So does this one, which makes the label wider than the hang column.", note: "With a note.", color: 2 },
+          { id: "d3", ts: now - 10 * minute, quote: "The newest one is the page's own day.", note: "", color: 1 },
+        ] };
+        _notesAllRows = _notesAllRows.filter((e) => e.row.key !== key);
+        _notesAllRows.push({ row: pbpNotesRow(key, rec), rec });
+        const hits = _pbpNotesPageHits(key);
+        _pbpNotesRenderDetail(hits[1], false);
+        return [...document.querySelectorAll("#notes-detail .notes-excerpt-date")].length;
+      }, HANG_ORDER_DAYS_KEY);
+      if (got < 2) throw new Error(`SETUP: hangOrder notes days: ${got} dated labels, want 2`);
+      await settleAnimations(p);
+    },
+  },
+};
+
+const HANG_ORDER_VIEWS = {
+  vocab: { paneSel: "#vocab-detail-pane", tab: null },
+  notes: { paneSel: "#notes-detail-pane", tab: "#lib-tab-notes" },
+};
+// What uiLangToBCP47() answers for each locale (i18n.js), written straight
+// onto the scratch page's global: the dates in the labels follow it, and the
+// real path through localStorage would reach every page of the origin.
+const HANG_ORDER_BCP47 = Object.freeze({ en: "en", zh_CN: "zh-Hans", de: "de" });
+// The product's container widths: a 861px window gives C ~ 395, a 2560px one
+// 1873. The coarse pass stays inside them.
+const HANG_ORDER_C_RANGE = Object.freeze([400, 1880]);
+
+// The matrix is a cross, not a full product. The primary (first) scenario
+// runs in every locale and both densities; every other scenario runs in en
+// and the theme's own density (default comfortable, terminal compact). Each
+// of those runs the 1px pass at every breakpoint (both directions, both
+// phases) and the coarse early pass; the primary scenario in en and the
+// theme's own density also runs the coarse settled pass and the window
+// driver. A settled read costs two frames and the pages cannot share a frame
+// clock (parallel scratch windows starved the oldest one ~10x on the
+// software compositor, measured in T8f), so the full product -- 30
+// vocabulary combinations x every pass -- would cost minutes per theme for
+// combinations that differ only in label text.
+async function driveHangOrder(page, extBase, theme, check) {
+  const { view, scenarios, indexWindows, coarseStep = 8, fine = 3, jump = 200, viewportRange = [861, 2560] } = check.expect.hangOrder;
+  const v = HANG_ORDER_VIEWS[view];
+  if (!v) throw new Error(`SETUP: hangOrder has no view ${JSON.stringify(view)}`);
+  for (const name of scenarios) {
+    if (!HANG_ORDER_SCENARIOS[view][name]) throw new Error(`SETUP: hangOrder has no ${view} scenario ${JSON.stringify(name)}`);
+  }
+  const bps = HANG_ORDER_BREAKPOINTS[view];
+  const primary = scenarios[0];
+  const seen = new Map(); // the first instance of each failure class
+  const stats = { measured: 0, labels: 0, ms: 0 };
+  const t0 = Date.now();
+  const themeTag = theme || "default";
+  const note = (key, line) => { if (!seen.has(key)) seen.set(key, line); };
+  const noteBad = (b, at, phase, drv) => note(`${b.rel}|${b.name.replace(/"[^"]*"/, "")}|${phase}|${drv}`,
+    `${at} ${phase}: ${b.name} is ${b.rel} its content (label ${b.label.join(",")} vs ${b.content.join(",")})`);
+  const p = await libScratchPage(page, extBase, theme, `hang-${view}`, "vocab", { width: indexWindows[0], height: 900 });
+  const run = async (args, tag) => {
+    const res = await p.evaluate(HANG_ORDER_PAGE, { paneSel: v.paneSel, exempt: HANG_ORDER_EXEMPT.map((e) => e.selector), ...args });
+    if (res.error) throw new Error(`SETUP: hangOrder ${tag}: ${res.error}`);
+    return res;
+  };
+  const one = (res, at, phase) => {
+    stats.measured++;
+    stats.labels = Math.max(stats.labels, res.labels);
+    if (res.setup.length) throw new Error(`SETUP: hangOrder ${at} ${phase}: ${res.setup[0]}`);
+    for (const b of res.bad) noteBad(b, at, phase, "window");
+  };
+  const setIndex = (px) => p.evaluate((w) => {
+    if (w == null) document.documentElement.style.removeProperty("--lib-index-w");
+    else document.documentElement.style.setProperty("--lib-index-w", `${w}px`);
+  }, px);
+  try {
+    if (v.tab) {
+      await p.click(v.tab);
+      await p.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS });
+      await settleAnimations(p);
+    }
+    // C(W) for the window driver. The pane's scrollbar gutter is stable, so C
+    // does not depend on what the pane shows: bisected once, and every W whose
+    // C lands in [bp - fine, bp + fine] is kept.
+    const cAt = async (w) => {
+      await p.setViewportSize({ width: w, height: 900 });
+      return (await run({ driver: "settle" }, `window@${w}`)).C;
+    };
+    const windowPlan = [];
+    for (const bp of bps) {
+      let lo = viewportRange[0], hi = viewportRange[1];
+      if ((await cAt(hi)) < bp || (await cAt(lo)) >= bp) continue;
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if ((await cAt(mid)) >= bp) hi = mid; else lo = mid;
+      }
+      const ws = [];
+      for (let w = hi - 8; w <= hi + 8; w++) {
+        const c = await cAt(w);
+        if (c >= bp - fine - 0.5 && c <= bp + fine + 0.5) ws.push({ w, c });
+      }
+      // 200 in C is about 250 in W (L is 20vw).
+      windowPlan.push({ bp, ws, from: [Math.min(viewportRange[1], hi + 250), Math.max(viewportRange[0], hi - 250)] });
+    }
+    if (windowPlan.length !== bps.length) {
+      throw new Error(`SETUP: hangOrder ${view}: only ${windowPlan.map((x) => x.bp).join("/") || "none"} of the breakpoints ${bps.join("/")} lie between windows ${viewportRange.join(" and ")}`);
+    }
+
+    // Anti-vacuity (diag §6.4): both known-bad layouts must be named before
+    // any sweep is trusted. Default density, the primary scenario.
+    {
+      await p.setViewportSize({ width: indexWindows[0], height: 900 });
+      await setIndex(400);
+      await HANG_ORDER_SCENARIOS[view][primary](p);
+      const C0 = (await run({ driver: "settle" }, "counter")).C;
+      await setIndex(400 + C0 - (view === "notes" ? 800 : 1100));
+      await run({ driver: "settle" }, "counter");
+      const counter = view === "notes" ? "stacked-narrow" : "label-after";
+      const want = view === "notes" ? "overlap" : "below";
+      const res = await run({ driver: "counter", counter }, `counter ${counter}`);
+      if (!res.bad.some((b) => b.rel === want)) {
+        throw new Error(`SETUP: hangOrder's counter-example ${counter} at C=${res.C} (${res.target}) was not reported as ${want}: ${JSON.stringify(res.bad)}`);
+      }
+      await setIndex(null);
+    }
+
+    // The theme's own tier (options-theme-early.js wrote it before load):
+    // default is comfortable, terminal compact.
+    const ownDensity = await p.evaluate(() => (document.documentElement.getAttribute("data-density") === "compact" ? "compact" : "comfortable"));
+    for (const density of ["comfortable", "compact"]) {
+      await p.evaluate((d) => {
+        if (d === "compact") document.documentElement.setAttribute("data-density", "compact");
+        else document.documentElement.removeAttribute("data-density");
+      }, density);
+      for (const locale of HANG_ORDER_LOCALES) {
+        await p.evaluate((tag) => { window.uiLangToBCP47 = () => tag; }, HANG_ORDER_BCP47[locale]);
+        await setLibraryLocale(p, extBase, locale);
+        const own = density === ownDensity && locale === HANG_ORDER_LOCALES[0];
+        for (const name of own ? scenarios : [primary]) {
+          const show = HANG_ORDER_SCENARIOS[view][name];
+          const full = own && name === primary;
+          const combo = `${themeTag} ${density} ${locale} ${name}`;
+          // Index driver: one in-page batch per window. Each breakpoint's
+          // 1px pass runs in the first window that reaches bp +- (fine +
+          // jump); the coarse pass runs in the last (widest) window, which
+          // reaches the whole product range.
+          const fined = new Set();
+          await show(p); // once: a width change re-lays the same detail out, it never re-renders it
+          for (const [wi, W] of indexWindows.entries()) {
+            await p.setViewportSize({ width: W, height: 900 });
+            await setIndex(400);
+            const C0 = (await run({ driver: "settle" }, `index@${W} ${combo}`)).C;
+            // The index stays within [200, W - 300] px.
+            const cMax = C0 + 200, cMin = C0 + 400 - (W - 300);
+            const points = [];
+            for (const bp of bps) {
+              if (fined.has(bp) || bp - fine - jump < cMin || bp + fine + jump > cMax) continue;
+              fined.add(bp);
+              for (const from of [bp + jump, bp - jump]) for (let c = bp - fine; c <= bp + fine; c++) points.push({ c, from });
+            }
+            if (wi === indexWindows.length - 1) {
+              const lo = Math.max(cMin, HANG_ORDER_C_RANGE[0]), hi = Math.min(cMax, HANG_ORDER_C_RANGE[1]);
+              for (let c = Math.floor(hi / coarseStep) * coarseStep; c >= lo; c -= coarseStep) points.push({ c, earlyOnly: !full });
+            }
+            const tag = `index@${W} ${combo}`;
+            const res = await run({ driver: "index", base: { L0: 400, C0 }, points }, tag);
+            stats.measured += res.measured;
+            stats.labels = Math.max(stats.labels, res.labels);
+            for (const pb of res.problems) {
+              const at = `${tag} C=${pb.c}${pb.from != null ? ` (from ${pb.from})` : ""}`;
+              if (pb.setup.length) throw new Error(`SETUP: hangOrder ${at} ${pb.phase}: ${pb.setup[0]}`);
+              if (pb.drift) note(`drift|index@${W}`, `${at} ${pb.phase}: measured C=${pb.C}, the driver set ${pb.c}`);
+              for (const b of pb.bad) noteBad(b, at, pb.phase, "index");
+            }
+            await setIndex(null);
+          }
+          const missed = bps.filter((bp) => !fined.has(bp));
+          if (missed.length) throw new Error(`SETUP: hangOrder ${combo}: no index window reaches breakpoint ${missed.join("/")} +- ${fine + jump}`);
+          if (!full) continue;
+          // Window driver: each W near each breakpoint, entered from a window
+          // about 200 C above and one about 200 C below once that one settled.
+          for (const plan of windowPlan) {
+            for (const fromW of plan.from) {
+              for (const { w, c } of plan.ws) {
+                await p.setViewportSize({ width: fromW, height: 900 });
+                await run({ driver: "settle" }, `window@${fromW}`);
+                await p.setViewportSize({ width: w, height: 900 });
+                const at = `window@${w} ${combo} C=${c} (from window ${fromW})`;
+                const early = await run({ driver: "probe" }, at);
+                if (Math.abs(early.C - c) > 0.5) note("drift|window", `${at}: measured C=${early.C}`);
+                one(early, at, "early");
+                one(await run({ driver: "settle" }, at), at, "settled");
+              }
+            }
+          }
+        }
+      }
+    }
+  } finally {
+    await closeLibScratch(page, p);
+  }
+  stats.ms = Date.now() - t0;
+  return { bad: [...seen.values()], stats };
+}
+
 // ---- Library layout states (library redesign 2026-10-03, plan T3) ---------
 // Each runs in a FRESH page of the same context (same extension origin, same
 // theme already written to storage) so its viewport, hash and scroll churn
@@ -3449,6 +3837,13 @@ async function runOneCheck(page, theme, check, results, extBase) {
     const bad = await driveFocusRowVisible(page, extBase, theme, check);
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("focusRowVisible", bad.length === 0, bad.length, 0, bad.length ? bad.slice(0, 4).join("; ") : undefined) });
+    return;
+  }
+  if (check.state === "hangOrder") {
+    const { bad, stats } = await driveHangOrder(page, extBase, theme, check);
+    results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
+      ...verdict("hangOrder", bad.length === 0, bad.length, 0,
+        [bad.length ? bad.slice(0, 6).join("; ") : null, `${stats.measured} measurements, up to ${stats.labels} labels, ${Math.round(stats.ms / 1000)}s`].filter(Boolean).join(" | ")) });
     return;
   }
   if (check.state === "listHeaderFit") {

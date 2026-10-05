@@ -54,6 +54,13 @@
 //                        (G7); `actual` reports the widest need.
 //   filterScrollResetToggles -- true: the status and colour toggles put
 //                        their list back at the top (G6, T4e).
+//   hangOrder         -- { view, scenarios, indexWindows }: every hang label
+//                        in the view's detail pane is above its content or
+//                        left of it on its first line, by container width:
+//                        each breakpoint +-3 at 1px from 200 above / below,
+//                        in the change's own task and after it settled, plus
+//                        a coarse 8px pass; index-column and window drivers
+//                        (T8f; the driver's comment has the sampling cross).
 // paneFit's optional `bleed: [selector]` names a list region that hangs out
 // of its pane by design: its own box is exempt; what it contains is measured
 // against the region's content box. Its overhang is allowed in the pane's
@@ -1977,6 +1984,16 @@ export const CHECKS = [
       { width: 1920, height: 1080, term: "constraint", headPx: 56, ref: "below", mainPx: 840, containerPx: [1000, 1376] },
       { width: 1280, height: 800, term: "constraint", headPx: 44, ref: "below", ringInside: [".vocab-detail-delete", ".vocab-note-input"], containerPx: [640, 1000] },
     ] } } },
+  // ---- Library redesign T8f (spec appendix 10-05, diag-hang-order §6): every
+  // hang label above its content or left of it on the content's first line,
+  // by container width C -- each tier breakpoint at 1px steps (+-3), entered
+  // from 200 above and below, measured in the width change's own task and
+  // again once the page's observers have run; index-column and window
+  // drivers; en / zh_CN / de x both densities. ----
+  { surface: "library", page: "library.html", selector: ".lib-hang-label", state: "hangOrder", themes: ["", "terminal"],
+    expect: { hangOrder: { view: "vocab", scenarios: ["constraint", "曖昧", "cover", "lookup", "editor"], indexWindows: [1600, 2560] } } },
+  { surface: "library", page: "library.html", selector: ".notes-excerpt-label", state: "hangOrder", themes: ["", "terminal"],
+    expect: { hangOrder: { view: "notes", scenarios: ["days", "multi"], indexWindows: [1600, 2560] } } },
   // The sort menu button's popover (T6b): the same panel family. Its trigger
   // is always on the filter row, never inside the Filter popover.
   { surface: "library", page: "library.html", selector: "#vocab-sort-btn + .listbox-pop", state: "open",
