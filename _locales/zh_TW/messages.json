@@ -3150,6 +3150,7 @@
         }
       }
     },
+    "vocabLoadMoreOne": { "message": "再載入 $COUNT$ 筆", "placeholders": { "count": { "content": "$1" } } },
     "vocabLoading": {
       "message": "正在載入生詞……"
     },

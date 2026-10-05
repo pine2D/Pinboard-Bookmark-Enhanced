@@ -3150,6 +3150,7 @@
         }
       }
     },
+    "vocabLoadMoreOne": { "message": "Wczytaj kolejne $COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "vocabLoading": {
       "message": "Wczytywanie zapisanych słówek…"
     },
@@ -3325,7 +3326,7 @@
     "vocabResultSaved": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "vocabResultSavedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "notesResultCount": {
-      "message": "Wyświetlono $RESULTS$ · łącznie $TOTAL$ zaznaczeń",
+      "message": "Wyświetlono: $RESULTS$ · wszystkich zaznaczeń: $TOTAL$",
       "placeholders": {
         "results": {
           "content": "$1"

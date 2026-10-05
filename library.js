@@ -173,9 +173,23 @@ function pbpLibSplitCount(format, values) {
 // zero in the singular ("0 surlignage"; CLDR fr: one = 0 and 1), en and de do
 // not. Call sites spell both keys out: the dead-key guard in
 // tests/ui-contract-tests.mjs looks for each key's literal.
+//
+// The rule follows the language of the messages t() actually prints, not the
+// localStorage mirror uiLangToBCP47() reads: the two part ways when the
+// mirror holds "fr" but its message copy is missing or corrupt (t() falls
+// back to chrome.i18n) or when the mirror write failed. A loaded manual
+// language is _i18nMessagesLang; otherwise t() goes to chrome.i18n, whose
+// messages follow the browser UI language.
+function _pbpLibMessagesLang() {
+  try {
+    if (typeof _i18nMessages !== "undefined" && _i18nMessages &&
+        typeof _i18nMessagesLang === "string" && _i18nMessagesLang) return _i18nMessagesLang;
+  } catch (_) {}
+  try { return chrome.i18n.getUILanguage() || ""; } catch (_) { return ""; }
+}
 function pbpLibCountKey(n, oneKey, otherKey) {
   const value = Number(n);
-  const lang = String(_pbpLibLocale() || "").toLowerCase().split("-")[0];
+  const lang = String(_pbpLibMessagesLang()).toLowerCase().split(/[-_]/)[0];
   return value === 1 || (value === 0 && lang === "fr") ? oneKey : otherKey;
 }
 

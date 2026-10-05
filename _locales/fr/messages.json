@@ -849,7 +849,7 @@
     "message": "Supprimer les $COUNT$ surlignages sélectionnés ?",
     "placeholders": { "count": { "content": "$1" } }
   },
-  "notesBatchDeleteConfirmOne": { "message": "Supprimer $COUNT$ surlignage sélectionné ?", "placeholders": { "count": { "content": "$1" } } },
+  "notesBatchDeleteConfirmOne": { "message": "Supprimer le surlignage sélectionné ?", "placeholders": { "count": { "content": "$1" } } },
   "notesDeleteFailed": {
     "message": "Impossible de supprimer ces surlignages. Réessayez."
   },
@@ -3150,6 +3150,7 @@
         }
       }
     },
+    "vocabLoadMoreOne": { "message": "Charger le dernier", "placeholders": { "count": { "content": "$1" } } },
     "vocabLoading": {
       "message": "Chargement du vocabulaire enregistré…"
     },

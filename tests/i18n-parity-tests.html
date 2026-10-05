@@ -139,12 +139,16 @@ async function loadLocale(loc) {
     // sentence itself carries the noun -- English's "found" / "saved" / "shown"
     // live in vocabResultCount / notesResultCount, not in these.
     "vocabResultFound","vocabResultFoundOne","vocabResultSaved","vocabResultSavedOne",
-    "notesResultShown","notesResultShownOne",
-    "libraryCountPages","libraryCountPagesOne" // "page(s)" is the same word in fr
+    "notesResultShown","notesResultShownOne"
   ]);
+  // Per-locale exemptions: a word that is genuinely the same in that one
+  // language, so the key stays checked everywhere else.
+  const LOCALE_SAME_OK = {
+    fr: new Set(["libraryCountPages", "libraryCountPagesOne"]), // "page(s)" is the same word in French
+  };
   for (const loc of ["de","fr","pl","ru","zh_HK"]) {
     const offenders = Object.keys(msgs.en).filter(k =>
-      !BRAND_OK.has(k) &&
+      !BRAND_OK.has(k) && !(LOCALE_SAME_OK[loc] && LOCALE_SAME_OK[loc].has(k)) &&
       msgs[loc][k]?.message != null &&
       msgs[loc][k].message === msgs.en[k].message);
     // log the worklist so the implementer sees exactly what to translate
@@ -560,25 +564,76 @@ async function loadLocale(loc) {
     }
   }
   check("T8g every <key>One is a singular twin: its base exists, same placeholders, and the six locales without singular nouns repeat the base text",
-    ONE_KEYS.length >= 19 && twinBroken.length === 0, `${ONE_KEYS.length} twins; ` + twinBroken.slice(0, 4).join("; "));
-
-  const T8G_TAGS = { en: "en", de: "de", fr: "fr", pl: "pl", ru: "ru", ja: "ja", zh_CN: "zh-Hans", zh_HK: "zh-Hant", zh_TW: "zh-Hant" };
-  const realUiLang = globalThis.uiLangToBCP47;
-  const withLang = (tag, fn) => {
-    globalThis.uiLangToBCP47 = () => tag;
-    try { return fn(); } finally { globalThis.uiLangToBCP47 = realUiLang; }
+    ONE_KEYS.length >= 20 && twinBroken.length === 0, `${ONE_KEYS.length} twins; ` + twinBroken.slice(0, 4).join("; "));
+  // ...and in the three locales that do inflect, a twin that repeats its base
+  // is a singular nobody wrote. The few that legitimately match:
+  const TWIN_SAME_OK = {
+    // Bare-number phrases ("$COUNT$"): the sentence around them carries an
+    // invariant word -- "5 found", "5 shown", "5 Treffer", "davon 2 mit Notiz",
+    // "dont 2 avec une note" read the same at one.
+    en: new Set(["vocabResultFoundOne", "vocabResultSavedOne", "notesResultShownOne"]),
+    de: new Set(["vocabResultFoundOne", "vocabResultSavedOne", "notesResultShownOne", "libraryCountNotedOne"]),
+    fr: new Set(["libraryCountNotedOne"]),
   };
+  const twinUnwritten = [];
+  for (const loc of ["en", "de", "fr"]) {
+    for (const key of ONE_KEYS) {
+      const one = msgs[loc][key], many = msgs[loc][key.slice(0, -3)];
+      if (one && many && one.message === many.message && !TWIN_SAME_OK[loc].has(key)) twinUnwritten.push(`${loc} ${key}: "${one.message}"`);
+      if (one && many && one.message !== many.message && TWIN_SAME_OK[loc].has(key)) twinUnwritten.push(`${loc} ${key}: allow-listed but differs (drop it from TWIN_SAME_OK)`);
+    }
+  }
+  check("T8g en / de / fr give every <key>One its own singular text (allow-list: bare-number phrases)",
+    twinUnwritten.length === 0, twinUnwritten.slice(0, 4).join("; "));
+
+  // The plural rule follows the messages t() prints (_i18nMessagesLang for a
+  // loaded manual language, else chrome.i18n's UI language), never the
+  // localStorage mirror uiLangToBCP47() reads.
+  const realUiLang = globalThis.uiLangToBCP47;
+  const realMessages = _i18nMessages, realMessagesLang = _i18nMessagesLang;
+  const realChrome = globalThis.chrome;
+  const withSources = ({ mirror = "en", loaded = null, browser = "en-US" }, fn) => {
+    globalThis.uiLangToBCP47 = () => mirror;
+    _i18nMessages = loaded ? msgs[loaded] : null;
+    _i18nMessagesLang = loaded;
+    globalThis.chrome = { ...(realChrome || {}), i18n: { getUILanguage: () => {
+      if (browser instanceof Error) throw browser;
+      return browser;
+    } } };
+    try { return fn(); } finally {
+      globalThis.uiLangToBCP47 = realUiLang;
+      _i18nMessages = realMessages;
+      _i18nMessagesLang = realMessagesLang;
+      globalThis.chrome = realChrome;
+    }
+  };
+  const withLang = (loc, fn) => withSources({ mirror: loc, loaded: loc, browser: "en-US" }, fn);
   const hasCountKey = typeof pbpLibCountKey === "function";
-  const pickAll = (tag, ns) => withLang(tag, () => ns.map((n) => (hasCountKey ? pbpLibCountKey(n, "one", "other") : "?")).join(","));
+  const pickAll = (loc, ns) => withLang(loc, () => ns.map((n) => (hasCountKey ? pbpLibCountKey(n, "one", "other") : "?")).join(","));
   check("T8g pbpLibCountKey: en and de take the singular for 1 only, French for 0 and 1",
     pickAll("en", [0, 1, 2, 21]) === "other,one,other,other" && pickAll("de", [0, 1, 2]) === "other,one,other" &&
     pickAll("fr", [0, 1, 2, 21]) === "one,one,other,other" && pickAll("fr", ["1", "0"]) === "one,one",
     `en ${pickAll("en", [0, 1, 2, 21])} de ${pickAll("de", [0, 1, 2])} fr ${pickAll("fr", [0, 1, 2, 21])}`);
-  check("T8g pbpLibCountKey: a UI language that throws falls back to the singular for 1 only",
-    withLang("fr", () => {
-      globalThis.uiLangToBCP47 = () => { throw new RangeError("bad tag"); };
-      return hasCountKey && pbpLibCountKey(0, "one", "other") === "other" && pbpLibCountKey(1, "one", "other") === "one";
-    }));
+  const zeroUnder = (sources) => withSources(sources, () => (hasCountKey ? pbpLibCountKey(0, "one", "other") : "?"));
+  const sourceCases = [
+    { mirror: "fr", loaded: null, browser: "en-US" },
+    { mirror: "en", loaded: "fr", browser: "en-US" },
+    { mirror: "en", loaded: null, browser: "fr-CA" },
+    { mirror: "de", loaded: "de", browser: "fr-FR" },
+  ];
+  check("T8g pbpLibCountKey follows the messages t() prints, not the localStorage mirror",
+    // mirror says fr but its message copy is missing: t() prints the browser's (English) messages
+    zeroUnder({ mirror: "fr", loaded: null, browser: "en-US" }) === "other" &&
+    // French messages loaded while the mirror write failed (mirror still en)
+    zeroUnder({ mirror: "en", loaded: "fr", browser: "en-US" }) === "one" &&
+    // auto mode in a French browser: chrome.i18n serves fr
+    zeroUnder({ mirror: "en", loaded: null, browser: "fr-CA" }) === "one" &&
+    // a loaded manual language wins over the browser's
+    zeroUnder({ mirror: "de", loaded: "de", browser: "fr-FR" }) === "other",
+    sourceCases.map((c) => `${c.mirror}/${c.loaded}/${c.browser}=${zeroUnder(c)}`).join(" "));
+  check("T8g pbpLibCountKey: with no readable language it falls back to the singular for 1 only",
+    withSources({ mirror: "fr", loaded: null, browser: new Error("no i18n") }, () =>
+      hasCountKey && pbpLibCountKey(0, "one", "other") === "other" && pbpLibCountKey(1, "one", "other") === "one"));
 
   // The sentences as library-notes.js / library-vocab.js build them: n holds
   // the real numbers (they choose the keys), m what goes into the text.
@@ -734,11 +789,20 @@ async function loadLocale(loc) {
     },
   };
   const frozenBroken = [], splitBroken = [];
+  // pl / ru notesResultCount was rewritten in fix round 1: its old text put
+  // the total in the genitive plural ("łącznie 1 zaznaczeń", "всего 3
+  // выделений"), wrong at 1 and at 2-4. It now uses the "label: N" form those
+  // two locales use for every other count; these are its new readings.
+  const T8G_REWRITTEN = {
+    pl: { notesResult: { many: "Wyświetlono: 5 · wszystkich zaznaczeń: 10", one: "Wyświetlono: 1 · wszystkich zaznaczeń: 1" } },
+    ru: { notesResult: { many: "Показано: 5 · всего выделений: 10", one: "Показано: 1 · всего выделений: 1" } },
+  };
   for (const loc of LOCALES) {
-    withLang(T8G_TAGS[loc], () => {
+    withLang(loc, () => {
       const s = t8gSentences(loc);
-      const cases = [...Object.entries(T8G_MANY).map(([k, v]) => [k, v, T8G_FROZEN[loc][k]]),
-        ...Object.entries(T8G_ONE).map(([k, v]) => [k, v, T8G_FROZEN[loc].one ? T8G_FROZEN[loc].one[k] : undefined])];
+      const rewritten = (k, form) => (T8G_REWRITTEN[loc] && T8G_REWRITTEN[loc][k] ? T8G_REWRITTEN[loc][k][form] : undefined);
+      const cases = [...Object.entries(T8G_MANY).map(([k, v]) => [k, v, rewritten(k, "many") ?? T8G_FROZEN[loc][k]]),
+        ...Object.entries(T8G_ONE).map(([k, v]) => [k, v, rewritten(k, "one") ?? (T8G_FROZEN[loc].one ? T8G_FROZEN[loc].one[k] : undefined)])];
       for (const [kind, values, frozen] of cases) {
         const shown = values.map(String);
         const text = s[kind](values, shown);

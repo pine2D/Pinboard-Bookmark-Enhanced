@@ -1282,7 +1282,8 @@ function _pbpNotesSyncLoadMore(remaining) {
     more.className = "btn btn-sm ghost vocab-load-more";
     more.addEventListener("click", _pbpNotesLoadMore);
   }
-  more.textContent = t("vocabLoadMore", String(Math.min(PBP_NOTES_RENDER_BATCH, remaining)));
+  const next = Math.min(PBP_NOTES_RENDER_BATCH, remaining);
+  more.textContent = t(pbpLibCountKey(next, "vocabLoadMoreOne", "vocabLoadMore"), String(next));
   // Sibling of the list, never a child: #notes-list is role="grid" and takes
   // rows only (same placement #notes-empty already has).
   if (more.previousElementSibling !== list) list.after(more);
@@ -1882,9 +1883,12 @@ if (typeof $id === "function") {
     // The count row is JS-written as well: without this a cold load whose
     // stored language differs from the localStorage mirror kept it in the
     // mirror's language. Before the first scan there is nothing to count.
+    // The colour toggles' title / aria-label ("Quote, 3 highlights") are
+    // written the same way.
     if (_notesScanDone) {
       const all = _pbpNotesHits();
       _pbpNotesRenderToolbar(all.length, _pbpNotesVisibleHits(all).length, all);
+      _pbpNotesSyncColorFilters(all);
     }
     const hit = _pbpNotesFindHit(_pbpNotesSelectedKey);
     if (!hit) return;

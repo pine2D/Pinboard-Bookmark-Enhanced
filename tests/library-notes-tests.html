@@ -1659,11 +1659,14 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
 
   // ---- T8g: a count of one reads in the singular (real en / de / fr copy) ----
   // The stub t() above echoes keys; this block swaps in the shipped messages so
-  // the sentences are read the way a user reads them. pbpLibCountKey takes the
-  // language from uiLangToBCP47, which this page does not load: stand one in.
+  // the sentences are read the way a user reads them. pbpLibCountKey follows
+  // the language of the messages t() prints -- with no manual language loaded
+  // (this page never loads i18n.js) that is chrome.i18n's UI language -- and
+  // the dates follow uiLangToBCP47: stand in both.
   {
     const locs = {};
     for (const loc of ["en", "de", "fr"]) locs[loc] = await (await fetch(`../_locales/${loc}/messages.json`)).json();
+    const prevI18n = chrome.i18n;
     const resolver = (m) => (key, ...values) => {
       const entry = m[key];
       if (!entry) return key;
@@ -1678,7 +1681,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     const hadLang = Object.prototype.hasOwnProperty.call(window, "uiLangToBCP47");
     const prevLang = window.uiLangToBCP47;
     const saved = { ...store };
-    const useLang = (loc) => { t = resolver(locs[loc]); window.uiLangToBCP47 = () => loc; };
+    const useLang = (loc) => { t = resolver(locs[loc]); window.uiLangToBCP47 = () => loc; chrome.i18n = { getUILanguage: () => loc }; };
     const items = () => [...$id("notes-count").querySelectorAll(".lib-count-item")].map((el) => el.textContent);
     const sr = () => $id("notes-count").querySelector(".lib-count-full")?.textContent || "";
     const lead = () => $id("notes-cover-lead");
@@ -1692,10 +1695,12 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       for (const key of Object.keys(store)) delete store[key];
       Object.assign(store, records);
       _notesActiveColors = new Set();
+      _notesRenderLimit = PBP_NOTES_RENDER_BATCH;
       $id("notes-filter").value = "";
       _pbpNotesRenderDetail(null);
       await renderNotesPanel();
     };
+    const quoteToggleTitle = () => $id("notes-color-filters").querySelector('.lib-toggle[data-color="1"]')?.title || "";
     try {
       useLang("en");
       await loadOnly({ pbp_hl_solo: solo() });
@@ -1739,6 +1744,15 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       check("T8g en: the page column counts highlights and notes each on its own number",
         twoNoted === "2 highlights, 2 with notes" && oneNoted === "2 highlights, 1 with a note" && noneNoted === "1 highlight",
         [twoNoted, oneNoted, noneNoted].join(" | "));
+      // Load more: the last one left reads in the singular.
+      const bulk = (n) => ({ pbp_hl_bulk: { v: 1, url: "https://bulk.example/", title: "Bulk",
+        items: Array.from({ length: n }, (_, i) => ({ id: "k" + i, n: i + 1, quote: "bulk " + i, color: 2, note: "", ts: TS - i })) } });
+      await loadOnly(bulk(PBP_NOTES_RENDER_BATCH + 1));
+      const lastOne = $id("notes-load-more")?.textContent;
+      await loadOnly(bulk(PBP_NOTES_RENDER_BATCH + 2));
+      const nextTwo = $id("notes-load-more")?.textContent;
+      check("T8g en: Load more with one left says the last one, with two left the next 2",
+        lastOne === "Load the last one" && nextTwo === "Load the next 2", `${lastOne} | ${nextTwo}`);
 
       useLang("de");
       await loadOnly({ pbp_hl_solo: solo() });
@@ -1772,8 +1786,22 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       check("T8g a language switch redraws the count row in the new language",
         items()[0] === "1 highlight" && items()[1] === "1 page" && sr().startsWith("1 shown · 1 highlight · "),
         items().join("|") + " | " + sr());
+      check("T8g a language switch redraws the colour toggles' title / aria-label too",
+        /, 1 highlight$/.test(quoteToggleTitle()) &&
+        $id("notes-color-filters").querySelector('.lib-toggle[data-color="1"]').getAttribute("aria-label") === quoteToggleTitle(),
+        quoteToggleTitle());
+      // Under a filter the redraw keeps the filtered reading.
+      filterTo("no such words anywhere");
+      useLang("fr");
+      document.dispatchEvent(new Event("pbp:i18n-applied"));
+      check("T8g a language switch under a filter keeps 0 / 1 and redraws it in the new language",
+        items()[0] === "0 / 1 surlignage" && sr().startsWith("0 affiché · 1 surlignage au total · ") &&
+        /, 1 surlignage$/.test(quoteToggleTitle()),
+        items()[0] + " | " + sr() + " | " + quoteToggleTitle());
+      filterTo("");
     } finally {
       t = realT;
+      if (prevI18n === undefined) delete chrome.i18n; else chrome.i18n = prevI18n;
       if (hadLang) window.uiLangToBCP47 = prevLang; else delete window.uiLangToBCP47;
       for (const key of Object.keys(store)) delete store[key];
       Object.assign(store, saved);

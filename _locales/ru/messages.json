@@ -3150,6 +3150,7 @@
         }
       }
     },
+    "vocabLoadMoreOne": { "message": "Загрузить следующие $COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "vocabLoading": {
       "message": "Загрузка сохранённых слов…"
     },
@@ -3325,7 +3326,7 @@
     "vocabResultSaved": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "vocabResultSavedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
     "notesResultCount": {
-      "message": "Показано $RESULTS$ · всего $TOTAL$ выделений",
+      "message": "Показано: $RESULTS$ · всего выделений: $TOTAL$",
       "placeholders": {
         "results": {
           "content": "$1"

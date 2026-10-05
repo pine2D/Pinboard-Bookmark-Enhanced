@@ -3150,6 +3150,7 @@
         }
       }
     },
+    "vocabLoadMoreOne": { "message": "次の $COUNT$ 件を読み込む", "placeholders": { "count": { "content": "$1" } } },
     "vocabLoading": {
       "message": "保存した単語を読み込んでいます…"
     },

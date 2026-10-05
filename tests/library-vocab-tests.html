@@ -2907,9 +2907,15 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
   }
   // ---- T8g: a count of one reads in the singular ----
   // Key choice first, on the stub t() (key names are the evidence), then the
-  // shipped en / de / fr copy read as a user reads it. pbpLibCountKey takes the
-  // language from uiLangToBCP47, which this page does not load: stand one in.
+  // shipped en / de / fr copy read as a user reads it. pbpLibCountKey follows
+  // the language of the messages t() prints -- with no manual language loaded
+  // (this page never loads i18n.js) that is chrome.i18n's UI language -- and
+  // the dates follow uiLangToBCP47: stand in both.
   {
+    const hadChrome = typeof window.chrome !== "undefined";
+    if (!hadChrome) window.chrome = {};
+    const prevI18n = window.chrome.i18n;
+    const setLang = (loc) => { window.uiLangToBCP47 = () => loc; chrome.i18n = { getUILanguage: () => loc }; };
     const hadLang = Object.prototype.hasOwnProperty.call(window, "uiLangToBCP47");
     const prevLang = window.uiLangToBCP47;
     const realT = t;
@@ -2948,7 +2954,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       delete cover.dataset.loadFailed;
       _vocabCurrentOwner = "acct_t8g";
       _vocabOwnerLabel = "t8g";
-      window.uiLangToBCP47 = () => "en";
+      setLang("en");
       const one = [word("t8g-a", "alpha", "new", "en", ["G1"], TS)];
       show(one);
       check("T8g stub: one word, one group, one language take the One keys on the row and in the sentence",
@@ -2988,9 +2994,21 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       _vocabSelected = new Set();
       _pbpVocabSyncSelectionUi();
 
+      // Load more: the last one left takes the singular key.
+      const bulk = (n) => Array.from({ length: n }, (_, i) => word("t8g-k" + i, "k" + i, "new", "en", [], TS - i));
+      const moreText = (n) => { show(bulk(n)); return $id("vocab-load-more").textContent; };
+      check("T8g stub: Load more with one word left takes vocabLoadMoreOne, with two the plural key",
+        moreText(PBP_VOCAB_RENDER_BATCH + 1) === "vocabLoadMoreOne:1" && moreText(PBP_VOCAB_RENDER_BATCH + 2) === "vocabLoadMore:2",
+        moreText(PBP_VOCAB_RENDER_BATCH + 1) + " | " + moreText(PBP_VOCAB_RENDER_BATCH + 2));
+
       const locs = {};
       for (const loc of ["en", "de", "fr"]) locs[loc] = await (await fetch(`../_locales/${loc}/messages.json`)).json();
-      const useLang = (loc) => { t = resolver(locs[loc]); window.uiLangToBCP47 = () => loc; };
+      const useLang = (loc) => { t = resolver(locs[loc]); setLang(loc); };
+      const lastOne = {};
+      for (const loc of ["en", "de", "fr"]) { useLang(loc); lastOne[loc] = moreText(PBP_VOCAB_RENDER_BATCH + 1); }
+      check("T8g en / de / fr: Load more with one word left reads in the singular, adjective agreeing",
+        lastOne.en === "Load the last one" && lastOne.de === "Den letzten Eintrag laden" && lastOne.fr === "Charger le dernier",
+        JSON.stringify(lastOne));
       useLang("en");
       show(one);
       const day = pbpLibFormatDay(TS);
@@ -3039,7 +3057,16 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         items().slice(0, 3).join("|") === "1 word|1 group|1 language" &&
         sr().startsWith("1 found · 1 saved for current Pinboard account: t8g"),
         items().join("|") + " | " + sr());
+      // Under a filter the redraw keeps the filtered reading.
+      show(one, "no such word");
+      useLang("fr");
+      document.dispatchEvent(new Event("pbp:i18n-applied"));
+      check("T8g a language switch under a filter keeps 0 / 1 and redraws it in the new language",
+        items()[0] === "0 / 1 mot" && sr().startsWith("Compte Pinboard actuel (t8g) : 0 résultat · 1 mot enregistré"),
+        items()[0] + " | " + sr());
     } finally {
+      if (!hadChrome) delete window.chrome;
+      else if (prevI18n === undefined) delete chrome.i18n; else chrome.i18n = prevI18n;
       _pbpVocabFlashStatus = real.flash;
       pbpVocabCurrentOwner = real.owner;
       pbpVocabBatchSetStatus = real.setStatus;

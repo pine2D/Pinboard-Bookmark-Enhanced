@@ -1793,7 +1793,9 @@ function _pbpVocabRenderList(append) {
   if (more) {
     const remaining = Math.max(0, rows.length - target);
     more.hidden = remaining === 0;
-    more.textContent = t("vocabLoadMore", String(Math.min(PBP_VOCAB_RENDER_BATCH, remaining)));
+    // The last one left reads in the singular ("Load the last one").
+    const next = Math.min(PBP_VOCAB_RENDER_BATCH, remaining);
+    more.textContent = t(pbpLibCountKey(next, "vocabLoadMoreOne", "vocabLoadMore"), String(next));
   }
   _pbpVocabSyncSelectionUi();
   // Full rebuilds (append=false: search/filter/sort/reload) replace every

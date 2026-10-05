@@ -3150,6 +3150,7 @@
         }
       }
     },
+    "vocabLoadMoreOne": { "message": "再加载 $COUNT$ 条", "placeholders": { "count": { "content": "$1" } } },
     "vocabLoading": {
       "message": "正在加载生词…"
     },

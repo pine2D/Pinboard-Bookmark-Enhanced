@@ -849,7 +849,7 @@
     "message": "$COUNT$ ausgewählte Markierungen löschen?",
     "placeholders": { "count": { "content": "$1" } }
   },
-  "notesBatchDeleteConfirmOne": { "message": "$COUNT$ ausgewählte Markierung löschen?", "placeholders": { "count": { "content": "$1" } } },
+  "notesBatchDeleteConfirmOne": { "message": "Ausgewählte Markierung löschen?", "placeholders": { "count": { "content": "$1" } } },
   "notesDeleteFailed": {
     "message": "Diese Markierungen konnten nicht gelöscht werden. Bitte erneut versuchen."
   },
@@ -3150,6 +3150,7 @@
         }
       }
     },
+    "vocabLoadMoreOne": { "message": "Den letzten Eintrag laden", "placeholders": { "count": { "content": "$1" } } },
     "vocabLoading": {
       "message": "Gespeicherte Vokabeln werden geladen…"
     },
