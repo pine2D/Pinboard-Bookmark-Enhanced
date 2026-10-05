@@ -476,15 +476,13 @@ input[type="checkbox"], input[type="radio"] {
    `border: 1px solid` resets border-color to currentColor
    (tests/ui-contract-tests.mjs pins both). */
 
-/* §7.3 `borderless` placement (full-width sidebar tabs, accordion and
-   disclosure headers): 1px accent core + the --lib-focus-ring glow. The core
+/* §7.3 `borderless` placement (the view tabs): 1px accent core + the
+   --lib-focus-ring glow. The core
    is not optional -- the glow alone is too faint to locate on light presets.
    .notes-card-head is deliberately NOT here: it spans only the first of the
    row's three grid columns, so a ring on it stopped mid-row and ran under
    .row-del-x. Its row carries an inset ring instead (see .notes-card-top). */
-.lib-tab:focus-visible,
-.accordion-header:focus-visible,
-.vocab-disclosure > summary:focus-visible {
+.lib-tab:focus-visible {
   outline: 1px solid var(--lib-accent);
   outline-offset: 2px;
   box-shadow: var(--lib-focus-ring);
@@ -2711,6 +2709,12 @@ body { display: flex; flex-direction: column; }
 .lib-tab:hover { color: var(--lib-fg); }
 /* Selected: body text, Bold, and the 2px edge in the body colour (§2.2). */
 .lib-tab.active { color: var(--lib-fg); font-weight: bold; border-bottom-color: var(--lib-fg); }
+/* Forced colours paint the resting tab's transparent edge in CanvasText, so
+   every tab would carry the selection line and only Bold would be left. The
+   resting edge takes Canvas instead: the line stays the current tab's alone. */
+@media (forced-colors: active) {
+  .lib-tab:not(.active) { border-bottom-color: Canvas; }
+}
 .lib-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .lib-view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .lib-view[hidden] { display: none; }
@@ -2868,6 +2872,18 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
     outline: 1px solid Highlight;
     outline-offset: -1px;
   }
+  /* A failed row (is-error): its danger fill is repainted to Canvas too, so
+     it takes the outline cue in DASHED -- after the selected rule at the same
+     specificity, so a failed row that is also selected still reads as failed.
+     A failed delete button loses its inset danger edge the same way and
+     takes a solid outline. Cues, not fills: the flat canvas rule holds. */
+  .vocab-card.is-error .notes-card-top:not(:has(> .notes-card-head:focus-visible)),
+  .notes-hit.is-error .notes-hit-btn:not(:focus-visible) {
+    outline: 1px dashed Highlight;
+    outline-offset: -1px;
+  }
+  .notes-detail-delete.is-error:not(:focus-visible),
+  #notes-batch-delete.is-error:not(:focus-visible) { outline: 1px solid Highlight; }
   .notes-toolbar input[type="search"],
   .vocab-lookup-bar input[type="search"],
   .vocab-group-unit,
@@ -2932,7 +2948,6 @@ html[data-theme="modern-card"] {
   --lib-field-border-focus: #3984e8;
   --lib-field-placeholder: #585e64;
   --lib-field-fg: #1a1a2e;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23585e64' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #e5e7eb;
   --lib-row-current-bg: #cccdd3;
   --lib-row-current-bg-hover: #c3c4cb;
@@ -2986,7 +3001,6 @@ html[data-theme="nord-night"] {
   --lib-field-border-focus: #75a0b0;
   --lib-field-placeholder: #b6c8da;
   --lib-field-fg: #e5e9f0;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23b6c8da' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #373d48;
   --lib-row-current-bg: #505662;
   --lib-row-current-bg-hover: #585e6a;
@@ -3041,7 +3055,6 @@ html[data-theme="terminal"] {
   --lib-field-border-focus: #33ff33;
   --lib-field-placeholder: #5bae5b;
   --lib-field-fg: #33ff33;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235bae5b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #0c160c;
   --lib-row-current-bg: #102f10;
   --lib-row-current-bg-hover: #123912;
@@ -3096,7 +3109,6 @@ html[data-theme="paper-ink"] {
   --lib-field-border-focus: #1a3a5c;
   --lib-field-placeholder: #5c5c5c;
   --lib-field-fg: #2c2c2c;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235c5c5c' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #f0eeeb;
   --lib-row-current-bg: #d7d5d3;
   --lib-row-current-bg-hover: #cecdcb;
@@ -3150,7 +3162,6 @@ html[data-theme="dracula"] {
   --lib-field-border-focus: #6ba0b4;
   --lib-field-placeholder: #bcc3d8;
   --lib-field-fg: #f8f8f2;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23bcc3d8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #32343f;
   --lib-row-current-bg: #4b4d56;
   --lib-row-current-bg-hover: #54565e;
@@ -3204,7 +3215,6 @@ html[data-theme="flexoki-light"] {
   --lib-field-border-focus: #5a85b5;
   --lib-field-placeholder: #615f55;
   --lib-field-fg: #100f0f;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23615f55' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #f3f0e5;
   --lib-row-current-bg: #d9d6cc;
   --lib-row-current-bg-hover: #cfccc3;
@@ -3258,7 +3268,6 @@ html[data-theme="flexoki-dark"] {
   --lib-field-border-focus: #417bad;
   --lib-field-placeholder: #a09e9a;
   --lib-field-fg: #cecdc3;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23a09e9a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #252422;
   --lib-row-current-bg: #3e3d3a;
   --lib-row-current-bg-hover: #474642;
@@ -3312,7 +3321,6 @@ html[data-theme="solarized-light"] {
   --lib-field-border-focus: #2380c1;
   --lib-field-placeholder: #525d5d;
   --lib-field-fg: #39474b;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23525d5d' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #f4efdd;
   --lib-row-current-bg: #dad9cb;
   --lib-row-current-bg-hover: #d2d2c5;
@@ -3367,7 +3375,6 @@ html[data-theme="solarized-dark"] {
   --lib-field-border-focus: #268bd2;
   --lib-field-placeholder: #9aacb2;
   --lib-field-fg: #c1cacb;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%239aacb2' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #09323d;
   --lib-row-current-bg: #22474f;
   --lib-row-current-bg-hover: #2a4d55;
@@ -3421,7 +3428,6 @@ html[data-theme="catppuccin-latte"] {
   --lib-field-border-focus: #3b78f3;
   --lib-field-placeholder: #575b6c;
   --lib-field-fg: #41445a;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23575b6c' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #e7e9ee;
   --lib-row-current-bg: #ced1d9;
   --lib-row-current-bg-hover: #c6c9d2;
@@ -3475,7 +3481,6 @@ html[data-theme="catppuccin-mocha"] {
   --lib-field-border-focus: #6784b8;
   --lib-field-placeholder: #a2a4b5;
   --lib-field-fg: #cdd6f4;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23a2a4b5' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #272738;
   --lib-row-current-bg: #3e3f52;
   --lib-row-current-bg-hover: #45475a;
@@ -3529,7 +3534,6 @@ html[data-theme="gruvbox-dark"] {
   --lib-field-border-focus: #749085;
   --lib-field-placeholder: #b6ada7;
   --lib-field-fg: #ebdbb2;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23b6ada7' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #32312f;
   --lib-row-current-bg: #4b4841;
   --lib-row-current-bg-hover: #534f47;
@@ -3583,7 +3587,6 @@ html[data-theme="rose-pine"] {
   --lib-field-border-focus: #7d6c9a;
   --lib-field-placeholder: #9996ac;
   --lib-field-fg: #e0def4;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%239996ac' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #23212e;
   --lib-row-current-bg: #3b3947;
   --lib-row-current-bg-hover: #434150;
@@ -3637,7 +3640,6 @@ html[data-theme="github-light"] {
   --lib-field-border-focus: #3f88df;
   --lib-field-placeholder: #5a626b;
   --lib-field-fg: #1f2328;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235a626b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #ebedf0;
   --lib-row-current-bg: #d1d4d6;
   --lib-row-current-bg-hover: #c8cbcd;
@@ -3676,7 +3678,6 @@ html[data-theme="github-light"] {
   --lib-field-border-focus: #3e88e9;
   --lib-field-placeholder: #5c636a;
   --lib-field-fg: #1a1a2e;
-  --lib-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235c636a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --lib-row-bg-hover: #ececee;
   --lib-row-current-bg: #d1d1d6;
   --lib-row-current-bg-hover: #c8c8ce;

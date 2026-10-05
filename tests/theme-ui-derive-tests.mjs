@@ -1557,7 +1557,7 @@ function f8Failures(id, out, hosts) {
   const NEW_ROLES = {
     opt: [...FIELD_ROLES, "field-chevron"],
     pp: [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"],
-    lib: [...FIELD_ROLES, "field-chevron"],
+    lib: [...FIELD_ROLES],
   };
   const FIELD_SURFACES = [
     { ns: "opt", surface: "options", frameKey: "input-border", compose: (tk, e) => composeOptionsThemeMap(tk, e.mode, e.useDarkMode).map },
@@ -1571,6 +1571,8 @@ function f8Failures(id, out, hosts) {
   }
   check(!UI_DERIVED_OUTPUT_ROLES.popup.includes("field-chevron"),
     "UI_DERIVED_OUTPUT_ROLES.popup lists field-chevron -- popup has no <select> (spec §2.2)");
+  check(!UI_DERIVED_OUTPUT_ROLES.library.includes("field-chevron"),
+    "UI_DERIVED_OUTPUT_ROLES.library lists field-chevron -- library has no native <select> since the 2026-10-03 redesign (final review #8)");
   const sets = { unseparatedFramed: [], sandwich: [], well: [], r13Pushed: [] };
   let walked = 0;
   for (const S of FIELD_SURFACES) {
@@ -1581,7 +1583,7 @@ function f8Failures(id, out, hosts) {
       walked++;
       const missing = NEW_ROLES[S.ns].filter((r) => typeof map[r] !== "string" || map[r] === "");
       check(!missing.length, `${id}: composed map lacks ${missing.join(", ")}`);
-      const stray = Object.keys(map).filter((k) => /^field-edge/.test(k) || (S.ns === "pp" && k === "field-chevron"));
+      const stray = Object.keys(map).filter((k) => /^field-edge/.test(k) || (S.ns !== "opt" && k === "field-chevron"));
       check(!stray.length, `${id}: composed map carries retired or foreign role(s) ${stray.join(", ")}`);
       if (missing.length) continue;
       const hosts = FIELD_HOST_ROLES[S.ns].map((r) => map[r]);
@@ -1702,7 +1704,7 @@ function f8Failures(id, out, hosts) {
 {
   const REQUIRED = {
     pp: [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"],
-    lib: [...FIELD_ROLES, "field-chevron"],
+    lib: [...FIELD_ROLES],
   };
   for (const [ns, file] of [["pp", "../popup.css"], ["lib", "../library.css"]]) {
     const css = readFileSync(new URL(file, import.meta.url), "utf8");
@@ -1715,7 +1717,7 @@ function f8Failures(id, out, hosts) {
       const declared = new Set(parseDeclarations(block.body).map((d) => d.property));
       const absent = REQUIRED[ns].filter((r) => !declared.has(`--${ns}-${r}`));
       check(!absent.length, `${file} ${block.selectors[0]}: missing ${absent.map((r) => `--${ns}-${r}`).join(", ")}`);
-      const stray = [...declared].filter((p) => p.startsWith(`--${ns}-field-edge`) || p === "--pp-field-chevron");
+      const stray = [...declared].filter((p) => p.startsWith(`--${ns}-field-edge`) || p === "--pp-field-chevron" || p === "--lib-field-chevron");
       check(!stray.length, `${file} ${block.selectors[0]}: declares retired or foreign role(s) ${stray.join(", ")}`);
     }
   }
@@ -1738,7 +1740,7 @@ function f8Failures(id, out, hosts) {
   const lib = fold("../library.css", "lib");
   const absent = (dict, roles) => roles.filter((r) => typeof dict[r] !== "string");
   const ppAbsent = absent(pp, [...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"]);
-  const libAbsent = absent(lib, [...FIELD_ROLES, "field-chevron"]);
+  const libAbsent = absent(lib, [...FIELD_ROLES]);
   check(!ppAbsent.length, `popup.css default :root (folded) lacks ${ppAbsent.map((r) => `--pp-${r}`).join(", ")} -- popup-chrome.mjs DEFAULT_LIGHT`);
   check(!libAbsent.length, `library.css default :root (folded) lacks ${libAbsent.map((r) => `--lib-${r}`).join(", ")} -- library-chrome.mjs DEFAULT_LIGHT`);
   if (!ppAbsent.length) {
@@ -1757,7 +1759,7 @@ function f8Failures(id, out, hosts) {
     for (const role of FIELD_ROLES) {
       check(lib[role] === want[role], `default :root --lib-${role}=${lib[role]} is not deriveFieldRoles(folded :root, hosts [panel, bg])=${want[role]} -- update library-chrome.mjs DEFAULT_LIGHT`);
     }
-    check(lib["field-chevron"] === fieldChevronUri(lib["field-placeholder"]), "default :root --lib-field-chevron is not fieldChevronUri(--lib-field-placeholder)");
+    check(!("field-chevron" in lib), "default :root still declares --lib-field-chevron -- library has no native <select> to read it (final review #8)");
   }
 }
 

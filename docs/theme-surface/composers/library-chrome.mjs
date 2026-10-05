@@ -1,6 +1,6 @@
 import { expandPalette } from "./_util.mjs";
 import { mergeTokens } from "./compose-theme.mjs";
-import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, FIELD_HOST_ROLES, fieldChevronUri, deriveRowStates, deriveNoteMarks, NOTE_MARK_ALPHA_LIGHT, NOTE_MARK_ALPHA_DARK } from "./_ui-derive.mjs";
+import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, FIELD_HOST_ROLES, deriveRowStates, deriveNoteMarks, NOTE_MARK_ALPHA_LIGHT, NOTE_MARK_ALPHA_DARK } from "./_ui-derive.mjs";
 import { POPUP_THEME_MAP } from "./popup-chrome.mjs";
 
 // The six S2 fills a row's TEXT can sit on (spec 2026-10-03-library-redesign
@@ -92,7 +92,6 @@ const DEFAULT_LIGHT = {
   "field-border-focus": "#3e88e9",  // = focus-bd, 3.01:1 on field-bg
   "field-placeholder": "#5c636a",   // fg-hint #61686f (4.29:1 on the hover fill) pushed to 4.62:1
   "field-fg": "#1a1a2e",            // = fg: already 2.80:1 from the placeholder
-  "field-chevron": fieldChevronUri("#5c636a"), // the native <select> chevron, stroked in field-placeholder
   // S2 row states (spec 2026-10-03-library-redesign §6.4, C55). NOT hand-
   // picked: deriveRowStates over library.css's hand :root (bg #f7f7f8, fg
   // #1a1a2e, accent #1a73e8), then the two text roles over the same :root
@@ -190,10 +189,11 @@ function emitLib(ui, palette, overrides, radius, focus = {}, mode) {
     // two themes whose fill lies between them (catppuccin-mocha,
     // gruvbox-dark) would step their hover toward the page bg until it
     // dissolves there (1.002 / 1.003). library emits every map key, so no
-    // whitelist to extend; field-chevron is the native <select> arrow.
+    // whitelist to extend. No field-chevron: library has no native <select>
+    // since the redesign (every select is a listbox.js .listbox-btn, whose
+    // arrow is a .btn-ic SVG in field-placeholder), so the role had no reader.
     fieldRoles: true,
     fieldHostRoles: FIELD_HOST_ROLES.lib,
-    fieldChevron: true,
   });
 
   // S2 row states (spec 2026-10-03-library-redesign §3.8 / §6.4; COMPONENTS.md

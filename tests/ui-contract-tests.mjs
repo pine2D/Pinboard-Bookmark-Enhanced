@@ -8568,12 +8568,14 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     const untyped = ["rest", "hover", "focus", "placeholder", "passenger", "chevron"].flatMap((k) => selectorListOf(t[k]))
       .filter((sel) => subjects(sel).some((c) => c.tag === "input" && c.type === null));
     check(untyped.length === 0, `ui-components.mjs FIELD_TARGETS.lib ${t.id}: untyped input subject(s) ${JSON.stringify(untyped)} -- type-restrict them (a checkbox must never take the field fill)`);
-    // A <select> family (a select tag, or a class the harvest saw on a runtime
-    // select) takes the per-theme chevron on exactly its rest selectors;
-    // nothing else does.
+    // No entry draws a chevron: library stopped emitting --lib-field-chevron
+    // when its last native <select> left (2026-10-03 redesign, final review
+    // #8), so a chevron here would paint var() of nothing. A <select> family
+    // (a select tag, or a class the harvest saw on a runtime select) coming
+    // back has to bring the role back first (library-chrome.mjs fieldChevron).
     const isSelect = selectorListOf(t.rest).every((sel) => subjects(sel).some((c) => c.tag === "select" || c.classes.some((cl) => LIBRARY_VALUE_BOX.selectClasses.has(cl))));
-    check(isSelect ? t.chevron === t.rest : t.chevron === null,
-      `ui-components.mjs FIELD_TARGETS.lib ${t.id}: chevron must be ${isSelect ? "the rest selector list (a select family)" : "null (not a select)"} -- got ${JSON.stringify(t.chevron)}`);
+    check(t.chevron === null && !isSelect,
+      `ui-components.mjs FIELD_TARGETS.lib ${t.id}: ${isSelect ? "a native <select> family -- library emits no --lib-field-chevron any more; restore the role before registering one" : "chevron must be null"} -- got ${JSON.stringify(t.chevron)}`);
   }
   const coveredClasses = new Set(LIB.flatMap((t) => selectorListOf(t.rest).flatMap((sel) => subjects(sel).flatMap((c) => c.classes))));
   const uncoveredClasses = [...LIBRARY_VALUE_BOX.classes].filter((cl) => !coveredClasses.has(cl));
@@ -8843,15 +8845,16 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // (d) A colour literal inside a url() of a value-box rule (%23<hex>, #<hex>,
   //     rgb(), hsl() -- stage 4 T7-e, Task 4's module-level
   //     valueBoxUrlColourOffenders): the bare hex ratchet cannot see it, and
-  //     library's chevrons are the per-theme --lib-field-chevron role now
+  //     library has no drawn chevron at all since the redesign (final review
+  //     #8 retired --lib-field-chevron); a theme colour comes from a role.
   //     (§2.2). Whole file, generated regions included.
   const libUrlOffenders = (css) => valueBoxUrlColourOffenders(css, isValueBoxSelector);
   check(libUrlOffenders(libNoComments).length === 0,
-    "library.css: a value-box rule carries a colour literal inside url() -- the chevron is var(--lib-field-chevron): " + libUrlOffenders(libNoComments).join(" | "));
+    "library.css: a value-box rule carries a colour literal inside url() -- colours come from a per-theme role: " + libUrlOffenders(libNoComments).join(" | "));
   check(libUrlOffenders(`.listbox-btn { background-image: ${CHEVRON}; }`).length === 1 &&
     libUrlOffenders(`html[data-theme="dracula"] .vocab-filter-row select { background-image: ${CHEVRON}; }`).length === 1 &&
     libUrlOffenders(`.listbox-trigger { background-image: ${CHEVRON}; }`).length === 0 &&
-    libUrlOffenders(".listbox-btn { background-image: var(--lib-field-chevron); }").length === 0,
+    libUrlOffenders(".listbox-btn { background-image: var(--lib-some-role); }").length === 0,
     "ui-contract-tests.mjs: the library url() colour scan no longer discriminates");
 
   // The value-box model itself must tell library's boxes from their neighbours.

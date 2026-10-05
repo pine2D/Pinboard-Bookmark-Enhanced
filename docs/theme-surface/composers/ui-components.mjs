@@ -493,10 +493,11 @@ function chipRules(ns) {
 // this guard landed).
 //
 // library's value boxes (stage 4, spec 2026-09-30 §3.3) take the COLOUR half
-// from FIELD_TARGETS.lib like popup's: the toolbar search fields, the
-// lookup-language select and .xp-dict-lang (plus the per-theme chevron),
+// from FIELD_TARGETS.lib like popup's: the toolbar search fields,
 // listbox.js's .listbox-btn, the .vocab-group-unit shell and its
-// passengers, and the note editor. Their
+// passengers, and the note editor. (Its native selects -- the lookup-language
+// select and the reader-only .xp-dict-lang -- left with the 2026-10-03
+// redesign, and the per-theme --lib-field-chevron with them.) Their
 // SHAPE half stays hand-written in library.css -- including the sm 20px
 // toolbar rung §6.4 records as a user decision (the .fg recipe's md 26px would
 // grow the sticky batch bar by 7px), the focus-ring glow with its z-index
@@ -684,7 +685,10 @@ function formRules(ns) {
 //   placeholder -> color field-placeholder
 //   passenger   -> color field-fg (the transparent, frameless core of a
 //                  fused shell; its own border/background stay hand-written)
-//   chevron     -> background-image field-chevron (library selects, Task 7)
+//   chevron     -> background-image field-chevron (a native <select> family;
+//                  every entry is null today -- popup has no select, and
+//                  library's last one left with the 2026-10-03 redesign,
+//                  which also stopped emitting --lib-field-chevron)
 //
 // The state ladder (ruling R1; binds pp AND lib): every entry climbs
 // rest < hover < focus by SPECIFICITY alone, box by box (spec §2.1: focus
@@ -704,8 +708,8 @@ function formRules(ns) {
 // within), so the eye or a tag chip holding focus keeps the unit out of its
 // hover paint, and the pointer over the eye keeps the token field in it.
 // No :has() on popup (the tags list toggles `.ac-open` by class for the same
-// reason, popup-tags.js). Library keeps its shipped triggers: .xp-dict-lang
-// :focus-visible, and the group unit's `:has(> input[type="text"]:focus)`
+// reason, popup-tags.js). Library keeps its shipped triggers: the listbox
+// button's :focus-visible, and the group unit's `:has(> input[type="text"]:focus)`
 // (its one :has() precedent), whose hover also excludes a disabled input.
 export const FIELD_TARGETS = Object.freeze({
   pp: Object.freeze([

@@ -366,7 +366,8 @@ final-fix wave:
   plus the value-box field family on all three surfaces (8 roles:
   `field-bg`, `field-border`, `field-bg-hover`, `field-border-hover`,
   `field-bg-focus`, `field-border-focus`, `field-placeholder`, `field-fg`,
-  plus `field-chevron` on options and library, plus library's nine S2 row-state
+  plus `field-chevron` on options (library retired its own with its last
+  native `<select>` in the 2026-10-03 redesign), plus library's nine S2 row-state
   roles (`row-bg-hover`, `row-current-bg`, `row-current-bg-hover`,
   `row-band-bg`, `row-band-bg-hover`, `row-band-current-bg`,
   `row-band-current-bg-hover`, `row-current-fg-muted`, `row-selected-fg` —

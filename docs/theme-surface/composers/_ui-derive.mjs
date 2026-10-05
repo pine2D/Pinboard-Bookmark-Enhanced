@@ -16,9 +16,10 @@ const COMMON_DERIVED_OUTPUT_ROLES = Object.freeze([
 // deriveFieldRoles() at the end of finalizeUiControlRoles when a composer
 // passes `fieldRoles: true`. Since stage 4 Task 5 all three composers do,
 // each with its own hosts (FIELD_HOST_ROLES: options [panel, pf-bg], popup
-// [bg], library [panel, bg]). options and library also pass
-// `fieldChevron: true` for the non-colour field-chevron (a url(), so not in
-// this list); popup adds tag-chip-fg / tag-chip-icon in popup-chrome.mjs.
+// [bg], library [panel, bg]). options also passes `fieldChevron: true` for
+// the non-colour field-chevron (a url(), so not in this list; library
+// dropped it with its last native <select> in the 2026-10-03 redesign);
+// popup adds tag-chip-fg / tag-chip-icon in popup-chrome.mjs.
 // Every one of them is in UI_DERIVED_OUTPUT_ROLES below.
 export const FIELD_ROLES = Object.freeze([
   "field-bg", "field-border", "field-bg-hover", "field-border-hover",
@@ -48,7 +49,8 @@ export const FIELD_ROLES = Object.freeze([
 //
 // Stage 4 Task 5 (spec docs/superpowers/specs/2026-09-30-ui-fields-stage4-
 // design.md §2.2): popup and library carry the value-box field family too
-// (FIELD_ROLES, plus library's non-colour field-chevron), and popup adds
+// (FIELD_ROLES; library's non-colour field-chevron was retired with its
+// last native <select> in the 2026-10-03 redesign), and popup adds
 // tag-chip-fg / tag-chip-icon / tag-chip-icon-hover -- the chip text and the
 // remove-x's resting and hover inks derived in
 // popup-chrome.mjs against the three backdrops a chip is painted on inside
@@ -67,7 +69,7 @@ export const FIELD_ROLES = Object.freeze([
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
   popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg", ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"]),
   options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
-  library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron",
+  library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES,
     "row-bg-hover", "row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover",
     "row-band-current-bg", "row-band-current-bg-hover", "row-current-fg-muted", "row-selected-fg",
     "note-mark-c1", "note-mark-c2", "note-mark-c3", "note-mark-c4", "note-mark-c5"]),
