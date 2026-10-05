@@ -147,6 +147,20 @@ const SHARD_TAG = SHARD ? ` (shard ${SHARD.i}/${SHARD.n})` : "";
 // cost extra CDP probes) spread across shards instead of landing in one.
 const SHARD_THEMES = SHARD ? THEMES.filter((_, idx) => idx % SHARD.n === SHARD.i) : THEMES;
 const RUNS_SWEEP = !SHARD || SHARD.i === 0;
+// ---- Relocated rows (library redesign T8f, controller ruling on cost).
+// Round-robin puts the default theme ("") in shard 0, which also runs the
+// single sweep pass -- the slowest shard, so the verify wall clock. The
+// default theme's hangOrder rows are the most expensive rows of any theme
+// (their window driver and settled coarse pass run on default only,
+// fullThemes), about four minutes under a 4-shard load, so they run in the
+// LAST shard instead: round-robin hands it the fewest themes (15 over n) and
+// never the sweep. Same rows, same sampling, run exactly once: the theme's
+// own shard skips them, the last shard runs them after its own themes, and a
+// run without --shard runs them in place as always. Holds for any n, so
+// verify.sh's default (min(4, cores)) and a PBP_RENDER_SHARDS override alike.
+const RELOCATED_ROWS = Object.freeze([{ surface: "library", state: "hangOrder", theme: "" }]);
+const RELOCATED_SHARD = SHARD ? SHARD.n - 1 : null;
+const isRelocated = (check, theme) => RELOCATED_ROWS.some((r) => r.surface === check.surface && r.state === check.state && r.theme === theme);
 
 // --json=<path> dumps the raw `results` array (every OK/SKIP/FAIL row, not
 // just the reported ones) next to the normal report. Added for the sharding
@@ -8452,7 +8466,11 @@ function checkFontconfigParity() {
 async function main() {
   checkFontconfigParity();
   if (SHARD) {
-    console.log(`[render-audit] shard ${SHARD.i}/${SHARD.n}: ${SHARD_THEMES.length}/${THEMES.length} theme(s) [${SHARD_THEMES.map((t) => t || "(default)").join(", ")}]${RUNS_SWEEP ? " + the single sweep pass (families 4-11 and the spacingScale ledger)" : ""}`);
+    const movedIn = SHARD.i === RELOCATED_SHARD ? RELOCATED_ROWS.filter((r) => !SHARD_THEMES.includes(r.theme)) : [];
+    const movedOut = SHARD.i !== RELOCATED_SHARD ? RELOCATED_ROWS.filter((r) => SHARD_THEMES.includes(r.theme)) : [];
+    console.log(`[render-audit] shard ${SHARD.i}/${SHARD.n}: ${SHARD_THEMES.length}/${THEMES.length} theme(s) [${SHARD_THEMES.map((t) => t || "(default)").join(", ")}]${RUNS_SWEEP ? " + the single sweep pass (families 4-11 and the spacingScale ledger)" : ""}` +
+      `${movedIn.length ? ` + relocated ${movedIn.map((r) => `${r.surface} ${r.state} (${r.theme || "default"})`).join(", ")}` : ""}` +
+      `${movedOut.length ? ` - relocated to shard ${RELOCATED_SHARD}: ${movedOut.map((r) => `${r.surface} ${r.state} (${r.theme || "default"})`).join(", ")}` : ""}`);
   }
   const userDataDir = mkdtempSync(join(tmpdir(), "pbp-render-audit-"));
   let ctx;
@@ -8763,11 +8781,25 @@ async function main() {
         await setTheme(sw, themePresetKey, optTheme);
         // `themes` (render-audit-checklist.mjs header) pins a layout entry to
         // the theme states whose geometry differs; everything else runs on all.
-        const themeChecks = checks.filter((c) => !c.themes || c.themes.includes(theme));
+        // Relocated rows leave their theme's shard for RELOCATED_SHARD (above).
+        const themeChecks = checks.filter((c) => (!c.themes || c.themes.includes(theme)) &&
+          !(SHARD && SHARD.i !== RELOCATED_SHARD && isRelocated(c, theme)));
         if (surface === "library") await runLibraryTheme(page, extBase, theme, themeChecks, results);
         else await runSimpleTheme(page, `${extBase}${SURFACE_PAGES[surface]}`, theme, themeChecks, results, surface, sw);
         if (MEDIA_THEME_SET.has(theme)) {
           mediaProbeCount += await runMediaPreferenceChecks(page, mediaSession, surface, theme, results);
+        }
+      }
+      // The relocated rows of OTHER shards' themes. They drive scratch pages
+      // of their own (no shared-page state), so only the theme's storage is
+      // set first; the shard's own theme loop has already finished with it.
+      if (SHARD && SHARD.i === RELOCATED_SHARD) {
+        for (const theme of THEMES.filter((t) => !SHARD_THEMES.includes(t))) {
+          const moved = checks.filter((c) => isRelocated(c, theme) && (!c.themes || c.themes.includes(theme)));
+          if (!moved.length) continue;
+          const { themePresetKey, optTheme } = themeToStorage(theme);
+          await setTheme(sw, themePresetKey, optTheme);
+          for (const check of moved) await runOneCheck(page, theme, check, results, extBase);
         }
       }
     }
