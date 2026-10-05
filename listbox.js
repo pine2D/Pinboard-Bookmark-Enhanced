@@ -250,12 +250,24 @@
       document.addEventListener("scroll", state.onScroll, true);
     } else {
       // Flip above when the list would overrun the viewport bottom and the
-      // room above is larger. Measured once per open; the attribute, not an
-      // inline style, carries the result (the CSS owns the geometry).
+      // room above is larger. Measured once per open; the side is an
+      // attribute the CSS positions by. --listbox-room is the border-box
+      // height the chosen side has inside the viewport (the anchor gap and an
+      // 8px edge off), same contract as place(): the surface CSS clamps the
+      // scroll layer with it. Without that clamp a list opened from mid-page
+      // in a short window ran past the viewport bottom, and since moving the
+      // active option scrolls only the list (reveal), End / PageDown put the
+      // active option out of sight.
+      pop.style.removeProperty("--listbox-room");
       const listRect = pop.getBoundingClientRect();
       const btnRect = btn.getBoundingClientRect();
       const viewH = window.innerHeight || document.documentElement.clientHeight;
-      if (listRect.bottom > viewH && btnRect.top > viewH - btnRect.bottom) pop.setAttribute("data-flip", "up");
+      const gap = Math.max(0, listRect.top - btnRect.bottom);
+      const below = Math.max(0, viewH - btnRect.bottom - gap - PLACE_EDGE);
+      const above = Math.max(0, btnRect.top - gap - PLACE_EDGE);
+      const up = listRect.bottom > viewH && btnRect.top > viewH - btnRect.bottom;
+      if (up) pop.setAttribute("data-flip", "up");
+      pop.style.setProperty("--listbox-room", `${Math.floor(up ? above : below)}px`);
     }
     const current = state.select.selectedIndex;
     const start = Number.isInteger(activeIndex) ? activeIndex

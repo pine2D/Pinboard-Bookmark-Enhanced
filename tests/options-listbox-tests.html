@@ -793,8 +793,11 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // the list's own scroll layer and nothing else. li.scrollIntoView() also
   // scrolled every scrollable ancestor -- here the options document; in the
   // library's two scroll containers the whole column jumped. The 260px
-  // viewport makes the open list overrun the bottom edge without flipping,
-  // which is exactly where scrollIntoView reached past the list.
+  // viewport is shorter than the list's natural height on either side of the
+  // button, which is exactly where scrollIntoView reached past the list --
+  // and, once it was gone, where End left the active option below the
+  // viewport (final review #2/#18): the list is now clamped to the room on
+  // the side it opened to, so the option it scrolls to is on screen.
   test("keyboard moves of the active option scroll only the list, never the page", async () => {
     showPanel("panel-ai");
     setValue(provider(), "gemini");
@@ -815,7 +818,9 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       const before = scrollers();
       btn.click();
       assert(!pop.hidden && pop.getAttribute("data-flip") !== "up", "fixture: the list did not open downward (data-flip=" + pop.getAttribute("data-flip") + ")");
-      assert(pop.getBoundingClientRect().bottom > win.innerHeight, "fixture: the open list fits the 260px viewport, so an ancestor scroll could not show");
+      assert(list.scrollHeight > win.innerHeight - btn.getBoundingClientRect().bottom, "fixture: the list's natural height fits below the button in the 260px viewport");
+      assert(pop.getBoundingClientRect().bottom <= win.innerHeight + 0.5,
+        "the open list runs past the viewport bottom: " + pop.getBoundingClientRect().bottom + " > " + win.innerHeight);
       key(btn, "End");
       const items = itemsOf(provider());
       assert(activeIndex(provider()) === items.length - 1, "End did not reach the last option");
@@ -825,6 +830,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       assert(lastRect.top >= box.top - 0.5 && lastRect.bottom <= box.top + list.clientTop + list.clientHeight + 0.5,
         "the last option is outside the list's visible box");
       assert(scrollers() === before, "an ancestor scrolled on End: " + before + " -> " + scrollers());
+      assert(lastRect.bottom <= win.innerHeight + 0.5, "End left the active option below the viewport: " + lastRect.bottom + " > " + win.innerHeight);
       key(btn, "Home");
       assert(items[0].getBoundingClientRect().top >= list.getBoundingClientRect().top - 0.5, "Home did not bring the first option back into view");
       assert(scrollers() === before, "an ancestor scrolled on Home: " + before + " -> " + scrollers());

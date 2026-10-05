@@ -350,7 +350,12 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 .listbox-pop { position: absolute; left: 0; top: calc(100% + var(--opt-sp-1)); z-index: var(--opt-z-popover); min-width: 100%; overflow: hidden; background: var(--opt-panel); color: var(--opt-fg); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-lg); box-shadow: var(--opt-shadow-md); }
 .listbox-pop[data-flip="up"] { top: auto; bottom: calc(100% + var(--opt-sp-1)); }
 .listbox-pop[hidden] { display: none; }
-.listbox-list { max-height: min(320px, calc(100dvh - 32px)); overflow: auto; margin: 0; padding: var(--opt-sp-2); list-style: none; }
+/* --listbox-room: the viewport room listbox.js measured on the side the
+   list opened to (border box), so the scroll layer never runs past the
+   viewport edge -- keyboard moves scroll only the list (spec 2026-10-03
+   library redesign §8.1), and a list half below the fold would hide the
+   active option. Minus the shell's 1px borders and this layer's padding. */
+.listbox-list { max-height: min(320px, calc(100dvh - 32px), calc(var(--listbox-room, 100dvh) - 2px - 2 * var(--opt-sp-2))); overflow: auto; margin: 0; padding: var(--opt-sp-2); list-style: none; }
 .listbox-opt { display: flex; align-items: center; height: var(--opt-control-h); padding: 0 var(--opt-sp-4); border-radius: var(--opt-radius-sm); font-size: var(--opt-text-body); white-space: nowrap; cursor: pointer; }
 .listbox-opt[data-active] { background: var(--opt-btn-hover); color: var(--opt-btn-fg); }
 .listbox-opt[aria-selected="true"] { background: var(--opt-accent); color: var(--opt-on-accent); }
