@@ -1470,8 +1470,8 @@ check(!read("anki-connect.js").includes("PBP_ANKI_ENDPOINT"),
     // #2): its offset is read before the rebuild, written back after it, and
     // the page itself is never scrolled.
     notesRefresh.indexOf("const listScroll = region ? region.scrollTop : 0;") >= 0 &&
-    notesRefresh.indexOf("await renderNotesPanel();") > notesRefresh.indexOf("const listScroll = region ? region.scrollTop : 0;") &&
-    notesRefresh.indexOf("region.scrollTop = listScroll") > notesRefresh.indexOf("await renderNotesPanel();") &&
+    notesRefresh.indexOf("await renderNotesPanel()") > notesRefresh.indexOf("const listScroll = region ? region.scrollTop : 0;") &&
+    notesRefresh.indexOf("region.scrollTop = listScroll") > notesRefresh.indexOf("await renderNotesPanel()") &&
     !/window\.scroll(?:To|Y)/.test(notesRefresh) &&
     /pbp-lib-view[\s\S]{0,120}_pbpNotesRefreshPreservingState\(\)/.test(libraryNotesJs) &&
     // Debounced: a single highlight drag rewrites the whole record per

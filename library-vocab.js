@@ -814,7 +814,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   del.type = "button";
   del.className = "btn btn-sm danger ghost vocab-detail-delete lib-hang-start";
   setBtnIcon(del, "trash", t("dictDeleteWord"));
-  del.addEventListener("click", () => _pbpVocabDeleteRow(w, del));
+  del.addEventListener("click", () => _pbpVocabDeleteRow(w, del, renderOwner));
   footer.appendChild(del);
   // Save stays in layout while hidden (visibility, see .vocab-note-save[hidden]
   // in library.css), so becoming dirty moves nothing in the row.
@@ -1290,6 +1290,18 @@ function _pbpVocabLookupOther(term, lang) {
       _pbpVocabMarkCurrentRow(fresh.id);
       const row = document.querySelector(`#vocab-list .vocab-card[data-vocab-id="${CSS.escape(fresh.id)}"]`);
       if (row) row.scrollIntoView({ block: "nearest" });
+      // Opening another word rebuilt this column, so the button just pressed
+      // is gone and focus would fall to <body>. Narrow mode already handed it
+      // to Back (_pbpVocabFocusNarrowBack). Otherwise it goes where a row
+      // click leaves it, on the word's row; a row filtered out of (or not
+      // yet loaded into) the list leaves the opened word's heading instead.
+      if (_pbpVocabNarrowMode()) return;
+      const head = row && row.querySelector(".notes-card-head");
+      const target = head || $id("vocab-detail")?.querySelector(".vocab-detail-term");
+      if (!target) return;
+      if (head) _pbpVocabSetRowTabStop(head);
+      else target.tabIndex = -1;
+      try { target.focus({ preventScroll: true }); } catch (_) { target.focus(); }
     });
     head.appendChild(hint);
   }
@@ -1591,7 +1603,11 @@ function pbpVocabSelectionSnapshotValid(ids, selected, rows) {
 // re-derived at action time, not reused from the render pass, so a delete
 // confirmed after an account switch still checks against the CURRENT
 // account (account-isolation invariant).
-function _pbpVocabDeleteRow(w, anchor) {
+// `renderOwner` (optional): the owner the detail was rendered for, passed by
+// the detail's own delete so it follows the same rule as the detail's other
+// writes (_pbpVocabOwnerMoved). A list row's delete leaves it out -- an
+// account switch removes the rows synchronously.
+function _pbpVocabDeleteRow(w, anchor, renderOwner) {
   showConfirmPopover(anchor, {
     msg: t("dictDeleteConfirm", w.term),
     yesText: t("delete"),
@@ -1607,6 +1623,7 @@ function _pbpVocabDeleteRow(w, anchor) {
       // would otherwise vanish with no user-visible feedback.
       try {
         owner = await pbpVocabCurrentOwner();
+        if (renderOwner !== undefined && _pbpVocabOwnerMoved(owner, renderOwner, gen)) return;
         const ok = await pbpVocabDelete(w.id, owner);
         // Only a confirmed delete collapses the card -- a failed one would
         // fold and then pop back on the reconciling re-render.
@@ -1772,6 +1789,18 @@ function _pbpVocabRefreshGroupOptions(preserveSelection) {
   }
 }
 
+// "Load N more" from the current view and render limit -- the list render
+// and a language switch (pbp:i18n-applied) both write it through here.
+function _pbpVocabSyncLoadMore() {
+  const more = $id("vocab-load-more");
+  if (!more) return;
+  const rows = _vocabViewRows;
+  const remaining = Math.max(0, rows.length - Math.min(rows.length, _vocabRenderLimit));
+  more.hidden = remaining === 0;
+  // The last one left reads in the singular ("Load the last one").
+  const next = Math.min(PBP_VOCAB_RENDER_BATCH, remaining);
+  more.textContent = t(pbpLibCountKey(next, "vocabLoadMoreOne", "vocabLoadMore"), String(next));
+}
 function _pbpVocabRenderList(append) {
   const list = $id("vocab-list");
   if (!list) return;
@@ -1789,14 +1818,7 @@ function _pbpVocabRenderList(append) {
   const fragment = document.createDocumentFragment();
   rows.slice(start, target).forEach((w) => fragment.appendChild(_pbpVocabBuildRow(w)));
   list.appendChild(fragment);
-  const more = $id("vocab-load-more");
-  if (more) {
-    const remaining = Math.max(0, rows.length - target);
-    more.hidden = remaining === 0;
-    // The last one left reads in the singular ("Load the last one").
-    const next = Math.min(PBP_VOCAB_RENDER_BATCH, remaining);
-    more.textContent = t(pbpLibCountKey(next, "vocabLoadMoreOne", "vocabLoadMore"), String(next));
-  }
+  _pbpVocabSyncLoadMore();
   _pbpVocabSyncSelectionUi();
   // Full rebuilds (append=false: search/filter/sort/reload) replace every
   // row, dropping the aria-current marker set by row activation even though
@@ -2483,6 +2505,7 @@ document.addEventListener("pbp:i18n-applied", () => {
   // cold load whose stored language differs from the localStorage mirror
   // kept them in the mirror's language.
   _pbpVocabRenderStats();
+  _pbpVocabSyncLoadMore();
 });
 // Narrow-screen door to the lookup row. Below 860px the detail pane is
 // display:none until `lib-narrow-detail` is on the body, so the list needs

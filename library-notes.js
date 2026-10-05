@@ -187,6 +187,13 @@ let _notesRenderedDetailKey = null;
 let _notesSelected = new Set();
 let _notesLastSelectedKey = null;
 let _notesBatchBusy = false;
+// Scan generation, twin of library-vocab.js's _vocabRenderGen. Every
+// renderNotesPanel takes a new one and an account switch bumps it too, so a
+// scan still in flight when the account changes lands stale and is dropped:
+// without this, the previous account's rows (and, through
+// _pbpNotesRefreshPreservingState, its open detail) came back after the
+// switch had already cleared them.
+let _notesRenderGen = 0;
 
 // Account scoping (roadmap #19): memoized owner scope for the scan below. The
 // library page is long-lived and the account can change under it, so the
@@ -213,6 +220,9 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     if (area !== "local" && area !== "sync") return;
     if (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys) {
       _notesOwnerCache = null;
+      // Invalidate any scan already in flight for the account that just left
+      // before clearing what it drew (see _notesRenderGen).
+      _notesRenderGen++;
       // Fail-closed NOW, not at the next view activation: an account switch
       // carries no pbp_hl_ write, so without this the old account's notes
       // stay on screen indefinitely (Codex review P1; CLAUDE.md owner rule).
@@ -1006,6 +1016,11 @@ function _pbpNotesJumpTo(key) {
 function _pbpNotesStackLabels(detail) {
   const host = detail || $id("notes-detail");
   if (!host || host.hidden) return;
+  // Not rendered (the vocabulary view is on screen, so an ancestor is
+  // display:none): every width below would read 0 and the verdicts would be
+  // wrong. Keep the last ones; the detail's ResizeObserver re-measures when
+  // the view comes back.
+  if (!host.getClientRects().length) return;
   const rows = [];
   for (const ex of host.querySelectorAll(":scope > .notes-excerpt")) {
     const label = ex.querySelector(":scope > .notes-excerpt-label");
@@ -1715,9 +1730,13 @@ function _pbpNotesFocusAfterDelete(position) {
 // Called from the pbp-lib-view mount below on every "notes" view activation.
 // Re-scans storage every activation (no "already inited" guard), matching
 // renderStoragePanel()'s convention.
+// Resolves true when this call's scan is still the latest one, false when a
+// newer scan or an account switch superseded it while it was reading (its
+// result is then dropped -- see _notesRenderGen).
 async function renderNotesPanel() {
   const list = $id("notes-list");
-  if (!list) return;
+  if (!list) return false;
+  const gen = ++_notesRenderGen;
   _pbpNotesBuildColorFilters();
   // The scan is a real storage round trip (getKeys + get over every pbp_hl_
   // record), and until it lands this grid is empty -- indistinguishable from
@@ -1732,8 +1751,10 @@ async function renderNotesPanel() {
   try {
     rows = await _pbpNotesScan();
   } finally {
-    list.setAttribute("aria-busy", "false");
+    // A superseded scan leaves the busy flag to the scan that replaced it.
+    if (gen === _notesRenderGen) list.setAttribute("aria-busy", "false");
   }
+  if (gen !== _notesRenderGen) return false;
   if (!rows) {
     // The read failed (null, not an empty array). Rendering the empty result
     // here would write "select text on a preview page to highlight it" over a
@@ -1745,7 +1766,7 @@ async function renderNotesPanel() {
     _pbpNotesSetStatus(_pbpNotesLoadFailedText());
     _notesLoadFailed = true;
     _pbpNotesRenderCover(true);
-    return;
+    return true;
   }
   // The read worked. Nothing else ever clears that sentence, so without this
   // one transient failure leaves "couldn't read your saved highlights" sitting
@@ -1758,6 +1779,7 @@ async function renderNotesPanel() {
   // pbp_hl_ debounce fires one behind every write the reader makes in another
   // tab -- collapsing an expanded list under the user each time.
   _pbpNotesRender();
+  return true;
 }
 
 // Select all, from either row; focus goes to the batch row's Clear because
@@ -1894,8 +1916,12 @@ if (typeof $id === "function") {
     // written the same way.
     if (_notesScanDone) {
       const all = _pbpNotesHits();
-      _pbpNotesRenderToolbar(all.length, _pbpNotesVisibleHits(all).length, all);
+      const visible = _pbpNotesVisibleHits(all);
+      _pbpNotesRenderToolbar(all.length, visible.length, all);
       _pbpNotesSyncColorFilters(all);
+      // "Load N more" is written by the render path only; same remaining
+      // count that render computed, so this only re-words it.
+      _pbpNotesSyncLoadMore(visible.length - Math.min(visible.length, _notesRenderLimit));
     }
     const hit = _pbpNotesFindHit(_pbpNotesSelectedKey);
     if (!hit) return;
@@ -1930,7 +1956,11 @@ async function _pbpNotesRefreshPreservingState() {
   const focusedRow = active && active.closest ? active.closest("#notes-list .notes-hit") : null;
   const focusedKey = focusedRow ? focusedRow.dataset.notesKey : null;
   const detailFocus = focusedRow ? null : _pbpNotesDetailFocusSnapshot();
-  await renderNotesPanel();
+  // Superseded (an account switch, or a newer refresh, landed while this
+  // scan was reading): `selected` and the focus snapshot belong to a picture
+  // that is gone, and restoring them would reopen the previous account's
+  // detail over the new account's list. The scan that won owns the screen.
+  if (!(await renderNotesPanel())) return;
   const hit = _pbpNotesFindHit(selected);
   if (hit) {
     _pbpNotesSelectedKey = selected;

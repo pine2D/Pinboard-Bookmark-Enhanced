@@ -576,6 +576,15 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     await frames();
     check("a window resize re-measures the hang labels too",
       !!labelOf("x2")?.classList.contains("is-stacked"), labelOf("x2")?.className);
+    // The other view on screen (#view-notes[hidden]): the detail itself is
+    // not hidden, but nothing in it is rendered, so a resize or i18n re-render
+    // that measures now would read zero widths. The last verdict stays.
+    $id("view-notes").hidden = true;
+    try {
+      _pbpNotesStackLabels(detail());
+      check("a re-measure while the notes view is hidden keeps the last stack verdicts",
+        !!labelOf("x2")?.classList.contains("is-stacked"), labelOf("x2")?.className);
+    } finally { $id("view-notes").hidden = false; }
     t = realT;
     // -- the stack decision is CSS's own wrap decision (T8c review) --
     // The unmeasured hang label wraps by CSS (flex-wrap) exactly when its
@@ -1422,6 +1431,59 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     await renderNotesPanel();
   }
 
+  // ---- a scan still reading when the account switches lands stale ----
+  // The refresh (visibilitychange / pbp_hl_ debounce) captured the open
+  // highlight and started reading as the first account; the switch then
+  // cleared the screen and rescanned as the second. When the first read comes
+  // back late it must be dropped, rows AND the detail restore with it.
+  {
+    const realOwnerFn = window.pbpVocabCurrentOwner;
+    const realGet = chrome.storage.local.get;
+    let stubbedOwner = "acct_one";
+    window.pbpVocabCurrentOwner = async () => stubbedOwner;
+    let releaseStale = null;
+    try {
+      store["pbp_hl_race"] = { v: 1, url: "https://race.example/p", title: "Race page", items: [
+        { id: "r1", n: 1, quote: "first account's highlight", color: 1, note: "first note", ts: 990, owner: "acct_one" },
+        { id: "r2", n: 2, quote: "second account's highlight", color: 2, note: "", ts: 980, owner: "acct_two" },
+      ] };
+      _notesOwnerCache = null;
+      await renderNotesPanel();
+      rowEl("pbp_hl_race#r1").querySelector(".notes-hit-btn").click();
+      check("the first account's highlight is open before the race",
+        _pbpNotesSelectedKey === "pbp_hl_race#r1" && detail().hidden === false);
+      // The next read (the refresh's) parks until released.
+      chrome.storage.local.get = (keys) => new Promise((resolve) => {
+        const snap = realGet(keys);
+        releaseStale = () => resolve(snap);
+      });
+      const refresh = _pbpNotesRefreshPreservingState();
+      await settle(() => !!releaseStale);
+      chrome.storage.local.get = realGet;
+      stubbedOwner = "acct_two";
+      fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "sync");
+      await settle(() => rowKeys().includes("pbp_hl_race#r2"));
+      releaseStale();
+      await refresh;
+      await settle(() => false);
+      check("a scan that lands after an account switch does not bring the old account's rows back",
+        rowKeys().includes("pbp_hl_race#r2") && !rowKeys().includes("pbp_hl_race#r1"), rowKeys());
+      check("...nor reopen the old account's highlight in the reading pane",
+        detail().hidden === true && _pbpNotesSelectedKey === null && !detail().textContent.includes("first note"),
+        detail().hidden + " | " + _pbpNotesSelectedKey);
+      check("...and the list is not left marked busy by the dropped scan",
+        $id("notes-list").getAttribute("aria-busy") === "false");
+    } finally {
+      if (releaseStale) releaseStale();
+      chrome.storage.local.get = realGet;
+      window.pbpVocabCurrentOwner = realOwnerFn;
+      delete store["pbp_hl_race"];
+      _notesOwnerCache = null;
+      _pbpNotesRenderDetail(null);
+      await renderNotesPanel();
+    }
+  }
+
   // ---- the cover before any successful read says the read failed ----
   {
     const realGet = chrome.storage.local.get;
@@ -1512,6 +1574,15 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       more() ? more().outerHTML : "(no button)");
     check("the count line still reports every hit, not just the rendered ones",
       countItems().startsWith("libraryStatsHighlights:150|"), countItems());
+    {
+      // A language switch after the render (the cold-load mirror refresh)
+      // re-words Load more; nothing else rewrites it until the next render.
+      const tBefore = t;
+      t = (key, ...values) => "L2:" + tBefore(key, ...values);
+      try { document.dispatchEvent(new Event("pbp:i18n-applied")); } finally { t = tBefore; }
+      check("a language switch re-words Load more in the new language",
+        more()?.textContent === "L2:vocabLoadMore:50" && rows().length === 100, more()?.textContent);
+    }
     check("Select all takes every matching highlight, not just the rendered ones", (() => {
       $id("notes-select-all").click();
       const size = _notesSelected.size;

@@ -562,11 +562,18 @@ check("lookup bar wiring populates the language select with no Auto leg",
 
     $id("vocab-lookup-input").value = "hello";
     _pbpVocabFreeLookup();
+    result.querySelector(".vocab-lookup-saved").focus();
     result.querySelector(".vocab-lookup-saved").click();
     const savedCard = $id("vocab-list").querySelector('.vocab-card[data-vocab-id="lk-hello"]');
     check("T7 the saved-word hint opens that word, marks its row current and resets the column for it",
       _pbpVocabDetailWordId === "lk-hello" && !!savedCard && savedCard.getAttribute("aria-current") === "true" &&
       result.dataset.refState !== "other" && $id("vocab-lookup-input").value === "");
+    // The column rebuild removes the pressed hint; focus must land on the
+    // opened word (its row, the list's tab stop), never on <body>.
+    check("the saved-word hint hands focus to the opened word's row, not to the page body",
+      _pbpVocabNarrowMode() ? document.activeElement === $id("vocab-detail-back")
+        : (document.activeElement === savedCard.querySelector(".notes-card-head") && document.activeElement.tabIndex === 0),
+      `narrow=${_pbpVocabNarrowMode()} active=${document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)}`);
 
     _pbpVocabRenderDetail(null);
     $id("vocab-lookup-input").value = "hello";
@@ -2148,6 +2155,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     const realOwnerFn = pbpVocabCurrentOwner, realSetNote = pbpVocabSetNote, realStatus = pbpVocabBatchSetStatus;
     const realAddGroup = pbpVocabBatchAddGroup, realRenderPanel = renderVocabPanel, realCur = _vocabCurrentOwner;
     const realAll = pbpVocabAll;
+    const realDelete = pbpVocabDelete, realFlash = _pbpVocabFlashStatus;
     const writes = [];
     let rerenders = 0;
     try {
@@ -2181,9 +2189,24 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("T7 a note save (Save, the chord or leaving the box) whose owner read returns another account writes nothing",
         writes.length === 0 && rerenders === 3 && $id("vocab-detail-tail").querySelector(".vocab-note-save").disabled === false,
         `writes=${writes.join(",")} rerenders=${rerenders}`);
+      // The detail's delete is the fourth write path: same rule, same
+      // outcome (nothing deleted, no "delete failed", the panel re-renders).
+      pbpVocabDelete = async (id, owner) => { writes.push("delete:" + owner); return true; };
+      const flashes = [];
+      _pbpVocabFlashStatus = (ok, msg) => { flashes.push(msg); };
+      _pbpVocabRenderDetail(null);
+      _pbpVocabRenderDetail(word);
+      $id("vocab-detail-tail").querySelector(".vocab-detail-delete").click();
+      document.querySelector(".confirm-popover .confirm-yes").click();
+      await settle();
+      check("T7 the detail's delete whose owner read returns another account deletes nothing and re-renders, without a failure message",
+        writes.length === 0 && rerenders === 4 && flashes.length === 0,
+        `writes=${writes.join(",")} rerenders=${rerenders} flashes=${flashes.join(",")}`);
     } finally {
       _pbpVocabDictRun = realDictRun;
       pbpVocabCurrentOwner = realOwnerFn;
+      pbpVocabDelete = realDelete;
+      _pbpVocabFlashStatus = realFlash;
       pbpVocabSetNote = realSetNote;
       pbpVocabBatchSetStatus = realStatus;
       pbpVocabBatchAddGroup = realAddGroup;
@@ -3000,6 +3023,14 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("T8g stub: Load more with one word left takes vocabLoadMoreOne, with two the plural key",
         moreText(PBP_VOCAB_RENDER_BATCH + 1) === "vocabLoadMoreOne:1" && moreText(PBP_VOCAB_RENDER_BATCH + 2) === "vocabLoadMore:2",
         moreText(PBP_VOCAB_RENDER_BATCH + 1) + " | " + moreText(PBP_VOCAB_RENDER_BATCH + 2));
+      // A language switch after the render (the cold-load mirror refresh)
+      // re-words Load more; nothing else rewrites it until the next render.
+      show(bulk(PBP_VOCAB_RENDER_BATCH + 2));
+      t = (key, ...values) => "L2:" + realT(key, ...values);
+      try { document.dispatchEvent(new Event("pbp:i18n-applied")); } finally { t = realT; }
+      check("a language switch re-words Load more in the new language",
+        $id("vocab-load-more").textContent === "L2:vocabLoadMore:2" && !$id("vocab-load-more").hidden,
+        $id("vocab-load-more").textContent);
 
       const locs = {};
       for (const loc of ["en", "de", "fr"]) locs[loc] = await (await fetch(`../_locales/${loc}/messages.json`)).json();
