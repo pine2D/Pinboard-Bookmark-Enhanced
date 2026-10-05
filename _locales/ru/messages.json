@@ -3173,7 +3173,7 @@
       "message": "Google Диск не подключён на этом устройстве."
     },
     "vocabDriveUnavailable": {
-      "message": "Синхронизация словаря через Google Диск недоступна в этой сборке: активация OAuth ещё не завершена."
+      "message": "Синхронизация словарика через Google Диск недоступна в этой сборке: активация OAuth ещё не завершена."
     },
     "vocabDriveAuthorizing": {
       "message": "Ожидание авторизации Google. Завершите вход и подтверждение в окне, которое открыл Chrome."
@@ -3975,12 +3975,12 @@
   "diagnosticsCopy": { "message": "Копировать диагностику" },
   "diagnosticsCopied": { "message": "Диагностика скопирована" },
   "diagnosticsCopyFailed": { "message": "Не удалось скопировать диагностику. Проверьте доступ к буферу обмена и повторите попытку." },
-  "libraryVocabSignedOutTitle": { "message": "Войдите, чтобы пользоваться словарём" },
-  "libraryVocabSignedOutHint": { "message": "Словарь хранится отдельно для каждого аккаунта Pinboard. Поиск определений доступен и без входа." },
+  "libraryVocabSignedOutTitle": { "message": "Войдите, чтобы пользоваться словариком" },
+  "libraryVocabSignedOutHint": { "message": "Словарик хранится отдельно для каждого аккаунта Pinboard. Толкования слов доступны и без входа." },
   "libraryVocabOpenSettings": { "message": "Открыть настройки аккаунта" },
-  "libraryLookupSignedOutHint": { "message": "Найдите слово в разделе «Словарь». Войдите, чтобы сохранить его в словарик." },
+  "libraryLookupSignedOutHint": { "message": "Найдите слово в разделе «Толкования». Войдите, чтобы сохранить его в словарик." },
   "mdPreviewClose": { "message": "Закрыть режим чтения" },
-  "librarySectionDict": { "message": "Словарь" },
+  "librarySectionDict": { "message": "Толкования" },
   "libraryLookupOther": { "message": "Найти другое слово" },
   "libraryDictIdle": { "message": "Найти это слово в словаре" },
   "libraryDictIdleFree": { "message": "Введите любое слово, чтобы найти его в словаре" },
