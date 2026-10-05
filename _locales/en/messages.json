@@ -3793,6 +3793,7 @@
   "libraryNotesDetailEmpty": { "message": "Pick a highlight from the list to read it in full." },
   "libraryPageCount": { "message": "$COUNT$ on this page", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "$TOTAL$ highlights from $PAGES$ pages. The latest was saved on $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
+  "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ highlights from $PAGES$ pages.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
   "libraryThisPage": { "message": "This page" },
   "libraryOpenOriginal": { "message": "Open original" },
   "libraryPageFacts": { "message": "$COUNT$ highlights, $NOTED$ with notes", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },

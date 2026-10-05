@@ -1221,6 +1221,9 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
   .notes-sheet > .notes-page-side { display: block; grid-column: 4; grid-row: 1 / span var(--notes-rows); align-self: start; }
   .notes-sheet > .notes-detail-footer { display: none; }
   .notes-detail-meta > .notes-meta-pagecount { display: none; }
+  /* The page count is the meta's only item that comes and goes; when it was
+     the first one shown, the next item now leads and takes no dot. */
+  .notes-detail-meta > .notes-meta-pagecount:first-child + span::before { content: none; }
 }
 .notes-page-side > .notes-side-title {
   --fs: var(--lib-text-secondary);

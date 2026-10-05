@@ -3799,6 +3799,7 @@
   "libraryNotesDetailEmpty": { "message": "一覧からハイライトを選ぶと、全文が表示されます。" },
   "libraryPageCount": { "message": "このページ $COUNT$ 件", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "$PAGES$ ページのハイライト $TOTAL$ 件。最後の保存は $DATE$ です。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
+  "libraryNotesCoverLeadNoDate": { "message": "$PAGES$ ページのハイライト $TOTAL$ 件。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
   "libraryThisPage": { "message": "このページ" },
   "libraryOpenOriginal": { "message": "元のページを開く" },
   "libraryPageFacts": { "message": "ハイライト $COUNT$ 件（メモ付き $NOTED$ 件）", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },

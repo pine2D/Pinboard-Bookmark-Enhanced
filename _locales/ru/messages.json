@@ -3799,6 +3799,7 @@
   "libraryNotesDetailEmpty": { "message": "Выберите выделение из списка, чтобы прочитать его целиком." },
   "libraryPageCount": { "message": "На этой странице: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "Выделения: $TOTAL$ (страниц: $PAGES$). Последнее сохранено $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
+  "libraryNotesCoverLeadNoDate": { "message": "Выделения: $TOTAL$ (страниц: $PAGES$).", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
   "libraryThisPage": { "message": "Эта страница" },
   "libraryOpenOriginal": { "message": "Открыть оригинал" },
   "libraryPageFacts": { "message": "Выделения: $COUNT$, с заметкой: $NOTED$", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },

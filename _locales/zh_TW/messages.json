@@ -3799,6 +3799,7 @@
   "libraryNotesDetailEmpty": { "message": "從清單中選一則標記，就能讀到全文。" },
   "libraryPageCount": { "message": "本頁 $COUNT$ 筆", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "$TOTAL$ 筆標記，來自 $PAGES$ 個網頁；最近一次儲存在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
+  "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ 筆標記，來自 $PAGES$ 個網頁。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
   "libraryThisPage": { "message": "這一頁" },
   "libraryOpenOriginal": { "message": "開啟原文" },
   "libraryPageFacts": { "message": "$COUNT$ 筆標記，其中 $NOTED$ 筆有筆記", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },

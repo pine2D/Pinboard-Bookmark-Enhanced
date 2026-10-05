@@ -739,6 +739,48 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("the cover states how many highlights from how many pages, and when the latest was saved",
       $id("notes-cover-lead").textContent === `libraryNotesCoverLead:${stats.highlights},${stats.pages},${pbpLibFormatDay(stats.latestTs)}`,
       $id("notes-cover-lead").textContent);
+    const coverHint = () => $id("notes-detail-empty").querySelector(".lib-cover-hint");
+    check("with highlights to pick from, the cover shows its hint",
+      coverHint()?.hidden === false, String(coverHint()?.hidden));
+    check("the cover's two counts are bold and its date is not (sentinel split, as on the vocabulary cover)",
+      [...$id("notes-cover-lead").querySelectorAll("b")].map((b) => b.textContent).join(",") === `${stats.highlights},${stats.pages}`,
+      $id("notes-cover-lead").innerHTML);
+
+    // -- records with no timestamp at all (T8d review) --
+    {
+      const saved = { ...store };
+      for (const key of Object.keys(store)) delete store[key];
+      store["pbp_hl_nots"] = { v: 1, items: [
+        { id: "n1", n: 1, quote: "no time at all", color: 2, note: "", side: "tr", lang: "fr" },
+        { id: "n2", n: 2, quote: "none here either", color: 3, note: "" },
+      ] };
+      try {
+        await renderNotesPanel();
+        check("when no highlight carries a time, the cover sentence ends after the counts",
+          $id("notes-cover-lead").textContent === "libraryNotesCoverLeadNoDate:2,1", $id("notes-cover-lead").textContent);
+        fixtureWidth(2400);
+        _pbpNotesSelectRow("pbp_hl_nots#n1");
+        check("a page with no time at all leaves the column's time line out instead of writing an empty one",
+          shown(side()) && facts().length === 1 && facts()[0] === "libraryStatsHighlights:2", facts().join(" | "));
+        const sepOf = (cls) => {
+          const el = detail().querySelector(".notes-detail-meta > ." + cls);
+          return el ? getComputedStyle(el, "::before").content : "missing";
+        };
+        const wideSep = sepOf("notes-meta-lang");
+        fixtureWidth(960);
+        _pbpNotesSelectRow("pbp_hl_nots#n1");
+        const narrowSep = sepOf("notes-meta-lang");
+        check("the meta's separator dot only ever sits between two shown items (none before the first once the page count hides)",
+          (wideSep === "none" || wideSep === "normal") && narrowSep.includes("·"), `wide=${wideSep} narrow=${narrowSep}`);
+      } finally {
+        delete store["pbp_hl_nots"];
+        Object.assign(store, saved);
+        fixtureWidth(960);
+        _pbpNotesRenderDetail(null);
+        await renderNotesPanel();
+      }
+    }
+
     t = (key, ...values) => (key === "libraryNotesCoverLead" ? "relabelled" : realT(key, ...values));
     document.dispatchEvent(new Event("pbp:i18n-applied"));
     check("a language switch rewrites the cover sentence", $id("notes-cover-lead").textContent === "relabelled");
@@ -1301,6 +1343,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     try { await renderNotesPanel(); } finally { chrome.storage.local.get = realGet; }
     check("a read failure before the first count puts the failure sentence on the cover",
       $id("notes-cover-lead").textContent === _pbpNotesLoadFailedText(), $id("notes-cover-lead").textContent);
+    check("a cover saying the read failed hides the pick-a-highlight hint",
+      $id("notes-detail-empty").querySelector(".lib-cover-hint")?.hidden === true);
     _pbpNotesSetStatus("");
     await renderNotesPanel();
   }
@@ -1441,6 +1485,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     String($id("notes-scope-note").hidden));
   check("an empty store's cover says how to make a first highlight",
     $id("notes-cover-lead").textContent === "notesEmpty", $id("notes-cover-lead").textContent);
+  check("an empty store's cover hides the pick-a-highlight hint -- there is nothing to pick",
+    $id("notes-detail-empty").querySelector(".lib-cover-hint")?.hidden === true);
   check("a truly empty store never claims the boolean it did not earn",
     _notesHiddenByOwner === false, String(_notesHiddenByOwner));
 
@@ -1470,6 +1516,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
         String($id("notes-scope-note").hidden));
       check("a cover over owner-hidden highlights says they are hidden, not absent",
         $id("notes-cover-lead").textContent === "notesHiddenByOwner", $id("notes-cover-lead").textContent);
+      check("a cover over owner-hidden highlights hides the pick-a-highlight hint",
+        $id("notes-detail-empty").querySelector(".lib-cover-hint")?.hidden === true);
     } finally {
       window.pbpVocabCurrentOwner = realOwnerFn2;
       delete store["pbp_hl_foreign"];

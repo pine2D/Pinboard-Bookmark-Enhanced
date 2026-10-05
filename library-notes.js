@@ -932,16 +932,29 @@ function _pbpNotesBuildSide(hit, pageHits, pageTs) {
 // The cover's statistics sentence (spec §5.7). Empty before the first count;
 // a read that fails before any success says so; a later failed read keeps the
 // last good sentence (the list's own rule); zero highlights reuse the list's
-// three-way empty wording, so owner-hidden highlights are not "none".
+// three-way empty wording, so owner-hidden highlights are not "none". The
+// "pick a highlight" hint shows only beside real counts -- with nothing to
+// pick it would point at an empty list (the vocabulary cover's rule, §4.11).
+// Numbers are bolded by the sentinel split (library.js), never by markup.
 function _pbpNotesRenderCover(failed, all) {
   const lead = $id("notes-cover-lead");
   if (!lead) return;
-  if (!_notesScanDone) { lead.textContent = failed ? _pbpNotesLoadFailedText() : ""; return; }
+  const hint = $id("notes-detail-empty") ? $id("notes-detail-empty").querySelector(".lib-cover-hint") : null;
+  const say = (text) => { lead.textContent = text; if (hint) hint.hidden = true; };
+  if (!_notesScanDone) { say(failed ? _pbpNotesLoadFailedText() : ""); return; }
   if (failed) return;
   const hits = all || _pbpNotesHits();
-  if (!hits.length) { lead.textContent = _notesHiddenByOwner ? t("notesHiddenByOwner") : t("notesEmpty"); return; }
+  if (!hits.length) { say(_notesHiddenByOwner ? t("notesHiddenByOwner") : t("notesEmpty")); return; }
+  if (hint) hint.hidden = false;
   const stats = pbpNotesStats(hits, Date.now());
-  lead.textContent = t("libraryNotesCoverLead", String(stats.highlights), String(stats.pages), pbpLibFormatDay(stats.latestTs));
+  // Highlights with no time at all (only a hand-edited backup has them) have
+  // no "latest" day: the sentence ends after the counts, not "on ." with nothing.
+  const day = pbpLibFormatDay(stats.latestTs);
+  const counts = [String(stats.highlights), String(stats.pages)];
+  const parts = day
+    ? pbpLibSplitCount((...a) => t("libraryNotesCoverLead", ...a), [...counts, day])
+    : pbpLibSplitCount((...a) => t("libraryNotesCoverLeadNoDate", ...a), counts);
+  pbpLibFillCount(lead, parts, (index) => (index >= 0 && index < 2 ? "b" : null));
 }
 
 // A same-page jump (spec §5.4): the clicked highlight becomes current (list row

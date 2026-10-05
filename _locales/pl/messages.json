@@ -3799,6 +3799,7 @@
   "libraryNotesDetailEmpty": { "message": "Wybierz zaznaczenie z listy, aby przeczytać je w całości." },
   "libraryPageCount": { "message": "Na tej stronie: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "Zaznaczenia: $TOTAL$ (stron: $PAGES$). Ostatnie zapisano $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
+  "libraryNotesCoverLeadNoDate": { "message": "Zaznaczenia: $TOTAL$ (stron: $PAGES$).", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
   "libraryThisPage": { "message": "Ta strona" },
   "libraryOpenOriginal": { "message": "Otwórz oryginał" },
   "libraryPageFacts": { "message": "Zaznaczenia: $COUNT$, z notatką: $NOTED$", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },

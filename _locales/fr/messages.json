@@ -3799,6 +3799,7 @@
   "libraryNotesDetailEmpty": { "message": "Choisissez un surlignage dans la liste pour le lire en entier." },
   "libraryPageCount": { "message": "$COUNT$ sur cette page", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "$TOTAL$ surlignages sur $PAGES$ pages, le dernier enregistré le $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
+  "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ surlignages sur $PAGES$ pages.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
   "libraryThisPage": { "message": "Cette page" },
   "libraryOpenOriginal": { "message": "Ouvrir l'original" },
   "libraryPageFacts": { "message": "$COUNT$ surlignages, dont $NOTED$ avec une note", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },

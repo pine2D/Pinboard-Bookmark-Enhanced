@@ -3799,6 +3799,7 @@
   "libraryNotesDetailEmpty": { "message": "Wähle eine Markierung aus der Liste, um sie ganz zu lesen." },
   "libraryPageCount": { "message": "$COUNT$ auf dieser Seite", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "$TOTAL$ Markierungen auf $PAGES$ Seiten, zuletzt gespeichert am $DATE$.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
+  "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ Markierungen auf $PAGES$ Seiten.", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
   "libraryThisPage": { "message": "Diese Seite" },
   "libraryOpenOriginal": { "message": "Original öffnen" },
   "libraryPageFacts": { "message": "$COUNT$ Markierungen, davon $NOTED$ mit Notiz", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
