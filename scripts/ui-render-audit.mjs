@@ -1636,7 +1636,7 @@ const ROW_STATE_TOKENS = Object.freeze({
 // Reads ONE row's band eight times with the real gestures: rest, Ctrl+click
 // (selected), click (selected + current), Ctrl+click (current only -- the
 // state that is neither rest nor a selection, so it is driven, not assumed),
-// each read once with the pointer parked in the detail pane and once hovering
+// each read once with the pointer parked outside the row and once hovering
 // the row. aria-current is exclusive, so the states are not on screen at once
 // -- they do not need to be: the question is whether a user can tell them
 // apart. The driven row is the first one that carries every textSelector
@@ -1663,7 +1663,6 @@ async function driveRowStates(page, extBase, theme, selector, textSelectors) {
   const view = libraryView(selector);
   const rowSel = view === "notes" ? "#notes-list .notes-hit-btn" : "#vocab-list .vocab-card .notes-card-head";
   const cardSel = view === "notes" ? "#notes-list .notes-hit" : "#vocab-list .vocab-card";
-  const paneSel = view === "notes" ? "#notes-detail-pane" : "#vocab-detail-pane";
   const before = await page.evaluate(rowStateSnapshot, cardSel);
   // The query carries the VIEW as well as the theme: without it the notes
   // pass and the vocab pass differ only by fragment, Chromium treats the
@@ -1728,23 +1727,55 @@ async function driveRowStates(page, extBase, theme, selector, textSelectors) {
           const n = el.querySelector(t);
           return n ? { sel: t, found: true, color: getComputedStyle(n).color, bgStack: stackOf(n) } : { sel: t, found: false };
         }),
+        // The pointer state this fill was read under, from the SAME task as
+        // the fill, for holdPointerState to judge (the probe is the element
+        // whose :hover rule paints the band: .notes-card-top contains the
+        // vocab head, the notes button is its own probe).
+        hovered: el.matches(":hover"),
+        focused: el.matches(":focus-within"),
+        active: (() => {
+          const n = document.activeElement;
+          return n ? `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${[...(n.classList || [])].map((c) => `.${c}`).join("")}` : "null";
+        })(),
+        at: performance.now(),
       };
     }, { sel: selector, idx: pick.idx, texts: textSelectors, state, tokenRole: ROW_STATE_TOKENS[state] });
-    // Park the pointer on a neutral point of the detail pane (its bottom
-    // padding) before every resting read: a click leaves the cursor ON the
-    // row, and each state's hover is a different fill. settleAnimations waits
-    // out the background-color transition page-wide (verify.sh's parallel
-    // shards once read two states mid-fade at exactly the same colour).
-    const park = async () => {
-      const pt = await page.evaluate((s) => {
-        const r = document.querySelector(s)?.getBoundingClientRect();
-        return r && r.width > 0 && r.height > 0 ? { x: r.left + r.width / 2, y: r.bottom - 8 } : null;
-      }, paneSel);
-      if (!pt) throw new Error(`SETUP: ${paneSel} has no box to park the pointer in (theme=${theme})`);
-      await page.mouse.move(pt.x, pt.y);
-      await settleAnimations(page);
+    // Every read, resting and hovered, goes through the shared pointer hold
+    // (holdPointerState has the root cause): this audit is headed, and
+    // Chromium dispatches TRUSTED pointer events at the host's OS cursor,
+    // which under CI's xvfb sits inside the window. One landing between a
+    // bare hover and the read moved the hover chain off the row, so the
+    // "hover" read measured the resting fill or a fill fading back to it
+    // (CI run 37403177853, both attempts: notes row, "hover" 1 off rest,
+    // "selected+current+hover" 3 short of its step; reproduced locally under
+    // xvfb with CPU contention, the witness log showing a mouseout at the
+    // xvfb cursor 17 ms after the hover). The hold waits for a late :hover,
+    // reads hovered / focus in the same task as the fill, retries a read a
+    // foreign event spoiled, and parks the resting reads outside the row (a
+    // click leaves the cursor ON the row, and each state's hover is a
+    // different fill). Inside the read: a rest read first waits for :hover
+    // to actually leave, then settleAnimations waits out the background-
+    // color transition page-wide (verify.sh's parallel shards once read two
+    // states mid-fade at exactly the same colour) -- a hover-off that lands
+    // after the settle looked would otherwise be read mid-fade.
+    const held = async (state, mode) => {
+      const handle = await head.elementHandle({ timeout: TIMEOUT_MS });
+      try {
+        const hold = await holdPointerState(page, handle, async () => {
+          if (mode === "rest") await handle.evaluate(awaitHoverState, { want: false, ms: HOVER_APPLY_MS });
+          await settleAnimations(page);
+          return read(state);
+        }, mode);
+        if (!hold.ok) {
+          const err = new Error(`SETUP: rowStates ${selector} "${state}" (${mode}) did not hold (theme=${theme})`);
+          err.rowStateHold = { state, mode, hold };
+          throw err;
+        }
+        return hold.got;
+      } finally {
+        await handle.dispose();
+      }
     };
-    const hovered = async (state) => { await head.hover(); await settleAnimations(page); return read(state); };
     // Each gesture is checked against the attribute it is supposed to flip,
     // so a renamed handler cannot quietly hand the gate a mislabelled state.
     const expectRow = async (state, current, selected) => {
@@ -1756,14 +1787,14 @@ async function driveRowStates(page, extBase, theme, selector, textSelectors) {
         throw new Error(`SETUP: rowStates ${selector} expected "${state}" (current=${current}, selected=${selected}) but the row reads ${JSON.stringify(got)} (theme=${theme})`);
       }
     };
-    await park(); await expectRow("rest", false, false);
-    samples.push(await read("rest"), await hovered("hover"));
-    await head.click({ modifiers: ["Control"] }); await park(); await expectRow("selected", false, true);
-    samples.push(await read("selected"), await hovered("selected+hover"));
-    await head.click(); await park(); await expectRow("selected+current", true, true);
-    samples.push(await read("selected+current"), await hovered("selected+current+hover"));
-    await head.click({ modifiers: ["Control"] }); await park(); await expectRow("current", true, false);
-    samples.push(await read("current"), await hovered("current+hover"));
+    await expectRow("rest", false, false);
+    samples.push(await held("rest", "rest"), await held("hover", "hover"));
+    await head.click({ modifiers: ["Control"] }); await settleAnimations(page); await expectRow("selected", false, true);
+    samples.push(await held("selected", "rest"), await held("selected+hover", "hover"));
+    await head.click(); await settleAnimations(page); await expectRow("selected+current", true, true);
+    samples.push(await held("selected+current", "rest"), await held("selected+current+hover", "hover"));
+    await head.click({ modifiers: ["Control"] }); await settleAnimations(page); await expectRow("current", true, false);
+    samples.push(await held("current", "rest"), await held("current+hover", "hover"));
     failed = false;
   } finally {
     if (failed) {
@@ -4403,7 +4434,23 @@ async function runOneCheck(page, theme, check, results, extBase) {
   }
   if (check.state === "rowStates") {
     if (!extBase) throw new Error(`rowStates check on ${check.selector} reached a runner that has no extBase`);
-    const samples = await driveRowStates(page, extBase, theme, check.selector, check.expect.bandDistinct?.textSelectors);
+    let samples;
+    try {
+      samples = await driveRowStates(page, extBase, theme, check.selector, check.expect.bandDistinct?.textSelectors);
+    } catch (err) {
+      if (!err.rowStateHold) throw err;
+      // A pointer state that never held is a HARNESS condition, not a
+      // product verdict (same SETUP row as family 14 and the `hover` state).
+      const { state, mode, hold } = err.rowStateHold;
+      results.push({
+        surface: check.surface, theme, selector: check.selector, state: check.state,
+        check: "bandDistinct", status: "SETUP", setup: hold.kind,
+        actual: `"${state}": ${mode === "rest" ? "the rest state (pointer parked outside, focus elsewhere)" : ":hover with focus elsewhere"} did not hold through the read in ${hold.attempts} attempt(s) -- ${describeHoldTries(hold.tries, mode)}`,
+        expected: "the real pointer's :hover reaches the driven row with focus elsewhere, and leaves it at rest, undisturbed through each of the eight reads (harness precondition for bandDistinct)",
+        note: holdSetupNote(hold),
+      });
+      return;
+    }
     const evald = evaluateCheck(check, { found: true, rect: { width: 1, height: 1 }, bgStack: [], bandSamples: samples }, theme);
     if (evald.setupError) {
       throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: ${evald.setupError}`);
