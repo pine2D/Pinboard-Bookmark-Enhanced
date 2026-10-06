@@ -554,6 +554,9 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       JSON.stringify(stackedSnap) + " | " + (document.activeElement && document.activeElement.className));
     detail().querySelector('.notes-excerpt-jump[data-notes-key="pbp_hl_times#x3"]')?.focus();
     t = (key, ...values) => (String(key).startsWith("hlColor") ? "Q" : realT(key, ...values));
+    // Short 24-hour stamps leave room for the colour control's 24px target.
+    const realTimeFormatter = window.pbpLibFormatTime;
+    window.pbpLibFormatTime = () => "12:34";
     document.dispatchEvent(new Event("pbp:i18n-applied"));
     check("a language switch re-renders the labels and re-measures them: a label that fits stays on one line",
       labelOf("x6")?.querySelector(".notes-excerpt-color-name")?.textContent === "Q" &&
@@ -569,6 +572,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     await frames();
     check("a density flip re-measures the hang labels",
       staleBefore && !labelOf("x2")?.classList.contains("is-stacked"), labelOf("x2")?.className);
+    window.pbpLibFormatTime = realTimeFormatter;
     document.documentElement.removeAttribute("data-density");
     await frames();
     if (x2Day) x2Day.textContent = "a much longer stand-in for the day";
@@ -742,8 +746,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       `side ${sideRect?.top},${sideRect?.left} head ${headRect?.top},${headRect?.right}`);
     const focusOrder = [...detail().querySelectorAll("a[href], button")].filter(shown)
       .map((el) => el.classList[el.classList.length - 1]);
-    check("Tab order is title link, the other excerpts, open original, then delete",
-      focusOrder.join(",") === ["notes-detail-link", ...Array(5).fill("notes-excerpt-jump"), "notes-open-original", "notes-detail-delete"].join(","),
+    check("Tab order reaches each color before its excerpt, then open original and delete",
+      focusOrder.join(",") === ["notes-detail-link", "notes-excerpt-color", "notes-excerpt-jump", "notes-excerpt-color", "notes-excerpt-jump", "notes-excerpt-color", "notes-excerpt-jump", "notes-excerpt-color", "notes-excerpt-jump", "notes-excerpt-color", "notes-excerpt-color", "notes-excerpt-jump", "notes-open-original", "notes-detail-delete"].join(","),
       focusOrder.join(","));
     const facts = () => [...(side()?.querySelectorAll(".notes-side-facts > span") || [])].map((s) => s.textContent);
     check("the column's facts count the page's highlights and notes and give its first and last time",
@@ -1921,6 +1925,66 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     }
   }
 
+  // Recolouring must update only this stable item from the latest locked
+  // record. Stale UI snapshots, deleted items and account changes cannot write.
+  {
+    const ownerFn = window.pbpVocabCurrentOwner, getFn = chrome.storage.local.get;
+    const setFn = chrome.storage.local.set;
+    let owner = "acct_me";
+    window.pbpVocabCurrentOwner = async () => owner;
+    const key = "pbp_hl_recolor";
+    const item = { id: "one", n: 7, color: 1, quote: "saved quotation", note: "old note", ts: 123,
+      owner: "acct_me", prefix: "before", suffix: "after", side: "tr", lang: "fr" };
+    const other = { id: "foreign", color: 2, quote: "foreign", owner: "acct_other", ts: 111 };
+    const reset = () => { store[key] = { v: 1, url: "https://example.com/recolor", title: "Page", extra: "keep", items: [{ ...item }, { ...other }] }; };
+    const hit = { key: key + "#one", row: { key }, item: { ...item } };
+    const write = (...args) => typeof _pbpNotesWriteColor === "function"
+      ? _pbpNotesWriteColor(...args) : Promise.resolve("missing");
+    try {
+      reset(); store[key].items[0].note = "edited in reader";
+      const before = JSON.stringify(store[key]);
+      check("recolor saves the requested color", await write(hit, 3, "acct_me") === "saved" && store[key].items[0].color === 3);
+      const restored = structuredClone(store[key]); restored.items[0].color = 1;
+      check("recolor preserves the newest note, anchors, owner, time, siblings and record metadata", JSON.stringify(restored) === before);
+      reset();
+      let acquired, release;
+      const ready = new Promise(resolve => { acquired = resolve; });
+      const gate = new Promise(resolve => { release = resolve; });
+      const held = navigator.locks.request("pbp-hl:" + key, async () => { acquired(); await gate; });
+      await ready;
+      const queued = write(hit, 3, "acct_me");
+      store[key].items[0].note = "committed by reader while lock was held";
+      release(); await held;
+      check("recolor waits for the reader's record lock and uses its committed note", await queued === "saved" &&
+        store[key].items[0].note === "committed by reader while lock was held" && store[key].items[0].color === 3);
+      reset(); store[key].items.reverse();
+      await write(hit, 5, "acct_me");
+      check("recolor follows stable id after item order changes", store[key].items[1].color === 5 && store[key].items[0].color === 2);
+      reset(); store[key].items.shift();
+      check("recolor never resurrects a deleted item", await write(hit, 3, "acct_me") === "gone" && store[key].items.length === 1);
+      delete store[key];
+      check("recolor never recreates a deleted record", await write(hit, 3, "acct_me") === "gone" && !(key in store));
+      reset(); owner = "acct_other";
+      check("recolor rejects a changed live account", await write(hit, 3, "acct_me") === "changed" && store[key].items[0].color === 1);
+      owner = "acct_me"; reset();
+      chrome.storage.local.get = async (keys) => { const out = await getFn(keys); if (keys === key) owner = "acct_other"; return out; };
+      check("recolor rechecks account after asynchronous record read", await write(hit, 3, "acct_me") === "changed" && store[key].items[0].color === 1);
+      chrome.storage.local.get = getFn; owner = "acct_me"; reset();
+      const legacy = { ...item }; delete legacy.id;
+      store[key].items = [{ ...other }, { ...legacy }];
+      check("legacy recolor matches an unchanged unique snapshot after insertion", await write({ ...hit, item: legacy }, 4, "acct_me") === "saved" && store[key].items[1].color === 4);
+      store[key].items = [{ ...legacy }, { ...legacy }];
+      check("ambiguous legacy items cannot recolor a different highlight", await write({ ...hit, item: legacy }, 4, "acct_me") === "gone" && store[key].items.every(i => i.color === 1));
+      reset();
+      check("invalid recolor values do not write", await write(hit, 0, "acct_me") === "gone" && store[key].items[0].color === 1);
+      chrome.storage.local.set = async () => { throw new Error("storage failure"); };
+      let failed = false; try { await write(hit, 3, "acct_me"); } catch (_) { failed = true; }
+      check("failed recolor leaves the original stored color for retry", failed && store[key].items[0].color === 1);
+    } finally {
+      window.pbpVocabCurrentOwner = ownerFn; chrome.storage.local.get = getFn; chrome.storage.local.set = setFn;
+      delete store[key];
+    }
+  }
   document.title = fail ? "FAIL library-notes Tests" : "PASS library-notes Tests";
 })();
 </script></body></html>

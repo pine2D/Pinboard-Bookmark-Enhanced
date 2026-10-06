@@ -33,7 +33,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 - **Zakreślenia w pięciu kolorach, z notatkami** — jedne i drugie przetrwają ponowne renderowanie, tłumaczenie, a nawet zmiany na stronie
 - **Przetłumacz stronę albo zadaj jej pytanie** — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
 - **Sprawdzaj słownictwo podczas czytania** — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka mają notatki i status opanowania i na życzenie trafiają do Anki lub Eudic; pakiety słowników offline (chińsko-angielski i angielsko-chiński) do wyboru
-- **Notatki i słówka mają własną stronę** — zapisane słówka i zakreślenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami
+- **Notatki i słówka mają własną stronę** — zapisane słówka i zakreślenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami; kolor zaznaczenia można zmienić bezpośrednio na stronie notatek
 - **Wyślij albo pobierz** — do [Obsidiana](https://obsidian.md), Notion, NotebookLM, do serwisu GitHub Gist lub dowolnego webhooka; albo jako `.md`, `.html`, `.epub` na czytnik e-booków
 - **Oglądaj podczas czytania** — podgląd stron YouTube i Bilibili wczytuje wideo i wielojęzyczne napisy obok siebie; transkrypcja podąża za odtwarzaniem, kliknięcie wiersza przeskakuje odtwarzacz, a tagi i podsumowania AI mogą czytać napisy zamiast strony
 

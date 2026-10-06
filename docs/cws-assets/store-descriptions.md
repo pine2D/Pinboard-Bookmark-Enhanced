@@ -31,7 +31,7 @@
 - Five-color highlights with notes: both survive re-renders, translation, even page edits
 - Translate the page or ask it questions: full-page translation with a bilingual view; answers cite the source and jump straight to it
 - Look up words as you read: definitions open on the sense that fits your sentence; saved words keep notes and a learning status and can be sent to Anki or Eudic; optional offline dictionary packs for Chinese-English and English-Chinese
-- A full page for notes and vocabulary: saved words and highlights in one place, with dictionary lookup and batch management
+- A full page for notes and vocabulary: saved words and highlights in one place, with dictionary lookup and batch management; change highlight colors directly in the notes page
 - Send or download: Obsidian (https://obsidian.md), Notion, NotebookLM, a GitHub Gist, or any webhook; .md, .html, or .epub for your e-reader
 - Watch while you read: YouTube and bilibili previews pair the video with its subtitles; the transcript follows playback, any line jumps the player, and AI tags and summaries can read the captions instead of the page
 
@@ -64,7 +64,7 @@
 - 五色高亮与笔记：重渲染、翻译、内容变动后都会保留
 - 整页翻译，或向文章提问：双语对照；回答附引用，点击直达原文出处
 - 边读边查词：先显示贴合当前句子的释义；生词可记笔记、标学习状态，可发送到 Anki 和欧路词典；离线汉英、英汉词典包可选
-- 笔记和生词独立成页：生词和高亮集中一处，随手查词、批量管理
+- 笔记和生词独立成页：生词和高亮集中一处，随手查词、批量管理；在笔记页可直接更改高亮颜色
 - 发送或下载：Obsidian (https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任意 webhook；.md、.html、.epub 供电子书阅读器
 - 边读边看：YouTube 和 B 站预览把视频和多语种字幕并排放好，字幕跟着播放走，点字幕行即可跳转，AI 标签和摘要还能直接读字幕
 
@@ -97,7 +97,7 @@
 - 五色劃重點與筆記：重新渲染、翻譯、內容變動後依然保留
 - 整頁翻譯，或向文章提問：雙語對照；回答附引用，一按即跳回原文出處
 - 邊讀邊查詞：先顯示最貼近句子的釋義；生詞可加筆記、標記學習狀態，也可傳送到 Anki 與歐路詞典；離線中英、英中詞典包可另外選用
-- 筆記與生詞獨立成頁：生詞與劃重點集中在同一頁，隨手查詞、批次管理
+- 筆記與生詞獨立成頁：生詞與劃重點集中在同一頁，隨手查詞、批次管理；可在筆記頁直接變更劃重點顏色
 - 傳送或下載：Obsidian (https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任何 webhook；.md、.html、.epub 供電子書閱讀器
 - 邊讀邊看：YouTube 與 B 站預覽把影片和多語種字幕並排放好，字幕跟著播放走，點字幕行即可跳轉，AI 標籤與摘要也能直接讀字幕
 
@@ -130,7 +130,7 @@
 - 五色高亮與筆記：重新渲染、翻譯、內容變動後仍會保留
 - 整頁翻譯，或向文章提問：雙語對照；答案附引註，一按即跳回原文出處
 - 邊讀邊查詞：先顯示切合該句的釋義；生詞可加筆記、標記學習狀態，並可傳送到 Anki 及歐路詞典；離線中英、英中詞典包可另行選用
-- 筆記與生詞獨立成頁：生詞與高亮集中在同一頁，隨手查詞、批量管理
+- 筆記與生詞獨立成頁：生詞與高亮集中在同一頁，隨手查詞、批量管理；可在筆記頁直接更改高亮顏色
 - 傳送或下載：Obsidian (https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任何 webhook；.md、.html、.epub 供電子書閱讀器
 - 邊讀邊看：YouTube 與 B 站預覽把影片和多語種字幕並排放好，字幕跟着播放走，點字幕行即可跳轉，AI 標籤與摘要也能直接讀字幕
 
@@ -163,7 +163,7 @@
 - Markieren in fünf Farben, mit Notizen – beide überstehen erneutes Rendern, Übersetzung und Änderungen an der Seite
 - Seite übersetzen oder befragen – Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
 - Wörter beim Lesen nachschlagen: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln tragen Notizen und Lernstatus und gehen auf Wunsch an Anki oder Eudic; optionale Offline-Wörterbuchpakete für Chinesisch–Englisch und Englisch–Chinesisch
-- Eine eigene Seite für Notizen und Vokabeln: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung
+- Eine eigene Seite für Notizen und Vokabeln: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung; die Markierungsfarbe lässt sich direkt auf der Notizseite ändern
 - Senden oder herunterladen – an Obsidian (https://obsidian.md), Notion, NotebookLM, ein GitHub Gist oder einen beliebigen Webhook; als .md, .html oder .epub für den E-Reader
 - Sehen beim Lesen – YouTube- und Bilibili-Vorschauen zeigen Video und mehrsprachige Untertitel nebeneinander; das Transkript folgt der Wiedergabe, ein Klick auf eine Zeile springt im Player, und KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel statt der Seite
 
@@ -196,7 +196,7 @@
 - Surlignage en cinq couleurs, avec notes : les deux survivent aux nouveaux rendus, à la traduction et aux modifications de la page
 - Traduisez la page ou posez-lui vos questions : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
 - Cherchez les mots au fil de la lecture : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; les mots enregistrés gardent notes et statut d'apprentissage et peuvent partir vers Anki ou Eudic ; packs de dictionnaires hors connexion chinois-anglais et anglais-chinois en option
-- Une page entière pour les notes et le vocabulaire : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots
+- Une page entière pour les notes et le vocabulaire : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots ; la couleur des surlignages se change directement dans cette page
 - Envoyer ou télécharger : vers Obsidian (https://obsidian.md), Notion, NotebookLM, un Gist GitHub ou n'importe quel webhook ; ou en .md, .html, .epub pour votre liseuse
 - Regarder en lisant : les aperçus YouTube et Bilibili affichent la vidéo et ses sous-titres multilingues côte à côte ; la transcription suit la lecture, un clic sur une ligne déplace le lecteur, et les tags et résumés IA peuvent lire les sous-titres plutôt que la page
 
@@ -229,7 +229,7 @@
 - 5 色のハイライトとメモ：再描画・翻訳・ページ内容の変化をまたいでも保持されます
 - ページ全体の翻訳とページへの質問：対訳表示に対応し、回答には出典への引用が付き、クリックで該当箇所へジャンプします
 - 読みながら単語を調べる：読んでいる文に合った語義がまず表示されます。保存した単語にはメモや学習ステータスを付けられ、Anki や Eudic にも送れます。中英・英中のオフライン辞書パックも選べます
-- メモと単語帳に専用ページ：保存した単語とハイライトが一か所に集まり、辞書検索も一括管理もできます
+- メモと単語帳に専用ページ：保存した単語とハイライトが一か所に集まり、辞書検索も一括管理もできます。ハイライトの色もこのページで直接変更できます
 - 送信もダウンロードも：Obsidian (https://obsidian.md)・Notion・NotebookLM・GitHub Gist・任意の webhook へ送信でき、.md・.html・.epub で電子書籍リーダーにも渡せます
 - 読みながら観る：YouTube と Bilibili のプレビューは動画と多言語字幕を並べて表示し、字幕は再生に追従、行クリックでジャンプでき、AI タグと要約も字幕を直接読めます
 
@@ -262,7 +262,7 @@
 - Zakreślenia w pięciu kolorach, z notatkami — jedne i drugie przetrwają ponowne renderowanie, tłumaczenie, a nawet zmiany na stronie
 - Przetłumacz stronę albo zadaj jej pytanie — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
 - Sprawdzaj słownictwo podczas czytania — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka mają notatki i status opanowania i na życzenie trafiają do Anki lub Eudic; pakiety słowników offline (chińsko-angielski i angielsko-chiński) do wyboru
-- Notatki i słówka mają własną stronę — zapisane słówka i zakreślenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami
+- Notatki i słówka mają własną stronę — zapisane słówka i zakreślenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami; kolor zaznaczenia można zmienić bezpośrednio na stronie notatek
 - Wyślij albo pobierz — do Obsidiana (https://obsidian.md), Notion, NotebookLM, do serwisu GitHub Gist lub dowolnego webhooka; albo jako .md, .html, .epub na czytnik e-booków
 - Oglądaj podczas czytania — podgląd stron YouTube i Bilibili wczytuje wideo i wielojęzyczne napisy obok siebie; transkrypcja podąża za odtwarzaniem, kliknięcie wiersza przeskakuje odtwarzacz, a tagi i podsumowania AI mogą czytać napisy zamiast strony
 
@@ -295,7 +295,7 @@
 - Выделения пяти цветов с заметками — и выделения, и заметки переживают перерисовку, перевод и даже изменения на странице
 - Переведите страницу или задайте ей вопрос — полный перевод с двуязычным режимом; ответы ссылаются на источник, и клик ведёт прямо к нему
 - Ищите слова во время чтения — словарь сразу показывает значение, подходящее к предложению; у сохранённых слов есть заметки и статус изучения, их можно отправить в Anki или Eudic; офлайн-словари (китайско-английский и англо-китайский) подключаются по желанию
-- У заметок и словарика своя страница — сохранённые слова и выделения в одном месте, с поиском по словарю и пакетными действиями
+- У заметок и словарика своя страница — сохранённые слова и выделения в одном месте, с поиском по словарю и пакетными действиями; цвет выделения можно изменить прямо на странице заметок
 - Отправить или скачать — в Obsidian (https://obsidian.md), Notion, NotebookLM, GitHub Gist или на любой вебхук; либо скачать .md, .html, .epub для читалки
 - Смотрите, пока читаете — предпросмотр YouTube и Bilibili показывает видео и многоязычные субтитры рядом; расшифровка следует за воспроизведением, клик по строке перематывает плеер, а AI-теги и резюме могут читать субтитры вместо страницы
 

@@ -850,6 +850,18 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "notesBatchDeleteConfirmOne": { "message": "删除选中的 $COUNT$ 条高亮？", "placeholders": { "count": { "content": "$1" } } },
+  "notesChangeColor": {
+    "message": "更改高亮颜色"
+  },
+  "notesColorSaved": {
+    "message": "高亮颜色已更改。"
+  },
+  "notesColorFiltered": {
+    "message": "颜色已更改，此条高亮不再符合当前筛选条件。"
+  },
+  "notesColorFailed": {
+    "message": "未能更改高亮颜色，请重试。"
+  },
   "notesDeleteFailed": {
     "message": "删除高亮失败，请重试。"
   },

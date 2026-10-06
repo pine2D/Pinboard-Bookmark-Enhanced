@@ -850,6 +850,18 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "notesBatchDeleteConfirmOne": { "message": "Supprimer le surlignage sélectionné ?", "placeholders": { "count": { "content": "$1" } } },
+  "notesChangeColor": {
+    "message": "Changer la couleur du surlignage"
+  },
+  "notesColorSaved": {
+    "message": "Couleur du surlignage modifiée."
+  },
+  "notesColorFiltered": {
+    "message": "Couleur modifiée. Ce surlignage ne correspond plus aux filtres actuels."
+  },
+  "notesColorFailed": {
+    "message": "Impossible de changer la couleur du surlignage. Réessayez."
+  },
   "notesDeleteFailed": {
     "message": "Impossible de supprimer ces surlignages. Réessayez."
   },

@@ -850,6 +850,18 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "notesBatchDeleteConfirmOne": { "message": "Delete the selected highlight?", "placeholders": { "count": { "content": "$1" } } },
+  "notesChangeColor": {
+    "message": "Change highlight color"
+  },
+  "notesColorSaved": {
+    "message": "Highlight color changed."
+  },
+  "notesColorFiltered": {
+    "message": "Color changed. This highlight no longer matches the current filters."
+  },
+  "notesColorFailed": {
+    "message": "Couldn't change the highlight color. Try again."
+  },
   "notesDeleteFailed": {
     "message": "Couldn't delete these highlights. Try again."
   },

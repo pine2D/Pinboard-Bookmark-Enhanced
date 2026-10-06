@@ -850,6 +850,18 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "notesBatchDeleteConfirmOne": { "message": "Ausgewählte Markierung löschen?", "placeholders": { "count": { "content": "$1" } } },
+  "notesChangeColor": {
+    "message": "Markierungsfarbe ändern"
+  },
+  "notesColorSaved": {
+    "message": "Markierungsfarbe geändert."
+  },
+  "notesColorFiltered": {
+    "message": "Farbe geändert. Diese Markierung entspricht nicht mehr den aktuellen Filtern."
+  },
+  "notesColorFailed": {
+    "message": "Die Markierungsfarbe konnte nicht geändert werden. Bitte erneut versuchen."
+  },
   "notesDeleteFailed": {
     "message": "Diese Markierungen konnten nicht gelöscht werden. Bitte erneut versuchen."
   },

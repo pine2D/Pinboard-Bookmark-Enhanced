@@ -1182,8 +1182,52 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   outline-offset: 2px;
   box-shadow: var(--lib-focus-ring);
 }
-.notes-excerpt-color { display: inline-flex; align-items: baseline; gap: var(--lib-sp-1); max-width: 100%; }
+.notes-excerpt-color {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--lib-sp-1);
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--lib-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.notes-excerpt-color:hover .notes-excerpt-color-name { text-decoration: underline; text-underline-offset: 2px; }
+.notes-excerpt-color:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
 .notes-excerpt-color > .notes-hit-dot { flex: none; margin-top: 0; }
+.notes-color-menu[popover] {
+  padding: var(--lib-sp-1);
+  max-height: var(--listbox-room, 330px);
+  overflow: auto;
+}
+.notes-color-menu .notes-color-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: var(--lib-sp-2);
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--lib-fg);
+  font-family: inherit;
+  line-height: var(--lib-lh-body);
+  text-align: start;
+}
+.notes-color-choice .notes-hit-dot { margin: 0; }
+.notes-color-choice > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }
+.notes-color-choice:hover { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
+.notes-color-choice[aria-checked="true"] { background: var(--lib-accent); color: var(--lib-on-accent); }
+.notes-color-choice:focus-visible { outline: 2px solid var(--lib-focus-bd); outline-offset: -2px; box-shadow: none; }
+.notes-color-choice[aria-disabled="true"] { opacity: 0.45; cursor: progress; }
+@media (forced-colors: active) {
+  .notes-color-choice[aria-checked="true"] { background: Highlight; color: HighlightText; }
+}
 
 /* Quotes: the current one is the loudest thing on the page by size alone. */
 .notes-excerpt-body { min-width: 0; }
@@ -2562,18 +2606,27 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
 .vocab-card,
 .vocab-card .notes-card-top { min-width: 0; }
 .vocab-card .notes-card-top {
-  /* Two tracks since the per-row checkbox went away (user ruling 2026-08-06:
-     selection is the row's own fill). The trailing `auto` is NOT vestigial:
-     .row-del-x is position:absolute at desktop, but the @media (hover: none)
-     block puts it back in flow, and that touch layout needs a track to land
-     in. It also keeps the 6px column gap reserved on the right so a long
-     headline does not run under the absolutely-positioned X. */
+  /* Keep a separate action column in flow, including when the X is hidden. */
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--lib-sp-1); /* the surface's own tightest rung; the old literal 6px was
     options' --opt-sp-3 borrowed across surfaces, the one 6px button-row gap the
     actionRowGap scan found on this page (2026-09-05) */
   padding: var(--lib-row-pad-y) var(--lib-row-pad-x);
 }
+.vocab-card .row-del-x {
+  position: relative;
+  inset: auto;
+  translate: none;
+  align-self: start;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0;
+  gap: 0;
+}
+.vocab-card .row-del-x > span:last-child:empty { display: none; }
+.vocab-card .row-del-x::before { inset: 0; }
+.vocab-card:focus-within .row-del-x { opacity: 1; }
 /* Collapsed-row rhythm (2026-08 redesign): controls anchor to the TITLE
    line instead of centering against whatever height the row happens to
    reach -- on a tall card a centered control floated mid-air. */
@@ -2805,6 +2858,7 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
   display: inline-grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  align-content: center;
   column-gap: var(--lib-sp-2);
   width: 100%;
   height: var(--lib-control-h);

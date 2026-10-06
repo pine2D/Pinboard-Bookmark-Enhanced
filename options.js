@@ -1761,7 +1761,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // (native <details>; the chevron is CSS, persistence keys off
       // data-acc-key through pbpAccRestore / the delegated toggle listener).
       const det = document.createElement("details");
-      det.className = "disclosure";
+      det.className = "disclosure disclosure-subsection";
       det.dataset.accKey = "et-" + id;
       const head = document.createElement("summary");
       head.textContent = row.label;

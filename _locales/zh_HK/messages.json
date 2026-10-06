@@ -850,6 +850,18 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "notesBatchDeleteConfirmOne": { "message": "刪除選取的 $COUNT$ 則螢光標記？", "placeholders": { "count": { "content": "$1" } } },
+  "notesChangeColor": {
+    "message": "更改標記顏色"
+  },
+  "notesColorSaved": {
+    "message": "標記顏色已更改。"
+  },
+  "notesColorFiltered": {
+    "message": "顏色已更改，這項標記不再符合目前的篩選條件。"
+  },
+  "notesColorFailed": {
+    "message": "未能更改標記顏色，請重試。"
+  },
   "notesDeleteFailed": {
     "message": "未能刪除這些標記，請重試。"
   },

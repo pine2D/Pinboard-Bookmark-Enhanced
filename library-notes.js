@@ -205,6 +205,7 @@ let _notesRenderGen = 0;
 // everyone, owned items only to their owner; resolve failure -> "" = only
 // ownerless items show (fail-closed for owned ones).
 let _notesOwnerCache = null; // null = unresolved; string = resolved scope ("" = ownerless)
+let _notesAuthRevision = 0;
 async function _pbpNotesOwner() {
   if (_notesOwnerCache !== null) return _notesOwnerCache;
   let scope = "";
@@ -219,6 +220,8 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" && area !== "sync") return;
     if (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys) {
+      _notesAuthRevision++;
+      _pbpNotesCloseColorMenu(false);
       _notesOwnerCache = null;
       // Invalidate any scan already in flight for the account that just left
       // before clearing what it drew (see _notesRenderGen).
@@ -818,8 +821,15 @@ function _pbpNotesExcerptLabel(hit, pageTs) {
     label.appendChild(span);
   }
   const c = _pbpNotesColorOf(hit.item);
-  const color = document.createElement("span");
+  const color = document.createElement("button");
+  color.type = "button";
   color.className = "notes-excerpt-color";
+  color.dataset.notesKey = hit.key;
+  color.title = t("notesChangeColor");
+  color.setAttribute("aria-label", t("notesChangeColor") + ": " + t(PBP_NOTES_COLOR_KEYS[c - 1]));
+  color.setAttribute("aria-haspopup", "menu");
+  color.setAttribute("aria-expanded", "false");
+  color.addEventListener("click", () => _pbpNotesOpenColorMenu(hit, color));
   const dot = document.createElement("span");
   dot.className = "notes-hit-dot notes-c" + c;
   dot.setAttribute("aria-hidden", "true");
@@ -1068,6 +1078,7 @@ function _pbpNotesScheduleStack() {
 // library-vocab.js: only a user activation may swap narrow mode from the list
 // to the detail, so a background refresh never yanks a narrow reader.
 function _pbpNotesRenderDetail(hit, enterNarrow) {
+  _pbpNotesCloseColorMenu(false);
   const empty = $id("notes-detail-empty");
   const detail = $id("notes-detail");
   if (!empty || !detail) return;
@@ -1514,9 +1525,147 @@ function _pbpNotesWithRecordLock(key, work) {
   if (locks && typeof locks.request === "function") return locks.request(_pbpNotesRecordLockName(key), work);
   if (!_pbpNotesLockWarned) {
     _pbpNotesLockWarned = true;
-    console.warn("[notes] Web Locks unavailable: highlight deletes are not serialised against the reader");
+    console.warn("[notes] Web Locks unavailable: highlight changes are not serialised against the reader");
   }
   return Promise.resolve().then(work);
+}
+
+// Never write the scan's stale record. Reader, backup and library writers
+// share this lock; recheck live credentials after each asynchronous read.
+async function _pbpNotesWriteColor(hit, color, ownerAtOpen) {
+  if (!Number.isInteger(color) || color < 1 || color > 5 || !hit?.item || !hit.row?.key) return "gone";
+  const revision = _notesAuthRevision;
+  const liveOwner = async () => {
+    const raw = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
+    return raw && raw !== "ownerless" ? String(raw) : "";
+  };
+  return _pbpNotesWithRecordLock(hit.row.key, async () => {
+    if (ownerAtOpen === null || await liveOwner() !== ownerAtOpen || revision !== _notesAuthRevision) return "changed";
+    const fresh = (await chrome.storage.local.get(hit.row.key))[hit.row.key];
+    if (await liveOwner() !== ownerAtOpen || revision !== _notesAuthRevision) return "changed";
+    if (!fresh || !Array.isArray(fresh.items)) return "gone";
+    const hasId = hit.item.id != null;
+    // Legacy idless items are safe only when exactly one complete snapshot
+    // still matches. Array indices can shift after a concurrent insertion.
+    const snapshot = hasId ? null : JSON.stringify(hit.item);
+    const matches = fresh.items.map((it, index) => ({ it, index })).filter(({ it }) =>
+      it && (hasId ? it.id != null && String(it.id) === String(hit.item.id)
+        : it.id == null && JSON.stringify(it) === snapshot));
+    if (matches.length !== 1) return "gone";
+    const { it, index } = matches[0];
+    if (!_pbpNotesItemVisible(it, ownerAtOpen)) return "changed";
+    if (it.color === color) return "saved";
+    const items = fresh.items.map((entry, i) => i === index ? { ...entry, color } : entry);
+    await chrome.storage.local.set({ [hit.row.key]: { ...fresh, items } });
+    return "saved";
+  });
+}
+
+let _notesColorSession = null;
+function _pbpNotesCloseColorMenu(restoreFocus) {
+  const session = _notesColorSession;
+  if (!session) return;
+  _notesColorSession = null;
+  session.anchor.setAttribute("aria-expanded", "false");
+  session.menu.remove();
+  if (restoreFocus && session.anchor.isConnected) _pbpNotesFocus(session.anchor);
+}
+window.addEventListener("scroll", (e) => {
+  if (_notesColorSession && !_notesColorSession.menu.contains(e.target)) _pbpNotesCloseColorMenu(false);
+}, true);
+window.addEventListener("resize", () => _pbpNotesCloseColorMenu(false));
+
+function _pbpNotesOpenColorMenu(hit, anchor) {
+  if (_notesColorSession?.anchor === anchor) { _pbpNotesCloseColorMenu(true); return; }
+  _pbpNotesCloseColorMenu(false);
+  const menu = document.createElement("div");
+  menu.className = "listbox-pop notes-color-menu";
+  menu.setAttribute("popover", "auto");
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", t("notesChangeColor"));
+  const session = { hit, anchor, menu, owner: _notesOwnerCache, revision: _notesAuthRevision, busy: false };
+  _notesColorSession = session;
+  anchor.setAttribute("aria-expanded", "true");
+  for (let c = 1; c <= 5; c++) {
+    const choice = document.createElement("button");
+    choice.type = "button";
+    choice.className = "listbox-opt notes-color-choice";
+    choice.dataset.color = String(c);
+    choice.setAttribute("role", "menuitemradio");
+    choice.setAttribute("aria-checked", String(c === _pbpNotesColorOf(hit.item)));
+    choice.tabIndex = c === _pbpNotesColorOf(hit.item) ? 0 : -1;
+    const dot = document.createElement("span");
+    dot.className = "notes-hit-dot notes-c" + c;
+    dot.setAttribute("aria-hidden", "true");
+    const name = document.createElement("span");
+    name.textContent = t(PBP_NOTES_COLOR_KEYS[c - 1]);
+    const mark = document.createElement("span");
+    mark.className = "btn-ic";
+    mark.setAttribute("aria-hidden", "true");
+    mark.innerHTML = c === _pbpNotesColorOf(hit.item) ? PBP_ICONS.check : "";
+    choice.append(dot, name, mark);
+    choice.addEventListener("click", () => _pbpNotesChooseColor(session, c));
+    menu.append(choice);
+  }
+  menu.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); _pbpNotesCloseColorMenu(true); return; }
+    if (e.key === "Tab") { _pbpNotesCloseColorMenu(true); return; }
+    const buttons = [...menu.querySelectorAll("button")];
+    const i = buttons.indexOf(document.activeElement);
+    let next;
+    if (e.key === "ArrowDown") next = (i + 1) % buttons.length;
+    else if (e.key === "ArrowUp") next = (i + buttons.length - 1) % buttons.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = buttons.length - 1;
+    if (next !== undefined) {
+      e.preventDefault();
+      for (const button of buttons) button.tabIndex = -1;
+      buttons[next].tabIndex = 0;
+      buttons[next].focus({ preventScroll: true });
+    }
+  });
+  menu.addEventListener("toggle", (e) => {
+    if (e.newState === "closed" && _notesColorSession === session) {
+      const focusInside = menu.contains(document.activeElement);
+      _pbpNotesCloseColorMenu(focusInside);
+    }
+  });
+  document.body.append(menu);
+  menu.showPopover();
+  pbpListboxPlace(menu, anchor);
+  menu.querySelector('[aria-checked="true"]').focus({ preventScroll: true });
+}
+
+async function _pbpNotesChooseColor(session, color) {
+  if (_notesColorSession !== session || session.busy) return;
+  session.busy = true;
+  session.menu.setAttribute("aria-busy", "true");
+  for (const button of session.menu.querySelectorAll("button")) button.setAttribute("aria-disabled", "true");
+  const position = Math.max(0, _pbpNotesVisibleHits().findIndex(h => h.key === session.hit.key));
+  try {
+    const result = await _pbpNotesWriteColor(session.hit, color, session.owner);
+    if (session.revision !== _notesAuthRevision) return;
+    _pbpNotesCloseColorMenu(true);
+    await _pbpNotesRefreshPreservingState();
+    if (session.revision !== _notesAuthRevision) return;
+    if (result !== "saved") { _pbpNotesSetStatus(t("vocabSelectionChanged")); return; }
+    const hidden = _pbpNotesSelectedKey === session.hit.key && !_pbpNotesVisibleHits().some(h => h.key === session.hit.key);
+    if (hidden) {
+      const next = _pbpNotesVisibleHits()[position] || _pbpNotesVisibleHits().at(-1);
+      if (next) _pbpNotesSelectRow(next.key);
+      else _pbpNotesRenderDetail(null);
+      _pbpNotesFocusAfterDelete(position);
+    } else _pbpNotesRestoreDetailFocus({ cls: "notes-excerpt-color", key: session.hit.key });
+    const status = _pbpNotesStatusEl();
+    if (status) setStatusIcon(status, true, t(hidden ? "notesColorFiltered" : "notesColorSaved"));
+  } catch (e) {
+    console.warn("[notes] color update failed", e && e.name, e && e.message);
+    if (session.revision === _notesAuthRevision) _pbpNotesSetStatus(t("notesColorFailed"));
+  } finally {
+    session.busy = false;
+    session.menu.removeAttribute("aria-busy");
+    for (const button of session.menu.querySelectorAll("button")) button.removeAttribute("aria-disabled");
+  }
 }
 
 // Same anchored confirm popover as every other destructive micro-action
@@ -1978,6 +2127,7 @@ async function _pbpNotesRefreshPreservingState() {
 // Library page mount: render on first show and on every re-show/visibility
 // return (the event carries the target view).
 document.addEventListener("pbp-lib-view", (e) => {
+  _pbpNotesCloseColorMenu(false);
   if (e.detail.view !== "notes") return;
   _pbpNotesRefreshPreservingState();
 });

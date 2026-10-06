@@ -850,6 +850,18 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "notesBatchDeleteConfirmOne": { "message": "Удалить выбранные выделения ($COUNT$)?", "placeholders": { "count": { "content": "$1" } } },
+  "notesChangeColor": {
+    "message": "Изменить цвет выделения"
+  },
+  "notesColorSaved": {
+    "message": "Цвет выделения изменён."
+  },
+  "notesColorFiltered": {
+    "message": "Цвет изменён. Это выделение больше не соответствует текущим фильтрам."
+  },
+  "notesColorFailed": {
+    "message": "Не удалось изменить цвет выделения. Попробуйте ещё раз."
+  },
   "notesDeleteFailed": {
     "message": "Не удалось удалить эти выделения. Повторите попытку."
   },

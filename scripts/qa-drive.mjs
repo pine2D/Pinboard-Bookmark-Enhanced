@@ -896,6 +896,49 @@ async function driveJourney(context, worker, extId, rep) {
     requireState((await library.locator('#notes-detail .notes-excerpt[aria-current="true"] .notes-excerpt-quote').innerText()) === targetQuote, "same-page jump did not select the target excerpt");
     await rep.shot(library, s, "find-and-read-same-page", { fullPage: true });
 
+    // Recolour via the real menu; the already-open reader must absorb the
+    // write and repaint its Range, with the saved note/anchor unchanged.
+    const target = await library.evaluate(() => {
+      const h = _pbpNotesFindHit(_pbpNotesSelectedKey);
+      return { key: h.key, record: h.row.key, item: h.item };
+    });
+    const targetTrigger = library.locator(`.notes-excerpt-color[data-notes-key="${target.key}"]`);
+    await targetTrigger.click();
+    await library.locator('.notes-color-menu:popover-open').waitFor();
+    requireState(await library.locator('.notes-color-choice').count() === 5, "five color choices missing");
+    await rep.shot(library, s, "color-menu");
+    await library.keyboard.press("Escape");
+    requireState(await targetTrigger.evaluate(el => document.activeElement === el), "Escape did not restore color trigger focus");
+    await targetTrigger.click();
+    await library.keyboard.press("End");
+    await library.keyboard.press("ArrowUp");
+    requireState(await library.evaluate(() => document.activeElement?.dataset.color === "4"), "keyboard color navigation failed");
+    await library.keyboard.press("Enter");
+    await reader.waitForFunction(id => _pbpHlState?.ranges[id]?.color === 4, target.item.id, { timeout: TIMEOUT_MS });
+    const recolored = await worker.evaluate(async ({ record, id }) => (await chrome.storage.local.get(record))[record].items.find(it => it.id === id),
+      { record: target.record, id: target.item.id });
+    requireState(JSON.stringify({ ...recolored, color: target.item.color }) === JSON.stringify(target.item), "recolor overwrote note or anchor fields");
+    await library.waitForFunction(key => document.activeElement?.dataset.notesKey === key && document.activeElement.classList.contains("notes-excerpt-color"), target.key);
+    await rep.shot(library, s, "color-saved");
+    await library.waitForTimeout(350); // settle the storage-driven refresh
+    await library.evaluate(() => {
+      window.__qaColorSet = chrome.storage.local.set;
+      chrome.storage.local.set = async () => { throw new Error("QA storage failure"); };
+    });
+    try {
+      await targetTrigger.click();
+      await library.locator('.notes-color-choice[data-color="5"]').click();
+      await library.waitForFunction(() => document.getElementById("notes-status")?.textContent.includes(t("notesColorFailed")));
+      requireState(await library.locator('.notes-color-choice[data-color="4"]').getAttribute("aria-checked") === "true", "failed save changed the color indicator");
+      requireState(await reader.evaluate(id => _pbpHlState.ranges[id]?.color === 4, target.item.id), "failed save changed reader paint");
+      await rep.shot(library, s, "color-save-failed");
+    } finally {
+      await library.evaluate(() => { chrome.storage.local.set = window.__qaColorSet; delete window.__qaColorSet; });
+    }
+    await library.locator('.notes-color-choice[data-color="3"]').click();
+    await reader.waitForFunction(id => _pbpHlState?.ranges[id]?.color === 3, target.item.id);
+    await library.waitForFunction(() => !document.querySelector('.notes-color-menu:popover-open'));
+
     const [source] = await Promise.all([
       context.waitForEvent("page", { timeout: TIMEOUT_MS }),
       library.locator(".notes-detail-link").click(),
@@ -916,6 +959,19 @@ async function driveJourney(context, worker, extId, rep) {
     await library.locator(".notes-detail-back").click();
     requireState(await library.locator("#notes-list .notes-hit-btn").first().isVisible(), "narrow back did not restore the index");
     requireState(await library.evaluate(() => !!document.activeElement?.matches(".notes-hit-btn")), "narrow back lost row focus");
+
+    await library.locator('#notes-color-filters [data-color="3"]').click();
+    const filteredRow = library.locator(`.notes-hit[data-notes-key="${target.key}"] .notes-hit-btn`);
+    await filteredRow.click();
+    await library.locator(`.notes-excerpt-color[data-notes-key="${target.key}"]`).click();
+    await library.locator('.notes-color-choice[data-color="5"]').click();
+    await library.waitForFunction(() => document.getElementById("notes-status")?.textContent.includes(t("notesColorFiltered")));
+    requireState(await filteredRow.count() === 0, "recolored item remained in the old color filter");
+    requireState(await library.evaluate(() => document.activeElement !== document.body && !!document.activeElement?.getClientRects().length), "filter disappearance lost keyboard focus");
+    await rep.shot(library, s, "color-filter-disappearance");
+    const backAfterColor = library.locator(".notes-detail-back");
+    if (await backAfterColor.isVisible()) await backAfterColor.click();
+    await library.locator('#notes-color-filters [data-color="all"]').click();
 
     await library.setViewportSize({ width: 1280, height: 900 });
     await library.locator("#notes-filter").fill("");

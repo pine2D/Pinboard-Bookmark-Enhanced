@@ -850,6 +850,18 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "notesBatchDeleteConfirmOne": { "message": "Usunąć wybrane zaznaczenia ($COUNT$)?", "placeholders": { "count": { "content": "$1" } } },
+  "notesChangeColor": {
+    "message": "Zmień kolor zaznaczenia"
+  },
+  "notesColorSaved": {
+    "message": "Kolor zaznaczenia został zmieniony."
+  },
+  "notesColorFiltered": {
+    "message": "Kolor został zmieniony. To zaznaczenie nie pasuje już do bieżących filtrów."
+  },
+  "notesColorFailed": {
+    "message": "Nie udało się zmienić koloru zaznaczenia. Spróbuj ponownie."
+  },
   "notesDeleteFailed": {
     "message": "Nie można usunąć tych zaznaczeń. Spróbuj ponownie."
   },

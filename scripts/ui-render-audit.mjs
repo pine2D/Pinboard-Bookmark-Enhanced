@@ -7669,6 +7669,7 @@ const SWEEP_CFG = {
       "#options-search-input",                      // the settings sidebar search box: 32px, the sidebar column's rung shared with the tabs
       ".action-link", ".clear-all-link", ".reset-tab-btn",
       ".tr-link", ".xp-dict-more", ".xp-dict-lemma-link", ".pbp-img-fix-btn", ".pbv-time", // link-styled, no chrome (COMPONENTS.md §0); .pbv-time is the cue row's timestamp (24px hit floor)
+      ".notes-excerpt-color",                       // inline semantic label action; 24px hit floor, can wrap in the hang column
       "summary", ".rail-sec-head", ".notes-hit-btn", ".notes-card-head", ".notes-card-top", ".notes-excerpt-jump", ".connection-health-row", ".hl-item-main", ".send-mi", ".pbv-poster", // row rung: whole-row clickables / section headers / status cards / menu rows / the video poster card
       ".theme-preset-btn", ".saved-theme-btn",       // borderless swatch pills (user-selected variant A, d57cdcf): the sm rung minus the collapsed frame
       ".tags-input-wrap > input", ".vocab-group-unit > input", ".source-badge > .src-seg", // fused-shell inners: the shell is measured instead
@@ -7679,7 +7680,7 @@ const SWEEP_CFG = {
   // 7. headerFace -- one computed face (size/weight/colour/transform/tracking)
   //    per surface for its section-heading set; anything off the majority is a hit.
   headerSets: {
-    options: "h2.section-title, .disclosure > summary",
+    options: "h2.section-title, .disclosure:not(.disclosure-subsection) > summary",
     "md-preview": ".rail-label, .rail-sec-head",
   },
   // 8. actionRowGap -- a flex/grid row holding buttons must use one of the
@@ -8152,6 +8153,16 @@ function sweepProbe(cfg) {
       }
     }
     const headerSel = cfg.headerSets[surface];
+    if (surface === "options") {
+      const compact = cfg.densityTier === "compact";
+      const expected = compact ? "13px/600/18px" : "14px/600/20px";
+      for (const el of document.querySelectorAll(".disclosure-subsection > summary")) {
+        if (!visible(el)) continue;
+        const cs = getComputedStyle(el);
+        const face = `${cs.fontSize}/${cs.fontWeight}/${cs.lineHeight}`;
+        if (face !== expected) hits.push({ kind: "headerFace", path: pathOf(el), face, majority: expected, detail: face });
+      }
+    }
     if (headerSel) {
       const faces = new Map();
       const items = [...document.querySelectorAll(headerSel)].filter((el) => visible(el) && !excluded(el));
@@ -8534,6 +8545,10 @@ async function runSweep(page, sw, extBase) {
   if (await notesHit.count()) {
     await notesHit.click(); await page.waitForTimeout(250);
     add(await runFamilySweep(page), "library", "notes-detail");
+    await page.locator(".notes-excerpt-color").first().click();
+    await page.waitForSelector(".notes-color-menu:popover-open", { timeout: TIMEOUT_MS });
+    add(await runFamilySweep(page), "library", "notes-color-menu");
+    await page.keyboard.press("Escape");
   }
   // Ctrl+click to open .notes-batch-bar.selecting (independent review F3):
   // the sweep used to only single-click a notes row, so .notes-batch-bar's

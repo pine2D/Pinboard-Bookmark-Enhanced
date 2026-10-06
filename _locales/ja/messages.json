@@ -850,6 +850,18 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "notesBatchDeleteConfirmOne": { "message": "選択した $COUNT$ 件のハイライトを削除しますか?", "placeholders": { "count": { "content": "$1" } } },
+  "notesChangeColor": {
+    "message": "ハイライトの色を変更"
+  },
+  "notesColorSaved": {
+    "message": "ハイライトの色を変更しました。"
+  },
+  "notesColorFiltered": {
+    "message": "色を変更しました。このハイライトは現在の絞り込み条件に一致しなくなりました。"
+  },
+  "notesColorFailed": {
+    "message": "ハイライトの色を変更できませんでした。もう一度お試しください。"
+  },
   "notesDeleteFailed": {
     "message": "ハイライトを削除できませんでした。もう一度お試しください。"
   },

@@ -4771,9 +4771,8 @@ for (const [file, text] of [["options.html", optionsHtml], ["options.css", optio
 for (const m of optionsHtml.matchAll(/<details class="disclosure"[^>]*>\s*<(\w+)/g)) {
   check(m[1] === "summary", `options.html: a .disclosure does not start with its <summary> (found <${m[1]}>)`);
 }
-check(/const det = document\.createElement\("details"\);\s*det\.className = "disclosure";\s*det\.dataset\.accKey = "et-" \+ id;/.test(optionsJs)
-  && /const head = document\.createElement\("summary"\);/.test(optionsJs),
-  "options.js: Send-to destination cards are not keyed details.disclosure sections");
+// Destination primitive/variant checks run on the actual builder below,
+// rather than requiring an exact className assignment in its source.
 
 // batch4 T3: the Send-to enable ×5 toggle (options.js renderExportTargets) is
 // the one dynamically-built checkbox the static .switch census (D4) couldn't
@@ -8034,11 +8033,16 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     }
     const host = new StubEl("div");
     try {
-      runInNewContext(`${read("export-targets.js")}\n${optionsJs.slice(start, end + 4)}\nrenderExportTargets({});`, {
+      const targetIds = runInNewContext(`${read("export-targets.js")}\n${optionsJs.slice(start, end + 4)}\nrenderExportTargets({}); pbpExportTargetIds();`, {
         document: { createElement: (tag) => new StubEl(tag) }, window: {},
         $id: (id) => (id === "export-targets" ? host : null), t: (key) => key, deobfuscateKey: (v) => v,
         pbpAccRestore() {}, setupSecretToggles() {}, bindAutoSave() {},
       });
+      check(host.children.length === targetIds.length && host.children.every((det, i) =>
+        det.tagName === "DETAILS" && det.className.split(/\s+/).includes("disclosure") &&
+        det.className.split(/\s+/).includes("disclosure-subsection") && det.dataset.accKey === "et-" + targetIds[i] &&
+        det.children[0]?.tagName === "SUMMARY"),
+      "options.js: Send-to destinations must be keyed native disclosures with subsection headings");
     } catch (e) {
       check(false, `ui-contract-tests.mjs: running options.js renderExportTargets() on the DOM stub failed (${e.message}) -- extend the stub rather than dropping the runtime key-wrap harvest`);
       return new Set();
