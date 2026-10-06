@@ -2067,6 +2067,16 @@ html.motion-ready .vocab-note-save {
 .vocab-group-unit > input[type="text"]:focus-visible {
   outline: none;
 }
+/* The datalist hover arrow Chrome draws for list="vocab-group-list" inherits
+   the input's px line-height (control height - 6), which the generated rule
+   sets equal to the box. The UA aligns the arrow by that line box, so it sat
+   below the text and the +/- steppers. A unitless 1 centres it (measured on
+   library.html, en and zh-CN: 0.75px off comfortable, 0 compact; `normal`
+   still left it 2-2.75px low); the typed text keeps the inherited one. Dark
+   themes declare color-scheme: dark, so the arrow's colour already follows. */
+.vocab-group-unit > input[type="text"]::-webkit-calendar-picker-indicator {
+  line-height: 1;
+}
 /* flex: 1 so the count text takes the whole slack and "Select all" lands on
    the row's right edge. Before this the slack went to .vocab-main-status's
    `margin-left: auto`, which right-aligned an EMPTY span and left Select all

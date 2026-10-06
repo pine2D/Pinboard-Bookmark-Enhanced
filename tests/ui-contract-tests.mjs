@@ -9315,6 +9315,14 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     read("library-notes.js").includes("const PBP_NOTES_CJK_RE = /[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul}]/u;") &&
     read("library-notes.js").includes('if (PBP_NOTES_CJK_RE.test(label)) title.classList.add("lib-cjk");'),
     "library.css / library-notes.js: a CJK notes page title pulls up again, or the Han / kana / Hangul test that marks it with .lib-cjk changed -- under the CI font the 4px pull-up clipped its ink 1.3px above the pane (render-audit G4 notes-solo, T9d)");
+  // Chrome's datalist arrow on the group input (list="vocab-group-list") is a
+  // UA pseudo-element no DOM read reaches, so the rule that centres it is
+  // pinned here: it inherits the generated px line-height (= the box) and
+  // without its own unitless 1 it sat below the text and the +/- steppers
+  // (user report 2026-10-06, the first redesign build; `normal` still left
+  // it 2-2.75px low on library.html).
+  check(declarationValueMap(hand, '.vocab-group-unit > input[type="text"]::-webkit-calendar-picker-indicator').get("line-height") === "1",
+    "library.css: the group input's datalist arrow lost its own line-height: 1 -- it inherits the box-high px line-height and drops below the +/- steppers");
   check(declarationValueMap(hand, ".vocab-note-input:placeholder-shown:not(:focus)").get("overflow") === "hidden" &&
     /^calc\(var\(--lib-lh-body\) \+ 20px\)$/.test(declarationValueMap(hand, ".vocab-note-input:placeholder-shown:not(:focus)").get("height") || "") &&
     declarationValueMap(hand, ".vocab-note-input:focus").get("min-height") === "96px" &&
