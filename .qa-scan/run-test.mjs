@@ -38,7 +38,7 @@ const SAFETY_MARGIN_MS = 1000;
 // row per test() block. Count rows in the page, not assert calls; an
 // unregistered suite is rejected instead of guessed complete.
 const EXPECTED_RESULTS = Object.freeze({
-  "tests/a11y-tests.html": 27,
+  "tests/a11y-tests.html": 28,
   "tests/ai-cache-tests.html": 26,
   "tests/ai-tags-tests.html": 98,
   "tests/anki-connect-tests.html": 41,

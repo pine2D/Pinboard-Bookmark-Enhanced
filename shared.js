@@ -3384,7 +3384,11 @@ function showConfirmPopover(anchor, opts) {
     surfaceObserver.observe(surfaceEl);
   }
   position();
-  no.focus();
+  // position() has already clamped the fixed popover into the viewport, so
+  // focus must not scroll anything: a scroll here would reach the capture
+  // listener above and dismiss this confirm the moment it opened (an opener
+  // at the viewport edge scrolled the page 6px and lost its confirm).
+  no.focus({ preventScroll: true });
   schedulePosition();
 }
 

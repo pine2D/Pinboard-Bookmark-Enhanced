@@ -317,6 +317,38 @@ function assert(cond,msg){if(!cond)throw new Error(msg||"assertion failed");}
   });
 })();
 
+// G6c: opening a confirm never scrolls the page itself. The popover is fixed
+// and already clamped into the viewport before it takes focus; a focus() that
+// scrolled would trip the confirm's own scroll->dismiss and close it at once
+// (seen with the opener at the viewport edge: 565 -> 559, popover gone).
+(function(){
+  test("G6c: confirm takes focus without scrolling",()=>{
+    const anchor = document.createElement("button");
+    anchor.type = "button";
+    anchor.textContent = "Delete";
+    document.body.appendChild(anchor);
+    const calls = [];
+    const native = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function (options) {
+      calls.push({ el: this, options });
+      return native.call(this, options);
+    };
+    try {
+      showConfirmPopover(anchor, { msg: "Sure?" });
+    } finally {
+      HTMLElement.prototype.focus = native;
+    }
+    const pop = document.body.querySelector(".confirm-popover");
+    assert(pop, "popover missing");
+    const own = calls.filter(c => pop.contains(c.el));
+    assert(own.length > 0, "confirm never focused a control inside itself");
+    own.forEach(c => assert(c.options && c.options.preventScroll === true,
+      "focus() inside the confirm without preventScroll: " + c.el.className));
+    pop.querySelector(".confirm-no").click();
+    anchor.remove();
+  });
+})();
+
 test("G7: applyI18n synchronizes the document language",()=>{
   const previous = localStorage.getItem("pp-i18n-lang");
   localStorage.setItem("pp-i18n-lang", "zh-TW");
