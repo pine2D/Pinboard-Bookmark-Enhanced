@@ -2,6 +2,8 @@
    Jina Reader Markdown Preview — Modern Flat Design
    ============================================================ */
 
+/* Loading, article replacement and translation can cross root overflow. */
+html { scrollbar-gutter: stable both-edges; }
 :root {
   --motion-collapse: 200ms;
   --motion-pop: 140ms;

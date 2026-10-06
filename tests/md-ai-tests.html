@@ -7464,7 +7464,8 @@ suite("skim status line", () => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
       await task();
       assert(!pop.matches(":popover-open"), "Escape left Explain open");
-      assertEq(document.activeElement, source, "Escape did not restore the opening source");
+      assertEq(document.activeElement, source, "Escape did not restore the opening source: " +
+        document.activeElement?.outerHTML?.slice(0, 180) + "; source=" + _pbpExplainFocusSource?.outerHTML?.slice(0, 120));
     } finally {
       _pbpExplainRun = realRun;
       source.remove();

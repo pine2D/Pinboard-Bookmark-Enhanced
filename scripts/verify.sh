@@ -36,6 +36,10 @@ if [ "$browser_failures" -ne 0 ]; then
   exit 1
 fi
 
+echo "[selection] real pointer selection with native popover light-dismiss"
+node scripts/qa-drive.mjs --headless --surfaces selection --check --label selection-default-contract
+node scripts/qa-drive.mjs --headless --surfaces selection --click-dismiss --check --label selection-click-contract
+
 echo "[syntax] checking JavaScript"
 git ls-files -- '*.js' '*.mjs' |
   while IFS= read -r file; do

@@ -11,7 +11,8 @@
 //
 // Unlike zip-install-smoke.mjs (release gate: pass/fail) this is a REPORTER:
 // surface-level breakage is recorded as a finding, not an exit code. Only
-// tooling failures (launch, seed, no SW) exit non-zero.
+// tooling failures (launch, seed, no SW) exit non-zero. --check also fails
+// when a surface reports a failed assertion or a page/console error.
 //
 // PREREQUISITES  (same as zip-install-smoke.mjs)
 //   cd .qa-scan && npm install && npx playwright install chromium
@@ -21,6 +22,7 @@
 //   node scripts/qa-drive.mjs --headless            # popup surface skipped
 //   node scripts/qa-drive.mjs --surfaces options,preview
 //   node scripts/qa-drive.mjs --headless --surfaces journey  # reader → notes → source + account isolation
+//   node scripts/qa-drive.mjs --headless --surfaces selection --click-dismiss --check
 //   node scripts/qa-drive.mjs --surfaces themes --label themes  # 13 preset × 明暗矩阵 + default + library + popup
 //   node scripts/qa-drive.mjs --site-theme dracula  # pinboard.in theme shot
 //   node scripts/qa-drive.mjs --label after-fix
@@ -57,6 +59,8 @@ const CONFIG = {
   label: flag("--label", "qa"),
   headless: hasFlag("--headless"),
   keepProfile: hasFlag("--keep-profile"),
+  check: hasFlag("--check"),
+  clickDismiss: hasFlag("--click-dismiss"),
   siteTheme: flag("--site-theme", "modern-card"),
   surfaces: (flag("--surfaces", "options,preview,popup,pinboard,library,journey")).split(",").filter(Boolean),
   // Named fault profile (error-state tour): mocks answer per the profile and
@@ -394,7 +398,7 @@ function launchContext(profile) {
     colorScheme: "light",
     deviceScaleFactor: 1,
     viewport: { width: 1280, height: 900 },
-    args: LAUNCH_ARGS,
+    args: [...LAUNCH_ARGS, ...(CONFIG.clickDismiss ? ["--enable-blink-features=LightDismissFromClick"] : [])],
   });
 }
 
@@ -963,6 +967,85 @@ function selectInRendered(needle) {
     return true;
   }
   return false;
+}
+
+// Real pointer events are essential here: dispatchEvent skips the native
+// popover light-dismiss that Chrome 153 moved from pointerup to click.
+// Run both defaults and --click-dismiss with --check to catch that regression.
+async function driveSelection(context, worker, extId, rep) {
+  const s = rep.surface("selection");
+  const page = await context.newPage();
+  const detach = rep.attach(page, s);
+  const open = () => page.evaluate(() => !!document.querySelector("#pb-hl-bar:popover-open"));
+  const clear = () => page.evaluate(() => { _pbpHlHideBar(); getSelection().removeAllRanges(); });
+  const check = async (name, fn) => {
+    try { await fn(); s.notes.push(`PASS ${name}`); }
+    catch (e) { s.failures.push(`${name}: ${e.message}`); }
+  };
+  const want = async (expected) => {
+    // Allow the deferred task and native toggle/click processing to finish;
+    // measuring synchronously in mouseup would falsely pass the old code.
+    await page.waitForTimeout(120);
+    if (await open() !== expected) throw new Error(`toolbar open must be ${expected}`);
+  };
+  const coords = (timeline) => page.evaluate((timeline) => {
+    const root = document.querySelector(timeline ? ".pbv-row" : "#rendered-view");
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const i = node.textContent.indexOf("serendipity");
+      if (i < 0) continue;
+      node.parentElement.scrollIntoView({ block: "center", behavior: "instant" });
+      const range = document.createRange();
+      range.setStart(node, i); range.setEnd(node, i + 11);
+      const b = range.getBoundingClientRect();
+      return { x: b.x, y: b.y + b.height / 2, w: b.width };
+    }
+    throw new Error("selection fixture missing");
+  }, timeline);
+  try {
+    await worker.evaluate(() => chrome.storage.local.set({ selectionTrigger: "icon" }));
+    await seedPreviewData(worker);
+    await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`);
+    await page.waitForFunction(() => typeof _pbpHlState !== "undefined" && !!_pbpHlState);
+    for (const timeline of [false, true]) {
+      if (timeline) await page.evaluate(() => {
+        _pbpHlHideBar(); getSelection().removeAllRanges();
+        document.getElementById("rendered-view").hidden = true;
+        const list = document.createElement("div");
+        list.className = "pbv-list";
+        list.style.cssText = "position:absolute;top:180px;left:350px;width:500px;padding:20px;font-size:20px;background:var(--bg)";
+        const row = document.createElement("div");
+        row.className = "pbv-row"; row.dataset.from = "0";
+        row.textContent = "Synthetic subtitle serendipity in this caption.";
+        list.append(row); document.body.append(list);
+      });
+      const c = await coords(timeline), host = timeline ? "caption" : "article";
+      await check(`${host} drag survives click`, async () => {
+        await clear(); await page.mouse.move(c.x + 1, c.y); await page.mouse.down();
+        await page.mouse.move(c.x + c.w - 1, c.y, { steps: 8 }); await page.mouse.up();
+        await want(true);
+      });
+      await check(`${host} double-click survives click`, async () => {
+        await clear(); await page.mouse.dblclick(c.x + c.w / 2, c.y); await want(true);
+      });
+      await check(`${host} Esc dismisses`, async () => {
+        await page.keyboard.press("Escape"); await want(false);
+      });
+      await check(`${host} right-click does not open`, async () => {
+        // Keep the same noncollapsed selection: the old handler erroneously
+        // opens it on any mouseup, including the context menu gesture.
+        await page.mouse.click(c.x + c.w / 2, c.y, { button: "right" }); await want(false);
+        await page.keyboard.press("Escape");
+      });
+      await check(`${host} outside click dismisses`, async () => {
+        await clear(); await page.mouse.dblclick(c.x + c.w / 2, c.y); await want(true);
+        await page.mouse.click(1230, 500); await want(false);
+      });
+      await rep.shot(page, s, host);
+    }
+  } catch (e) { s.failures.push(`selection setup: ${e.message}`); }
+  finally { detach(); await page.close(); }
 }
 
 async function drivePreview(context, worker, extId, rep) {
@@ -1638,6 +1721,7 @@ try {
     else if (surface === "library") await driveLibrary(context, extId, rep);
     else if (surface === "journey") await driveJourney(context, worker, extId, rep);
     else if (surface === "preview") await drivePreview(context, worker, extId, rep);
+    else if (surface === "selection") await driveSelection(context, worker, extId, rep);
     else if (surface === "pinboard") await drivePinboard(context, rep);
     else if (surface === "popup") await drivePopup(context, worker, extId, rep);
     else if (surface === "themes") await driveThemes(context, worker, extId, rep);
@@ -1670,6 +1754,7 @@ try {
   const failures = rep.surfaces.reduce((n, s) => n + s.failures.length, 0);
   const errors = rep.surfaces.reduce((n, s) => n + s.pageErrors.length + s.consoleErrors.length, 0);
   console.log(`[qa-drive] done: ${rep.shotSeq} shots, ${failures} driver failure(s), ${errors} page/console error(s)`);
+  if (CONFIG.check && (failures || errors)) process.exitCode = 1;
 } catch (error) {
   console.error(`[qa-drive] fatal: ${error.message}`);
   process.exitCode = 2;

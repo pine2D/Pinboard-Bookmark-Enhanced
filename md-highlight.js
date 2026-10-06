@@ -1466,6 +1466,7 @@ function _pbpHlNewId() {
 // Positioned above the selection via pbpTrPeekPopPos (spec
 // 4), horizontally clamped to the viewport the same way #explain-pop is. ----
 let _pbpHlBarEl = null;
+let _pbpHlBarShowTimer = 0;
 let _pbpHlBarRange = null;
 // Last _pbpHlShowBar arguments, kept ACROSS the dismissal: _pbpHlBarRange is
 // cleared by the popover's own "closed" toggle handler, and the creation paths
@@ -1602,6 +1603,8 @@ function _pbpHlShowBar(range, timeline) {
 }
 
 function _pbpHlHideBar() {
+  clearTimeout(_pbpHlBarShowTimer);
+  _pbpHlBarShowTimer = 0;
   if (_pbpHlBarEl) { try { _pbpHlBarEl.hidePopover(); } catch (_) {} }
 }
 
@@ -1729,28 +1732,37 @@ async function _pbpHlCreateWithNote(btn) {
 }
 
 // ---- Interaction binder: mouseup (show bar) + keydown (H/N/1-5 hotkeys) +
-// scroll/selection-collapse hide. Esc + click-elsewhere dismiss are free
-// via the popover's own light-dismiss (no listener needed for those). ----
+// scroll/selection-collapse hide. The native popover owns light-dismiss;
+// Escape also cancels an opening that is still queued. ----
 function _pbpHlOnMouseUp(e) {
-  // (research T2.2) the host is the article OR the visible timeline list.
-  const host = (typeof pbpStudyHost === "function") ? pbpStudyHost(e.target)
-    : (document.getElementById("rendered-view") && document.getElementById("rendered-view").contains(e.target)
-      ? document.getElementById("rendered-view") : null);
-  if (!host) return;
+  if (e.button !== 0) return;
+  if (e.target.closest && e.target.closest("#pb-hl-bar, #pb-hl-card, #explain-pop")) return;
+  clearTimeout(_pbpHlBarShowTimer);
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) { _pbpHlHideBar(); return; }
-  const range = sel.getRangeAt(0);
-  const timeline = typeof pbpStudyHostIsTimeline === "function" && pbpStudyHostIsTimeline(host);
-  if (timeline) {
-    // No block anchors on caption rows: the bar shows lookup/explain/seek
-    // plus the "highlight lives in the reading view" hint (research T2.3).
-    if (host !== (typeof pbpStudyHost === "function" ? pbpStudyHost(range.endContainer) : host)) { _pbpHlHideBar(); return; }
-    _pbpHlShowBar(range, true);
-    return;
-  }
-  const segments = _pbpHlSelectionSegments(range);
-  if (!segments.length) { _pbpHlHideBar(); return; }
-  _pbpHlShowBar(range, false);
+  const range = sel.getRangeAt(0).cloneRange();
+  const revision = _pbpHlArticleRev, owner = _pbpHlOwner;
+  // Chrome 153+ dismisses auto popovers during click, AFTER mouseup. Open
+  // in the next task so the selection gesture cannot dismiss its own bar.
+  // Endpoints, rather than the release target, allow a drag ending outside
+  // the article. Revalidate the live selection and host after that delay.
+  _pbpHlBarShowTimer = setTimeout(() => {
+    _pbpHlBarShowTimer = 0;
+    const live = window.getSelection();
+    if (revision !== _pbpHlArticleRev || owner !== _pbpHlOwner ||
+        !range.startContainer.isConnected || !range.endContainer.isConnected ||
+        !live || live.isCollapsed || !live.rangeCount) return;
+    const current = live.getRangeAt(0);
+    if (current.startContainer !== range.startContainer || current.startOffset !== range.startOffset ||
+        current.endContainer !== range.endContainer || current.endOffset !== range.endOffset) return;
+    const hostOf = (node) => typeof pbpStudyHost === "function" ? pbpStudyHost(node)
+      : (document.getElementById("rendered-view")?.contains(node) ? document.getElementById("rendered-view") : null);
+    const host = hostOf(range.startContainer);
+    if (!host || host !== hostOf(range.endContainer)) { _pbpHlHideBar(); return; }
+    const timeline = typeof pbpStudyHostIsTimeline === "function" && pbpStudyHostIsTimeline(host);
+    if (!timeline && !_pbpHlSelectionSegments(range).length) { _pbpHlHideBar(); return; }
+    _pbpHlShowBar(range, timeline);
+  }, 0);
 }
 
 // Same shared modifier/typing/raw-view gate as the t/v/e/d shortcuts:
@@ -1808,16 +1820,20 @@ function _pbpHlOnKeyDown(e) {
 }
 
 function _pbpHlBindInteractions(view) {
-  // Document-level (research T2.2): the handler gates on pbpStudyHost, so
-  // a mouseup outside the article/timeline returns at once, while a
-  // selection on a caption row -- a sibling of #rendered-view -- can now
-  // reach it at all (bound to `view` it never did).
+  // Document-level: a caption list is a sibling of the article, and a drag
+  // can finish outside either host. The deferred handler checks both ends
+  // of the selection against the currently visible study host.
   document.addEventListener("mouseup", _pbpHlOnMouseUp);
+  document.addEventListener("pointerdown", () => {
+    clearTimeout(_pbpHlBarShowTimer);
+    _pbpHlBarShowTimer = 0;
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") _pbpHlHideBar(); });
   document.addEventListener("keydown", _pbpHlOnKeyDown);
   window.addEventListener("scroll", () => _pbpHlHideBar(), true);
   document.addEventListener("selectionchange", () => {
     const sel = window.getSelection();
-    if ((!sel || sel.isCollapsed) && _pbpHlBarEl && _pbpHlBarEl.matches(":popover-open")) _pbpHlHideBar();
+    if (!sel || sel.isCollapsed) _pbpHlHideBar();
   });
 }
 
@@ -2666,6 +2682,7 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     // on exactly that change and lets a stale cached owner survive.
     if ((area === "local" || area === "sync") &&
         (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys)) {
+      _pbpHlHideBar();
       (async () => {
         let scope = "";
         try {
