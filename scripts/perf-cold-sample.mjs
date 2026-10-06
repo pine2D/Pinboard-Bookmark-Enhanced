@@ -107,6 +107,13 @@ function roundMetric(value) {
   return value == null ? null : Math.round(value * 1000) / 1000;
 }
 
+function matchesScale(actual, expected) {
+  // Chromium can report emulated DPR 1 as 1.0000000298023224 on a scaled
+  // desktop. Accept numerical noise, while still rejecting a real scale change.
+  return Number.isFinite(actual) && Number.isFinite(expected) && actual > 0 && expected > 0 &&
+    Math.abs(actual - expected) <= 1e-6;
+}
+
 function metricStats(values, expected) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   const p50 = median(sorted);
@@ -134,6 +141,8 @@ function runSelfTest() {
   assert(parsed.runs === 1 && parsed.headless && parsed.scenarios.join(",") === "options,worker", "CLI parsing");
   assert(SYNTHETIC_MARKDOWN.split(/\n\n+/).length === 52, "52 synthetic Markdown blocks");
   assert((SYNTHETIC_MARKDOWN.match(/^## /gm) || []).length === 25, "25 synthetic TOC headings");
+  assert(matchesScale(1.0000000298023224, 1) && matchesScale(1.49999997, 1.5), "DPR allows floating-point noise");
+  assert([1.01, 1.25, 1.5, 2, 0, undefined, NaN, Infinity, "1"].every(value => !matchesScale(value, 1)), "DPR rejects scale changes and missing/invalid readings");
   console.log("[perf-cold] self-test PASS");
 }
 
@@ -659,7 +668,9 @@ async function measurePageOpen(context, extensionId, scenario, phase, capture, f
       previewTitle: PREVIEW_TITLE,
     }, { polling: "raf", timeout: TIMEOUT_MS });
     const geometryProof = scenario === "options" ? await page.evaluate(intersectionGeometryProof, {
-      selectors: ["#panel-general", "#opt-lang", "#opt-pinboard-token", "#auto-save-status"],
+      // The select stores the value but listbox.js hides it; the actual control
+      // whose paint we must prove is the enhanced combobox button.
+      selectors: ["#panel-general", "#opt-lang-btn", "#opt-pinboard-token", "#auto-save-status"],
       timeout: TIMEOUT_MS,
     }) : null;
     const wallReadyMs = performance.now() - wallStart;
@@ -937,7 +948,7 @@ async function runSample(templateProfile, scenario, run, fakeToken) {
       .filter((metric) => !Number.isFinite(sample[phase]?.[metric]))
       .map((metric) => `${phase}.${metric}`));
     const environmentMismatches = scenario === "worker" || scenario === "popup" ? [] : ["cold", "warm"]
-      .filter((phase) => sample[phase]?.viewport?.deviceScaleFactor !== 1)
+      .filter((phase) => !matchesScale(sample[phase]?.viewport?.deviceScaleFactor, 1))
       .map((phase) => `${phase}.viewport.deviceScaleFactor`);
     const lifecycleFailures = scenario !== "popup" ? [] : ["cold", "warm"]
       .filter((phase) => sample[phase]?.closeProof?.nativeClosed !== true || sample[phase]?.closeProof?.forcedClose || sample[phase]?.closeProof?.activePageAlive !== true)
@@ -1066,7 +1077,7 @@ try {
   if (config.scenarios.includes("popup")) {
     environment.popupUsesNativeDisplayScale = !config.headless;
     environment.popupTargetMode = config.headless ? "headless-toolbar-target" : "headed-toolbar-target";
-    if (popupDeviceScaleFactors.length > 1) {
+    if (popupDeviceScaleFactors.some(scale => !matchesScale(scale, popupDeviceScaleFactors[0]))) {
       const sample = raw.samples.find((item) => item.scenario === "popup" && !item.failure);
       if (sample) sample.failure = {
         name: "ValidityError",
