@@ -3986,6 +3986,7 @@
   "libraryDictIdleFree": { "message": "Wpisz dowolne słowo, aby sprawdzić je w słowniku" },
   "librarySectionContext": { "message": "Kontekst" },
   "librarySectionMyNote": { "message": "Moja notatka" },
+  "libraryNotePlaceholderShort": { "message": "Dodaj notatkę" },
   "libraryEditGroups": { "message": "Edytuj grupy" },
   "libraryNotePlaceholder": { "message": "Zapisz skojarzenia, mylone słowa, wskazówki użycia. Zapisuje się po opuszczeniu pola" },
   "libraryVocabCoverTitle": { "message": "Słówka" },

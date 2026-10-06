@@ -3980,6 +3980,7 @@
   "libraryDictIdleFree": { "message": "输入任意词，查询它的词典释义" },
   "librarySectionContext": { "message": "语境" },
   "librarySectionMyNote": { "message": "我的笔记" },
+  "libraryNotePlaceholderShort": { "message": "添加笔记" },
   "libraryEditGroups": { "message": "编辑分组" },
   "libraryNotePlaceholder": { "message": "写点什么：联想、易混词、用法提醒。离开输入框时自动保存" },
   "libraryVocabCoverTitle": { "message": "生词本" },

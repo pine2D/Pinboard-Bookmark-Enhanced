@@ -3986,6 +3986,7 @@
   "libraryDictIdleFree": { "message": "Saisissez n’importe quel mot pour consulter sa définition" },
   "librarySectionContext": { "message": "Contexte" },
   "librarySectionMyNote": { "message": "Ma note" },
+  "libraryNotePlaceholderShort": { "message": "Ajouter une note" },
   "libraryEditGroups": { "message": "Modifier les groupes" },
   "libraryNotePlaceholder": { "message": "Notez ce qui vous aide : associations, mots à ne pas confondre, rappels d’usage. Enregistré quand vous quittez le champ" },
   "libraryVocabCoverTitle": { "message": "Vocabulaire" },

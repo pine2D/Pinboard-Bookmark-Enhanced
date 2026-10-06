@@ -5891,27 +5891,28 @@ check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code
   check(/function pbpScrollIntoView\([\s\S]{0,240}pbpPrefersReducedMotion\(\)[\s\S]{0,80}behavior: "instant"/.test(sharedJs),
     "shared.js: pbpScrollIntoView no longer downgrades to instant under prefers-reduced-motion");
   // A reduced-motion preference must not cost the user a status channel. The
-  // blanket reset parks every infinite animation after one 0.01ms cycle, so each
-  // status indicator restates its duration. The invariant asserted here is that
-  // the override MIRRORS the base rule -- retiming the base rule then needs no
-  // test edit, but forgetting to retime the override does fail.
+  // busy dot stays visible as a static mark; indicators whose animation is
+  // their status channel still restate the base duration. Actual reduced-motion
+  // visibility of the busy dot is also exercised in qa-drive's options tour.
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const lastMatch = (css, re) => { let m, last = null; while ((m = re.exec(css))) last = m[1]; return last; };
   const statusMotion = [
     ["popup.css", popupCss, ".tag-skel", "the AI tag skeleton"],
     ["popup.css", popupCss, ".offline-queue-retry.loading svg", "the offline retry spinner"],
     ["popup.css", popupCss, ".auto-close-bar", "the auto-close countdown, the only warning before the popup self-closes"],
-    ["options.css", optionsCss, ".tab-btn.tab-busy::after", "the tab busy dot"],
+    ["options.css", optionsCss, ".tab-btn.tab-busy::after", "the tab busy dot", "static"],
     ["md-preview.css", mdCss, ".preview-spinner", "the page loading spinner"],
     ["md-preview.css", mdCss, ".xp-skel", "the streaming answer skeleton"],
     ["md-preview.css", mdCss, ".src-seg.loading::after", "the extraction spinner"],
   ];
-  for (const [cssName, cssSrc, sel, what] of statusMotion) {
+  for (const [cssName, cssSrc, sel, what, mode] of statusMotion) {
     const base = lastMatch(cssSrc, new RegExp(`${esc(sel)}\\s*\\{[^}]*animation:\\s*[\\w-]+\\s+([\\d.]+m?s)`, "g"));
-    const override = lastMatch(cssSrc, new RegExp(`${esc(sel)}\\s*\\{[^}]*animation-duration:\\s*([\\d.]+m?s)\\s*!important`, "g"));
+    const override = mode === "static"
+      ? lastMatch(cssSrc, new RegExp(`${esc(sel)}\\s*\\{[^}]*animation:\\s*(none)\\s*!important`, "g"))
+      : lastMatch(cssSrc, new RegExp(`${esc(sel)}\\s*\\{[^}]*animation-duration:\\s*([\\d.]+m?s)\\s*!important`, "g"));
     check(base !== null, `${cssName}: cannot find the base animation for ${sel} — the status-motion contract has drifted`);
-    check(override === base,
-      `${cssName}: reduced motion no longer keeps ${what} running at its own rate (base ${base}, override ${override})`);
+    check(override === (mode === "static" ? "none" : base),
+      `${cssName}: reduced motion no longer keeps ${what} ${mode === "static" ? "static" : "running at its own rate"} (base ${base}, override ${override})`);
   }
   // The zen bar's positional half is vestibular; its idle fade is not. Killing
   // both turned the fade into a repeated hard brightness cut.
@@ -9329,9 +9330,10 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     declarationValueMap(hand, ".vocab-note-input").get("min-height") === "64px",
     "library.css: the note box lost one of its three heights (one line empty and unfocused, 96 focused, content-sized from 64; spec §4.6)");
   const note = fnBody(libraryVocabJs, "function _pbpVocabBuildNoteEditor(w) {");
-  check(note.includes('noteInput.placeholder = t("libraryNotePlaceholder");') &&
+  check(note.includes('noteInput.placeholder = t("libraryNotePlaceholderShort");') &&
+    note.includes('noteInput.title = t("libraryNotePlaceholder");') &&
     /noteInput\.addEventListener\("blur", \(\) => \{[\s\S]{0,200}noteSave\.click\(\)/.test(note),
-    "library-vocab.js: the note box lost its My note placeholder or its save-on-leave (the placeholder promises it)");
+    "library-vocab.js: the note box lost its short invitation, full guidance or save-on-leave behavior");
   check(!/id="vocab-detail-empty"[^>]*data-i18n=/.test(libraryHtml) &&
     /<div id="vocab-detail-empty" class="lib-cover">\s*<h2 class="lib-cover-title lib-first-line"><\/h2>\s*<p class="lib-cover-lead"><\/p>\s*<p class="lib-cover-hint" data-i18n="libraryVocabCoverHint">/.test(libraryHtml),
     "library.html: the vocabulary cover must be title + stats + hint with data-i18n on the hint only (applyI18n would overwrite a container whole; spec §4.11)");

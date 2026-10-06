@@ -3980,6 +3980,7 @@
   "libraryDictIdleFree": { "message": "Type any word to look up its dictionary entry" },
   "librarySectionContext": { "message": "Context" },
   "librarySectionMyNote": { "message": "My note" },
+  "libraryNotePlaceholderShort": { "message": "Add a note" },
   "libraryEditGroups": { "message": "Edit groups" },
   "libraryNotePlaceholder": { "message": "Write anything: associations, easily confused words, usage reminders. Saved when you leave the box" },
   "libraryVocabCoverTitle": { "message": "Vocabulary" },

@@ -3168,13 +3168,9 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  /* ...but the tab busy dot keeps pulsing: opacity only, no position change, and
-     it is the only indication that a panel has background work running. The
-     blanket reset above parked it after one 0.01ms cycle. Duration mirrors the
-     base rule. */
+  /* Keep the activity indicator visible without pulsing when motion is reduced. */
   .tab-btn.tab-busy::after {
-    animation-duration: 1.2s !important;
-    animation-iteration-count: infinite !important;
+    animation: none !important;
   }
 }
 

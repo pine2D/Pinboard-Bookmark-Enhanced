@@ -1761,8 +1761,9 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         !bareDetail.querySelector(".vocab-detail-gloss, .vocab-manage-groups, .vocab-sec-context") &&
         bareDetail.querySelector(".vocab-detail-status").textContent.includes("vocabMarkLearning"));
       const note = bareDetail.querySelector(".vocab-sec-note .vocab-note-input");
-      check("T7 the note box is named My note and invites a note",
-        !!note && note.placeholder === "libraryNotePlaceholder" && note.getAttribute("aria-label") === "librarySectionMyNote");
+      check("T7 the note box keeps a short invitation, full guidance and its My note name",
+        !!note && note.placeholder === "libraryNotePlaceholderShort" && note.title === "libraryNotePlaceholder" &&
+        note.getAttribute("aria-label") === "librarySectionMyNote");
       const saved = [];
       pbpVocabCurrentOwner = async () => "acct_layout";
       pbpVocabAll = async () => rows();

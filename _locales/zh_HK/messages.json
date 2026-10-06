@@ -3986,6 +3986,7 @@
   "libraryDictIdleFree": { "message": "輸入任何詞語，查詢它的詞典釋義" },
   "librarySectionContext": { "message": "語境" },
   "librarySectionMyNote": { "message": "我的筆記" },
+  "libraryNotePlaceholderShort": { "message": "新增筆記" },
   "libraryEditGroups": { "message": "編輯群組" },
   "libraryNotePlaceholder": { "message": "寫點甚麼：聯想、易混淆的詞、用法提醒。離開輸入框時會自動儲存" },
   "libraryVocabCoverTitle": { "message": "生詞本" },

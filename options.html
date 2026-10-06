@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <div class="container">
+  <main class="container">
     <!-- The auto-save hint is a peripheral indicator that changes on EVERY
          debounced save (and again 1.5s later when it resets), so it is
          deliberately not a live region: as one it announced twice per
@@ -22,7 +22,7 @@
          cannot take an unrelated alert down with it. -->
     <p id="opt-global-alert" class="opt-error hidden" role="alert"></p>
 
-    <div class="options-nav">
+    <nav class="options-nav" aria-label="Settings category" data-i18n-aria="settingsCategory">
       <div class="options-search" role="search">
         <label class="sr-only" for="options-search-input" data-i18n="settingsSearchLabel">Search settings</label>
         <input type="search" id="options-search-input" autocomplete="off" placeholder="Search settings" data-i18n-placeholder="settingsSearchPlaceholder" data-i18n-aria="settingsSearchLabel" aria-label="Search settings" aria-controls="options-search-results" />
@@ -77,7 +77,7 @@
         <button class="tab-btn" id="tab-storage" data-panel="storage" role="tab" aria-selected="false" aria-controls="panel-storage" data-i18n="tabStorage">Storage</button>
       </div>
       <button class="reset-tab-btn" id="reset-panel-btn" title="Reset current tab settings to defaults" data-i18n="resetTabBtn" data-i18n-title="resetTabTitle">Reset This Tab</button>
-    </div>
+    </nav>
 
     <!-- Tab 1: General -->
     <div id="panel-general" class="panel active" role="tabpanel" aria-labelledby="tab-general">
@@ -1252,7 +1252,7 @@
         </div>
       </section>
     </div>
-  </div>
+  </main>
   <script defer src="i18n.js"></script>
   <script defer src="shared.js"></script>
   <script defer src="vocab-store.js"></script>

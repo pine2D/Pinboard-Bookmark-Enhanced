@@ -3986,6 +3986,7 @@
   "libraryDictIdleFree": { "message": "Введите любое слово, чтобы найти его в словаре" },
   "librarySectionContext": { "message": "Контекст" },
   "librarySectionMyNote": { "message": "Моя заметка" },
+  "libraryNotePlaceholderShort": { "message": "Добавить заметку" },
   "libraryEditGroups": { "message": "Изменить группы" },
   "libraryNotePlaceholder": { "message": "Запишите ассоциации, похожие слова, подсказки по употреблению. Сохраняется, когда вы уходите из поля" },
   "libraryVocabCoverTitle": { "message": "Словарик" },

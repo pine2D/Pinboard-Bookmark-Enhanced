@@ -222,7 +222,7 @@ function _pbpVocabSyncRowTabStops() {
 // No render-index parameter any more: its only job was the expandable body's
 // DOM id, and the master-detail row has no body to address.
 function _pbpVocabBuildRow(w) {
-  const card = document.createElement("article");
+  const card = document.createElement("div");
   card.className = "notes-card vocab-card";
   // role=row + role=gridcell, not listitem (user ruling 2026-08-06: the
   // per-row checkbox is gone and selection is carried by the row's own fill).
@@ -374,9 +374,11 @@ function _pbpVocabBuildNoteEditor(w) {
   noteInput.className = "vocab-note-input";
   noteInput.rows = 2;
   noteInput.maxLength = 500;
-  // The visible label is the section's "My note"; the placeholder says what
-  // goes in and that leaving the box saves it (spec §4.6).
-  noteInput.placeholder = t("libraryNotePlaceholder");
+  // The empty field collapses to one line. Keep the invitation short in all
+  // locales; the full writing/autosave guidance remains its native tooltip
+  // and accessible description alongside the section's "My note" name.
+  noteInput.placeholder = t("libraryNotePlaceholderShort");
+  noteInput.title = t("libraryNotePlaceholder");
   noteInput.setAttribute("aria-label", t("librarySectionMyNote"));
   noteInput.value = w.note || "";
   // Announced, not labelled: the chord has no visible affordance of its own,

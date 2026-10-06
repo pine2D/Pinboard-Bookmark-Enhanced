@@ -20,6 +20,7 @@
 //   node scripts/qa-drive.mjs                       # all surfaces, headed
 //   node scripts/qa-drive.mjs --headless            # popup surface skipped
 //   node scripts/qa-drive.mjs --surfaces options,preview
+//   node scripts/qa-drive.mjs --headless --surfaces journey  # reader → notes → source + account isolation
 //   node scripts/qa-drive.mjs --surfaces themes --label themes  # 13 preset × 明暗矩阵 + default + library + popup
 //   node scripts/qa-drive.mjs --site-theme dracula  # pinboard.in theme shot
 //   node scripts/qa-drive.mjs --label after-fix
@@ -57,7 +58,7 @@ const CONFIG = {
   headless: hasFlag("--headless"),
   keepProfile: hasFlag("--keep-profile"),
   siteTheme: flag("--site-theme", "modern-card"),
-  surfaces: (flag("--surfaces", "options,preview,popup,pinboard,library")).split(",").filter(Boolean),
+  surfaces: (flag("--surfaces", "options,preview,popup,pinboard,library,journey")).split(",").filter(Boolean),
   // Named fault profile (error-state tour): mocks answer per the profile and
   // the `faults` surface screenshots the resulting error UI. No random fuzz.
   fault: flag("--fault", ""),
@@ -89,6 +90,7 @@ try {
 // ============================================================
 
 const FAKE_TOKEN = "qa:0000000000000000000000000000000000000000"; // username "qa"
+const FAKE_OTHER_TOKEN = "otherqa:0000000000000000000000000000000000000000";
 const ARTICLE_URL = "http://127.0.0.1:43123/qa-article";
 const ARTICLE_TITLE = "QA 走查用固定文章 — Serendipity in Systems";
 const PREVIEW_KEY = "qa-drive-preview";
@@ -427,30 +429,45 @@ function grantLoopbackHostInPrefs(profile, extId) {
 // status 合法值只有 new/known（pbpVocabBatchSetStatus 会把其他值归一为 new，
 // Codex 评审抓出的事实），不要写 "learning" 之类幻想值。
 const VOCAB_SEED = [
-  { term: "serendipity", language: "en", gloss: "意外发现珍宝的运气", status: "new", note: "来自 QA 固定文章", group: "阅读" },
+  { term: "serendipity", language: "en", gloss: "意外发现珍宝的运气", status: "new", note: "来自 QA 固定文章。\n" + "联想与用法提醒：记录相近词之间的区别，并保留上下文。".repeat(12), groups: ["阅读", "容易混淆", "A long group name for wrapping checks"] },
   { term: "ephemeral", language: "en", gloss: "短暂的，朝生暮死的", status: "known", group: "阅读" },
   { term: "ubiquitous", language: "en", gloss: "无处不在的", status: "known" },
   { term: "呼吸", language: "zh", gloss: "breathe; breathing room", status: "new" },
+  { term: "Verhältnismäßigkeit", language: "de", gloss: "比例原则；长词检查", status: "new", group: "Deutsch" },
+  ...["resilience", "ambiguity", "coherence", "inference", "constraint", "boundary", "hierarchy", "context", "pattern", "reciprocity", "persistence", "continuity", "threshold", "convergence", "divergence", "clarity", "iteration", "composition", "semantics", "affordance"].map((term, i) => ({
+    term, language: "en", gloss: `固定释义 ${i + 1}：用于长列表、筛选与滚动检查`,
+    status: i % 3 === 0 ? "known" : "new", group: i % 2 ? "阅读" : "复习",
+  })),
 ];
 
-// pbp_hl_ records are page-scoped, not Pinboard-owner-scoped (CLAUDE.md's
-// owner invariants cover vocab only) -- a literal storage.local.set is the
-// whole write. library-notes.js's scan only filters on the "pbp_hl_" prefix
-// (verified: _pbpNotesScan does not check any owner field), so a hand-picked
-// key is fine, same as ui-render-audit.mjs's fixture. Two separate pages so
-// the library Notes list has more than one row to walk.
+// Local storage shape is hand-written: owner belongs to each item, not the
+// page record. Mix same-page excerpts, current/foreign owners and one legacy
+// ownerless item (still visible) so a title/prefix-only scan cannot look correct.
+// These are local UI fixtures, not simulated remote Drive responses.
 const HIGHLIGHT_SEED = [
   {
     key: "pbp_hl_qa-drive-note-1",
     url: "https://example.invalid/qa-note-1",
     title: "QA 固定笔记页一 — 用于 library 走查",
-    items: [{ id: "h1", ts: Date.now() - 60_000, quote: "这是第一条固定高亮的引用文本，用于 library 笔记视图走查。", note: "第一条笔记内容，检查详情面板渲染。", color: 1 }],
+    items: [
+      { id: "h1", owner: "acct_qa", ts: Date.now() - 60_000, quote: "这是第一条固定高亮的引用文本，用于 library 笔记视图走查。", note: "第一条笔记内容，检查详情面板渲染。\n" + "长笔记保留连续阅读的上下文。".repeat(30), color: 1 },
+      ...Array.from({ length: 6 }, (_, i) => ({
+        id: `same-page-${i}`, owner: "acct_qa", ts: Date.now() - (i + 2) * 60_000,
+        quote: `同一页的第 ${i + 2} 条摘录。A longer quotation for continuous reading and same-page navigation.`,
+        note: i % 2 ? "" : "固定笔记，检查有笔记和无笔记摘录交替出现。", color: i % 5 + 1,
+      })),
+      { id: "foreign-shared", owner: "acct_otherqa", ts: Date.now(), quote: "FOREIGN_IN_SHARED_PAGE", note: "其他账号在同一页的摘录", color: 4 },
+    ],
   },
   {
     key: "pbp_hl_qa-drive-note-2",
     url: "https://example.invalid/qa-note-2",
-    title: "QA 固定笔记页二",
+    title: "QA 固定笔记页二 — legacy ownerless",
     items: [{ id: "h2", ts: Date.now() - 30_000, quote: "第二条固定高亮，不带笔记，检查空笔记态的渲染。", color: 3 }],
+  },
+  {
+    key: "pbp_hl_qa-drive-foreign", url: "https://example.invalid/qa-foreign", title: "其他 QA 账号的页面",
+    items: [{ id: "foreign-only", owner: "acct_otherqa", ts: Date.now(), quote: "FOREIGN_OWNER_ONLY", note: "当前 QA 账号不可见", color: 2 }],
   },
 ];
 
@@ -461,6 +478,9 @@ async function seedAll(context, worker, aiPort) {
     await chrome.storage.local.set({
       optSyncEnabled: false,
       syncApiKeys: false,
+      // This tour models a migrated installation. Otherwise the phase-2 SW
+      // startup claims the deliberately ownerless legacy fixture for "qa".
+      _hlOwnerClaimDone: true,
       pinboardToken: obfuscateKey(token),
       optLang: "zh_CN",
       optTheme: "light",
@@ -494,7 +514,13 @@ async function seedAll(context, worker, aiPort) {
       if (w.status && w.status !== "new") await pbpVocabBatchSetStatus([id], owner, w.status);
       if (w.note) await pbpVocabSetNote(id, owner, w.note);
       if (w.group) await pbpVocabBatchAddGroup([id], owner, w.group);
+      for (const group of w.groups || []) await pbpVocabBatchAddGroup([id], owner, group);
     }
+    await pbpVocabSaveWord(pbpDictOwnerScope("otherqa"), { term: "account-separate", language: "en", gloss: "仅其他 QA 账号可见" });
+    // Revisit one word from a second source to exercise multiple contexts.
+    await pbpVocabSaveWord(owner, { term: "serendipity", language: "en", context: {
+      articleUrl: "https://example.invalid/qa-second-source", articleTitle: "第二个来源", quote: "A second context for serendipity.",
+    } });
   }, VOCAB_SEED);
 
   // 3. Highlights (pbp_hl_) for the library page's Notes view.
@@ -657,7 +683,24 @@ async function driveOptions(context, extId, rep) {
         await page.locator(`#tab-${tab}`).click({ timeout: 3000 });
         await page.waitForTimeout(tab === "vocab" ? 1200 : 400);
         await rep.shot(page, s, `tab-${tab}`, { fullPage: true });
-        if (tab === "general") await axeScan(page, s, "options");
+        if (tab === "general") {
+          await axeScan(page, s, "options");
+          await page.emulateMedia({ reducedMotion: "reduce" });
+          try {
+            const busy = await page.locator("#tab-general").evaluate(el => {
+              el.classList.add("tab-busy");
+              const c = getComputedStyle(el, "::after");
+              return { animation: c.animationName, display: c.display, width: parseFloat(c.width), opacity: parseFloat(c.opacity) };
+            });
+            if (busy.animation !== "none" || busy.display === "none" || busy.width <= 0 || busy.opacity <= 0) {
+              throw new Error("reduced motion must keep a visible static busy dot");
+            }
+            s.notes.push("PASS：减少动态效果下忙碌圆点静止且可见。");
+          } finally {
+            await page.locator("#tab-general").evaluate(el => el.classList.remove("tab-busy"));
+            await page.emulateMedia({ reducedMotion: "no-preference" });
+          }
+        }
         if (tab === "tags") {
           // Second shot with the low-count disclosure open: renderLowCountTags's
           // checkbox chips (and the "N selected" / Select all / Delete row below
@@ -717,9 +760,17 @@ async function driveLibrary(context, extId, rep) {
       await rep.shot(page, s, "vocab-detail", { fullPage: true });
     });
 
+    await step("vocab-rich-detail", async () => {
+      await page.locator("#vocab-list .notes-card-head").filter({ hasText: "serendipity" }).click();
+      const noteLength = await page.locator("#vocab-detail .vocab-note-input").evaluate(el => el.value.length);
+      if (noteLength < 200 || await page.locator("#vocab-detail .vocab-manage-groups > span").count() !== 3 ||
+          await page.locator("#vocab-detail .vocab-context-quote").count() !== 2) throw new Error("rich vocabulary fixture lost its long note, groups or contexts");
+      await page.waitForTimeout(400);
+      await rep.shot(page, s, "vocab-rich-detail", { fullPage: true });
+    });
+
     await step("vocab-batch-bar", async () => {
-      // Not fullPage: .vocab-batch-bar is `position: sticky` and a stitched
-      // full-page capture can mis-place sticky elements.
+      // Capture the fixed-height selection row in the viewport with its list.
       // Ctrl+click the row heads: the per-row checkbox was removed 2026-08-06
       // and a modified click on the row is the selection gesture now.
       const rows = page.locator("#vocab-list .vocab-card .notes-card-head");
@@ -737,6 +788,19 @@ async function driveLibrary(context, extId, rep) {
       await page.locator("#notes-list .notes-hit-btn").first().click({ timeout: 3000 });
       await page.waitForTimeout(400);
       await rep.shot(page, s, "notes-two-pane", { fullPage: true });
+    });
+
+    await step("notes-same-page", async () => {
+      await page.locator("#notes-list .notes-hit-btn").filter({ hasText: "这是第一条固定高亮" }).click();
+      await page.waitForSelector("#notes-detail .notes-excerpt-jump");
+      if (await page.locator("#notes-detail .notes-excerpt").count() !== 7) throw new Error("same-page excerpts missing or foreign item leaked");
+      await rep.shot(page, s, "notes-same-page", { fullPage: true });
+      await page.locator("#notes-detail .notes-excerpt-jump").filter({ hasText: "同一页的第 2 条摘录" }).click();
+      await page.locator("#notes-detail .notes-excerpt-jump").filter({ hasText: "这是第一条固定高亮" }).click();
+      const note = page.locator('#notes-detail .notes-excerpt[aria-current="true"] .notes-excerpt-note');
+      if ((await note.innerText()).length < 300) throw new Error("long highlight note missing");
+      await page.waitForTimeout(400);
+      await rep.shot(page, s, "notes-long-note");
     });
 
     await step("narrow", async () => {
@@ -757,6 +821,126 @@ async function driveLibrary(context, extId, rep) {
   } finally {
     detach();
     await page.close().catch(() => {});
+  }
+}
+
+// Continuous task through public UI. The page content and accounts are fixtures;
+// creating/saving notes, searching, same-page jumps and returning to the source
+// use the actual controls. Assertions are findings under the reporter contract.
+async function driveJourney(context, worker, extId, rep) {
+  const s = rep.surface("journey");
+  const reader = await context.newPage();
+  const library = await context.newPage();
+  const detachReader = rep.attach(reader, s);
+  const detachLibrary = rep.attach(library, s);
+  const requireState = (ok, message) => { if (!ok) throw new Error(message); };
+  const quotes = ["这是 QA 走查用的固定合成文章", "this section exists to create scroll depth"];
+  const marker = "QA 连续任务";
+  try {
+    const legacyOwner = await worker.evaluate(async () => {
+      const rows = await chrome.storage.local.get("pbp_hl_qa-drive-note-2");
+      return rows["pbp_hl_qa-drive-note-2"]?.items?.[0]?.owner;
+    });
+    requireState(legacyOwner === undefined, `legacy fixture was claimed before the tour: ${legacyOwner}`);
+    await seedPreviewData(worker);
+    await reader.bringToFront();
+    await reader.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await reader.waitForSelector("#rendered-view [data-pb]", { timeout: TIMEOUT_MS });
+    // Article paint precedes highlight binding and the asynchronous translation
+    // cache restore. Wait for both before selecting; a cache hit can replace the
+    // view and clear an earlier selection. Read the source via its actual toggle.
+    await reader.waitForSelector("#hl-rail-section", { state: "attached", timeout: TIMEOUT_MS });
+    await reader.waitForSelector("#tr-section", { state: "attached", timeout: TIMEOUT_MS });
+    await reader.waitForFunction(async () => {
+      if (!_pbpTrState?.workReady) return false;
+      await _pbpTrState.workReady;
+      return true;
+    }, null, { timeout: TIMEOUT_MS });
+    const original = reader.locator('#tr-view-toggle [data-tr-mode="original"]');
+    if (await original.isVisible()) {
+      await original.click();
+      await reader.waitForFunction(() => !document.body.classList.contains("tr-only"), null, { timeout: TIMEOUT_MS });
+    }
+    for (const [i, quote] of quotes.entries()) {
+      requireState(await reader.evaluate(selectInRendered, quote), `reader selection ${i + 1} missing`);
+      await reader.keyboard.press("n");
+      const note = `${marker} ${i + 1}：通过阅读器保存，再从笔记页找回。`;
+      await reader.locator("#pb-hl-card:popover-open .hl-card-note").fill(note, { timeout: TIMEOUT_MS });
+      await reader.locator("#pb-hl-card .hl-card-save").click();
+      await reader.waitForFunction(async ({ note, quote }) => {
+        const rows = await chrome.storage.local.get(null);
+        return Object.entries(rows).some(([key, row]) => key.startsWith("pbp_hl_") &&
+          Array.isArray(row?.items) && row.items.some(item => item.note === note && item.quote === quote && item.owner === "acct_qa"));
+      }, { note, quote }, { timeout: TIMEOUT_MS });
+      await reader.keyboard.press("Escape");
+    }
+    await rep.shot(reader, s, "reader-saved-notes");
+
+    await library.bringToFront();
+    await library.goto(`chrome-extension://${extId}/library.html#notes`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await library.waitForSelector("#notes-list .notes-hit-btn", { timeout: TIMEOUT_MS });
+    const listText = await library.locator("#notes-list").innerText();
+    requireState(!listText.includes("FOREIGN_"), "foreign-owner highlight leaked into current account");
+    requireState(listText.includes("第二条固定高亮"), "legacy ownerless highlight missing");
+    await library.locator("#notes-filter").fill(marker);
+    await library.waitForFunction(() => document.querySelectorAll("#notes-list .notes-hit").length === 2, null, { timeout: TIMEOUT_MS });
+    await library.locator("#notes-list .notes-hit-btn").first().click();
+    for (const quote of quotes) requireState(await library.locator("#notes-detail .notes-excerpt").filter({ hasText: quote }).count() === 1, "saved notes not shown together on the same page");
+    const jump = library.locator("#notes-detail .notes-excerpt-jump").first();
+    const targetQuote = await jump.innerText();
+    await jump.click();
+    requireState((await library.locator('#notes-detail .notes-excerpt[aria-current="true"] .notes-excerpt-quote').innerText()) === targetQuote, "same-page jump did not select the target excerpt");
+    await rep.shot(library, s, "find-and-read-same-page", { fullPage: true });
+
+    const [source] = await Promise.all([
+      context.waitForEvent("page", { timeout: TIMEOUT_MS }),
+      library.locator(".notes-detail-link").click(),
+    ]);
+    const detachSource = rep.attach(source, s);
+    try {
+      await source.waitForURL(ARTICLE_URL, { timeout: TIMEOUT_MS });
+      await source.waitForSelector("main h1", { timeout: TIMEOUT_MS });
+      await rep.shot(source, s, "return-to-source");
+    } finally { detachSource(); await source.close(); }
+
+    await library.setViewportSize({ width: 420, height: 860 });
+    await library.goto(`chrome-extension://${extId}/library.html?_qa=journey-narrow#notes`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await library.locator("#notes-filter").fill(marker);
+    await library.waitForFunction(() => document.querySelectorAll("#notes-list .notes-hit").length === 2, null, { timeout: TIMEOUT_MS });
+    await library.locator("#notes-list .notes-hit-btn").first().click();
+    await rep.shot(library, s, "narrow-notes-detail");
+    await library.locator(".notes-detail-back").click();
+    requireState(await library.locator("#notes-list .notes-hit-btn").first().isVisible(), "narrow back did not restore the index");
+    requireState(await library.evaluate(() => !!document.activeElement?.matches(".notes-hit-btn")), "narrow back lost row focus");
+
+    await library.setViewportSize({ width: 1280, height: 900 });
+    await library.locator("#notes-filter").fill("");
+    await library.locator("#lib-tab-vocab").click();
+    await library.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
+    requireState(!(await library.locator("#vocab-list").innerText()).includes("account-separate"), "foreign vocabulary leaked into current account");
+    await worker.evaluate(async token => chrome.storage.local.set({ pinboardToken: obfuscateKey(token) }), FAKE_OTHER_TOKEN);
+    await library.locator("#vocab-list .notes-card-head").filter({ hasText: "account-separate" }).waitFor({ timeout: TIMEOUT_MS });
+    requireState(await library.locator("#vocab-list .vocab-card").count() === 1, "previous owner's vocabulary survived account switch");
+    await library.locator("#lib-tab-notes").click();
+    await library.locator("#notes-list .notes-hit-btn").filter({ hasText: "FOREIGN_OWNER_ONLY" }).waitFor({ timeout: TIMEOUT_MS });
+    const otherText = await library.locator("#notes-list").innerText();
+    requireState(otherText.includes("FOREIGN_IN_SHARED_PAGE") && otherText.includes("第二条固定高亮"), "foreign/legacy fixture visibility incorrect after account switch");
+    requireState(!otherText.includes(marker) && !otherText.includes("这是第一条固定高亮"), "previous owner's notes survived account switch");
+    await rep.shot(library, s, "other-account-isolated");
+    await worker.evaluate(async token => chrome.storage.local.set({ pinboardToken: obfuscateKey(token) }), FAKE_TOKEN);
+    await library.locator("#notes-list .notes-hit-btn").filter({ hasText: marker }).first().waitFor({ timeout: TIMEOUT_MS });
+    requireState(!(await library.locator("#notes-list").innerText()).includes("FOREIGN_"), "foreign notes survived switching back");
+    s.notes.push("PASS：阅读器保存两条笔记 → 搜索找回 → 同页连续阅读/跳转 → 原文；窄屏返回恢复焦点；切换账号隔离生词与笔记，保留 legacy ownerless 可见性。");
+  } catch (e) {
+    s.failures.push(`journey: ${e.message}`);
+    await rep.shot(reader, s, "reader-failure-state").catch(() => {});
+    await rep.shot(library, s, "failure-state").catch(() => {});
+  } finally {
+    // Keep subsequent surfaces independent even if a journey assertion fails.
+    await worker.evaluate(async token => chrome.storage.local.set({ pinboardToken: obfuscateKey(token) }), FAKE_TOKEN);
+    detachReader(); detachLibrary();
+    await reader.close().catch(() => {});
+    await library.close().catch(() => {});
   }
 }
 
@@ -1452,6 +1636,7 @@ try {
     console.log(`[qa-drive] surface: ${surface}`);
     if (surface === "options") await driveOptions(context, extId, rep);
     else if (surface === "library") await driveLibrary(context, extId, rep);
+    else if (surface === "journey") await driveJourney(context, worker, extId, rep);
     else if (surface === "preview") await drivePreview(context, worker, extId, rep);
     else if (surface === "pinboard") await drivePinboard(context, rep);
     else if (surface === "popup") await drivePopup(context, worker, extId, rep);

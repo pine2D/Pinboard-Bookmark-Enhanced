@@ -3986,6 +3986,7 @@
   "libraryDictIdleFree": { "message": "Gib ein beliebiges Wort ein, um es im Wörterbuch nachzuschlagen" },
   "librarySectionContext": { "message": "Kontext" },
   "librarySectionMyNote": { "message": "Meine Notiz" },
+  "libraryNotePlaceholderShort": { "message": "Notiz hinzufügen" },
   "libraryEditGroups": { "message": "Gruppen bearbeiten" },
   "libraryNotePlaceholder": { "message": "Schreib etwas dazu: Assoziationen, Verwechslungsgefahr, Hinweise zur Verwendung. Wird beim Verlassen des Felds gespeichert" },
   "libraryVocabCoverTitle": { "message": "Vokabeln" },
