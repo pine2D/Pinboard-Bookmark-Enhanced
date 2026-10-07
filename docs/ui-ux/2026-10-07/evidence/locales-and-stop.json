@@ -1,0 +1,1903 @@
+[
+  {
+    "kind": "locale",
+    "preset": "default",
+    "lang": "de",
+    "width": 420,
+    "scrollWidth": 451,
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": "Pinboard Bookmark Enhanced – Einstellungen Automatisches Speichern aktiviert"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 271.640625,
+        "right": 460.609375,
+        "width": 188.96875,
+        "text": "Automatisches Speichern aktiviert"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": "\n      \n        Einstellungen durchsuchen\n        \n        \n      \n      \n        Einstellungskatego"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": "\n        Einstellungen durchsuchen\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 299.140625,
+        "right": 460.609375,
+        "width": 161.46875,
+        "text": "Diesen Tab zurücksetzen"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": "\n      \n        KI in der Leseansicht\n\n        \n           KI-Funktionen in der Leseansicht aktivier"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": "\n        KI in der Leseansicht\n\n        \n           KI-Funktionen in der Leseansicht aktivieren\n    "
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": "KI in der Leseansicht"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": "\n           KI-Funktionen in der Leseansicht aktivieren\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": " KI-Funktionen in der Leseansicht aktivieren"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": " KI-Funktionen in der Leseansicht aktivieren"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "default",
+    "lang": "de",
+    "width": 320,
+    "scrollWidth": 451,
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": "Pinboard Bookmark Enhanced – Einstellungen Automatisches Speichern aktiviert"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 271.640625,
+        "right": 460.609375,
+        "width": 188.96875,
+        "text": "Automatisches Speichern aktiviert"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": "\n      \n        Einstellungen durchsuchen\n        \n        \n      \n      \n        Einstellungskatego"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": "\n        Einstellungen durchsuchen\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 299.140625,
+        "right": 460.609375,
+        "width": 161.46875,
+        "text": "Diesen Tab zurücksetzen"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 460.609375,
+        "width": 434.609375,
+        "text": "\n      \n        KI in der Leseansicht\n\n        \n           KI-Funktionen in der Leseansicht aktivier"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": "\n        KI in der Leseansicht\n\n        \n           KI-Funktionen in der Leseansicht aktivieren\n    "
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": "KI in der Leseansicht"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": "\n           KI-Funktionen in der Leseansicht aktivieren\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": " KI-Funktionen in der Leseansicht aktivieren"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 443.609375,
+        "width": 400.609375,
+        "text": " KI-Funktionen in der Leseansicht aktivieren"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "default",
+    "lang": "fr",
+    "width": 420,
+    "scrollWidth": 435,
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": "Pinboard Bookmark Enhanced — Paramètres enregistrement automatique activé"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 250.453125,
+        "right": 445.046875,
+        "width": 194.59375,
+        "text": "enregistrement automatique activé"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": "\n      \n        Rechercher dans les paramètres\n        \n        \n      \n      \n        Catégorie de "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": "\n        Rechercher dans les paramètres\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 297.109375,
+        "right": 445.046875,
+        "width": 147.9375,
+        "text": "Réinitialiser cet onglet"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": "\n      \n        IA de la page Lecture\n\n        \n           Activer les fonctionnalités IA sur la pag"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": "\n        IA de la page Lecture\n\n        \n           Activer les fonctionnalités IA sur la page Lectu"
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": "IA de la page Lecture"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": "\n           Activer les fonctionnalités IA sur la page Lecture\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": " Activer les fonctionnalités IA sur la page Lecture"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": " Activer les fonctionnalités IA sur la page Lecture"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "default",
+    "lang": "fr",
+    "width": 320,
+    "scrollWidth": 435,
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": "Pinboard Bookmark Enhanced — Paramètres enregistrement automatique activé"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 250.453125,
+        "right": 445.046875,
+        "width": 194.59375,
+        "text": "enregistrement automatique activé"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": "\n      \n        Rechercher dans les paramètres\n        \n        \n      \n      \n        Catégorie de "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": "\n        Rechercher dans les paramètres\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 297.109375,
+        "right": 445.046875,
+        "width": 147.9375,
+        "text": "Réinitialiser cet onglet"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 445.046875,
+        "width": 419.046875,
+        "text": "\n      \n        IA de la page Lecture\n\n        \n           Activer les fonctionnalités IA sur la pag"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": "\n        IA de la page Lecture\n\n        \n           Activer les fonctionnalités IA sur la page Lectu"
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": "IA de la page Lecture"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": "\n           Activer les fonctionnalités IA sur la page Lecture\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": " Activer les fonctionnalités IA sur la page Lecture"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 428.046875,
+        "width": 385.046875,
+        "text": " Activer les fonctionnalités IA sur la page Lecture"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "default",
+    "lang": "pl",
+    "width": 420,
+    "scrollWidth": 443,
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": "Pinboard Bookmark Enhanced — Ustawienia automatyczny zapis włączony"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 289.953125,
+        "right": 453.359375,
+        "width": 163.40625,
+        "text": "automatyczny zapis włączony"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": "\n      \n        Przeszukaj ustawienia\n        \n        \n      \n      \n        Kategoria ustawień\n   "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": "\n        Przeszukaj ustawienia\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 339.734375,
+        "right": 453.359375,
+        "width": 113.625,
+        "text": "Resetuj tę kartę"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": "\n      \n        AI w czytniku\n\n        \n           Włącz funkcje AI w czytniku\n        \n\n        \n  "
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": "\n        AI w czytniku\n\n        \n           Włącz funkcje AI w czytniku\n        \n\n        \n        U"
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": "AI w czytniku"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": "\n           Włącz funkcje AI w czytniku\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": " Włącz funkcje AI w czytniku"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": " Włącz funkcje AI w czytniku"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "default",
+    "lang": "pl",
+    "width": 320,
+    "scrollWidth": 443,
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": "Pinboard Bookmark Enhanced — Ustawienia automatyczny zapis włączony"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 289.953125,
+        "right": 453.359375,
+        "width": 163.40625,
+        "text": "automatyczny zapis włączony"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": "\n      \n        Przeszukaj ustawienia\n        \n        \n      \n      \n        Kategoria ustawień\n   "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": "\n        Przeszukaj ustawienia\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 339.734375,
+        "right": 453.359375,
+        "width": 113.625,
+        "text": "Resetuj tę kartę"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 453.359375,
+        "width": 427.359375,
+        "text": "\n      \n        AI w czytniku\n\n        \n           Włącz funkcje AI w czytniku\n        \n\n        \n  "
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": "\n        AI w czytniku\n\n        \n           Włącz funkcje AI w czytniku\n        \n\n        \n        U"
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": "AI w czytniku"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": "\n           Włącz funkcje AI w czytniku\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": " Włącz funkcje AI w czytniku"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 436.359375,
+        "width": 393.359375,
+        "text": " Włącz funkcje AI w czytniku"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "default",
+    "lang": "ru",
+    "width": 420,
+    "scrollWidth": 460,
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": "Pinboard Bookmark Enhanced — Настройки автосохранение включено"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 318.25,
+        "right": 470.09375,
+        "width": 151.84375,
+        "text": "автосохранение включено"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": "\n      \n        Поиск по настройкам\n        \n        \n      \n      \n        Категория настроек\n     "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": "\n        Поиск по настройкам\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 342.25,
+        "right": 470.09375,
+        "width": 127.84375,
+        "text": "Сбросить вкладку"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": "\n      \n        AI на странице «Чтение»\n\n        \n           Включить функции ИИ на странице «Чтение"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": "\n        AI на странице «Чтение»\n\n        \n           Включить функции ИИ на странице «Чтение»\n     "
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": "AI на странице «Чтение»"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": "\n           Включить функции ИИ на странице «Чтение»\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": " Включить функции ИИ на странице «Чтение»"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": " Включить функции ИИ на странице «Чтение»"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "default",
+    "lang": "ru",
+    "width": 320,
+    "scrollWidth": 460,
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": "Pinboard Bookmark Enhanced — Настройки автосохранение включено"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 318.25,
+        "right": 470.09375,
+        "width": 151.84375,
+        "text": "автосохранение включено"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": "\n      \n        Поиск по настройкам\n        \n        \n      \n      \n        Категория настроек\n     "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": "\n        Поиск по настройкам\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 342.25,
+        "right": 470.09375,
+        "width": 127.84375,
+        "text": "Сбросить вкладку"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 470.09375,
+        "width": 444.09375,
+        "text": "\n      \n        AI на странице «Чтение»\n\n        \n           Включить функции ИИ на странице «Чтение"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": "\n        AI на странице «Чтение»\n\n        \n           Включить функции ИИ на странице «Чтение»\n     "
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": "AI на странице «Чтение»"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": "\n           Включить функции ИИ на странице «Чтение»\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": " Включить функции ИИ на странице «Чтение»"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 453.09375,
+        "width": 410.09375,
+        "text": " Включить функции ИИ на странице «Чтение»"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "terminal",
+    "lang": "de",
+    "width": 420,
+    "scrollWidth": 461,
+    "density": "compact",
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "Pinboard Bookmark Enhanced – Einstellungen Automatisches Speichern aktiviert"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 253.421875,
+        "right": 471.265625,
+        "width": 217.84375,
+        "text": "Automatisches Speichern aktiviert"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n      \n        Einstellungen durchsuchen\n        \n        \n      \n      \n        Einstellungskatego"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n        Einstellungen durchsuchen\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 294.4375,
+        "right": 471.265625,
+        "width": 176.828125,
+        "text": "Diesen Tab zurücksetzen"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n      \n        KI in der Leseansicht\n\n        \n           KI-Funktionen in der Leseansicht aktivier"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "\n        KI in der Leseansicht\n\n        \n           KI-Funktionen in der Leseansicht aktivieren\n    "
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "KI in der Leseansicht"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "\n           KI-Funktionen in der Leseansicht aktivieren\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": " KI-Funktionen in der Leseansicht aktivieren"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": " KI-Funktionen in der Leseansicht aktivieren"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "terminal",
+    "lang": "de",
+    "width": 320,
+    "scrollWidth": 461,
+    "density": "compact",
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "Pinboard Bookmark Enhanced – Einstellungen Automatisches Speichern aktiviert"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 253.421875,
+        "right": 471.265625,
+        "width": 217.84375,
+        "text": "Automatisches Speichern aktiviert"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n      \n        Einstellungen durchsuchen\n        \n        \n      \n      \n        Einstellungskatego"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n        Einstellungen durchsuchen\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 294.4375,
+        "right": 471.265625,
+        "width": 176.828125,
+        "text": "Diesen Tab zurücksetzen"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n      \n        KI in der Leseansicht\n\n        \n           KI-Funktionen in der Leseansicht aktivier"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "\n        KI in der Leseansicht\n\n        \n           KI-Funktionen in der Leseansicht aktivieren\n    "
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "KI in der Leseansicht"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "\n           KI-Funktionen in der Leseansicht aktivieren\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": " KI-Funktionen in der Leseansicht aktivieren"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": " KI-Funktionen in der Leseansicht aktivieren"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "terminal",
+    "lang": "fr",
+    "width": 420,
+    "scrollWidth": 469,
+    "density": "compact",
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": "Pinboard Bookmark Enhanced — Paramètres enregistrement automatique activé"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 261.21875,
+        "right": 479.0625,
+        "width": 217.84375,
+        "text": "enregistrement automatique activé"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": "\n      \n        Rechercher dans les paramètres\n        \n        \n      \n      \n        Catégorie de "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": "\n        Rechercher dans les paramètres\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 295.625,
+        "right": 479.0625,
+        "width": 183.4375,
+        "text": "Réinitialiser cet onglet"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": "\n      \n        IA de la page Lecture\n\n        \n           Activer les fonctionnalités IA sur la pag"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": "\n        IA de la page Lecture\n\n        \n           Activer les fonctionnalités IA sur la page Lectu"
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": "IA de la page Lecture"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": "\n           Activer les fonctionnalités IA sur la page Lecture\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": " Activer les fonctionnalités IA sur la page Lecture"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": " Activer les fonctionnalités IA sur la page Lecture"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "terminal",
+    "lang": "fr",
+    "width": 320,
+    "scrollWidth": 469,
+    "density": "compact",
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": "Pinboard Bookmark Enhanced — Paramètres enregistrement automatique activé"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 261.21875,
+        "right": 479.0625,
+        "width": 217.84375,
+        "text": "enregistrement automatique activé"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": "\n      \n        Rechercher dans les paramètres\n        \n        \n      \n      \n        Catégorie de "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": "\n        Rechercher dans les paramètres\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 295.625,
+        "right": 479.0625,
+        "width": 183.4375,
+        "text": "Réinitialiser cet onglet"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 479.0625,
+        "width": 453.0625,
+        "text": "\n      \n        IA de la page Lecture\n\n        \n           Activer les fonctionnalités IA sur la pag"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": "\n        IA de la page Lecture\n\n        \n           Activer les fonctionnalités IA sur la page Lectu"
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": "IA de la page Lecture"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": "\n           Activer les fonctionnalités IA sur la page Lecture\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": " Activer les fonctionnalités IA sur la page Lecture"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 462.0625,
+        "width": 419.0625,
+        "text": " Activer les fonctionnalités IA sur la page Lecture"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "terminal",
+    "lang": "pl",
+    "width": 420,
+    "scrollWidth": 461,
+    "density": "compact",
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "Pinboard Bookmark Enhanced — Ustawienia automatyczny zapis włączony"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 293.03125,
+        "right": 471.265625,
+        "width": 178.234375,
+        "text": "automatyczny zapis włączony"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n      \n        Przeszukaj ustawienia\n        \n        \n      \n      \n        Kategoria ustawień\n   "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n        Przeszukaj ustawienia\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 340.640625,
+        "right": 471.265625,
+        "width": 130.625,
+        "text": "Resetuj tę kartę"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n      \n        AI w czytniku\n\n        \n           Włącz funkcje AI w czytniku\n        \n\n        \n  "
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "\n        AI w czytniku\n\n        \n           Włącz funkcje AI w czytniku\n        \n\n        \n        U"
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "AI w czytniku"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "\n           Włącz funkcje AI w czytniku\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": " Włącz funkcje AI w czytniku"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": " Włącz funkcje AI w czytniku"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "terminal",
+    "lang": "pl",
+    "width": 320,
+    "scrollWidth": 461,
+    "density": "compact",
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "Pinboard Bookmark Enhanced — Ustawienia automatyczny zapis włączony"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 293.03125,
+        "right": 471.265625,
+        "width": 178.234375,
+        "text": "automatyczny zapis włączony"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n      \n        Przeszukaj ustawienia\n        \n        \n      \n      \n        Kategoria ustawień\n   "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n        Przeszukaj ustawienia\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 340.640625,
+        "right": 471.265625,
+        "width": 130.625,
+        "text": "Resetuj tę kartę"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 471.265625,
+        "width": 445.265625,
+        "text": "\n      \n        AI w czytniku\n\n        \n           Włącz funkcje AI w czytniku\n        \n\n        \n  "
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "\n        AI w czytniku\n\n        \n           Włącz funkcje AI w czytniku\n        \n\n        \n        U"
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "AI w czytniku"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": "\n           Włącz funkcje AI w czytniku\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": " Włącz funkcje AI w czytniku"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 454.265625,
+        "width": 411.265625,
+        "text": " Włącz funkcje AI w czytniku"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "terminal",
+    "lang": "ru",
+    "width": 420,
+    "scrollWidth": 446,
+    "density": "compact",
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": "Pinboard Bookmark Enhanced — Настройки автосохранение включено"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 303.828125,
+        "right": 455.65625,
+        "width": 151.828125,
+        "text": "автосохранение включено"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": "\n      \n        Поиск по настройкам\n        \n        \n      \n      \n        Категория настроек\n     "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": "\n        Поиск по настройкам\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 325.03125,
+        "right": 455.65625,
+        "width": 130.625,
+        "text": "Сбросить вкладку"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": "\n      \n        AI на странице «Чтение»\n\n        \n           Включить функции ИИ на странице «Чтение"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": "\n        AI на странице «Чтение»\n\n        \n           Включить функции ИИ на странице «Чтение»\n     "
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": "AI на странице «Чтение»"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": "\n           Включить функции ИИ на странице «Чтение»\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": " Включить функции ИИ на странице «Чтение»"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": " Включить функции ИИ на странице «Чтение»"
+      }
+    ]
+  },
+  {
+    "kind": "locale",
+    "preset": "terminal",
+    "lang": "ru",
+    "width": 320,
+    "scrollWidth": 446,
+    "density": "compact",
+    "beyond": [
+      {
+        "tag": "H1",
+        "id": "",
+        "cls": "",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": "Pinboard Bookmark Enhanced — Настройки автосохранение включено"
+      },
+      {
+        "tag": "SPAN",
+        "id": "auto-save-status",
+        "cls": "auto-save-hint",
+        "left": 303.828125,
+        "right": 455.65625,
+        "width": 151.828125,
+        "text": "автосохранение включено"
+      },
+      {
+        "tag": "NAV",
+        "id": "",
+        "cls": "options-nav",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": "\n      \n        Поиск по настройкам\n        \n        \n      \n      \n        Категория настроек\n     "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "options-search",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": "\n        Поиск по настройкам\n        \n        \n      "
+      },
+      {
+        "tag": "INPUT",
+        "id": "options-search-input",
+        "cls": "",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "left": 325.03125,
+        "right": 455.65625,
+        "width": 130.625,
+        "text": "Сбросить вкладку"
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-reader",
+        "cls": "panel active",
+        "left": 26,
+        "right": 455.65625,
+        "width": 429.65625,
+        "text": "\n      \n        AI на странице «Чтение»\n\n        \n           Включить функции ИИ на странице «Чтение"
+      },
+      {
+        "tag": "SECTION",
+        "id": "",
+        "cls": "settings-section",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": "\n        AI на странице «Чтение»\n\n        \n           Включить функции ИИ на странице «Чтение»\n     "
+      },
+      {
+        "tag": "H2",
+        "id": "",
+        "cls": "section-title",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": "AI на странице «Чтение»"
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-group",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": "\n           Включить функции ИИ на странице «Чтение»\n        "
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "pref-row",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": " Включить функции ИИ на странице «Чтение»"
+      },
+      {
+        "tag": "LABEL",
+        "id": "",
+        "cls": "switch",
+        "left": 43,
+        "right": 438.65625,
+        "width": 395.65625,
+        "text": " Включить функции ИИ на странице «Чтение»"
+      }
+    ]
+  },
+  {
+    "kind": "429-before-stop",
+    "stopVisible": true,
+    "progress": "抽取术语中…"
+  },
+  {
+    "kind": "429-500ms-after-stop",
+    "stopVisible": true,
+    "progress": "抽取术语中…"
+  },
+  {
+    "kind": "429-2s-after-stop",
+    "stopVisible": true,
+    "progress": "抽取术语中…"
+  },
+  {
+    "kind": "429-stop-finished",
+    "elapsedMs": 29135,
+    "stopVisible": false,
+    "progress": "抽取术语中…"
+  }
+]

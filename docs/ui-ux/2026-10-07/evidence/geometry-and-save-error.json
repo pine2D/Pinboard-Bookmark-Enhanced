@@ -1,0 +1,868 @@
+[
+  {
+    "kind": "options-geometry",
+    "tab": "general",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "popup",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "bookmarks",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "quick",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "ai",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "ai-behavior",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "reader",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "vocab",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "markdown",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "tags",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "archive",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "appearance",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "storage",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "general",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "popup",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "bookmarks",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "quick",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "ai",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "ai-behavior",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "reader",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "vocab",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "markdown",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "tags",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "archive",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "appearance",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "storage",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "general",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "popup",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "bookmarks",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "quick",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "ai",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "ai-behavior",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "reader",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "vocab",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "markdown",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "tags",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "archive",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "appearance",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "storage",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "general",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "popup",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "bookmarks",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "quick",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "ai",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "ai-behavior",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "reader",
+    "width": 320,
+    "scrollWidth": 314,
+    "horizontal": false,
+    "beyond": [
+      {
+        "id": "options-search-input",
+        "cls": "",
+        "r": 324,
+        "w": 298
+      },
+      {
+        "id": "reset-panel-btn",
+        "cls": "reset-tab-btn",
+        "r": 324,
+        "w": 69
+      },
+      {
+        "id": "panel-reader",
+        "cls": "panel active",
+        "r": 324,
+        "w": 298
+      }
+    ]
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "vocab",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "markdown",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "tags",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "archive",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "appearance",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-geometry",
+    "tab": "storage",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "options-save-error",
+    "scrollY": 405,
+    "alertHidden": false,
+    "text": "保存未能完成；部分其他设置可能已保存，请检查后重试",
+    "alertTop": -324,
+    "alertBottom": -294,
+    "headerTop": -381,
+    "viewport": 900
+  },
+  {
+    "kind": "library-geometry",
+    "view": "vocab",
+    "width": 820,
+    "scrollWidth": 820,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "library-geometry",
+    "view": "vocab",
+    "width": 420,
+    "scrollWidth": 420,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "library-geometry",
+    "view": "vocab",
+    "width": 320,
+    "scrollWidth": 320,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "library-no-results",
+    "text": "没有符合当前筛选条件的生词。",
+    "clearButtons": [
+      {
+        "id": "lib-tab-vocab",
+        "text": "生词",
+        "aria": null
+      },
+      {
+        "id": "lib-tab-notes",
+        "text": "笔记",
+        "aria": null
+      },
+      {
+        "id": "vocab-filter-narrow",
+        "text": "筛选",
+        "aria": null
+      },
+      {
+        "id": "vocab-sort-btn",
+        "text": "时间",
+        "aria": null
+      },
+      {
+        "id": "vocab-lookup-narrow",
+        "text": "",
+        "aria": "查询任意词"
+      },
+      {
+        "id": "vocab-select-all",
+        "text": "全选",
+        "aria": null
+      }
+    ]
+  },
+  {
+    "kind": "library-geometry",
+    "view": "vocab-detail",
+    "width": 320,
+    "scrollWidth": 310,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "library-geometry",
+    "view": "notes",
+    "width": 320,
+    "scrollWidth": 320,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "reader-ask-geometry",
+    "width": 1280,
+    "article": {
+      "left": 306,
+      "right": 842,
+      "top": 48,
+      "bottom": 4327.984375,
+      "width": 536,
+      "height": 4279.984375,
+      "visibility": "visible"
+    },
+    "rail": {
+      "left": 10,
+      "right": 266,
+      "top": 0,
+      "bottom": 900,
+      "width": 256,
+      "height": 900,
+      "visibility": "visible"
+    },
+    "ask": {
+      "left": 890,
+      "right": 1270,
+      "top": 0,
+      "bottom": 900,
+      "width": 380,
+      "height": 900,
+      "visibility": "visible"
+    },
+    "scrollWidth": 1260
+  },
+  {
+    "kind": "reader-geometry",
+    "view": "base",
+    "width": 1280,
+    "scrollWidth": 1260,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "reader-ask-geometry",
+    "width": 1100,
+    "article": {
+      "left": 306,
+      "right": 662,
+      "top": 48,
+      "bottom": 4562.765625,
+      "width": 356,
+      "height": 4514.765625,
+      "visibility": "visible"
+    },
+    "rail": {
+      "left": 10,
+      "right": 266,
+      "top": 0,
+      "bottom": 900,
+      "width": 256,
+      "height": 900,
+      "visibility": "visible"
+    },
+    "ask": {
+      "left": 710,
+      "right": 1090,
+      "top": 0,
+      "bottom": 900,
+      "width": 380,
+      "height": 900,
+      "visibility": "visible"
+    },
+    "scrollWidth": 1080
+  },
+  {
+    "kind": "reader-geometry",
+    "view": "base",
+    "width": 1100,
+    "scrollWidth": 1080,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "reader-ask-geometry",
+    "width": 1024,
+    "article": {
+      "left": 306,
+      "right": 586,
+      "top": 48,
+      "bottom": 4984.5625,
+      "width": 280,
+      "height": 4936.5625,
+      "visibility": "visible"
+    },
+    "rail": {
+      "left": 10,
+      "right": 266,
+      "top": 0,
+      "bottom": 900,
+      "width": 256,
+      "height": 900,
+      "visibility": "visible"
+    },
+    "ask": {
+      "left": 634,
+      "right": 1014,
+      "top": 0,
+      "bottom": 900,
+      "width": 380,
+      "height": 900,
+      "visibility": "visible"
+    },
+    "scrollWidth": 1004
+  },
+  {
+    "kind": "reader-geometry",
+    "view": "base",
+    "width": 1024,
+    "scrollWidth": 1004,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "reader-ask-geometry",
+    "width": 1001,
+    "article": {
+      "left": 306,
+      "right": 563,
+      "top": 48,
+      "bottom": 5073.84375,
+      "width": 257,
+      "height": 5025.84375,
+      "visibility": "visible"
+    },
+    "rail": {
+      "left": 10,
+      "right": 266,
+      "top": 0,
+      "bottom": 900,
+      "width": 256,
+      "height": 900,
+      "visibility": "visible"
+    },
+    "ask": {
+      "left": 611,
+      "right": 991,
+      "top": 0,
+      "bottom": 900,
+      "width": 380,
+      "height": 900,
+      "visibility": "visible"
+    },
+    "scrollWidth": 981
+  },
+  {
+    "kind": "reader-geometry",
+    "view": "base",
+    "width": 1001,
+    "scrollWidth": 981,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "reader-ask-geometry",
+    "width": 1000,
+    "article": {
+      "left": 60,
+      "right": 940,
+      "top": 64,
+      "bottom": 3237.28125,
+      "width": 880,
+      "height": 3173.28125,
+      "visibility": "visible"
+    },
+    "rail": {
+      "left": -246,
+      "right": 10,
+      "top": 0,
+      "bottom": 900,
+      "width": 256,
+      "height": 900,
+      "visibility": "hidden"
+    },
+    "ask": {
+      "left": 10,
+      "right": 990,
+      "top": 635.609375,
+      "bottom": 900,
+      "width": 980,
+      "height": 264.390625,
+      "visibility": "visible"
+    },
+    "scrollWidth": 980
+  },
+  {
+    "kind": "reader-geometry",
+    "view": "base",
+    "width": 1000,
+    "scrollWidth": 980,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "reader-ask-geometry",
+    "width": 820,
+    "article": {
+      "left": 30,
+      "right": 790,
+      "top": 64,
+      "bottom": 3610.09375,
+      "width": 760,
+      "height": 3546.09375,
+      "visibility": "visible"
+    },
+    "rail": {
+      "left": -246,
+      "right": 10,
+      "top": 0,
+      "bottom": 900,
+      "width": 256,
+      "height": 900,
+      "visibility": "hidden"
+    },
+    "ask": {
+      "left": 10,
+      "right": 810,
+      "top": 639.421875,
+      "bottom": 900,
+      "width": 800,
+      "height": 260.578125,
+      "visibility": "visible"
+    },
+    "scrollWidth": 800
+  },
+  {
+    "kind": "reader-geometry",
+    "view": "base",
+    "width": 820,
+    "scrollWidth": 800,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "reader-ask-geometry",
+    "width": 420,
+    "article": {
+      "left": 30,
+      "right": 390,
+      "top": 64,
+      "bottom": 3809.640625,
+      "width": 360,
+      "height": 3745.640625,
+      "visibility": "visible"
+    },
+    "rail": {
+      "left": -246,
+      "right": 10,
+      "top": 0,
+      "bottom": 900,
+      "width": 256,
+      "height": 900,
+      "visibility": "hidden"
+    },
+    "ask": {
+      "left": 10,
+      "right": 410,
+      "top": 589.984375,
+      "bottom": 900,
+      "width": 400,
+      "height": 310.015625,
+      "visibility": "visible"
+    },
+    "scrollWidth": 400
+  },
+  {
+    "kind": "reader-geometry",
+    "view": "base",
+    "width": 420,
+    "scrollWidth": 400,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "reader-ask-geometry",
+    "width": 320,
+    "article": {
+      "left": 30,
+      "right": 290,
+      "top": 64,
+      "bottom": 4303.171875,
+      "width": 260,
+      "height": 4239.171875,
+      "visibility": "visible"
+    },
+    "rail": {
+      "left": -246,
+      "right": 10,
+      "top": 0,
+      "bottom": 900,
+      "width": 256,
+      "height": 900,
+      "visibility": "hidden"
+    },
+    "ask": {
+      "left": 10,
+      "right": 310,
+      "top": 570.203125,
+      "bottom": 900,
+      "width": 300,
+      "height": 329.796875,
+      "visibility": "visible"
+    },
+    "scrollWidth": 300
+  },
+  {
+    "kind": "reader-geometry",
+    "view": "base",
+    "width": 320,
+    "scrollWidth": 300,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "popup-page-geometry",
+    "width": 550,
+    "scrollWidth": 550,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "popup-page-geometry",
+    "width": 420,
+    "scrollWidth": 420,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "popup-page-geometry",
+    "width": 320,
+    "scrollWidth": 320,
+    "horizontal": false,
+    "beyond": []
+  },
+  {
+    "kind": "popup-first-login",
+    "text": "Pinboard 书签增强\n\n请输入你的 API Token，获取地址： pinboard.in/settings/password\n\n登录"
+  }
+]
