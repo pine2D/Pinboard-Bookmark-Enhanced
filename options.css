@@ -1828,7 +1828,11 @@ html.motion-ready .pf:not([hidden]) {
    open/close behavior. */
 details::details-content {
   height: 0;
-  overflow: clip;
+  /* Full-width fields paint their focus glow outside the disclosure. Only
+     clip vertically for the height transition; clipping both axes cuts off
+     the glow at the left/right edges, including nested export fields. */
+  overflow-x: visible;
+  overflow-y: clip;
   content-visibility: hidden;
 }
 details[open]::details-content {
