@@ -4040,5 +4040,6 @@
   "aiConfigure": {"message": "Configurer l’IA"},
   "themePreviewTitle": {"message": "Aperçu du thème prédéfini"},
   "themePreviewSampleTitle": {"message": "Une page à retrouver"},
-  "themePreviewSampleDescription": {"message": "Lisez, surlignez et retrouvez vos pages préférées."}
+  "themePreviewSampleDescription": {"message": "Lisez, surlignez et retrouvez vos pages préférées."},
+  "themePreviewSearch": {"message": "Rechercher"}
 }

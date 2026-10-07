@@ -4034,5 +4034,6 @@
   "aiConfigure": {"message": "Configure AI"},
   "themePreviewTitle": {"message": "Preset preview"},
   "themePreviewSampleTitle": {"message": "A bookmark worth keeping"},
-  "themePreviewSampleDescription": {"message": "Read, highlight, and return to your favorite pages."}
+  "themePreviewSampleDescription": {"message": "Read, highlight, and return to your favorite pages."},
+  "themePreviewSearch": {"message": "Search"}
 }

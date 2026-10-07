@@ -4040,5 +4040,6 @@
   "aiConfigure": {"message": "Skonfiguruj AI"},
   "themePreviewTitle": {"message": "Podgląd motywu"},
   "themePreviewSampleTitle": {"message": "Strona, do której warto wrócić"},
-  "themePreviewSampleDescription": {"message": "Czytaj, zaznaczaj i wracaj do ulubionych stron."}
+  "themePreviewSampleDescription": {"message": "Czytaj, zaznaczaj i wracaj do ulubionych stron."},
+  "themePreviewSearch": {"message": "Szukaj"}
 }

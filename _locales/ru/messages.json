@@ -4040,5 +4040,6 @@
   "aiConfigure": {"message": "Настроить AI"},
   "themePreviewTitle": {"message": "Предпросмотр темы"},
   "themePreviewSampleTitle": {"message": "Страница, к которой хочется вернуться"},
-  "themePreviewSampleDescription": {"message": "Читайте, выделяйте и возвращайтесь к любимым страницам."}
+  "themePreviewSampleDescription": {"message": "Читайте, выделяйте и возвращайтесь к любимым страницам."},
+  "themePreviewSearch": {"message": "Поиск"}
 }

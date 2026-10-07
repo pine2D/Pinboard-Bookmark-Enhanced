@@ -4040,5 +4040,6 @@
   "aiConfigure": {"message": "設定 AI"},
   "themePreviewTitle": {"message": "預設主題預覽"},
   "themePreviewSampleTitle": {"message": "值得收藏的頁面"},
-  "themePreviewSampleDescription": {"message": "閱讀、標記，隨時回到喜歡的內容。"}
+  "themePreviewSampleDescription": {"message": "閱讀、標記，隨時回到喜歡的內容。"},
+  "themePreviewSearch": {"message": "搜尋"}
 }

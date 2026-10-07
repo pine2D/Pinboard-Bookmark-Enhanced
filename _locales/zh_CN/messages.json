@@ -4034,5 +4034,6 @@
   "aiConfigure": {"message": "配置 AI"},
   "themePreviewTitle": {"message": "预设效果预览"},
   "themePreviewSampleTitle": {"message": "值得收藏的页面"},
-  "themePreviewSampleDescription": {"message": "阅读、标记，随时回到喜欢的内容。"}
+  "themePreviewSampleDescription": {"message": "阅读、标记，随时回到喜欢的内容。"},
+  "themePreviewSearch": {"message": "搜索"}
 }

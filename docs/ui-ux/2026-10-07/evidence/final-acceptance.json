@@ -375,5 +375,38 @@
   ],
   "unmeasured_optional_sweep": [
     "reader confirm-popover (opener returned false; logged by the render audit)"
-  ]
+  ],
+  "post_verify": {
+    "change": "Localize theme preview search values and accessible label in all nine locales",
+    "i18n": {
+      "pass": 233,
+      "fail": 0,
+      "skip": 0
+    },
+    "discovery": {
+      "presets": 11,
+      "modes": 2,
+      "widths": [
+        320,
+        420
+      ],
+      "locales": 9,
+      "screenshots": 4,
+      "driver_failures": 0,
+      "page_errors": 0,
+      "console_errors": 0,
+      "ai_requests": 0
+    },
+    "static": [
+      "ui-consumer-lint options.js",
+      "ESLint options.js and scripts/qa-drive.mjs",
+      "git diff --check"
+    ],
+    "full_verify_rerun": false,
+    "logs": [
+      ".qa-scan/i18n-preview-final.log",
+      ".qa-scan/discovery-localized.log",
+      ".qa-scan/discovery-localized-narrow.log"
+    ]
+  }
 }

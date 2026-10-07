@@ -3700,7 +3700,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       body { margin:0; font-family:"Segoe UI",Arial,"PingFang SC","Microsoft YaHei","Hiragino Sans","Noto Sans CJK SC","Noto Sans SC","微软雅黑","Source Han Sans SC","WenQuanYi Micro Hei",sans-serif; }
       button,input {font-family:inherit} #banner,#sub_banner,.user_navbar,#main_column {padding:8px 12px} #main_column {margin:0;width:auto;max-width:none} #banner_searchbox {display:flex;gap:4px;float:none} #banner_searchbox input {min-width:0;max-width:100%} .bookmark {margin:8px 0} .tag {margin-right:8px}
     </style><style>${css}</style><style>:root { --pinboard-font-family: ${previewFamily} !important; }</style></head><body id="pinboard">
-      <div id="banner"><span id="pinboard_name"><a>pinboard</a></span><span id="banner_searchbox"><input type="text" readonly value="${esc(t("search"))}" aria-label="${esc(t("search"))}"><span class="search_button"><input type="button" value="${esc(t("search"))}"></span></span></div>
+      <div id="banner"><span id="pinboard_name"><a>pinboard</a></span><span id="banner_searchbox"><input type="text" readonly value="${esc(t("themePreviewSearch"))}" aria-label="${esc(t("themePreviewSearch"))}"><span class="search_button"><input type="button" value="${esc(t("themePreviewSearch"))}"></span></span></div>
       <div class="user_navbar"><div id="bmarks_page_nav"><a class="filter selected">${esc(t("libraryFilterAll"))}</a></div></div>
       <div id="main_column"><div class="bookmark"><div class="display"><a class="bookmark_title">${esc(t("themePreviewSampleTitle"))}</a><div class="description">${esc(t("themePreviewSampleDescription"))}</div><div class="tags"><a class="tag">${esc(t("libraryFilterAll"))}</a></div></div></div></div>
     </body></html>`;

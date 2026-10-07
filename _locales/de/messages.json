@@ -4040,5 +4040,6 @@
   "aiConfigure": {"message": "KI einrichten"},
   "themePreviewTitle": {"message": "Vorschau der Vorlage"},
   "themePreviewSampleTitle": {"message": "Eine Seite zum Wiederfinden"},
-  "themePreviewSampleDescription": {"message": "Lesen, markieren und Lieblingsseiten wieder besuchen."}
+  "themePreviewSampleDescription": {"message": "Lesen, markieren und Lieblingsseiten wieder besuchen."},
+  "themePreviewSearch": {"message": "Suchen"}
 }

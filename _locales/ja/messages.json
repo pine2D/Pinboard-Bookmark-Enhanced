@@ -4040,5 +4040,6 @@
   "aiConfigure": {"message": "AI を設定"},
   "themePreviewTitle": {"message": "プリセットのプレビュー"},
   "themePreviewSampleTitle": {"message": "また読みたいページ"},
-  "themePreviewSampleDescription": {"message": "読み、ハイライトし、お気に入りのページに戻れます。"}
+  "themePreviewSampleDescription": {"message": "読み、ハイライトし、お気に入りのページに戻れます。"},
+  "themePreviewSearch": {"message": "検索"}
 }

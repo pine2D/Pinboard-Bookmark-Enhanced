@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-07T12:22:16.774Z",
-  "label": "discovery-accepted",
+  "generatedAt": "2026-10-07T13:05:25.920Z",
+  "label": "discovery-localized-narrow",
   "surfaces": [
     {
       "name": "discovery",
@@ -34,7 +34,7 @@
       "consoleErrors": [],
       "pageErrors": [],
       "notes": [
-        "PASS: 9-language sync matrix and theme samples, actual cross-links; 11 presets × 2 modes, 14 color pairs, auto OS switch; source controls/AI setup/master-off; account switch and split local-secret/sync-main writes enable rail and selection AI once; no AI request."
+        "PASS: 9-language sync matrix and theme samples at 320/420px, localized search values/label, actual cross-links; 11 presets × 2 modes × 2 widths, 14 color pairs, auto OS switch; source controls/AI setup/master-off; account switch and split local-secret/sync-main writes enable rail and selection AI once; no AI request."
       ],
       "failures": [],
       "_events": [],
@@ -51,8 +51,8 @@
   },
   "aiRequests": 0,
   "environment": {
-    "commit": "dc597d37",
-    "dirty": 40,
+    "commit": "c0408f29",
+    "dirty": 11,
     "chromium": "147.0.7727.15",
     "node": "v24.14.1",
     "platform": "linux"

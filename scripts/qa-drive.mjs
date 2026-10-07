@@ -1817,10 +1817,13 @@ async function driveDiscovery(context, worker, extId, rep) {
       // identical sample text (all presets deliberately share that text).
       await frame.locator(`html[data-preset="${preset}"][data-mode="${mode}"]`).waitFor();
       await frame.locator('.bookmark_title').filter({hasText:await options.evaluate(()=>t('themePreviewSampleTitle'))}).waitFor();
-      const g=await frame.locator('body').evaluate(el=>({bg:getComputedStyle(el).backgroundColor,fg:getComputedStyle(el).color,scroll:document.documentElement.scrollWidth,width:innerWidth,selected:getComputedStyle(document.querySelector('.filter.selected')).color,title:document.querySelector('.bookmark_title').getBoundingClientRect().toJSON(),description:document.querySelector('.description').getBoundingClientRect().toJSON(),tags:document.querySelector('.tags').getBoundingClientRect().toJSON()}));
-      requireState(g.scroll<=g.width,`preset preview overflow ${preset}/${mode}: ${g.scroll}/${g.width}`);
-      requireState(g.description.top>=g.title.bottom-1&&g.tags.top>=g.description.bottom-1,`preset sample rows overlap ${preset}/${mode}`);
-      colors.add(g.bg+'|'+g.fg);
+      for (const width of [320,420]) {
+        await options.setViewportSize({width,height:900});
+        const g=await frame.locator('body').evaluate(el=>({bg:getComputedStyle(el).backgroundColor,fg:getComputedStyle(el).color,scroll:document.documentElement.scrollWidth,width:innerWidth,selected:getComputedStyle(document.querySelector('.filter.selected')).color,title:document.querySelector('.bookmark_title').getBoundingClientRect().toJSON(),description:document.querySelector('.description').getBoundingClientRect().toJSON(),tags:document.querySelector('.tags').getBoundingClientRect().toJSON()}));
+        requireState(g.scroll<=g.width,`preset preview overflow ${preset}/${mode}/${width}: ${g.scroll}/${g.width}`);
+        requireState(g.description.top>=g.title.bottom-1&&g.tags.top>=g.description.bottom-1,`preset sample rows overlap ${preset}/${mode}/${width}`);
+        colors.add(g.bg+'|'+g.fg);
+      }
       requireState(await options.locator('#preset-effect-frame').getAttribute('sandbox')==='',"theme preview sandbox permits capabilities");
       requireState(await frame.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content').then(v=>v.includes("default-src 'none'")),"theme preview missing closed network CSP");
       if(preset==='flexoki') {
@@ -1833,8 +1836,13 @@ async function driveDiscovery(context, worker, extId, rep) {
       await options.evaluate(async lang=>{await chrome.storage.local.set({optLang:lang});initI18n();await pbpI18nReady();},locale);
       const frame=options.frameLocator('#preset-effect-frame');
       await frame.locator(`html[lang="${await options.evaluate(()=>document.documentElement.lang)}"]`).waitFor();
-      const g=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,title:document.querySelector('.bookmark_title').textContent}));
-      requireState(g.scroll<=g.width && g.title===await options.evaluate(()=>t('themePreviewSampleTitle')),`localized theme preview mismatch/overflow: ${locale}`);
+      const search=await options.evaluate(()=>t('themePreviewSearch'));
+      for (const width of [320,420]) {
+        await options.setViewportSize({width,height:900});
+        const g=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,title:document.querySelector('.bookmark_title').textContent,search:document.querySelector('input[type="text"]').value,button:document.querySelector('input[type="button"]').value,aria:document.querySelector('input[type="text"]').getAttribute('aria-label')}));
+        requireState(g.scroll<=g.width && g.title===await options.evaluate(()=>t('themePreviewSampleTitle')),`localized theme preview mismatch/overflow: ${locale}/${width}`);
+        requireState(search!=='themePreviewSearch'&&g.search===search&&g.button===search&&g.aria===search,`theme preview search copy/label not localized: ${locale}/${width}`);
+      }
     }
     await options.locator('#opt-theme-btn').click();
     await options.locator('#opt-theme-list [data-value="auto"]').click();
@@ -1906,7 +1914,7 @@ async function driveDiscovery(context, worker, extId, rep) {
     await popup.locator('#ai-configure-btn').click();
     await options.waitForURL('**/options.html#ai');
     requireState(aiRequests.length===aiBefore,"setup/initialization dispatched paid AI");
-    s.notes.push(`PASS: 9-language sync matrix and theme samples, actual cross-links; ${presets.length} presets × 2 modes, ${colors.size} color pairs, auto OS switch; source controls/AI setup/master-off; account switch and split local-secret/sync-main writes enable rail and selection AI once; no AI request.`);
+    s.notes.push(`PASS: 9-language sync matrix and theme samples at 320/420px, localized search values/label, actual cross-links; ${presets.length} presets × 2 modes × 2 widths, ${colors.size} color pairs, auto OS switch; source controls/AI setup/master-off; account switch and split local-secret/sync-main writes enable rail and selection AI once; no AI request.`);
   } catch(e){s.failures.push(e.stack);}
   finally {for(const d of detach)d();for(const p of [options,reader,popup,source])await p.close();}
 }
