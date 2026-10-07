@@ -131,7 +131,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const snapshotIndex = submit.indexOf('url: $id("url-input").value.trim()', policyIndex);
     const ownershipIndex = submit.indexOf("saveUrl !== url", snapshotIndex);
     const intentIndex = submit.indexOf("const intent = {", ownershipIndex);
-    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount })', intentIndex);
+    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft })', intentIndex);
     const snapshot = submit.slice(snapshotIndex, ownershipIndex);
     const intentBlock = submit.slice(intentIndex, sendIndex);
     const tagHelperStart = source.indexOf("function pbpRebasePopupTags(");
@@ -189,7 +189,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       return element;
     }
 
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
@@ -298,6 +298,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
         existingBookmark: null,
         currentTags,
         _archiveUserTouched: archiveUserTouched,
+        _popupDraftContext: draftContext ? {pageUrl: URL, incognito: false} : null,
+        _popupDraftEdited: false,
+        _popupDraftRestored: false,
+        pbpDiscardPopupDraft: async () => {},
         _waybackHostGranted: waybackHostGranted,
         settings,
         chrome: chromeStub,
@@ -314,7 +318,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         POSTS_ADD_URI_BUDGET,
       };
       const names = Object.keys(dependencies);
-      const factory = new Function(...names, `${resetSource}\n${setupSource}\nreturn setupSubmit;`);
+      const factory = new Function(...names, `${source.slice(source.indexOf("function pbpPopupDraftSnapshot("), source.indexOf("function pbpRememberPopupDraft("))}\n${resetSource}\n${setupSource}\nreturn setupSubmit;`);
       const setupSubmit = factory(...names.map((name) => dependencies[name]));
       setupSubmit("alice:token");
       const click = elements["submit-btn"]._listeners.click[0];
@@ -371,6 +375,18 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(harness.messages.length === 1, "save_intent did not start after the Wayback snapshot");
       harness.resolveSave({ status: "queued", queueId: "q-wayback" });
       await pending;
+    });
+
+    await testAsync("draft cleanup uses the clicked snapshot even when the form changes before dispatch", async () => {
+      const harness = createSubmitHarness({archiveRequested:true, deferWayback:true, draftContext:true});
+      const pending = harness.click();
+      await Promise.resolve();
+      harness.elements["title-input"].value = "Unsaved newer title";
+      harness.resolveWayback({});
+      await Promise.resolve(); await Promise.resolve();
+      assert(harness.messages.length === 1, "save was not dispatched");
+      assert(harness.messages[0].popupDraft.expectedDraft.title === "Submitted title", "newer edit can be cleared as if it was submitted");
+      harness.resolveSave({status:"saved"}); await pending;
     });
 
     await testAsync("untouched failed lookup leaves archive policy to the final merged bookmark", async () => {
@@ -2588,6 +2604,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let currentTags = [];",
         "let pinboardFetch, pinboardFetchImmediate;",
         proxySource,
+        "let _popupDraftRestored = false;",
         lookupSource,
         "return { checkExistingBookmark, getLookup: () => bookmarkLookup };",
       ].join("\n");
@@ -2787,6 +2804,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let currentTags = [];",
         "let pinboardFetch, pinboardFetchImmediate;",
         proxySource,
+        "let _popupDraftRestored = false;",
         lookupSource,
         "return { checkExistingBookmark, getTags: () => currentTags };",
       ].join("\n");
@@ -3201,8 +3219,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
 
     function runFormIsDirty(fieldDirtyFlags, tagsUserTouched) {
-      return new Function("fieldDirtyFlags", "_tagsUserTouched",
-        `${formIsDirtySource}\nreturn pbpPopupFormIsDirty();`)(fieldDirtyFlags, tagsUserTouched);
+      return new Function("fieldDirtyFlags", "_tagsUserTouched", "_popupDraftEdited",
+        `${formIsDirtySource}\nreturn pbpPopupFormIsDirty();`)(fieldDirtyFlags, tagsUserTouched, false);
     }
 
     test("K75: a clean form (no dirty field, tags untouched) is not dirty", () => {

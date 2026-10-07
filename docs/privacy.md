@@ -33,6 +33,7 @@ Extension settings, caches, and temporary state are stored locally by default. B
 | Video reading-view choice (per video: reading or timeline, with a last-used timestamp; account-scoped keys include the non-secret plaintext Pinboard username owner; at most 50 recent entries) | `chrome.storage.local` | No |
 | Bookmark-status cache (account-scoped in memory) | Service Worker memory | No |
 | Offline save queue (URL, title, notes, tags, save options, time, and a non-secret plaintext Pinboard username binding) | `chrome.storage.local` | No |
+| Unsaved popup drafts (page/bookmark URLs, title, notes, tags and pending tag text, save options, and the non-secret Pinboard username owner; normal and incognito scopes are separate) | `chrome.storage.session`; expire after 24 hours, with expired entries pruned on subsequent writes; cleared on browser restart, successful matching save, or logout | No; excluded from manual backups |
 | Batch progress & Markdown preview data (account-scoped records include the non-secret plaintext Pinboard username owner); for video pages this includes the captured subtitle text, the selected caption track, and AI punctuation results, so the reader can restore them after a reload without refetching | `chrome.storage.local` | No |
 | Reader highlights & notes | `chrome.storage.local` | No |
 | Wayback archive log | `chrome.storage.local` | No |

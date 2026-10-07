@@ -20,6 +20,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 - **Ein Klick, alles ausgefüllt** – Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
 - **Per Tastenkürzel speichern** – ohne das Popup zu öffnen; auf Wunsch alle offenen Tabs auf einmal
 - **Funktioniert offline** – Gespeichertes landet in einer lokalen Warteschlange und wird gesendet, sobald du wieder online bist
+- **Entwurf wiederherstellen**: das Popup erneut öffnen und ungespeicherte Änderungen fortsetzen; Entwürfe verfallen nach 24 Stunden oder einem Browserneustart
 
 ![Speichern mit einem Klick, KI-Tags und Zusammenfassung](docs/cws-assets/originals/screenshot-1-save.png)
 

@@ -40,6 +40,9 @@ echo "[selection] real pointer selection with native popover light-dismiss"
 node scripts/qa-drive.mjs --headless --surfaces selection --check --label selection-default-contract
 node scripts/qa-drive.mjs --headless --surfaces selection --click-dismiss --check --label selection-click-contract
 
+echo "[draft] native popup close/reopen preserves unsaved edits"
+node scripts/qa-drive.mjs --surfaces drafts --check --label popup-draft-contract
+
 echo "[syntax] checking JavaScript"
 git ls-files -- '*.js' '*.mjs' |
   while IFS= read -r file; do

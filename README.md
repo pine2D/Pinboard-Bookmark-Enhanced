@@ -20,6 +20,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 - **One click, everything filled in**: title, description, and selected text, with tracking parameters stripped from the URL
 - **Save by hotkey**: skip the popup, or batch-save every open tab
 - **Works offline**: saves are queued locally and retried when you're back online
+- **Recover a draft**: reopen the popup to resume unsaved edits; drafts expire after 24 hours or a browser restart
 
 ![One-click save with AI tags and summary](docs/cws-assets/originals/screenshot-1-save.png)
 

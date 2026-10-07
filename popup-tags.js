@@ -301,6 +301,7 @@ function setupTagsInput() {
     input.setAttribute("aria-expanded", "false");
     input.removeAttribute("aria-activedescendant");
     acIndex = -1;
+    if (typeof pbpRememberPopupDraft === "function") pbpRememberPopupDraft();
   }
   function openAutocomplete() {
     dropdown.classList.remove("hidden");
@@ -653,6 +654,7 @@ function renderTags() {
     });
   }
   if (typeof updateCharCount === "function") updateCharCount();
+  if (typeof pbpRememberPopupDraft === "function") pbpRememberPopupDraft();
 }
 
 function syncSuggestTagStates() {

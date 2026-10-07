@@ -4008,5 +4008,11 @@
   "libraryCountWordsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
-  "libraryVocabCoverHint": { "message": "Wybierz słowo, aby zobaczyć kontekst, swoją notatkę i hasło ze słownika, albo od razu sprawdź dowolne słowo." }
+  "libraryVocabCoverHint": { "message": "Wybierz słowo, aby zobaczyć kontekst, swoją notatkę i hasło ze słownika, albo od razu sprawdź dowolne słowo." },
+  "popupDraftRestored": {
+    "message": "Przywrócono niezapisany szkic."
+  },
+  "popupDraftFailed": {
+    "message": "Nie udało się zachować szkicu. Zapisz zakładkę przed zamknięciem okna rozszerzenia."
+  }
 }

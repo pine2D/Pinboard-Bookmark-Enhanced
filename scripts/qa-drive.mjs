@@ -1720,6 +1720,50 @@ async function diffAgainstPrev(runDir, prevDir) {
 // ============================================================
 // Main
 // ============================================================
+async function drivePopupDrafts(context, worker, extId, rep) {
+  const s=rep.surface('popup-drafts');
+  const page=await context.newPage();
+  let cdp,session;
+  try {
+    await page.goto(ARTICLE_URL); await page.bringToFront();
+    cdp=await context.browser().newBrowserCDPSession();
+    await cdp.send('Target.setDiscoverTargets',{discover:true});
+    const open = async () => {
+      const popupUrl=`chrome-extension://${extId}/popup.html`;
+      await worker.evaluate(()=>chrome.action.openPopup());
+      const deadline=Date.now()+15000;let target;
+      while(Date.now()<deadline) {
+        const r=await cdp.send('Target.getTargets');
+        target=r.targetInfos.find(t=>t.url===popupUrl && t.type==='page');
+        if(target) break;
+        await new Promise(r=>setTimeout(r,100));
+      }
+      if(!target)throw new Error('popup missing');
+      const {sessionId}=await cdp.send('Target.attachToTarget',{targetId:target.targetId,flatten:false});
+      session=createTargetSession(cdp,sessionId);
+      await session.send('Runtime.enable');await session.send('Page.enable');
+      for(let i=0;i<150;i++) {
+        const r=await session.send('Runtime.evaluate',{expression:'!!document.getElementById("main-section") && !document.getElementById("main-section").classList.contains("hidden") && document.getElementById("url-input").value.includes("qa-article")',returnByValue:true});
+        if(r.result.value)break;await new Promise(r=>setTimeout(r,100));
+      }
+      await new Promise(r=>setTimeout(r,1000));
+      return target.targetId;
+    };
+    let id=await open();
+    await session.send('Runtime.evaluate',{expression:'document.getElementById("description-input").value="UX_UNSAVED_DRAFT_20261007";document.getElementById("description-input").dispatchEvent(new Event("input",{bubbles:true}));document.getElementById("title-input").value="UX edited title";document.getElementById("title-input").dispatchEvent(new Event("input",{bubbles:true}));currentTags=["manual-one","manual-two"];_tagsUserTouched=true;renderTags();document.getElementById("tags-input").value="pending-tag";document.getElementById("tags-input").dispatchEvent(new Event("input",{bubbles:true}));for(const id of ["private-check","readlater-check"]){document.getElementById(id).checked=true;document.getElementById(id).dispatchEvent(new Event("change",{bubbles:true}));}document.getElementById("url-input").value+="?edited=1";document.getElementById("url-input").dispatchEvent(new Event("input",{bubbles:true}));'});
+    let r=await session.send('Page.captureScreenshot',{format:'png'});rep.saveShotBuffer(Buffer.from(r.data,'base64'),s,'before-close');
+    const before=await session.send('Runtime.evaluate',{expression:'({form:pbpPopupDraftSnapshot(),dirty:pbpPopupFormIsDirty()})',returnByValue:true});
+    await cdp.send('Target.closeTarget',{targetId:id});session.close();session=null;
+    await page.bringToFront();id=await open();
+    const after=await session.send('Runtime.evaluate',{expression:'({form:pbpPopupDraftSnapshot(),dirty:pbpPopupFormIsDirty()})',returnByValue:true});
+    r=await session.send('Page.captureScreenshot',{format:'png'});rep.saveShotBuffer(Buffer.from(r.data,'base64'),s,'after-reopen');
+    s.notes.push(JSON.stringify({before:before.result.value,after:after.result.value}));
+    if (JSON.stringify(before.result.value) !== JSON.stringify(after.result.value)) throw new Error("Unsaved draft did not survive popup close/reopen");
+    await cdp.send('Target.closeTarget',{targetId:id});
+  }catch(e){s.failures.push(e.stack);}
+  finally{session?.close();await cdp?.detach().catch(()=>{});await page.close().catch(()=>{});}
+}
+
 
 const runDir = join(REPORT_ROOT, CONFIG.label);
 // Same label overwrites, but the previous run survives one generation as
@@ -1780,6 +1824,7 @@ try {
     else if (surface === "selection") await driveSelection(context, worker, extId, rep);
     else if (surface === "pinboard") await drivePinboard(context, rep);
     else if (surface === "popup") await drivePopup(context, worker, extId, rep);
+    else if (surface === "drafts") await drivePopupDrafts(context, worker, extId, rep);
     else if (surface === "themes") await driveThemes(context, worker, extId, rep);
     else if (surface === "faults") await driveFaults(context, worker, extId, rep);
     else console.warn(`[qa-drive] unknown surface: ${surface}`);

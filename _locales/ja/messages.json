@@ -4008,5 +4008,11 @@
   "libraryCountWordsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
-  "libraryVocabCoverHint": { "message": "単語を選ぶと、文脈、自分のメモ、辞書の意味が表示されます。任意の単語を直接調べることもできます。" }
+  "libraryVocabCoverHint": { "message": "単語を選ぶと、文脈、自分のメモ、辞書の意味が表示されます。任意の単語を直接調べることもできます。" },
+  "popupDraftRestored": {
+    "message": "未保存の下書きを復元しました。"
+  },
+  "popupDraftFailed": {
+    "message": "下書きを保持できませんでした。ポップアップを閉じる前にブックマークを保存してください。"
+  }
 }

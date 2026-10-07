@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-07T04:44:51.159Z",
+  "label": "popup-draft-first-batch",
+  "surfaces": [
+    {
+      "name": "popup-drafts",
+      "states": [
+        {
+          "state": "before-close",
+          "file": "01-popup-drafts-before-close.png",
+          "events": []
+        },
+        {
+          "state": "after-reopen",
+          "file": "02-popup-drafts-after-reopen.png",
+          "events": []
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "notes": [
+        "{\"before\":{\"form\":{\"url\":\"http://127.0.0.1:43123/qa-article?edited=1\",\"title\":\"UX edited title\",\"notes\":\"UX_UNSAVED_DRAFT_20261007\",\"tags\":[\"manual-one\",\"manual-two\"],\"tagInput\":\"pending-tag\",\"private\":true,\"toread\":true,\"archive\":false,\"archiveTouched\":false},\"dirty\":true},\"after\":{\"form\":{\"url\":\"http://127.0.0.1:43123/qa-article?edited=1\",\"title\":\"UX edited title\",\"notes\":\"UX_UNSAVED_DRAFT_20261007\",\"tags\":[\"manual-one\",\"manual-two\"],\"tagInput\":\"pending-tag\",\"private\":true,\"toread\":true,\"archive\":false,\"archiveTouched\":false},\"dirty\":true}}"
+      ],
+      "failures": [],
+      "_events": [],
+      "_lastCursor": 0
+    }
+  ],
+  "headless": false,
+  "siteTheme": "modern-card",
+  "extensionId": "feoognahlmfmbllpmgailahcnjppiegb",
+  "hostPermissionGrants": {
+    "http://127.0.0.1/*": true,
+    "http://localhost/*": true,
+    "https://freedictionaryapi.com/*": true
+  },
+  "aiRequests": 0,
+  "environment": {
+    "commit": "7476e667",
+    "dirty": 30,
+    "chromium": "147.0.7727.15",
+    "node": "v24.14.1",
+    "platform": "linux"
+  },
+  "network": [
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:43123",
+      "path": "/qa-article",
+      "disposition": "article-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/get",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/suggest",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/recent",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/suggest",
+      "disposition": "pinboard-fixture"
+    }
+  ]
+}

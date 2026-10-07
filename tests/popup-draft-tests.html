@@ -1,0 +1,51 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Popup Draft Tests</title></head><body>
+<h1>Popup Draft Tests</h1><div id="results"></div>
+<script>
+const assert = (v,m) => { if(!v)throw new Error(m||'assertion failed'); };
+async function test(name,fn){const d=document.createElement('div');d.className='case';try{await fn();d.classList.add('pass');d.textContent='PASS '+name;}catch(e){d.classList.add('fail');d.textContent='FAIL '+name+': '+e.message;}document.getElementById('results').append(d);}
+(async()=>{
+ const source=await(await fetch('../background.js')).text();
+ const start=source.indexOf('async function pbpRunPopupDraft('),end=source.indexOf('// Popup drafts end',start);
+ let run;
+ const rows={};let owner='alice';let duringRead=null;let failSet=false;
+ const session={async get(key){if(duringRead){const f=duringRead;duringRead=null;f();}return key===null?structuredClone(rows):{[key]:structuredClone(rows[key])};},async set(values){if(failSet)throw new Error('synthetic write failure');Object.assign(rows,structuredClone(values));},async remove(keys){for(const k of Array.isArray(keys)?keys:[keys])delete rows[k];}};
+ const msg=(action,extra={})=>({account:'alice',action,pageUrl:'https://example.com/article',incognito:false,...extra});
+ const draft={url:'https://example.com/article',title:'Edited title',notes:'Private note',tags:['One','Two'],tagInput:'unsubmitted',private:true,toread:true,archive:false,archiveTouched:true};
+ const read=()=>run(msg('read'));
+ await test('production draft handler can be loaded',()=>{assert(start>=0&&end>start,'draft handler is not implemented');run=new Function('chrome','getCurrentPinboardAuth','navigator',source.slice(start,end)+'\nreturn pbpRunPopupDraft;')({storage:{session}},async()=>({account:owner}),navigator);});
+ await test('write and read preserve the complete form including pending tag text',async()=>{const w=await run(msg('write',{draft}));const r=await read();assert(w.ok&&r.ok&&r.account==='alice');assert(JSON.stringify(r.draft)===JSON.stringify(draft));});
+ await test('stored draft contains no unrecognized fields or credentials',async()=>{await run(msg('write',{draft:{...draft,token:'FORBIDDEN',apiKey:'FORBIDDEN',content:'FORBIDDEN'}}));const row=Object.values(rows)[0];assert(!JSON.stringify(row).includes('FORBIDDEN'));});
+ await test('another URL cannot restore the article draft',async()=>{assert((await run(msg('read',{pageUrl:'https://example.com/other'}))).draft===null);});
+ await test('incognito and normal drafts are separate',async()=>{assert((await run(msg('read',{incognito:true}))).draft===null);});
+ await test('another account cannot read a captured old-owner draft',async()=>{owner='bob';assert(!(await read()).ok);assert((await run(msg('read',{account:'bob'}))).draft===null);owner='alice';});
+ await test('logout blocks both restore and write',async()=>{owner='';assert(!(await read()).ok);assert(!(await run(msg('write',{draft}))).ok);owner='alice';});
+ await test('account change during storage read cannot deliver a draft',async()=>{duringRead=()=>{owner='bob';};assert(!(await read()).ok);owner='alice';});
+ await test('account change before mutation cannot write old-owner content',async()=>{duringRead=()=>{owner='bob';};assert(!(await run(msg('write',{draft:{...draft,title:'MUST_NOT_WRITE'}}))).ok);owner='alice';assert((await read()).draft.title==='Edited title');});
+ await test('unsupported URL and invalid payload are rejected',async()=>{assert(!(await run(msg('write',{pageUrl:'javascript:alert(1)',draft}))).ok);assert(!(await run(msg('write',{draft:{...draft,tags:[123]}}))).ok);});
+ await test('expired drafts are not restored',async()=>{for(const r of Object.values(rows))r.updatedAt=Date.now()-25*60*60*1000;assert((await read()).draft===null);});
+ await test('storage failure is returned without false success',async()=>{failSet=true;assert(!(await run(msg('write',{draft}))).ok);failSet=false;});
+ await test('clearing a page removes only that draft',async()=>{await run(msg('write',{draft}));await run(msg('write',{pageUrl:'https://example.com/other',draft:{...draft,url:'https://example.com/other'}}));await run(msg('clear'));assert((await read()).draft===null);assert((await run(msg('read',{pageUrl:'https://example.com/other'}))).draft!==null);});
+ await test('owner cleanup removes normal and incognito drafts, preserving other data',async()=>{rows.unrelated={value:1};await run(msg('write',{incognito:true,draft}));await run(msg('clearOwner'));assert(Object.keys(rows).length===1&&rows.unrelated.value===1);});
+ await test('draft retention is bounded without overwriting unrelated session data',async()=>{for(let i=0;i<25;i++)await run(msg('write',{pageUrl:'https://example.com/'+i,draft:{...draft,url:'https://example.com/'+i}}));assert(Object.keys(rows).filter(k=>k.startsWith('pbp-popup-draft:')).length<=20);assert(rows.unrelated.value===1);});
+ await test('successful save clears its matching submitted snapshot',async()=>{const submitted={...draft,tagInput:''};await run(msg('write',{draft:submitted}));await run(msg('clear',{expectedDraft:submitted}));assert((await read()).draft===null);});
+ await test('save completion preserves newer edits and unsubmitted tag text',async()=>{await run(msg('write',{draft}));await run(msg('clear',{expectedDraft:{...draft,tagInput:''}}));assert((await read()).draft.tagInput==='unsubmitted');await run(msg('write',{draft:{...draft,title:'New edit',tagInput:''}}));await run(msg('clear',{expectedDraft:{...draft,tagInput:''}}));assert((await read()).draft.title==='New edit');});
+ const uiSource=await(await fetch('../popup.js')).text();
+ const a=uiSource.indexOf('let _popupDraftContext ='),b=uiSource.indexOf('// Popup draft UI end',a);
+ function uiHarness(){
+   const elements={};for(const id of ['url-input','title-input','description-input','tags-input','private-check','readlater-check','archive-check']){const e=document.createElement('input');e.type=id.endsWith('check')?'checkbox':'text';elements[id]=e;}
+   const flags={'title-input':false,'description-input':false,'private-check':false,'readlater-check':false};
+   let resolveRead;let currentOwner='alice';const sent=[];
+   const deps={$id:id=>elements[id],currentTags:[],fieldDirtyFlags:flags,_tagsUserTouched:false,_archiveUserTouched:false,
+     pbpPopupFormIsDirty:()=>Object.values(flags).some(Boolean),renderTags(){},showStatus(){},t:k=>k,
+     chrome:{runtime:{sendMessage(m){sent.push(m);if(m.action==='read')return new Promise(r=>{resolveRead=r;});return Promise.resolve({ok:true,account:currentOwner});}}},
+     pbpReadSettingsWithSecrets:async()=>({pinboardToken:currentOwner+':fake'}),pbpPinboardAccountFromToken:t=>t.split(':')[0]};
+   const names=Object.keys(deps);const api=new Function(...names,uiSource.slice(a,b)+'\nreturn {initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpDiscardPopupDraft};')(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
+   return {api,elements,flags,sent,release:()=>resolveRead({ok:true,account:'alice',draft}),owner:o=>{currentOwner=o;}};
+ }
+ await test('restore applies the full form and guards later prefills',async()=>{const h=uiHarness();const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await pending;assert(JSON.stringify(h.api.pbpPopupDraftSnapshot())===JSON.stringify(draft));assert(Object.values(h.flags).every(Boolean));});
+ await test('typing during asynchronous restore wins over an older draft',async()=>{const h=uiHarness();h.elements['url-input'].value='https://example.com/article';const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.elements['title-input'].value='New input';h.elements['title-input'].dispatchEvent(new Event('input'));h.release();await pending;assert(h.elements['title-input'].value==='New input');assert(h.sent.some(m=>m.action==='write'&&m.draft.title==='New input'));});
+ await test('restore rechecks the current account before changing any field',async()=>{const h=uiHarness();const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.owner('bob');h.release();await pending;assert(h.elements['title-input'].value==='');assert(!h.sent.some(m=>m.action==='write'));});
+ await test('input dispatches immediately with the scoped incognito owner',async()=>{const h=uiHarness();const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article',incognito:true});h.release();await pending;h.elements['description-input'].value='Fast close';h.elements['description-input'].dispatchEvent(new Event('input'));assert(h.sent.at(-1).action==='write'&&h.sent.at(-1).incognito===true&&h.sent.at(-1).account==='alice');await h.api.pbpDiscardPopupDraft(true);assert(h.sent.at(-1).action==='clearOwner');});
+})().catch(e=>test('suite initialization',()=>{throw e;}));
+</script></body></html>

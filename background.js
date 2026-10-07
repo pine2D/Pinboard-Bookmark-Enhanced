@@ -2652,6 +2652,72 @@ async function pbpRunPopupAiCall(message) {
   }
 }
 
+// Popup draft writes outlive the popup that dispatched them. Only session
+// storage is used; the lock orders rapid input/clear requests within the SW.
+async function pbpRunPopupDraft(message) {
+  const prefix = "pbp-popup-draft:";
+  const ttl = 24 * 60 * 60 * 1000;
+  const safeUrl = (s) => {
+    try { const u = new URL(s); return typeof s === "string" && s.length <= 16384 && /^https?:$/.test(u.protocol) && !u.username && !u.password; }
+    catch (_) { return false; }
+  };
+  const clean = (d) => {
+    if (!d || !safeUrl(d.url) || typeof d.title !== "string" || typeof d.notes !== "string"
+        || typeof d.tagInput !== "string" || !Array.isArray(d.tags) || d.tags.length > 1000
+        || !d.tags.every((s) => typeof s === "string")
+        || !["private", "toread", "archive", "archiveTouched"].every((k) => typeof d[k] === "boolean")) return null;
+    const out = { url: d.url, title: d.title, notes: d.notes, tags: d.tags.slice(), tagInput: d.tagInput,
+      private: d.private, toread: d.toread, archive: d.archive, archiveTouched: d.archiveTouched };
+    return JSON.stringify(out).length <= 65536 ? out : null;
+  };
+  if (!message.account || !["read", "write", "clear", "clearOwner"].includes(message.action)
+      || (message.action !== "clearOwner" && !safeUrl(message.pageUrl))) return { ok: false, error: "invalid" };
+  try {
+    return await navigator.locks.request("pbp-popup-drafts", async () => {
+      const current = async () => (await getCurrentPinboardAuth()).account === message.account;
+      if (!await current()) return { ok: false, error: "account_changed" };
+      const ownerPrefix = prefix + encodeURIComponent(message.account) + ":";
+      const key = ownerPrefix + (message.incognito === true ? "private:" : "normal:") + encodeURIComponent(message.pageUrl);
+      const rows = await chrome.storage.session.get(null);
+      // A storage await may straddle logout or an account switch.
+      if (!await current()) return { ok: false, error: "account_changed" };
+      const now = Date.now();
+      const row = rows[key];
+      const valid = (r) => r && typeof r.updatedAt === "number" && r.updatedAt <= now && now - r.updatedAt < ttl;
+      if (message.action === "read") {
+        const draft = valid(row) && row.owner === message.account && row.pageUrl === message.pageUrl
+          && row.incognito === (message.incognito === true) ? clean(row.draft) : null;
+        return { ok: true, account: message.account, draft };
+      }
+      if (message.action === "clearOwner") {
+        await chrome.storage.session.remove(Object.keys(rows).filter((k) => k.startsWith(ownerPrefix)));
+      } else if (message.action === "clear") {
+        // Save completion clears only the snapshot actually submitted. A newer
+        // edit, or pending tag text that was never submitted, must survive.
+        if (message.expectedDraft) {
+          const expected = clean(message.expectedDraft);
+          if (!expected || expected.tagInput || JSON.stringify(clean(row?.draft)) !== JSON.stringify(expected)) return { ok: true, account: message.account };
+        }
+        await chrome.storage.session.remove(key);
+      } else {
+        const draft = clean(message.draft);
+        if (!draft) return { ok: false, error: "invalid" };
+        await chrome.storage.session.set({ [key]: { owner: message.account, pageUrl: message.pageUrl,
+          incognito: message.incognito === true, updatedAt: now, draft } });
+        const others = Object.keys(rows).filter((k) => k.startsWith(prefix) && k !== key)
+          .sort((a, b) => (rows[b]?.updatedAt || 0) - (rows[a]?.updatedAt || 0));
+        const expired = others.filter((k, i) => !valid(rows[k]) || i >= 19);
+        if (expired.length) await chrome.storage.session.remove(expired);
+      }
+      return { ok: true, account: message.account };
+    });
+  } catch (e) {
+    console.warn("[popup-draft] session storage failed:", e && e.name, e && e.message);
+    return { ok: false, error: "storage" };
+  }
+}
+// Popup drafts end
+
 // ---- 监听来自 popup 的消息 ----
 // Named, not an inline arrow (roadmap #35): the router is the single entry
 // for all four surfaces' messaging, and the project's source-slice test
@@ -2889,6 +2955,11 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     return true;
   }
 
+  if (message.type === "PBP_POPUP_DRAFT") {
+    pbpRunPopupDraft(message).then((result) => { try { sendResponse(result); } catch (_) {} });
+    return true;
+  }
+
   if (message.type === "get_offline_queue") {
     readOfflineQueueWithIds()
       .then((queue) => sendResponse({ ok: true, queue }))
@@ -2928,6 +2999,9 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     // needs no feature-detection fallback.
     submitPopupSaveIntent(message.intent, message.account)
       .then(async (result) => {
+        if (result.status === "saved" && message.popupDraft) {
+          await pbpRunPopupDraft({ ...message.popupDraft, account: message.account, action: "clear" });
+        }
         sendResponse(result);
         if (result.status !== "failed") return;
         const ctx = await chrome.runtime.getContexts({ contextTypes: ["POPUP"] }).catch(() => []);

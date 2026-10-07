@@ -4008,5 +4008,11 @@
   "libraryCountWordsOne": { "message": "$COUNT$ Wort", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguages": { "message": "$COUNT$ Sprachen", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguagesOne": { "message": "$COUNT$ Sprache", "placeholders": { "count": { "content": "$1" } } },
-  "libraryVocabCoverHint": { "message": "Wähle ein Wort, um Kontext, deine Notiz und den Wörterbucheintrag zu sehen, oder schlag direkt ein beliebiges Wort nach." }
+  "libraryVocabCoverHint": { "message": "Wähle ein Wort, um Kontext, deine Notiz und den Wörterbucheintrag zu sehen, oder schlag direkt ein beliebiges Wort nach." },
+  "popupDraftRestored": {
+    "message": "Ungespeicherter Entwurf wiederhergestellt."
+  },
+  "popupDraftFailed": {
+    "message": "Der Entwurf konnte nicht aufbewahrt werden. Speichere das Lesezeichen, bevor du das Popup schließt."
+  }
 }

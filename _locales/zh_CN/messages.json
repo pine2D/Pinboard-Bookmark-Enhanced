@@ -4002,5 +4002,11 @@
   "libraryCountWordsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
-  "libraryVocabCoverHint": { "message": "选一个词，查看它的语境、你的笔记和词典释义；也可以直接查任意词。" }
+  "libraryVocabCoverHint": { "message": "选一个词，查看它的语境、你的笔记和词典释义；也可以直接查任意词。" },
+  "popupDraftRestored": {
+    "message": "已恢复未保存的草稿。"
+  },
+  "popupDraftFailed": {
+    "message": "草稿未能保留，请在关闭弹窗前保存书签。"
+  }
 }

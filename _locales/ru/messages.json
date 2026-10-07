@@ -4008,5 +4008,11 @@
   "libraryCountWordsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
-  "libraryVocabCoverHint": { "message": "Выберите слово, чтобы увидеть контекст, свою заметку и словарную статью, или сразу найдите любое слово." }
+  "libraryVocabCoverHint": { "message": "Выберите слово, чтобы увидеть контекст, свою заметку и словарную статью, или сразу найдите любое слово." },
+  "popupDraftRestored": {
+    "message": "Несохранённый черновик восстановлен."
+  },
+  "popupDraftFailed": {
+    "message": "Не удалось сохранить черновик. Сохраните закладку перед закрытием окна расширения."
+  }
 }

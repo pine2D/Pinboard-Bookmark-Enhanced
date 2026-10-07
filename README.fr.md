@@ -20,6 +20,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 - **Un clic, tout est rempli** : titre, description et texte sélectionné sont repris, les paramètres de suivi retirés de l'URL
 - **Enregistrement par raccourci clavier** : sans ouvrir la fenêtre ; ou tous les onglets ouverts d'un coup
 - **Fonctionne hors ligne** : les enregistrements passent par une file d'attente locale et sont renvoyés au retour de la connexion
+- **Retrouver un brouillon** : rouvrir la fenêtre pour reprendre les modifications non enregistrées ; les brouillons expirent après 24 heures ou au redémarrage du navigateur
 
 ![Enregistrement en un clic avec étiquettes et résumé par IA](docs/cws-assets/originals/screenshot-1-save.png)
 

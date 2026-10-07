@@ -4008,5 +4008,11 @@
   "libraryCountWordsOne": { "message": "$COUNT$ mot", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguages": { "message": "$COUNT$ langues", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountLanguagesOne": { "message": "$COUNT$ langue", "placeholders": { "count": { "content": "$1" } } },
-  "libraryVocabCoverHint": { "message": "Choisissez un mot pour voir son contexte, votre note et sa définition, ou recherchez directement n’importe quel mot." }
+  "libraryVocabCoverHint": { "message": "Choisissez un mot pour voir son contexte, votre note et sa définition, ou recherchez directement n’importe quel mot." },
+  "popupDraftRestored": {
+    "message": "Brouillon non enregistré restauré."
+  },
+  "popupDraftFailed": {
+    "message": "Impossible de conserver le brouillon. Enregistrez le signet avant de fermer la fenêtre."
+  }
 }
