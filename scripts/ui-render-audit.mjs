@@ -5675,7 +5675,18 @@ async function holdPointerState(page, handle, read, mode, skip = null) {
   let got = null;
   const maxAttempts = holdFailStreak[mode] >= HOLD_FAIL_STREAK ? 1 : HOLD_ATTEMPTS;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    if (mode === "hover") await handle.scrollIntoViewIfNeeded({ timeout: TIMEOUT_MS });
+    if (mode === "hover") {
+      await handle.scrollIntoViewIfNeeded({ timeout: TIMEOUT_MS });
+      // scrollIntoViewIfNeeded measures the viewport, not a fixed feedback
+      // bar. Scroll an obscured value box as a user would before probing it;
+      // the real pointer/hit witnesses below must still pass unchanged.
+      await handle.evaluate((el) => {
+        const bar = document.querySelector(".options-save-bar");
+        if (bar && !bar.contains(el) && el.getBoundingClientRect().bottom > bar.getBoundingClientRect().top) {
+          el.scrollIntoView({ block: "center", behavior: "instant" });
+        }
+      });
+    }
     const prep = await handle.evaluate(preparePointerAttempt, attempt > 1 ? POINTER_QUIET_MS : 0);
     let applyMs = null;
     if (mode === "rest") {
@@ -8511,6 +8522,17 @@ async function runSweep(page, sw, extBase) {
     }
     add(await runFamilySweep(page), "options", tabId);
   }
+
+  // Geometry fixture for the normally hidden failure/retry state. The real
+  // persistence and repeated-error flow is covered by qa-drive options-save.
+  await page.evaluate(() => {
+    document.getElementById("auto-save-status").classList.add("hidden");
+    const alert = document.getElementById("opt-global-alert");
+    alert.textContent = t("optSaveFailed"); alert.classList.remove("hidden");
+    const retry = document.getElementById("auto-save-retry");
+    retry.hidden = false; retry.disabled = false;
+  });
+  add(await runFamilySweep(page), "options", "save-failure");
 
   // ---- library: vocab (list, detail pane, batch bar) + notes (list, detail pane). ----
   await page.goto(`${extBase}library.html?_ra=sweep#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });

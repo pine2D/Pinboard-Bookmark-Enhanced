@@ -4014,5 +4014,7 @@
   },
   "popupDraftFailed": {
     "message": "下書きを保持できませんでした。ポップアップを閉じる前にブックマークを保存してください。"
-  }
+  },
+  "optSavePending": { "message": "変更は未保存です" },
+  "optRetrySave": { "message": "保存を再試行" }
 }

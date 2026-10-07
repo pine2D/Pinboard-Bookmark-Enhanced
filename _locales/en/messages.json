@@ -4008,5 +4008,7 @@
   },
   "popupDraftFailed": {
     "message": "Draft could not be kept. Save your bookmark before closing the popup."
-  }
+  },
+  "optSavePending": { "message": "Unsaved changes" },
+  "optRetrySave": { "message": "Retry saving" }
 }

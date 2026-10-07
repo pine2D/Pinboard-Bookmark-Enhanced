@@ -1720,6 +1720,140 @@ async function diffAgainstPrev(runDir, prevDir) {
 // ============================================================
 // Main
 // ============================================================
+async function driveOptionsSaveFeedback(context, extId, rep) {
+  const s = rep.surface("options-save");
+  const page = await context.newPage();
+  const detach = rep.attach(page, s);
+  try {
+    await page.goto(`chrome-extension://${extId}/options.html#general`);
+    await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready")
+      && document.getElementById("notify-errors").dataset.autosaveReady === "1");
+    let failureAttempt = 0;
+    const fail = async () => {
+      failureAttempt = await page.evaluate(() => {
+        window.qaOriginalPersist ||= persistSettings;
+        persistSettings = async () => { window.qaFailureAttempts = (window.qaFailureAttempts || 0) + 1; throw new Error("QA_EXPECTED_SAVE_FAILURE"); };
+        const e = document.getElementById("notify-errors");
+        e.checked = !e.checked; e.dispatchEvent(new Event("change", { bubbles: true }));
+        // Always change a real setting so a no-op delta cannot skip the fault.
+        const tags = document.getElementById("qs-default-tags");
+        tags.value = `qa-failure-${window.qaFailureRevision = (window.qaFailureRevision || 0) + 1}`;
+        tags.dispatchEvent(new Event("input", {bubbles:true}));
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        return window.qaFailureAttempts || 0;
+      });
+    };
+    const waitFailure = () => page.waitForFunction((after) => window.qaFailureAttempts > after
+      && !document.getElementById("opt-global-alert").classList.contains("hidden")
+      && document.getElementById("opt-global-alert").textContent === t("optSaveFailed")
+      && !document.getElementById("auto-save-retry").disabled
+      && document.getElementById("auto-save-retry").getAttribute("aria-disabled") !== "true", failureAttempt);
+    await fail(); await waitFailure();
+    await rep.shot(page, s, "failure-at-bottom");
+    const measure = () => page.evaluate(() => {
+      const rect = (e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; };
+      return { alert: rect(document.getElementById("opt-global-alert")), retry: rect(document.getElementById("auto-save-retry")), bar: rect(document.querySelector(".options-save-bar")), viewport: {width:innerWidth, height:innerHeight} };
+    });
+    const assertVisible = (g) => {
+      for (const name of ["alert", "retry", "bar"]) {
+        const r = g[name];
+        if (r.height <= 0 || r.width <= 0 || r.top < 0 || r.bottom > g.viewport.height + 1 || r.left < 0 || r.right > g.viewport.width + 1) throw new Error(`${name} feedback is outside viewport: ${JSON.stringify(g)}`);
+      }
+    };
+    assertVisible(await measure());
+    await page.waitForTimeout(4500);
+    if (!await page.locator("#auto-save-retry").isVisible()) throw new Error("Failure cleared without a successful save");
+    await page.evaluate(() => {
+      window.qaAlertMutations = 0;
+      new MutationObserver((m) => { window.qaAlertMutations += m.length; }).observe(document.getElementById("opt-global-alert"), {subtree:true, childList:true, characterData:true});
+    });
+    failureAttempt = await page.evaluate(() => window.qaFailureAttempts);
+    await page.locator("#auto-save-retry").click();
+    await waitFailure();
+    if (!await page.evaluate(() => document.activeElement === document.getElementById("auto-save-retry"))) throw new Error("Failed retry lost keyboard focus");
+    failureAttempt = await page.evaluate(() => window.qaFailureAttempts);
+    await page.keyboard.press("Enter");
+    await waitFailure();
+    if (!await page.evaluate(() => document.activeElement === document.getElementById("auto-save-retry"))) throw new Error("Consecutive Enter retry lost keyboard focus");
+    failureAttempt = await page.evaluate(() => {
+      window.qaFailingPersist=persistSettings;
+      persistSettings=async()=>{window.qaFailureAttempts++;await new Promise((resolve,reject)=>{window.qaRejectHeldSave=()=>reject(new Error("QA_EXPECTED_SAVE_FAILURE"));});};
+      return window.qaFailureAttempts;
+    });
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => document.getElementById("auto-save-retry").getAttribute("aria-disabled") === "true" && !!window.qaRejectHeldSave);
+    if (!await page.evaluate(() => document.activeElement === document.getElementById("auto-save-retry"))) throw new Error("Pending retry lost keyboard focus");
+    await page.keyboard.press("Enter");
+    await page.evaluate(() => window.qaRejectHeldSave());
+    await waitFailure();
+    await page.evaluate(() => new Promise(r=>setTimeout(r,0)));
+    if (await page.evaluate(()=>window.qaFailureAttempts)!==failureAttempt+1) throw new Error("Busy retry enqueued duplicate saves");
+    await page.evaluate(()=>{persistSettings=window.qaFailingPersist;});
+    if (await page.evaluate(() => window.qaAlertMutations) !== 0) throw new Error("Same failure re-announced by rewriting the live region");
+    await page.evaluate(() => { persistSettings = window.qaOriginalPersist; });
+    await page.locator("#auto-save-retry").focus(); await page.keyboard.press("Enter");
+    await page.waitForFunction(() => document.getElementById("opt-global-alert").classList.contains("hidden"));
+    if (!await page.evaluate(async () => (await pbpReadSettingsWithSecrets({notifyErrors:true})).notifyErrors === document.getElementById("notify-errors").checked)) throw new Error("Retry did not persist edited settings");
+    await rep.shot(page, s, "retry-success");
+
+    // A completed older snapshot cannot advertise a newer edit as saved.
+    await page.evaluate(() => {
+      window.qaSaveStarted = false;
+      const gate = new Promise((r) => { window.qaReleaseSave = r; });
+      persistSettings = async (d) => { window.qaSaveStarted = true; await gate; return window.qaOriginalPersist(d); };
+      const e = document.getElementById("notify-errors"); e.checked = !e.checked; e.dispatchEvent(new Event("change", {bubbles:true}));
+    });
+    await page.waitForFunction(() => window.qaSaveStarted);
+    await page.evaluate(() => {
+      const e = document.getElementById("notify-batch-save"); e.checked = !e.checked; e.dispatchEvent(new Event("change", {bubbles:true}));
+      window.qaReleaseSave();
+    });
+    await page.waitForFunction(() => document.getElementById("auto-save-status").textContent === t("optSavePending"));
+    await page.waitForFunction(() => document.getElementById("auto-save-status").classList.contains("saved"));
+    if (!await page.evaluate(async () => {
+      const d = await pbpReadSettingsWithSecrets({notifyErrors:true, notifyBatchSave:true});
+      return d.notifyErrors === document.getElementById("notify-errors").checked && d.notifyBatchSave === document.getElementById("notify-batch-save").checked;
+    })) throw new Error("Queued newer edit did not finish saving");
+    await page.evaluate(() => { persistSettings = window.qaOriginalPersist; });
+
+    for (const locale of ["en","zh_CN","zh_TW","zh_HK","ja","de","fr","pl","ru"]) {
+      await page.evaluate(async (lang) => { await chrome.storage.local.set({optLang:lang}); initI18n(); await pbpI18nReady(); }, locale);
+      for (const mode of ["light","dark"]) for (const density of ["comfortable","compact"]) for (const width of [320,420]) {
+        await page.setViewportSize({width,height:640});
+        await page.evaluate(({mode,density}) => {
+          document.documentElement.dataset.theme = mode === "dark" ? "catppuccin-mocha" : "modern-card";
+          document.documentElement.dataset.density = density;
+        }, {mode,density});
+        await fail(); await waitFailure();
+        const g = await measure(); assertVisible(g);
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        const clearance = await page.evaluate(() => document.querySelector(".panel.active").getBoundingClientRect().bottom <= document.querySelector(".options-save-bar").getBoundingClientRect().top);
+        if (!clearance) throw new Error(`${locale}/${mode}/${density}/${width}: footer covers final settings`);
+        const focusVisible = await page.evaluate(() => {
+          const controls = [...document.querySelectorAll('.panel.active input:not([type="hidden"]), .panel.active button, .panel.active textarea')].filter(el=>el.getBoundingClientRect().height && !el.disabled);
+          const el = controls.at(-1);
+          if (!el) return false;
+          el.blur();
+          window.scrollTo(0, Math.max(0, scrollY + el.getBoundingClientRect().bottom - innerHeight + 4));
+          el.focus();
+          return document.activeElement === el && el.getBoundingClientRect().bottom <= document.querySelector(".options-save-bar").getBoundingClientRect().top;
+        });
+        if (!focusVisible) throw new Error(`${locale}/${mode}/${density}/${width}: keyboard focus obscured by feedback`);
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        s.notes.push(JSON.stringify({locale,mode,density,width,...g}));
+        if (["en","zh_CN","de"].includes(locale) && width === 320 && density === "comfortable") await rep.shot(page,s,`${locale}-${mode}-320`);
+      }
+    }
+    s.notes.push("PASS: persistent failure, same-error live-region dedupe, keyboard retry, queued edit status, 72 locale/theme/density/width feedback geometries.");
+  } catch (e) { s.failures.push(e.stack); }
+  finally {
+    detach();
+    // Keep injected errors in screenshot events; exempt only this named fixture.
+    s.consoleErrors = s.consoleErrors.filter((e) => !e.includes("QA_EXPECTED_SAVE_FAILURE"));
+    await page.close().catch(() => {});
+  }
+}
+
 async function drivePopupDrafts(context, worker, extId, rep) {
   const s=rep.surface('popup-drafts');
   const page=await context.newPage();
@@ -1896,6 +2030,7 @@ try {
     else if (surface === "pinboard") await drivePinboard(context, rep);
     else if (surface === "popup") await drivePopup(context, worker, extId, rep);
     else if (surface === "drafts") await drivePopupDrafts(context, worker, extId, rep);
+    else if (surface === "options-save") await driveOptionsSaveFeedback(context, extId, rep);
     else if (surface === "themes") await driveThemes(context, worker, extId, rep);
     else if (surface === "faults") await driveFaults(context, worker, extId, rep);
     else console.warn(`[qa-drive] unknown surface: ${surface}`);

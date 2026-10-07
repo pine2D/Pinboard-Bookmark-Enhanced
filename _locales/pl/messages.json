@@ -4014,5 +4014,7 @@
   },
   "popupDraftFailed": {
     "message": "Nie udało się zachować szkicu. Zapisz zakładkę przed zamknięciem okna rozszerzenia."
-  }
+  },
+  "optSavePending": { "message": "Niezapisane zmiany" },
+  "optRetrySave": { "message": "Ponów zapis" }
 }

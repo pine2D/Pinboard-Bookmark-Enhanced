@@ -9,18 +9,7 @@
 </head>
 <body>
   <main class="container">
-    <!-- The auto-save hint is a peripheral indicator that changes on EVERY
-         debounced save (and again 1.5s later when it resets), so it is
-         deliberately not a live region: as one it announced twice per
-         keystroke burst. Failures announce through #opt-global-alert below. -->
-    <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced - Settings</span> <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span></h1>
-
-    <!-- Page-level alert slot. Auto-save runs from every panel, so its standing
-         failure notice cannot live inside #panel-general (12 of the 13 panels
-         would have it under a display:none ancestor, silent for screen readers
-         too). Kept separate from #opt-sync-error so that slot's 8s auto-hide
-         cannot take an unrelated alert down with it. -->
-    <p id="opt-global-alert" class="opt-error hidden" role="alert"></p>
+    <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced - Settings</span></h1>
 
     <nav class="options-nav" aria-label="Settings category" data-i18n-aria="settingsCategory">
       <div class="options-search" role="search">
@@ -1253,6 +1242,14 @@
       </section>
     </div>
   </main>
+  <!-- Persistent feedback outside every panel; failures announce once through
+       the alert, while ordinary saves stay quiet for screen readers. -->
+  <footer class="options-save-bar">
+    <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span>
+    <p id="opt-global-alert" class="hidden" role="alert"></p>
+    <button type="button" class="btn btn-sm" id="auto-save-retry" data-i18n="optRetrySave" hidden>Retry saving</button>
+  </footer>
+
   <script defer src="i18n.js"></script>
   <script defer src="shared.js"></script>
   <script defer src="vocab-store.js"></script>

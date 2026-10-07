@@ -4014,5 +4014,7 @@
   },
   "popupDraftFailed": {
     "message": "Impossible de conserver le brouillon. Enregistrez le signet avant de fermer la fenêtre."
-  }
+  },
+  "optSavePending": { "message": "Modifications non enregistrées" },
+  "optRetrySave": { "message": "Réessayer d’enregistrer" }
 }

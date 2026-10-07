@@ -4008,5 +4008,7 @@
   },
   "popupDraftFailed": {
     "message": "草稿未能保留，请在关闭弹窗前保存书签。"
-  }
+  },
+  "optSavePending": { "message": "更改尚未保存" },
+  "optRetrySave": { "message": "重试保存" }
 }

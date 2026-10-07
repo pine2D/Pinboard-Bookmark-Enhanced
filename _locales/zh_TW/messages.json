@@ -4014,5 +4014,7 @@
   },
   "popupDraftFailed": {
     "message": "無法保留草稿，請在關閉彈出視窗前儲存書籤。"
-  }
+  },
+  "optSavePending": { "message": "變更尚未儲存" },
+  "optRetrySave": { "message": "重試儲存" }
 }

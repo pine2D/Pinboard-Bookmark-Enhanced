@@ -968,6 +968,12 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: ".btn", state: "default",
     expect: { textContrast: 4.5 } },
 
+  // Save feedback now lives on the panel-colored persistent footer.
+  { surface: "options", page: "options.html", selector: "#auto-save-status", state: "default",
+    expect: { textContrast: 4.5 } },
+  { surface: "options", page: "options.html", selector: "#auto-save-status", state: "classState", addClass: ["saved"],
+    expect: { textContrast: 4.5 } },
+
   // Context help is intentionally quieter than an ordinary ghost action:
   // the 24px hit target remains, while hover is communicated by glyph
   // color/opacity rather than exposing the whole target as a filled button.

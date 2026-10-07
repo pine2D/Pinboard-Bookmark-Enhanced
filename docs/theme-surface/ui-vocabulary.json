@@ -128,6 +128,7 @@
         "disclosure"
       ],
       "primitives": [
+        "options-save-bar",
         "context-help-action-row",
         "context-help-host",
         "context-help-section",

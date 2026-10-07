@@ -1,0 +1,666 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-07T05:55:46.521Z",
+  "label": "options-save-final",
+  "surfaces": [
+    {
+      "name": "options-save",
+      "states": [
+        {
+          "state": "failure-at-bottom",
+          "file": "01-options-save-failure-at-bottom.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#general",
+          "events": [
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            }
+          ]
+        },
+        {
+          "state": "retry-success",
+          "file": "02-options-save-retry-success.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#general",
+          "events": [
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at window.qaRejectHeldSave (eval at evaluate (:302:30), <anonymous>:3:132)\n    at eval (eval at evaluate (:302:30), <anonymous>:1:14)\n    at UtilityScript.evaluate (<anonymous>:304:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+            }
+          ]
+        },
+        {
+          "state": "en-light-320",
+          "file": "03-options-save-en-light-320.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#general",
+          "events": [
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            }
+          ]
+        },
+        {
+          "state": "en-dark-320",
+          "file": "04-options-save-en-dark-320.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#general",
+          "events": [
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            }
+          ]
+        },
+        {
+          "state": "zh_CN-light-320",
+          "file": "05-options-save-zh_CN-light-320.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#general",
+          "events": [
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            }
+          ]
+        },
+        {
+          "state": "zh_CN-dark-320",
+          "file": "06-options-save-zh_CN-dark-320.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#general",
+          "events": [
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            }
+          ]
+        },
+        {
+          "state": "de-light-320",
+          "file": "07-options-save-de-light-320.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#general",
+          "events": [
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            }
+          ]
+        },
+        {
+          "state": "de-dark-320",
+          "file": "08-options-save-de-dark-320.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#general",
+          "events": [
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            },
+            {
+              "kind": "console",
+              "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+            }
+          ]
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "notes": [
+        "{\"locale\":\"en\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":538,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":54},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":133.46875,\"width\":99.46875,\"height\":28},\"bar\":{\"top\":525,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":115},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"en\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":574,\"bottom\":628,\"left\":34,\"right\":278.53125,\"width\":244.53125,\"height\":54},\"retry\":{\"top\":587,\"bottom\":615,\"left\":286.53125,\"right\":386,\"width\":99.46875,\"height\":28},\"bar\":{\"top\":561,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":79},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"en\",\"mode\":\"light\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":548,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":48},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":127.203125,\"width\":93.203125,\"height\":24},\"bar\":{\"top\":535,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":105},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"en\",\"mode\":\"light\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":580,\"bottom\":628,\"left\":34,\"right\":284.796875,\"width\":250.796875,\"height\":48},\"retry\":{\"top\":592,\"bottom\":616,\"left\":292.796875,\"right\":386,\"width\":93.203125,\"height\":24},\"bar\":{\"top\":567,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":73},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"en\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":538,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":54},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":133.46875,\"width\":99.46875,\"height\":28},\"bar\":{\"top\":525,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":115},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"en\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":574,\"bottom\":628,\"left\":34,\"right\":278.53125,\"width\":244.53125,\"height\":54},\"retry\":{\"top\":587,\"bottom\":615,\"left\":286.53125,\"right\":386,\"width\":99.46875,\"height\":28},\"bar\":{\"top\":561,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":79},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"en\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":548,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":48},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":127.203125,\"width\":93.203125,\"height\":24},\"bar\":{\"top\":535,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":105},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"en\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":580,\"bottom\":628,\"left\":34,\"right\":284.796875,\"width\":250.796875,\"height\":48},\"retry\":{\"top\":592,\"bottom\":616,\"left\":292.796875,\"right\":386,\"width\":93.203125,\"height\":24},\"bar\":{\"top\":567,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":73},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_CN\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":208,\"width\":174,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":216,\"right\":286,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":61},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_CN\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":308,\"width\":274,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":316,\"right\":386,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":61},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_CN\",\"mode\":\"light\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":212,\"width\":178,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":220,\"right\":286,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":57},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_CN\",\"mode\":\"light\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":312,\"width\":278,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":320,\"right\":386,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":57},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_CN\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":208,\"width\":174,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":216,\"right\":286,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":61},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_CN\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":308,\"width\":274,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":316,\"right\":386,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":61},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_CN\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":212,\"width\":178,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":220,\"right\":286,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":57},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_CN\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":312,\"width\":278,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":320,\"right\":386,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":57},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_TW\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":208,\"width\":174,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":216,\"right\":286,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":61},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_TW\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":308,\"width\":274,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":316,\"right\":386,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":61},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_TW\",\"mode\":\"light\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":212,\"width\":178,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":220,\"right\":286,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":57},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_TW\",\"mode\":\"light\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":312,\"width\":278,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":320,\"right\":386,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":57},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_TW\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":208,\"width\":174,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":216,\"right\":286,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":61},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_TW\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":308,\"width\":274,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":316,\"right\":386,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":61},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_TW\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":212,\"width\":178,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":220,\"right\":286,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":57},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_TW\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":312,\"width\":278,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":320,\"right\":386,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":57},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_HK\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":208,\"width\":174,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":216,\"right\":286,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":61},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_HK\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":308,\"width\":274,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":316,\"right\":386,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":61},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_HK\",\"mode\":\"light\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":212,\"width\":178,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":220,\"right\":286,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":57},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_HK\",\"mode\":\"light\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":312,\"width\":278,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":320,\"right\":386,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":57},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_HK\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":208,\"width\":174,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":216,\"right\":286,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":61},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_HK\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":592,\"bottom\":628,\"left\":34,\"right\":308,\"width\":274,\"height\":36},\"retry\":{\"top\":596,\"bottom\":624,\"left\":316,\"right\":386,\"width\":70,\"height\":28},\"bar\":{\"top\":579,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":61},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"zh_HK\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":212,\"width\":178,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":220,\"right\":286,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":57},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"zh_HK\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":596,\"bottom\":628,\"left\":34,\"right\":312,\"width\":278,\"height\":32},\"retry\":{\"top\":600,\"bottom\":624,\"left\":320,\"right\":386,\"width\":66,\"height\":24},\"bar\":{\"top\":583,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":57},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"ja\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":538,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":54},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":130,\"width\":96,\"height\":28},\"bar\":{\"top\":525,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":115},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"ja\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":556,\"bottom\":628,\"left\":34,\"right\":282,\"width\":248,\"height\":72},\"retry\":{\"top\":578,\"bottom\":606,\"left\":290,\"right\":386,\"width\":96,\"height\":28},\"bar\":{\"top\":543,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":97},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"ja\",\"mode\":\"light\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":548,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":48},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":124,\"width\":90,\"height\":24},\"bar\":{\"top\":535,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":105},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"ja\",\"mode\":\"light\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":580,\"bottom\":628,\"left\":34,\"right\":288,\"width\":254,\"height\":48},\"retry\":{\"top\":592,\"bottom\":616,\"left\":296,\"right\":386,\"width\":90,\"height\":24},\"bar\":{\"top\":567,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":73},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"ja\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":538,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":54},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":130,\"width\":96,\"height\":28},\"bar\":{\"top\":525,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":115},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"ja\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":556,\"bottom\":628,\"left\":34,\"right\":282,\"width\":248,\"height\":72},\"retry\":{\"top\":578,\"bottom\":606,\"left\":290,\"right\":386,\"width\":96,\"height\":28},\"bar\":{\"top\":543,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":97},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"ja\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":548,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":48},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":124,\"width\":90,\"height\":24},\"bar\":{\"top\":535,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":105},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"ja\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":580,\"bottom\":628,\"left\":34,\"right\":288,\"width\":254,\"height\":48},\"retry\":{\"top\":592,\"bottom\":616,\"left\":296,\"right\":386,\"width\":90,\"height\":24},\"bar\":{\"top\":567,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":73},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"de\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":502,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":90},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":235.421875,\"width\":201.421875,\"height\":28},\"bar\":{\"top\":489,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":151},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"de\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":538,\"bottom\":592,\"left\":34,\"right\":386,\"width\":352,\"height\":54},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":235.421875,\"width\":201.421875,\"height\":28},\"bar\":{\"top\":525,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":115},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"de\",\"mode\":\"light\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":516,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":80},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":221.3125,\"width\":187.3125,\"height\":24},\"bar\":{\"top\":503,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":137},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"de\",\"mode\":\"light\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":548,\"bottom\":596,\"left\":34,\"right\":386,\"width\":352,\"height\":48},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":221.3125,\"width\":187.3125,\"height\":24},\"bar\":{\"top\":535,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":105},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"de\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":502,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":90},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":235.421875,\"width\":201.421875,\"height\":28},\"bar\":{\"top\":489,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":151},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"de\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":538,\"bottom\":592,\"left\":34,\"right\":386,\"width\":352,\"height\":54},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":235.421875,\"width\":201.421875,\"height\":28},\"bar\":{\"top\":525,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":115},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"de\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":516,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":80},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":221.3125,\"width\":187.3125,\"height\":24},\"bar\":{\"top\":503,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":137},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"de\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":548,\"bottom\":596,\"left\":34,\"right\":386,\"width\":352,\"height\":48},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":221.3125,\"width\":187.3125,\"height\":24},\"bar\":{\"top\":535,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":105},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"fr\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":520,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":72},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":206.484375,\"width\":172.484375,\"height\":28},\"bar\":{\"top\":507,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":133},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"fr\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":538,\"bottom\":628,\"left\":34,\"right\":205.515625,\"width\":171.515625,\"height\":90},\"retry\":{\"top\":569,\"bottom\":597,\"left\":213.515625,\"right\":386,\"width\":172.484375,\"height\":28},\"bar\":{\"top\":525,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":115},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"fr\",\"mode\":\"light\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":532,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":64},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":194.59375,\"width\":160.59375,\"height\":24},\"bar\":{\"top\":519,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":121},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"fr\",\"mode\":\"light\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":548,\"bottom\":628,\"left\":34,\"right\":217.40625,\"width\":183.40625,\"height\":80},\"retry\":{\"top\":576,\"bottom\":600,\"left\":225.40625,\"right\":386,\"width\":160.59375,\"height\":24},\"bar\":{\"top\":535,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":105},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"fr\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":520,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":72},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":206.484375,\"width\":172.484375,\"height\":28},\"bar\":{\"top\":507,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":133},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"fr\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":538,\"bottom\":628,\"left\":34,\"right\":205.515625,\"width\":171.515625,\"height\":90},\"retry\":{\"top\":569,\"bottom\":597,\"left\":213.515625,\"right\":386,\"width\":172.484375,\"height\":28},\"bar\":{\"top\":525,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":115},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"fr\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":532,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":64},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":194.59375,\"width\":160.59375,\"height\":24},\"bar\":{\"top\":519,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":121},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"fr\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":548,\"bottom\":628,\"left\":34,\"right\":217.40625,\"width\":183.40625,\"height\":80},\"retry\":{\"top\":576,\"bottom\":600,\"left\":225.40625,\"right\":386,\"width\":160.59375,\"height\":24},\"bar\":{\"top\":535,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":105},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"pl\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":520,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":72},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":131.828125,\"width\":97.828125,\"height\":28},\"bar\":{\"top\":507,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":133},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"pl\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":556,\"bottom\":628,\"left\":34,\"right\":280.171875,\"width\":246.171875,\"height\":72},\"retry\":{\"top\":578,\"bottom\":606,\"left\":288.171875,\"right\":386,\"width\":97.828125,\"height\":28},\"bar\":{\"top\":543,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":97},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"pl\",\"mode\":\"light\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":532,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":64},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":125.6875,\"width\":91.6875,\"height\":24},\"bar\":{\"top\":519,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":121},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"pl\",\"mode\":\"light\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":564,\"bottom\":628,\"left\":34,\"right\":286.3125,\"width\":252.3125,\"height\":64},\"retry\":{\"top\":584,\"bottom\":608,\"left\":294.3125,\"right\":386,\"width\":91.6875,\"height\":24},\"bar\":{\"top\":551,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":89},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"pl\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":520,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":72},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":131.828125,\"width\":97.828125,\"height\":28},\"bar\":{\"top\":507,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":133},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"pl\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":556,\"bottom\":628,\"left\":34,\"right\":280.171875,\"width\":246.171875,\"height\":72},\"retry\":{\"top\":578,\"bottom\":606,\"left\":288.171875,\"right\":386,\"width\":97.828125,\"height\":28},\"bar\":{\"top\":543,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":97},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"pl\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":532,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":64},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":125.6875,\"width\":91.6875,\"height\":24},\"bar\":{\"top\":519,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":121},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"pl\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":564,\"bottom\":628,\"left\":34,\"right\":286.3125,\"width\":252.3125,\"height\":64},\"retry\":{\"top\":584,\"bottom\":608,\"left\":294.3125,\"right\":386,\"width\":91.6875,\"height\":24},\"bar\":{\"top\":551,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":89},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"ru\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":520,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":72},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":205.40625,\"width\":171.40625,\"height\":28},\"bar\":{\"top\":507,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":133},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"ru\",\"mode\":\"light\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":520,\"bottom\":628,\"left\":34,\"right\":206.59375,\"width\":172.59375,\"height\":108},\"retry\":{\"top\":560,\"bottom\":588,\"left\":214.59375,\"right\":386,\"width\":171.40625,\"height\":28},\"bar\":{\"top\":507,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":133},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"ru\",\"mode\":\"light\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":532,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":64},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":193.609375,\"width\":159.609375,\"height\":24},\"bar\":{\"top\":519,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":121},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"ru\",\"mode\":\"light\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":532,\"bottom\":628,\"left\":34,\"right\":218.390625,\"width\":184.390625,\"height\":96},\"retry\":{\"top\":568,\"bottom\":592,\"left\":226.390625,\"right\":386,\"width\":159.609375,\"height\":24},\"bar\":{\"top\":519,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":121},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"ru\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":320,\"alert\":{\"top\":520,\"bottom\":592,\"left\":34,\"right\":286,\"width\":252,\"height\":72},\"retry\":{\"top\":600,\"bottom\":628,\"left\":34,\"right\":205.40625,\"width\":171.40625,\"height\":28},\"bar\":{\"top\":507,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":133},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"ru\",\"mode\":\"dark\",\"density\":\"comfortable\",\"width\":420,\"alert\":{\"top\":520,\"bottom\":628,\"left\":34,\"right\":206.59375,\"width\":172.59375,\"height\":108},\"retry\":{\"top\":560,\"bottom\":588,\"left\":214.59375,\"right\":386,\"width\":171.40625,\"height\":28},\"bar\":{\"top\":507,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":133},\"viewport\":{\"width\":420,\"height\":640}}",
+        "{\"locale\":\"ru\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":320,\"alert\":{\"top\":532,\"bottom\":596,\"left\":34,\"right\":286,\"width\":252,\"height\":64},\"retry\":{\"top\":604,\"bottom\":628,\"left\":34,\"right\":193.609375,\"width\":159.609375,\"height\":24},\"bar\":{\"top\":519,\"bottom\":640,\"left\":10,\"right\":310,\"width\":300,\"height\":121},\"viewport\":{\"width\":320,\"height\":640}}",
+        "{\"locale\":\"ru\",\"mode\":\"dark\",\"density\":\"compact\",\"width\":420,\"alert\":{\"top\":532,\"bottom\":628,\"left\":34,\"right\":218.390625,\"width\":184.390625,\"height\":96},\"retry\":{\"top\":568,\"bottom\":592,\"left\":226.390625,\"right\":386,\"width\":159.609375,\"height\":24},\"bar\":{\"top\":519,\"bottom\":640,\"left\":10,\"right\":410,\"width\":400,\"height\":121},\"viewport\":{\"width\":420,\"height\":640}}",
+        "PASS: persistent failure, same-error live-region dedupe, keyboard retry, queued edit status, 72 locale/theme/density/width feedback geometries."
+      ],
+      "failures": [],
+      "_events": [
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at window.qaRejectHeldSave (eval at evaluate (:302:30), <anonymous>:3:132)\n    at eval (eval at evaluate (:302:30), <anonymous>:1:14)\n    at UtilityScript.evaluate (<anonymous>:304:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        },
+        {
+          "kind": "console",
+          "text": "[options] save failed Error: QA_EXPECTED_SAVE_FAILURE\n    at persistSettings (eval at evaluate (:302:30), <anonymous>:3:111)\n    at pbpSaveOptionsSnapshot (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:975:13)\n    at saveAll (chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.js:3354:28)"
+        }
+      ],
+      "_lastCursor": 49
+    }
+  ],
+  "headless": true,
+  "siteTheme": "modern-card",
+  "extensionId": "feoognahlmfmbllpmgailahcnjppiegb",
+  "hostPermissionGrants": {
+    "http://127.0.0.1/*": true,
+    "http://localhost/*": true,
+    "https://freedictionaryapi.com/*": true
+  },
+  "aiRequests": 0,
+  "environment": {
+    "commit": "06056962",
+    "dirty": 24,
+    "chromium": "147.0.7727.15",
+    "node": "v24.14.1",
+    "platform": "linux"
+  },
+  "network": []
+}

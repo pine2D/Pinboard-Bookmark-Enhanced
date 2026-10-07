@@ -43,6 +43,9 @@ node scripts/qa-drive.mjs --headless --surfaces selection --click-dismiss --chec
 echo "[draft] native popup close/reopen preserves unsaved edits"
 node scripts/qa-drive.mjs --surfaces drafts --check --label popup-draft-contract
 
+echo "[options-save] persistent feedback, retry and translated narrow layouts"
+node scripts/qa-drive.mjs --headless --surfaces options-save --check --label options-save-contract
+
 echo "[syntax] checking JavaScript"
 git ls-files -- '*.js' '*.mjs' |
   while IFS= read -r file; do

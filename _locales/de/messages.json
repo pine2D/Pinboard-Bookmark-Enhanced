@@ -4014,5 +4014,7 @@
   },
   "popupDraftFailed": {
     "message": "Der Entwurf konnte nicht aufbewahrt werden. Speichere das Lesezeichen, bevor du das Popup schließt."
-  }
+  },
+  "optSavePending": { "message": "Änderungen noch nicht gespeichert" },
+  "optRetrySave": { "message": "Speichern erneut versuchen" }
 }

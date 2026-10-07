@@ -1575,6 +1575,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
+| options | `.options-save-bar` | 视口底部的保存反馈：flex wrap、gap sp-4、内距 sp-5 × sp-7、z sticky；失败持续并提供 sm 重试，实际高度回填 `--opt-save-bar-h` 以保留最后一项的滚动空间；普通状态非 live、错误独立 role=alert |
 | options | `.fg` | 表单组；`margin-bottom: var(--opt-rhythm)`（12px）= 组间节律的唯一主人 |
 | options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；作 `.fg` 末子元素时 `margin-top: --opt-label-gap`（8/4），作 `.fg` 的兄弟或 `.pf` 子元素时 `sp-6`；Send-to 卡片测试行 `sp-6` |
 | options | `.hint` / `.hint-warn` | 辅助文字 `--opt-text-helper`/`--opt-lh-helper`（12/18）；`.fg > .hint` 距控件 sp-1；组外 `margin: sp-1 0 rhythm` |

@@ -3344,7 +3344,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     overlay: $id("opt-custom-css").value,
   };
 
+  let autoSaveRevision = 0;
   async function saveAll() {
+    const revision = autoSaveRevision;
+    setAutoSaveProgress("saving");
     const data = collectSettingsFromForm();
     const overlayValue = $id("opt-custom-css").value;
     try {
@@ -3364,8 +3367,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
       });
       await pbpRefreshSyncLocalFallbackStatus();
-      if (result.fellBackToLocal) {
-        flashAutoSave("optSavedLocally", "Saved locally (sync quota full)", 4000);
+      if (revision !== autoSaveRevision) {
+        // This snapshot completed, but more edits are still waiting to save.
+        clearAutoSaveFailureAlert();
+        setAutoSaveProgress("optSavePending");
+      } else if (result.fellBackToLocal) {
+        flashAutoSave("optSavedLocally", "Saved locally (sync quota full)");
       } else {
         flashAutoSave();
       }
@@ -3375,21 +3382,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // "Some settings may already have been saved" is the one message on this page
-  // the user must not miss, and the header slot it used to be the sole home of
-  // wipes itself after 4s. Mirror it into the page-level role="alert" slot and
-  // leave it there until a save actually succeeds.
-  //
-  // That slot is #opt-global-alert, NOT #opt-sync-error: auto-save fires from
-  // whichever panel the user is editing, while #opt-sync-error sits inside
-  // #panel-general, so on the other 12 panels its display:none ancestor hid the
-  // message outright and kept the live region from announcing. #opt-sync-error
-  // stays the sync-migration slot (that error is raised by controls in that
-  // very panel, and its 8s auto-hide must not reach an unrelated alert).
-  // The marker records that this element's current text is ours to retire.
+  // The failure stays visible across panels until an actual save succeeds.
+  // Repeated identical errors leave the live region untouched.
   function setAutoSaveFailureAlert(text) {
     const errEl = $id("opt-global-alert");
     if (!errEl) return;
+    $id("auto-save-status")?.classList.add("hidden");
+    const retry = $id("auto-save-retry");
+    if (retry) { retry.hidden = false; retry.setAttribute("aria-disabled", "false"); retry.textContent = t("optRetrySave"); }
     // Saves are debounced at 500ms and a failing storage area keeps failing:
     // rewriting the same text into a role="alert" re-announces it on every
     // keystroke burst. The standing message is already on screen -- leave it.
@@ -3405,17 +3405,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     delete errEl.dataset.autosaveFailure;
     errEl.textContent = "";
     errEl.classList.add("hidden");
+    const retry = $id("auto-save-retry");
+    if (retry) retry.hidden = true;
+  }
+
+  function setAutoSaveProgress(key) {
+    const el = $id("auto-save-status");
+    const retry = $id("auto-save-retry");
+    if (el) { el.textContent = t(key); el.classList.remove("saved"); el.classList.toggle("hidden", $id("opt-global-alert")?.dataset.autosaveFailure === "1"); }
+    // Preserve keyboard focus through a failed retry. aria-disabled plus the
+    // click gate prevents duplicate work without native disabled blurring it.
+    if (retry && !retry.hidden) { retry.setAttribute("aria-disabled", "true"); retry.textContent = t(key); }
   }
 
   function reportAutoSaveFailure(error) {
     console.error("[options] save failed", error);
     const msg = t("optSaveFailed") || "Save did not complete; some settings may already have been saved";
-    flashAutoSave("optSaveFailed", "Save did not complete; some settings may already have been saved", 4000, false);
+    flashAutoSave("optSaveFailed", "Save did not complete; some settings may already have been saved", false);
     setAutoSaveFailureAlert(msg);
     return { ok: false, error };
   }
 
   function saveAllSafely() {
+    clearTimeout(saveTimer);
+    saveTimer = null;
     void pbpQueueOptionsSave(autoSaveState, saveAll).catch(reportAutoSaveFailure);
   }
 
@@ -3423,6 +3436,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   let saveTimer = null;
   function scheduleAutoSave() {
     if (autoSaveState.suspended) return;
+    autoSaveRevision++;
+    // An earlier failure's enabled Retry button must remain available during
+    // the debounce; only the active save temporarily disables it.
+    if (!$id("opt-global-alert")?.dataset.autosaveFailure) setAutoSaveProgress("optSavePending");
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveAllSafely, 500);
   }
@@ -3497,19 +3514,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   bindAutoSave();
 
-  function flashAutoSave(key = "optAutoSaved", fallback = "Saved", delay = 1500, ok = true) {
-    // A save that went through retires the standing failure alert; leaving it up
-    // would keep warning about settings that are on disk by now.
+  function flashAutoSave(key = "optAutoSaved", fallback = "Saved", ok = true) {
     if (ok) clearAutoSaveFailureAlert();
     const el = $id("auto-save-status");
     if (!el) return;
     setStatusIcon(el, ok, t(key) || fallback);
     el.classList.toggle("saved", ok);
-    clearTimeout(el._timer);
-    el._timer = setTimeout(() => {
-      el.textContent = t("optAutoSave");
-      el.classList.remove("saved");
-    }, delay);
+    el.classList.toggle("hidden", !ok);
+  }
+  const retrySave = $id("auto-save-retry");
+  retrySave?.addEventListener("click", () => {
+    if (retrySave.getAttribute("aria-disabled") === "true") return;
+    setAutoSaveProgress("saving");
+    saveAllSafely();
+  });
+  const saveBar = document.querySelector(".options-save-bar");
+  if (saveBar) {
+    new ResizeObserver(() => {
+      document.documentElement.style.setProperty("--opt-save-bar-h", `${Math.ceil(saveBar.getBoundingClientRect().height)}px`);
+    }).observe(saveBar);
+    document.addEventListener("focusin", (event) => {
+      const el = event.target;
+      if (!(el instanceof HTMLElement) || saveBar.contains(el)) return;
+      const r = el.getBoundingClientRect();
+      if (r.bottom > saveBar.getBoundingClientRect().top && r.top < innerHeight) {
+        el.scrollIntoView({ block: "center", behavior: "instant" });
+      }
+    });
   }
 
   // ---- Export/Import: see options-backup.js ----

@@ -4,7 +4,7 @@
 
 /* ---- Design tokens (default light mode; theme/dark blocks override) ---- */
 /* Reserve classic scrollbars on both sides of this centred surface. */
-html { scrollbar-gutter: stable both-edges; }
+html { scrollbar-gutter: stable both-edges; scroll-padding-bottom: calc(var(--opt-save-bar-h) + var(--opt-sp-4)); }
 :root {
   interpolate-size: allow-keywords;
   --motion-collapse: 200ms;
@@ -53,6 +53,7 @@ html { scrollbar-gutter: stable both-edges; }
   --opt-sp-8: 32px;
   --opt-text-body: 14px;   --opt-lh-body: 20px;
   --opt-text-helper: 12px; --opt-lh-helper: 18px;
+  --opt-save-bar-h: calc(var(--opt-lh-helper) + 2 * var(--opt-sp-5) + 1px);
   --opt-text-section: 16px; --opt-lh-section: 24px;
   --opt-control-h: 32px;   --opt-control-pad-x: 12px;
   --opt-row-pad-y: var(--opt-sp-5);   /* 12 */
@@ -230,18 +231,24 @@ button, input, select { font-family: inherit; }
   align-items: start;
 }
 html[data-options-ready] .container { visibility: visible; }
-/* LOAD-BEARING: h1 must span both columns. The floated .auto-save-hint relies on
-   the full width; without this it collapses into the ~160px sidebar column. */
+html[data-options-ready] .options-save-bar { visibility: visible; }
 .container > h1 { grid-column: 1 / -1; }
 h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); border-bottom: 1px solid var(--opt-border-section); padding-bottom: var(--opt-sp-4); }
-/* Page-level alert band: full width, between the title and the tab strip, so a
-   standing auto-save failure is visible from whichever panel raised it. Pinned
-   to row 2 (nav and the active panel moved to row 3) instead of auto-placed --
-   both of those carry a definite row, so an auto-placed full-width item would
-   land BELOW them. While hidden it is display:none, hence not a grid item at
-   all: row 2 collapses to zero and the desktop grid has no row-gap, so the
-   layout is byte-identical to before. */
-#opt-global-alert { grid-column: 1 / -1; grid-row: 2; margin: 0 0 var(--opt-sp-5); }
+
+/* The feedback bar's measured height reserves space below the last control,
+   including wrapped failure copy, browser zoom and translated button labels. */
+body { padding-bottom: calc(var(--opt-save-bar-h) + var(--opt-sp-7)); }
+.options-save-bar {
+  visibility: hidden;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: var(--opt-z-sticky);
+  max-width: 1040px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--opt-sp-4);
+  padding: var(--opt-sp-5) var(--opt-sp-7);
+  background: var(--opt-bg); border-top: 1px solid var(--opt-border);
+}
+.options-save-bar > .auto-save-hint,
+.options-save-bar > #opt-global-alert { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+#opt-global-alert { margin: 0; font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); color: var(--opt-danger); }
 
 /* ---- Tabs ---- */
 /* z-index: a sticky box is a stacking context of its own, so at z auto the
@@ -1887,7 +1894,7 @@ html.motion-ready #preset-preview-section > summary::after {
 
 /* ---- Auto-save indicator ---- */
 .auto-save-hint {
-  float: right; font-size: 11px; color: var(--opt-fg-hint); font-weight: normal;
+  font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); color: var(--opt-fg-hint); font-weight: normal;
   /* 0.3s on purpose (double --motion-state): peripheral indicator that fires
      on every settings edit; the slow soak keeps it from flashing for
      attention. Ratified on-device 2026-08 -- do not converge to the token. */
