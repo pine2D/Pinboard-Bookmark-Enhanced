@@ -996,9 +996,9 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
     return r ? parseDeclarations(r.body).filter((d) => d.property === "color").at(-1)?.value : undefined;
   };
   const INK = [
-    ...[".vocab-row-gloss", ".vocab-row-groups", ".notes-row-meta", ".row-del-x:not(:hover)"].map((t) => [`.vocab-card[aria-current]:not(.selected) ${t}`, "var(--lib-row-current-fg-muted)"]),
+    ...[".vocab-row-gloss", ".vocab-row-groups", ".notes-row-meta"].map((t) => [`.vocab-card[aria-current]:not(.selected) ${t}`, "var(--lib-row-current-fg-muted)"]),
     ...[".notes-hit-note", ".notes-hit-meta"].map((t) => [`.notes-hit[aria-current]:not(.selected) ${t}`, "var(--lib-row-current-fg-muted)"]),
-    ...[".vocab-row-gloss", ".vocab-row-groups", ".notes-row-meta", ".row-del-x:not(:hover)"].map((t) => [`.vocab-card.selected ${t}`, "var(--lib-row-selected-fg)"]),
+    ...[".vocab-row-gloss", ".vocab-row-groups", ".notes-row-meta"].map((t) => [`.vocab-card.selected ${t}`, "var(--lib-row-selected-fg)"]),
     ...[".notes-hit-note", ".notes-hit-meta"].map((t) => [`.notes-hit.selected ${t}`, "var(--lib-row-selected-fg)"]),
     [".vocab-card[aria-current] .notes-card-head", "var(--lib-row-selected-fg)"],
     [".notes-hit[aria-current] .notes-hit-btn", "var(--lib-row-selected-fg)"],
@@ -6163,12 +6163,10 @@ check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code
 // gone (deleted design-uplift Task 13 step 4), and any future bare hex/rgba
 // literal here is a straight regression, no baseline bump possible.
 // library.css's hex is fully migrated too (own zero-tolerance assertion
-// below). Its rgba() stays a live ratchet -- library.css:497's
-// `background: rgba(220, 80, 80, 0.08)` has a comment admitting there is no
-// token for it yet -- LIBRARY_RGBA_CEILING is the debt this last ratchet
-// exists to track; lower it (never raise it) as that debt gets paid down.
+// below). Its final bare rgba() belonged to the per-row delete X, retired
+// 2026-10-07. Keep the ratchet at zero so that debt cannot return.
 {
-  const LIBRARY_RGBA_CEILING = 1;
+  const LIBRARY_RGBA_CEILING = 0;
   for (const [file, css] of [["popup.css", popupCss], ["options.css", optionsCss]]) {
     check(countBareHex(css) === 0,
       `${file}: bare hex colors leaked outside var() fallbacks in the hand-maintained region (must stay at zero)`);
@@ -9143,14 +9141,6 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     /class="btn btn-sm ghost" id="vocab-batch-select-all" data-i18n="vocabSelectAll"/.test(libraryHtml) &&
     /class="btn btn-sm ghost" id="notes-batch-select-all" data-i18n="vocabSelectAll"/.test(libraryHtml),
     "library.html: the batch rows' Known / Learning text buttons (names unchanged) or their Select all are missing (spec §3.9, §11 V28)");
-  // The row head's hit area (.vocab-card .notes-card-head::before) is
-  // positioned; on touch the delete X goes back in flow and must stay
-  // positioned too, or it paints -- and hit-tests -- under that area (and its
-  // own ::before pad would resolve against the whole row).
-  const touchBlocks = [...hand.matchAll(/@media \(hover: none\) \{([\s\S]*?)\n\}/g)].map((m) => m[1]);
-  const touchX = touchBlocks.map((b) => /\.row-del-x \{([^}]*)\}/.exec(b)).find(Boolean);
-  check(!!touchX && /position:\s*relative/.test(touchX[1]) && !/position:\s*static/.test(touchX[1]),
-    "library.css: under @media (hover: none) .row-del-x must stay positioned (relative, offsets cleared), never static -- a static X sits under the row head's full-card hit area");
 }
 
 // Library redesign T4e (spec §3.9): a keyboard row move scrolls the list

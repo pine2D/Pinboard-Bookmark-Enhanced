@@ -400,18 +400,19 @@ check("a row keeps language and status as plain text on line one and its groups 
       const card = cards[0].getBoundingClientRect();
       let dead = [];
       for (let y = Math.ceil(first.top); y < Math.floor(last.bottom); y++) {
-        for (const x of [card.left + 1, card.left + card.width / 3]) {
+        for (const x of [card.left + 1, card.left + card.width / 3, card.right - 24, card.right - 1]) {
           const hit = document.elementFromPoint(x, y);
           if (!hit || !hit.closest(".notes-card-head")) dead.push(`${Math.round(x)},${y}:${hit ? hit.className || hit.tagName : "none"}`);
         }
       }
-      // The delete X sits over the head's spread hit area; it must stay on top.
-      const xs = cards.map((c) => {
-        const r = c.querySelector(".row-del-x").getBoundingClientRect();
-        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        return !!(hit && hit.closest(".row-del-x"));
+      // Both text lines use the row's full content width, including its right end.
+      const fullWidth = cards.map((c) => {
+        const top = c.querySelector(".notes-card-top");
+        const box = top.getBoundingClientRect();
+        const main = c.querySelector(".notes-card-main").getBoundingClientRect();
+        return Math.abs(main.right - (box.right - parseFloat(getComputedStyle(top).paddingRight))) < 0.5;
       });
-      report.push({ density: density || "comfortable", pitch, pitches, dead, xs });
+      report.push({ density: density || "comfortable", pitch, pitches, dead, fullWidth });
     }
   } finally {
     delete document.documentElement.dataset.density;
@@ -420,9 +421,9 @@ check("a row keeps language and status as plain text on line one and its groups 
   check("vocabulary rows sit on a 56 / 44 pitch and the row button covers the card and the gap between rows",
     report.length === 2 && report.every((r) => r.pitches.length === sample.length - 1 && r.pitches.every((p) => p === r.pitch) && r.dead.length === 0),
     JSON.stringify(report.map((r) => ({ ...r, dead: r.dead.slice(0, 6) }))));
-  check("the row's delete X stays clickable above the row button's spread hit area",
-    report.length === 2 && report.every((r) => r.xs.length === sample.length && r.xs.every(Boolean)),
-    JSON.stringify(report.map((r) => r.xs)));
+  check("both text lines reach the row's right content edge without an empty action column",
+    report.length === 2 && report.every((r) => r.fullWidth.length === sample.length && r.fullWidth.every(Boolean)),
+    JSON.stringify(report.map((r) => r.fullWidth)));
 }
 
 // Count row + status toggles (spec §3.2 / §3.5). Before the clearing check:
@@ -762,7 +763,7 @@ const notedRow = _pbpVocabBuildRow({
 // deleted that class everywhere, so asserting its absence here could no
 // longer fail. What CAN regress is the row growing the detail pane's own
 // controls back, so pin the row's actual structure instead: head button,
-// headline, one-line gloss, nothing focusable beyond the head + delete.)
+// headline, one-line gloss, nothing focusable beyond the reading button.)
 check("row builds the collapsed structure only, and claims no expansion state",
   fullGlossRow.querySelectorAll(".notes-card-head").length === 1 &&
   !!fullGlossRow.querySelector(".vocab-row-headline .notes-row-title") &&
@@ -770,7 +771,7 @@ check("row builds the collapsed structure only, and claims no expansion state",
   !fullGlossRow.querySelector(".vocab-gloss-text") &&
   !fullGlossRow.querySelector(".vocab-detail-gloss, .vocab-detail-context, .vocab-detail-dict") &&
   !notedRow.querySelector(".vocab-note-input") &&
-  fullGlossRow.querySelectorAll("button, a, textarea, select").length === 2 &&
+  fullGlossRow.querySelectorAll("button, a, textarea, select").length === 1 &&
   !fullGlossRow.querySelector("[aria-expanded]"));
 check("collapsed card clamps the gloss to its first line, outside the chip row",
   fullGlossRow.querySelector(".vocab-row-gloss").textContent === "contextual sense line" &&
@@ -784,9 +785,9 @@ check("activating a row moves aria-current onto it and off every other row",
   $id("vocab-list").querySelectorAll(".vocab-card[aria-current]").length === 1);
 fullGlossRow.remove();
 notedRow.remove();
-check("icon-only delete button keeps an accessible name and an SVG face",
-  !!notedRow.querySelector(".notes-row-del svg") &&
-  !!notedRow.querySelector(".notes-row-del").getAttribute("aria-label"));
+const detailDelete = $id("vocab-detail-tail").querySelector(".vocab-detail-delete");
+check("the activated word exposes the named trash action in its detail pane",
+  !!detailDelete?.querySelector("svg") && detailDelete.textContent.includes("dictDeleteWord"));
 // Live gesture path. Ctrl-click selects without disturbing the detail pane;
 // Shift-click spans the interval; a second Shift-click over the same span
 // clears it (the "range de-select" the checkbox era got from checkbox.checked).
@@ -1451,9 +1452,10 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       // the reload then removes -- focus fell to <body>.
       cStore = [{ id:"f1", owner:cOwner, term:"focus", groups:[], contexts:[], updatedAt:1 }];
       await renderVocabPanel();
-      const rowDelete = $id("vocab-list").querySelector('.vocab-card[data-vocab-id="f1"] .notes-row-del');
-      rowDelete.focus();
-      rowDelete.click();
+      $id("vocab-list").querySelector('.vocab-card[data-vocab-id="f1"] .notes-card-head').click();
+      const deleteButton = $id("vocab-detail-tail").querySelector(".vocab-detail-delete");
+      deleteButton.focus();
+      deleteButton.click();
       document.querySelector(".confirm-popover .confirm-yes").click();
       await settle();
       check("a confirmed single delete lands focus on the visible search field",
@@ -2357,8 +2359,6 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       list.querySelectorAll(".notes-card-head").length === 100 && stops().length === 1 &&
       stops()[0] === list.children[0].querySelector(".notes-card-head"),
       String(stops().length));
-    check("the row's delete button leaves the tab order with it",
-      [...list.querySelectorAll(".row-del-x")].every((el) => el.tabIndex === -1));
     const heads = [...list.querySelectorAll(".notes-card-head")];
     heads[0].focus();
     const press = (key, extra) => document.activeElement.dispatchEvent(
@@ -2367,13 +2367,10 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     check("ArrowDown moves to the next row", document.activeElement === heads[1]);
     check("the single tab stop follows the focused row",
       heads[1].tabIndex === 0 && stops().length === 1);
-    press("ArrowRight");
-    check("ArrowRight reaches the row's own delete button",
-      document.activeElement === list.children[1].querySelector(".row-del-x"));
-    check("moving inside a row leaves the tab stop on that row",
-      heads[1].tabIndex === 0 && stops().length === 1);
-    press("ArrowLeft");
-    check("ArrowLeft returns to the row head", document.activeElement === heads[1]);
+    check("ArrowRight is unhandled and keeps focus on the row's reading action",
+      press("ArrowRight") === true && document.activeElement === heads[1]);
+    check("ArrowLeft is unhandled and keeps the list's single tab stop",
+      press("ArrowLeft") === true && document.activeElement === heads[1] && stops().length === 1);
     press("End");
     check("End jumps to the last rendered row", document.activeElement === heads[99]);
     press("ArrowDown");
@@ -2555,7 +2552,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       <div class="vocab-context-bar lib-count-row"><span class="vocab-ctx-text"><span class="notes-count"><span class="lib-count-items" aria-hidden="true"><span class="lib-count-item" data-label="ci-0"></span><span class="lib-count-item" data-label="ci-1"></span><span class="lib-count-item" data-label="ci-2"></span><span class="lib-count-item" data-label="ci-3"></span></span></span></span><span class="save-status vocab-main-status">Saved just now</span><div class="lib-cluster"><button class="btn btn-sm ghost lib-hang-end" data-label="all"></button></div></div>
       <div class="vocab-batch-bar selecting"><span class="notes-count" id="vocab-selected-count" data-label="selected-count">5000</span><button class="btn btn-sm ghost" id="vocab-batch-select-all" data-label="batch-all"></button><span class="lib-cluster"><button class="btn btn-sm ghost" data-label="invert"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm danger ghost" data-label="batch-delete"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm ghost vocab-clear-selection"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><span class="vocab-group-unit"><input type="text"><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><button class="btn btn-sm" id="vocab-mark-known" data-label="known"></button><button class="btn btn-sm" id="vocab-mark-learning" data-label="learning"></button><span class="lib-batch-status"></span></div>
       <div class="vocab-list-region">
-      <article class="notes-card vocab-card"><div class="notes-card-top"><button class="notes-card-head"><span class="notes-card-main"><span class="vocab-row-headline"><span class="notes-row-title">Wortzusammensetzung mit außergewöhnlich langem ausgewähltem Begriff</span><span class="notes-row-meta"><span class="notes-meta-chip" data-label="row-lang"></span><span class="notes-meta-chip vocab-status-chip" data-label="row-known"></span></span></span><span class="vocab-row-gloss">Außergewöhnlich lange Definition, die auf einer Zeile bleiben muss</span><span class="vocab-row-groups" data-label="row-groups"><span>Außergewöhnlich lange Gruppe für Fachbegriffe</span><span>Wiederholung vor der Prüfung</span></span></span></button><button class="btn btn-sm notes-row-del" data-label="remove"></button></div></article>
+      <article class="notes-card vocab-card"><div class="notes-card-top"><button class="notes-card-head"><span class="notes-card-main"><span class="vocab-row-headline"><span class="notes-row-title">Wortzusammensetzung mit außergewöhnlich langem ausgewähltem Begriff</span><span class="notes-row-meta"><span class="notes-meta-chip" data-label="row-lang"></span><span class="notes-meta-chip vocab-status-chip" data-label="row-known"></span></span></span><span class="vocab-row-gloss">Außergewöhnlich lange Definition, die auf einer Zeile bleiben muss</span><span class="vocab-row-groups" data-label="row-groups"><span>Außergewöhnlich lange Gruppe für Fachbegriffe</span><span>Wiederholung vor der Prüfung</span></span></span></button></div></article>
       </div>
     </div>
     <aside class="vocab-detail-pane">
@@ -2601,7 +2598,6 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         panel.querySelector('[data-label="learning"]').textContent = m.vocabStatusLearning.message;
         panel.querySelector('[data-label="selected-count"]').textContent = m.vocabSelectedCount.message.replace("$COUNT$", "5000");
         panel.querySelector('[data-label="batch-delete"]').title = m.vocabBatchDelete.message;
-        panel.querySelector('[data-label="remove"]').textContent = m.delete.message;
         panel.querySelector('input[type="text"]').placeholder = m.vocabGroupNamePlaceholder.message;
         for (const el of panel.querySelectorAll('[data-label="group-filter"] .listbox-value, [data-label="group-filter"] .listbox-sizer')) el.textContent = m.vocabAllGroups.message;
         // Task 3 fix round 1 (Minor 7): the lookup bar and stats strip joined

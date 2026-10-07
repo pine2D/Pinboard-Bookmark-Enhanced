@@ -479,9 +479,8 @@ input[type="checkbox"], input[type="radio"] {
 /* §7.3 `borderless` placement (the view tabs): 1px accent core + the
    --lib-focus-ring glow. The core
    is not optional -- the glow alone is too faint to locate on light presets.
-   .notes-card-head is deliberately NOT here: it spans only the first of the
-   row's three grid columns, so a ring on it stopped mid-row and ran under
-   .row-del-x. Its row carries an inset ring instead (see .notes-card-top). */
+   .notes-card-head is deliberately NOT here: its row carries an inset ring
+   that includes the surrounding padding (see .notes-card-top). */
 .lib-tab:focus-visible {
   outline: 1px solid var(--lib-accent);
   outline-offset: 2px;
@@ -686,9 +685,8 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
   cursor: pointer;
 }
 .notes-card-head:focus-visible { outline: none; }
-/* §7.3 `inset`. Drawn on the whole row, not on the head: the head is only
-   the first of .notes-card-top's three grid columns. `:has(> ...)` keeps the
-   selector at (0,3,0) -- deliberately NOT a box-shadow ring, because
+/* §7.3 `inset`. Drawn on the whole row, including its padding. `:has(> ...)`
+   keeps the selector at (0,3,0) -- deliberately NOT a box-shadow ring, because
    .vocab-card.selected .notes-card-top (also (0,3,0)) owns box-shadow for
    the batch-selection ring and the later of two same-specificity rules
    would silently erase the other. */
@@ -713,10 +711,9 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
    unbreakable chip (white-space:nowrap, no spaces to wrap on -- a real long
    custom group name) then refused to shrink below that width no matter how
    narrow the card got, and silently overflowed the card's visible
-   overflow-x:visible boundary into the delete button's hit area. */
+   overflow-x:visible boundary. */
 .notes-row-meta { display: flex; flex-wrap: wrap; gap: var(--lib-sp-3); min-width: 0; font-size: 11px; color: var(--lib-fg-muted); }
 .notes-meta-chip { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.notes-row-del { white-space: nowrap; }
 /* Source link under a context quote in the vocabulary detail pane (the only
    consumer left -- library-vocab.js builds it as a bare <a>).
    `display: block` was the earlier fix for the earlier defect: on a
@@ -788,43 +785,6 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
 /* Inside a list region (which starts 4px outboard of the search box) the
    same 12px text inset needs the rows' 4px margin first. */
 .notes-list-region > .notes-empty { margin-inline: var(--lib-sp-1); }
-
-/* Ghost X delete button (options.css's shared recipe for vocab AND notes rows;
-   only the notes rows consume it here until Task 5 brings the vocab list). */
-.row-del-x {
-  padding: var(--lib-sp-0) var(--lib-sp-1);
-  line-height: 0;
-  color: var(--lib-fg-muted);
-  border-color: transparent;
-  background: transparent;
-  position: absolute;
-  right: var(--lib-sp-1);
-  top: 50%;
-  translate: 0 -50%;
-  background: var(--row-bg, var(--lib-bg));
-  opacity: 0;
-  transition: opacity var(--motion-state) ease, background var(--motion-state), border-color var(--motion-state), color var(--motion-state);
-}
-.notes-card:hover .row-del-x,
-.row-del-x:focus-visible { opacity: 1; }
-/* -4px vertical (was -3px): the vocab list's instance (.btn.btn-sm, built via
-   setBtnIcon's icon+gap+empty-label shape) measures 27x19, an 18px padding
-   box once its 1px border is excluded -- -3px landed at 23px, one short of
-   the 24px floor (hit-area-debt sweep). -1px horizontal is untouched: 27px
-   already clears 24 on that axis. */
-.row-del-x::before { content: ""; position: absolute; inset: -4px -1px; }
-.row-del-x:hover {
-  color: var(--lib-danger);
-  border-color: color-mix(in srgb, var(--lib-danger) 55%, var(--lib-border, #ccc));
-  background: rgba(220, 80, 80, 0.08); /* no --lib-danger-bg token; options.css's own fallback literal */
-}
-@media (hover: none) {
-  /* Back in flow, but still positioned (relative, offsets cleared): the
-     vocabulary row head's full-card hit area (.notes-card-head::before) is
-     positioned too, and a static X would sit under it -- and the X's own
-     ::before hit pad would resolve against the whole row. */
-  .row-del-x { position: relative; inset: auto; translate: none; opacity: 1; background: transparent; }
-}
 
 /* ============================================================
    Notes master-detail: one row per highlight on the left, the selected
@@ -1795,9 +1755,8 @@ html.motion-ready .vocab-note-save {
    text-select I-beam over a non-editable label (Finding 4 baseline). The
    detail pane's instance additionally carries .removable and a nested
    .chip-remove button (Finding 5) -- hovering/focusing the chip reveals a
-   ghost "x" using the same opacity-reveal language as .row-del-x, laid out
-   as a normal flex child rather than that recipe's absolute-position
-   overlay (a pill has no fixed row height to anchor an overlay against).
+   ghost "x", laid out as a normal flex child (a pill has no fixed row
+   height to anchor an overlay against).
    Row-language background feedback (§3.2) on the removable variant signals
    "this pill has an action" without claiming the whole pill is clickable --
    only .chip-remove itself is. */
@@ -1810,7 +1769,7 @@ html.motion-ready .vocab-note-save {
    only, a real 2px drift from the list-row instance caught by this task's
    own new heightEqWith regression check (render-audit-checklist.mjs) before
    it shipped. Hit-area expansion (COMPONENTS.md §1.5's ::before pattern,
-   same recipe as .row-del-x) makes up the difference without growing the
+   using a pseudo-element) makes up the difference without growing the
    box that sets the row height. */
 .vocab-group-chip .chip-remove {
   display: inline-flex;
@@ -1839,8 +1798,7 @@ html.motion-ready .vocab-note-save {
 .chip-remove:hover { color: var(--lib-danger); background: color-mix(in srgb, var(--lib-danger) 14%, transparent); }
 .chip-remove:active { transform: scale(0.97); }
 .chip-remove:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
-/* Touch has no :hover to reveal the remove "x" -- same fallback .row-del-x
-   already uses (library.css, @media (hover:none) block). */
+/* Touch has no :hover to reveal the remove "x", so it stays visible. */
 @media (hover: none) { .chip-remove { opacity: 1; } }
 /* ---- Detail sheet and dictionary reference column (library redesign T7a,
    spec §4.1, §4.8, §4.9). T7b adds the container tiers; until then the sheet
@@ -2606,30 +2564,11 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
 .vocab-card,
 .vocab-card .notes-card-top { min-width: 0; }
 .vocab-card .notes-card-top {
-  /* Keep a separate action column in flow, including when the X is hidden. */
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--lib-sp-1); /* the surface's own tightest rung; the old literal 6px was
-    options' --opt-sp-3 borrowed across surfaces, the one 6px button-row gap the
-    actionRowGap scan found on this page (2026-09-05) */
+  /* Both text lines use the full row; deletion lives outside the list. */
+  grid-template-columns: minmax(0, 1fr);
   padding: var(--lib-row-pad-y) var(--lib-row-pad-x);
 }
-.vocab-card .row-del-x {
-  position: relative;
-  inset: auto;
-  translate: none;
-  align-self: start;
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  padding: 0;
-  gap: 0;
-}
-.vocab-card .row-del-x > span:last-child:empty { display: none; }
-.vocab-card .row-del-x::before { inset: 0; }
-.vocab-card:focus-within .row-del-x { opacity: 1; }
-/* Collapsed-row rhythm (2026-08 redesign): controls anchor to the TITLE
-   line instead of centering against whatever height the row happens to
-   reach -- on a tall card a centered control floated mid-air. */
+/* Keep the two-line reading button aligned to the top of the row. */
 .vocab-card .notes-card-top { align-items: start; }
 /* COMPONENTS.md §9.1 law 3 (inset selection): the band never reaches the
    list's corners -- four-sided margin and radius-md in every state.
@@ -2641,8 +2580,7 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
    over the row's padding and its 4px side margins, and 1px into the 2px gap
    on each side, so no pixel between two rows is dead (the T4b geometry left
    a 2-4px band along every card's top edge that took no click). Positioned
-   against .notes-card-top (position: relative); the delete X comes later in
-   the row and stays on top. Transparent: hit area only. */
+   against .notes-card-top (position: relative). Transparent: hit area only. */
 .vocab-card .notes-card-head::before {
   content: "";
   position: absolute;
@@ -2668,20 +2606,17 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
 .vocab-card.selected[aria-current] .notes-card-top { --row-bg: var(--lib-row-band-current-bg); }
 .vocab-card.selected[aria-current] .notes-card-top:hover { --row-bg: var(--lib-row-band-current-bg-hover); }
 .vocab-card.selected .notes-card-head { color: var(--lib-row-selected-fg); }
-/* Secondary text and the hover-revealed delete X paint their own colour, so
-   each state names its ink (spec §3.8 / §7.5): --lib-row-current-fg-muted on
-   the current fill, --lib-row-selected-fg on any band. :not(:hover) leaves
-   the X's own danger hover alone; :not(.selected) keeps the two inks apart on
-   specificity. fg-muted on selected+current+hover fell under 3:1 on five dark
+/* Secondary text paints its own colour, so each state names its ink (spec
+   §3.8 / §7.5): --lib-row-current-fg-muted on the current fill,
+   --lib-row-selected-fg on any band. :not(.selected) keeps the two inks apart
+   on specificity. fg-muted on selected+current+hover fell under 3:1 on five dark
    themes before this (facts-s2 §6.2). */
 .vocab-card[aria-current]:not(.selected) .vocab-row-gloss,
 .vocab-card[aria-current]:not(.selected) .vocab-row-groups,
-.vocab-card[aria-current]:not(.selected) .notes-row-meta,
-.vocab-card[aria-current]:not(.selected) .row-del-x:not(:hover) { color: var(--lib-row-current-fg-muted); }
+.vocab-card[aria-current]:not(.selected) .notes-row-meta { color: var(--lib-row-current-fg-muted); }
 .vocab-card.selected .vocab-row-gloss,
 .vocab-card.selected .vocab-row-groups,
-.vocab-card.selected .notes-row-meta,
-.vocab-card.selected .row-del-x:not(:hover) { color: var(--lib-row-selected-fg); }
+.vocab-card.selected .notes-row-meta { color: var(--lib-row-selected-fg); }
 /* A failed save / delete, pinned to the row it happened on. is-error lands
    on the row being acted on (library-vocab.js) -- the current row when the
    action starts, which may stop being current while the mark stays -- and

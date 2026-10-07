@@ -1187,8 +1187,6 @@ export const CHECKS = [
   // ---- §1/§2 button + icon family: representative instances beyond the
   // defect-tagged selectors above, so the button-family assertions have
   // coverage that isn't 100% coincident with the six named defects. ----
-  { surface: "library", page: "library.html", selector: ".row-del-x", state: "default",
-    expect: { iconContrast: 3 } },
   { surface: "options", page: "options.html", selector: "#export-settings", state: "default",
     expect: { textContrast: 4.5 } },
 
@@ -1572,8 +1570,7 @@ export const CHECKS = [
     focusTarget: ":scope", expect: { focusRecipe: "bordered" } },
   // `inset` CARRIED for a passenger: the vocab row's ring is drawn on
   // .notes-card-top, not on the .notes-card-head button that actually takes
-  // focus -- the head spans only the first of the row's three grid columns,
-  // so its old ring stopped mid-row and ran under .row-del-x. Because the
+  // focus -- the whole-row ring includes the padding around the head. Because the
   // focus target differs from the probed element, the runner additionally
   // requires the head to draw nothing of its own (no double ring).
   { surface: "library", page: "library.html", selector: ".vocab-card .notes-card-top", state: "focusWithin",

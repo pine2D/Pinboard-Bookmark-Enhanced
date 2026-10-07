@@ -478,7 +478,7 @@ function probeSelector({ selector, compareSelector, extraBgVarName, extraColorVa
     extraBorderColorRaw = getComputedStyle(document.documentElement).getPropertyValue(extraBorderColorVarName).trim() || null;
   }
   // Effective hit-area box (COMPONENTS.md §1.5's ::before hit-area expansion
-  // recipe, e.g. .row-del-x / #vocab-invert-selection): getBoundingClientRect()
+  // recipe, e.g. .chip-remove / #vocab-invert-selection): getBoundingClientRect()
   // on the host alone can't see it -- position:absolute pseudo-elements never
   // affect their own host's layout box, that's the whole point of the trick --
   // so hitAreaMin was blind to it (COMPONENTS.md §1.4 always said "含 ::before
@@ -3234,9 +3234,21 @@ async function driveLibAxis(page, check, extBase, theme) {
                 if (prev === null) html.removeAttribute("data-density");
               });
             } else {
-              await p.setViewportSize({ width: w + 1, height: h });
-              await p.waitForTimeout(100);
-              await p.setViewportSize({ width: w, height: h });
+              // Hold each width until its real resize arrives. Fixed sleeps
+              // let Chromium coalesce the out-and-back changes under parallel
+              // load, leaving the deliberately corrupted value untouched even
+              // though the production listener works. Wait for the stimulus,
+              // not the expected --lib-sb-w value: a broken listener must still
+              // fail the geometry below.
+              await p.bringToFront();
+              for (const width of [w + 1, w]) {
+                await p.evaluate(() => {
+                  window.__pbpLibAxisResized = false;
+                  window.addEventListener("resize", () => { window.__pbpLibAxisResized = true; }, { once: true });
+                });
+                await p.setViewportSize({ width, height: h });
+                await p.waitForFunction(() => window.__pbpLibAxisResized === true, null, { timeout: TIMEOUT_MS });
+              }
             }
             await p.waitForTimeout(150);
           }

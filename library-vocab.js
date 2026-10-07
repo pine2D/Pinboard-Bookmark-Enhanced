@@ -189,14 +189,10 @@ function _pbpVocabActivateRow(w, card) {
   _pbpVocabSetRowTabStop(card.querySelector(".notes-card-head"));
 }
 
-// Roving tabindex for the row grid. #vocab-list declares role="grid" and each
-// row carries two real buttons, so one render batch put 200 Tab stops between
-// the search box and "Load more" -- and the arrow keys that role promises did
-// nothing at all, which left the Ctrl/Shift+Space multi-select path above
-// reachable only by tabbing row by row. One stop for the whole list instead,
-// with the arrows doing the moving: the same recipe library.js uses for the
-// page's tab strip and options.js for its sidebar. The selection chords are
-// untouched -- navigation never activates or selects a row.
+// One Tab stop for the row grid, with Up/Down/Home/End moving among its
+// reading buttons: the same recipe library.js uses for the page's tab strip
+// and options.js for its sidebar. Navigation never activates or selects a
+// row; Ctrl/Shift+Space remains the separate multi-select path.
 function _pbpVocabRowHeads() {
   const list = $id("vocab-list");
   return list ? [...list.querySelectorAll(".vocab-card .notes-card-head")] : [];
@@ -229,8 +225,8 @@ function _pbpVocabBuildRow(w) {
   // `aria-selected` is only supported on grid/listbox descendants -- declared
   // on a `listitem` it is invalid ARIA that assistive tech drops silently, so
   // deleting the checkbox without moving the role would have deleted the
-  // screen-reader path with it. `option` is out: it must be a leaf, and this
-  // row carries two real buttons.
+  // screen-reader path with it. Each gridcell carries one reading button;
+  // deletion lives in the detail pane and batch toolbar, as in the notes view.
   card.setAttribute("role", "row");
   card.dataset.vocabId = w.id;
   const isSelected = _vocabSelected.has(w.id);
@@ -308,26 +304,6 @@ function _pbpVocabBuildRow(w) {
   head.appendChild(main);
   top.appendChild(head);
 
-  const delBtn = document.createElement("button");
-  delBtn.type = "button";
-  delBtn.className = "btn btn-sm notes-row-del row-del-x";
-  // The row's second control, reached with ArrowRight rather than Tab: it is
-  // opacity:0 until its row is hovered or it takes focus, so leaving it in the
-  // tab order kept ~100 stops that land on something invisible (and it shares
-  // this row's single gridcell, which is what makes Left/Right the right key
-  // pair for it).
-  delBtn.tabIndex = -1;
-  // Icon-only: the full sentence ate a third of every row. The name lives in
-  // title/aria-label; the confirm popover still anchors to the button.
-  setBtnIcon(delBtn, "cross", "");
-  delBtn.title = t("dictDeleteWord");
-  delBtn.setAttribute("aria-label", t("dictDeleteWord"));
-  delBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    _pbpVocabDeleteRow(w, delBtn);
-  });
-  top.appendChild(delBtn);
   card.appendChild(top);
 
   // Desktop list grammar: a plain click reads the row (activation), a
@@ -1607,8 +1583,7 @@ function pbpVocabSelectionSnapshotValid(ids, selected, rows) {
 // account (account-isolation invariant).
 // `renderOwner` (optional): the owner the detail was rendered for, passed by
 // the detail's own delete so it follows the same rule as the detail's other
-// writes (_pbpVocabOwnerMoved). A list row's delete leaves it out -- an
-// account switch removes the rows synchronously.
+// writes (_pbpVocabOwnerMoved).
 function _pbpVocabDeleteRow(w, anchor, renderOwner) {
   showConfirmPopover(anchor, {
     msg: t("dictDeleteConfirm", w.term),
@@ -2664,14 +2639,10 @@ if (_vocabListEl) _vocabListEl.addEventListener("keydown", (e) => {
   else if (e.key === "ArrowUp") next = heads[Math.max(at - 1, 0)];
   else if (e.key === "Home") next = heads[0];
   else if (e.key === "End") next = heads[heads.length - 1];
-  else if (e.key === "ArrowRight") next = card.querySelector(".row-del-x");
-  else if (e.key === "ArrowLeft") next = head;
   else return;
   e.preventDefault();
   if (!next) return;
-  // Left/Right move WITHIN one row (head and delete share its single
-  // gridcell), so the row keeps the tab stop either way.
-  _pbpVocabSetRowTabStop(next.classList.contains("notes-card-head") ? next : head);
+  _pbpVocabSetRowTabStop(next);
   next.focus();
 });
 const _vocabGroupInput = $id("vocab-group-input");

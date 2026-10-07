@@ -269,12 +269,12 @@ composer 一旦开始发射 `color: var(--opt-btn-fg)`，它们会逐条覆盖�
 - **sm 阶的 icon-only 按钮命中区不达标**（20px < 24px）。补救按轴选择：纵向不与邻居冲突就
   `::before { content:""; position:absolute; inset:-2px 0 }`；两轴都能扩就 `inset:-2px`；扩张会与相邻
   控件命中盒重叠（例如与输入框熔接的步进器）时，把**整行**升到 md 阶而不是留一个不达标的靶子。
-  样板：`.row-del-x`（library.css）已用 `::before { inset:-3px -1px }` 做过一遍。
+  样板：`.chip-remove`（library.css）用 `::before { inset:-5px }` 将 14px 视觉盒扩到 24px 命中区。
 - **覆盖 `.btn` 的 `display` 会同时取消 `gap`**。只有纯文字按钮（`.vocab-load-more`，`display:block` 居中）
   和 icon-only 按钮（`.vocab-group-step`，`display:inline-grid` 居中）可以这么做；带「图标+文字」的按钮
   一律不许改 `display`，否则图标与文字贴死。
 - 生成区**物理位置钉在各文件当前组件配方处**（library ≈:119 / options ≈:341 / popup ≈:137），不许搬到
-  文件尾。`.row-del-x`、`.vocab-load-more`、`.lib-cluster > .btn.ghost`、`.vocab-batch-bar .btn:not(.vocab-group-step)`、
+  文件尾。`.vocab-load-more`、`.lib-cluster > .btn.ghost`、`.vocab-batch-bar .btn:not(.vocab-group-step)`、
   `.vocab-group-step` 这些排在插入点之后的手写规则**靠源顺序或特异性赢**，换位置会静默翻转级联。
 - 新增按钮先 grep 同表面同类控件，归入既有阶与档，不新造第三套 padding。
 - **即时自动保存的设置页，大多数 tab 没有主档，这是预期，不是遗漏**（2026-09-21，Task 4）：options 一进
@@ -343,7 +343,7 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
   `.vocab-detail-delete`、`.vocab-detail-relookup`、`.vocab-detail-speak`、`.notes-detail-delete` 全部落回
   `display: inline` 吃基线对齐。全局基础规则落地后，这四条窄例外**必须删掉**（留着只会掩盖下一次同类缺口）。
   （2026-10 现状：全局基础规则已由生成区发射，四条窄例外已不在 library.css；其中 `.vocab-sort-btn` 与
-  `.vocab-detail-relookup` 本身也已退役，C58。）
+  `.vocab-detail-relookup` 本身也已退役，C58；`.row-del-x` 于 2026-10-07 随逐行删除入口退役。）
 - 图标只从 Lucide v0.525.0 同版本取 path，24-box、stroke 2。SVG 内**禁止 `<text>` 节点**（CJK 字形会踩
   字体回退停顿）。语义分配见附录 A。
 - UI 里禁止字面 emoji / dingbat 字符（⚠ ✓ ✗ ↻ ▸ ▾ ℹ …），一律走 `PBP_ICONS` 内联 SVG。
@@ -501,8 +501,11 @@ quiet 档在 popup 目前只有 `.del-btn` 一个消费者。
   它只是打开确认弹层 / 只是删一条可再抓取的本地记录 → quiet。**没有第三种答案。**
 - 视觉权重随「距离真正执行」的远近递增：入口安静、确认响亮。同一个删除动作在两个位置权重不同是对的。
 - **缺陷 6 的形状**：`.notes-detail-delete` 与 `.vocab-detail-delete` 常亮红字红边地嵌在 15px/1.65
-  行高的阅读正文流里，没有任何降噪。它们归 quiet + ghost。同文件的 `.row-del-x`（默认 `opacity: 0`，
-  行 hover 才现身）是 quiet 档的**行内变体**——同一档 + 列表行特有的渐进披露，不是第三档。
+  行高的阅读正文流里，没有任何降噪。它们归 quiet + ghost。
+- **生词列表删除入口（用户裁决 2026-10-07）**：移除逐行叉按钮，与笔记列表一致。每行只有打开详情的阅读按钮，
+  单项删除使用详情垃圾桶；批量栏删除也支持只选中一项，均保留确认与账号校验。两行文字恢复全宽，分组仍在第二行右侧，
+  不为删除预留动作列；行高 54 / 42px、行距 56 / 44px 不变。整个列表仅一个 Tab 停靠点，Up/Down/Home/End 移动，
+  Ctrl/Shift+Space 多选，左右方向键不再切换到行内操作。
 - **`.notes-detail-delete.is-error` 是类级联依赖**（`library.css:442`）：失败标记用 `box-shadow` 而不是
   background，注释写明理由是「`.btn.danger:hover` 的 background 会赢过它并在下一次指针经过时抹掉失败痕迹」。
   改 danger 配方**必须**复核这个标记在新配方下仍可见——进附录 A 人审清单，不是自动门能判的。
@@ -1713,8 +1716,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
       而非 background，注释写明是为了绕开 `.btn.danger:hover` 的 background。改 danger 配方后，
       **真开一次失败态**（或临时加类目测）确认标记仍可见，且在指针经过后不被抹掉。
 - [ ] `.notes-hit.is-error .notes-hit-btn`（同文件）用 `--row-bg` 变量通道传背景，同理复核。
-- [ ] 生成区插入点**之后**的同特异性 (0,1,0) 手写规则清单是否重新核过：`.row-del-x`（`library.css:350`）、
-      `.vocab-load-more`（:1063）、`.vocab-selection-actions .btn`（:976）、`.vocab-batch-cluster > .btn`（:1044）、
+- [ ] 生成区插入点**之后**的同特异性 (0,1,0) 手写规则清单是否重新核过：`.vocab-load-more`（:1063）、`.vocab-selection-actions .btn`（:976）、`.vocab-batch-cluster > .btn`（:1044）、
       `.vocab-group-step`（:1051）。它们靠源顺序赢，谁赢谁输在迁移后必须逐条复述一遍。
 - [ ] **本规范自己要改的几何，其手写规则同样排在插入点之后、会赢过配方**，逐条确认已删或已改：
       `library.css:934` `.vocab-stat-chip { padding: 1px 8px }`（赢过配方的 `2px 8px`，C9 失效）、
