@@ -219,7 +219,10 @@
         "vocab-drive-notice-dismiss",
         "wayback-log-retry",
         "wayback-perm-help",
-        "wayback-perm-tip"
+        "wayback-perm-tip",
+        "sync-scope",
+        "scope-channel",
+        "preset-effect-preview"
       ]
     },
     "library": {

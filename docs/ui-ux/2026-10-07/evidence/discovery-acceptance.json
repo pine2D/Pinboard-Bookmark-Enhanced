@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-07T12:22:16.774Z",
+  "label": "discovery-accepted",
+  "surfaces": [
+    {
+      "name": "discovery",
+      "states": [
+        {
+          "state": "sync-scope-de-320",
+          "file": "01-discovery-sync-scope-de-320.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#general",
+          "events": []
+        },
+        {
+          "state": "theme-effect-light",
+          "file": "02-discovery-theme-effect-light.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#appearance",
+          "events": []
+        },
+        {
+          "state": "theme-effect-dark",
+          "file": "03-discovery-theme-effect-dark.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#appearance",
+          "events": []
+        },
+        {
+          "state": "reader-primary-controls",
+          "file": "04-discovery-reader-primary-controls.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/md-preview.html?k=qa-drive-preview",
+          "events": []
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "notes": [
+        "PASS: 9-language sync matrix and theme samples, actual cross-links; 11 presets × 2 modes, 14 color pairs, auto OS switch; source controls/AI setup/master-off; account switch and split local-secret/sync-main writes enable rail and selection AI once; no AI request."
+      ],
+      "failures": [],
+      "_events": [],
+      "_lastCursor": 0
+    }
+  ],
+  "headless": true,
+  "siteTheme": "modern-card",
+  "extensionId": "feoognahlmfmbllpmgailahcnjppiegb",
+  "hostPermissionGrants": {
+    "http://127.0.0.1/*": true,
+    "http://localhost/*": true,
+    "https://freedictionaryapi.com/*": true
+  },
+  "aiRequests": 0,
+  "environment": {
+    "commit": "dc597d37",
+    "dirty": 40,
+    "chromium": "147.0.7727.15",
+    "node": "v24.14.1",
+    "platform": "linux"
+  },
+  "network": [
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/get",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/get",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:43123",
+      "path": "/qa-article",
+      "disposition": "article-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/suggest",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/suggest",
+      "disposition": "pinboard-fixture"
+    }
+  ]
+}

@@ -42,7 +42,10 @@ async function pbpAskInit(detail) {
   const view = document.getElementById("rendered-view");
   if (!view || _pbpAskState) return;
   const s = await pbpAiGetSettings();
+  if (_pbpAskState) return; // another lifecycle initializer finished this await
   if (!pbpAiAvailable(s)) return; // master off / no key: no button, no hotkey, no bridge
+  if (typeof pbpAiResolveInitDetail === "function") detail = await pbpAiResolveInitDetail(detail);
+  if (!detail || _pbpAskState) return; // owner/lifecycle changed during the read
   // Idempotent index guard: md-translate may have indexed already; an
   // unconditional re-index would reset its md/text caches mid-flight.
   if (!pbpAiBlocks().length) pbpAiIndexBlocks(view);
@@ -115,7 +118,7 @@ async function pbpAskInit(detail) {
 //   </div>
 // Anchor: directly after #tr-section when the translate entry rendered,
 // else after the Raw/Rendered .view-toggle (the same slot translate uses,
-// so the rail order is: view-toggle, [tr-section], ask-section, Export).
+// Primary rail order: Contents, [tr-section], ask-section, Export; source tools are secondary.
 function _pbpAskBuildRailEntry() {
   const rail = document.getElementById("rail");
   if (!rail || document.getElementById("ask-open")) return;
@@ -146,7 +149,11 @@ function _pbpAskBuildRailEntry() {
   // above this task). pbpRailCollapsible leaves it untouched; only wires the
   // storage-backed handle for interface conformance.
   _pbpAskRailHandle = pbpRailCollapsible(sec, "ask", { label: btn, defaultCollapsed: true });
-  anchor.insertAdjacentElement("afterend", sec);
+  const translation = document.getElementById("tr-section");
+  const primaryAnchor = document.getElementById("export-section");
+  if (translation) translation.insertAdjacentElement("afterend", sec);
+  else if (primaryAnchor) rail.insertBefore(sec, primaryAnchor);
+  else anchor.insertAdjacentElement("afterend", sec);
   btn.addEventListener("click", () => _pbpAskSetOpen(!_pbpAskIsOpen()));
 }
 
@@ -482,6 +489,8 @@ function _pbpAskOnSubmit() {
 // _pbpAskState being set (pbpAskInit's first act after its gates); two
 // spaced retries re-run the full gate chain, so a genuinely disabled AI
 // config just re-checks twice, silently, with no UI flash.
+// pbpAskInit resolves the current lifecycle detail after its asynchronous
+// reads; the original detail retained by these timers cannot reclaim an owner.
 function _pbpAskInitWithRetry(detail, attempt) {
   attempt = attempt || 1;
   pbpAskInit(detail).catch(() => {}).then(() => {
@@ -1998,14 +2007,18 @@ function _pbpExplainOnShortcut(e) {
   pbpExplainInvoke(key === "d" ? "dict" : "explain");
 }
 
+function pbpExplainRefreshSettings(s) {
+  _pbpExplainSettings = s;
+  _pbpExplainAiOk = pbpAiAvailable(s);
+}
+
 function pbpExplainInit(detail) {
   _pbpExplainPage = { url: (detail && detail.url) || "", title: (detail && detail.title) || "" };
   pbpAiGetSettings().then((s) => {
     // dict P1: the surface exists for everyone; only the trigger ladder gates
     // it. AI-less runs of explain/translate render their own not-configured
     // error; dict works fully without AI.
-    _pbpExplainSettings = s;
-    _pbpExplainAiOk = pbpAiAvailable(s);
+    pbpExplainRefreshSettings(s);
     _pbpExplainTrigger = s.selectionTrigger || "icon";
     if (_pbpExplainTrigger === "off") return; // "off": zero listeners, zero DOM
 

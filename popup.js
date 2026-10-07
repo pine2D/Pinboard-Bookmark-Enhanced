@@ -446,6 +446,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("options-link").addEventListener("click", (e) => {
     e.preventDefault(); pbpOpenOptionsTab("general");
   });
+  $id("ai-configure-btn")?.addEventListener("click", () => pbpOpenOptionsTab("ai"));
   // The login screen hides #main-section, so its header carries its own gear --
   // a distinct id, because $id() memoizes and a duplicate would shadow the one
   // in the main header.
@@ -581,6 +582,14 @@ async function showMain(token) {
     const aiTagsBox = $id("ai-suggest-tags");
     const aiTagsRow = aiTagsBox ? aiTagsBox.closest(".row") : null;
     if (aiTagsRow) aiTagsRow.classList.add("hidden");
+  }
+  const needsAiSetup = !hasAIKey(settings) && (settings.optShowAiTags !== false || settings.optShowAiSummary !== false);
+  $id("ai-setup-row")?.classList.toggle("hidden", !needsAiSetup);
+  if (!hasAIKey(settings)) {
+    $id("ai-suggest-tags")?.closest(".row")?.classList.add("hidden");
+    $id("ai-tags-btn")?.classList.add("hidden");
+    $id("ai-summary-btn")?.classList.add("hidden");
+    $id("ai-summary-hint")?.classList.add("hidden");
   }
   // K70: unhide here (fetchPinboardSuggestTags itself stays where it was,
   // gated behind the pageInfo await below) so the suggest skeleton is on

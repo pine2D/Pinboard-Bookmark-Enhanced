@@ -52,6 +52,12 @@ node scripts/qa-drive.mjs --headless --surfaces translate-stop --fault ai-429 --
 echo "[layouts] nine locales, narrow settings, Ask width and popup semantics"
 node scripts/qa-drive.mjs --headless --surfaces layouts --check --label layouts-contract
 
+echo "[journey] note editing, failure retry and clearing combined filters"
+node scripts/qa-drive.mjs --headless --surfaces journey --check --label notes-edit-clear-contract
+
+echo "[discovery] sync scope, source controls, AI setup and local theme preview"
+node scripts/qa-drive.mjs --headless --surfaces discovery --check --label discovery-contract
+
 echo "[syntax] checking JavaScript"
 git ls-files -- '*.js' '*.mjs' |
   while IFS= read -r file; do

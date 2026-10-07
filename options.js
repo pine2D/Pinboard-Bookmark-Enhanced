@@ -1482,6 +1482,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   _activateHashPanel();
   window.addEventListener("hashchange", _activateHashPanel);
   setupOptionsSearch();
+  $id("sync-backup-link")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    $id("export-settings").scrollIntoView({ block: "center" });
+    $id("export-settings").focus({ preventScroll: true });
+  });
 
   // ---- Storage management (C2-6) ----
   // Category checkboxes over the reclaimable-cache allowlist in shared.js.
@@ -3659,16 +3664,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderPresetPreview() {
     const previewEl = $id("preset-preview-content");
     const previewSection = $id("preset-preview-section");
-    if (!previewEl || !previewSection) return;
+    const effect = $id("preset-effect-preview");
+    const frame = $id("preset-effect-frame");
+    if (!previewEl || !previewSection || !effect || !frame) return;
     if (!currentPresetKey) {
       previewSection.hidden = true;
       previewEl.textContent = "";
+      effect.hidden = true; frame.removeAttribute("srcdoc");
       return;
     }
     let themeKey = currentPresetKey;
+    const mode = $id("opt-theme").value;
+    const prefersDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     if (ADAPTIVE_THEME_MAP[themeKey]) {
-      const mode = $id("opt-theme").value;
-      const prefersDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       const variantKey = ADAPTIVE_THEME_MAP[themeKey][prefersDark ? 1 : 0];
       if (PINBOARD_THEMES[variantKey]) themeKey = variantKey;
       // Fall back to parent (e.g., flexoki ships one CSS that toggles via .pbp-dark)
@@ -3676,7 +3684,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     const theme = PINBOARD_THEMES[themeKey];
     previewSection.hidden = false;
     previewEl.textContent = theme ? theme.css : "";
+    effect.hidden = !theme;
+    if (!theme) { frame.removeAttribute("srcdoc"); return; }
+    // Built-in preset only. Opaque, scriptless sandbox + CSP prevent this
+    // local example from loading subresources or affecting the settings page.
+    const esc = value => String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+    const css = theme.css.replace(/<\/style/gi, "<\\/style");
+    // The example lives in a short-lived extension surface: preserve the
+    // preset's Latin family while adding this project's fast CJK fallback.
+    const family = /--pinboard-font-family:\s*([^;]+);/.exec(theme.css)?.[1] || '"Segoe UI", Arial, sans-serif';
+    const previewFamily = family.replace(/^ui-monospace\b/, '"SF Mono", Consolas, Menlo')
+      .replace(/(sans-serif|monospace)\s*$/, '"PingFang SC", "Microsoft YaHei", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans SC", "微软雅黑", "Source Han Sans SC", "WenQuanYi Micro Hei", $1');
+
+    frame.srcdoc = `<!doctype html><html lang="${esc(document.documentElement.lang)}" data-preset="${esc(currentPresetKey)}" data-mode="${prefersDark ? "dark" : "light"}" class="${prefersDark ? "pbp-dark" : ""}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'"><style>
+      body { margin:0; font-family:"Segoe UI",Arial,"PingFang SC","Microsoft YaHei","Hiragino Sans","Noto Sans CJK SC","Noto Sans SC","微软雅黑","Source Han Sans SC","WenQuanYi Micro Hei",sans-serif; }
+      button,input {font-family:inherit} #banner,#sub_banner,.user_navbar,#main_column {padding:8px 12px} #main_column {margin:0;width:auto;max-width:none} #banner_searchbox {display:flex;gap:4px;float:none} #banner_searchbox input {min-width:0;max-width:100%} .bookmark {margin:8px 0} .tag {margin-right:8px}
+    </style><style>${css}</style><style>:root { --pinboard-font-family: ${previewFamily} !important; }</style></head><body id="pinboard">
+      <div id="banner"><span id="pinboard_name"><a>pinboard</a></span><span id="banner_searchbox"><input type="text" readonly value="${esc(t("search"))}" aria-label="${esc(t("search"))}"><span class="search_button"><input type="button" value="${esc(t("search"))}"></span></span></div>
+      <div class="user_navbar"><div id="bmarks_page_nav"><a class="filter selected">${esc(t("libraryFilterAll"))}</a></div></div>
+      <div id="main_column"><div class="bookmark"><div class="display"><a class="bookmark_title">${esc(t("themePreviewSampleTitle"))}</a><div class="description">${esc(t("themePreviewSampleDescription"))}</div><div class="tags"><a class="tag">${esc(t("libraryFilterAll"))}</a></div></div></div></div>
+    </body></html>`;
+
   }
+
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (_appearanceInited && $id("opt-theme").value === "auto") renderPresetPreview();
+  });
+  document.addEventListener("pbp:i18n-applied", () => { if (_appearanceInited) renderPresetPreview(); });
 
   // W3: appearance panel's render deps (currentPresetKey, PINBOARD_THEMES,
   // ADAPTIVE_THEME_MAP, $id targets) are now initialized — flip the boot-ready

@@ -43,7 +43,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 ![Die Seite befragen, Antworten zitieren die Quelle](docs/cws-assets/originals/screenshot-3-ask.png)
 
 ### Pinboard nach deinem Geschmack
-- **13 Themes für pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
+- **13 Themes für pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) mit lokaler Vorschau und deinem eigenen CSS
 - **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren** – auf Wunsch bei jedem Speichern; Seiten bleiben erreichbar, auch wenn der Originallink tot ist
 - **Sicherung und Synchronisierung**: Einstellungen über Chrome Sync, Vokabeln über dein eigenes Google Drive, dazu manuelle JSON-Sicherungen mit Markierungen, Notizen, Vokabeln und deinen API-Schlüsseln; alles einzeln aktivierbar, Einzelheiten unten im Abschnitt Datenschutz
 - **9 Sprachen** · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking

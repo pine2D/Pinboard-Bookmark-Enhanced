@@ -1097,11 +1097,7 @@ function _pbpRailBottomRow() {
   row = document.createElement("div");
   row.id = "rail-bottom-row";
   row.className = "row";
-  rail.appendChild(row); // #toc (nav) is #rail's static last child today, and every
-  // dynamic rail section (tr/ask/hl) inserts itself BEFORE #toc -- so a
-  // plain appendChild here always lands truly last, i.e. at the rail's
-  // bottom, matching spec 5.2's "unobtrusive rail-bottom entry" (comment
-  // moved verbatim from the old rail.appendChild(btn) call this replaces).
+  rail.appendChild(row); // Reading toggles stay last, after the source-tools disclosure.
   return row;
 }
 

@@ -573,6 +573,101 @@ function pbpAiAvailable(s) {
   return s.previewAiEnabled !== false && hasAIKey(s);
 }
 
+// Setup is navigation, never an AI request or permission prompt. Keep it
+// separate from the paid-action gate and honour the reader's master switch.
+function pbpAiRenderSetupEntry(s) {
+  const rail = document.getElementById("rail");
+  const old = document.getElementById("ai-setup-section");
+  if (!rail || s.previewAiEnabled === false || hasAIKey(s)) { old?.remove(); return; }
+  if (old) return;
+  const section = document.createElement("div");
+  section.id = "ai-setup-section"; section.className = "rail-section";
+  const button = document.createElement("button");
+  button.type = "button"; button.className = "action-btn"; button.id = "reader-ai-configure";
+  button.textContent = t("aiConfigure");
+  button.addEventListener("click", () => pbpOpenOptionsTab("ai"));
+  section.appendChild(button);
+  rail.insertBefore(section, document.getElementById("export-section"));
+}
+
+let _pbpAiSetupDetail = null;
+let _pbpAiSetupRevision = 0;
+
+async function pbpAiResolveInitDetail(fallback) {
+  const detail = _pbpAiSetupDetail;
+  if (!detail) return fallback || {}; // standalone test pages have no lifecycle
+  const revision = _pbpAiSetupRevision;
+  let current;
+  try { current = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken }); }
+  catch (e) {
+    // The one-time hooks/legacy retry fold init failures into a hidden entry.
+    // Keep the platform failure observable before those callers handle it.
+    console.warn("[reader] AI initializer owner read failed", e?.name, e?.message);
+    throw e;
+  }
+  const owner = pbpPinboardAccountFromToken(current.pinboardToken);
+  if (revision !== _pbpAiSetupRevision || detail !== _pbpAiSetupDetail
+      || String(owner || "") !== String(detail.account || "")) return null;
+  // Initial one-time hooks and delayed retries may still carry the first
+  // render's detail. Resolve after settings/owner awaits, before creating state.
+  return detail;
+}
+
+async function pbpAiRefreshSetup() {
+  const revision = ++_pbpAiSetupRevision;
+  const s = await pbpAiGetSettings();
+  if (revision !== _pbpAiSetupRevision) return;
+  pbpAiRenderSetupEntry(s);
+  if (typeof pbpExplainRefreshSettings === "function") pbpExplainRefreshSettings(s);
+  // Eligibility is state, not the setup button's presence. A newer settings
+  // write or owner event may supersede this read after that button is removed;
+  // every subsequent refresh must still be able to initialize missing controls.
+  if (!pbpAiAvailable(s) || !_pbpAiSetupDetail) return;
+  const detail = _pbpAiSetupDetail;
+  const current = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
+  const owner = pbpPinboardAccountFromToken(current.pinboardToken);
+  if (revision !== _pbpAiSetupRevision || String(owner || "") !== String(detail.account || "")) return;
+  // Initializers only build controls/restore local caches; generation still
+  // requires their explicit action. Each retains its own idempotent guard.
+  if (typeof pbpTrInit === "function") await pbpTrInit(detail);
+  if (revision !== _pbpAiSetupRevision) return;
+  if (typeof pbpAskInit === "function") await pbpAskInit(detail);
+}
+
+async function pbpAiOnSetupSettingsChanged(changes, area) {
+  if (!_pbpAiSetupDetail || (area !== "local" && area !== "sync") || !pbpSettingsKeysChanged(changes)) return;
+  const flags = await pbpReadSecretSyncState({ persistInferredState: false });
+  const mainArea = flags.optSyncEnabled ? "sync" : "local";
+  const secretArea = pbpSecretRoutingActive(flags.optSyncEnabled, flags.syncApiKeys) ? "local" : mainArea;
+  const relevant = Object.keys(changes).some(key => {
+    if (key === "optSyncEnabled") return area === "local";
+    if (key === "syncApiKeys") return flags.optSyncEnabled && area === "sync";
+    if (API_KEY_FIELDS.includes(key)) return area === secretArea;
+    return area === mainArea && pbpSettingsKeysChanged({ [key]: changes[key] });
+  });
+  // A foreign area's event must not even advance the refresh revision: it
+  // cannot cancel a local-secret read while sync main settings remain active.
+  if (relevant) await pbpAiRefreshSetup();
+}
+if (typeof document !== "undefined") {
+  const refreshSetup = () => pbpAiRefreshSetup().catch(e => console.warn("[reader] AI setup refresh failed", e?.name, e?.message));
+  document.addEventListener("pbp:rendered", e => { _pbpAiSetupDetail = e.detail || {}; refreshSetup(); }, { once: true });
+  document.addEventListener("pbp:account-changed", e => {
+    if (!_pbpAiSetupDetail) return;
+    _pbpAiSetupDetail = { ..._pbpAiSetupDetail, account: String(e.detail?.account || "") };
+    refreshSetup();
+  });
+  document.addEventListener("pbp:article-replaced", e => {
+    if (!_pbpAiSetupDetail) return;
+    _pbpAiSetupDetail = { ..._pbpAiSetupDetail, ...e.detail };
+    refreshSetup();
+  });
+  if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => pbpAiOnSetupSettingsChanged(changes, area)
+      .catch(e => console.warn("[reader] AI setup settings refresh failed", e?.name, e?.message)));
+  }
+}
+
 // Preview model override is PER PROVIDER (previewAiModelByProvider): a model
 // name written for one provider is meaningless on another, and the old single
 // key silently leaked across an AI-provider switch (translate failed while the

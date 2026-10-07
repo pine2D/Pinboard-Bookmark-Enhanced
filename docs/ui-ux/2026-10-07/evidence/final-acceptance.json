@@ -1,0 +1,379 @@
+{
+  "date": "2026-10-07",
+  "scope": "All 12 authorized UI/UX improvements; local commits only",
+  "html": {
+    "suites": 54,
+    "checks": 6185,
+    "results": {
+      "tests/md-convert-tests.html": {
+        "pass": 728,
+        "fail": 0,
+        "skip": 0,
+        "expected": 728
+      },
+      "tests/a11y-tests.html": {
+        "pass": 28,
+        "fail": 0,
+        "skip": 0,
+        "expected": 28
+      },
+      "tests/ai-cache-tests.html": {
+        "pass": 26,
+        "fail": 0,
+        "skip": 0,
+        "expected": 26
+      },
+      "tests/ai-tags-tests.html": {
+        "pass": 98,
+        "fail": 0,
+        "skip": 0,
+        "expected": 98
+      },
+      "tests/anki-connect-tests.html": {
+        "pass": 41,
+        "fail": 0,
+        "skip": 0,
+        "expected": 41
+      },
+      "tests/background-active-tab-tests.html": {
+        "pass": 38,
+        "fail": 0,
+        "skip": 0,
+        "expected": 38
+      },
+      "tests/background-lifecycle-tests.html": {
+        "pass": 55,
+        "fail": 0,
+        "skip": 0,
+        "expected": 55
+      },
+      "tests/batch-dedup-tests.html": {
+        "pass": 27,
+        "fail": 0,
+        "skip": 0,
+        "expected": 27
+      },
+      "tests/bili-bridge-tests.html": {
+        "pass": 1,
+        "fail": 0,
+        "skip": 0,
+        "expected": 1
+      },
+      "tests/contrast-tests.html": {
+        "pass": 6,
+        "fail": 0,
+        "skip": 0,
+        "expected": 6
+      },
+      "tests/dict-pack-tests.html": {
+        "pass": 212,
+        "fail": 0,
+        "skip": 0,
+        "expected": 212
+      },
+      "tests/escape-html-tests.html": {
+        "pass": 8,
+        "fail": 0,
+        "skip": 0,
+        "expected": 8
+      },
+      "tests/eudic-sync-tests.html": {
+        "pass": 39,
+        "fail": 0,
+        "skip": 0,
+        "expected": 39
+      },
+      "tests/export-targets-tests.html": {
+        "pass": 144,
+        "fail": 0,
+        "skip": 0,
+        "expected": 144
+      },
+      "tests/frame-candidate-tests.html": {
+        "pass": 26,
+        "fail": 0,
+        "skip": 0,
+        "expected": 26
+      },
+      "tests/i18n-parity-tests.html": {
+        "pass": 233,
+        "fail": 0,
+        "skip": 0,
+        "expected": 233
+      },
+      "tests/icon-state-tests.html": {
+        "pass": 11,
+        "fail": 0,
+        "skip": 0,
+        "expected": 11
+      },
+      "tests/jina-cache-tests.html": {
+        "pass": 28,
+        "fail": 0,
+        "skip": 0,
+        "expected": 28
+      },
+      "tests/library-listbox-tests.html": {
+        "pass": 72,
+        "fail": 0,
+        "skip": 0,
+        "expected": 72
+      },
+      "tests/library-notes-tests.html": {
+        "pass": 273,
+        "fail": 0,
+        "skip": 0,
+        "expected": 273
+      },
+      "tests/library-vocab-tests.html": {
+        "pass": 334,
+        "fail": 0,
+        "skip": 0,
+        "expected": 334
+      },
+      "tests/md-ai-setup-tests.html": {
+        "pass": 18,
+        "fail": 0,
+        "skip": 0,
+        "expected": 18
+      },
+      "tests/md-ai-tests.html": {
+        "pass": 992,
+        "fail": 0,
+        "skip": 0,
+        "expected": 992
+      },
+      "tests/md-dict-tests.html": {
+        "pass": 436,
+        "fail": 0,
+        "skip": 0,
+        "expected": 436
+      },
+      "tests/md-embed-tests.html": {
+        "pass": 48,
+        "fail": 0,
+        "skip": 0,
+        "expected": 48
+      },
+      "tests/md-explain-layout-tests.html": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "expected": 4
+      },
+      "tests/md-highlight-commit-tests.html": {
+        "pass": 219,
+        "fail": 0,
+        "skip": 0,
+        "expected": 219
+      },
+      "tests/md-mermaid-tests.html": {
+        "pass": 13,
+        "fail": 0,
+        "skip": 0,
+        "expected": 13
+      },
+      "tests/md-video-tests.html": {
+        "pass": 516,
+        "fail": 0,
+        "skip": 0,
+        "expected": 516
+      },
+      "tests/offline-queue-tests.html": {
+        "pass": 22,
+        "fail": 0,
+        "skip": 0,
+        "expected": 22
+      },
+      "tests/options-context-help-tests.html": {
+        "pass": 33,
+        "fail": 0,
+        "skip": 0,
+        "expected": 33
+      },
+      "tests/options-listbox-tests.html": {
+        "pass": 41,
+        "fail": 0,
+        "skip": 0,
+        "expected": 41
+      },
+      "tests/options-notes-tests.html": {
+        "pass": 36,
+        "fail": 0,
+        "skip": 0,
+        "expected": 36
+      },
+      "tests/options-reset-tests.html": {
+        "pass": 14,
+        "fail": 0,
+        "skip": 0,
+        "expected": 14
+      },
+      "tests/options-usability-tests.html": {
+        "pass": 88,
+        "fail": 0,
+        "skip": 0,
+        "expected": 88
+      },
+      "tests/options-vocab-tests.html": {
+        "pass": 78,
+        "fail": 0,
+        "skip": 0,
+        "expected": 78
+      },
+      "tests/pinboard-sort-tests.html": {
+        "pass": 45,
+        "fail": 0,
+        "skip": 0,
+        "expected": 45
+      },
+      "tests/pinboard-style-cloak-tests.html": {
+        "pass": 21,
+        "fail": 0,
+        "skip": 0,
+        "expected": 21
+      },
+      "tests/popup-ai-sw-tests.html": {
+        "pass": 52,
+        "fail": 0,
+        "skip": 0,
+        "expected": 52
+      },
+      "tests/popup-draft-tests.html": {
+        "pass": 38,
+        "fail": 0,
+        "skip": 0,
+        "expected": 38
+      },
+      "tests/popup-save-tests.html": {
+        "pass": 184,
+        "fail": 0,
+        "skip": 0,
+        "expected": 184
+      },
+      "tests/popup-tag-cache-tests.html": {
+        "pass": 23,
+        "fail": 0,
+        "skip": 0,
+        "expected": 23
+      },
+      "tests/save-pipeline-tests.html": {
+        "pass": 63,
+        "fail": 0,
+        "skip": 0,
+        "expected": 63
+      },
+      "tests/settings-cache-invalidate-tests.html": {
+        "pass": 8,
+        "fail": 0,
+        "skip": 0,
+        "expected": 8
+      },
+      "tests/settings-persist-tests.html": {
+        "pass": 450,
+        "fail": 0,
+        "skip": 0,
+        "expected": 450
+      },
+      "tests/tag-gov-layout-tests.html": {
+        "pass": 7,
+        "fail": 0,
+        "skip": 0,
+        "expected": 7
+      },
+      "tests/tag-gov-reserve-tests.html": {
+        "pass": 2,
+        "fail": 0,
+        "skip": 0,
+        "expected": 2
+      },
+      "tests/tag-gov-tests.html": {
+        "pass": 67,
+        "fail": 0,
+        "skip": 0,
+        "expected": 67
+      },
+      "tests/union-tags-tests.html": {
+        "pass": 12,
+        "fail": 0,
+        "skip": 0,
+        "expected": 12
+      },
+      "tests/url-strip-tests.html": {
+        "pass": 19,
+        "fail": 0,
+        "skip": 0,
+        "expected": 19
+      },
+      "tests/vocab-background-tests.html": {
+        "pass": 17,
+        "fail": 0,
+        "skip": 0,
+        "expected": 17
+      },
+      "tests/vocab-gdrive-tests.html": {
+        "pass": 73,
+        "fail": 0,
+        "skip": 0,
+        "expected": 73
+      },
+      "tests/vocab-store-tests.html": {
+        "pass": 74,
+        "fail": 0,
+        "skip": 0,
+        "expected": 74
+      },
+      "tests/wayback-tests.html": {
+        "pass": 44,
+        "fail": 0,
+        "skip": 0,
+        "expected": 44
+      }
+    }
+  },
+  "render": {
+    "themes": 15,
+    "shards": [
+      1712,
+      1699,
+      1710,
+      1274
+    ],
+    "checks": 6395,
+    "fail": 0,
+    "skip": 0,
+    "warn": 0,
+    "setup": 0,
+    "fontconfig": "scripts/ci-fonts.conf"
+  },
+  "verify": "All stages passed sequentially; failed fixture stages corrected and rerun without skipping or weakening checks",
+  "ui_journeys": [
+    "selection-default-contract",
+    "selection-click-contract",
+    "popup-draft-contract",
+    "options-save-contract",
+    "translate-stop-contract",
+    "layouts-contract",
+    "notes-edit-clear-contract",
+    "discovery-contract",
+    "discovery-accepted"
+  ],
+  "independent_review": "03-08 and 09-12 accepted after owner/focus fixes",
+  "limitations": [
+    "Windows high-DPI cold start",
+    "manual screen reader",
+    "real third-party-service end-to-end"
+  ],
+  "logs": [
+    ".qa-scan/ux-final-verify.log",
+    ".qa-scan/popup-save-discovery-final.log",
+    ".qa-scan/ai-setup-final.log",
+    ".qa-scan/ux-final-verify-rest.log",
+    ".qa-scan/ux-final-verify-rest2.log",
+    ".qa-scan/ux-final-verify-render.log",
+    ".qa-scan/discovery-accepted.log"
+  ],
+  "unmeasured_optional_sweep": [
+    "reader confirm-popover (opener returned false; logged by the render audit)"
+  ]
+}

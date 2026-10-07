@@ -1,0 +1,195 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Reader AI setup lifecycle</title></head><body>
+<h1>Reader AI setup lifecycle</h1><div id="results"></div>
+<div id="rail"><div id="export-section"></div></div>
+<script>
+const storageListeners = [];
+const keydownListeners = new Set();
+const originalAdd = document.addEventListener.bind(document);
+document.addEventListener = (type, fn, options) => {
+  if (type === "keydown") keydownListeners.add(fn);
+  originalAdd(type, fn, options);
+};
+window.chrome = { storage: {
+  local: { get: async () => ({}) }, sync: { get: async () => ({}) },
+  onChanged: { addListener: fn => storageListeners.push(fn) }
+} };
+</script>
+<script src="../shared.js"></script>
+<script>
+let settings = {previewAiEnabled:true, customApiKey:"", selectionTrigger:"icon", customModel:"first"};
+let owner = "alice", flags = {optSyncEnabled:false,syncApiKeys:false};
+let ownerReads = [], calls = [], paidCalls = 0, navigation = "";
+t = key => key;
+hasAIKey = s => !!s.customApiKey;
+pbpSettingsAreaName = async () => flags.optSyncEnabled ? "sync" : "local";
+pbpReadSecretSyncState = async () => ({...flags});
+pbpReadSettingsWithSecrets = async query => {
+  if (Object.keys(query).length === 1 && "pinboardToken" in query) {
+    if (ownerReads.length) return ownerReads.shift().promise;
+    return {pinboardToken:owner ? owner + ":fixture" : ""};
+  }
+  return {...query,...settings};
+};
+deobfuscateSettings = s => s;
+pbpOpenOptionsTab = section => {navigation=section;};
+window.callAIStream = async () => {paidCalls++;throw new Error("setup must never generate");};
+</script>
+<script src="../md-ai-core.js"></script>
+<script src="../md-translate.js"></script>
+<script src="../md-ask.js"></script>
+<script>
+const realTrInit=pbpTrInit, realAskInit=pbpAskInit;
+pbpTrInit = async detail => {calls.push("translate:"+detail.account);};
+pbpAskInit = async detail => {calls.push("ask:"+detail.account);};
+const assert = (ok, message) => {if(!ok)throw new Error(message);};
+const deferred = () => {let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
+const tick = () => new Promise(r=>setTimeout(r,0));
+async function settle(){for(let i=0;i<5;i++)await tick();}
+async function changed(changes,area="local") {
+  await Promise.all(storageListeners.map(fn=>fn(changes,area)));
+  await settle();
+}
+async function reset(account="alice") {
+  owner=account;flags={optSyncEnabled:false,syncApiKeys:false};ownerReads=[];calls=[];
+  settings={previewAiEnabled:true,customApiKey:"",selectionTrigger:"icon",customModel:"first"};
+  _pbpAiSetupDetail={account,url:"https://fixture.test/article",title:"Fixture"};
+  _pbpAiSettingsPromise=null;
+  await pbpAiRefreshSetup();calls=[];
+}
+let pass=0,fail=0;
+async function test(name, fn) {
+  const row=document.createElement("div");
+  try {await reset();await fn();pass++;row.className="case pass";row.textContent="PASS "+name;}
+  catch(e){fail++;row.className="case fail";row.textContent="FAIL "+name+" — "+e.message;}
+  document.getElementById("results").appendChild(row);
+}
+(async()=>{
+  // Fire the production one-time hooks, including Explain's real initializer.
+  document.dispatchEvent(new CustomEvent("pbp:rendered",{detail:{account:owner,url:"https://fixture.test/article"}}));
+  await settle();
+  const registered=keydownListeners.size;
+  await test("unconfigured setup only navigates",async()=>{
+    document.getElementById("reader-ai-configure").click();
+    assert(navigation==="ai" && calls.length===0 && paidCalls===0,"setup dispatched work or wrong destination");
+  });
+  await test("configuration enables rail and selection AI",async()=>{
+    settings.customApiKey="fixture-key";await changed({customApiKey:{newValue:"fixture-key"}});
+    assert(calls.join(",")==="translate:alice,ask:alice","missing actual initialization");
+    assert(_pbpExplainAiOk && _pbpExplainSettings.customApiKey==="fixture-key","selection AI stayed unconfigured");
+  });
+  await test("split secret/model writes do not consume initialization eligibility",async()=>{
+    const read=deferred();ownerReads.push(read);settings.customApiKey="fixture-key";
+    const first=changed({customApiKey:{newValue:"fixture-key"}});await settle();
+    settings.customModel="second";await changed({customModel:{newValue:"second"}});
+    read.resolve({pinboardToken:"alice:fixture"});await first;
+    assert(calls.join(",")==="translate:alice,ask:alice","superseded refresh lost or duplicated controls");
+  });
+  await test("live settings refresh updates Explain without duplicating listeners",async()=>{
+    settings.customApiKey="fixture-key";await changed({customApiKey:{newValue:"fixture-key"}});
+    settings.customModel="second";await changed({customModel:{newValue:"second"}});
+    assert(_pbpExplainSettings.customModel==="second" && keydownListeners.size===registered,"stale settings or duplicated hotkeys");
+  });
+  await test("account switch before configuring uses the new owner",async()=>{
+    owner="bob";document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"bob"}}));await settle();
+    settings.customApiKey="fixture-key";await changed({customApiKey:{newValue:"fixture-key"}});
+    assert(calls.join(",")==="translate:bob,ask:bob","old account blocked or scoped initialization");
+  });
+  await test("owner mismatch remains retryable when lifecycle catches up",async()=>{
+    owner="bob";settings.customApiKey="fixture-key";await changed({customApiKey:{newValue:"fixture-key"}});
+    assert(calls.length===0,"initialized against mismatched owner");
+    document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"bob"}}));await settle();
+    assert(calls.join(",")==="translate:bob,ask:bob","mismatch permanently consumed eligibility");
+  });
+  await test("late owner read cannot build previous account controls",async()=>{
+    const read=deferred();ownerReads.push(read);settings.customApiKey="fixture-key";
+    const first=changed({customApiKey:{newValue:"fixture-key"}});await settle();
+    owner="bob";document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"bob"}}));await settle();
+    read.resolve({pinboardToken:"alice:fixture"});await first;
+    assert(calls.join(",")==="translate:bob,ask:bob","late read resurrected old owner");
+  });
+  await test("foreign sync settings cannot supersede local initialization",async()=>{
+    const read=deferred();ownerReads.push(read);settings.customApiKey="fixture-key";
+    const first=changed({customApiKey:{newValue:"fixture-key"}});await settle();
+    await changed({customModel:{newValue:"foreign"}},"sync");
+    read.resolve({pinboardToken:"alice:fixture"});await first;
+    assert(calls.join(",")==="translate:alice,ask:alice","foreign area canceled local initialization");
+  });
+  await test("sync main plus local secrets are both consumed",async()=>{
+    flags={optSyncEnabled:true,syncApiKeys:false};settings.customApiKey="fixture-key";
+    const read=deferred();ownerReads.push(read);const first=changed({customApiKey:{newValue:"fixture-key"}},"local");await settle();
+    settings.customModel="sync-model";await changed({customModel:{newValue:"sync-model"}},"sync");
+    read.resolve({pinboardToken:"alice:fixture"});await first;
+    assert(calls.join(",")==="translate:alice,ask:alice" && _pbpExplainSettings.customModel==="sync-model","split routing lost latest settings");
+  });
+  await test("cloud secrets are ignored while secrets route locally",async()=>{
+    flags={optSyncEnabled:true,syncApiKeys:false};settings.customApiKey="fixture-key";
+    const read=deferred();ownerReads.push(read);const first=changed({customApiKey:{newValue:"fixture-key"}},"local");await settle();
+    await changed({customApiKey:{newValue:"foreign"}},"sync");
+    read.resolve({pinboardToken:"alice:fixture"});await first;
+    assert(calls.join(",")==="translate:alice,ask:alice","cloud secret superseded local initialization");
+  });
+  await test("master off neither configures nor enables selection AI",async()=>{
+    settings.previewAiEnabled=false;settings.customApiKey="fixture-key";
+    await changed({previewAiEnabled:{newValue:false},customApiKey:{newValue:"fixture-key"}});
+    assert(!document.getElementById("reader-ai-configure") && calls.length===0 && !_pbpExplainAiOk,"master gate ignored");
+  });
+  await test("key removal restores setup and disables selection AI",async()=>{
+    settings.customApiKey="fixture-key";await changed({customApiKey:{newValue:"fixture-key"}});
+    settings.customApiKey="";await changed({customApiKey:{newValue:""}});
+    assert(document.getElementById("reader-ai-configure") && !_pbpExplainAiOk && paidCalls===0,"stale AI gate or paid initialization");
+  });
+  // Keep the production initializer and its awaits/state creation intact.
+  // Only the downstream rendering/cache legs are replaced for this fixture.
+  const view=document.createElement('article');view.id='rendered-view';view.lang='en';
+  view.innerHTML='<p>An English paragraph for translation and questions.</p>';document.body.appendChild(view);
+  uiLangToBCP47=()=>"zh-CN";
+  let built=0;
+  _pbpAskBuildRailEntry=()=>{built++;};
+  _pbpTrBuildSection=()=>{built++;};
+  _pbpTrBuildWork=async()=>{};_pbpTrApplySkips=()=>{};
+  const settingsRead=pbpAiGetSettings;
+  async function realInitCase(fn){
+    _pbpTrState=null;_pbpAskState=null;built=0;settings.customApiKey='fixture-key';
+    try {await fn();} finally {_pbpTrState=null;_pbpAskState=null;pbpAiGetSettings=settingsRead;}
+  }
+  for(const [name,init,state] of [['Ask',realAskInit,()=>_pbpAskState],['Translate',realTrInit,()=>_pbpTrState]]) {
+    await test(`${name} settings await follows latest owner`,()=>realInitCase(async()=>{
+      const gate=deferred();pbpAiGetSettings=()=>gate.promise;
+      const pending=init({account:'alice',url:'https://fixture.test/article'});
+      owner='bob';document.dispatchEvent(new CustomEvent('pbp:account-changed',{detail:{account:'bob'}}));
+      gate.resolve({...settings});await pending;await settle();
+      assert(state()?.account==='bob',`${name} initialized old owner after settings await`);
+    }));
+  }
+  await test('old retry detail resolves current owner',()=>realInitCase(async()=>{
+    owner='bob';_pbpAiSetupDetail={..._pbpAiSetupDetail,account:'bob'};
+    _pbpAiSettingsPromise=null;
+    await realAskInit({account:'alice',url:'https://fixture.test/article'});
+    assert(_pbpAskState?.account==='bob','delayed retry reused initial account');
+  }));
+  await test('initialization owner read rejects a superseded lifecycle',()=>realInitCase(async()=>{
+    const read=deferred();ownerReads.push(read);_pbpAiSettingsPromise=null;
+    const pending=realAskInit({account:'alice',url:'https://fixture.test/article'});await settle();
+    assert(ownerReads.length===0,'initializer never verified owner');
+    owner='bob';document.dispatchEvent(new CustomEvent('pbp:account-changed',{detail:{account:'bob'}}));await settle();
+    read.resolve({pinboardToken:'alice:fixture'});await pending;
+    assert(!_pbpAskState||_pbpAskState.account==='bob','late owner read created alice state');
+    await realAskInit({account:'bob',url:'https://fixture.test/article'});
+    assert(_pbpAskState?.account==='bob','safe retry did not initialize current owner');
+  }));
+  await test('parallel real initializers build one state',()=>realInitCase(async()=>{
+    const gate=deferred();pbpAiGetSettings=()=>gate.promise;
+    const a=realAskInit(_pbpAiSetupDetail),b=realAskInit(_pbpAiSetupDetail);
+    gate.resolve({...settings});await Promise.all([a,b]);
+    assert(built===1&&_pbpAskState?.account==='alice','parallel initialization duplicated controls');
+  }));
+  await test('retry after article replacement uses latest article identity',()=>realInitCase(async()=>{
+    _pbpAiSetupDetail={account:'alice',url:'https://fixture.test/new',title:'New article'};
+    _pbpAiSettingsPromise=null;
+    await realAskInit({account:'alice',url:'https://fixture.test/old',title:'Old article'});
+    assert(_pbpAskState?.url==='https://fixture.test/new'&&_pbpAskState.title==='New article','retry bound old article');
+  }));
+  document.title=(fail?"FAIL ":"PASS ")+document.title;
+})();
+</script></body></html>

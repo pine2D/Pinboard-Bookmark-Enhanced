@@ -1028,7 +1028,10 @@ async function pbpTrInit(detail) {
   const view = document.getElementById("rendered-view");
   if (!view || _pbpTrState) return;
   const s = await pbpAiGetSettings();
+  if (_pbpTrState) return; // another lifecycle initializer finished this await
   if (!pbpAiAvailable(s)) return; // master switch off or no key: zero UI
+  if (typeof pbpAiResolveInitDetail === "function") detail = await pbpAiResolveInitDetail(detail);
+  if (!detail || _pbpTrState) return; // owner/lifecycle changed during the read
   const uiLang = uiLangToBCP47();
   const target = pbpTrResolveTargetLang(s, uiLang);
   if (_pbpTrShouldHideEntry(view.lang || "", target.code)) return;
@@ -1491,7 +1494,9 @@ function _pbpTrBuildSection(st) {
   // bug. Never auto-translates: expanding costs zero tokens.
   st.railHandle = pbpRailCollapsible(sec, "tr", { label, defaultCollapsed: !st.articleLang });
 
-  anchor.insertAdjacentElement("afterend", sec);
+  const primaryAnchor = document.getElementById("ask-section") || document.getElementById("export-section");
+  if (primaryAnchor) rail.insertBefore(sec, primaryAnchor);
+  else anchor.insertAdjacentElement("afterend", sec);
   btn.addEventListener("click", () => { _pbpTrTrigger(st); });
   stop.addEventListener("click", () => { if (st.ctrl) st.ctrl.abort(); });
 }

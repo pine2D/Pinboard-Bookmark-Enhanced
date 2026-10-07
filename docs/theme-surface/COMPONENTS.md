@@ -1865,3 +1865,8 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
   ghost 档（详情面板类阅读面）时是**首次出现**，按 §1.2 配方来，不要去 options 里找样板。
 
 - 笔记摘录原地编辑：`.notes-note-editor` 复用 `.vocab-note-input` 字段与 `.lib-cluster` 紧凑按钮；gap sp-2，摘录下 margin sp-3。编辑/保存/取消使用现有 btn-sm，无新阶梯；失败提示在表单内持续，后台刷新保留会话草稿。
+
+同步范围表 `.sync-scope`：语义table，sp-2单元格内距，600px及以下按数据种类逐行展示并重复渠道名；不承接开关状态或数据写入，跳转链接指向已有配置。
+
+预设效果 `.preset-effect-preview`：sp-2网格，280px脚本禁用的sandbox iframe展示内置实际主题CSS；当前预设/明暗/语言更新。原CSS预览保持独立折叠，不将用户overlay加入该示例。
+阅读器：目录紧随阅读统计；抽取工具/Raw切换在原生details次级区域，engine-status和错误重试保留直接可达，AI及高亮插入在Export之前。

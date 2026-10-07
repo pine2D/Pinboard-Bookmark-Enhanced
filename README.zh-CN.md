@@ -43,7 +43,7 @@
 ![向文章提问，回答附带引用](docs/cws-assets/originals/screenshot-3-ask.png)
 
 ### 个性化
-- **13 套 pinboard.in 主题**（Dracula、Nord、Catppuccin、Solarized 等），还能叠加自定义 CSS
+- **13 套 pinboard.in 主题**（Dracula、Nord、Catppuccin、Solarized 等），可在设置中本地预览，还能叠加自定义 CSS
 - **自动存档到 [Wayback Machine](https://web.archive.org)**：开启后每次保存都提交一份；原链接失效也找得回
 - **备份与同步**：设置走 Chrome Sync，生词走你自己的 Google Drive，手动 JSON 备份可含高亮、笔记、生词和 API 密钥；全部可选，细节见下方「隐私」
 - **9 种语言**、可自定义快捷键、本地优先存储、零追踪

@@ -547,11 +547,12 @@ async function seedAll(context, worker, aiPort) {
 // md-preview navigation (perf-cold-sample re-seeds per open for the same reason).
 async function seedPreviewData(worker) {
   await worker.evaluate(async ({ storageKey, markdown, title, url }) => {
+    const auth = await getCurrentPinboardAuth();
     await chrome.storage.local.set({
       [`md_preview_data_${storageKey}`]: {
         markdown, contentHtml: "", title, url, baseUrl: url,
         tags: ["reading", "qa"], tokens: 0, hasApiKey: true,
-        source: "local", math: false, forum: false, ts: Date.now(),
+        source: "local", math: false, forum: false, account: auth.account || "", ts: Date.now(),
       },
     });
   }, { storageKey: PREVIEW_KEY, markdown: SYNTHETIC_MARKDOWN, title: ARTICLE_TITLE, url: ARTICLE_URL });
@@ -1772,6 +1773,144 @@ async function diffAgainstPrev(runDir, prevDir) {
 // ============================================================
 // Main
 // ============================================================
+async function driveDiscovery(context, worker, extId, rep) {
+  const s = rep.surface("discovery");
+  const options = await context.newPage();
+  const reader = await context.newPage();
+  const popup = await context.newPage();
+  const source = await context.newPage();
+  const detach = [options,reader,popup].map(p=>rep.attach(p,s));
+  const requireState = (ok, message) => { if (!ok) throw new Error(message); };
+  const aiBefore = aiRequests.length;
+  try {
+    await options.goto(`chrome-extension://${extId}/options.html#general`,{waitUntil:"load"});
+    await options.waitForFunction(()=>document.documentElement.hasAttribute("data-options-ready"));
+    for (const locale of ["en","zh_CN","zh_TW","zh_HK","de","fr","ja","pl","ru"]) {
+      await options.evaluate(async lang=>{await chrome.storage.local.set({optLang:lang});initI18n();await pbpI18nReady();},locale);
+      for(const density of ["comfortable","compact"]) for(const width of [320,420]) {
+        await options.setViewportSize({width,height:900});
+        await options.evaluate(d=>document.documentElement.dataset.density=d,density);
+        const g=await options.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,rect:document.getElementById('sync-scope').getBoundingClientRect().toJSON(),cells:[...document.querySelectorAll('#sync-scope tbody td')].map(el=>({text:el.innerText.trim(),right:el.getBoundingClientRect().right}))}));
+        requireState(g.scroll<=width&&g.rect.right<=width&&g.cells.every(c=>c.text&&c.right<=width),`sync matrix overflow/missing copy ${locale}/${density}/${width}`);
+        if(locale==='de'&&density==='comfortable'&&width===320) {
+          await options.locator('#sync-scope').evaluate(el=>el.scrollIntoView({block:'start'}));
+          await rep.shot(options,s,'sync-scope-de-320');
+        }
+      }
+    }
+    await options.locator('#sync-backup-link').click();
+    requireState(await options.locator('#export-settings').evaluate(el=>document.activeElement===el),"backup cross-link missed actual export control");
+    await options.locator('#sync-scope').evaluate(el=>el.scrollIntoView());
+    await options.locator('a[href="#vocab"]').filter({hasText:await options.evaluate(()=>t('dictVocabSection'))}).first().click();
+    await options.waitForSelector('#panel-vocab.active');
+    await options.evaluate(()=>document.querySelector('.tab-btn[data-panel="appearance"]').click());
+    await options.waitForSelector('.theme-preset-btn[data-theme="flexoki"]');
+    await options.evaluate(async()=>{await chrome.storage.local.set({optLang:'zh_CN'});initI18n();await pbpI18nReady();});
+    const presets=await options.locator('.theme-preset-btn').evaluateAll(els=>[...new Set(els.map(e=>e.dataset.theme).filter(Boolean))]);
+    const colors=new Set();
+    for(const mode of ['light','dark']) for(const preset of presets) {
+      await options.locator('#opt-theme-btn').click();
+      await options.locator('#opt-theme-list [data-value="'+mode+'"]').click();
+      await options.locator(`.theme-preset-btn[data-theme="${preset}"]`).click();
+      const frame=options.frameLocator('#preset-effect-frame');
+      // Wait for the selected document to load, not the previous iframe's
+      // identical sample text (all presets deliberately share that text).
+      await frame.locator(`html[data-preset="${preset}"][data-mode="${mode}"]`).waitFor();
+      await frame.locator('.bookmark_title').filter({hasText:await options.evaluate(()=>t('themePreviewSampleTitle'))}).waitFor();
+      const g=await frame.locator('body').evaluate(el=>({bg:getComputedStyle(el).backgroundColor,fg:getComputedStyle(el).color,scroll:document.documentElement.scrollWidth,width:innerWidth,selected:getComputedStyle(document.querySelector('.filter.selected')).color,title:document.querySelector('.bookmark_title').getBoundingClientRect().toJSON(),description:document.querySelector('.description').getBoundingClientRect().toJSON(),tags:document.querySelector('.tags').getBoundingClientRect().toJSON()}));
+      requireState(g.scroll<=g.width,`preset preview overflow ${preset}/${mode}: ${g.scroll}/${g.width}`);
+      requireState(g.description.top>=g.title.bottom-1&&g.tags.top>=g.description.bottom-1,`preset sample rows overlap ${preset}/${mode}`);
+      colors.add(g.bg+'|'+g.fg);
+      requireState(await options.locator('#preset-effect-frame').getAttribute('sandbox')==='',"theme preview sandbox permits capabilities");
+      requireState(await frame.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content').then(v=>v.includes("default-src 'none'")),"theme preview missing closed network CSP");
+      if(preset==='flexoki') {
+        await options.locator('#preset-effect-preview').evaluate(el=>el.scrollIntoView({block:'center'}));
+        await rep.shot(options,s,`theme-effect-${mode}`);
+      }
+    }
+    requireState(colors.size>5,"theme preview did not reflect distinct real preset colors");
+    for(const locale of ["en","zh_CN","zh_TW","zh_HK","de","fr","ja","pl","ru"]) {
+      await options.evaluate(async lang=>{await chrome.storage.local.set({optLang:lang});initI18n();await pbpI18nReady();},locale);
+      const frame=options.frameLocator('#preset-effect-frame');
+      await frame.locator(`html[lang="${await options.evaluate(()=>document.documentElement.lang)}"]`).waitFor();
+      const g=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,title:document.querySelector('.bookmark_title').textContent}));
+      requireState(g.scroll<=g.width && g.title===await options.evaluate(()=>t('themePreviewSampleTitle')),`localized theme preview mismatch/overflow: ${locale}`);
+    }
+    await options.locator('#opt-theme-btn').click();
+    await options.locator('#opt-theme-list [data-value="auto"]').click();
+    await options.locator('.theme-preset-btn[data-theme="flexoki"]').click();
+    await options.emulateMedia({colorScheme:'dark'});
+    await options.frameLocator('#preset-effect-frame').locator('html.pbp-dark').waitFor();
+    await options.emulateMedia({colorScheme:'light'});
+    await options.frameLocator('#preset-effect-frame').locator('html:not(.pbp-dark)').waitFor();
+    await seedPreviewData(worker);
+    await worker.evaluate(async()=>chrome.storage.local.set({aiProvider:'custom',customApiKey:'',previewAiEnabled:true,optShowAiTags:true,optShowAiSummary:true}));
+    await reader.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`,{waitUntil:'load'});
+    await reader.waitForSelector('#reader-ai-configure');
+    requireState(await reader.locator('#reader-source-details').getAttribute('open')===null,"source tools should start secondary/collapsed");
+    const order=await reader.evaluate(()=>document.getElementById('toc').compareDocumentPosition(document.getElementById('ai-setup-section'))&Node.DOCUMENT_POSITION_FOLLOWING);
+    requireState(!!order,"Contents is below configuration/actions");
+    await reader.locator('#reader-source-details summary').click();
+    await reader.locator('#btn-raw').click();
+    await reader.waitForSelector('#raw-view:not(.hidden)');
+    await reader.locator('#btn-rendered').click();
+    requireState(await reader.locator('#engine-status').evaluate(el=>!el.closest('details')),"engine errors hidden behind source disclosure");
+    await worker.evaluate(async token=>chrome.storage.local.set({pinboardToken:obfuscateKey(token)}),FAKE_OTHER_TOKEN);
+    await reader.waitForFunction(account=>_pbpAiSetupDetail.account===account,FAKE_OTHER_TOKEN.split(':')[0]);
+    await reader.locator('#reader-ai-configure').click();
+    await options.waitForURL('**/options.html#ai');
+    requireState(aiRequests.length===aiBefore,"configuration navigation triggered AI");
+    await worker.evaluate(async base=>{
+      await chrome.storage.sync.set({aiProvider:'custom',customBaseUrl:base,customModel:'qa-first',previewAiEnabled:true,translateTargetLang:'zh-CN',syncApiKeys:false});
+      await chrome.storage.local.set({optSyncEnabled:true});
+    },`http://127.0.0.1:${aiPort}/v1`);
+    await reader.waitForFunction(()=>!!document.getElementById('reader-ai-configure'));
+    await reader.evaluate(()=>{
+      const original=pbpReadSettingsWithSecrets;let held=false;
+      window.qaRestoreReaderRead=()=>{pbpReadSettingsWithSecrets=original;};
+      pbpReadSettingsWithSecrets=query=>{
+        if(!held&&Object.keys(query).length===1&&'pinboardToken' in query){
+          held=true;return new Promise(resolve=>{window.qaReleaseOwnerRead=async()=>resolve(await original(query));});
+        }
+        return original(query);
+      };
+    });
+    await worker.evaluate(async()=>chrome.storage.local.set({customApiKey:obfuscateKey('qa-mock-key')}));
+    await reader.waitForFunction(()=>typeof qaReleaseOwnerRead==='function');
+    await worker.evaluate(async()=>chrome.storage.sync.set({customModel:'qa-second'}));
+    await reader.waitForSelector('#ask-open');
+    await reader.evaluate(async()=>{await qaReleaseOwnerRead();qaRestoreReaderRead();});
+    await reader.waitForFunction(()=>_pbpExplainAiOk&&_pbpExplainSettings.customModel==='qa-second');
+    const account=FAKE_OTHER_TOKEN.split(':')[0];
+    requireState(await reader.evaluate(account=>_pbpAskState.account===account&&_pbpTrState.account===account,account),"live AI controls carry stale account");
+    requireState(await reader.locator('#ask-open').count()===1&&await reader.locator('#btn-translate').count()===1,"split settings write duplicated AI controls");
+    requireState(await reader.locator('#reader-ai-configure').count()===0,"configured reader still promotes setup");
+    await rep.shot(reader,s,'reader-primary-controls');
+    await worker.evaluate(async token=>chrome.storage.local.set({optSyncEnabled:false,pinboardToken:obfuscateKey(token),customApiKey:'',previewAiEnabled:false,optShowAiTags:false,optShowAiSummary:false}),FAKE_TOKEN);
+    await reader.waitForFunction(account=>_pbpAiSetupDetail.account===account,FAKE_TOKEN.split(':')[0]);
+    // The prior preview slot now belongs to the account used in the live
+    // switch test. Reload from a fresh fixture for the restored account.
+    await seedPreviewData(worker);
+    await reader.reload();
+    await reader.waitForSelector('#rendered-view [data-pb]');
+    requireState(await reader.locator('#reader-ai-configure,#ask-open,#btn-translate').count()===0,"reader master-off ignored");
+    await source.goto(ARTICLE_URL,{waitUntil:'load'});
+    const sourceTab=await worker.evaluate(async url=>(await chrome.tabs.query({url}))[0],ARTICLE_URL);
+    await popup.addInitScript(({sourceTab})=>{const query=chrome.tabs.query.bind(chrome.tabs);chrome.tabs.query=async opts=>opts?.active?[sourceTab]:query(opts);},{sourceTab});
+    await popup.goto(`chrome-extension://${extId}/popup.html`,{waitUntil:'load'});
+    await popup.waitForFunction(()=>!document.getElementById('main-section').classList.contains('hidden'));
+    requireState(!await popup.locator('#ai-setup-row').isVisible(),"popup disabled AI still promotes setup");
+    await worker.evaluate(async()=>chrome.storage.local.set({optShowAiTags:true,optShowAiSummary:true}));
+    await popup.reload();
+    await popup.waitForSelector('#ai-configure-btn',{state:'visible'});
+    await popup.locator('#ai-configure-btn').click();
+    await options.waitForURL('**/options.html#ai');
+    requireState(aiRequests.length===aiBefore,"setup/initialization dispatched paid AI");
+    s.notes.push(`PASS: 9-language sync matrix and theme samples, actual cross-links; ${presets.length} presets × 2 modes, ${colors.size} color pairs, auto OS switch; source controls/AI setup/master-off; account switch and split local-secret/sync-main writes enable rail and selection AI once; no AI request.`);
+  } catch(e){s.failures.push(e.stack);}
+  finally {for(const d of detach)d();for(const p of [options,reader,popup,source])await p.close();}
+}
+
 async function driveNarrowLayouts(context, worker, extId, rep) {
   const s = rep.surface("layouts");
   const page = await context.newPage();
@@ -2160,6 +2299,7 @@ try {
     else if (surface === "pinboard") await drivePinboard(context, rep);
     else if (surface === "popup") await drivePopup(context, worker, extId, rep);
     else if (surface === "drafts") await drivePopupDrafts(context, worker, extId, rep);
+    else if (surface === "discovery") await driveDiscovery(context, worker, extId, rep);
     else if (surface === "layouts") await driveNarrowLayouts(context, worker, extId, rep);
     else if (surface === "translate-stop") await driveTranslateStop(context, worker, extId, rep);
     else if (surface === "options-save") await driveOptionsSaveFeedback(context, extId, rep);

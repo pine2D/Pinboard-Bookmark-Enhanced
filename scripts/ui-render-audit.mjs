@@ -6596,6 +6596,15 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   if (surface === "options") {
     await sw.evaluate(() => chrome.storage.local.set({ savedThemes: [{ name: "weakTextOnFill probe", css: "body{}" }] }));
   }
+  if (surface === "popup") {
+    // These legs measure paid-action controls and cached AI chips. The
+    // production visibility gate now correctly hides them without a key;
+    // seed a synthetic configured provider before showMain runs.
+    await sw.evaluate(() => chrome.storage.local.set({
+      aiProvider: "openai", openaiApiKey: obfuscateKey("sk-render-audit-fixture"),
+      optShowAiTags: true, optShowAiSummary: true,
+    }));
+  }
   await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
   await page.waitForTimeout(500); // settles the theme-early async storage.get correction
   if (surface === "popup" && checks.some((c) => c.selector === "#offline-queue-clear")) {
@@ -8387,11 +8396,17 @@ function reconcileSpacing(sweepHits) {
 // the dictionary view), so "explain-pop" leaves it open and "explain-dict"
 // closes it. The answered-state footer actions are unhidden by hand: they
 // appear once a reply lands, and the sweep measures geometry, not the flow.
-const READER_SURFACES = ["explain-pop", "explain-dict", "ask-panel", "search-pop", "kbd-help-pop", "typo-pop", "pb-hl-card", "send-menu", "confirm-popover"];
+const READER_SURFACES = ["reader-source-details", "explain-pop", "explain-dict", "ask-panel", "search-pop", "kbd-help-pop", "typo-pop", "pb-hl-card", "send-menu", "confirm-popover"];
 async function openReaderSurface(name) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const shown = (el) => !!(el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getBoundingClientRect().width > 0);
   switch (name) {
+    case "reader-source-details": {
+      const details = document.getElementById(name);
+      if (!details) return false;
+      details.open = true;
+      return shown(details.querySelector("#source-badge"));
+    }
     case "explain-pop": {
       const p = document.querySelector("#rendered-view p");
       if (!p || !p.firstChild || typeof pbpExplainInvoke !== "function") return false;
@@ -8442,6 +8457,7 @@ async function openReaderSurface(name) {
 function closeReaderSurface(name) {
   const hide = (el) => { try { if (el && el.matches(":popover-open")) el.hidePopover(); } catch (_) {} };
   switch (name) {
+    case "reader-source-details": { document.getElementById(name).open = false; return; }
     case "explain-pop": return; // stays open for explain-dict
     case "explain-dict": { const pop = document.getElementById("explain-pop"); if (pop && typeof _pbpExplainClose === "function") _pbpExplainClose(pop); return; }
     case "ask-panel": { const btn = document.getElementById("ask-open"); const panel = document.getElementById("ask-panel"); if (btn && panel && !panel.hidden) btn.click(); return; }
@@ -8615,7 +8631,7 @@ async function runSweep(page, sw, extBase) {
   const readerPayload = (k, url = readerUrl) => ({ [`md_preview_data_${k}`]: {
     markdown: "# Render audit fixture\n\nA paragraph with a [link](https://example.com/) and the quick brown fox.\n\n## Section\n\n- item one\n- item two\n\n`code` and **bold**.\n",
     contentHtml: "", title: "Render Audit Fixture", url, baseUrl: url,
-    tags: ["qa"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, ts: Date.now(),
+    tags: ["qa"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, account: SEED_TOKEN_ACCOUNT, ts: Date.now(),
   } });
   await sw.evaluate((o) => chrome.storage.local.set(o), {
     ...readerPayload("render-audit-sweep"),

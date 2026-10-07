@@ -849,8 +849,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
       const suggestRow = createElementStub({ classes: ["hidden", "row"] });
       const settingsStub = { optShowSearch: true, optShowAiSummary: true, optShowAiTags: true, optShowSuggestTags: true };
-      const run = new Function("$id", "document", "settings", switchBlock + "\nreturn true;");
-      run((id) => (id === "suggest-row" ? suggestRow : createElementStub()), document, settingsStub);
+      const run = new Function("$id", "document", "settings", "hasAIKey", switchBlock + "\nreturn true;");
+      run((id) => (id === "ai-setup-row" ? null : id === "suggest-row" ? suggestRow : createElementStub()), document, settingsStub, () => true);
 
       assert(!suggestRow.classList.contains("hidden"),
         "optShowSuggestTags === true must unhide #suggest-row synchronously, before any await");
@@ -863,8 +863,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
       const suggestRow = createElementStub({ classes: ["hidden", "row"] });
       const settingsStub = { optShowSearch: true, optShowAiSummary: true, optShowAiTags: true, optShowSuggestTags: false };
-      const run = new Function("$id", "document", "settings", switchBlock + "\nreturn true;");
-      run((id) => (id === "suggest-row" ? suggestRow : createElementStub()), document, settingsStub);
+      const run = new Function("$id", "document", "settings", "hasAIKey", switchBlock + "\nreturn true;");
+      run((id) => (id === "ai-setup-row" ? null : id === "suggest-row" ? suggestRow : createElementStub()), document, settingsStub, () => true);
 
       assert(suggestRow.classList.contains("hidden"),
         "optShowSuggestTags === false must leave #suggest-row hidden");
@@ -880,16 +880,42 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
       const switchBlock = source.slice(switchStart, switchEnd);
       const settingsStub = { optShowSearch: true, optShowAiSummary: true, optShowAiTags: true, optShowSuggestTags: true };
-      const run = new Function("$id", "document", "settings", switchBlock + "\nreturn true;");
+      const run = new Function("$id", "document", "settings", "hasAIKey", switchBlock + "\nreturn true;");
       let threw = null;
       try {
-        run((id) => (id === "suggest-row" ? null : createElementStub()), document, settingsStub);
+        run((id) => (id === "ai-setup-row" || id === "suggest-row" ? null : createElementStub()), document, settingsStub, () => true);
       } catch (e) {
         threw = e;
       }
       assert(threw === null,
         "a missing #suggest-row must not throw when optShowSuggestTags is on, got " + (threw && threw.message));
     });
+
+    for (const [name, keyed, tags, summary, setup] of [
+      ["both actions unconfigured", false, true, true, true],
+      ["tags only unconfigured", false, true, false, true],
+      ["summary only unconfigured", false, false, true, true],
+      ["both actions disabled", false, false, false, false],
+      ["configured actions", true, true, true, false],
+    ]) {
+      await testAsync("AI setup visibility: " + name, async () => {
+        const root = document.createElement("div");
+        root.innerHTML = '<div id="ai-setup-row" class="row hidden"></div><div class="row"><div id="ai-suggest-tags"><button id="ai-tags-btn"></button></div></div><button id="ai-summary-btn"></button><span id="ai-summary-hint"></span><div id="suggest-row" class="hidden"></div>';
+        const switchStart = source.indexOf("if (!settings.optShowSearch) {");
+        const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
+        const run = new Function("$id", "document", "settings", "hasAIKey", source.slice(switchStart, switchEnd));
+        run(id => root.querySelector("#" + id), document,
+          { optShowSearch: true, optShowAiTags: tags, optShowAiSummary: summary, optShowSuggestTags: false }, () => keyed);
+        assert(!root.querySelector("#ai-setup-row").classList.contains("hidden") === setup, "wrong configuration entry visibility");
+        if (!keyed) {
+          assert(root.querySelector("#ai-suggest-tags").closest(".row").classList.contains("hidden")
+            && root.querySelector("#ai-summary-btn").classList.contains("hidden"), "unconfigured paid actions remained visible");
+        } else {
+          assert(!root.querySelector("#ai-suggest-tags").closest(".row").classList.contains("hidden")
+            && !root.querySelector("#ai-summary-btn").classList.contains("hidden"), "configured actions hidden");
+        }
+      });
+    }
 
     // The fetch itself must still be gated the same way it always was, just
     // no longer paired with the unhide -- a regression here would mean the

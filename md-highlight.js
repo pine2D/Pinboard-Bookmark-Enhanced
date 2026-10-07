@@ -2506,7 +2506,7 @@ function _pbpHlBuildNotebookDom(rail) {
   });
   sec.appendChild(copyBtn);
 
-  const toc = document.getElementById("toc");
+  const toc = document.getElementById("export-section") || document.getElementById("toc");
   if (toc) toc.insertAdjacentElement("beforebegin", sec);
   else rail.appendChild(sec);
 

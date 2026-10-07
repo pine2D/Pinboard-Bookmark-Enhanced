@@ -24,18 +24,14 @@
       <a id="preview-url" href="#" target="_blank" rel="noopener"></a>
     </div>
     <div class="rail-badges">
-      <span id="source-badge" class="source-badge" role="group" aria-label="Extraction engine" data-i18n-aria="mdEngineGroupAria">
-        <button type="button" class="src-seg" data-engine="local">Defuddle</button>
-        <button type="button" class="src-seg" data-engine="jina">Jina Reader</button>
-      </span>
       <span id="engine-status" class="engine-status" role="status" aria-live="polite"></span>
       <span id="reading-stats" class="rail-stats"></span>
       <span id="token-count" class="token-badge"></span>
     </div>
-    <div class="view-toggle">
-      <button id="btn-raw" class="toggle-btn" data-i18n="mdViewRaw" aria-pressed="false">Raw</button>
-      <button id="btn-rendered" class="toggle-btn active" data-i18n="mdViewRendered" aria-pressed="true">Rendered</button>
-    </div>
+    <nav id="toc" class="toc rail-section" aria-label="Table of contents" data-i18n-aria="mdTocContents" hidden>
+      <div class="rail-label" data-i18n="mdTocContents">Contents</div>
+      <ul id="toc-list" class="toc-list"></ul>
+    </nav>
     <!-- K156: the reader's only general settings entry point. Lives here, not
          in #rail-bottom-row's icon tray (md-reader.js _pbpRailBottomRow) --
          that tray is a documented "four ghost cells" contract of in-page
@@ -119,10 +115,19 @@
       </div>
         <div id="send-status" class="send-status msg-bar" role="status" aria-live="polite" hidden></div>
     </div>
-    <nav id="toc" class="toc rail-section" aria-label="Table of contents" data-i18n-aria="mdTocContents" hidden>
-      <div class="rail-label" data-i18n="mdTocContents">Contents</div>
-      <ul id="toc-list" class="toc-list"></ul>
-    </nav>
+    <details id="reader-source-details" class="rail-section">
+      <summary class="rail-label"><span data-i18n="readerSourceTools">Source and extraction tools</span><span class="rail-sec-tri" aria-hidden="true"></span></summary>
+      <div class="rail-badges">
+      <span id="source-badge" class="source-badge" role="group" aria-label="Extraction engine" data-i18n-aria="mdEngineGroupAria">
+        <button type="button" class="src-seg" data-engine="local">Defuddle</button>
+        <button type="button" class="src-seg" data-engine="jina">Jina Reader</button>
+      </span>
+      </div>
+    <div class="view-toggle">
+      <button id="btn-raw" class="toggle-btn" data-i18n="mdViewRaw" aria-pressed="false">Raw</button>
+      <button id="btn-rendered" class="toggle-btn active" data-i18n="mdViewRendered" aria-pressed="true">Rendered</button>
+    </div>
+    </details>
   </aside>
   <main>
     <div class="doc-body">

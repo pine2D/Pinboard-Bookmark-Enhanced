@@ -4223,3 +4223,7 @@ details#video-description .desc-body a { color: var(--link); }
   text-align: center;
   color: var(--fg-secondary);
 }
+
+#reader-source-details > summary { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; list-style: none; }
+#reader-source-details > summary::-webkit-details-marker { display: none; }
+#reader-source-details[open] > summary .rail-sec-tri { transform: translateY(1px) rotate(225deg); }
