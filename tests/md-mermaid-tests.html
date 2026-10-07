@@ -71,6 +71,18 @@ _pbpMermaidLoad = Promise.resolve();
     const again = await _pbpMermaidRender("graph TD;A-->B;", false);
     if (again !== e) throw new Error("cache must return the same entry object");
   });
+  await atest("render: existing flowcharts retain their classic appearance", async () => {
+    // Mermaid 12 gives flowcharts a diagram-specific neo default even when
+    // getConfig().look still reports classic. Check the rendered nodes, not
+    // the configuration object, so dropping the explicit look pin is caught.
+    const e = await _pbpMermaidRender("graph LR;ClassicA[Alpha]-->ClassicB[Beta];", false);
+    const svg = new DOMParser().parseFromString(e.svg, "image/svg+xml");
+    const nodes = Array.from(svg.querySelectorAll("g.node"));
+    if (nodes.length !== 2) throw new Error("expected two rendered flowchart nodes");
+    if (nodes.some((n) => n.getAttribute("data-look") !== "classic")) {
+      throw new Error("existing flowchart changed its appearance");
+    }
+  });
   await atest("render: dark and light cache separately", async () => {
     const l = await _pbpMermaidRender("graph TD;A-->B;", false);
     const d = await _pbpMermaidRender("graph TD;A-->B;", true);

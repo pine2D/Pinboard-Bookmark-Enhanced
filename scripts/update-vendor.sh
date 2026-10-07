@@ -194,7 +194,11 @@ echo "Refreshing vendored libraries from registry.npmjs.org (cooldown-bypassed):
 fetch_npm defuddle  dist/index.js               defuddle.js    defuddle "https://github.com/kepano/defuddle"
 fetch_npm turndown  lib/turndown.browser.umd.js turndown.js    turndown "https://github.com/mixmark-io/turndown"
 fetch_npm marked    lib/marked.umd.js           marked.min.js  ""
-fetch_npm dompurify dist/purify.min.js          purify.min.js  ""
+# Keep the official unminified UMD under the historical filename: 3.4.16's
+# minified distribution roughly doubled long-article sanitize time in Chromium,
+# while dist/purify.js kept the same API/security behavior near the old timing.
+# Do not minify it locally; recheck both upstream builds on future refreshes.
+fetch_npm dompurify dist/purify.js              purify.min.js  ""
 
 # highlight.js — the prebuilt browser bundle is NOT in the npm tarball; it lives
 # on cdnjs. Resolve the latest version from the npm registry, then pull that exact

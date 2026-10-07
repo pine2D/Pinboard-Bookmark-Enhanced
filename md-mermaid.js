@@ -3,7 +3,7 @@
 // Local ```mermaid rendering for the reader (md-preview.html only).
 // PURE SECTION first (no DOM/chrome side effects at load) so
 // tests/md-mermaid-tests.html can drive it on file://. The RUNTIME section
-// lazy-loads vendor/mermaid.min.js (3.4MB — only when the article actually
+// lazy-loads vendor/mermaid.min.js (only when the article actually
 // carries a mermaid fence) via a <script src> tag in the extension's own
 // page. NEVER chrome.scripting.executeScript: upstream mermaid issues
 // #5378 (CSP/Function("return this")) and #5383 (UTF-8) both live on that
@@ -39,6 +39,10 @@ function pbpMermaidConfig(dark) {
     startOnLoad: false,
     securityLevel: "strict",
     theme: dark ? "dark" : "default",
+    // Mermaid 12 defaults to ELK and a diagram-specific neo look. Keep the
+    // reader's existing layout/appearance; diagram front matter can override.
+    layout: "dagre",
+    look: "classic",
     fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif'
   };
 }

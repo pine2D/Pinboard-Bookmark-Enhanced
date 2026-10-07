@@ -2652,7 +2652,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // That is bounded and benign rather than a correctness hole: both snapshot
     // their nodes BEFORE the swap, so a straggler writes into elements already
     // detached from the document and nothing visible changes — wasted CPU (and
-    // a 3.4MB mermaid pipeline racing the new article's own), not DOM
+    // a Mermaid pipeline racing the new article's own), not DOM
     // corruption. Do not read the guards below as stronger than that.
     const rev = _articleRevision;
     let renderedHtml = renderMarkdown(markdown);

@@ -2,10 +2,10 @@
   "_comment": "Vendor lock manifest (roadmap #38). Hand-maintained oracle: version, upstream source, license and SHA-256 for every vendored artifact. scripts/vendor-lock-check.mjs verifies shipped bytes against this file (verify.sh). Update TOGETHER with any vendor refresh — update-vendor.sh prints new hashes; a mismatch is either an unrecorded upgrade or a tampered file, and both must stop a release. KaTeX fonts are covered by count+extension policy (20 woff2), not per-file hashes.",
   "files": {
     "vendor/defuddle.js": {
-      "version": "0.19.3",
+      "version": "0.19.4",
       "source": "npm:defuddle (dist/index.js, version banner prepended)",
       "license": "MIT",
-      "sha256": "2e6a0a01f0f3c30e4fe0cc8101c3c5d811197a56d76213d731cc9a2b4fd171f5"
+      "sha256": "c5ae98384a7ce0f04c746e736d42de3f91a906feaad8ad37c08c75309250f426"
     },
     "vendor/turndown.js": {
       "version": "7.2.4",
@@ -14,16 +14,16 @@
       "sha256": "3daa021a5dc3a10953682278b4646bb8cee7fef8b021fec6657992e37a04aa4d"
     },
     "vendor/marked.min.js": {
-      "version": "18.0.11",
+      "version": "18.1.0",
       "source": "npm:marked (lib/marked.umd.js)",
       "license": "MIT",
-      "sha256": "69451c8541c9c1e7a4bf3ffc6f73c4d89633de92bfbe3e484dfe182ef8091f88"
+      "sha256": "f424dcb508fdf93e0137a970cfce8f3207ea2e3f37eca5f7556a52875683632a"
     },
     "vendor/purify.min.js": {
-      "version": "3.4.14",
-      "source": "npm:dompurify (dist/purify.min.js)",
+      "version": "3.4.16",
+      "source": "npm:dompurify (dist/purify.js, official UMD under historical .min.js name)",
       "license": "Apache-2.0 OR MPL-2.0",
-      "sha256": "c2f26ea4fc0d88141c9aa430eb515ac86fce59418ceebd85fa475b87a8d6c3e6"
+      "sha256": "acefba6ebc9733869f60c80b519eaefad1691ea56022c54a3e6cbe74286d8d46"
     },
     "vendor/highlight.min.js": {
       "version": "11.12.0",
@@ -44,25 +44,25 @@
       "sha256": "9f208d022102b1d0c7aebfecd8e42ca7997d5de636649d2b31ea63093d809019"
     },
     "vendor/mermaid.min.js": {
-      "version": "11.17.0",
-      "source": "jsdelivr:mermaid@11.17.0/dist/mermaid.min.js",
+      "version": "12.1.0",
+      "source": "npm:mermaid (dist/mermaid.min.js; byte-identical to jsDelivr)",
       "license": "MIT",
-      "sha256": "8d8e0eec56d3a83b4b3c87f42050845546dee93ebe1875d2117c12e6947c0cb3"
+      "sha256": "6484afc32872a3aa16cac9a76ba1816a1ed4cc870a6593cc2e17757750f518b2"
     },
     "vendor/katex/katex.min.js": {
-      "version": "0.18.4",
+      "version": "0.19.0",
       "source": "npm:katex (dist/katex.min.js)",
       "license": "MIT",
-      "sha256": "2ec5916941ef4383e0314eaabcc712301b06001d9fb68e08d751d2bae5a27a1a"
+      "sha256": "103a53763cc033bba8d175bf3f0ba597c3505c9b6747dd3f2c7bc2a6bfcc8ae7"
     },
     "vendor/katex/katex.min.css": {
-      "version": "0.18.4",
+      "version": "0.19.0",
       "source": "npm:katex (dist/katex.min.css)",
       "license": "MIT",
-      "sha256": "180c2d77d434d7da51d6625c50a964d4fd6fdbdb9bc8796a0a016c30c49931fb"
+      "sha256": "d4ab5b8ee16989b070cdb0ea24bd6ad48fc8df1b787f280f29d3ae4f959f2c00"
     },
     "vendor/katex/auto-render.min.js": {
-      "version": "0.18.4",
+      "version": "0.19.0",
       "source": "npm:katex (dist/contrib/auto-render.min.js)",
       "license": "MIT",
       "sha256": "e5372d199bcdae8b4de71d0f7ceba72a4ba12774a27c60a6f1f77d03b3228ee4"
