@@ -75,7 +75,7 @@ if (CONFIG.fault && !FAULTS.includes(CONFIG.fault)) {
   console.error(`[qa-drive] --fault must be one of: ${FAULTS.join(", ")}`);
   process.exit(2);
 }
-if (CONFIG.fault && !CONFIG.surfaces.includes("faults")) {
+if (CONFIG.fault && !CONFIG.surfaces.some((s) => ["faults", "translate-stop"].includes(s))) {
   console.warn(`[qa-drive] --fault ${CONFIG.fault} set — running the faults surface only`);
   CONFIG.surfaces = ["faults"];
 }
@@ -258,6 +258,7 @@ function startAiMock() {
         // Fault profiles (named, deterministic): exercise the error paths the
         // happy-path mock structurally never reaches.
         if (CONFIG.fault === "ai-429") {
+          requests.push({ path: req.url, model: body?.model || null, stream: !!body?.stream, fault: "ai-429" });
           res.writeHead(429, { "Content-Type": "application/json" });
           res.end('{"error":{"message":"qa-mock rate limit","type":"rate_limit_exceeded"}}');
           return;
@@ -939,6 +940,37 @@ async function driveJourney(context, worker, extId, rep) {
     await reader.waitForFunction(id => _pbpHlState?.ranges[id]?.color === 3, target.item.id);
     await library.waitForFunction(() => !document.querySelector('.notes-color-menu:popover-open'));
 
+    // Edit the same stored highlight through the library's public controls.
+    // A storage failure must preserve the draft; retry only changes note.
+    const excerpt = library.locator(`.notes-excerpt[data-notes-key="${target.key}"]`);
+    await excerpt.locator('.notes-note-edit').click();
+    const editedNote = `${marker}：在详情编辑并重试保存。`;
+    await excerpt.locator('textarea').fill(editedNote);
+    await library.evaluate(() => {
+      window.__qaNoteSet = chrome.storage.local.set;
+      chrome.storage.local.set = async () => { throw new Error("QA note storage failure"); };
+    });
+    try {
+      await excerpt.locator('button[type="submit"]').click();
+      await excerpt.locator('[role="alert"]').filter({hasText:await library.evaluate(()=>t("notesEditFailed"))}).waitFor();
+      requireState(await excerpt.locator('textarea').inputValue() === editedNote, "failed note write discarded draft");
+      await rep.shot(library,s,"note-edit-failed-draft-kept");
+    } finally {
+      await library.evaluate(() => { chrome.storage.local.set = window.__qaNoteSet; delete window.__qaNoteSet; });
+    }
+    const beforeEdit = await worker.evaluate(async ({record,id})=>(await chrome.storage.local.get(record))[record].items.find(it=>it.id===id),{record:target.record,id:target.item.id});
+    await excerpt.locator('textarea').press('Control+Enter');
+    await excerpt.locator('.notes-note-edit').waitFor();
+    await reader.waitForFunction(({id,note})=>_pbpHlState?.items.some(it=>it.id===id&&it.note===note),{id:target.item.id,note:editedNote});
+    const afterEdit=await worker.evaluate(async ({record,id})=>(await chrome.storage.local.get(record))[record].items.find(it=>it.id===id),{record:target.record,id:target.item.id});
+    requireState(JSON.stringify({...afterEdit,note:beforeEdit.note})===JSON.stringify(beforeEdit),"note edit overwrote highlight metadata");
+    await excerpt.locator('.notes-note-edit').click();
+    await excerpt.locator('textarea').fill('QA cancelled draft');
+    await excerpt.locator('textarea').press('Escape');
+    requireState(await excerpt.locator('.notes-excerpt-note-text').innerText()===editedNote,"cancel changed saved note");
+    requireState(await excerpt.locator('.notes-note-edit').evaluate(el=>document.activeElement===el),"cancel lost edit focus");
+    await rep.shot(library,s,"note-edit-saved");
+
     const [source] = await Promise.all([
       context.waitForEvent("page", { timeout: TIMEOUT_MS }),
       library.locator(".notes-detail-link").click(),
@@ -973,10 +1005,30 @@ async function driveJourney(context, worker, extId, rep) {
     if (await backAfterColor.isVisible()) await backAfterColor.click();
     await library.locator('#notes-color-filters [data-color="all"]').click();
 
+    await library.locator('#notes-color-filters [data-color="1"]').click();
+    await library.locator('#notes-filter').fill('QA impossible search 20261007');
+    await library.locator('#notes-empty button').click();
+    requireState(await library.locator('#notes-filter').inputValue()==='',"notes search was not cleared");
+    requireState(await library.locator('#notes-color-filters [data-color="all"]').getAttribute('aria-pressed')==='true',"notes colors were not cleared");
+    requireState(await library.locator('#notes-filter').evaluate(el=>document.activeElement===el),"notes reset lost search focus");
+
     await library.setViewportSize({ width: 1280, height: 900 });
     await library.locator("#notes-filter").fill("");
     await library.locator("#lib-tab-vocab").click();
     await library.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
+    await library.setViewportSize({width:320,height:860});
+    await library.locator('#vocab-filter-narrow').click();
+    await library.locator('#vocab-stat-known').click();
+    await library.keyboard.press('Escape');
+    const sortBefore=await library.locator('#vocab-sort').inputValue();
+    await library.locator('#vocab-search').fill('QA impossible word 20261007');
+    await library.locator('#vocab-clear-filters').click();
+    requireState(await library.locator('#vocab-search').inputValue()===''&&await library.locator('#vocab-status-filter').inputValue()==='',"vocab combined filters were not cleared");
+    requireState(await library.locator('#vocab-sort').inputValue()===sortBefore,"filter reset changed sort");
+    requireState(await library.locator('#vocab-search').evaluate(el=>document.activeElement===el),"vocab reset lost search focus");
+    await library.waitForSelector('#vocab-list .vocab-card');
+    await rep.shot(library,s,'narrow-filter-recovery');
+    await library.setViewportSize({width:1280,height:900});
     requireState(!(await library.locator("#vocab-list").innerText()).includes("account-separate"), "foreign vocabulary leaked into current account");
     await worker.evaluate(async token => chrome.storage.local.set({ pinboardToken: obfuscateKey(token) }), FAKE_OTHER_TOKEN);
     await library.locator("#vocab-list .notes-card-head").filter({ hasText: "account-separate" }).waitFor({ timeout: TIMEOUT_MS });
@@ -1720,6 +1772,84 @@ async function diffAgainstPrev(runDir, prevDir) {
 // ============================================================
 // Main
 // ============================================================
+async function driveNarrowLayouts(context, worker, extId, rep) {
+  const s = rep.surface("layouts");
+  const page = await context.newPage();
+  const detach = rep.attach(page, s);
+  try {
+    await page.goto(`chrome-extension://${extId}/options.html#appearance`, {waitUntil:"load"});
+    await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready"));
+    for (const locale of ["de","fr","pl","ru","en","zh_CN","zh_TW","zh_HK","ja"]) {
+      await page.evaluate(async lang=>{await chrome.storage.local.set({optLang:lang});initI18n();await pbpI18nReady();},locale);
+      for (const density of ["comfortable","compact"]) for (const mode of ["light","dark"]) for (const width of [320,420]) {
+        await page.setViewportSize({width,height:720});
+        await page.evaluate(({density,mode})=>{document.documentElement.dataset.density=density;document.documentElement.dataset.theme=mode==='light'?'modern-card':'catppuccin-mocha';},{density,mode});
+        for (const tab of await page.locator('.tabs [data-panel]').evaluateAll(els=>els.map(el=>el.dataset.panel))) {
+          await page.evaluate(tab=>document.querySelector('.tabs [data-panel="'+tab+'"]').click(),tab);
+          const g = await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth, controls:[...document.querySelectorAll('.panel.active input,.panel.active textarea,.panel.active .listbox-btn,.options-nav button,.panel.active .btn')].filter(el=>el.getBoundingClientRect().width).map(el=>({id:el.id||el.className,left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right}))}));
+          if(g.scroll>width) s.failures.push(`${locale}/${density}/${mode}/${width}/${tab}: scrollWidth=${g.scroll}`);
+          for(const c of g.controls) if(c.left<0||c.right>width+1) s.failures.push(`${locale}/${width}/${tab}: ${c.id} outside viewport`);
+        }
+        if(locale==='de'&&width===320&&density==='comfortable'&&mode==='light') {await page.evaluate(()=>document.querySelector('.tabs [data-panel="appearance"]').click());await rep.shot(page,s,'de-appearance-320');}
+      }
+    }
+    s.notes.push("9 locales × 2 densities × 2 themes × 2 widths × all settings tabs measured.");
+    await seedPreviewData(worker);
+    await page.setViewportSize({width:1024,height:900});
+    await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`,{waitUntil:"load"});
+    await page.waitForFunction(()=>document.querySelectorAll('#rendered-view [data-pb]').length>0);
+    await page.locator('#ask-open').click();
+    for(const width of [880,1000,1001,1024,1100,1199,1200,1280,1440]) {
+      await page.setViewportSize({width,height:900});
+      await page.waitForTimeout(220);
+      const g=await page.evaluate(()=>({width:document.querySelector('.doc-body').getBoundingClientRect().width,scroll:document.documentElement.scrollWidth,ask:document.getElementById('ask-panel').getBoundingClientRect().toJSON(), rail:document.getElementById('rail').getBoundingClientRect().toJSON()}));
+      if(g.width<Math.min(460,width-70)) s.failures.push(`Ask ${width}: article only ${g.width}px`);
+      if(g.scroll>width) s.failures.push(`Ask ${width}: horizontal overflow`);
+      if(width>1000&&g.ask.left<g.rail.right-1) s.failures.push(`Ask ${width}: panel behind visible rail`);
+      s.notes.push(JSON.stringify({viewport:width,...g}));
+      if(width===1024)await rep.shot(page,s,'ask-1024');
+    }
+    await page.goto(`chrome-extension://${extId}/popup.html`,{waitUntil:"load"});
+    await page.waitForFunction(()=>!document.getElementById('main-section').classList.contains('hidden'));
+    for(const section of ['main-section','login-section']) {
+      await page.evaluate(section=>{for(const id of ['main-section','login-section']) document.getElementById(id).classList.toggle('hidden',id!==section);document.documentElement.dataset.section=section==='main-section'?'main':'login';},section);
+      const semantic=await page.evaluate(()=>document.querySelectorAll('main').length===1&&[...document.querySelectorAll('h1')].filter(el=>el.getBoundingClientRect().width).length===1);
+      if(!semantic)s.failures.push(`${section}: visible main/heading semantics missing`);
+      await axeScan(page,s,`popup-${section}`);
+    }
+  } catch(e){s.failures.push(e.stack);}
+  finally {detach();await page.close();}
+}
+
+async function driveTranslateStop(context, worker, extId, rep) {
+  const s = rep.surface("translate-stop");
+  const page = await context.newPage();
+  const detach = rep.attach(page, s);
+  try {
+    if (CONFIG.fault !== "ai-429") throw new Error("translate-stop requires --fault ai-429");
+    await seedPreviewData(worker);
+    await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForFunction(() => document.querySelectorAll("#rendered-view [data-pb]").length > 0);
+    await page.locator("#btn-translate").click();
+    await page.waitForFunction(() => _pbpTrState?.running && document.getElementById("tr-progress").textContent === t("trRateLimitWaiting", String(PBP_TR_BACKOFF_MS.at(-1) / 1000)));
+    await rep.shot(page, s, "rate-limit-waiting");
+    const requestsBefore = aiRequests.length;
+    const started = Date.now();
+    await page.locator("#btn-tr-stop").click();
+    await page.waitForFunction(() => !_pbpTrState.running && document.getElementById("tr-progress").textContent === t("trStopped", String(Object.keys(_pbpTrState.trMd).length), String(_pbpTrState.work.length)));
+    const elapsed = Date.now() - started;
+    if (elapsed >= 1000) throw new Error(`Stop took ${elapsed}ms`);
+    if (!await page.locator("#btn-translate").isEnabled()) throw new Error("Continue remains disabled");
+    if (!await page.evaluate(()=>document.activeElement.id==="btn-translate")) throw new Error("Stop did not return keyboard focus to Continue");
+    await page.waitForTimeout(250);
+    if (aiRequests.length !== requestsBefore) throw new Error("AI request dispatched after Stop");
+    s.notes.push(`Real HTTP 429 → Stop: ${elapsed}ms; ${requestsBefore} requests, no later dispatch; Continue enabled.`);
+    await rep.shot(page, s, "stopped");
+    s.consoleErrors = s.consoleErrors.filter((e) => e !== "Failed to load resource: the server responded with a status of 429 (Too Many Requests)");
+  } catch (e) { s.failures.push(e.message); }
+  finally { detach(); await page.close(); }
+}
+
 async function driveOptionsSaveFeedback(context, extId, rep) {
   const s = rep.surface("options-save");
   const page = await context.newPage();
@@ -2030,6 +2160,8 @@ try {
     else if (surface === "pinboard") await drivePinboard(context, rep);
     else if (surface === "popup") await drivePopup(context, worker, extId, rep);
     else if (surface === "drafts") await drivePopupDrafts(context, worker, extId, rep);
+    else if (surface === "layouts") await driveNarrowLayouts(context, worker, extId, rep);
+    else if (surface === "translate-stop") await driveTranslateStop(context, worker, extId, rep);
     else if (surface === "options-save") await driveOptionsSaveFeedback(context, extId, rep);
     else if (surface === "themes") await driveThemes(context, worker, extId, rep);
     else if (surface === "faults") await driveFaults(context, worker, extId, rep);

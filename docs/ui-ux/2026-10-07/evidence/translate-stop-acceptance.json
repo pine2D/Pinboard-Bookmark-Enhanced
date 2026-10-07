@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-07T06:10:01.676Z",
+  "label": "translate-stop-accepted",
+  "surfaces": [
+    {
+      "name": "translate-stop",
+      "states": [
+        {
+          "state": "rate-limit-waiting",
+          "file": "01-translate-stop-rate-limit-waiting.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/md-preview.html?k=qa-drive-preview",
+          "events": [
+            {
+              "kind": "console",
+              "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+            },
+            {
+              "kind": "console",
+              "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+            },
+            {
+              "kind": "console",
+              "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+            },
+            {
+              "kind": "console",
+              "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+            },
+            {
+              "kind": "console",
+              "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+            },
+            {
+              "kind": "console",
+              "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+            },
+            {
+              "kind": "console",
+              "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+            }
+          ]
+        },
+        {
+          "state": "stopped",
+          "file": "02-translate-stop-stopped.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/md-preview.html?k=qa-drive-preview",
+          "events": []
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "notes": [
+        "Real HTTP 429 → Stop: 163ms; 7 requests, no later dispatch; Continue enabled."
+      ],
+      "failures": [],
+      "_events": [
+        {
+          "kind": "console",
+          "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+        },
+        {
+          "kind": "console",
+          "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+        },
+        {
+          "kind": "console",
+          "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+        },
+        {
+          "kind": "console",
+          "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+        },
+        {
+          "kind": "console",
+          "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+        },
+        {
+          "kind": "console",
+          "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+        },
+        {
+          "kind": "console",
+          "text": "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+        }
+      ],
+      "_lastCursor": 7
+    }
+  ],
+  "headless": true,
+  "siteTheme": "modern-card",
+  "extensionId": "feoognahlmfmbllpmgailahcnjppiegb",
+  "hostPermissionGrants": {
+    "http://127.0.0.1/*": true,
+    "http://localhost/*": true,
+    "https://freedictionaryapi.com/*": true
+  },
+  "aiRequests": 7,
+  "environment": {
+    "commit": "1ea601ce",
+    "dirty": 21,
+    "chromium": "147.0.7727.15",
+    "node": "v24.14.1",
+    "platform": "linux"
+  },
+  "network": [
+    {
+      "method": "POST",
+      "origin": "http://127.0.0.1:44460",
+      "path": "/v1/chat/completions",
+      "disposition": "ai-mock-passthrough"
+    },
+    {
+      "method": "POST",
+      "origin": "http://127.0.0.1:44460",
+      "path": "/v1/chat/completions",
+      "disposition": "ai-mock-passthrough"
+    },
+    {
+      "method": "POST",
+      "origin": "http://127.0.0.1:44460",
+      "path": "/v1/chat/completions",
+      "disposition": "ai-mock-passthrough"
+    },
+    {
+      "method": "POST",
+      "origin": "http://127.0.0.1:44460",
+      "path": "/v1/chat/completions",
+      "disposition": "ai-mock-passthrough"
+    },
+    {
+      "method": "POST",
+      "origin": "http://127.0.0.1:44460",
+      "path": "/v1/chat/completions",
+      "disposition": "ai-mock-passthrough"
+    },
+    {
+      "method": "POST",
+      "origin": "http://127.0.0.1:44460",
+      "path": "/v1/chat/completions",
+      "disposition": "ai-mock-passthrough"
+    },
+    {
+      "method": "POST",
+      "origin": "http://127.0.0.1:44460",
+      "path": "/v1/chat/completions",
+      "disposition": "ai-mock-passthrough"
+    }
+  ]
+}

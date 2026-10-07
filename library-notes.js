@@ -206,6 +206,7 @@ let _notesRenderGen = 0;
 // ownerless items show (fail-closed for owned ones).
 let _notesOwnerCache = null; // null = unresolved; string = resolved scope ("" = ownerless)
 let _notesAuthRevision = 0;
+const _notesEditSessions = new Map();
 async function _pbpNotesOwner() {
   if (_notesOwnerCache !== null) return _notesOwnerCache;
   let scope = "";
@@ -221,6 +222,7 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     if (area !== "local" && area !== "sync") return;
     if (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys) {
       _notesAuthRevision++;
+      _notesEditSessions.clear();
       _pbpNotesCloseColorMenu(false);
       _notesOwnerCache = null;
       // Invalidate any scan already in flight for the account that just left
@@ -892,8 +894,95 @@ function _pbpNotesBuildExcerpt(h, index, isCurrent, pageTs, q) {
     p.append(ic, text);
     body.appendChild(p);
   }
+  const editing = _notesEditSessions.get(h.key);
+  if (editing) body.appendChild(_pbpNotesBuildNoteEditor(editing));
+  else {
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "btn btn-sm ghost notes-note-edit";
+    edit.dataset.notesKey = h.key;
+    setBtnIcon(edit, "pencil", t("notesEdit"));
+    edit.addEventListener("click", () => _pbpNotesBeginNoteEdit(h));
+    body.appendChild(edit);
+  }
   sec.appendChild(body);
   return sec;
+}
+
+// Drafts live outside rebuilt DOM; owner changes clear them synchronously.
+function _pbpNotesBeginNoteEdit(hit) {
+  if (!hit || _notesOwnerCache === null) return;
+  const session = {hit, owner:_notesOwnerCache, revision:_notesAuthRevision, text:hit.item.note || "", busy:false, error:""};
+  _notesEditSessions.set(hit.key, session);
+  _pbpNotesSelectRow(hit.key);
+  const input = $id("notes-detail").querySelector('[data-notes-key="' + CSS.escape(hit.key) + '"] textarea');
+  _pbpNotesFocus(input);
+}
+function _pbpNotesCancelNoteEdit(session) {
+  if (session.busy) return;
+  _notesEditSessions.delete(session.hit.key);
+  const hit = _pbpNotesFindHit(session.hit.key);
+  _pbpNotesRenderDetail(hit);
+  _pbpNotesRestoreDetailFocus({cls:"notes-note-edit",key:session.hit.key});
+}
+function _pbpNotesBuildNoteEditor(session) {
+  const form = document.createElement("form");
+  form.className = "notes-note-editor";
+  form.dataset.notesKey = session.hit.key;
+  const input = document.createElement("textarea");
+  input.className = "vocab-note-input";
+  input.rows = 4; input.value = session.text; input.readOnly = session.busy;
+  input.setAttribute("aria-label", t("labelNotes"));
+  input.addEventListener("input", () => {session.text = input.value;});
+  input.addEventListener("keydown", e => {
+    if (e.key === "Escape") {e.preventDefault();_pbpNotesCancelNoteEdit(session);}
+    else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {e.preventDefault();_pbpNotesSaveNote(session);}
+  });
+  const actions = document.createElement("div");
+  actions.className = "lib-cluster";
+  const save = document.createElement("button");
+  save.type = "submit";save.className = "btn btn-sm";save.textContent = t("hlSave");
+  save.setAttribute("aria-disabled", String(session.busy));
+  const cancel = document.createElement("button");
+  cancel.type = "button";cancel.className = "btn btn-sm ghost";cancel.textContent = t("cancel");
+  cancel.setAttribute("aria-disabled", String(session.busy));cancel.addEventListener("click",()=>_pbpNotesCancelNoteEdit(session));
+  actions.append(save,cancel);
+  const error = document.createElement("p");
+  error.className = "save-status bad";error.setAttribute("role","alert");error.textContent = session.error;
+  form.append(input,actions,error);
+  form.addEventListener("submit",e=>{e.preventDefault();_pbpNotesSaveNote(session);});
+  return form;
+}
+async function _pbpNotesSaveNote(session) {
+  if (session.busy || _notesEditSessions.get(session.hit.key) !== session) return;
+  session.busy = true;session.error = "";
+  const update = () => {
+    const form = [...$id("notes-detail").querySelectorAll(".notes-note-editor")].find(el=>el.dataset.notesKey===session.hit.key);
+    if (!form) return;
+    form.setAttribute("aria-busy", String(session.busy));
+    form.querySelector("textarea").readOnly = session.busy;
+    for (const b of form.querySelectorAll("button")) b.setAttribute("aria-disabled", String(session.busy));
+    form.querySelector('[role="alert"]').textContent = session.error;
+  };
+  update();
+  try {
+    const result = await _pbpNotesWriteNote(session.hit, session.text, session.owner);
+    if (session.revision !== _notesAuthRevision) return;
+    if (result === "saved") {
+      _notesEditSessions.delete(session.hit.key);
+      await _pbpNotesRefreshPreservingState();
+      if (session.revision !== _notesAuthRevision) return;
+      _pbpNotesRestoreDetailFocus({cls:"notes-note-edit",key:session.hit.key});
+      const status = _pbpNotesStatusEl();if(status)setStatusIcon(status,true,t("notesEditSaved"));
+    } else {
+      _notesEditSessions.delete(session.hit.key);
+      await _pbpNotesRefreshPreservingState();
+      if(session.revision===_notesAuthRevision)_pbpNotesSetStatus(t("vocabSelectionChanged"));
+    }
+  } catch (e) {
+    console.warn("[notes] note update failed", e && e.name, e && e.message);
+    if (session.revision === _notesAuthRevision) session.error = t("notesEditFailed");
+  } finally { session.busy = false;if(session.revision === _notesAuthRevision)update(); }
 }
 
 // The page delete. Scope is the PAGE's record -- the confirm popover names the
@@ -1375,6 +1464,16 @@ function _pbpNotesRenderList(hits, allHits, append) {
       empty.textContent = total
         ? t("notesFilterEmpty")
         : (_notesHiddenByOwner ? t("notesHiddenByOwner") : t("notesEmpty"));
+      if(total) {
+        const clear = document.createElement("button");
+        clear.type="button";clear.className="btn btn-sm ghost";clear.textContent=t("libraryClearFilters");
+        clear.addEventListener("click",()=>{
+          const search=$id("notes-filter");if(search)search.value="";
+          _notesActiveColors=new Set();_pbpNotesClearSelection();_pbpNotesResetListScroll();_pbpNotesRender(true);
+          _pbpNotesFocus(search);
+        });
+        empty.appendChild(clear);
+      }
     }
   }
   // Storage scope, only when there is nothing at all to show: with a filter
@@ -1532,8 +1631,16 @@ function _pbpNotesWithRecordLock(key, work) {
 
 // Never write the scan's stale record. Reader, backup and library writers
 // share this lock; recheck live credentials after each asynchronous read.
-async function _pbpNotesWriteColor(hit, color, ownerAtOpen) {
-  if (!Number.isInteger(color) || color < 1 || color > 5 || !hit?.item || !hit.row?.key) return "gone";
+function _pbpNotesWriteColor(hit, color, ownerAtOpen) {
+  if (!Number.isInteger(color) || color < 1 || color > 5) return Promise.resolve("gone");
+  return _pbpNotesWriteItem(hit, {color}, ownerAtOpen);
+}
+function _pbpNotesWriteNote(hit, note, ownerAtOpen) {
+  if (typeof note !== "string") return Promise.resolve("gone");
+  return _pbpNotesWriteItem(hit, {note}, ownerAtOpen);
+}
+async function _pbpNotesWriteItem(hit, patch, ownerAtOpen) {
+  if (!hit?.item || !hit.row?.key) return "gone";
   const revision = _notesAuthRevision;
   const liveOwner = async () => {
     const raw = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
@@ -1554,8 +1661,8 @@ async function _pbpNotesWriteColor(hit, color, ownerAtOpen) {
     if (matches.length !== 1) return "gone";
     const { it, index } = matches[0];
     if (!_pbpNotesItemVisible(it, ownerAtOpen)) return "changed";
-    if (it.color === color) return "saved";
-    const items = fresh.items.map((entry, i) => i === index ? { ...entry, color } : entry);
+    if (Object.keys(patch).every(k => it[k] === patch[k])) return "saved";
+    const items = fresh.items.map((entry, i) => i === index ? { ...entry, ...patch } : entry);
     await chrome.storage.local.set({ [hit.row.key]: { ...fresh, items } });
     return "saved";
   });

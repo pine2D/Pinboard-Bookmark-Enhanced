@@ -3035,8 +3035,8 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 
 #ask-meta { min-height: 16px; font-size: 0.75em; line-height: 1.5; color: var(--fg-muted); }
 
-/* Narrow viewports: bottom sheet (same 1000px breakpoint as the rail drawer). */
-@media (max-width: 1000px) {
+/* Keep at least ~460px of article beside the rail and Ask; use a sheet earlier. */
+@media (max-width: 1200px) {
   body.ask-open main { margin-right: 0; }
   body.ask-open #zen-bar { right: 12px; } /* bottom-sheet mode: no side dodge */
   #ask-panel {
@@ -3054,6 +3054,12 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
      this just overrides the `transform` value by source order, everything
      else (visibility, transition, display:flex) is inherited from it. */
   #ask-panel[hidden] { transform: translateY(105%); }
+}
+
+/* The visible rail stays above the sheet; keep Ask's controls beside it. */
+@media (min-width: 1001px) and (max-width: 1200px) {
+  #ask-panel { left: 264px; }
+  body.zen #ask-panel { left: 0; }
 }
 
 @media print {

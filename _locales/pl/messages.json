@@ -4016,5 +4016,11 @@
     "message": "Nie udało się zachować szkicu. Zapisz zakładkę przed zamknięciem okna rozszerzenia."
   },
   "optSavePending": { "message": "Niezapisane zmiany" },
-  "optRetrySave": { "message": "Ponów zapis" }
+  "optRetrySave": { "message": "Ponów zapis" },
+  "trRateLimitWaiting": {"message": "Limit zapytań. Ponowna próba za $SECONDS$ s…", "placeholders": {"seconds": {"content": "$1"}}},
+  "trStopped": {"message": "Zatrzymano. Zachowano $DONE$ / $TOTAL$ fragmentów.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
+  "notesEdit": {"message": "Edytuj notatkę"},
+  "notesEditSaved": {"message": "Notatka zapisana."},
+  "notesEditFailed": {"message": "Nie udało się zapisać notatki. Szkic zachowano. Spróbuj ponownie."},
+  "libraryClearFilters": {"message": "Wyczyść wyszukiwanie i filtry"}
 }

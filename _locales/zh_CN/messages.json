@@ -4010,5 +4010,11 @@
     "message": "草稿未能保留，请在关闭弹窗前保存书签。"
   },
   "optSavePending": { "message": "更改尚未保存" },
-  "optRetrySave": { "message": "重试保存" }
+  "optRetrySave": { "message": "重试保存" },
+  "trRateLimitWaiting": {"message": "触发限流，$SECONDS$ 秒后重试…", "placeholders": {"seconds": {"content": "$1"}}},
+  "trStopped": {"message": "已停止，保留 $DONE$ / $TOTAL$ 段译文。", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
+  "notesEdit": {"message": "编辑笔记"},
+  "notesEditSaved": {"message": "笔记已保存。"},
+  "notesEditFailed": {"message": "笔记保存失败，草稿已保留，请重试。"},
+  "libraryClearFilters": {"message": "清除搜索和筛选"}
 }

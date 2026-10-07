@@ -2184,10 +2184,10 @@ check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.strin
   ![...LIBRARY_VALUE_BOX.ghostTriggers].some((id) => LIBRARY_VALUE_BOX.ids.has(id)),
   `ui-contract-tests.mjs: the library ghost-trigger harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort())}. ` +
   "A select with data-listbox-face=\"ghost\" renders a .btn trigger, not a value box: it must never also land in LIBRARY_VALUE_BOX.ids.");
-check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-vocab.js:input[type="text"]', "library-vocab.js:textarea.vocab-note-input"]) &&
+check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-notes.js:textarea.vocab-note-input', 'library-vocab.js:input[type="text"]', "library-vocab.js:textarea.vocab-note-input"]) &&
   /groupUnit\.className = "vocab-group-unit";[\s\S]{0,400}groupUnit\.appendChild\(groupInput\);/.test(libraryVocabJs),
   `ui-contract-tests.mjs: the runtime library value-box harvest drifted -- got ${JSON.stringify(LIBRARY_VALUE_BOX.built)} ` +
-  "(expected the note editor textarea and the detail pane's group-unit text input; the relookup language select merged into #vocab-lookup-lang in T7). " +
+  "(expected both note editor textareas and the vocabulary group-unit input; the relookup language select merged into #vocab-lookup-lang in T7). " +
   "A new runtime value box must join FIELD_TARGETS.lib and VALUE_BOX_LEGS.library; then update this list.");
 function isValueBoxCompound(compound) {
   const c = classifyCompound(compound);
@@ -5060,7 +5060,7 @@ check(/function pbpLiveAiSettingsSnapshot\(provider\)/.test(optionsConnectivityJ
   tagGovClick.includes("sNow = { ...sNow, ...live"),
   "Options connectivity and tag governance do not share one live provider form snapshot");
 
-check(/@media \(max-width: 720px\)[\s\S]*\.container\s*{[\s\S]*grid-template-columns:\s*1fr/.test(optionsCss), "options.css: missing mobile one-column container rule");
+check(/@media \(max-width: 720px\)[\s\S]*\.container\s*{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/.test(optionsCss), "options.css: mobile column must shrink below intrinsic translated widths");
 check(/@media \(max-width: 720px\)[\s\S]*\.options-nav\s*{[\s\S]*position:\s*static/.test(optionsCss) &&
   /@media \(max-width: 720px\)[\s\S]*\.tabs\s*{\s*display:\s*none/.test(optionsCss),
   "options.css: mobile category select does not replace the desktop tablist");
@@ -8595,21 +8595,20 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const LIB_TREE = htmlNodes(libraryHtml);
   const LIB_SCOPE = scanScopeOf(LIB_TREE);
   const detailNode = LIB_TREE.find((n) => n.attrs.id === "vocab-detail");
-  const runtimeHtml = LIBRARY_VALUE_BOX.built.map((b) => {
+  const runtimeNodes = LIBRARY_VALUE_BOX.built.flatMap((b) => {
     const m = /^[^:]+:(\w+)(?:\[type="([^"]+)"\])?(?:\.([\w-]+))?$/.exec(b);
-    if (!m) return "";
+    if (!m) return [];
     const [, tag, type, cls] = m;
     const el = `<${tag}${type ? ` type="${type}"` : ""}${cls ? ` class="${cls}"` : ""}>${tag === "input" ? "" : `</${tag}>`}`;
-    return cls ? el : `<span class="${[...LIBRARY_VALUE_BOX.shells][0]}">${el}</span>`;
-  }).join("");
-  const runtimeNodes = htmlNodes(runtimeHtml);
-  // Grafted boxes sit somewhere under #vocab-detail next to other runtime
-  // elements: their place among siblings is unknown (`unplaced`, which scan
-  // mode's sibling combinators read fail-closed; strict mode never follows one).
-  for (const n of runtimeNodes) {
-    if (n.parent?.tag === "#root") n.parent = detailNode;
-    n.unplaced = true;
-  }
+    const nodes = htmlNodes(cls ? el : `<span class="${[...LIBRARY_VALUE_BOX.shells][0]}">${el}</span>`);
+    const parent = LIB_TREE.find(n => n.attrs.id === (b.startsWith("library-notes.js:") ? "notes-detail" : "vocab-detail"));
+    check(!!parent, `runtime field has no detail host: ${b}`);
+    for (const n of nodes) {
+      if (n.parent?.tag === "#root") n.parent = parent;
+      n.unplaced = true;
+    }
+    return nodes;
+  });
   // listbox.js (library redesign T6, spec §8.4): each value-box
   // select[data-listbox] renders as div.listbox > button.listbox-btn#<id>-btn
   // right after it. The button is the value box the user sees, so it joins
@@ -8627,11 +8626,11 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
   const listboxBtnNodes = listboxGraftNodes.filter((n) => n.tag === "button");
   const LIB_NODES = [...LIB_TREE, ...runtimeNodes, ...listboxGraftNodes];
-  check(!!detailNode && runtimeNodes.length === 3,
-    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes under #vocab-detail (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 3)`);
+  check(!!detailNode && runtimeNodes.length === 4,
+    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes under #vocab-detail (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 4)`);
   const libCov = valueBoxCoverage(LIB_NODES, LIB);
-  check(libCov.entries === 6 && libCov.uncovered.length === 0,
-    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 6); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
+  check(libCov.entries === 7 && libCov.uncovered.length === 0,
+    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 7); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
   check(libCov.dead.length === 0, `ui-components.mjs: FIELD_TARGETS.lib entries whose rest selector reaches nothing in library.html + the runtime boxes: ${libCov.dead.map((t) => t.id).join(", ")}`);
   const libSelects = LIB_NODES.filter((n) => n.tag === "select" && !Object.hasOwn(n.attrs, "hidden") && !Object.hasOwn(n.attrs, "data-listbox"));
   const selectMiss = libSelects.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
@@ -8664,7 +8663,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // Scan mode vs strict mode on library (final fix wave; the popup block
   // above holds the model's full case list): [selector, node, scan, strict].
   {
-    const libNode = (key) => LIB_NODES.find((n) => (key.startsWith("#") ? n.attrs.id === key.slice(1) : n.classes.includes(key.slice(1))));
+    const libNode = (key) => LIB_NODES.find((n) => selectorReaches(key, n));
     const LIB_SCAN_CASES = [
       // (T7a: the select's sr-only label sits between the two now)
       ["#vocab-lookup-input + label + select", "#vocab-lookup-lang", true, false],
@@ -8674,7 +8673,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
       // follows a sibling combinator
       ["#vocab-lookup-input ~ .listbox > .listbox-btn", "#vocab-lookup-lang-btn", true, false],
       ['html[data-theme="dracula"] .vocab-filter-row select', "#vocab-group-filter", true, false],
-      ["#vocab-detail[aria-busy] .vocab-note-input", ".vocab-note-input", true, false],
+      ["#vocab-detail[aria-busy] .vocab-note-input", "#vocab-detail .vocab-note-input", true, false],
+      ["#notes-detail[aria-busy] .vocab-note-input", "#notes-detail .vocab-note-input", true, false],
+      ["#vocab-detail .vocab-note-input", "#notes-detail .vocab-note-input", false, false],
       ['[role="search"] select', "#vocab-lookup-lang", true, true],
       // must NOT reach
       ["#vocab-search + select", "#vocab-group-filter", false, false],

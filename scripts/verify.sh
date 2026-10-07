@@ -46,6 +46,12 @@ node scripts/qa-drive.mjs --surfaces drafts --check --label popup-draft-contract
 echo "[options-save] persistent feedback, retry and translated narrow layouts"
 node scripts/qa-drive.mjs --headless --surfaces options-save --check --label options-save-contract
 
+echo "[translate-stop] HTTP 429 wait responds to Stop"
+node scripts/qa-drive.mjs --headless --surfaces translate-stop --fault ai-429 --check --label translate-stop-contract
+
+echo "[layouts] nine locales, narrow settings, Ask width and popup semantics"
+node scripts/qa-drive.mjs --headless --surfaces layouts --check --label layouts-contract
+
 echo "[syntax] checking JavaScript"
 git ls-files -- '*.js' '*.mjs' |
   while IFS= read -r file; do

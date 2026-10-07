@@ -4016,5 +4016,11 @@
     "message": "Der Entwurf konnte nicht aufbewahrt werden. Speichere das Lesezeichen, bevor du das Popup schließt."
   },
   "optSavePending": { "message": "Änderungen noch nicht gespeichert" },
-  "optRetrySave": { "message": "Speichern erneut versuchen" }
+  "optRetrySave": { "message": "Speichern erneut versuchen" },
+  "trRateLimitWaiting": {"message": "Anfragelimit erreicht. Neuer Versuch in $SECONDS$ s…", "placeholders": {"seconds": {"content": "$1"}}},
+  "trStopped": {"message": "Gestoppt. $DONE$ / $TOTAL$ Abschnitte behalten.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
+  "notesEdit": {"message": "Notiz bearbeiten"},
+  "notesEditSaved": {"message": "Notiz gespeichert."},
+  "notesEditFailed": {"message": "Die Notiz konnte nicht gespeichert werden. Der Entwurf bleibt erhalten. Bitte erneut versuchen."},
+  "libraryClearFilters": {"message": "Suche und Filter löschen"}
 }

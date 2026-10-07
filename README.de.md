@@ -34,7 +34,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 - **Markieren in fünf Farben, mit Notizen** – beide überstehen erneutes Rendern, Übersetzung und Änderungen an der Seite
 - **Seite übersetzen oder befragen** – Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
 - **Wörter beim Lesen nachschlagen**: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln tragen Notizen und Lernstatus und gehen auf Wunsch an Anki oder Eudic; optionale Offline-Wörterbuchpakete für Chinesisch–Englisch und Englisch–Chinesisch
-- **Eine eigene Seite für Notizen und Vokabeln**: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung; die Markierungsfarbe lässt sich direkt auf der Notizseite ändern
+- **Eine eigene Seite für Notizen und Vokabeln**: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung; Notizen und Markierungsfarben lassen sich direkt bearbeiten, erfolglose Suchen samt Filtern zurücksetzen
 - **Senden oder herunterladen** – an [Obsidian](https://obsidian.md), Notion, NotebookLM, ein GitHub Gist oder einen beliebigen Webhook; als `.md`, `.html` oder `.epub` für den E-Reader
 - **Sehen beim Lesen** – YouTube- und Bilibili-Vorschauen zeigen Video und mehrsprachige Untertitel nebeneinander; das Transkript folgt der Wiedergabe, ein Klick auf eine Zeile springt im Player, und KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel statt der Seite
 

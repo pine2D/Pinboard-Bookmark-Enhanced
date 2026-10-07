@@ -316,6 +316,8 @@
         "notes-meta-pagecount",
         "notes-meta-site",
         "notes-note-ic",
+        "notes-note-edit",
+        "notes-note-editor",
         "notes-open-original",
         "notes-row-meta",
         "notes-row-open-text",

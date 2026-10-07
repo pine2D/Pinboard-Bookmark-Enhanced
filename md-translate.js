@@ -521,6 +521,29 @@ function pbpTrRunAnchor(pendingNs, totalWork, skippedCount, viewTopBlock) {
 const PBP_TR_FLUSH_BLOCKS = 8;
 const PBP_TR_FLUSH_MS = 5000;
 
+// Backoff belongs to the run's AbortSignal. Even an injected sleeper that
+// never settles cannot hold Stop hostage; the real timer is also cancelled.
+function pbpTrWait(ms, signal, sleep) {
+  if (signal?.aborted) return Promise.resolve(false);
+  return new Promise((resolve, reject) => {
+    let timer = null, settled = false;
+    const finish = (completed, error, rejected = false) => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      if (rejected) reject(error); else resolve(completed);
+    };
+    const onAbort = () => finish(false);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) { onAbort(); return; }
+    if (sleep) {
+      try { Promise.resolve(sleep(ms)).then(() => finish(true), (e) => finish(false, e, true)); }
+      catch (e) { finish(false, e, true); }
+    } else timer = setTimeout(() => finish(true), ms);
+  });
+}
+
 // pbpTrRunQueue(plan) -> Promise<{done, total, failed:[{id,message}], stopped}>
 //   plan: {
 //     batches:      [[{id, text}]]            (pbpTrPackBatches output; text = SHIELDED md)
@@ -532,6 +555,7 @@ const PBP_TR_FLUSH_MS = 5000;
 //                    one attempt; null = model returned nothing usable)
 //     targetCode?:  BCP-47-ish target code used by the length quality gate
 //     onFill(id, text), onBlockFail(id, message), onProgress(done, total)
+//     onPhase?("translating"|"waiting", {done,total,delayMs?})
 //     signal?:      AbortSignal (Stop button / page close)
 //     concurrency?: default 2; backoffMs?: default PBP_TR_BACKOFF_MS (tests
 //                   inject [1,1,1]); sleep?: default setTimeout promise
@@ -548,7 +572,6 @@ async function pbpTrRunQueue(plan) {
   const targetCode = plan.targetCode || "";
   const conc = plan.concurrency || 2;
   const backoff = plan.backoffMs || PBP_TR_BACKOFF_MS;
-  const sleep = plan.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
   const signal = plan.signal;
   const aborted = () => !!(signal && signal.aborted);
   // ZH-3: caught request errors are humanized at THIS boundary (the only place
@@ -579,6 +602,17 @@ async function pbpTrRunQueue(plan) {
   };
   let permissionError = null;
   const halted = () => aborted() || !!permissionError;
+  const phases = new Map();
+  const reportPhase = () => {
+    const running = [...phases.values()];
+    if (!running.length) return;
+    const current = running.find(p => p.name === "translating") || running[0];
+    try { plan.onPhase?.(current.name, { done, total, ...current.details }); } catch (_) {}
+  };
+  const phase = (work, name, details = {}) => {
+    phases.set(work, { name, details });
+    reportPhase();
+  };
 
   const fill = (id, text) => {
     if (filled.has(id)) return;
@@ -586,6 +620,7 @@ async function pbpTrRunQueue(plan) {
     done += 1;
     try { plan.onFill(id, text); } catch (_) {}
     try { plan.onProgress(done, total); } catch (_) {}
+    reportPhase();
   };
   const fail = (id, message) => {
     failed.push({ id, message: String(message || "translation failed") });
@@ -595,6 +630,7 @@ async function pbpTrRunQueue(plan) {
     // terminology..." text forever (D4-1: onProgress was fill()-only, so 0 successes
     // meant 0 repaints of the batch-start placeholder).
     try { plan.onProgress(done, total); } catch (_) {}
+    reportPhase();
   };
 
   async function runBatch(batch) {
@@ -607,6 +643,7 @@ async function pbpTrRunQueue(plan) {
     };
     for (let attempt = 0; ; attempt++) {
       if (halted()) return;
+      phase(batch, "translating");
       try {
         await plan.requestBatch(batch, onItem);
         break; // stream completed; missing-id diff below
@@ -615,7 +652,14 @@ async function pbpTrRunQueue(plan) {
         if (e && e.code === "host_permission") { permissionError = e; return; }
         if (_pbpTrIs429(e) && attempt < backoff.length) {
           slow = true;                                     // 2 -> 1 worker
-          await sleep(backoff[attempt]);
+          phase(batch, "waiting", { delayMs: backoff[attempt] });
+          try {
+            if (!await pbpTrWait(backoff[attempt], signal, plan.sleep)) return;
+          } catch (waitError) {
+            const msg = describe(waitError);
+            for (const id of _pbpTrMissingIds(batch, filled)) fail(id, msg);
+            return;
+          }
           continue;
         }
         // hard batch failure: classify the shared error object ONCE (review
@@ -648,7 +692,8 @@ async function pbpTrRunQueue(plan) {
       if (slow && index > 0) return;                       // pool 2 -> 1 after a 429
       const i = claimNext();
       if (i === -1) return;
-      await runBatch(batches[i]);
+      try { await runBatch(batches[i]); }
+      finally { phases.delete(batches[i]); reportPhase(); }
     }
   }
 
@@ -662,6 +707,7 @@ async function pbpTrRunQueue(plan) {
     if (halted()) break;
     const seg = downgrade.shift();
     if (!seg || filled.has(seg.id)) continue;
+    phase(seg, "translating");
     try {
       const text = await plan.requestSingle(seg);
       if (typeof text === "string" && pbpTrPlaceholdersConserved(seg.text, text) && pbpTrLengthRatioOk(seg.text, text, targetCode)) fill(seg.id, text);
@@ -670,7 +716,7 @@ async function pbpTrRunQueue(plan) {
       if (aborted()) break;
       if (e && e.code === "host_permission") { permissionError = e; break; }
       fail(seg.id, describe(e));
-    }
+    } finally { phases.delete(seg); reportPhase(); }
   }
 
   return { done, total, failed, stopped: aborted(), permissionError };
@@ -1793,6 +1839,8 @@ async function _pbpTrEnsureGlossary(st) {
     } else {
       auto = await pbpTrGlossaryCacheGet(st.url, st.target.code, st.modelKey, st.account);
       if (!auto) {
+        const prog = document.getElementById("tr-progress");
+        if (prog) prog.textContent = t("trExtracting");
         auto = await _pbpTrExtractGlossary(st);
         if (auto) { try { await pbpTrGlossaryCacheSet(st.url, st.target.code, st.modelKey, auto, st.account); } catch (_) {} }
       }
@@ -1878,7 +1926,7 @@ async function _pbpTrStart(st) {
     summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account, st.s)) || "";
   } catch (_) {}
   const prog0 = document.getElementById("tr-progress");
-  if (prog0) prog0.textContent = t("trExtracting");
+  if (prog0) prog0.textContent = t("trTranslating");
   await _pbpTrEnsureGlossary(st);
   // ZH-1a: the run's cache meta, computed once here (deterministic, known
   // before the first request) and attached to every cache write of this run
@@ -2007,6 +2055,13 @@ async function _pbpTrStart(st) {
       if (done.allFailed) { _pbpTrMarkFailed(st, w, message); return; }  // 0 parts translated: whole-block failure, not a fake success (don't fill st.trMd / count as done)
       _pbpTrCommitAssembled(st, w, done, pb.failed);                     // partial (>=1 real part) -> displayed, never cached (D7)
     },
+    onPhase: (phase, detail) => {
+      if (st.rev !== runRev || st.ctrl.signal.aborted) return;
+      const prog = document.getElementById("tr-progress");
+      if (prog) prog.textContent = phase === "waiting"
+        ? t("trRateLimitWaiting", String(Math.ceil(detail.delayMs / 1000)))
+        : t("trTranslating") + " " + t("trProgress", String(detail.done + (st.skippedCount || 0)), String(detail.total + (st.skippedCount || 0)));
+    },
     onProgress: (done, total) => {
       const prog = document.getElementById("tr-progress");
       // T3: N/M counts from the skip baseline, not from zero -- skipped blocks are
@@ -2091,7 +2146,11 @@ async function _pbpTrStart(st) {
   // #tr-progress frozen at the last mid-run count while identical pills
   // stacked below. One aggregate line names the cause once; the
   // host-permission path writes its own message above and never gets here.
-  if (!doneAll && queueResult.failed.length) {
+  if (!doneAll && queueResult.stopped) {
+    const prog = document.getElementById("tr-progress");
+    if (prog) { prog.hidden = false; prog.textContent = t("trStopped", String(Object.keys(st.trMd).length), String(st.work.length)); }
+
+  } else if (!doneAll && queueResult.failed.length) {
     const prog = document.getElementById("tr-progress");
     if (prog) {
       const msgs = [...new Set(queueResult.failed.map((f) => f.message))];
@@ -2606,6 +2665,7 @@ function _pbpTrSetStatus(st, status) {
     label.textContent = t(st.permissionError ? "aiGrantRetry" : "trContinue");
     btn.disabled = false;
     btn.hidden = false;
+    if (document.activeElement === stop) btn.focus();
     stop.hidden = true;
     // A cache-probe partial used to leave the estimate at the whole-article
     // figure _pbpTrBuildSection painted -- several times the real cost of

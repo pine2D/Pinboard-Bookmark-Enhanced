@@ -466,7 +466,7 @@ body { padding-bottom: calc(var(--opt-save-bar-h) + var(--opt-sp-7)); }
    card -- its own fill separates it from the page, so the edge drops from
    the 3:1 structural --opt-border to the hairline divider weight. */
 .panel { background: var(--opt-panel); border: 1px solid var(--opt-border-section); display: none; }
-.panel.active { grid-column: 2; grid-row: 3; display: block; padding: var(--opt-sp-6); border-width: 1px; border-radius: var(--opt-radius-md); }
+.panel.active { min-width: 0; grid-column: 2; grid-row: 3; display: block; padding: var(--opt-sp-6); border-width: 1px; border-radius: var(--opt-radius-md); }
 
 /* ---- Form groups ---- */
 .fg { margin-bottom: var(--opt-rhythm); }
@@ -3664,7 +3664,7 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
 }
 @media (max-width: 720px) {
   .container {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     row-gap: var(--opt-sp-6);
   }
   .container > h1,
@@ -3763,4 +3763,17 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     outline: 1px solid Highlight;
     outline-offset: 2px;
   }
+}
+
+/* Narrow settings retain complete controls and allow translated labels to wrap. */
+@media (max-width: 480px) {
+  .options-nav { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .reset-tab-btn { justify-self: start; border-left: 0; padding-left: 0; white-space: normal; }
+  .panel.active { padding: var(--opt-sp-4); }
+  .fg > .listbox { min-width: 0; width: 100%; }
+  .fg select { min-width: 0; }
+  .theme-group-label { flex-basis: 100%; white-space: normal; }
+  .connection-health { grid-template-columns: minmax(0, 1fr); }
+  .fg-actions > .btn { max-width: 100%; white-space: normal; height: auto; min-height: var(--opt-control-h); }
+  .section-title, .hint, .fg > label { overflow-wrap: anywhere; }
 }

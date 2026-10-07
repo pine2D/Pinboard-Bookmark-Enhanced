@@ -300,7 +300,7 @@ function _pbpAskSettleClear() {
 }
 
 // The same breakpoint md-preview.css uses to turn the panel into a bottom
-// sheet: `@media (max-width: 1000px) { body.ask-open main { margin-right: 0 } }`
+// sheet: `@media (max-width: 1200px) { body.ask-open main { margin-right: 0 } }`
 // (md-preview.css:2983-2984). At or below it, opening Ask changes NOTHING
 // about the article's layout, so capturing an anchor and arming a document
 // listener would buy exactly nothing. Video mode is NOT special-cased in
@@ -309,11 +309,11 @@ function _pbpAskSettleClear() {
 // workspace is the strongest case for this whole block - its `.doc-body` is
 // `min(2160px, 100%)` (md-preview.css:3990), so the push really re-wraps the
 // text at ANY window width, not just inside article mode's narrow
-// 1000px..(--pbp-width + 724) band.
+// 1200px..(--pbp-width + 724) band.
 function _pbpAskLayoutShifts() {
   if (typeof window.matchMedia !== "function") return true;
   try {
-    return !window.matchMedia("(max-width: 1000px)").matches;
+    return !window.matchMedia("(max-width: 1200px)").matches;
   } catch (_) {
     return true; // no media support: behave like the wide tier rather than silently skip
   }

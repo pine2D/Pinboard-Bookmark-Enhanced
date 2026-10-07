@@ -1863,3 +1863,5 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
   本规范（只要两份副本的值与 §1.2 一致）。**options.css 没有等价副本**——`library.css:350` 的注释
   「options.css's shared recipe」是移植来源的说法，`grep row-del-x options.css` 零命中，options 侧要用
   ghost 档（详情面板类阅读面）时是**首次出现**，按 §1.2 配方来，不要去 options 里找样板。
+
+- 笔记摘录原地编辑：`.notes-note-editor` 复用 `.vocab-note-input` 字段与 `.lib-cluster` 紧凑按钮；gap sp-2，摘录下 margin sp-3。编辑/保存/取消使用现有 btn-sm，无新阶梯；失败提示在表单内持续，后台刷新保留会话草稿。

@@ -3722,3 +3722,11 @@ html[data-theme="github-light"] {
   --lib-note-mark-c5: #c084fc66;
 }
 /* @generated:ui-themes end */
+
+/* Inline note editing uses the existing field and compact action families. */
+.notes-note-editor { display: grid; gap: var(--lib-sp-2); margin-top: var(--lib-sp-3); }
+.notes-note-editor > .lib-cluster { flex-wrap: wrap; }
+.notes-note-editor > .save-status { margin: 0; }
+.notes-note-edit { margin-top: var(--lib-sp-2); }
+
+.notes-empty > .btn { display: block; max-width: 100%; margin-top: var(--lib-sp-3); white-space: normal; height: auto; min-height: calc(var(--lib-control-h) - 4px); }

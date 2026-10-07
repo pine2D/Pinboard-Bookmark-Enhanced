@@ -4010,5 +4010,11 @@
     "message": "Draft could not be kept. Save your bookmark before closing the popup."
   },
   "optSavePending": { "message": "Unsaved changes" },
-  "optRetrySave": { "message": "Retry saving" }
+  "optRetrySave": { "message": "Retry saving" },
+  "trRateLimitWaiting": {"message": "Rate limited; retrying in $SECONDS$s…", "placeholders": {"seconds": {"content": "$1"}}},
+  "trStopped": {"message": "Stopped. $DONE$ / $TOTAL$ segments retained.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
+  "notesEdit": {"message": "Edit note"},
+  "notesEditSaved": {"message": "Note saved."},
+  "notesEditFailed": {"message": "Could not save the note. Your draft is kept; try again."},
+  "libraryClearFilters": {"message": "Clear search and filters"}
 }

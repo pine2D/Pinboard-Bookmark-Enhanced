@@ -91,7 +91,7 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
         <span class="lib-batch-status"></span>
       </div>
       <div id="vocab-empty" class="notes-empty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
-      <div id="vocab-no-results" class="notes-empty" hidden>No words match the current filters.</div>
+      <div id="vocab-no-results" class="notes-empty" hidden><span>No words match the current filters.</span><button type="button" id="vocab-clear-filters">Clear search and filters</button></div>
       <div class="vocab-list-region">
         <div id="vocab-list" role="grid" aria-multiselectable="true" aria-label="Saved vocabulary" aria-busy="false"></div>
         <button type="button" class="btn btn-sm ghost vocab-load-more" id="vocab-load-more" hidden>Load more</button>
@@ -3106,6 +3106,12 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       pane.classList.toggle("vocab-signed-out", wasSignedOut);
       show(saved.rows);
     }
+  }
+  {
+    $id('vocab-search').value='___NO_MATCH___';$id('vocab-group-filter').value='';$id('vocab-status-filter').value='known';_pbpVocabApplyView(true);
+    $id('vocab-clear-filters').click();
+    check('clear vocabulary resets search, group and status together',!$id('vocab-search').value&&!$id('vocab-group-filter').value&&!$id('vocab-status-filter').value);
+    check('clear vocabulary restores current-owner words',_vocabViewRows.length===_vocabRows.length&&_vocabRows.length>0);
   }
   document.title = fail ? "FAIL library-vocab Tests" : "PASS library-vocab Tests";
 })();

@@ -4016,5 +4016,11 @@
     "message": "未能保留草稿，請在關閉彈出視窗前儲存書籤。"
   },
   "optSavePending": { "message": "變更尚未儲存" },
-  "optRetrySave": { "message": "重新儲存" }
+  "optRetrySave": { "message": "重新儲存" },
+  "trRateLimitWaiting": {"message": "觸發限流，$SECONDS$ 秒後重試…", "placeholders": {"seconds": {"content": "$1"}}},
+  "trStopped": {"message": "已停止，保留 $DONE$ / $TOTAL$ 段譯文。", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
+  "notesEdit": {"message": "編輯筆記"},
+  "notesEditSaved": {"message": "筆記已儲存。"},
+  "notesEditFailed": {"message": "筆記儲存失敗，草稿已保留，請重試。"},
+  "libraryClearFilters": {"message": "清除搜尋與篩選"}
 }

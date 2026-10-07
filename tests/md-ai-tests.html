@@ -2191,6 +2191,62 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
       "permission failure fragmented into block retries: " + JSON.stringify(r));
   });
 
+  for (const injected of [false,true]) {
+    await atest("Stop cancels 429 backoff promptly ("+(injected?"injected sleeper":"real timer")+")",async()=>{
+      const ctrl=new AbortController();let calls=0,entered;
+      const waiting=new Promise(r=>{entered=r;});
+      const plan={batches:[segs([1])],concurrency:1,backoffMs:[1000],signal:ctrl.signal,
+        requestBatch:async()=>{calls++;entered();throw new Error('API failed (HTTP 429)');},
+        requestSingle:async()=>null,onFill(){},onProgress(){},onBlockFail(){}};
+      if(injected)plan.sleep=()=>new Promise(()=>{});
+      const running=pbpTrRunQueue(plan);await waiting;await new Promise(r=>setTimeout(r,10));ctrl.abort();
+      const r=await Promise.race([running,new Promise(resolve=>setTimeout(()=>resolve(null),180))]);
+      ok(r&&r.stopped&&r.done===0&&r.failed.length===0,'Stop did not release backoff promptly');
+      ok(calls===1,'stopped queue sent another request');
+    });
+  }
+  await atest("queue reports translating, rate-limit wait, and resumed translating phases",async()=>{
+    let calls=0;const phases=[];
+    const r=await pbpTrRunQueue({batches:[segs([1])],concurrency:1,backoffMs:[5],sleep:async()=>{},
+      requestBatch:async(batch,fill)=>{if(!calls++)throw new Error('API failed (HTTP 429)');fill({id:1,text:'T:'+batch[0].text});},
+      requestSingle:async()=>null,onFill(){},onProgress(){},onBlockFail(){},onPhase:(phase,details)=>phases.push({phase,...details})});
+    ok(r.done===1,'translation did not resume');
+    ok(phases.filter((p,i)=>!i||p.phase!==phases[i-1].phase).map(p=>p.phase).join(',')==='translating,waiting,translating','missing or stale phase feedback');
+    ok(phases[1].delayMs===5&&phases[1].done===0&&phases[1].total===1,'waiting details are wrong');
+  });
+  await atest("aborted waiting preserves already filled blocks without reporting failures",async()=>{
+    const ctrl=new AbortController();let calls=0,enter;const waited=new Promise(r=>{enter=r;});const fills=[];
+    const running=pbpTrRunQueue({batches:[segs([1]),segs([2])],concurrency:1,backoffMs:[1000],signal:ctrl.signal,sleep:()=>{enter();return new Promise(()=>{});},
+      requestBatch:async(batch,fill)=>{calls++;if(calls===2)throw new Error('API failed (HTTP 429)');fill({id:1,text:'T:'+batch[0].text});},
+      requestSingle:async()=>null,onFill:id=>fills.push(id),onProgress(){},onBlockFail(){}});
+    await waited;ctrl.abort();const r=await Promise.race([running,new Promise(resolve=>setTimeout(()=>resolve(null),180))]);
+    ok(r&&r.stopped&&r.done===1&&r.failed.length===0&&fills.join(',')==='1'&&calls===2,'completed translation was lost or another request started');
+  });
+  await atest("backoff releases its abort listener after natural completion",async()=>{
+    const ctrl=new AbortController();let added=0,removed=0,calls=0;
+    const signal={get aborted(){return ctrl.signal.aborted;},addEventListener(...args){added++;ctrl.signal.addEventListener(...args);},removeEventListener(...args){removed++;ctrl.signal.removeEventListener(...args);}};
+    const r=await pbpTrRunQueue({batches:[segs([1])],concurrency:1,backoffMs:[1],signal,
+      requestBatch:async(batch,fill)=>{if(!calls++)throw new Error('API failed (HTTP 429)');fill({id:1,text:'T:'+batch[0].text});},
+      requestSingle:async()=>null,onFill(){},onProgress(){},onBlockFail(){}});
+    ok(r.done===1&&added>0&&added===removed,'backoff leaked or omitted its abort listener');
+  });
+  await atest("phase callback errors do not interrupt queue resolution",async()=>{
+    const r=await pbpTrRunQueue({batches:[segs([1])],requestBatch:async(batch,fill)=>fill({id:1,text:'T:'+batch[0].text}),requestSingle:async()=>null,onFill(){},onProgress(){},onBlockFail(){},onPhase(){throw new Error('broken UI callback');}});
+    ok(r.done===1&&r.failed.length===0,'UI phase callback escaped the queue');
+  });
+  await atest("rejected injected waits classify pending blocks even with a falsey rejection",async()=>{
+    const r=await pbpTrRunQueue({batches:[segs([1])],concurrency:1,backoffMs:[1],sleep:()=>Promise.reject(),
+      requestBatch:async()=>{throw new Error('API failed (HTTP 429)');},requestSingle:async()=>null,onFill(){},onProgress(){},onBlockFail(){}});
+    ok(!r.stopped&&r.done===0&&r.failed.length===1,'wait rejection silently left an unclassified block');
+  });
+  await atest("two workers keep waiting feedback after the other worker's last fill",async()=>{
+    const ctrl=new AbortController();let enter,fillOther;const waiting=new Promise(r=>enter=r),other=new Promise(r=>fillOther=r);let phase='';
+    const run=pbpTrRunQueue({batches:[segs([1]),segs([2])],concurrency:2,backoffMs:[1000],signal:ctrl.signal,sleep:()=>{enter();return new Promise(()=>{});},
+      requestBatch:async(batch,fill)=>{if(batch[0].id===1)throw new Error('API failed (HTTP 429)');await other;fill({id:2,text:'T:'+batch[0].text});},
+      requestSingle:async()=>null,onFill(){},onBlockFail(){},onPhase:p=>{phase=p;},onProgress:()=>{phase='progress';}});
+    await waiting;fillOther();await new Promise(r=>setTimeout(r,10));const feedback=phase;ctrl.abort();await run;
+    ok(feedback==='waiting','the sole remaining worker is waiting but feedback reads '+feedback);
+  });
   const sum = document.createElement("div");
   sum.id = "tr-queue-summary";
   sum.className = "case " + (qfail ? "fail" : "pass");
@@ -11502,6 +11558,7 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
   // already returns focus to <body> on its own, so only a case that borrows from
   // a REAL element can tell a working handback from no handback at all.
   ktest("the teardown hands focus back to whoever actually held it, not just to <body>", () => {
+    const previousFocus = document.activeElement;
     const sentinel = document.createElement("button");
     sentinel.type = "button";
     sentinel.textContent = "k85 focus sentinel";
@@ -11520,7 +11577,12 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
       assertEq(document.activeElement, sentinel,
         "teardown left focus on " +
         (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
-    } finally { sentinel.remove(); }
+    } finally {
+      sentinel.remove();
+      if (previousFocus && previousFocus.isConnected && typeof previousFocus.focus === "function") {
+        previousFocus.focus({ preventScroll: true });
+      }
+    }
   });
 
   ktest("keyboard focus on a TOC entry hands the scroll position back to the reader", () => {

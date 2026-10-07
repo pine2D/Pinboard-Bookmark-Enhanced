@@ -2422,6 +2422,16 @@ function _pbpVocabResetListScroll() {
   if (region) region.scrollTop = 0;
 }
 
+function _pbpVocabClearFilters() {
+  const search = $id("vocab-search");if(search)search.value = "";
+  for(const id of ["vocab-group-filter", "vocab-status-filter"]) {
+    const control = $id(id);if(control){control.value="";window.pbpListboxSync?.(control);}
+  }
+  _pbpVocabClearSelection();_pbpVocabApplyView(true);_pbpVocabResetListScroll();
+  if(search)search.focus({preventScroll:true});
+}
+$id("vocab-clear-filters")?.addEventListener("click", _pbpVocabClearFilters);
+
 const _vocabSearch = $id("vocab-search");
 if (_vocabSearch) _vocabSearch.addEventListener("input", () => {
   _pbpVocabClearSelection();

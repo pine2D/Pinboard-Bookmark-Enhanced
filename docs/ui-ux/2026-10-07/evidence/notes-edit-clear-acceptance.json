@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-07T11:25:36.448Z",
+  "label": "notes-edit-clear-accepted",
+  "surfaces": [
+    {
+      "name": "journey",
+      "states": [
+        {
+          "state": "reader-saved-notes",
+          "file": "01-journey-reader-saved-notes.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/md-preview.html?k=qa-drive-preview",
+          "events": []
+        },
+        {
+          "state": "find-and-read-same-page",
+          "file": "02-journey-find-and-read-same-page.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html#notes",
+          "events": []
+        },
+        {
+          "state": "color-menu",
+          "file": "03-journey-color-menu.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html#notes",
+          "events": []
+        },
+        {
+          "state": "color-saved",
+          "file": "04-journey-color-saved.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html#notes",
+          "events": []
+        },
+        {
+          "state": "color-save-failed",
+          "file": "05-journey-color-save-failed.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html#notes",
+          "events": []
+        },
+        {
+          "state": "note-edit-failed-draft-kept",
+          "file": "06-journey-note-edit-failed-draft-kept.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html#notes",
+          "events": []
+        },
+        {
+          "state": "note-edit-saved",
+          "file": "07-journey-note-edit-saved.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html#notes",
+          "events": []
+        },
+        {
+          "state": "return-to-source",
+          "file": "08-journey-return-to-source.png",
+          "url": "http://127.0.0.1:43123/qa-article",
+          "events": []
+        },
+        {
+          "state": "narrow-notes-detail",
+          "file": "09-journey-narrow-notes-detail.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html?_qa=journey-narrow#notes",
+          "events": []
+        },
+        {
+          "state": "color-filter-disappearance",
+          "file": "10-journey-color-filter-disappearance.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html?_qa=journey-narrow#notes",
+          "events": []
+        },
+        {
+          "state": "narrow-filter-recovery",
+          "file": "11-journey-narrow-filter-recovery.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html?_qa=journey-narrow#vocab",
+          "events": []
+        },
+        {
+          "state": "other-account-isolated",
+          "file": "12-journey-other-account-isolated.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/library.html?_qa=journey-narrow#notes",
+          "events": []
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "notes": [
+        "PASS：阅读器保存两条笔记 → 搜索找回 → 同页连续阅读/跳转 → 原文；窄屏返回恢复焦点；切换账号隔离生词与笔记，保留 legacy ownerless 可见性。"
+      ],
+      "failures": [],
+      "_events": [],
+      "_lastCursor": 0
+    }
+  ],
+  "headless": true,
+  "siteTheme": "modern-card",
+  "extensionId": "feoognahlmfmbllpmgailahcnjppiegb",
+  "hostPermissionGrants": {
+    "http://127.0.0.1/*": true,
+    "http://localhost/*": true,
+    "https://freedictionaryapi.com/*": true
+  },
+  "aiRequests": 0,
+  "environment": {
+    "commit": "1ea601ce",
+    "dirty": 43,
+    "chromium": "147.0.7727.15",
+    "node": "v24.14.1",
+    "platform": "linux"
+  },
+  "network": [
+    {
+      "method": "GET",
+      "origin": "http://127.0.0.1:43123",
+      "path": "/qa-article",
+      "disposition": "article-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/get",
+      "disposition": "pinboard-fixture"
+    }
+  ]
+}

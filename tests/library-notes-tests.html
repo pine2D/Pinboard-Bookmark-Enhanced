@@ -747,7 +747,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     const focusOrder = [...detail().querySelectorAll("a[href], button")].filter(shown)
       .map((el) => el.classList[el.classList.length - 1]);
     check("Tab order reaches each color before its excerpt, then open original and delete",
-      focusOrder.join(",") === ["notes-detail-link", "notes-excerpt-color", "notes-excerpt-jump", "notes-excerpt-color", "notes-excerpt-jump", "notes-excerpt-color", "notes-excerpt-jump", "notes-excerpt-color", "notes-excerpt-jump", "notes-excerpt-color", "notes-excerpt-color", "notes-excerpt-jump", "notes-open-original", "notes-detail-delete"].join(","),
+      focusOrder.join(",") === ["notes-detail-link", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-open-original", "notes-detail-delete"].join(","),
       focusOrder.join(","));
     const facts = () => [...(side()?.querySelectorAll(".notes-side-facts > span") || [])].map((s) => s.textContent);
     check("the column's facts count the page's highlights and notes and give its first and last time",
@@ -1984,6 +1984,52 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       window.pbpVocabCurrentOwner = ownerFn; chrome.storage.local.get = getFn; chrome.storage.local.set = setFn;
       delete store[key];
     }
+  }
+  {
+    const ownerFn=window.pbpVocabCurrentOwner,getFn=chrome.storage.local.get,setFn=chrome.storage.local.set;
+    let owner='acct_me';window.pbpVocabCurrentOwner=async()=>owner;
+    const key='pbp_hl_note_edit',item={id:'editable',n:1,color:1,quote:'Keep this quotation',note:'old note',owner:'acct_me',ts:123,prefix:'before',suffix:'after'};
+    const reset=()=>{store[key]={v:1,url:'https://example.com/note-edit',title:'Note editing',extra:'keep',items:[{...item},{id:'foreign',owner:'acct_other',note:'foreign',color:2}]};};
+    const hit={key:key+'#editable',row:{key},item:{...item}};
+    const write=(...a)=>typeof _pbpNotesWriteNote==='function'?_pbpNotesWriteNote(...a):Promise.resolve('missing');
+    try {
+      reset();store[key].items[0].color=5;const before=JSON.stringify(store[key]);
+      check('note edit saves text',await write(hit,'new note','acct_me')==='saved'&&store[key].items[0].note==='new note');
+      const copy=structuredClone(store[key]);copy.items[0].note='old note';
+      check('note edit preserves latest color, anchors, owner, sibling and record metadata',JSON.stringify(copy)===before);
+      check('note edit permits clearing the note',await write(hit,'','acct_me')==='saved'&&store[key].items[0].note==='');
+      reset();store[key].items.reverse();await write(hit,'moved','acct_me');
+      check('note edit follows stable id after insertion or reorder',store[key].items[1].note==='moved');
+      reset();store[key].items.shift();check('note edit cannot resurrect deleted highlight',await write(hit,'new','acct_me')==='gone'&&store[key].items.length===1);
+      reset();owner='acct_other';check('note edit rejects live account switch',await write(hit,'new','acct_me')==='changed'&&store[key].items[0].note==='old note');
+      owner='acct_me';reset();chrome.storage.local.get=async keys=>{const out=await getFn(keys);if(keys===key)owner='acct_other';return out;};
+      check('note edit rechecks owner after async record read',await write(hit,'new','acct_me')==='changed'&&store[key].items[0].note==='old note');
+      chrome.storage.local.get=getFn;owner='acct_me';reset();const legacy={...item};delete legacy.id;store[key].items=[{...legacy},{...legacy}];
+      check('note edit rejects ambiguous legacy snapshots',await write({...hit,item:legacy},'new','acct_me')==='gone');
+      reset();chrome.storage.local.set=async()=>{throw new Error('QA note write failure');};let failed=false;try{await write(hit,'new','acct_me');}catch(_){failed=true;}
+      check('note edit surfaces write failure and preserves stored text',failed&&store[key].items[0].note==='old note');
+      chrome.storage.local.set=setFn;reset();_notesOwnerCache=null;await renderNotesPanel();
+      const realHit=_pbpNotesHits().find(h=>h.item.id==='editable');
+      if(typeof _pbpNotesBeginNoteEdit==='function')_pbpNotesBeginNoteEdit(realHit);
+      let input=$id('notes-detail').querySelector('textarea');
+      check('note editor opens with existing text and accessible name',!!input&&input.value==='old note'&&!!input.getAttribute('aria-label'));
+      if(input){input.value='unsaved draft';input.dispatchEvent(new Event('input',{bubbles:true}));await _pbpNotesRefreshPreservingState();}
+      input=$id('notes-detail').querySelector('textarea');
+      check('note draft survives background detail refresh',!!input&&input.value==='unsaved draft');
+      const session=typeof _notesEditSessions!=='undefined'?_notesEditSessions.get(realHit?.key):null;
+      chrome.storage.local.set=async()=>{throw new Error('QA note write failure');};if(session)await _pbpNotesSaveNote(session);
+      input=$id('notes-detail').querySelector('textarea');
+      check('failed note save retains editable draft for retry',!!input&&input.value==='unsaved draft'&&!input.readOnly);
+      chrome.storage.local.set=setFn;if(session&&typeof _pbpNotesCancelNoteEdit==='function')_pbpNotesCancelNoteEdit(session);
+      check('cancel note edit leaves storage unchanged and closes editor',store[key].items[0].note==='old note'&&!$id('notes-detail').querySelector('textarea'));
+    } finally {window.pbpVocabCurrentOwner=ownerFn;chrome.storage.local.get=getFn;chrome.storage.local.set=setFn;delete store[key];}
+  }
+  {
+    $id('notes-filter').value='___NO_MATCH___';_notesActiveColors=new Set([5]);_pbpNotesRender(true);
+    const clear=$id('notes-empty').querySelector('button');
+    check('no-results offers an explicit clear-search-and-filters action',!!clear);
+    if(clear)clear.click();
+    check('clear notes resets search and all colors and restores results',!$id('notes-filter').value&&!_notesActiveColors.size&&$id('notes-empty').hidden&&$id('notes-list').children.length>0);
   }
   document.title = fail ? "FAIL library-notes Tests" : "PASS library-notes Tests";
 })();

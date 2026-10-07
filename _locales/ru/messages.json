@@ -4016,5 +4016,11 @@
     "message": "Не удалось сохранить черновик. Сохраните закладку перед закрытием окна расширения."
   },
   "optSavePending": { "message": "Изменения ещё не сохранены" },
-  "optRetrySave": { "message": "Повторить сохранение" }
+  "optRetrySave": { "message": "Повторить сохранение" },
+  "trRateLimitWaiting": {"message": "Лимит запросов. Повтор через $SECONDS$ с…", "placeholders": {"seconds": {"content": "$1"}}},
+  "trStopped": {"message": "Остановлено. Сохранено $DONE$ / $TOTAL$ сегментов.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
+  "notesEdit": {"message": "Изменить заметку"},
+  "notesEditSaved": {"message": "Заметка сохранена."},
+  "notesEditFailed": {"message": "Не удалось сохранить заметку. Черновик сохранён. Повторите попытку."},
+  "libraryClearFilters": {"message": "Очистить поиск и фильтры"}
 }

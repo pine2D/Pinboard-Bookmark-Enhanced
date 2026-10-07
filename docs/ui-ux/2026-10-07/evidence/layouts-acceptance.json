@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-07T06:09:24.006Z",
+  "label": "layouts-accepted",
+  "surfaces": [
+    {
+      "name": "layouts",
+      "states": [
+        {
+          "state": "de-appearance-320",
+          "file": "01-layouts-de-appearance-320.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/options.html#appearance",
+          "events": []
+        },
+        {
+          "state": "ask-1024",
+          "file": "02-layouts-ask-1024.png",
+          "url": "chrome-extension://feoognahlmfmbllpmgailahcnjppiegb/md-preview.html?k=qa-drive-preview",
+          "events": []
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "notes": [
+        "9 locales × 2 densities × 2 themes × 2 widths × all settings tabs measured.",
+        "{\"viewport\":880,\"width\":819.828125,\"scroll\":860,\"ask\":{\"x\":10,\"y\":638.15625,\"width\":860,\"height\":261.84375,\"top\":638.15625,\"right\":870,\"bottom\":900,\"left\":10},\"rail\":{\"x\":-245.8208465576172,\"y\":0,\"width\":256,\"height\":900,\"top\":0,\"right\":10.179153442382812,\"bottom\":900,\"left\":-245.8208465576172}}",
+        "{\"viewport\":1000,\"width\":880,\"scroll\":980,\"ask\":{\"x\":10,\"y\":635.609375,\"width\":980,\"height\":264.390625,\"top\":635.609375,\"right\":990,\"bottom\":900,\"left\":10},\"rail\":{\"x\":-246,\"y\":0,\"width\":256,\"height\":900,\"top\":0,\"right\":10,\"bottom\":900,\"left\":-246}}",
+        "{\"viewport\":1001,\"width\":653,\"scroll\":981,\"ask\":{\"x\":274,\"y\":635.609375,\"width\":717,\"height\":264.390625,\"top\":635.609375,\"right\":991,\"bottom\":900,\"left\":274},\"rail\":{\"x\":10,\"y\":0,\"width\":256,\"height\":900,\"top\":0,\"right\":266,\"bottom\":900,\"left\":10}}",
+        "{\"viewport\":1024,\"width\":676,\"scroll\":1004,\"ask\":{\"x\":274,\"y\":635.125,\"width\":740,\"height\":264.875,\"top\":635.125,\"right\":1014,\"bottom\":900,\"left\":274},\"rail\":{\"x\":10,\"y\":0,\"width\":256,\"height\":900,\"top\":0,\"right\":266,\"bottom\":900,\"left\":10}}",
+        "{\"viewport\":1100,\"width\":752,\"scroll\":1080,\"ask\":{\"x\":274,\"y\":633.53125,\"width\":816,\"height\":266.46875,\"top\":633.53125,\"right\":1090,\"bottom\":900,\"left\":274},\"rail\":{\"x\":10,\"y\":0,\"width\":256,\"height\":900,\"top\":0,\"right\":266,\"bottom\":900,\"left\":10}}",
+        "{\"viewport\":1199,\"width\":851,\"scroll\":1179,\"ask\":{\"x\":274,\"y\":631.4375,\"width\":915,\"height\":268.5625,\"top\":631.4375,\"right\":1189,\"bottom\":900,\"left\":274},\"rail\":{\"x\":10,\"y\":0,\"width\":256,\"height\":900,\"top\":0,\"right\":266,\"bottom\":900,\"left\":10}}",
+        "{\"viewport\":1200,\"width\":852,\"scroll\":1180,\"ask\":{\"x\":274,\"y\":631.421875,\"width\":916,\"height\":268.578125,\"top\":631.421875,\"right\":1190,\"bottom\":900,\"left\":274},\"rail\":{\"x\":10,\"y\":0,\"width\":256,\"height\":900,\"top\":0,\"right\":266,\"bottom\":900,\"left\":10}}",
+        "{\"viewport\":1280,\"width\":536,\"scroll\":1260,\"ask\":{\"x\":890,\"y\":0,\"width\":380,\"height\":900,\"top\":0,\"right\":1270,\"bottom\":900,\"left\":890},\"rail\":{\"x\":10,\"y\":0,\"width\":256,\"height\":900,\"top\":0,\"right\":266,\"bottom\":900,\"left\":10}}",
+        "{\"viewport\":1440,\"width\":696,\"scroll\":1420,\"ask\":{\"x\":1050,\"y\":0,\"width\":380,\"height\":900,\"top\":0,\"right\":1430,\"bottom\":900,\"left\":1050},\"rail\":{\"x\":10,\"y\":0,\"width\":256,\"height\":900,\"top\":0,\"right\":266,\"bottom\":900,\"left\":10}}",
+        "a11y(popup-main-section)：0 类违规",
+        "a11y(popup-login-section)：0 类违规"
+      ],
+      "failures": [],
+      "_events": [],
+      "_lastCursor": 0,
+      "a11y": {
+        "popup-main-section": [],
+        "popup-login-section": []
+      }
+    }
+  ],
+  "headless": true,
+  "siteTheme": "modern-card",
+  "extensionId": "feoognahlmfmbllpmgailahcnjppiegb",
+  "hostPermissionGrants": {
+    "http://127.0.0.1/*": true,
+    "http://localhost/*": true,
+    "https://freedictionaryapi.com/*": true
+  },
+  "aiRequests": 0,
+  "environment": {
+    "commit": "1ea601ce",
+    "dirty": 21,
+    "chromium": "147.0.7727.15",
+    "node": "v24.14.1",
+    "platform": "linux"
+  },
+  "network": [
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/tags/get",
+      "disposition": "pinboard-fixture"
+    }
+  ]
+}

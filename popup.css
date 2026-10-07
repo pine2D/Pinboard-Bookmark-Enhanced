@@ -3299,3 +3299,6 @@ html[data-theme] .md-strip-btn:focus-visible { border-color: var(--pp-focus-bd);
     outline-offset: 2px;
   }
 }
+
+/* Semantic heading shares the established compact header face. */
+.header-bar h1 { margin: 0; font: inherit; color: inherit; }

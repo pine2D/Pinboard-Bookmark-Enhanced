@@ -4016,5 +4016,11 @@
     "message": "Impossible de conserver le brouillon. Enregistrez le signet avant de fermer la fenêtre."
   },
   "optSavePending": { "message": "Modifications non enregistrées" },
-  "optRetrySave": { "message": "Réessayer d’enregistrer" }
+  "optRetrySave": { "message": "Réessayer d’enregistrer" },
+  "trRateLimitWaiting": {"message": "Limite atteinte. Nouvel essai dans $SECONDS$ s…", "placeholders": {"seconds": {"content": "$1"}}},
+  "trStopped": {"message": "Arrêté. $DONE$ / $TOTAL$ segments conservés.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
+  "notesEdit": {"message": "Modifier la note"},
+  "notesEditSaved": {"message": "Note enregistrée."},
+  "notesEditFailed": {"message": "Impossible d’enregistrer la note. Le brouillon est conservé. Réessayez."},
+  "libraryClearFilters": {"message": "Effacer la recherche et les filtres"}
 }

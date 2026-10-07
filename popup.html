@@ -8,8 +8,9 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
+  <main>
   <div id="login-section" class="hidden">
-    <div class="header-bar"><span data-i18n="appName">Pinboard Bookmark Enhanced</span><span class="header-icons"><button type="button" class="header-ic" id="login-options-link" data-i18n-title="settings" data-i18n-aria="settings"><span class="btn-ic" data-ic="gear"></span></button></span></div>
+    <div class="header-bar"><h1 data-i18n="appName">Pinboard Bookmark Enhanced</h1><span class="header-icons"><button type="button" class="header-ic" id="login-options-link" data-i18n-title="settings" data-i18n-aria="settings"><span class="btn-ic" data-ic="gear"></span></button></span></div>
     <form id="login-form" class="login-body">
       <p><span data-i18n="loginPrompt">Enter your API token from</span> <a href="https://pinboard.in/settings/password" target="_blank" rel="noopener"><span data-i18n="settingsPassword">pinboard.in/settings/password</span></a></p>
       <div class="secret-field">
@@ -23,7 +24,7 @@
 
   <div id="main-section" class="hidden">
     <div class="header-bar">
-      <span id="user-info"></span>
+      <h1 id="user-info"></h1>
       <span class="header-icons"><button type="button" class="header-ic" id="library-link" data-i18n-title="libraryOpen" data-i18n-aria="libraryOpen"><span class="btn-ic" data-ic="bookMarked"></span></button><button type="button" class="header-ic" id="options-link" data-i18n-title="settings" data-i18n-aria="settings"><span class="btn-ic" data-ic="gear"></span></button><button type="button" class="header-ic" id="logout-link" data-i18n-title="logout" data-i18n-aria="logout"><span class="btn-ic" data-ic="logout"></span></button></span>
     </div>
 
@@ -174,6 +175,8 @@
     <div id="offline-queue-list" class="offline-queue-list hidden"></div>
     <div id="recent-bookmarks" class="recent-bm-area hidden"></div>
   </div>
+
+  </main>
 
   <!-- P2.9: defer — allow parallel fetch during HTML parse while preserving execution order -->
   <script defer src="i18n.js"></script>

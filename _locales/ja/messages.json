@@ -4016,5 +4016,11 @@
     "message": "下書きを保持できませんでした。ポップアップを閉じる前にブックマークを保存してください。"
   },
   "optSavePending": { "message": "変更は未保存です" },
-  "optRetrySave": { "message": "保存を再試行" }
+  "optRetrySave": { "message": "保存を再試行" },
+  "trRateLimitWaiting": {"message": "レート制限中。$SECONDS$ 秒後に再試行…", "placeholders": {"seconds": {"content": "$1"}}},
+  "trStopped": {"message": "停止しました。$DONE$ / $TOTAL$ 段落を保持。", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
+  "notesEdit": {"message": "メモを編集"},
+  "notesEditSaved": {"message": "メモを保存しました。"},
+  "notesEditFailed": {"message": "メモを保存できませんでした。下書きは保持されています。再試行してください。"},
+  "libraryClearFilters": {"message": "検索と絞り込みを解除"}
 }

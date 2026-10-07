@@ -5975,7 +5975,7 @@ const VALUE_BOX_LEGS = Object.freeze({
       ["#vocab-search", null], ["#vocab-group-filter-btn", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang-btn", null],
       ["#vocab-detail .vocab-note-input", null],
       ["#vocab-batch-toolbar .vocab-group-unit", null], ["#vocab-detail .vocab-group-unit", null],
-      ["#notes-filter", null],
+      ["#notes-filter", null], ["#notes-detail .vocab-note-input", null],
     ]),
     legs: Object.freeze([
       {
@@ -6019,10 +6019,13 @@ const VALUE_BOX_LEGS = Object.freeze({
         // Reuses the vocab leg's page (no navigation): switches it to the
         // notes tab.
         context: "notes",
-        boxes: ["#notes-filter"],
+        boxes: ["#notes-filter", "#notes-detail .vocab-note-input"],
         async open(page, url, theme) {
           await page.click("#lib-tab-notes");
           await page.waitForSelector("#notes-filter", { state: "visible", timeout: TIMEOUT_MS });
+          await page.locator("#notes-list .notes-hit-btn").first().click();
+          await page.locator("#notes-detail .notes-note-edit").first().click();
+          await page.waitForSelector("#notes-detail .vocab-note-input");
           await page.evaluate(() => document.activeElement?.blur?.());
           await page.mouse.move(0, 0);
           await settleAnimations(page);
