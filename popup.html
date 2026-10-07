@@ -35,18 +35,18 @@
       <div class="row">
         <label class="label" for="url-input" data-i18n="labelUrl">URL</label>
         <div class="field">
-          <input type="text" id="url-input" aria-label="Bookmark URL" data-i18n-aria="labelUrl" />
+          <input type="text" id="url-input" readonly aria-label="Bookmark URL" data-i18n-aria="labelUrl" />
           <div id="url-clean-hint" class="url-clean-hint hidden" aria-live="polite"></div>
         </div>
       </div>
       <div class="row">
         <label class="label" for="title-input" data-i18n="labelTitle">Title</label>
-        <div class="field"><input type="text" id="title-input" dir="auto" aria-label="Bookmark title" data-i18n-aria="labelTitle" /></div>
+        <div class="field"><input type="text" id="title-input" readonly dir="auto" aria-label="Bookmark title" data-i18n-aria="labelTitle" /></div>
       </div>
       <div class="row">
         <label class="label top" for="description-input" data-i18n="labelNotes">Notes</label>
         <div class="field">
-          <textarea id="description-input" rows="3" dir="auto" aria-label="Notes" data-i18n-aria="labelNotes"></textarea>
+          <textarea id="description-input" readonly rows="3" dir="auto" aria-label="Notes" data-i18n-aria="labelNotes"></textarea>
           <div class="notes-bar">
             <span id="desc-char-count">0</span>
             <span id="ai-summary-hint" class="kb-hint" data-i18n="aiSummaryBtnTitle"></span>
@@ -59,7 +59,7 @@
         <div class="field">
           <div class="tags-input-wrap">
             <div id="tags-display" class="tags-display"></div>
-            <input type="text" id="tags-input" autofocus dir="auto" role="combobox" aria-autocomplete="list" aria-controls="tags-autocomplete" aria-expanded="false" autocomplete="off" spellcheck="false" aria-label="Add tags" data-i18n-aria="placeholderAddTags" />
+            <input type="text" id="tags-input" readonly autofocus dir="auto" role="combobox" aria-autocomplete="list" aria-controls="tags-autocomplete" aria-expanded="false" autocomplete="off" spellcheck="false" aria-label="Add tags" data-i18n-aria="placeholderAddTags" />
           </div>
           <div id="tags-autocomplete" class="autocomplete-dropdown hidden" role="listbox"></div>
           <div class="actions">
@@ -102,9 +102,9 @@
         <button type="button" id="ai-error-dismiss" class="fc-dismiss" title="" data-i18n-title="aiErrorDismiss" data-i18n-aria="aiErrorDismiss">×</button>
       </div>
       <div class="bottom-bar">
-        <label><input type="checkbox" id="private-check" aria-keyshortcuts="Alt+P" /> <span data-i18n="private">private</span></label>
-        <label><input type="checkbox" id="readlater-check" aria-keyshortcuts="Alt+R" /> <span data-i18n="readLater">read later</span></label>
-        <label><input type="checkbox" id="archive-check" aria-keyshortcuts="Alt+A" /> <span data-i18n="archiveThisSave">archive</span></label>
+        <label><input type="checkbox" id="private-check" disabled aria-keyshortcuts="Alt+P" /> <span data-i18n="private">private</span></label>
+        <label><input type="checkbox" id="readlater-check" disabled aria-keyshortcuts="Alt+R" /> <span data-i18n="readLater">read later</span></label>
+        <label><input type="checkbox" id="archive-check" disabled aria-keyshortcuts="Alt+A" /> <span data-i18n="archiveThisSave">archive</span></label>
         <span id="bottom-kb-hint" class="kb-hint" data-i18n="kbdAltCheckHint"></span>
       </div>
       <div class="submit-bar">

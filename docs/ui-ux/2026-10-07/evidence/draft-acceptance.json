@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-07T04:44:51.159Z",
-  "label": "popup-draft-first-batch",
+  "generatedAt": "2026-10-07T05:43:29.119Z",
+  "label": "popup-draft-boundaries-final",
   "surfaces": [
     {
       "name": "popup-drafts",
@@ -20,7 +20,8 @@
       "consoleErrors": [],
       "pageErrors": [],
       "notes": [
-        "{\"before\":{\"form\":{\"url\":\"http://127.0.0.1:43123/qa-article?edited=1\",\"title\":\"UX edited title\",\"notes\":\"UX_UNSAVED_DRAFT_20261007\",\"tags\":[\"manual-one\",\"manual-two\"],\"tagInput\":\"pending-tag\",\"private\":true,\"toread\":true,\"archive\":false,\"archiveTouched\":false},\"dirty\":true},\"after\":{\"form\":{\"url\":\"http://127.0.0.1:43123/qa-article?edited=1\",\"title\":\"UX edited title\",\"notes\":\"UX_UNSAVED_DRAFT_20261007\",\"tags\":[\"manual-one\",\"manual-two\"],\"tagInput\":\"pending-tag\",\"private\":true,\"toread\":true,\"archive\":false,\"archiveTouched\":false},\"dirty\":true}}"
+        "{\"before\":{\"form\":{\"url\":\"http://127.0.0.1:43123/qa-article?edited=1\",\"title\":\"UX edited title\",\"notes\":\"UX_UNSAVED_DRAFT_20261007\",\"tags\":[\"manual-one\",\"manual-two\"],\"tagInput\":\"pending-tag\",\"private\":true,\"toread\":true,\"archive\":false,\"archiveTouched\":false},\"dirty\":true},\"after\":{\"form\":{\"url\":\"http://127.0.0.1:43123/qa-article?edited=1\",\"title\":\"UX edited title\",\"notes\":\"UX_UNSAVED_DRAFT_20261007\",\"tags\":[\"manual-one\",\"manual-two\"],\"tagInput\":\"pending-tag\",\"private\":true,\"toread\":true,\"archive\":false,\"archiveTouched\":false},\"dirty\":true}}",
+        "PASS: real toolbar close/reopen; disposable extension-tab boundaries with real source-tab API fixture: pending restore field merge, editable empty URL/no lookup, recent source scope, explicit discard."
       ],
       "failures": [],
       "_events": [],
@@ -37,8 +38,8 @@
   },
   "aiRequests": 0,
   "environment": {
-    "commit": "7476e667",
-    "dirty": 30,
+    "commit": "07d2477b",
+    "dirty": 29,
     "chromium": "147.0.7727.15",
     "node": "v24.14.1",
     "platform": "linux"
@@ -72,6 +73,30 @@
       "method": "GET",
       "origin": "https://api.pinboard.in",
       "path": "/v1/posts/suggest",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/tags/get",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/recent",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/suggest",
+      "disposition": "pinboard-fixture"
+    },
+    {
+      "method": "GET",
+      "origin": "https://api.pinboard.in",
+      "path": "/v1/posts/get",
       "disposition": "pinboard-fixture"
     }
   ]

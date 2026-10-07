@@ -1723,14 +1723,40 @@ async function diffAgainstPrev(runDir, prevDir) {
 async function drivePopupDrafts(context, worker, extId, rep) {
   const s=rep.surface('popup-drafts');
   const page=await context.newPage();
-  let cdp,session;
+  let cdp,session,sourceTab,boundaryTabs=false;
   try {
     await page.goto(ARTICLE_URL); await page.bringToFront();
+    sourceTab=await worker.evaluate(async(url)=>(await chrome.tabs.query({})).find(tab=>tab.url===url),ARTICLE_URL);
     cdp=await context.browser().newBrowserCDPSession();
     await cdp.send('Target.setDiscoverTargets',{discover:true});
-    const open = async () => {
+    const evaluate = async (expression) => {
+      let r;
+      try { r = await session.send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true}); }
+      catch (e) { throw new Error(`Popup evaluation ${expression.slice(0,100)}: ${e.message}`); }
+      if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
+      return r.result.value;
+    };
+    const open = async (ready = true) => {
       const popupUrl=`chrome-extension://${extId}/popup.html`;
-      await worker.evaluate(()=>chrome.action.openPopup());
+      if (boundaryTabs) {
+        // Repeated native popup creation is OS-focus-sensitive under Xvfb.
+        // The first close/reopen pair above uses the real toolbar. Boundary
+        // cases run the same popup document in disposable extension tabs,
+        // with its active-tab API returning the real source tab.
+        const tabPage=await context.newPage();
+        await tabPage.addInitScript((source)=>{
+          const query=chrome.tabs.query.bind(chrome.tabs);
+          chrome.tabs.query=(info,...rest)=>info.active?Promise.resolve([source]):query(info,...rest);
+        },sourceTab);
+        await tabPage.goto(popupUrl);
+      } else {
+        await worker.evaluate(async()=>{
+          const windows=await chrome.windows.getAll({windowTypes:["normal"]});
+          const windowId=windows[0].id;
+          await chrome.windows.update(windowId,{focused:true});
+          await chrome.action.openPopup({windowId});
+        });
+      }
       const deadline=Date.now()+15000;let target;
       while(Date.now()<deadline) {
         const r=await cdp.send('Target.getTargets');
@@ -1743,7 +1769,7 @@ async function drivePopupDrafts(context, worker, extId, rep) {
       session=createTargetSession(cdp,sessionId);
       await session.send('Runtime.enable');await session.send('Page.enable');
       for(let i=0;i<150;i++) {
-        const r=await session.send('Runtime.evaluate',{expression:'!!document.getElementById("main-section") && !document.getElementById("main-section").classList.contains("hidden") && document.getElementById("url-input").value.includes("qa-article")',returnByValue:true});
+        const r=await session.send('Runtime.evaluate',{expression:ready ? 'typeof _pageInfoReady !== "undefined" && _pageInfoReady && _popupDraftContext?.ready' : 'typeof _popupDraftContext !== "undefined" && !!_popupDraftContext',returnByValue:true});
         if(r.result.value)break;await new Promise(r=>setTimeout(r,100));
       }
       await new Promise(r=>setTimeout(r,1000));
@@ -1759,6 +1785,51 @@ async function drivePopupDrafts(context, worker, extId, rep) {
     r=await session.send('Page.captureScreenshot',{format:'png'});rep.saveShotBuffer(Buffer.from(r.data,'base64'),s,'after-reopen');
     s.notes.push(JSON.stringify({before:before.result.value,after:after.result.value}));
     if (JSON.stringify(before.result.value) !== JSON.stringify(after.result.value)) throw new Error("Unsaved draft did not survive popup close/reopen");
+    await cdp.send('Target.closeTarget',{targetId:id});
+    session.close();session=null;
+    boundaryTabs=true;
+    // Hold only the read response. Input writes still run in the real SW and
+    // must merge into its prior row even after this document closes.
+    await worker.evaluate(() => {
+      self.qaDraftReadResolvers=[];
+      self.qaDraftOriginalHandler=pbpRunPopupDraft;
+      pbpRunPopupDraft=async(message)=>{
+        const result=await self.qaDraftOriginalHandler(message);
+        if(message.action==='read')await new Promise(r=>self.qaDraftReadResolvers.push(r));
+        return result;
+      };
+    });
+    await page.bringToFront();id=await open(false);
+    await evaluate('document.getElementById("title-input").value="Edited before restore";document.getElementById("title-input").dispatchEvent(new Event("input",{bubbles:true}));');
+    await cdp.send('Target.closeTarget',{targetId:id});session.close();session=null;
+    await worker.evaluate(() => {pbpRunPopupDraft=self.qaDraftOriginalHandler;for(const r of self.qaDraftReadResolvers)r();});
+    await page.bringToFront();id=await open();
+    const merged=await evaluate('pbpPopupDraftSnapshot()');
+    if(merged.title!=='Edited before restore'||merged.notes!==before.result.value.form.notes||merged.tags.join('|')!==before.result.value.form.tags.join('|')||!merged.private)throw new Error('Pending restore lost edited or untouched fields');
+    await evaluate('document.getElementById("url-input").value="";document.getElementById("url-input").dispatchEvent(new Event("input",{bubbles:true}));document.getElementById("description-input").value="Empty URL note";document.getElementById("description-input").dispatchEvent(new Event("input",{bubbles:true}));');
+    await cdp.send('Target.closeTarget',{targetId:id});session.close();session=null;
+    await page.bringToFront();id=await open();
+    const empty=await evaluate('({draft:pbpPopupDraftSnapshot(),editable:!document.getElementById("main-section").classList.contains("unsupported-url"),lookup:bookmarkLookup.status})');
+    if(empty.draft.url!==''||empty.draft.notes!=='Empty URL note'||!empty.editable||empty.lookup!=='idle')throw new Error('Incomplete URL was lost or queried automatically');
+    // Recent lookup shares Pinboard's 3.1s queue with all prior popup opens.
+    // Start the actual editor and type while it waits; draft ownership must
+    // already be correct, independently of that network completion.
+    await evaluate('void loadBookmarkForEdit("https://example.com/qa-recent-edit",settings.pinboardToken)');
+    for (let i=0;i<50;i++) {
+      if(await evaluate('document.getElementById("url-input").value==="https://example.com/qa-recent-edit"'))break;
+      await new Promise(r=>setTimeout(r,100));
+    }
+    await evaluate('document.getElementById("description-input").value="Recent edit retained";document.getElementById("description-input").dispatchEvent(new Event("input",{bubbles:true}));');
+    await cdp.send('Target.closeTarget',{targetId:id});session.close();session=null;
+    await page.bringToFront();id=await open();
+    const recent=await evaluate('({draft:pbpPopupDraftSnapshot(),scope:_popupDraftContext.pageUrl})');
+    if(recent.draft.url!=='https://example.com/qa-recent-edit'||recent.draft.notes!=='Recent edit retained'||recent.scope!==ARTICLE_URL)throw new Error('Recent edit restored under the wrong scope');
+    await evaluate('pbpDiscardPopupDraft()');
+    await cdp.send('Target.closeTarget',{targetId:id});session.close();session=null;
+    await page.bringToFront();id=await open();
+    const cleared=await evaluate('({restored:_popupDraftRestored,url:document.getElementById("url-input").value})');
+    if(cleared.restored||cleared.url.includes('qa-recent-edit'))throw new Error('Discarded recent edit resurrected');
+    s.notes.push('PASS: real toolbar close/reopen; disposable extension-tab boundaries with real source-tab API fixture: pending restore field merge, editable empty URL/no lookup, recent source scope, explicit discard.');
     await cdp.send('Target.closeTarget',{targetId:id});
   }catch(e){s.failures.push(e.stack);}
   finally{session?.close();await cdp?.detach().catch(()=>{});await page.close().catch(()=>{});}

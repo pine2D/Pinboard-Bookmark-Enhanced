@@ -649,7 +649,7 @@ function setupAIFeatures() {
       }
       if (cached &&
           pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
-        upsertSummary(cached);
+        upsertSummary(cached, { userEdit: false });
         showSummaryActions(true);
       }
     });
@@ -716,7 +716,7 @@ async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
 // ---- Insert or replace AI summary in description ----
 // Replace the session-owned range, migrate the last legacy block in place,
 // or append a new block without rewriting surrounding notes.
-function upsertSummary(summary) {
+function upsertSummary(summary, { userEdit = true } = {}) {
   const di = $id("description-input");
   const cur = di.value;
   const wrapped = pbpAiWrapSummary(summary);
@@ -740,6 +740,7 @@ function upsertSummary(summary) {
   di.value = next;
   _aiSummaryRange = { start, end: start + wrapped.length };
   _aiSummaryValue = next;
+  if (userEdit && next !== cur && typeof pbpPopupDraftFieldEdited === "function") pbpPopupDraftFieldEdited("description-input");
   updateCharCount();
   autoResizeTextarea(di);
 }
@@ -760,6 +761,7 @@ function removeSummary() {
   if (removed.removed) di.value = removed.value;
   _aiSummaryRange = null;
   _aiSummaryValue = di.value;
+  if (removed.removed && typeof pbpPopupDraftFieldEdited === "function") pbpPopupDraftFieldEdited("description-input");
   updateCharCount();
   autoResizeTextarea(di);
   return removed.removed;

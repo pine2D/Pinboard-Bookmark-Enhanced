@@ -121,6 +121,7 @@ function recomputeArchiveCheck() {
     force: false,
     override: undefined,
   });
+  if (typeof pbpRememberPopupDraft === "function") pbpRememberPopupDraft();
 }
 
 function shouldUpdateField(fieldId) {
@@ -180,77 +181,121 @@ let _activeTabAtOpen = null;
 // closing this short-lived document does not cancel queued work.
 let _popupDraftContext = null;
 let _popupDraftRevision = 0;
+let _popupDraftWriteRevision = 0;
 let _popupDraftUserUrl = false;
 let _popupDraftRestored = false;
 let _popupDraftEdited = false;
+let _popupDraftLastSnapshot = "";
+const _popupDraftChangedFields = new Set();
 function pbpPopupDraftSnapshot() {
-  return { url: $id("url-input").value.trim(), title: $id("title-input").value,
+  return { url: $id("url-input").value, title: $id("title-input").value,
     notes: $id("description-input").value, tags: currentTags.slice(), tagInput: $id("tags-input").value,
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
     archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched };
 }
 function pbpRememberPopupDraft() {
-  if (!_popupDraftContext?.ready) return;
+  if (!_popupDraftContext) return;
   if (!pbpPopupFormIsDirty() && !_popupDraftEdited && !$id("tags-input").value) return;
+  if (_tagsUserTouched) _popupDraftChangedFields.add("tags");
+  const draft = pbpPopupDraftSnapshot();
+  const snapshot = JSON.stringify(draft);
+  if (snapshot === _popupDraftLastSnapshot) return;
+  _popupDraftLastSnapshot = snapshot;
+  _popupDraftEdited = true;
   _popupDraftRevision++;
-  const revision = _popupDraftRevision;
+  const revision = ++_popupDraftWriteRevision;
   const context = _popupDraftContext;
-  chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ..._popupDraftContext,
-    action: "write", draft: pbpPopupDraftSnapshot() }).then((result) => {
-    if (!result?.ok && context === _popupDraftContext && revision === _popupDraftRevision) {
+  chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ...context,
+    action: "write", draft, ...(!context.ready ? { fields: [..._popupDraftChangedFields] } : {}) }).then((result) => {
+    if (!result?.ok && context === _popupDraftContext && revision === _popupDraftWriteRevision) {
+      _popupDraftLastSnapshot = "";
       showStatus("status-msg", t("popupDraftFailed"), "error");
     }
   }).catch((e) => {
     console.warn("[popup-draft] dispatch failed:", e && e.name, e && e.message);
-    if (context === _popupDraftContext && revision === _popupDraftRevision) showStatus("status-msg", t("popupDraftFailed"), "error");
+    if (context === _popupDraftContext && revision === _popupDraftWriteRevision) {
+      _popupDraftLastSnapshot = "";
+      showStatus("status-msg", t("popupDraftFailed"), "error");
+    }
   });
 }
 async function pbpDiscardPopupDraft(allOwner = false) {
-  if (!_popupDraftContext) return;
-  await chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ..._popupDraftContext,
+  if (!_popupDraftContext) return true;
+  const context = _popupDraftContext;
+  // Cancel owns the old context immediately. A late AI/prefill completion
+  // must not queue a new write behind the clear that is in progress.
+  _popupDraftContext = null;
+  _popupDraftWriteRevision++;
+  const result = await chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ...context,
     action: allOwner ? "clearOwner" : "clear" }).catch((e) => {
     console.warn("[popup-draft] clear failed:", e && e.name, e && e.message);
   });
+  if (!result?.ok) {
+    if (!_popupDraftContext) _popupDraftContext = context;
+    showStatus("status-msg", t("popupDraftFailed"), "error");
+    return false;
+  }
+  _popupDraftLastSnapshot = "";
+  return true;
+}
+function pbpPopupDraftFieldEdited(id) {
+  _popupDraftRevision++;
+  _popupDraftEdited = true;
+  if (id in fieldDirtyFlags) fieldDirtyFlags[id] = true;
+  if (id === "url-input") _popupDraftUserUrl = true;
+  if (id === "archive-check") _archiveUserTouched = true;
+  const key = { "url-input": "url", "title-input": "title", "description-input": "notes", "tags-input": "tagInput",
+    "private-check": "private", "readlater-check": "toread", "archive-check": "archive" }[id];
+  _popupDraftChangedFields.add(key);
+  if (id === "archive-check") _popupDraftChangedFields.add("archiveTouched");
+  pbpRememberPopupDraft();
 }
 function setupPopupDraftTracking() {
   for (const id of ["url-input", "title-input", "description-input", "tags-input", "private-check", "readlater-check", "archive-check"]) {
-    const mark = () => {
-      _popupDraftRevision++;
-      _popupDraftEdited = true;
-      if (id in fieldDirtyFlags) fieldDirtyFlags[id] = true;
-      if (id === "url-input") _popupDraftUserUrl = true;
-      if (id === "archive-check") _archiveUserTouched = true;
-      pbpRememberPopupDraft();
-    };
+    const mark = () => pbpPopupDraftFieldEdited(id);
     $id(id).addEventListener("input", mark);
     $id(id).addEventListener("change", mark);
   }
+}
+function pbpPopupHasWebUrl(value) {
+  try { const u = new URL(value); return /^https?:$/.test(u.protocol) && !u.username && !u.password; }
+  catch (_) { return false; }
 }
 async function initPopupDraft(account, tab) {
   if (!account || !tab?.url || !/^https?:\/\//.test(tab.url)) return;
   const context = { account, pageUrl: tab.url, incognito: tab.incognito === true, ready: false };
   _popupDraftContext = context;
+  _popupDraftLastSnapshot = "";
   const revision = _popupDraftRevision;
+  for (const id of ["url-input", "title-input", "description-input", "tags-input", "private-check", "readlater-check", "archive-check"]) {
+    const el = $id(id);
+    if (id.endsWith("check")) el.disabled = false; else el.readOnly = false;
+  }
+  if (_popupDraftChangedFields.size) pbpRememberPopupDraft();
   try {
     const result = await chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ...context, action: "read" });
     const auth = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
     if (_popupDraftContext !== context || (result?.ok && result.account !== account)
         || pbpPinboardAccountFromToken(auth.pinboardToken) !== account) return;
-    if (result.ok && result.draft && revision === _popupDraftRevision) {
+    if (!result?.ok) {
+      showStatus("status-msg", t("popupDraftFailed"), "error");
+      return;
+    }
+    if (result?.ok && result.draft) {
       const d = result.draft;
-      $id("url-input").value = d.url;
-      $id("title-input").value = d.title;
-      $id("description-input").value = d.notes;
-      $id("tags-input").value = d.tagInput;
-      $id("private-check").checked = d.private;
-      $id("readlater-check").checked = d.toread;
-      $id("archive-check").checked = d.archive;
-      _archiveUserTouched = d.archiveTouched;
+      for (const [id, key] of Object.entries({ "url-input": "url", "title-input": "title", "description-input": "notes", "tags-input": "tagInput",
+        "private-check": "private", "readlater-check": "toread", "archive-check": "archive" })) {
+        if (!_popupDraftChangedFields.has(key)) $id(id)[id.endsWith("check") ? "checked" : "value"] = d[key];
+      }
+      if (!_popupDraftChangedFields.has("archiveTouched")) _archiveUserTouched = d.archiveTouched;
       _popupDraftUserUrl = true;
       _popupDraftRestored = true;
       for (const id of Object.keys(fieldDirtyFlags)) fieldDirtyFlags[id] = true;
       _tagsUserTouched = true;
-      currentTags = d.tags.slice();
+      if (!_popupDraftChangedFields.has("tags")) currentTags = d.tags.slice();
+      // Rendering a restored form does not refresh its expiry timestamp.
+      if (revision === _popupDraftRevision) _popupDraftLastSnapshot = JSON.stringify(pbpPopupDraftSnapshot());
+      context.ready = true;
       renderTags();
       showStatus("status-msg", t("popupDraftRestored"), "info");
     }
@@ -258,7 +303,7 @@ async function initPopupDraft(account, tab) {
     if (revision !== _popupDraftRevision) pbpRememberPopupDraft();
   } catch (e) {
     console.warn("[popup-draft] restore failed:", e && e.name, e && e.message);
-    context.ready = true;
+    showStatus("status-msg", t("popupDraftFailed"), "error");
     pbpRememberPopupDraft();
   }
 }
@@ -593,6 +638,10 @@ async function showMain(token) {
     if (!_popupDraftUserUrl) $id("url-input").value = tab.url || "";
     if (shouldUpdateField("title-input")) $id("title-input").value = tab.title || "";
   }
+  // Seed defaults before any await so the first input snapshot has the same
+  // privacy/read-later values the user sees after page-info arrives.
+  if (shouldUpdateField("private-check") && (settings.optPrivateDefault || (settings.optPrivateIncognito && tab?.incognito))) $id("private-check").checked = true;
+  if (shouldUpdateField("readlater-check") && settings.optReadlaterDefault) $id("readlater-check").checked = true;
   // Kick off page-info extraction AND the bookmark cache lookup in parallel — both depend
   // only on `tab` (already obtained). Awaiting them sequentially wastes overlap potential.
   // Bind extraction and bookmark prefetch to the same URL so a mid-open navigation cannot
@@ -608,7 +657,7 @@ async function showMain(token) {
   const _bookmarkPrefetchUrl = _popupDraftUserUrl ? $id("url-input").value.trim() : tab?.url
     ? (_ucs.enabled && _ucs.onPopupOpen ? stripTrackingParams(tab.url, _ucs).cleaned : tab.url)
     : "";
-  const _bookmarkPrefetchPromise = _bookmarkPrefetchUrl
+  const _bookmarkPrefetchPromise = pbpPopupHasWebUrl(_bookmarkPrefetchUrl)
     ? chrome.runtime.sendMessage({ type: "get_bookmark_data", url: _bookmarkPrefetchUrl, account: sessionAccount }).catch(() => null)
     : Promise.resolve(null);
   // Tag entry only needs the DOM, so wire it before the wait below: typing tags
@@ -734,8 +783,6 @@ async function showMain(token) {
   updateCharCount();
   setTimeout(() => autoResizeTextarea($id("description-input")), 50);
 
-  if (shouldUpdateField("private-check") && (settings.optPrivateDefault || (settings.optPrivateIncognito && tab?.incognito))) $id("private-check").checked = true;
-  if (shouldUpdateField("readlater-check") && settings.optReadlaterDefault) $id("readlater-check").checked = true;
   // Gated on the setting, because this await sits BEFORE setupSubmit(token)
   // sets _pageInfoReady -- its round trip is added straight onto the window in
   // which the Save button is disabled. Both readers of _waybackHostGranted
@@ -1301,11 +1348,11 @@ async function htmlToMarkdownAsync(html, opts) {
   // Suggest tags — enqueue after user tags so tagCaseMap is ready.
   // #suggest-row's own unhide already happened up in the showMain visibility
   // switch (K70) so the skeleton isn't waiting on this await chain to paint.
-  if (settings.optShowSuggestTags) fetchPinboardSuggestTags(token, targetUrl);
+  if (settings.optShowSuggestTags && pbpPopupHasWebUrl(targetUrl)) fetchPinboardSuggestTags(token, targetUrl);
   // Bookmark check — non-blocking, updates UI when ready.
   // Pass the prefetched cache promise (started right after popup-form-ready) so the
   // service-worker round-trip overlaps with getPageInfoFromTab instead of running after it.
-  checkExistingBookmark(token, targetUrl, {
+  if (pbpPopupHasWebUrl(targetUrl)) checkExistingBookmark(token, targetUrl, {
     prefetchUrl: _bookmarkPrefetchUrl,
     prefetchPromise: _bookmarkPrefetchPromise,
   });
@@ -1413,7 +1460,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
         currentTags = Array.isArray(submittedTags)
           ? pbpRebasePopupTags(existingBookmark.tags || "", submittedTags, currentTags)
-          : _popupDraftRestored ? currentTags : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
+          : (_popupDraftRestored || _tagsUserTouched) ? currentTags : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
         renderTags();
         $id("submit-btn").textContent = t("update");
         $id("delete-btn").classList.remove("hidden");
@@ -1739,6 +1786,8 @@ function setupSubmit(token) {
         if (formMatchesSubmitted()) {
           _popupDraftEdited = false;
           _popupDraftRestored = false;
+          _popupDraftLastSnapshot = "";
+          _popupDraftChangedFields.clear();
         }
         try {
           if (typeof pbpAiSaveSummaryOwnership === "function") {
@@ -1980,8 +2029,12 @@ function setupSubmit(token) {
 
 // ===================== Edit From Recent =====================
 async function loadBookmarkForEdit(url, token) {
-  await pbpDiscardPopupDraft();
-  _popupDraftContext = { account: pbpPinboardAccountFromToken(token), pageUrl: url, incognito: _activeTabAtOpen?.incognito === true, ready: true };
+  if (!await pbpDiscardPopupDraft()) return;
+  const sourceUrl = _popupDraftContext?.pageUrl || _activeTabAtOpen?.url;
+  _popupDraftContext = /^https?:\/\//.test(sourceUrl || "")
+    ? { account: pbpPinboardAccountFromToken(token), pageUrl: sourceUrl, incognito: _activeTabAtOpen?.incognito === true, ready: true } : null;
+  _popupDraftLastSnapshot = "";
+  _popupDraftChangedFields.clear();
   _popupDraftUserUrl = false;
   _popupDraftRestored = false;
   _popupDraftEdited = false;
@@ -2027,7 +2080,8 @@ async function loadBookmarkForEdit(url, token) {
   pbpScrollIntoView($id("title-input"), { behavior: "smooth", block: "center" });
 }
 
-function exitEditMode() {
+async function exitEditMode() {
+  if (!await pbpDiscardPopupDraft()) return;
   delete document.body.dataset.editMode;
   // Simplest reliable restore: reload popup so current-tab logic runs again
   window.location.reload();
@@ -2240,6 +2294,7 @@ function updateCharCount() {
   sub.title = over ? t("submitUriTooLong")
     : urlBad ? t("urlCannotSave")
     : !_pageInfoReady ? t("loading") : "";
+  if (typeof pbpRememberPopupDraft === "function") pbpRememberPopupDraft();
 }
 function showElement(id, text) { const el = $id(id); el.textContent = text; el.classList.remove("hidden"); }
 function showStatus(id, msg, kind) {

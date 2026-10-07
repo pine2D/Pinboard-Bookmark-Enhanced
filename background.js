@@ -2662,7 +2662,7 @@ async function pbpRunPopupDraft(message) {
     catch (_) { return false; }
   };
   const clean = (d) => {
-    if (!d || !safeUrl(d.url) || typeof d.title !== "string" || typeof d.notes !== "string"
+    if (!d || typeof d.url !== "string" || d.url.length > 16384 || typeof d.title !== "string" || typeof d.notes !== "string"
         || typeof d.tagInput !== "string" || !Array.isArray(d.tags) || d.tags.length > 1000
         || !d.tags.every((s) => typeof s === "string")
         || !["private", "toread", "archive", "archiveTouched"].every((k) => typeof d[k] === "boolean")) return null;
@@ -2696,12 +2696,22 @@ async function pbpRunPopupDraft(message) {
         // edit, or pending tag text that was never submitted, must survive.
         if (message.expectedDraft) {
           const expected = clean(message.expectedDraft);
-          if (!expected || expected.tagInput || JSON.stringify(clean(row?.draft)) !== JSON.stringify(expected)) return { ok: true, account: message.account };
+          if (!expected || expected.tagInput.trim() || JSON.stringify(clean(row?.draft)) !== JSON.stringify(expected)) return { ok: true, account: message.account };
         }
         await chrome.storage.session.remove(key);
       } else {
-        const draft = clean(message.draft);
+        let draft = clean(message.draft);
         if (!draft) return { ok: false, error: "invalid" };
+        // While restore is pending, merge only the fields already edited.
+        // The popup may close before reading the old row; its empty defaults
+        // must not replace untouched values in that row.
+        if (message.fields !== undefined) {
+          if (!Array.isArray(message.fields) || !message.fields.length
+              || !message.fields.every((k) => Object.hasOwn(draft, k))) return { ok: false, error: "invalid" };
+          const previous = valid(row) && row.owner === message.account ? clean(row.draft) : null;
+          if (previous) draft = clean({ ...previous, ...Object.fromEntries(message.fields.map((k) => [k, draft[k]])) });
+          if (!draft) return { ok: false, error: "invalid" };
+        }
         await chrome.storage.session.set({ [key]: { owner: message.account, pageUrl: message.pageUrl,
           incognito: message.incognito === true, updatedAt: now, draft } });
         const others = Object.keys(rows).filter((k) => k.startsWith(prefix) && k !== key)

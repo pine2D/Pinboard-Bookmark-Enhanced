@@ -301,6 +301,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _popupDraftContext: draftContext ? {pageUrl: URL, incognito: false} : null,
         _popupDraftEdited: false,
         _popupDraftRestored: false,
+        _popupDraftLastSnapshot: "",
+        _popupDraftChangedFields: new Set(),
         pbpDiscardPopupDraft: async () => {},
         _waybackHostGranted: waybackHostGranted,
         settings,
@@ -893,8 +895,18 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // no longer paired with the unhide -- a regression here would mean the
     // request fires even when the user turned the row off entirely.
     await testAsync("K70: fetchPinboardSuggestTags stays gated behind optShowSuggestTags at its original call site", async () => {
-      const enqueueStart = source.indexOf('if (settings.optShowSuggestTags) fetchPinboardSuggestTags(token, targetUrl);');
-      assert(enqueueStart >= 0, "fetchPinboardSuggestTags's original gated call site is gone -- did it move or lose its guard?");
+      const line = source.split("\n").find(s => s.includes("fetchPinboardSuggestTags(token, targetUrl);"));
+      assert(line, "suggestion enqueue call is missing");
+      const start=source.indexOf("function pbpPopupHasWebUrl(");
+      const guard=new Function("URL",source.slice(start,source.indexOf("\n}",start)+2)+";return pbpPopupHasWebUrl;")(window.URL);
+      const calls=[];
+      const enqueue=new Function("settings","pbpPopupHasWebUrl","fetchPinboardSuggestTags","token","targetUrl",line);
+      const send=(...args)=>calls.push(args);
+      for (const target of ["", "https://", "file:///test"]) enqueue({optShowSuggestTags:true},guard,send,"alice:token",target);
+      enqueue({optShowSuggestTags:false},guard,send,"alice:token",URL);
+      assert(calls.length===0,"disabled or invalid-target suggestions were requested");
+      enqueue({optShowSuggestTags:true},guard,send,"alice:token",URL);
+      assert(calls.length===1&&calls[0][1]===URL,"enabled valid-target suggestions did not use the target URL");
     });
 
     test("update forwards only the exact loaded server time", () => {
@@ -2605,15 +2617,27 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let pinboardFetch, pinboardFetchImmediate;",
         proxySource,
         "let _popupDraftRestored = false;",
+        "let _tagsUserTouched = false;",
         lookupSource,
-        "return { checkExistingBookmark, getLookup: () => bookmarkLookup };",
+        "return { checkExistingBookmark, getLookup: () => bookmarkLookup, getTags: () => currentTags, touchTags: tags => {currentTags=tags;_tagsUserTouched=true;} };",
       ].join("\n");
       const names = Object.keys(dependencies);
       const built = new Function(...names, body)(...names.map((name) => dependencies[name]));
-      return { run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args), getLookup: built.getLookup, statuses, warns, sent, resets: () => resets };
+      return { run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args), getLookup: built.getLookup, getTags: built.getTags, touchTags: built.touchTags, statuses, warns, sent, resets: () => resets };
     }
 
     const FOUND_BODY = JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] });
+
+    await testAsync("a pending lookup preserves a user's explicitly cleared tags", async () => {
+      let release;
+      const h=createLookupHarness(()=>new Promise(r=>{release=r;}));
+      const pending=h.run();
+      h.touchTags(["Manual"]);
+      h.touchTags([]);
+      release({ok:true,status:200,text:FOUND_BODY});
+      assert((await pending).status==="found");
+      assert(h.getTags().length===0,"late server tags resurrected a removed tag");
+    });
 
     await testAsync("an account switch mid-lookup is named as an auth failure, not offline", async () => {
       const harness = createLookupHarness({ ok: false, status: 0, text: "", error: "account_changed" });
@@ -2805,6 +2829,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let pinboardFetch, pinboardFetchImmediate;",
         proxySource,
         "let _popupDraftRestored = false;",
+        "let _tagsUserTouched = false;",
         lookupSource,
         "return { checkExistingBookmark, getTags: () => currentTags };",
       ].join("\n");
@@ -3336,7 +3361,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
 
     test("K75: checkExistingBookmark's server-filled tags never touch _tagsUserTouched", () => {
-      assert(!lookupSource.includes("_tagsUserTouched"),
+      assert(!/_tagsUserTouched\s*=(?!=)/.test(lookupSource),
         "checkExistingBookmark must not mark tags user-touched -- it fills currentTags from the server, not from a user edit");
     });
 
