@@ -2040,6 +2040,13 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       store[key].items=[old];await renderNotesPanel();_pbpNotesBeginNoteEdit(_pbpNotesHits().find(h=>h.item.quote===old.quote));
       store[key].items=[{...old,quote:'replacement'}];await _pbpNotesRefreshPreservingState();
       check('deleted legacy editor never binds a replacement at the old index',!$id('notes-detail').querySelector('textarea')&&!_notesEditSessions.size);
+      const peer={...old,quote:'kept legacy',note:'kept note'};store[key].items=[old,peer];await renderNotesPanel();
+      const a=_pbpNotesHits().find(h=>h.item.quote===old.quote),b=_pbpNotesHits().find(h=>h.item.quote===peer.quote);
+      _pbpNotesBeginNoteEdit(a);_pbpNotesBeginNoteEdit(b);
+      $id('notes-detail').querySelector('[data-notes-key="'+a.key+'"] textarea').focus();
+      store[key].items=[peer];await _pbpNotesRefreshPreservingState();
+      check('a removed focused legacy editor cannot lend focus to a reused index',document.activeElement===$id('notes-filter'));
+
 
     } finally {window.pbpVocabCurrentOwner=ownerFn;chrome.storage.local.get=getFn;chrome.storage.local.set=setFn;delete store[key];}
   }

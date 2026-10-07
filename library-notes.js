@@ -2256,7 +2256,8 @@ async function _pbpNotesRefreshPreservingState() {
   // detail over the new account's list. The scan that won owns the screen.
   if (!(await renderNotesPanel())) return;
   const selectedKey = selectedEditor ? (_notesEditSessions.get(selectedEditor.hit.key) === selectedEditor ? selectedEditor.hit.key : null) : selected;
-  if (focusedEditor && detailFocus) detailFocus.key = focusedEditor.hit.key;
+  const focusedEditorGone = focusedEditor && _notesEditSessions.get(focusedEditor.hit.key) !== focusedEditor;
+  if (focusedEditor && detailFocus && !focusedEditorGone) detailFocus.key = focusedEditor.hit.key;
   const hit = _pbpNotesFindHit(selectedKey);
   if (hit) {
     _pbpNotesSelectedKey = selectedKey;
@@ -2267,8 +2268,8 @@ async function _pbpNotesRefreshPreservingState() {
   }
   const refocus = focusedKey && _pbpNotesRowEl(focusedKey);
   if (refocus) _pbpNotesFocus(refocus.querySelector(".notes-hit-btn"));
-  else _pbpNotesRestoreDetailFocus(detailFocus);
-  if (selectedEditor && !hit) {
+  else if (!focusedEditorGone) _pbpNotesRestoreDetailFocus(detailFocus);
+  if (focusedEditorGone || (selectedEditor && !hit)) {
     _pbpNotesSetStatus(t("vocabSelectionChanged"));
     _pbpNotesFocus($id("notes-filter"));
   }
