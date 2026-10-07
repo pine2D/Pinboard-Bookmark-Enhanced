@@ -95,3 +95,7 @@
 ### 07–08 实施与验收
 
 摘录详情可原地编辑笔记，Escape取消、Ctrl/Command+Enter保存；失败保留草稿供重试。草稿跨storage刷新保留，账号变化同步清理；写入复用已有记录锁与最新记录，stable ID或唯一legacy快照定位，只改note。267笔记/334生词回归涵盖并发删除、owner变化、ID挪位、metadata保留、失败草稿和组合筛选。真实journey验收失败重试、取消接回焦点、reader同步更新、320px隐藏筛选恢复及双向账号切换，12图、0 driver/page/console错误。九语README同步更新；值盒子收割、详情归属与真实渲染腿均补齐。证据见evidence/notes-edit-clear-acceptance.json。
+
+### 07 独立复核修正
+
+保留fc421195检查点，独立复核在实际Chromium发现后台刷新光标移动、多编辑器焦点错位、legacy索引挪位后草稿错挂。5条回归旧实现267PASS/5FAIL，修正后272PASS：编辑控件按highlight key/角色恢复，保存选区方向与输入滚动；旧记录编辑器以唯一完整快照重映射，删除/重复/替换均停止关联并提示，不把草稿显示给别的摘录。修正独立提交；不改写检查点历史。

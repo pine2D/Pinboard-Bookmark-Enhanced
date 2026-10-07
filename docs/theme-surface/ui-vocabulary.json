@@ -358,7 +358,9 @@
         "xp-dict",
         "xp-dict-local",
         "xp-dict-online",
-        "xp-dict-slot"
+        "xp-dict-slot",
+        "notes-note-save",
+        "notes-note-cancel"
       ],
       "canvasStructures": [
         "lib-header",

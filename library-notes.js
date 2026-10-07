@@ -931,6 +931,7 @@ function _pbpNotesBuildNoteEditor(session) {
   form.dataset.notesKey = session.hit.key;
   const input = document.createElement("textarea");
   input.className = "vocab-note-input";
+  input.dataset.notesKey = session.hit.key;
   input.rows = 4; input.value = session.text; input.readOnly = session.busy;
   input.setAttribute("aria-label", t("labelNotes"));
   input.addEventListener("input", () => {session.text = input.value;});
@@ -941,10 +942,12 @@ function _pbpNotesBuildNoteEditor(session) {
   const actions = document.createElement("div");
   actions.className = "lib-cluster";
   const save = document.createElement("button");
-  save.type = "submit";save.className = "btn btn-sm";save.textContent = t("hlSave");
+  save.type = "submit";save.className = "btn btn-sm notes-note-save";save.textContent = t("hlSave");
+  save.dataset.notesKey = session.hit.key;
   save.setAttribute("aria-disabled", String(session.busy));
   const cancel = document.createElement("button");
-  cancel.type = "button";cancel.className = "btn btn-sm ghost";cancel.textContent = t("cancel");
+  cancel.type = "button";cancel.className = "btn btn-sm ghost notes-note-cancel";cancel.textContent = t("cancel");
+  cancel.dataset.notesKey = session.hit.key;
   cancel.setAttribute("aria-disabled", String(session.busy));cancel.addEventListener("click",()=>_pbpNotesCancelNoteEdit(session));
   actions.append(save,cancel);
   const error = document.createElement("p");
@@ -952,6 +955,28 @@ function _pbpNotesBuildNoteEditor(session) {
   form.append(input,actions,error);
   form.addEventListener("submit",e=>{e.preventDefault();_pbpNotesSaveNote(session);});
   return form;
+}
+
+// Legacy row keys contain array indices; reconcile editors by the same unique
+// identity as the writer before painting a new scan. Never lend a draft to an
+// inserted/replacement item that inherited its old index.
+function _pbpNotesReconcileEditors() {
+  const hits = _pbpNotesHits();
+  const next = new Map();
+  for (const session of _notesEditSessions.values()) {
+    const old = session.hit;
+    const matches = hits.filter(h => h.row.key === old.row.key &&
+      _pbpNotesItemVisible(h.item, session.owner) &&
+      (old.item.id != null ? h.item.id != null && String(h.item.id) === String(old.item.id)
+        : h.item.id == null && JSON.stringify(h.item) === JSON.stringify(old.item)));
+    if (matches.length !== 1) continue;
+    const hit = matches[0];
+    if (_pbpNotesSelectedKey === old.key) _pbpNotesSelectedKey = hit.key;
+    session.hit = hit;
+    next.set(hit.key, session);
+  }
+  _notesEditSessions.clear();
+  for (const [key, session] of next) _notesEditSessions.set(key, session);
 }
 async function _pbpNotesSaveNote(session) {
   if (session.busy || _notesEditSessions.get(session.hit.key) !== session) return;
@@ -1239,7 +1264,12 @@ function _pbpNotesDetailFocusSnapshot() {
   if (!active || !active.closest || !active.closest("#notes-detail")) return null;
   const classes = [...active.classList].filter((c) => c !== "is-stacked");
   if (!classes.length) return null;
-  return { cls: classes[classes.length - 1], key: (active.dataset && active.dataset.notesKey) || null };
+  const snap = { cls: classes[classes.length - 1], key: (active.dataset && active.dataset.notesKey) || null };
+  if (typeof active.selectionStart === "number") {
+    snap.start = active.selectionStart; snap.end = active.selectionEnd;
+    snap.direction = active.selectionDirection; snap.scroll = active.scrollTop;
+  }
+  return snap;
 }
 
 // The equivalent control in the rebuilt detail, else the back button -- which
@@ -1252,7 +1282,12 @@ function _pbpNotesRestoreDetailFocus(snap) {
   const host = $id("notes-detail");
   if (!host || host.hidden) return;
   const sel = "." + CSS.escape(snap.cls) + (snap.key ? '[data-notes-key="' + CSS.escape(snap.key) + '"]' : "");
-  if (![...host.querySelectorAll(sel)].some((el) => _pbpNotesFocus(el))) _pbpNotesFocus(host.querySelector(".notes-detail-back"));
+  const restored = [...host.querySelectorAll(sel)].find((el) => _pbpNotesFocus(el));
+  if (restored && typeof snap.start === "number" && typeof restored.setSelectionRange === "function") {
+    restored.setSelectionRange(snap.start, snap.end, snap.direction);
+    restored.scrollTop = snap.scroll;
+  }
+  if (!restored) _pbpNotesFocus(host.querySelector(".notes-detail-back"));
 }
 
 // Same guard the two failure sentences above use: t() echoes an unknown key
@@ -2031,6 +2066,7 @@ async function renderNotesPanel() {
   if (_notesLoadFailed) _pbpNotesSetStatus("");
   _notesScanDone = true;
   _notesAllRows = rows;
+  _pbpNotesReconcileEditors();
   // No limit reset: a rescan is a refresh, not a filter change, and the 250ms
   // pbp_hl_ debounce fires one behind every write the reader makes in another
   // tab -- collapsing an expanded list under the user each time.
@@ -2194,6 +2230,7 @@ if (typeof $id === "function") {
 // re-render: a refresh must never swap a narrow reader's pane.
 async function _pbpNotesRefreshPreservingState() {
   const selected = _pbpNotesSelectedKey;
+  const selectedEditor = _notesEditSessions.get(selected);
   // The list region is this view's scroll container (library redesign §2.5
   // #2); the rebuild below replaces every row, so its offset is the place to
   // keep. The page itself never scrolls.
@@ -2212,14 +2249,17 @@ async function _pbpNotesRefreshPreservingState() {
   const focusedRow = active && active.closest ? active.closest("#notes-list .notes-hit") : null;
   const focusedKey = focusedRow ? focusedRow.dataset.notesKey : null;
   const detailFocus = focusedRow ? null : _pbpNotesDetailFocusSnapshot();
+  const focusedEditor = _notesEditSessions.get(detailFocus?.key);
   // Superseded (an account switch, or a newer refresh, landed while this
   // scan was reading): `selected` and the focus snapshot belong to a picture
   // that is gone, and restoring them would reopen the previous account's
   // detail over the new account's list. The scan that won owns the screen.
   if (!(await renderNotesPanel())) return;
-  const hit = _pbpNotesFindHit(selected);
+  const selectedKey = selectedEditor ? (_notesEditSessions.get(selectedEditor.hit.key) === selectedEditor ? selectedEditor.hit.key : null) : selected;
+  if (focusedEditor && detailFocus) detailFocus.key = focusedEditor.hit.key;
+  const hit = _pbpNotesFindHit(selectedKey);
   if (hit) {
-    _pbpNotesSelectedKey = selected;
+    _pbpNotesSelectedKey = selectedKey;
     _pbpNotesMarkCurrentRow();
     _pbpNotesRenderDetail(hit);
   } else {
@@ -2228,6 +2268,10 @@ async function _pbpNotesRefreshPreservingState() {
   const refocus = focusedKey && _pbpNotesRowEl(focusedKey);
   if (refocus) _pbpNotesFocus(refocus.querySelector(".notes-hit-btn"));
   else _pbpNotesRestoreDetailFocus(detailFocus);
+  if (selectedEditor && !hit) {
+    _pbpNotesSetStatus(t("vocabSelectionChanged"));
+    _pbpNotesFocus($id("notes-filter"));
+  }
   if (region && listScroll) region.scrollTop = listScroll;
 }
 

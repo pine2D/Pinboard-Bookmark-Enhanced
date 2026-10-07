@@ -2013,15 +2013,34 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       if(typeof _pbpNotesBeginNoteEdit==='function')_pbpNotesBeginNoteEdit(realHit);
       let input=$id('notes-detail').querySelector('textarea');
       check('note editor opens with existing text and accessible name',!!input&&input.value==='old note'&&!!input.getAttribute('aria-label'));
-      if(input){input.value='unsaved draft';input.dispatchEvent(new Event('input',{bubbles:true}));await _pbpNotesRefreshPreservingState();}
+      if(input){input.value='unsaved draft';input.focus();input.setSelectionRange(3,7,'backward');input.dispatchEvent(new Event('input',{bubbles:true}));await _pbpNotesRefreshPreservingState();}
       input=$id('notes-detail').querySelector('textarea');
       check('note draft survives background detail refresh',!!input&&input.value==='unsaved draft');
+      check('note refresh preserves focused text selection',document.activeElement===input&&input.selectionStart===3&&input.selectionEnd===7&&input.selectionDirection==='backward');
       const session=typeof _notesEditSessions!=='undefined'?_notesEditSessions.get(realHit?.key):null;
       chrome.storage.local.set=async()=>{throw new Error('QA note write failure');};if(session)await _pbpNotesSaveNote(session);
       input=$id('notes-detail').querySelector('textarea');
       check('failed note save retains editable draft for retry',!!input&&input.value==='unsaved draft'&&!input.readOnly);
       chrome.storage.local.set=setFn;if(session&&typeof _pbpNotesCancelNoteEdit==='function')_pbpNotesCancelNoteEdit(session);
       check('cancel note edit leaves storage unchanged and closes editor',store[key].items[0].note==='old note'&&!$id('notes-detail').querySelector('textarea'));
+      reset();store[key].items[1]={...item,id:'peer',quote:'Second quote',note:'second note',ts:124};await renderNotesPanel();
+      _pbpNotesBeginNoteEdit(_pbpNotesHits().find(h=>h.item.id==='editable'));
+      _pbpNotesBeginNoteEdit(_pbpNotesHits().find(h=>h.item.id==='peer'));
+      input=$id('notes-detail').querySelector('[data-notes-key="'+key+'#peer"] textarea');input.focus();input.setSelectionRange(2,5);
+      await _pbpNotesRefreshPreservingState();
+      check('multiple editors restore the exact focused note',document.activeElement?.value==='second note'&&document.activeElement.selectionStart===2&&document.activeElement.selectionEnd===5);
+      _notesEditSessions.clear();const old={...item};delete old.id;store[key].items=[old];await renderNotesPanel();
+      _pbpNotesBeginNoteEdit(_pbpNotesHits().find(h=>h.item.quote===old.quote));
+      input=$id('notes-detail').querySelector('textarea');input.value='legacy draft';input.dispatchEvent(new Event('input'));
+      store[key].items.unshift({...old,quote:'Inserted quote',note:'inserted'});await _pbpNotesRefreshPreservingState();
+      const editor=$id('notes-detail').querySelector('textarea');
+      check('legacy editor follows its unique full snapshot after insertion',editor?.value==='legacy draft'&&editor.closest('.notes-excerpt').textContent.includes(old.quote)&&!editor.closest('.notes-excerpt').textContent.includes('Inserted quote'));
+      store[key].items.push({...old});await _pbpNotesRefreshPreservingState();
+      check('ambiguous legacy snapshots never borrow a draft',!$id('notes-detail').querySelector('textarea')&&!_notesEditSessions.size);
+      store[key].items=[old];await renderNotesPanel();_pbpNotesBeginNoteEdit(_pbpNotesHits().find(h=>h.item.quote===old.quote));
+      store[key].items=[{...old,quote:'replacement'}];await _pbpNotesRefreshPreservingState();
+      check('deleted legacy editor never binds a replacement at the old index',!$id('notes-detail').querySelector('textarea')&&!_notesEditSessions.size);
+
     } finally {window.pbpVocabCurrentOwner=ownerFn;chrome.storage.local.get=getFn;chrome.storage.local.set=setFn;delete store[key];}
   }
   {
