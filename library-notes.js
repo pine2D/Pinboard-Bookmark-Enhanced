@@ -209,11 +209,15 @@ let _notesAuthRevision = 0;
 const _notesEditSessions = new Map();
 async function _pbpNotesOwner() {
   if (_notesOwnerCache !== null) return _notesOwnerCache;
+  const revision = _notesAuthRevision;
   let scope = "";
   try {
     const raw = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
     scope = (raw && raw !== "ownerless") ? String(raw) : "";
   } catch (_) { scope = ""; }
+  // A newer account may already have populated the cache while this read
+  // waited. Re-resolve that generation instead of restoring the old scope.
+  if (revision !== _notesAuthRevision) return _pbpNotesOwner();
   _notesOwnerCache = scope;
   return scope;
 }
@@ -1674,17 +1678,19 @@ function _pbpNotesWriteNote(hit, note, ownerAtOpen) {
   if (typeof note !== "string") return Promise.resolve("gone");
   return _pbpNotesWriteItem(hit, {note}, ownerAtOpen);
 }
+async function _pbpNotesWriteOwnerMatches(ownerAtOpen, revision) {
+  if (ownerAtOpen === null || revision !== _notesAuthRevision) return false;
+  const raw = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
+  const owner = raw && raw !== "ownerless" ? String(raw) : "";
+  return owner === ownerAtOpen && revision === _notesAuthRevision;
+}
 async function _pbpNotesWriteItem(hit, patch, ownerAtOpen) {
   if (!hit?.item || !hit.row?.key) return "gone";
   const revision = _notesAuthRevision;
-  const liveOwner = async () => {
-    const raw = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
-    return raw && raw !== "ownerless" ? String(raw) : "";
-  };
   return _pbpNotesWithRecordLock(hit.row.key, async () => {
-    if (ownerAtOpen === null || await liveOwner() !== ownerAtOpen || revision !== _notesAuthRevision) return "changed";
+    if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
     const fresh = (await chrome.storage.local.get(hit.row.key))[hit.row.key];
-    if (await liveOwner() !== ownerAtOpen || revision !== _notesAuthRevision) return "changed";
+    if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
     if (!fresh || !Array.isArray(fresh.items)) return "gone";
     const hasId = hit.item.id != null;
     // Legacy idless items are safe only when exactly one complete snapshot
@@ -1823,6 +1829,7 @@ function _pbpNotesDelete(row, anchor) {
   // leaves it on screen while _notesOwnerCache is invalidated underneath it --
   // and the delete below resolves the owner again when it is answered.
   const ownerAtOpen = _notesOwnerCache;
+  const revision = _notesAuthRevision;
   showConfirmPopover(anchor, {
     msg: t("notesDeleteConfirm", label),
     yesText: t("delete"),
@@ -1848,28 +1855,31 @@ function _pbpNotesDelete(row, anchor) {
         // page, the list and the confirm sentence both counted only the ones
         // _pbpNotesItemVisible admits, and highlights have no tombstone and no
         // undo -- so the key itself goes only once nothing is left.
-        const owner = await _pbpNotesOwner();
-        if (owner !== ownerAtOpen) {
+        const result = await _pbpNotesWithRecordLock(row.key, async () => {
+          if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
+          const fresh = (await chrome.storage.local.get(row.key))[row.key];
+          if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
+          // Gone already (deleted elsewhere while the confirm was open):
+          // nothing to remove, and re-creating it would be worse.
+          if (!fresh) return;
+          const items = Array.isArray(fresh.items) ? fresh.items : [];
+          const keep = items.filter((it) => !_pbpNotesItemVisible(it, ownerAtOpen));
+          if (keep.length === items.length) return;
+          if (keep.length) await chrome.storage.local.set({ [row.key]: { ...fresh, items: keep } });
+          else await chrome.storage.local.remove(row.key);
+        });
+        if (result === "changed") {
           // The account changed while the confirm was open, so this filter
           // would now match the NEW account's items on that page -- items the
           // sentence the user read never counted. Same guard, same wording, as
           // the batch delete's snapshot mismatch below: nothing was deleted.
           // (`null` at open = the owner was never resolved, so a match cannot
           // be proven either; fail closed.)
+          _notesOwnerCache = null;
+          await _pbpNotesRefreshPreservingState();
           _pbpNotesSetStatus(t("vocabSelectionChanged"));
           return;
         }
-        await _pbpNotesWithRecordLock(row.key, async () => {
-          const fresh = (await chrome.storage.local.get(row.key))[row.key];
-          // Gone already (deleted elsewhere while the confirm was open):
-          // nothing to remove, and re-creating it would be worse.
-          if (!fresh) return;
-          const items = Array.isArray(fresh.items) ? fresh.items : [];
-          const keep = items.filter((it) => !_pbpNotesItemVisible(it, owner));
-          if (keep.length === items.length) return;
-          if (keep.length) await chrome.storage.local.set({ [row.key]: { ...fresh, items: keep } });
-          else await chrome.storage.local.remove(row.key);
-        });
       } catch (e) {
         // A swallowed failure looked identical to success (popover closed,
         // row still there, zero feedback). Pin it to the row it happened on
@@ -1917,6 +1927,7 @@ function _pbpNotesBatchDelete() {
   const button = $id("notes-batch-delete");
   if (!button || button.disabled || _notesBatchBusy || !_notesSelected.size) return;
   const snapshot = [..._notesSelected];
+  const ownerAtOpen = _notesOwnerCache, revision = _notesAuthRevision;
   showConfirmPopover(button, {
     msg: t(pbpLibCountKey(snapshot.length, "notesBatchDeleteConfirmOne", "notesBatchDeleteConfirm"), String(snapshot.length)),
     yesText: t("delete"),
@@ -1944,6 +1955,7 @@ function _pbpNotesBatchDelete() {
       _pbpNotesSyncSelectionUi();
       const drop = new Set(snapshot);
       let failed = 0;
+      let changed = false;
       try {
         for (const { row } of _notesAllRows) {
           // Pages this batch does not touch cost nothing: hit keys are
@@ -1962,8 +1974,10 @@ function _pbpNotesBatchDelete() {
             // set. Per record, inside the loop, on purpose: one page's write
             // must neither be based on a read taken before another page's
             // write nor hold another page's lock while it happens.
-            await _pbpNotesWithRecordLock(row.key, async () => {
+            const result = await _pbpNotesWithRecordLock(row.key, async () => {
+              if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
               const fresh = (await chrome.storage.local.get(row.key))[row.key];
+              if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
               // Gone already (deleted elsewhere while the confirm was open):
               // nothing to remove, and re-creating it would be worse.
               if (!fresh) return;
@@ -1973,11 +1987,12 @@ function _pbpNotesBatchDelete() {
               // insertion could shift which item a key names. Every item the
               // reader writes carries an id; upgrade path is an id backfill in
               // md-highlight.js, not more logic here.
-              const keep = items.filter((it, idx) => !drop.has(_pbpNotesHitKey(row.key, it, idx)));
+              const keep = items.filter((it, idx) => !_pbpNotesItemVisible(it, ownerAtOpen) || !drop.has(_pbpNotesHitKey(row.key, it, idx)));
               if (keep.length === items.length) return;
               if (keep.length) await chrome.storage.local.set({ [row.key]: { ...fresh, items: keep } });
               else await chrome.storage.local.remove(row.key);
             });
+            if (result === "changed") { changed = true; break; }
           } catch (e) {
             // Name/message only, never highlight or note content.
             console.warn("[notes] batch delete failed", e && e.name, e && e.message);
@@ -1988,6 +2003,12 @@ function _pbpNotesBatchDelete() {
         _notesBatchBusy = false;
       }
       _pbpNotesClearSelection();
+      if (changed) {
+        _notesOwnerCache = null;
+        await _pbpNotesRefreshPreservingState();
+        _pbpNotesSetStatus(t("vocabSelectionChanged"));
+        return;
+      }
       // The detail may have been reading one of the highlights just removed.
       const stillThere = _pbpNotesSelectedKey && drop.has(_pbpNotesSelectedKey);
       await renderNotesPanel();

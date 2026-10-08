@@ -1488,6 +1488,99 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     }
   }
 
+  // Owner resolution can finish after a newer account's scan. The render
+  // generation must also fence the memoized scope consumed by the next scan.
+  {
+    const ownerFn = window.pbpVocabCurrentOwner;
+    const key = "pbp_hl_owner_read_race";
+    let release, reads = 0;
+    const oldOwner = new Promise(resolve => { release = resolve; });
+    window.pbpVocabCurrentOwner = () => ++reads === 1 ? oldOwner : Promise.resolve("acct_two");
+    store[key] = { v: 1, url: "https://owner-read.example/p", title: "Owner read", items: [
+      { id: "one", n: 1, quote: "first account", color: 1, note: "private first note", ts: 990, owner: "acct_one" },
+      { id: "two", n: 2, quote: "second account", color: 2, note: "", ts: 980, owner: "acct_two" }
+    ] };
+    try {
+      _notesOwnerCache = null;
+      const oldScan = renderNotesPanel();
+      fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "local");
+      await settle(() => rowKeys().includes(key + "#two"));
+      release("acct_one");
+      await oldScan;
+      check("a late owner read cannot overwrite the new account's cached scope", _notesOwnerCache === "acct_two", _notesOwnerCache);
+      await renderNotesPanel();
+      check("the next scan still hides the previous account's notes after a late owner read",
+        rowKeys().includes(key + "#two") && !rowKeys().includes(key + "#one"), rowKeys());
+    } finally {
+      release("acct_one");
+      window.pbpVocabCurrentOwner = ownerFn;
+      delete store[key]; _notesOwnerCache = null;
+      await renderNotesPanel();
+    }
+  }
+
+  // Run the production confirmation callbacks, with only the external read
+  // or Web Lock delayed. Both delete scopes must re-read the live owner at
+  // dispatch, even when the credential-change event has not arrived yet.
+  for (const scenario of ["page-lock", "page-read", "batch-read"]) {
+    const ownerFn = window.pbpVocabCurrentOwner, getFn = chrome.storage.local.get;
+    const confirmFn = window.showConfirmPopover;
+    const key = "pbp_hl_delete_owner_race";
+    let owner = "acct_one", onConfirm, releaseRead, releaseLock, heldLock;
+    window.pbpVocabCurrentOwner = async () => owner;
+    window.showConfirmPopover = (anchor, opts) => { onConfirm = opts.onConfirm; };
+    store[key] = { v: 1, url: "https://delete-owner.example/p", title: "Delete owner", items: [
+      { id: "one", n: 1, quote: "first account", color: 1, note: "keep first", ts: 990, owner: "acct_one" },
+      { id: "two", n: 2, quote: "second account", color: 2, note: "keep second", ts: 980, owner: "acct_two" }
+    ] };
+    try {
+      _notesOwnerCache = null;
+      await renderNotesPanel();
+      const hit = _pbpNotesHits().find(h => h.key === key + "#one");
+      if (scenario === "page-lock") {
+        let acquired;
+        const ready = new Promise(resolve => { acquired = resolve; });
+        heldLock = navigator.locks.request(_pbpNotesRecordLockName(key), async () => {
+          acquired(); await new Promise(resolve => { releaseLock = resolve; });
+        });
+        await ready;
+      } else {
+        chrome.storage.local.get = async keys => {
+          const snapshot = await getFn(keys);
+          if (keys === key) await new Promise(resolve => { releaseRead = resolve; });
+          return snapshot;
+        };
+      }
+      if (scenario === "batch-read") {
+        _notesSelected = new Set([hit.key]); _pbpNotesSyncSelectionUi();
+        _pbpNotesBatchDelete();
+      } else _pbpNotesDelete(hit.row, null);
+      const task = onConfirm();
+      if (scenario === "page-lock") {
+        for (let i = 0; i < 300; i++) {
+          const state = await navigator.locks.query();
+          if (state.pending.some(lock => lock.name === _pbpNotesRecordLockName(key))) break;
+          await tick();
+        }
+      } else await settle(() => !!releaseRead);
+      owner = "acct_two";
+      if (scenario === "page-lock") fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "local");
+      if (releaseRead) releaseRead();
+      if (releaseLock) releaseLock();
+      await task;
+      check(scenario + ": switching accounts before the delete write preserves both owners' highlights",
+        store[key]?.items.map(it => it.id).join(",") === "one,two", JSON.stringify(store[key]));
+      check(scenario + ": an account mismatch reports selection changed",
+        $id("notes-status").textContent.includes("vocabSelectionChanged"), $id("notes-status").textContent);
+    } finally {
+      if (releaseRead) releaseRead(); if (releaseLock) releaseLock();
+      if (heldLock) await heldLock;
+      window.pbpVocabCurrentOwner = ownerFn; chrome.storage.local.get = getFn; window.showConfirmPopover = confirmFn;
+      delete store[key]; _notesOwnerCache = null; _pbpNotesClearSelection(); _pbpNotesSetStatus("");
+      await renderNotesPanel();
+    }
+  }
+
   // ---- the cover before any successful read says the read failed ----
   {
     const realGet = chrome.storage.local.get;

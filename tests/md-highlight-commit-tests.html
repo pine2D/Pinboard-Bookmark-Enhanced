@@ -29,6 +29,7 @@ writer would agree with it no matter how wrong both are.</p>
   <div id="copy-status" role="status" aria-live="polite"></div>
 </div>
 
+<script src="../shared.js"></script>
 <script>
 // ---- Collaborators md-highlight.js reads by name. Deliberately minimal: this
 // suite is about which ITEMS reach storage, not about anchoring or the card DOM.
@@ -40,7 +41,15 @@ function t(key) { return key; }
 // under. Moving it mid-suite is what a token swap in another tab looks like
 // from this page: the answer changes before the page hears about it.
 let OWNER_NOW = "ownerless";
-async function pbpVocabCurrentOwner() { return OWNER_NOW; }
+const OWNER_READS = [];
+const FLAG_READS = [];
+let AUTH_FLAGS = { optSyncEnabled: true, syncApiKeys: false };
+async function pbpVocabCurrentOwner() {
+  return OWNER_READS.length ? OWNER_READS.shift()() : OWNER_NOW;
+}
+async function pbpReadSecretSyncState() {
+  return FLAG_READS.length ? FLAG_READS.shift()() : structuredClone(AUTH_FLAGS);
+}
 
 function pbpAiHash(s) {
   let h = 0;
@@ -121,6 +130,7 @@ let FAIL_READS = false;
 // instant the first has its base in hand); SET_GATE is what holds the first
 // writer's set until the second reaches its own.
 let ON_GET = null;   // fn(key), called synchronously inside get() for a string key
+let ON_SET = null;   // fn(obj), called when a write reaches the IPC boundary
 let SET_GATE = null; // promise the NEXT set() awaits before it applies anything
 
 function _fire(key, oldValue, newValue) {
@@ -148,6 +158,7 @@ window.chrome = {
         return answer;
       },
       set: async (obj) => {
+        if (ON_SET) ON_SET(obj);
         if (SET_GATE) { const gate = SET_GATE; SET_GATE = null; await gate; }
         for (const k in obj) {
           const old = STORE[k];
@@ -1271,6 +1282,164 @@ function selectionRange(n, start, end) {
     check(path.name + " still applies to a legacy ownerless item after the switch",
       path.applied(storedItem("h-legacy") || {}), JSON.stringify(storedItem("h-legacy")));
   }
+  OWNER_NOW = "ownerless";
+  _pbpHlOwner = "";
+
+  // ================= scenario 9: live owner reads finish out of order =================
+  section("(9) owner refreshes stay fresh and clear account surfaces while pending");
+  const notebookRail = document.createElement("div");
+  notebookRail.id = "rail";
+  document.getElementById("fixture").appendChild(notebookRail);
+  function authChanged(changes, area) {
+    CHANGE_LISTENERS.forEach((fn) => fn(changes, area));
+  }
+  function gatedRead(queue) {
+    let release, entered;
+    const value = new Promise((r) => { release = r; });
+    const started = new Promise((r) => { entered = r; });
+    queue.push(() => { entered(); return value; });
+    return { release, started };
+  }
+  async function mountedAccount(owner, flags = { optSyncEnabled: true, syncApiKeys: false }) {
+    await bootAs(owner);
+    AUTH_FLAGS = flags;
+    authChanged({ optSyncEnabled: { newValue: flags.optSyncEnabled } }, "local");
+    await flush();
+    const rec = ownedRecord();
+    rec.items.push({ id: "h-his", n: 2, quote: "Beta", prefix: "", suffix: " paragraph", color: 2, note: "his", ts: 3000, owner: BOB });
+    await chrome.storage.local.set({ [KEY]: rec });
+    await flush();
+    pbpHlRestore();
+    _pbpHlNotebookRender();
+  }
+
+  await mountedAccount(ALICE);
+  _pbpHlCardItemId = "h-hers";
+  _pbpHlBarRange = selectionRange(1, 0, 5);
+  _pbpHlEchoItems = structuredClone(record().items);
+  CARD_HIDDEN = 0;
+  const oldOwner = gatedRead(OWNER_READS);
+  authChanged({ syncApiKeys: { oldValue: true, newValue: false } }, "sync");
+  check("owner refresh immediately tears down the previous account's card and selection",
+    _pbpHlCardItemId === null && _pbpHlBarRange === null && CARD_HIDDEN === 1);
+  check("owner refresh immediately removes all displayed items and painted ranges",
+    memoryIds().length === 0 && Object.keys(_pbpHlState.ranges).length === 0 &&
+    !CSS.highlights.has("pbp-hl-1") && _pbpHlEchoItems === null &&
+    document.getElementById("hl-rail-section").hidden && !document.getElementById("hl-list").children.length);
+  await oldOwner.started;
+  const updated = structuredClone(record());
+  updated.items[0].note = "changed while owner read waits";
+  await chrome.storage.local.set({ [KEY]: updated });
+  check("a record change cannot repopulate items while the owner read waits",
+    memoryIds().length === 0 && !CSS.highlights.has("pbp-hl-1"));
+  OWNER_NOW = BOB;
+  authChanged({ pinboardToken: { oldValue: "alice:fixture", newValue: "bob:fixture" } }, "local");
+  await flush();
+  check("the newer owner read displays only Bob and legacy items",
+    _pbpHlOwner === BOB && sameSet(memoryIds(), ["h-his", "h-legacy"]), memoryIds());
+  oldOwner.release(ALICE);
+  await flush();
+  check("the late Alice read cannot overwrite Bob or restore Alice's items",
+    _pbpHlOwner === BOB && sameSet(memoryIds(), ["h-his", "h-legacy"]), memoryIds());
+
+  await mountedAccount(ALICE);
+  const oldFlags = gatedRead(FLAG_READS);
+  OWNER_NOW = BOB;
+  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  // The original listener does not read routing flags; do not block RED on a
+  // collaborator the production path has yet to use.
+  await flush();
+  OWNER_NOW = ALICE;
+  authChanged({ pinboardToken: { newValue: "alice:fixture" } }, "local");
+  await flush();
+  OWNER_NOW = BOB;
+  oldFlags.release({ optSyncEnabled: true, syncApiKeys: false });
+  await flush();
+  FLAG_READS.length = 0;
+  check("late routing flags cannot trigger an old refresh after the newer owner settled",
+    _pbpHlOwner === ALICE && sameSet(memoryIds(), ["h-hers", "h-legacy"]), memoryIds());
+
+  await mountedAccount(ALICE);
+  const failedOwner = gatedRead(OWNER_READS);
+  OWNER_NOW = BOB;
+  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  await failedOwner.started;
+  failedOwner.release(Promise.reject(new Error("simulated owner read failure")));
+  await flush();
+  check("a failed owner refresh keeps the account surfaces empty, including legacy items",
+    memoryIds().length === 0 && _pbpHlOwner === "", memoryIds());
+  authChanged({ pinboardToken: { newValue: "bob:retry" } }, "local");
+  await flush();
+  check("a later successful owner read restores Bob and legacy items after failure",
+    _pbpHlOwner === BOB && sameSet(memoryIds(), ["h-his", "h-legacy"]), memoryIds());
+
+  await mountedAccount(ALICE);
+  let saveStarted, finishSave;
+  const saving = new Promise((r) => { saveStarted = r; });
+  SET_GATE = new Promise((r) => { finishSave = r; });
+  ON_SET = (obj) => { if (obj[KEY]) { ON_SET = null; saveStarted(); } };
+  const creating = _pbpHlCreateFromRange(selectionRange(1, 0, 5), 1, null);
+  await saving;
+  const pendingBob = gatedRead(OWNER_READS);
+  OWNER_NOW = BOB;
+  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  await pendingBob.started;
+  finishSave();
+  const made = await creating;
+  check("a dispatched creation finishing during owner refresh cannot repaint its old-account range",
+    (!made || !made.length) && memoryIds().length === 0 && !CSS.highlights.has("pbp-hl-1"));
+  pendingBob.release(BOB);
+  await flush();
+  check("after the late save only Bob and legacy items return to the notebook",
+    sameSet(memoryIds(), ["h-his", "h-legacy"]) && !document.getElementById("hl-list").textContent.includes("hers"), memoryIds());
+
+  await mountedAccount(ALICE);
+  FLAG_READS.push(() => Promise.reject(new Error("simulated routing read failure")));
+  OWNER_NOW = BOB;
+  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  await flush();
+  const unknownFlags = gatedRead(FLAG_READS);
+  authChanged({ pinboardToken: { newValue: "foreign:fixture" } }, "sync");
+  check("unknown routing stays empty and re-reads even for a possibly foreign-area event",
+    memoryIds().length === 0 && document.getElementById("hl-rail-section").hidden, memoryIds());
+  // The baseline has no routing read; releasing a never-entered fixture is
+  // harmless and keeps the red run on observable behavior rather than timing.
+  unknownFlags.release({ optSyncEnabled: true, syncApiKeys: false });
+  await flush();
+  FLAG_READS.length = 0;
+  check("a fresh routing read recovers the effective account after routing failure",
+    _pbpHlOwner === BOB && sameSet(memoryIds(), ["h-his", "h-legacy"]), memoryIds());
+
+  for (const flags of [
+    { optSyncEnabled: true, syncApiKeys: false },
+    { optSyncEnabled: true, syncApiKeys: true },
+    { optSyncEnabled: false, syncApiKeys: false },
+  ]) {
+    await mountedAccount(ALICE, flags);
+    OWNER_NOW = BOB;
+    const foreignArea = flags.optSyncEnabled && flags.syncApiKeys ? "local" : "sync";
+    authChanged({ pinboardToken: { newValue: "foreign:fixture" } }, foreignArea);
+    authChanged({ optSyncEnabled: { newValue: !flags.optSyncEnabled } }, "sync");
+    authChanged({ syncApiKeys: { newValue: !flags.syncApiKeys } }, "local");
+    if (!flags.optSyncEnabled) authChanged({ syncApiKeys: { newValue: true } }, "sync");
+    await flush();
+    check("non-effective auth areas preserve the displayed account for " + JSON.stringify(flags),
+      _pbpHlOwner === ALICE && sameSet(memoryIds(), ["h-hers", "h-legacy"]), memoryIds());
+  }
+
+  await mountedAccount(ALICE);
+  _pbpHlState = null;
+  _pbpHlRawItems = null;
+  const initialOwner = gatedRead(OWNER_READS);
+  const mounting = pbpHlInit({ url: PAGE_URL, title: "Fixture article" });
+  await initialOwner.started;
+  OWNER_NOW = BOB;
+  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  await flush();
+  initialOwner.release(ALICE);
+  await mounting;
+  check("an initial mount's late owner read cannot override a newer storage refresh",
+    _pbpHlOwner === BOB && sameSet(memoryIds(), ["h-his", "h-legacy"]), memoryIds());
   OWNER_NOW = "ownerless";
   _pbpHlOwner = "";
 

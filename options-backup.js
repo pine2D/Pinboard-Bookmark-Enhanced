@@ -286,7 +286,11 @@ async function pbpBackupWriteHighlights(cleaned, ownerScope, verifyOwner) {
     // Read and write inside the same lock: the merge is only sound against the
     // record as it stands at write time.
     await pbpBackupHighlightWithRecordLock(key, async () => {
+      // The lock and the storage read can both wait long enough for an account
+      // switch. Re-check each boundary before committing this owner's merge.
+      await verifyOwner();
       const stored = await chrome.storage.local.get(key);
+      await verifyOwner();
       await chrome.storage.local.set({ [key]: pbpMergeHighlightBackupRecord(stored[key], value, ownerScope) });
     });
   }

@@ -4755,7 +4755,6 @@ async function run() {
     let themeWrites = 0;
     let highlightWrites = 0;
     let sectionHighlightWrites = 0;
-    let switchedHighlightOwnerReads = 0;
     let vocabWrites = 0;
     let sectionResults = [];
     // Highlight records are read back inside the per-record lock, so the local
@@ -4820,8 +4819,8 @@ async function run() {
         _highlights: { pbp_hl_shared: { v: 1, url: "https://shared.test/", title: "Shared", items: [{ id: "restored", n: 1, quote: "restored", color: 1, ts: 3 }] } },
       }, { ...common, sections: { settings: false, themes: false, highlights: true, vocabulary: false } }));
       // Every record costs its own lock and its own storage round trip, so the
-      // account can change halfway down a multi-page restore. The third owner
-      // read lands between record one and record two.
+      // account can change halfway down a multi-page restore. Switch as soon
+      // as record one lands, independently of the verification read count.
       sectionResults.push(await pbpApplyBackupPayload({
         _schemaVersion: 3, _backup: metadata, _highlightsOwner: backupOwner,
         _highlights: {
@@ -4831,7 +4830,7 @@ async function run() {
       }, {
         ...common,
         sections: { settings: false, themes: false, highlights: true, vocabulary: false },
-        readCurrentOwner: async () => (++switchedHighlightOwnerReads < 3 ? backupOwner : "different-owner"),
+        readCurrentOwner: async () => ("pbp_hl_switch1" in hlStore ? "different-owner" : backupOwner),
       }));
     } catch (_) {
       sectionResults = [];
@@ -4863,6 +4862,66 @@ async function run() {
       exactTextRepreflight);
     check("E11 new file selection takes busy ownership from a stale pending apply",
       selectionRaceSafe);
+
+    async function highlightOwnerBoundary(phase) {
+      const priorChrome = globalThis.chrome;
+      const key = "pbp_hl_owner_boundary_" + phase;
+      let currentOwner = backupOwner;
+      let ownerReads = 0;
+      const writes = [];
+      let signalBoundary;
+      const boundary = new Promise((resolve) => { signalBoundary = resolve; });
+      let releaseBoundary;
+      const gate = new Promise((resolve) => { releaseBoundary = resolve; });
+      let heldLock = null;
+      try {
+        if (phase === "lock") {
+          let signalHeld;
+          const held = new Promise((resolve) => { signalHeld = resolve; });
+          heldLock = navigator.locks.request(pbpBackupHighlightLockName(key), async () => {
+            signalHeld();
+            await gate;
+          });
+          await held;
+        }
+        globalThis.chrome = {
+          storage: {
+            local: {
+              async get() {
+                if (phase === "read") { signalBoundary(); await gate; }
+                return {};
+              },
+              async set(data) { writes.push(data); },
+            },
+          },
+        };
+        const restoring = pbpApplyBackupPayload({
+          _schemaVersion: 3, _backup: metadata, _highlightsOwner: backupOwner,
+          _highlights: { [key]: { v: 1, url: "https://boundary.test/", title: "Boundary", items: [{ id: "h", n: 1, quote: "fixture", color: 1 }] } },
+        }, {
+          exportableKeys: [],
+          sections: { settings: false, themes: false, highlights: true, vocabulary: false },
+          readCurrentOwner: async () => {
+            if (++ownerReads === 2 && phase === "lock") signalBoundary();
+            return currentOwner;
+          },
+        });
+        await boundary;
+        currentOwner = "different-owner";
+        releaseBoundary();
+        if (heldLock) await heldLock;
+        const result = await restoring;
+        return result.highlights === "failed" && writes.length === 0;
+      } finally {
+        releaseBoundary();
+        if (heldLock) await heldLock;
+        globalThis.chrome = priorChrome;
+      }
+    }
+    check("E11 highlight restore writes nothing after an account switch while waiting for its record lock",
+      await highlightOwnerBoundary("lock"));
+    check("E11 highlight restore writes nothing after an account switch during its storage read",
+      await highlightOwnerBoundary("read"));
 
     const dbDelete = indexedDB.deleteDatabase("pbp-vocab");
     await new Promise((resolve) => {

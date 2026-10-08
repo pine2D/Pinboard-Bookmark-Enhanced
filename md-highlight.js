@@ -661,12 +661,14 @@ async function _pbpHlSave(url, items, btn) {
 
 // Owner scope for stamping and display filtering. Resolved in pbpHlInit and
 // refreshed by the account-switch branch at the bottom of this file; "" =
-// logged out ("ownerless" normalizes to it) or resolve failure — then new
-// items stay fieldless (legacy shape) and only ownerless items show
-// (fail-closed for owned ones). This is a DISPLAY cache: no write may trust
-// it, because the refresh is async and its own re-read can fail —
-// _pbpHlLiveOwner below is what every commit gates on.
+// logged out ("ownerless" normalizes to it). Pending or failed resolution
+// hides even legacy items and blocks edits until a fresh read succeeds.
+// This is a DISPLAY cache: no write may trust it, because the refresh is
+// async and its own re-read can fail — _pbpHlLiveOwner gates every commit.
 let _pbpHlOwner = "";
+let _pbpHlOwnerRevision = 0;
+let _pbpHlOwnerPending = false;
+let _pbpHlAuthFlags = null;
 // Last known FULL stored items array (unfiltered). The onChanged echo
 // comparison must run raw-vs-raw: _pbpHlState.items is the filtered display
 // set and would spuriously differ from every echo once foreign items exist.
@@ -686,6 +688,45 @@ function _pbpHlQueueWrite(fn) {
 // _pbpHlState.items alone -- that array is only swapped in once the save
 // returns.
 let _pbpHlEchoItems = null;
+
+// Invalidate synchronously, before either routing or owner storage can await.
+// Only the newest refresh may publish; a failed refresh stays empty until a
+// later successful read establishes the effective account again.
+async function _pbpHlRefreshOwner() {
+  const revision = ++_pbpHlOwnerRevision;
+  _pbpHlOwnerPending = true;
+  _pbpHlOwner = "";
+  _pbpHlAuthFlags = null;
+  _pbpHlEchoItems = null;
+  // Clear the binding before hidePopover blurs the note textarea: this note
+  // belongs to the account being left and must not be rescued into storage.
+  _pbpHlCardItemId = null;
+  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) {} }
+  _pbpHlHideBar();
+  _pbpHlBarRange = null;
+  if (_pbpHlState) {
+    _pbpHlState.items = [];
+    try { pbpHlRestore(); } catch (_) {}
+    try { _pbpHlNotebookRender(); } catch (_) {}
+  }
+  try {
+    const flags = await pbpReadSecretSyncState({ persistInferredState: false });
+    if (revision !== _pbpHlOwnerRevision) return;
+    _pbpHlAuthFlags = flags;
+    const raw = await pbpVocabCurrentOwner();
+    if (revision !== _pbpHlOwnerRevision) return;
+    _pbpHlOwner = (raw && raw !== "ownerless") ? String(raw) : "";
+    _pbpHlOwnerPending = false;
+    if (_pbpHlState) {
+      _pbpHlState.items = pbpHlVisibleItems(_pbpHlRawItems || [], _pbpHlOwner);
+      try { pbpHlRestore(); } catch (_) {}
+      try { _pbpHlNotebookRender(); } catch (_) {}
+    }
+  } catch (e) {
+    if (revision !== _pbpHlOwnerRevision) return;
+    console.warn("pbp: highlight owner read failed", e && e.name, e && e.message);
+  }
+}
 
 // The account this page is allowed to write for, read live rather than taken
 // from _pbpHlOwner: the switch branch that refreshes that cache is async, and
@@ -726,12 +767,13 @@ async function _pbpHlLiveOwner() {
 // A fresh read WITHOUT the lock only narrows the window: two contexts can still
 // both read X, compute X+A and X+B, and have the later set erase the earlier.
 async function _pbpHlCommit(patch, btn) {
+  const ownerRevision = _pbpHlOwnerRevision;
   return _pbpHlQueueWrite(async () => {
-    if (!_pbpHlState) return false;
+    if (!_pbpHlState || _pbpHlOwnerPending || ownerRevision !== _pbpHlOwnerRevision) return false;
     const url = _pbpHlState.url;
     return _pbpHlWithRecordLock(url, async () => {
       // Mount can have swapped state out while we waited for the lock.
-      if (!_pbpHlState || _pbpHlState.url !== url) return false;
+      if (!_pbpHlState || _pbpHlState.url !== url || _pbpHlOwnerPending || ownerRevision !== _pbpHlOwnerRevision) return false;
       const stored = await _pbpHlLoadStrict(url); // fresh, not pbpHlInit's snapshot
       if (!stored) { _pbpHlToast(t("hlSaveFailed"), btn); return false; } // unreadable: [] here would wipe the page
       const next = patch(stored);
@@ -748,7 +790,7 @@ async function _pbpHlCommit(patch, btn) {
       // identical, in the same order. Ownerless legacy items belong to whoever
       // is reading and stay editable (pbpHlItemVisibleFor's documented rule).
       const liveOwner = await _pbpHlLiveOwner();
-      if (liveOwner === null) return false;
+      if (liveOwner === null || _pbpHlOwnerPending || ownerRevision !== _pbpHlOwnerRevision) return false;
       const hiddenBefore = stored.filter((it) => !pbpHlItemVisibleFor(it, liveOwner));
       const hiddenAfter = next.filter((it) => !pbpHlItemVisibleFor(it, liveOwner));
       if (!pbpHlItemsSame(hiddenBefore, hiddenAfter)) {
@@ -761,8 +803,10 @@ async function _pbpHlCommit(patch, btn) {
       const ok = await _pbpHlSave(url, next, btn);
       if (!ok) { _pbpHlEchoItems = null; return false; } // nothing was written: a later foreign write of this exact content is NOT an echo
       _pbpHlRawItems = next;
-      _pbpHlState.items = pbpHlVisibleItems(next, _pbpHlOwner);
-      return true;
+      _pbpHlState.items = _pbpHlOwnerPending ? [] : pbpHlVisibleItems(next, _pbpHlOwner);
+      // A dispatched write may finish after an account refresh. Its caller
+      // must not paint a newly created range or reopen the previous card.
+      return !_pbpHlOwnerPending && ownerRevision === _pbpHlOwnerRevision;
     });
   });
 }
@@ -934,15 +978,9 @@ async function pbpHlInit(detail) {
   try {
     const url = String((detail && detail.url) || "");
     const title = String((detail && detail.title) || "");
-    try {
-      const scope = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
-      _pbpHlOwner = (scope && scope !== "ownerless") ? String(scope) : "";
-    } catch (e) {
-      console.warn("pbp: highlight owner read failed", e && e.name, e && e.message);
-      _pbpHlOwner = "";
-    }
+    await _pbpHlRefreshOwner();
     _pbpHlRawItems = await _pbpHlLoad(url);
-    const items = pbpHlVisibleItems(_pbpHlRawItems, _pbpHlOwner);
+    const items = _pbpHlOwnerPending ? [] : pbpHlVisibleItems(_pbpHlRawItems, _pbpHlOwner);
     _pbpHlState = { url, title, items, ranges: Object.create(null), degraded: Object.create(null), resolvedN: Object.create(null), orphans: Object.create(null) };
     pbpHlRestore();
     // Restored-from-storage highlights must surface the rail entry on first
@@ -1616,7 +1654,7 @@ function _pbpHlHideBar() {
 // from a live selection (spec 4: register the new Range immediately,
 // without a full pbpHlRestore rerun).
 async function _pbpHlCreateFromRange(range, color, btn) {
-  if (!_pbpHlState) return [];
+  if (!_pbpHlState || _pbpHlOwnerPending) return [];
   const segments = _pbpHlSelectionSegments(range);
   const created = [];
   // One fingerprint per creation batch (anchoring round): stamps every item
@@ -2671,45 +2709,12 @@ function _pbpHlNotebookJump(item) {
 // of them from the new items -- which is why absorbing needs no help from the record.
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
-    // Account switch while the reader stays open (Codex review P1, CLAUDE.md
-    // account-isolation rule: owner is re-validated on reads and commits, not
-    // frozen at boot). Token routing decides the area, so listen on both;
-    // re-resolve, then re-filter the display set from the raw mirror.
-    // syncApiKeys (K30): credential routing decides which area the live
-    // token lives in (shared.js:578, tokenArea = syncApiKeys ? "sync" :
-    // "local"), so a sync change that flips ONLY this key moves the token
-    // without ever touching pinboardToken -- a two-key condition goes silent
-    // on exactly that change and lets a stale cached owner survive.
+    // Known routing ignores the other token area. Unknown routing must take
+    // the surfaces down and re-read; event values never establish an owner.
     if ((area === "local" || area === "sync") &&
-        (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys)) {
-      _pbpHlHideBar();
-      (async () => {
-        let scope = "";
-        try {
-          const raw = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
-          scope = (raw && raw !== "ownerless") ? String(raw) : "";
-        } catch (e) {
-          console.warn("pbp: highlight owner read failed", e && e.name, e && e.message);
-          scope = "";
-        }
-        if (scope === _pbpHlOwner || !_pbpHlState) { _pbpHlOwner = scope; return; }
-        _pbpHlOwner = scope;
-        // Take every account-scoped surface down before the repaint: the card
-        // and the selection bar describe items the new account is about to
-        // stop seeing, yet their buttons stay live. Same teardown
-        // _pbpHlOnArticleWillReplace runs, minus its note rescue -- an unsaved
-        // note here belongs to the account being left, so it is dropped rather
-        // than saved. The binding goes FIRST for that reason: hiding the
-        // popover blurs the textarea, and the blur listener would otherwise
-        // route that half-typed note straight back into the old account.
-        _pbpHlCardItemId = null;
-        if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) {} }
-        _pbpHlHideBar();
-        _pbpHlBarRange = null;
-        _pbpHlState.items = pbpHlVisibleItems(_pbpHlRawItems || [], _pbpHlOwner);
-        try { pbpHlRestore(); } catch (_) {}
-        try { _pbpHlNotebookRender(); } catch (_) {}
-      })();
+        (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys) &&
+        (!_pbpHlAuthFlags || pbpAuthStorageChangeIsRelevant(changes, area, _pbpHlAuthFlags))) {
+      _pbpHlRefreshOwner();
     }
     if (area !== "local" || !_pbpHlState) return;
     const c = changes[_pbpHlKey(_pbpHlState.url)];
@@ -2721,7 +2726,7 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     // from every echo once another account's items share the record.
     if (!pbpHlItemsSame(next, _pbpHlRawItems) && !pbpHlItemsSame(next, _pbpHlEchoItems)) {
       _pbpHlRawItems = next;
-      _pbpHlState.items = pbpHlVisibleItems(next, _pbpHlOwner);
+      _pbpHlState.items = _pbpHlOwnerPending ? [] : pbpHlVisibleItems(next, _pbpHlOwner);
       // Retire the echo: it has been overtaken, and keeping it would mask a
       // later foreign write that happens to restore that exact content.
       _pbpHlEchoItems = null;
