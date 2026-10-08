@@ -234,7 +234,13 @@ async function createHarness(options) {
     }),
   };
   const source = await getCoreSource();
-  const factory = new Function(...Object.keys(deps), source + `
+  const background = await getBackgroundSource();
+  const freshStart = background.indexOf("async function pbpReadFreshPinboardAuthForAccount("), freshEnd = background.indexOf("// An automatic auth reset", freshStart);
+  deps.pbpPinboardAuthEpoch = () => authState.epoch;
+  deps.pbpReadSettingsWithSecrets = async () => ({ pinboardToken: authState.token });
+  deps.SETTINGS_DEFAULTS = SETTINGS_DEFAULTS;
+  deps.deobfuscateKey = (value) => value;
+  const factory = new Function(...Object.keys(deps), background.slice(freshStart, freshEnd) + source + `
     return {
       validateSaveIntent, fetchExistingBookmark, deliverSaveIntent,
       submitSaveIntent, submitPopupSaveIntent, sendOfflineItem,
@@ -835,6 +841,138 @@ await suite("unified save pipeline", async () => {
     });
     equal((await loggedOut.submitSaveIntent(intent())).reason, "not_logged_in");
     equal(loggedOut.fetchCalls.length, 0, "logout sent a request with stale credentials");
+  });
+
+  await test("late 401/403 save responses cannot invalidate a rotated or switched session", async () => {
+    for (const status of [401, 403]) {
+      for (const token of ["alice:rotated-token", "bob:new-token", ""]) for (const bumpEpoch of [false, true]) {
+        let release, started;
+        const dispatched = new Promise((resolve) => { started = resolve; });
+        const h = await createHarness({ pinboardFetch: async () => {
+          started();
+          await new Promise((resolve) => { release = resolve; });
+          return response(status, null);
+        } });
+        const pending = h.submitSaveIntent(intent());
+        await dispatched;
+        h.authState.token = token;
+        if (bumpEpoch) h.authState.epoch++;
+        release();
+        equal((await pending).reason, "account_changed", "old auth rejection invalidated the later session");
+        equal(h.storageData.offlineQueue.length, 0, "disowned auth failure was queued");
+      }
+      const unchanged = await createHarness({ pinboardFetch: async () => response(status, null) });
+      equal((await unchanged.submitSaveIntent(intent())).reason, "not_logged_in", "real auth rejection was suppressed");
+    }
+  });
+
+  await test("conditional auth reset serializes credential reads and clears with newer writes", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf("async function pbpResetPinboardAuth("), end = source.indexOf("// Conditional auth reset end", start);
+    assert(start >= 0 && end > start, "conditional reset handler is not implemented");
+    let token = "alice:failed-token", releaseRead, readStarted, writerFinished = false;
+    const readGate = new Promise((resolve) => { releaseRead = resolve; });
+    const started = new Promise((resolve) => { readStarted = resolve; });
+    const local = { get: async () => { readStarted(); await readGate; return { pinboardToken: token }; }, set: async (values) => { token = values.pinboardToken; } };
+    const reset = new Function("chrome", "pbpWithSecretStorageLock", "pbpReadSecretSyncStateUnlocked", "deobfuscateKey", "pbpPinboardAccountFromToken", "invalidatePinboardAuthState", source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(
+      { storage: { local, session: { get: async () => ({}), remove: async () => {} } } }, pbpWithSecretStorageLock, async () => ({ optSyncEnabled: false, syncApiKeys: false }), (value) => value, pbpPinboardAccountFromToken, () => {}
+    );
+    const pending = reset("alice:failed-token");
+    await started;
+    const writer = pbpWithSecretStorageLock(async () => { token = "bob:new-token"; writerFinished = true; });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert(!writerFinished, "credential writer interleaved with the conditional reset");
+    releaseRead();
+    assert((await pending).ok, "matching token could not be reset");
+    await writer;
+    equal(token, "bob:new-token", "reset overwrote the subsequent credential write");
+  });
+
+  await test("conditional auth reset clears only the exact routed token", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf("async function pbpResetPinboardAuth("), end = source.indexOf("// Conditional auth reset end", start);
+    assert(start >= 0 && end > start, "conditional reset handler is not implemented");
+    for (const state of [
+      { optSyncEnabled: false, syncApiKeys: false },
+      { optSyncEnabled: true, syncApiKeys: false },
+      { optSyncEnabled: true, syncApiKeys: true },
+    ]) {
+      const destination = state.optSyncEnabled && state.syncApiKeys ? "sync" : "local";
+      for (const token of ["alice:failed-token", "alice:rotated-token", "bob:new-token", ""]) {
+        const data = { local: { pinboardToken: "bob:local-token" }, sync: { pinboardToken: "bob:sync-token" } };
+        data[destination].pinboardToken = token;
+        const drafts = { "pbp-popup-draft:alice:normal:article": { owner: "alice" }, "pbp-popup-draft:bob:normal:article": { owner: "bob" }, unrelated: { value: 1 } };
+        const writes = [];
+        const area = (name) => ({ get: async () => ({ ...data[name] }), set: async (values) => { Object.assign(data[name], values); writes.push(name); } });
+        const session = { get: async () => ({ ...drafts }), remove: async (keys) => { keys.forEach((key) => delete drafts[key]); } };
+        const reset = new Function("chrome", "pbpWithSecretStorageLock", "pbpReadSecretSyncStateUnlocked", "deobfuscateKey", "pbpPinboardAccountFromToken", "invalidatePinboardAuthState", source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(
+          { storage: { local: area("local"), sync: area("sync"), session } }, pbpWithSecretStorageLock, async () => state, (value) => value, pbpPinboardAccountFromToken, () => {}
+        );
+        const result = await reset("alice:failed-token");
+        const matched = token === "alice:failed-token";
+        equal(result.ok, matched, "conditional reset acknowledged a different token");
+        equal(data[destination].pinboardToken, matched ? "" : token, "reset changed the wrong routed token");
+        equal(writes.length, matched ? 1 : 0, "mismatched reset wrote credentials");
+        equal(data[destination === "local" ? "sync" : "local"].pinboardToken, destination === "local" ? "bob:sync-token" : "bob:local-token", "reset touched the other storage area");
+        equal(Object.hasOwn(drafts, "pbp-popup-draft:alice:normal:article"), !matched, "reset did not conditionally clear only the failed owner's drafts");
+        assert(drafts["pbp-popup-draft:bob:normal:article"] && drafts.unrelated, "reset removed another owner's draft or unrelated session data");
+      }
+    }
+  });
+
+  await test("conditional auth reset reports storage rejection without clearing credentials", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf("async function pbpResetPinboardAuth("), end = source.indexOf("// Conditional auth reset end", start);
+    for (const phase of ["routing", "tokenRead", "draftRead", "draftRemove", "tokenWrite"]) {
+      let token = "alice:failed-token", invalidations = 0;
+      const fail = (at) => { if (phase === at) throw new Error("synthetic storage failure"); };
+      const local = { get: async () => { fail("tokenRead"); return { pinboardToken: token }; }, set: async (values) => { fail("tokenWrite"); token = values.pinboardToken; } };
+      const session = { get: async () => { fail("draftRead"); return { "pbp-popup-draft:alice:normal:article": { owner: "alice" } }; }, remove: async () => { fail("draftRemove"); } };
+      const warnings = [];
+      const deps = { chrome: { storage: { local, session } }, pbpWithSecretStorageLock,
+        pbpReadSecretSyncStateUnlocked: async () => { fail("routing"); return { optSyncEnabled: false, syncApiKeys: false }; },
+        deobfuscateKey: (value) => value, pbpPinboardAccountFromToken,
+        invalidatePinboardAuthState: () => { invalidations++; }, console: { warn: (...args) => warnings.push(args) } };
+      const names = Object.keys(deps);
+      const reset = new Function(...names, source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(...names.map((name) => deps[name]));
+      const result = await reset("alice:failed-token");
+      equal(result.error, "storage", "storage rejection was acknowledged as a reset");
+      equal(token, "alice:failed-token", "failed reset cleared credentials");
+      equal(invalidations, 0, "failed storage reset invalidated the session");
+      equal(warnings.length, 1, "storage rejection left no trace");
+      assert(!JSON.stringify(warnings).includes("failed-token") && !JSON.stringify(result).includes("failed-token"), "reset exposed a token in its result or diagnostic");
+    }
+  });
+
+  await test("conditional auth reset orders in-flight drafts and blocks later old-owner writes", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf("async function pbpResetPinboardAuth("), end = source.indexOf("// Conditional auth reset end", start);
+    const draftStart = source.indexOf("async function pbpRunPopupDraft("), draftEnd = source.indexOf("// Popup drafts end", draftStart);
+    const rows = {}; let token = "alice:failed-token", releaseRead, readStarted, holdRead = true;
+    const started = new Promise((resolve) => { readStarted = resolve; });
+    const readGate = new Promise((resolve) => { releaseRead = resolve; });
+    const session = {
+      get: async () => { if (holdRead) { holdRead = false; readStarted(); await readGate; } return structuredClone(rows); },
+      set: async (values) => Object.assign(rows, structuredClone(values)),
+      remove: async (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete rows[key]); },
+    };
+    const deps = { chrome: { storage: { session, local: { get: async () => ({ pinboardToken: token }), set: async (values) => { token = values.pinboardToken; } } } },
+      pbpWithSecretStorageLock, pbpReadSecretSyncStateUnlocked: async () => ({ optSyncEnabled: false, syncApiKeys: false }),
+      deobfuscateKey: (value) => value, pbpPinboardAccountFromToken, invalidatePinboardAuthState() {},
+      getCurrentPinboardAuth: async () => ({ account: pbpPinboardAccountFromToken(token) }), navigator };
+    const names = Object.keys(deps);
+    const api = new Function(...names, source.slice(start, end) + source.slice(draftStart, draftEnd) + "\nreturn {pbpResetPinboardAuth,pbpRunPopupDraft};")(...names.map((name) => deps[name]));
+    const draft = { url: BASE_INTENT.url, title: "Draft", notes: "Unsaved", tags: [], tagInput: "", private: false, toread: false, archive: false, archiveTouched: false };
+    const message = { account: "alice", action: "write", pageUrl: BASE_INTENT.url, incognito: false, draft };
+    const first = api.pbpRunPopupDraft(message);
+    await started;
+    const resetting = api.pbpResetPinboardAuth("alice:failed-token");
+    const late = api.pbpRunPopupDraft(message);
+    releaseRead();
+    assert((await first).ok, "reset bypassed the in-flight draft write");
+    assert((await resetting).ok, "matching auth reset failed");
+    equal((await late).error, "account_changed", "old-owner draft was recreated after reset");
+    equal(Object.keys(rows).length, 0, "reset left a stale owner draft");
   });
 
   await test("save_intent listener preserves the Chrome 110 async response contract", async () => {

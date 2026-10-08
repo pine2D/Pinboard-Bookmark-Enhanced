@@ -138,7 +138,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const tagHelperEnd = source.indexOf("// Wayback per-save toggle", tagHelperStart);
     assert(tagHelperStart >= 0 && tagHelperEnd > tagHelperStart, "pbpRebasePopupTags source not found");
     const tagHelperSource = source.slice(tagHelperStart, tagHelperEnd);
-    const resetStart = source.indexOf("async function resetPinboardSession()");
+    const resetStart = source.indexOf("async function resetPinboardSession(");
     const resetEnd = source.indexOf("// ===================== URL Clean Helpers", resetStart);
     assert(resetStart >= 0 && resetEnd > resetStart, "resetPinboardSession source not found");
     const resetSource = source.slice(resetStart, resetEnd);
@@ -227,12 +227,21 @@ test("posts/add default remains replace=yes for existing callers", () => {
       let nextTimerId = 1;
       let resolveSave;
       let resolveWayback;
+      let effectiveToken = settings.pinboardToken;
       const saveResponse = new Promise((resolve) => { resolveSave = resolve; });
       const waybackResponse = new Promise((resolve) => { resolveWayback = resolve; });
 
       const chromeStub = {
         runtime: {
           sendMessage(message) {
+            if (message.type === "PBP_RESET_PINBOARD_AUTH") {
+              messages.push(message);
+              if (message.expectedToken !== effectiveToken) return Promise.resolve({ ok: false, error: "account_changed" });
+              effectiveToken = "";
+              localTokenWrites.push({ pinboardToken: "" });
+              authEvents.push("conditional-reset");
+              return Promise.resolve({ ok: true });
+            }
             if (message.type !== "save_intent") throw new Error("unexpected runtime message: " + message.type);
             messages.push(message);
             return saveResponse;
@@ -328,6 +337,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         elements, currentTags, fieldDirtyFlags, bookmarkLookup, settings, messages, statuses, timers, bars,
         checkCalls, savedTagCalls, syncRemovals, localTokenWrites, authEvents, reloadTokenValues,
         click, resolveSave, resolveWayback,
+        setCurrentToken: (token) => { effectiveToken = token; },
+        currentToken: () => effectiveToken,
         queueRefreshes: () => queueRefreshes,
         closeCalls: () => closeCalls,
         reloadCalls: () => reloadCalls,
@@ -515,8 +526,34 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(JSON.stringify(harness.localTokenWrites) === JSON.stringify([{ pinboardToken: "" }]), "empty token was not persisted");
       assert(harness.settings.pinboardToken === "", "in-memory token was not cleared");
       assert(harness.reloadCalls() === 1, "session reset did not reload the Popup");
-      assert(harness.authEvents.join("|") === "persist-empty|reload", "session reset order changed: " + harness.authEvents.join("|"));
+      assert(harness.authEvents.join("|") === "conditional-reset|reload", "session reset order changed: " + harness.authEvents.join("|"));
       assert(JSON.stringify(harness.reloadTokenValues) === JSON.stringify([""]), "reload happened before the in-memory token was cleared");
+    });
+
+    await testAsync("late auth failure preserves rotated, switched, and logged-out credentials", async () => {
+      for (const token of ["alice:rotated-token", "bob:new-token", ""]) {
+        const harness = createSubmitHarness();
+        const pending = harness.click();
+        harness.setCurrentToken(token);
+        harness.resolveSave({ status: "failed", reason: "not_logged_in", httpStatus: 401 });
+        await pending;
+        assert(harness.currentToken() === token, "late auth failure changed current credentials");
+        assert(harness.localTokenWrites.length === 0, "late auth failure persisted an empty token");
+        assert(harness.reloadCalls() === 0, "late auth failure reloaded the new session");
+        assert(harness.messages.at(-1)?.expectedToken === "alice:token", "reset was not bound to the failed session token");
+        assert(!harness.elements["submit-btn"].classList.contains("loading"), "refused auth reset stranded the save spinner");
+      }
+    });
+
+    await testAsync("Pinboard proxy binds an auth reset to the token in its failed request", async () => {
+      const proxySource = source.slice(source.indexOf("function _pbpProxyPinboardFetch("), source.indexOf("pinboardFetch = function"));
+      const resetTokens = [];
+      const proxy = new Function("chrome", "resetPinboardSession", proxySource + "\nreturn _pbpProxyPinboardFetch;")(
+        { runtime: { sendMessage: async () => ({ ok: false, status: 401, text: "" }) } },
+        (token) => { resetTokens.push(token); }
+      );
+      await proxy("https://api.pinboard.in/v1/posts/get?auth_token=alice%3Afailed-token&format=json", false);
+      assert(JSON.stringify(resetTokens) === JSON.stringify(["alice:failed-token"]), "proxy reset used a later session token");
     });
 
     test("submit rereads one owned form snapshot into save_intent", () => {
@@ -982,7 +1019,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(conflict.includes('result.reason === "conflict"') && conflict.includes("checkExistingBookmark(token, url, null, true, tags)"), "skipped/conflict refresh path missing");
       assert(conflict.includes('t("saveNeedsReview")') && !conflict.includes('t("editingExisting")'),
         "conflict re-check must own a key that says the save did not land, not the banner's state label");
-      assert(auth.includes("await resetPinboardSession()"), "auth failure does not use the shared session reset");
+      assert(auth.includes("await resetPinboardSession(token)"), "auth failure does not use the token-bound session reset");
       assert(authStart < ownershipAfterSend, "auth failure is suppressed by stale form ownership");
     });
 
@@ -2431,8 +2468,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
     test("both Pinboard 401 paths share reset-and-reload behavior", () => {
       const fetch401 = source.slice(source.indexOf("function _pbpProxyPinboardFetch"), source.indexOf("let currentTags"));
       const loginSource = source.slice(source.indexOf('$id("login-form").addEventListener'), source.indexOf("// ===================== Main"));
-      assert(fetch401.includes("resetPinboardSession()") && !fetch401.includes("showLogin()"), "pinboardFetch 401 still mutates the live view");
-      assert(resetSource.includes('persistSettings({ pinboardToken: "" })') && resetSource.includes("if (!result.ok) return false"), "session reset bypasses or ignores unified persistence");
+      assert(fetch401.includes("resetPinboardSession(") && !fetch401.includes("showLogin()"), "pinboardFetch 401 still mutates the live view");
+      assert(resetSource.includes('type: "PBP_RESET_PINBOARD_AUTH", expectedToken') && resetSource.includes("if (!result?.ok) return false"), "session reset bypasses or ignores conditional worker reset");
+      assert(!resetSource.includes("pbpDiscardPopupDraft"), "automatic auth reset discards a later session's drafts");
       assert(logoutSource.includes('persistSettings({ pinboardToken: "" })') && logoutSource.includes("if (!result.ok) return"), "logout bypasses or ignores unified persistence");
       assert(!resetSource.includes("storage.local") && !logoutSource.includes("storage.local"), "token clear still hand-routes a storage area");
       assert(loginSource.includes("const saved = await persistSettings") && loginSource.indexOf("if (!saved.ok)") < loginSource.indexOf("settings.pinboardToken = token"), "login enters memory before persistence succeeds");

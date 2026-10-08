@@ -400,6 +400,37 @@ async function pbpReadFreshPinboardAuthForAccount(account) {
   }
 }
 
+// An automatic auth reset may arrive after another surface replaced the token.
+// Take the draft lock before the secret lock, matching pbpRunPopupDraft, so
+// in-flight draft writes finish before cleanup and cannot recreate it later.
+async function pbpResetPinboardAuth(expectedToken) {
+  if (typeof expectedToken !== "string" || !pbpPinboardAccountFromToken(expectedToken)) {
+    return { ok: false, error: "account_changed" };
+  }
+  try {
+    return await navigator.locks.request("pbp-popup-drafts", () => pbpWithSecretStorageLock(async () => {
+      const state = await pbpReadSecretSyncStateUnlocked({ persistInferredState: false });
+      const area = state.optSyncEnabled && state.syncApiKeys ? chrome.storage.sync : chrome.storage.local;
+      const raw = await area.get({ pinboardToken: "" });
+      if ((deobfuscateKey(raw.pinboardToken) || "") !== expectedToken) {
+        return { ok: false, error: "account_changed" };
+      }
+      const owner = pbpPinboardAccountFromToken(expectedToken);
+      const prefix = "pbp-popup-draft:" + encodeURIComponent(owner) + ":";
+      const rows = await chrome.storage.session.get(null);
+      const keys = Object.keys(rows).filter((key) => key.startsWith(prefix) && rows[key]?.owner === owner);
+      if (keys.length) await chrome.storage.session.remove(keys);
+      await area.set({ pinboardToken: "" });
+      invalidatePinboardAuthState();
+      return { ok: true };
+    }));
+  } catch (e) {
+    console.warn("[pinboard-auth] conditional reset failed:", e && e.name, e && e.message);
+    return { ok: false, error: "storage" };
+  }
+}
+// Conditional auth reset end
+
 // ---- Show Chrome notification (with category filter) ----
 async function showNotification(id, title, message, category, undoInfo) {
   try {
@@ -756,6 +787,12 @@ async function deliverSaveIntent(intent, settings, auth = pbpCapturePinboardAuth
     }
 
     const delivered = await pbpSendResolvedPlan(plan, settings);
+    if (delivered.result.reason === "not_logged_in") {
+      const current = await pbpReadFreshPinboardAuthForAccount(auth.account);
+      if (!current || current.token !== settings.pinboardToken || !pbpPinboardAuthIsCurrent(auth)) {
+        return { result: pbpSaveFailure("account_changed"), persisted: null, retryable: false };
+      }
+    }
     // Lookup-backed modes can now lose a race between the read and the write
     // (replace=no answered with "already exists"); one fresh retry resolves it.
     if (delivered.result.reason !== "conflict"
@@ -2788,6 +2825,11 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     return true;
   }
   noteActivity(); // using the popup keeps the SW warm for the next open
+
+  if (message.type === "PBP_RESET_PINBOARD_AUTH") {
+    pbpResetPinboardAuth(message.expectedToken).then((result) => { try { sendResponse(result); } catch (_) {} });
+    return true;
+  }
 
   if (message.type === "PBP_VOCAB_DIRTY") {
     if (!PBP_VOCAB_DRIVE_CAPABLE) {

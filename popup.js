@@ -13,7 +13,7 @@ function _pbpProxyPinboardFetch(url, immediate) {
         if (!resp) { reject(new Error("no background response")); return; }
         if (resp.status === 401) {
           // Invalid token — redirect to login instead of letting Chrome show the auth dialog
-          resetPinboardSession();
+          resetPinboardSession(new globalThis.URL(url).searchParams.get("auth_token") || "");
           // Return a dummy resolved response so call sites don't also throw
           resolve({ ok: false, status: 401, json: () => Promise.resolve({}), text: () => Promise.resolve("") });
           return;
@@ -309,12 +309,14 @@ async function initPopupDraft(account, tab) {
 }
 // Popup draft UI end
 
-async function resetPinboardSession() {
-  await pbpDiscardPopupDraft(true);
+async function resetPinboardSession(expectedToken) {
   try {
-    const result = await persistSettings({ pinboardToken: "" });
-    if (!result.ok) return false;
-  } catch (_) { return false; }
+    const result = await chrome.runtime.sendMessage({ type: "PBP_RESET_PINBOARD_AUTH", expectedToken });
+    if (!result?.ok) return false;
+  } catch (e) {
+    console.warn("[pinboard-auth] reset dispatch failed:", e && e.name, e && e.message);
+    return false;
+  }
   settings.pinboardToken = "";
   invalidateBookmarkLookup();
   const recent = $id("recent-bookmarks");
@@ -1421,7 +1423,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
             // otherwise an invalidated token would leave the popup silently
             // stuck on a form it can never submit (the catch below stays quiet
             // on 401 precisely because the login screen is supposed to be up).
-            if (resolved.status === 401) resetPinboardSession();
+            if (resolved.status === 401) resetPinboardSession(token);
             // Same error shape the proxied branch below builds, so the catch
             // names an account switch and a dead network apart either way.
             workerError = new Error(`HTTP ${resolved.status || 0}`);
@@ -1755,7 +1757,10 @@ function setupSubmit(token) {
         throw new Error("invalid save response");
       }
       if (result.status === "failed" && result.reason === "not_logged_in") {
-        await resetPinboardSession();
+        if (!await resetPinboardSession(token) && ownsSubmitUi()) {
+          showStatus("status-msg", t("pinboardErrorAuth"), "error");
+          setSubmitState("idle");
+        }
         return;
       }
       if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
