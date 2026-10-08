@@ -886,26 +886,22 @@ function _pbpNotesBuildExcerpt(h, index, isCurrent, pageTs, q) {
     body.appendChild(jump);
   }
   const note = typeof h.item.note === "string" ? h.item.note : "";
-  if (note.trim()) {
-    const p = document.createElement("p");
-    p.className = "notes-excerpt-note";
-    const ic = document.createElement("span");
-    ic.className = "notes-note-ic";
-    ic.innerHTML = PBP_ICONS.pencil;
-    const text = document.createElement("span");
-    text.className = "notes-excerpt-note-text";
-    _pbpNotesMarkText(text, note, q);
-    p.append(ic, text);
-    body.appendChild(p);
-  }
   const editing = _notesEditSessions.get(h.key);
   if (editing) body.appendChild(_pbpNotesBuildNoteEditor(editing));
   else {
     const edit = document.createElement("button");
     edit.type = "button";
-    edit.className = "btn btn-sm ghost notes-note-edit";
+    edit.className = "notes-excerpt-note notes-note-edit";
     edit.dataset.notesKey = h.key;
-    setBtnIcon(edit, "pencil", t("notesEdit"));
+    edit.title = t("notesEdit");
+    edit.setAttribute("aria-label", t("notesEdit") + (note.trim() ? ": " + note : ""));
+    const ic = document.createElement("span");
+    ic.className = "notes-note-ic";
+    ic.innerHTML = PBP_ICONS.pencil;
+    const text = document.createElement("span");
+    text.className = "notes-excerpt-note-text";
+    _pbpNotesMarkText(text, note.trim() ? note : t("notesEdit"), q);
+    edit.append(ic, text);
     edit.addEventListener("click", () => _pbpNotesBeginNoteEdit(h));
     body.appendChild(edit);
   }

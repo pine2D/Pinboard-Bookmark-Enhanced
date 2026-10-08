@@ -893,16 +893,26 @@ async function driveJourney(context, worker, extId, rep) {
         requireState(await reader.evaluate(mode => getComputedStyle(document.documentElement).colorScheme === mode, mode), 'reader color scheme was not applied');
         if (width === 320 && await reader.locator('#rail-toggle').getAttribute('aria-expanded') !== 'true') await reader.locator('#rail-toggle').click();
         const section=reader.locator('#hl-rail-section');
-        if (await section.evaluate(el=>el.classList.contains('rail-collapsed'))) await section.locator('.rail-sec-head').click();
+        // A fixed 220ms sleep can sample before the 200ms animation's finish
+        // callback on a busy renderer. Wait for the actual settled fold state.
+        const waitSettled=()=>reader.waitForFunction(()=>!document.getElementById('hl-rail-section').style.height,null,{timeout:2000});
+        await waitSettled();
+        if (await section.evaluate(el=>el.classList.contains('rail-collapsed'))) {
+          await section.locator('.rail-sec-head').click();
+          await waitSettled();
+        }
         await section.locator('.rail-sec-head').click();
-        await reader.waitForTimeout(220);
+        await reader.waitForFunction(()=>{
+          const el=document.getElementById('hl-rail-section');
+          return el.classList.contains('rail-collapsed') && !el.style.height && el.querySelector('.hl-list').getBoundingClientRect().height===0;
+        },null,{timeout:2000});
         const geometry=await section.evaluate(el=>{
           const box=selector=>el.querySelector(selector).getBoundingClientRect().toJSON();
           return {label:box('.rail-sec-label'),count:box('.rail-sec-count'),copy:box('#hl-rail-copy'),book:box('.rail-sec-open:not(#hl-rail-copy)'),list:box('.hl-list'),total:el.querySelector('.rail-sec-count').textContent};
         });
         requireState(geometry.count.left-geometry.label.right<=6 && geometry.count.left>=geometry.label.right-1, 'highlight count separated from label');
         requireState(geometry.copy.width>=24 && geometry.book.width>=24 && Math.abs(geometry.copy.top-geometry.book.top)<1 && geometry.copy.right<=geometry.book.left, 'collapsed header actions hidden, overlapping or misordered');
-        requireState(geometry.total==='(2)' && geometry.list.height===0, 'fold hid total or left list visible');
+        requireState(geometry.total==='(2)' && geometry.list.height===0, `fold hid total or left list visible: ${locale}/${mode}/${width} total=${geometry.total} height=${geometry.list.height}`);
         requireState(await reader.locator('#rail-settings-btn').evaluate(el=>{
           const svg = el.querySelector('svg');
           return el.closest('.rail-ident') && el.getBoundingClientRect().top===document.getElementById('preview-title').getBoundingClientRect().top
@@ -910,6 +920,7 @@ async function driveJourney(context, worker, extId, rep) {
         }), 'settings icon is not visible beside the title');
         if(locale==='zh_CN') await rep.shot(reader,s,`rail-${mode}-${width}`);
         await section.locator('.rail-sec-head').click();
+        await waitSettled();
       }
     }
     await reader.evaluate(() => {
@@ -1855,8 +1866,12 @@ async function driveDiscovery(context, worker, extId, rep) {
     await reader.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`,{waitUntil:'load'});
     await reader.waitForSelector('#reader-ai-configure');
     requireState(await reader.locator('#reader-source-details').getAttribute('open')===null,"source tools should start secondary/collapsed");
-    const order=await reader.evaluate(()=>document.getElementById('toc').compareDocumentPosition(document.getElementById('ai-setup-section'))&Node.DOCUMENT_POSITION_FOLLOWING);
-    requireState(!!order,"Contents is below configuration/actions");
+    const order=await reader.evaluate(()=>{
+      const toc=document.getElementById('toc');
+      return !!(document.getElementById('export-section').compareDocumentPosition(toc)&Node.DOCUMENT_POSITION_FOLLOWING) &&
+        !!(toc.compareDocumentPosition(document.getElementById('reader-source-details'))&Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    requireState(order,"Contents must follow export and precede source tools");
     await reader.locator('#reader-source-details summary').click();
     await reader.locator('#btn-raw').click();
     await reader.waitForSelector('#raw-view:not(.hidden)');

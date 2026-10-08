@@ -3768,7 +3768,7 @@ async function loadKatexCss() {
 
 // ---- Rail drawer (narrow viewports) ----
 // Off-canvas modal-style drawer: move focus in on open, trap Tab while open,
-// restore focus to the opener on close. Only engaged <1000px (toggle is
+// restore focus to the opener on close. Only engaged <=1000px (toggle is
 // display:none above, so setOpen(true) never fires at wide widths).
 function setupDrawer() {
   const toggle = document.getElementById("rail-toggle");
@@ -3787,6 +3787,8 @@ function setupDrawer() {
     scrim.hidden = !open;
     if (open) {
       lastFocus = document.activeElement;
+      const ident = rail.querySelector(".rail-ident");
+      if (ident) ident.insertBefore(toggle, document.getElementById("preview-url"));
       rail.setAttribute("role", "dialog");
       rail.setAttribute("aria-modal", "true");
       if (main) main.inert = true;
@@ -3853,7 +3855,10 @@ function pbpRailDrawerClose() {
   const scrim = document.getElementById("rail-scrim");
   const rail = document.getElementById("rail");
   const main = document.querySelector("main");
-  if (toggle) toggle.setAttribute("aria-expanded", "false");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", "false");
+    if (scrim && scrim.parentNode) scrim.parentNode.insertBefore(toggle, scrim);
+  }
   if (scrim) scrim.hidden = true;
   if (rail) {
     rail.removeAttribute("role");
@@ -3893,9 +3898,9 @@ function trOnlyScrollTarget(headEl) {
 // tests/ui-contract-tests.mjs, and a helper with four early `return;`s does not
 // belong under it.
 //
-// #toc is the rail's LAST section -- ident, badges, the Raw/Rendered switch, the
-// translation section, Ask, export and the Notebook list (whose .hl-list alone
-// may take 40vh) all sit above it -- and .rail is the single scroller for a long
+// #toc follows the rail's primary sections -- ident, badges, translation,
+// Ask, export and the Notebook list (whose .hl-list alone may take 40vh)
+// all sit above it -- and .rail is the single scroller for a long
 // TOC by explicit user decision (md-preview.css ~:1312: no inner max-height, two
 // adjacent scrollbars are jarring). So on a 30+ heading article the entry that
 // says "you are here" scrolls out of the rail and the scroll-spy stops paying

@@ -1224,15 +1224,26 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
 .notes-excerpt-jump:focus-visible { outline: 2px solid var(--lib-focus-bd); outline-offset: -2px; box-shadow: none; }
 .notes-excerpt-note {
   display: flex;
+  align-items: flex-start;
   gap: var(--lib-sp-2);
+  width: 100%;
+  min-height: calc(var(--lib-control-h) - 4px);
   margin: var(--lib-sp-2) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--lib-radius-md);
+  background: transparent;
   font-size: 14px;
   line-height: 22px;
   color: var(--lib-fg);
+  text-align: start;
   text-wrap: pretty;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  cursor: pointer;
 }
+.notes-excerpt-note:hover { background: var(--lib-row-bg-hover); }
+.notes-excerpt-note:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
 .notes-note-ic { flex: none; display: inline-flex; margin-top: var(--lib-sp-1); color: var(--lib-fg-muted); }
 .notes-note-ic svg { width: 14px; height: 14px; }
 .notes-excerpt-note-text { min-width: 0; }
@@ -3724,9 +3735,8 @@ html[data-theme="github-light"] {
 /* @generated:ui-themes end */
 
 /* Inline note editing uses the existing field and compact action families. */
-.notes-note-editor { display: grid; gap: var(--lib-sp-2); margin-top: var(--lib-sp-3); }
+.notes-note-editor { display: grid; gap: var(--lib-sp-2); margin-top: var(--lib-sp-2); }
 .notes-note-editor > .lib-cluster { flex-wrap: wrap; }
 .notes-note-editor > .save-status { margin: 0; }
-.notes-note-edit { margin-top: var(--lib-sp-2); }
 
 .notes-empty > .btn { display: block; max-width: 100%; margin-top: var(--lib-sp-3); white-space: normal; height: auto; min-height: calc(var(--lib-control-h) - 4px); }

@@ -15,7 +15,8 @@
   <a href="#rendered-view" id="skip-link" class="skip-link" data-i18n="mdSkipToContent">Skip to content</a>
   <div id="copy-status" class="sr-only" aria-live="polite"></div>
   <button id="rail-toggle" class="rail-toggle" type="button" aria-label="Toggle controls" data-i18n-aria="mdToggleControls" data-i18n-title="mdToggleControls" aria-expanded="false" aria-controls="rail">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    <svg class="rail-toggle-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    <svg class="rail-toggle-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
   </button>
   <div id="rail-scrim" class="rail-scrim" hidden></div>
   <aside id="rail" class="rail" aria-labelledby="preview-title">
@@ -31,10 +32,6 @@
       <span id="reading-stats" class="rail-stats"></span>
       <span id="token-count" class="token-badge"></span>
     </div>
-    <nav id="toc" class="toc rail-section" aria-label="Table of contents" data-i18n-aria="mdTocContents" hidden>
-      <div class="rail-label" data-i18n="mdTocContents">Contents</div>
-      <ul id="toc-list" class="toc-list"></ul>
-    </nav>
     <div class="rail-section" id="export-section">
       <div class="rail-label" data-i18n="mdExportSection">Export</div>
       <div class="row" role="group" aria-label="Export" data-i18n-aria="mdExportSection">
@@ -103,6 +100,10 @@
       </div>
         <div id="send-status" class="send-status msg-bar" role="status" aria-live="polite" hidden></div>
     </div>
+    <nav id="toc" class="toc rail-section" aria-label="Table of contents" data-i18n-aria="mdTocContents" hidden>
+      <div class="rail-label" data-i18n="mdTocContents">Contents</div>
+      <ul id="toc-list" class="toc-list"></ul>
+    </nav>
     <details id="reader-source-details" class="rail-section">
       <summary class="rail-label"><span data-i18n="readerSourceTools">Source and extraction tools</span><span class="rail-sec-tri" aria-hidden="true"></span></summary>
       <div class="rail-badges">

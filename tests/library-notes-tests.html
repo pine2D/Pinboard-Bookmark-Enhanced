@@ -2103,9 +2103,15 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       check('note edit surfaces write failure and preserves stored text',failed&&store[key].items[0].note==='old note');
       chrome.storage.local.set=setFn;reset();_notesOwnerCache=null;await renderNotesPanel();
       const realHit=_pbpNotesHits().find(h=>h.item.id==='editable');
+      _pbpNotesSelectRow(realHit.key);
+      const noteEntry=()=>detail().querySelector('[data-notes-key="'+realHit.key+'"] .notes-note-edit');
+      check('saved note is one editable pencil-and-text entry without a duplicate display row',
+        noteEntry()?.querySelector('.notes-excerpt-note-text')?.textContent==='old note'&&
+        noteEntry().querySelectorAll('svg').length===1&&
+        noteEntry().closest('.notes-excerpt-body').querySelectorAll('.notes-excerpt-note,.notes-note-edit').length===1);
       if(typeof _pbpNotesBeginNoteEdit==='function')_pbpNotesBeginNoteEdit(realHit);
       let input=$id('notes-detail').querySelector('textarea');
-      check('note editor opens with existing text and accessible name',!!input&&input.value==='old note'&&!!input.getAttribute('aria-label'));
+      check('note editor opens with existing text and accessible name',!!input&&input.value==='old note'&&!!input.getAttribute('aria-label')&&!noteEntry());
       if(input){input.value='unsaved draft';input.focus();input.setSelectionRange(3,7,'backward');input.dispatchEvent(new Event('input',{bubbles:true}));await _pbpNotesRefreshPreservingState();}
       input=$id('notes-detail').querySelector('textarea');
       check('note draft survives background detail refresh',!!input&&input.value==='unsaved draft');
@@ -2115,7 +2121,28 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       input=$id('notes-detail').querySelector('textarea');
       check('failed note save retains editable draft for retry',!!input&&input.value==='unsaved draft'&&!input.readOnly);
       chrome.storage.local.set=setFn;if(session&&typeof _pbpNotesCancelNoteEdit==='function')_pbpNotesCancelNoteEdit(session);
-      check('cancel note edit leaves storage unchanged and closes editor',store[key].items[0].note==='old note'&&!$id('notes-detail').querySelector('textarea'));
+      check('cancel note edit leaves storage unchanged and closes editor',store[key].items[0].note==='old note'&&!$id('notes-detail').querySelector('textarea')&&noteEntry()?.textContent==='old note'&&document.activeElement===noteEntry());
+      noteEntry().click();
+      input=detail().querySelector('textarea');
+      const multiline='fresh first line\n'+('A longer fresh note with wrapping. '.repeat(8));
+      input.value=multiline;input.dispatchEvent(new Event('input'));
+      await _pbpNotesSaveNote(_notesEditSessions.get(realHit.key));
+      check('saving replaces the editor with the full multiline note and restores its focus',
+        !detail().querySelector('textarea')&&noteEntry()?.querySelector('.notes-excerpt-note-text')?.textContent===multiline&&document.activeElement===noteEntry());
+      const marked=_pbpNotesBuildExcerpt({...realHit,item:{...realHit.item,note:multiline}},0,true,realHit.item.ts,'fresh');
+      check('saved note keeps line breaks, wraps long text and highlights search matches',
+        getComputedStyle(noteEntry()).whiteSpace==='pre-wrap'&&getComputedStyle(noteEntry()).overflowWrap==='anywhere'&&
+        marked.querySelector('.notes-excerpt-note-text')?.textContent===multiline&&marked.querySelectorAll('.notes-excerpt-note-text mark').length===9);
+      noteEntry().click();
+      input=detail().querySelector('textarea');
+      check('clicking the saved note reopens only its editor with the complete text',input?.value===multiline&&!noteEntry());
+      input.value=' \n ';input.dispatchEvent(new Event('input'));
+      await _pbpNotesSaveNote(_notesEditSessions.get(realHit.key));
+      check('blank note save restores the pencil-and-edit-note entry in place',
+        !detail().querySelector('textarea')&&noteEntry()?.querySelector('.notes-excerpt-note-text')?.textContent===t('notesEdit')&&noteEntry().querySelectorAll('svg').length===1);
+      noteEntry().click();
+      _pbpNotesCancelNoteEdit(_notesEditSessions.get(realHit.key));
+      check('cancel from an empty note restores its single focused edit entry',!detail().querySelector('textarea')&&noteEntry()?.textContent===t('notesEdit')&&document.activeElement===noteEntry());
       reset();store[key].items[1]={...item,id:'peer',quote:'Second quote',note:'second note',ts:124};await renderNotesPanel();
       _pbpNotesBeginNoteEdit(_pbpNotesHits().find(h=>h.item.id==='editable'));
       _pbpNotesBeginNoteEdit(_pbpNotesHits().find(h=>h.item.id==='peer'));

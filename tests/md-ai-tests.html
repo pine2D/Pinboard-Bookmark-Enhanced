@@ -11834,4 +11834,44 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
   });
 })();
 </script>
+<script>
+suiteIf("reader drawer: one close control and focus ownership", "setupDrawer", () => {
+  test("the existing toggle moves into the title, participates in modal focus, and returns on close or breakpoint change", () => {
+    // Isolate document-level listeners from the other reader fixtures. The
+    // production functions run against this real, connected iframe document.
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "position:fixed;left:-9999px;top:0;width:500px;height:500px";
+    document.body.appendChild(frame);
+    try {
+      const win = frame.contentWindow, doc = frame.contentDocument;
+      doc.body.innerHTML = '<button id="rail-toggle">Menu</button><div id="rail-scrim" hidden></div><aside id="rail"><div class="rail-ident"><h1 id="preview-title">Title</h1><button id="rail-settings-btn">Settings</button><a id="preview-url" href="#">URL</a></div></aside><main>Article</main>';
+      const script = doc.createElement("script");
+      script.textContent = setupDrawer.toString() + "\n" + pbpRailDrawerClose.toString();
+      doc.head.appendChild(script);
+      let breakpointChange;
+      win.matchMedia = () => ({addEventListener: (_type, fn) => {breakpointChange = fn;}});
+      win.setupDrawer();
+      const toggle = doc.getElementById("rail-toggle"), rail = doc.getElementById("rail");
+      const gear = doc.getElementById("rail-settings-btn"), url = doc.getElementById("preview-url");
+      toggle.focus(); toggle.click();
+      assertEq(toggle.parentElement, rail.querySelector(".rail-ident"), "same opener becomes the title's close control");
+      assertEq(toggle.nextElementSibling, url, "close control sits before the URL in keyboard order");
+      assertEq(doc.querySelectorAll("#rail-toggle").length, 1, "opening never duplicates the toggle");
+      assert(doc.querySelector("main").inert && rail.getAttribute("aria-modal") === "true", "open drawer owns focus");
+      url.focus();
+      doc.dispatchEvent(new win.KeyboardEvent("keydown", {key:"Tab", bubbles:true, cancelable:true}));
+      assertEq(doc.activeElement, gear, "Tab wraps inside the drawer");
+      doc.dispatchEvent(new win.KeyboardEvent("keydown", {key:"Tab", shiftKey:true, bubbles:true, cancelable:true}));
+      assertEq(doc.activeElement, url, "Shift+Tab wraps inside the drawer");
+      toggle.click();
+      assertEq(toggle.parentElement, doc.body, "close restores the original opener");
+      assertEq(doc.activeElement, toggle, "close restores focus to that same node");
+      assert(!doc.querySelector("main").inert && !rail.hasAttribute("aria-modal"), "close releases modal state");
+      toggle.click(); breakpointChange({matches:false});
+      assertEq(toggle.parentElement, doc.body, "crossing the wide breakpoint restores the opener");
+      assert(!doc.body.classList.contains("rail-open") && toggle.getAttribute("aria-expanded") === "false", "breakpoint clears open state");
+    } finally { frame.remove(); }
+  });
+});
+</script>
 </body></html>
