@@ -3170,13 +3170,13 @@
       "message": "閱讀提示"
     },
     "vocabDriveSection": {
-      "message": "Google Drive 生詞同步"
+      "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "只同步目前 Pinboard 帳戶的生詞，不會同步設定或 API 金鑰。"
+      "message": "同步範圍只適用於這部裝置和目前的 Pinboard 帳戶。設定與 API 金鑰不會同步。"
     },
     "vocabDriveDisclosure": {
-      "message": "擴充功能會在 Google Drive 的專用 appDataFolder 內，以明文格式儲存一份生詞副本。資料並非端對端加密，可能包括詞語、釋義、筆記、來源 URL、文章標題及語境摘錄。"
+      "message": "Google Drive appDataFolder 中的副本以明文儲存，未經端對端加密，可能包含生詞、釋義、標記摘錄、筆記、來源網址、標題和時間。"
     },
     "vocabDriveLoading": {
       "message": "正在讀取 Google Drive 同步狀態…"
@@ -3185,16 +3185,16 @@
       "message": "這部裝置尚未連接 Google Drive。"
     },
     "vocabDriveUnavailable": {
-      "message": "此版本尚未完成 OAuth 設定，因此暫不支援 Google Drive 生詞同步。"
+      "message": "此版本尚未啟用 OAuth，暫時無法使用 Google Drive 同步。"
     },
     "vocabDriveAuthorizing": {
       "message": "正在等待 Google 授權。請在 Chrome 彈出的視窗中完成登入與授權。"
     },
     "vocabDriveWorking": {
-      "message": "正在與 Google Drive 同步生詞…"
+      "message": "正在與 Google Drive 同步所選資料…"
     },
     "vocabDriveSynced": {
-      "message": "生詞已與 Google Drive 同步。"
+      "message": "所選資料已與 Google Drive 同步。"
     },
     "vocabDriveConnected": {
       "message": "這部裝置已連接 Google Drive。"
@@ -3217,27 +3217,11 @@
     "vocabDriveNever": {
       "message": "尚未同步"
     },
-    "vocabDriveNoticesExplain": {
-      "message": "另一部裝置刪除了這些生詞，而這部裝置隨後有較新的修改，因此保留了本機版本：$TERMS$",
-      "placeholders": {
-        "terms": {
-          "content": "$1"
-        }
-      }
-    },
     "vocabDriveNoticesClear": {
       "message": "關閉衝突提示"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Google Drive 生詞同步已停止，而且不會自動重試。請開啟設定查看原因。"
-    },
-    "vocabDriveNotices": {
-      "message": "刪除衝突提示：$COUNT$ 項",
-      "placeholders": {
-        "count": {
-          "content": "$1"
-        }
-      }
+      "message": "Google Drive 同步已停止，不會自動重試。開啟設定查看原因。"
     },
     "vocabDriveConnect": {
       "message": "連接 Google Drive"
@@ -3258,16 +3242,16 @@
       "message": "Google Drive 授權無法使用。請確認已登入 Chrome 瀏覽器帳戶。"
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "尚未登入 Pinboard 帳戶，生詞同步無法開始。請在「一般 → Pinboard 帳戶」中填寫 API Token，然後重新連接。"
+      "message": "尚未登入 Pinboard 帳戶。請在「一般 → Pinboard 帳戶」填入 API Token，然後重新連線。"
     },
     "vocabDriveErrorPermission": {
       "message": "缺少 Google Drive 權限。"
     },
     "vocabDriveErrorCorrupt": {
-      "message": "無法安全讀取 Google Drive 同步資料，本機生詞並無變更。"
+      "message": "無法安全讀取 Google Drive 同步資料，本機資料未變更。"
     },
     "vocabDriveErrorLocalStore": {
-      "message": "無法寫入本機生詞資料庫，同步已停止。已儲存的生詞並無變更。"
+      "message": "無法儲存本機資料，同步已停止。"
     },
     "vocabDriveErrorNetwork": {
       "message": "無法連接 Google Drive。"
@@ -3276,7 +3260,7 @@
       "message": "Google Drive 同步失敗。"
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Google 帳戶或 Pinboard 帳戶已切換。請重新開啟「生詞」後再試。"
+      "message": "Google 帳戶或 Pinboard 帳戶已變更。重新開啟「一般」後再試。"
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "有一條生詞或其上下文內容過大，無法同步。請縮短或刪除該項內容，然後按下「立即同步」。"
@@ -4024,5 +4008,62 @@
   "notesEditFailed": {"message": "筆記儲存失敗，草稿已保留，請重試。"},
   "libraryClearFilters": {"message": "清除搜尋與篩選"},
   "readerSourceTools": {"message": "原始碼與擷取工具"},
-  "aiConfigure": {"message": "設定 AI"}
+  "aiConfigure": {"message": "設定 AI"},
+    "driveChromeSyncSection": {
+      "message": "Chrome Sync"
+    },
+    "driveSyncVocabulary": {
+      "message": "生詞"
+    },
+    "driveSyncNotes": {
+      "message": "標記與筆記"
+    },
+    "driveVocabularyLastSuccess": {
+      "message": "生詞上次同步成功"
+    },
+    "driveNotesLastSuccess": {
+      "message": "標記與筆記上次同步成功"
+    },
+    "driveSyncChooseData": {
+      "message": "選擇要在這部裝置同步的資料。"
+    },
+    "driveVocabularyStatus": {
+      "message": "生詞：$STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesStatus": {
+      "message": "標記與筆記：$STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveVocabularyNotices": {
+      "message": "生詞衝突：$COUNT$。已保留本機修改。",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesNotices": {
+      "message": "標記與筆記衝突：$COUNT$。已保留兩個版本。",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesErrorEntryTooLarge": {
+      "message": "一項標記或筆記過大，無法同步。縮短或移除後，按「立即同步」。"
+    },
+    "driveScopeSaveFailed": {
+      "message": "無法儲存這部裝置的同步範圍，請重試。"
+    }
+
 }

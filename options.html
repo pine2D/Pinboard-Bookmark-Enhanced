@@ -114,24 +114,65 @@
         </div>
       </section>
       <section class="settings-section">
-        <h2 class="section-title" id="sec-sync" data-i18n="secSync">Data Sync</h2>
-        <div class="pref-group" role="group" aria-labelledby="sec-sync">
-        <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-enabled" aria-labelledby="opt-sync-enabled-label" /> <span class="switch-text" id="opt-sync-enabled-label" data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span>
-          <details class="context-help">
-            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="optSyncHint">This checkbox applies to this device only. Settings are shared between the devices where you turn it on; devices with it off keep their own local settings.</p>
-          </details><span class="switch-track" aria-hidden="true"></span></label>
-        </div>
-        <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-api-keys" aria-labelledby="opt-sync-api-keys-label" /> <span class="switch-text" id="opt-sync-api-keys-label" data-i18n="syncApiKeysLabel">Sync credentials for this Google account</span>
-          <details class="context-help">
-            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="syncApiKeysHint">This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted.</p>
-          </details><span class="switch-track" aria-hidden="true"></span></label>
-        </div>
-        </div>
-        <p id="opt-sync-local-only" class="sync-local-only" role="status" aria-live="polite" hidden></p>
-        <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
-
+        <details class="disclosure" data-acc-key="general-data-sync" open>
+          <summary id="sec-sync" data-i18n="secSync">Data Sync</summary>
+          <div class="disclosure-body" id="sec-sync-body">
+            <section class="settings-section" id="chrome-sync-section" aria-labelledby="sec-chrome-sync">
+              <div class="fg"><div class="bl" role="heading" aria-level="3" id="sec-chrome-sync" data-i18n="driveChromeSyncSection">Chrome Sync</div></div>
+              <div class="pref-group" role="group" aria-labelledby="sec-chrome-sync">
+              <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-enabled" aria-labelledby="opt-sync-enabled-label" /> <span class="switch-text" id="opt-sync-enabled-label" data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span>
+                <details class="context-help">
+                  <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+                  <p class="hint context-help-body" data-i18n="optSyncHint">This checkbox applies to this device only. Settings are shared between the devices where you turn it on; devices with it off keep their own local settings.</p>
+                </details><span class="switch-track" aria-hidden="true"></span></label>
+              </div>
+              <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-api-keys" aria-labelledby="opt-sync-api-keys-label" /> <span class="switch-text" id="opt-sync-api-keys-label" data-i18n="syncApiKeysLabel">Sync credentials for this Google account</span>
+                <details class="context-help">
+                  <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+                  <p class="hint context-help-body" data-i18n="syncApiKeysHint">This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted.</p>
+                </details><span class="switch-track" aria-hidden="true"></span></label>
+              </div>
+              </div>
+              <p id="opt-sync-local-only" class="sync-local-only" role="status" aria-live="polite" hidden></p>
+              <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
+            </section>
+            <section class="settings-section" aria-labelledby="sec-google-drive">
+              <div class="fg context-help-host" data-help-role="group">
+                <div class="bl" role="heading" aria-level="3" id="sec-google-drive" data-i18n="vocabDriveSection">Google Drive</div>
+                <details class="context-help">
+                  <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+                  <p class="hint context-help-body" data-i18n="vocabDriveScope">Choices apply only to this device and the current Pinboard account. Settings and API keys are not synced.</p>
+                  <p class="hint context-help-body" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">Copies in your Google Drive appDataFolder are plaintext, without end-to-end encryption. They can include saved words, definitions, highlighted excerpts, notes, source URLs, titles, and timestamps.</p>
+                </details>
+              </div>
+              <div id="vocab-drive-body">
+                <div class="pref-group" role="group" aria-labelledby="sec-google-drive">
+                  <div class="pref-row"><label class="switch"><input type="checkbox" id="drive-sync-vocabulary" data-no-autosave checked /> <span class="switch-text" data-i18n="driveSyncVocabulary">Vocabulary</span><span class="switch-track" aria-hidden="true"></span></label></div>
+                  <div class="pref-row"><label class="switch"><input type="checkbox" id="drive-sync-notes" data-no-autosave /> <span class="switch-text" data-i18n="driveSyncNotes">Highlights and notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
+                </div>
+                <p id="vocab-drive-state" class="save-status vocab-drive-state" role="status" aria-live="polite" data-i18n="vocabDriveLoading">Loading Google Drive sync status…</p>
+                <dl id="vocab-drive-fields" class="vocab-drive-fields" hidden>
+                  <dt data-i18n="vocabDriveAccountLabel">Google account</dt><dd id="vocab-drive-account"></dd>
+                  <dt data-i18n="vocabDriveOwnerLabel">Pinboard account</dt><dd id="vocab-drive-owner"></dd>
+                  <dt id="vocab-drive-last-success-label" data-i18n="driveVocabularyLastSuccess">Vocabulary last synced</dt><dd id="vocab-drive-last-success"></dd>
+                  <dt id="drive-notes-last-success-label" data-i18n="driveNotesLastSuccess">Highlights and notes last synced</dt><dd id="drive-notes-last-success"></dd>
+                </dl>
+                <p id="vocab-drive-error" class="field-error" role="status" aria-live="polite"></p>
+                <p id="drive-notes-error" class="field-error" role="status" aria-live="polite"></p>
+                <div class="vocab-drive-notice-row" hidden>
+                  <p id="vocab-drive-notices" class="vocab-drive-notices" role="status" aria-live="polite"></p>
+                  <button type="button" class="btn btn-sm ghost vocab-drive-notice-dismiss" id="vocab-drive-clear-notices" title="Dismiss conflict notice" aria-label="Dismiss conflict notice" data-i18n-title="vocabDriveNoticesClear" data-i18n-aria="vocabDriveNoticesClear"><span class="btn-ic" data-ic="cross"></span></button>
+                </div>
+                <div class="vocab-drive-actions fg-actions" id="vocab-drive-actions" hidden>
+                  <button type="button" class="btn btn-sm" id="vocab-drive-connect" data-i18n="vocabDriveConnect" hidden>Connect Google Drive</button>
+                  <button type="button" class="btn btn-sm" id="vocab-drive-sync" data-i18n="vocabDriveSyncNow" hidden>Sync now</button>
+                  <button type="button" class="btn btn-sm" id="vocab-drive-disconnect" data-i18n="vocabDriveDisconnect" hidden>Disconnect this device</button>
+                  <span class="save-status" id="vocab-drive-action-status" role="status" aria-live="polite"></span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </details>
       </section>
       <section class="settings-section">
         <div class="context-help-host context-help-section" data-help-role="section">
@@ -898,32 +939,6 @@
             </div>
           </div>
         </details>
-        <details class="disclosure" data-acc-key="vocab-google-drive" open>
-          <summary data-i18n="vocabDriveSection">Google Drive vocabulary sync</summary>
-          <div class="disclosure-body" id="vocab-drive-body">
-            <p class="hint vocab-drive-copy" data-i18n="vocabDriveScope">Syncs vocabulary for the current Pinboard account only. Settings and API keys are not synced.</p>
-            <p class="hint vocab-drive-copy" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">The extension stores a plaintext copy in its private appDataFolder on your Google Drive. The copy is not end-to-end encrypted and may include words, definitions, notes, source URLs, article titles, and context excerpts.</p>
-            <p id="vocab-drive-state" class="save-status vocab-drive-state" role="status" aria-live="polite" data-i18n="vocabDriveUnavailable">Google Drive vocabulary sync is not available in this build because OAuth activation is still pending.</p>
-            <dl id="vocab-drive-fields" class="vocab-drive-fields" hidden>
-              <dt data-i18n="vocabDriveAccountLabel">Google account</dt><dd id="vocab-drive-account"></dd>
-              <dt data-i18n="vocabDriveOwnerLabel">Pinboard account</dt><dd id="vocab-drive-owner"></dd>
-              <dt data-i18n="vocabDriveLastSuccessLabel">Last successful sync</dt><dd id="vocab-drive-last-success"></dd>
-              <dt data-i18n="vocabDrivePendingWordsLabel">Pending words</dt><dd id="vocab-drive-pending-words"></dd>
-              <dt data-i18n="vocabDrivePendingBatchesLabel">Pending batches</dt><dd id="vocab-drive-pending-batches"></dd>
-            </dl>
-            <p id="vocab-drive-error" class="field-error" role="status" aria-live="polite"></p>
-            <div class="vocab-drive-notice-row" hidden>
-              <p id="vocab-drive-notices" class="vocab-drive-notices" role="status" aria-live="polite"></p>
-              <button type="button" class="btn btn-sm ghost vocab-drive-notice-dismiss" id="vocab-drive-clear-notices" title="Dismiss conflict notice" aria-label="Dismiss conflict notice" data-i18n-title="vocabDriveNoticesClear" data-i18n-aria="vocabDriveNoticesClear"><span class="btn-ic" data-ic="cross"></span></button>
-            </div>
-            <div class="vocab-drive-actions" id="vocab-drive-actions" hidden>
-              <button type="button" class="btn btn-sm" id="vocab-drive-connect" data-i18n="vocabDriveConnect" hidden>Connect Google Drive</button>
-              <button type="button" class="btn btn-sm" id="vocab-drive-sync" data-i18n="vocabDriveSyncNow" hidden>Sync now</button>
-              <button type="button" class="btn btn-sm" id="vocab-drive-disconnect" data-i18n="vocabDriveDisconnect" hidden>Disconnect this device</button>
-              <span class="save-status" id="vocab-drive-action-status" role="status" aria-live="polite"></span>
-            </div>
-          </div>
-        </details>
         <details class="disclosure" data-acc-key="vocab-learning">
           <summary data-i18n="vocabLearningSection">Export and integrations</summary>
           <div class="disclosure-body">
@@ -1252,6 +1267,7 @@
   <script defer src="i18n.js"></script>
   <script defer src="shared.js"></script>
   <script defer src="vocab-store.js"></script>
+  <script defer src="notes-sync.js"></script>
   <script defer src="ai-cache.js"></script>
   <script defer src="ai.js"></script>
   <script defer src="options-connectivity.js"></script>

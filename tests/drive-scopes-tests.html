@@ -1,0 +1,220 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Drive Dataset Scopes Tests</title>
+<style>body{font-family:monospace;padding:16px}.case{padding:6px}.pass{color:green}.fail{color:red}</style>
+</head><body><h1>Drive Dataset Scopes Tests</h1><div id="summary"></div><div id="results"></div>
+<script src="../shared.js"></script>
+<script src="../vocab-store.js"></script>
+<script src="../vocab-gdrive.js"></script>
+<script>
+let pass = 0, fail = 0;
+function check(name, ok) { ok ? pass++ : fail++; const el = document.createElement("div"); el.className = "case " + (ok ? "pass" : "fail"); el.textContent = name; document.getElementById("results").append(el); }
+function harness(source, seed = {}, results = {}) {
+  const local = { vocabDriveConnected: true, ...seed }, calls = [], alarms = [];
+  const empty = { states: [], outbox: [], batches: [], notices: [] };
+  const client = { async connect() { calls.push("authorize"); return { ok: true, permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" }; }, async about() { return results.googleIdentity || { ok: true, permissionId: "google-a" }; } };
+  const deps = {
+    chrome: { runtime: { getManifest: () => ({}), sendMessage: async () => {} }, storage: { local: {
+      async get(query) { if (typeof query === "string") return { [query]: local[query] }; const out = {}; for (const [key, fallback] of Object.entries(query)) out[key] = key in local ? local[key] : fallback; return structuredClone(out); },
+      async set(values) { Object.assign(local, structuredClone(values)); results.afterSet?.(values); }
+    } }, permissions: { contains: async () => results.permissionGranted !== false }, alarms: { async clear(name) { alarms.push(name); }, create() {} } },
+    PBP_NOTES_DRIVE_PROTOCOL: {},
+    pbpVocabDriveOAuthActive: () => true, pbpCreateRecoveringTail: results.createTail || (() => async (fn) => fn()),
+    pbpCreateVocabDriveClient: results.createClient || (() => client),
+    pbpCreateVocabDriveSyncRunner: results.createVocabRunner || ((options) => async () => { calls.push("vocabulary"); const result = results.vocabulary || { ok: true }; if (result.status?.drivePermissionId) options.onSession?.(result.status.drivePermissionId); return result; }),
+    pbpCreateNotesDriveSyncRunner: (options) => async () => { calls.push("notes"); const result = results.notes || { ok: true }; if (result.status?.drivePermissionId) options.onSession?.(result.status.drivePermissionId); return result; },
+    pbpCreateNotesSyncStore: () => ({ getPreflightState: async () => null }),
+    pbpVocabSyncSnapshot: async () => { if (results.vocabSnapshotError) throw new Error("vocabulary storage unavailable"); return results.vocabSnapshot || ({ ...empty, outbox: [{ recordKey: "en|word" }] }); },
+    pbpNotesSyncSnapshot: async () => { if (results.notesSnapshotError) throw new Error("notes storage unavailable"); return results.notesSnapshot || ({ ...empty, outbox: [{ recordKey: "pbp_hl_abcd|note" }] }); },
+    pbpVocabGetPreflightState: async () => null,
+    pbpNotesGetPreflightState: async () => null,
+    getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
+    pbpPinboardAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
+    pbpVocabOwnerHash: async () => "a".repeat(64),
+    showNotification: async () => {}, t: (key) => key, console
+  };
+  const start = source.indexOf("const PBP_VOCAB_DRIVE_CONNECTED_KEY");
+  const end = source.indexOf("// Floor between two cold-start syncs.", start);
+  const factory = new Function(...Object.keys(deps), source.slice(start, end) + `
+    return { queue: typeof pbpQueueSelectedDriveSync === "function" ? pbpQueueSelectedDriveSync : null,
+      connect: typeof pbpConnectDrive === "function" ? pbpConnectDrive : null,
+      status: pbpGetVocabDriveStatus };`);
+  return { ...factory(...Object.values(deps)), calls, local, alarms };
+}
+async function connectDuringSync(source, sessionPermissionId) {
+  let releaseIdentity, identityPending, connected;
+  const identityRead = new Promise((resolve) => { identityPending = resolve; });
+  const identityGate = new Promise((resolve) => { releaseIdentity = resolve; });
+  const connectionWritten = new Promise((resolve) => { connected = resolve; });
+  let currentPermissionId = sessionPermissionId, clientNumber = 0, aboutReads = 0, runNumber = 0;
+  const mutations = [], states = new Map();
+  const h = harness(source, {
+    driveSyncVocabulary: true, driveSyncNotes: false,
+    driveConnectionAccount: { permissionId: "google-previous", emailAddress: "previous@example.test", displayName: "Previous" }
+  }, {
+    createTail: pbpCreateRecoveringTail,
+    afterSet(values) {
+      if (values.vocabDriveConnected === true && values.driveConnectionAccount?.permissionId === "google-a") connected();
+    },
+    createClient(options = {}) {
+      const number = clientNumber++;
+      return pbpCreateVocabDriveClient({ ...options,
+        identity: { async getAuthToken() { return { token: "fixture-google-token" }; }, async removeCachedAuthToken() {} },
+        fetchImpl: async (input) => {
+          const path = new URL(input).pathname;
+          if (path === "/drive/v3/about") {
+            if (number === 2) currentPermissionId = "google-a"; // Explicit Connect client.
+            // Handwritten Drive response, captured before the pending read.
+            const payload = { user: { permissionId: currentPermissionId, emailAddress: "current@example.test", displayName: "Current" } };
+            if (number === 0 && ++aboutReads === 2) { identityPending(); await identityGate; }
+            return new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json" } });
+          }
+          if (path === "/drive/v3/changes") {
+            return new Response('{"changes":[],"newStartPageToken":"after-connect"}', { headers: { "Content-Type": "application/json" } });
+          }
+          throw new Error("Unexpected Drive request: " + path);
+        }
+      });
+    },
+    createVocabRunner(options) {
+      const store = {
+        async getPreflightState() { return null; }, async deletePreflightState() { return true; },
+        async getAccountState(permissionId, ownerHash) {
+          return states.get(permissionId) || { key: "account:" + permissionId + ":" + ownerHash,
+            drivePermissionId: permissionId, ownerHash, bootstrapComplete: true, pageToken: "before-connect" };
+        },
+        async getMeta() { return { deviceId: "device-a", counter: 1 }; },
+        async applyRemotePage(_owner, _hash, _batches, cursor) {
+          mutations.push({ run: runNumber, kind: "cursor", pageToken: cursor.pageToken });
+          states.set(cursor.drivePermissionId, structuredClone(cursor));
+          return { ok: true, applied: 0, merged: 0, ignored: 0 };
+        },
+        async putAccountState(state) { mutations.push({ run: runNumber, kind: "state" }); states.set(state.drivePermissionId, structuredClone(state)); return true; },
+        async listPendingBatches() { return []; }, async listOutbox() { return []; }
+      };
+      const runner = pbpCreateVocabDriveSyncRunner({ ...options, store,
+        alarms: { async clear() {}, create() {} }, now: () => 100000 });
+      return (runOptions) => { runNumber++; return runner(runOptions); };
+    }
+  });
+  // The first run is bound to its Google ID. Its next /about response is
+  // already in flight when another options page finishes Connect.
+  const pending = h.queue({});
+  await identityRead;
+  const reconnecting = h.connect();
+  await connectionWritten;
+  releaseIdentity();
+  const [first, reconnect] = await Promise.all([pending, reconnecting]);
+  return { first, reconnect, mutations, account: h.local.driveConnectionAccount };
+}
+function bootHarness(source, seed = {}) {
+  const local = { vocabDriveConnected: true, driveSyncVocabulary: true, driveSyncNotes: true, ...seed };
+  const calls = [], cleared = [];
+  const chrome = { storage: { local: {
+    async get(query) { const out = {}; for (const [key, fallback] of Object.entries(query)) out[key] = key in local ? local[key] : fallback; return structuredClone(out); },
+    async set(values) { Object.assign(local, structuredClone(values)); },
+    async remove(keys) { for (const key of [].concat(keys)) delete local[key]; }
+  } }, permissions: { async contains() { return seed.permissionGranted !== false; }, async remove() { return true; } },
+  identity: { async getAuthToken() { calls.push("mint:" + local.vocabDriveConnected); return { token: "cached-token" }; }, async removeCachedAuthToken() { calls.push("remove-token"); } },
+  alarms: { async clear(name) { cleared.push(name); } } };
+  const deps = { chrome, PBP_VOCAB_DRIVE_CAPABLE: true, PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected", PBP_GOOGLE_API_ORIGIN: "https://www.googleapis.com/*",
+    PBP_DRIVE_CONNECTION_ACCOUNT_KEY: "driveConnectionAccount",
+    driveScopeEpochs: { vocabulary: 0, notes: 0 },
+    pbpVocabDriveIsConnected: async () => local.vocabDriveConnected === true,
+    pbpDriveTypeEnabled: async (type) => local.vocabDriveConnected === true && local[type === "notes" ? "driveSyncNotes" : "driveSyncVocabulary"] === true,
+    pbpQueueVocabDriveSync: async () => { calls.push("vocabulary"); return { ok: true }; },
+    pbpQueueNotesDriveSync: async () => { calls.push("notes"); return { ok: true }; },
+    pbpGetVocabDriveStatus: async () => ({ connected: local.vocabDriveConnected }), console
+  };
+  const start = source.indexOf("const PBP_VOCAB_BOOT_SYNC_KEY");
+  const end = source.indexOf("\npbpBootVocabDriveSync({ throttleMs:", start);
+  const factory = new Function(...Object.keys(deps), source.slice(start, end) + `
+    return { boot: pbpBootVocabDriveSync, notesBoot: pbpBootNotesDriveSync, disconnect: pbpDisconnectVocabDrive };`);
+  return { ...factory(...Object.values(deps)), local, calls, cleared };
+}
+(async () => {
+  const source = await fetch("../background.js").then((r) => r.text());
+  let h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true });
+  const onlyNotes = h.queue ? await h.queue({}) : null;
+  check("notes-only scope runs notes without enrolling vocabulary", onlyNotes?.ok && h.calls.join() === "notes");
+  h = harness(source, { driveSyncNotes: true }, { vocabulary: { ok: false, error: "corrupt" } });
+  const partial = h.queue ? await h.queue({}) : null;
+  check("blocked vocabulary does not stop selected notes and combined result fails", partial?.ok === false && partial.error === "corrupt" && h.calls.includes("notes"));
+  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false });
+  const none = h.queue ? await h.queue({}) : null;
+  check("no selected data does not open a sync session", none?.error === "no_data_selected" && h.calls.length === 0);
+  const connected = h.connect ? await h.connect() : null;
+  check("connecting without selected data still authorizes Google", connected?.ok && h.calls.join() === "authorize" && h.local.vocabDriveConnected === true);
+  h = harness(source);
+  const defaults = h.queue ? await h.queue({}) : null;
+  check("legacy defaults select vocabulary alone", defaults?.ok && h.calls.join() === "vocabulary");
+  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true });
+  const status = await h.status();
+  check("status preserves vocabulary fields and exposes independent notes counts", status.vocabularyEnabled === false && status.notesEnabled === true && status.pendingWords === 1 && status.notes?.pendingNotes === 1);
+  h = harness(source, { driveSyncNotes: true }, { notes: { ok: true, status: { waitingForRetry: true } } });
+  const waiting = h.queue ? await h.queue({}) : null;
+  check("a selected type in backoff is not reported as completed", waiting?.ok === false && waiting.error === "waiting_for_retry");
+  const boot = bootHarness(source);
+  await boot.boot({ throttleMs: 900000 }); await boot.notesBoot({ throttleMs: 900000 });
+  await boot.boot({ throttleMs: 900000 }); await boot.notesBoot({ throttleMs: 900000 });
+  check("cold-start throttle is independent for each selected type", boot.calls.join() === "vocabulary,notes" && boot.local._vocabBootSyncTs > 0 && boot.local._notesBootSyncTs > 0);
+  const off = bootHarness(source, { driveSyncNotes: false }); await off.notesBoot();
+  check("disabled notes boot clears only notes alarms", off.calls.length === 0 && off.cleared.length === 3 && off.cleared.every((name) => name.startsWith("notes-sync-")));
+  const disconnected = bootHarness(source, { pbp_hl_local: { note: "Keep local notes" } });
+  await disconnected.disconnect();
+  check("disconnect invalidates active runs before awaiting OAuth operations", disconnected.calls[0] === "mint:false" && disconnected.local.vocabDriveConnected === false);
+  check("disconnect clears both alarm groups and retains both datasets", ["notes", "vocab"].every((prefix) => ["dirty", "periodic", "retry"].every((suffix) => disconnected.cleared.includes(prefix + "-sync-" + suffix))) && disconnected.local.pbp_hl_local.note === "Keep local notes" && disconnected.local.driveSyncNotes === true && disconnected.local.driveSyncVocabulary === true);
+  h = harness(source, {}, { permissionGranted: false });
+  const deniedConnect = await h.connect();
+  check("Connect checks optional permissions before token mint or HTTP", deniedConnect.error === "permission" && h.calls.length === 0);
+  const deniedSync = await h.queue({});
+  check("revoked permission never starts selected dataset runners", deniedSync.error === "permission" && h.calls.length === 0);
+  const revokedBoot = bootHarness(source, { permissionGranted: false }); const bootResult = await revokedBoot.notesBoot();
+  check("boot with revoked permissions disconnects and clears both groups", bootResult.error === "permission" && revokedBoot.local.vocabDriveConnected === false && revokedBoot.cleared.length === 6 && revokedBoot.calls.length === 0);
+  const snap = (permissionId, emailAddress) => ({ states: [{ drivePermissionId: permissionId, emailAddress, lastSuccessAt: 100 }], outbox: [], batches: [], notices: [] });
+  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true }, { vocabSnapshot: snap("google-old", "old@example.test"), notesSnapshot: snap("google-current", "current@example.test") });
+  const notesAccount = await h.status();
+  check("notes-only status identifies current notes account over disabled vocabulary history", notesAccount.drivePermissionId === "google-current" && notesAccount.emailAddress === "current@example.test");
+  h = harness(source, { driveSyncNotes: true }, { notesSnapshotError: true });
+  let notesFailed = null; try { notesFailed = await h.status(); } catch (_) {}
+  check("notes status read failure retains healthy vocabulary status", notesFailed?.pendingWords === 1 && notesFailed.notes?.lastError === "local_store" && notesFailed.notes.blocked === true);
+  h = harness(source, { driveSyncNotes: true }, { vocabSnapshotError: true });
+  let vocabularyFailed = null; try { vocabularyFailed = await h.status(); } catch (_) {}
+  check("vocabulary status read failure retains healthy notes status", vocabularyFailed?.lastError === "local_store" && vocabularyFailed.blocked === true && vocabularyFailed.notes?.pendingNotes === 1 && !vocabularyFailed.notes.lastError);
+  h = harness(source, { driveSyncNotes: false }, { notesSnapshotError: true });
+  let disabledNotes = null; try { disabledNotes = await h.status(); } catch (_) {}
+  check("disabled notes storage failure adds no visible dataset error", disabledNotes?.pendingWords === 1 && disabledNotes.notes?.lastError !== "local_store" && disabledNotes.notes?.blocked !== true);
+  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false }, { notesSnapshotError: true, vocabSnapshotError: true });
+  let disabledBoth = null; try { disabledBoth = await h.status(); } catch (_) {}
+  check("disabled dataset read failures retain a neutral shared connection status", disabledBoth?.connected === true && disabledBoth.lastError !== "local_store" && disabledBoth.blocked !== true && disabledBoth.notes?.lastError !== "local_store");
+  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false }); await h.connect();
+  const emptySelectionAccount = await h.status();
+  check("fresh connection identifies Google with both datasets disabled", emptySelectionAccount.drivePermissionId === "google-a" && emptySelectionAccount.emailAddress === "current@example.test" && h.calls.join() === "authorize");
+  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false }, { vocabSnapshot: snap("google-previous", "previous@example.test") }); await h.connect();
+  const refreshedConnection = await h.status();
+  check("reconnect identity overrides disabled dataset account history", refreshedConnection.drivePermissionId === "google-a" && refreshedConnection.emailAddress === "current@example.test");
+  const disconnectedIdentity = bootHarness(source, { driveConnectionAccount: { permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" }, pbp_hl_local: { note: "Preserve history" } }); await disconnectedIdentity.disconnect();
+  check("disconnect clears shared connection identity while preserving dataset history", !("driveConnectionAccount" in disconnectedIdentity.local) && disconnectedIdentity.local.pbp_hl_local.note === "Preserve history");
+  const olderVocabulary = snap("google-old", "old@example.test"), newerNotes = snap("google-recent", "recent@example.test"); newerNotes.states[0].lastSuccessAt = 200;
+  h = harness(source, { driveSyncNotes: true }, { vocabSnapshot: olderVocabulary, notesSnapshot: newerNotes });
+  const legacyAccount = await h.status();
+  check("legacy connection without shared identity uses latest selected dataset account", legacyAccount.drivePermissionId === "google-recent" && legacyAccount.emailAddress === "recent@example.test");
+  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false }, { vocabSnapshot: snap("google-previous", "previous@example.test") });
+  const disabledLegacyAccount = await h.status();
+  check("legacy connection with no selected datasets does not leak disabled identity fields", !Object.hasOwn(disabledLegacyAccount, "drivePermissionId") && !Object.hasOwn(disabledLegacyAccount, "emailAddress") && !Object.hasOwn(disabledLegacyAccount, "displayName"));
+  const previousConnection = { permissionId: "google-previous", emailAddress: "previous@example.test", displayName: "Previous" };
+  const confirmedNotes = { ok: true, status: { drivePermissionId: "google-new", emailAddress: "new@example.test", displayName: "New", lastSuccessAt: 200 } };
+  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true, driveConnectionAccount: previousConnection }, { notes: confirmedNotes, notesSnapshot: snap("google-previous", "previous@example.test"), googleIdentity: { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" } });
+  const silentlySynced = await h.queue({}); const silentlySyncedStatus = await h.status();
+  check("successful background sync refreshes shared Google connection identity", silentlySynced.ok && h.local.driveConnectionAccount?.permissionId === "google-new" && silentlySyncedStatus.drivePermissionId === "google-new" && silentlySyncedStatus.emailAddress === "new@example.test");
+  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true, driveConnectionAccount: previousConnection }, { notes: confirmedNotes, googleIdentity: { ok: true, permissionId: "google-third", emailAddress: "third@example.test" } });
+  const switchedAfterRun = await h.queue({});
+  check("connection identity refresh rejects Google switch after successful run", switchedAfterRun.error === "account_changed" && h.local.driveConnectionAccount.permissionId === "google-previous");
+  h = harness(source, { driveSyncNotes: true, driveConnectionAccount: previousConnection }, { vocabulary: confirmedNotes, notes: confirmedNotes, googleIdentity: { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" } });
+  const concurrentIdentity = await h.queue({}), nextIdentity = await h.queue({});
+  check("concurrent syncs on the same Google account do not cancel each other or the next run", concurrentIdentity.ok && nextIdentity.ok && h.local.driveConnectionAccount.permissionId === "google-new" && h.calls.length === 4);
+  const sameGoogle = await connectDuringSync(source, "google-a");
+  check("Connect preserves a healthy same-Google run despite older connection metadata", sameGoogle.first.ok && sameGoogle.reconnect.ok && sameGoogle.account.permissionId === "google-a" && sameGoogle.mutations.some((row) => row.run === 1 && row.kind === "cursor" && row.pageToken === "after-connect"));
+  const olderGoogle = await connectDuringSync(source, "google-old");
+  check("Connect cancels a bound older-Google run before its pending identity read can commit", olderGoogle.first.error === "account_changed" && olderGoogle.reconnect.ok && olderGoogle.account.permissionId === "google-a" && olderGoogle.mutations.every((row) => row.run !== 1));
+  document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
+})();
+</script></body></html>

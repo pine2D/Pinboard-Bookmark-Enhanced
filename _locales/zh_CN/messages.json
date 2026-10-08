@@ -3170,13 +3170,13 @@
       "message": "阅读提示"
     },
     "vocabDriveSection": {
-      "message": "Google Drive 生词同步"
+      "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "仅同步当前 Pinboard 账号的生词，不会同步设置或 API 密钥。"
+      "message": "同步范围仅适用于本机和当前 Pinboard 账号。设置与 API 密钥不参与同步。"
     },
     "vocabDriveDisclosure": {
-      "message": "扩展会在 Google Drive 的专用 appDataFolder 中以明文格式保存一份生词副本。数据未经端到端加密，可能包含词语、释义、笔记、来源 URL、文章标题和上下文摘录。"
+      "message": "Google Drive appDataFolder 中的副本以明文保存，未经端到端加密，可能包含生词、释义、高亮摘录、笔记、来源网址、标题和时间。"
     },
     "vocabDriveLoading": {
       "message": "正在读取 Google Drive 同步状态…"
@@ -3185,16 +3185,16 @@
       "message": "此设备尚未连接 Google Drive。"
     },
     "vocabDriveUnavailable": {
-      "message": "此版本尚未完成 OAuth 配置，因此暂不支持 Google Drive 生词同步。"
+      "message": "此构建尚未启用 OAuth，暂不能使用 Google Drive 同步。"
     },
     "vocabDriveAuthorizing": {
       "message": "正在等待 Google 授权。请在 Chrome 弹出的窗口中完成登录与授权。"
     },
     "vocabDriveWorking": {
-      "message": "正在与 Google Drive 同步生词…"
+      "message": "正在与 Google Drive 同步所选数据…"
     },
     "vocabDriveSynced": {
-      "message": "生词已与 Google Drive 同步。"
+      "message": "所选数据已与 Google Drive 同步。"
     },
     "vocabDriveConnected": {
       "message": "此设备已连接 Google Drive。"
@@ -3217,27 +3217,11 @@
     "vocabDriveNever": {
       "message": "尚未同步"
     },
-    "vocabDriveNoticesExplain": {
-      "message": "另一台设备删除了这些生词，而本机随后有更新的修改，因此保留了本机版本：$TERMS$",
-      "placeholders": {
-        "terms": {
-          "content": "$1"
-        }
-      }
-    },
     "vocabDriveNoticesClear": {
       "message": "关闭冲突提示"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Google Drive 生词同步已停止，且不会自动重试。请打开设置查看原因。"
-    },
-    "vocabDriveNotices": {
-      "message": "删除冲突提示：$COUNT$ 条",
-      "placeholders": {
-        "count": {
-          "content": "$1"
-        }
-      }
+      "message": "Google Drive 同步已停止，不会自动重试。打开设置查看原因。"
     },
     "vocabDriveConnect": {
       "message": "连接 Google Drive"
@@ -3258,16 +3242,16 @@
       "message": "Google Drive 授权不可用。请确认已登录 Chrome 浏览器账户。"
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "尚未登录 Pinboard 账户，生词同步无法开始。请在「通用 → Pinboard 账户」中填写 API Token，然后重新连接。"
+      "message": "尚未登录 Pinboard 账号。请在「通用 → Pinboard 账号」中填写 API Token，然后重新连接。"
     },
     "vocabDriveErrorPermission": {
       "message": "缺少 Google Drive 权限。"
     },
     "vocabDriveErrorCorrupt": {
-      "message": "无法安全读取 Google Drive 同步数据，本地生词未作更改。"
+      "message": "无法安全读取 Google Drive 同步数据，本机数据未改变。"
     },
     "vocabDriveErrorLocalStore": {
-      "message": "无法写入本地生词数据库，同步已停止。已保存的生词未作更改。"
+      "message": "无法保存本机数据，同步已停止。"
     },
     "vocabDriveErrorNetwork": {
       "message": "无法连接 Google Drive。"
@@ -3276,7 +3260,7 @@
       "message": "Google Drive 同步失败。"
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Google 账号或 Pinboard 账号已切换。请重新打开「生词」后再试。"
+      "message": "Google 账号或 Pinboard 账号已改变。重新打开「通用」后再试。"
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "有一条生词或其上下文内容过大，无法同步。请缩短或删除该条内容，然后点击「立即同步」。"
@@ -4018,5 +4002,62 @@
   "notesEditFailed": {"message": "笔记保存失败，草稿已保留，请重试。"},
   "libraryClearFilters": {"message": "清除搜索和筛选"},
   "readerSourceTools": {"message": "源码与抽取工具"},
-  "aiConfigure": {"message": "配置 AI"}
+  "aiConfigure": {"message": "配置 AI"},
+    "driveChromeSyncSection": {
+      "message": "Chrome Sync"
+    },
+    "driveSyncVocabulary": {
+      "message": "生词"
+    },
+    "driveSyncNotes": {
+      "message": "高亮与笔记"
+    },
+    "driveVocabularyLastSuccess": {
+      "message": "生词上次同步成功"
+    },
+    "driveNotesLastSuccess": {
+      "message": "高亮与笔记上次同步成功"
+    },
+    "driveSyncChooseData": {
+      "message": "选择要在本机同步的数据。"
+    },
+    "driveVocabularyStatus": {
+      "message": "生词：$STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesStatus": {
+      "message": "高亮与笔记：$STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveVocabularyNotices": {
+      "message": "生词冲突：$COUNT$。已保留本机修改。",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesNotices": {
+      "message": "高亮与笔记冲突：$COUNT$。已保留两个版本。",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesErrorEntryTooLarge": {
+      "message": "一条高亮或笔记过大，无法同步。缩短或移除后，点击「立即同步」。"
+    },
+    "driveScopeSaveFailed": {
+      "message": "无法保存本机同步范围，请重试。"
+    }
+
 }

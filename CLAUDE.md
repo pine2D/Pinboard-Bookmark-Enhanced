@@ -7,7 +7,7 @@
 
 ## 项目概述
 
-Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英 + 用户自备 ECDICT 英汉）；高亮/笔记与生词集中在独立的「笔记与生词本」页（library.html，索引 + 详情平铺双栏）；生词按当前 Pinboard 账号隔离，可管理/导出/发送到 Anki 或欧路词典，并支持 Google Drive 同步。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
+Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英 + 用户自备 ECDICT 英汉）；高亮/笔记与生词集中在独立的「笔记与生词本」页（library.html，索引 + 详情平铺双栏）；生词按当前 Pinboard 账号隔离，可管理/导出/发送到 Anki 或欧路词典，支持 Google Drive 生词同步；高亮与笔记可另行启用 Drive 同步。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
 
 ## 技术栈
 
@@ -75,12 +75,12 @@ docs/superpowers/ DESIGN-IS-2026-07-22/ release/  # gitignored 本地产物（.q
 | 机制 | 数据 | 边界 |
 |------|------|------|
 | Chrome Sync | 普通设置；另行启用时含凭据 | `optSyncEnabled` 是**每设备** local 开关，普通设置据此路由 sync/local；不含生词、高亮、缓存、任务状态 |
-| Google Drive | 当前 Pinboard owner 的生词 | 每设备单独连接；只用 `drive.appdata`；不接管设置、凭据、高亮 |
+| Google Drive | 当前 Pinboard owner 的生词，以及另行启用的高亮与笔记 | 每设备单独连接；`driveSyncVocabulary` 默认 true、`driveSyncNotes` 默认 false，均只存 local；只用 `drive.appdata`；不接管设置、凭据 |
 | 手工 JSON schema v3 | 设置、主题 + 用户分项选择的高亮/生词/凭据 | 明文文件；导入先预览分项选择；凭据两端默认关、fail-closed（详见 rules/backup.md） |
 
 - 凭据（API key / token / password / 导出目标）不能硬编码。默认存 `chrome.storage.local`；仅当本机 `optSyncEnabled=true` 且账号级 `syncApiKeys=true` 时用 sync；旧云端已有非空 secret 时迁移保留 `syncApiKeys=true`，避免升级丢凭据。
 - sync 配额：单 item ≤8KB、总约 100KB、写入限流；写后检查 `lastError`。缓存、大对象、瞬态状态一律 local。
-- 生词及 Drive 协议状态在 IndexedDB（vocab-store.js 是唯一写入口）；逐设备连接标记在 local。
+- 生词及其 Drive 协议状态在 IndexedDB（vocab-store.js 是生词唯一写入口）；高亮与笔记及其 Drive 协议状态走 notes-sync.js 的统一写边界；逐设备连接标记和数据范围开关在 local。
 - **离线队列**只存 local：新记录**仅**保存保存模式、URL、标题、备注、标签、私密/稍后读/归档标志、书签时间、队列 ID/入队时间与非秘密 Pinboard 用户名绑定——此外一律不存，禁止保存 token；legacy token 记录读取时改写为账号绑定并删除 token。重放必须用当前登录 token 且用户名与队列绑定精确一致，否则保留队列并 fail-closed。
 
 ## 跨领域安全铁律
@@ -156,7 +156,7 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
 
 - （`bgSaveMode` 迁移已于 2026-09-15 退役——自 v2.79 / 2026-06-10 起运行三个月，远超 10 个版本 / 33 天的先例；`PRIME_EXCLUDED_KEYS` 里的 `bgSaveMode` 保留，理由见 shared.js 该常量注释）
 - （WebDAV 遗留清理迁移已于 2026-08-26 退役——自 v2.98 起随 10 个版本运行 33 天）
-- **`pbpClaimLegacyHighlightOwners` 可退役（到期日 2026-12-31）**：background.js 的一次性认领（2026-08-29 上线，flag `_hlOwnerClaimDone`）——把无 owner 的存量高亮 item 认领给当前账号（高亮按账号过滤，用户拍板）。未登录用户的 flag 不落，到期删函数与调用行时若 flag 仍未落，存量保持无主（人人可见）属可接受终态。退役时还须把 `background.js` 从 tests/ui-contract-tests.mjs 的 `PBP_HL_LOCK_PREFIX_WRITERS` 移除（删掉那句 `"pbp-hl:"` 字面量就会让该门故意报红，直到注册表同步），并把 md-highlight.js / library-notes.js / options-backup.js 三处契约注释里的「第四个 producer」段落删掉，改回三个 writer。
+- **`pbpClaimLegacyHighlightOwners` 可退役（到期日 2026-12-31）**：background.js 的一次性认领（2026-08-29 上线，flag `_hlOwnerClaimDone`）——把无 owner 的存量高亮 item 认领给当前账号（高亮按账号过滤，用户拍板）。未登录用户的 flag 不落，到期删函数与调用行时若 flag 仍未落，存量保持无主（人人可见）属可接受终态。退役时还须把 `background.js` 从 tests/ui-contract-tests.mjs 的 `PBP_HL_LOCK_PREFIX_WRITERS` 移除（删掉那句 `"pbp-hl:"` 字面量就会让该门故意报红，直到注册表同步），并把 md-highlight.js / library-notes.js / options-backup.js 三处契约注释里的「第五个 producer」段落删掉，保留四个 writer（含 notes-sync.js）。
 - **`pbpScrubLegacySyncWebhookUrls` 可退役（到期日 2026-12-31）**：background.js 的一次性 scrub（2026-08-29 上线，flag `_webhookSyncScrubDone`）——keys-off 用户遗留在 chrome.storage.sync 的明文 webhook capability URL 先救进 local 再全剥。到期直接删函数与调用行；届时 `pbpStripExportTargetTokensOnly`（shared.js）若 migrate 路径仍在用则保留，其注释同步改。
 - **`migrateGithubModelsRetirement` 可退役（到期日 2026-10-15）**：GitHub Models 服务 2026-07-30 整体退役（端点 HTTP 410），provider 已于 2026-08-29 下线；background.js 的该迁移负责重置存量用户的 `aiProvider` 并清理两个 storage area 里的 `githubModelsApiKey`/`githubModelsModel`。按 WebDAV 先例（10 个版本/33 天）到期直接删函数与调用行即可，无接线门。
 - **`migrateRetiredProviderModels` 可退役（到期日 2026-10-31）**：background.js 的一次性改写（2026-09-07 上线，flag `_retiredModelDefaultsDone`、常量 `PBP_RETIRED_MODEL_FLAG` / `PBP_RETIRED_MODEL_DEFAULTS`）——Groq 的 `llama-3.1-8b-instant`（上游 2026-08-16 关停）与 OpenRouter 的 `openai/gpt-oss-20b:free`（0 个服务端点）两个出厂默认已被 `primeSettings()` 落盘到每个存量安装，只换字面量修不到它们；迁移在两个 storage area 里把**恰好等于旧默认值**的 `groqModel` / `openrouterModel` 改写为 `openai/gpt-oss-20b`，用户自填值一律不动。按 WebDAV 先例到期直接删常量、函数与调用行即可，无接线门；`tests/background-lifecycle-tests.html` 的 5 条断言与 run-test.mjs 计数同步撤。
@@ -186,7 +186,7 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
 | 改这些文件 | 必读 |
 |------|------|
 | docs/theme-surface/**、popup/options/library.css、pinboard-themes.js、render-audit 家族 | `.claude/rules/theme-factory.md` |
-| vocab-store.js、vocab-gdrive.js、options-vocab.js、library-vocab.js、anki-connect.js、eudic-sync.js | `.claude/rules/vocab-sync.md` |
+| vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、anki-connect.js、eudic-sync.js | `.claude/rules/vocab-sync.md` |
 | md-preview.*、md-translate / md-ask / md-reader / md-highlight / md-ai-core 等 md-*.js | `.claude/rules/md-preview.md` |
 | md-dict.js、dict-pack.js、md-vocab-echo.js、ai-cache.js | `.claude/rules/dict.md` |
 | options-backup.js（备份 schema v3 / 凭据 opt-in） | `.claude/rules/backup.md` |

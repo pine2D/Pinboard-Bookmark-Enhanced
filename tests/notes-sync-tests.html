@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Notes Sync Tests</title></head><body>
+<h1>Notes Sync Tests</h1><div id="summary"></div><div id="results"></div>
+<script src="../shared.js"></script><script src="../options-backup.js"></script>
+<script src="../vocab-store.js"></script><script src="../notes-sync.js"></script>
+<script>
+const cases = [];
+const test = (name, run) => cases.push({name, run});
+function assert(value, why) { if (!value) throw new Error(why || "assertion failed"); }
+const clone = value => structuredClone(value);
+const OWNER = "acct_alice", OTHER = "acct_bob", HASH = "dc44c294755b665b89960e445fe48d98d7ff67fd3b1fb92b2c420b78a52fe4e1", URL_ = "https://example.com/read";
+const KEY = "pbp_hl_598109c8";
+function item(note = "original", id = "highlight-a", owner = OWNER) {
+  return {id, n:0, quote:"Selected passage", prefix:"before", suffix:"after", color:1, note, ts:100, fp:"article-fingerprint", owner};
+}
+// Handwritten peer event, independently shaped like a received batch entry.
+function event(device = "peer-a", note = "original", counter = 1) {
+  const it = item(note); delete it.owner;
+  return {recordKey: KEY + "|highlight-a", vector:{[device]:counter}, dot:{deviceId:device,counter}, deleted:false, value:{url:URL_,title:"Article",item:it}};
+}
+function batch(entries) { return {schema:1, ownerHash:HASH, deviceId:"peer-a", createdAt:123, entries}; }
+function fixture(seed = {}, deviceId = "local-a") {
+  const data = clone({...seed, pbpNotesSyncDeviceId:deviceId});
+  let owner = OWNER, failWrite = false, beforeSet = null;
+  const tails = new Map();
+  const locks = {request: async (name, run) => {
+    const previous = tails.get(name) || Promise.resolve();
+    let release; const next = new Promise(resolve => release = resolve); tails.set(name,next);
+    await previous;
+    try { return await run(); } finally { release(); if (tails.get(name) === next) tails.delete(name); }
+  }};
+  const storage = {
+    async get(keys) {
+      const result = {};
+      if (keys === null) return clone(data);
+      for (const key of (Array.isArray(keys) ? keys : typeof keys === "string" ? [keys] : Object.keys(keys))) {
+        if (Object.hasOwn(data,key)) result[key] = clone(data[key]);
+        else if (keys && typeof keys === "object" && !Array.isArray(keys)) result[key] = clone(keys[key]);
+      }
+      return result;
+    },
+    async getKeys() { return Object.keys(data); },
+    async set(values) { if (beforeSet) { const callback=beforeSet; beforeSet=null; await callback(); } if (failWrite) throw new Error("quota"); Object.assign(data,clone(values)); },
+    async remove(keys) { for (const key of (Array.isArray(keys) ? keys : [keys])) delete data[key]; }
+  };
+  const options = {storage, locks, getCurrentOwner:async()=>owner};
+  return {data,storage,options, store:()=>pbpCreateNotesSyncStore(options), owner(value){owner=value;}, fail(value){failWrite=value;}, beforeSet(fn){beforeSet=fn;}};
+}
+const record = (items = [item()]) => ({v:1,url:URL_,title:"Article",items});
+const write = (f, rec, owner=OWNER) => pbpNotesWriteRecord(KEY,rec,owner,f.options);
+test("new notes sync exposes validation and durable write APIs",()=>{assert(typeof pbpNotesValidateEvent === "function");assert(typeof pbpNotesWriteRecord === "function");});
+test("received note event accepts exact owner-free payload",()=>assert(pbpNotesValidateEvent(event())));
+test("event rejects missing vectors and zero dots",()=>{const e=event();e.vector={};assert(!pbpNotesValidateEvent(e));e.vector={"peer-a":1};e.dot.counter=0;assert(!pbpNotesValidateEvent(e));});
+test("remote payload cannot contain credentials or another owner",()=>{const e=event();e.value.item.owner=OTHER;assert(!pbpNotesValidateEvent(e));delete e.value.item.owner;e.value.token="secret";assert(!pbpNotesValidateEvent(e));});
+test("unsafe URL and URL/key mismatch are rejected",()=>{const e=event();e.value.url="javascript:alert(1)";assert(!pbpNotesValidateEvent(e));e.value.url="https://example.com/other";assert(!pbpNotesValidateEvent(e));});
+test("deletion event has no live payload",()=>{const e=event();e.deleted=true;assert(!pbpNotesValidateEvent(e));delete e.value;assert(pbpNotesValidateEvent(e));});
+test("batch validates owner identity and malformed entries",()=>{assert(pbpNotesValidBatchBody(batch([event()]),HASH));assert(!pbpNotesValidBatchBody(batch([event()]),"b".repeat(64)));assert(!pbpNotesValidBatchBody(batch([{...event(),deleted:"yes"}]),HASH));});
+test("causal newer note replaces older note",()=>{const a=event(),b=event("peer-a","new",2);const result=pbpNotesMergeEvents(a,b);assert(result.event.value.item.note === "new");assert(!result.notice);});
+test("duplicate and dominated events are idempotent",()=>{const a=event(),b=event("peer-a","new",2);assert(pbpNotesMergeEvents(a,a).kind === "noop");assert(pbpNotesMergeEvents(b,a).kind === "noop");});
+test("equal vector with different content is corrupt",()=>assert(pbpNotesMergeEvents(event(),event("peer-a","changed")).kind === "corrupt"));
+test("concurrent notes preserve both versions and converge",()=>{const a=event("peer-a","first"),b=event("peer-b","second");const ab=pbpNotesMergeEvents(a,b),ba=pbpNotesMergeEvents(b,a);assert(ab.notice);assert(ab.event.value.item.note.includes("first") && ab.event.value.item.note.includes("second"));assert(pbpVocabEventContentEqual(ab.event,ba.event));});
+test("three-way note merge is associative",()=>{const a=event("peer-a","first"),b=event("peer-b","second"),c=event("peer-c","third");const ab=pbpNotesMergeEvents(a,b).event;const bc=pbpNotesMergeEvents(b,c).event;assert(pbpVocabEventContentEqual(pbpNotesMergeEvents(ab,c).event,pbpNotesMergeEvents(a,bc).event));});
+test("concurrent delete/edit preserves text and a notice",()=>{const a=event("peer-a","edited"),b=event("peer-b");b.deleted=true;delete b.value;const r=pbpNotesMergeEvents(a,b);assert(!r.event.deleted && r.event.value.item.note === "edited" && r.notice);});
+test("later delete dominates earlier note",()=>{const a=event(),b=event("peer-a","",2);b.deleted=true;delete b.value;assert(pbpNotesMergeEvents(a,b).event.deleted);});
+test("write persists content and pending event in one article record",async()=>{const f=fixture();await write(f,record());const out=await f.store().listOutbox(OWNER);assert(f.data[KEY].items[0].note === "original");assert(out.length===1 && out[0].event.value.item.note === "original");});
+test("note edits advance version without losing other items",async()=>{const f=fixture({[KEY]:record([item("foreign","foreign",OTHER)])});await write(f,record([item(),item("foreign","foreign",OTHER)]));await write(f,record([item("changed"),item("foreign","foreign",OTHER)]));const out=await f.store().listOutbox(OWNER);assert(out.length===1 && out[0].event.dot.counter===2);assert(f.data[KEY].items[1].note === "foreign");});
+test("unchanged content does not queue another version",async()=>{const f=fixture();await write(f,record());await write(f,record());assert((await f.store().listOutbox(OWNER))[0].event.dot.counter===1);});
+test("deleting last item keeps durable tombstone",async()=>{const f=fixture();await write(f,record());await write(f,record([]));assert(f.data[KEY].items.length===0);assert((await f.store().listOutbox(OWNER))[0].event.deleted);});
+test("ownerless items stay local while owned items sync",async()=>{const f=fixture();const legacy=item("legacy","legacy","");await write(f,record([legacy,item()]));const out=await f.store().listOutbox(OWNER);assert(out.length===1 && out[0].event.recordKey.endsWith("highlight-a"));assert(f.data[KEY].items.length===2);});
+test("writer cannot alter another owner's items",async()=>{const f=fixture({[KEY]:record([item("foreign","foreign",OTHER)])});let rejected=false;try{await write(f,record([item("tampered","foreign",OTHER)]));}catch(error){rejected=error.code==="account_changed";}assert(rejected && f.data[KEY].items[0].note === "foreign");});
+test("account switch rejects writes before persistent commit",async()=>{const f=fixture();f.owner(OTHER);let rejected=false;try{await write(f,record());}catch(error){rejected=error.code==="account_changed";}assert(rejected && !f.data[KEY]);});
+test("quota failure leaves original note and queue intact",async()=>{const f=fixture();await write(f,record());const before=clone(f.data[KEY]);f.fail(true);try{await write(f,record([item("changed")]))}catch(_){}assert(JSON.stringify(f.data[KEY])===JSON.stringify(before));});
+test("legacy seed assigns repeatable IDs and respects other owners",async()=>{const it=item();delete it.id;const seed={[KEY]:record([it,item("foreign","foreign",OTHER),item("unowned","unowned","")])};const a=fixture(seed,"local-a"),b=fixture(seed,"local-b");assert((await a.store().seedLegacy(OWNER,100)).ok);await b.store().seedLegacy(OWNER,100);assert(a.data[KEY].items[0].id===b.data[KEY].items[0].id);assert((await a.store().listOutbox(OWNER)).length===1);assert((await a.store().seedLegacy(OWNER,100)).processed===0);});
+test("pull into empty device restores note plus ownership",async()=>{const f=fixture();const r=await f.store().applyRemotePage(OWNER,HASH,[batch([event()])],null);assert(r.ok && f.data[KEY].items[0].owner===OWNER && f.data[KEY].items[0].note === "original");});
+test("pull preserves different-account rows on same article",async()=>{const f=fixture({[KEY]:record([item("foreign","foreign",OTHER)])});await f.store().applyRemotePage(OWNER,HASH,[batch([event()])],null);assert(f.data[KEY].items.length===2 && f.data[KEY].items.some(it=>it.owner===OTHER));});
+test("replayed page does not resurrect a newer deletion",async()=>{const f=fixture();await f.store().applyRemotePage(OWNER,HASH,[batch([event()])],null);await write(f,record([]));await f.store().applyRemotePage(OWNER,HASH,[batch([event()])],null);assert(f.data[KEY].items.length===0);});
+test("remote merge validates whole page before writing",async()=>{const f=fixture();const bad=event();bad.value.item.color=9;const r=await f.store().applyRemotePage(OWNER,HASH,[batch([event(),bad])],null);assert(!r.ok && !f.data[KEY]);});
+test("failed local page does not advance sync cursor",async()=>{const f=fixture();f.fail(true);const cursor={key:"account:google:"+HASH,ownerHash:HASH,drivePermissionId:"google",pageToken:"new"};const r=await f.store().applyRemotePage(OWNER,HASH,[batch([event()])],cursor);assert(!r.ok && !(await f.store().getAccountState("google",HASH)));});
+test("frozen upload survives factory restart",async()=>{const f=fixture();await write(f,record());const rows=await f.store().listOutbox(OWNER);const body=JSON.stringify({schema:1,ownerHash:HASH,deviceId:"local-a",createdAt:123,entries:rows.map(r=>r.event)});await f.store().freezeOutbox(OWNER,"google",HASH,"upload-a",{body,bytes:new TextEncoder().encode(body).length});const pending=await f.store().listPendingBatches("google",HASH);assert(pending.length===1 && pending[0].body===body);assert((await f.store().listOutbox(OWNER)).length===0);});
+test("new edit during frozen upload remains pending",async()=>{const f=fixture();await write(f,record());const rows=await f.store().listOutbox(OWNER);await write(f,record([item("later")]));const body=JSON.stringify({schema:1,ownerHash:HASH,deviceId:"local-a",createdAt:123,entries:rows.map(r=>r.event)});await f.store().freezeOutbox(OWNER,"google",HASH,"upload-a",{body,bytes:new TextEncoder().encode(body).length});await f.store().deletePendingBatch("google",HASH,"upload-a");assert((await f.store().listOutbox(OWNER))[0].event.value.item.note === "later");});
+test("checkpoint requeues live records and deletions for new Google account",async()=>{const f=fixture();await write(f,record());await write(f,record([]));const rows=await f.store().listOutbox(OWNER);const body=JSON.stringify({schema:1,ownerHash:HASH,deviceId:"local-a",createdAt:123,entries:rows.map(r=>r.event)});await f.store().freezeOutbox(OWNER,"google",HASH,"upload-a",{body,bytes:body.length});await f.store().checkpointOwner(OWNER);assert((await f.store().listOutbox(OWNER))[0].event.deleted);});
+test("two devices exchange notes and converge after offline edits",async()=>{const a=fixture({},"local-a"),b=fixture({},"local-b");await write(a,record());const first=(await a.store().listOutbox(OWNER))[0].event;await b.store().applyRemotePage(OWNER,HASH,[batch([first])],null);await write(a,record([item("from A")]));await write(b,record([item("from B")]));const ae=(await a.store().listOutbox(OWNER))[0].event,be=(await b.store().listOutbox(OWNER))[0].event;await a.store().applyRemotePage(OWNER,HASH,[batch([be])],null);await b.store().applyRemotePage(OWNER,HASH,[batch([ae])],null);assert(a.data[KEY].items[0].note===b.data[KEY].items[0].note);assert(a.data[KEY].items[0].note.includes("from A")&&a.data[KEY].items[0].note.includes("from B"));});
+test("clear conflict notices preserves note variants and queue",async()=>{const f=fixture();await f.store().applyRemotePage(OWNER,HASH,[batch([event("peer-a","A"),event("peer-b","B")])],null);assert((await f.store().snapshot(OWNER,HASH)).notices.length===1);assert(await f.store().clearNotices(OWNER));assert((await f.store().snapshot(OWNER,HASH)).notices.length===0);assert(f.data[KEY].items[0].note.includes("A")&&f.data[KEY].items[0].note.includes("B"));});
+test("outbox never exposes another account",async()=>{const f=fixture();await write(f,record());f.owner(OTHER);const rows=await f.store().listOutbox(OTHER);assert(rows.length===0);});
+test("page metadata changes advance vectors without corrupting other owners",async()=>{const f=fixture({[KEY]:record([item("foreign","foreign",OTHER)])});await write(f,record([item(),item("foreign","foreign",OTHER)]));const next=record([item(),item("foreign","foreign",OTHER)]);next.title="Updated title";await write(f,next);const e=(await f.store().listOutbox(OWNER))[0].event;assert(e.dot.counter===2 && e.value.title==="Updated title");});
+test("missing legacy article URL cannot stall bootstrap",async()=>{const rec=record();delete rec.url;const f=fixture({[KEY]:rec});const result=await f.store().seedLegacy(OWNER,100);assert(result.ok && result.processed===0);assert(f.data[KEY].items[0].note==="original");});
+test("sync state and pull reject another owner hash",async()=>{const f=fixture();const badHash="b".repeat(64);let rejected=false;try{await f.store().putAccountState({key:"account:google:"+badHash,ownerHash:badHash,drivePermissionId:"google",pageToken:"bad"});}catch(error){rejected=error.code==="account_changed";}assert(rejected);const body={...batch([event()]),ownerHash:badHash};assert(!(await f.store().applyRemotePage(OWNER,badHash,[body],null)).ok);assert(!f.data[KEY]);});
+test("offline preflight persists retry while account commits require Google verification",async()=>{
+ const f=fixture();let driveChecks=0;
+ const store=pbpCreateNotesSyncStore({...f.options,getCurrentOwner:async(options)=>{
+  if(options?.requireDriveAccount===false)return OWNER;
+  driveChecks++;const error=new Error("offline");error.code="network";error.retryable=true;throw error;
+ }});
+ assert(await store.putPreflightState({key:"preflight:"+HASH,ownerHash:HASH,retryAt:123,lastError:"network"}));
+ assert((await store.getPreflightState(HASH)).retryAt===123 && driveChecks===0);
+ let rejected=false;try{await store.putAccountState({key:"account:google:"+HASH,ownerHash:HASH,drivePermissionId:"google"});}catch(error){rejected=error.code==="network"&&error.retryable;}
+ assert(rejected && !(await store.getAccountState("google",HASH)));
+ assert(await store.deletePreflightState(HASH));assert(!(await store.getPreflightState(HASH)));
+});
+test("retryable account verification failures survive seed and remote apply",async()=>{
+ const f=fixture({[KEY]:record()});const store=pbpCreateNotesSyncStore({...f.options,getCurrentOwner:async()=>{
+  const error=new Error("offline");error.code="network";error.retryable=true;throw error;
+ }});
+ const seeded=await store.seedLegacy(OWNER,100);assert(!seeded.ok&&seeded.error==="network"&&seeded.retryable);
+ const pulled=await store.applyRemotePage(OWNER,HASH,[batch([event()])],null);assert(!pulled.ok&&pulled.error==="network"&&pulled.retryable);
+ assert(f.data[KEY].items[0].note==="original" && !f.data[KEY].notesSync);
+});
+test("preflight still rejects switched Pinboard owner and treats quota as local failure",async()=>{
+ const f=fixture();f.owner(OTHER);let rejected=false;
+ try{await f.store().putPreflightState({key:"preflight:"+HASH,ownerHash:HASH,retryAt:123});}catch(error){rejected=error.code==="account_changed";}
+ assert(rejected && !(await f.store().getPreflightState(HASH)));
+ f.owner(OWNER);f.fail(true);assert(!await f.store().putPreflightState({key:"preflight:"+HASH,ownerHash:HASH,retryAt:123}));
+});
+test("actual backup restore queues note intent and preserves another account",async()=>{
+ const f=fixture({[KEY]:record([item("foreign","foreign",OTHER)])});const prior=globalThis.chrome;
+ try{
+  globalThis.chrome={storage:{local:f.storage}};
+  await pbpBackupWriteHighlights({[KEY]:record([item("restored")])},OWNER,async()=>{});
+  const rows=await f.store().listOutbox(OWNER);
+  assert(rows.length===1&&rows[0].event.value.item.note==="restored");
+  assert(f.data[KEY].items.some(it=>it.owner===OTHER&&it.note==="foreign"));
+ }finally{globalThis.chrome=prior;}
+});
+test("manual highlight backup excludes notes sync metadata and device scopes",async()=>{
+ const f=fixture();await write(f,record());
+ const output=pbpBuildHighlightBackup({...f.data,driveSyncVocabulary:false,driveSyncNotes:true},OWNER);
+ assert(output[KEY].items[0].note==="original");
+ assert(!output[KEY].notesSync && !output.pbpNotesSyncDeviceId && !output.driveSyncNotes && !output.driveSyncVocabulary);
+ const cleaned=pbpCleanHighlightBackup({[KEY]:{...record(),notesSync:{untrusted:true}}});
+ assert(!cleaned[KEY].notesSync);
+});
+test("causal revisions interleaved with concurrent notes converge in every arrival order",()=>{
+ const a1=event("peer-a","A1"),b1=event("peer-b","B1"),a2=event("peer-a","A2",2);
+ const orders=[[a1,b1,a2],[a1,a2,b1],[b1,a1,a2],[b1,a2,a1],[a2,a1,b1],[a2,b1,a1]];
+ const results=orders.map(([x,y,z])=>pbpNotesMergeEvents(pbpNotesMergeEvents(x,y).event,z).event);
+ assert(results.every(e=>e.value.item.note==="A2\n\nB1"));
+ assert(results.every(e=>pbpNotesMergeEvents(results[0],e).kind==="noop"));
+});
+test("causal delete removes only dominated note in concurrent frontier",()=>{
+ const a1=event("peer-a","A1"),b1=event("peer-b","B1"),a2=event("peer-a","",2);a2.deleted=true;delete a2.value;
+ const orders=[[a1,b1,a2],[a1,a2,b1],[b1,a1,a2],[b1,a2,a1],[a2,a1,b1],[a2,b1,a1]];
+ const results=orders.map(([x,y,z])=>pbpNotesMergeEvents(pbpNotesMergeEvents(x,y).event,z).event);
+ assert(results.every(e=>!e.deleted&&e.value.item.note==="B1"));
+ assert(results.every(e=>pbpVocabEventContentEqual(results[0],e)));
+});
+test("frontier validation rejects nested leaves and forged projections",()=>{
+ const merged=pbpNotesMergeEvents(event("peer-a","A"),event("peer-b","B")).event;
+ assert(pbpNotesValidateEvent(merged));
+ const forged=clone(merged);forged.value.item.note="forged";assert(!pbpNotesValidateEvent(forged));
+ const nested=clone(merged);nested.versions[0].versions=[event()];assert(!pbpNotesValidateEvent(nested));
+ const reordered=clone(merged);reordered.versions.reverse();assert(!pbpNotesValidateEvent(reordered));
+});
+test("equal causal leaf with conflicting payload cannot merge silently",()=>{
+ const left=pbpNotesMergeEvents(event("peer-a","A"),event("peer-b","B")).event;
+ const right=pbpNotesMergeEvents(event("peer-a","changed"),event("peer-c","C")).event;
+ assert(pbpNotesMergeEvents(left,right).kind==="corrupt");
+});
+test("concurrent live and deletion frontiers converge and replay idempotently",()=>{
+ for(let mask=0;mask<8;mask++){
+  const entries=[event("peer-a","A"),event("peer-b","B"),event("peer-c","C")];
+  entries.forEach((e,index)=>{if(mask&(1<<index)){e.deleted=true;delete e.value;}});
+  const [a,b,c]=entries;const orders=[[a,b,c],[a,c,b],[b,a,c],[b,c,a],[c,a,b],[c,b,a]];
+  const results=orders.map(([x,y,z])=>pbpNotesMergeEvents(pbpNotesMergeEvents(x,y).event,z).event);
+  assert(results.every(e=>pbpNotesValidateEvent(e)&&pbpVocabEventContentEqual(results[0],e)));
+  assert(entries.every(e=>pbpNotesMergeEvents(results[0],e).kind==="noop"));
+ }
+});
+test("persistent conflict frontier survives restart and a local edit absorbs all leaves",async()=>{
+ const f=fixture();await f.store().applyRemotePage(OWNER,HASH,[batch([event("peer-a","A1"),event("peer-b","B1")])],null);
+ const merged=(await f.store().listOutbox(OWNER))[0].event;assert(merged.versions.length===2);
+ await f.store().applyRemotePage(OWNER,HASH,[batch([event("peer-a","A2",2)])],null);
+ assert(f.data[KEY].items[0].note==="A2\n\nB1");
+ await write(f,record([item("resolved")]));const current=(await f.store().listOutbox(OWNER))[0].event;
+ assert(!current.versions && !current.value.item.noteVariants && current.vector["peer-a"]===2 && current.vector["peer-b"]===1);
+ assert(pbpNotesMergeEvents(current,merged).kind==="noop");
+});
+test("frontier rejects inflated top causal counter",()=>{
+ const merged=pbpNotesMergeEvents(event("peer-a","A"),event("peer-b","B")).event;
+ merged.vector["peer-a"]=999;assert(!pbpNotesValidateEvent(merged));
+});
+test("frontier rejects phantom top causal coordinate",()=>{
+ const merged=pbpNotesMergeEvents(event("peer-a","A"),event("peer-b","B")).event;
+ merged.vector["phantom-device"]=999;assert(!pbpNotesValidateEvent(merged));
+});
+(async()=>{let pass=0,fail=0;for(const c of cases){const row=document.createElement("div");try{await c.run();row.className="pass";pass++;row.textContent=c.name;}catch(error){row.className="fail";fail++;row.textContent=c.name+": "+error.message;}document.getElementById("results").appendChild(row);}document.getElementById("summary").textContent=`${pass} passed, ${fail} failed`;})();
+</script></body></html>

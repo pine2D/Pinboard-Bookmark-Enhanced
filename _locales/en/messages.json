@@ -3170,13 +3170,13 @@
       "message": "Reading hints"
     },
     "vocabDriveSection": {
-      "message": "Google Drive vocabulary sync"
+      "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Syncs vocabulary for the current Pinboard account only. Settings and API keys are not synced."
+      "message": "Choices apply only to this device and the current Pinboard account. Settings and API keys are not synced."
     },
     "vocabDriveDisclosure": {
-      "message": "The extension stores a plaintext copy in its private appDataFolder on your Google Drive. The copy is not end-to-end encrypted and may include words, definitions, notes, source URLs, article titles, and context excerpts."
+      "message": "Copies in your Google Drive appDataFolder are plaintext, without end-to-end encryption. They can include saved words, definitions, highlighted excerpts, notes, source URLs, titles, and timestamps."
     },
     "vocabDriveLoading": {
       "message": "Loading Google Drive sync status…"
@@ -3185,16 +3185,16 @@
       "message": "Google Drive is not connected on this device."
     },
     "vocabDriveUnavailable": {
-      "message": "Google Drive vocabulary sync is not available in this build because OAuth activation is still pending."
+      "message": "Google Drive sync is not available in this build because OAuth activation is still pending."
     },
     "vocabDriveAuthorizing": {
       "message": "Waiting for Google authorization. Complete the sign-in and approval in the window Chrome opened."
     },
     "vocabDriveWorking": {
-      "message": "Syncing vocabulary with Google Drive…"
+      "message": "Syncing selected data with Google Drive…"
     },
     "vocabDriveSynced": {
-      "message": "Vocabulary synced with Google Drive."
+      "message": "Selected data synced with Google Drive."
     },
     "vocabDriveConnected": {
       "message": "Google Drive is connected on this device."
@@ -3217,27 +3217,11 @@
     "vocabDriveNever": {
       "message": "Not synced yet"
     },
-    "vocabDriveNoticesExplain": {
-      "message": "Another device deleted these words while this device had newer edits, so the local version was kept: $TERMS$",
-      "placeholders": {
-        "terms": {
-          "content": "$1"
-        }
-      }
-    },
     "vocabDriveNoticesClear": {
       "message": "Dismiss conflict notice"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Google Drive vocabulary sync stopped and will not retry on its own. Open Settings to see why."
-    },
-    "vocabDriveNotices": {
-      "message": "Delete conflict notices: $COUNT$",
-      "placeholders": {
-        "count": {
-          "content": "$1"
-        }
-      }
+      "message": "Google Drive sync stopped and will not retry on its own. Open Settings to see why."
     },
     "vocabDriveConnect": {
       "message": "Connect Google Drive"
@@ -3258,16 +3242,16 @@
       "message": "Google Drive authorization is unavailable. Check that you are signed in to Chrome."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "No Pinboard account is signed in, so vocabulary sync cannot start. Enter your API Token under General → Pinboard Account, then connect again."
+      "message": "No Pinboard account is signed in. Enter your API Token under General → Pinboard Account, then connect again."
     },
     "vocabDriveErrorPermission": {
       "message": "Google Drive permission is missing."
     },
     "vocabDriveErrorCorrupt": {
-      "message": "Google Drive sync data could not be read safely. Local vocabulary was not changed."
+      "message": "Google Drive sync data could not be read safely. Local data was not changed."
     },
     "vocabDriveErrorLocalStore": {
-      "message": "The local vocabulary database could not be written, so sync stopped. No saved words were changed."
+      "message": "The local data could not be saved, so sync stopped."
     },
     "vocabDriveErrorNetwork": {
       "message": "Google Drive could not be reached."
@@ -3276,7 +3260,7 @@
       "message": "Google Drive sync failed."
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "The Google account or Pinboard account changed. Reopen Vocabulary and try again."
+      "message": "The Google account or Pinboard account changed. Reopen General and try again."
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "A saved word or its context is too large to sync. Shorten or remove it, then click Sync now."
@@ -4018,5 +4002,62 @@
   "notesEditFailed": {"message": "Could not save the note. Your draft is kept; try again."},
   "libraryClearFilters": {"message": "Clear search and filters"},
   "readerSourceTools": {"message": "Source and extraction tools"},
-  "aiConfigure": {"message": "Configure AI"}
+  "aiConfigure": {"message": "Configure AI"},
+    "driveChromeSyncSection": {
+      "message": "Chrome Sync"
+    },
+    "driveSyncVocabulary": {
+      "message": "Vocabulary"
+    },
+    "driveSyncNotes": {
+      "message": "Highlights and notes"
+    },
+    "driveVocabularyLastSuccess": {
+      "message": "Vocabulary last synced"
+    },
+    "driveNotesLastSuccess": {
+      "message": "Highlights and notes last synced"
+    },
+    "driveSyncChooseData": {
+      "message": "Choose what to sync on this device."
+    },
+    "driveVocabularyStatus": {
+      "message": "Vocabulary: $STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesStatus": {
+      "message": "Highlights and notes: $STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveVocabularyNotices": {
+      "message": "Vocabulary conflicts: $COUNT$. Local edits were kept.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesNotices": {
+      "message": "Highlights and notes conflicts: $COUNT$. Both versions were kept.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesErrorEntryTooLarge": {
+      "message": "A highlight or note is too large to sync. Shorten or remove it, then click Sync now."
+    },
+    "driveScopeSaveFailed": {
+      "message": "Could not save the sync choices for this device. Try again."
+    }
+
 }

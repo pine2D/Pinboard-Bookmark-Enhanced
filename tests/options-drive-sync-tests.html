@@ -1,0 +1,202 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>options-drive-sync Tests</title>
+<link rel="stylesheet" href="../options.css">
+<style>body{padding:16px}.case{padding:5px}.pass{color:#176}.fail{color:#b00}</style>
+</head><body>
+<button class="tab-btn active" data-panel="general" hidden></button>
+<div id="panel-general" style="position:fixed;left:-9999px;top:0;width:700px">
+  <div id="vocab-drive-body">
+    <input type="checkbox" id="drive-sync-vocabulary" data-no-autosave checked>
+    <input type="checkbox" id="drive-sync-notes" data-no-autosave>
+    <p id="vocab-drive-state"></p>
+    <dl id="vocab-drive-fields" hidden>
+      <dt>Google account</dt><dd id="vocab-drive-account"></dd>
+      <dt>Pinboard account</dt><dd id="vocab-drive-owner"></dd>
+      <dt id="vocab-drive-last-success-label">Vocabulary</dt><dd id="vocab-drive-last-success"></dd>
+      <dt id="drive-notes-last-success-label">Notes</dt><dd id="drive-notes-last-success"></dd>
+    </dl>
+    <p id="vocab-drive-error"></p><p id="drive-notes-error"></p>
+    <div class="vocab-drive-notice-row" hidden>
+      <p id="vocab-drive-notices"></p><button id="vocab-drive-clear-notices"></button>
+    </div>
+    <div id="vocab-drive-actions" hidden>
+      <button id="vocab-drive-connect" hidden></button>
+      <button id="vocab-drive-sync" hidden></button>
+      <button id="vocab-drive-disconnect" hidden></button>
+      <span id="vocab-drive-action-status"></span>
+    </div>
+  </div>
+</div>
+<div id="results"></div>
+<script>
+function t(key, value) { return key + (value === undefined ? "" : ":" + value); }
+let owner = "acct_alice";
+let values = {};
+let localFailure = false;
+let localReadFailure = false;
+let beforeLocalSet = null;
+const messages = [], writes = [], permissionRequests = [], storageListeners = [];
+let fixture = {
+  connected:true, owner:"alice", emailAddress:"alice@example.test", displayName:"Alice",
+  vocabularyEnabled:true, notesEnabled:false, lastSuccessAt:Date.UTC(2026,6,23,8,0), lastError:null,
+  retryAt:null, notices:0,
+  notes:{lastSuccessAt:Date.UTC(2026,6,24,8,0),lastError:null,retryAt:null,blocked:false,notices:0}
+};
+let response = null;
+let send = async (message) => {
+  messages.push(message);
+  return response || {ok:true,status:{...fixture,
+    vocabularyEnabled:values.driveSyncVocabulary !== false,notesEnabled:values.driveSyncNotes === true}};
+};
+window.chrome = {
+  permissions:{request:async (request) => {permissionRequests.push(request);return true;}},
+  runtime:{getManifest:() => ({optional_permissions:["identity"],
+    optional_host_permissions:["https://*/*"],oauth2:{client_id:"fixture.apps.googleusercontent.com",
+    scopes:["https://www.googleapis.com/auth/drive.appdata"]}}),sendMessage:(message) => send(message)},
+  storage:{local:{get:async (defaults) => {
+    if(localReadFailure) throw new Error("read fixture failure");
+    return {...defaults,...values};
+  },set:async (batch) => {
+    if(beforeLocalSet) await beforeLocalSet();
+    if(localFailure) throw new Error("write fixture failure");
+    writes.push(batch);Object.assign(values,batch);
+  }},onChanged:{addListener:(listener) => storageListeners.push(listener)}}
+};
+</script>
+<script src="../shared.js"></script><script src="../vocab-store.js"></script>
+<script>pbpVocabCurrentOwner = async () => owner; pbpReadSettingsWithSecrets = async () => ({});</script>
+<script src="../options-vocab.js"></script>
+<script>
+(async () => {
+  let failed=0;
+  function check(name, condition) {
+    const row=document.createElement("div"); row.className="case "+(condition?"pass":"fail");
+    row.textContent=(condition?"PASS ":"FAIL ")+name; $id("results").appendChild(row);
+    if(!condition) failed++;
+  }
+  const task=() => new Promise(resolve => setTimeout(resolve,0));
+  const source=await (await fetch("../options.html")).text();
+  const production=new DOMParser().parseFromString(source,"text/html");
+  const dataSync=production.querySelector('details[data-acc-key="general-data-sync"]');
+  check("data sync uses the existing persisted native disclosure in General",
+    dataSync?.classList.contains("disclosure") && dataSync.closest("#panel-general"));
+  check("Drive follows Chrome Sync before Backup with one shared connection",
+    dataSync?.querySelector("#chrome-sync-section + section #vocab-drive-body") &&
+    production.querySelectorAll("#vocab-drive-connect").length===1 &&
+    !production.querySelector("#panel-vocab #vocab-drive-body") &&
+    dataSync.closest("section").nextElementSibling.querySelector("#sec-backup-restore"));
+  check("data scope controls skip ordinary form auto-save",
+    ["drive-sync-vocabulary","drive-sync-notes"].every(id => production.getElementById(id)?.hasAttribute("data-no-autosave")));
+  check("plaintext disclosure stays in contextual help and routine counts are absent",
+    production.getElementById("vocab-drive-disclosure").closest("details.context-help") &&
+    !production.getElementById("vocab-drive-pending-words") && !production.getElementById("vocab-drive-pending-batches"));
+  await renderDriveSyncPanel();
+  check("default scopes preserve vocabulary opt-in and leave notes off",
+    $id("drive-sync-vocabulary").checked && !$id("drive-sync-notes").checked);
+  check("entering General reads status without authorization or synchronization",
+    messages.length===1 && messages[0].type==="vocabDriveStatus" && !permissionRequests.length);
+  check("default status shows only the selected dataset's successful timestamp",
+    !$id("vocab-drive-last-success").hidden && $id("drive-notes-last-success").hidden);
+  const scopesBefore=Object.keys(SETTINGS_DEFAULTS);
+  check("Drive scopes remain outside Chrome Sync settings defaults",
+    !scopesBefore.includes("driveSyncVocabulary") && !scopesBefore.includes("driveSyncNotes"));
+  values={driveSyncVocabulary:false,driveSyncNotes:true};
+  await renderDriveSyncPanel();
+  check("notes-only mode retains shared account and Sync now",
+    !$id("vocab-drive-sync").hidden && !$id("vocab-drive-sync").disabled &&
+    $id("vocab-drive-account").textContent.includes("alice@example.test"));
+  check("notes-only mode shows the notes timestamp and hides vocabulary timestamp",
+    $id("vocab-drive-last-success").hidden && !$id("drive-notes-last-success").hidden &&
+    !$id("drive-notes-last-success-label").hidden);
+  _pbpVocabDriveRender({...fixture,vocabularyEnabled:true,notesEnabled:true,
+    notes:{...fixture.notes,lastError:"network",retryAt:Date.now()+60000}});
+  check("partial failure stays on the failed dataset and has no overall success",
+    $id("drive-notes-error").textContent.includes("driveNotesStatus:vocabDriveErrorNetwork") &&
+    !$id("vocab-drive-error").textContent && !$id("vocab-drive-state").classList.contains("ok"));
+  check("per-dataset successful timestamps remain independent after partial failure",
+    $id("vocab-drive-last-success").textContent!==$id("drive-notes-last-success").textContent);
+  response={ok:false,error:"network",results:{vocabulary:{ok:true},notes:{ok:false,error:"network"}},
+    status:{...fixture,vocabularyEnabled:true,notesEnabled:true,notes:{...fixture.notes,lastError:"network"}}};
+  await _pbpVocabDriveAction("vocabDriveSyncNow",true);
+  check("manual partial success never flashes combined success",
+    !$id("vocab-drive-action-status").textContent && $id("drive-notes-error").textContent.includes("vocabDriveErrorNetwork"));
+  response={ok:false,error:"waiting_for_retry",results:{notes:{ok:false,error:"waiting_for_retry"}},
+    status:{...fixture,vocabularyEnabled:false,notesEnabled:true,notes:{...fixture.notes,lastError:"network",retryAt:Date.now()+60000}}};
+  await _pbpVocabDriveAction("vocabDriveSyncNow",true);
+  check("retry waiting cannot produce a green success message",
+    !$id("vocab-drive-action-status").textContent && $id("drive-notes-error").textContent.includes("vocabDriveRetryAt"));
+  _pbpVocabDriveRender({...fixture,vocabularyEnabled:false,notesEnabled:false});
+  const countBefore=messages.length;
+  await _pbpVocabDriveAction("vocabDriveSyncNow",true);
+  check("no selection is neutral and disables only Sync now",
+    $id("vocab-drive-state").textContent.includes("driveSyncChooseData") &&
+    $id("vocab-drive-sync").disabled && !$id("vocab-drive-disconnect").disabled &&
+    messages.length===countBefore && !$id("vocab-drive-error").textContent);
+  _pbpVocabDriveRender({...fixture,connected:false,vocabularyEnabled:false,notesEnabled:false});
+  check("no selection still allows connecting the shared Google account",
+    !$id("vocab-drive-connect").hidden && !$id("vocab-drive-connect").disabled);
+  response=null; values={driveSyncVocabulary:true,driveSyncNotes:false};
+  await renderDriveSyncPanel(); messages.length=0; writes.length=0;
+  $id("drive-sync-notes").checked=true;
+  await _pbpDriveScopeChange($id("drive-sync-notes"),"notes","driveSyncNotes");
+  check("scope changes write a single local preference and refresh only status",
+    writes.length===1 && writes[0].driveSyncNotes===true && Object.keys(writes[0]).length===1 &&
+    messages.every(message => message.type==="vocabDriveStatus"));
+  let releaseScope;let enteredScope;
+  const scopeEntered=new Promise(resolve=>enteredScope=resolve);
+  const scopeGate=new Promise(resolve=>releaseScope=resolve);
+  beforeLocalSet=async()=>{enteredScope();await scopeGate;};
+  $id("drive-sync-notes").checked=false;
+  const scopePending=_pbpDriveScopeChange($id("drive-sync-notes"),"notes","driveSyncNotes");
+  await scopeEntered;const actionsBefore=messages.length, permissionsBefore=permissionRequests.length;
+  check("scope write disables all connection actions until persistence completes",
+    ["vocab-drive-sync","vocab-drive-connect","vocab-drive-disconnect"].every(id=>$id(id).disabled));
+  await _pbpVocabDriveAction("vocabDriveSyncNow",true);await _pbpVocabDriveAction("vocabDriveDisconnect",false);
+  await _pbpVocabDriveConnect();
+  check("programmatic sync and connect cannot use the old scope while a scope write waits",
+    messages.length===actionsBefore && permissionRequests.length===permissionsBefore);
+  releaseScope();await scopePending;beforeLocalSet=null;
+  $id("drive-sync-notes").checked=true;await _pbpDriveScopeChange($id("drive-sync-notes"),"notes","driveSyncNotes");
+  localFailure=true; $id("drive-sync-notes").checked=false;
+  await _pbpDriveScopeChange($id("drive-sync-notes"),"notes","driveSyncNotes");
+  check("failed preference persistence rolls back the control and names the local save failure",
+    $id("drive-sync-notes").checked && values.driveSyncNotes===true &&
+    $id("vocab-drive-error").textContent.includes("driveScopeSaveFailed"));
+  const resetFailed=await resetDriveSyncScopes();
+  check("a failed local reset preserves the previous scope selection",
+    !resetFailed.ok && values.driveSyncNotes===true && $id("drive-sync-notes").checked);
+  localFailure=false; writes.length=0; messages.length=0;
+  const resetSucceeded=await resetDriveSyncScopes();
+  check("General reset restores scopes through one local-only write and no sync action",
+    resetSucceeded.ok && writes.length===1 && writes[0].driveSyncVocabulary===true &&
+    writes[0].driveSyncNotes===false && $id("drive-sync-vocabulary").checked && !$id("drive-sync-notes").checked &&
+    messages.every(message => message.type==="vocabDriveStatus"));
+  _pbpVocabDriveRender({...fixture,vocabularyEnabled:true,notesEnabled:true,notices:2,notes:{...fixture.notes,notices:3}});
+  check("conflict notices name each dataset without exposing record content",
+    $id("vocab-drive-notices").textContent.includes("driveVocabularyNotices:2") &&
+    $id("vocab-drive-notices").textContent.includes("driveNotesNotices:3"));
+  response={ok:true,status:{...fixture,vocabularyEnabled:true,notesEnabled:true,notices:0,notes:{...fixture.notes,notices:0}}};
+  $id("vocab-drive-clear-notices").click(); await task();await task();
+  check("shared dismissal clears notices for both data scopes",
+    !$id("vocab-drive-notices").textContent && $id("vocab-drive-clear-notices").closest(".vocab-drive-notice-row").hidden);
+  _pbpVocabDriveRender({...fixture,vocabularyEnabled:false,notesEnabled:true,notes:{...fixture.notes,lastError:"entry_too_large",blocked:true}});
+  check("oversized notes have notes-specific recovery rather than vocabulary recovery",
+    $id("drive-notes-error").textContent.includes("driveNotesErrorEntryTooLarge") && !$id("vocab-drive-error").textContent);
+  response=null; await renderDriveSyncPanel();
+  let resolveAction;
+  send=() => new Promise(resolve => {resolveAction=resolve;});
+  const pending=_pbpVocabDriveAction("vocabDriveSyncNow",true); await task();
+  owner="acct_bob";
+  resolveAction({ok:true,status:{...fixture,emailAddress:"old-private@example.test"}}); await pending;
+  check("current owner is checked even when no storage event or generation change arrived",
+    !$id("vocab-drive-account").textContent.includes("old-private@example.test") &&
+    !$id("vocab-drive-action-status").textContent);
+  owner="acct_alice"; send=async message => {messages.push(message);return {ok:true,status:fixture};};
+  await renderDriveSyncPanel();
+  localReadFailure=true; messages.length=0; await renderDriveSyncPanel();
+  check("failed local scope reads leave actions closed and cannot request synchronization",
+    !$id("vocab-drive-connect").getClientRects().length && !messages.length &&
+    $id("vocab-drive-error").textContent.includes("driveScopeSaveFailed"));
+  document.title=(failed?"FAIL ":"PASS ")+"options-drive-sync Tests";
+})();
+</script></body></html>

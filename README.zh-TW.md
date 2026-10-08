@@ -45,7 +45,7 @@
 ### 個人化
 - **13 套 pinboard.in 佈景主題**（Dracula、Nord、Catppuccin、Solarized 等），還可疊加自訂 CSS
 - **自動存檔到 [Wayback Machine](https://web.archive.org)**：開啟後每次儲存都一併提交；原連結失效也找得回
-- **備份與同步**：設定透過 Chrome Sync，生詞透過你自己的 Google Drive，手動 JSON 備份可納入劃重點、筆記、生詞與 API 金鑰；全部自行開啟，細節見下方「隱私」
+- **備份與同步**：設定透過 Chrome Sync，生詞及另行啟用的標記與筆記透過自己的 Google Drive，手動 JSON 備份可含標記、筆記、生詞和 API 金鑰；全部可選，詳見下方「隱私」
 - **9 種語言**、可自訂快捷鍵、本機優先儲存、零追蹤
 
 ![13 套 pinboard.in 佈景主題](docs/cws-assets/originals/screenshot-4-themes.png)
@@ -66,6 +66,8 @@
 ## 隱私
 
 零追蹤、零分析、零遙測。新使用者的設定與憑證預設儲存在本機。一般設定同步必須在每台裝置上分別開啟。憑證同步是 Chrome 帳號層級的選項，但只有開啟一般設定同步的裝置才會參與；關閉一般設定同步的裝置會繼續使用本機憑證。新使用者的憑證同步預設關閉；若升級時 Chrome Sync 已有非空憑證，為避免資料遺失會保持開啟。開啟後，API 金鑰、權杖、密碼與匯出憑證會透過 Chrome Sync 共用，且僅經過混淆處理，並未加密。書籤內容、頁面內容與離線佇列不會透過 Chrome Sync 同步。AI 請求**僅**透過你啟用或使用的功能發送——包括 AI 標籤／摘要、頁面問答、翻譯、選取解說，或選用的重點速覽——並直接傳送到你設定的服務商。安裝時僅授予 Pinboard 存取權限；AI、Jina、批次操作中選取的網站，以及選用的匯出與封存目的地，只會在你執行相應操作時申請目前確切網站的權限。自訂網路端點必須使用 HTTPS；HTTP 僅允許用於 `localhost`、`127.0.0.1` 和 `[::1]`。擴充功能頁面採用嚴格的 Content-Security-Policy（不執行遠端程式碼）。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+
+Google Drive 需在每台裝置分別連線，只同步目前 Pinboard 帳號的所選資料：連線後預設選取生詞，標記與筆記需另外啟用。同步範圍保存在本機；Drive 私有 appDataFolder 中的副本為明文，未經端對端加密。
 
 ## 授權
 

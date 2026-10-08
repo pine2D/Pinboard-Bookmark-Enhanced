@@ -45,7 +45,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 ### Make Pinboard yours
 - **13 themes for pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus your own custom CSS
 - **Auto-archive to the [Wayback Machine](https://web.archive.org)**: optionally submit every save; pages stay reachable after the original link dies
-- **Backup and sync**: settings via Chrome Sync, vocabulary via your own Google Drive, manual JSON backups that can include highlights, notes, vocabulary, and your API keys; each is opt-in, with the exact terms under Privacy below
+- **Backup and sync**: settings via Chrome Sync; vocabulary and optional highlights and notes via your own Google Drive; manual JSON backups can include highlights, notes, vocabulary, and API keys; all opt-in, see Privacy below for the exact scope
 - **9 languages** · configurable shortcuts · local-first storage · zero tracking
 
 ![13 themes for pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
@@ -66,6 +66,8 @@ After installing, click the toolbar icon → paste your [Pinboard API token](htt
 ## Privacy
 
 No tracking, no analytics, no telemetry. For new users, settings and credentials stay on this device by default. Ordinary settings sync is enabled separately on each device. Credential sync is one Chrome-account-wide choice, but only devices with settings sync enabled participate; other devices continue using local credentials. New users start with credential sync off, while upgrades keep it on when non-empty credentials already exist in Chrome Sync to avoid data loss. When enabled, API keys, tokens, passwords, and export credentials are shared through Chrome Sync and are obfuscated, not encrypted. Saved bookmarks, page content, and the offline queue never enter Chrome Sync. AI requests are sent **only** through features you enable or invoke (AI tags/summary, page Q&A, translation, selection explain, or the opt-in key-points skim) and go directly to the provider you configured. At install time, only Pinboard access is granted; AI, Jina, Batch-selected sites, and optional export and archive destinations request only the exact site permission when you use the corresponding action. Custom network endpoints must use HTTPS; HTTP is allowed only for `localhost`, `127.0.0.1`, and `[::1]`. Extension pages enforce a strict Content-Security-Policy (no remote code). Full policy: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+
+Google Drive connects separately on each device and syncs selected data for the current Pinboard account: vocabulary is selected by default after connection, while highlights and notes require a separate opt-in. These choices stay on the device; Drive copies are plaintext in the private appDataFolder and are not end-to-end encrypted.
 
 ## License
 

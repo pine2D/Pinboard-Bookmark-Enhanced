@@ -224,7 +224,8 @@ function pbpBackupImportResultKey(result) {
 // on one name. That name is the contract with md-highlight.js's _pbpHlLockName
 // and library-notes.js's _pbpNotesRecordLockName -- "pbp-hl:" + the storage key
 // -- and all three resident copies must keep producing the same string or the
-// mutual exclusion silently stops existing. A fourth producer exists too:
+// mutual exclusion silently stops existing. notes-sync.js uses the same prefix for remote merges and durable queue updates.
+// A fifth producer exists too:
 // background.js's pbpClaimLegacyHighlightOwners() one-shot legacy-owner
 // migration writes the same "pbp-hl:" + key inline; it is scheduled to
 // retire by 2026-12-31 (CLAUDE.md 临时事项) and must match until then.
@@ -291,7 +292,12 @@ async function pbpBackupWriteHighlights(cleaned, ownerScope, verifyOwner) {
       await verifyOwner();
       const stored = await chrome.storage.local.get(key);
       await verifyOwner();
-      await chrome.storage.local.set({ [key]: pbpMergeHighlightBackupRecord(stored[key], value, ownerScope) });
+      const record = pbpMergeHighlightBackupRecord(stored[key], value, ownerScope);
+      if (typeof pbpNotesWriteRecord === "function") {
+        await pbpNotesWriteRecord(key,record,ownerScope,{locked:true,getCurrentOwner:async()=>{
+          await verifyOwner(); return ownerScope;
+        }});
+      } else await chrome.storage.local.set({ [key]: record });
     });
   }
   await verifyOwner();

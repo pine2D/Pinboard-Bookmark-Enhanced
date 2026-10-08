@@ -45,7 +45,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 ### Pinboard nach deinem Geschmack
 - **13 Themes für pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
 - **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren** – auf Wunsch bei jedem Speichern; Seiten bleiben erreichbar, auch wenn der Originallink tot ist
-- **Sicherung und Synchronisierung**: Einstellungen über Chrome Sync, Vokabeln über dein eigenes Google Drive, dazu manuelle JSON-Sicherungen mit Markierungen, Notizen, Vokabeln und deinen API-Schlüsseln; alles einzeln aktivierbar, Einzelheiten unten im Abschnitt Datenschutz
+- **Sichern und synchronisieren**: Einstellungen über Chrome Sync, Vokabeln und optional Markierungen und Notizen über dein eigenes Google Drive; manuelle JSON-Backups können Markierungen, Notizen, Vokabeln und API-Schlüssel enthalten; alles optional, der genaue Umfang steht unten unter „Datenschutz“
 - **9 Sprachen** · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking
 
 ![13 Themes für pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
@@ -66,6 +66,8 @@ Nach der Installation: Auf das Symbol in der Symbolleiste klicken → deinen [Pi
 ## Datenschutz
 
 Kein Tracking, keine Analytik, keine Telemetrie. Für neue Nutzer werden Einstellungen und Zugangsdaten standardmäßig auf diesem Gerät gespeichert. Die Synchronisierung gewöhnlicher Einstellungen wird auf jedem Gerät separat aktiviert. Die Synchronisierung von Zugangsdaten ist eine kontoweite Chrome-Option, an der aber nur Geräte mit aktivierter Einstellungssynchronisierung teilnehmen; andere Geräte verwenden weiterhin ihre lokalen Zugangsdaten. Bei neuen Nutzern ist die Synchronisierung von Zugangsdaten standardmäßig deaktiviert. Sind bei einem Upgrade bereits nicht leere Zugangsdaten in Chrome Sync vorhanden, bleibt sie zur Vermeidung von Datenverlust aktiviert. Wenn sie aktiviert ist, werden API-Schlüssel, Tokens, Passwörter und Export-Zugangsdaten über Chrome Sync geteilt; sie sind nur verschleiert, nicht verschlüsselt. Gespeicherte Lesezeichen, Seiteninhalte und die Offline-Warteschlange gelangen nicht in Chrome Sync. KI-Anfragen werden **nur** über Funktionen gesendet, die du aktivierst oder nutzt — KI-Tags/-Zusammenfassung, Fragen zur Seite, Übersetzung, Erklärung einer markierten Passage oder der optionale Schnellüberblick über die wichtigsten Punkte — und gehen direkt an den von dir konfigurierten Anbieter. Bei der Installation wird nur der Zugriff auf Pinboard gewährt; KI, Jina, in Batch ausgewählte Websites sowie optionale Export- und Archivierungsziele fordern erst bei der jeweiligen Aktion nur die Berechtigung für die konkrete Website an. Benutzerdefinierte Netzwerkendpunkte müssen HTTPS verwenden; HTTP ist nur für `localhost`, `127.0.0.1` und `[::1]` zulässig. Die Seiten der Erweiterung setzen eine strikte Content-Security-Policy durch (kein Remote-Code). Vollständige Richtlinie: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+
+Google Drive wird auf jedem Gerät separat verbunden und synchronisiert nur die ausgewählten Daten des aktuellen Pinboard-Kontos. Vokabeln sind nach dem Verbinden standardmäßig ausgewählt; Markierungen und Notizen müssen separat aktiviert werden. Diese Auswahl bleibt auf dem Gerät. Kopien im privaten appDataFolder von Drive liegen im Klartext vor und sind nicht Ende-zu-Ende-verschlüsselt.
 
 ## Lizenz
 

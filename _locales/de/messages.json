@@ -3170,13 +3170,13 @@
       "message": "Lesehinweise"
     },
     "vocabDriveSection": {
-      "message": "Vokabeln mit Google Drive synchronisieren"
+      "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Synchronisiert nur die Vokabeln des aktuellen Pinboard-Kontos. Einstellungen und API-Schlüssel werden nicht synchronisiert."
+      "message": "Die Auswahl gilt nur für dieses Gerät und das aktuelle Pinboard-Konto. Einstellungen und API-Schlüssel werden nicht synchronisiert."
     },
     "vocabDriveDisclosure": {
-      "message": "Die Erweiterung speichert eine Klartextkopie im privaten appDataFolder der Erweiterung in deinem Google Drive. Sie ist nicht Ende-zu-Ende-verschlüsselt und kann Vokabeln, Definitionen, Notizen, Quell-URLs, Artikeltitel und Kontextauszüge enthalten."
+      "message": "Kopien im appDataFolder von Google Drive werden im Klartext ohne Ende-zu-Ende-Verschlüsselung gespeichert. Sie können Wörter, Definitionen, markierte Auszüge, Notizen, Quell-URLs, Titel und Zeitangaben enthalten."
     },
     "vocabDriveLoading": {
       "message": "Google-Drive-Synchronisierungsstatus wird geladen…"
@@ -3185,16 +3185,16 @@
       "message": "Google Drive ist auf diesem Gerät nicht verbunden."
     },
     "vocabDriveUnavailable": {
-      "message": "Die Google-Drive-Synchronisierung des Wortschatzes ist in diesem Build nicht verfügbar, da die OAuth-Aktivierung noch aussteht."
+      "message": "Google-Drive-Synchronisierung ist in dieser Version noch nicht verfügbar, da OAuth noch nicht aktiviert wurde."
     },
     "vocabDriveAuthorizing": {
       "message": "Warten auf die Google-Autorisierung. Schließe die Anmeldung und die Freigabe in dem Fenster ab, das Chrome geöffnet hat."
     },
     "vocabDriveWorking": {
-      "message": "Vokabeln werden mit Google Drive synchronisiert…"
+      "message": "Ausgewählte Daten werden mit Google Drive synchronisiert…"
     },
     "vocabDriveSynced": {
-      "message": "Vokabeln mit Google Drive synchronisiert."
+      "message": "Ausgewählte Daten wurden mit Google Drive synchronisiert."
     },
     "vocabDriveConnected": {
       "message": "Google Drive ist auf diesem Gerät verbunden."
@@ -3217,27 +3217,11 @@
     "vocabDriveNever": {
       "message": "Noch nicht synchronisiert"
     },
-    "vocabDriveNoticesExplain": {
-      "message": "Ein anderes Gerät hat diese Vokabeln gelöscht, während auf diesem Gerät neuere Änderungen vorlagen. Die lokale Fassung wurde behalten: $TERMS$",
-      "placeholders": {
-        "terms": {
-          "content": "$1"
-        }
-      }
-    },
     "vocabDriveNoticesClear": {
       "message": "Konflikthinweis schließen"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Die Google-Drive-Vokabelsynchronisierung wurde angehalten und versucht es nicht von selbst erneut. Öffne die Einstellungen, um den Grund zu sehen."
-    },
-    "vocabDriveNotices": {
-      "message": "Hinweise zu Löschkonflikten: $COUNT$",
-      "placeholders": {
-        "count": {
-          "content": "$1"
-        }
-      }
+      "message": "Die Google-Drive-Synchronisierung wurde angehalten und wird nicht automatisch wiederholt. Den Grund findest du in den Einstellungen."
     },
     "vocabDriveConnect": {
       "message": "Google Drive verbinden"
@@ -3258,16 +3242,16 @@
       "message": "Die Google-Drive-Autorisierung ist nicht verfügbar. Prüfe, ob du in Chrome angemeldet bist."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Es ist kein Pinboard-Konto angemeldet, daher kann die Vokabelsynchronisierung nicht starten. Trage dein API Token unter „Allgemein → Pinboard Konto“ ein und verbinde dich dann erneut."
+      "message": "Kein Pinboard-Konto angemeldet. Trage unter „Allgemein → Pinboard-Konto“ deinen API Token ein und verbinde dich erneut."
     },
     "vocabDriveErrorPermission": {
       "message": "Die Berechtigung für Google Drive fehlt."
     },
     "vocabDriveErrorCorrupt": {
-      "message": "Die Google-Drive-Synchronisierungsdaten konnten nicht sicher gelesen werden. Die lokalen Vokabeln wurden nicht geändert."
+      "message": "Die Google-Drive-Synchronisierungsdaten konnten nicht sicher gelesen werden. Lokale Daten wurden nicht geändert."
     },
     "vocabDriveErrorLocalStore": {
-      "message": "Auf die lokale Vokabeldatenbank konnte nicht geschrieben werden, daher wurde die Synchronisierung gestoppt. Gespeicherte Vokabeln wurden nicht geändert."
+      "message": "Lokale Daten konnten nicht gespeichert werden. Die Synchronisierung wurde angehalten."
     },
     "vocabDriveErrorNetwork": {
       "message": "Google Drive ist nicht erreichbar."
@@ -3276,7 +3260,7 @@
       "message": "Die Synchronisierung mit Google Drive ist fehlgeschlagen."
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Das Google- oder Pinboard-Konto hat sich geändert. Öffne „Vokabeln“ erneut und versuche es noch einmal."
+      "message": "Das Google- oder Pinboard-Konto hat sich geändert. Öffne „Allgemein“ erneut und versuche es noch einmal."
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "Eine gespeicherte Vokabel oder ihr Kontext ist zu groß für die Synchronisierung. Kürze oder entferne den Eintrag und klicke dann auf „Jetzt synchronisieren“."
@@ -4024,5 +4008,62 @@
   "notesEditFailed": {"message": "Die Notiz konnte nicht gespeichert werden. Der Entwurf bleibt erhalten. Bitte erneut versuchen."},
   "libraryClearFilters": {"message": "Suche und Filter löschen"},
   "readerSourceTools": {"message": "Quelltext und Extraktion"},
-  "aiConfigure": {"message": "KI einrichten"}
+  "aiConfigure": {"message": "KI einrichten"},
+    "driveChromeSyncSection": {
+      "message": "Chrome Sync"
+    },
+    "driveSyncVocabulary": {
+      "message": "Vokabeln"
+    },
+    "driveSyncNotes": {
+      "message": "Markierungen und Notizen"
+    },
+    "driveVocabularyLastSuccess": {
+      "message": "Vokabeln zuletzt synchronisiert"
+    },
+    "driveNotesLastSuccess": {
+      "message": "Markierungen und Notizen zuletzt synchronisiert"
+    },
+    "driveSyncChooseData": {
+      "message": "Wähle die Daten aus, die auf diesem Gerät synchronisiert werden sollen."
+    },
+    "driveVocabularyStatus": {
+      "message": "Vokabeln: $STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesStatus": {
+      "message": "Markierungen und Notizen: $STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveVocabularyNotices": {
+      "message": "Vokabelkonflikte: $COUNT$. Lokale Änderungen wurden beibehalten.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesNotices": {
+      "message": "Konflikte bei Markierungen und Notizen: $COUNT$. Beide Versionen wurden beibehalten.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesErrorEntryTooLarge": {
+      "message": "Eine Markierung oder Notiz ist zu groß zum Synchronisieren. Kürze oder entferne sie und klicke auf „Jetzt synchronisieren“."
+    },
+    "driveScopeSaveFailed": {
+      "message": "Die Synchronisierungsauswahl für dieses Gerät konnte nicht gespeichert werden. Versuche es erneut."
+    }
+
 }

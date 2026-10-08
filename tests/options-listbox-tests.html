@@ -1144,7 +1144,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     const activeBefore = doc.querySelector(".panel.active")?.id;
     const densityBefore = doc.documentElement.dataset.density;
     const opened = [];
-    // Open the disclosures (vocab's five, the Send-to cards) so their rows have
+    // Open the disclosures (Data Sync, vocab's four, the Send-to cards) so their rows have
     // layout -- but NOT the context-help answers: an open answer sits between
     // a section title and its first row and would inflate the R9 gap.
     doc.querySelectorAll(".panel details.disclosure:not([open])").forEach((d) => { d.open = true; opened.push(d); });
@@ -1167,6 +1167,12 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
             if (!row.matches(".pref-row:first-child") || !group.matches(".pref-group")) return false;
             const block = group.parentElement.matches(".storage-cats") ? group.parentElement : group;
             const section = block.parentElement;
+            // Data Sync's two subsection headings use the same first-row
+            // optical alignment as top-level titles, at the child text rung.
+            const subsectionTitle=group.previousElementSibling ||
+              (group.parentElement.id === "vocab-drive-body" ? group.parentElement.previousElementSibling : null);
+            if (subsectionTitle?.matches(".fg") &&
+                subsectionTitle.querySelector(':scope > .bl[role="heading"][aria-level="3"]')) return true;
             return section.matches(".settings-section") && !!block.previousElementSibling
               && block.previousElementSibling.matches("h2.section-title, .context-help-section") && titleOf(section) !== null;
           };

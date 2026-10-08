@@ -1,7 +1,7 @@
 // ============================================================
 // Pinboard Bookmark Enhanced - options-vocab.js
-// Vocabulary tab: the settings half of the vocabulary feature -- Google
-// Drive sync, the export/Anki/Eudic sends, and the two offline dictionary
+// Settings-side Google Drive sync (General), vocabulary export/Anki/Eudic
+// sends (Vocabulary), and the two offline dictionary
 // packs. The word LIST itself (search / filter / sort / selection / batch
 // bar) lives on the standalone library page, in library-vocab.js.
 // Every action here is scoped to ALL of the current Pinboard owner's rows,
@@ -17,6 +17,10 @@ var _vocabRenderGen = 0; // guards stale async renders (account switch mid-fetch
 var _vocabFlashTimer = 0; // guards two flashes racing to clear each other's text early
 const _vocabLocalFlashTimers = new Map();
 let _vocabDriveBusy = false;
+let _driveRenderGen = 0;
+let _driveScopeBusy = false;
+let _driveVisibleOwner = null;
+let _driveScopes = { vocabulary: true, notes: false };
 let _vocabDriveActionSeq = 0;
 const PBP_VOCAB_GOOGLE_API_ORIGIN = "https://www.googleapis.com/*";
 
@@ -82,7 +86,8 @@ function _pbpVocabDriveClear() {
   for (const id of [
     "vocab-drive-state", "vocab-drive-account", "vocab-drive-owner",
     "vocab-drive-last-success", "vocab-drive-pending-words",
-    "vocab-drive-pending-batches", "vocab-drive-error", "vocab-drive-notices"
+    "vocab-drive-pending-batches", "vocab-drive-error", "vocab-drive-notices",
+    "drive-notes-last-success", "drive-notes-error", "vocab-drive-action-status"
   ]) {
     const el = $id(id);
     if (el) {
@@ -156,10 +161,12 @@ function _pbpVocabDriveRenderUnavailable() {
   _pbpVocabDriveSetBusy(false);
 }
 
-function _pbpVocabDriveShowError(code, retryAt, blocked, connected) {
-  const el = $id("vocab-drive-error");
+function _pbpVocabDriveShowError(code, retryAt, blocked, connected, scope) {
+  const el = $id(scope === "notes" ? "drive-notes-error" : "vocab-drive-error");
   if (!el) return;
-  const parts = [t(_pbpVocabDriveErrorKey(code))];
+  const key = scope === "notes" && code === "entry_too_large"
+    ? "driveNotesErrorEntryTooLarge" : _pbpVocabDriveErrorKey(code);
+  const parts = [t(key)];
   const retry = _pbpVocabDriveDate(retryAt);
   if (retry) parts.push(t("vocabDriveRetryAt", retry));
   // Every state that cannot proceed on its own names a button that is actually
@@ -175,13 +182,16 @@ function _pbpVocabDriveShowError(code, retryAt, blocked, connected) {
       parts.push(t("vocabDriveSyncNowRequired"));
     }
   }
-  setStatusIcon(el, false, parts.join(" "));
+  const message = parts.join(" ");
+  setStatusIcon(el, false, scope
+    ? t(scope === "notes" ? "driveNotesStatus" : "driveVocabularyStatus", message)
+    : message);
 }
 
 function _pbpVocabDriveSetBusy(busy, focusOwner, phaseKey) {
   _vocabDriveBusy = !!busy;
   const body = $id("vocab-drive-body");
-  if (body) body.setAttribute("aria-busy", String(_vocabDriveBusy));
+  if (body) body.setAttribute("aria-busy", String(_vocabDriveBusy || _driveScopeBusy));
   // A first sync can page through Drive for minutes. Without this the state
   // line keeps whatever it said before -- usually "not connected" -- for the
   // whole run, so the panel reads as if the click did nothing. Only written
@@ -199,9 +209,14 @@ function _pbpVocabDriveSetBusy(busy, focusOwner, phaseKey) {
     const button = $id(id);
     if (!button) continue;
     const keepFocused = _vocabDriveBusy && button === focusOwner;
-    button.disabled = _vocabDriveBusy && !keepFocused;
+    const noSelection = id === "vocab-drive-sync" && !_driveScopes.vocabulary && !_driveScopes.notes;
+    button.disabled = noSelection || _driveScopeBusy || (_vocabDriveBusy && !keepFocused);
     if (keepFocused) button.setAttribute("aria-disabled", "true");
     else button.removeAttribute("aria-disabled");
+  }
+  for (const id of ["drive-sync-vocabulary", "drive-sync-notes"]) {
+    const input = $id(id);
+    if (input) input.disabled = _vocabDriveBusy || _driveScopeBusy;
   }
 }
 
@@ -211,6 +226,17 @@ function _pbpVocabDriveRender(status) {
     return;
   }
   _pbpVocabDriveClear();
+  _driveVisibleOwner = typeof status?.owner === "string"
+    ? pbpDictOwnerScope(status.owner) : null;
+  // Status is authoritative once read; the local defaults cover old status
+  // fixtures and the short interval before the worker returns.
+  if (typeof status?.vocabularyEnabled === "boolean") _driveScopes.vocabulary = status.vocabularyEnabled;
+  if (typeof status?.notesEnabled === "boolean") _driveScopes.notes = status.notesEnabled;
+  for (const [id, scope] of [["drive-sync-vocabulary", "vocabulary"], ["drive-sync-notes", "notes"]]) {
+    const input = $id(id);
+    if (input) input.checked = _driveScopes[scope];
+  }
+  const selected = _driveScopes.vocabulary || _driveScopes.notes;
   const actions = $id("vocab-drive-actions");
   if (actions) actions.hidden = false;
   const connected = status?.connected === true;
@@ -221,13 +247,15 @@ function _pbpVocabDriveRender(status) {
   if (connect) connect.hidden = connected;
   if (sync) sync.hidden = !connected;
   if (disconnect) disconnect.hidden = !connected;
+  // The line describes the connection, not a combined sync result. Dataset
+  // errors below stay visible, and a partial run never paints overall success.
+  if (state) state.textContent = t(!selected ? "driveSyncChooseData"
+    : connected ? "vocabDriveConnected" : "vocabDriveDisconnected");
   if (!connected) {
-    if (state) state.textContent = t("vocabDriveDisconnected");
     _pbpVocabDriveSetBusy(false);
     return;
   }
 
-  if (state) setStatusIcon(state, true, t("vocabDriveConnected"));
   const fields = $id("vocab-drive-fields");
   if (fields) fields.hidden = false;
   const email = String(status.emailAddress || "");
@@ -236,37 +264,44 @@ function _pbpVocabDriveRender(status) {
   if (account) account.textContent = displayName && email
     ? `${displayName} (${email})` : (displayName || email);
   const owner = $id("vocab-drive-owner");
-  // An empty row reads as a rendering glitch; the panel is scoped to a Pinboard
-  // account, so say when there isn't one. Same label the vocabulary list uses.
   if (owner) owner.textContent = String(status.owner || "") || t("vocabOwnerNoAccount");
-  const lastSuccess = $id("vocab-drive-last-success");
-  if (lastSuccess) lastSuccess.textContent =
-    _pbpVocabDriveDate(status.lastSuccessAt) || t("vocabDriveNever");
-  const pendingWords = $id("vocab-drive-pending-words");
-  if (pendingWords) pendingWords.textContent =
-    _pbpVocabNum(Math.max(0, Number(status.pendingWords) || 0));
-  const pendingBatches = $id("vocab-drive-pending-batches");
-  if (pendingBatches) pendingBatches.textContent =
-    _pbpVocabNum(Math.max(0, Number(status.pendingBatches) || 0));
-  const notices = $id("vocab-drive-notices");
-  // Zero is the normal state; rendering "Delete conflict notices: 0" leaves a
-  // permanent line of jargon on a healthy account and makes the live region
-  // announce a non-event on every render. When it is not zero, a bare number
-  // names nothing -- say which words and what happened to them, and offer a
-  // way to dismiss, since nothing else ever clears these rows.
-  const noticeCount = Math.max(0, Number(status.notices) || 0);
-  if (notices) {
-    const terms = Array.isArray(status.noticeTerms) ? status.noticeTerms : [];
-    const parts = noticeCount > 0 ? [t("vocabDriveNotices", _pbpVocabNum(noticeCount))] : [];
-    if (terms.length) parts.push(t("vocabDriveNoticesExplain", terms.join(", ")));
-    notices.textContent = parts.join(" ");
-    notices.classList.toggle("bad", noticeCount > 0);
+  for (const [id, enabled, stamp] of [
+    ["vocab-drive-last-success", _driveScopes.vocabulary, status.lastSuccessAt],
+    ["drive-notes-last-success", _driveScopes.notes, status.notes?.lastSuccessAt]
+  ]) {
+    const value = $id(id);
+    const label = $id(id + "-label");
+    if (value) {
+      value.hidden = !enabled;
+      value.textContent = enabled ? (_pbpVocabDriveDate(stamp) || t("vocabDriveNever")) : "";
+    }
+    if (label) label.hidden = !enabled;
   }
-  const clearNoticesBtn = $id("vocab-drive-clear-notices");
-  const noticeRow = clearNoticesBtn?.closest(".vocab-drive-notice-row");
-  if (noticeRow) noticeRow.hidden = noticeCount === 0;
-  if (status.lastError) {
-    _pbpVocabDriveShowError(status.lastError, status.retryAt, status.blocked === true, true);
+  // Technical counts are kept compatible with test/diagnostic fixtures, but
+  // do not occupy the normal settings surface.
+  for (const [id, count] of [["vocab-drive-pending-words", status.pendingWords],
+    ["vocab-drive-pending-batches", status.pendingBatches]]) {
+    const value = $id(id);
+    if (value) value.textContent = _pbpVocabNum(Math.max(0, Number(count) || 0));
+  }
+  const vocabularyNotices = _driveScopes.vocabulary ? Math.max(0, Number(status.notices) || 0) : 0;
+  const notesNotices = _driveScopes.notes ? Math.max(0, Number(status.notes?.notices) || 0) : 0;
+  const notices = $id("vocab-drive-notices");
+  if (notices) {
+    const parts = [];
+    if (vocabularyNotices) parts.push(t("driveVocabularyNotices", _pbpVocabNum(vocabularyNotices)));
+    if (notesNotices) parts.push(t("driveNotesNotices", _pbpVocabNum(notesNotices)));
+    notices.textContent = parts.join(" ");
+    notices.classList.toggle("bad", parts.length > 0);
+  }
+  const noticeRow = $id("vocab-drive-clear-notices")?.closest(".vocab-drive-notice-row");
+  if (noticeRow) noticeRow.hidden = vocabularyNotices + notesNotices === 0;
+  if (_driveScopes.vocabulary && status.lastError) {
+    _pbpVocabDriveShowError(status.lastError, status.retryAt, status.blocked === true, true, "vocabulary");
+  }
+  if (_driveScopes.notes && status.notes?.lastError) {
+    _pbpVocabDriveShowError(status.notes.lastError, status.notes.retryAt,
+      status.notes.blocked === true, true, "notes");
   }
   _pbpVocabDriveSetBusy(false);
 }
@@ -275,23 +310,46 @@ function _pbpVocabDriveApplyResponse(response, fallbackStatus) {
   const status = response?.status || (response?.ok ? fallbackStatus : null);
   if (status) _pbpVocabDriveRender(status);
   if (!response?.ok) {
-    // A blocked preflight is the authoritative reason and outranks whatever
-    // this attempt reported. Otherwise the code this run produced wins: a
-    // persisted lastError may predate the run and would mislabel it.
-    const code = status?.blocked === true
-      ? (status.lastError || response?.error)
-      : (response?.error || status?.lastError);
-    // Not connected is a state, not a failure. The re-render above already
-    // says so and puts Connect on screen; a red line repeating it adds noise
-    // and no next step.
-    if (code === "not_connected") return status;
-    _pbpVocabDriveShowError(
-      code, status?.retryAt, status?.blocked === true, status?.connected === true
-    );
+    const scopedError = (_driveScopes.vocabulary && status?.lastError)
+      || (_driveScopes.notes && status?.notes?.lastError);
+    if (response.results) {
+      for (const [scope, result] of Object.entries(response.results)) {
+        if (!_driveScopes[scope] || result?.ok) continue;
+        const scoped = scope === "notes" ? status?.notes : status;
+        const code = scoped?.blocked === true || result?.waitingForRetry || result?.error === "waiting_for_retry"
+          ? scoped?.lastError : result?.error;
+        _pbpVocabDriveShowError(code || scoped?.lastError, scoped?.retryAt,
+          scoped?.blocked === true, status?.connected === true, scope);
+      }
+      return status;
+    }
+    if (scopedError && (!response.error || status?.blocked || status?.notes?.blocked
+        || response.error === status?.lastError || response.error === status?.notes?.lastError)) return status;
+    const code = response?.error || status?.lastError;
+    if (code === "not_connected" || code === "no_data_selected") return status;
+    _pbpVocabDriveShowError(code, status?.retryAt, status?.blocked === true, status?.connected === true);
   }
   return status;
 }
 
+// Every awaited response rechecks the non-secret owner as well as the local
+// render/action generations. Storage notifications alone can arrive after a
+// message response and cannot guard that final UI commit.
+async function _pbpVocabDriveCurrent(gen, actionSeq, owner, status) {
+  if (gen !== _driveRenderGen || (actionSeq && actionSeq !== _vocabDriveActionSeq)) return false;
+  try {
+    const currentOwner = await pbpVocabCurrentOwner();
+    if (gen !== _driveRenderGen || (actionSeq && actionSeq !== _vocabDriveActionSeq)) return false;
+    if (owner !== currentOwner) {
+      invalidateDriveSyncPanel();
+      return false;
+    }
+    return !status?.owner || pbpDictOwnerScope(status.owner) === currentOwner;
+  } catch (error) {
+    console.warn("[drive] account check failed:", error?.name, error?.message);
+    return false;
+  }
+}
 
 // The status read is the only thing that un-hides the action row, so when it
 // fails the panel is left with an error and no button at all -- the container
@@ -306,17 +364,18 @@ function _pbpVocabDriveOfferRetry() {
   _pbpVocabDriveSetBusy(false);
 }
 
-async function _pbpVocabDriveRefresh(gen, requestSync) {
+async function _pbpVocabDriveRefresh(gen) {
   if (!_pbpVocabDriveAvailable()) {
     _pbpVocabDriveRenderUnavailable();
     return;
   }
-  let actionSeq = 0;
   const loading = $id("vocab-drive-state");
   if (loading) loading.textContent = t("vocabDriveLoading");
   try {
+    const owner = await pbpVocabCurrentOwner();
+    if (gen !== _driveRenderGen) return;
     const response = await chrome.runtime.sendMessage({ type: "vocabDriveStatus" });
-    if (gen !== _vocabRenderGen) return;
+    if (!(await _pbpVocabDriveCurrent(gen, 0, await owner, response?.status))) return;
     if (!response?.ok) {
       const state = $id("vocab-drive-state");
       if (state) state.textContent = t("vocabDriveStatusFailed");
@@ -325,28 +384,17 @@ async function _pbpVocabDriveRefresh(gen, requestSync) {
       return;
     }
     _pbpVocabDriveRender(response.status);
-    if (!requestSync || response.status?.connected !== true) return;
-    actionSeq = ++_vocabDriveActionSeq;
-    _pbpVocabDriveSetBusy(true);
-    const synced = await chrome.runtime.sendMessage({ type: "vocabDriveSyncNow" });
-    if (gen !== _vocabRenderGen || actionSeq !== _vocabDriveActionSeq) return;
-    _pbpVocabDriveApplyResponse(synced, response.status);
-    if (synced?.ok) _pbpVocabFlashLocalStatus("vocab-drive-action-status", true, t("vocabDriveSynced"));
-  } catch (_) {
-    if (gen !== _vocabRenderGen ||
-        (actionSeq && actionSeq !== _vocabDriveActionSeq)) return;
+  } catch (error) {
+    if (gen !== _driveRenderGen) return;
+    console.warn("[drive] status read failed:", error?.name, error?.message);
     const state = $id("vocab-drive-state");
     if (state) state.textContent = t("vocabDriveStatusFailed");
     _pbpVocabDriveShowError("remote");
     _pbpVocabDriveOfferRetry();
-  } finally {
-    if (actionSeq && actionSeq === _vocabDriveActionSeq) {
-      _pbpVocabDriveSetBusy(false);
-    }
   }
 }
 
-async function _pbpVocabDriveSend(type, force, gen, actionSeq, sourceButton, focusTargetId) {
+async function _pbpVocabDriveSend(type, force, gen, actionSeq, sourceButton, focusTargetId, owner) {
   if (!_pbpVocabDriveAvailable()) {
     _pbpVocabDriveRenderUnavailable();
     return;
@@ -354,8 +402,10 @@ async function _pbpVocabDriveSend(type, force, gen, actionSeq, sourceButton, foc
   try {
     const message = { type };
     if (force === true) message.force = true;
+    owner = await owner;
+    if (!(await _pbpVocabDriveCurrent(gen, actionSeq, owner))) return;
     const response = await chrome.runtime.sendMessage(message);
-    if (gen !== _vocabRenderGen || actionSeq !== _vocabDriveActionSeq) return;
+    if (!(await _pbpVocabDriveCurrent(gen, actionSeq, owner, response?.status))) return;
     const moveFocus = document.activeElement === sourceButton;
     _pbpVocabDriveApplyResponse(response);
     const preferred = moveFocus && focusTargetId ? $id(focusTargetId) : null;
@@ -370,11 +420,13 @@ async function _pbpVocabDriveSend(type, force, gen, actionSeq, sourceButton, foc
     // clicks inside one minute change nothing on screen. (A pull that landed
     // new words shows up on the library page's own next render -- this page
     // has no word list to reconcile.)
-    if (response?.ok && type !== "vocabDriveDisconnect") {
+    if (response?.ok && !response.waitingForRetry && type !== "vocabDriveDisconnect"
+        && (_driveScopes.vocabulary || _driveScopes.notes)) {
       _pbpVocabFlashLocalStatus("vocab-drive-action-status", true, t("vocabDriveSynced"));
     }
-  } catch (_) {
-    if (gen === _vocabRenderGen && actionSeq === _vocabDriveActionSeq) {
+  } catch (error) {
+    console.warn("[drive] action failed:", error?.name, error?.message);
+    if (gen === _driveRenderGen && actionSeq === _vocabDriveActionSeq) {
       _pbpVocabDriveShowError("remote");
     }
   } finally {
@@ -383,10 +435,11 @@ async function _pbpVocabDriveSend(type, force, gen, actionSeq, sourceButton, foc
 }
 
 async function _pbpVocabDriveConnect() {
-  if (_vocabDriveBusy || !_pbpVocabDriveAvailable()) return;
-  const gen = _vocabRenderGen;
+  if (_vocabDriveBusy || _driveScopeBusy || !_pbpVocabDriveAvailable()) return;
+  const gen = _driveRenderGen;
   const actionSeq = ++_vocabDriveActionSeq;
   const sourceButton = $id("vocab-drive-connect");
+  const owner = _driveVisibleOwner === null ? pbpVocabCurrentOwner() : _driveVisibleOwner;
   let granted = false;
   try {
     const permission = chrome.permissions.request({
@@ -396,7 +449,7 @@ async function _pbpVocabDriveConnect() {
     _pbpVocabDriveSetBusy(true, sourceButton, "vocabDriveAuthorizing");
     granted = await permission;
   } catch (_) {}
-  if (gen !== _vocabRenderGen || actionSeq !== _vocabDriveActionSeq) {
+  if (gen !== _driveRenderGen || actionSeq !== _vocabDriveActionSeq) {
     if (actionSeq === _vocabDriveActionSeq) _pbpVocabDriveSetBusy(false);
     return;
   }
@@ -406,40 +459,101 @@ async function _pbpVocabDriveConnect() {
     return;
   }
   return _pbpVocabDriveSend(
-    "vocabDriveConnect", false, gen, actionSeq, sourceButton, "vocab-drive-sync"
+    "vocabDriveConnect", false, gen, actionSeq, sourceButton, "vocab-drive-sync", owner
   );
 }
 
 async function _pbpVocabDriveAction(type, force, focusTargetId) {
-  if (_vocabDriveBusy || !_pbpVocabDriveAvailable()) return;
-  const gen = _vocabRenderGen;
+  if (_vocabDriveBusy || _driveScopeBusy || !_pbpVocabDriveAvailable()) return;
+  if (type === "vocabDriveSyncNow" && !_driveScopes.vocabulary && !_driveScopes.notes) return;
+  const gen = _driveRenderGen;
+  const owner = _driveVisibleOwner === null ? pbpVocabCurrentOwner() : _driveVisibleOwner;
   const actionSeq = ++_vocabDriveActionSeq;
   const sourceButton = type === "vocabDriveDisconnect"
     ? $id("vocab-drive-disconnect") : $id("vocab-drive-sync");
   _pbpVocabDriveSetBusy(true, sourceButton);
   return _pbpVocabDriveSend(
-    type, force, gen, actionSeq, sourceButton, focusTargetId
+    type, force, gen, actionSeq, sourceButton, focusTargetId, owner
   );
 }
 
-// Called from options.js's activateTab -- the sole lazy-init line added
-// there, same convention as renderNotesPanel/renderStoragePanel (rescans
-// every activation, no "already inited" guard). _vocabRenderGen guards a
-// slow Drive status read that's still in flight when the account changes
-// again (or the user leaves and re-enters the tab) from clobbering a newer
-// render. The word list is the library page's job (library-vocab.js).
-async function renderVocabPanel() {
-  if (!$id("vocab-drive-body")) return;
-  const gen = ++_vocabRenderGen;
+// General only reads status. Opening settings must not authorize or sync.
+function invalidateDriveSyncPanel() {
+  ++_driveRenderGen;
   ++_vocabDriveActionSeq;
+  _driveVisibleOwner = null;
   _pbpVocabDriveClear();
   _pbpVocabDriveSetBusy(false);
-  if (_pbpVocabDriveAvailable()) _pbpVocabDriveRefresh(gen, true);
-  else _pbpVocabDriveRenderUnavailable();
-  // Fire-and-forget like the Drive refresh above: the button starts hidden and
-  // appears only once a token is confirmed, which is the honest default.
+}
+
+async function renderDriveSyncPanel() {
+  if (!$id("vocab-drive-body")) return;
+  invalidateDriveSyncPanel();
+  const gen = _driveRenderGen;
+  try {
+    if (typeof pbpI18nReady === "function") await pbpI18nReady();
+    const scopes = await chrome.storage.local.get({ driveSyncVocabulary: true, driveSyncNotes: false });
+    if (gen !== _driveRenderGen) return;
+    _driveScopes = { vocabulary: scopes.driveSyncVocabulary !== false, notes: scopes.driveSyncNotes === true };
+    for (const [id, value] of [["drive-sync-vocabulary", _driveScopes.vocabulary],
+      ["drive-sync-notes", _driveScopes.notes]]) {
+      const input = $id(id);
+      if (input) input.checked = value;
+    }
+    if (_pbpVocabDriveAvailable()) await _pbpVocabDriveRefresh(gen);
+    else _pbpVocabDriveRenderUnavailable();
+  } catch (error) {
+    if (gen !== _driveRenderGen) return;
+    console.warn("[drive] local preferences read failed:", error?.name, error?.message);
+    setStatusIcon($id("vocab-drive-error"), false, t("driveScopeSaveFailed"));
+    // A failed local preference read cannot authorize a connection with
+    // unknown data scopes. Entering General again retries the status read.
+  }
+}
+
+async function resetDriveSyncScopes() {
+  if (_driveScopeBusy || _vocabDriveBusy) return { ok: false };
+  _driveScopeBusy = true;
+  _pbpVocabDriveSetBusy(false);
+  try {
+    await chrome.storage.local.set({ driveSyncVocabulary: true, driveSyncNotes: false });
+    _driveScopes = { vocabulary: true, notes: false };
+    await renderDriveSyncPanel();
+    return { ok: true };
+  } catch (error) {
+    console.warn("[drive] scope reset failed:", error?.name, error?.message);
+    setStatusIcon($id("vocab-drive-error"), false, t("driveScopeSaveFailed"));
+    return { ok: false };
+  } finally {
+    _driveScopeBusy = false;
+    _pbpVocabDriveSetBusy(false);
+  }
+}
+
+async function renderVocabPanel() {
+  ++_vocabRenderGen;
   _pbpVocabRefreshEudicConfigured().then(_pbpVocabUpdateExternalActions);
   _pbpPackRefreshStatus();
+}
+
+async function _pbpDriveScopeChange(input, scope, key) {
+  if (_driveScopeBusy || _vocabDriveBusy) { input.checked = _driveScopes[scope]; return; }
+  const previous = _driveScopes[scope];
+  const chosen = input.checked;
+  _driveScopeBusy = true;
+  _pbpVocabDriveSetBusy(false);
+  try {
+    await chrome.storage.local.set({ [key]: chosen });
+    _driveScopes[scope] = chosen;
+    await renderDriveSyncPanel();
+  } catch (error) {
+    console.warn("[drive] scope preference write failed:", error?.name, error?.message);
+    input.checked = previous;
+    setStatusIcon($id("vocab-drive-error"), false, t("driveScopeSaveFailed"));
+  } finally {
+    _driveScopeBusy = false;
+    _pbpVocabDriveSetBusy(false);
+  }
 }
 
 
@@ -923,36 +1037,43 @@ if (_vocabDriveSync) _vocabDriveSync.addEventListener("click", () =>
   _pbpVocabDriveAction("vocabDriveSyncNow", true));
 const _vocabDriveClearNotices = $id("vocab-drive-clear-notices");
 if (_vocabDriveClearNotices) _vocabDriveClearNotices.addEventListener("click", async () => {
-  const gen = _vocabRenderGen;
+  const gen = _driveRenderGen;
+  const owner = _driveVisibleOwner === null ? pbpVocabCurrentOwner() : _driveVisibleOwner;
   try {
     const response = await chrome.runtime.sendMessage({ type: "vocabDriveClearNotices" });
-    if (gen !== _vocabRenderGen) return;
+    if (!(await _pbpVocabDriveCurrent(gen, 0, await owner, response?.status))) return;
     _pbpVocabDriveApplyResponse(response);
-  } catch (_) {
-    if (gen === _vocabRenderGen) _pbpVocabDriveShowError("remote");
+  } catch (error) {
+    console.warn("[drive] notices dismissal failed:", error?.name, error?.message);
+    if (gen === _driveRenderGen) _pbpVocabDriveShowError("remote");
   }
 });
 const _vocabDriveDisconnect = $id("vocab-drive-disconnect");
 if (_vocabDriveDisconnect) _vocabDriveDisconnect.addEventListener("click", () =>
   _pbpVocabDriveAction("vocabDriveDisconnect", false, "vocab-drive-connect"));
+for (const [id, scope, key] of [["drive-sync-vocabulary", "vocabulary", "driveSyncVocabulary"],
+  ["drive-sync-notes", "notes", "driveSyncNotes"]]) {
+  const input = $id(id);
+  if (input) input.addEventListener("change", () => _pbpDriveScopeChange(input, scope, key));
+}
 
-// Account switch (token rotation, or the sync/keys-routing toggles that
-// change which area holds the effective token) invalidates the Drive card's
-// owner line and the Eudic button's row test -- re-render only when the
-// vocab tab is the one on screen; renderVocabPanel's generation counter
-// absorbs a rerun that lands after the user has already navigated away and
-// back again. (The word list re-reads on its own page, library-vocab.js.)
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "sync" || area === "local") {
-      if (changes.dictEudicToken) {
-        _pbpVocabRefreshEudicConfigured().then(_pbpVocabUpdateExternalActions);
-      }
+    if (area !== "sync" && area !== "local") return;
+    if (changes.dictEudicToken) {
+      _pbpVocabRefreshEudicConfigured().then(_pbpVocabUpdateExternalActions);
     }
-    if ((area !== "sync" && area !== "local") ||
-        !(changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys)) return;
-    const activeBtn = document.querySelector(".tab-btn.active");
-    if (activeBtn && activeBtn.dataset.panel === "vocab") renderVocabPanel();
+    const accountChanged = changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys;
+    const scopesChanged = area === "local" && (changes.driveSyncVocabulary || changes.driveSyncNotes);
+    const active = document.querySelector(".tab-btn.active")?.dataset.panel;
+    if (accountChanged) {
+      invalidateDriveSyncPanel();
+      if (active === "vocab") renderVocabPanel();
+    }
+    if ((accountChanged || scopesChanged || changes.optLang) && active === "general") renderDriveSyncPanel();
+    // Manual actions render their own authoritative response. Reading status
+    // while they run would invalidate it when Connect writes its marker.
+    if (area === "local" && changes.vocabDriveConnected && !_vocabDriveBusy && active === "general") renderDriveSyncPanel();
   });
 }
 

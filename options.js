@@ -156,7 +156,7 @@ function pbpOpenOptionsTarget(panel, targetId) {
     // hypothetical for the hard-coded connection-overview targets: options.css
     // now really enforces [hidden] (it used to lose to .btn's inline-flex),
     // #vocab-drive-connect is `hidden` exactly when Drive IS connected, and
-    // renderVocabPanel hides all three Drive buttons synchronously until the
+    // renderDriveSyncPanel hides all three Drive buttons synchronously until the
     // status round trip returns -- so at this frame it has no box on EVERY
     // click. The search index guards its own side (!el.closest("[hidden]") when
     // it picks a section's target); this is the counterpart for every target
@@ -249,7 +249,7 @@ async function renderConnectionOverview() {
       configured: pbpIsValidTokenFormat($id("opt-pinboard-token")?.value.trim() || "") === true, permission: true },
     { id: `ai:${provider}`, name: $id("opt-ai-provider")?.selectedOptions?.[0]?.textContent?.trim() || provider,
       panel: "ai", target: `test-${provider}`, configured: aiConfigured, permission: aiPermission },
-    { id: "drive", name: "Google Drive", panel: "vocab", target: "vocab-drive-connect",
+    { id: "drive", name: "Google Drive", panel: "general", target: "vocab-drive-connect",
       connected: stored.vocabDriveConnected === true, permission: drivePermission },
     // The port input ships a default ("8765"), so a non-empty field proves
     // nothing -- reading it as configuration put every user who never touched
@@ -1443,6 +1443,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (btn.dataset.panel === "tags") _initTagGovPanel();
     if (btn.dataset.panel === "storage") renderStoragePanel();
     if (btn.dataset.panel === "vocab") renderVocabPanel();
+    if (btn.dataset.panel === "general") renderDriveSyncPanel();
+    else if (typeof invalidateDriveSyncPanel === "function") invalidateDriveSyncPanel();
     history.replaceState(null, "", "#" + btn.dataset.panel);
   }
   _tabBtns.forEach((btn, i) => {
@@ -1609,6 +1611,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     general: {
       fields: {
         "opt-lang": "auto",
+        "drive-sync-vocabulary": true, "drive-sync-notes": false,
         "opt-backup-include-highlights": true,
         "opt-backup-include-vocabulary": true,
         "notify-quick-save": true, "notify-read-later": true, "notify-tab-set": true,
@@ -2112,7 +2115,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       msg: t("resetConfirm", activeBtn.textContent) + (def.keepsSecrets ? t("resetKeysKept") : "") + (panelHasAuthoredText ? t("resetClearsAuthored") : ""),
       yesText: t("reset"),
       noText: t("cancel"),
-      onConfirm: () => {
+      onConfirm: async () => {
+        // Drive scopes are device-local and bypass collectSettingsFromForm.
+        // Persist them before changing the remaining controls or allowing the
+        // language reset to reload; a failed write leaves the reset unapplied.
+        if (panel === "general" && !(await resetDriveSyncScopes()).ok) return;
         const langBefore = $id("opt-lang")?.value;
         applyPanelReset(def, document);
         // export-targets has no static fields; reset = re-render with the

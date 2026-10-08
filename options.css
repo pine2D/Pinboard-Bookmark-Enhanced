@@ -3576,9 +3576,9 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
   position: relative;
 }
 
-/* ---- Vocabulary settings disclosures (hand-maintained): the Drive sync /
-   export & integrations / offline dictionary pack <details> panels inside
-   #panel-vocab (they are .disclosure members -- the page-wide primitive is
+/* ---- Drive sync in General and vocabulary settings (hand-maintained):
+   export/integrations and offline dictionary disclosures in #panel-vocab
+   (the page-wide .disclosure primitive is
    defined next to the chevron family above). Task 9 (2026-08) retired the Notes tab and the vocabulary word
    list from options.html -- both moved to library.html/library.css. This
    region used to be much larger: it also carried the list/card/sticky-
@@ -3589,20 +3589,26 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
    deleted the now-fully-unreachable families here -- see that commit for
    the per-class grep evidence. What remains below is genuinely still
    shipped on options.html. ---- */
-.vocab-drive-copy {
-  max-width: 76ch;
-  overflow-wrap: anywhere;
+#sec-chrome-sync, #sec-google-drive { font-weight: 600; }
+#chrome-sync-section > .fg + .pref-group > .pref-row:first-child > label {
+  padding-top: 0;
+  min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
+}
+#vocab-drive-body > .pref-group > .pref-row:first-child > label {
+  padding-top: 0;
+  min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
 }
 .vocab-drive-state { display: block; min-height: 18px; margin: var(--opt-sp-3) 0; }
+/* Connection state is neutral; dataset errors and completed actions own color. */
+.vocab-drive-state, html[data-theme] .vocab-drive-state { color: var(--opt-fg-muted); }
 .vocab-drive-fields {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   gap: var(--opt-sp-2) var(--opt-sp-4);
   margin: var(--opt-sp-3) 0;
-  padding: var(--opt-sp-3);
-  border: 1px solid var(--opt-border-section);
-  background: var(--opt-panel);
-  color: var(--opt-fg);
+  font-size: var(--opt-text-body);
+  line-height: var(--opt-lh-body);
+  font-variant-numeric: tabular-nums;
 }
 .vocab-drive-fields[hidden] { display: none; }
 .vocab-drive-fields dt { color: var(--opt-fg-muted); }
@@ -3626,7 +3632,7 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--opt-sp-3);
+  gap: var(--opt-sp-4);
   margin-top: var(--opt-sp-3);
 }
 .vocab-drive-actions .btn { max-width: 100%; white-space: normal; }

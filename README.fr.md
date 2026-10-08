@@ -45,7 +45,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 ### Personnalisation
 - **13 thèmes pour pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
 - **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** : à chaque enregistrement si vous le souhaitez ; les pages restent accessibles même quand le lien d'origine disparaît
-- **Sauvegarde et synchronisation** : les paramètres via Chrome Sync, le vocabulaire via votre propre Google Drive, des sauvegardes JSON manuelles pouvant inclure surlignages, notes, vocabulaire et clés API ; chaque option est facultative, conditions exactes dans la section Confidentialité ci-dessous
+- **Sauvegarde et synchronisation** : paramètres via Chrome Sync, vocabulaire et, sur activation, surlignages et notes via votre propre Google Drive ; les sauvegardes JSON manuelles peuvent inclure surlignages, notes, vocabulaire et clés API ; tout est facultatif, voir « Confidentialité » ci-dessous pour le périmètre exact
 - **9 langues** · raccourcis configurables · stockage local en priorité · aucun pistage
 
 ![13 thèmes pour pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
@@ -66,6 +66,8 @@ Après l'installation : cliquez sur l'icône de la barre d'outils → collez vot
 ## Confidentialité
 
 Aucun tracking, aucune analytique, aucune télémétrie. Pour les nouveaux utilisateurs, les paramètres et identifiants restent par défaut sur cet appareil. La synchronisation des paramètres ordinaires s'active séparément sur chaque appareil. La synchronisation des identifiants est un choix unique à l'échelle du compte Chrome, mais seuls les appareils où la synchronisation des paramètres est activée y participent ; les autres continuent d'utiliser leurs identifiants locaux. Elle est désactivée par défaut pour les nouveaux utilisateurs. Si une mise à niveau trouve déjà des identifiants non vides dans Chrome Sync, elle reste activée afin d'éviter toute perte de données. Lorsqu'elle est activée, les clés API, jetons, mots de passe et identifiants d'exportation sont partagés via Chrome Sync ; ils sont obfusqués, pas chiffrés. Les signets enregistrés, le contenu des pages et la file d'attente hors ligne n'entrent jamais dans Chrome Sync. Les requêtes IA sont envoyées **uniquement** par les fonctionnalités que vous activez ou utilisez — tags/résumé IA, questions-réponses sur la page, traduction, explication de sélection, ou le survol des points clés facultatif — et vont directement au fournisseur que vous avez configuré. À l'installation, seul l'accès à Pinboard est accordé ; l'IA, Jina, les sites sélectionnés pour le traitement par lot et les destinations facultatives d'exportation et d'archivage ne demandent que l'autorisation du site précis au moment où vous lancez l'action correspondante. Les points de terminaison réseau personnalisés doivent utiliser HTTPS ; HTTP n'est autorisé que pour `localhost`, `127.0.0.1` et `[::1]`. Les pages de l'extension appliquent une Content-Security-Policy stricte (aucun code distant). Politique complète : <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+
+Google Drive se connecte séparément sur chaque appareil et synchronise les données sélectionnées du compte Pinboard actuel. Le vocabulaire est sélectionné par défaut après connexion ; les surlignages et notes doivent être activés séparément. Ce choix reste sur l’appareil. Les copies dans le dossier privé appDataFolder de Drive sont en texte clair, sans chiffrement de bout en bout.
 
 ## Licence
 

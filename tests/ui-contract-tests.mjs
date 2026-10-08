@@ -1172,7 +1172,7 @@ check(zipInstallSmoke.includes("const EXPECTED_EXTENSION_ID = 'pnjndmjhljjbdlbej
     privacyMd.indexOf("## Chrome Web Store data categories")
   );
   const rows = storage.split("\n").filter((line) => line.startsWith("|"));
-  const local = rows.find((line) => line.includes("Vocabulary sync runtime/account state"));
+  const local = rows.find((line) => line.includes("Drive sync runtime/account state"));
   const pending = rows.find((line) => line.includes("Pending vocabulary upload data"));
   const remote = rows.find((line) => line.includes("Convergence metadata sent to Google Drive"));
   check(local && pending && remote &&
@@ -1248,14 +1248,14 @@ for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-sel
 // options.html no longer renders the word list (retired for the library
 // page, Task 9) -- what has to hold here is that the settings tab still
 // opens with the entry link, ahead of the collapsed secondary settings.
-check((optionsHtml.match(/<details class="disclosure" data-acc-key="vocab-/g) || []).length === 5 &&
+check((optionsHtml.match(/<details class="disclosure" data-acc-key="vocab-/g) || []).length === 4 &&
   optionsHtml.indexOf('id="vocab-open-library"') < optionsHtml.indexOf('id="dict-anki-deck"'),
   "options.html: the library entry link is not first or secondary settings are not collapsed");
 const disclosureKeys = [...optionsHtml.matchAll(
   /<details class="disclosure"(?: id="[^"]+")? data-acc-key="([^"]+)"/g
 )].map((match) => match[1]);
 check(disclosureKeys.join(",") ===
-  "connection-overview,vocab-reading,vocab-google-drive,vocab-learning,vocab-ecdict-pack,vocab-dictionary-pack",
+  "connection-overview,general-data-sync,vocab-reading,vocab-learning,vocab-ecdict-pack,vocab-dictionary-pack",
   "options.html: settings disclosures lack stable pp-acc keys");
 check(optionsJs.includes('querySelectorAll("details[data-acc-key]")') &&
   /addEventListener\("toggle",[\s\S]{0,500}pbpAccSet\(det\.dataset\.accKey, det\.open\)/.test(optionsJs),
@@ -4179,6 +4179,8 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
 // unwatched.
 {
   const DEFAULT_EQ_ALLOWLIST = {
+    "drive-sync-vocabulary": "device-local Drive scope, not SETTINGS_DEFAULTS or Chrome Sync; defaults true and General reset writes local",
+    "drive-sync-notes": "device-local Drive scope, not SETTINGS_DEFAULTS or Chrome Sync; defaults false and General reset writes local",
     // customOverlayCSS is not a SETTINGS_DEFAULTS key at all -- it is a
     // schema-v2 large-value field synced outside the settings.get() default
     // merge (shared.js:1187-1199, options.js ~1814), so there is nothing in
@@ -7199,14 +7201,14 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   }
 }
 
-// K25: the pbp-hl:<key> Web Lock prefix has four writers -- three resident
+// K25: the pbp-hl:<key> Web Lock prefix has five writers -- four resident
 // (md-highlight.js's reader commit path, library-notes.js's delete path,
-// options-backup.js's backup restore) plus background.js's retiring
+// options-backup.js's backup restore, notes-sync.js's sync store) plus background.js's retiring
 // pbpClaimLegacyHighlightOwners() one-shot legacy-owner migration -- that
 // coordinate purely by each independently producing the SAME string
-// literal. Nothing but four hand-written comments has ever enforced that
-// the SET of files doing so stays exactly these four; this gate makes that
-// machine-checked. Comments are stripped first, using the module-scope
+// literal. The writer contract comments document this set; this gate makes
+// the set of files doing so machine-checked rather than relying on comments.
+// Comments are stripped first, using the module-scope
 // character-scanning stripJsComments defined above (NOT a regex stripper --
 // fix round 1: a first cut here used
 // `s.replace(/\/\*[\s\S]*?\*\//g, "")`, which does not track string
@@ -7256,7 +7258,7 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   check(countPbpHl(selfCheckDanger) === 1,
     'ui-contract: the pbp-hl: writer-set gate\'s comment stripper is broken on the `x + "/*"` string-boundary hazard -- it swallowed a real "pbp-hl:" literal that sits between that string and a later unrelated block comment (this is the exact background.js:3020/:1820 shape, reproduced in isolation so it does not depend on that file\'s current line order); a regex-based stripper without string tracking fails this case, which is why this gate must reuse the character-scanning stripJsComments defined above instead of rolling its own');
 
-  const PBP_HL_LOCK_PREFIX_WRITERS = ["background.js", "library-notes.js", "md-highlight.js", "options-backup.js"];
+  const PBP_HL_LOCK_PREFIX_WRITERS = ["background.js", "library-notes.js", "md-highlight.js", "notes-sync.js", "options-backup.js"];
   const pbpHlLiteralRe = /["']pbp-hl:["']/;
   const detected = readdirSync(root)
     .filter((n) => n.endsWith(".js"))
@@ -7267,7 +7269,7 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   const missing = registered.filter((n) => !detected.includes(n));
   check(extra.length === 0 && missing.length === 0,
     `pbp-hl: record lock writer set drifted (registered=${JSON.stringify(registered)}, detected=${JSON.stringify(detected)})` +
-    (extra.length ? ` -- a fifth writer of the pbp-hl: record lock appeared (${extra.join(", ")})` : "") +
+    (extra.length ? ` -- an unregistered writer of the pbp-hl: record lock appeared (${extra.join(", ")})` : "") +
     (missing.length ? ` -- a registered writer stopped using the prefix (${missing.join(", ")})` : "") +
     ` -- update the registered set (PBP_HL_LOCK_PREFIX_WRITERS in tests/ui-contract-tests.mjs) and the contract comments in all writers.`);
 }

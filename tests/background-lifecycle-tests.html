@@ -152,6 +152,8 @@ function buildBootVocabSyncHarness(source, opts) {
     PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected",
     PBP_GOOGLE_API_ORIGIN: "https://www.googleapis.com/*",
     pbpVocabDriveIsConnected: async () => true,
+    pbpDriveTypeEnabled: async () => true,
+    pbpQueueNotesDriveSync: async (options) => { syncs.push(options); return { ok: true }; },
     pbpQueueVocabDriveSync: async (options) => { syncs.push(options); return { ok: true }; },
     console,
   };

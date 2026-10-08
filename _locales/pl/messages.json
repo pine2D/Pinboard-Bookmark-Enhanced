@@ -3170,13 +3170,13 @@
       "message": "Podpowiedzi podczas czytania"
     },
     "vocabDriveSection": {
-      "message": "Synchronizacja słówek z Dyskiem Google"
+      "message": "Dysk Google"
     },
     "vocabDriveScope": {
-      "message": "Synchronizuje tylko słówka bieżącego konta Pinboard. Ustawienia i klucze API nie są synchronizowane."
+      "message": "Wybór dotyczy tylko tego urządzenia i bieżącego konta Pinboard. Ustawienia i klucze API nie są synchronizowane."
     },
     "vocabDriveDisclosure": {
-      "message": "Rozszerzenie zapisuje kopię w postaci zwykłego tekstu w swoim prywatnym folderze appDataFolder na Dysku Google. Kopia nie jest szyfrowana kompleksowo i może zawierać słowa, definicje, notatki, źródłowe adresy URL, tytuły artykułów oraz fragmenty kontekstu."
+      "message": "Kopie w folderze appDataFolder na Dysku Google są zapisane jawnym tekstem, bez szyfrowania end-to-end. Mogą zawierać słowa, definicje, zaznaczone fragmenty, notatki, źródłowe adresy URL, tytuły i daty."
     },
     "vocabDriveLoading": {
       "message": "Wczytywanie stanu synchronizacji z Dyskiem Google…"
@@ -3185,16 +3185,16 @@
       "message": "Dysk Google nie jest połączony na tym urządzeniu."
     },
     "vocabDriveUnavailable": {
-      "message": "Synchronizacja słówek z Dyskiem Google nie jest dostępna w tej wersji, ponieważ aktywacja OAuth nie została jeszcze ukończona."
+      "message": "Synchronizacja z Dyskiem Google jest niedostępna w tej wersji, ponieważ OAuth nie został jeszcze aktywowany."
     },
     "vocabDriveAuthorizing": {
       "message": "Oczekiwanie na autoryzację Google. Dokończ logowanie i zatwierdzenie w oknie otwartym przez Chrome."
     },
     "vocabDriveWorking": {
-      "message": "Synchronizowanie słówek z Dyskiem Google…"
+      "message": "Synchronizowanie wybranych danych z Dyskiem Google…"
     },
     "vocabDriveSynced": {
-      "message": "Zsynchronizowano słówka z Dyskiem Google."
+      "message": "Wybrane dane zsynchronizowano z Dyskiem Google."
     },
     "vocabDriveConnected": {
       "message": "Dysk Google jest połączony na tym urządzeniu."
@@ -3217,27 +3217,11 @@
     "vocabDriveNever": {
       "message": "Jeszcze nie synchronizowano"
     },
-    "vocabDriveNoticesExplain": {
-      "message": "Inne urządzenie usunęło te słówka, a na tym urządzeniu były nowsze zmiany, więc zachowano wersję lokalną: $TERMS$",
-      "placeholders": {
-        "terms": {
-          "content": "$1"
-        }
-      }
-    },
     "vocabDriveNoticesClear": {
       "message": "Zamknij powiadomienie o konflikcie"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Synchronizacja słówek z Dyskiem Google została zatrzymana i nie ponowi próby samoczynnie. Otwórz ustawienia, aby poznać przyczynę."
-    },
-    "vocabDriveNotices": {
-      "message": "Powiadomienia o konflikcie usuwania: $COUNT$",
-      "placeholders": {
-        "count": {
-          "content": "$1"
-        }
-      }
+      "message": "Synchronizacja z Dyskiem Google została zatrzymana i nie zostanie wznowiona automatycznie. Otwórz ustawienia, aby sprawdzić przyczynę."
     },
     "vocabDriveConnect": {
       "message": "Połącz z Dyskiem Google"
@@ -3258,16 +3242,16 @@
       "message": "Autoryzacja Dysku Google jest niedostępna. Sprawdź, czy masz zalogowane konto w Chrome."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Żadne konto Pinboard nie jest zalogowane, więc synchronizacja słówek nie może się rozpocząć. Wprowadź API Token w sekcji „Ogólne → Konto Pinboard”, a następnie połącz ponownie."
+      "message": "Nie zalogowano konta Pinboard. Wpisz API Token w „Ogólne → Konto Pinboard”, a potem połącz ponownie."
     },
     "vocabDriveErrorPermission": {
       "message": "Brakuje uprawnienia do Dysku Google."
     },
     "vocabDriveErrorCorrupt": {
-      "message": "Nie udało się bezpiecznie odczytać danych synchronizacji z Dysku Google. Lokalne słówka nie zostały zmienione."
+      "message": "Nie można bezpiecznie odczytać danych synchronizacji z Dysku Google. Dane lokalne nie zostały zmienione."
     },
     "vocabDriveErrorLocalStore": {
-      "message": "Nie udało się zaktualizować lokalnej bazy słówek, więc synchronizacja została zatrzymana. Zapisane słówka nie zostały zmienione."
+      "message": "Nie można zapisać danych lokalnych. Synchronizacja została zatrzymana."
     },
     "vocabDriveErrorNetwork": {
       "message": "Nie można połączyć się z Dyskiem Google."
@@ -3276,7 +3260,7 @@
       "message": "Synchronizacja z Dyskiem Google nie powiodła się."
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Konto Google lub Pinboard uległo zmianie. Otwórz ponownie kartę Słówka i spróbuj jeszcze raz."
+      "message": "Konto Google lub Pinboard uległo zmianie. Otwórz ponownie „Ogólne” i spróbuj jeszcze raz."
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "Jeden z zapisanych wpisów lub jego kontekst jest zbyt duży do synchronizacji. Skróć lub usuń ten wpis, a następnie wybierz „Synchronizuj teraz”."
@@ -4024,5 +4008,62 @@
   "notesEditFailed": {"message": "Nie udało się zapisać notatki. Szkic zachowano. Spróbuj ponownie."},
   "libraryClearFilters": {"message": "Wyczyść wyszukiwanie i filtry"},
   "readerSourceTools": {"message": "Źródło i narzędzia ekstrakcji"},
-  "aiConfigure": {"message": "Skonfiguruj AI"}
+  "aiConfigure": {"message": "Skonfiguruj AI"},
+    "driveChromeSyncSection": {
+      "message": "Chrome Sync"
+    },
+    "driveSyncVocabulary": {
+      "message": "Słówka"
+    },
+    "driveSyncNotes": {
+      "message": "Zaznaczenia i notatki"
+    },
+    "driveVocabularyLastSuccess": {
+      "message": "Ostatnia synchronizacja słówek"
+    },
+    "driveNotesLastSuccess": {
+      "message": "Ostatnia synchronizacja zaznaczeń i notatek"
+    },
+    "driveSyncChooseData": {
+      "message": "Wybierz dane do synchronizacji na tym urządzeniu."
+    },
+    "driveVocabularyStatus": {
+      "message": "Słówka: $STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesStatus": {
+      "message": "Zaznaczenia i notatki: $STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveVocabularyNotices": {
+      "message": "Konflikty słówek: $COUNT$. Zachowano lokalne zmiany.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesNotices": {
+      "message": "Konflikty zaznaczeń i notatek: $COUNT$. Zachowano obie wersje.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesErrorEntryTooLarge": {
+      "message": "Zaznaczenie lub notatka ma zbyt duży rozmiar do synchronizacji. Skróć treść lub usuń zapis, a potem kliknij „Synchronizuj teraz”."
+    },
+    "driveScopeSaveFailed": {
+      "message": "Nie można zapisać wyboru danych do synchronizacji na tym urządzeniu. Spróbuj ponownie."
+    }
+
 }

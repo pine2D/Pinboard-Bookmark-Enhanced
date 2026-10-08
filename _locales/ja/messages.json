@@ -3170,13 +3170,13 @@
       "message": "読書中のヒント"
     },
     "vocabDriveSection": {
-      "message": "Google Drive で単語を同期"
+      "message": "Google ドライブ"
     },
     "vocabDriveScope": {
-      "message": "現在の Pinboard アカウントの単語だけを同期します。設定と API キーは同期しません。"
+      "message": "同期する項目は、このデバイスと現在の Pinboard アカウントにのみ適用されます。設定と API キーは同期しません。"
     },
     "vocabDriveDisclosure": {
-      "message": "Google Drive のこの拡張機能専用 appDataFolder に、単語データのコピーを平文で保存します。エンドツーエンド暗号化はされません。単語、定義、メモ、参照元 URL、記事タイトル、文脈の抜粋が含まれる場合があります。"
+      "message": "Google ドライブの appDataFolder に保存するコピーは平文で、エンドツーエンド暗号化されません。単語、定義、ハイライトした引用、メモ、参照元 URL、タイトル、日時が含まれる場合があります。"
     },
     "vocabDriveLoading": {
       "message": "Google Drive の同期状態を読み込んでいます…"
@@ -3185,16 +3185,16 @@
       "message": "このデバイスは Google Drive に接続されていません。"
     },
     "vocabDriveUnavailable": {
-      "message": "このビルドでは OAuth の有効化が完了していないため、Google Drive の単語帳同期は利用できません。"
+      "message": "このビルドでは OAuth がまだ有効になっていないため、Google ドライブ同期は利用できません。"
     },
     "vocabDriveAuthorizing": {
       "message": "Google の認可を待っています。Chrome が開いたウィンドウでログインと許可を完了してください。"
     },
     "vocabDriveWorking": {
-      "message": "Google Drive と単語を同期しています…"
+      "message": "選択したデータを Google ドライブと同期しています…"
     },
     "vocabDriveSynced": {
-      "message": "Google Drive と単語を同期しました。"
+      "message": "選択したデータを Google ドライブと同期しました。"
     },
     "vocabDriveConnected": {
       "message": "このデバイスは Google Drive に接続されています。"
@@ -3217,27 +3217,11 @@
     "vocabDriveNever": {
       "message": "まだ同期されていません"
     },
-    "vocabDriveNoticesExplain": {
-      "message": "別のデバイスがこれらの単語を削除しましたが、このデバイスにより新しい変更があったため、ローカルの内容を残しました：$TERMS$",
-      "placeholders": {
-        "terms": {
-          "content": "$1"
-        }
-      }
-    },
     "vocabDriveNoticesClear": {
       "message": "競合通知を閉じる"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Google Drive の単語同期が停止し、自動では再試行されません。設定で理由を確認してください。"
-    },
-    "vocabDriveNotices": {
-      "message": "削除の競合に関する通知：$COUNT$ 件",
-      "placeholders": {
-        "count": {
-          "content": "$1"
-        }
-      }
+      "message": "Google ドライブ同期が停止しました。自動では再試行されません。設定を開いて原因を確認してください。"
     },
     "vocabDriveConnect": {
       "message": "Google Drive に接続"
@@ -3258,16 +3242,16 @@
       "message": "Google Drive の認可を利用できません。Chrome にログインしているか確認してください。"
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Pinboard アカウントにログインしていないため、単語の同期を開始できません。「一般 → Pinboard アカウント」で API Token を入力してから、もう一度接続してください。"
+      "message": "Pinboard にログインしていません。「一般 → Pinboard アカウント」で API Token を入力してから、接続し直してください。"
     },
     "vocabDriveErrorPermission": {
       "message": "Google Drive の権限がありません。"
     },
     "vocabDriveErrorCorrupt": {
-      "message": "Google Drive の同期データを安全に読み込めませんでした。ローカルの単語は変更されていません。"
+      "message": "Google ドライブの同期データを安全に読み取れませんでした。ローカルデータは変更していません。"
     },
     "vocabDriveErrorLocalStore": {
-      "message": "ローカルの単語データベースに書き込めなかったため、同期を停止しました。保存済みの単語は変更されていません。"
+      "message": "ローカルデータを保存できなかったため、同期を停止しました。"
     },
     "vocabDriveErrorNetwork": {
       "message": "Google Drive に接続できません。"
@@ -3276,7 +3260,7 @@
       "message": "Google Drive との同期に失敗しました。"
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Google アカウントまたは Pinboard アカウントが変わりました。「単語帳」を開き直して、もう一度お試しください。"
+      "message": "Google または Pinboard のアカウントが変わりました。「一般」を開き直して再試行してください。"
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "保存した単語またはその文脈が大きすぎるため同期できません。内容を短くするか削除してから、「今すぐ同期」をクリックしてください。"
@@ -4024,5 +4008,62 @@
   "notesEditFailed": {"message": "メモを保存できませんでした。下書きは保持されています。再試行してください。"},
   "libraryClearFilters": {"message": "検索と絞り込みを解除"},
   "readerSourceTools": {"message": "ソースと抽出ツール"},
-  "aiConfigure": {"message": "AI を設定"}
+  "aiConfigure": {"message": "AI を設定"},
+    "driveChromeSyncSection": {
+      "message": "Chrome Sync"
+    },
+    "driveSyncVocabulary": {
+      "message": "単語"
+    },
+    "driveSyncNotes": {
+      "message": "ハイライトとメモ"
+    },
+    "driveVocabularyLastSuccess": {
+      "message": "単語の最終同期"
+    },
+    "driveNotesLastSuccess": {
+      "message": "ハイライトとメモの最終同期"
+    },
+    "driveSyncChooseData": {
+      "message": "このデバイスで同期するデータを選択してください。"
+    },
+    "driveVocabularyStatus": {
+      "message": "単語：$STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesStatus": {
+      "message": "ハイライトとメモ：$STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveVocabularyNotices": {
+      "message": "単語の競合：$COUNT$。ローカルの編集を保持しました。",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesNotices": {
+      "message": "ハイライトとメモの競合：$COUNT$。両方のバージョンを保持しました。",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesErrorEntryTooLarge": {
+      "message": "ハイライトまたはメモが大きすぎるため同期できません。短くするか削除してから「今すぐ同期」をクリックしてください。"
+    },
+    "driveScopeSaveFailed": {
+      "message": "このデバイスの同期項目を保存できませんでした。再試行してください。"
+    }
+
 }

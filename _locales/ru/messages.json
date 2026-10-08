@@ -3170,13 +3170,13 @@
       "message": "Подсказки при чтении"
     },
     "vocabDriveSection": {
-      "message": "Синхронизация слов с Google Диском"
+      "message": "Google Диск"
     },
     "vocabDriveScope": {
-      "message": "Синхронизирует только слова текущего аккаунта Pinboard. Настройки и API-ключи не синхронизируются."
+      "message": "Выбор действует только на этом устройстве и для текущего аккаунта Pinboard. Настройки и API-ключи не синхронизируются."
     },
     "vocabDriveDisclosure": {
-      "message": "Расширение сохраняет копию в виде открытого текста в своём закрытом каталоге appDataFolder на Google Диске. Эта копия не защищена сквозным шифрованием и может содержать слова, определения, заметки, URL источников, заголовки статей и фрагменты контекста."
+      "message": "Копии в папке appDataFolder на Google Диске хранятся открытым текстом, без сквозного шифрования. Они могут содержать слова, определения, выделенные фрагменты, заметки, исходные URL, заголовки и даты."
     },
     "vocabDriveLoading": {
       "message": "Загрузка состояния синхронизации с Google Диском…"
@@ -3185,16 +3185,16 @@
       "message": "Google Диск не подключён на этом устройстве."
     },
     "vocabDriveUnavailable": {
-      "message": "Синхронизация словарика через Google Диск недоступна в этой сборке: активация OAuth ещё не завершена."
+      "message": "В этой сборке синхронизация с Google Диском недоступна, поскольку OAuth ещё не активирован."
     },
     "vocabDriveAuthorizing": {
       "message": "Ожидание авторизации Google. Завершите вход и подтверждение в окне, которое открыл Chrome."
     },
     "vocabDriveWorking": {
-      "message": "Синхронизация слов с Google Диском…"
+      "message": "Синхронизация выбранных данных с Google Диском…"
     },
     "vocabDriveSynced": {
-      "message": "Слова синхронизированы с Google Диском."
+      "message": "Выбранные данные синхронизированы с Google Диском."
     },
     "vocabDriveConnected": {
       "message": "Google Диск подключён на этом устройстве."
@@ -3217,27 +3217,11 @@
     "vocabDriveNever": {
       "message": "Синхронизация ещё не выполнялась"
     },
-    "vocabDriveNoticesExplain": {
-      "message": "Другое устройство удалило эти слова, но на этом устройстве были более новые изменения, поэтому сохранена локальная версия: $TERMS$",
-      "placeholders": {
-        "terms": {
-          "content": "$1"
-        }
-      }
-    },
     "vocabDriveNoticesClear": {
       "message": "Закрыть уведомление о конфликте"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Синхронизация слов с Google Диском остановлена и не возобновится сама. Откройте настройки, чтобы узнать причину."
-    },
-    "vocabDriveNotices": {
-      "message": "Уведомления о конфликтах удаления: $COUNT$",
-      "placeholders": {
-        "count": {
-          "content": "$1"
-        }
-      }
+      "message": "Синхронизация с Google Диском остановлена и не возобновится автоматически. Откройте настройки, чтобы узнать причину."
     },
     "vocabDriveConnect": {
       "message": "Подключить Google Диск"
@@ -3258,16 +3242,16 @@
       "message": "Авторизация Google Диска недоступна. Проверьте, выполнен ли вход в Chrome."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Аккаунт Pinboard не подключён, поэтому синхронизация слов не может начаться. Укажите API-токен в разделе «Общие → Аккаунт Pinboard», затем подключитесь снова."
+      "message": "Нет входа в аккаунт Pinboard. Введите API Token в разделе «Общие → Аккаунт Pinboard» и подключитесь снова."
     },
     "vocabDriveErrorPermission": {
       "message": "Нет разрешения на доступ к Google Диску."
     },
     "vocabDriveErrorCorrupt": {
-      "message": "Не удалось безопасно прочитать данные синхронизации с Google Диском. Локальные слова не изменены."
+      "message": "Не удалось безопасно прочитать данные синхронизации с Google Диском. Локальные данные не изменены."
     },
     "vocabDriveErrorLocalStore": {
-      "message": "Не удалось записать данные в локальную базу слов, поэтому синхронизация остановлена. Сохранённые слова не изменены."
+      "message": "Не удалось сохранить локальные данные. Синхронизация остановлена."
     },
     "vocabDriveErrorNetwork": {
       "message": "Не удалось подключиться к Google Диску."
@@ -3276,7 +3260,7 @@
       "message": "Не удалось синхронизировать данные с Google Диском."
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Аккаунт Google или Pinboard изменился. Откройте раздел «Словарик» заново и повторите попытку."
+      "message": "Аккаунт Google или Pinboard изменился. Снова откройте раздел «Общие» и повторите попытку."
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "Размер сохранённого слова или его контекста превышает допустимый для синхронизации. Сократите или удалите эту запись, затем нажмите «Синхронизировать сейчас»."
@@ -4024,5 +4008,62 @@
   "notesEditFailed": {"message": "Не удалось сохранить заметку. Черновик сохранён. Повторите попытку."},
   "libraryClearFilters": {"message": "Очистить поиск и фильтры"},
   "readerSourceTools": {"message": "Исходный текст и извлечение"},
-  "aiConfigure": {"message": "Настроить AI"}
+  "aiConfigure": {"message": "Настроить AI"},
+    "driveChromeSyncSection": {
+      "message": "Chrome Sync"
+    },
+    "driveSyncVocabulary": {
+      "message": "Словарик"
+    },
+    "driveSyncNotes": {
+      "message": "Выделения и заметки"
+    },
+    "driveVocabularyLastSuccess": {
+      "message": "Последняя синхронизация словарика"
+    },
+    "driveNotesLastSuccess": {
+      "message": "Последняя синхронизация выделений и заметок"
+    },
+    "driveSyncChooseData": {
+      "message": "Выберите данные для синхронизации на этом устройстве."
+    },
+    "driveVocabularyStatus": {
+      "message": "Словарик: $STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesStatus": {
+      "message": "Выделения и заметки: $STATUS$",
+      "placeholders": {
+        "status": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveVocabularyNotices": {
+      "message": "Конфликты словарика: $COUNT$. Локальные изменения сохранены.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesNotices": {
+      "message": "Конфликты выделений и заметок: $COUNT$. Сохранены обе версии.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "driveNotesErrorEntryTooLarge": {
+      "message": "Выделение или заметка слишком велики для синхронизации. Сократите или удалите их, затем нажмите «Синхронизировать сейчас»."
+    },
+    "driveScopeSaveFailed": {
+      "message": "Не удалось сохранить выбор данных для синхронизации на этом устройстве. Повторите попытку."
+    }
+
 }

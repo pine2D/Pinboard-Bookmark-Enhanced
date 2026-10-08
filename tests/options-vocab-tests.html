@@ -534,11 +534,11 @@ delete document.documentElement.dataset.theme;
         getManifest:() => ({ optional_host_permissions:["*://*/*"] }),
         sendMessage:driveResponse
       },
-      storage:{ onChanged:{ addListener(){} } }
+      storage:{ local:{ get:async () => ({driveSyncVocabulary:true,driveSyncNotes:false}) }, onChanged:{ addListener(){} } }
     };
     pbpVocabCurrentOwner = async () => "acct_alice";
     pbpVocabAll = async () => [];
-    await renderVocabPanel();
+    await renderDriveSyncPanel();
     $id("vocab-drive-connect").click();
     $id("vocab-drive-sync").click();
     await task(); await task();
@@ -553,10 +553,10 @@ delete document.documentElement.dataset.theme;
     window.chrome = {
       permissions:{ request: async (request) => { permissionRequests.push(request); return true; } },
       runtime:{ getManifest:() => activeDriveManifest, sendMessage: driveResponse },
-      storage:{ onChanged:{ addListener(){} } }
+      storage:{ local:{ get:async () => ({driveSyncVocabulary:true,driveSyncNotes:false}) }, onChanged:{ addListener(){} } }
     };
 
-    if (typeof _pbpVocabDriveRender === "function") _pbpVocabDriveRender({ connected:false });
+    if (typeof _pbpVocabDriveRender === "function") _pbpVocabDriveRender({ connected:false, owner:"alice" });
     check("Google Drive card renders a persistent disconnected state",
       $id("vocab-drive-state").textContent.includes("vocabDriveDisconnected") &&
       !$id("vocab-drive-connect").hidden && $id("vocab-drive-sync").hidden && $id("vocab-drive-disconnect").hidden);
@@ -593,7 +593,7 @@ delete document.documentElement.dataset.theme;
       retryAt:Date.UTC(2026, 6, 24, 10, 0),
       lastError:"network"
     };
-    _pbpVocabDriveRender({ connected:false });
+    _pbpVocabDriveRender({ connected:false, owner:"alice" });
     window.chrome.permissions.request = async () => true;
     window.chrome.runtime.sendMessage = async () => ({
       ok:false, error:"network", status:connectedAfterFailure
@@ -609,7 +609,7 @@ delete document.documentElement.dataset.theme;
     check("connecting moves focus from the hidden initiator to Sync now",
       document.activeElement === $id("vocab-drive-sync"));
 
-    _pbpVocabDriveRender({ connected:false });
+    _pbpVocabDriveRender({ connected:false, owner:"alice" });
     let resolveDelayedConnect;
     window.chrome.runtime.sendMessage = () => new Promise((resolve) => {
       resolveDelayedConnect = resolve;
@@ -627,7 +627,7 @@ delete document.documentElement.dataset.theme;
       document.activeElement === outsideDriveControl);
     outsideDriveControl.remove();
 
-    _pbpVocabDriveRender({ connected:false });
+    _pbpVocabDriveRender({ connected:false, owner:"alice" });
     driveMessages.length = 0;
     let resolvePermission;
     window.chrome.permissions.request = () => new Promise((resolve) => {
@@ -636,7 +636,7 @@ delete document.documentElement.dataset.theme;
     window.chrome.runtime.sendMessage = driveResponse;
     $id("vocab-drive-connect").click();
     await task();
-    ++_vocabRenderGen;
+    ++_driveRenderGen;
     const bobStatus = {
       ...driveStatus,
       owner:"bob",
@@ -663,7 +663,7 @@ delete document.documentElement.dataset.theme;
     window.chrome.runtime.sendMessage = async (message) => message.type === "vocabDriveStatus"
       ? { ok:true, status:blockedStatus }
       : { ok:false, error:"network", status:blockedStatus };
-    await _pbpVocabDriveRefresh(++_vocabRenderGen, true);
+    await _pbpVocabDriveRefresh(++_driveRenderGen, true);
     check("a failed automatic sync preserves authoritative blocked reconnect guidance",
       $id("vocab-drive-owner").textContent === "alice" &&
       $id("vocab-drive-error").textContent.includes("vocabDriveErrorPermission") &&
@@ -697,7 +697,7 @@ delete document.documentElement.dataset.theme;
     $id("vocab-drive-actions").hidden = true;
     $id("vocab-drive-connect").hidden = true;
     window.chrome.runtime.sendMessage = async () => ({ ok:false, error:"remote" });
-    await _pbpVocabDriveRefresh(++_vocabRenderGen, true);
+    await _pbpVocabDriveRefresh(++_driveRenderGen, true);
     check("a failed status read still leaves a way to retry",
       $id("vocab-drive-state").textContent.includes("vocabDriveStatusFailed") &&
       $id("vocab-drive-actions").hidden === false &&
@@ -722,10 +722,8 @@ delete document.documentElement.dataset.theme;
     const noticeText = $id("vocab-drive-notices").textContent;
     const clearShown = $id("vocab-drive-clear-notices").closest(".vocab-drive-notice-row").hidden === false;
     _pbpVocabDriveRender({ ...driveStatus, retryAt:null, lastError:null, notices:0, noticeTerms:[] });
-    check("a conflict notice names the words and offers a way to dismiss",
-      noticeText.includes("vocabDriveNotices") &&
-      noticeText.includes("vocabDriveNoticesExplain") &&
-      noticeText.includes("blossom") && noticeText.includes("ephemeral") &&
+    check("a conflict notice identifies the dataset and offers a way to dismiss",
+      noticeText.includes("driveVocabularyNotices") &&
       clearShown &&
       $id("vocab-drive-notices").textContent === "" &&
       $id("vocab-drive-clear-notices").closest(".vocab-drive-notice-row").hidden === true);
@@ -768,7 +766,7 @@ delete document.documentElement.dataset.theme;
     _pbpVocabDriveRender({ ...driveStatus, retryAt:null, lastError:null, notices:2 });
     const loudNotices = $id("vocab-drive-notices").textContent;
     check("the conflict counter stays silent at zero and speaks when it is not",
-      quietNotices === "" && loudNotices.includes("vocabDriveNotices") &&
+      quietNotices === "" && loudNotices.includes("driveVocabularyNotices") &&
       $id("vocab-drive-notices").classList.contains("bad"));
 
     // The sentences around these counts come from t() (extension UI language),
@@ -812,7 +810,8 @@ delete document.documentElement.dataset.theme;
     window.chrome.runtime.sendMessage = async (message) => message.type === "vocabDriveStatus"
       ? { ok:true, status:{ ...driveStatus, retryAt:null, lastError:"corrupt", blocked:false } }
       : { ok:false, error:"network", status:{ ...driveStatus, retryAt:null, lastError:"corrupt", blocked:false } };
-    await _pbpVocabDriveRefresh(++_vocabRenderGen, true);
+    await _pbpVocabDriveRefresh(++_driveRenderGen, true);
+    await _pbpVocabDriveAction("vocabDriveSyncNow", true);
     check("an unblocked run reports its own error, not a stale persisted one",
       $id("vocab-drive-error").textContent.includes("vocabDriveErrorNetwork") &&
       !$id("vocab-drive-error").textContent.includes("vocabDriveErrorCorrupt"));
@@ -850,8 +849,9 @@ delete document.documentElement.dataset.theme;
     });
     $id("vocab-drive-sync").click();
     await task();
-    ++_vocabRenderGen;
+    ++_driveRenderGen;
     if (typeof _vocabDriveActionSeq !== "undefined") ++_vocabDriveActionSeq;
+    pbpVocabCurrentOwner = async () => "acct_bob";
     _pbpVocabDriveRender(bobStatus);
     $id("vocab-drive-sync").click();
     await task();
@@ -869,6 +869,7 @@ delete document.documentElement.dataset.theme;
       $id("vocab-drive-action-status").textContent.includes("vocabDriveSynced") &&
       !$id("vocab-status").textContent);
 
+    pbpVocabCurrentOwner = async () => "acct_alice";
     _pbpVocabDriveRender({ ...driveStatus, retryAt:null, lastError:null });
     let resolveMutationStale;
     window.chrome.runtime.sendMessage = () => new Promise((resolve) => {
@@ -876,7 +877,7 @@ delete document.documentElement.dataset.theme;
     });
     $id("vocab-drive-sync").click();
     await task();
-    ++_vocabRenderGen;
+    ++_driveRenderGen;
     resolveMutationStale({
       ok:true,
       status:{
@@ -922,7 +923,7 @@ delete document.documentElement.dataset.theme;
       $id("vocab-drive-error").textContent.includes("vocabDriveErrorNetwork") &&
       $id("vocab-drive-error").textContent.includes("vocabDriveRetryAt"));
     check("Google Drive conflict notices stay visible",
-      $id("vocab-drive-notices").textContent.includes("vocabDriveNotices:3"));
+      $id("vocab-drive-notices").textContent.includes("driveVocabularyNotices:3"));
 
     window.chrome.permissions.request = async () => true;
     driveMessages.length = 0;
@@ -945,18 +946,19 @@ delete document.documentElement.dataset.theme;
         : Promise.resolve({ ok:true, status:driveStatus });
     };
     if (typeof _pbpVocabDriveClear === "function") _pbpVocabDriveClear();
-    const staleGen = ++_vocabRenderGen;
+    const staleGen = ++_driveRenderGen;
     const staleRender = typeof _pbpVocabDriveRefresh === "function"
       ? _pbpVocabDriveRefresh(staleGen, false) : Promise.resolve();
-    ++_vocabRenderGen;
+    await task();
+    ++_driveRenderGen;
     if (resolveStale) resolveStale({ ok:true, status:driveStatus });
     await staleRender;
-    check("vocabulary render generation prevents stale Drive status overwrite",
+    check("Drive render generation prevents stale Drive status overwrite",
       !$id("vocab-drive-account").textContent && !$id("vocab-drive-owner").textContent);
 
     const optionsSource = await (await fetch("../options.html")).text();
     check("production Google Drive disclosure has a persistent accordion key",
-      /<details class="disclosure" data-acc-key="vocab-google-drive" open>/.test(optionsSource) &&
+      /<details class="disclosure" data-acc-key="general-data-sync" open>/.test(optionsSource) &&
       /id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure"/.test(optionsSource) &&
       /id="vocab-drive-state"[^>]*role="status"[^>]*aria-live="polite"/.test(optionsSource) &&
       /id="vocab-drive-actions"[^>]*hidden/.test(optionsSource) &&
@@ -968,10 +970,9 @@ delete document.documentElement.dataset.theme;
     window.chrome.runtime.sendMessage = driveResponse;
     pbpVocabCurrentOwner = async () => "acct_alice";
     pbpVocabAll = async () => [];
-    await renderVocabPanel();
-    check("opening Vocabulary requests status and a noninteractive non-forced sync",
-      driveMessages.some((message) => message.type === "vocabDriveStatus") &&
-      driveMessages.some((message) => message.type === "vocabDriveSyncNow" && message.force !== true));
+    await renderDriveSyncPanel();
+    check("opening General requests only status without authorization or synchronization",
+      driveMessages.length === 1 && driveMessages[0].type === "vocabDriveStatus");
   } finally {
     pbpVocabCurrentOwner = driveRealOwner;
     pbpVocabAll = driveRealAll;

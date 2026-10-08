@@ -45,7 +45,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 ### Personalizacja
 - **13 motywów dla pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) oraz własny CSS
 - **Automatyczna archiwizacja w [Wayback Machine](https://web.archive.org)** — opcjonalnie przy każdym zapisie; strony pozostają dostępne, nawet gdy oryginalny link przestanie działać
-- **Kopie zapasowe i synchronizacja** — ustawienia synchronizuje Chrome Sync, słówka trafiają na twój własny Google Drive, a ręczna kopia JSON może objąć zakreślenia, notatki, słówka i klucze API; wszystko opcjonalne, szczegóły w sekcji Prywatność poniżej
+- **Kopie zapasowe i synchronizacja** — ustawienia przez Chrome Sync, słówka oraz opcjonalnie zaznaczenia i notatki przez własny Dysk Google; ręczna kopia JSON może zawierać zaznaczenia, notatki, słówka i klucze API; wszystko jest opcjonalne, zakres opisano niżej w sekcji „Prywatność”
 - **9 języków** · konfigurowalne skróty · dane przede wszystkim lokalnie · zero śledzenia
 
 ![13 motywów dla pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
@@ -66,6 +66,8 @@ Po instalacji: kliknij ikonę paska narzędzi → wklej swój [token API Pinboar
 ## Prywatność
 
 Bez śledzenia, bez analityki, bez telemetrii. W przypadku nowych użytkowników ustawienia i dane uwierzytelniające pozostają domyślnie na tym urządzeniu. Synchronizację zwykłych ustawień włącza się osobno na każdym urządzeniu. Synchronizacja danych uwierzytelniających jest jednym wyborem dla całego konta Chrome, ale uczestniczą w niej tylko urządzenia z włączoną synchronizacją ustawień; pozostałe nadal używają lokalnych danych uwierzytelniających. Dla nowych użytkowników jest domyślnie wyłączona. Jeśli podczas aktualizacji w Chrome Sync są już niepuste dane uwierzytelniające, pozostaje włączona, aby uniknąć utraty danych. Po włączeniu klucze API, tokeny, hasła i dane uwierzytelniające eksportu są udostępniane przez Chrome Sync; są jedynie zaciemnione, a nie zaszyfrowane. Zapisane zakładki, zawartość stron i kolejka offline nigdy nie trafiają do Chrome Sync. Zapytania AI są wysyłane **tylko** przez funkcje, które włączysz lub wywołasz — Tagi AI/Streszczenie AI, pytania o stronę, tłumaczenie, wyjaśnienie zaznaczenia lub opcjonalne podsumowanie kluczowych punktów — i trafiają bezpośrednio do skonfigurowanego dostawcy. Podczas instalacji przyznawany jest tylko dostęp do Pinboard; AI, Jina, witryny wybrane do przetwarzania wsadowego oraz opcjonalne miejsca docelowe eksportu i archiwizacji proszą tylko o uprawnienie do konkretnej witryny podczas wykonywania odpowiedniej operacji. Niestandardowe punkty końcowe sieci muszą używać HTTPS; HTTP jest dozwolone tylko dla `localhost`, `127.0.0.1` i `[::1]`. Strony rozszerzenia egzekwują restrykcyjną politykę Content-Security-Policy (bez zdalnego kodu). Pełna polityka: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+
+Z Dyskiem Google łączysz się osobno na każdym urządzeniu. Synchronizowane są tylko wybrane dane bieżącego konta Pinboard: po połączeniu słówka są domyślnie wybrane, a zaznaczenia i notatki wymagają osobnego włączenia. Wybór pozostaje na urządzeniu. Kopie w prywatnym folderze appDataFolder Dysku są zapisane jawnym tekstem, bez szyfrowania end-to-end.
 
 ## Licencja
 

@@ -1076,14 +1076,14 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   // Stage-3b Task 2 (2026-09-24-ui-system-stage3b): general + storage move
-  // onto the row model. General's 10 switches: Data Sync (2) + Backup &
+  // onto the row model. General's 12 switches: Data Sync (4) + Backup &
   // Restore (3: highlights/vocabulary/secrets) + Notifications (5) --
   // counted straight from the brief, re-verified against the live markup.
   await test("stage3b: every switch in the general panel sits in a .pref-row", async () => {
     const panel = await panelDoc("general");
     assert(!!panel, "panel-general is missing");
     const switches = [...panel.querySelectorAll("label.switch")];
-    assert(switches.length === 10, "expected 10 switches in panel-general, got " + switches.length);
+    assert(switches.length === 12, "expected 12 switches in panel-general, got " + switches.length);
     assert(switches.every((l) => l.parentElement.classList.contains("pref-row") && l.closest(".pref-group")),
       "every switch in panel-general must sit directly in a .pref-row inside a .pref-group");
   });
@@ -1233,7 +1233,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // becomes a plain .pref-group > .pref-row (1 switch total), and the four
   // .fg fields inside the "Export and integrations" disclosure (Anki
   // deck/port/key, Eudic token) become .fg.entry-block, key-wraps included.
-  // The Drive disclosure's <dl>/<p> and every .vocab-toolbar stay untouched.
+  // Drive now lives in General Data Sync; vocabulary integrations keep their toolbars.
   await test("stage3b: dict-echo-enabled sits in a .pref-row inside a .pref-group", async () => {
     const panel = await panelDoc("vocab");
     assert(!!panel, "panel-vocab is missing");
@@ -1249,8 +1249,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(!!panel, "panel-vocab is missing");
     const sections = [...panel.querySelectorAll(":scope > section.settings-section")];
     assert(sections.length === 1, "expected 1 top-level section in panel-vocab, got " + sections.length);
-    assert(sections[0].querySelectorAll(":scope > details.disclosure").length === 5,
-      "expected all 5 vocab disclosures inside the one section");
+    assert(sections[0].querySelectorAll(":scope > details.disclosure").length === 4,
+      "expected all 4 vocab disclosures inside the one section");
   });
 
   await test("stage3b: vocab's Export and integrations disclosure moves its .fg fields onto entry-block", async () => {
@@ -1273,11 +1273,11 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       ".vocab-toolbar must stay outside any .fg (spec: .fg-actions/.vocab-toolbar untouched)");
   });
 
-  await test("stage3b: vocab's Google Drive disclosure keeps its dl fields and toolbar untouched", async () => {
-    const panel = await panelDoc("vocab");
-    assert(!!panel, "panel-vocab is missing");
-    const drive = panel.querySelector('details.disclosure[data-acc-key="vocab-google-drive"]');
-    assert(!!drive, "panel-vocab lost the vocab-google-drive disclosure");
+  await test("Google Drive in General Data Sync retains the shared connection fields and toolbar", async () => {
+    const panel = await panelDoc("general");
+    assert(!!panel, "panel-general is missing");
+    const drive = panel.querySelector('details.disclosure[data-acc-key="general-data-sync"] #vocab-drive-body');
+    assert(!!drive, "General Data Sync lost the shared Google Drive connection");
     assert(!!drive.querySelector("dl#vocab-drive-fields[hidden]"), "vocab-drive-fields dl or its hidden attribute is missing");
     assert(!drive.querySelector(".fg"), "vocab-google-drive must not gain any .fg wrapper");
   });

@@ -1,0 +1,175 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Notes Google Drive Tests</title>
+<style>body{font-family:monospace;padding:16px}.case{padding:6px}.pass{color:green}.fail{color:red}</style>
+</head><body><h1>Notes Google Drive Tests</h1><div id="summary"></div><div id="results"></div>
+<script src="../vocab-store.js"></script><script src="../vocab-gdrive.js"></script>
+<script src="../notes-sync.js"></script><script src="../notes-gdrive.js"></script>
+<script>
+let pass = 0, fail = 0;
+async function test(name, run) { let ok = false, detail = ""; try { ok = !!await run(); } catch (error) { detail = error.message; } ok ? pass++ : fail++; const el = document.createElement("div"); el.className = "case " + (ok ? "pass" : "fail"); el.textContent = name + (detail ? " " + detail : ""); document.getElementById("results").append(el); }
+const OWNER = "acct_alice", ARTICLE = "pbp_hl_598109c8", ARTICLE_URL = "https://example.com/read";
+const item = (note = "Local note") => ({ id: "highlight-a", n: 0, quote: "Selected passage", prefix: "before", suffix: "after", color: 1, note, ts: 100 });
+function peerEvent() {
+  return { recordKey: "pbp_hl_598109c8|highlight-a", vector: { "peer-a": 1 },
+    dot: { deviceId: "peer-a", counter: 1 }, deleted: false,
+    value: { url: ARTICLE_URL, title: "Article", item: item("Remote note") } };
+}
+function fixture(ownerHash, options = {}) {
+  const data = { pbpNotesSyncDeviceId: "local-a" }, calls = [], uploads = [], alarms = [];
+  let owner = OWNER, enabled = true, drivePermissionId = "google-a", activePermissionId = "", offline = false,
+    rejectArticles = false, rejectFrozen = false, switchInUploadGate = false, failUpload = options.failUpload === true;
+  // Server response fixtures deliberately use Drive's opaque folder ID.
+  const remoteMetadata = { id: "notes-remote", name: "pbp-notes-notes-remote.json",
+    parents: ["1opaque-real-appdata-folder"], mimeType: "application/json",
+    appProperties: { pbpKind: "notes-batch", schema: "1", owner: ownerHash, device: "peer-a" } };
+  const remoteBody = JSON.stringify({ schema: 1, ownerHash, deviceId: "peer-a", createdAt: 123, entries: [peerEvent()] });
+  const storage = {
+    async get(keys) { if (keys === null) return structuredClone(data); const out = {}; for (const key of [].concat(keys)) if (key in data) out[key] = structuredClone(data[key]); return out; },
+    async getKeys() { return Object.keys(data); },
+    async set(values) { if ((rejectArticles && Object.keys(values).some((key) => key.startsWith("pbp_hl_"))) || (rejectFrozen && Object.keys(values).some((key) => key.startsWith("pbp_notes_sync_batch_")))) throw new DOMException("quota", "QuotaExceededError"); Object.assign(data, structuredClone(values)); },
+    async remove(keys) { for (const key of [].concat(keys)) delete data[key]; }
+  };
+  const store = pbpCreateNotesSyncStore({ storage, locks: navigator.locks,
+    getCurrentOwner: async ({ requireDriveAccount = true } = {}) => {
+      if (!enabled) return "";
+      if (requireDriveAccount && activePermissionId) {
+        const current = await client.about();
+        if (!current.ok) {
+          const error = new Error("Drive identity verification unavailable");
+          error.code = current.error; error.retryable = current.retryable; throw error;
+        }
+        if (current.permissionId !== activePermissionId) return "";
+      }
+      return owner;
+    } });
+  const identity = { async getAuthToken() { return { token: "google-token" }; }, async removeCachedAuthToken() {} };
+  const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+  const client = pbpCreateVocabDriveClient({ identity, protocol: PBP_NOTES_DRIVE_PROTOCOL,
+    beforeRequest: async () => {
+      if (switchInUploadGate) { await Promise.resolve(); owner = "acct_bob"; switchInUploadGate = false; }
+      return enabled;
+    },
+    fetchImpl: async (input, init) => {
+      const url = new URL(input); calls.push(url.pathname + url.search);
+      if (url.pathname === "/drive/v3/about") {
+        if (offline) throw new TypeError("offline fixture");
+        return json({ user: { permissionId: drivePermissionId, emailAddress: "alice@example.test" } });
+      }
+      if (url.pathname === "/drive/v3/changes/startPageToken") return json({ startPageToken: "notes-start" });
+      if (url.pathname === "/drive/v3/files") return json({ files: options.remote ? [remoteMetadata] : [] });
+      if (url.pathname === "/drive/v3/changes") return json({ changes: [], newStartPageToken: "notes-end" });
+      if (url.pathname === "/drive/v3/files/notes-remote") {
+        if (options.afterDownload) options.afterDownload({ disable: () => { enabled = false; }, switchOwner: () => { owner = "acct_bob"; }, switchGoogle: () => { drivePermissionId = "google-b"; }, goOffline: () => { offline = true; } });
+        return new Response(options.corrupt ? "{bad json" : remoteBody);
+      }
+      if (url.pathname === "/drive/v3/files/generateIds") return json({ ids: ["notes-upload-" + (uploads.length + 1)] });
+      if (url.pathname === "/upload/drive/v3/files") {
+        const parts = init.body.split("\r\n\r\n");
+        const metadata = JSON.parse(parts[1].split("\r\n--")[0]);
+        const body = JSON.parse(parts[2].slice(0, parts[2].lastIndexOf("\r\n--")));
+        uploads.push({ metadata, body });
+        return json({}, failUpload ? 503 : 201);
+      }
+      throw new Error("unexpected fixture request: " + url.pathname);
+    }
+  });
+  if (options.switchDuringUploadGuard) {
+    const open = client.openSession;
+    client.openSession = async (...args) => {
+      const session = await open(...args);
+      if (session.ok) {
+        const upload = session.upload;
+        session.upload = (...uploadArgs) => { switchInUploadGate = true; return upload(...uploadArgs); };
+      }
+      return session;
+    };
+  }
+  const run = (runOptions) => pbpCreateNotesDriveSyncRunner({ client, store,
+    alarms: { create(name) { alarms.push(name); }, async clear(name) { alarms.push("clear:" + name); } },
+    getCurrentPinboardAuth: async () => ({ account: owner === OWNER ? "alice" : "bob" }),
+    pinboardAuthIsCurrent: (auth) => auth.account === (owner === OWNER ? "alice" : "bob"),
+    isEnabled: async () => enabled, getCurrentPermissionId: () => client.about(),
+    onSession: (permissionId) => { activePermissionId = permissionId; },
+    now: () => 100000, random: () => .5
+  })(runOptions);
+  return { data, calls, uploads, alarms, client, store, run, remoteMetadata, remoteBody,
+    async addLocal() { await store.writeRecord(ARTICLE, { v: 1, url: ARTICLE_URL, title: "Article", items: [{ ...item(), owner: OWNER }] }, OWNER); },
+    failUpload(value) { failUpload = value; }, quota(value) { rejectArticles = value; }, frozenQuota(value) { rejectFrozen = value; }, goOffline() { offline = true; } };
+}
+(async () => {
+  const hash = await pbpVocabOwnerHash(OWNER);
+  await test("notes codec accepts server metadata and rejects vocabulary identity", async () => {
+    const f = fixture(hash);
+    return pbpVocabValidateDriveBatch(f.remoteMetadata, f.remoteBody, hash, PBP_NOTES_DRIVE_PROTOCOL) &&
+      !pbpVocabValidateDriveBatch(f.remoteMetadata, f.remoteBody, hash) &&
+      !pbpVocabValidateDriveBatch({ ...f.remoteMetadata, appProperties: { ...f.remoteMetadata.appProperties, pbpKind: "vocab-batch" } }, f.remoteBody, hash, PBP_NOTES_DRIVE_PROTOCOL);
+  });
+  await test("notes list query scopes the independent dataset", async () => {
+    const f = fixture(hash); await f.client.listFiles(hash);
+    const url = new URL("https://www.googleapis.com" + f.calls[0]);
+    return url.searchParams.get("q").includes("value='notes-batch'") && !url.searchParams.get("q").includes("vocab-batch") && url.searchParams.get("spaces") === "appDataFolder";
+  });
+  await test("real notes runner pulls into empty device and checkpoints notes only", async () => {
+    const f = fixture(hash, { remote: true }), result = await f.run();
+    const record = f.data[ARTICLE], state = await f.store.getAccountState("google-a", hash);
+    return result.ok && result.changed && record.items[0].owner === OWNER && record.items[0].note === "Remote note" &&
+      state?.pageToken === "notes-end" && f.uploads.length === 1 &&
+      f.uploads[0].metadata.appProperties.pbpKind === "notes-batch" &&
+      f.uploads[0].metadata.name.startsWith("pbp-notes-") &&
+      !Object.hasOwn(f.uploads[0].body.entries[0].value.item, "owner") &&
+      f.alarms.includes("notes-sync-periodic") && !f.alarms.includes("vocab-sync-periodic");
+  });
+  await test("frozen notes batch retries the same file ID after worker restart", async () => {
+    const f = fixture(hash, { failUpload: true }); await f.addLocal();
+    const first = await f.run(), pending = await f.store.listPendingBatches("google-a", hash);
+    f.failUpload(false); const second = await f.run({ force: true });
+    return first.error === "network" && pending.length === 1 && second.ok &&
+      f.uploads.length === 2 && f.uploads[0].metadata.id === f.uploads[1].metadata.id &&
+      (await f.store.listPendingBatches("google-a", hash)).length === 0;
+  });
+  await test("notes quota failure keeps remote cursor before the unapplied page", async () => {
+    const f = fixture(hash, { remote: true }); f.quota(true); const result = await f.run();
+    const state = await f.store.getAccountState("google-a", hash);
+    return result.error === "local_store" && !f.data[ARTICLE] && state?.bootstrapListComplete !== true && !state?.pageToken && f.uploads.length === 0;
+  });
+  await test("frozen notes storage quota is a local failure and preserves upload intent", async () => {
+    const f = fixture(hash); await f.addLocal(); f.frozenQuota(true); const result = await f.run();
+    return result.error === "local_store" && f.uploads.length === 0 &&
+      (await f.store.listOutbox(OWNER)).length === 1 && (await f.store.listPendingBatches("google-a", hash)).length === 0;
+  });
+  await test("all Google identity checks offline retain owner-level notes retry without importing", async () => {
+    const f = fixture(hash, { remote: true, afterDownload: (ctx) => ctx.goOffline() });
+    const result = await f.run(), preflight = await f.store.getPreflightState(hash);
+    return result.error === "network" && result.retryable === true && !f.data[ARTICLE] &&
+      preflight?.lastError === "network" && preflight.blocked === false &&
+      f.alarms.includes("notes-sync-retry") && f.uploads.length === 0;
+  });
+  await test("offline token identity checks preserve a previously frozen notes upload", async () => {
+    const f = fixture(hash, { failUpload: true }); await f.addLocal(); await f.run();
+    const before = await f.store.listPendingBatches("google-a", hash); f.goOffline();
+    const result = await f.run({ force: true }), after = await f.store.listPendingBatches("google-a", hash);
+    const preflight = await f.store.getPreflightState(hash);
+    return result.error === "network" && preflight?.blocked === false && preflight.retryAt > 100000 &&
+      before.length === 1 && after.length === 1 && before[0].body === after[0].body &&
+      f.uploads.length === 1 && f.alarms.includes("notes-sync-retry");
+  });
+  await test("Pinboard switch inside final HTTP gate prevents old-account notes POST", async () => {
+    const f = fixture(hash, { switchDuringUploadGuard: true }); await f.addLocal();
+    const result = await f.run(), pending = await f.store.listPendingBatches("google-a", hash);
+    return result.error === "account_changed" && f.uploads.length === 0 && pending.length === 1 &&
+      pending[0].body.includes("Local note") && f.data[ARTICLE].items[0].owner === OWNER;
+  });
+  for (const [name, change] of [["disabled notes scope", "disable"], ["Pinboard account switch", "switchOwner"], ["Google account switch", "switchGoogle"]]) {
+    await test(name + " during body transfer cannot commit remote notes", async () => {
+      const f = fixture(hash, { remote: true, afterDownload: (ctx) => ctx[change]() });
+      const result = await f.run();
+      return !result.ok && !f.data[ARTICLE] && f.uploads.length === 0;
+    });
+  }
+  await test("corrupt notes does not disable vocabulary alarms", async () => {
+    const f = fixture(hash, { remote: true, corrupt: true }), result = await f.run();
+    return result.error === "corrupt" && f.alarms.includes("clear:notes-sync-periodic") &&
+      !f.alarms.some((name) => name.includes("vocab-sync"));
+  });
+  document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
+})();
+</script></body></html>

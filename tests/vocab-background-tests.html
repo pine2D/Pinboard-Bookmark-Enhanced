@@ -77,9 +77,10 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
     (syncNow.match(/pbpVocabDriveResponse\(result\)/g) || []).length === 1);
   check("sync-now message preserves persisted backoff unless explicitly forced",
     syncNowAt >= 0 &&
-    /pbpQueueVocabDriveSync\(\{\s*interactive: false,\s*force: message\.force === true\s*\}\)/
+    /pbpQueueSelectedDriveSync\(\{\s*interactive: false,\s*force: message\.force === true\s*\}\)/
       .test(syncNow) &&
-    /if \(message\.force === true\) await chrome\.alarms\.clear\("vocab-sync-retry"\)/.test(syncNow));
+    /if \(message\.force === true\) await Promise\.all/.test(syncNow) &&
+    syncNow.includes('chrome.alarms.clear("vocab-sync-retry")') && syncNow.includes('chrome.alarms.clear("notes-sync-retry")'));
   // A retryable auth failure means the token could not be minted right now,
   // not that the grant is gone. Dropping the flag makes pbpBootVocabDriveSync
   // return early, so the retry alarm the runner just scheduled does nothing.
@@ -88,14 +89,14 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
     connect.indexOf("retryable !== true") <
       connect.indexOf("PBP_VOCAB_DRIVE_CONNECTED_KEY]: false"));
   check("disconnect message is handled", messages.includes('message.type === "vocabDriveDisconnect"'));
-  check("one recovering promise tail serializes sync", source.includes("const queueVocabSync = pbpCreateRecoveringTail();") && source.includes("queueVocabSync(async () =>"));
+  check("one recovering promise tail serializes sync", source.includes("const queueVocabSync = pbpCreateRecoveringTail();") && source.includes("const queueNotesSync = pbpCreateRecoveringTail();") && source.includes("return tail(async () =>"));
   check("boot invokes only one noninteractive cold-start sync",
     bootAt >= 0 && boot.includes("interactive: false") && !boot.includes("interactive: true") &&
     !startup.includes("pbpBootVocabDriveSync") &&
     boot.includes("if (!await pbpVocabDriveIsConnected()) return { ok: true };") &&
     !boot.includes("status: await pbpGetVocabDriveStatus()") &&
     !boot.includes("pbpVocabSchedulePeriodic") &&
-    /if \(!granted\) \{[\s\S]*PBP_VOCAB_DRIVE_CONNECTED_KEY[\s\S]*false[\s\S]*vocab-sync-dirty[\s\S]*vocab-sync-periodic[\s\S]*vocab-sync-retry[\s\S]*error: "permission"/
+    /if \(!granted\) \{[\s\S]*PBP_VOCAB_DRIVE_CONNECTED_KEY[\s\S]*false[\s\S]*pbpClearDriveTypeAlarms[\s\S]*error: "permission"/
       .test(boot) &&
     !connect.includes("pbpVocabSchedulePeriodic"));
   check("background never requests optional permissions", !source.includes("chrome.permissions.request(") && !source.includes("permissions.request("));

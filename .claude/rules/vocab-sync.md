@@ -2,6 +2,8 @@
 paths:
   - "vocab-store.js"
   - "vocab-gdrive.js"
+  - "notes-sync.js"
+  - "notes-gdrive.js"
   - "options-vocab.js"
   - "library-vocab.js"
   - "anki-connect.js"
@@ -16,9 +18,17 @@ paths:
 - 远端批次用 owner hash 隔离，vector dominance 与稳定 dot 决定收敛；并发删除遇到新修改时 live 胜出并留下持久 notice，用户再次删除后 tombstone 才支配。
 - 每个网络 await 和 IDB commit 前都重核验 Pinboard owner 与 Drive `permissionId`，变化时不得推进游标或上传旧账号数据。
 
+## 高亮与笔记同步不变量
+
+- `notes-sync.js` 保留 `chrome.storage.local` 的文章记录为权威内容。版本与待同步 ID 嵌入同一记录，以 `pbp-hl:<key>` 锁和单次 `set` 同时持久化内容及同步意图；远端应用、编辑、删除和 JSON 恢复共用此锁。
+- 并发事件保留各叶的版本向量；合并只去掉被因果支配的叶，确定排序并保留并发笔记及删除事件。本机后续编辑从完整向量递增并吸收冲突，不能只拼接笔记字符串而丢掉因果来源。
+- 冻结批次先持久化，再仅移除仍匹配该批次的待同步 ID；远端游标在本页所有文章写入成功后推进，重放必须幂等。删除标记不自动回收。
+- 两类数据共享本机 Drive 连接，但范围开关、协议、队列、游标及告警独立。`driveSyncVocabulary=true`、`driveSyncNotes=false` 是本机 local 默认值，不属于 Chrome Sync 设置。
+- Google 账号无法在线核验时保留原网络或认证错误，不能当作账号切换；退避状态仅需重新核验 Pinboard owner 与范围，成功数据写入仍需核验 Drive 账号。
+
 ## 错误码与指引契约
 
-`auth`（Google 令牌失败）、`pinboard_auth`（无 Pinboard 账号，发生在任何 Google 调用之前，不写 preflight）、`not_connected`（本机未连接，**不渲染成错误**）、`permission`、`corrupt`（远端批次不合法）、`local_store`（本机 IndexedDB 写失败，与 `corrupt` 严格分开）、`entry_too_large`、`network`、`remote`。`applyRemotePage` 只返回 `invalid_remote_page`，必须显式认领。**每个 blocked 状态都要点名一个当前屏幕上可见的按钮**：已连接指向「断开此设备」，未连接指向「连接 Google Drive」，重连救不了的指向「立即同步」（`force` 是唯一能清除 blocked 的入口）。仍在退避的状态只显示下次重试时间，不给指令。按钮名称逐字复用该 locale 已发布的按钮文案，不另造叫法。
+`auth`（Google 令牌失败）、`pinboard_auth`（无 Pinboard 账号，发生在任何 Google 调用之前，不写 preflight）、`not_connected`（本机未连接，**不渲染成错误**）、`permission`、`corrupt`（远端批次不合法）、`local_store`（本机 IndexedDB 或 Chrome Storage 写失败，与 `corrupt` 严格分开）、`entry_too_large`、`network`、`remote`。`applyRemotePage` 只返回 `invalid_remote_page`，必须显式认领。**每个 blocked 状态都要点名一个当前屏幕上可见的按钮**：已连接指向「断开此设备」，未连接指向「连接 Google Drive」，重连救不了的指向「立即同步」（`force` 是唯一能清除 blocked 的入口）。仍在退避的状态只显示下次重试时间，不给指令。按钮名称逐字复用该 locale 已发布的按钮文案，不另造叫法。
 
 ## Google Drive OAuth 构建契约
 
@@ -26,7 +36,7 @@ paths:
 
 ## Drive 权限与断开语义
 
-只有「连接 Google Drive」这一直接用户动作可申请 `identity` 和精确 Google API origin；后台同步只做 `permissions.contains`，SW 启动不得弹 OAuth。断开本设备时移除 token cache 与可选权限，但保留本地生词、outbox、tombstone 和远端 `appDataFolder` 文件。Drive 中保存的是当前 owner 生词的明文应用私有副本，不是端到端加密。`getAuthToken` 硬依赖已登录 Chrome。
+只有「连接 Google Drive」这一直接用户动作可申请 `identity` 和精确 Google API origin；后台同步只做 `permissions.contains`，SW 启动不得弹 OAuth。断开本设备时移除 token cache 与可选权限，但保留本地生词、高亮和笔记、outbox、tombstone 和远端 `appDataFolder` 文件。Drive 中保存的是当前 owner 所选数据的明文应用私有副本，不是端到端加密。`getAuthToken` 硬依赖已登录 Chrome。
 
 ## 生词 owner、选择与刷新不变量（UI 层）
 

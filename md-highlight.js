@@ -580,7 +580,8 @@ let _pbpHlLockWarned = false;
 // (isolated script contexts, no shared module) -- the contract between them
 // is the lock NAME, so _pbpHlLockName, _pbpNotesRecordLockName and
 // pbpBackupHighlightLockName must keep producing the same string for the
-// same storage key. A fourth producer exists too: background.js's
+// same storage key. notes-sync.js uses the same prefix for remote merges and durable queue updates.
+// A fifth producer exists too: background.js's
 // pbpClaimLegacyHighlightOwners() one-shot legacy-owner migration writes the
 // same "pbp-hl:" + key inline; it is scheduled to retire by 2026-12-31
 // (CLAUDE.md 临时事项) and must match until then.
@@ -638,20 +639,27 @@ async function _pbpHlLoad(url) {
 }
 
 // Single-key read-modify-write: caller passes the FULL current items array.
-// Deletes the key outright when items is empty (spec 2: deleting down to
-// zero items removes the whole key, no empty-shell leftover). On write
+// Synced deletions retain an invisible record carrying their tombstones;
+// records never enrolled in sync can still be removed outright. On write
 // failure, toasts via btn if given, else the #copy-status live region;
 // never throws.
-async function _pbpHlSave(url, items, btn) {
+async function _pbpHlSave(url, items, btn, owner = _pbpHlOwner) {
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return false;
   const key = _pbpHlKey(url);
   try {
-    if (!items.length) { await chrome.storage.local.remove(key); return true; }
     // url/title ride the record because the key is a one-way hash of the url:
     // without them an aggregate "all pages with notes" view cannot name the
     // page. Records saved before this field existed self-heal on next save.
     const title = (_pbpHlState && _pbpHlState.title) || "";
-    await chrome.storage.local.set({ [key]: { v: 1, url: String(url || ""), title, items } });
+    const record = { v: 1, url: String(url || ""), title, items };
+    if (typeof pbpNotesWriteRecord === "function") {
+      const revision = _pbpHlOwnerRevision;
+      await pbpNotesWriteRecord(key,record,owner,{locked:true,getCurrentOwner:async()=>{
+        const current=await _pbpHlLiveOwner();
+        return current !== null && !_pbpHlOwnerPending && revision===_pbpHlOwnerRevision ? current : null;
+      }});
+    } else if (!items.length) await chrome.storage.local.remove(key);
+    else await chrome.storage.local.set({ [key]: record });
     return true;
   } catch (_) {
     _pbpHlToast(t("hlSaveFailed"), btn);
@@ -800,7 +808,7 @@ async function _pbpHlCommit(patch, btn) {
         return false;
       }
       _pbpHlEchoItems = next;
-      const ok = await _pbpHlSave(url, next, btn);
+      const ok = await _pbpHlSave(url, next, btn, liveOwner);
       if (!ok) { _pbpHlEchoItems = null; return false; } // nothing was written: a later foreign write of this exact content is NOT an echo
       _pbpHlRawItems = next;
       _pbpHlState.items = _pbpHlOwnerPending ? [] : pbpHlVisibleItems(next, _pbpHlOwner);

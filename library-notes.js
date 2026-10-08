@@ -1644,7 +1644,8 @@ function _pbpNotesLoadFailedText() {
 // on one name. That name is the contract with md-highlight.js's
 // _pbpHlLockName and options-backup.js's pbpBackupHighlightLockName --
 // "pbp-hl:" + the storage key, per record so one page's delete never blocks
-// another's. A fourth producer exists too: background.js's
+// another's. notes-sync.js uses the same prefix for remote merges and durable queue updates.
+// A fifth producer exists too: background.js's
 // pbpClaimLegacyHighlightOwners() one-shot legacy-owner migration writes the
 // same "pbp-hl:" + key inline; it is scheduled to retire by 2026-12-31
 // (CLAUDE.md 临时事项) and must match until then. The helper is deliberately
@@ -1680,6 +1681,19 @@ async function _pbpNotesWriteOwnerMatches(ownerAtOpen, revision) {
   const owner = raw && raw !== "ownerless" ? String(raw) : "";
   return owner === ownerAtOpen && revision === _notesAuthRevision;
 }
+async function _pbpNotesStoreRecord(key, record, owner, revision) {
+  if (typeof pbpNotesWriteRecord === "function") {
+    try {
+      await pbpNotesWriteRecord(key,record,owner,{locked:true,getCurrentOwner:async()=>
+        await _pbpNotesWriteOwnerMatches(owner,revision) ? owner : null});
+    } catch (error) {
+      if (error.code === "account_changed") return "changed";
+      throw error;
+    }
+  } else if (record.items.length) await chrome.storage.local.set({[key]:record});
+  else await chrome.storage.local.remove(key);
+  return "saved";
+}
 async function _pbpNotesWriteItem(hit, patch, ownerAtOpen) {
   if (!hit?.item || !hit.row?.key) return "gone";
   const revision = _notesAuthRevision;
@@ -1700,8 +1714,7 @@ async function _pbpNotesWriteItem(hit, patch, ownerAtOpen) {
     if (!_pbpNotesItemVisible(it, ownerAtOpen)) return "changed";
     if (Object.keys(patch).every(k => it[k] === patch[k])) return "saved";
     const items = fresh.items.map((entry, i) => i === index ? { ...entry, ...patch } : entry);
-    await chrome.storage.local.set({ [hit.row.key]: { ...fresh, items } });
-    return "saved";
+    return _pbpNotesStoreRecord(hit.row.key,{...fresh,items},ownerAtOpen,revision);
   });
 }
 
@@ -1861,8 +1874,7 @@ function _pbpNotesDelete(row, anchor) {
           const items = Array.isArray(fresh.items) ? fresh.items : [];
           const keep = items.filter((it) => !_pbpNotesItemVisible(it, ownerAtOpen));
           if (keep.length === items.length) return;
-          if (keep.length) await chrome.storage.local.set({ [row.key]: { ...fresh, items: keep } });
-          else await chrome.storage.local.remove(row.key);
+          return _pbpNotesStoreRecord(row.key,{...fresh,items:keep},ownerAtOpen,revision);
         });
         if (result === "changed") {
           // The account changed while the confirm was open, so this filter
@@ -1985,8 +1997,7 @@ function _pbpNotesBatchDelete() {
               // md-highlight.js, not more logic here.
               const keep = items.filter((it, idx) => !_pbpNotesItemVisible(it, ownerAtOpen) || !drop.has(_pbpNotesHitKey(row.key, it, idx)));
               if (keep.length === items.length) return;
-              if (keep.length) await chrome.storage.local.set({ [row.key]: { ...fresh, items: keep } });
-              else await chrome.storage.local.remove(row.key);
+              return _pbpNotesStoreRecord(row.key,{...fresh,items:keep},ownerAtOpen,revision);
             });
             if (result === "changed") { changed = true; break; }
           } catch (e) {

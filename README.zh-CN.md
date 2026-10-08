@@ -45,7 +45,7 @@
 ### 个性化
 - **13 套 pinboard.in 主题**（Dracula、Nord、Catppuccin、Solarized 等），还能叠加自定义 CSS
 - **自动存档到 [Wayback Machine](https://web.archive.org)**：开启后每次保存都提交一份；原链接失效也找得回
-- **备份与同步**：设置走 Chrome Sync，生词走你自己的 Google Drive，手动 JSON 备份可含高亮、笔记、生词和 API 密钥；全部可选，细节见下方「隐私」
+- **备份与同步**：设置走 Chrome Sync，生词及可选启用的高亮与笔记走自己的 Google Drive，手动 JSON 备份可含高亮、笔记、生词和 API 密钥；全部可选，细节见下方「隐私」
 - **9 种语言**、可自定义快捷键、本地优先存储、零追踪
 
 ![13 套 pinboard.in 主题](docs/cws-assets/originals/screenshot-4-themes.png)
@@ -66,6 +66,8 @@
 ## 隐私
 
 零追踪、零分析、零遥测。新用户的设置和凭据默认保存在本机。普通设置同步需在每台设备上分别开启。凭据同步是 Chrome 账号级选项，但只有开启普通设置同步的设备才会参与；关闭普通设置同步的设备继续使用本地凭据。新用户的凭据同步默认关闭；若升级时 Chrome Sync 已有非空凭据，则为避免数据丢失会保持开启。开启后，API 密钥、令牌、密码和导出凭据会通过 Chrome Sync 共享，且仅做混淆存储，并未加密。书签内容、页面内容和离线队列不会通过 Chrome Sync 同步。AI 请求**仅**通过你启用或调用的功能发出——AI 标签/摘要、页面问答、翻译、选中段落解读，或可选启用的 AI 要点摘要——并直接发送到你配置的服务商。安装时仅授予 Pinboard 访问权限；AI、Jina、批量操作中选定的站点，以及可选的导出和归档目的地，只会在你执行相应操作时申请当前精确站点权限。自定义网络端点必须使用 HTTPS；HTTP 仅允许用于 `localhost`、`127.0.0.1` 和 `[::1]`。扩展页面强制执行严格的内容安全策略（Content-Security-Policy，禁止远程代码）。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+
+Google Drive 需在每台设备上分别连接，只同步当前 Pinboard 账号的所选数据：连接后默认选中生词，高亮与笔记需另行开启。同步范围保存在本机；Drive 私有 appDataFolder 中的副本是明文，未经端到端加密。
 
 ## 许可证
 

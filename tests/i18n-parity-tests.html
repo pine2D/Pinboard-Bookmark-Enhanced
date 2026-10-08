@@ -107,6 +107,7 @@ async function loadLocale(loc) {
           `${loc}.jinaAuthFailed: ${JSON.stringify(msgs[loc].jinaAuthFailed?.message)}`);
   // H5: enumerate English-identical keys per locale, excluding brand/technical tokens
   const BRAND_OK = new Set([
+    "vocabDriveSection","driveChromeSyncSection", // product names: Google Drive and Chrome Sync
     "extName","appName","labelUrl","labelApiKey","labelApiToken","labelBaseUrl",
     // link text that is a URL path on an English-only page — see H18
     "settingsPassword",

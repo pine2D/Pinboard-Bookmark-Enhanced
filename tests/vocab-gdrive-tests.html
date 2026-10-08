@@ -117,8 +117,9 @@ function readerResponse(chunks, onCancel, headers = {}) {
 }
 function driveFile(fileId, term = fileId, deviceId = "device-b") {
   const meta = {
-    ...pbpVocabDriveMetadata(fileId, OWNER_HASH, deviceId),
-    parents: [APPDATA_PARENT_ID]
+    id: fileId, name: `pbp-vocab-${fileId}.json`, parents: [APPDATA_PARENT_ID],
+    mimeType: "application/json",
+    appProperties: { pbpKind: "vocab-batch", schema: "1", owner: OWNER_HASH, device: deviceId }
   };
   return { meta, body: bodyString([live(term, "en", {}, deviceId)], { ...ENVELOPE, deviceId }) };
 }
@@ -143,7 +144,10 @@ function syncHarness(options = {}) {
   let authEpoch = 1;
   const auth = () => ({ account: authAccount, epoch: authEpoch, token: "pin-token" });
   const store = {
-    async getMeta() { return options.meta || { deviceId: DEVICE_ID, counter: 1 }; },
+    async getMeta() {
+      if (options.afterGetMeta) options.afterGetMeta();
+      return options.meta || { deviceId: DEVICE_ID, counter: 1 };
+    },
     async getPreflightState() {
       calls.push("get-preflight");
       if (options.afterGetPreflight) options.afterGetPreflight({
@@ -284,6 +288,11 @@ function syncHarness(options = {}) {
     create(name, info) { this.created.push({ name, info }); calls.push(`alarm:${name}`); }
   };
   const runner = () => pbpCreateVocabDriveSyncRunner({
+    ...(options.protocol ? { protocol: options.protocol } : {}),
+    ...(options.alarmNames ? { alarmNames: options.alarmNames } : {}),
+    ...(options.isEnabled ? { isEnabled: options.isEnabled } : {}),
+    ...(options.getCurrentPermissionId ? { getCurrentPermissionId: options.getCurrentPermissionId } : {}),
+    ...(options.getScopeEpoch ? { getScopeEpoch: options.getScopeEpoch } : {}),
     client,
     store,
     alarms,
@@ -1907,6 +1916,93 @@ function syncHarness(options = {}) {
       (await pbpVocabListOutbox(owner)).length === 0;
   });
 
+  const notesProtocol = {
+    kind: "notes-batch", schema: 1, filePrefix: "pbp-notes",
+    validateEvent: (event) => event?.recordKey === "pbp_hl_abcd|note-a" && event.deleted === true,
+    validBatchBody: (body, ownerHash) => body?.schema === 1 && body.ownerHash === ownerHash &&
+      Array.isArray(body.entries) && body.entries.every((event) => notesProtocol.validateEvent(event))
+  };
+  const notesEvent = { recordKey: "pbp_hl_abcd|note-a", vector: { "device-b": 1 },
+    dot: { deviceId: "device-b", counter: 1 }, deleted: true };
+  const notesMetadata = {
+    id: "notes-remote", name: "pbp-notes-notes-remote.json", parents: [APPDATA_PARENT_ID],
+    mimeType: "application/json", appProperties: {
+      pbpKind: "notes-batch", schema: "1", owner: OWNER_HASH, device: "device-b"
+    }
+  };
+  const notesBody = JSON.stringify({ schema: 1, ownerHash: OWNER_HASH, deviceId: "device-b",
+    createdAt: 123, entries: [notesEvent] });
+  const notesAlarms = { dirty: "notes-sync-dirty", periodic: "notes-sync-periodic", retry: "notes-sync-retry" };
+  await asyncCheck("injected notes codec pulls a real Drive metadata shape and uploads notes batches", async () => {
+    const h = syncHarness({ protocol: notesProtocol, alarmNames: notesAlarms,
+      files: [{ meta: notesMetadata, body: notesBody }],
+      filePages: [{ files: [notesMetadata], nextPageToken: null }],
+      outbox: [{ owner: OWNER_SCOPE, recordKey: notesEvent.recordKey, event: notesEvent }] });
+    const result = await h.runner()();
+    return result.ok && result.changed && h.calls.includes("download:notes-remote") &&
+      h.calls.some((call) => call.startsWith("upload:generated-batch:")) &&
+      h.alarms.created.some((alarm) => alarm.name === "notes-sync-periodic");
+  });
+  await asyncCheck("disabled type exits before any Google call or sync write", async () => {
+    const h = syncHarness({ isEnabled: async () => false });
+    const result = await h.runner()();
+    return result.ok === false && result.error === "disabled" && h.calls.length === 0;
+  });
+  await asyncCheck("disabling a type during download prevents local page and cursor commits", async () => {
+    let enabled = true;
+    const file = driveFile("scope-remote");
+    const h = syncHarness({ files: [file], filePages: [{ files: [file.meta], nextPageToken: null }],
+      isEnabled: async () => enabled, afterDownload: () => { enabled = false; } });
+    const result = await h.runner()();
+    return !result.ok && !h.calls.some((call) => call.startsWith("apply:")) &&
+      !h.calls.some((call) => call.startsWith("upload:"));
+  });
+  await asyncCheck("blocked notes clears only notes alarms", async () => {
+    const h = syncHarness({ protocol: notesProtocol, alarmNames: notesAlarms,
+      filePages: [{ files: [{ ...notesMetadata, mimeType: "text/plain" }], nextPageToken: null }] });
+    const result = await h.runner()();
+    return result.error === "corrupt" && notesAlarms.dirty &&
+      Object.values(notesAlarms).every((name) => h.calls.includes(`clear:${name}`)) &&
+      !h.calls.some((call) => call.startsWith("clear:vocab-sync"));
+  });
+  await asyncCheck("disabling after sync metadata read prevents seeding local records", async () => {
+    let enabled = true;
+    const h = syncHarness({ isEnabled: async () => enabled, afterGetMeta: () => { enabled = false; } });
+    const result = await h.runner()();
+    return !result.ok && !h.calls.some((call) => call.startsWith("seed:"));
+  });
+  await asyncCheck("Google account switch during a download prevents page or cursor writes", async () => {
+    let permissionId = "perm-a";
+    const file = driveFile("google-switch");
+    const h = syncHarness({ files: [file], filePages: [{ files: [file.meta], nextPageToken: null }],
+      getCurrentPermissionId: async () => permissionId, afterDownload: () => { permissionId = "perm-b"; } });
+    const result = await h.runner()();
+    return result.error === "account_changed" && !h.calls.some((call) => call.startsWith("apply:"));
+  });
+  await asyncCheck("HTTP session checks the selected scope after awaiting token mint", async () => {
+    let enabled = true, fetches = 0;
+    const client = pbpCreateVocabDriveClient({
+      identity: { async getAuthToken() { enabled = false; return { token: "token-a" }; } },
+      fetchImpl: async () => { fetches++; return jsonResponse({ user: { permissionId: "perm-a" } }); }
+    });
+    const result = await client.openSession(false, { beforeRequest: async () => enabled });
+    return result.error === "account_changed" && fetches === 0;
+  });
+  await asyncCheck("unreachable Google identity verification retains network backoff", async () => {
+    const h = syncHarness({ getCurrentPermissionId: async () => ({ ok: false, error: "network", retryable: true }),
+      outbox: [{ owner: OWNER_SCOPE, recordKey: "en|offline", event: live("Offline") }] });
+    const result = await h.runner()();
+    return result.error === "network" && result.retryable === true &&
+      h.preflight()?.lastError === "network" && h.preflight()?.blocked === false &&
+      h.alarms.created.some((alarm) => alarm.name === "vocab-sync-retry") && h.outbox.length === 1;
+  });
+  await asyncCheck("disable and re-enable during a pending await cancels the older sync generation", async () => {
+    let epoch = 1;
+    const h = syncHarness({ getScopeEpoch: () => epoch, afterGetMeta: () => { epoch++; } });
+    const result = await h.runner()();
+    return result.error === "account_changed" && !h.calls.some((call) => call.startsWith("seed:")) &&
+      !h.calls.some((call) => call.startsWith("upload:"));
+  });
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

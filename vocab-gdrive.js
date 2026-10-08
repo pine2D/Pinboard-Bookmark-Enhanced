@@ -1,5 +1,11 @@
 const PBP_VOCAB_BATCH_SCHEMA = 1;
 const PBP_VOCAB_BATCH_MAX_BYTES = 4 * 1024 * 1024;
+// The transport is shared; each dataset owns its wire validation and identity.
+const PBP_VOCAB_DRIVE_PROTOCOL = Object.freeze({
+  kind: "vocab-batch", schema: PBP_VOCAB_BATCH_SCHEMA, filePrefix: "pbp-vocab",
+  validateEvent: (event) => pbpVocabValidateEvent(event),
+  validBatchBody: (body, ownerHash) => _pbpVocabValidBatchBody(body, ownerHash)
+});
 
 function _pbpVocabDriveBytes(value) {
   return new TextEncoder().encode(value).length;
@@ -10,9 +16,9 @@ function _pbpVocabDriveValidProperty(key, value) {
     _pbpVocabDriveBytes(key) + _pbpVocabDriveBytes(value) <= 124;
 }
 
-function _pbpVocabDriveBody(entries, envelope) {
+function _pbpVocabDriveBody(entries, envelope, protocol = PBP_VOCAB_DRIVE_PROTOCOL) {
   return JSON.stringify({
-    schema: PBP_VOCAB_BATCH_SCHEMA,
+    schema: protocol.schema,
     ownerHash: envelope.ownerHash,
     deviceId: envelope.deviceId,
     createdAt: envelope.createdAt,
@@ -20,18 +26,18 @@ function _pbpVocabDriveBody(entries, envelope) {
   });
 }
 
-function _pbpVocabDriveValidMetadata(metadata) {
+function _pbpVocabDriveValidMetadata(metadata, protocol = PBP_VOCAB_DRIVE_PROTOCOL) {
   const properties = metadata && metadata.appProperties;
   return _pbpVocabOnlyKeys(metadata, ["id", "name", "parents", "mimeType", "appProperties"]) &&
     Object.keys(metadata).length === 5 &&
     typeof metadata.id === "string" && !!metadata.id &&
-    metadata.name === `pbp-vocab-${metadata.id}.json` &&
+    metadata.name === `${protocol.filePrefix}-${metadata.id}.json` &&
     Array.isArray(metadata.parents) && metadata.parents.length === 1 &&
     typeof metadata.parents[0] === "string" && !!metadata.parents[0] &&
     metadata.mimeType === "application/json" &&
     _pbpVocabOnlyKeys(properties, ["pbpKind", "schema", "owner", "device"]) &&
-    Object.keys(properties).length === 4 && properties.pbpKind === "vocab-batch" &&
-    properties.schema === String(PBP_VOCAB_BATCH_SCHEMA) &&
+    Object.keys(properties).length === 4 && properties.pbpKind === protocol.kind &&
+    properties.schema === String(protocol.schema) &&
     _pbpVocabValidOwnerHash(properties.owner) && _pbpVocabDeviceId(properties.device) &&
     Object.entries(properties).every(([key, value]) => _pbpVocabDriveValidProperty(key, value));
 }
@@ -42,10 +48,10 @@ async function pbpVocabOwnerHash(owner) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function pbpVocabDriveMetadata(fileId, ownerHash, deviceId) {
+function pbpVocabDriveMetadata(fileId, ownerHash, deviceId, protocol = PBP_VOCAB_DRIVE_PROTOCOL) {
   const appProperties = {
-    pbpKind: "vocab-batch",
-    schema: String(PBP_VOCAB_BATCH_SCHEMA),
+    pbpKind: protocol.kind,
+    schema: String(protocol.schema),
     owner: ownerHash,
     device: deviceId
   };
@@ -56,26 +62,26 @@ function pbpVocabDriveMetadata(fileId, ownerHash, deviceId) {
   }
   return {
     id: fileId,
-    name: `pbp-vocab-${fileId}.json`,
+    name: `${protocol.filePrefix}-${fileId}.json`,
     parents: ["appDataFolder"],
     mimeType: "application/json",
     appProperties
   };
 }
 
-function pbpVocabValidateDriveBatch(metadata, body, expectedOwnerHash) {
-  if (!_pbpVocabValidOwnerHash(expectedOwnerHash) || !_pbpVocabDriveValidMetadata(metadata) ||
+function pbpVocabValidateDriveBatch(metadata, body, expectedOwnerHash, protocol = PBP_VOCAB_DRIVE_PROTOCOL) {
+  if (!_pbpVocabValidOwnerHash(expectedOwnerHash) || !_pbpVocabDriveValidMetadata(metadata, protocol) ||
       metadata.appProperties.owner !== expectedOwnerHash || typeof body !== "string" ||
       _pbpVocabDriveBytes(body) > PBP_VOCAB_BATCH_MAX_BYTES) return false;
   let parsed;
   try { parsed = JSON.parse(body); } catch (_) { return false; }
-  if (!_pbpVocabValidBatchBody(parsed, expectedOwnerHash) ||
+  if (!protocol.validBatchBody(parsed, expectedOwnerHash) ||
       metadata.appProperties.device !== parsed.deviceId ||
-      body !== _pbpVocabDriveBody(parsed.entries, parsed)) return false;
+      body !== _pbpVocabDriveBody(parsed.entries, parsed, protocol)) return false;
   return true;
 }
 
-function pbpVocabSplitDriveEntries(entries, envelope) {
+function pbpVocabSplitDriveEntries(entries, envelope, protocol = PBP_VOCAB_DRIVE_PROTOCOL) {
   if (!Array.isArray(entries) ||
       !_pbpVocabOnlyKeys(envelope, ["ownerHash", "deviceId", "createdAt"]) ||
       Object.keys(envelope).length !== 3 || !_pbpVocabValidOwnerHash(envelope.ownerHash) ||
@@ -87,13 +93,13 @@ function pbpVocabSplitDriveEntries(entries, envelope) {
     return { ok: false, error: "invalid_envelope" };
   }
   for (const entry of entries) {
-    if (!pbpVocabValidateEvent(entry)) {
+    if (!protocol.validateEvent(entry)) {
       console.warn("[vocab-drive] outbox rejected by local validator: entry");
       return { ok: false, error: "invalid_entry" };
     }
   }
 
-  const emptyBody = _pbpVocabDriveBody([], envelope);
+  const emptyBody = _pbpVocabDriveBody([], envelope, protocol);
   const prefix = emptyBody.slice(0, -2);
   const suffix = "]}";
   const baseBytes = _pbpVocabDriveBytes(prefix) + _pbpVocabDriveBytes(suffix);
@@ -122,9 +128,9 @@ function pbpVocabSplitDriveEntries(entries, envelope) {
   return { ok: true, batches };
 }
 
-function pbpVocabBuildMultipart(metadata, body) {
+function pbpVocabBuildMultipart(metadata, body, protocol = PBP_VOCAB_DRIVE_PROTOCOL) {
   const expectedOwnerHash = metadata && metadata.appProperties && metadata.appProperties.owner;
-  if (!pbpVocabValidateDriveBatch(metadata, body, expectedOwnerHash)) {
+  if (!pbpVocabValidateDriveBatch(metadata, body, expectedOwnerHash, protocol)) {
     throw new TypeError("invalid Drive batch");
   }
   const metadataJson = JSON.stringify(metadata);
@@ -147,6 +153,8 @@ function pbpVocabBuildMultipart(metadata, body) {
 function pbpCreateVocabDriveClient({
   fetchImpl = fetch,
   identity = null,
+  protocol = PBP_VOCAB_DRIVE_PROTOCOL,
+  beforeRequest = null,
   now = Date.now,
   random = Math.random,
   timeoutMs = 30000
@@ -183,8 +191,13 @@ function pbpCreateVocabDriveClient({
   };
   const tokenValue = (value) => typeof value === "string" ? value : value && value.token;
 
-  async function requestWithToken(token, url, init = {}, fileId, deadlineMs = requestTimeoutMs) {
+  async function requestWithToken(token, url, init = {}, fileId, deadlineMs = requestTimeoutMs, guards = null) {
     let response;
+    if (beforeRequest && !await beforeRequest()) return failure("account_changed", false, undefined, fileId);
+    // Run the session owner check AFTER the client's asynchronous scope gate.
+    // No asynchronous operation follows the final synchronous epoch check.
+    if (guards?.beforeRequest && !await guards.beforeRequest()) return failure("account_changed", false, undefined, fileId);
+    if (guards?.isCurrent && guards.isCurrent() !== true) return failure("account_changed", false, undefined, fileId);
     const timeoutSignal = AbortSignal.timeout(deadlineMs);
     const signal = init.signal
       ? AbortSignal.any([init.signal, timeoutSignal])
@@ -331,7 +344,7 @@ function pbpCreateVocabDriveClient({
   }
 
   function metadataMatches(actual, expected) {
-    if (!_pbpVocabDriveValidMetadata(actual)) return false;
+    if (!_pbpVocabDriveValidMetadata(actual, protocol)) return false;
     return actual.id === expected.id && actual.name === expected.name &&
       actual.mimeType === expected.mimeType &&
       Object.keys(expected.appProperties).every((key) =>
@@ -341,7 +354,7 @@ function pbpCreateVocabDriveClient({
   async function upload(metadata, body, requestFn = request) {
     let multipart;
     try {
-      multipart = pbpVocabBuildMultipart(metadata, body);
+      multipart = pbpVocabBuildMultipart(metadata, body, protocol);
     } catch (_) {
       return failure("invalid_input", false);
     }
@@ -433,8 +446,8 @@ function pbpCreateVocabDriveClient({
     url.searchParams.set("pageSize", "1000");
     url.searchParams.set("q",
       "'appDataFolder' in parents and trashed = false and " +
-      "appProperties has { key='pbpKind' and value='vocab-batch' } and " +
-      `appProperties has { key='schema' and value='${PBP_VOCAB_BATCH_SCHEMA}' } and ` +
+      `appProperties has { key='pbpKind' and value='${protocol.kind}' } and ` +
+      `appProperties has { key='schema' and value='${protocol.schema}' } and ` +
       `appProperties has { key='owner' and value='${ownerHash}' }`);
     url.searchParams.set("fields", `nextPageToken,files(${metadataFields})`);
     if (pageToken !== undefined) url.searchParams.set("pageToken", pageToken);
@@ -512,7 +525,9 @@ function pbpCreateVocabDriveClient({
     };
   }
 
-  async function openSession(interactive = false) {
+  async function openSession(interactive = false, {
+    beforeRequest: sessionGuard = null, isCurrent: sessionIsCurrent = null
+  } = {}) {
     let token;
     try {
       token = tokenValue(await identityApi().getAuthToken({ interactive }));
@@ -523,8 +538,9 @@ function pbpCreateVocabDriveClient({
     if (typeof token !== "string" || !token) return mintFailure(interactive);
 
     let permissionId = "";
+    const guards = { beforeRequest: sessionGuard, isCurrent: sessionIsCurrent };
     const sessionRequest = async (url, init = {}, _interactive = false, fileId, deadlineMs) => {
-      const sent = await requestWithToken(token, url, init, fileId, deadlineMs);
+      const sent = await requestWithToken(token, url, init, fileId, deadlineMs, guards);
       if (!sent.ok || sent.response.status !== 401) return sent;
 
       let renewed;
@@ -542,7 +558,7 @@ function pbpCreateVocabDriveClient({
       if (permissionId) {
         const probe = await about(false, async (probeUrl, probeInit, _probeInteractive, probeFileId) => {
           const checked = await requestWithToken(
-            renewed, probeUrl, probeInit, probeFileId
+            renewed, probeUrl, probeInit, probeFileId, requestTimeoutMs, guards
           );
           if (checked.ok && checked.response.status === 401) {
             return failure("auth", false, 401, probeFileId);
@@ -556,7 +572,7 @@ function pbpCreateVocabDriveClient({
       }
 
       token = renewed;
-      const retried = await requestWithToken(token, url, init, fileId, deadlineMs);
+      const retried = await requestWithToken(token, url, init, fileId, deadlineMs, guards);
       if (retried.ok && retried.response.status === 401) {
         return failure("auth", false, 401, fileId);
       }
@@ -653,7 +669,13 @@ function pbpCreateVocabDriveSyncRunner({
   pinboardAuthIsCurrent,
   hashOwner = pbpVocabOwnerHash,
   now = Date.now,
-  random = Math.random
+  random = Math.random,
+  protocol = PBP_VOCAB_DRIVE_PROTOCOL,
+  alarmNames = { dirty: PBP_VOCAB_DIRTY_ALARM, periodic: PBP_VOCAB_PERIODIC_ALARM, retry: PBP_VOCAB_RETRY_ALARM },
+  isEnabled = async () => true,
+  getCurrentPermissionId = null,
+  onSession = null,
+  getScopeEpoch = null
 } = {}) {
   const accountKey = (permissionId, ownerHash) =>
     `account:${permissionId}:${ownerHash}`;
@@ -668,6 +690,7 @@ function pbpCreateVocabDriveSyncRunner({
     if (source?.error === "auth") {
       return { ok: false, error: "auth", retryable: source.retryable === true };
     }
+    if (source?.error === "network") return { ok: false, error: "network", retryable: true };
     if (source?.retryable) return { ok: false, error: "network", retryable: true };
     if (source?.error === "entry_too_large") {
       return { ok: false, error: "entry_too_large", retryable: false };
@@ -690,6 +713,8 @@ function pbpCreateVocabDriveSyncRunner({
   };
 
   return async function run({ interactive = false, force = false } = {}) {
+    const scopeEpoch = getScopeEpoch ? getScopeEpoch() : null;
+    const scopeIsCurrent = () => !getScopeEpoch || getScopeEpoch() === scopeEpoch;
     let state = null;
     let startAuth = null;
     let owner = "";
@@ -711,21 +736,41 @@ function pbpCreateVocabDriveSyncRunner({
       if (page?.status !== 400 && page?.status !== 404) return;
       state = stateWith({ cursorRejected: true });
     };
-    const stillCurrent = async () => {
+    const stillCurrent = async ({ checkDrive = true } = {}) => {
+      if (!await isEnabled()) return false;
+      if (checkDrive && session?.permissionId && getCurrentPermissionId) {
+        const verified = await getCurrentPermissionId();
+        if (verified && typeof verified === "object" && verified.ok !== true) {
+          const error = new Error("Drive identity verification unavailable");
+          error.code = verified.error || "remote";
+          error.retryable = verified.retryable === true;
+          throw error;
+        }
+        const permissionId = typeof verified === "string" ? verified : verified?.permissionId;
+        if (permissionId !== session.permissionId) return false;
+      }
+      if (!await isEnabled()) return false;
       const current = await getCurrentPinboardAuth();
       return !!startAuth?.account && current?.account === startAuth.account &&
-        pinboardAuthIsCurrent(startAuth) && pinboardAuthIsCurrent(current);
+        pinboardAuthIsCurrent(startAuth) && pinboardAuthIsCurrent(current) && scopeIsCurrent();
     };
     const finishFailure = async (source) => {
       let result = normalizedFailure(source);
       if (result.error === "account_changed") return result;
-      if (!await stillCurrent()) {
+      if (!await stillCurrent({ checkDrive: false })) {
         return normalizedFailure({ error: "account_changed" });
       }
       const canPersistPreflight = /^[0-9a-f]{64}$/.test(ownerHash);
       const attempts = [state?.retryAttempt, preflight?.retryAttempt]
         .filter((value) => Number.isInteger(value) && value >= 0);
       const attempt = attempts.length ? Math.max(...attempts) : 0;
+      const persistAccountFailure = async (failed) => {
+        // Account verification may be unavailable because the original request
+        // went offline. The owner-level preflight can still retain its backoff;
+        // never let an unverified account write replace the original error.
+        try { if (await store.putAccountState(failed)) state = failed; }
+        catch (error) { console.warn("[vocab-drive] failure state unavailable:", error?.name, error?.code); }
+      };
       // A revoked grant can never mint a token silently, so it never produces
       // the 401 that would prove revocation -- it is indistinguishable from
       // being offline. Retrying forever would leave the panel claiming the
@@ -743,7 +788,7 @@ function pbpCreateVocabDriveSyncRunner({
             retryAttempt: attempt + 1,
             retryAt
           });
-          if (await store.putAccountState(failed)) state = failed;
+          await persistAccountFailure(failed);
         }
         if (canPersistPreflight) {
           const failedPreflight = {
@@ -756,7 +801,7 @@ function pbpCreateVocabDriveSyncRunner({
           };
           if (await store.putPreflightState(failedPreflight)) {
             preflight = failedPreflight;
-            alarms.create(PBP_VOCAB_RETRY_ALARM, { when: retryAt });
+            alarms.create(alarmNames.retry, { when: retryAt });
           }
         }
       } else {
@@ -775,12 +820,12 @@ function pbpCreateVocabDriveSyncRunner({
         }
         if (state) {
           const failed = stateWith({ lastError: result.error });
-          if (await store.putAccountState(failed)) state = failed;
+          await persistAccountFailure(failed);
         }
         await Promise.all([
-          alarms.clear(PBP_VOCAB_DIRTY_ALARM),
-          alarms.clear(PBP_VOCAB_PERIODIC_ALARM),
-          alarms.clear(PBP_VOCAB_RETRY_ALARM)
+          alarms.clear(alarmNames.dirty),
+          alarms.clear(alarmNames.periodic),
+          alarms.clear(alarmNames.retry)
         ]);
       }
       return result;
@@ -788,14 +833,14 @@ function pbpCreateVocabDriveSyncRunner({
     const applyPage = async (metadata, cursorCommit) => {
       const batches = [];
       for (const meta of metadata) {
-        if (!_pbpVocabDriveValidMetadata(meta) ||
+        if (!_pbpVocabDriveValidMetadata(meta, protocol) ||
             meta.appProperties.owner !== ownerHash) {
           return normalizedFailure({ error: "invalid_response" });
         }
         const downloaded = await session.download(meta.id);
         if (!downloaded.ok) return normalizedFailure(downloaded);
         if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
-        if (!pbpVocabValidateDriveBatch(meta, downloaded.body, ownerHash)) {
+        if (!pbpVocabValidateDriveBatch(meta, downloaded.body, ownerHash, protocol)) {
           return normalizedFailure({ error: "invalid_response" });
         }
         batches.push(JSON.parse(downloaded.body));
@@ -822,12 +867,12 @@ function pbpCreateVocabDriveSyncRunner({
           continue;
         }
         const properties = change.file?.appProperties;
-        if (!properties || properties.pbpKind !== "vocab-batch" ||
-            properties.schema !== String(PBP_VOCAB_BATCH_SCHEMA) ||
+        if (!properties || properties.pbpKind !== protocol.kind ||
+            properties.schema !== String(protocol.schema) ||
             properties.owner !== ownerHash) {
           continue;
         }
-        if (!_pbpVocabDriveValidMetadata(change.file) ||
+        if (!_pbpVocabDriveValidMetadata(change.file, protocol) ||
             change.fileId !== change.file.id) return { ok: false };
         if (!skipSelf || properties.device !== deviceId) metadata.push(change.file);
       }
@@ -835,6 +880,7 @@ function pbpCreateVocabDriveSyncRunner({
     };
 
     try {
+      if (!await isEnabled()) return { ok: false, error: "disabled", retryable: false };
       startAuth = await getCurrentPinboardAuth();
       // Distinct from "auth": there is no Pinboard account to scope the
       // vocabulary to, so no Google call has been made and reconnecting Drive
@@ -854,24 +900,30 @@ function pbpCreateVocabDriveSyncRunner({
           return finishFailure({ error: "local_store" });
         }
         preflight = null;
-        await alarms.clear(PBP_VOCAB_RETRY_ALARM);
+        await alarms.clear(alarmNames.retry);
       } else if (preflight?.blocked === true) {
         await Promise.all([
-          alarms.clear(PBP_VOCAB_DIRTY_ALARM),
-          alarms.clear(PBP_VOCAB_PERIODIC_ALARM),
-          alarms.clear(PBP_VOCAB_RETRY_ALARM)
+          alarms.clear(alarmNames.dirty),
+          alarms.clear(alarmNames.periodic),
+          alarms.clear(alarmNames.retry)
         ]);
         return normalizedFailure({ error: preflight.lastError || "remote" });
       } else if (Number.isFinite(preflight?.retryAt) && preflight.retryAt > now()) {
-        alarms.create(PBP_VOCAB_RETRY_ALARM, { when: preflight.retryAt });
+        alarms.create(alarmNames.retry, { when: preflight.retryAt });
         return {
           ok: true,
           status: { ...preflight, waitingForRetry: true }
         };
       }
 
-      session = await client.openSession(interactive);
+      session = await client.openSession(interactive, { beforeRequest: async () => {
+        if (!await isEnabled()) return false;
+        const current = await getCurrentPinboardAuth();
+        return current?.account === startAuth.account && pinboardAuthIsCurrent(startAuth) &&
+          pinboardAuthIsCurrent(current) && scopeIsCurrent();
+      }, isCurrent: () => pinboardAuthIsCurrent(startAuth) && scopeIsCurrent() });
       if (!session.ok) return finishFailure(session);
+      if (onSession) onSession(session.permissionId);
       if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
 
       state = await store.getAccountState(session.permissionId, ownerHash);
@@ -925,19 +977,22 @@ function pbpCreateVocabDriveSyncRunner({
         state = reset;
       }
       if (!force && Number.isFinite(state.retryAt) && state.retryAt > now()) {
-        alarms.create(PBP_VOCAB_RETRY_ALARM, { when: state.retryAt });
+        alarms.create(alarmNames.retry, { when: state.retryAt });
         return { ok: true, status: { ...state, waitingForRetry: true } };
       }
 
       const meta = await store.getMeta();
+      if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
       if (!meta?.deviceId) return finishFailure({ error: "invalid_response" });
       const deviceId = meta.deviceId;
       let needsCheckpoint = state.needsCheckpoint === true;
 
       if (!state.bootstrapComplete) {
         while (true) {
+          if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
           const seeded = await store.seedLegacy(owner, 100);
-          if (!seeded?.ok) return finishFailure({ error: "local_store" });
+          if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
+          if (!seeded?.ok) return finishFailure(seeded?.error ? seeded : { error: "local_store" });
           if (!seeded.processed) break;
         }
 
@@ -1024,6 +1079,7 @@ function pbpCreateVocabDriveSyncRunner({
       }
 
       if (needsCheckpoint) {
+        if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
         // The checkpoint rewrites one outbox row per record in a single IDB
         // transaction, so a full disk or an exhausted quota aborts it. Claim it
         // as "local_store" here: letting it reach the outer catch would blame
@@ -1033,8 +1089,12 @@ function pbpCreateVocabDriveSyncRunner({
           await store.checkpointOwner(owner);
         } catch (error) {
           console.warn("[vocab-drive] checkpoint failed:", error?.name, error?.message);
-          return finishFailure({ error: "local_store" });
+          return finishFailure({
+            error: typeof error?.code === "string" ? error.code : "local_store",
+            retryable: error?.retryable === true
+          });
         }
+        if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
         const cleared = stateWith({}, ["needsCheckpoint"]);
         if (!await store.putAccountState(cleared)) {
           return finishFailure({ error: "local_store" });
@@ -1050,12 +1110,12 @@ function pbpCreateVocabDriveSyncRunner({
         let metadata;
         try {
           metadata = pbpVocabDriveMetadata(
-            pending.driveFileId, ownerHash, parsed.deviceId
+            pending.driveFileId, ownerHash, parsed.deviceId, protocol
           );
         } catch (_) {
           return normalizedFailure({ error: "invalid_response" });
         }
-        if (!pbpVocabValidateDriveBatch(metadata, pending.body, ownerHash)) {
+        if (!pbpVocabValidateDriveBatch(metadata, pending.body, ownerHash, protocol)) {
           return normalizedFailure({ error: "invalid_response" });
         }
         if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
@@ -1078,20 +1138,25 @@ function pbpCreateVocabDriveSyncRunner({
       const outbox = await store.listOutbox(owner);
       const split = pbpVocabSplitDriveEntries(
         outbox.map((row) => row.event),
-        { ownerHash, deviceId, createdAt: now() }
+        { ownerHash, deviceId, createdAt: now() }, protocol
       );
       if (!split.ok) return finishFailure(split);
       for (const batch of split.batches) {
         const generated = await session.generateId();
         if (!generated.ok) return finishFailure(generated);
         if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
-        const frozen = await store.freezeOutbox(
-          owner,
-          state.drivePermissionId,
-          ownerHash,
-          generated.fileId,
-          batch
-        );
+        let frozen;
+        try {
+          frozen = await store.freezeOutbox(
+            owner, state.drivePermissionId, ownerHash, generated.fileId, batch
+          );
+        } catch (error) {
+          console.warn("[vocab-drive] freeze failed:", error?.name, error?.message);
+          return finishFailure({
+            error: typeof error?.code === "string" ? error.code : "local_store",
+            retryable: error?.retryable === true
+          });
+        }
         if (!frozen) return finishFailure({ error: "local_store" });
         const uploaded = await uploadPending(frozen);
         if (!uploaded.ok) return finishFailure(uploaded);
@@ -1112,14 +1177,20 @@ function pbpCreateVocabDriveSyncRunner({
         return finishFailure({ error: "local_store" });
       }
       state = success;
+      if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
       if (!await store.deletePreflightState(ownerHash)) {
         return finishFailure({ error: "local_store" });
       }
       preflight = null;
-      await alarms.clear(PBP_VOCAB_RETRY_ALARM);
-      pbpVocabSchedulePeriodic(alarms);
+      await alarms.clear(alarmNames.retry);
+      if (!await isEnabled()) return normalizedFailure({ error: "account_changed" });
+      alarms.create(alarmNames.periodic, { periodInMinutes: 15 });
       return { ok: true, changed: changedLocal, status: { ...state } };
-    } catch (_) {
+    } catch (error) {
+      console.warn("[vocab-drive] sync failed:", error?.name, error?.message);
+      if (typeof error?.code === "string") {
+        return finishFailure({ error: error.code, retryable: error.retryable === true });
+      }
       return { ok: false, error: "remote", retryable: false };
     }
   };

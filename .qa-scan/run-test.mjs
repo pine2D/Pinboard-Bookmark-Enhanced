@@ -90,8 +90,12 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/union-tags-tests.html": 12,
   "tests/url-strip-tests.html": 19,
   "tests/vocab-background-tests.html": 17,
-  "tests/vocab-gdrive-tests.html": 74,
+  "tests/vocab-gdrive-tests.html": 83,
   "tests/vocab-store-tests.html": 76,
+  "tests/notes-sync-tests.html": 50,
+  "tests/notes-gdrive-tests.html": 13,
+  "tests/options-drive-sync-tests.html": 27,
+  "tests/drive-scopes-tests.html": 29,
   "tests/wayback-tests.html": 44,
 });
 const expected = EXPECTED_RESULTS[rel];

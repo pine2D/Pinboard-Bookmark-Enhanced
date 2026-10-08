@@ -1026,6 +1026,12 @@ async function driveJourney(context, worker, extId, rep) {
     await reader.waitForFunction(({id,note})=>_pbpHlState?.items.some(it=>it.id===id&&it.note===note),{id:target.item.id,note:editedNote});
     const afterEdit=await worker.evaluate(async ({record,id})=>(await chrome.storage.local.get(record))[record].items.find(it=>it.id===id),{record:target.record,id:target.item.id});
     requireState(JSON.stringify({...afterEdit,note:beforeEdit.note})===JSON.stringify(beforeEdit),"note edit overwrote highlight metadata");
+    const queuedNote=await worker.evaluate(async ({record,id})=>{
+      const owner=await pbpVocabCurrentOwner();
+      const rows=await pbpCreateNotesSyncStore().listOutbox(owner);
+      return rows.find(row=>row.event.recordKey===record+"|"+encodeURIComponent(id))?.event;
+    },{record:target.record,id:target.item.id});
+    requireState(queuedNote?.value?.item?.note===editedNote,"library note edit did not persist its sync intent");
     await excerpt.locator('.notes-note-edit').click();
     await excerpt.locator('textarea').fill('QA cancelled draft');
     await excerpt.locator('textarea').press('Escape');

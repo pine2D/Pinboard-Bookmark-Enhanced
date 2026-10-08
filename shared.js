@@ -910,6 +910,8 @@ function pbpIsNeverClearKey(key) {
   if (key.startsWith("_tagGov")) return true;              // _tagGovAiGroups / _tagGovLastRun / _tagGovIgnored
   if (key.startsWith("md_preview_data")) return true;      // md_preview_data + md_preview_data_<uuid> handoffs
   if (key.startsWith("pbp_hl_")) return true;               // pbp_hl_<urlKey> highlight sets + pbp_hl_last_color (user data, never reclaimable)
+  if (key.startsWith("pbp_notes_sync_") || key === "pbpNotesSyncDeviceId" || key === "driveConnectionAccount" ||
+      key === "driveSyncVocabulary" || key === "driveSyncNotes") return true;
   // Local-only settings that are NOT in SETTINGS_DEFAULTS. syncApiKeys is kept
   // here solely to protect its pre-account-wide legacy migration marker.
   if (key === "optSyncEnabled" || key === "syncApiKeys" || PBP_LARGE_FALLBACK_KEYS.has(key) || key === "lastUsedTags" || key.startsWith("lastUsedTags_")) return true;
