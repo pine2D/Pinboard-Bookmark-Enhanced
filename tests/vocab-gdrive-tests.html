@@ -1831,6 +1831,82 @@ function syncHarness(options = {}) {
       rejected.calls.includes("clear:vocab-sync-periodic");
   });
 
+  await asyncCheck("real runner merges differently cased saved words without blocking Drive sync", async () => {
+    // This suite's earlier runners use in-memory stores. Reset its test-origin
+    // database so reopening this file exercises bootstrap again, too.
+    const db = await _pbpVocabOpenDB();
+    const reset = db.transaction(["words", "sync"], "readwrite");
+    const resetDone = _pbpVocabTransactionDone(reset);
+    reset.objectStore("words").clear();
+    reset.objectStore("sync").clear();
+    await resetDone;
+    const owner = "acct_alias-runner";
+    const ownerHash = "c".repeat(64);
+    const saved = await pbpVocabSaveWord(owner, {
+      term: "Hello", language: "en", gloss: "local gloss",
+      context: { articleUrl: "https://local.test/", quote: "local context" }
+    });
+    if (!saved) return false;
+    // Hand-written server responses: do not derive either the remote event or
+    // its opaque parent ID from a local outbox / upload-side constructor.
+    const remoteMetadata = {
+      id: "remote-alias-file", name: "pbp-vocab-remote-alias-file.json",
+      parents: ["opaque-alias-appdata-folder"], mimeType: "application/json",
+      appProperties: { pbpKind: "vocab-batch", schema: "1", owner: ownerHash, device: "remote-alias-device" }
+    };
+    const remoteBody = JSON.stringify({
+      schema: 1, ownerHash, deviceId: "remote-alias-device", createdAt: 20,
+      entries: [{
+        recordKey: "en|hello", vector: { "remote-alias-device": 2 },
+        dot: { deviceId: "remote-alias-device", counter: 2 }, deleted: false,
+        value: {
+          term: "hello", lemma: null, language: "en", gloss: "remote gloss", ipa: null,
+          sourceUrl: null, license: null,
+          contexts: [{ articleUrl: "https://remote.test/", quote: "remote context" }],
+          groups: ["Remote"], note: "", status: "new", createdAt: 10, updatedAt: 20
+        }
+      }]
+    });
+    const uploads = [];
+    const client = pbpCreateVocabDriveClient({
+      identity: identityFixture(),
+      fetchImpl: async (url, init) => {
+        const path = new URL(url).pathname;
+        if (path === "/drive/v3/about") return jsonResponse({ user: { permissionId: "alias-permission" } });
+        if (path === "/drive/v3/changes/startPageToken") return jsonResponse({ startPageToken: "alias-start" });
+        if (path === "/drive/v3/files") return jsonResponse({ files: [remoteMetadata] });
+        if (path === "/drive/v3/files/remote-alias-file") return new Response(remoteBody);
+        if (path === "/drive/v3/changes") return jsonResponse({ changes: [], newStartPageToken: "alias-end" });
+        if (path === "/drive/v3/files/generateIds") return jsonResponse({ ids: ["merged-alias-upload"] });
+        if (path === "/upload/drive/v3/files") {
+          const part = init.body.split("\r\nContent-Type: application/json\r\n\r\n")[1];
+          uploads.push(JSON.parse(part.slice(0, part.lastIndexOf("\r\n--"))));
+          return jsonResponse({ id: "merged-alias-upload" }, 201);
+        }
+        throw new Error("unexpected fixture request");
+      }
+    });
+    const runner = pbpCreateVocabDriveSyncRunner({
+      client,
+      alarms: { create() {}, async clear() { return true; } },
+      getCurrentPinboardAuth: async () => ({ account: "alias-runner" }),
+      pinboardAuthIsCurrent: () => true,
+      hashOwner: async () => ownerHash
+    });
+    const first = await runner();
+    const second = await runner();
+    const rows = await pbpVocabAll(owner);
+    const state = await pbpVocabGetAccountState("alias-permission", ownerHash);
+    const preflight = await pbpVocabGetPreflightState(ownerHash);
+    const uploaded = uploads[0]?.entries[0];
+    return first.ok && first.changed === true && second.ok && preflight === null &&
+      state?.bootstrapComplete === true && state.pageToken === "alias-end" &&
+      rows.length === 1 && rows[0].term === "hello" && rows[0].gloss === "remote gloss" &&
+      rows[0].contexts.length === 2 && uploaded?.value.term === "hello" &&
+      uploaded.value.contexts.length === 2 && Object.keys(uploaded.vector).length === 2 &&
+      (await pbpVocabListOutbox(owner)).length === 0;
+  });
+
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

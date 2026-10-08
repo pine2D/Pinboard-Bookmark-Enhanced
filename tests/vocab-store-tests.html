@@ -90,8 +90,34 @@ check("corruption and untrusted fields reject", (() => {
     !pbpVocabValidateEvent(sparseGroups) && !pbpVocabValidateEvent(sparseContexts) &&
     pbpVocabValidateEvent(pipeTerm);
 })());
-check("term mismatch rejects", (() => { const remote = live("b", 1, { term: "word", lemma: "word" }); return pbpVocabValidateEvent(remote) && pbpVocabMergeEvents(live("a", 2), remote).kind === "invalid"; })());
-check("language and recordKey mismatch reject", (() => { const local = live("a", 2, { language: "en-US" }); const remote = live("b", 1, { language: "en-GB" }); return pbpVocabValidateEvent(local) && pbpVocabValidateEvent(remote) && pbpVocabMergeEvents(local, remote).kind === "invalid" && !pbpVocabValidateEvent(local, "en|other"); })());
+check("different canonical terms reject", (() => { const remote = live("b", 1, { term: "Other", lemma: "other" }); remote.recordKey = "en|other"; return pbpVocabValidateEvent(remote) && pbpVocabMergeEvents(live("a", 2), remote).kind === "invalid"; })());
+check("different primary languages and recordKey mismatch reject", (() => { const local = live("a", 2, { language: "en-US" }); const remote = live("b", 1, { language: "fr-GB" }); remote.recordKey = "fr|word"; return pbpVocabValidateEvent(local) && pbpVocabValidateEvent(remote) && pbpVocabMergeEvents(local, remote).kind === "invalid" && !pbpVocabValidateEvent(local, "en|other"); })());
+check("canonical term and language aliases converge with the stable dot winner", (() => {
+  const variants = [
+    [{ term: "Word", language: "en" }, { term: "word", language: "en" }],
+    [{ term: " Word ", language: "en-US" }, { term: "Word", language: "en-GB" }],
+    [{ term: "caf\u00e9", language: "fr" }, { term: "cafe\u0301", language: "fr-FR" }],
+  ];
+  return variants.every(([leftValue, rightValue]) => {
+    const left = live("a", 1, leftValue);
+    const right = live("b", 2, rightValue);
+    left.recordKey = pbpDictCacheKeyPublic(leftValue.language, leftValue.term);
+    right.recordKey = pbpDictCacheKeyPublic(rightValue.language, rightValue.term);
+    const ab = pbpVocabMergeEvents(left, right);
+    const ba = pbpVocabMergeEvents(right, left);
+    return [ab, ba].every((merged) => merged.kind === "merged" &&
+      pbpVocabValidateEvent(merged.event) && merged.event.value.term === rightValue.term &&
+      merged.event.value.language === rightValue.language && merged.event.dot.deviceId === "b") &&
+      pbpVocabEventContentEqual(ab.event, ba.event);
+  });
+})());
+check("causally newer canonical aliases replace the older display value", (() => {
+  const older = live("a", 1, { term: "Word", language: "en-US" });
+  const newer = live("b", 2, { term: "word", language: "en-GB" }, { a: 1, b: 2 });
+  return pbpVocabMergeEvents(older, newer).kind === "apply" &&
+    pbpVocabMergeEvents(older, newer).event.value.term === "word" &&
+    pbpVocabMergeEvents(newer, older).kind === "noop";
+})());
 check("cross-vector merge converges in both directions", (() => { const a = live("a", 2, {}, { a: 2, b: 5 }); const b = live("b", 4, {}, { a: 3, b: 4 }); const ab = pbpVocabMergeEvents(a, b); const ba = pbpVocabMergeEvents(b, a); return [ab, ba].every((m) => m.kind === "merged" && pbpVocabValidateEvent(m.event) && m.event.vector.a === 3 && m.event.vector.b === 5 && m.event.dot.deviceId === "b" && m.event.dot.counter === 4 && m.requeue) && pbpVocabEventContentEqual(ab.event, ba.event); })());
 
 function idbReq(req) {

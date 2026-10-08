@@ -215,8 +215,9 @@ function pbpVocabMergeEvents(localEvent, remoteEvent) {
   if (relation === "equal") return pbpVocabEventContentEqual(localEvent, remoteEvent)
     ? { kind: "noop", event: localEvent, requeue: false, notice: null }
     : { kind: "corrupt", event: localEvent, requeue: false, notice: null };
-  if (!localEvent.deleted && !remoteEvent.deleted &&
-      (localEvent.value.term !== remoteEvent.value.term || localEvent.value.language !== remoteEvent.value.language)) return invalid;
+  // Validation above compares canonical recordKey identity. Display spelling
+  // and regional language tags may differ on two devices without denoting a
+  // different word; preserve the existing vector/dot winner for those values.
   if (relation === "left") return { kind: "noop", event: localEvent, requeue: false, notice: null };
   if (relation === "right") return { kind: "apply", event: remoteEvent, requeue: false, notice: null };
   const winner = pbpVocabDotCompare(localEvent.dot, remoteEvent.dot) >= 0 ? localEvent : remoteEvent;
