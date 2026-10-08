@@ -55,7 +55,7 @@ node scripts/qa-drive.mjs --headless --surfaces layouts --check --label layouts-
 echo "[journey] note editing, failure retry and clearing combined filters"
 node scripts/qa-drive.mjs --headless --surfaces journey --check --label notes-edit-clear-contract
 
-echo "[discovery] sync scope, source controls, AI setup and local theme preview"
+echo "[discovery] source controls, AI setup and preset CSS"
 node scripts/qa-drive.mjs --headless --surfaces discovery --check --label discovery-contract
 
 echo "[syntax] checking JavaScript"

@@ -43,7 +43,7 @@
 ![ページへの質問、回答には出典引用付き](docs/cws-assets/originals/screenshot-3-ask.png)
 
 ### カスタマイズ
-- **pinboard.in 用テーマ 13 種**（Dracula、Nord、Catppuccin、Solarized など）を設定画面でローカルプレビューでき、自分のカスタム CSS も重ねられます
+- **pinboard.in 用テーマ 13 種**（Dracula、Nord、Catppuccin、Solarized など）に、自分のカスタム CSS を重ねられます
 - **[Wayback Machine](https://web.archive.org) へ自動アーカイブ**：有効にすると保存のたびに送信し、元のページが消えてもあとから参照できます
 - **バックアップと同期**：設定は Chrome Sync、単語帳は自分の Google Drive で同期でき、手動の JSON バックアップにはハイライト・メモ・単語帳・API キーを含められます。いずれもオプトインで、詳細は下記の「プライバシー」を参照してください
 - **9 言語対応** · カスタマイズ可能なショートカット · ローカルファースト保存 · トラッキング一切なし

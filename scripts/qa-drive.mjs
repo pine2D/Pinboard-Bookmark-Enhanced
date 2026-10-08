@@ -881,6 +881,56 @@ async function driveJourney(context, worker, extId, rep) {
       await reader.keyboard.press("Escape");
     }
     await rep.shot(reader, s, "reader-saved-notes");
+    const titleText = await reader.locator('#preview-title').innerText();
+    for (const locale of ["en","zh_CN","zh_TW","zh_HK","ja","de","fr","pl","ru"]) {
+      await reader.evaluate(async lang => { await chrome.storage.local.set({optLang:lang}); initI18n(); await pbpI18nReady(); }, locale);
+      await seedPreviewData(worker); // Preview handoff slots are consumed on load.
+      await reader.reload();
+      await reader.waitForSelector('#hl-rail-section:not([hidden]) .rail-sec-count');
+      for (const mode of ["light","dark"]) for (const width of [320,1280]) {
+        await reader.setViewportSize({width,height:900});
+        await reader.evaluate(({mode,titleText}) => { pbpReaderSchemeSet(mode); document.getElementById('preview-title').textContent=titleText+' — '+titleText; }, {mode,titleText});
+        requireState(await reader.evaluate(mode => getComputedStyle(document.documentElement).colorScheme === mode, mode), 'reader color scheme was not applied');
+        if (width === 320 && await reader.locator('#rail-toggle').getAttribute('aria-expanded') !== 'true') await reader.locator('#rail-toggle').click();
+        const section=reader.locator('#hl-rail-section');
+        if (await section.evaluate(el=>el.classList.contains('rail-collapsed'))) await section.locator('.rail-sec-head').click();
+        await section.locator('.rail-sec-head').click();
+        await reader.waitForTimeout(220);
+        const geometry=await section.evaluate(el=>{
+          const box=selector=>el.querySelector(selector).getBoundingClientRect().toJSON();
+          return {label:box('.rail-sec-label'),count:box('.rail-sec-count'),copy:box('#hl-rail-copy'),book:box('.rail-sec-open:not(#hl-rail-copy)'),list:box('.hl-list'),total:el.querySelector('.rail-sec-count').textContent};
+        });
+        requireState(geometry.count.left-geometry.label.right<=6 && geometry.count.left>=geometry.label.right-1, 'highlight count separated from label');
+        requireState(geometry.copy.width>=24 && geometry.book.width>=24 && Math.abs(geometry.copy.top-geometry.book.top)<1 && geometry.copy.right<=geometry.book.left, 'collapsed header actions hidden, overlapping or misordered');
+        requireState(geometry.total==='(2)' && geometry.list.height===0, 'fold hid total or left list visible');
+        requireState(await reader.locator('#rail-settings-btn').evaluate(el=>{
+          const svg = el.querySelector('svg');
+          return el.closest('.rail-ident') && el.getBoundingClientRect().top===document.getElementById('preview-title').getBoundingClientRect().top
+            && svg?.getBoundingClientRect().width > 0 && svg.getBoundingClientRect().height > 0;
+        }), 'settings icon is not visible beside the title');
+        if(locale==='zh_CN') await rep.shot(reader,s,`rail-${mode}-${width}`);
+        await section.locator('.rail-sec-head').click();
+      }
+    }
+    await reader.evaluate(() => {
+      window.qaOriginalClipboard=navigator.clipboard.writeText.bind(navigator.clipboard);
+      navigator.clipboard.writeText=async text=>{ if(window.qaClipboardFailure) throw new Error('QA_EXPECTED_CLIPBOARD_FAILURE'); window.qaCopiedHighlights=text; };
+    });
+    await reader.locator('#hl-rail-section .rail-sec-head').click();
+    await reader.locator('#hl-rail-copy').click();
+    requireState(await reader.evaluate(quotes=>quotes.every(q=>qaCopiedHighlights.includes(q)) && !!document.querySelector('#hl-rail-copy svg') && !document.querySelector('#hl-rail-copy').textContent.trim(),quotes), 'collapsed copy omitted highlights or replaced its icon');
+    await reader.evaluate(()=>{window.qaClipboardFailure=true;});
+    await reader.locator('#hl-rail-copy').click();
+    requireState(await reader.evaluate(()=>!!document.querySelector('#hl-rail-copy svg') && document.getElementById('copy-status').textContent===t('mdPreviewFailed')), 'copy failure destroyed icon or was not announced');
+    await reader.evaluate(()=>{navigator.clipboard.writeText=qaOriginalClipboard;});
+    await reader.waitForFunction(()=>document.querySelector('#hl-rail-copy').title===t('hlCopyMd'));
+    requireState(await reader.locator('#hl-rail-section').evaluate(el=>el.classList.contains('rail-collapsed')), 'copy click toggled highlights');
+    await reader.locator('#hl-rail-section .rail-sec-open:not(#hl-rail-copy)').click();
+    await reader.waitForFunction(async()=>!!(await chrome.tabs.query({url:chrome.runtime.getURL('library.html')+'*'})).find(tab=>tab.url.endsWith('#notes')));
+    requireState(await reader.locator('#hl-rail-section').evaluate(el=>el.classList.contains('rail-collapsed')), 'library click toggled highlights');
+    await reader.evaluate(()=>{document.getElementById('preview-title').textContent='QA 走查用固定文章 — Serendipity in Systems';});
+    s.notes.push('PASS: 36 locale/mode/width rail layouts; collapsed copy success/failure and library navigation.');
+
 
     await library.bringToFront();
     await library.goto(`chrome-extension://${extId}/library.html#notes`, { waitUntil: "load", timeout: TIMEOUT_MS });
@@ -1785,72 +1835,21 @@ async function driveDiscovery(context, worker, extId, rep) {
   try {
     await options.goto(`chrome-extension://${extId}/options.html#general`,{waitUntil:"load"});
     await options.waitForFunction(()=>document.documentElement.hasAttribute("data-options-ready"));
-    for (const locale of ["en","zh_CN","zh_TW","zh_HK","de","fr","ja","pl","ru"]) {
-      await options.evaluate(async lang=>{await chrome.storage.local.set({optLang:lang});initI18n();await pbpI18nReady();},locale);
-      for(const density of ["comfortable","compact"]) for(const width of [320,420]) {
-        await options.setViewportSize({width,height:900});
-        await options.evaluate(d=>document.documentElement.dataset.density=d,density);
-        const g=await options.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,rect:document.getElementById('sync-scope').getBoundingClientRect().toJSON(),cells:[...document.querySelectorAll('#sync-scope tbody td')].map(el=>({text:el.innerText.trim(),right:el.getBoundingClientRect().right}))}));
-        requireState(g.scroll<=width&&g.rect.right<=width&&g.cells.every(c=>c.text&&c.right<=width),`sync matrix overflow/missing copy ${locale}/${density}/${width}`);
-        if(locale==='de'&&density==='comfortable'&&width===320) {
-          await options.locator('#sync-scope').evaluate(el=>el.scrollIntoView({block:'start'}));
-          await rep.shot(options,s,'sync-scope-de-320');
-        }
-      }
-    }
-    await options.locator('#sync-backup-link').click();
-    requireState(await options.locator('#export-settings').evaluate(el=>document.activeElement===el),"backup cross-link missed actual export control");
-    await options.locator('#sync-scope').evaluate(el=>el.scrollIntoView());
-    await options.locator('a[href="#vocab"]').filter({hasText:await options.evaluate(()=>t('dictVocabSection'))}).first().click();
-    await options.waitForSelector('#panel-vocab.active');
-    await options.evaluate(()=>document.querySelector('.tab-btn[data-panel="appearance"]').click());
+    await options.evaluate(() => document.querySelector('.tab-btn[data-panel="appearance"]').click());
     await options.waitForSelector('.theme-preset-btn[data-theme="flexoki"]');
-    await options.evaluate(async()=>{await chrome.storage.local.set({optLang:'zh_CN'});initI18n();await pbpI18nReady();});
-    const presets=await options.locator('.theme-preset-btn').evaluateAll(els=>[...new Set(els.map(e=>e.dataset.theme).filter(Boolean))]);
-    const colors=new Set();
-    for(const mode of ['light','dark']) for(const preset of presets) {
-      await options.locator('#opt-theme-btn').click();
-      await options.locator('#opt-theme-list [data-value="'+mode+'"]').click();
-      await options.locator(`.theme-preset-btn[data-theme="${preset}"]`).click();
-      const frame=options.frameLocator('#preset-effect-frame');
-      // Wait for the selected document to load, not the previous iframe's
-      // identical sample text (all presets deliberately share that text).
-      await frame.locator(`html[data-preset="${preset}"][data-mode="${mode}"]`).waitFor();
-      await frame.locator('.bookmark_title').filter({hasText:await options.evaluate(()=>t('themePreviewSampleTitle'))}).waitFor();
-      for (const width of [320,420]) {
-        await options.setViewportSize({width,height:900});
-        const g=await frame.locator('body').evaluate(el=>({bg:getComputedStyle(el).backgroundColor,fg:getComputedStyle(el).color,scroll:document.documentElement.scrollWidth,width:innerWidth,selected:getComputedStyle(document.querySelector('.filter.selected')).color,title:document.querySelector('.bookmark_title').getBoundingClientRect().toJSON(),description:document.querySelector('.description').getBoundingClientRect().toJSON(),tags:document.querySelector('.tags').getBoundingClientRect().toJSON()}));
-        requireState(g.scroll<=g.width,`preset preview overflow ${preset}/${mode}/${width}: ${g.scroll}/${g.width}`);
-        requireState(g.description.top>=g.title.bottom-1&&g.tags.top>=g.description.bottom-1,`preset sample rows overlap ${preset}/${mode}/${width}`);
-        colors.add(g.bg+'|'+g.fg);
-      }
-      requireState(await options.locator('#preset-effect-frame').getAttribute('sandbox')==='',"theme preview sandbox permits capabilities");
-      requireState(await frame.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content').then(v=>v.includes("default-src 'none'")),"theme preview missing closed network CSP");
-      if(preset==='flexoki') {
-        await options.locator('#preset-effect-preview').evaluate(el=>el.scrollIntoView({block:'center'}));
-        await rep.shot(options,s,`theme-effect-${mode}`);
-      }
-    }
-    requireState(colors.size>5,"theme preview did not reflect distinct real preset colors");
-    for(const locale of ["en","zh_CN","zh_TW","zh_HK","de","fr","ja","pl","ru"]) {
-      await options.evaluate(async lang=>{await chrome.storage.local.set({optLang:lang});initI18n();await pbpI18nReady();},locale);
-      const frame=options.frameLocator('#preset-effect-frame');
-      await frame.locator(`html[lang="${await options.evaluate(()=>document.documentElement.lang)}"]`).waitFor();
-      const search=await options.evaluate(()=>t('themePreviewSearch'));
-      for (const width of [320,420]) {
-        await options.setViewportSize({width,height:900});
-        const g=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,title:document.querySelector('.bookmark_title').textContent,search:document.querySelector('input[type="text"]').value,button:document.querySelector('input[type="button"]').value,aria:document.querySelector('input[type="text"]').getAttribute('aria-label')}));
-        requireState(g.scroll<=g.width && g.title===await options.evaluate(()=>t('themePreviewSampleTitle')),`localized theme preview mismatch/overflow: ${locale}/${width}`);
-        requireState(search!=='themePreviewSearch'&&g.search===search&&g.button===search&&g.aria===search,`theme preview search copy/label not localized: ${locale}/${width}`);
-      }
-    }
-    await options.locator('#opt-theme-btn').click();
-    await options.locator('#opt-theme-list [data-value="auto"]').click();
     await options.locator('.theme-preset-btn[data-theme="flexoki"]').click();
-    await options.emulateMedia({colorScheme:'dark'});
-    await options.frameLocator('#preset-effect-frame').locator('html.pbp-dark').waitFor();
-    await options.emulateMedia({colorScheme:'light'});
-    await options.frameLocator('#preset-effect-frame').locator('html:not(.pbp-dark)').waitFor();
+    await options.locator('#preset-preview-section summary').click();
+    requireState(await options.locator('#preset-preview-content').evaluate(el => el.textContent.length > 1000 && !el.isContentEditable), "preset CSS viewer no longer shows read-only CSS");
+    await options.emulateMedia({colorScheme: 'light'});
+    await options.evaluate(() => { const el = document.getElementById('opt-theme'); el.value = 'auto'; el.dispatchEvent(new Event('change', {bubbles: true})); });
+    await options.locator('.theme-preset-btn[data-theme="solarized"]').click();
+    await options.waitForFunction(() => document.getElementById('preset-preview-content').textContent === PINBOARD_THEMES['solarized-light'].css);
+    await options.emulateMedia({colorScheme: 'dark'});
+    await options.waitForFunction(() => document.documentElement.dataset.theme === 'solarized-dark');
+    requireState(await options.locator('#preset-preview-content').evaluate(el => el.textContent === PINBOARD_THEMES['solarized-dark'].css), 'CSS viewer did not follow the system dark scheme');
+    await options.emulateMedia({colorScheme: 'light'});
+    await options.waitForFunction(() => document.getElementById('preset-preview-content').textContent === PINBOARD_THEMES['solarized-light'].css);
+    await rep.shot(options, s, 'appearance-css-controls');
     await seedPreviewData(worker);
     await worker.evaluate(async()=>chrome.storage.local.set({aiProvider:'custom',customApiKey:'',previewAiEnabled:true,optShowAiTags:true,optShowAiSummary:true}));
     await reader.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`,{waitUntil:'load'});
@@ -1914,7 +1913,7 @@ async function driveDiscovery(context, worker, extId, rep) {
     await popup.locator('#ai-configure-btn').click();
     await options.waitForURL('**/options.html#ai');
     requireState(aiRequests.length===aiBefore,"setup/initialization dispatched paid AI");
-    s.notes.push(`PASS: 9-language sync matrix and theme samples at 320/420px, localized search values/label, actual cross-links; ${presets.length} presets × 2 modes × 2 widths, ${colors.size} color pairs, auto OS switch; source controls/AI setup/master-off; account switch and split local-secret/sync-main writes enable rail and selection AI once; no AI request.`);
+    s.notes.push("PASS: read-only preset CSS follows system light/dark in auto mode; source controls/AI setup/master-off; account switch and split settings initialize controls once; no AI request.");
   } catch(e){s.failures.push(e.stack);}
   finally {for(const d of detach)d();for(const p of [options,reader,popup,source])await p.close();}
 }
@@ -2026,13 +2025,14 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
       && !document.getElementById("auto-save-retry").disabled
       && document.getElementById("auto-save-retry").getAttribute("aria-disabled") !== "true", failureAttempt);
     await fail(); await waitFailure();
-    await rep.shot(page, s, "failure-at-bottom");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await rep.shot(page, s, "failure-at-title");
     const measure = () => page.evaluate(() => {
       const rect = (e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; };
-      return { alert: rect(document.getElementById("opt-global-alert")), retry: rect(document.getElementById("auto-save-retry")), bar: rect(document.querySelector(".options-save-bar")), viewport: {width:innerWidth, height:innerHeight} };
+      return { alert: rect(document.getElementById("opt-global-alert")), retry: rect(document.getElementById("auto-save-retry")), header: rect(document.querySelector(".container > h1")), viewport: {width:innerWidth, height:innerHeight} };
     });
     const assertVisible = (g) => {
-      for (const name of ["alert", "retry", "bar"]) {
+      for (const name of ["alert", "retry", "header"]) {
         const r = g[name];
         if (r.height <= 0 || r.width <= 0 || r.top < 0 || r.bottom > g.viewport.height + 1 || r.left < 0 || r.right > g.viewport.width + 1) throw new Error(`${name} feedback is outside viewport: ${JSON.stringify(g)}`);
       }
@@ -2087,6 +2087,7 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
     });
     await page.waitForFunction(() => document.getElementById("auto-save-status").textContent === t("optSavePending"));
     await page.waitForFunction(() => document.getElementById("auto-save-status").classList.contains("saved"));
+    await page.waitForFunction(() => document.getElementById("auto-save-status").textContent === t("optAutoSave") && !document.getElementById("auto-save-status").classList.contains("saved"));
     if (!await page.evaluate(async () => {
       const d = await pbpReadSettingsWithSecrets({notifyErrors:true, notifyBatchSave:true});
       return d.notifyErrors === document.getElementById("notify-errors").checked && d.notifyBatchSave === document.getElementById("notify-batch-save").checked;
@@ -2102,10 +2103,11 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
           document.documentElement.dataset.density = density;
         }, {mode,density});
         await fail(); await waitFailure();
+        await page.evaluate(() => window.scrollTo(0, 0));
         const g = await measure(); assertVisible(g);
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-        const clearance = await page.evaluate(() => document.querySelector(".panel.active").getBoundingClientRect().bottom <= document.querySelector(".options-save-bar").getBoundingClientRect().top);
-        if (!clearance) throw new Error(`${locale}/${mode}/${density}/${width}: footer covers final settings`);
+        const clearance = await page.evaluate(() => document.querySelector(".panel.active").getBoundingClientRect().bottom <= innerHeight + 1);
+        if (!clearance) throw new Error(`${locale}/${mode}/${density}/${width}: final settings cannot scroll into view`);
         const focusVisible = await page.evaluate(() => {
           const controls = [...document.querySelectorAll('.panel.active input:not([type="hidden"]), .panel.active button, .panel.active textarea')].filter(el=>el.getBoundingClientRect().height && !el.disabled);
           const el = controls.at(-1);
@@ -2113,15 +2115,15 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
           el.blur();
           window.scrollTo(0, Math.max(0, scrollY + el.getBoundingClientRect().bottom - innerHeight + 4));
           el.focus();
-          return document.activeElement === el && el.getBoundingClientRect().bottom <= document.querySelector(".options-save-bar").getBoundingClientRect().top;
+          return document.activeElement === el && el.getBoundingClientRect().bottom <= innerHeight + 1;
         });
-        if (!focusVisible) throw new Error(`${locale}/${mode}/${density}/${width}: keyboard focus obscured by feedback`);
+        if (!focusVisible) throw new Error(`${locale}/${mode}/${density}/${width}: keyboard focus cannot scroll into view`);
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         s.notes.push(JSON.stringify({locale,mode,density,width,...g}));
         if (["en","zh_CN","de"].includes(locale) && width === 320 && density === "comfortable") await rep.shot(page,s,`${locale}-${mode}-320`);
       }
     }
-    s.notes.push("PASS: persistent failure, same-error live-region dedupe, keyboard retry, queued edit status, 72 locale/theme/density/width feedback geometries.");
+    s.notes.push("PASS: persistent failure, same-error live-region dedupe, keyboard retry, queued edit status, 72 locale/theme/density/width title-error geometries, original brief success feedback.");
   } catch (e) { s.failures.push(e.stack); }
   finally {
     detach();

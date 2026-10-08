@@ -1115,6 +1115,9 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   z-index: 20;
   transition: transform 200ms var(--ease-drawer), visibility 0s;
 }
+.rail-ident { display: grid; grid-template-columns: minmax(0, 1fr) 24px; column-gap: var(--sp-2); align-items: start; }
+.rail-ident > #rail-settings-btn { grid-column: 2; grid-row: 1; width: 24px; height: 24px; padding: 0; }
+.rail-ident > a { grid-column: 1 / -1; }
 .rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .rail-ident a { display: block; margin-top: var(--sp-1); font-size: 12px; color: var(--fg-muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rail-ident a:hover { color: var(--link); }
@@ -1440,37 +1443,26 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .rail-sec-count { flex: none; color: var(--fg-muted); }
 .rail-sec-progress { flex: none; display: none; color: var(--fg-muted); }
 .rail-collapsed .rail-sec-head .rail-sec-progress { display: inline; }
-/* Notebook-header opener into the library page (md-highlight.js). A plain
-   sibling of .rail-sec-head, not a child -- .rail-sec-head IS the
-   accordion-toggle <button> (pbpRailCollapsible), and nesting another
-   interactive element inside a <button> is invalid (real AT-flattening
-   risk). Painted into the header row's right edge via a reserved gutter,
-   scoped to this one section (#hl-rail-section) so sibling rail sections
-   (TOC/Export/tr/ask) are untouched. Ghost icon button, same family as
-   .pb-hl-note-btn -- 24px (vs its 22px) to hit the rail's minimum tap
-   target since this one has no adjacent text label. As a direct child of
-   #hl-rail-section it's caught by the ">*:not(.rail-sec-head)" collapse
-   rule below for free: hidden when the section collapses, visible when
-   expanded, same as every other row -- no extra JS needed. */
-#hl-rail-section { position: relative; }
-/* The gutter opens BEFORE .rail-sec-tri, not after: .rail-sec-tri stays
-   flush at the row's true right edge, pixel-identical to every sibling
-   section's chevron, because .rail-sec-label is the flex-grow item that
-   absorbs all leftover width and pushes count+tri to the boundary
-   regardless of what sits between them. Widening the gap after
-   .rail-sec-count (a margin on the item before tri, not padding on the
-   container) opens the slot without moving tri at all. top/right below are
-   measured (getBoundingClientRect against a real rendered rail), not
-   guessed -- centers on the chevron's own vertical midline with a ~5px
-   clearance on both sides (count and tri). */
-#hl-rail-section .rail-sec-count { margin-right: calc(24px + var(--sp-2)) /* the 24px add button + one gap */; }
-/* top:23px is fitted to .rail-sec-head's own box (margin:12px 0 8px; padding:12px 0 0;
-   font-size:11px at ~1249-1251 above) -- it centers this button on that header's
-   chevron midline the same way the comment above .rail-sec-count explains. Editing
-   .rail-sec-head's margin/padding/font-size drifts this button's vertical position
-   silently; re-measure top against a real rendered rail if any of those three change. */
+/* A shared grid keeps header actions independent of the folding button,
+   without absolute offsets tied to font metrics. The toggle spans the row;
+   sibling actions occupy its reserved cells, with the chevron at the edge. */
+.rail-sec-toolbar {
+  display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px 6px;
+  align-items: center; column-gap: var(--sp-2);
+  margin: var(--sp-3) 0 var(--sp-2); padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+.rail-sec-toolbar > .rail-sec-head {
+  grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: subgrid;
+  margin: 0; padding: 0; border: 0; min-height: 24px;
+}
+.rail-sec-caption { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
+.rail-sec-caption > .rail-sec-label { flex: 0 1 auto; }
+.rail-sec-toolbar .rail-sec-tri { grid-column: 4; grid-row: 1; justify-self: center; }
+.rail-sec-toolbar > .rail-sec-open { grid-column: 3; grid-row: 1; z-index: 1; }
+.rail-sec-toolbar > #hl-rail-copy { grid-column: 2; }
+.rail-sec-toolbar .rail-sec-progress { display: none; }
 .rail-sec-open {
-  position: absolute; top: 23px; right: 12px;
   width: 24px; height: 24px;
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0;
@@ -1493,7 +1485,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    collapsed section without this. !important keeps "collapsed hides
    everything but the header" true regardless of what ID-scoped display rule
    a current or future rail section adds. */
-.rail-collapsed > *:not(.rail-sec-head) { display: none !important; }
+.rail-collapsed > *:not(.rail-sec-head):not(.rail-sec-toolbar) { display: none !important; }
 
 /* Drawer toggle (hamburger) + scrim — shown only in narrow mode.
    The toggle's visibility is expressed HERE and only here: display:none by
@@ -3284,9 +3276,6 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
   padding: 0;
 }
 
-
-/* ---- Highlight rail entry (md-highlight.js) ---- */
-.hl-rail-btn { width: 100%; justify-content: center; }
 
 /* ---- Highlight notebook list (md-highlight.js, spec 2026-07-04 sec.2) ---- */
 .hl-filter-row { display: flex; gap: var(--sp-4); padding: var(--sp-1) 0 var(--sp-2); }

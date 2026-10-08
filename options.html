@@ -9,7 +9,12 @@
 </head>
 <body>
   <main class="container">
-    <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced - Settings</span></h1>
+    <!-- Peripheral feedback stays in the original title slot, without live announcements on every save. -->
+    <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced - Settings</span> <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span></h1>
+    <div id="opt-global-error" class="fg-actions hidden">
+      <p id="opt-global-alert" class="opt-error hidden" role="alert"></p>
+      <button type="button" class="btn btn-sm" id="auto-save-retry" data-i18n="optRetrySave" hidden>Retry saving</button>
+    </div>
 
     <nav class="options-nav" aria-label="Settings category" data-i18n-aria="settingsCategory">
       <div class="options-search" role="search">
@@ -126,12 +131,6 @@
         </div>
         <p id="opt-sync-local-only" class="sync-local-only" role="status" aria-live="polite" hidden></p>
         <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
-        <table class="sync-scope" id="sync-scope">
-          <caption data-i18n="syncScopeTitle">Where your data goes</caption>
-          <thead><tr><th scope="col" data-i18n="syncScopeData">Data</th><th scope="col" data-i18n="syncScopeLocal">This device</th><th scope="col">Chrome Sync</th><th scope="col">Google Drive</th><th scope="col" data-i18n="syncScopeManual">JSON backup</th></tr></thead>
-          <tbody><tr><th scope="row"><span data-i18n="backupSectionSettings"></span></th><td><span class="scope-channel" aria-hidden="true" data-i18n="syncScopeLocal">This device</span><span data-i18n="syncScopeSettingsLocal">When Chrome Sync is off</span></td><td><span class="scope-channel" aria-hidden="true">Chrome Sync</span><span data-i18n="syncScopeSettingsChrome">When enabled on this device</span></td><td><span class="scope-channel" aria-hidden="true">Google Drive</span><span data-i18n="syncScopeExcluded">Not included</span></td><td><span class="scope-channel" aria-hidden="true" data-i18n="syncScopeManual">JSON backup</span><span data-i18n="syncScopeBackup">Choose when exporting and importing</span></td></tr><tr><th scope="row"><span data-i18n="backupSectionSecrets"></span></th><td><span class="scope-channel" aria-hidden="true" data-i18n="syncScopeLocal">This device</span><span data-i18n="syncScopeSecretsLocal">Unless both sync switches are on</span></td><td><span class="scope-channel" aria-hidden="true">Chrome Sync</span><span data-i18n="syncScopeSecretsChrome">Only with both sync switches on</span></td><td><span class="scope-channel" aria-hidden="true">Google Drive</span><span data-i18n="syncScopeExcluded">Not included</span></td><td><span class="scope-channel" aria-hidden="true" data-i18n="syncScopeManual">JSON backup</span><span data-i18n="syncScopeBackupSecrets">Optional, off by default; plain text</span></td></tr><tr><th scope="row"><span data-i18n="backupSectionVocabulary"></span></th><td><span class="scope-channel" aria-hidden="true" data-i18n="syncScopeLocal">This device</span><span data-i18n="syncScopeAlwaysLocal">Stored on this device</span></td><td><span class="scope-channel" aria-hidden="true">Chrome Sync</span><span data-i18n="syncScopeExcluded">Not included</span></td><td><span class="scope-channel" aria-hidden="true">Google Drive</span><span data-i18n="syncScopeDriveVocab">Current Pinboard account; connect each device</span></td><td><span class="scope-channel" aria-hidden="true" data-i18n="syncScopeManual">JSON backup</span><span data-i18n="syncScopeBackup">Choose when exporting and importing</span></td></tr><tr><th scope="row"><span data-i18n="backupSectionHighlights"></span></th><td><span class="scope-channel" aria-hidden="true" data-i18n="syncScopeLocal">This device</span><span data-i18n="syncScopeAlwaysLocal">Stored on this device</span></td><td><span class="scope-channel" aria-hidden="true">Chrome Sync</span><span data-i18n="syncScopeExcluded">Not included</span></td><td><span class="scope-channel" aria-hidden="true">Google Drive</span><span data-i18n="syncScopeExcluded">Not included</span></td><td><span class="scope-channel" aria-hidden="true" data-i18n="syncScopeManual">JSON backup</span><span data-i18n="syncScopeBackup">Choose when exporting and importing</span></td></tr></tbody>
-        </table>
-        <p class="hint"><a href="#vocab" data-i18n="dictVocabSection">Vocabulary</a> · <a href="#general" id="sync-backup-link" data-i18n="secBackupRestore">Backup &amp; Restore</a></p>
 
       </section>
       <section class="settings-section">
@@ -1224,10 +1223,6 @@
           </div>
         </div>
 
-        <div id="preset-effect-preview" class="preset-effect-preview" hidden>
-          <h3 data-i18n="themePreviewTitle">Preset preview</h3>
-          <iframe id="preset-effect-frame" sandbox="" title="Preset preview" data-i18n-title="themePreviewTitle"></iframe>
-        </div>
         <details id="preset-preview-section" class="preset-preview-section" hidden>
           <summary data-i18n="presetPreviewToggle">View current preset CSS (read-only)</summary>
           <pre id="preset-preview-content" class="preset-preview-content"></pre>
@@ -1253,13 +1248,6 @@
       </section>
     </div>
   </main>
-  <!-- Persistent feedback outside every panel; failures announce once through
-       the alert, while ordinary saves stay quiet for screen readers. -->
-  <footer class="options-save-bar">
-    <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span>
-    <p id="opt-global-alert" class="hidden" role="alert"></p>
-    <button type="button" class="btn btn-sm" id="auto-save-retry" data-i18n="optRetrySave" hidden>Retry saving</button>
-  </footer>
 
   <script defer src="i18n.js"></script>
   <script defer src="shared.js"></script>

@@ -128,7 +128,6 @@
         "disclosure"
       ],
       "primitives": [
-        "options-save-bar",
         "context-help-action-row",
         "context-help-host",
         "context-help-section",
@@ -219,10 +218,7 @@
         "vocab-drive-notice-dismiss",
         "wayback-log-retry",
         "wayback-perm-help",
-        "wayback-perm-tip",
-        "sync-scope",
-        "scope-channel",
-        "preset-effect-preview"
+        "wayback-perm-tip"
       ]
     },
     "library": {
@@ -429,6 +425,7 @@
         "pop-panel",
         "rail-label",
         "rail-sec-head",
+        "rail-sec-toolbar",
         "rail-section",
         "row",
         "send-menu",
@@ -495,7 +492,6 @@
         "hl-item-main",
         "hl-item-note",
         "hl-item-quote",
-        "hl-rail-btn",
         "icon-only",
         "kbd-help-chip",
         "kbd-help-desc",
@@ -535,6 +531,7 @@
         "pbv-tr",
         "pbv-tracks",
         "rail-kbd-help-btn",
+        "rail-sec-caption",
         "rail-sec-count",
         "rail-sec-label",
         "rail-sec-open",

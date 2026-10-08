@@ -43,7 +43,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 ![Ask the page and get cited answers](docs/cws-assets/originals/screenshot-3-ask.png)
 
 ### Make Pinboard yours
-- **13 themes for pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) with a local preview, plus your own custom CSS
+- **13 themes for pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus your own custom CSS
 - **Auto-archive to the [Wayback Machine](https://web.archive.org)**: optionally submit every save; pages stay reachable after the original link dies
 - **Backup and sync**: settings via Chrome Sync, vocabulary via your own Google Drive, manual JSON backups that can include highlights, notes, vocabulary, and your API keys; each is opt-in, with the exact terms under Privacy below
 - **9 languages** · configurable shortcuts · local-first storage · zero tracking

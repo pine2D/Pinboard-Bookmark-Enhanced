@@ -1443,6 +1443,35 @@ function selectionRange(n, start, end) {
   OWNER_NOW = "ownerless";
   _pbpHlOwner = "";
 
+  // Exercise the reader's actual feedback helper: textContent feedback must
+  // never eat an icon-only copy button, including a repeated failed click.
+  const previewSource = await (await fetch("../md-preview.js")).text();
+  const feedbackSource = previewSource.slice(previewSource.indexOf("function flashButtonLabel("),
+    previewSource.indexOf("// renderMarkdown +"));
+  const realFeedback = new Function(feedbackSource + "\nreturn flashButtonLabel;")();
+  const iconCopy = document.createElement("button");
+  iconCopy.className = "action-btn icon-only";
+  iconCopy.title = "hlCopyMd";
+  iconCopy.setAttribute("aria-label", "hlCopyMd");
+  iconCopy.innerHTML = PBP_ICONS.copy;
+  const originalIcon = iconCopy.innerHTML;
+  document.getElementById("fixture").appendChild(iconCopy);
+  realFeedback(iconCopy, "hlCopied");
+  check("copy success keeps an icon-only button free of visible text",
+    !!iconCopy.querySelector("svg") && !iconCopy.textContent.trim());
+  check("icon-only copy success is announced", document.getElementById("copy-status").textContent === "hlCopied");
+  await new Promise(resolve => setTimeout(resolve, 700));
+  realFeedback(iconCopy, "mdPreviewFailed", false);
+  check("copy failure keeps an icon-only button free of visible text",
+    !!iconCopy.querySelector("svg") && !iconCopy.textContent.trim());
+  check("icon-only copy failure is announced", document.getElementById("copy-status").textContent === "mdPreviewFailed");
+  await new Promise(resolve => setTimeout(resolve, 900));
+  check("an older feedback timer cannot clear the latest copy result", iconCopy.title === "mdPreviewFailed");
+  await new Promise(resolve => setTimeout(resolve, 700));
+  check("copy feedback restores the original icon and accessible action",
+    iconCopy.innerHTML === originalIcon && iconCopy.title === "hlCopyMd" && iconCopy.getAttribute("aria-label") === "hlCopyMd");
+  iconCopy.remove();
+
   document.getElementById("summary").textContent =
     "PASS " + PASS + " / FAIL " + FAIL + " (total " + (PASS + FAIL) + ")";
   document.getElementById("summary").style.color = FAIL ? "#c00" : "#0a0";

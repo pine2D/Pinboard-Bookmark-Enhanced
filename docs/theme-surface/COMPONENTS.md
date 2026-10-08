@@ -1575,7 +1575,6 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
-| options | `.options-save-bar` | 视口底部的保存反馈：flex wrap、gap sp-4、内距 sp-5 × sp-7、z sticky；失败持续并提供 sm 重试，实际高度回填 `--opt-save-bar-h` 以保留最后一项的滚动空间；普通状态非 live、错误独立 role=alert |
 | options | `.fg` | 表单组；`margin-bottom: var(--opt-rhythm)`（12px）= 组间节律的唯一主人 |
 | options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；作 `.fg` 末子元素时 `margin-top: --opt-label-gap`（8/4），作 `.fg` 的兄弟或 `.pf` 子元素时 `sp-6`；Send-to 卡片测试行 `sp-6` |
 | options | `.hint` / `.hint-warn` | 辅助文字 `--opt-text-helper`/`--opt-lh-helper`（12/18）；`.fg > .hint` 距控件 sp-1；组外 `margin: sp-1 0 rhythm` |
@@ -1584,6 +1583,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |
 | options | `.pf` | 带边框子面板（provider 卡）：padding `--opt-panel-pad`（16/12）、radius md、`margin-top sp-6`；`> h3` 正文字号、600、`--opt-fg`、`margin: 0 0 --opt-label-gap` |
 | options | `.switch` (+ `.switch-text` / `.switch-track`) | 持久化布尔设置的开关行：`label.switch > input + .switch-text + .switch-track`（可选第三个子元素 `details.context-help`，夹在 `.switch-text` 与 `.switch-track` 之间——带帮助的开关行用它，Ruling 36）；flex、flex-start（轨道 `margin-left:auto` 到行尾）、gap sp-3；轨道 28×16 无边框 / 滑块 12 内缩 2 / input 命中高 24；§6.1 几何、§6.4 例外契约（原生 input 首位可聚焦、焦点环在轨道、forced-colors 回退、无 aria-checked、details-in-label 合法性附注） |
+| md-preview | `.rail-sec-toolbar` | 高亮常驻标题行：grid、操作格 gap sp-2、两个 24px 操作格与末端折叠箭头；标题与总计数相邻，折叠仅隐藏内容；复制和笔记本按钮是折叠按钮的独立同级控件 |
 | options | `.listbox` (+ `.listbox-btn` / `.listbox-value` / `.listbox-sizer` / `.listbox-pop` / `.listbox-list` / `.listbox-opt`) | 唯一自绘 select（§6.4 例外 2）：`select[data-listbox][hidden]` 之后的 `div.listbox`；宽度沿用 select 例外（`width: max-content; min-width: 240px; max-width: 100%`），max-content 取最长选项（`.listbox-sizer` 零高网格行），按钮占满 `.listbox`、高 `--opt-control-h`（32/28）；弹层外壳 `.listbox-pop` absolute、`top: 100% + sp-1`（`data-flip=up` 时贴上方）、`z-index: --opt-z-popover`、圆角 lg、边框阴影、`overflow: hidden`；滚动层 `.listbox-list` `max-height: min(320px, 100dvh − 32px)`、`overflow: auto`、内距 sp-2；选项高 `--opt-control-h`、内距 `0 sp-4`、圆角 sm；跟随输入框的关系规则 `.fg > .listbox + input { margin-top: sp-3 }` 接替 `.fg > select + input` |
 | options | `.pick` (+ `.pick-text` / `.pick-mark` / `.pick-box`) | 单选组勾选行（§6.4 例外 3，stage3b Task 1）：`label.pick > input[type=radio\|checkbox] + .pick-text (+ 可选行内控件) + .pick-mark`；行几何与 `.switch` 相同（`--opt-row-min-h` 44/36、`--opt-row-pad-y`、`.pref-row` 分隔线，`.pref-group-radio` 不再单独变体）；flex、gap sp-5（12px）、mark `margin-left:auto` 到行尾；mark 20×20，圆形（radio）/ `.pick-box` 修饰符 4px 圆角方形（Task 2）；选中 `background/border-color: --opt-accent`，勾线 `::after` CSS 边框转 45° 画 L 形（不用字面字符）；焦点环画在 mark（同 `.switch-track`）、forced-colors 回退原生控件、无 `aria-checked`；行内非 radio/checkbox 控件（popup-width 自定义数字框）`position:relative;z-index:1` 盖过隐藏 input 的 `inset:0`；`.context-help-host[data-help-role="choice"]` 宿主（details 仍是 label 兄弟）有专属覆盖（fix round 1）：label 仍 `position:static`（宿主自身 `position:relative` 兜底定位上下文）；隐藏 input 与 mark 都钉在一个自定义属性 `--pick-row1-h` 上（= `--opt-row-min-h`，R9 首行时改 `calc(--opt-row-min-h - --opt-row-pad-y)`，见 `.pref-row` 行 R9 附注）——input `bottom:auto;height:var(--pick-row1-h)`（forced-colors 下不生效，交回原生控件的 `auto`）、mark `top:0` + `translateY(calc((--pick-row1-h - 20px)/2))`，二者都从宿主的 `top:0`（= row 1 顶边，答案展开也不变）起算，而不是 `inset:0`/`50%`：`.context-help::details-content` 展开时占 `grid-row:2`、把宿主整体撑高，若 input/mark 仍随宿主总高伸缩，命中区会吞掉展开的答案文本、mark 也会往宿主新的纵向中点漂移，详见 §6.4 例外 3 附注；在 `.fg-actions` 行内（tag-gov 全选，fix round 1）：行高由按钮阶决定（不设 `min-height: 0`）；`.fg-actions > label.pick` 以 (0,2,1) 覆盖同容器内 `.fg label`（0,1,1）的 6px gap，保留配方原生的 12px 文案→mark 间距（`gap: --opt-sp-5`）；`margin-right: --opt-sp-6`（16px）把 mark 与行内下一个子元素（"已选 N 个"）再拉开一段，叠加在行自身 8px flex gap 之上；`min-height: 24px` 补足命中区地板，仍低于本行由按钮撑出的 28px，行高不变 |
 | options | `section.settings-section` | 分区容器；相邻分区 `margin-top: --opt-section-gap`；`> h2.section-title` 字号 `--opt-text-section`，`margin: 0 0 --opt-sp-5`（12） |
@@ -1866,7 +1866,4 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 
 - 笔记摘录原地编辑：`.notes-note-editor` 复用 `.vocab-note-input` 字段与 `.lib-cluster` 紧凑按钮；gap sp-2，摘录下 margin sp-3。编辑/保存/取消使用现有 btn-sm，无新阶梯；失败提示在表单内持续，后台刷新保留会话草稿。
 
-同步范围表 `.sync-scope`：语义table，sp-2单元格内距，600px及以下按数据种类逐行展示并重复渠道名；不承接开关状态或数据写入，跳转链接指向已有配置。
-
-预设效果 `.preset-effect-preview`：sp-2网格，280px脚本禁用的sandbox iframe展示内置实际主题CSS；当前预设/明暗/语言更新。原CSS预览保持独立折叠，不将用户overlay加入该示例。
 阅读器：目录紧随阅读统计；抽取工具/Raw切换在原生details次级区域，engine-status和错误重试保留直接可达，AI及高亮插入在Export之前。

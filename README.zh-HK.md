@@ -43,7 +43,7 @@
 ![向文章提問，答案附帶引註](docs/cws-assets/originals/screenshot-3-ask.png)
 
 ### 個人化
-- **13 套 pinboard.in 佈景主題**（Dracula、Nord、Catppuccin、Solarized 等），可在設定中本機預覽，更可疊加自訂 CSS
+- **13 套 pinboard.in 佈景主題**（Dracula、Nord、Catppuccin、Solarized 等），更可疊加自訂 CSS
 - **自動存檔至 [Wayback Machine](https://web.archive.org)**：開啟後每次儲存都一併提交；原連結失效仍可尋回
 - **備份與同步**：設定經 Chrome Sync，生詞同步到你自己的 Google Drive，手動 JSON 備份可包含高亮、筆記、生詞與 API 密鑰；全部自行開啟，詳情見下方私隱一節
 - **9 種語言**、可自訂快捷鍵、本機優先儲存、零追蹤

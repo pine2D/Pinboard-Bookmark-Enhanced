@@ -43,7 +43,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 ![Posez vos questions à la page, les réponses citent la source](docs/cws-assets/originals/screenshot-3-ask.png)
 
 ### Personnalisation
-- **13 thèmes pour pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …), avec aperçu local dans les réglages et ajout de votre CSS personnalisé
+- **13 thèmes pour pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
 - **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** : à chaque enregistrement si vous le souhaitez ; les pages restent accessibles même quand le lien d'origine disparaît
 - **Sauvegarde et synchronisation** : les paramètres via Chrome Sync, le vocabulaire via votre propre Google Drive, des sauvegardes JSON manuelles pouvant inclure surlignages, notes, vocabulaire et clés API ; chaque option est facultative, conditions exactes dans la section Confidentialité ci-dessous
 - **9 langues** · raccourcis configurables · stockage local en priorité · aucun pistage

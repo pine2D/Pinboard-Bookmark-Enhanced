@@ -37,7 +37,7 @@
 - Watch while you read: YouTube and bilibili previews pair the video with its subtitles; the transcript follows playback, any line jumps the player, and AI tags and summaries can read the captions instead of the page
 
 # Make Pinboard yours
-- 13 themes for pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) with a local preview, plus your own custom CSS
+- 13 themes for pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) plus your own custom CSS
 - Auto-archive to the Wayback Machine (https://web.archive.org): optionally submit every save; pages stay reachable after the original link dies
 - Backup and sync: settings via Chrome Sync, vocabulary via your own Google Drive, manual JSON backups that can include highlights, notes, vocabulary, and your API keys; each is opt-in, with the exact terms under Privacy below
 - 9 languages · configurable shortcuts · local-first storage · zero tracking
@@ -71,7 +71,7 @@
 - 边读边看：YouTube 和 B 站预览把视频和多语种字幕并排放好，字幕跟着播放走，点字幕行即可跳转，AI 标签和摘要还能直接读字幕
 
 # 个性化
-- 13 套 pinboard.in 主题（Dracula、Nord、Catppuccin、Solarized 等），可在设置中本地预览，还能叠加自定义 CSS
+- 13 套 pinboard.in 主题（Dracula、Nord、Catppuccin、Solarized 等），还能叠加自定义 CSS
 - 自动存档到 Wayback Machine (https://web.archive.org)：开启后每次保存都提交一份；原链接失效也找得回
 - 备份与同步：设置走 Chrome Sync，生词走你自己的 Google Drive，手动 JSON 备份可含高亮、笔记、生词和 API 密钥；全部可选，细节见下方「隐私」
 - 9 种语言、可自定义快捷键、本地优先存储、零追踪
@@ -105,7 +105,7 @@
 - 邊讀邊看：YouTube 與 B 站預覽把影片和多語種字幕並排放好，字幕跟著播放走，點字幕行即可跳轉，AI 標籤與摘要也能直接讀字幕
 
 # 個人化
-- 13 套 pinboard.in 佈景主題（Dracula、Nord、Catppuccin、Solarized 等），可先在本機預覽，還可疊加自訂 CSS
+- 13 套 pinboard.in 佈景主題（Dracula、Nord、Catppuccin、Solarized 等），還可疊加自訂 CSS
 - 自動存檔到 Wayback Machine (https://web.archive.org)：開啟後每次儲存都一併提交；原連結失效也找得回
 - 備份與同步：設定透過 Chrome Sync，生詞透過你自己的 Google Drive，手動 JSON 備份可納入劃重點、筆記、生詞與 API 金鑰；全部自行開啟，細節見下方「隱私」
 - 9 種語言、可自訂快捷鍵、本機優先儲存、零追蹤
@@ -139,7 +139,7 @@
 - 邊讀邊看：YouTube 與 B 站預覽把影片和多語種字幕並排放好，字幕跟着播放走，點字幕行即可跳轉，AI 標籤與摘要也能直接讀字幕
 
 # 個人化
-- 13 套 pinboard.in 佈景主題（Dracula、Nord、Catppuccin、Solarized 等），可在設定中本機預覽，更可疊加自訂 CSS
+- 13 套 pinboard.in 佈景主題（Dracula、Nord、Catppuccin、Solarized 等），更可疊加自訂 CSS
 - 自動存檔至 Wayback Machine (https://web.archive.org)：開啟後每次儲存都一併提交；原連結失效仍可尋回
 - 備份與同步：設定經 Chrome Sync，生詞同步到你自己的 Google Drive，手動 JSON 備份可包含高亮、筆記、生詞與 API 密鑰；全部自行開啟，詳情見下方私隱一節
 - 9 種語言、可自訂快捷鍵、本機優先儲存、零追蹤
@@ -173,7 +173,7 @@
 - Sehen beim Lesen – YouTube- und Bilibili-Vorschauen zeigen Video und mehrsprachige Untertitel nebeneinander; das Transkript folgt der Wiedergabe, ein Klick auf eine Zeile springt im Player, und KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel statt der Seite
 
 # Pinboard nach deinem Geschmack
-- 13 Themes für pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) mit lokaler Vorschau und deinem eigenen CSS
+- 13 Themes für pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
 - Automatisch in die Wayback Machine (https://web.archive.org) archivieren – auf Wunsch bei jedem Speichern; Seiten bleiben erreichbar, auch wenn der Originallink tot ist
 - Sicherung und Synchronisierung: Einstellungen über Chrome Sync, Vokabeln über dein eigenes Google Drive, dazu manuelle JSON-Sicherungen mit Markierungen, Notizen, Vokabeln und deinen API-Schlüsseln; alles einzeln aktivierbar, Einzelheiten unten im Abschnitt Datenschutz
 - 9 Sprachen · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking
@@ -207,7 +207,7 @@
 - Regarder en lisant : les aperçus YouTube et Bilibili affichent la vidéo et ses sous-titres multilingues côte à côte ; la transcription suit la lecture, un clic sur une ligne déplace le lecteur, et les tags et résumés IA peuvent lire les sous-titres plutôt que la page
 
 # Personnalisation
-- 13 thèmes pour pinboard.in (Dracula · Nord · Catppuccin · Solarized · …), avec aperçu local dans les réglages et ajout de votre CSS personnalisé
+- 13 thèmes pour pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
 - Archivage automatique dans la Wayback Machine (https://web.archive.org) : à chaque enregistrement si vous le souhaitez ; les pages restent accessibles même quand le lien d'origine disparaît
 - Sauvegarde et synchronisation : les paramètres via Chrome Sync, le vocabulaire via votre propre Google Drive, des sauvegardes JSON manuelles pouvant inclure surlignages, notes, vocabulaire et clés API ; chaque option est facultative, conditions exactes dans la section Confidentialité ci-dessous
 - 9 langues · raccourcis configurables · stockage local en priorité · aucun pistage
@@ -241,7 +241,7 @@
 - 読みながら観る：YouTube と Bilibili のプレビューは動画と多言語字幕を並べて表示し、字幕は再生に追従、行クリックでジャンプでき、AI タグと要約も字幕を直接読めます
 
 # カスタマイズ
-- pinboard.in 用テーマ 13 種（Dracula、Nord、Catppuccin、Solarized など）を設定画面でローカルプレビューでき、自分のカスタム CSS も重ねられます
+- pinboard.in 用テーマ 13 種（Dracula、Nord、Catppuccin、Solarized など）に、自分のカスタム CSS を重ねられます
 - Wayback Machine (https://web.archive.org) へ自動アーカイブ：有効にすると保存のたびに送信し、元のページが消えてもあとから参照できます
 - バックアップと同期：設定は Chrome Sync、単語帳は自分の Google Drive で同期でき、手動の JSON バックアップにはハイライト・メモ・単語帳・API キーを含められます。いずれもオプトインで、詳細は下記の「プライバシー」を参照してください
 - 9 言語対応 · カスタマイズ可能なショートカット · ローカルファースト保存 · トラッキング一切なし
@@ -275,7 +275,7 @@
 - Oglądaj podczas czytania — podgląd stron YouTube i Bilibili wczytuje wideo i wielojęzyczne napisy obok siebie; transkrypcja podąża za odtwarzaniem, kliknięcie wiersza przeskakuje odtwarzacz, a tagi i podsumowania AI mogą czytać napisy zamiast strony
 
 # Personalizacja
-- 13 motywów dla pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) oraz lokalny podgląd i własny CSS
+- 13 motywów dla pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) oraz własny CSS
 - Automatyczna archiwizacja w Wayback Machine (https://web.archive.org) — opcjonalnie przy każdym zapisie; strony pozostają dostępne, nawet gdy oryginalny link przestanie działać
 - Kopie zapasowe i synchronizacja — ustawienia synchronizuje Chrome Sync, słówka trafiają na twój własny Google Drive, a ręczna kopia JSON może objąć zakreślenia, notatki, słówka i klucze API; wszystko opcjonalne, szczegóły w sekcji Prywatność poniżej
 - 9 języków · konfigurowalne skróty · dane przede wszystkim lokalnie · zero śledzenia
@@ -309,7 +309,7 @@
 - Смотрите, пока читаете — предпросмотр YouTube и Bilibili показывает видео и многоязычные субтитры рядом; расшифровка следует за воспроизведением, клик по строке перематывает плеер, а AI-теги и резюме могут читать субтитры вместо страницы
 
 # Персонализация
-- 13 тем для pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) плюс локальный предпросмотр и свой CSS
+- 13 тем для pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) плюс свой CSS
 - Автоархив в Wayback Machine (https://web.archive.org) — по желанию при каждом сохранении; страницы остаются доступны, даже если исходная ссылка перестанет работать
 - Резервное копирование и синхронизация — настройки через Chrome Sync, словарик — через ваш Google Диск, ручная копия JSON может включать выделения, заметки, словарик и API-ключи; всё включается по выбору, точные условия — в разделе «Конфиденциальность» ниже
 - 9 языков · настраиваемые горячие клавиши · локальное хранилище в приоритете · никакого трекинга

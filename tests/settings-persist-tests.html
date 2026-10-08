@@ -2595,11 +2595,28 @@ async function run() {
       exportTargets: joinSync.exportTargets,
     });
     let joinHandler;
+    // Drive the production reload watchdog against the real alert markup and
+    // stylesheet. A cancelled reload keeps the old form suspended: the user
+    // must still be able to see why another reload is required.
+    const optionsDoc = new DOMParser().parseFromString(await fetch("../options.html").then(r => r.text()), "text/html");
+    const reloadNotice = optionsDoc.getElementById("opt-global-error").cloneNode(true);
+    const optionsStyle = document.createElement("link");
+    optionsStyle.rel = "stylesheet";
+    optionsStyle.href = "../options.css";
+    const optionsStyleLoaded = new Promise(resolve => { optionsStyle.onload = resolve; });
+    document.head.appendChild(optionsStyle);
+    await optionsStyleLoaded;
+    document.body.appendChild(reloadNotice);
+    const joinTimers = [];
+    let joinResumes = 0;
     const joinDeps = {
       ...handlerDeps,
       syncToggle: { checked: true, addEventListener: (_type, fn) => { joinHandler = fn; } },
       syncKeysToggle: { disabled: true },
       chrome: joinChrome,
+      $id: id => reloadNotice.id === id ? reloadNotice : reloadNotice.querySelector(`#${id}`),
+      setTimeout: (fn, delay) => { joinTimers.push({ fn, delay }); return joinTimers.length; },
+      resumeOptionsAutoSave: () => { joinResumes++; },
     };
     globalThis.chrome = joinChrome;
     const writesBeforeCloudJoin = handlerLargeWrites.length;
@@ -2610,6 +2627,17 @@ async function run() {
         openaiApiKey: joinSync.openaiApiKey,
         exportTargets: joinSync.exportTargets,
       }) && joinSync.optTheme === "cloud-theme" && handlerLargeWrites.length === writesBeforeCloudJoin);
+    joinTimers.find(timer => timer.delay === 2000).fn();
+    check("E5 Options handler: cancelling the cloud-settings reload leaves the reload notice visibly rendered",
+      reloadNotice.querySelector("#opt-global-alert").textContent === "syncReloadNeeded" &&
+      reloadNotice.querySelector("#opt-global-alert").getClientRects().length > 0);
+    check("E5 Options handler: cancelled cloud reload keeps stale-form saving suspended and preserves the cloud",
+      joinResumes === 0 && cloudSecretsBeforeJoin === JSON.stringify({
+        openaiApiKey: joinSync.openaiApiKey,
+        exportTargets: joinSync.exportTargets,
+      }) && joinSync.optTheme === "cloud-theme");
+    reloadNotice.remove();
+    optionsStyle.remove();
 
     const overwriteLocal = {
       optSyncEnabled: false,

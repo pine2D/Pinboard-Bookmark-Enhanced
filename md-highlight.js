@@ -2478,10 +2478,9 @@ function _pbpHlNotebookRender() {
   _pbpHlNbEls.orphanNote.textContent = orphanCount ? t("hlOrphanNote", String(orphanCount)) : "";
 }
 
-// One-time DOM build: filter row + list + empty-filter hint + copy footer,
+// One-time DOM build: filter row + list + empty-filter hint + header actions,
 // then installs the collapsible header via pbpRailCollapsible (Task 1,
-// md-preview.js). Same insertion point as before (immediately before #toc, or
-// appended to #rail if #toc is absent).
+// md-preview.js). Insert before Export so Contents remains near the title.
 function _pbpHlBuildNotebookDom(rail) {
   const sec = document.createElement("div");
   sec.className = "rail-section";
@@ -2529,17 +2528,16 @@ function _pbpHlBuildNotebookDom(rail) {
   const copyBtn = document.createElement("button");
   copyBtn.type = "button";
   copyBtn.id = "hl-rail-copy";
-  copyBtn.className = "action-btn hl-rail-btn";
-  const lab = document.createElement("span");
-  lab.className = "btn-label";
-  lab.textContent = t("hlCopyMd");
-  copyBtn.appendChild(lab);
+  copyBtn.className = "rail-sec-open icon-only";
+  copyBtn.innerHTML = PBP_ICONS.copy;
+  copyBtn.title = t("hlCopyMd");
+  copyBtn.setAttribute("aria-label", t("hlCopyMd"));
   copyBtn.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(pbpHlComposeSection(_pbpHlState ? _pbpHlState.items : []));
       flashButtonLabel(copyBtn, t("hlCopied"));
     } catch (_) {
-      flashButtonLabel(copyBtn, t("mdPreviewFailed"));
+      flashButtonLabel(copyBtn, t("mdPreviewFailed"), false);
     }
   });
   sec.appendChild(copyBtn);
@@ -2556,22 +2554,18 @@ function _pbpHlBuildNotebookDom(rail) {
       })
     : null; // degrade: no collapsible header (file:// test harness has no #rail at all, never reaches here)
 
-  // Opener into the standalone library page's Notes view. A SIBLING of
-  // .rail-sec-head (not a child) -- .rail-sec-head is itself the
-  // accordion-toggle <button> (pbpRailCollapsible), and a <button> cannot
-  // validly contain another interactive element. Positioned via CSS
-  // (#hl-rail-section/.rail-sec-open, md-preview.css) to paint inline with
-  // the header row, just left of the chevron. Because it's a plain sibling
-  // -- not a descendant of headBtn -- its click never bubbles through
-  // headBtn's own listener (bubbling only follows the ancestor chain), so
-  // no stopPropagation is needed here; confirmed no other ancestor
-  // (#hl-rail-section, .rail, document) has a click listener that would
-  // react to it either. This placement also reuses the existing
-  // ".rail-collapsed > *:not(.rail-sec-head)" collapse rule for free: as a
-  // direct child of the (potentially) .rail-collapsed section, it hides
-  // when collapsed and shows when expanded, same as every other row.
+  // Keep the toggle and actions as independent siblings in one persistent
+  // header. Only the list/filter content participates in folding.
   const headBtn = sec.querySelector(".rail-sec-head");
   if (headBtn) {
+    const toolbar = document.createElement("div");
+    toolbar.className = "rail-sec-toolbar";
+    headBtn.replaceWith(toolbar);
+    const caption = document.createElement("span");
+    caption.className = "rail-sec-caption";
+    caption.append(headBtn.querySelector(".rail-sec-label"), headBtn.querySelector(".rail-sec-count"));
+    headBtn.appendChild(caption);
+    toolbar.append(headBtn, copyBtn);
     const openLib = document.createElement("button");
     openLib.type = "button";
     openLib.className = "rail-sec-open";
@@ -2586,7 +2580,7 @@ function _pbpHlBuildNotebookDom(rail) {
           && await pbpOpenExtensionTab("library.html", "notes")) return;
       try { window.open(chrome.runtime.getURL("library.html#notes")); } catch (_) {}
     });
-    headBtn.insertAdjacentElement("afterend", openLib); // DOM order = tab order: right after the header button
+    toolbar.appendChild(openLib); // Tab order: fold, copy, library.
   }
 
   return { sec, list, filterBtns, emptyHint, copyBtn, handle, orphanNote };

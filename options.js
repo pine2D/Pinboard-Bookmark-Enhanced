@@ -1482,11 +1482,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   _activateHashPanel();
   window.addEventListener("hashchange", _activateHashPanel);
   setupOptionsSearch();
-  $id("sync-backup-link")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    $id("export-settings").scrollIntoView({ block: "center" });
-    $id("export-settings").focus({ preventScroll: true });
-  });
 
   // ---- Storage management (C2-6) ----
   // Category checkboxes over the reclaimable-cache allowlist in shared.js.
@@ -2831,6 +2826,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (alertEl) {
           alertEl.textContent = t("syncReloadNeeded");
           alertEl.classList.remove("hidden");
+          $id("opt-global-error")?.classList.remove("hidden");
         }
         return;
       }
@@ -3402,6 +3398,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     errEl.textContent = text;
     errEl.dataset.autosaveFailure = "1";
     errEl.classList.remove("hidden");
+    $id("opt-global-error")?.classList.remove("hidden");
   }
 
   function clearAutoSaveFailureAlert() {
@@ -3410,6 +3407,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     delete errEl.dataset.autosaveFailure;
     errEl.textContent = "";
     errEl.classList.add("hidden");
+    $id("opt-global-error")?.classList.add("hidden");
     const retry = $id("auto-save-retry");
     if (retry) retry.hidden = true;
   }
@@ -3417,7 +3415,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function setAutoSaveProgress(key) {
     const el = $id("auto-save-status");
     const retry = $id("auto-save-retry");
-    if (el) { el.textContent = t(key); el.classList.remove("saved"); el.classList.toggle("hidden", $id("opt-global-alert")?.dataset.autosaveFailure === "1"); }
+    if (el) { clearTimeout(el._timer); el.textContent = t(key); el.classList.remove("saved"); el.classList.toggle("hidden", $id("opt-global-alert")?.dataset.autosaveFailure === "1"); }
     // Preserve keyboard focus through a failed retry. aria-disabled plus the
     // click gate prevents duplicate work without native disabled blurring it.
     if (retry && !retry.hidden) { retry.setAttribute("aria-disabled", "true"); retry.textContent = t(key); }
@@ -3526,6 +3524,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     setStatusIcon(el, ok, t(key) || fallback);
     el.classList.toggle("saved", ok);
     el.classList.toggle("hidden", !ok);
+    clearTimeout(el._timer);
+    if (ok) el._timer = setTimeout(() => {
+      el.textContent = t("optAutoSave");
+      el.classList.remove("saved");
+    }, 1500);
   }
   const retrySave = $id("auto-save-retry");
   retrySave?.addEventListener("click", () => {
@@ -3533,21 +3536,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     setAutoSaveProgress("saving");
     saveAllSafely();
   });
-  const saveBar = document.querySelector(".options-save-bar");
-  if (saveBar) {
-    new ResizeObserver(() => {
-      document.documentElement.style.setProperty("--opt-save-bar-h", `${Math.ceil(saveBar.getBoundingClientRect().height)}px`);
-    }).observe(saveBar);
-    document.addEventListener("focusin", (event) => {
-      const el = event.target;
-      if (!(el instanceof HTMLElement) || saveBar.contains(el)) return;
-      const r = el.getBoundingClientRect();
-      if (r.bottom > saveBar.getBoundingClientRect().top && r.top < innerHeight) {
-        el.scrollIntoView({ block: "center", behavior: "instant" });
-      }
-    });
-  }
-
   // ---- Export/Import: see options-backup.js ----
   // EXPORTABLE_KEYS whitelist excludes API keys + cache entries from backup.
   const EXPORTABLE_KEYS = Object.keys(SETTINGS_DEFAULTS).filter(k => !API_KEY_FIELDS.includes(k));
@@ -3664,13 +3652,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderPresetPreview() {
     const previewEl = $id("preset-preview-content");
     const previewSection = $id("preset-preview-section");
-    const effect = $id("preset-effect-preview");
-    const frame = $id("preset-effect-frame");
-    if (!previewEl || !previewSection || !effect || !frame) return;
+    if (!previewEl || !previewSection) return;
     if (!currentPresetKey) {
       previewSection.hidden = true;
       previewEl.textContent = "";
-      effect.hidden = true; frame.removeAttribute("srcdoc");
       return;
     }
     let themeKey = currentPresetKey;
@@ -3684,33 +3669,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const theme = PINBOARD_THEMES[themeKey];
     previewSection.hidden = false;
     previewEl.textContent = theme ? theme.css : "";
-    effect.hidden = !theme;
-    if (!theme) { frame.removeAttribute("srcdoc"); return; }
-    // Built-in preset only. Opaque, scriptless sandbox + CSP prevent this
-    // local example from loading subresources or affecting the settings page.
-    const esc = value => String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
-    const css = theme.css.replace(/<\/style/gi, "<\\/style");
-    // The example lives in a short-lived extension surface: preserve the
-    // preset's Latin family while adding this project's fast CJK fallback.
-    const family = /--pinboard-font-family:\s*([^;]+);/.exec(theme.css)?.[1] || '"Segoe UI", Arial, sans-serif';
-    const previewFamily = family.replace(/^ui-monospace\b/, '"SF Mono", Consolas, Menlo')
-      .replace(/(sans-serif|monospace)\s*$/, '"PingFang SC", "Microsoft YaHei", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans SC", "微软雅黑", "Source Han Sans SC", "WenQuanYi Micro Hei", $1');
-
-    frame.srcdoc = `<!doctype html><html lang="${esc(document.documentElement.lang)}" data-preset="${esc(currentPresetKey)}" data-mode="${prefersDark ? "dark" : "light"}" class="${prefersDark ? "pbp-dark" : ""}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'"><style>
-      body { margin:0; font-family:"Segoe UI",Arial,"PingFang SC","Microsoft YaHei","Hiragino Sans","Noto Sans CJK SC","Noto Sans SC","微软雅黑","Source Han Sans SC","WenQuanYi Micro Hei",sans-serif; }
-      button,input {font-family:inherit} #banner,#sub_banner,.user_navbar,#main_column {padding:8px 12px} #main_column {margin:0;width:auto;max-width:none} #banner_searchbox {display:flex;gap:4px;float:none} #banner_searchbox input {min-width:0;max-width:100%} .bookmark {margin:8px 0} .tag {margin-right:8px}
-    </style><style>${css}</style><style>:root { --pinboard-font-family: ${previewFamily} !important; }</style></head><body id="pinboard">
-      <div id="banner"><span id="pinboard_name"><a>pinboard</a></span><span id="banner_searchbox"><input type="text" readonly value="${esc(t("themePreviewSearch"))}" aria-label="${esc(t("themePreviewSearch"))}"><span class="search_button"><input type="button" value="${esc(t("themePreviewSearch"))}"></span></span></div>
-      <div class="user_navbar"><div id="bmarks_page_nav"><a class="filter selected">${esc(t("libraryFilterAll"))}</a></div></div>
-      <div id="main_column"><div class="bookmark"><div class="display"><a class="bookmark_title">${esc(t("themePreviewSampleTitle"))}</a><div class="description">${esc(t("themePreviewSampleDescription"))}</div><div class="tags"><a class="tag">${esc(t("libraryFilterAll"))}</a></div></div></div></div>
-    </body></html>`;
-
   }
 
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (_appearanceInited && $id("opt-theme").value === "auto") renderPresetPreview();
   });
-  document.addEventListener("pbp:i18n-applied", () => { if (_appearanceInited) renderPresetPreview(); });
 
   // W3: appearance panel's render deps (currentPresetKey, PINBOARD_THEMES,
   // ADAPTIVE_THEME_MAP, $id targets) are now initialized — flip the boot-ready

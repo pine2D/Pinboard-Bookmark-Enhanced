@@ -547,7 +547,7 @@ function _pbpRailPersist(key, collapsed) {
 // indicator, an always-present-but-empty mini-progress slot, and
 // aria-expanded/aria-controls pointing at sectionEl's own id -- assigned
 // one if it doesn't have one). Collapsing toggles sectionEl.classList
-// "rail-collapsed"; CSS (`.rail-collapsed > *:not(.rail-sec-head)`) hides
+// "rail-collapsed"; CSS preserves the toggle (or its action toolbar) and hides
 // every OTHER direct child, so anything appended to sectionEl LATER (a
 // progress span, the view-toggle wrap, a usage line) is automatically
 // covered without pbpRailCollapsible tracking a separate content-wrapper
@@ -3712,20 +3712,25 @@ async function copyToClipboard(text, btn) {
   }, 1500);
 }
 
-// One-shot button feedback: swap the .btn-label to msg + .copied for 1.5s, then
-// revert; also announce to the #copy-status live region for screen readers. Uses
-// the same re-entry guard as copyToClipboard (persist orig once, clear pending timer).
-function flashButtonLabel(btn, msg) {
+// Brief feedback preserves icon-only geometry; text buttons keep their label.
+// Repeated clicks extend the latest result without capturing it as the original.
+function flashButtonLabel(btn, msg, ok = true) {
+  const iconOnly = btn.classList.contains("icon-only");
   const label = btn.querySelector(".btn-label");
-  const setLabel = (s) => { if (label) label.textContent = s; else btn.textContent = s; };
-  if (btn._copyOrig == null) btn._copyOrig = label ? label.textContent : btn.textContent;
+  const setLabel = (s) => { if (iconOnly) btn.innerHTML = s; else if (label) label.textContent = s; else btn.textContent = s; };
+  if (btn._copyOrig == null) {
+    btn._copyOrig = iconOnly ? btn.innerHTML : label ? label.textContent : btn.textContent;
+    if (iconOnly) btn._copyOrigTitle = btn.title;
+  }
   const el = document.getElementById("copy-status");
   if (el) el.textContent = msg;
-  setLabel(msg);
-  btn.classList.add("copied");
+  setLabel(iconOnly ? PBP_ICONS[ok ? "check" : "warning"] : msg);
+  if (iconOnly) btn.title = msg;
+  btn.classList.toggle("copied", ok);
   clearTimeout(btn._copyTimer);
   btn._copyTimer = setTimeout(() => {
     setLabel(btn._copyOrig);
+    if (iconOnly) { btn.title = btn._copyOrigTitle; btn._copyOrigTitle = null; }
     btn.classList.remove("copied");
     btn._copyOrig = null;
     if (el) el.textContent = "";
