@@ -1788,7 +1788,8 @@ async function _pbpTrMapLimit(items, limit, fn) {
 
 // Run the extraction pass over the full shielded article text. Returns a term map
 // (possibly empty) on success, or null on failure (caller then uses user glossary only).
-async function _pbpTrExtractGlossary(st) {
+async function _pbpTrExtractGlossary(st, signal = st.ctrl && st.ctrl.signal) {
+  const revision = st.rev;
   const full = st.work.map((w) => w.shielded.text).join("\n\n");
   if (!full.trim()) return Object.create(null);   // no source text: a REAL empty table, cacheable
   const chunks = full.length <= PBP_TR_GLOSSARY_LIMIT
@@ -1800,15 +1801,15 @@ async function _pbpTrExtractGlossary(st) {
   // empty) or null on abort/error; a null chunk is dropped from the merge, the rest
   // still merge. The <=24000-char common case is a single chunk = one call.
   const outs = await _pbpTrMapLimit(chunks, 2, async (chunk) => {
-    if (st.ctrl && st.ctrl.signal && st.ctrl.signal.aborted) return null;
+    if (signal && signal.aborted) return null;
     const { system, prompt } = pbpTrBuildGlossaryPrompt(chunk, st.target.name, pbpTrGlossaryCap(full.length));
     try {
       const raw = await callAIStream(st.s, prompt, {
         system, model, temperature: 0.1, noThinking: true,
-        signal: st.ctrl && st.ctrl.signal, maxTokens: 2048,
+        signal, maxTokens: 2048,
         // T4: fold real glossary-pass usage into the run total when the provider
         // emits it (no estimate fallback here — this pass is optional/often cached).
-        onUsage: (u) => { if (st.usage) { st.usage.inTok += u.inTok; st.usage.outTok += u.outTok; } }
+        onUsage: (u) => { if (st.rev === revision && st.usage) { st.usage.inTok += u.inTok; st.usage.outTok += u.outTok; } }
       }, () => {});
       return pbpTrParseGlossaryJson(raw);
     } catch (_) { return null; }
@@ -1824,7 +1825,10 @@ async function _pbpTrExtractGlossary(st) {
 
 // Build st.glossary = merge(auto, user), once. auto = cached or freshly extracted;
 // any failure degrades to user-only (never blocks translation).
-async function _pbpTrEnsureGlossary(st) {
+async function _pbpTrEnsureGlossary(st, signal = st.ctrl && st.ctrl.signal) {
+  const revision = st.rev;
+  const current = () => revision === st.rev && !(signal && signal.aborted);
+  if (!current()) return null;
   if (st.glossary) return st.glossary;
   const user = pbpTrParseGlossary(st.s.translateGlossary);
   if (!_pbpTrGlossaryWorthIt(st)) {
@@ -1843,14 +1847,19 @@ async function _pbpTrEnsureGlossary(st) {
       auto = st.cacheMeta.ag;
     } else {
       auto = await pbpTrGlossaryCacheGet(st.url, st.target.code, st.modelKey, st.account);
+      if (!current()) return null;
       if (!auto) {
         const prog = document.getElementById("tr-progress");
         if (prog) prog.textContent = t("trExtracting");
-        auto = await _pbpTrExtractGlossary(st);
+        auto = await _pbpTrExtractGlossary(st, signal);
+        if (!current()) return null;
         if (auto) { try { await pbpTrGlossaryCacheSet(st.url, st.target.code, st.modelKey, auto, st.account); } catch (_) {} }
       }
     }
   } catch (_) { auto = null; }
+  // A replacement cleared the old glossary while the cache/extraction was
+  // pending. Never seed the new article or persist late aborted output.
+  if (!current()) return null;
   st.glossaryAuto = auto || null;   // null = extraction failed/degraded -> runMeta.ag omitted so a later run can retry
   st.glossary = pbpTrMergeGlossary(auto || Object.create(null), user);
   return st.glossary;
@@ -1880,18 +1889,20 @@ async function _pbpTrStart(st) {
   st.running = true;                       // claim the run synchronously so a double-click during
                                            // the rAF-chunked st.work build can't start two runs
   const runRev = st.rev;                   // article this run was launched for (fence, see pbpTrInit)
+  const cacheKey = { url: st.url, lang: st.target.code, model: st.modelKey, account: st.account };
   // Reset the run buffers FIRST (review blocker #1): st.flushBuf could hold a
   // previous run's residue, and everything between here and the queue launch
   // awaits (permission recovery / workReady / glossary extraction) -- a
   // visibilitychange flush inside any of those windows would write stale
   // blocks under whatever st.target currently says.
-  st.newly = Object.create(null);          // blockHash -> shielded translation (end-of-run write)
+  const newly = st.newly = Object.create(null); // retain THIS run's paid output across article replacement
   st.flushBuf = Object.create(null);       // ZH-0: pending incremental flush
   st.flushInflight = false;
   st.lastFlushTs = Date.now();
   st.wroteOk = false;                      // did any cache write of THIS run actually land? (stale->mixed escalation gate)
   if (st.permissionError) {
     const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
+    if (st.rev !== runRev) return;
     if (!recovered) { st.running = false; return; }
     st.permissionError = null;
   }
@@ -1902,12 +1913,15 @@ async function _pbpTrStart(st) {
   // so continuing would silently bill the user for a translation they never
   // asked for, on an article they did not click Translate on. Product rule:
   // a replacement NEVER auto-spends.
-  if (st.rev !== runRev) { st.running = false; return; }
+  if (st.rev !== runRev) return;
   _pbpTrApplySkips(st);                    // T3: re-detect every run -- target may have changed since init/last run
   const pending = st.work.filter((w) => !(w.n in st.trMd));
   if (!pending.length) { st.running = false; _pbpTrSetStatus(st, "done"); _pbpTrShowViewToggle(st); return; }
   _pbpTrClearPendingFailures(new Set(pending.map((w) => w.n)));
   st.ctrl = new AbortController();
+  // The lifecycle teardown clears st.ctrl. All work in this run must retain
+  // its own signal, including cache awaits and later glossary chunks.
+  const signal = st.ctrl.signal;
   st.usage = { inTok: 0, outTok: 0, approx: false };   // T4: reset actual/estimated usage per run
   st.glossaryHits = Object.create(null);
   _pbpTrRenderGlossaryHits(st);
@@ -1930,9 +1944,11 @@ async function _pbpTrStart(st) {
     const source = (activeSeg && activeSeg.getAttribute("data-engine") === "jina") ? "jina" : "local";
     summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account, st.s)) || "";
   } catch (_) {}
+  if (st.rev !== runRev) return;
   const prog0 = document.getElementById("tr-progress");
   if (prog0) prog0.textContent = t("trTranslating");
-  await _pbpTrEnsureGlossary(st);
+  await _pbpTrEnsureGlossary(st, signal);
+  if (st.rev !== runRev) return;
   // ZH-1a: the run's cache meta, computed once here (deterministic, known
   // before the first request) and attached to every cache write of this run
   // (incremental flushes included). gf covers only the USER glossary subset
@@ -1949,8 +1965,7 @@ async function _pbpTrStart(st) {
   if (st.glossaryAuto) st.runMeta.ag = st.glossaryAuto;
   const model = pbpAiResolveModelOverride(st.s);
   const baseArgs = { targetLanguage: st.target.name, targetCode: st.target.code, title: st.title, summary };
-  // st.ctrl is re-read per call: the run installs a fresh controller each start.
-  const streamOpts = (sourceText) => _pbpTrStreamOpts(sourceText, model, st.ctrl.signal);
+  const streamOpts = (sourceText) => _pbpTrStreamOpts(sourceText, model, signal);
 
   const requestBatch = (segments, onItem) => {
     const glossary = pbpTrMatchGlossary(st.glossary, segments);
@@ -1961,11 +1976,11 @@ async function _pbpTrStart(st) {
     const opts = streamOpts(sentText);
     opts.system = system;
     const u = { got: false };            // T4: did the provider report real usage for this batch?
-    opts.onUsage = (usage) => { u.got = true; st.usage.inTok += usage.inTok; st.usage.outTok += usage.outTok; };
-    const key = "tr:" + st.modelKey + ":" + st.target.code + ":" + segments.map((x) => x.id).join(",");
+    opts.onUsage = (usage) => { if (st.rev !== runRev) return; u.got = true; st.usage.inTok += usage.inTok; st.usage.outTok += usage.outTok; };
+    const key = "tr:" + st.modelKey + ":" + st.target.code + ":" + runRev + ":" + segments.map((x) => x.id).join(",");
     return getOrCreateInflight(key, () =>
       callAIStream(st.s, prompt, opts, (d, acc) => parser.push(acc))
-    ).then((full) => { _pbpTrUsageFallback(st, u.got, sentText, full); return parser.finish(full); });
+    ).then((full) => { if (st.rev !== runRev) return; _pbpTrUsageFallback(st, u.got, sentText, full); return parser.finish(full); });
   };
   const requestSingle = async (seg) => {
     const glossary = pbpTrMatchGlossary(st.glossary, [seg]);
@@ -1976,8 +1991,9 @@ async function _pbpTrStart(st) {
     const opts = streamOpts(seg.text);
     opts.system = system;
     const u = { got: false };            // T4
-    opts.onUsage = (usage) => { u.got = true; st.usage.inTok += usage.inTok; st.usage.outTok += usage.outTok; };
+    opts.onUsage = (usage) => { if (st.rev !== runRev) return; u.got = true; st.usage.inTok += usage.inTok; st.usage.outTok += usage.outTok; };
     const full = await callAIStream(st.s, prompt, opts, (d, acc) => parser.push(acc));
+    if (st.rev !== runRev) return null;
     _pbpTrUsageFallback(st, u.got, seg.text, full);
     parser.finish(full);
     return got;
@@ -2030,7 +2046,7 @@ async function _pbpTrStart(st) {
     batches: batchesPacked,
     claim: (remaining) => pbpTrPickBatch(remaining, batchBlockNs,
       pbpTrRunAnchor(pendingNs, st.work.length, st.skippedCount || 0, st.viewTopBlock)),
-    requestBatch, requestSingle, signal: st.ctrl.signal,
+    requestBatch, requestSingle, signal,
     onFill: (id, text) => {
       const m = segMap.get(id);
       if (!m) return;
@@ -2061,13 +2077,14 @@ async function _pbpTrStart(st) {
       _pbpTrCommitAssembled(st, w, done, pb.failed);                     // partial (>=1 real part) -> displayed, never cached (D7)
     },
     onPhase: (phase, detail) => {
-      if (st.rev !== runRev || st.ctrl.signal.aborted) return;
+      if (st.rev !== runRev || signal.aborted) return;
       const prog = document.getElementById("tr-progress");
       if (prog) prog.textContent = phase === "waiting"
         ? t("trRateLimitWaiting", String(Math.ceil(detail.delayMs / 1000)))
         : t("trTranslating") + " " + t("trProgress", String(detail.done + (st.skippedCount || 0)), String(detail.total + (st.skippedCount || 0)));
     },
     onProgress: (done, total) => {
+      if (st.rev !== runRev || signal.aborted) return;
       const prog = document.getElementById("tr-progress");
       // T3: N/M counts from the skip baseline, not from zero -- skipped blocks are
       // already "done" and were never queued, so both the numerator and the
@@ -2081,6 +2098,15 @@ async function _pbpTrStart(st) {
       if (headProg) headProg.textContent = "(" + d + "/" + tt + ")";
     }
   });
+  // A new article owns the shared state now. Preserve only the old run's
+  // already-paid blocks, under its captured cache key, as a meta-less merge.
+  // Never clear a new run's flags/buffers or consume its replace semantics.
+  if (st.rev !== runRev) {
+    if (Object.keys(newly).length) {
+      try { await pbpTrCacheSet(cacheKey.url, cacheKey.lang, cacheKey.model, newly, cacheKey.account); } catch (_) {}
+    }
+    return;
+  }
   // End-of-run write keeps the FULL st.newly (not just the unflushed residue):
   // the append transform is an idempotent merge, so rewriting flushed blocks is
   // free, and any blocks a failed flush dropped are retried here. A still-armed
@@ -2088,30 +2114,17 @@ async function _pbpTrStart(st) {
   if (Object.keys(st.newly).length) {
     try {
       await pbpTrCacheSet(st.url, st.target.code, st.modelKey, st.newly, st.account, st.runMeta, st.replaceRun);
+      if (st.rev !== runRev) return;
       st.wroteOk = true;
       st.replaceRun = false;
     } catch (_) {}
   }
+  if (st.rev !== runRev) return;
   // Review blocker #1: everything in the flush buffer is now on disk via the
   // full st.newly write above; residue must not outlive the run -- a later
   // language switch plus a hidden-flush would re-key it under the NEW language
   // (permanent wrong-language cache entries, no TTL to age them out).
   st.flushBuf = Object.create(null);
-  // Replaced mid-run. The cache write above deliberately stays on THIS side of
-  // the fence (review F3): st.newly holds only blocks this run paid for, keyed
-  // by their own content hashes, so they are correct data that a switch back to
-  // the old track restores for free. The teardown disarmed st.replaceRun, so it
-  // is a merge and never a destructive replace, and it cleared st.runMeta, which
-  // makes it a meta-less write -- the same shape _pbpTrRetryBlock performs and
-  // documents as leaving the stored meta untouched (D5). Dropping it would have
-  // thrown away already-paid work twice over, since the teardown also wipes
-  // st.flushBuf.
-  //
-  // Everything BELOW is what must not continue: session verdict, status and
-  // progress text, the usage line and the persisted view mode all describe an
-  // article that is no longer on screen. st.running is released so the reader
-  // can translate the NEW article by hand.
-  if (st.rev !== runRev) { st.running = false; return; }
   // ZH-1b (review #5/#12): escalate the session verdict to "mixed" only when
   // this run actually LANDED writes into the old-generation entry -- a run
   // that wrote nothing (instant Stop, total failure) leaves the disk
@@ -2209,6 +2222,8 @@ function _pbpTrFlushCache(st) {
   if (!st || !st.flushBuf || st.flushInflight) return;
   if (!Object.keys(st.flushBuf).length) return;
   const url = st.url, lang = st.target.code, model = st.modelKey, account = st.account, meta = st.runMeta;
+  const revision = st.rev, newly = st.newly;
+  const current = () => st.rev === revision && st.newly === newly;
   // Replace-run flushes (ZH-1b retranslate / full-miss probe) carry the
   // CUMULATIVE run output and replace the whole entry; on the first success
   // the flag is consumed and later flushes merge as usual. A failed replace
@@ -2228,9 +2243,9 @@ function _pbpTrFlushCache(st) {
     try { console.warn("tr flush failed:", e && e.name, e && e.message); } catch (_) {}
     return;
   }
-  p.then(() => { st.wroteOk = true; if (replace) st.replaceRun = false; })
+  p.then(() => { if (!current()) return; st.wroteOk = true; if (replace) st.replaceRun = false; })
     .catch((e) => { try { console.warn("tr flush failed:", e && e.name, e && e.message); } catch (_) {} })
-    .finally(() => { st.flushInflight = false; });
+    .finally(() => { if (current()) st.flushInflight = false; });
 }
 
 // Shared tail of the multi-part assembly (onFill and onBlockFail converge
@@ -2981,6 +2996,7 @@ function _pbpTrOnArticleWillReplace(detail) {
   st.rev = (Number.isFinite(claimed) && claimed > cur) ? claimed : cur + 1;
   if (st.ctrl) st.ctrl.abort();            // stop the network; the fence stops the write-back
   st.ctrl = null;
+  st.running = false;                      // the new article can start its own run immediately
   // Invalidate the work builder: the rev bump already makes its next chunk
   // bail, and emptying st.work means nothing downstream can read a half-old
   // index. A _pbpTrStart parked on the old promise resolves immediately.

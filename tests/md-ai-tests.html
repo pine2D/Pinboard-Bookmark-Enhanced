@@ -82,7 +82,7 @@ function assertEq(actual, expected, label) {
 // on CI (a slower machine, another interleaving) "failed retranslate keeps
 // the old entry" saw a different block's succeeding callAIStream stub and
 // watched its entry get replaced, while the same file was green locally on
-// every run. Only the stub-swapping blocks join the queue: serialising every
+// every run. Stub-swapping blocks and their cache consumers join the queue: serialising every
 // async case in the file changed the semantics of a dozen early-running ones.
 // `report` is the calling block's reporter so results land in its own host.
 let __netStubQueue = Promise.resolve();
@@ -1293,7 +1293,7 @@ suite("md-ai IDB key conventions", () => {
     else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
     host.appendChild(div);
   }
-  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  async function atest(name, fn) { return atestNetSerial(name, fn, report); } // cache consumers must not observe another suite's temporary cache stubs
   if (typeof pbpAiCacheAppend !== "function" || typeof pbpAskHistAppend !== "function") {
     const div = document.createElement("div");
     div.className = "case skip";
@@ -10155,6 +10155,186 @@ window._t4AsyncDone = (async function () {
       _pbpTrState = saved;
       window.callAIStream = savedStream;
       sec.remove();
+    }
+  });
+
+  for (const stage of ["summary", "glossary-cache", "glossary-stream", "glossary-chunks"]) {
+    await atest("article replacement fences a translate run waiting on " + stage, async () => {
+      const saved = _pbpTrState;
+      const savedStream = window.callAIStream, savedSummary = window.getAICache;
+      const savedGlossGet = window.pbpTrGlossaryCacheGet, savedGlossSet = window.pbpTrGlossaryCacheSet;
+      const savedTrGet = window.pbpTrCacheGet;
+      const sec = document.createElement("div"); sec.id = "tr-section"; document.body.appendChild(sec);
+      const text = stage === "glossary-chunks" ? "old article terminology ".repeat(2500) : "old article terminology ".repeat(100);
+      const view = _t4View("<p>" + text + "</p>");
+      const st = _t4TrState("https://example.test/t4-setup-" + stage + "-" + Date.now());
+      st.work = [_t4Work(1, text, 0)]; _pbpTrState = st;
+      let release, releaseNew, entered = false, newEntered = false, paidCalls = 0, cacheWrites = 0, oldRun, newRun;
+      const delayed = new Promise(resolve => { release = resolve; });
+      const delayedNew = new Promise(resolve => { releaseNew = resolve; });
+      window.getAICache = async () => {
+        if (st.rev === 1) { newEntered = true; return delayedNew; }
+        if (stage === "summary") { entered = true; return delayed; } return "";
+      };
+      window.pbpTrGlossaryCacheGet = async () => { if (stage === "glossary-cache") { entered = true; return delayed; } return null; };
+      window.pbpTrGlossaryCacheSet = async () => { cacheWrites++; };
+      window.pbpTrCacheGet = async () => null;
+      window.callAIStream = async (settings, prompt, opts) => {
+        paidCalls++; entered = true;
+        if (stage.startsWith("glossary-s") || stage === "glossary-chunks") {
+          const answer = await delayed;
+          if (opts.onUsage) opts.onUsage({ inTok: 17, outTok: 19 });
+          return answer;
+        }
+        return '{"terms":[]}';
+      };
+      try {
+        let rejection = "";
+        oldRun = _pbpTrStart(st).catch(error => { rejection = error.message; });
+        for (let i = 0; i < 300 && (!entered || (stage === "glossary-chunks" && paidCalls < 2)); i++) await new Promise(resolve => setTimeout(resolve, 0));
+        assert(entered, "control: the production run reached the delayed operation");
+        const alreadySent = paidCalls;
+        _t4WithSyncRaf(() => {
+          _pbpTrOnArticleWillReplace({ revision: 1 });
+          view.innerHTML = "<p>" + "new article terminology ".repeat(100) + "</p>";
+          pbpAiIndexBlocks(view);
+          _pbpTrOnArticleReplaced({ revision: 1 });
+        });
+        await st.workReady;
+        newRun = _pbpTrStart(st);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assert(newEntered, "a replacement immediately frees the module for an explicit new run");
+        const newController = st.ctrl;
+        release(stage === "summary" ? "" : stage === "glossary-cache" ? null : '{"terms":[{"term":"terminology","translation":"term"}]}');
+        await oldRun;
+        assertEq(paidCalls, alreadySent, "a superseded run sends no further AI requests");
+        assertEq(cacheWrites, 0, "a late glossary result is not persisted by the superseded run");
+        assertEq(st.glossary, null, "a late result cannot seed the new article's glossary");
+        assertEq(rejection, "", "cancellation settles without dereferencing the removed controller");
+        assertEq(st.running, true, "the old run cannot release the new run's claim");
+        assertEq(st.usage.inTok, 0, "a late old usage event cannot accrue to the new run");
+        assertEq(st.ctrl, newController, "the old run cannot clear the new controller");
+        await _pbpTrStart(st);
+        assertEq(st.ctrl, newController, "a second new click cannot create a concurrent run");
+      } finally {
+        release(null);
+        if (oldRun) await oldRun;
+        if (newRun) { if (st.ctrl) st.ctrl.abort(); releaseNew(""); await newRun; }
+        window.callAIStream = savedStream; window.getAICache = savedSummary;
+        window.pbpTrGlossaryCacheGet = savedGlossGet; window.pbpTrGlossaryCacheSet = savedGlossSet;
+        window.pbpTrCacheGet = savedTrGet; _pbpTrState = saved;
+        sec.remove(); view.remove(); document.body.classList.remove("tr-bilingual", "tr-only");
+        window.pbpViewMarkdown = null;
+      }
+    });
+  }
+
+  for (const boundary of ["batch", "flush"]) {
+    await atest("a late " + boundary + " completion preserves a new translation run", async () => {
+      const saved = _pbpTrState;
+      const savedStream = window.callAIStream, savedSummary = window.getAICache;
+      const savedSet = window.pbpTrCacheSet, savedGet = window.pbpTrCacheGet;
+      const sec = document.createElement("div"); sec.id = "tr-section"; document.body.appendChild(sec);
+      const view = _t4View("<p>old article text for translation</p>");
+      const st = _t4TrState("https://example.test/t4-owned-" + boundary + "-" + Date.now());
+      st.work = [_t4Work(1, "old article text for translation", 0)]; _pbpTrState = st;
+      let releaseOld, releaseNew, oldEntered = false, newEntered = false, oldRun, newRun;
+      const oldPending = new Promise(resolve => { releaseOld = resolve; });
+      const newPending = new Promise(resolve => { releaseNew = resolve; });
+      const writes = [];
+      window.pbpTrCacheGet = async () => null;
+      window.pbpTrCacheSet = async (...args) => { writes.push(args); };
+      window.getAICache = async () => { if (st.rev === 1) { newEntered = true; return newPending; } return ""; };
+      const answer = '{"translations":[{"id":1,"text":"old article text translated correctly"}]}';
+      window.callAIStream = async (settings, prompt, opts, onDelta) => {
+        oldEntered = true; onDelta(answer, answer); await oldPending;
+        if (opts.onUsage) opts.onUsage({ inTok: 17, outTok: 19 });
+        return answer;
+      };
+      try {
+        if (boundary === "batch") {
+          oldRun = _pbpTrStart(st);
+          for (let i = 0; i < 300 && !oldEntered; i++) await new Promise(resolve => setTimeout(resolve, 0));
+          assert(oldEntered && st.newly.h1_0, "control: the paid old block filled before its stream completed");
+        } else {
+          st.newly = { h1_0: "paid old block" }; st.flushBuf = { h1_0: "paid old block" }; st.replaceRun = true;
+          st.flushFn = async () => { oldEntered = true; await oldPending; };
+          _pbpTrFlushCache(st);
+        }
+        _t4WithSyncRaf(() => {
+          _pbpTrOnArticleWillReplace({ revision: 1 });
+          view.innerHTML = "<p>new article text for translation</p>"; pbpAiIndexBlocks(view);
+          _pbpTrOnArticleReplaced({ revision: 1 });
+        });
+        await st.workReady;
+        newRun = _pbpTrStart(st);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assert(newEntered, "control: the new explicit run reached its own cache await");
+        const newController = st.ctrl;
+        st.flushBuf.newPaid = "new unflushed block"; st.replaceRun = true; st.wroteOk = false; st.flushInflight = true;
+        releaseOld();
+        if (oldRun) await oldRun;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assertEq(st.running, true, "a stale completion cannot release the new run");
+        assertEq(st.usage.inTok, 0, "late usage belongs to the old run");
+        assertEq(st.ctrl, newController, "the new controller keeps ownership");
+        assertEq(st.flushBuf.newPaid, "new unflushed block", "the new flush buffer is retained");
+        assertEq(st.replaceRun, true, "the new replace flag is not consumed by an old write");
+        assertEq(st.wroteOk, false, "an old write is not counted as success in the new run");
+        assertEq(st.flushInflight, true, "an old flush cannot release the new flush claim");
+        if (boundary === "batch") {
+          assertEq(writes.length, 1, "the paid old block remains cached");
+          assertEq(Object.keys(writes[0][3]).join(","), "h1_0", "only the old run's own output is written");
+          assert(!writes[0][6], "a superseded run can only merge its paid output");
+        }
+      } finally {
+        releaseOld(); if (oldRun) await oldRun;
+        if (newRun) { if (st.ctrl) st.ctrl.abort(); releaseNew(""); await newRun; }
+        window.callAIStream = savedStream; window.getAICache = savedSummary;
+        window.pbpTrCacheSet = savedSet; window.pbpTrCacheGet = savedGet; _pbpTrState = saved;
+        sec.remove(); view.remove(); document.body.classList.remove("tr-bilingual", "tr-only"); window.pbpViewMarkdown = null;
+      }
+    });
+  }
+
+  await atest("a new article never shares the previous article's in-flight translation", async () => {
+    const saved = _pbpTrState, savedStream = window.callAIStream, savedSummary = window.getAICache;
+    const savedSet = window.pbpTrCacheSet, savedGet = window.pbpTrCacheGet;
+    const sec = document.createElement("div"); sec.id = "tr-section"; document.body.appendChild(sec);
+    const view = _t4View("<p>old article content</p>");
+    const st = _t4TrState("https://example.test/t4-inflight-" + Date.now());
+    st.work = [_t4Work(1, "old article content", 0)]; _pbpTrState = st;
+    let release, calls = 0, oldRun, newRun;
+    const pending = new Promise(resolve => { release = resolve; });
+    window.getAICache = async () => ""; window.pbpTrCacheGet = async () => null; window.pbpTrCacheSet = async () => {};
+    window.callAIStream = async (settings, prompt, opts, onDelta) => {
+      const isOld = JSON.parse(prompt).segments[0].text.includes("old article");
+      calls++;
+      const answer = JSON.stringify({ translations: [{ id: 1, text: isOld ? "old article translated" : "new article translated" }] });
+      onDelta(answer, answer);
+      if (isOld) await pending;
+      return answer;
+    };
+    try {
+      oldRun = _pbpTrStart(st);
+      for (let i = 0; i < 300 && calls < 1; i++) await new Promise(resolve => setTimeout(resolve, 0));
+      assertEq(calls, 1, "control: the old request remains in the singleflight map");
+      _t4WithSyncRaf(() => {
+        _pbpTrOnArticleWillReplace({ revision: 1 });
+        view.innerHTML = "<p>new article content</p>"; pbpAiIndexBlocks(view);
+        _pbpTrOnArticleReplaced({ revision: 1 });
+      });
+      await st.workReady; newRun = _pbpTrStart(st);
+      for (let i = 0; i < 300 && calls < 2; i++) await new Promise(resolve => setTimeout(resolve, 0));
+      const sentIndependently = calls === 2;
+      release(); await oldRun; await newRun;
+      assert(sentIndependently, "the new article dispatches its own prompt before the old request settles");
+      assertEq(view.querySelector(".pb-tr")?.textContent.trim(), "new article translated", "the new article never displays the old answer");
+    } finally {
+      release(); if (oldRun) await oldRun; if (newRun) await newRun;
+      window.callAIStream = savedStream; window.getAICache = savedSummary;
+      window.pbpTrCacheSet = savedSet; window.pbpTrCacheGet = savedGet; _pbpTrState = saved;
+      sec.remove(); view.remove(); document.body.classList.remove("tr-bilingual", "tr-only"); window.pbpViewMarkdown = null;
     }
   });
 
