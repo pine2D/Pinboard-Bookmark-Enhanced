@@ -1,0 +1,194 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Reader Send-to lifecycle tests</title></head><body>
+<h1>Reader Send-to lifecycle tests</h1><div id="results"></div>
+<script src="../export-targets.js"></script>
+<script>
+const assert = (ok, message) => { if (!ok) throw new Error(message); };
+const deferred = () => {
+  let resolve;
+  const promise = new Promise(r => { resolve = r; });
+  return { promise, resolve };
+};
+const tick = () => new Promise(r => setTimeout(r, 0));
+async function settle() { for (let i = 0; i < 5; i++) await tick(); }
+let source;
+async function fixture() {
+  const frame = document.createElement("iframe");
+  document.body.appendChild(frame);
+  const w = frame.contentWindow, d = w.document;
+  d.body.innerHTML = '<div id="send-split"><button id="send-primary"><span id="send-primary-ic"></span><span id="send-primary-label" class="btn-label"></span></button><button id="send-caret"></button><div id="send-menu" hidden></div></div><div id="send-status" hidden></div><div id="copy-status"></div>';
+  const state = {
+    settings: { exportTargets: { github: { enabled: true, token: "first" } } },
+    flags: { optSyncEnabled: false, syncApiKeys: false },
+    reads: [], lastReads: [], listeners: [], sends: [], sendWaits: [], permissionWaits: [], lastWrites: []
+  };
+  const params = {
+    exportSettings: {},
+    PBP_EXPORT_TARGETS,
+    pbpExportTargetIds,
+    pbpReadSettingsWithSecrets: async () => state.reads.length ? state.reads.shift().promise : structuredClone(state.settings),
+    pbpReadSecretSyncState: async () => ({ ...state.flags }),
+    pbpSettingsAreaName: async () => state.flags.optSyncEnabled ? "sync" : "local",
+    pbpGetLastTarget: async () => state.lastReads.length ? state.lastReads.shift().promise : "github",
+    pbpSetLastTarget: async () => state.lastWrites.length ? state.lastWrites.shift().promise : undefined,
+    pbpRequestTargetPermission: async () => state.permissionWaits.length ? state.permissionWaits.shift().promise : true,
+    pbpSendToTarget: async (id, ctx) => {
+      state.sends.push({ id, ctx });
+      return state.sendWaits.length ? state.sendWaits.shift().promise : { ok: true, fellBack: false };
+    },
+    buildMeta: () => ({ title: "Fixture", url: "https://fixture.test/article" }),
+    buildExportOpts: () => ({ imagePolicy: "keep" }),
+    composeExport: body => body,
+    getViewMarkdown: () => "Fixture body",
+    imgFixExportNote: () => {},
+    pbpOpenOptionsTab: () => {},
+    t: key => key === "mdSendTo" ? "Send to {name}" : key,
+    chrome: { storage: { onChanged: { addListener: fn => state.listeners.push(fn) } } }
+  };
+  const begin = source.indexOf("  let _sendMenuCtl = null;");
+  const end = source.indexOf("\n})().catch", begin);
+  assert(begin >= 0 && end > begin, "production Send-to lifecycle block missing");
+  const flashStart = source.indexOf("function flashButtonLabel(");
+  const flashEnd = source.indexOf("\n// renderMarkdown", flashStart);
+  const AsyncFunction = w.eval("(async function(){}).constructor");
+  const api = await new AsyncFunction(...Object.keys(params),
+    source.slice(flashStart, flashEnd) + "\n" + source.slice(begin, end) + "\nreturn { refresh: setupSendMenu };")(...Object.values(params));
+  return {
+    ...api, state, d,
+    click: () => d.getElementById("send-primary").click(),
+    changed: async (changes, area = "local") => {
+      await Promise.all(state.listeners.map(fn => fn(changes, area)));
+      await settle();
+    },
+    close: () => frame.remove()
+  };
+}
+let pass = 0, fail = 0;
+async function test(name, fn) {
+  const row = document.createElement("div");
+  let f;
+  try { f = await fixture(); await fn(f); pass++; row.className = "pass"; row.textContent = "PASS " + name; }
+  catch (e) { fail++; row.className = "fail"; row.textContent = "FAIL " + name + " — " + e.message; }
+  finally { if (f) f.close(); }
+  document.getElementById("results").appendChild(row);
+}
+(async () => {
+  source = await (await fetch("../md-preview.js")).text();
+  await test("normal send captures configured target and article", async f => {
+    f.click(); await settle();
+    assert(f.state.sends.length === 1 && f.state.sends[0].id === "github"
+      && f.state.sends[0].ctx.cfg.token === "first" && f.state.sends[0].ctx.rawBody === "Fixture body", "wrong outbound clip");
+  });
+  await test("double click shares one pending send", async f => {
+    const wait = deferred(); f.state.sendWaits.push(wait);
+    f.click(); await settle(); f.click(); await settle();
+    const count = f.state.sends.length; wait.resolve({ ok: true }); await settle();
+    assert(count === 1, "duplicate dispatch");
+  });
+  await test("settings refresh cannot reset pending-send guard", async f => {
+    const wait = deferred(); f.state.sendWaits.push(wait);
+    f.click(); await settle(); await f.refresh(); f.click(); await settle();
+    const count = f.state.sends.length; wait.resolve({ ok: true }); await settle();
+    assert(count === 1, "refresh allowed a second dispatch");
+  });
+  await test("completed old send cannot restore a disabled primary target", async f => {
+    const wait = deferred(); f.state.sendWaits.push(wait);
+    f.click(); await settle();
+    f.state.settings = { exportTargets: { notebooklm: { enabled: true } } }; await f.refresh();
+    wait.resolve({ ok: true }); await settle();
+    assert(f.d.getElementById("send-primary").dataset.targetId === "notebooklm", "old completion restored GitHub");
+  });
+  await test("late settings read cannot re-enable a removed target", async f => {
+    const read = deferred(); f.state.reads.push(read);
+    const old = f.refresh(); await settle();
+    f.state.settings = { exportTargets: {} }; await f.refresh();
+    read.resolve({ exportTargets: { github: { enabled: true, token: "stale" } } }); await old;
+    assert(f.d.getElementById("send-split").classList.contains("send-empty"), "stale settings replaced latest menu");
+  });
+  await test("late last-target read cannot replace latest menu", async f => {
+    const read = deferred(); f.state.lastReads.push(read);
+    const old = f.refresh(); await settle();
+    f.state.settings = { exportTargets: { notebooklm: { enabled: true } } }; await f.refresh();
+    read.resolve("github"); await old;
+    assert(f.d.getElementById("send-primary").dataset.targetId === "notebooklm"
+      && !f.d.querySelector('.send-mi[data-target-id="github"]'), "old preference read replaced latest menu");
+  });
+  await test("local secret changes refresh a sync-routed menu", async f => {
+    f.state.flags.optSyncEnabled = true;
+    f.state.settings.exportTargets.github.token = "second";
+    await f.changed({ exportTargets: { newValue: f.state.settings.exportTargets } }, "local");
+    f.click(); await settle();
+    assert(f.state.sends[0]?.ctx.cfg.token === "second", "old local secret was sent");
+  });
+  await test("local webhook capability changes refresh a sync-routed menu", async f => {
+    f.state.settings = { exportTargets: { webhook: { enabled: true, url: "https://fixture.test/first" } } };
+    await f.refresh();
+    f.state.flags.optSyncEnabled = true;
+    f.state.settings.exportTargets.webhook.url = "https://fixture.test/second";
+    await f.changed({ exportTargets: { newValue: f.state.settings.exportTargets } }, "local");
+    f.click(); await settle();
+    assert(f.state.sends[0]?.ctx.cfg.url === "https://fixture.test/second", "old capability URL was retained");
+  });
+  await test("foreign sync changes do not replace local menu", async f => {
+    f.state.settings = { exportTargets: {} };
+    await f.changed({ exportTargets: { newValue: {} } }, "sync");
+    assert(!f.d.getElementById("send-split").classList.contains("send-empty"), "foreign sync rerendered local menu");
+  });
+  await test("local shadow is ignored while credentials sync", async f => {
+    f.state.flags = { optSyncEnabled: true, syncApiKeys: true };
+    f.state.settings = { exportTargets: {} };
+    await f.changed({ exportTargets: { newValue: {} } }, "local");
+    assert(!f.d.getElementById("send-split").classList.contains("send-empty"), "local shadow rerendered cloud menu");
+  });
+  await test("device routing switch rebuilds the menu", async f => {
+    f.state.flags.optSyncEnabled = true; f.state.settings = { exportTargets: {} };
+    await f.changed({ optSyncEnabled: { newValue: true } }, "local");
+    assert(f.d.getElementById("send-split").classList.contains("send-empty"), "route switch was ignored");
+  });
+  await test("refresh before permission resolves cancels obsolete send", async f => {
+    const wait = deferred(); f.state.permissionWaits.push(wait);
+    f.click(); await settle(); f.state.settings = { exportTargets: {} }; await f.refresh();
+    wait.resolve(true); await settle();
+    assert(f.state.sends.length === 0, "disabled target was dispatched after permission wait");
+  });
+  await test("obsolete feedback timer cannot revert the new target label", async f => {
+    f.click(); await settle();
+    f.state.settings = { exportTargets: { notebooklm: { enabled: true } } }; await f.refresh();
+    await new Promise(r => setTimeout(r, 1600));
+    assert(f.d.getElementById("send-primary-label").textContent === "Send to NotebookLM", "old timer restored the previous label");
+  });
+  await test("send failure releases guard for explicit retry", async f => {
+    const wait = deferred(); f.state.sendWaits.push(wait);
+    f.click(); await settle(); wait.resolve({ ok: false, error: "api-down" }); await settle();
+    f.click(); await settle();
+    assert(f.state.sends.length === 2, "failure permanently blocked retry");
+  });
+  await test("switching destinations before feedback expires preserves the new label", async f => {
+    f.state.settings.exportTargets.notebooklm = { enabled: true }; await f.refresh();
+    f.click(); await settle();
+    f.d.querySelector('.send-mi[data-target-id="notebooklm"]').click(); await settle();
+    await new Promise(r => setTimeout(r, 1600));
+    assert(f.d.getElementById("send-primary-label").textContent === "Send to NotebookLM", "previous destination feedback restored the wrong label");
+  });
+  await test("successful retry clears the previous error status", async f => {
+    const wait = deferred(); f.state.sendWaits.push(wait);
+    f.click(); await settle(); wait.resolve({ ok: false, error: "api-down" }); await settle();
+    f.click(); await settle();
+    const status = f.d.getElementById("send-status");
+    assert(status.hidden || !status.classList.contains("error"), "successful retry still displays the previous failure");
+  });
+  await test("obsolete last-target write cannot dispatch removed destination", async f => {
+    const wait = deferred(); f.state.lastWrites.push(wait);
+    f.click(); await settle(); f.state.settings = { exportTargets: {} }; await f.refresh();
+    wait.resolve(); await settle();
+    assert(f.state.sends.length === 0, "obsolete send continued after preference write");
+  });
+  await test("detached menu items cannot dispatch disabled destinations", async f => {
+    const old = f.d.querySelector('.send-mi[data-target-id="github"]');
+    f.state.settings = { exportTargets: {} }; await f.refresh();
+    old.click(); await settle();
+    assert(f.state.sends.length === 0, "old menu listener sent to disabled destination");
+  });
+  document.title = (fail ? "FAIL" : "PASS") + " Reader Send-to lifecycle tests";
+})().catch(e => { const row = document.createElement("div"); row.className = "fail"; row.textContent = e.stack; document.getElementById("results").appendChild(row); });
+</script></body></html>

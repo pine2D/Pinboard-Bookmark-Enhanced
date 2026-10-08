@@ -3393,6 +3393,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   });
 
   let _sendMenuCtl = null;
+  let _sendInFlight = false;
+  let sendStatusTimer;
   async function setupSendMenu() {
     const split = document.getElementById("send-split");
     if (!split || typeof PBP_EXPORT_TARGETS === "undefined") return;
@@ -3406,8 +3408,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // enabled/disabled target, changed vault/folder) is reflected WITHOUT reopening the preview.
     try {
       const _fresh = await pbpReadSettingsWithSecrets({ exportTargets: {}, obsidianEnabled: false, obsidianVault: "", obsidianFolder: "" });
+      if (_sig.aborted) return;
       Object.assign(exportSettings, _fresh);
     } catch (_) {}
+    if (_sig.aborted) return;
 
     // Resolve enabled targets. Back-compat: if exportTargets is empty but the
     // legacy obsidian* settings exist, synthesize the obsidian row so existing
@@ -3428,7 +3432,6 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     const caret = document.getElementById("send-caret");
     const menu = document.getElementById("send-menu");
     const sendStatus = document.getElementById("send-status");
-    let sendStatusTimer;
     function showSendStatus(msg, isError, url, viewLabel) {
       if (!sendStatus) return;
       clearTimeout(sendStatusTimer);
@@ -3470,12 +3473,19 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     }, { signal: _sig });
 
     split.classList.remove("send-empty");
+    // Feedback belongs to this render. A prior label timer must not restore
+    // the name of a destination that was changed or disabled in settings.
+    clearTimeout(primary._copyTimer);
+    primary._copyOrig = null;
+    primary.classList.remove("copied");
     primary.title = "";
     caret.removeAttribute("hidden");
     menu.setAttribute("hidden", "");
     caret.setAttribute("aria-expanded", "false");
 
     if (!enabledIds.length) {
+      delete primary.dataset.targetId;
+      menu.innerHTML = "";
       split.classList.add("send-empty");
       primaryIc.innerHTML = "";
       primaryLabel.textContent = t("mdSendToEllipsis");
@@ -3486,20 +3496,25 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     }
 
     let lastId = await pbpGetLastTarget();
+    if (_sig.aborted) return;
     if (!enabledIds.includes(lastId)) lastId = enabledIds[0];
 
     function setPrimary(id) {
       const row = PBP_EXPORT_TARGETS[id];
+      clearTimeout(primary._copyTimer);
+      primary._copyOrig = null;
+      primary.classList.remove("copied");
       primary.dataset.targetId = id;
       primaryIc.innerHTML = row.icon;
       primaryLabel.textContent = t("mdSendTo").replace("{name}", row.label);
     }
     setPrimary(lastId);
 
-    let _sending = false;
     async function doSend(id) {
-      if (_sending) return;                 // re-entrancy guard: a double-click on a
-      _sending = true;                      // slow gist POST must not create two gists
+      // The guard outlives menu renders: changing settings during a pending
+      // POST must not allow a second click to create another remote resource.
+      if (_sendInFlight || _sig.aborted) return;
+      _sendInFlight = true;
       try {                                 // (the "mdSending" label is the affordance;
         const row = PBP_EXPORT_TARGETS[id]; // not disabling keeps the restored focus, F8)
         setPrimary(id);
@@ -3507,10 +3522,14 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         // First await in the direct click chain: chrome.permissions.request()
         // must run while the user gesture is still active.
         await pbpRequestTargetPermission(id, cfg);
+        if (_sig.aborted) return;
         await pbpSetLastTarget(id);
+        if (_sig.aborted) return;
         const meta = buildMeta();
         const _exp = buildExportOpts();
         imgFixExportNote(false);
+        clearTimeout(sendStatusTimer);
+        if (sendStatus) { sendStatus.hidden = true; sendStatus.textContent = ""; }
         // Send-to never runs resolveEmbed (no permission-gesture flow here) --
         // "embed" clamps to "keep" so a plain absolute link is sent instead of
         // a dangling literal "embed" policy string reaching applyImagePolicy.
@@ -3524,17 +3543,17 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           res = { ok: false, fellBack: false, error: "" };
         }
         primary.classList.remove("sending");
-        setPrimary(id);
+        if (!_sig.aborted) setPrimary(id);
         if (res.ok && !res.fellBack) {
           // token-api (gist/webhook) has a real HTTP receipt -- text unchanged.
           // url-scheme (obsidian) has no receipt: the OS may have silently
           // dropped the open, so the claim is scoped to what's verifiably
           // true ("opened" + "copied"), not "sent".
           if (row.mechanism === "url-scheme") {
-            flashButtonLabel(primary, t("mdOpenedApp").replace("{name}", row.label));
+            if (!_sig.aborted) flashButtonLabel(primary, t("mdOpenedApp").replace("{name}", row.label));
             showSendStatus(t("mdSentUrlScheme").replace("{name}", row.label), false);
           } else {
-            flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label));        // short -> button
+            if (!_sig.aborted) flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label)); // short -> button
             if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url, row.viewLabel ? t(row.viewLabel) : undefined); // + clickable link
           }
         } else if (res.error === "open-blocked") {
@@ -3563,7 +3582,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           showSendStatus(t("mdSendFailed"), true);
         }
       } finally {
-        _sending = false;
+        _sendInFlight = false;
+        primary.classList.remove("sending");
       }
     }
 
@@ -3620,31 +3640,37 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       }
       // Restore focus to the primary button before the menu collapses, so a
       // keyboard user isn't dropped to <body> (WCAG 2.4.3).
-      item.addEventListener("click", () => { closeMenu(); primary.focus(); doSend(id); });
+      item.addEventListener("click", () => { closeMenu(); primary.focus(); doSend(id); }, { signal: _sig });
       menu.appendChild(item);
     });
 
     const foot = document.createElement("button");
     foot.type = "button"; foot.className = "send-mi send-mi-foot"; foot.setAttribute("role", "menuitem");
     foot.textContent = t("mdManageDestinations");
-    foot.addEventListener("click", () => { closeMenu(); pbpOpenOptionsTab("markdown"); });
+    foot.addEventListener("click", () => { closeMenu(); pbpOpenOptionsTab("markdown"); }, { signal: _sig });
     menu.appendChild(foot);
   }
 
   await setupSendMenu();
-  // Only the area this device routes its settings to (settings batch D3): a
-  // synced write from a device that DOES sync must not re-render this menu --
-  // setupSendMenu() hides an open dropdown and drops focus to <body>, for data
-  // that never changed here. Same filter shape as md-translate.js's target-lang
-  // listener; optSyncEnabled flips the routing itself, so it always counts and
-  // setupSendMenu's own pbpReadSettingsWithSecrets re-reads from the new area.
+  // exportTargets mixes ordinary settings with credentials/capability URLs.
+  // With settings sync on and credentials sync off, either area's write can
+  // change the effective menu. Ignore only areas not consumed by this device.
   chrome.storage.onChanged.addListener(async (changes, area) => {
     const rerouted = area === "local" && !!changes.optSyncEnabled;
     const touched = !!(changes.syncApiKeys || changes.exportTargets
       || changes.obsidianEnabled || changes.obsidianVault || changes.obsidianFolder);
     if ((area !== "sync" && area !== "local") || !(rerouted || touched)) return;
-    if (!rerouted && typeof pbpSettingsAreaName === "function" && area !== await pbpSettingsAreaName()) return;
-    setupSendMenu();
+    try {
+      const flags = await pbpReadSecretSyncState({ persistInferredState: false });
+      const mainArea = flags.optSyncEnabled ? "sync" : "local";
+      const secretArea = flags.optSyncEnabled && !flags.syncApiKeys ? "local" : mainArea;
+      const relevant = rerouted
+        || (area === mainArea && touched)
+        || (area === secretArea && !!changes.exportTargets);
+      if (relevant) await setupSendMenu();
+    } catch (e) {
+      console.warn("[reader] Send-to settings refresh failed", e?.name, e?.message);
+    }
   });
 })().catch((e) => {
   // Top-level backstop: any unhandled throw in the init flow above (malformed HTML into
