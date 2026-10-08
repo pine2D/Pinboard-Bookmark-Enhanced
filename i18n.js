@@ -8,6 +8,9 @@ let _i18nMessages = null;
 // updated the stamp while THIS page still holds the old language's messages,
 // so the stamp alone must never short-circuit the refresh (Codex review P2).
 let _i18nMessagesLang = null;
+// A persistent mirror can outlive source edits and same-version unpacked
+// reloads. Validate it against the packaged locale once in every new page.
+let _i18nMessagesVerified = false;
 let _i18nReady = false;
 let _i18nRefreshGeneration = 0;
 // Promise for the most recently kicked-off _refreshI18nAsync() call, exposed
@@ -90,19 +93,17 @@ async function _refreshI18nAsync() {
       if (changed) {
         _i18nMessages = null;
         _i18nMessagesLang = null;
+        _i18nMessagesVerified = false;
         if (typeof applyI18n === "function") applyI18n();
       }
       return;
     }
 
-    // Version-stamp short circuit: messages.json only changes with the extension
-    // version, so when the mirror was written by THIS version for THIS language
-    // and boot already parsed it, there is nothing to fetch or diff. Saves a
-    // ~100KB fetch+parse plus three full JSON.stringify passes on every surface
-    // open for manual-language users. Fail-open: any localStorage hiccup just
-    // falls through to the full refresh below.
+    // Only reuse messages already verified in this page. Version stamps alone
+    // cannot detect edits followed by an unpacked reload without a version bump.
+    // Repeated calls in the same page retain the fast path.
     try {
-      if (_i18nMessages && _i18nMessagesLang === optLang &&
+      if (_i18nMessagesVerified && _i18nMessages && _i18nMessagesLang === optLang &&
           localStorage.getItem("pp-i18n-stamp") === optLang + "@" + chrome.runtime.getManifest().version) {
         return;
       }
@@ -136,6 +137,7 @@ async function _refreshI18nAsync() {
       || JSON.stringify(_i18nMessages) !== JSON.stringify(msgs);
     _i18nMessages = msgs;
     _i18nMessagesLang = optLang;
+    _i18nMessagesVerified = true;
     if (changed && typeof applyI18n === "function") applyI18n();
   } catch (e) {
     console.warn("[i18n] async refresh failed:", e?.message || e);

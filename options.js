@@ -1482,6 +1482,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (_dlBtn) _dlBtn.click();
   }
   _activateHashPanel();
+  // The default General panel is already active in the markup, so opening
+  // options.html without a hash never clicks its tab to hydrate Drive scopes.
+  if (!location.hash) renderDriveSyncPanel();
   window.addEventListener("hashchange", _activateHashPanel);
   setupOptionsSearch();
 

@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"><title>I18n Cache Tests</title>
+<style>.case{font-family:monospace}.pass{color:green}.fail{color:red}</style></head>
+<body><div id="results"></div><script>
+(async () => {
+  const source = await (await fetch("../i18n.js")).text();
+  const english = await (await fetch("../_locales/en/messages.json")).json();
+  let pass = 0, fail = 0;
+  function check(name, ok) {
+    ok ? pass++ : fail++;
+    const row = document.createElement("div"); row.className = "case " + (ok ? "pass" : "fail");
+    row.textContent = name; document.getElementById("results").append(row);
+  }
+  // A prior installation's partial dictionary and stamp are handwritten:
+  // new keys are absent and an existing key has its old wording.
+  function page(version = "2.118") {
+    const mirror = new Map([
+      ["pp-i18n-lang", "zh_CN"], ["pp-i18n-stamp", "zh_CN@2.118"],
+      ["pp-i18n-msgs", JSON.stringify({ driveSyncVocabulary: { message: "旧生词名称" } })]
+    ]);
+    const doc = document.implementation.createHTMLDocument();
+    doc.body.innerHTML = '<span data-i18n="driveSyncNotes"></span><span data-i18n="driveSyncVocabulary"></span>';
+    let lang = "zh_CN", reads = 0;
+    const storage = { getItem: key => mirror.get(key) ?? null,
+      setItem: (key, value) => mirror.set(key, String(value)), removeItem: key => mirror.delete(key) };
+    const chrome = { runtime: { getURL: path => "../" + path, getManifest: () => ({version}) },
+      storage: { local: { get: async () => ({optLang:lang}) } },
+      i18n: { getMessage: key => english[key]?.message || "", getUILanguage: () => "en" } };
+    const fetchLocale = (...args) => { reads++; return fetch(...args); };
+    const api = new Function("chrome", "localStorage", "fetch", "document", "getSettingsStorage",
+      source + "\nreturn {initI18n,pbpI18nReady,applyI18n,t};")(chrome, storage, fetchLocale, doc, undefined);
+    return {api, doc, mirror, reads:() => reads, language:value => {lang=value;}};
+  }
+  const cold = page(); cold.api.initI18n(); cold.api.applyI18n();
+  check("cold page may synchronously paint the previous mirror", cold.api.t("driveSyncVocabulary") === "旧生词名称");
+  await cold.api.pbpI18nReady();
+  check("same-version reload translates newly added keys without changing language",
+    cold.doc.querySelector('[data-i18n="driveSyncNotes"]').textContent === "高亮与笔记");
+  check("same-version reload refreshes changed existing wording",
+    cold.doc.querySelector('[data-i18n="driveSyncVocabulary"]').textContent === "生词");
+  check("cold page validates the packaged locale even when the persistent stamp matches", cold.reads() === 1);
+  check("cold refresh replaces the persistent dictionary with current translations",
+    JSON.parse(cold.mirror.get("pp-i18n-msgs")).driveSyncNotes?.message === "高亮与笔记");
+  cold.api.initI18n(); await cold.api.pbpI18nReady();
+  check("a dictionary already verified in this page is reused", cold.reads() === 1);
+  const upgrade = page("2.119"); upgrade.api.initI18n(); upgrade.api.applyI18n(); await upgrade.api.pbpI18nReady();
+  check("a version upgrade refreshes the previous locale cache",
+    upgrade.api.t("driveSyncNotes") === "高亮与笔记" && upgrade.reads() === 1);
+  cold.language("auto"); cold.api.initI18n(); await cold.api.pbpI18nReady();
+  check("automatic language discards the manual mirror and uses the browser locale",
+    cold.api.t("driveSyncNotes") === "Highlights and notes" && !cold.mirror.has("pp-i18n-msgs"));
+  cold.language("zh_CN"); cold.api.initI18n(); await cold.api.pbpI18nReady();
+  check("returning from automatic language loads the selected locale again",
+    cold.api.t("driveSyncNotes") === "高亮与笔记" && cold.reads() === 2);
+  console.log(`pass=${pass} fail=${fail}`);
+})();
+</script></body></html>
