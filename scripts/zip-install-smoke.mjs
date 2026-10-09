@@ -294,6 +294,17 @@ async function checkExtensionPage(number, name, waitMs) {
     await page.goto(`${extensionBase}${name}.html`, { waitUntil: 'domcontentloaded', timeout: 10000 });
     await new Promise(r => setTimeout(r, waitMs));
     if (name === 'options') {
+      // Delay delivery of the real status response to exercise async hydration
+      // consistently on fast hosts; no response fields are mocked.
+      await page.evaluate(() => {
+        const sendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
+        chrome.runtime.sendMessage = (...args) => {
+          const response = sendMessage(...args);
+          return args.length === 1 && args[0]?.type === 'vocabDriveStatus'
+            ? Promise.resolve(response).then(value => new Promise(resolve => setTimeout(() => resolve(value), 300)))
+            : response;
+        };
+      });
       await page.locator('#tab-general').click();
       const connect = page.locator('#vocab-drive-connect');
       const actions = page.locator('#vocab-drive-actions');
@@ -301,6 +312,7 @@ async function checkExtensionPage(number, name, waitMs) {
       if (await connect.count() !== 1) {
         failures.push('Google Drive control not found');
       } else if (driveOAuthActive) {
+        await connect.waitFor({ state: 'visible', timeout: 10000 });
         if (!await connect.isVisible()) {
           failures.push('OAuth-active manifest did not expose Connect Google Drive');
         }
