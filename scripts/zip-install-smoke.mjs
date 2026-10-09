@@ -294,12 +294,12 @@ async function checkExtensionPage(number, name, waitMs) {
     await page.goto(`${extensionBase}${name}.html`, { waitUntil: 'domcontentloaded', timeout: 10000 });
     await new Promise(r => setTimeout(r, waitMs));
     if (name === 'options') {
-      await page.locator('#tab-vocab').click();
+      await page.locator('#tab-general').click();
       const connect = page.locator('#vocab-drive-connect');
       const actions = page.locator('#vocab-drive-actions');
       const state = page.locator('#vocab-drive-state');
       if (await connect.count() !== 1) {
-        failures.push('Google Drive vocabulary control not found');
+        failures.push('Google Drive control not found');
       } else if (driveOAuthActive) {
         if (!await connect.isVisible()) {
           failures.push('OAuth-active manifest did not expose Connect Google Drive');
