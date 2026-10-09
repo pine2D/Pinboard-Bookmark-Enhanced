@@ -279,6 +279,15 @@ a:hover { text-decoration: underline; }
    they don't fall back to Segoe UI Emoji (1-3s first-render stall, Windows hi-DPI). */
 :root { font-variant-emoji: text; }
 /* @generated:ui-components start (popup) */
+button.action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pp-sp-2);
+  min-height: var(--pp-control-h-sm);
+  font-size: var(--pp-text-body-sm);
+  line-height: 14px;
+  font-family: inherit;
+}
 .btn {
   display: inline-flex;
   align-items: center;
@@ -348,6 +357,10 @@ a:hover { text-decoration: underline; }
 }
 .btn-ic svg {
   display: block;
+}
+.btn > .btn-ic, .qbtn > .btn-ic, button.action-link > .btn-ic {
+  margin-right: 0;
+  vertical-align: 0;
 }
 
 .btn.danger {
@@ -805,12 +818,15 @@ html[data-section="login"] .quick-actions { display: none !important; }
    Set, batch permission grant, the offline queue) report exclusively through
    them. Hiding both turned every one of those outcomes into zero feedback. */
 #main-section.unsupported-url .form-body > *:not(#url-warning):not(#status-msg):not(.feedback-card) { display: none; }
-.row { display: flex; padding: var(--pp-sp-2) var(--pp-sp-5); gap: var(--pp-sp-4); }
+.row { --pp-row-control-h: var(--pp-control-h); display: flex; padding: var(--pp-sp-2) var(--pp-sp-5); gap: var(--pp-sp-4); }
+#presets-row, #suggest-row, #ai-tags-row, #ai-setup-row { --pp-row-control-h: var(--pp-control-h-sm); }
 .label {
   width: var(--pp-label-w); flex-shrink: 0; text-align: right;
-  font-weight: 400; font-size: 11px; color: var(--pp-fg-muted); padding-top: var(--pp-sp-2); line-height: 1.5;
+  /* Align with the first control line, including when the field wraps or
+     holds a textarea. Compact suggestion rows use the small control rung. */
+  font-weight: 400; font-size: 11px; color: var(--pp-fg-muted);
+  align-self: flex-start; line-height: var(--pp-row-control-h);
 }
-.label.top { align-self: flex-start; } /* padding-top is .label's own; this rule only pins the alignment */
 .field { flex: 1; min-width: 0; }
 /* .actions (COMPONENTS.md §10.2): a row of buttons -- flex, wrap, centred, the
    surface's one button-row gap (sp-4 = 8px, actionRowGap). Margins belong to
@@ -878,7 +894,8 @@ html[data-section="login"] .quick-actions { display: none !important; }
 @keyframes tagSkelPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 /* Button-as-link reset: applied when these link-styled classes wrap a <button>
    (so middle-click/Cmd+click don't try to navigate to "#"). */
-button.action-link, button.clear-all-link, button.offline-clear,
+button.action-link { background: none; border: none; padding: 0; margin: 0; cursor: pointer; }
+button.clear-all-link, button.offline-clear,
 button.offline-toggle {
   background: none; border: none; padding: 0; margin: 0;
   font: inherit; line-height: inherit; cursor: pointer;
@@ -899,16 +916,8 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   animation: spin 0.6s linear infinite;
   vertical-align: middle;
 }
-/* The gap between spinner and label belongs to the HOST, and the two hosts
-   provide it differently. `.submit-bar button` is a `.btn` now: it is a flex
-   container with `gap: var(--pp-sp-2)`, and this pseudo-element is a flex
-   item, so the gap already spaces it -- a `margin-right` on top of that
-   measured 8px instead of 4 (button 80.70px -> 84.70px), on every save and
-   every delete. `.action-link` is not a flex container, so it still needs the
-   margin. Adding a control to the submit bar WITHOUT class="btn" would leave
-   its spinner flush against the label; that is the trade for not writing a
-   `:not(.btn)` guard nobody would maintain. */
-.action-link.loading::before { margin-right: var(--pp-sp-2); }
+/* Both action-link and submit buttons are flex hosts; their gap owns the
+   spinner-to-label spacing, with no extra margin on the pseudo-element. */
 @keyframes spin { to { transform: rotate(360deg); } }
 .submit-bar button.loading {
   color: var(--pp-fg-hint); cursor: wait;
@@ -1100,10 +1109,10 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    margin against this (the container owns spacing; .preset-btn's old
    margin-right and .group-label's old margin-right both double-counted
    against this gap and were dropped). */
-.suggest-group, #ai-suggest-tags, #tag-presets { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pp-sp-2); }
+.suggest-group, #ai-suggest-tags, #tag-presets { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pp-sp-2); min-height: var(--pp-control-h-sm); }
 .suggest-group { margin-bottom: var(--pp-sp-1); }
 .suggest-group:last-child { margin-bottom: 0; }
-.group-label { font-size: 11px; color: var(--pp-fg-hint); font-weight: 400; }
+.group-label { font-size: 11px; line-height: 14px; color: var(--pp-fg-hint); font-weight: 400; }
 /* Geometry/fill/text (display, padding, font-size, line-height, radius,
    background, color) now come from the chip recipe (ui-components.mjs
    CHIP_TARGETS, popup-only entry) -- this hand region only adds what the

@@ -38,7 +38,7 @@
 | 组件族 | popup | options | library |
 |---|---|---|---|
 | 1 按钮族（几何 + 颜色 + 状态） | 配方全量发射，**消费按钮逐个迁移**（见下） | 全量 | 全量 |
-| 2 btn-ic 图标容器 | 基础规则（display/align/svg），保留 `-3px`/`margin-right` 变体 | 全量 | 全量 |
+| 2 btn-ic 图标容器 | 内联保留基线补偿；flex 按钮清零图标自带间距 | 全量 | 全量 |
 | 3 状态反馈 | 全量（press 已收敛到 `scale(0.97)`） | 全量 | 全量 |
 | 4 危险分级 | 全量 | 全量 | 全量 |
 | 5 chip / badge | 几何律适用（施工排期见附录 C） | 全量 | 全量 |
@@ -288,17 +288,18 @@ composer 一旦开始发射 `color: var(--opt-btn-fg)`，它们会逐条覆盖�
 ## 2. 按钮内图标（`.btn-ic`）
 
 **适用**：三表面。design-uplift 期间这是 popup 唯一进生成区的结构规则；2026-08-07 起 popup 也发射
-按钮族与危险分级，`.btn-ic` 不再是孤例。两份配方的分野**依然成立**——popup 已迁到 `class="btn"` 的
-按钮才有 flex `gap` 可用，未迁的手写配方仍靠 `.btn-ic` 自己的 `margin-right`。
+按钮族与危险分级，`.btn-ic` 不再是孤例。popup 的 `.btn`、`.qbtn` 与 `button.action-link` 都是 flex
+宿主，间距归宿主 `gap`；正文内联图标仍保留基线补偿与自带间距。
 
 **`gap` 与 `margin-right` 会叠加，而且触发器不是 `.btn-ic`。** 这里原本写的是「等某颗 popup 按钮
 同时带 `class="btn"` 和 `.btn-ic` 时才会叠成 8px，已迁的两颗都是纯文字，暂未触发」——**实测证伪**
 （2026-08-07 独立复审）：`.btn` 是 flex 容器，`gap` 对**任何**flex item 生效，而 loading spinner
 的 `::before` 就是一个带 `margin-right` 的 flex item。submit bar 迁 `.btn` 之后 spinner→标签间距
-实测 4px → 8px（按钮宽 80.70 → 84.70），每次保存每次删除都出现。已修：那条 `margin-right` 交还给
-**非 flex 宿主**（`.action-link`）独有，flex 宿主的间距由 `gap` 单独负责。
-**规则**：`.btn` 宿主内的子盒一律不要自带 `margin`，间距归 `gap`；`.btn-ic` 的 `margin-right` 是
-同一叠加尚未兑现的另一个载体，给 popup 按钮加图标时先来读这一段。
+实测 4px → 8px（按钮宽 80.70 → 84.70），每次保存每次删除都出现。已修：移除 flex spinner 的自带
+`margin-right`，间距由宿主 `gap` 单独负责。`button.action-link` 现由按钮配方发射
+inline-flex、14px 行高与 sm 字阶/高度，加载 spinner 同样由宿主 gap 排列。
+**规则**：flex 按钮宿主内的子盒一律不要自带 `margin`，间距归 `gap`。popup 的 `.qbtn` 曾因图标
+自带 4px margin 将 gap 叠成 8px，现由图标配方对 flex 宿主显式清零。
 
 ### 2.1 结构配方
 
@@ -307,13 +308,15 @@ composer 一旦开始发射 `color: var(--opt-btn-fg)`，它们会逐条覆盖�
 .btn-ic { display: inline-flex; align-items: center; }
 .btn-ic svg { display: block; }
 
-/* popup：宿主是 inline 上下文的一次性按钮配方，保留基线补偿与自带间距 */
+/* popup：正文 inline 上下文保留基线补偿与自带间距 */
 .btn-ic { display: inline-flex; align-items: center; vertical-align: -3px; margin-right: 4px; }
 .btn-ic svg { display: block; }
+/* flex 宿主已有 gap，不叠加 inline 间距 */
+.btn > .btn-ic, .qbtn > .btn-ic, button.action-link > .btn-ic { margin-right: 0; vertical-align: 0; }
 ```
 
 两份差异**收在密度表里显式声明**（`ui-components.mjs` 的 per-ns 参数），不是散落例外。差异的成因是
-§0 的 popup 豁免：popup 按钮没有统一的 flex 容器可提供 `gap`。
+popup 的内联正文与 flex 按钮使用场景不同。
 
 `display: block` 消掉 SVG 的 baseline 空隙；`align-items: center` 让图标与文字按视觉中线而非基线对齐。
 inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是错的。
@@ -321,7 +324,7 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
 **图标与文字的间距归宿主的 `gap`，不归 `.btn-ic`**（options/library）。`.btn-ic` 里只有一个 SVG，
 在它自己身上写 `gap` 不产生任何间距；间距发生在「图标 span ↔ 文字节点」之间，只有宿主按钮作为 flex
 容器时才能用 `gap` 表达。options 的 `a.btn { display:inline-flex; …; gap }` 已经把这个形状验证过一遍，
-§1.2 把它从 `a.btn` 上移到 `.btn`。popup 宿主不是 flex 容器，所以那一份保留 `margin-right`。
+§1.2 把它从 `a.btn` 上移到 `.btn`。popup 仅内联正文保留 `margin-right`，flex 按钮由配方清零。
 
 ### 2.2 消费 token 对
 
@@ -1594,7 +1597,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | options | `.entry-block-sub` | 从属录入块，左缩进 sp-7，与 `.pref-row-sub` 同值 |
 | options | `.fg.edit-area` | 编辑区：`label.bl` + textarea 占满（min-height 96、13px/20px、内距 sp-4 × control-pad-x） |
 | options | 控件外观 | 值盒子（阶段 4）：底 `--opt-field-bg`，四边 `--opt-field-border`（塌陷进填充；framed 主题为 pilot 框），四角 md，不画底边；hover 填充朝远离宿主的方向走一档（凹井加深），四边换 `--opt-field-border-hover`（未与宿主分离的 framed 主题 terminal、rose-pine 填充不变，由框承担，见 §6.2）；键入文字 `--opt-field-fg`（与占位符 ≥1.4:1）；focus 四边 `--opt-field-border-focus` 加光晕；原生 select 回退与窄屏选择器同形（§6.1、§6.2、§9.1 律 9） |
-| popup | `.row` / `.label` / `.field` | 表单行壳（flex，padding sp-2 sp-5，gap sp-4）/ 52px 标签槽 / 控件槽（flex:1，min-width:0） |
+| popup | `.row` / `.label` / `.field` | 表单行壳（flex，padding sp-2 sp-5，gap sp-4）/ 52px 标签槽，行高跟随首行控件阶（字段 26px；预设、推荐、AI 20px），多行标签保持首行对齐 / 控件槽（flex:1，min-width:0） |
 | popup | `.suggest-area` | chip 流容器 |
 | popup | `.divider` | 表单与快捷区之间的分隔 |
 | popup | `.actions` | 按钮行（flex wrap，align center，gap sp-4）：标签操作行、批量授权操作行、离线队列条目操作；margin 由父级关系规则拥有（`.batch-permission > .actions`、`.offline-queue-item > .actions`）。`.fc-actions` 仍是共享反馈卡的组件；`.quick-row`（space-between）与 `.submit-bar`（带内距的条）是另外两种形状 |

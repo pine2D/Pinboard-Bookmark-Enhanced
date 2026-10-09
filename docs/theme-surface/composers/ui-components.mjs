@@ -128,6 +128,15 @@ function stringifyRules(rules) {
 // and simply never match `.btn`.
 function btnRules(ns) {
   return [
+    // Popup's link buttons use the same small control rung without a fill.
+    // Keep type and icon alignment here, rather than inheriting body metrics
+    // from the page's button reset (which previously overrode the 11px type).
+    ...(ns === "pp" ? [rule("button.action-link", [
+      ["display", "inline-flex"], ["align-items", "center"],
+      ["gap", sp(ns, 4)], ["min-height", "var(--pp-control-h-sm)"],
+      ["font-size", "var(--pp-text-body-sm)"], ["line-height", "14px"],
+      ["font-family", "inherit"],
+    ])] : []),
     rule(".btn", [
       ["display", "inline-flex"],
       ["align-items", "center"],
@@ -283,9 +292,8 @@ function btnRules(ns) {
 
 // -----------------------------------------------------------------------
 // §2: .btn-ic (icon inside a button). The ONLY family popup participates in
-// this campaign. options/library share one recipe (gap comes from the host
-// .btn's flex gap); popup's hosts aren't flex containers, so it keeps its
-// own baseline-compensation + margin-right variant (§2.1).
+// this campaign. Popup retains the inline variant for prose, while flex
+// button hosts own the icon gap and must not inherit the inline margin.
 function btnIcRules(ns) {
   if (ns === "pp") {
     return [
@@ -294,6 +302,9 @@ function btnIcRules(ns) {
         ["vertical-align", "-3px"], ["margin-right", sp(ns, 4)],
       ]),
       rule(".btn-ic svg", [["display", "block"]]),
+      rule(".btn > .btn-ic, .qbtn > .btn-ic, button.action-link > .btn-ic", [
+        ["margin-right", "0"], ["vertical-align", "0"],
+      ]),
     ];
   }
   return [
