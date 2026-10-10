@@ -18,18 +18,18 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 
 ### Speichern
 - **Ein Klick, alles ausgefüllt**: Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
-- **Per Tastenkürzel speichern**: ohne das Popup zu öffnen; auf Wunsch alle offenen Tabs auf einmal
+- **Tastenkürzel und Stapelspeicherung**: speichern, ohne das Popup zu öffnen, oder alle Tabs des Fensters auf einmal als Lesezeichen anlegen
 - **Funktioniert offline**: Gespeichertes landet in einer lokalen Warteschlange und wird gesendet, sobald du wieder online bist
 - **Entwürfe bleiben erhalten**: Popup schließen, wieder öffnen und genau dort weiterschreiben
 
 ### Tags
 - **KI-Tags und Zusammenfassung**: gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 14 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
 - **Autovervollständigung**: aus deinen Tags, Pinboards Vorschlägen und Ein-Klick-Voreinstellungen
-- **Tags aufräumen**: doppelte und selten genutzte Tags finden und stapelweise zusammenführen
+- **Tags aufräumen**: ähnliche Tags zusammenführen und selten genutzte ausmisten
 
 ### Lesen
 - **Jede Seite wird zur Leseansicht**: Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
-- **Markieren in fünf Farben, mit Notizen**: beide überstehen erneutes Rendern, Übersetzung und Änderungen an der Seite
+- **Markieren in fünf Farben, mit Notizen**: beide bleiben an ihrer Stelle, auch nach der Übersetzung und späteren Änderungen an der Seite
 - **Seite übersetzen oder befragen**: Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
 - **Wörter beim Lesen nachschlagen**: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch
 - **Eine eigene Seite für Notizen und Vokabeln**: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung
@@ -48,8 +48,8 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 
 ### Pinboard nach deinem Geschmack
 - **13 Themes für pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
-- **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren**: auf Wunsch bei jedem Speichern; Seiten bleiben erreichbar, auch wenn der Originallink tot ist
-- **Sichern und synchronisieren**: Einstellungen über Chrome Sync, Vokabeln und optional Markierungen und Notizen über dein eigenes Google Drive; manuelle JSON-Backups können Markierungen, Notizen, Vokabeln und API-Schlüssel enthalten; alles optional, der genaue Umfang steht unten unter „Datenschutz“
+- **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren**: von jeder gespeicherten Seite ein Snapshot, damit sie lesbar bleibt, auch wenn der Originallink tot ist
+- **Sichern und synchronisieren**: Einstellungen über Chrome Sync, Vokabeln und Markierungen über dein eigenes Google Drive, dazu eine JSON-Datei, die alles zusammen sichert
 - **9 Sprachen** · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking
 
 ![13 Themes für pinboard.in](docs/screenshots/readme/themes.webp)
@@ -63,13 +63,13 @@ Oder als entpackte Erweiterung aus einem Release-ZIP laden:
 2. Entpacken
 3. `chrome://extensions/` → **Entwicklermodus** aktivieren → **Entpackte Erweiterung laden** → entpackten Ordner auswählen
 
-Der Quellcode verwendet eine eigene feste Entwicklungs-ID und kann deshalb zu Testzwecken neben der Version aus dem Chrome Web Store installiert werden. Das Release-ZIP verwendet dagegen die ID des Chrome Web Store und kann nicht gleichzeitig mit der Store-Version im selben Chrome-Profil installiert sein. Chrome Sync gleicht die Einstellungen ab, sobald die Einstellungssynchronisierung auf jedem Gerät aktiviert ist. Vor dem Wechsel von einem älteren entpackten Release zuerst dessen Einstellungen exportieren und die Sicherung nach dem Laden des neuen Releases importieren.
+Der Quellcode verwendet eine eigene feste Entwicklungs-ID und kann deshalb zu Testzwecken neben der Version aus dem Chrome Web Store installiert werden. Das Release-ZIP verwendet dagegen die ID des Chrome Web Store und kann nicht gleichzeitig mit der Store-Version im selben Chrome-Profil installiert sein. Chrome Sync gleicht die Einstellungen ab, sobald die Einstellungssynchronisierung auf jedem Gerät aktiviert ist. Vor dem Wechsel von einem älteren entpackten Release in dessen Einstellungen auf **Sicherung exportieren** klicken und nach dem Laden des neuen Releases **Sicherung importieren** verwenden.
 
-Nach der Installation: Auf das Symbol in der Symbolleiste klicken → deinen [Pinboard-API-Token](https://pinboard.in/settings/password) einfügen → speichern
+Nach der Installation: Auf das Symbol in der Symbolleiste klicken → deinen [Pinboard-API-Token](https://pinboard.in/settings/password) einfügen → **Anmelden**
 
 ## Datenschutz
 
-Kein Tracking, keine Analytik, keine Telemetrie. Für neue Nutzer werden Einstellungen und Zugangsdaten standardmäßig auf diesem Gerät gespeichert. Die Synchronisierung gewöhnlicher Einstellungen wird auf jedem Gerät separat aktiviert. Die Synchronisierung von Zugangsdaten ist eine kontoweite Chrome-Option, an der aber nur Geräte mit aktivierter Einstellungssynchronisierung teilnehmen; andere Geräte verwenden weiterhin ihre lokalen Zugangsdaten. Bei neuen Nutzern ist die Synchronisierung von Zugangsdaten standardmäßig deaktiviert. Sind bei einem Upgrade bereits nicht leere Zugangsdaten in Chrome Sync vorhanden, bleibt sie zur Vermeidung von Datenverlust aktiviert. Wenn sie aktiviert ist, werden API-Schlüssel, Tokens, Passwörter und Export-Zugangsdaten über Chrome Sync geteilt; sie sind nur verschleiert, nicht verschlüsselt. Gespeicherte Lesezeichen, Seiteninhalte und die Offline-Warteschlange gelangen nicht in Chrome Sync. KI-Anfragen werden **nur** über Funktionen gesendet, die du aktivierst oder nutzt — KI-Tags/-Zusammenfassung, Fragen zur Seite, Übersetzung, Erklärung einer markierten Passage oder der optionale Schnellüberblick über die wichtigsten Punkte — und gehen direkt an den von dir konfigurierten Anbieter. Bei der Installation wird nur der Zugriff auf Pinboard gewährt; KI, Jina, in Batch ausgewählte Websites sowie optionale Export- und Archivierungsziele fordern erst bei der jeweiligen Aktion nur die Berechtigung für die konkrete Website an. Benutzerdefinierte Netzwerkendpunkte müssen HTTPS verwenden; HTTP ist nur für `localhost`, `127.0.0.1` und `[::1]` zulässig. Die Seiten der Erweiterung setzen eine strikte Content-Security-Policy durch (kein Remote-Code). Vollständige Richtlinie: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+Kein Tracking, keine Analytik, keine Telemetrie. Für neue Nutzer werden Einstellungen und Zugangsdaten standardmäßig auf diesem Gerät gespeichert. Die Synchronisierung gewöhnlicher Einstellungen wird auf jedem Gerät separat aktiviert. Die Synchronisierung von Zugangsdaten ist eine kontoweite Chrome-Option, an der aber nur Geräte mit aktivierter Einstellungssynchronisierung teilnehmen; andere Geräte verwenden weiterhin ihre lokalen Zugangsdaten. Bei neuen Nutzern ist die Synchronisierung von Zugangsdaten standardmäßig deaktiviert. Sind bei einem Upgrade bereits nicht leere Zugangsdaten in Chrome Sync vorhanden, bleibt sie zur Vermeidung von Datenverlust aktiviert. Wenn sie aktiviert ist, werden API-Schlüssel, Tokens, Passwörter und Export-Zugangsdaten über Chrome Sync geteilt; sie sind nur verschleiert, nicht verschlüsselt. Gespeicherte Lesezeichen, Seiteninhalte und die Offline-Warteschlange gelangen nicht in Chrome Sync. KI-Anfragen entstehen **nur** durch KI-Funktionen, die du aktivierst oder nutzt, und gehen direkt an den von dir konfigurierten Anbieter. Bei der Installation wird nur der Zugriff auf Pinboard gewährt. Jede weitere Website, die die Erweiterung braucht (ein KI-Anbieter, ein Export- oder Archivierungsziel, ein Wörterbuch, Google Drive, Video-Untertitel oder die Websites einer Stapelspeicherung), wird erst angefragt, wenn du die jeweilige Funktion zum ersten Mal nutzt, und zwar einzeln und nur für genau diese Website. Benutzerdefinierte Netzwerkendpunkte müssen HTTPS verwenden; HTTP ist nur für `localhost`, `127.0.0.1` und `[::1]` zulässig. Die Seiten der Erweiterung setzen eine strikte Content-Security-Policy durch (kein Remote-Code). Vollständige Richtlinie: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 Google Drive wird auf jedem Gerät separat verbunden und synchronisiert nur die ausgewählten Daten des aktuellen Pinboard-Kontos. Vokabeln sind nach dem Verbinden standardmäßig ausgewählt; Markierungen und Notizen müssen separat aktiviert werden. Diese Auswahl bleibt auf dem Gerät. Kopien im privaten appDataFolder von Drive liegen im Klartext vor und sind nicht Ende-zu-Ende-verschlüsselt.
 

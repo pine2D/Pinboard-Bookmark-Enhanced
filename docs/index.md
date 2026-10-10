@@ -9,19 +9,19 @@ A Chrome extension for [Pinboard](https://pinboard.in) with AI tags and summarie
 
 ## Reading and translation
 
-- The reader works on the extracted article text, not on the live page, so full-text translation never has to fight the original site's layout: headings, lists, tables, code blocks, and math keep their structure in both the bilingual and translated views.
+- The reader translates the extracted article text rather than the live page, so headings, lists, tables, code blocks, and math keep their structure in both the bilingual and translated views.
 - Translation runs between your browser and the AI provider you configured with your own key. The extension operates no translation snapshot or sharing service, so a translated page cannot appear on a public URL unless you export it yourself.
 
 ## Sync and backup
 
 - Chrome Sync can share settings between devices where you enable it. Credential sync is a separate opt-in.
-- Manual schema v3 JSON backups contain settings and can optionally include reader highlights, notes, and vocabulary from the current Pinboard account.
+- Manual schema v3 JSON backups contain settings and can optionally include reader highlights, notes, and vocabulary from the current Pinboard account, plus API keys and tokens if you tick that box.
 - Google Drive can sync the current Pinboard account's vocabulary and, when separately enabled, highlights and notes. Connect it on each device while signed in to Chrome, then choose the data to sync under General → Data Sync; the choices remain local to that device. Highlights and notes are off by default.
 
 ## Video pages
 
-- On YouTube and bilibili video pages the reader loads the video beside its subtitles and treats the transcript as the article. Subtitle access is asked for once per site, from a button in the preview; nothing is fetched from either site before that click.
-- `yt-embed.html` on this site is the relay page the reader frames to load YouTube's player: Chrome sends no Referer from extension pages, so the player refuses to load there directly. The relay passes play and seek commands between the reader and the player, answers only the page that opened it, and stores nothing.
+- On YouTube and bilibili video pages the reader loads the video beside its subtitles and treats the transcript as the article. Subtitle access is asked for once per site, from a button in the reader; before that click, the only request is for YouTube's video thumbnail.
+- `yt-embed.html` on this site is the relay page the reader frames to load YouTube's player: Chrome sends no Referer from extension pages, so the player refuses to load there directly. The relay passes play and seek commands between the reader and the player, answers only the reader page that first messaged it, and stores nothing.
 
 ## Documents
 

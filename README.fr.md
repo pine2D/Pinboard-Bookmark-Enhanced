@@ -18,18 +18,18 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 
 ### Enregistrer
 - **Un clic, tout est rempli** : titre, description et texte sélectionné sont repris, les paramètres de suivi retirés de l'URL
-- **Enregistrement par raccourci clavier** : sans ouvrir la fenêtre ; ou tous les onglets ouverts d'un coup
+- **Raccourcis et enregistrement groupé** : enregistrez sans ouvrir le popup, ou mettez d'un coup tous les onglets de la fenêtre en signets
 - **Fonctionne hors ligne** : les enregistrements passent par une file d'attente locale et sont renvoyés au retour de la connexion
 - **Brouillons préservés** : fermez la fenêtre en pleine saisie et reprenez là où vous en étiez
 
 ### Étiquettes
 - **Étiquettes et résumé par IA** : l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 14 fournisseurs ou tout point de terminaison compatible OpenAI
 - **Autocomplétion** : à partir de vos étiquettes, des suggestions de Pinboard et de préréglages en un clic
-- **Nettoyage des étiquettes** : repérez les doublons et les étiquettes peu utilisées, puis fusionnez-les par lots
+- **Nettoyage des étiquettes** : fusionnez les étiquettes quasi identiques et élaguez celles qui servent peu
 
 ### Lecture
 - **Chaque page passe en mode lecture épuré** : vue Markdown avec table des matières, recherche et aperçu des notes de bas de page ; formules, diagrammes et tableaux s'affichent correctement
-- **Surlignage en cinq couleurs, avec notes** : les deux survivent aux nouveaux rendus, à la traduction et aux modifications de la page
+- **Surlignage en cinq couleurs, avec notes** : les deux restent à leur place après une traduction, et même si la page change ensuite
 - **Traduisez la page ou posez-lui vos questions** : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
 - **Cherchez les mots au fil de la lecture** : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; envoyez les mots enregistrés vers Anki ou Eudic en un clic, et ajoutez si vous le souhaitez des dictionnaires hors connexion chinois-anglais et anglais-chinois
 - **Une page entière pour les notes et le vocabulaire** : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots
@@ -48,8 +48,8 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 
 ### Personnalisation
 - **13 thèmes pour pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
-- **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** : à chaque enregistrement si vous le souhaitez ; les pages restent accessibles même quand le lien d'origine disparaît
-- **Sauvegarde et synchronisation** : paramètres via Chrome Sync, vocabulaire et, sur activation, surlignages et notes via votre propre Google Drive ; les sauvegardes JSON manuelles peuvent inclure surlignages, notes, vocabulaire et clés API ; tout est facultatif, voir « Confidentialité » ci-dessous pour le périmètre exact
+- **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** : chaque page enregistrée est capturée et reste lisible même quand le lien d'origine disparaît
+- **Sauvegarde et synchronisation** : Chrome Sync pour les paramètres, votre propre Google Drive pour le vocabulaire et les surlignages, et un fichier JSON qui sauvegarde le tout
 - **9 langues** · raccourcis configurables · stockage local en priorité · aucun pistage
 
 ![13 thèmes pour pinboard.in](docs/screenshots/readme/themes.webp)
@@ -63,13 +63,13 @@ Ou chargez une version décompressée depuis un ZIP de release :
 2. Décompressez
 3. `chrome://extensions/` → activez le **Mode développeur** → **Charger l'extension non empaquetée** → sélectionnez le dossier décompressé
 
-Le répertoire source utilise un identifiant de développement distinct et fixe. Il peut donc coexister avec la version du Chrome Web Store pour les tests. Le ZIP de release utilise l'identifiant du Chrome Web Store et ne peut pas coexister avec la version du Store dans un même profil Chrome. Chrome Sync peut partager les paramètres dès que leur synchronisation est activée sur chaque appareil. Avant de remplacer une ancienne release chargée manuellement, exportez ses paramètres, puis importez la sauvegarde après avoir chargé la nouvelle release.
+Le répertoire source utilise un identifiant de développement distinct et fixe. Il peut donc coexister avec la version du Chrome Web Store pour les tests. Le ZIP de release utilise l'identifiant du Chrome Web Store et ne peut pas coexister avec la version du Store dans un même profil Chrome. Chrome Sync peut partager les paramètres dès que leur synchronisation est activée sur chaque appareil. Avant de remplacer une ancienne release chargée manuellement, cliquez sur **Exporter une sauvegarde** dans ses paramètres ; après avoir chargé la nouvelle release, utilisez **Importer une sauvegarde**.
 
-Après l'installation : cliquez sur l'icône de la barre d'outils → collez votre [jeton API Pinboard](https://pinboard.in/settings/password) → enregistrez
+Après l'installation : cliquez sur l'icône de la barre d'outils → collez votre [jeton API Pinboard](https://pinboard.in/settings/password) → **Se connecter**
 
 ## Confidentialité
 
-Aucun tracking, aucune analytique, aucune télémétrie. Pour les nouveaux utilisateurs, les paramètres et identifiants restent par défaut sur cet appareil. La synchronisation des paramètres ordinaires s'active séparément sur chaque appareil. La synchronisation des identifiants est un choix unique à l'échelle du compte Chrome, mais seuls les appareils où la synchronisation des paramètres est activée y participent ; les autres continuent d'utiliser leurs identifiants locaux. Elle est désactivée par défaut pour les nouveaux utilisateurs. Si une mise à niveau trouve déjà des identifiants non vides dans Chrome Sync, elle reste activée afin d'éviter toute perte de données. Lorsqu'elle est activée, les clés API, jetons, mots de passe et identifiants d'exportation sont partagés via Chrome Sync ; ils sont obfusqués, pas chiffrés. Les signets enregistrés, le contenu des pages et la file d'attente hors ligne n'entrent jamais dans Chrome Sync. Les requêtes IA sont envoyées **uniquement** par les fonctionnalités que vous activez ou utilisez — tags/résumé IA, questions-réponses sur la page, traduction, explication de sélection, ou le survol des points clés facultatif — et vont directement au fournisseur que vous avez configuré. À l'installation, seul l'accès à Pinboard est accordé ; l'IA, Jina, les sites sélectionnés pour le traitement par lot et les destinations facultatives d'exportation et d'archivage ne demandent que l'autorisation du site précis au moment où vous lancez l'action correspondante. Les points de terminaison réseau personnalisés doivent utiliser HTTPS ; HTTP n'est autorisé que pour `localhost`, `127.0.0.1` et `[::1]`. Les pages de l'extension appliquent une Content-Security-Policy stricte (aucun code distant). Politique complète : <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+Aucun tracking, aucune analytique, aucune télémétrie. Pour les nouveaux utilisateurs, les paramètres et identifiants restent par défaut sur cet appareil. La synchronisation des paramètres ordinaires s'active séparément sur chaque appareil. La synchronisation des identifiants est un choix unique à l'échelle du compte Chrome, mais seuls les appareils où la synchronisation des paramètres est activée y participent ; les autres continuent d'utiliser leurs identifiants locaux. Elle est désactivée par défaut pour les nouveaux utilisateurs. Si une mise à niveau trouve déjà des identifiants non vides dans Chrome Sync, elle reste activée afin d'éviter toute perte de données. Lorsqu'elle est activée, les clés API, jetons, mots de passe et identifiants d'exportation sont partagés via Chrome Sync ; ils sont obfusqués, pas chiffrés. Les signets enregistrés, le contenu des pages et la file d'attente hors ligne n'entrent jamais dans Chrome Sync. Les requêtes IA proviennent **uniquement** des fonctionnalités IA que vous activez ou utilisez, et vont directement au fournisseur que vous avez configuré. À l'installation, seul l'accès à Pinboard est accordé. Tout autre site dont l'extension a besoin (fournisseur d'IA, destination d'exportation ou d'archivage, dictionnaire, Google Drive, sous-titres vidéo ou sites d'un enregistrement groupé) est demandé un site précis à la fois, la première fois que vous utilisez la fonctionnalité concernée. Les points de terminaison réseau personnalisés doivent utiliser HTTPS ; HTTP n'est autorisé que pour `localhost`, `127.0.0.1` et `[::1]`. Les pages de l'extension appliquent une Content-Security-Policy stricte (aucun code distant). Politique complète : <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 Google Drive se connecte séparément sur chaque appareil et synchronise les données sélectionnées du compte Pinboard actuel. Le vocabulaire est sélectionné par défaut après connexion ; les surlignages et notes doivent être activés séparément. Ce choix reste sur l’appareil. Les copies dans le dossier privé appDataFolder de Drive sont en texte clair, sans chiffrement de bout en bout.
 

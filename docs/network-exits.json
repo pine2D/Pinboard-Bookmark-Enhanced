@@ -43,10 +43,6 @@
     "player.bilibili.com": {
       "purpose": "Bilibili player bridge — playback sync content script (optional exact-origin grant)"
     },
-    "www.bilibili.com": {
-      "purpose": "Bilibili watch pages — video workbench tab injection for subtitle rescue (covered by the same user-triggered caption grant flow)",
-      "disclosedAs": "bilibili"
-    },
     "api.openai.com": {
       "purpose": "AI provider: OpenAI (BYO key, user-selected)",
       "disclosedAs": "OpenAI"
@@ -105,6 +101,7 @@
     "www.zhihu.com": "site-rule matcher string only",
     "arxiv.org": "site-rule matcher string only",
     "www.notion.so": "outbound link the user opens",
+    "www.bilibili.com": "outbound link the user opens (Open on bilibili, timestamp deep links)",
     "notebooklm.google.com": "send-to target opened as a browser tab, no fetch",
     "unpkg.com": "comment/documentation reference",
     "lucide.dev": "icon-set attribution comment",

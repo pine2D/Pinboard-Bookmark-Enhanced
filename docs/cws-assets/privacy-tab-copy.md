@@ -7,15 +7,15 @@
 > service retirement and provider removal in v2.107.6; everything else
 > unchanged and still aligned with docs/privacy.md).
 
-## Single purpose description (891/1000)
+## Single purpose description (994/1000)
 
 Save, enrich, read, and export Pinboard bookmarks. The extension captures the page you choose, optionally extracts readable article content, generates AI tags, summaries, translations, or Ask-the-page answers with the provider you select, then saves or exports the result to destinations you configure.
 
-Workflow: toolbar or shortcut -> review the current page -> optional AI or Markdown preview/export -> save to Pinboard.
+Workflow: toolbar or shortcut -> review the current page -> optional AI, reader, or export -> save to Pinboard.
 
-Related features: AI tags/summaries, translation, Ask/Explain, key-points skim; batch save, offline queue, optional Wayback archiving; Send to Obsidian, GitHub Gist, or a webhook; file-based settings backup; tag autocomplete and cleanup; pinboard.in themes.
+Related features: AI tags/summaries, translation, Ask/Explain, key-points skim; Batch Save, offline queue, optional Wayback archiving; word lookup and vocabulary with optional Google Drive sync; YouTube/bilibili subtitles in the reader; Send to Obsidian, Notion, NotebookLM, GitHub Gist, or a webhook; JSON backups; tag autocomplete and cleanup; pinboard.in themes.
 
-Data: local-first. No developer servers, no analytics, no telemetry, no sale of data. Page URLs and content leave your device only when you take an action, and only to Pinboard or the service you configured.
+Data: local-first. No developer servers, no analytics, no telemetry, no sale of data. Page URLs and content go only to Pinboard or to a service you configured, for an action you take or a feature you turned on.
 
 ## activeTab justification (unchanged, accurate)
 
@@ -23,11 +23,11 @@ Read the active tab's URL and title to pre-fill the bookmark form when you open 
 
 ## storage justification (tail sentence replaced)
 
-Persist settings, credentials, and local caches needed for the bookmark workflow: Pinboard token, AI provider keys, export-target tokens, preferences, custom CSS/themes, bookmark-status cache, tag cache/tag-cleanup state, AI result cache, offline queue, Markdown preview data, highlights/notes, and the Wayback log. Stored in chrome.storage.local by default; selected non-content settings sync via chrome.storage.sync only if you enable settings sync, and obfuscated credentials join only with the separate account-wide API-key sync option. Nothing is sent to any developer server.
+Persist settings, credentials, and local caches needed for the bookmark workflow: Pinboard token, AI provider keys, export-target tokens, preferences, custom CSS/themes, bookmark-status cache, tag cache/tag-cleanup state, AI result cache, offline queue, unsaved popup drafts, reader handoff data, highlights/notes and their Google Drive sync state, and the Wayback log. Stored in chrome.storage.local by default; selected non-content settings sync via chrome.storage.sync only if you enable settings sync, and obfuscated credentials join only with the separate account-wide credential-sync option. Nothing is sent to any developer server.
 
-## scripting justification (612/1000)
+## scripting justification (965/1000)
 
-Inject the bundled Defuddle extractor (and optional per-site extraction rules) into the page to pull clean article text/HTML. This runs only on explicit user action: clicking AI tags or AI summary, quick-saving or batch-saving with AI enabled, or opening Markdown preview (button or Alt+Shift+M, including the in-preview engine toggle, Translate, Ask, and Explain). It never runs on popup open or passively. Batch save with AI first asks you to approve the exact origins of the selected tabs, listed in the prompt, so those non-active tabs can be read; the extension never requests an all-sites grant at runtime.
+Inject the bundled Defuddle extractor (and optional per-site extraction rules) into the page to pull clean article text/HTML. This runs only on explicit user action: clicking AI tags or AI summary, quick-saving or batch-saving with AI enabled, or opening the reader (button or Alt+Shift+M, including the engine toggle, Translate, Ask, and Explain inside it). It never runs on popup open or passively. Batch Save with AI first asks you to approve the exact origins of the selected tabs, listed in the prompt, so those non-active tabs can be read; the extension never requests an all-sites grant at runtime. Three more uses each sit behind an exact-origin grant you approve: reading YouTube subtitles through an open www.youtube.com tab of the same video; a small script in player.bilibili.com frames so the transcript follows playback; and, when an article lives inside one large embedded frame, rerunning the extractor in that frame after you click Grant and retry.
 
 ## tabs justification (unchanged, accurate)
 
@@ -37,21 +37,21 @@ Enumerate open tabs for batch save, and read tab titles/URLs for "save tab set" 
 
 Show success/failure/queued feedback after save operations (quick-save, read-later, batch, tab-set, offline retry) and provide a 30-second Undo button that deletes the just-saved bookmark via the Pinboard API.
 
-## alarms justification (352/1000)
+## alarms justification (418/1000)
 
-Run recurring background tasks: keep the service worker warm during active use, re-prime the settings cache, expire the bookmark-status cache, retry the offline save queue, refresh the unread badge, and optionally prewarm the Pinboard tag list. Alarms themselves send nothing; tasks that contact Pinboard do so only while their configuration allows it.
+Run recurring background tasks: keep the service worker warm during active use, re-prime the settings cache, expire the bookmark-status cache, retry the offline save queue, refresh the unread badge, optionally prewarm the Pinboard tag list, and schedule Google Drive sync after it is connected. Alarms themselves send nothing; tasks that contact Pinboard or Google Drive do so only while their configuration allows it.
 
-## Host permission justification (979/1000)
+## Host permission justification (899/1000)
 
-Static hosts: api.pinboard.in and pinboard.in, for saving/fetching/managing bookmarks, pinboard.in themes and tag sorting, and cookie-based Save Tab Set. 13 user-selectable AI providers plus Jina Reader cover optional AI/extraction actions; each is contacted only when configured and only when you trigger the action. Optional hosts are requested at runtime as exact origins only: the selected tabs of a batch save, your custom OpenAI-compatible endpoint or non-loopback Ollama, GitHub Gist export, webhook export, web.archive.org for opt-in Wayback archiving, and the image origins needed when you choose the Embed (offline) export policy or click Fix on hotlink-blocked preview images. localhost/127.0.0.1 remain allowed for a local Ollama. The manifest ceiling is https://*/* plus literal-loopback HTTP only; it merely lets Chrome offer these exact-origin prompts, and the extension never requests the ceiling patterns themselves. Page content goes only to the service you selected, never to the developer.
+Static hosts: api.pinboard.in and pinboard.in, for saving/fetching/managing bookmarks, pinboard.in themes and tag sorting, and cookie-based Save Tab Set. Every other host is optional and requested at runtime as one exact origin, from a direct user action: your AI provider (13 cloud providers, a custom OpenAI-compatible endpoint, or Ollama), Jina Reader, web.archive.org for opt-in archiving, GitHub Gist, Notion, or webhook export, the tabs in a Batch Save, Free Dictionary, Eudic, AnkiConnect on 127.0.0.1, Google Drive, YouTube and bilibili subtitles, an embedded article frame, and image origins for Embed (offline) downloads or hotlink-blocked images. HTTP is allowed only for localhost, 127.0.0.1, and [::1]. The https://*/* ceiling only lets Chrome offer these exact-origin prompts; the extension never requests it. Page content goes only to the service you selected, never to the developer.
 
 ## declarativeNetRequestWithHostAccess justification (481/1000; field will appear on next submit)
 
 Set the Referer header (to the article page's origin only) on the extension's own image re-fetches during two user actions in Markdown preview: the Fix button for hotlink-blocked images, and the Embed (offline) export retry. Implemented as a temporary session rule scoped to the granted image origins, the fetch request type, and that single preview tab; the rule is removed when the run finishes. It grants no page access by itself and never touches other tabs' or sites' traffic.
 
-## identity justification (981/1000)
+## identity justification (937/1000)
 
-Obtain an OAuth access token for the optional Google Drive vocabulary sync, and nothing else. This is an optional permission: nothing requests it until you click Connect Google Drive in settings, and every other feature works without it. The only scope requested is drive.appdata, which reaches the extension's own hidden application-data folder and cannot read, list, or modify any other file in your Drive. It is used to store vocabulary batches for the current Pinboard account so your devices converge on the same list, plus one Drive about.get call so settings can show which account is connected. identity is never used to sign you in to this extension, to identify you to the developer, or for analytics or advertising; no account data reaches anyone but Google. Background syncs only check whether the permission is already granted and never open an OAuth prompt. Disconnect this device removes the cached token and this permission, and leaves your local vocabulary intact.
+Obtain an OAuth access token for optional Google Drive sync, and nothing else. This is an optional permission: nothing requests it until you click Connect Google Drive in settings, and every other feature works without it. The only scope is drive.appdata, which reaches the extension's own hidden application-data folder and cannot read, list, or modify any other file in your Drive. It stores the current Pinboard account's vocabulary batches, plus highlights and notes if you turn those on, so your devices converge on the same data, and makes one Drive about.get call so settings can show which account is connected. identity never signs you in to this extension, never identifies you to the developer, and is not used for analytics or advertising. Background syncs only check that the permission is granted and never open an OAuth prompt. Disconnect this device removes the cached token and this permission and keeps your local data.
 
 ## Remote code
 
