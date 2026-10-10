@@ -33,14 +33,14 @@
 - Translate the page or ask it questions: full-page translation with a bilingual view; answers cite the source and jump straight to it
 - Look up words as you read: definitions open on the sense that fits your sentence; send saved words to Anki or Eudic in one click, or add offline Chinese-English and English-Chinese dictionaries
 - A full page for notes and vocabulary: saved words and highlights in one place, with dictionary lookup and batch management
-- Send or download: Obsidian (https://obsidian.md), Notion, NotebookLM, a GitHub Gist, or any webhook; .md, .html, or .epub for your e-reader
+- Send or download: send articles to your notes app or your own webhook, or save them as e-books for your e-reader
 - Watch while you read: YouTube and bilibili videos sit beside a transcript that follows playback; AI tags and summaries can read the subtitles
 
 # Make Pinboard yours
-- 13 themes for pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) plus your own custom CSS
-- Auto-archive to the Wayback Machine (https://web.archive.org): snapshot each page you save, so it stays readable after the original link dies
+- 13 themes for pinboard.in: light and dark looks for the site itself, plus room for your own custom CSS
+- Auto-archive to the Wayback Machine: snapshot each page you save, so it stays readable after the original link dies
 - Backup and sync: Chrome Sync for settings, your own Google Drive for vocabulary and highlights, and a JSON file that backs up all of it
-- 9 languages · configurable shortcuts · local-first storage · zero tracking
+- Private by default: your data stays in your browser with zero tracking; the interface comes in 9 languages and every shortcut is configurable
 ```
 
 ---
@@ -67,14 +67,14 @@
 - 整页翻译，或向文章提问：双语对照；回答附引用，点击直达原文出处
 - 边读边查词：先显示贴合当前句子的释义；生词一键发到 Anki 和欧路词典，还可以选择离线汉英、英汉词典包
 - 笔记和生词独立成页：生词和高亮集中一处，随手查词、批量管理
-- 发送或下载：Obsidian (https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任意 webhook；.md、.html、.epub 供电子书阅读器
+- 发送或下载：把文章发到常用的笔记应用或你自己的 webhook，或者存成电子书放进阅读器
 - 边读边看：YouTube 和 B 站视频旁边配上随播放滚动的字幕，AI 标签和摘要可以直接读字幕
 
 # 个性化
-- 13 套 pinboard.in 主题（Dracula、Nord、Catppuccin、Solarized 等），还能叠加自定义 CSS
-- 自动存档到 Wayback Machine (https://web.archive.org)：每次保存都留一份快照，原链接失效也能找回
+- 13 套 pinboard.in 主题：给网站本身换上浅色或深色外观，还能叠加自定义 CSS
+- 自动存档到 Wayback Machine：每次保存都留一份快照，原链接失效也能找回
 - 备份与同步：设置走 Chrome Sync，生词和高亮走自己的 Google Drive，JSON 备份文件一次存下全部
-- 9 种语言、可自定义快捷键、本地优先存储、零追踪
+- 隐私优先：数据留在你自己的浏览器里，零追踪；界面支持 9 种语言，快捷键可自定义
 ```
 
 ---
@@ -101,14 +101,14 @@
 - 整頁翻譯，或向文章提問：雙語對照；回答附引用，一按即跳回原文出處
 - 邊讀邊查詞：先顯示最貼近句子的釋義；生詞一鍵傳送到 Anki 與歐路詞典，也可以選用離線中英、英中詞典包
 - 筆記與生詞獨立成頁：生詞與劃重點集中在同一頁，隨手查詞、批次管理
-- 傳送或下載：Obsidian (https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任何 webhook；.md、.html、.epub 供電子書閱讀器
+- 傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器
 - 邊讀邊看：YouTube 與 B 站影片旁邊配上隨播放捲動的字幕，AI 標籤與摘要也能直接讀字幕
 
 # 個人化
-- 13 套 pinboard.in 佈景主題（Dracula、Nord、Catppuccin、Solarized 等），還可疊加自訂 CSS
-- 自動存檔到 Wayback Machine (https://web.archive.org)：每次儲存都留一份快照，原連結失效也能找回
+- 13 套 pinboard.in 佈景主題：替網站本身換上淺色或深色外觀，還可疊加自訂 CSS
+- 自動存檔到 Wayback Machine：每次儲存都留一份快照，原連結失效也能找回
 - 備份與同步：設定透過 Chrome Sync，生詞與劃重點透過自己的 Google Drive，JSON 備份檔一次存下全部
-- 9 種語言、可自訂快捷鍵、本機優先儲存、零追蹤
+- 隱私優先：資料留在你自己的瀏覽器裡，零追蹤；介面支援 9 種語言，快捷鍵可自訂
 ```
 
 ---
@@ -135,14 +135,14 @@
 - 整頁翻譯，或向文章提問：雙語對照；答案附引註，一按即跳回原文出處
 - 邊讀邊查詞：先顯示切合該句的釋義；生詞一鍵傳送到 Anki 及歐路詞典，亦可選用離線中英、英中詞典包
 - 筆記與生詞獨立成頁：生詞與高亮集中在同一頁，隨手查詞、批量管理
-- 傳送或下載：Obsidian (https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任何 webhook；.md、.html、.epub 供電子書閱讀器
+- 傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器
 - 邊讀邊看：YouTube 與 B 站影片旁邊配上跟着播放捲動的字幕，AI 標籤與摘要亦能直接讀字幕
 
 # 個人化
-- 13 套 pinboard.in 佈景主題（Dracula、Nord、Catppuccin、Solarized 等），更可疊加自訂 CSS
-- 自動存檔至 Wayback Machine (https://web.archive.org)：每次儲存都留一份快照，原連結失效也能找回
+- 13 套 pinboard.in 佈景主題：為網站本身換上淺色或深色外觀，更可疊加自訂 CSS
+- 自動存檔至 Wayback Machine：每次儲存都留一份快照，原連結失效也能找回
 - 備份與同步：設定透過 Chrome Sync，生詞和標記透過自己的 Google Drive，一個 JSON 備份檔案就能存下全部
-- 9 種語言、可自訂快捷鍵、本機優先儲存、零追蹤
+- 私隱優先：資料留在你自己的瀏覽器內，零追蹤；介面支援 9 種語言，快捷鍵可自訂
 ```
 
 ---
@@ -169,14 +169,14 @@
 - Seite übersetzen oder befragen: Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
 - Wörter beim Lesen nachschlagen: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch
 - Eine eigene Seite für Notizen und Vokabeln: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung
-- Senden oder herunterladen: an Obsidian (https://obsidian.md), Notion, NotebookLM, ein GitHub Gist oder einen beliebigen Webhook; als .md, .html oder .epub für den E-Reader
+- Senden oder herunterladen: Artikel an deine Notiz-App oder deinen eigenen Webhook senden oder als E-Book für den E-Reader speichern
 - Sehen beim Lesen: YouTube- und Bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt; KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel
 
 # Pinboard nach deinem Geschmack
-- 13 Themes für pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
-- Automatisch in die Wayback Machine (https://web.archive.org) archivieren: von jeder gespeicherten Seite ein Snapshot, damit sie lesbar bleibt, auch wenn der Originallink tot ist
+- 13 Themes für pinboard.in: helle und dunkle Looks für die Seite selbst, dazu dein eigenes CSS
+- Automatisch in die Wayback Machine archivieren: von jeder gespeicherten Seite ein Snapshot, damit sie lesbar bleibt, auch wenn der Originallink tot ist
 - Sichern und synchronisieren: Einstellungen über Chrome Sync, Vokabeln und Markierungen über dein eigenes Google Drive, dazu eine JSON-Datei, die alles zusammen sichert
-- 9 Sprachen · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking
+- Privat von Anfang an: deine Daten bleiben im Browser, ohne Tracking; die Oberfläche gibt es in 9 Sprachen, alle Tastenkürzel sind anpassbar
 ```
 
 ---
@@ -203,14 +203,14 @@
 - Traduisez la page ou posez-lui vos questions : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
 - Cherchez les mots au fil de la lecture : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; envoyez les mots enregistrés vers Anki ou Eudic en un clic, et ajoutez si vous le souhaitez des dictionnaires hors connexion chinois-anglais et anglais-chinois
 - Une page entière pour les notes et le vocabulaire : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots
-- Envoyer ou télécharger : vers Obsidian (https://obsidian.md), Notion, NotebookLM, un Gist GitHub ou n'importe quel webhook ; ou en .md, .html, .epub pour votre liseuse
+- Envoyer ou télécharger : envoyez vos articles vers votre application de notes ou votre propre webhook, ou enregistrez-les en livre numérique pour votre liseuse
 - Regarder en lisant : les vidéos YouTube et Bilibili s'affichent à côté d'une transcription qui suit la lecture ; les tags et résumés IA peuvent lire les sous-titres
 
 # Personnalisation
-- 13 thèmes pour pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
-- Archivage automatique dans la Wayback Machine (https://web.archive.org) : chaque page enregistrée est capturée et reste lisible même quand le lien d'origine disparaît
+- 13 thèmes pour pinboard.in : des apparences claires et sombres pour le site lui-même, plus votre CSS personnalisé
+- Archivage automatique dans la Wayback Machine : chaque page enregistrée est capturée et reste lisible même quand le lien d'origine disparaît
 - Sauvegarde et synchronisation : Chrome Sync pour les paramètres, votre propre Google Drive pour le vocabulaire et les surlignages, et un fichier JSON qui sauvegarde le tout
-- 9 langues · raccourcis configurables · stockage local en priorité · aucun pistage
+- Confidentiel par défaut : vos données restent dans votre navigateur, sans aucun pistage ; l'interface existe en 9 langues et tous les raccourcis sont configurables
 ```
 
 ---
@@ -237,14 +237,14 @@
 - ページ全体の翻訳とページへの質問：対訳表示に対応し、回答には出典への引用が付き、クリックで該当箇所へジャンプします
 - 読みながら単語を調べる：読んでいる文に合った語義がまず表示されます。保存した単語はワンクリックで Anki や Eudic に送れ、中英・英中のオフライン辞書パックも選べます
 - メモと単語帳に専用ページ：保存した単語とハイライトが一か所に集まり、辞書検索も一括管理もできます
-- 送信もダウンロードも：Obsidian (https://obsidian.md)・Notion・NotebookLM・GitHub Gist・任意の webhook へ送信でき、.md・.html・.epub で電子書籍リーダーにも渡せます
+- 送信もダウンロードも：記事を普段使いのノートアプリや自分の webhook に送ったり、電子書籍として保存してリーダーで読んだりできます
 - 読みながら観る：YouTube と Bilibili の動画の横に、再生に合わせて流れる字幕を表示。AI タグと要約も字幕を直接読めます
 
 # カスタマイズ
-- pinboard.in 用テーマ 13 種（Dracula、Nord、Catppuccin、Solarized など）に、自分のカスタム CSS を重ねられます
-- Wayback Machine (https://web.archive.org) へ自動アーカイブ：保存したページごとにスナップショットを残すので、元のリンクが切れても読めます
+- pinboard.in 用テーマ 13 種：サイト自体をライトにもダークにも着せ替えられ、自分のカスタム CSS も重ねられます
+- Wayback Machine へ自動アーカイブ：保存したページごとにスナップショットを残すので、元のリンクが切れても読めます
 - バックアップと同期：設定は Chrome Sync、単語とハイライトは自分の Google ドライブで同期し、JSON ファイルにはそのすべてをバックアップできます
-- 9 言語対応 · カスタマイズ可能なショートカット · ローカルファースト保存 · トラッキング一切なし
+- プライバシー重視：データはブラウザー内に保存され、トラッキングは一切なし。9 言語に対応し、ショートカットも自由に変更できます
 ```
 
 ---
@@ -271,14 +271,14 @@
 - Przetłumacz stronę albo zadaj jej pytanie — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
 - Sprawdzaj słownictwo podczas czytania — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka wyślesz jednym kliknięciem do Anki lub Eudic, a do wyboru masz też słowniki offline chińsko-angielski i angielsko-chiński
 - Notatki i słówka mają własną stronę — zapisane słówka i zaznaczenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami
-- Wyślij albo pobierz — do Obsidiana (https://obsidian.md), Notion, NotebookLM, do serwisu GitHub Gist lub dowolnego webhooka; albo jako .md, .html, .epub na czytnik e-booków
+- Wyślij albo pobierz — wyślij artykuł do swojej aplikacji z notatkami lub własnego webhooka albo zapisz go jako e-book na czytnik
 - Oglądaj podczas czytania — filmy z YouTube i Bilibili wyświetlają się obok transkrypcji, która podąża za odtwarzaniem; tagi i podsumowania AI mogą czytać napisy
 
 # Personalizacja
-- 13 motywów dla pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) oraz własny CSS
-- Automatyczna archiwizacja w Wayback Machine (https://web.archive.org) — każda zapisana strona dostaje migawkę, więc przeczytasz ją nawet wtedy, gdy oryginalny link przestanie działać
+- 13 motywów dla pinboard.in — jasne i ciemne wersje samej witryny oraz miejsce na własny CSS
+- Automatyczna archiwizacja w Wayback Machine — każda zapisana strona dostaje migawkę, więc przeczytasz ją nawet wtedy, gdy oryginalny link przestanie działać
 - Kopie zapasowe i synchronizacja — ustawienia przez Chrome Sync, słówka i zaznaczenia przez własny Dysk Google, a jeden plik JSON zabezpiecza to wszystko naraz
-- 9 języków · konfigurowalne skróty · dane przede wszystkim lokalnie · zero śledzenia
+- Prywatność przede wszystkim — dane zostają w przeglądarce, zero śledzenia; interfejs w 9 językach, a skróty można dowolnie zmieniać
 ```
 
 ---
@@ -305,12 +305,12 @@
 - Переведите страницу или задайте ей вопрос — полный перевод с двуязычным режимом; ответы ссылаются на источник, и клик ведёт прямо к нему
 - Ищите слова во время чтения — словарь сразу показывает значение, подходящее к предложению; сохранённые слова отправляются в Anki или Eudic в один клик, а офлайн-словари (китайско-английский и англо-китайский) подключаются по желанию
 - У заметок и словарика своя страница — сохранённые слова и выделения в одном месте, с поиском по словарю и пакетными действиями
-- Отправить или скачать — в Obsidian (https://obsidian.md), Notion, NotebookLM, GitHub Gist или на любой вебхук; либо скачать .md, .html, .epub для читалки
+- Отправить или скачать — отправляйте статьи в своё приложение для заметок или на собственный вебхук либо сохраняйте их как электронные книги для читалки
 - Смотрите, пока читаете — видео с YouTube и Bilibili показываются рядом с расшифровкой, которая следует за воспроизведением; AI-теги и резюме могут читать субтитры
 
 # Персонализация
-- 13 тем для pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) плюс свой CSS
-- Автоархив в Wayback Machine (https://web.archive.org) — снимок каждой сохранённой страницы, чтобы её можно было прочитать, даже когда исходная ссылка перестанет работать
+- 13 тем для pinboard.in — светлое и тёмное оформление самого сайта плюс место для своего CSS
+- Автоархив в Wayback Machine — снимок каждой сохранённой страницы, чтобы её можно было прочитать, даже когда исходная ссылка перестанет работать
 - Резервное копирование и синхронизация — настройки через Chrome Sync, словарик и выделения через ваш Google Диск, а файл JSON сохраняет всё это разом
-- 9 языков · настраиваемые горячие клавиши · локальное хранилище в приоритете · никакого трекинга
+- Конфиденциальность по умолчанию — данные остаются в браузере, никакого трекинга; интерфейс на 9 языках, все горячие клавиши настраиваются
 ```

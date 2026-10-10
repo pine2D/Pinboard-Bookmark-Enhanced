@@ -11,6 +11,14 @@
 // rejected once), plus the sentence stating AI is optional and BYO-key. It is
 // carried over verbatim from the previous generated file.
 //
+// Store keyword policy (CWS rejection "Keyword Spam / Yellow Argon",
+// 2026-10-10): the reviewer flagged the export bullet's run of brand names and
+// file formats plus its inline URL. The README keeps that detail (docs-lint
+// pins the Obsidian/Wayback links and the .md/.html/.epub spans), so the store
+// copy drops link URLs and swaps three list-shaped bullets for prose
+// (STORE_REWRITES). STORE_BANNED then fails generation if any URL, dot-joined
+// list, theme-name run or file-format name reaches the store text.
+//
 // Usage:
 //   node scripts/sync-store-descriptions.mjs           rewrite the file
 //   node scripts/sync-store-descriptions.mjs --check    exit 1 if it is stale
@@ -36,7 +44,7 @@ const LOCALES = [
 // Markdown -> the plain text the store actually shows.
 function toPlainText(md) {
   return md
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")  // links: keep the URL visible
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")       // links: label only (store keyword policy)
     .replace(/\*\*([^*]+)\*\*/g, "$1")               // bold markers
     .replace(/`([^`]+)`/g, "$1")                     // code spans
     .replace(/[ \t]+$/gm, "");
@@ -66,7 +74,13 @@ function buildFeatures(readmePath) {
     if (/^!\[/.test(raw)) continue;                       // screenshots
     const heading = raw.match(/^### (.+)$/);
     if (heading) { lines.push("", `# ${toPlainText(heading[1])}`); continue; }
-    if (/^- /.test(raw)) { lines.push(toPlainText(raw)); continue; }
+    if (/^- /.test(raw)) {
+      const label = (raw.match(/^- \*\*([^*]+)\*\*/) || [])[1];
+      const rewrite = label && STORE_REWRITES[readmePath]?.[label];
+      if (rewrite) used.add(`${readmePath}\u0000${label}`);
+      lines.push(rewrite ? `- ${rewrite}` : toPlainText(raw));
+      continue;
+    }
   }
   const sections = lines.filter((line) => line.startsWith("# ")).length;
   const bullets = lines.filter((line) => line.startsWith("- ")).length;
@@ -79,6 +93,66 @@ function buildFeatures(readmePath) {
   }
   return { text: lines.join("\n").trim(), sections, bullets };
 }
+
+// Store-only prose for the README bullets that read as keyword lists, keyed by
+// README file and the bullet's bold label. Every entry must match exactly one
+// bullet; a renamed label fails generation instead of silently reverting.
+const STORE_REWRITES = {
+  "README.md": {
+    "Send or download": "Send or download: send articles to your notes app or your own webhook, or save them as e-books for your e-reader",
+    "13 themes for pinboard.in": "13 themes for pinboard.in: light and dark looks for the site itself, plus room for your own custom CSS",
+    "9 languages": "Private by default: your data stays in your browser with zero tracking; the interface comes in 9 languages and every shortcut is configurable",
+  },
+  "README.zh-CN.md": {
+    "发送或下载": "发送或下载：把文章发到常用的笔记应用或你自己的 webhook，或者存成电子书放进阅读器",
+    "13 套 pinboard.in 主题": "13 套 pinboard.in 主题：给网站本身换上浅色或深色外观，还能叠加自定义 CSS",
+    "9 种语言": "隐私优先：数据留在你自己的浏览器里，零追踪；界面支持 9 种语言，快捷键可自定义",
+  },
+  "README.zh-TW.md": {
+    "傳送或下載": "傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器",
+    "13 套 pinboard.in 佈景主題": "13 套 pinboard.in 佈景主題：替網站本身換上淺色或深色外觀，還可疊加自訂 CSS",
+    "9 種語言": "隱私優先：資料留在你自己的瀏覽器裡，零追蹤；介面支援 9 種語言，快捷鍵可自訂",
+  },
+  "README.zh-HK.md": {
+    "傳送或下載": "傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器",
+    "13 套 pinboard.in 佈景主題": "13 套 pinboard.in 佈景主題：為網站本身換上淺色或深色外觀，更可疊加自訂 CSS",
+    "9 種語言": "私隱優先：資料留在你自己的瀏覽器內，零追蹤；介面支援 9 種語言，快捷鍵可自訂",
+  },
+  "README.de.md": {
+    "Senden oder herunterladen": "Senden oder herunterladen: Artikel an deine Notiz-App oder deinen eigenen Webhook senden oder als E-Book für den E-Reader speichern",
+    "13 Themes für pinboard.in": "13 Themes für pinboard.in: helle und dunkle Looks für die Seite selbst, dazu dein eigenes CSS",
+    "9 Sprachen": "Privat von Anfang an: deine Daten bleiben im Browser, ohne Tracking; die Oberfläche gibt es in 9 Sprachen, alle Tastenkürzel sind anpassbar",
+  },
+  "README.fr.md": {
+    "Envoyer ou télécharger": "Envoyer ou télécharger : envoyez vos articles vers votre application de notes ou votre propre webhook, ou enregistrez-les en livre numérique pour votre liseuse",
+    "13 thèmes pour pinboard.in": "13 thèmes pour pinboard.in : des apparences claires et sombres pour le site lui-même, plus votre CSS personnalisé",
+    "9 langues": "Confidentiel par défaut : vos données restent dans votre navigateur, sans aucun pistage ; l'interface existe en 9 langues et tous les raccourcis sont configurables",
+  },
+  "README.ja.md": {
+    "送信もダウンロードも": "送信もダウンロードも：記事を普段使いのノートアプリや自分の webhook に送ったり、電子書籍として保存してリーダーで読んだりできます",
+    "pinboard.in 用テーマ 13 種": "pinboard.in 用テーマ 13 種：サイト自体をライトにもダークにも着せ替えられ、自分のカスタム CSS も重ねられます",
+    "9 言語対応": "プライバシー重視：データはブラウザー内に保存され、トラッキングは一切なし。9 言語に対応し、ショートカットも自由に変更できます",
+  },
+  "README.pl.md": {
+    "Wyślij albo pobierz": "Wyślij albo pobierz — wyślij artykuł do swojej aplikacji z notatkami lub własnego webhooka albo zapisz go jako e-book na czytnik",
+    "13 motywów dla pinboard.in": "13 motywów dla pinboard.in — jasne i ciemne wersje samej witryny oraz miejsce na własny CSS",
+    "9 języków": "Prywatność przede wszystkim — dane zostają w przeglądarce, zero śledzenia; interfejs w 9 językach, a skróty można dowolnie zmieniać",
+  },
+  "README.ru.md": {
+    "Отправить или скачать": "Отправить или скачать — отправляйте статьи в своё приложение для заметок или на собственный вебхук либо сохраняйте их как электронные книги для читалки",
+    "13 тем для pinboard.in": "13 тем для pinboard.in — светлое и тёмное оформление самого сайта плюс место для своего CSS",
+    "9 языков": "Конфиденциальность по умолчанию — данные остаются в браузере, никакого трекинга; интерфейс на 9 языках, все горячие клавиши настраиваются",
+  },
+};
+// What the CWS reviewer reads as keyword stuffing; none may reach store text.
+const STORE_BANNED = [
+  [/https?:\/\//, "URL"],
+  [/ · /, "dot-joined list"],
+  [/Dracula|Catppuccin|Solarized/, "theme-name run"],
+  [/\.(epub|html|md)\b/, "file-format name"],
+  [/NotebookLM|GitHub Gist|Gist GitHub/, "export-target name run"],
+];
+const used = new Set();
 
 const disclosures = readExistingDisclosures();
 const parts = [
@@ -105,6 +179,19 @@ LOCALES.forEach(([label, readme], index) => {
   parts.push("---", "", `## ${label}`, "", "```text", disclosures[index], "", feat.text, "```", "");
 });
 const output = parts.join("\n");
+
+for (const [readme, map] of Object.entries(STORE_REWRITES)) {
+  for (const label of Object.keys(map)) {
+    if (!used.has(`${readme}\u0000${label}`)) throw new Error(`${readme}: store rewrite for "${label}" matched no bullet (label renamed?)`);
+  }
+}
+const storeTexts = [...output.matchAll(/```text\n([\s\S]*?)\n```/g)].map((m) => m[1]);
+storeTexts.forEach((text, i) => {
+  for (const [re, what] of STORE_BANNED) {
+    const hit = text.match(re);
+    if (hit) throw new Error(`${LOCALES[i][0]}: store text contains a ${what} ("${hit[0]}"); CWS flags this as keyword spam`);
+  }
+});
 
 if (process.argv.includes("--check")) {
   const current = readFileSync(OUT, "utf8");
