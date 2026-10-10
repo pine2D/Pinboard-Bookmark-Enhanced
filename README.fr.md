@@ -12,6 +12,8 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 
 ![Enregistrement avec étiquettes et résumé par IA, en thème sombre et clair](docs/screenshots/readme/hero.webp)
 
+[![Vidéo de 30 secondes : enregistrer, lire, garder](docs/screenshots/readme/promo-video.webp)](https://youtu.be/DMQS8LC09kU)
+
 ---
 
 ## Fonctionnalités

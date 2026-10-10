@@ -12,6 +12,8 @@
 
 ![AI 生成标签和摘要后保存，深色与浅色主题](docs/screenshots/readme/hero.webp)
 
+[![30 秒视频介绍：保存、阅读、留存](docs/screenshots/readme/promo-video.webp)](https://youtu.be/DMQS8LC09kU)
+
 ---
 
 ## 功能特性

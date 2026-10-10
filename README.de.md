@@ -12,6 +12,8 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 
 ![Speichern mit KI-Tags und Zusammenfassung, in dunklem und hellem Theme](docs/screenshots/readme/hero.webp)
 
+[![30-Sekunden-Video: speichern, lesen, behalten](docs/screenshots/readme/promo-video.webp)](https://youtu.be/DMQS8LC09kU)
+
 ---
 
 ## Funktionen

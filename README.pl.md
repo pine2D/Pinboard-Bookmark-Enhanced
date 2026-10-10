@@ -12,6 +12,8 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 
 ![Zapis z tagami i streszczeniem od AI, w motywie ciemnym i jasnym](docs/screenshots/readme/hero.webp)
 
+[![30-sekundowy film: zapisz, przeczytaj, zachowaj](docs/screenshots/readme/promo-video.webp)](https://youtu.be/DMQS8LC09kU)
+
 ---
 
 ## Funkcje
