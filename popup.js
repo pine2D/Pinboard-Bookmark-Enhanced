@@ -232,7 +232,7 @@ async function pbpDiscardPopupDraft(allOwner = false) {
   });
   if (!result?.ok) {
     if (!_popupDraftContext) _popupDraftContext = context;
-    showStatus("status-msg", t("popupDraftFailed"), "error");
+    showStatus("status-msg", t("popupDraftDiscardFailed"), "error");
     return false;
   }
   _popupDraftLastSnapshot = "";
@@ -278,7 +278,7 @@ async function initPopupDraft(account, tab) {
     if (_popupDraftContext !== context || (result?.ok && result.account !== account)
         || pbpPinboardAccountFromToken(auth.pinboardToken) !== account) return;
     if (!result?.ok) {
-      showStatus("status-msg", t("popupDraftFailed"), "error");
+      showStatus("status-msg", t("popupDraftRestoreFailed"), "error");
       return;
     }
     if (result?.ok && result.draft) {
@@ -303,7 +303,7 @@ async function initPopupDraft(account, tab) {
     if (revision !== _popupDraftRevision) pbpRememberPopupDraft();
   } catch (e) {
     console.warn("[popup-draft] restore failed:", e && e.name, e && e.message);
-    showStatus("status-msg", t("popupDraftFailed"), "error");
+    showStatus("status-msg", t("popupDraftRestoreFailed"), "error");
     pbpRememberPopupDraft();
   }
 }
@@ -516,13 +516,22 @@ $id("login-form").addEventListener("submit", async (event) => {
     });
     if (res.ok) {
       const saved = await persistSettings({ pinboardToken: obfuscateKey(token) });
-      if (!saved.ok) { showElement("login-error", t("networkError")); return; }
+      // Pinboard already accepted the token: a failed write is local storage,
+      // not the network.
+      if (!saved.ok) {
+        console.warn("[login] token persist failed:", saved.error?.name, saved.error?.message);
+        showElement("login-error", t("loginSaveFailed"));
+        return;
+      }
       settings.pinboardToken = token;
       const recent = $id("recent-bookmarks");
       if (recent) { recent.replaceChildren(); recent.classList.add("hidden"); }
       showMain(token);
     } else showElement("login-error", t(pbpPinboardTestErrorKey(res)));
-  } catch (e) { showElement("login-error", t("networkError")); }
+  } catch (e) {
+    console.warn("[login] token check failed:", e?.name, e?.message);
+    showElement("login-error", t("networkError"));
+  }
   finally { loginBtn.disabled = false; }
 });
 
@@ -1185,9 +1194,12 @@ async function htmlToMarkdownAsync(html, opts) {
           // Announce through the existing #status-msg live region (the pattern
           // md-preview pairs with its own copy label swap).
           showStatus("status-msg", t("jinaCopied"), "");
-        } catch (_) {
+        } catch (e) {
+          console.warn("[popup] markdown copy failed:", e?.name, e?.message);
           if (ic) ic.innerHTML = PBP_ICONS.warning;
-          showStatus("status-msg", t("jinaFailed"), "error");
+          // A sentence, not the button's one-word "Failed": the status line
+          // has no button next to it to say what failed.
+          showStatus("status-msg", t("popupCopyFailed"), "error");
         }
         btn._t = setTimeout(() => { if (ic) ic.innerHTML = PBP_ICONS.copy; btn.classList.remove("copied"); }, 1500);
       };
@@ -1502,7 +1514,8 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
           }
           const tagCount = existingBookmark.tags?.trim() ? existingBookmark.tags.trim().split(/\s+/).length : 0;
           if (tagCount > 0) parts.push(tagCount > 1 ? t("tagCountPlural", String(tagCount)) : t("tagCount", String(tagCount)));
-          if (parts.length) info += " (" + parts.join(", ") + ")";
+          // Brackets and separator come from the catalogue: CJK UIs use full-width ones.
+          if (parts.length) info = t("editingExistingDetails", info, parts.join(t("editingExistingDetailSep")));
           banner.textContent = info;
           banner.classList.remove("hidden");
         }
@@ -1919,7 +1932,7 @@ function setupSubmit(token) {
       } else if (result.status === "failed" && result.reason === "http" && result.httpStatus) {
         showStatus("status-msg", `HTTP ${result.httpStatus}`, "error");
       } else if (result.status === "failed" && result.reason === "api" && result.detail) {
-        showStatus("status-msg", `Error: ${result.detail}`, "error");
+        showStatus("status-msg", t("pinboardApiError", String(result.detail)), "error");
       } else if (result.status === "failed" && result.reason === "account_changed") {
         showStatus("status-msg", t("pinboardErrorAuth"), "error");
       } else {
@@ -2011,8 +2024,8 @@ function setupSubmit(token) {
           const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(deleteUrl)}&auth_token=${token}&format=json`);
           // Same gate the recent-bookmark delete uses: _pbpProxyPinboardFetch
           // resolves a stand-in whose json() is {} on 401, so without this the
-          // result_code is undefined and the user reads the unlocalized
-          // "Error: undefined" instead of the login redirect already under way.
+          // result_code is undefined and the user reads an API error ending in
+          // "undefined" instead of the login redirect already under way.
           if (resp.status === 401) return; // pinboardFetch already redirected to login
           const data = await resp.json();
           const deleted = data.result_code === "done" || data.result_code === "item not found";
@@ -2023,7 +2036,7 @@ function setupSubmit(token) {
           if (deleted) {
             showStatus("status-msg", t("deleted"), "success");
             setTimeout(() => { if (ownsDeleteForm()) window.close(); }, 800);
-          } else showStatus("status-msg", `Error: ${data.result_code}`, "error");
+          } else showStatus("status-msg", t("pinboardApiError", String(data.result_code)), "error");
         } catch (e) {
           if (ownsDeleteForm()) showStatus("status-msg", t("networkError"), "error");
         } finally {
@@ -2187,7 +2200,7 @@ async function fetchRecentBookmarks(token) {
                 // Same feedback the main Delete button gives -- a failed delete
                 // that leaves the row in place is otherwise indistinguishable
                 // from a list that simply did not refresh.
-                showStatus("status-msg", `Error: ${data.result_code}`, "error");
+                showStatus("status-msg", t("pinboardApiError", String(data.result_code)), "error");
               }
             } catch (e) {
               console.warn("recent delete failed:", e && e.name, e && e.message);

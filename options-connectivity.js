@@ -189,7 +189,9 @@ function setupApiTests() {
         const timedOut = err?.name === "AbortError" || err?.name === "TimeoutError";
         let msg = timedOut ? t("testTimeout") : err.message;
         if (err?.code === "model_not_found") {
-          const mnf = pbpAiModelNotFoundText(cs.aiProvider);
+          // Display name from the provider picker's own option, not the internal id.
+          const provOpt = [...($id("opt-ai-provider")?.options || [])].find((o) => o.value === cs.aiProvider);
+          const mnf = pbpAiModelNotFoundText(provOpt?.textContent.trim() || cs.aiProvider);
           msg = mnf.msg + " " + mnf.hint;
         }
         setStatusResult(statusEl, false, msg);

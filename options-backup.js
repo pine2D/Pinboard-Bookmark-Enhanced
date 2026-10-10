@@ -576,6 +576,23 @@ function pbpImportNeedsPageReload(result) {
   return !!result && (landed(result.settings) || landed(result.themes));
 }
 
+// The preview's "created" value: _backup.createdAt is an ISO string (export
+// writes toISOString()), which read as "2026-10-10T08:12:33.456Z" -- UTC,
+// milliseconds and all. Shown in the extension's UI language and the local
+// time zone instead; anything that does not parse is shown as written.
+function pbpBackupCreatedLabel(createdAt) {
+  if (typeof createdAt !== "string" || !createdAt) return "";
+  const ms = Date.parse(createdAt);
+  if (!Number.isFinite(ms)) return createdAt;
+  try {
+    const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined;
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(ms));
+  } catch (e) {
+    console.warn("[backup] created-at format failed:", e?.name, e?.message);
+    return createdAt;
+  }
+}
+
 function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, beforeExport, beforeApply, afterApply, onApplied }) {
   let selectionToken = 0;
   let selectionText = "";
@@ -616,7 +633,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     setPreviewText("backup-preview-meta", t(
       "backupPreviewMeta",
       String(preview.schemaVersion),
-      metadata.createdAt || t("backupPreviewUnknown"),
+      pbpBackupCreatedLabel(metadata.createdAt) || t("backupPreviewUnknown"),
       metadata.extensionVersion || t("backupPreviewUnknown")
     ));
     // An overlay-only backup has no safeData keys at all, so the plain count
@@ -862,20 +879,22 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     } catch (err) {
       console.error("[export] failed", err);
       const status = $id("import-status");
-      // Three outcomes, because two of them are not "the save half-happened".
+      // Three outcomes, and none of them is "the save half-happened": export
+      // writes no settings, so optSaveFailed's guidance never applies here.
       // pbpAssertChunkedSyncReadComplete's refusal (code "chunks_propagating")
       // names no field and wrote nothing anywhere -- neither to storage nor to
       // disk -- and the remedy is to wait, so it gets copy that says so rather
       // than the generic one telling the user to go audit settings. Both throw
       // points that reject a field -- pbpBuildBackupSnapshot above and the
-      // preflight after it -- name that field. The generic save failure is
-      // what is left: an account that changed mid-export, a storage read that
-      // threw.
+      // preflight after it -- name that field. What is left -- an account
+      // that changed mid-export, a storage read that threw -- still wrote
+      // nothing, so it gets export copy too, never optSaveFailed's "some
+      // settings may already have been saved".
       const field = pbpBackupErrorField(err);
       setStatusIcon(status, false,
         err?.code === "chunks_propagating"
           ? t("backupExportSyncPending")
-          : field ? t("backupExportFailed", field) : t("optSaveFailed"));
+          : field ? t("backupExportFailed", field) : t("backupExportFailedGeneric"));
     }
   };
 

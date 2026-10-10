@@ -487,6 +487,78 @@ delete document.documentElement.dataset.theme;
     await _pbpVocabTestEudic();
     check("a successful Eudic connection test records only a categorical health result",
       healthCalls.some(([id, ok, code]) => id === "eudic" && ok === true && code === "connected"));
+
+    // B18: AnkiConnect answers a wrong key with {"result":null,"error":...};
+    // that is a key refusal, not a reachability or permission problem.
+    resetActions();
+    healthCalls.length = 0;
+    pbpReadSettingsWithSecrets = async () => ({ dictAnkiPort:"8765", dictAnkiKey:"wrong-key" });
+    pbpAnkiCall = async (action) => action === "requestPermission"
+      ? pbpAnkiParseResult('{"result":{"permission":"granted","requireApikey":true,"version":6},"error":null}')
+      : pbpAnkiParseResult('{"result":null,"error":"valid api key must be provided"}');
+    await _pbpVocabTestAnki();
+    check("a rejected AnkiConnect API key is reported as a key problem",
+      $id("vocab-anki-test-status").textContent.includes("dictAnkiKeyRejected") &&
+      !$id("vocab-anki-test-status").textContent.includes("dictAnkiConnectPermissionFailed") &&
+      healthCalls.some(([id, ok, code]) => id === "anki" && ok === false && code === "auth"),
+      $id("vocab-anki-test-status").textContent);
+
+    resetActions();
+    pbpReadSettingsWithSecrets = async () => ({ dictAnkiPort:"8765", dictAnkiKey:"key" });
+    pbpAnkiCall = async (action) => action === "requestPermission"
+      ? pbpAnkiParseResult('{"result":{"permission":"granted","requireApikey":true,"version":6},"error":null}')
+      : { ok:false, result:null, error:"unreachable" };
+    await _pbpVocabTestAnki();
+    check("an AnkiConnect that stops answering mid-test is not blamed on the key",
+      $id("vocab-anki-test-status").textContent.includes("dictAnkiConnectPermissionFailed") &&
+      !$id("vocab-anki-test-status").textContent.includes("dictAnkiKeyRejected"));
+
+    // B19: a throwing host-permission request during Send all reports beside
+    // the send button and records no connection-test health.
+    resetActions();
+    healthCalls.length = 0;
+    window.chrome.permissions.request = async () => { throw new TypeError("Invalid url pattern"); };
+    await _pbpVocabSendAnki();
+    check("a failed Anki host-permission request during send stays on the send status line",
+      $id("vocab-status").textContent.includes("dictAnkiHostPermissionDenied") &&
+      !$id("vocab-anki-test-status").textContent && healthCalls.length === 0,
+      `status=${$id("vocab-status").textContent} test=${$id("vocab-anki-test-status").textContent}`);
+
+    // B22: the tester maps 401/403 exactly as pbpEudicSendRows does.
+    const realFetch = window.fetch;
+    try {
+      for (const [status, key, code] of [[401, "dictEudicTokenRequired", "auth"], [403, "dictEudicRejected", "forbidden"]]) {
+        resetActions();
+        healthCalls.length = 0;
+        pbpEudicPing = realEudicPing;
+        window.fetch = async () => new Response("", { status });
+        await _pbpVocabTestEudic();
+        check(`Eudic connection test answers HTTP ${status} like the send path`,
+          $id("vocab-eudic-test-status").textContent.includes(key) &&
+          healthCalls.some(([id, ok, recorded]) => id === "eudic" && ok === false && recorded === code),
+          $id("vocab-eudic-test-status").textContent);
+      }
+    } finally { window.fetch = realFetch; }
+
+    // B20: failures are recovery instructions and stay until replaced;
+    // successes still clear after 3 s.
+    const realSetTimeout = window.setTimeout;
+    const scheduled = [];
+    try {
+      window.setTimeout = (fn, ms) => { scheduled.push(ms); return 0; };
+      _pbpVocabFlashStatus(false, "dictAnkiModelMismatch");
+      _pbpVocabFlashLocalStatus("vocab-anki-test-status", false, "dictAnkiKeyRejected");
+      const failureTimers = scheduled.length;
+      _pbpVocabFlashStatus(true, "dictAnkiResult");
+      _pbpVocabFlashLocalStatus("vocab-anki-test-status", true, "testConnected");
+      check("failed status messages are not timed out while successes still clear",
+        failureTimers === 0 && scheduled.length === 2 && scheduled.every((ms) => ms === 3000),
+        `failureTimers=${failureTimers} scheduled=${scheduled.join()}`);
+    } finally {
+      window.setTimeout = realSetTimeout;
+      $id("vocab-status").textContent = "";
+      $id("vocab-anki-test-status").textContent = "";
+    }
   } finally {
     pbpVocabCurrentOwner = realOwner;
     pbpVocabAll = realAll;
@@ -664,12 +736,14 @@ delete document.documentElement.dataset.theme;
       ? { ok:true, status:blockedStatus }
       : { ok:false, error:"network", status:blockedStatus };
     await _pbpVocabDriveRefresh(++_driveRenderGen, true);
+    // A blocked account never retries by itself, so a leftover retryAt must
+    // not add a "next retry" line beside the instruction (B13).
     check("a failed automatic sync preserves authoritative blocked reconnect guidance",
       $id("vocab-drive-owner").textContent === "alice" &&
       $id("vocab-drive-error").textContent.includes("vocabDriveErrorPermission") &&
       !$id("vocab-drive-error").textContent.includes("vocabDriveErrorNetwork") &&
       $id("vocab-drive-error").textContent.includes("vocabDriveReconnectRequired") &&
-      $id("vocab-drive-error").textContent.includes("vocabDriveRetryAt"));
+      !$id("vocab-drive-error").textContent.includes("vocabDriveRetryAt"));
 
     _pbpVocabDriveRender({
       ...driveStatus, retryAt:null, lastError:"entry_too_large", blocked:true

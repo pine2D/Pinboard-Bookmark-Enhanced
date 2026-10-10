@@ -1230,8 +1230,8 @@ check(vocabGdriveJs.includes("function pbpCreateVocabDriveSyncRunner("),
   const tagStart = btnStart >= 0 ? mdHtml.lastIndexOf("<button", btnStart) : -1;
   const tagEnd = tagStart >= 0 ? mdHtml.indexOf("</button>", tagStart) : -1;
   const btn = tagStart >= 0 && tagEnd > tagStart ? mdHtml.slice(tagStart, tagEnd) : "";
-  check(!!btn && btn.includes('title="settings"') && btn.includes('data-i18n-title="settings"') &&
-    btn.includes('aria-label="settings"') && btn.includes('data-i18n-aria="settings"') && btn.includes("<svg"),
+  check(!!btn && btn.includes('title="Settings"') && btn.includes('data-i18n-title="settings"') &&
+    btn.includes('aria-label="Settings"') && btn.includes('data-i18n-aria="settings"') && btn.includes("<svg"),
     "md-preview.html: #rail-settings-btn is missing title/aria-label/icon (or dropped the shared \"settings\" i18n key)");
   check(/function pbpRailSettingsBtnInit\(\)[\s\S]{0,300}getElementById\("rail-settings-btn"\)[\s\S]{0,120}addEventListener\("click", \(\) => pbpOpenOptionsTab\("reader"\)\)/.test(mdPreviewJs),
     "md-preview.js: #rail-settings-btn's click handler does not open the Reader settings tab");
@@ -3872,8 +3872,12 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { b
     mdTranslateJs.indexOf("function _pbpTrMarkPartial"));
   const partial = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrMarkPartial"),
     mdTranslateJs.indexOf("function _pbpTrClearPendingFailures"));
-  check(failed.includes("btn.dataset.tip") && partial.includes("btn.dataset.tip") &&
-    failed.includes('btn.setAttribute("aria-label"') && partial.includes('btn.setAttribute("aria-label"') &&
+  // Both pills write their tip + accessible name through one helper (which
+  // also keeps the visible label at the front of the name, WCAG 2.5.3).
+  const setTip = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrSetErrTip"),
+    mdTranslateJs.indexOf("function _pbpTrMarkFailed"));
+  check(setTip.includes("btn.dataset.tip") && setTip.includes('btn.setAttribute("aria-label"') &&
+    failed.includes("_pbpTrSetErrTip(btn,") && partial.includes("_pbpTrSetErrTip(btn,") &&
     !failed.includes("btn.title") && !partial.includes("btn.title") &&
     mdCss.includes(".pb-tr-err::after") && mdCss.includes("content: attr(data-tip)"),
     "translation failure reasons still depend on native title tooltips or lack a themed hover/focus surface");

@@ -685,6 +685,18 @@ function pbpAiResolveModelOverride(s) {
   return m || undefined;
 }
 
+// Display name of the active provider, the same one the Settings provider
+// dropdown shows (its options carry data-i18n="prov<Id>"), so the reader never
+// prints an internal id like "siliconflow" next to a Settings page that says
+// "SiliconFlow". A provider without a prov* key falls back to its id. DISPLAY
+// ONLY -- cache keys and request routing keep using s.aiProvider.
+function pbpAiProviderName(s) {
+  const id = (s && s.aiProvider) || "gemini";
+  const key = "prov" + id.charAt(0).toUpperCase() + id.slice(1);
+  const name = t(key);
+  return (name && name !== key) ? name : id;
+}
+
 // Error attribution for the override: when a preview request dies on a
 // model-shaped failure while an override is active, name the override as the
 // suspect -- the AI Providers tab's test connection never exercises it, so
@@ -696,7 +708,7 @@ function pbpAiOverrideErrHint(err, s) {
   const code = err && err.code;
   const status = err && err.status;
   if (code !== "model_not_found" && status !== 400 && status !== 404 && status !== 422) return "";
-  return t("previewAiOverrideErrHint", model, (s && s.aiProvider) || "gemini");
+  return t("previewAiOverrideErrHint", model, pbpAiProviderName(s));
 }
 
 // Cache-identity model: the preview override if set, else the provider's

@@ -1340,7 +1340,9 @@ function refineTags(tags, opts) {
 // Writes nothing; callers put the result into textContent/dataset.tip/
 // aria-label only (spec ZH-3 write-surface allowlist).
 function pbpAiErrorText(err) {
-  const msg = String((err && err.message) || "") || "translation failed";
+  // No message at all: a localized generic reason, never a hardcoded English
+  // word mixed into a translated UI (it lands after "Translation failed - ").
+  const msg = String((err && err.message) || "") || t("aiErrRequestFailed");
   // CLAUDE.md "swallowed exceptions must leave a trace": log the raw shape
   // before folding it into a product string (no keys/tokens in these fields).
   try { console.warn("[pbp-ai] request failed:", err && err.name, err && err.status, msg); } catch (_) {}

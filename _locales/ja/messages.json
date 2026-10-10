@@ -15,10 +15,10 @@
     "message": "あとで読むとしてクイック保存（ポップアップなし）"
   },
   "cmdMarkdownPreview": {
-    "message": "ページを Markdown プレビューに変換（ポップアップなし）"
+    "message": "ページをリーダーで開く（ポップアップなし）"
   },
   "cmdSaveTabSet": {
-    "message": "全タブをタブセットとして保存"
+    "message": "このウィンドウのタブをタブセットとして保存"
   },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
@@ -86,7 +86,7 @@
     "message": "前回："
   },
   "loading": {
-    "message": "読み込み中…"
+    "message": "ページ情報を読み込み中…"
   },
   "private": {
     "message": "非公開"
@@ -98,7 +98,7 @@
     "message": "ネットワークエラー"
   },
   "uriTooLong": {
-    "message": "リクエストが長すぎます（$LEN$/$MAX$ 文字）。メモまたはタグを短くしてください。",
+    "message": "リクエストが長すぎます（$LEN$/$MAX$ B）。メモ、タイトル、またはタグを短くしてください。",
     "placeholders": {
       "len": {
         "content": "$1"
@@ -128,8 +128,11 @@
   "loginInvalidFormat": {
     "message": "形式が正しくありません。ユーザー名:TOKEN の形式で入力してください"
   },
+  "loginSaveFailed": {
+    "message": "API Token は有効ですが、保存できませんでした。ブラウザーのストレージに空きがあるか確認して、もう一度お試しください。"
+  },
   "loginFailed": {
-    "message": "認証に失敗しました。"
+    "message": "認証に失敗しました。API Token を確認してください。"
   },
   "settingsPassword": {
     "message": "pinboard.in/settings/password"
@@ -177,7 +180,7 @@
     "message": "ブックマークを保存しました。"
   },
   "tagDraftUnsaved": {
-    "message": "タグ入力欄に未確定のテキストが残っています。"
+    "message": "タグ入力欄に残っているテキストは、タグとして追加されていません。"
   },
   "savedSuccess": {
     "message": "保存しました！"
@@ -202,6 +205,22 @@
   },
   "editingExisting": {
     "message": "既存のブックマークを編集中"
+  },
+  "editingExistingDetails": {
+    "message": "$BASE$（$DETAILS$）",
+    "placeholders": {
+      "base": {
+        "content": "$1",
+        "example": "Editing existing bookmark"
+      },
+      "details": {
+        "content": "$2",
+        "example": "saved Oct 2, 2026, 3 tags"
+      }
+    }
+  },
+  "editingExistingDetailSep": {
+    "message": "、"
   },
   "saveNeedsReview": {
     "message": "すでにブックマーク済みです。内容を確認して、もう一度「更新」を押してください。"
@@ -248,9 +267,6 @@
   "aiGenerateBtn": {
     "message": "生成"
   },
-  "aiGenerate": {
-    "message": "生成"
-  },
   "aiSummaryGenerated": {
     "message": "要約を生成しました"
   },
@@ -267,13 +283,16 @@
     "message": "タグを再生成しました"
   },
   "aiNoContent": {
-    "message": "要約するページ内容がありません"
+    "message": "このページには利用できる内容がありません"
+  },
+  "aiEmptyResult": {
+    "message": "AI が空の結果を返しました。もう一度試すか、モデルを切り替えてください。"
   },
   "aiUrlEdited": {
-    "message": "URL が編集されているため、AI は元のページに対してのみ生成できます。"
+    "message": "URL が編集されています。AI は最初に開いたページだけを読み取ります。AI を使うには URL を元に戻してください。"
   },
   "aiSetKey": {
-    "message": "[[設定]]で AI API Key を設定してください"
+    "message": "[[設定]]で AI の API キーを追加してください"
   },
   "aiCached": {
     "message": "キャッシュ済み"
@@ -323,7 +342,7 @@
     "message": "不明なエラー"
   },
   "aiErrorModelNotFound": {
-    "message": "$PROVIDER$ のデフォルトモデルが古くなっている可能性があります。設定でモデルを選択してください",
+    "message": "$PROVIDER$ で、設定されているモデルが見つかりませんでした。提供が終了したか、モデル名が間違っている可能性があります。",
     "placeholders": {
       "provider": {
         "content": "$1"
@@ -364,6 +383,15 @@
   "pinboardErrorAuth": {
     "message": "認証に失敗しました。APIトークンを確認してください"
   },
+  "pinboardApiError": {
+    "message": "Pinboard がエラーを返しました：$DETAIL$",
+    "placeholders": {
+      "detail": {
+        "content": "$1",
+        "example": "item not found"
+      }
+    }
+  },
   "pinboardErrorRateLimit": {
     "message": "リクエストが多すぎます。しばらくしてから再試行してください"
   },
@@ -395,7 +423,7 @@
     "message": "タブセットを保存"
   },
   "batchSaveBtn": {
-    "message": "各タブを個別に保存"
+    "message": "一括保存"
   },
   "batchSaving": {
     "message": "保存中…"
@@ -404,13 +432,13 @@
     "message": "バックグラウンドで保存中…"
   },
   "batchNoValidTabs": {
-    "message": "保存できるタブがありません"
+    "message": "このウィンドウには保存できるウェブページがありません"
   },
   "batchNoTabs": {
-    "message": "有効なタブがありません"
+    "message": "このウィンドウには保存できるウェブページがありません"
   },
   "batchNotLoggedIn": {
-    "message": "ログインしていません"
+    "message": "ログインしていません。設定で API Token を入力してください。"
   },
   "batchSent": {
     "message": "送信しました！"
@@ -432,8 +460,32 @@
       }
     }
   },
+  "batchProgressLabel": {
+    "message": "一括保存の進行状況"
+  },
+  "batchProgressValue": {
+    "message": "$TOTAL$ 件中 $CURRENT$ 件を処理：$SAVED$ 件保存、$FAILED$ 件失敗",
+    "placeholders": {
+      "current": {
+        "content": "$1",
+        "example": "3"
+      },
+      "total": {
+        "content": "$2",
+        "example": "10"
+      },
+      "saved": {
+        "content": "$3",
+        "example": "2"
+      },
+      "failed": {
+        "content": "$4",
+        "example": "1"
+      }
+    }
+  },
   "batchDone": {
-    "message": "一括完了：$SAVED$ 件保存、$FAILED$ 件失敗",
+    "message": "一括保存が完了しました：$SAVED$ 件保存、$FAILED$ 件失敗",
     "placeholders": {
       "saved": {
         "content": "$1"
@@ -452,10 +504,19 @@
     }
   },
   "batchTooLong": {
-    "message": "、$COUNT$ 件長すぎ",
+    "message": "、$COUNT$ 件は長すぎて保存できませんでした",
     "placeholders": {
       "count": {
         "content": "$1"
+      }
+    }
+  },
+  "batchAiFailed": {
+    "message": "、$COUNT$ 件は AI 処理に失敗",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
       }
     }
   },
@@ -468,15 +529,27 @@
     }
   },
   "batchFailed": {
-    "message": "一括保存に失敗：$ERROR$",
+    "message": "一括保存に失敗しました：$ERROR$",
     "placeholders": {
       "error": {
         "content": "$1"
       }
     }
   },
+  "batchAccountChanged": {
+    "message": "Pinboard アカウントが切り替わったため、一括保存を停止しました。"
+  },
+  "tabSetFailed": {
+    "message": "タブセットを保存できませんでした：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "No response"
+      }
+    }
+  },
   "batchInterrupted": {
-    "message": "一括保存が $DONE$/$TOTAL$ 件で中断しました。残りのタブはもう一度実行して保存してください。",
+    "message": "一括保存が $DONE$/$TOTAL$ 件で中断しました。もう一度実行すると、残りのタブを保存できます。",
     "placeholders": {
       "done": {
         "content": "$1"
@@ -490,7 +563,7 @@
     "message": "一括保存をキャンセル"
   },
   "batchCancelled": {
-    "message": "一括保存をキャンセルしました。保存済みの $SAVED$ 件はそのまま残ります。",
+    "message": "一括保存をキャンセルしました。保存済みのブックマーク（$SAVED$ 件）はそのまま残ります。",
     "placeholders": {
       "saved": { "content": "$1" }
     }
@@ -517,6 +590,9 @@
   "offlineRetryWrongAccount": {
     "message": "この項目は別の Pinboard アカウントで保存待ちになっています。そのアカウントでログインすると送信できます。"
   },
+  "offlineRetryAccountChanged": {
+    "message": "再試行中に Pinboard アカウントが切り替わったため、送信を停止しました。"
+  },
   "offlineRetryFailed": {
     "message": "このブックマークを送信できませんでした。もう一度お試しください。",
     "description": "Popup offline queue: a retry failed for a reason that is not the network and has no more specific message (storage full, internal error, invalid payload, conflict)."
@@ -525,10 +601,13 @@
     "message": "キューから削除"
   },
   "offlineRemoveConfirm": {
-    "message": "この項目を削除しますか？"
+    "message": "このブックマークをキューから削除しますか？削除すると保存されません。"
   },
   "offlineQueueEmpty": {
     "message": "キューは空です"
+  },
+  "offlineQueueUntitled": {
+    "message": "（無題）"
   },
   "offlineJustNow": {
     "message": "たった今"
@@ -558,7 +637,7 @@
     }
   },
   "offlineClearConfirm": {
-    "message": "待機中のブックマークをすべてクリアしますか？"
+    "message": "キュー内のブックマークをすべてクリアしますか？これらは保存されません。"
   },
   "recentLabel": {
     "message": "最近："
@@ -590,16 +669,16 @@
     "message": "ブックマークを削除しました。"
   },
   "bgQuickSaved": {
-    "message": "Pinboard：クイック保存しました！"
+    "message": "Pinboard：クイック保存"
   },
   "bgReadLater": {
-    "message": "Pinboard：あとで読むに保存しました！"
+    "message": "Pinboard：あとで読む"
   },
   "bgCannotSave": {
     "message": "Pinboard：保存できません"
   },
   "bgCannotBookmark": {
-    "message": "このページはブックマークできません。"
+    "message": "保存できるのは http と https のページだけです。"
   },
   "bgMdPreviewFailed": {
     "message": "Pinboard：Markdown への変換に失敗しました"
@@ -607,14 +686,17 @@
   "bgMdPreviewNoContent": {
     "message": "このページから読み取れるコンテンツが見つかりませんでした。"
   },
+  "bgMdPreviewUnsupported": {
+    "message": "リーダーで開けるのは http と https のページだけです。"
+  },
   "bgMdPreviewTooLarge": {
-    "message": "ストレージがいっぱいです。拡張機能のオプションの「ストレージ」でキャッシュを削除してからもう一度お試しください。"
+    "message": "ストレージがいっぱいです。「設定 > ストレージ」でキャッシュデータを削除してから、もう一度お試しください。"
   },
   "mdPreviewOpenFailed": {
-    "message": "プレビューを開けませんでした。ページが大きすぎて保存できない可能性があります。"
+    "message": "リーダーを開けませんでした。もう一度お試しください。"
   },
   "mdPreviewQuotaFull": {
-    "message": "ストレージがいっぱいのため、プレビューを保存できませんでした。空き容量を確保してからもう一度お試しください。"
+    "message": "ストレージがいっぱいのため、リーダーの内容を保存できませんでした。空き容量を確保してから、もう一度お試しください。"
   },
   "manageStorage": {
     "message": "ストレージを管理"
@@ -698,10 +780,10 @@
     "message": "このページを抽出できませんでした。もう一度お試しください。"
   },
   "mdEngineTabGone": {
-    "message": "元のタブが利用できません。ページを開き直すと Defuddle を使えます"
+    "message": "元のタブはもう利用できません。Defuddle を使うには、ページを開き直してください。"
   },
   "mdEngineJinaNeedsHttp": {
-    "message": "Jina Reader が取得できるのは http(s) のページのみです。http(s) で開き直すと使えます"
+    "message": "Jina Reader が取得できるのは http(s) のページだけのため、このページは読み取れません。"
   },
   "mdEngineGroupAria": {
     "message": "抽出エンジン"
@@ -721,7 +803,7 @@
     "message": "Pinboard：タブセットの保存に失敗"
   },
   "bgLoginRequired": {
-    "message": "先にブラウザで pinboard.in にログインしてください。"
+    "message": "このブラウザーで pinboard.in にログインしてから、もう一度お試しください。"
   },
   "bgQuickSaveFailed": {
     "message": "Pinboard：クイック保存に失敗"
@@ -747,7 +829,7 @@
     }
   },
   "bgTitleSavedAiSkipped": {
-    "message": "\"$TITLE$\" を保存しました。AI は実行されませんでした。「設定 > AI プロバイダー > 接続テスト」でアクセスを許可してください。",
+    "message": "\"$TITLE$\" を保存しました。AI プロバイダーへのアクセスが許可されていないため、AI はスキップされました。「設定 > AI プロバイダー > 接続テスト」から許可してください。",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -763,7 +845,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard：一括保存が完了しました！"
+    "message": "Pinboard：一括保存が完了"
+  },
+  "bgBatchCancelled": {
+    "message": "Pinboard：一括保存をキャンセルしました"
   },
   "bgUndo": {
     "message": "取り消し"
@@ -823,7 +908,7 @@
     "message": "不明なページ"
   },
   "notesUnknownHint": {
-    "message": "このページのプレビューを再度開いてハイライトを保存すると、タイトルとリンクが自動的に補完されます。"
+    "message": "このページをリーダーでもう一度開いてハイライトを保存すると、タイトルとリンクが補完されます。"
   },
   "notesDeleteBtn": {
     "message": "このページのハイライトをすべて削除"
@@ -889,7 +974,7 @@
     }
   },
   "resetKeysKept": {
-    "message": "（キーは保持）"
+    "message": "API キーとトークンは保持されます。"
   },
   "resetClearsAuthored": {
     "message": "このページの手書きの内容（プロンプト、用語集、リスト、カスタム CSS など）も消去されます。"
@@ -901,10 +986,10 @@
     "message": "API Token"
   },
   "hintApiToken": {
-    "message": "取得先："
+    "message": "トークンの取得先："
   },
   "secSaveDefaults": {
-    "message": "保存のデフォルト設定"
+    "message": "保存時のデフォルト"
   },
   "optPrivateDefault": {
     "message": "デフォルトで非公開にする"
@@ -925,13 +1010,13 @@
     "message": "選択テキストを <blockquote> で囲む"
   },
   "optIncludeReferrer": {
-    "message": "メモにリファラーを含める"
+    "message": "参照元ページの URL をメモに追加する"
   },
   "secTags": {
     "message": "タグ"
   },
   "optRespectTagCase": {
-    "message": "既存タグの大文字小文字を尊重（最も使われている表記に合わせる）"
+    "message": "既存タグの大文字・小文字の表記に合わせる（最も多く使われている表記を優先）"
   },
   "optShowSuggestTags": {
     "message": "ポップアップに Pinboard のおすすめタグを表示"
@@ -946,7 +1031,7 @@
     "message": "ポップアップにクイックリンクを表示"
   },
   "optShowQuickRow": {
-    "message": "ポップアップにクイック操作ボタンを表示（タブセット保存 · 一括保存 · Markdown）"
+    "message": "ポップアップにクイック操作ボタンを表示（タブセットを保存 · 一括保存 · リーダー）"
   },
   "tagSyncLabel": {
     "message": "タグキャッシュ戦略"
@@ -976,7 +1061,7 @@
     "message": "ポップアップの動作"
   },
   "optCheckBookmarkStatus": {
-    "message": "アイコンでブックマーク状態を表示（現在のページが保存済みか確認）"
+    "message": "このページがブックマーク済みかどうかをツールバーのアイコンに表示"
   },
   "optAutoClose": {
     "message": "保存後にポップアップを自動で閉じる"
@@ -987,9 +1072,6 @@
   "secBackupRestore": {
     "message": "バックアップと復元"
   },
-  "backupHint": {
-    "message": "設定と選択したデータをエクスポートまたはインポートします。チェックしない限り、認証情報は含まれません。"
-  },
   "backupIncludeHighlightsLabel": {
     "message": "バックアップにハイライトとメモを含める"
   },
@@ -997,7 +1079,7 @@
     "message": "バックアップにはページ URL、タイトル、選択したテキスト、メモ、色、タイムスタンプが含まれます。"
   },
   "backupPlaintextDisclosure": {
-    "message": "バックアップは平文の JSON ファイルです。設定、ハイライト、ページ URL、単語、文脈の抜粋が含まれる場合があります。"
+    "message": "バックアップは平文の JSON ファイルです。設定、テーマ、ハイライトとメモ、ページ URL、単語、文脈の抜粋が含まれる場合があり、含めることを選んだ場合は API キーとトークンも含まれます。"
   },
   "backupIncludeVocabularyLabel": {
     "message": "バックアップに単語を含める"
@@ -1009,7 +1091,7 @@
     "message": "バックアップに API キーとトークンを含める"
   },
   "backupIncludeSecretsHint": {
-    "message": "すべての認証情報が平文でファイルに書き込まれます。Pinboard トークン、各 AI プロバイダーのキー、Jina、Wayback、Anki、Eudic、Gist、Webhook の認証情報が対象です。ファイルを開いた人は誰でもそのまま使用できます。パスワードと同じ扱いで保管してください。"
+    "message": "すべての認証情報が平文でファイルに書き込まれます。Pinboard の API Token、各 AI プロバイダーの API キー、Jina、Wayback、Anki、Eudic、Notion、Gist、Webhook の認証情報が対象です。ファイルを開いた人は誰でもそのまま使用できます。パスワードと同じ扱いで保管してください。"
   },
   "backupSecretsExportConfirm": {
     "message": "このバックアップには API キーとトークンが平文で保存されます。信頼できない経路で送信せず、復元が終わったらすぐに削除してください。"
@@ -1042,7 +1124,7 @@
     "message": "インポートのプレビュー"
   },
   "backupPreviewMeta": {
-    "message": "スキーマ $SCHEMA$、作成日時 $CREATED$、拡張機能のバージョン $VERSION$。",
+    "message": "形式バージョン $SCHEMA$、作成日時 $CREATED$、拡張機能のバージョン $VERSION$。",
     "placeholders": {
       "schema": { "content": "$1" },
       "created": { "content": "$2" },
@@ -1086,7 +1168,7 @@
     "message": "言語"
   },
   "backupPreviewLegacyOwner": {
-    "message": "アカウント情報のない旧形式のバックアップ"
+    "message": "記録なし"
   },
   "backupPreviewNone": {
     "message": "なし"
@@ -1104,7 +1186,7 @@
     "message": "このデバイスでは設定の同期が有効です。インポートした設定がほかの Chrome デバイスに同期される場合があります。"
   },
   "backupPreviewLocalWarning": {
-    "message": "次の選択項目は現在このデバイスだけに保存されているか、サイズ上このデバイスだけへの保存が必要です：$FIELDS$。",
+    "message": "次の項目は Chrome Sync には大きすぎるため、このデバイスだけに保存される場合があります：$FIELDS$。",
     "placeholders": { "fields": { "content": "$1" } }
   },
   "backupPreviewSemantics": {
@@ -1148,7 +1230,7 @@
     }
   },
   "backupImportComplete": {
-    "message": "インポートが完了しました。設定とテーマの変更は再読み込み後に表示されます。"
+    "message": "インポートが完了しました。"
   },
   "backupImportPartialResult": {
     "message": "インポートは終了しましたが、未完了の項目またはこのデバイスだけに保存された項目があります。バックアップを削除する前に、下の結果を確認してください。"
@@ -1157,39 +1239,42 @@
     "message": "適用されたバックアップ項目はありません。"
   },
   "exportSettings": {
-    "message": "設定をエクスポート"
+    "message": "バックアップをエクスポート"
   },
   "backupExportFailed": {
     "message": "フィールド $FIELD$ の内容が無効なため、バックアップファイルを作成できませんでした。",
     "placeholders": { "field": { "content": "$1" } }
   },
+  "backupExportFailedGeneric": {
+    "message": "バックアップファイルを作成できませんでした。もう一度お試しください。"
+  },
   "backupExportSyncPending": {
     "message": "Chrome Sync がこのデバイスへのデータ転送を完了していません。ファイルは作成していません。1 分ほど待ってから再試行してください。"
   },
   "importSettings": {
-    "message": "設定をインポート"
+    "message": "バックアップをインポート"
   },
   "importedReload": {
     "message": "インポート完了。リロードすると反映されます"
   },
   "importInvalid": {
-    "message": "無効なファイル"
+    "message": "有効なバックアップファイルではありません"
   },
   "importInvalidField": {
-    "message": "無効なファイル：フィールド $FIELD$ を読み取れません",
+    "message": "有効なバックアップファイルではありません：フィールド $FIELD$ を読み取れません",
     "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "インポートを完了できませんでした。一部の設定はすでに変更されている可能性があります。内容を確認してから再試行してください。"
   },
   "importSettingsTitle": {
-    "message": "JSONファイルから設定をインポート"
+    "message": "JSON バックアップファイルからインポート"
   },
   "jinaMdNonWebHint": {
     "message": "ウェブページでのみ動作します"
   },
   "popSortTitle": {
-    "message": "このページを人気順に並び替える"
+    "message": "このページのブックマークを保存した人数の多い順に並べ替える"
   },
   "importPartial": {
     "message": "インポート完了。テーマはローカルに保存されました（同期容量超過）。リロードで反映"
@@ -1197,11 +1282,8 @@
   "secQuickSave": {
     "message": "クイック保存"
   },
-  "qsHint": {
-    "message": "キーボードショートカットで現在のページを即座に保存（ポップアップを開かずに）。"
-  },
   "labelShortcut": {
-    "message": "ショートカット"
+    "message": "ショートカット："
   },
   "labelOpenPopupShortcut": {
     "message": "ポップアップを開くショートカット"
@@ -1215,11 +1297,8 @@
   "mdShortcutUnset": {
     "message": "未設定"
   },
-  "shortcutsManual": {
-    "message": "または手動で移動："
-  },
   "qsAutoNotes": {
-    "message": "ページの説明をメモに自動追加"
+    "message": "テキストが選択されていないときは、ページの説明をメモに追加する"
   },
   "qsBlockquote": {
     "message": "選択テキストを blockquote で囲む"
@@ -1239,14 +1318,8 @@
   "secReadLater": {
     "message": "あとで読む"
   },
-  "rlHint": {
-    "message": "キーボードショートカットで現在のページを「あとで読む」として保存します。自動的に未読としてマークされます。"
-  },
   "secBatchSave": {
     "message": "一括保存"
-  },
-  "batchHint": {
-    "message": "開いている各タブを個別のブックマークとして保存します。"
   },
   "batchAutoAddTags": {
     "message": "タグを自動追加"
@@ -1255,7 +1328,7 @@
     "message": "タグ（カンマ区切り）"
   },
   "batchTagsHint": {
-    "message": "複数のタグはカンマで区切ります。例：batch_saved, research"
+    "message": "複数のタグはカンマで区切ります。タグ内のスペースはハイフンに変換されます。例：batch_saved, research"
   },
   "batchAiTags": {
     "message": "各タブに AI タグを自動生成"
@@ -1267,13 +1340,13 @@
     "message": "既にブックマーク済みの URL をスキップ"
   },
   "batchAiHint": {
-    "message": "AI はタブごとに 1 回呼び出されるため、時間がかかる場合があります。初回のみ、一覧のタブサイトと現在の AI プロバイダーへの権限を求めます。"
+    "message": "AI はタブごとに 1 回呼び出されるため、時間がかかる場合があります。アクセス権がない場合、一括保存は保存するタブのサイトと現在の AI プロバイダーへのアクセスだけを求めます。"
   },
   "batchPermDenied": {
-    "message": "一覧のサイト権限が付与されなかったため、Batch AI は開始されませんでした。"
+    "message": "一覧のサイトへのアクセスが許可されなかったため、一括保存は開始されませんでした。"
   },
   "batchPermConfirm": {
-    "message": "今回の Batch AI は次の $COUNT$ 件のサイトへアクセスします：",
+    "message": "一括保存には次の $COUNT$ 件のサイトへのアクセスが必要です：",
     "placeholders": {
       "count": { "content": "$1" }
     }
@@ -1348,7 +1421,7 @@
     }
   },
   "testTimeout": {
-    "message": "タイムアウト（30秒）"
+    "message": "リクエストがタイムアウトしました"
   },
   "testNoApiKey": {
     "message": "API Key が未入力です"
@@ -1360,16 +1433,13 @@
     "message": "詳細情報"
   },
   "hintOpenAIBaseUrl": {
-    "message": "プロキシや互換エンドポイントに変更可能"
-  },
-  "hintClaudeModel": {
-    "message": "例：claude-haiku-4-5-20251001, claude-sonnet-4-20250514"
+    "message": "プロキシや互換エンドポイントを使う場合に変更します"
   },
   "hintOllamaModel": {
     "message": "先に ollama pull llama3.2 を実行してください"
   },
   "hintCustomBaseUrl": {
-    "message": "/chat/completions エンドポイントに対応している必要があります"
+    "message": "この URL の末尾に /chat/completions が付加されます。エンドポイントがこのパスに対応している必要があります"
   },
   "hintCustomKey": {
     "message": "不要な場合は空欄のままにしてください"
@@ -1422,10 +1492,10 @@
     "message": "Русский"
   },
   "labelAiCache": {
-    "message": "AI タグ・要約とページ取得のキャッシュ時間（分）"
+    "message": "AI タグ・要約と取得したページのキャッシュ時間（分）"
   },
   "aiCacheHint": {
-    "message": "URL ごとにキャッシュ、共有枠 200 件（LRU）。0 で無効にします。"
+    "message": "URL ごとに 200 件の共有枠でキャッシュし、最も長く使われていないものから削除します。0 で無効になります。"
   },
   "labelTagSeparator": {
     "message": "複数語タグの区切り文字"
@@ -1518,23 +1588,14 @@
   "optTagSortByPop": {
     "message": "タグページに人気順の並べ替えコントロールを追加"
   },
-  "optTagSortByPopHint": {
-    "message": "pinboard.in のタグページに「pop」コントロールを追加し、各リンクの保存人数で現在のページのブックマークを並べ替えます（再クリックで元に戻ります）。"
-  },
   "secCustomStyle": {
     "message": "Pinboard.in カスタムスタイル"
-  },
-  "customStyleHint": {
-    "message": "pinboard.in のページにカスタム CSS を適用します。フォント、配色、レイアウトなどを変更できます。"
   },
   "labelCustomFont": {
     "message": "カスタムフォント"
   },
   "customFontPlaceholder": {
     "message": "例：'Noto Sans JP', 'Fira Code', sans-serif"
-  },
-  "customFontHint": {
-    "message": "pinboard.in の body に適用されます。空欄の場合はデフォルトのままです。"
   },
   "labelThemePresets": {
     "message": "テーマプリセット"
@@ -1551,9 +1612,6 @@
   "themeGroupDark": {
     "message": "ダーク"
   },
-  "themePresetsHint": {
-    "message": "プリセットをクリックして CSS を読み込みます。アダプティブテーマはテーマ設定（ライト/ダーク）に連動します。"
-  },
   "labelSavedThemes": {
     "message": "保存済みテーマ"
   },
@@ -1561,7 +1619,7 @@
     "message": "テーマとして保存"
   },
   "saveAsThemeHint": {
-    "message": "カスタム CSS オーバーレイを編集すると、再利用可能なテーマとして保存できます。"
+    "message": "カスタム CSS オーバーレイを再利用可能なテーマとして保存します。欄に CSS があり、50 KB 以下のときに使用できます。"
   },
   "customCSSPlaceholder": {
     "message": "/* pinboard.in 用カスタム CSS */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
@@ -1611,22 +1669,22 @@
     "message": "上書き"
   },
   "saveTabsTitle": {
-    "message": "開いている全タブを 1 つの Pinboard タブセットとしてまとめて保存（pinboard.in へのログインが必要）"
+    "message": "このウィンドウのタブを 1 つの Pinboard タブセットとしてまとめて保存（pinboard.in へのログインが必要）"
   },
   "batchSaveTitle": {
-    "message": "開いている各タブを個別のブックマークとして保存（AI タグ・要約はオプション）"
+    "message": "このウィンドウの各タブを個別にブックマーク（AI タグ・要約は任意）"
   },
   "qlSetsTitle": {
-    "message": "タブセット"
+    "message": "Pinboard に保存したタブセット"
   },
   "qlNetworkTitle": {
-    "message": "ネットワーク"
+    "message": "フォローしているユーザーのブックマーク"
   },
   "qlUnreadTitle": {
-    "message": "未読ブックマーク"
+    "message": "未読（あとで読む）のブックマーク"
   },
   "qlNotesTitle": {
-    "message": "メモ"
+    "message": "Pinboard のメモ"
   },
   "secSync": {
     "message": "データ同期"
@@ -1635,7 +1693,7 @@
     "message": "このデバイスの設定に Chrome Sync を使用"
   },
   "optSyncHint": {
-    "message": "この選択はデバイスごとです。オンにしたデバイス間でのみ設定が共有され、オフのデバイスはそれぞれのローカル設定を使い続けます。"
+    "message": "この設定はデバイスごとです。オンにしたデバイス間でのみ設定が共有され、オフのデバイスはそれぞれのローカル設定を使い続けます。"
   },
   "syncApiKeysLabel": {
     "message": "この Google アカウントで認証情報を同期"
@@ -1651,10 +1709,10 @@
     "message": "他のデバイスの設定が Chrome Sync に保存されています。このデバイスで使うには、設定の同期をオンにしてください。"
   },
   "syncApiKeysDisableConfirm": {
-    "message": "認証情報の同期を無効にしますか？このデバイスはローカルの認証情報を使用するようになり、Chrome Sync に残っている古い認証情報は削除されます。そのクラウド認証情報を使用している他のデバイスでは、機能しなくなる可能性があります。Google Drive の OAuth トークンには影響しません。"
+    "message": "認証情報の同期を無効にしますか？同期されている認証情報はこのデバイスにローカルのコピーとして残り、Chrome Sync からは削除されます。そのクラウド上の認証情報を使用している他のデバイスでは、機能しなくなる可能性があります。Google Drive の OAuth トークンには影響しません。"
   },
   "qlPopularTitle": {
-    "message": "人気"
+    "message": "Pinboard の人気ブックマーク"
   },
   "provGemini": {
     "message": "Google Gemini"
@@ -1701,6 +1759,9 @@
   "provCustom": {
     "message": "カスタム OpenAI互換"
   },
+  "provCustomShort": {
+    "message": "カスタム"
+  },
   "jinaMarkdownBtn": {
     "message": "リーダー"
   },
@@ -1716,6 +1777,9 @@
   "jinaCopied": {
     "message": "コピー済み!"
   },
+  "popupCopyFailed": {
+    "message": "クリップボードにコピーできませんでした。"
+  },
   "jinaFailed": {
     "message": "失敗"
   },
@@ -1723,26 +1787,23 @@
     "message": "ページの主要コンテンツをローカルで抽出します（オフライン、高速）。"
   },
   "aiContentSourceJinaHint": {
-    "message": "Jina Reader API で整形済み Markdown を取得します（ネットワーク必須、API キーは任意・より高いクォータに）。"
+    "message": "ページの URL を Jina Reader に送信し、Jina Reader がページを取得して整形済みの Markdown を返します。ネットワーク接続が必要です。API キーは任意で、追加するとクォータが増えます。"
   },
   "jinaAuthFailed": {
     "message": "Jina API キーが無効または期限切れです。「設定 > AI プロバイダー > Jina Reader」で更新してください。"
   },
   "jinaFailedDetail": {
-    "message": "Markdown の取得に失敗しました：$ERROR$",
+    "message": "ページを Markdown に変換できませんでした：$ERROR$",
     "placeholders": {
       "error": {
         "content": "$1"
       }
     }
   },
-  "jinaViewBtn": {
-    "message": "表示"
-  },
   "mdStripPreview": {
-    "message": "プレビュー"
+    "message": "リーダーで開く"
   },
-  "mdStripPreviewVideo": { "message": "字幕をプレビュー" },
+  "mdStripPreviewVideo": { "message": "字幕をリーダーで開く" },
   "mdStripDownloadMd": {
     "message": ".md をダウンロード"
   },
@@ -1754,9 +1815,6 @@
   },
   "mdExportSection": {
     "message": "エクスポート"
-  },
-  "mdOptFrontmatter": {
-    "message": "Frontmatter"
   },
   "mdOptImages": {
     "message": "画像"
@@ -1781,14 +1839,14 @@
     "message": "埋め込みはダウンロードでのみ有効です。この出力では画像リンクをそのまま保持します。"
   },
   "mdImgBrokenNote": {
-    "message": "$COUNT$ 枚の画像がプレビューで読み込めませんでした。エクスポート後も表示されない可能性があります。ダウンロードで「埋め込み」を選ぶと画像を同梱できます。",
+    "message": "$COUNT$ 枚の画像がリーダーで読み込めませんでした。エクスポート後も表示されない可能性があります。ダウンロードで「埋め込み」を選ぶと画像を同梱できます。",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdExportRunning": {
     "message": "エクスポートを準備しています…"
   },
   "mdObsidianRoute": {
-    "message": "Obsidian ルート"
+    "message": "保存先"
   },
   "mdObsidianRouteNew": {
     "message": "新規ノート"
@@ -1833,16 +1891,13 @@
     "message": "画像を削除"
   },
   "mdExportImagePolicyHint": {
-    "message": "プレビューページから Markdown をコピーまたはダウンロードする際に適用されます。エクスポートごとに上書きできます。"
+    "message": "ポップアップやリーダーから Markdown をコピー、ダウンロード、送信するときのデフォルトの扱いです。リーダーではエクスポートごとに変更できます。"
   },
   "mdExportIncludeToc": {
     "message": "目次を含める"
   },
   "mdExportExtendedMeta": {
-    "message": "拡張メタデータ(著者、公開日、サイト、画像、文字数)を含める"
-  },
-  "mdExportExtendedMetaHint": {
-    "message": "値がある場合、これらの項目を frontmatter、HTML の署名行、webhook ペイロードに追加します。オフにすると旧バージョンと完全に同一のエクスポートになります。"
+    "message": "拡張メタデータ（著者、公開日、サイト、カバー画像、文字数）を含める"
   },
   "mdOptIncludeHl": {
     "message": "ハイライトを含める"
@@ -1970,16 +2025,16 @@
     "message": "jina_xxxx（空欄で無料枠を使用）"
   },
   "submitUriTooLong": {
-    "message": "リクエストが大きすぎます。メモ・タイトル・タグを短くしてください"
+    "message": "リクエストが長すぎます。メモ、タイトル、またはタグを短くしてください。"
   },
   "saveAsThemeDisabledHint": {
-    "message": "カスタム CSS を編集してからテーマとして保存できます"
+    "message": "カスタム CSS オーバーレイを再利用可能なテーマとして保存（CSS が必要、50 KB 以下）"
   },
   "labelCustomCSSOverlay": {
     "message": "カスタム CSS オーバーレイ"
   },
   "customCSSOverlayHelp": {
-    "message": "あなたの CSS は選択したプリセットの上に追加されます。空のままにするとプリセットのみを使用し、ここに書いたルールはプリセットの同名ルールを上書きします。"
+    "message": "ここに入力した CSS は選択したプリセットの後に読み込まれるため、同じセレクターのプリセットのルールより優先されます。空のままにすると、プリセットだけが使用されます。"
   },
   "presetPreviewToggle": {
     "message": "現在のプリセット CSS を表示（読み取り専用）"
@@ -1988,7 +2043,7 @@
     "message": "ローカルに保存しました（同期容量が満杯）"
   },
   "optSaveFailed": {
-    "message": "保存を完了できませんでした。その他の設定の一部はすでに保存されている可能性があります。内容を確認してから再試行してください。"
+    "message": "一部の変更を保存できませんでした。ほかの変更はすでに保存されている可能性があります。設定を確認して、もう一度お試しください。"
   },
   "confirm": {
     "message": "確認"
@@ -2017,19 +2072,13 @@
     "description": "Options page alert after adopting the cloud settings profile: the page must be reloaded before the adopted settings take effect."
   },
   "jinaFreeTierHint": {
-    "message": "無料枠: 20 RPM。キーを追加するとクォータが増えます。"
+    "message": "キーなしの場合：1 分あたり 20 リクエストまで。API キーを追加するとクォータが増えます。"
   },
   "openrouterTagline": {
     "message": "1 つの API で 100+ モデルにアクセス。"
   },
   "browseModelsAt": {
     "message": "モデル一覧:"
-  },
-  "hintZhipuModel": {
-    "message": "例: glm-4.7-flash, glm-4-flash, glm-4-plus"
-  },
-  "hintKimiModel": {
-    "message": "例: kimi-k2.6, kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
   },
   "mdPreviewEmpty": {
     "message": "まだ読むものがありません。ページを開いてから、拡張機能のポップアップで「リーダー」をクリックしてください。"
@@ -2053,14 +2102,11 @@
   "aiSlowHint": {
     "message": "通常より時間がかかっています"
   },
-  "aiCancel": {
-    "message": "キャンセル"
-  },
   "urlCleanedN": {
     "message": "{n} 個のトラッキングパラメータをクリーンアップ"
   },
   "urlShowOriginal": {
-    "message": "元の URL を表示"
+    "message": "元の URL に戻す"
   },
   "urlPasteCleanedN": {
     "message": "{n} 個のトラッキングパラメータを削除しました"
@@ -2078,16 +2124,16 @@
     "message": "ポップアップを開いたときにクリーンアップ（無音、元に戻すリンク付き）"
   },
   "optUrlCleanOnPaste": {
-    "message": "URL を貼り付けたときにクリーンアップ（トースト通知）"
+    "message": "URL を貼り付けたときにクリーンアップ（通知を表示し、元に戻せます）"
   },
   "optUrlCleanAggressive": {
-    "message": "アグレッシブモード: ref/si/igshid なども削除"
+    "message": "アグレッシブモード：ref、si、igshid なども削除（一部のリンクが機能しなくなる場合があります）"
   },
   "optUrlCleanCustom": {
     "message": "カスタムパラメータ（1 行に 1 つ、デフォルトリストに追加）"
   },
   "optUrlCleanExclude": {
-    "message": "除外パラメータ（1 行に 1 つ、例: アフィリエイトの tag= を残す）"
+    "message": "クリーンアップしないパラメータ（1 行に 1 つ。例：アフィリエイトの tag を残すには tag）"
   },
   "emptyRecentBookmarks": {
     "message": "最近のブックマークはありません"
@@ -2111,7 +2157,7 @@
     "message": "カスタム："
   },
   "optPopupWidthHelp": {
-    "message": "範囲: 420–720px (Chrome popup 制限)"
+    "message": "範囲：420–720px（Chrome のポップアップ上限 800px 未満）"
   },
   "optUrlCleanCustomPlaceholder": {
     "message": "utm_other\ncustom_track_id\n_branch_referrer"
@@ -2120,13 +2166,10 @@
     "message": "tag\nref\nsi"
   },
   "obsidianInstallHint": {
-    "message": "ノートを開くには Obsidian がインストールされている必要があります。ノートの内容はバックアップとしてクリップボードにもコピーされています。"
+    "message": "ノートを作成するには Obsidian がインストールされている必要があります。ノートの内容はクリップボードにもあるので、どこにでも貼り付けられます。"
   },
   "obsidianClipboardFailed": {
     "message": "クリップボードへの書き込みに失敗したため、ノートは作成されていません。もう一度お試しください。"
-  },
-  "apiKeySecurityHint": {
-    "message": "新規ユーザーの認証情報は既定でこのデバイスだけに保存されます。既存のクラウド認証情報がある場合、アップグレード後もアカウント全体の同期が有効なことがあります。設定同期を有効にしたデバイスだけが参加し、同期される認証情報は難読化されるだけで暗号化はされません。"
   },
   "batchPermLabel": {
     "message": "旧バージョンの全サイト権限："
@@ -2135,7 +2178,7 @@
     "message": "旧バージョンの全サイト権限を取り消す"
   },
   "batchRevokeHint": {
-    "message": "旧バージョンでは全サイト権限が付与される場合がありました。新しい Batch は一覧のサイトだけを要求します。このボタンで旧権限を削除できます。"
+    "message": "旧バージョンでは、全サイトへのアクセス権を保持している場合がありました。現在の一括保存は、保存するタブのサイトだけを要求します。このボタンで旧バージョンの全サイト権限を削除できます。"
   },
   "batchRevokeSuccess": {
     "message": "取り消しました"
@@ -2162,7 +2205,7 @@
     "message": "一括保存中もアーカイブする"
   },
   "optWaybackBatchHint": {
-    "message": "一括保存は複数のアーカイブ リクエストを同時に送信できます。匿名クォータは限定されています。"
+    "message": "一括保存では、多数のアーカイブ リクエストが同時に送信されることがあります。匿名のクォータには上限があります。"
   },
   "optWaybackS3Key": {
     "message": "archive.org S3 Access Key（オプション）"
@@ -2177,7 +2220,7 @@
     "message": "非公開で保存したブックマークは archive.org に送信しない"
   },
   "waybackPermDenied": {
-    "message": "このページ上部で「保存したページを Wayback Machine にアーカイブする」をいったんオフにしてから再度オンにし、web.archive.org の権限を再申請してください。"
+    "message": "アーカイブには web.archive.org へのアクセス権が必要ですが、許可されていません。アーカイブを有効にし直すと、もう一度リクエストできます。"
   },
   "archiveThisSave": {
     "message": "アーカイブ"
@@ -2206,7 +2249,7 @@
     "message": "リクエスト済み"
   },
   "archiveOutcomeSkipped": {
-    "message": "スキップ（最近アーカイブ済み）"
+    "message": "スキップ（24 時間以内にリクエスト済み）"
   },
   "archiveOutcomeSkippedPrivate": {
     "message": "スキップ（非公開）"
@@ -2230,7 +2273,7 @@
     "message": "送信に成功しても、スナップショットがすぐに表示されるとは限りません。Wayback Machine が新しいキャプチャをインデックスするまで、通常は数分（場合によってはそれ以上）かかります。"
   },
   "archiveErrAuth": {
-    "message": "認証情報が無効です"
+    "message": "S3 Access Key または Secret が無効です"
   },
   "archiveErrNetwork": {
     "message": "archive.org に接続できません"
@@ -2251,7 +2294,7 @@
     "message": "archive.org のサーバーエラーです。しばらくしてから再試行してください"
   },
   "archiveErrRateLimited": {
-    "message": "匿名リクエストは IP ごとにレート制限されています。しばらく待つか S3 キーを追加してください"
+    "message": "archive.org がリクエストを制限しています。しばらくしてからもう一度お試しください。匿名リクエストは IP ごとに制限されるため、S3 キーを追加するとクォータが増えます。"
   },
   "archiveErrTimeoutHint": {
     "message": "リクエストがタイムアウトしました。archive.org が混雑しているかネットワークが遅い可能性があります"
@@ -2277,7 +2320,7 @@
     "message": "類似タググループ"
   },
   "tagGovNoGroups": {
-    "message": "重複したタグは見つかりません"
+    "message": "類似タググループは見つかりませんでした"
   },
   "tagGovKindPlural": {
     "message": "単複数"
@@ -2310,7 +2353,7 @@
     "message": "無視をリセット"
   },
   "tagGovResetIgnoredConfirm": {
-    "message": "無視されたグループをクリアしてすべての重複を再表示しますか？"
+    "message": "無視したグループをすべて再表示しますか？"
   },
   "tagGovAiBtn": {
     "message": "AI ディープ分析"
@@ -2319,7 +2362,7 @@
     "message": "分析中…"
   },
   "tagGovAiNone": {
-    "message": "AI グループが見つかりません"
+    "message": "AI は類似タグを見つけませんでした"
   },
   "tagGovAiNoKey": {
     "message": "AI プロバイダーが未設定です。「AI プロバイダー」タブで設定してください"
@@ -2355,10 +2398,19 @@
     "message": "これらのタグは大文字と小文字が異なるだけで、Pinboard では元々1つのタグとして扱われています。マージの必要はないため、この候補は削除しました。"
   },
   "tagGovConfirmDelete": {
-    "message": "選択した $N$ 個のタグを削除しますか？（永続的）",
+    "message": "選択した $N$ 個のタグを完全に削除しますか？",
     "placeholders": {
       "N": {
         "content": "$1"
+      }
+    }
+  },
+  "tagGovMoreCount": {
+    "message": "ほか $COUNT$ 個",
+    "placeholders": {
+      "COUNT": {
+        "content": "$1",
+        "example": "5"
       }
     }
   },
@@ -2374,7 +2426,7 @@
     }
   },
   "tagGovAborted429": {
-    "message": "レート制限によりバッチを停止しました。完了済みの変更は保存されています。同じマージを再実行すると安全に再開できます（更新済みのブックマークは自動でスキップされます）。"
+    "message": "レート制限のため、バッチを停止しました。完了した変更は保持されています。もう一度実行すると続きから再開し、更新済みのブックマークはスキップされます。"
   },
   "tagGovMergeEstimate": {
     "message": "推定所要時間：約 $T$",
@@ -2474,7 +2526,7 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "タグを読み込めませんでした。Pinboard トークンまたはネットワークを確認して更新してください"
+    "message": "タグを読み込めませんでした。API Token またはネットワークを確認してから、「更新」をクリックしてください。"
   },
   "placeholderOptional": {
     "message": "任意"
@@ -2483,7 +2535,7 @@
     "message": "タグ一覧のスナップショットをダウンロードしました（名前と件数のみ。手動修復の参考用で、自動復元はできません）"
   },
   "tagGovSnapshotFailed": {
-    "message": "スナップショットを作成できません。マージ/削除がブロックされています"
+    "message": "タグのスナップショットを作成できなかったため、マージまたは削除は実行されませんでした。"
   },
   "tagGovIrreversibleWarn": {
     "message": "マージと削除は元に戻せません。最初の変更前にタグ一覧のスナップショット（名前と件数のみ、手動修復の参考用）を自動ダウンロードします。"
@@ -2492,7 +2544,7 @@
     "message": "pinboard.in のタグバンドルは、名前変更によって自動更新されません。マージ後に手動で確認してください。"
   },
   "optBgSaveMode": {
-    "message": "バックグラウンド保存モード"
+    "message": "ショートカットでの保存時に既存のブックマークが見つかった場合"
   },
   "optBgSaveModeMerge": {
     "message": "マージ（デフォルト、新しいタグと既存タグを結合）"
@@ -2503,9 +2555,6 @@
   "optBgSaveModeOverwrite": {
     "message": "上書き（すべてのタグを置換、マージしない）"
   },
-  "optBgSaveModeHint": {
-    "message": "マージ：既存のブックマークタグを読み込み、新しいタグと結合します。スキップ：重複 URL の保存を避けます。上書き：タグを完全に置換します（フォアグラウンド編集は常に置換）。"
-  },
   "bgSkippedTitle": {
     "message": "既にブックマーク済み"
   },
@@ -2515,23 +2564,14 @@
   "secPreviewAi": {
     "message": "リーダーの AI"
   },
-  "previewAiSectionHint": {
-    "message": "リーダーの選択範囲の解説、ページへの質問、全文翻訳は、自分で実行したときだけ動作し、「AI プロバイダー」タブで設定したプロバイダーとキーを使用します。AI 要点まとめをオンにしている場合は、リーダーを開いたときに実行されることがあります。非表示のバックグラウンドタスクとして実行される機能はありません。"
-  },
   "previewAiEnabled": {
     "message": "リーダーで AI 機能を有効にする"
-  },
-  "previewAiEnabledHint": {
-    "message": "オフにするとリーダーから AI の入口がすべて消えます。API キーが設定されていない場合も入口は自動的に非表示になります。"
   },
   "previewAiUnavailableHint": {
     "message": "以下の設定はまだ機能しません。選択中のプロバイダーに API キーがないか、権限が許可されていません。「AI プロバイダー」タブで設定してください。"
   },
   "previewAiModelLabel": {
     "message": "モデルの上書き（任意）"
-  },
-  "previewAiModelHint": {
-    "message": "リーダーの AI 機能専用のモデル名で、プロバイダーごとに保存されます。空欄にすると「AI プロバイダー」タブで設定したモデルを使用します。"
   },
   "previewAiModelFor": {
     "message": "$PROVIDER$ に適用されます。",
@@ -2571,7 +2611,7 @@
     "message": "LLM=大規模言語モデル\nPinboard="
   },
   "translateGlossaryHint": {
-    "message": "1 行に 1 ルール、形式は 用語=訳語。右側を空欄にするとその用語は翻訳されません。毎回の翻訳リクエストと一緒に送信されます。"
+    "message": "1 行に 1 ルール、形式は 用語=訳語。右側を空欄にするとその用語は翻訳されません。全文翻訳で使用され、各リクエストには送信するテキストに出現する用語だけが添付されます。"
   },
   "selectionTriggerLabel": {
     "message": "選択説明のトリガー"
@@ -2580,7 +2620,7 @@
     "message": "選択範囲の横にボタンを表示"
   },
   "selectionTriggerHotkey": {
-    "message": "ショートカット e と d のみ"
+    "message": "ショートカットのみ（e で解説、d で辞書検索）"
   },
   "selectionTriggerOff": {
     "message": "オフ"
@@ -2666,19 +2706,22 @@
     }
   },
   "trBlockFailed": {
-    "message": "この段落の翻訳に失敗しました"
+    "message": "このセグメントの翻訳に失敗しました"
   },
   "trErrKey": {
     "message": "API キーが無効か拒否されました。設定で確認してください"
   },
   "trErrQuota": {
-    "message": "レート制限またはクォータ超過です。しばらくしてからもう一度お試しください"
+    "message": "レート制限またはクォータの上限に達しました。しばらくしてからもう一度試すか、アカウントの残高を確認してください"
   },
   "trErrNetwork": {
     "message": "ネットワークまたはサーバーエラーです。しばらくしてからもう一度お試しください"
   },
   "trErrTimeout": {
     "message": "AI サービスがタイムアウトしました。もう一度お試しください"
+  },
+  "aiErrRequestFailed": {
+    "message": "AI リクエストに失敗しました"
   },
   "trRetranslate": {
     "message": "再翻訳"
@@ -2709,7 +2752,7 @@
     }
   },
   "trFailedSummaryMixed": {
-    "message": "$COUNT$ 個のセグメントがそれぞれ異なる理由で失敗しました。各セグメントから再試行してください。",
+    "message": "$COUNT$ 個のセグメントがそれぞれ異なる理由で失敗しました。理由は各セグメントの再試行ボタンで確認できます。",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2717,7 +2760,7 @@
     }
   },
   "trPartsUntranslated": {
-    "message": "この段落には未翻訳の箇所が $COUNT$ か所あります",
+    "message": "このセグメントには未翻訳の箇所が $COUNT$ か所あります",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2725,7 +2768,7 @@
     }
   },
   "trRetryBlock": {
-    "message": "この段落を再試行"
+    "message": "このセグメントを再試行"
   },
   "trRetryAllFailed": {
     "message": "失敗をすべて再試行"
@@ -2766,7 +2809,7 @@
     }
   },
   "askSentPartial": {
-    "message": "（記事が長いため $TOTAL$ 段落中 $SENT$ 段落を送信）",
+    "message": "（$TOTAL$ 段落中 $SENT$ 段落を送信）",
     "placeholders": {
       "sent": {
         "content": "$1"
@@ -2786,7 +2829,7 @@
     "message": "どんなデータが引用されている？"
   },
   "askChipVerified": {
-    "message": "検証済み"
+    "message": "引用を原文で確認済み"
   },
   "askErrRetry": {
     "message": "再試行"
@@ -2795,7 +2838,7 @@
     "message": "停止しました（途中までの回答を保持）"
   },
   "askEmptyHint": {
-    "message": "回答には原文の段落への出典が付くので、各主張を確認できます。"
+    "message": "回答には記事の段落が出典として示されます。出典をクリックすると、原文の該当箇所に移動します。"
   },
   "askCopyAnswer": {
     "message": "回答をコピー"
@@ -2845,10 +2888,10 @@
     "message": "辞書を検索中…"
   },
   "explainAiNotConfigured": {
-    "message": "設定で AI プロバイダーを指定すると、選択範囲を解説できます。"
+    "message": "選択範囲を解説するには、設定で AI プロバイダーを設定し、リーダーの AI 機能を有効にしてください。"
   },
   "explainTranslateAiNotConfigured": {
-    "message": "設定で AI プロバイダーを指定すると、選択範囲を翻訳できます。"
+    "message": "選択範囲を翻訳するには、設定で AI プロバイダーを設定し、リーダーの AI 機能を有効にしてください。"
   },
   "explainErrRetry": {
     "message": "再試行"
@@ -2887,7 +2930,7 @@
     "message": "freedictionaryapi.comへのアクセスを許可し、Wiktionaryデータに基づく語義を取得します。"
   },
   "dictConnectRetry": {
-    "message": "アクセス権限を再度リクエスト"
+    "message": "再試行"
   },
   "dictPermissionDenied": {
     "message": "アクセスが許可されませんでした。オンライン辞書は引き続き利用できません。"
@@ -2896,7 +2939,7 @@
     "message": "オンライン辞書では見つかりませんでした。"
   },
   "dictLangUnknown": {
-    "message": "この単語の言語を判定できませんでした。「辞書の言語」から選択してください。"
+    "message": "この単語の言語を判定できませんでした。上の言語メニューから選択してください。"
   },
   "dictMatchedHeadword": {
     "message": "一致した見出し語：$TERM$",
@@ -2913,7 +2956,7 @@
     "message": "コードをコピー"
   },
   "dictMoreSenses": {
-    "message": "残り $COUNT$ 件の語義を表示",
+    "message": "残り $COUNT$ 件を表示",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2921,7 +2964,7 @@
     }
   },
   "dictMoreIpa": {
-    "message": "ほかに発音 $COUNT$ 件",
+    "message": "ほか $COUNT$ 件",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -3041,7 +3084,7 @@
     "placeholders": {"n": {"content": "$1"}}
   },
   "ecdictReady": {
-    "message": "$N$ 件 · $DATE$",
+    "message": "$N$ 件をインポート済み · $DATE$",
     "placeholders": {"n": {"content": "$1"}, "date": {"content": "$2"}}
   },
   "ecdictParseFailed": {
@@ -3146,7 +3189,7 @@
       "message": "選択した単語はこのグループに含まれていません"
     },
     "vocabBatchDelete": {
-      "message": "選択項目を削除"
+      "message": "選択した単語を削除"
     },
     "vocabNoResults": {
       "message": "現在の条件に一致する単語はありません。"
@@ -3173,7 +3216,7 @@
       "message": "Google ドライブ"
     },
     "vocabDriveScope": {
-      "message": "同期する項目は、このデバイスと現在の Pinboard アカウントにのみ適用されます。設定と API キーは同期しません。"
+      "message": "これらの選択は、このデバイスと現在の Pinboard アカウントにのみ適用されます。Google Drive では設定や認証情報は同期されません。"
     },
     "vocabDriveDisclosure": {
       "message": "Google ドライブの appDataFolder に保存するコピーは平文で、エンドツーエンド暗号化されません。単語、定義、ハイライトした引用、メモ、参照元 URL、タイトル、日時が含まれる場合があります。"
@@ -3188,7 +3231,7 @@
       "message": "このビルドでは OAuth がまだ有効になっていないため、Google ドライブ同期は利用できません。"
     },
     "vocabDriveAuthorizing": {
-      "message": "Google の認可を待っています。Chrome が開いたウィンドウでログインと許可を完了してください。"
+      "message": "Google の認可を待っています。Chrome が開いたウィンドウでログインし、アクセスを許可してください。"
     },
     "vocabDriveWorking": {
       "message": "選択したデータを Google ドライブと同期しています…"
@@ -3205,15 +3248,6 @@
     "vocabDriveOwnerLabel": {
       "message": "Pinboard アカウント"
     },
-    "vocabDriveLastSuccessLabel": {
-      "message": "前回の同期成功"
-    },
-    "vocabDrivePendingWordsLabel": {
-      "message": "同期待ちの単語"
-    },
-    "vocabDrivePendingBatchesLabel": {
-      "message": "アップロード待ちのバッチ"
-    },
     "vocabDriveNever": {
       "message": "まだ同期されていません"
     },
@@ -3221,7 +3255,7 @@
       "message": "競合通知を閉じる"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Google ドライブ同期が停止しました。自動では再試行されません。設定を開いて原因を確認してください。"
+      "message": "Google ドライブ同期は一時停止中で、自動では再試行されません。設定を開いて原因を確認してください。"
     },
     "vocabDriveConnect": {
       "message": "Google Drive に接続"
@@ -3251,7 +3285,7 @@
       "message": "Google ドライブの同期データを安全に読み取れませんでした。ローカルデータは変更していません。"
     },
     "vocabDriveErrorLocalStore": {
-      "message": "ローカルデータを保存できなかったため、同期を停止しました。"
+      "message": "このデバイスのデータを読み取りまたは保存できませんでした。"
     },
     "vocabDriveErrorNetwork": {
       "message": "Google Drive に接続できません。"
@@ -3260,7 +3294,7 @@
       "message": "Google Drive との同期に失敗しました。"
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Google または Pinboard のアカウントが変わりました。「一般」を開き直して再試行してください。"
+      "message": "同期中に Google アカウントまたは Pinboard アカウントが変わりました。もう一度お試しください。"
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "保存した単語またはその文脈が大きすぎるため同期できません。内容を短くするか削除してから、「今すぐ同期」をクリックしてください。"
@@ -3274,10 +3308,10 @@
       }
     },
     "vocabDriveConnectRequired": {
-      "message": "「Google Drive に接続」をクリックし、Google の認可を完了してください。"
+      "message": "「Google Drive に接続」をクリックし、アクセスを許可してください。"
     },
     "vocabDriveSyncNowRequired": {
-      "message": "同期は停止しています。「今すぐ同期」をクリックして再試行してください。"
+      "message": "自動同期は一時停止中です。「今すぐ同期」をクリックして再試行してください。"
     },
     "vocabDriveReconnectRequired": {
       "message": "「このデバイスの接続を解除」をクリックしてから、もう一度接続してください。"
@@ -3292,10 +3326,10 @@
       "message": "現在の Pinboard アカウントの単語を読み込めませんでした。「単語帳」を開き直して、もう一度お試しください。"
     },
     "vocabExportFailed": {
-      "message": "単語を書き出せませんでした。拡張機能のストレージを確認して、もう一度お試しください。"
+      "message": "単語を書き出せませんでした。もう一度お試しください。"
     },
     "vocabAccountChanged": {
-      "message": "Pinboard アカウントが切り替わりました。現在の単語一覧を確認して、もう一度お試しください。"
+      "message": "処理が完了する前に Pinboard アカウントが切り替わりました。もう一度お試しください。"
     },
     "vocabSettingsSaveFailed": {
       "message": "変更した連携設定を保存できませんでした。設定を確認して、もう一度お試しください。"
@@ -3351,10 +3385,10 @@
       }
     },
     "vocabBatchFailed": {
-      "message": "一括操作に失敗しました。単語は変更されていません。"
+      "message": "操作に失敗しました。単語は変更されていません。"
     },
     "vocabSelectionChanged": {
-      "message": "選択内容が変わりました。現在の結果を確認して、もう一度お試しください。"
+      "message": "一覧が変わりました。現在の結果を確認して、もう一度お試しください。"
     },
     "vocabRefreshFailed": {
       "message": "変更は保存されましたが、一覧を更新できませんでした。「単語帳」を開き直してください。"
@@ -3434,7 +3468,7 @@
     }
   },
   "dictAnkiModelMismatch": {
-    "message": "既存の「Pinboard Vocab」ノートタイプのフィールドが一致しません。想定されたフィールドと順序に戻してから、もう一度お試しください。"
+    "message": "Anki の「Pinboard Vocab」ノートタイプのフィールドが一致しません。元のフィールドに戻すか、新しく作成できるように名前を変更してから、もう一度お試しください。"
   },
   "dictAnkiHostPermissionDenied": {
     "message": "Chrome にローカルの AnkiConnect アドレスへのアクセスが許可されていません。アクセスを許可して、もう一度お試しください。"
@@ -3455,7 +3489,10 @@
     "message": "単語を Anki に送信できませんでした。AnkiConnect を確認して再試行するか、すべてを .tsv で書き出してください。"
   },
   "dictAnkiKeyRequired": {
-    "message": "AnkiConnect には API キーが必要です。下記に入力してください。"
+    "message": "AnkiConnect には API キーが必要です。上の欄に入力してください。"
+  },
+  "dictAnkiKeyRejected": {
+    "message": "AnkiConnect がこの API キーを拒否しました。上の欄のキーを確認して、もう一度お試しください。"
   },
   "dictAnkiDeckLabel": {
     "message": "Anki デッキ"
@@ -3476,7 +3513,7 @@
     "message": "ファイルをインポート"
   },
   "dictPackImporting": {
-    "message": "$N$ 件をインポート中…",
+    "message": "インポート中…これまでに $N$ 件",
     "placeholders": {
       "n": {
         "content": "$1"
@@ -3565,7 +3602,7 @@
     "message": "単語を Eudic に送信できませんでした。認証情報を確認して、もう一度お試しください。"
   },
   "dictEudicTokenRequired": {
-    "message": "下記に Eudic OpenAPI の認証情報を入力するか、有効期限が切れていないか確認してください。"
+    "message": "上の欄に Eudic OpenAPI の認証情報を入力するか、まだ有効か確認してください。"
   },
   "dictEudicTokenLabel": {
     "message": "Eudic OpenAPI 認証情報"
@@ -3580,7 +3617,7 @@
     "message": "Eudic の接続をテスト"
   },
   "dictAnkiNothing": {
-    "message": "送信できる単語がまだありません。"
+    "message": "保存した単語はまだありません。"
   },
   "dictDeleteWord": {
     "message": "単語帳から削除"
@@ -3589,7 +3626,7 @@
     "message": "出典:"
   },
   "dictAiNotConfigured": {
-    "message": "設定で AI プロバイダーを設定すると文脈に応じた説明が得られます。"
+    "message": "文脈に応じた説明を得るには、設定で AI プロバイダーを設定し、リーダーの AI 機能を有効にしてください。"
   },
   "dictVocabEmpty": {
     "message": "現在の Pinboard アカウント（$OWNER$）には単語が保存されていません。リーダーの辞書ビューから保存できます。",
@@ -3612,9 +3649,6 @@
   },
   "secSendDestinations": {
     "message": "送信先"
-  },
-  "secSendDestinationsHint": {
-    "message": "有効にした送信先は、リーダーの「送信先」メニューに表示されます。"
   },
   "mdSendEnableTo": {
     "message": "{name} へのエクスポートを有効化"
@@ -3659,32 +3693,32 @@
     "message": "アプリを開けませんでした。全文をクリップボードにコピーしました"
   },
   "mdSendNoneConfigured": {
-    "message": "送信先が有効化されていません。設定で追加してください"
+    "message": "有効な送信先がありません。設定で有効にしてください。"
   },
   "mdManageDestinations": {
     "message": "送信先を管理 →"
   },
   "mdSendApiDown": { "message": "エクスポートサーバーに接続できませんでした。全文をクリップボードにコピーしました。貼り付けて完了してください。" },
-  "mdSendApiBadToken": { "message": "サーバーがトークンを拒否しました。アプリからコピーし直してください。全文をクリップボードにコピーしました。" },
+  "mdSendApiBadToken": { "message": "トークンが拒否されました。設定で確認してください。全文をクリップボードにコピーしました。" },
   "mdSendNotionNotShared": { "message": "Notion が親ページを拒否しました。ページの ··· メニューの「接続を追加」で接続を追加してから再試行してください。全文はクリップボードにコピー済みです。" },
   "mdSendApiFailed": { "message": "エクスポートリクエストに失敗しました。全文をクリップボードにコピーしました。貼り付けて完了してください。" },
   "mdSendTest": {
     "message": "接続テスト"
   },
   "mdSendTestOk": { "message": "接続成功" },
-  "mdSendTestDown": { "message": "サーバーに接続できません。アプリは起動していますか？" },
-  "mdSendTestBadToken": { "message": "トークンが拒否されました。アプリからコピーし直してください。" },
+  "mdSendTestDown": { "message": "サービスに接続できないか、サービスがエラーを返しました。" },
+  "mdSendTestBadToken": { "message": "トークンが拒否されました。トークン全体をもう一度コピーして貼り付けてください。" },
   "mdSendTestNoToken": {
     "message": "先にトークンを入力してください。"
   },
   "mdSendTestPerm": {
-    "message": "ローカルアクセス権限が拒否されました。"
+    "message": "アクセス権限が拒否されました。"
   },
   "mdTargetGithubToken": {
     "message": "GitHub トークン（classic、gist スコープ）"
   },
   "mdTargetGithubOnboarding": {
-    "message": "GitHub → Settings → Developer settings → Tokens (classic) で「gist」スコープを付与した個人アクセストークン（classic）を作成し、下に貼り付けてください。各クリップは非公開 gist として保存されます。注意：fine-grained トークンはまだ gist を作成できないため、classic トークンを使用してください。"
+    "message": "GitHub → Settings → Developer settings → Tokens (classic) で「gist」スコープを付与した個人アクセストークン（classic）を作成し、下に貼り付けてください。各クリップはシークレット gist として保存されます。一般には公開されませんが、リンクを知っている人は誰でも閲覧できます。"
   },
   "mdTargetNotionToken": {
     "message": "内部接続のトークン"
@@ -3714,7 +3748,7 @@
     "message": "Authorization ヘッダー（任意）"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "JSON ペイロード {title, url, date, tags, markdown} をエンドポイントに POST します。設定した Authorization 値はそのまま送信されるため（例：Bearer <token> や Token <key>）、あらゆる認証方式に対応します。n8n、Make、Zapier、Readwise、または任意の自己ホスト型レシーバーで利用できます。ここでのアカウント登録は不要です。"
+    "message": "JSON ペイロード {title, url, date, tags, markdown} をエンドポイントに POST します。「拡張メタデータを含める」がオンの場合は、著者やサイトなどのメタデータ フィールドも追加されます。設定した Authorization 値はそのまま送信されるため（例：Bearer <token> や Token <key>）、あらゆる認証方式に対応します。n8n、Make、Zapier、Readwise、または任意の自己ホスト型レシーバーで利用できます。ここでのアカウント登録は不要です。"
   },
   "mdTargetWebhookHttpWarn": {
     "message": "ブロックしました。HTTPS、または localhost、127.0.0.1、[::1] に限り HTTP を使用してください。LAN／公開 HTTP、不正な URL、認証情報を含む URL は送信されません。"
@@ -3728,13 +3762,16 @@
   "hlColorDoubt": { "message": "疑問" },
   "hlColorTodo": { "message": "やること" },
   "hlTrBadgeAria": { "message": "翻訳のハイライト（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
-  "hlNoteBtn": { "message": "メモ付きでハイライト" },
-  "hlSaveFailed": { "message": "ハイライトを保存できませんでした（ストレージが一杯です）" },
+  "hlNoteBtn": { "message": "ハイライトしてメモを追加" },
+  "hlSaveFailed": { "message": "ハイライトを保存できませんでした" },
   "hlNotePlaceholder": { "message": "メモを追加…" },
   "hlSave": { "message": "保存" },
   "hlDelete": { "message": "ハイライトを削除" },
   "hlDeleteConfirm": {
     "message": "このハイライトとメモを削除しますか？"
+  },
+  "hlGoneElsewhere": {
+    "message": "このハイライトは別の場所で削除されたため、変更は保存されませんでした。"
   },
   "hlDegraded": { "message": "位置が失われました。周囲のテキストが変更されたため、このハイライトは段落全体に適用されています。" },
   "hlOrphanNote": { "message": "$COUNT$ 件のハイライトが現在のページ内容で見つかりませんでした。メモは保持されます。", "placeholders": { "count": { "content": "$1" } } },
@@ -3746,7 +3783,6 @@
   "mdImgFixPartial": {"message": "$TOTAL$ 枚中 $OK$ 枚の画像を修復しました", "placeholders": {"ok": {"content": "$1"}, "total": {"content": "$2"}}},
   "hlSectionTitle": { "message": "ハイライト" },
   "kbdHelpTitle": { "message": "キーボードショートカット" },
-  "kbdHelpIntro": { "message": "これらのショートカットはリーダー画面でのみ有効です（この設定画面では動作しません）。" },
   "kbdHelpRailBtn": { "message": "キーボードショートカット" },
   "kbdHelpTranslate": { "message": "記事の翻訳を開始または続行する" },
   "kbdHelpDictionary": { "message": "選択範囲を辞書で調べる" },
@@ -3763,7 +3799,7 @@
   "hlCopied": { "message": "ハイライトをコピーしました" },
   "hlFilterEmpty": { "message": "選択した色に一致するハイライトがありません" },
   "explainSaveNote": { "message": "メモとして保存" },
-  "explainSavedNote": { "message": "保存しました" },
+  "explainSavedNote": { "message": "メモとして保存しました" },
   "hlCardExplain": { "message": "解説" },
   "hlCardTranslate": { "message": "翻訳" },
   "hlCardAsk": { "message": "質問" },
@@ -3774,7 +3810,7 @@
   "srchPrevAria": { "message": "前の一致" },
   "srchNextAria": { "message": "次の一致" },
   "srchRegexAria": { "message": "正規表現で検索" },
-  "kbdHelpZen": { "message": "禅(集中)モードを切り替える" },
+  "kbdHelpZen": { "message": "禅モードを切り替える" },
   "zenEnterBtn": { "message": "禅モードに入る" },
   "zenExitAria": { "message": "禅モードを終了" },
   "zenWidthAria": { "message": "本文の幅" },
@@ -3817,8 +3853,8 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最初 $FIRST$ · 最新 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "$TIME$ に保存", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "ハイライトとメモはこのデバイスにのみ保存され、同期されません。別のデバイスに移すには、設定ページでバックアップを書き出し、そのデバイスで読み込んでください。" },
-  "libraryNotesScopeOpenBackup": { "message": "バックアップ設定を開く" },
+  "libraryNotesScopeHint": { "message": "ハイライトとメモはこのデバイスに保存されます。別のデバイスで使うには、設定で「ハイライトとメモ」の Google Drive 同期を有効にするか、バックアップをエクスポートしてそのデバイスでインポートしてください。" },
+  "libraryNotesScopeOpenBackup": { "message": "一般設定を開く" },
   "libraryRelookup": { "message": "辞書で調べ直す" },
   "libraryBack": { "message": "一覧に戻る" },
   "libraryStatsWords": { "message": "$COUNT$ 語", "placeholders": { "count": { "content": "$1" } } },
@@ -3858,10 +3894,10 @@
   "mdVideoNoTracks": { "message": "この動画には利用できる字幕がありません" },
   "mdVideoBiliLogin": { "message": "字幕が見つかりません。bilibili はログイン時のみ字幕を返します。bilibili.com にログインしてから再試行してください。" },
   "mdVideoFailed": { "message": "この拡張機能ではこの動画の字幕を取得できません。YouTube は一部の動画で字幕アクセスを制限しています。" },
-  "mdVideoBlocked": { "message": "YouTube がこのリクエストをブロックしました（ボットでないことの確認を求めています）。動画に字幕があるかどうかとは無関係です。「YouTube で開く」を使うか、設定でログイン Cookie のオプションを有効にして再試行してください。" },
+  "mdVideoBlocked": { "message": "YouTube がこのリクエストをブロックしました（ボットでないことの確認を求めています）。動画に字幕があるかどうかとは無関係です。「YouTube で開く」をお試しください。" },
   "mdVideoOpenTabHint": { "message": "ヒント：この動画を YouTube のタブで開いたままにして再試行すると、そのタブ経由で字幕を読み取れます。" },
   "mdVideoBodyBlocked": { "message": "字幕トラックは見つかりましたが、YouTube が字幕テキストを返しませんでした。この動画の YouTube タブを開いたまま再試行するか、別のトラックを選んでください。" },
-  "mdVideoPermMissing": { "message": "権限が拒否されたため、何も読み込まれませんでした" },
+  "mdVideoPermMissing": { "message": "字幕へのアクセスが許可されなかったため、字幕を読み込みませんでした" },
   "mdVideoCopyMd": { "message": "文字起こしを Markdown としてコピー" },
   "mdVideoAiPunct": { "message": "AI 句読点" },
   "mdVideoAiPunctDone": { "message": "句読点済み" },
@@ -3906,7 +3942,7 @@
   "mdVideoDownloadSrt": { "message": "SRT 字幕をダウンロード" },
   "mdVideoSrtSaved": { "message": "SRT ファイルを保存しました" },
   "askScopeNear": { "message": "現在位置の周辺" },
-  "askScopeNearHint": { "message": "現在の字幕の前後 2 段落だけを送信します（トークン節約）" },
+  "askScopeNearHint": { "message": "現在の再生位置の段落と、その前後 2 段落ずつだけを送信します（トークン節約）" },
   "hlTimelineHint": { "message": "ハイライトするには読み物ビューに切り替えてください" },
   "hlSeekHere": { "message": "ここから再生" },
   "mdVideoLoop": { "message": "この字幕を繰り返す" },
@@ -3922,9 +3958,9 @@
   "mdVideoRelaySilent": { "message": "プレーヤーが再生位置を返していません（YouTube プレーヤー API が読み込まれていません）。再生追従・キーボードショートカット・字幕の繰り返し・自動一時停止・再生速度は現在使えません" },
   "mdVideoUnplayable": { "message": "YouTube はこの動画を現在再生できないと報告しています（$STATUS$）。字幕の問題ではありません。YouTube で開いて理由を確認してください。", "placeholders": { "status": { "content": "$1" } } },
   "mdVideoBridgeEnable": { "message": "再生追従を有効化" },
-  "mdVideoBridgeEnableHint": { "message": "拡張機能が player.bilibili.com から再生位置を読み取れるようにします（このプレビュー内のみ、再生位置と再生状態だけ）。YouTube と同じように、文字起こしを再生に追従させ、字幕を繰り返し、各字幕の終わりで一時停止できるようになります。" },
+  "mdVideoBridgeEnableHint": { "message": "拡張機能が player.bilibili.com から再生位置を読み取れるようにします（このリーダー内のみ、再生位置と再生状態だけ）。YouTube と同じように、文字起こしを再生に追従させ、字幕を繰り返し、各字幕の終わりで一時停止できるようになります。" },
   "mdVideoGrantScopeBili": { "message": "許可の範囲：bilibili の字幕 API とプレーヤーページ（字幕と再生位置の読み取り）" },
-  "mdVideoBridgeSilent": { "message": "プレーヤーが再生位置を返していません。「推定再生位置」を使うか、プレビューを開き直してください" },
+  "mdVideoBridgeSilent": { "message": "プレーヤーが再生位置を返していません。「推定再生位置」を使うか、リーダーを開き直して再試行してください" },
   "mdVideoTimelineAria": { "message": "字幕タイムライン" },
   "kbdHelpVideoPlay": { "message": "再生 / 一時停止" },
   "kbdHelpVideoSeek": { "message": "3 秒戻る / 進む" },
@@ -3933,16 +3969,12 @@
   "kbdHelpVideoFollow": { "message": "再生に追従" },
   "kbdHelpVideoCurrent": { "message": "現在の字幕へ戻る" },
   "kbdHelpVideoView": { "message": "読み物 / タイムライン" },
-  "kbdHelpVideoSection": { "message": "動画ページ" },
-  "kbdHelpVideoNote": { "message": "Space、左右キー、r、f はプレーヤーが再生位置を報告する場合に使えます。YouTube では常に、bilibili では再生追従を有効にした後に使えます。" },
   "secVideoPreview": { "message": "動画ページ" },
   "optVideoLangPref": { "message": "優先する字幕言語" },
   "optVideoLangPrefHint": { "message": "言語コードを優先順にカンマ区切りで入力します（例：en, zh は英語を優先し、次に中国語）。zh-Hant のような完全なタグも使えます。並び順が常に優先され、同じ言語内では完全なタグを先に照合し、見つからなければ基本コードに戻ります。空欄ならインターフェース言語に従います。" },
   "optVideoLangCodesLink": { "message": "言語コード一覧" },
   "optVideoPauseOnLookup": { "message": "単語を調べる間は再生を一時停止" },
-  "optVideoPauseOnLookupHint": { "message": "テキストを選択したり解説ポップオーバーを開いたりすると再生を一時停止し、調べ終わると再開します。対象は YouTube、および再生追従を有効にした bilibili です。" },
   "optVideoDarkScheme": { "message": "動画ページをダークモードで開く" },
-  "optVideoDarkSchemeHint": { "message": "テーマが自動またはライトでも、動画ページはダークの読書配色で開きます。リーダーの「Aa」パネルで、このデバイスのすべてのリーダーページについて上書きできます。" },
   "mdVideoResumePrompt": { "message": "前回は $TIME$ まで視聴しました", "placeholders": { "time": { "content": "$1" } } },
   "mdVideoResumeGo": { "message": "続きから" },
   "mdVideoResumeRestart": { "message": "最初から" },
@@ -3952,7 +3984,7 @@
   "mdVideoStateOn": { "message": "オン" },
   "mdVideoStateOff": { "message": "オフ" },
   "skimWaitingCaptions": { "message": "字幕が揃うと要点を自動生成します。「再生成」で今すぐ生成できます" },
-  "batchResumed": { "message": "一括保存を再開 · $MAX$ 回中 $ATTEMPT$ 回目", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
+  "batchResumed": { "message": "中断から再開（$MAX$ 回中 $ATTEMPT$ 回目）", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
   "batchCancelFailed": { "message": "キャンセルを要求できませんでした。もう一度お試しください。" },
   "connectionOverviewTitle": { "message": "接続状況" },
   "connectionOverviewHint": { "message": "現在の設定、許可済みの権限、直近の手動テストをもとに表示します。設定を開くだけではサービスへの接続や権限の要求は行いません。" },
@@ -3967,7 +3999,7 @@
   "settingsSearchPlaceholder": { "message": "設定を検索" },
   "settingsSearchNoResults": { "message": "一致する設定がありません。機能名や操作項目名で検索してください。" },
   "diagnosticsTitle": { "message": "サポート用診断情報" },
-  "diagnosticsHint": { "message": "拡張機能、ブラウザー、機能、権限、ストレージ、エラー分類の情報をコピーします。認証情報、アカウント名、ページ URL、本文、カスタム接続先は含みません。" },
+  "diagnosticsHint": { "message": "拡張機能のバージョン、ブラウザーと言語、AI プロバイダー、各サービスの設定状況、機能のオン/オフ、権限、ストレージとキャッシュの使用量、キューと一括保存の件数、接続テストの結果、エラー コードをコピーします。認証情報、アカウント名、ページ URL、本文、カスタム接続先は含みません。" },
   "diagnosticsCopy": { "message": "診断情報をコピー" },
   "diagnosticsCopied": { "message": "診断情報をコピーしました" },
   "diagnosticsCopyFailed": { "message": "診断情報をコピーできませんでした。クリップボードへのアクセスを確認して、もう一度お試しください。" },
@@ -3996,8 +4028,17 @@
   "popupDraftRestored": {
     "message": "未保存の下書きを復元しました。"
   },
+  "mdVideoBlockedLoginHint": {
+    "message": "設定で「字幕リクエストに YouTube のログイン Cookie を送信する」をオンにすることもできます。"
+  },
   "popupDraftFailed": {
     "message": "下書きを保持できませんでした。ポップアップを閉じる前にブックマークを保存してください。"
+  },
+  "popupDraftRestoreFailed": {
+    "message": "前回の下書きを復元できませんでした。"
+  },
+  "popupDraftDiscardFailed": {
+    "message": "下書きを破棄できませんでした。もう一度お試しください。"
   },
   "optSavePending": { "message": "変更は未保存です" },
   "optRetrySave": { "message": "保存を再試行" },
@@ -4044,7 +4085,7 @@
       }
     },
     "driveVocabularyNotices": {
-      "message": "単語の競合：$COUNT$。ローカルの編集を保持しました。",
+      "message": "単語の競合：$COUNT$。編集された単語は削除せずに保持しました。",
       "placeholders": {
         "count": {
           "content": "$1"
@@ -4052,7 +4093,7 @@
       }
     },
     "driveNotesNotices": {
-      "message": "ハイライトとメモの競合：$COUNT$。両方のバージョンを保持しました。",
+      "message": "ハイライトとメモの競合：$COUNT$。編集された項目は削除せずに保持し、競合したメモは両方のバージョンを保持しました。",
       "placeholders": {
         "count": {
           "content": "$1"

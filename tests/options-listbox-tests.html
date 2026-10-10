@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 41;
+const TOTAL = 46;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -1352,6 +1352,180 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     } finally {
       localStore.set = origSet;
       if (cb.checked !== before) { label.click(); await win.pbpOptionsFlushAutoSave(); }
+    }
+  });
+
+  // ---- options batch bug fixes (2026-10-10) ----------------------------------
+  // B23: pbpReclaimLocalStorage folds every storage failure into a zero-byte
+  // result without throwing, and the Clear button only showed
+  // storageClearFailed from its catch -- so a rejected remove() painted the OK
+  // "Freed 0 B." line. Driven through the real button and the real reclaim.
+  test("storage Clear: a failed remove() reports storageClearFailed, not \"Freed 0 B.\"", async () => {
+    const localStore = win.chrome.storage.local;
+    const host = doc.getElementById("storage-cats");
+    const status = doc.getElementById("storage-status");
+    const btn = doc.getElementById("storage-clear-btn");
+    const seedAndPick = async () => {
+      await localStore.set({ cached_user_tags: { tags: ["a", "b"], timestamp: 1 } });
+      const box = doc.createElement("input");
+      box.type = "checkbox"; box.className = "storage-cat-cb"; box.dataset.cat = "tags"; box.checked = true;
+      host.replaceChildren(box);
+      status.textContent = "";
+    };
+    const clickAndWait = async () => {
+      btn.click();
+      for (let i = 0; i < 40 && !status.textContent; i++) await sleep(10);
+      for (let i = 0; i < 40 && btn.disabled; i++) await sleep(10);
+    };
+    const origRemove = localStore.remove;
+    try {
+      await seedAndPick();
+      localStore.remove = () => Promise.reject(new Error("remove refused"));
+      await clickAndWait();
+      assert(status.textContent === enMessages.storageClearFailed.message,
+        "rejected remove() painted: " + JSON.stringify(status.textContent));
+      assert(status.classList.contains("err") && !status.classList.contains("ok"), "failure styled as " + status.className);
+      localStore.remove = origRemove;
+      await seedAndPick();
+      await clickAndWait();
+      assert(status.classList.contains("ok") && status.textContent !== enMessages.storageClearFailed.message,
+        "a clean clear did not report success: " + status.className + " " + JSON.stringify(status.textContent));
+    } finally {
+      localStore.remove = origRemove;
+      await localStore.remove("cached_user_tags");
+    }
+  });
+
+  // B28 + B29: the "Save as theme" name popover. The label must name the
+  // input (screen readers, click-to-focus), and an overwrite prompt confirms
+  // ONE name: renaming withdraws it, so the next click asks about the new name
+  // instead of silently overwriting a different existing theme.
+  test("save-as-theme popover: label names the input; renaming withdraws the overwrite prompt", async () => {
+    showPanel("panel-appearance");
+    const css = doc.getElementById("opt-custom-css");
+    const saveAs = doc.getElementById("save-custom-theme");
+    const cssBefore = css.value;
+    const popover = () => { const all = doc.querySelectorAll(".save-theme-wrap .theme-name-popover:not(.is-closing)"); return all[all.length - 1] || null; };
+    const settle = async () => { for (let i = 0; i < 40 && doc.querySelector(".save-theme-wrap .theme-name-popover"); i++) await sleep(10); };
+    const open = async () => {
+      await settle();
+      saveAs.click();
+      const pop = popover();
+      assert(pop, "name popover did not open");
+      return pop;
+    };
+    const typeName = (inp, value) => { inp.value = value; inp.dispatchEvent(new win.Event("input", { bubbles: true })); };
+    const saveNamed = async (name) => {
+      const pop = await open();
+      typeName(pop.querySelector("input"), name);
+      pop.querySelector(".tnp-save").click();
+      for (let i = 0; i < 60 && ![...doc.querySelectorAll(".saved-theme-btn")].some((b) => b.textContent === name); i++) await sleep(10);
+      assert([...doc.querySelectorAll(".saved-theme-btn")].some((b) => b.textContent === name), "theme " + name + " was not saved");
+    };
+    try {
+      css.value = "a { color: red; }";
+      css.dispatchEvent(new win.Event("input", { bubbles: true }));
+      assert(!saveAs.disabled, "Save as theme stayed disabled with CSS in the box");
+      await saveNamed("Alpha");
+      await saveNamed("Beta");
+
+      const pop = await open();
+      const inp = pop.querySelector("input");
+      const lbl = pop.querySelector("label");
+      assert(inp.id && lbl.htmlFor === inp.id && inp.labels && inp.labels[0] === lbl,
+        "theme-name label is not associated with its input (id=" + inp.id + ", for=" + lbl.htmlFor + ")");
+      const msg = pop.querySelector(".tnp-overwrite");
+      const btn = pop.querySelector(".tnp-save");
+      typeName(inp, "Alpha");
+      btn.click();
+      // (The fixture's getMessage stub does no $NAME$ substitution, so the
+      // prompt is identified by its visibility and the button, not its text.)
+      assert(msg.style.display !== "none" && msg.textContent, "no overwrite prompt for an existing name");
+      assert(btn.textContent === enMessages.themeNameOverwriteBtn.message, "button did not turn into Overwrite: " + btn.textContent);
+      typeName(inp, "Beta");
+      assert(msg.style.display === "none", "renaming left the old overwrite prompt up");
+      assert(btn.textContent === enMessages.themeNameSave.message, "renaming left the button as " + btn.textContent);
+      btn.click();
+      // Overwriting would persist and then dismiss the popover; asking keeps
+      // it open with the prompt back up and the button reading Overwrite.
+      await sleep(250);
+      assert(pop.isConnected && !pop.classList.contains("is-closing"), "a renamed existing theme was overwritten without asking");
+      assert(msg.style.display !== "none" && btn.textContent === enMessages.themeNameOverwriteBtn.message,
+        "the second click did not ask about the new name");
+      pop.querySelector(".tnp-cancel").click();
+    } finally {
+      await settle();
+      css.value = cssBefore;
+      css.dispatchEvent(new win.Event("input", { bubbles: true }));
+    }
+  });
+
+  // B36: the delete-low-count-tags confirmation listed the first ten tags and
+  // then a hardcoded English ", +N more" in every UI language.
+  test("tag-gov delete confirmation: the overflow tail comes from tagGovMoreCount", async () => {
+    showPanel("panel-tags");
+    const list = doc.getElementById("tag-gov-lowcount-list");
+    const btn = doc.getElementById("tag-gov-delete-selected");
+    list.replaceChildren();
+    for (let i = 1; i <= 12; i++) {
+      const box = doc.createElement("input");
+      box.type = "checkbox"; box.className = "tag-gov-lowcount-checkbox";
+      box.value = "t" + i; box.dataset.account = "alice"; box.checked = true;
+      list.appendChild(box);
+    }
+    win.pbpSyncTagGovDeleteBtnState();
+    try {
+      assert(!btn.disabled, "Delete selected stayed disabled with 12 tags picked");
+      btn.click();
+      const msgs = doc.querySelectorAll(".confirm-popover .confirm-msg");
+      const text = msgs[msgs.length - 1]?.textContent || "";
+      // The fixture's getMessage stub returns the raw message (no $COUNT$
+      // substitution, same as the "$N$" in the question line), so the tail is
+      // compared as such -- still distinct from the old hardcoded "+2 more".
+      const tail = enMessages.tagGovMoreCount.message;
+      assert(text.includes("t10, " + tail), "overflow tail is not the localized one: " + JSON.stringify(text));
+      assert(!/\+\d+ more/.test(text), "hardcoded English tail still present: " + JSON.stringify(text));
+      const no = doc.querySelectorAll(".confirm-popover .confirm-no");
+      no[no.length - 1]?.click();
+    } finally {
+      list.replaceChildren();
+      win.pbpSyncTagGovDeleteBtnState();
+    }
+  });
+
+  // B35: the merge confirmation glued the rename list onto the question with
+  // ": " -- "Merge 2 tags into X?: a -> X | b -> X". The list now starts its
+  // own line under the question (the popover's text is white-space: pre-line).
+  test("tag-gov merge confirmation: the rename list sits on its own line after the question", async () => {
+    showPanel("panel-tags");
+    const anchor = doc.getElementById("tag-gov-delete-selected");
+    await win.confirmMergeGroup({ members: [
+      { tag: "js", count: 2 }, { tag: "JS-lang", count: 1 }, { tag: "javascript", count: 5 },
+    ] }, "javascript", anchor, "alice");
+    const msgs = doc.querySelectorAll(".confirm-popover .confirm-msg");
+    const text = msgs[msgs.length - 1]?.textContent || "";
+    try {
+      const lines = text.split("\n");
+      assert(lines.length >= 3, "expected question / rename list / estimate lines, got " + JSON.stringify(text));
+      assert(lines[0] === enMessages.tagGovConfirmMerge.message, "first line is not the bare question: " + JSON.stringify(lines[0]));
+      assert(lines[1].includes("js -> javascript") && !/^[:：]/.test(lines[1].trim()), "rename list line: " + JSON.stringify(lines[1]));
+      assert(!/[?？]\s*[:：]/.test(text), "question mark still followed by a colon: " + JSON.stringify(text));
+    } finally {
+      const no = doc.querySelectorAll(".confirm-popover .confirm-no");
+      no[no.length - 1]?.click();
+    }
+  });
+
+  // B30: the colon after "Shortcut" was literal HTML, so every locale got an
+  // ASCII ": " (Chinese showed "快捷键: "). It now belongs to the message.
+  test("shortcut lines: the label's colon comes from labelShortcut, not the markup", () => {
+    const labels = [...doc.querySelectorAll('[data-i18n="labelShortcut"]')];
+    assert(labels.length === 2, "expected the Quick Save + Read Later shortcut labels, got " + labels.length);
+    for (const span of labels) {
+      assert(span.textContent === enMessages.labelShortcut.message, "label text " + JSON.stringify(span.textContent));
+      const next = span.nextSibling;
+      assert(!next || next.nodeType !== 3 || !/[:：]/.test(next.textContent),
+        "markup still adds its own colon after the label: " + JSON.stringify(next && next.textContent));
     }
   });
 

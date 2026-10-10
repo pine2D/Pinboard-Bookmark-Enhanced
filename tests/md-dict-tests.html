@@ -448,6 +448,21 @@ const legacySlot = document.createElement("div");
 // No sourceLabel field at all -- shape of an entry cached before this field existed.
 _pbpDictRenderEntry(legacySlot, { entries: RENDER_ENTRIES, sourceUrl: "https://en.wiktionary.org/wiki/word", license: "CC BY-SA 4.0" }, "word", "en");
 assert(legacySlot.querySelector(".xp-dict-src a").textContent.includes("Wiktionary"), "missing sourceLabel (old cache shape) falls back to Wiktionary");
+// Source label spacing: a full-width colon (zh) already carries its spacing,
+// a half-width one (en/ja) gets one space before the link.
+{
+  const realT = window.t;
+  const srcText = (label) => {
+    window.t = (k, ...args) => k === "dictSource" ? label : realT(k, ...args);
+    try {
+      const slot = document.createElement("div");
+      _pbpDictRenderEntry(slot, { entries: RENDER_ENTRIES, sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/word", license: "CC BY-SA 4.0" }, "word", "en");
+      return slot.querySelector(".xp-dict-src span").textContent;
+    } finally { window.t = realT; }
+  };
+  assert(srcText("来源：") === "来源：", "full-width colon label gets no extra space: " + JSON.stringify(srcText("来源：")));
+  assert(srcText("Source:") === "Source: ", "half-width colon label keeps one space: " + JSON.stringify(srcText("Source:")));
+}
 const matchedSlot = document.createElement("div");
 _pbpDictRenderEntry(matchedSlot, { word: "défense", entries: RENDER_ENTRIES, sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/défense", license: "CC BY-SA 4.0" }, "défense", "fr", "Défense");
 assert(matchedSlot.querySelector(".xp-dict-match")?.textContent === "dictMatchedHeadword:défense",

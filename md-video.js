@@ -4686,7 +4686,13 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       // the bot-check copy would send the reader after the wrong fix.
       const ps = String(session.errorStatus || "");
       const botCheck = !ps || ps === "LOGIN_REQUIRED";
-      pbvSetStatus(statusEl, (botCheck ? t("mdVideoBlocked") : t("mdVideoUnplayable", ps)) + (botCheck && !ytHadTab ? " " + t("mdVideoOpenTabHint") : ""), true);
+      // The login-cookie setting only governs the extension-page fallback,
+      // and only helps when it is off: with a YouTube tab open the captions
+      // went through that tab's own session, so that hint would be a dead end.
+      const tabHints = botCheck && !ytHadTab
+        ? " " + t("mdVideoOpenTabHint") + (session.useLogin !== true ? " " + t("mdVideoBlockedLoginHint") : "")
+        : "";
+      pbvSetStatus(statusEl, (botCheck ? t("mdVideoBlocked") : t("mdVideoUnplayable", ps)) + tabHints, true);
       return;
     }
     if (res.error === "no-tracks" || res.error === "caption-body") {
@@ -5466,6 +5472,9 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       return;
     }
     _detectedNow = detected; // per-video persistence identity (audit U4)
+    // Catch-all failure line for the unexpected-throw exits below: name the
+    // right platform (mdVideoFailed speaks of YouTube), as loadFlow already does.
+    const failKey = detected.provider === "bilibili" ? "mdVideoBiliFailed" : "mdVideoFailed";
     // Owner scope (M7). Re-pointed live afterwards by the pbp:account-changed
     // listener up beside _ownerNow's declaration.
     _ownerNow = _videoOwnerScope(typeof ctx.account === "string" ? ctx.account : "");
@@ -6224,7 +6233,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           if (!_segments.length) retryBtn.hidden = false;
         } catch (e) {
           console.warn("[pbp-video] retry:", (e && e.message) || e);
-          pbvSetStatus(status, t("mdVideoFailed"), true);
+          pbvSetStatus(status, t(failKey), true);
           retryBtn.hidden = false;
         } finally {
           retryBtn.disabled = false;
@@ -6480,7 +6489,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     // out of a click-started run left a permanent loading shell behind.
     cta.addEventListener("click", () => runLoad(true).catch((e) => {
       console.warn("[pbp-video] load:", (e && e.message) || e);
-      if (statusRef) pbvSetStatus(statusRef, t("mdVideoFailed"), true);
+      if (statusRef) pbvSetStatus(statusRef, t(failKey), true);
       cta.disabled = false;
       _runLoadEntered = false;
       if (_retryBtnEl) _retryBtnEl.hidden = false; // closing review M2
@@ -6513,7 +6522,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       runLoad(false).catch((e) => {
         console.warn("[pbp-video] auto load:", (e && e.message) || e);
         _runLoadEntered = false; // closing review M2: catch must release the latch
-        if (statusRef) { pbvSetStatus(statusRef, t("mdVideoFailed"), true); if (_retryBtnEl) _retryBtnEl.hidden = false; }
+        if (statusRef) { pbvSetStatus(statusRef, t(failKey), true); if (_retryBtnEl) _retryBtnEl.hidden = false; }
         else { cta.disabled = false; panel.replaceChildren(cta); }
       });
     } else if (window.pbpVideoDoc && window.pbpVideoDoc.committed === true) {
@@ -6534,7 +6543,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       })().catch((e) => {
         console.warn("[pbp-video] committed auto load:", (e && e.message) || e);
         _runLoadEntered = false; // closing review M2
-        if (statusRef) { pbvSetStatus(statusRef, t("mdVideoFailed"), true); if (_retryBtnEl) _retryBtnEl.hidden = false; }
+        if (statusRef) { pbvSetStatus(statusRef, t(failKey), true); if (_retryBtnEl) _retryBtnEl.hidden = false; }
         else { cta.disabled = false; panel.replaceChildren(cta); }
       });
     } else if (window.pbpVideoDoc && window.pbpVideoDoc.kind === "video-fallback") {
@@ -6556,7 +6565,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       })().catch((e) => {
         console.warn("[pbp-video] fallback auto load:", (e && e.message) || e);
         _runLoadEntered = false; // closing review M2
-        if (statusRef) { pbvSetStatus(statusRef, t("mdVideoFailed"), true); if (_retryBtnEl) _retryBtnEl.hidden = false; }
+        if (statusRef) { pbvSetStatus(statusRef, t(failKey), true); if (_retryBtnEl) _retryBtnEl.hidden = false; }
         else { cta.disabled = false; panel.replaceChildren(cta); }
       });
     }

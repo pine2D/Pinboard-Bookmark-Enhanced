@@ -15,10 +15,10 @@
     "message": "Schnell als Später lesen speichern (ohne Popup)"
   },
   "cmdMarkdownPreview": {
-    "message": "Seite als Markdown-Vorschau öffnen (ohne Popup)"
+    "message": "Seite in der Leseansicht öffnen (ohne Popup)"
   },
   "cmdSaveTabSet": {
-    "message": "Alle Tabs als Tab-Set speichern"
+    "message": "Tabs dieses Fensters als Tab-Set speichern"
   },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
@@ -30,7 +30,7 @@
     "message": "Anmelden"
   },
   "logout": {
-    "message": "Ausloggen"
+    "message": "Abmelden"
   },
   "cancel": {
     "message": "Abbrechen"
@@ -86,7 +86,7 @@
     "message": "Zuletzt:"
   },
   "loading": {
-    "message": "Laden…"
+    "message": "Seiteninfos werden geladen…"
   },
   "private": {
     "message": "Privat"
@@ -98,7 +98,7 @@
     "message": "Netzwerkfehler"
   },
   "uriTooLong": {
-    "message": "Anfrage zu lang ($LEN$/$MAX$ Zeichen). Notizen oder Tags kürzen.",
+    "message": "Anfrage zu lang ($LEN$/$MAX$ B). Kürze Notizen, Titel oder Tags.",
     "placeholders": {
       "len": {
         "content": "$1"
@@ -120,7 +120,7 @@
     "message": "Löschen"
   },
   "loginPrompt": {
-    "message": "Gib deinen API Token ein von"
+    "message": "Gib deinen API-Token ein von"
   },
   "loginTokenPlaceholder": {
     "message": "Benutzername:XXXXXXXXXXXXXX"
@@ -128,8 +128,11 @@
   "loginInvalidFormat": {
     "message": "Ungültiges Format. Verwende Benutzername:TOKEN"
   },
+  "loginSaveFailed": {
+    "message": "Dein API-Token ist gültig, konnte aber nicht gespeichert werden. Prüfe, ob der Browser freien Speicher hat, und versuche es erneut."
+  },
   "loginFailed": {
-    "message": "Authentifizierung fehlgeschlagen."
+    "message": "Authentifizierung fehlgeschlagen. Prüfe deinen API-Token."
   },
   "settingsPassword": {
     "message": "pinboard.in/settings/password"
@@ -177,7 +180,7 @@
     "message": "Lesezeichen gespeichert."
   },
   "tagDraftUnsaved": {
-    "message": "Im Tag-Feld liegt noch ungespeicherter Text."
+    "message": "Der Text im Tag-Feld wurde nicht als Tag übernommen."
   },
   "savedSuccess": {
     "message": "Gespeichert!"
@@ -195,13 +198,29 @@
     "message": "Dieses Lesezeichen löschen?"
   },
   "confirmLogout": {
-    "message": "Ausloggen? Dein API Token wird entfernt."
+    "message": "Abmelden? Dein API-Token wird entfernt."
   },
   "hintCtrlEnter": {
     "message": "Strg+Eingabe"
   },
   "editingExisting": {
     "message": "Vorhandenes Lesezeichen bearbeiten"
+  },
+  "editingExistingDetails": {
+    "message": "$BASE$ ($DETAILS$)",
+    "placeholders": {
+      "base": {
+        "content": "$1",
+        "example": "Editing existing bookmark"
+      },
+      "details": {
+        "content": "$2",
+        "example": "saved Oct 2, 2026, 3 tags"
+      }
+    }
+  },
+  "editingExistingDetailSep": {
+    "message": ", "
   },
   "saveNeedsReview": {
     "message": "Bereits als Lesezeichen gespeichert. Prüfe die Felder und klicke erneut auf „Aktualisieren“."
@@ -248,9 +267,6 @@
   "aiGenerateBtn": {
     "message": "Generieren"
   },
-  "aiGenerate": {
-    "message": "Generieren"
-  },
   "aiSummaryGenerated": {
     "message": "Zusammenfassung erstellt"
   },
@@ -267,13 +283,16 @@
     "message": "Tags neu generiert"
   },
   "aiNoContent": {
-    "message": "Kein Seiteninhalt zum Zusammenfassen"
+    "message": "Auf dieser Seite gibt es keinen verwertbaren Inhalt"
+  },
+  "aiEmptyResult": {
+    "message": "Die KI hat ein leeres Ergebnis geliefert. Versuche es erneut oder wechsle das Modell."
   },
   "aiUrlEdited": {
-    "message": "URL geändert – KI erzeugt nur für die ursprünglich geöffnete Seite."
+    "message": "URL geändert. Die KI liest nur die ursprünglich geöffnete Seite; stelle die URL wieder her, um sie zu nutzen."
   },
   "aiSetKey": {
-    "message": "Lege den KI-API-Key in den [[Einstellungen]] fest"
+    "message": "Hinterlege einen KI-API-Schlüssel in den [[Einstellungen]]"
   },
   "aiCached": {
     "message": "Zwischengespeichert"
@@ -323,7 +342,7 @@
     "message": "Unbekannter Fehler"
   },
   "aiErrorModelNotFound": {
-    "message": "Das Standardmodell für $PROVIDER$ ist möglicherweise veraltet. Wähle ein Modell in den Einstellungen",
+    "message": "$PROVIDER$ findet das konfigurierte Modell nicht. Vielleicht wurde es abgekündigt oder der Name ist falsch geschrieben.",
     "placeholders": {
       "provider": {
         "content": "$1"
@@ -364,6 +383,15 @@
   "pinboardErrorAuth": {
     "message": "Authentifizierung fehlgeschlagen, API-Token prüfen"
   },
+  "pinboardApiError": {
+    "message": "Pinboard hat einen Fehler gemeldet: $DETAIL$",
+    "placeholders": {
+      "detail": {
+        "content": "$1",
+        "example": "item not found"
+      }
+    }
+  },
   "pinboardErrorRateLimit": {
     "message": "Zu viele Anfragen, später erneut versuchen"
   },
@@ -395,7 +423,7 @@
     "message": "Tab-Set speichern"
   },
   "batchSaveBtn": {
-    "message": "Tabs einzeln speichern"
+    "message": "Stapelspeicherung"
   },
   "batchSaving": {
     "message": "Speichern…"
@@ -404,13 +432,13 @@
     "message": "Wird im Hintergrund gespeichert…"
   },
   "batchNoValidTabs": {
-    "message": "Keine gültigen Tabs zum Speichern"
+    "message": "In diesem Fenster gibt es keine Webseiten zum Speichern"
   },
   "batchNoTabs": {
-    "message": "Keine gültigen Tabs"
+    "message": "In diesem Fenster gibt es keine Webseiten zum Speichern"
   },
   "batchNotLoggedIn": {
-    "message": "Nicht angemeldet"
+    "message": "Nicht angemeldet. Hinterlege deinen API-Token in den Einstellungen."
   },
   "batchSent": {
     "message": "Gesendet!"
@@ -432,8 +460,32 @@
       }
     }
   },
+  "batchProgressLabel": {
+    "message": "Fortschritt der Stapelspeicherung"
+  },
+  "batchProgressValue": {
+    "message": "$CURRENT$ von $TOTAL$ verarbeitet: $SAVED$ gespeichert, $FAILED$ fehlgeschlagen",
+    "placeholders": {
+      "current": {
+        "content": "$1",
+        "example": "3"
+      },
+      "total": {
+        "content": "$2",
+        "example": "10"
+      },
+      "saved": {
+        "content": "$3",
+        "example": "2"
+      },
+      "failed": {
+        "content": "$4",
+        "example": "1"
+      }
+    }
+  },
   "batchDone": {
-    "message": "Stapel abgeschlossen: $SAVED$ gespeichert, $FAILED$ fehlgeschlagen",
+    "message": "Stapelspeicherung abgeschlossen: $SAVED$ gespeichert, $FAILED$ fehlgeschlagen",
     "placeholders": {
       "saved": {
         "content": "$1"
@@ -452,10 +504,19 @@
     }
   },
   "batchTooLong": {
-    "message": ", $COUNT$ zu lang",
+    "message": ", $COUNT$ zu lang zum Speichern",
     "placeholders": {
       "count": {
         "content": "$1"
+      }
+    }
+  },
+  "batchAiFailed": {
+    "message": ", KI bei $COUNT$ fehlgeschlagen",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
       }
     }
   },
@@ -475,8 +536,20 @@
       }
     }
   },
+  "batchAccountChanged": {
+    "message": "Stapelspeicherung gestoppt: Das Pinboard-Konto wurde gewechselt."
+  },
+  "tabSetFailed": {
+    "message": "Das Tab-Set konnte nicht gespeichert werden: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "No response"
+      }
+    }
+  },
   "batchInterrupted": {
-    "message": "Stapelspeicherung bei $DONE$/$TOTAL$ abgebrochen. Zum Speichern der übrigen Tabs erneut ausführen.",
+    "message": "Stapelspeicherung bei $DONE$/$TOTAL$ abgebrochen. Starte sie erneut, um die übrigen Tabs zu speichern.",
     "placeholders": {
       "done": {
         "content": "$1"
@@ -490,7 +563,7 @@
     "message": "Stapelspeicherung abbrechen"
   },
   "batchCancelled": {
-    "message": "Stapelspeicherung abgebrochen – $SAVED$ Tabs waren bereits gespeichert.",
+    "message": "Stapelspeicherung abgebrochen. Bereits gespeicherte Lesezeichen ($SAVED$) bleiben erhalten.",
     "placeholders": {
       "saved": { "content": "$1" }
     }
@@ -517,6 +590,9 @@
   "offlineRetryWrongAccount": {
     "message": "Dieser Eintrag wurde für ein anderes Pinboard-Konto in die Warteschlange gestellt. Melde dich mit diesem Konto an, um ihn zu senden."
   },
+  "offlineRetryAccountChanged": {
+    "message": "Das Pinboard-Konto wurde während des erneuten Versuchs gewechselt, daher wurde er abgebrochen."
+  },
   "offlineRetryFailed": {
     "message": "Dieses Lesezeichen konnte nicht gesendet werden. Bitte erneut versuchen.",
     "description": "Popup offline queue: a retry failed for a reason that is not the network and has no more specific message (storage full, internal error, invalid payload, conflict)."
@@ -525,10 +601,13 @@
     "message": "Aus Warteschlange entfernen"
   },
   "offlineRemoveConfirm": {
-    "message": "Diesen Eintrag entfernen?"
+    "message": "Dieses Lesezeichen aus der Warteschlange entfernen? Es wird dann nicht gespeichert."
   },
   "offlineQueueEmpty": {
     "message": "Warteschlange ist leer"
+  },
+  "offlineQueueUntitled": {
+    "message": "(Ohne Titel)"
   },
   "offlineJustNow": {
     "message": "gerade eben"
@@ -558,7 +637,7 @@
     }
   },
   "offlineClearConfirm": {
-    "message": "Alle Lesezeichen in der Warteschlange löschen?"
+    "message": "Alle Lesezeichen aus der Warteschlange löschen? Keines davon wird gespeichert."
   },
   "recentLabel": {
     "message": "Kürzlich:"
@@ -578,7 +657,7 @@
     "message": "Pinboard: Nicht angemeldet"
   },
   "bgSetToken": {
-    "message": "Lege deinen API Token in den Erweiterungseinstellungen fest."
+    "message": "Lege deinen API-Token in den Erweiterungseinstellungen fest."
   },
   "bgUndone": {
     "message": "Pinboard: Rückgängig gemacht"
@@ -590,16 +669,16 @@
     "message": "Lesezeichen entfernt."
   },
   "bgQuickSaved": {
-    "message": "Pinboard: Schnell gespeichert!"
+    "message": "Pinboard: Schnellspeichern"
   },
   "bgReadLater": {
-    "message": "Pinboard: Schnell als Später lesen gespeichert!"
+    "message": "Pinboard: Später lesen"
   },
   "bgCannotSave": {
     "message": "Pinboard: Speichern nicht möglich"
   },
   "bgCannotBookmark": {
-    "message": "Diese Seite kann nicht als Lesezeichen gespeichert werden."
+    "message": "Nur http- und https-Seiten können gespeichert werden."
   },
   "bgMdPreviewFailed": {
     "message": "Pinboard: Markdown-Konvertierung fehlgeschlagen"
@@ -607,14 +686,17 @@
   "bgMdPreviewNoContent": {
     "message": "Auf dieser Seite wurde kein lesbarer Inhalt gefunden."
   },
+  "bgMdPreviewUnsupported": {
+    "message": "Die Leseansicht öffnet nur http- und https-Seiten."
+  },
   "bgMdPreviewTooLarge": {
-    "message": "Der Speicher ist voll. Lösche zwischengespeicherte Daten in den Erweiterungsoptionen (Speicher) und versuche es erneut."
+    "message": "Der Speicher ist voll. Lösche zwischengespeicherte Daten unter Einstellungen > Speicher und versuche es erneut."
   },
   "mdPreviewOpenFailed": {
-    "message": "Vorschau konnte nicht geöffnet werden. Die Seite ist möglicherweise zu groß zum Speichern."
+    "message": "Die Leseansicht konnte nicht geöffnet werden. Versuche es erneut."
   },
   "mdPreviewQuotaFull": {
-    "message": "Der Speicher ist voll, daher konnte die Vorschau nicht gespeichert werden. Gib Speicher frei und versuche es erneut."
+    "message": "Der Speicher ist voll, daher konnte der Inhalt der Leseansicht nicht gespeichert werden. Gib Speicher frei und versuche es erneut."
   },
   "manageStorage": {
     "message": "Speicher verwalten"
@@ -698,10 +780,10 @@
     "message": "Diese Seite konnte nicht extrahiert werden. Bitte erneut versuchen."
   },
   "mdEngineTabGone": {
-    "message": "Quell-Tab nicht mehr verfügbar. Seite erneut öffnen, um Defuddle zu nutzen"
+    "message": "Der ursprüngliche Tab ist nicht mehr verfügbar. Öffne die Seite erneut, um Defuddle zu nutzen."
   },
   "mdEngineJinaNeedsHttp": {
-    "message": "Jina Reader kann nur http(s)-Seiten abrufen. Öffne die Seite über http(s), um es zu nutzen"
+    "message": "Jina Reader kann nur http(s)-Seiten abrufen und diese Seite daher nicht lesen."
   },
   "mdEngineGroupAria": {
     "message": "Extraktions-Engine"
@@ -718,10 +800,10 @@
     }
   },
   "bgTabSetFailed": {
-    "message": "Pinboard: Tab-Set speichern fehlgeschlagen"
+    "message": "Pinboard: Tab-Set konnte nicht gespeichert werden"
   },
   "bgLoginRequired": {
-    "message": "Bitte melde dich zuerst bei pinboard.in in deinem Browser an."
+    "message": "Melde dich in diesem Browser bei pinboard.in an und versuche es dann erneut."
   },
   "bgQuickSaveFailed": {
     "message": "Pinboard: Schnellspeicherung fehlgeschlagen"
@@ -747,7 +829,7 @@
     }
   },
   "bgTitleSavedAiSkipped": {
-    "message": "\"$TITLE$\" gespeichert. KI wurde nicht ausgeführt; Zugriff unter Einstellungen > KI-Anbieter > Verbindung testen erlauben.",
+    "message": "„$TITLE$“ gespeichert. KI übersprungen: Der Zugriff auf deinen KI-Anbieter ist nicht erlaubt. Erlaube ihn unter Einstellungen > KI-Anbieter > Verbindung testen.",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -763,7 +845,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard: Stapelspeicherung abgeschlossen!"
+    "message": "Pinboard: Stapelspeicherung abgeschlossen"
+  },
+  "bgBatchCancelled": {
+    "message": "Pinboard: Stapelspeicherung abgebrochen"
   },
   "bgUndo": {
     "message": "Rückgängig"
@@ -823,7 +908,7 @@
     "message": "Unbekannte Seite"
   },
   "notesUnknownHint": {
-    "message": "Öffne die Vorschau dieser Seite erneut und speichere eine Markierung, um Titel und Link zu ergänzen."
+    "message": "Öffne diese Seite erneut in der Leseansicht und speichere eine Markierung, um Titel und Link zu ergänzen."
   },
   "notesDeleteBtn": {
     "message": "Alle Markierungen dieser Seite löschen"
@@ -889,7 +974,7 @@
     }
   },
   "resetKeysKept": {
-    "message": " (Schlüssel beibehalten)"
+    "message": " API-Schlüssel und Tokens bleiben erhalten."
   },
   "resetClearsAuthored": {
     "message": " Handgeschriebene Texte auf dieser Seite (Prompts, Glossar, Listen, eigenes CSS) werden ebenfalls gelöscht."
@@ -898,13 +983,13 @@
     "message": "Pinboard Konto"
   },
   "labelApiToken": {
-    "message": "API Token"
+    "message": "API-Token"
   },
   "hintApiToken": {
-    "message": "Von"
+    "message": "Deinen API-Token erhältst du unter"
   },
   "secSaveDefaults": {
-    "message": "Speicher-Standardeinstellungen"
+    "message": "Standardwerte beim Speichern"
   },
   "optPrivateDefault": {
     "message": "Standardmäßig Privat"
@@ -925,13 +1010,13 @@
     "message": "Markierten Text mit <blockquote> umschließen"
   },
   "optIncludeReferrer": {
-    "message": "Referrer in Notizen aufnehmen"
+    "message": "URL der verweisenden Seite zu den Notizen hinzufügen"
   },
   "secTags": {
     "message": "Tags"
   },
   "optRespectTagCase": {
-    "message": "Vorhandene Tag-Groß-/Kleinschreibung beibehalten (häufigste Schreibweise verwenden)"
+    "message": "Groß-/Kleinschreibung vorhandener Tags übernehmen (die häufigste Schreibweise gilt)"
   },
   "optShowSuggestTags": {
     "message": "Pinboard-Tagvorschläge im Popup anzeigen"
@@ -946,7 +1031,7 @@
     "message": "Schnelllinks im Popup anzeigen"
   },
   "optShowQuickRow": {
-    "message": "Schnellaktionsschaltflächen im Popup anzeigen (Tabs speichern · Batch-Speichern · Markdown)"
+    "message": "Schnellaktionsschaltflächen im Popup anzeigen (Tab-Set speichern · Stapelspeicherung · Leseansicht)"
   },
   "tagSyncLabel": {
     "message": "Tag-Cache-Strategie"
@@ -955,7 +1040,7 @@
     "message": "Cached (Standard, alle 10 Min. neu laden)"
   },
   "tagSyncFresh": {
-    "message": "Live (bei jedem Popup abrufen, langsamer)"
+    "message": "Live (bei jedem Öffnen des Popups abrufen, langsamer)"
   },
   "tagSyncPrewarmed": {
     "message": "Vorgewärmt (Hintergrundabruf alle 15 Min., sofort verfügbar)"
@@ -976,7 +1061,7 @@
     "message": "Popup-Verhalten"
   },
   "optCheckBookmarkStatus": {
-    "message": "Lesezeichen-Status über Symbol anzeigen (prüfen ob aktuelle Seite gespeichert ist)"
+    "message": "Am Symbol in der Symbolleiste anzeigen, ob diese Seite gespeichert ist"
   },
   "optAutoClose": {
     "message": "Popup nach dem Speichern automatisch schließen"
@@ -987,9 +1072,6 @@
   "secBackupRestore": {
     "message": "Sicherung & Wiederherstellung"
   },
-  "backupHint": {
-    "message": "Einstellungen und ausgewählte Daten exportieren oder importieren. Zugangsdaten werden nur auf Wunsch exportiert."
-  },
   "backupIncludeHighlightsLabel": {
     "message": "Markierungen und Notizen in Sicherungen einschließen"
   },
@@ -997,7 +1079,7 @@
     "message": "Backups enthalten Seiten-URLs, Titel, markierten Text, Notizen, Farben und Zeitstempel."
   },
   "backupPlaintextDisclosure": {
-    "message": "Sicherungen sind unverschlüsselte JSON-Dateien. Sie können Einstellungen, Markierungen, Seiten-URLs, Vokabeln und Kontextauszüge enthalten."
+    "message": "Sicherungen sind unverschlüsselte JSON-Dateien. Sie können Einstellungen, Themes, Markierungen und Notizen, Seiten-URLs, Vokabeln, Kontextauszüge und, wenn du es auswählst, API-Schlüssel und Tokens enthalten."
   },
   "backupIncludeVocabularyLabel": {
     "message": "Vokabeln in Sicherungen einschließen"
@@ -1009,7 +1091,7 @@
     "message": "API-Schlüssel und Tokens in Sicherungen einschließen"
   },
   "backupIncludeSecretsHint": {
-    "message": "Schreibt sämtliche Zugangsdaten im Klartext in die Datei: Pinboard-Token, alle Schlüssel der KI-Anbieter sowie die Zugangsdaten für Jina, Wayback, Anki, Eudic, Gist und Webhook. Wer die Datei öffnet, kann sie direkt verwenden. Bewahre die Datei wie ein Passwort auf."
+    "message": "Schreibt sämtliche Zugangsdaten im Klartext in die Datei: deinen Pinboard-API-Token, alle API-Schlüssel der KI-Anbieter sowie die Zugangsdaten für Jina, Wayback, Anki, Eudic, Notion, Gist und Webhook. Wer die Datei öffnet, kann sie direkt verwenden. Bewahre die Datei wie ein Passwort auf."
   },
   "backupSecretsExportConfirm": {
     "message": "Diese Sicherung enthält deine API-Schlüssel und Tokens im Klartext. Sende sie nicht über Kanäle, denen du nicht vertraust, und lösche sie nach der Wiederherstellung."
@@ -1042,7 +1124,7 @@
     "message": "Importvorschau"
   },
   "backupPreviewMeta": {
-    "message": "Schema $SCHEMA$; erstellt $CREATED$; Erweiterungsversion $VERSION$.",
+    "message": "Formatversion $SCHEMA$; erstellt $CREATED$; Erweiterungsversion $VERSION$.",
     "placeholders": {
       "schema": { "content": "$1" },
       "created": { "content": "$2" },
@@ -1086,7 +1168,7 @@
     "message": "Sprachen"
   },
   "backupPreviewLegacyOwner": {
-    "message": "Ältere Sicherung ohne Kontoinformation"
+    "message": "Nicht erfasst"
   },
   "backupPreviewNone": {
     "message": "Keine"
@@ -1104,7 +1186,7 @@
     "message": "Die Einstellungssynchronisierung ist auf diesem Gerät aktiv. Importierte Einstellungen können auf andere Chrome-Geräte übertragen werden."
   },
   "backupPreviewLocalWarning": {
-    "message": "Diese ausgewählten Felder werden derzeit nur auf diesem Gerät gespeichert oder benötigen aufgrund ihrer Größe lokalen Speicher: $FIELDS$.",
+    "message": "Diese Felder sind zu groß für Chrome Sync und werden möglicherweise nur auf diesem Gerät gespeichert: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
   },
   "backupPreviewSemantics": {
@@ -1148,7 +1230,7 @@
     }
   },
   "backupImportComplete": {
-    "message": "Import abgeschlossen. Lade die Seite neu, um Änderungen an Einstellungen und Themes zu sehen."
+    "message": "Import abgeschlossen."
   },
   "backupImportPartialResult": {
     "message": "Der Import ist beendet, aber einige Bereiche sind unvollständig oder wurden nur auf diesem Gerät gespeichert. Prüfe die Ergebnisse unten, bevor du die Sicherungsdatei löschst."
@@ -1157,39 +1239,42 @@
     "message": "Es wurden keine Sicherungsbereiche angewendet."
   },
   "exportSettings": {
-    "message": "Einstellungen exportieren"
+    "message": "Sicherung exportieren"
   },
   "backupExportFailed": {
     "message": "Die Sicherungsdatei konnte nicht erstellt werden, weil das Feld $FIELD$ ungültig ist.",
     "placeholders": { "field": { "content": "$1" } }
   },
+  "backupExportFailedGeneric": {
+    "message": "Die Sicherungsdatei konnte nicht erstellt werden. Versuche es erneut."
+  },
   "backupExportSyncPending": {
     "message": "Chrome Sync hat diese Daten noch nicht vollständig auf dieses Gerät übertragen. Es wurde nichts geschrieben; versuche es in einer Minute erneut."
   },
   "importSettings": {
-    "message": "Einstellungen importieren"
+    "message": "Sicherung importieren"
   },
   "importedReload": {
     "message": "Importiert. Seite neu laden, um Änderungen zu sehen"
   },
   "importInvalid": {
-    "message": "Ungültige Datei"
+    "message": "Keine gültige Sicherungsdatei"
   },
   "importInvalidField": {
-    "message": "Ungültige Datei: Das Feld $FIELD$ konnte nicht gelesen werden",
+    "message": "Keine gültige Sicherungsdatei: Das Feld $FIELD$ konnte nicht gelesen werden",
     "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "Der Import konnte nicht abgeschlossen werden; einige Einstellungen wurden möglicherweise bereits geändert. Bitte prüfe sie und versuche es erneut."
   },
   "importSettingsTitle": {
-    "message": "Einstellungen aus JSON-Datei importieren"
+    "message": "Aus einer JSON-Sicherungsdatei importieren"
   },
   "jinaMdNonWebHint": {
     "message": "Funktioniert nur auf Webseiten"
   },
   "popSortTitle": {
-    "message": "Diese Seite nach Beliebtheit sortieren"
+    "message": "Lesezeichen dieser Seite danach sortieren, wie oft sie gespeichert wurden"
   },
   "importPartial": {
     "message": "Importiert. Themes lokal gespeichert (Sync-Kontingent voll); Seite neu laden"
@@ -1197,11 +1282,8 @@
   "secQuickSave": {
     "message": "Schnellspeicherung"
   },
-  "qsHint": {
-    "message": "Aktuelle Seite sofort per Tastenkürzel speichern (ohne Popup zu öffnen)."
-  },
   "labelShortcut": {
-    "message": "Tastenkürzel"
+    "message": "Tastenkürzel:"
   },
   "labelOpenPopupShortcut": {
     "message": "Tastenkürzel zum Öffnen des Popups"
@@ -1215,11 +1297,8 @@
   "mdShortcutUnset": {
     "message": "Nicht festgelegt"
   },
-  "shortcutsManual": {
-    "message": "Oder manuell navigieren:"
-  },
   "qsAutoNotes": {
-    "message": "Seitenbeschreibung automatisch zu Notizen hinzufügen"
+    "message": "Seitenbeschreibung in die Notizen übernehmen, wenn kein Text markiert ist"
   },
   "qsBlockquote": {
     "message": "Markierten Text mit blockquote umschließen"
@@ -1239,14 +1318,8 @@
   "secReadLater": {
     "message": "Später lesen"
   },
-  "rlHint": {
-    "message": "Aktuelle Seite per Tastenkürzel als „Später lesen“ speichern. Wird automatisch als ungelesen markiert."
-  },
   "secBatchSave": {
     "message": "Stapelspeicherung"
-  },
-  "batchHint": {
-    "message": "Jeden geöffneten Tab als einzelnes Lesezeichen speichern."
   },
   "batchAutoAddTags": {
     "message": "Tags automatisch hinzufügen"
@@ -1255,7 +1328,7 @@
     "message": "Tags (kommagetrennt)"
   },
   "batchTagsHint": {
-    "message": "Mehrere Tags durch Kommas getrennt. Z.B. batch_saved, research"
+    "message": "Tags durch Kommas trennen; Leerzeichen innerhalb eines Tags werden zu Bindestrichen. Z. B. batch_saved, research"
   },
   "batchAiTags": {
     "message": "KI-Tags für jeden Tab automatisch generieren"
@@ -1267,13 +1340,13 @@
     "message": "Bereits gespeicherte URLs überspringen"
   },
   "batchAiHint": {
-    "message": "KI führt einen Aufruf pro Tab aus und kann langsam sein. Beim ersten Einsatz fragt Batch nur nach den aufgelisteten Tab-Websites und dem aktuellen KI-Anbieter."
+    "message": "Die KI wird für jeden Tab einzeln aufgerufen, das kann dauern. Fehlt ein Zugriff, fragt die Stapelspeicherung nur nach den Websites der zu speichernden Tabs und deinem aktuellen KI-Anbieter."
   },
   "batchPermDenied": {
-    "message": "Die aufgelisteten Website-Berechtigungen wurden nicht erteilt. Batch-KI wurde nicht gestartet."
+    "message": "Der Zugriff auf die aufgeführten Websites wurde nicht erlaubt, daher wurde die Stapelspeicherung nicht gestartet."
   },
   "batchPermConfirm": {
-    "message": "Batch-KI benötigt für diesen Lauf Zugriff auf diese $COUNT$ Websites:",
+    "message": "Die Stapelspeicherung benötigt Zugriff auf diese $COUNT$ Websites:",
     "placeholders": {
       "count": { "content": "$1" }
     }
@@ -1348,7 +1421,7 @@
     }
   },
   "testTimeout": {
-    "message": "Zeitüberschreitung (30s)"
+    "message": "Zeitüberschreitung der Anfrage"
   },
   "testNoApiKey": {
     "message": "Kein API Key"
@@ -1360,16 +1433,13 @@
     "message": "Weitere Informationen"
   },
   "hintOpenAIBaseUrl": {
-    "message": "Ändern für Proxy oder kompatiblen Endpunkt"
-  },
-  "hintClaudeModel": {
-    "message": "Z.B. claude-haiku-4-5-20251001, claude-sonnet-4-20250514"
+    "message": "Ändern, um einen Proxy oder einen kompatiblen Endpunkt zu nutzen"
   },
   "hintOllamaModel": {
     "message": "Führe zuerst ollama pull llama3.2 aus"
   },
   "hintCustomBaseUrl": {
-    "message": "Muss den /chat/completions Endpunkt unterstützen"
+    "message": "An diese URL wird /chat/completions angehängt; der Endpunkt muss das unterstützen"
   },
   "hintCustomKey": {
     "message": "Leer lassen, wenn nicht erforderlich"
@@ -1422,10 +1492,10 @@
     "message": "Русский"
   },
   "labelAiCache": {
-    "message": "KI-Cache-Dauer für Tags, Zusammenfassungen & Seitenabruf (Minuten)"
+    "message": "Cache-Dauer für KI-Tags, Zusammenfassungen und abgerufene Seiten (Minuten)"
   },
   "aiCacheHint": {
-    "message": "Pro URL zwischengespeichert, gemeinsamer 200er-Pool (LRU). Auf 0 setzen zum Deaktivieren."
+    "message": "Pro URL zwischengespeichert, in einem gemeinsamen Speicher mit 200 Einträgen; die am längsten nicht genutzten werden zuerst entfernt. 0 deaktiviert den Cache."
   },
   "labelTagSeparator": {
     "message": "Trennzeichen für mehrteilige Tags"
@@ -1518,23 +1588,14 @@
   "optTagSortByPop": {
     "message": "Steuerelement zum Sortieren nach Beliebtheit auf Tag-Seiten hinzufügen"
   },
-  "optTagSortByPopHint": {
-    "message": "Fügt auf pinboard.in-Tag-Seiten ein „pop“-Steuerelement hinzu, das die Lesezeichen der aktuellen Seite nach Anzahl der Speicherungen sortiert (erneut klicken zum Zurücksetzen)."
-  },
   "secCustomStyle": {
     "message": "Pinboard.in Benutzerdefinierter Stil"
-  },
-  "customStyleHint": {
-    "message": "Benutzerdefiniertes CSS in pinboard.in-Seiten einfügen. Nützlich zum Ändern von Schriftarten, Farben, Layout usw."
   },
   "labelCustomFont": {
     "message": "Benutzerdefinierte Schriftart"
   },
   "customFontPlaceholder": {
     "message": "Z.B. 'Noto Sans', 'Fira Code', sans-serif"
-  },
-  "customFontHint": {
-    "message": "Wird auf body von pinboard.in angewendet. Leer lassen für Standard."
   },
   "labelThemePresets": {
     "message": "Theme-Vorlagen"
@@ -1551,9 +1612,6 @@
   "themeGroupDark": {
     "message": "Dunkel"
   },
-  "themePresetsHint": {
-    "message": "Klicke auf eine Vorlage, um deren CSS zu laden. Adaptive Themes folgen deiner Design-Einstellung (Hell/Dunkel)."
-  },
   "labelSavedThemes": {
     "message": "Gespeicherte Themes"
   },
@@ -1561,7 +1619,7 @@
     "message": "Als Theme speichern"
   },
   "saveAsThemeHint": {
-    "message": "Bearbeite zuerst die eigene CSS-Überlagerung. Danach kannst du sie als Theme speichern."
+    "message": "Speichert die eigene CSS-Überlagerung als wiederverwendbares Theme. Verfügbar, sobald das Feld CSS enthält (bis 50 KB)."
   },
   "customCSSPlaceholder": {
     "message": "/* Benutzerdefiniertes CSS für pinboard.in */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
@@ -1611,22 +1669,22 @@
     "message": "Überschreiben"
   },
   "saveTabsTitle": {
-    "message": "Alle offenen Tabs zu einem einzigen Pinboard-Tab-Set zusammenfassen (pinboard.in-Anmeldung erforderlich)"
+    "message": "Die Tabs dieses Fensters zu einem Pinboard-Tab-Set zusammenfassen (pinboard.in-Anmeldung erforderlich)"
   },
   "batchSaveTitle": {
-    "message": "Jeden offenen Tab einzeln als eigenes Lesezeichen speichern (optional mit KI-Tags/Zusammenfassung)"
+    "message": "Jeden Tab dieses Fensters als eigenes Lesezeichen speichern (optional mit KI-Tags und Zusammenfassung)"
   },
   "qlSetsTitle": {
-    "message": "Tab-Sets"
+    "message": "Deine gespeicherten Tab-Sets auf Pinboard"
   },
   "qlNetworkTitle": {
-    "message": "Netzwerk"
+    "message": "Lesezeichen von Personen, denen du folgst"
   },
   "qlUnreadTitle": {
-    "message": "Ungelesene Lesezeichen"
+    "message": "Deine ungelesenen Lesezeichen („Später lesen“)"
   },
   "qlNotesTitle": {
-    "message": "Notizen"
+    "message": "Deine Pinboard-Notizen"
   },
   "secSync": {
     "message": "Datensynchronisierung"
@@ -1635,7 +1693,7 @@
     "message": "Chrome Sync für Einstellungen auf diesem Gerät verwenden"
   },
   "optSyncHint": {
-    "message": "Diese Auswahl gilt nur für dieses Gerät. Einstellungen werden nur zwischen den Geräten geteilt, auf denen du sie aktivierst; alle anderen behalten ihre eigenen lokalen Einstellungen."
+    "message": "Diese Einstellung gilt nur für dieses Gerät. Einstellungen werden nur zwischen den Geräten geteilt, auf denen du sie aktivierst; alle anderen behalten ihre eigenen lokalen Einstellungen."
   },
   "syncApiKeysLabel": {
     "message": "Zugangsdaten für dieses Google-Konto synchronisieren"
@@ -1651,10 +1709,10 @@
     "message": "In Chrome Sync sind bereits Einstellungen von einem anderen Gerät gespeichert. Aktiviere die Einstellungssynchronisierung, um sie hier zu verwenden."
   },
   "syncApiKeysDisableConfirm": {
-    "message": "Synchronisierung der Zugangsdaten deaktivieren? Dieses Gerät verwendet danach lokale Zugangsdaten und alte Zugangsdaten in Chrome Sync werden gelöscht. Andere Geräte, die noch auf diese Cloud-Zugangsdaten angewiesen sind, funktionieren möglicherweise nicht mehr. Dein Google Drive OAuth-Token bleibt davon unberührt."
+    "message": "Synchronisierung der Zugangsdaten deaktivieren? Dieses Gerät behält eine lokale Kopie der synchronisierten Zugangsdaten, und sie werden aus Chrome Sync gelöscht. Andere Geräte, die noch auf diese Cloud-Zugangsdaten angewiesen sind, funktionieren möglicherweise nicht mehr. Dein Google Drive OAuth-Token bleibt davon unberührt."
   },
   "qlPopularTitle": {
-    "message": "Beliebt"
+    "message": "Beliebte Lesezeichen auf Pinboard"
   },
   "provGemini": {
     "message": "Google Gemini"
@@ -1701,6 +1759,9 @@
   "provCustom": {
     "message": "Custom OpenAI-compatible"
   },
+  "provCustomShort": {
+    "message": "Benutzerdefiniert"
+  },
   "jinaMarkdownBtn": {
     "message": "Leseansicht"
   },
@@ -1716,6 +1777,9 @@
   "jinaCopied": {
     "message": "Kopiert!"
   },
+  "popupCopyFailed": {
+    "message": "Kopieren in die Zwischenablage fehlgeschlagen."
+  },
   "jinaFailed": {
     "message": "Fehlgeschlagen"
   },
@@ -1723,26 +1787,23 @@
     "message": "Hauptinhalt der Seite lokal extrahieren (offline, schnell)."
   },
   "aiContentSourceJinaHint": {
-    "message": "Bereinigtes Markdown über die Jina Reader API abrufen (Netzwerk erforderlich; API-Schlüssel optional für höheres Kontingent)."
+    "message": "Sendet die Seiten-URL an Jina Reader, das die Seite abruft und bereinigtes Markdown zurückgibt. Erfordert Netzwerkzugang; ein API-Schlüssel ist optional und erhöht das Kontingent."
   },
   "jinaAuthFailed": {
     "message": "Jina API-Schlüssel ist ungültig oder abgelaufen. Öffne Einstellungen > KI-Anbieter > Jina Reader, um ihn zu aktualisieren."
   },
   "jinaFailedDetail": {
-    "message": "Markdown-Abruf fehlgeschlagen: $ERROR$",
+    "message": "Die Seite konnte nicht in Markdown umgewandelt werden: $ERROR$",
     "placeholders": {
       "error": {
         "content": "$1"
       }
     }
   },
-  "jinaViewBtn": {
-    "message": "Ansehen"
-  },
   "mdStripPreview": {
-    "message": "Vorschau"
+    "message": "In der Leseansicht öffnen"
   },
-  "mdStripPreviewVideo": { "message": "Untertitel-Vorschau" },
+  "mdStripPreviewVideo": { "message": "Untertitel in der Leseansicht öffnen" },
   "mdStripDownloadMd": {
     "message": ".md laden"
   },
@@ -1754,9 +1815,6 @@
   },
   "mdExportSection": {
     "message": "Exportieren"
-  },
-  "mdOptFrontmatter": {
-    "message": "Frontmatter"
   },
   "mdOptImages": {
     "message": "Bilder"
@@ -1781,14 +1839,14 @@
     "message": "Einbetten gilt nur für Downloads; dieser Export behält Bildlinks."
   },
   "mdImgBrokenNote": {
-    "message": "$COUNT$ Bild(er) konnten in dieser Vorschau nicht geladen werden und werden nach dem Export möglicherweise nicht angezeigt; „Einbetten“ packt Bilder in Downloads.",
+    "message": "$COUNT$ Bild(er) konnten in der Leseansicht nicht geladen werden und werden nach dem Export möglicherweise nicht angezeigt; „Einbetten“ packt Bilder in Downloads.",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdExportRunning": {
     "message": "Export wird vorbereitet…"
   },
   "mdObsidianRoute": {
-    "message": "Obsidian-Ziel"
+    "message": "Speicherort"
   },
   "mdObsidianRouteNew": {
     "message": "Neue Notiz"
@@ -1833,16 +1891,13 @@
     "message": "Bilder entfernen"
   },
   "mdExportImagePolicyHint": {
-    "message": "Wird beim Kopieren oder Herunterladen von Markdown auf der Vorschauseite angewendet. Kann pro Export überschrieben werden."
+    "message": "Standard für Markdown, das du im Popup oder in der Leseansicht kopierst, herunterlädst oder sendest. In der Leseansicht lässt es sich für jeden Export ändern."
   },
   "mdExportIncludeToc": {
     "message": "Inhaltsverzeichnis einfügen"
   },
   "mdExportExtendedMeta": {
-    "message": "Erweiterte Metadaten einschließen (Autor, Veröffentlichungsdatum, Website, Bild, Wortzahl)"
-  },
-  "mdExportExtendedMetaHint": {
-    "message": "Fügt diese Felder bei Verfügbarkeit dem Frontmatter, der HTML-Kopfzeile und den Webhook-Payloads hinzu. Deaktivieren für byte-identische Exporte wie zuvor."
+    "message": "Erweiterte Metadaten einschließen (Autor, Veröffentlichungsdatum, Website, Titelbild, Wortzahl)"
   },
   "mdOptIncludeHl": {
     "message": "Markierungen einbeziehen"
@@ -1970,16 +2025,16 @@
     "message": "jina_xxxx (für kostenloses Kontingent leer lassen)"
   },
   "submitUriTooLong": {
-    "message": "Anfrage zu groß. Notizen, Titel oder Tags kürzen"
+    "message": "Anfrage zu lang. Kürze Notizen, Titel oder Tags."
   },
   "saveAsThemeDisabledHint": {
-    "message": "Zuerst Custom CSS ändern, um als Theme zu speichern"
+    "message": "Die eigene CSS-Überlagerung als wiederverwendbares Theme speichern (erfordert CSS, bis 50 KB)"
   },
   "labelCustomCSSOverlay": {
     "message": "Eigene CSS-Überlagerung"
   },
   "customCSSOverlayHelp": {
-    "message": "Dein CSS wird oben auf das ausgewählte Preset gelegt. Leer lassen, um nur das Preset zu nutzen; hier geschriebene Regeln überschreiben gleichnamige Regeln des Presets."
+    "message": "Dein CSS wird nach dem ausgewählten Preset geladen und hat daher bei gleichem Selektor Vorrang vor dessen Regeln. Leer lassen, um nur das Preset zu nutzen."
   },
   "presetPreviewToggle": {
     "message": "Aktuelles Preset-CSS anzeigen (schreibgeschützt)"
@@ -1988,7 +2043,7 @@
     "message": "Lokal gespeichert (Sync-Kontingent voll)"
   },
   "optSaveFailed": {
-    "message": "Das Speichern konnte nicht abgeschlossen werden; einige andere Einstellungen wurden möglicherweise bereits gespeichert. Bitte prüfe sie und versuche es erneut."
+    "message": "Einige Änderungen wurden nicht gespeichert, andere möglicherweise schon. Prüfe deine Einstellungen und versuche es erneut."
   },
   "confirm": {
     "message": "Bestätigen"
@@ -2017,19 +2072,13 @@
     "description": "Options page alert after adopting the cloud settings profile: the page must be reloaded before the adopted settings take effect."
   },
   "jinaFreeTierHint": {
-    "message": "Kostenlos: 20 RPM. Key für höheres Kontingent hinzufügen."
+    "message": "Ohne Schlüssel: 20 Anfragen pro Minute. Mit einem API-Schlüssel steigt das Kontingent."
   },
   "openrouterTagline": {
     "message": "Greife auf 100+ Modelle über eine API zu."
   },
   "browseModelsAt": {
     "message": "Modelle ansehen:"
-  },
-  "hintZhipuModel": {
-    "message": "z. B. glm-4.7-flash, glm-4-flash, glm-4-plus"
-  },
-  "hintKimiModel": {
-    "message": "z. B. kimi-k2.6, kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
   },
   "mdPreviewEmpty": {
     "message": "Hier gibt es noch nichts zu lesen. Öffne eine Seite und klicke dann im Popup der Erweiterung auf „Leseansicht“."
@@ -2053,14 +2102,11 @@
   "aiSlowHint": {
     "message": "dauert länger als üblich"
   },
-  "aiCancel": {
-    "message": "Abbrechen"
-  },
   "urlCleanedN": {
     "message": "{n} Tracking-Parameter entfernt"
   },
   "urlShowOriginal": {
-    "message": "Original anzeigen"
+    "message": "Original wiederherstellen"
   },
   "urlPasteCleanedN": {
     "message": "{n} Tracking-Parameter entfernt"
@@ -2078,16 +2124,16 @@
     "message": "Beim Öffnen des Popups bereinigen (still, mit Rückgängig-Link)"
   },
   "optUrlCleanOnPaste": {
-    "message": "Beim Einfügen einer URL bereinigen (Toast-Hinweis)"
+    "message": "Beim Einfügen einer URL bereinigen (mit Hinweis und „Rückgängig“)"
   },
   "optUrlCleanAggressive": {
-    "message": "Aggressiver Modus: auch ref/si/igshid und ähnliche entfernen"
+    "message": "Aggressiver Modus: auch ref, si, igshid und Ähnliches entfernen (kann manche Links unbrauchbar machen)"
   },
   "optUrlCleanCustom": {
     "message": "Benutzerdefinierte Parameter (einer pro Zeile, zur Standardliste hinzufügen)"
   },
   "optUrlCleanExclude": {
-    "message": "Auszuschließende Parameter (einer pro Zeile, werden nie bereinigt; z. B. tag= behalten, um Affiliate-Tags zu erhalten)"
+    "message": "Parameter, die nie bereinigt werden (einer pro Zeile, z. B. tag, um Affiliate-Tags zu behalten)"
   },
   "emptyRecentBookmarks": {
     "message": "Keine aktuellen Lesezeichen"
@@ -2111,7 +2157,7 @@
     "message": "Benutzerdefiniert:"
   },
   "optPopupWidthHelp": {
-    "message": "Bereich: 420–720px (Chrome-Popup-Limit)"
+    "message": "Bereich: 420–720px (unter Chromes Popup-Grenze von 800px)"
   },
   "optUrlCleanCustomPlaceholder": {
     "message": "utm_other\ncustom_track_id\n_branch_referrer"
@@ -2120,13 +2166,10 @@
     "message": "tag\nref\nsi"
   },
   "obsidianInstallHint": {
-    "message": "Obsidian muss installiert sein, damit die Notiz geöffnet werden kann. Der Inhalt wurde zur Sicherheit auch in die Zwischenablage kopiert."
+    "message": "Obsidian muss installiert sein, damit die Notiz angelegt werden kann. Die Notiz liegt außerdem in der Zwischenablage, du kannst sie also überall einfügen."
   },
   "obsidianClipboardFailed": {
     "message": "Kopieren in die Zwischenablage fehlgeschlagen, daher wurde die Notiz nicht erstellt. Bitte erneut versuchen."
-  },
-  "apiKeySecurityHint": {
-    "message": "Bei neuen Nutzern bleiben Zugangsdaten standardmäßig auf diesem Gerät. Vorhandene Cloud-Zugangsdaten können die kontoweite Synchronisierung nach einem Upgrade aktiviert halten. Nur Geräte mit aktivierter Einstellungssynchronisierung nehmen teil; synchronisierte Zugangsdaten sind nur verschleiert, nicht verschlüsselt."
   },
   "batchPermLabel": {
     "message": "Veraltete Berechtigung für alle Websites:"
@@ -2135,7 +2178,7 @@
     "message": "Veralteten Zugriff auf alle Websites widerrufen"
   },
   "batchRevokeHint": {
-    "message": "Ältere Versionen konnten Zugriff auf jede Website gewähren. Neue Batch-Läufe fragen nur nach den aufgelisteten Websites; diese Schaltfläche entfernt die alte breite Berechtigung."
+    "message": "Ältere Versionen konnten Zugriff auf alle Websites haben. Die Stapelspeicherung fragt jetzt nur nach den Websites der zu speichernden Tabs; diese Schaltfläche entfernt die alte Berechtigung für alle Websites."
   },
   "batchRevokeSuccess": {
     "message": "Widerrufen"
@@ -2159,10 +2202,10 @@
     "message": "Nach jedem Speichern das Internet Archive bitten, einen Schnappschuss der Seite zu erstellen (Best-Effort, blockiert das Speichern nicht). Sendet die gespeicherte URL an archive.org; standardmäßig deaktiviert."
   },
   "optWaybackBatch": {
-    "message": "Auch während Batch-Speichern archivieren"
+    "message": "Auch bei der Stapelspeicherung archivieren"
   },
   "optWaybackBatchHint": {
-    "message": "Batch-Speichern können viele Archivierungsanfragen gleichzeitig auslösen; anonymes Kontingent ist begrenzt."
+    "message": "Die Stapelspeicherung kann viele Archivierungsanfragen auf einmal auslösen; das anonyme Kontingent ist begrenzt."
   },
   "optWaybackS3Key": {
     "message": "archive.org S3 Access Key (optional)"
@@ -2177,7 +2220,7 @@
     "message": "Als privat gespeicherte Lesezeichen nie bei archive.org archivieren"
   },
   "waybackPermDenied": {
-    "message": "Deaktiviere oben auf dieser Seite „Gespeicherte Seiten im Wayback Machine archivieren“ und aktiviere die Option erneut, um die Berechtigung für web.archive.org neu anzufordern."
+    "message": "Zum Archivieren ist Zugriff auf web.archive.org nötig, der nicht erteilt wurde. Aktiviere das Archivieren erneut, um ihn anzufordern."
   },
   "archiveThisSave": {
     "message": "Archivieren"
@@ -2206,7 +2249,7 @@
     "message": "angefordert"
   },
   "archiveOutcomeSkipped": {
-    "message": "übersprungen (kürzlich archiviert)"
+    "message": "übersprungen (in den letzten 24 Stunden bereits angefordert)"
   },
   "archiveOutcomeSkippedPrivate": {
     "message": "übersprungen (privat)"
@@ -2230,7 +2273,7 @@
     "message": "Eine erfolgreiche Einreichung bedeutet nicht, dass der Schnappschuss sofort sichtbar ist; die Wayback Machine benötigt normalerweise einige Minuten (manchmal länger), um neue Aufnahmen zu indizieren."
   },
   "archiveErrAuth": {
-    "message": "ungültige Anmeldedaten"
+    "message": "S3 Access Key oder Secret ungültig"
   },
   "archiveErrNetwork": {
     "message": "archive.org nicht erreichbar"
@@ -2251,7 +2294,7 @@
     "message": "archive.org-Serverfehler; versuche es später erneut"
   },
   "archiveErrRateLimited": {
-    "message": "Anonyme Anfragen sind pro IP ratenbegrenzt; versuche es später oder füge einen S3-Schlüssel hinzu"
+    "message": "archive.org begrenzt gerade die Anfragen; versuche es später erneut. Anonyme Anfragen sind pro IP begrenzt, ein S3-Schlüssel erhöht das Kontingent."
   },
   "archiveErrTimeoutHint": {
     "message": "Die Anfrage hat das Zeitlimit überschritten; archive.org ist möglicherweise ausgelastet oder das Netzwerk ist langsam"
@@ -2277,7 +2320,7 @@
     "message": "Ähnliche Tag-Gruppen"
   },
   "tagGovNoGroups": {
-    "message": "Keine doppelten Tags gefunden"
+    "message": "Keine Gruppen ähnlicher Tags gefunden"
   },
   "tagGovKindPlural": {
     "message": "Singular/Plural"
@@ -2310,7 +2353,7 @@
     "message": "Ignorierte zurücksetzen"
   },
   "tagGovResetIgnoredConfirm": {
-    "message": "Ignorierte Gruppen löschen und alle Duplikate erneut anzeigen?"
+    "message": "Alle ignorierten Gruppen wieder anzeigen?"
   },
   "tagGovAiBtn": {
     "message": "KI-Tiefenanalyse"
@@ -2319,7 +2362,7 @@
     "message": "Analysiere…"
   },
   "tagGovAiNone": {
-    "message": "Keine KI-Gruppen gefunden"
+    "message": "Die KI hat keine ähnlichen Tags gefunden"
   },
   "tagGovAiNoKey": {
     "message": "Kein KI-Anbieter konfiguriert. Im Tab „KI-Anbieter“ einrichten"
@@ -2352,13 +2395,22 @@
     }
   },
   "tagGovAlreadyOneTag": {
-    "message": "Diese Tags unterscheiden sich nur in der Groß- und Kleinschreibung und werden von Pinboard ohnehin als ein einziger Tag gespeichert. Es gibt also nichts zusammenzuführen; der Vorschlag wurde entfernt."
+    "message": "Diese Tags unterscheiden sich nur in der Groß- und Kleinschreibung und werden von Pinboard ohnehin als ein einziger Tag behandelt. Es gibt nichts zusammenzuführen, daher wurde der Vorschlag entfernt."
   },
   "tagGovConfirmDelete": {
-    "message": "$N$ ausgewählte Tags löschen? (permanent)",
+    "message": "$N$ ausgewählte Tags endgültig löschen?",
     "placeholders": {
       "N": {
         "content": "$1"
+      }
+    }
+  },
+  "tagGovMoreCount": {
+    "message": "und $COUNT$ weitere",
+    "placeholders": {
+      "COUNT": {
+        "content": "$1",
+        "example": "5"
       }
     }
   },
@@ -2374,7 +2426,7 @@
     }
   },
   "tagGovAborted429": {
-    "message": "Rate-Limit erreicht. Der Stapel wurde gestoppt; abgeschlossene Änderungen bleiben erhalten. Ein erneuter Lauf derselben Zusammenführung setzt sicher fort (bereits aktualisierte Lesezeichen werden übersprungen)."
+    "message": "Rate-Limit erreicht, daher wurde der Stapel gestoppt. Abgeschlossene Änderungen bleiben erhalten. Starte den Vorgang erneut, um fortzufahren; bereits aktualisierte Lesezeichen werden übersprungen."
   },
   "tagGovMergeEstimate": {
     "message": "Geschätzte Dauer: ca. $T$",
@@ -2474,7 +2526,7 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "Tags konnten nicht geladen werden. Pinboard-Token oder Netzwerk prüfen, dann Aktualisieren"
+    "message": "Tags konnten nicht geladen werden. Prüfe deinen API-Token oder die Netzwerkverbindung und klicke dann auf „Aktualisieren“."
   },
   "placeholderOptional": {
     "message": "optional"
@@ -2483,7 +2535,7 @@
     "message": "Tag-Listen-Snapshot heruntergeladen (nur Namen und Anzahl; Referenz für manuelle Reparatur, keine automatische Wiederherstellung)"
   },
   "tagGovSnapshotFailed": {
-    "message": "Snapshot konnte nicht erstellt werden; Zusammenführen/Löschen blockiert"
+    "message": "Der Tag-Snapshot konnte nicht erstellt werden, daher wurde das Zusammenführen bzw. Löschen nicht ausgeführt."
   },
   "tagGovIrreversibleWarn": {
     "message": "Zusammenführungen und Löschungen können nicht rückgängig gemacht werden. Vor der ersten Änderung wird ein Snapshot der Tag-Liste (Namen und Anzahl) heruntergeladen, nur als Referenz."
@@ -2492,7 +2544,7 @@
     "message": "Tag-Bundles auf pinboard.in werden bei Umbenennungen nicht automatisch aktualisiert; überprüfe sie nach dem Zusammenführen manuell."
   },
   "optBgSaveMode": {
-    "message": "Modus für Hintergrund-Speichern"
+    "message": "Wenn beim Speichern per Tastenkürzel bereits ein Lesezeichen existiert"
   },
   "optBgSaveModeMerge": {
     "message": "Zusammenführen (Standard, neue Tags mit vorhandenen kombinieren)"
@@ -2503,9 +2555,6 @@
   "optBgSaveModeOverwrite": {
     "message": "Überschreiben (alle Tags ersetzen, nicht zusammenführen)"
   },
-  "optBgSaveModeHint": {
-    "message": "Zusammenführen: liest vorhandene Lesezeichen-Tags und kombiniert mit neuen Tags. Überspringen: vermeidet Speichern doppelter URLs. Überschreiben: ersetzt Tags vollständig (Vordergrund-Bearbeitung ersetzt immer)."
-  },
   "bgSkippedTitle": {
     "message": "Bereits als Lesezeichen gespeichert"
   },
@@ -2515,23 +2564,14 @@
   "secPreviewAi": {
     "message": "KI in der Leseansicht"
   },
-  "previewAiSectionHint": {
-    "message": "Auswahl erklären, Seite befragen und Volltextübersetzung in der Leseansicht laufen nur, wenn du sie startest, und verwenden den Anbieter und den Schlüssel aus dem Tab „KI-Anbieter“. Wenn du die Kernpunkte-Zusammenfassung eingeschaltet hast, kann sie beim Öffnen der Leseansicht laufen; nichts läuft als verborgene Hintergrundaufgabe."
-  },
   "previewAiEnabled": {
     "message": "KI-Funktionen in der Leseansicht aktivieren"
-  },
-  "previewAiEnabledHint": {
-    "message": "Wenn deaktiviert, werden alle KI-Einstiegspunkte aus der Leseansicht entfernt. Einstiegspunkte werden auch automatisch ausgeblendet, wenn kein API-Schlüssel konfiguriert ist."
   },
   "previewAiUnavailableHint": {
     "message": "Die Einstellungen unten haben noch keine Wirkung: Dem ausgewählten Anbieter fehlt der API-Schlüssel oder die Berechtigung dafür. Richte beides im Tab „KI-Anbieter“ ein."
   },
   "previewAiModelLabel": {
     "message": "Modell-Überschreibung (optional)"
-  },
-  "previewAiModelHint": {
-    "message": "Modellname, der nur von den KI-Funktionen der Leseansicht verwendet wird und je Anbieter separat gespeichert ist. Leer lassen, um das im Tab „KI-Anbieter“ konfigurierte Modell zu verwenden."
   },
   "previewAiModelFor": {
     "message": "Gilt für $PROVIDER$.",
@@ -2571,7 +2611,7 @@
     "message": "LLM=Großes Sprachmodell\nPinboard="
   },
   "translateGlossaryHint": {
-    "message": "Eine Regel pro Zeile im Format Begriff=Übersetzung. Rechte Seite leer lassen, um den Begriff unübersetzt zu behalten. Wird mit jeder Übersetzungsanfrage gesendet."
+    "message": "Eine Regel pro Zeile im Format Begriff=Übersetzung. Rechte Seite leer lassen, um den Begriff unübersetzt zu behalten. Wird für die Volltextübersetzung genutzt; jede Anfrage enthält nur die Einträge, deren Begriffe im gesendeten Text vorkommen."
   },
   "selectionTriggerLabel": {
     "message": "Auslöser für Auswahlbeschreibung"
@@ -2580,7 +2620,7 @@
     "message": "Schaltfläche neben der Auswahl"
   },
   "selectionTriggerHotkey": {
-    "message": "Nur Tastenkürzel e und d"
+    "message": "Nur Tastenkürzel (e zum Erklären, d zum Nachschlagen)"
   },
   "selectionTriggerOff": {
     "message": "Aus"
@@ -2614,7 +2654,7 @@
     "message": "Ändern"
   },
   "trDone": {
-    "message": "Fertig · $COUNT$ Segmente",
+    "message": "Fertig · $COUNT$ Abschnitte",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2658,7 +2698,7 @@
     "message": "Terminologie wird extrahiert…"
   },
   "trSkippedTargetLang": {
-    "message": "$COUNT$ Segment(e) sind bereits in der Zielsprache und wurden übersprungen",
+    "message": "$COUNT$ Abschnitt(e) übersprungen, da bereits in der Zielsprache",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2666,19 +2706,22 @@
     }
   },
   "trBlockFailed": {
-    "message": "Übersetzung dieses Absatzes fehlgeschlagen"
+    "message": "Übersetzung dieses Abschnitts fehlgeschlagen"
   },
   "trErrKey": {
     "message": "API-Schlüssel ungültig oder abgelehnt; prüfe ihn in den Einstellungen"
   },
   "trErrQuota": {
-    "message": "Ratenlimit oder Kontingent erschöpft; versuche es später erneut"
+    "message": "Ratenlimit oder Kontingent erreicht; versuche es später erneut oder prüfe dein Kontoguthaben"
   },
   "trErrNetwork": {
     "message": "Netzwerk- oder Serverfehler; versuche es später erneut"
   },
   "trErrTimeout": {
     "message": "Zeitüberschreitung beim KI-Dienst; versuche es erneut"
+  },
+  "aiErrRequestFailed": {
+    "message": "Die KI-Anfrage ist fehlgeschlagen"
   },
   "trRetranslate": {
     "message": "Neu übersetzen"
@@ -2709,7 +2752,7 @@
     }
   },
   "trFailedSummaryMixed": {
-    "message": "$COUNT$ Abschnitte aus unterschiedlichen Gründen fehlgeschlagen; jeder hat eine eigene Schaltfläche zum Wiederholen.",
+    "message": "$COUNT$ Abschnitte aus unterschiedlichen Gründen fehlgeschlagen; die Schaltfläche zum Wiederholen jedes Abschnitts zeigt den jeweiligen Grund.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2717,7 +2760,7 @@
     }
   },
   "trPartsUntranslated": {
-    "message": "In diesem Absatz blieben $COUNT$ Passagen unübersetzt",
+    "message": "In diesem Abschnitt sind noch $COUNT$ Passagen unübersetzt",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2725,7 +2768,7 @@
     }
   },
   "trRetryBlock": {
-    "message": "Diesen Absatz erneut versuchen"
+    "message": "Diesen Abschnitt erneut versuchen"
   },
   "trRetryAllFailed": {
     "message": "Alle fehlgeschlagenen wiederholen"
@@ -2766,7 +2809,7 @@
     }
   },
   "askSentPartial": {
-    "message": "(langer Artikel: $SENT$ von $TOTAL$ Blöcken werden gesendet)",
+    "message": "($SENT$ von $TOTAL$ Absätzen werden gesendet)",
     "placeholders": {
       "sent": {
         "content": "$1"
@@ -2786,7 +2829,7 @@
     "message": "Welche Daten werden zitiert?"
   },
   "askChipVerified": {
-    "message": "Verifiziert"
+    "message": "Zitat im Artikel gefunden"
   },
   "askErrRetry": {
     "message": "Erneut versuchen"
@@ -2795,7 +2838,7 @@
     "message": "Gestoppt (Teilantwort beibehalten)"
   },
   "askEmptyHint": {
-    "message": "Antworten zitieren die Absätze des Artikels, sodass jede Aussage überprüfbar ist."
+    "message": "Antworten zitieren Absätze des Artikels; ein Klick auf ein Zitat springt zur Quelle."
   },
   "askCopyAnswer": {
     "message": "Antwort kopieren"
@@ -2845,10 +2888,10 @@
     "message": "Wörterbucheintrag wird gesucht…"
   },
   "explainAiNotConfigured": {
-    "message": "Richte in den Einstellungen einen KI-Anbieter ein, um die Auswahl zu erklären."
+    "message": "Um markierte Stellen zu erklären, richte in den Einstellungen einen KI-Anbieter ein und aktiviere die KI-Funktionen in der Leseansicht."
   },
   "explainTranslateAiNotConfigured": {
-    "message": "Richte in den Einstellungen einen KI-Anbieter ein, um die Auswahl zu übersetzen."
+    "message": "Um markierte Stellen zu übersetzen, richte in den Einstellungen einen KI-Anbieter ein und aktiviere die KI-Funktionen in der Leseansicht."
   },
   "explainErrRetry": {
     "message": "Erneut versuchen"
@@ -2887,7 +2930,7 @@
     "message": "Erlaube freedictionaryapi.com, Definitionen aus Wiktionary-Daten bereitzustellen."
   },
   "dictConnectRetry": {
-    "message": "Berechtigung erneut anfragen"
+    "message": "Erneut versuchen"
   },
   "dictPermissionDenied": {
     "message": "Berechtigung nicht erteilt. Das Online-Wörterbuch ist weiterhin nicht verfügbar."
@@ -2896,7 +2939,7 @@
     "message": "Im Online-Wörterbuch wurde kein Eintrag gefunden."
   },
   "dictLangUnknown": {
-    "message": "Die Sprache des Worts wurde nicht erkannt. Wähle im Menü „Wörterbuchsprache“ eine Sprache aus."
+    "message": "Die Sprache des Worts wurde nicht erkannt. Wähle oben im Sprachmenü eine Sprache aus."
   },
   "dictMatchedHeadword": {
     "message": "Passender Eintrag: $TERM$",
@@ -2913,7 +2956,7 @@
     "message": "Code kopieren"
   },
   "dictMoreSenses": {
-    "message": "Weitere $COUNT$ Bedeutungen anzeigen",
+    "message": "$COUNT$ weitere anzeigen",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2921,7 +2964,7 @@
     }
   },
   "dictMoreIpa": {
-    "message": "$COUNT$ weitere Aussprachen",
+    "message": "+$COUNT$ weitere",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -3041,7 +3084,7 @@
     "placeholders": {"n": {"content": "$1"}}
   },
   "ecdictReady": {
-    "message": "$N$ Einträge · $DATE$",
+    "message": "$N$ Einträge importiert · $DATE$",
     "placeholders": {"n": {"content": "$1"}, "date": {"content": "$2"}}
   },
   "ecdictParseFailed": {
@@ -3146,7 +3189,7 @@
       "message": "Keine der ausgewählten Vokabeln ist in dieser Gruppe"
     },
     "vocabBatchDelete": {
-      "message": "Ausgewählte löschen"
+      "message": "Ausgewählte Vokabeln löschen"
     },
     "vocabNoResults": {
       "message": "Keine Vokabeln entsprechen den aktuellen Filtern."
@@ -3173,7 +3216,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Die Auswahl gilt nur für dieses Gerät und das aktuelle Pinboard-Konto. Einstellungen und API-Schlüssel werden nicht synchronisiert."
+      "message": "Diese Auswahl gilt nur für dieses Gerät und das aktuelle Pinboard-Konto. Google Drive synchronisiert keine Einstellungen oder Zugangsdaten."
     },
     "vocabDriveDisclosure": {
       "message": "Kopien im appDataFolder von Google Drive werden im Klartext ohne Ende-zu-Ende-Verschlüsselung gespeichert. Sie können Wörter, Definitionen, markierte Auszüge, Notizen, Quell-URLs, Titel und Zeitangaben enthalten."
@@ -3188,7 +3231,7 @@
       "message": "Google-Drive-Synchronisierung ist in dieser Version noch nicht verfügbar, da OAuth noch nicht aktiviert wurde."
     },
     "vocabDriveAuthorizing": {
-      "message": "Warten auf die Google-Autorisierung. Schließe die Anmeldung und die Freigabe in dem Fenster ab, das Chrome geöffnet hat."
+      "message": "Warten auf die Google-Autorisierung. Melde dich in dem Fenster an, das Chrome geöffnet hat, und erlaube den Zugriff."
     },
     "vocabDriveWorking": {
       "message": "Ausgewählte Daten werden mit Google Drive synchronisiert…"
@@ -3205,15 +3248,6 @@
     "vocabDriveOwnerLabel": {
       "message": "Pinboard-Konto"
     },
-    "vocabDriveLastSuccessLabel": {
-      "message": "Letzte erfolgreiche Synchronisierung"
-    },
-    "vocabDrivePendingWordsLabel": {
-      "message": "Ausstehende Vokabeln"
-    },
-    "vocabDrivePendingBatchesLabel": {
-      "message": "Ausstehende Upload-Pakete"
-    },
     "vocabDriveNever": {
       "message": "Noch nicht synchronisiert"
     },
@@ -3221,7 +3255,7 @@
       "message": "Konflikthinweis schließen"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Die Google-Drive-Synchronisierung wurde angehalten und wird nicht automatisch wiederholt. Den Grund findest du in den Einstellungen."
+      "message": "Die Google-Drive-Synchronisierung ist pausiert und wird nicht automatisch wiederholt. Den Grund findest du in den Einstellungen."
     },
     "vocabDriveConnect": {
       "message": "Google Drive verbinden"
@@ -3242,7 +3276,7 @@
       "message": "Die Google-Drive-Autorisierung ist nicht verfügbar. Prüfe, ob du in Chrome angemeldet bist."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Kein Pinboard-Konto angemeldet. Trage unter „Allgemein → Pinboard-Konto“ deinen API Token ein und verbinde dich erneut."
+      "message": "Kein Pinboard-Konto angemeldet. Trage unter „Allgemein → Pinboard-Konto“ deinen API-Token ein und verbinde dich erneut."
     },
     "vocabDriveErrorPermission": {
       "message": "Die Berechtigung für Google Drive fehlt."
@@ -3251,7 +3285,7 @@
       "message": "Die Google-Drive-Synchronisierungsdaten konnten nicht sicher gelesen werden. Lokale Daten wurden nicht geändert."
     },
     "vocabDriveErrorLocalStore": {
-      "message": "Lokale Daten konnten nicht gespeichert werden. Die Synchronisierung wurde angehalten."
+      "message": "Daten auf diesem Gerät konnten nicht gelesen oder gespeichert werden."
     },
     "vocabDriveErrorNetwork": {
       "message": "Google Drive ist nicht erreichbar."
@@ -3260,7 +3294,7 @@
       "message": "Die Synchronisierung mit Google Drive ist fehlgeschlagen."
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Das Google- oder Pinboard-Konto hat sich geändert. Öffne „Allgemein“ erneut und versuche es noch einmal."
+      "message": "Das Google- oder Pinboard-Konto hat sich während der Synchronisierung geändert. Versuche es erneut."
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "Eine gespeicherte Vokabel oder ihr Kontext ist zu groß für die Synchronisierung. Kürze oder entferne den Eintrag und klicke dann auf „Jetzt synchronisieren“."
@@ -3274,10 +3308,10 @@
       }
     },
     "vocabDriveConnectRequired": {
-      "message": "Klicke auf „Google Drive verbinden“ und schließe die Google-Autorisierung ab."
+      "message": "Klicke auf „Google Drive verbinden“ und erlaube den Zugriff."
     },
     "vocabDriveSyncNowRequired": {
-      "message": "Die Synchronisierung ist angehalten. Klicke auf „Jetzt synchronisieren“, um es erneut zu versuchen."
+      "message": "Die automatische Synchronisierung ist pausiert. Klicke auf „Jetzt synchronisieren“, um es erneut zu versuchen."
     },
     "vocabDriveReconnectRequired": {
       "message": "Klicke auf „Dieses Gerät trennen“ und verbinde dich dann erneut."
@@ -3292,10 +3326,10 @@
       "message": "Die Vokabeln des aktuellen Pinboard-Kontos konnten nicht geladen werden. Öffne „Vokabeln“ erneut und versuche es noch einmal."
     },
     "vocabExportFailed": {
-      "message": "Die Vokabeln konnten nicht exportiert werden. Prüfe den Erweiterungsspeicher und versuche es noch einmal."
+      "message": "Die Vokabeln konnten nicht exportiert werden. Versuche es erneut."
     },
     "vocabAccountChanged": {
-      "message": "Das Pinboard-Konto wurde gewechselt. Prüfe die aktuelle Vokabelliste und versuche es noch einmal."
+      "message": "Das Pinboard-Konto wurde gewechselt, bevor der Vorgang abgeschlossen war. Versuche es erneut."
     },
     "vocabSettingsSaveFailed": {
       "message": "Die geänderten Integrationseinstellungen konnten nicht gespeichert werden. Prüfe sie und versuche es noch einmal."
@@ -3351,10 +3385,10 @@
       }
     },
     "vocabBatchFailed": {
-      "message": "Die Stapelaktion ist fehlgeschlagen. Es wurden keine Vokabeln geändert."
+      "message": "Die Aktion ist fehlgeschlagen. Es wurden keine Vokabeln geändert."
     },
     "vocabSelectionChanged": {
-      "message": "Die Auswahl hat sich geändert. Prüfe die aktuellen Ergebnisse und versuche es erneut."
+      "message": "Die Liste hat sich geändert. Prüfe die aktuellen Ergebnisse und versuche es erneut."
     },
     "vocabRefreshFailed": {
       "message": "Die Änderungen wurden gespeichert, aber die Liste konnte nicht aktualisiert werden. Öffne „Vokabeln“ erneut."
@@ -3434,7 +3468,7 @@
     }
   },
   "dictAnkiModelMismatch": {
-    "message": "Die Felder des vorhandenen Notiztyps „Pinboard Vocab“ stimmen nicht überein. Stelle die erwarteten Felder und ihre Reihenfolge wieder her und versuche es erneut."
+    "message": "Der Notiztyp „Pinboard Vocab“ in Anki hat andere Felder. Stelle seine ursprünglichen Felder wieder her oder benenne ihn um, damit ein neuer angelegt werden kann, und versuche es dann erneut."
   },
   "dictAnkiHostPermissionDenied": {
     "message": "Chrome hat keinen Zugriff auf die lokale AnkiConnect-Adresse erhalten. Erlaube den Zugriff und versuche es erneut."
@@ -3455,7 +3489,10 @@
     "message": "Die Vokabeln konnten nicht an Anki gesendet werden. Prüfe AnkiConnect und versuche es erneut oder exportiere alle als .tsv."
   },
   "dictAnkiKeyRequired": {
-    "message": "AnkiConnect benötigt einen API-Schlüssel. Trag ihn unten ein."
+    "message": "AnkiConnect benötigt einen API-Schlüssel. Trag ihn oben ein."
+  },
+  "dictAnkiKeyRejected": {
+    "message": "AnkiConnect hat diesen API-Schlüssel abgelehnt. Prüfe den Schlüssel oben und versuche es erneut."
   },
   "dictAnkiDeckLabel": {
     "message": "Anki-Stapel"
@@ -3476,7 +3513,7 @@
     "message": "Datei importieren"
   },
   "dictPackImporting": {
-    "message": "$N$ Einträge importiert …",
+    "message": "Wird importiert … bisher $N$ Einträge",
     "placeholders": {
       "n": {
         "content": "$1"
@@ -3495,7 +3532,7 @@
     "message": "Das Wörterbuch konnte nicht importiert werden. Prüfe die ausgewählte Datei und den verfügbaren Erweiterungsspeicher und versuche es erneut."
   },
   "dictPackFailedCleared": {
-    "message": "Das Wörterbuch konnte nicht importiert werden, und das bisherige Paket ist bereits entfernt. Prüfe die ausgewählte Datei und den verfügbaren Erweiterungsspeicher und importiere es erneut."
+    "message": "Das Wörterbuch konnte nicht importiert werden, und das bisher installierte Paket wurde entfernt. Prüfe die ausgewählte Datei und den verfügbaren Erweiterungsspeicher und importiere es erneut."
   },
   "dictPackImplausible": {
     "message": "Diese Datei sieht nicht nach einer CC-CEDICT-Version aus. Das bereits importierte Wörterbuch bleibt unverändert."
@@ -3565,7 +3602,7 @@
     "message": "Die Vokabeln konnten nicht an Eudic gesendet werden. Prüfe die Autorisierung und versuche es erneut."
   },
   "dictEudicTokenRequired": {
-    "message": "Trag deine Eudic-OpenAPI-Autorisierung unten ein oder prüfe, ob sie noch gültig ist."
+    "message": "Trag deine Eudic-OpenAPI-Autorisierung oben ein oder prüfe, ob sie noch gültig ist."
   },
   "dictEudicTokenLabel": {
     "message": "Eudic-OpenAPI-Autorisierung"
@@ -3580,7 +3617,7 @@
     "message": "Eudic-Verbindung testen"
   },
   "dictAnkiNothing": {
-    "message": "Noch keine Wörter zum Senden."
+    "message": "Noch keine gespeicherten Vokabeln."
   },
   "dictDeleteWord": {
     "message": "Aus Vokabelliste entfernen"
@@ -3589,7 +3626,7 @@
     "message": "Quelle:"
   },
   "dictAiNotConfigured": {
-    "message": "Richte in den Einstellungen einen KI-Anbieter ein, um Kontexterklärungen zu erhalten."
+    "message": "Für Erklärungen im Kontext richte in den Einstellungen einen KI-Anbieter ein und aktiviere die KI-Funktionen in der Leseansicht."
   },
   "dictVocabEmpty": {
     "message": "Für das aktuelle Pinboard-Konto ($OWNER$) sind noch keine Vokabeln gespeichert. Speichere Wörter aus der Wörterbuchansicht des Readers.",
@@ -3612,9 +3649,6 @@
   },
   "secSendDestinations": {
     "message": "Sendeziele"
-  },
-  "secSendDestinationsHint": {
-    "message": "Jedes aktivierte Ziel erscheint im „Senden an“-Menü der Leseansicht."
   },
   "mdSendEnableTo": {
     "message": "Export nach {name} aktivieren"
@@ -3659,32 +3693,32 @@
     "message": "App konnte nicht geöffnet werden; vollständiger Text in die Zwischenablage kopiert"
   },
   "mdSendNoneConfigured": {
-    "message": "Keine Ziele aktiviert. Eines in den Einstellungen hinzufügen"
+    "message": "Keine Ziele aktiviert. Aktiviere eines in den Einstellungen."
   },
   "mdManageDestinations": {
     "message": "Ziele verwalten →"
   },
   "mdSendApiDown": { "message": "Export-Server nicht erreichbar. Volltext in die Zwischenablage kopiert; zum Abschließen einfügen." },
-  "mdSendApiBadToken": { "message": "Der Server hat den Token abgelehnt. Erneut aus der App kopieren. Volltext in die Zwischenablage kopiert." },
+  "mdSendApiBadToken": { "message": "Der Token wurde abgelehnt. Prüfe ihn in den Einstellungen. Volltext in die Zwischenablage kopiert." },
   "mdSendNotionNotShared": { "message": "Notion hat die übergeordnete Seite abgelehnt. Gib die Seite über das Menü ··· (Verbindungen hinzufügen) für deine Verbindung frei und versuche es erneut. Der gesamte Text wurde in die Zwischenablage kopiert." },
   "mdSendApiFailed": { "message": "Die Export-Anfrage ist fehlgeschlagen. Volltext in die Zwischenablage kopiert; zum Abschließen einfügen." },
   "mdSendTest": {
     "message": "Verbindung testen"
   },
   "mdSendTestOk": { "message": "Verbunden" },
-  "mdSendTestDown": { "message": "Server nicht erreichbar. Läuft die App?" },
-  "mdSendTestBadToken": { "message": "Token abgelehnt. Erneut aus der App kopieren." },
+  "mdSendTestDown": { "message": "Der Dienst ist nicht erreichbar oder hat einen Fehler gemeldet." },
+  "mdSendTestBadToken": { "message": "Token abgelehnt. Kopiere den vollständigen Token erneut und füge ihn ein." },
   "mdSendTestNoToken": {
     "message": "Zuerst einen Token eingeben."
   },
   "mdSendTestPerm": {
-    "message": "Berechtigung für lokalen Zugriff verweigert."
+    "message": "Zugriffsberechtigung verweigert."
   },
   "mdTargetGithubToken": {
     "message": "GitHub-Token (classic, gist-Scope)"
   },
   "mdTargetGithubOnboarding": {
-    "message": "Erstelle bei GitHub → Settings → Developer settings → Tokens (classic) einen Personal Access Token (classic) mit dem „gist“-Scope und füge ihn unten ein. Jeder Clip wird als privater gist gespeichert. Hinweis: fine-grained Tokens können noch keine gists erstellen, verwende daher einen classic Token."
+    "message": "Erstelle bei GitHub → Settings → Developer settings → Tokens (classic) einen Personal Access Token (classic) mit dem „gist“-Scope und füge ihn unten ein. Jeder Clip wird als secret gist gespeichert: Er wird nicht öffentlich gelistet, aber alle mit dem Link können ihn ansehen."
   },
   "mdTargetNotionToken": {
     "message": "Interner Verbindungstoken"
@@ -3714,7 +3748,7 @@
     "message": "Authorization-Header (optional)"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "Sendet ein JSON-Payload {title, url, date, tags, markdown} per POST an deinen Endpunkt. Ein von dir gesetzter Authorization-Wert wird unverändert gesendet (z. B. Bearer <token> oder Token <key>), sodass jedes Auth-Schema funktioniert. Für n8n, Make, Zapier, Readwise oder jeden selbst gehosteten Empfänger; hier ist kein Konto nötig."
+    "message": "Sendet ein JSON-Payload {title, url, date, tags, markdown} per POST an deinen Endpunkt, bei aktivierter Option „Erweiterte Metadaten einschließen“ zusätzlich Autor, Website und weitere Metadatenfelder. Ein von dir gesetzter Authorization-Wert wird unverändert gesendet (z. B. Bearer <token> oder Token <key>), sodass jedes Auth-Schema funktioniert. Für n8n, Make, Zapier, Readwise oder jeden selbst gehosteten Empfänger; hier ist kein Konto nötig."
   },
   "mdTargetWebhookHttpWarn": {
     "message": "Blockiert: Verwende HTTPS oder HTTP nur für localhost, 127.0.0.1 oder [::1]. LAN-/öffentliches HTTP, ungültige URLs und URLs mit Zugangsdaten werden nicht gesendet."
@@ -3728,13 +3762,16 @@
   "hlColorDoubt": { "message": "Zweifel" },
   "hlColorTodo": { "message": "Aufgabe" },
   "hlTrBadgeAria": { "message": "Hervorhebung der Übersetzung ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
-  "hlNoteBtn": { "message": "Mit Notiz markieren" },
-  "hlSaveFailed": { "message": "Markierung konnte nicht gespeichert werden (Speicher voll)" },
+  "hlNoteBtn": { "message": "Markieren und Notiz hinzufügen" },
+  "hlSaveFailed": { "message": "Die Markierung konnte nicht gespeichert werden" },
   "hlNotePlaceholder": { "message": "Notiz hinzufügen…" },
   "hlSave": { "message": "Speichern" },
   "hlDelete": { "message": "Markierung löschen" },
   "hlDeleteConfirm": {
     "message": "Diese Markierung samt Notiz löschen?"
+  },
+  "hlGoneElsewhere": {
+    "message": "Diese Markierung wurde an anderer Stelle gelöscht, daher wurde die Änderung nicht gespeichert."
   },
   "hlDegraded": { "message": "Position verloren: Der umliegende Text hat sich geändert, daher deckt diese Markierung jetzt den ganzen Absatz ab." },
   "hlOrphanNote": { "message": "$COUNT$ Markierungen konnten im aktuellen Seiteninhalt nicht gefunden werden; ihre Notizen bleiben erhalten.", "placeholders": { "count": { "content": "$1" } } },
@@ -3746,7 +3783,6 @@
   "mdImgFixPartial": {"message": "$OK$ von $TOTAL$ Bildern behoben", "placeholders": {"ok": {"content": "$1"}, "total": {"content": "$2"}}},
   "hlSectionTitle": { "message": "Markierungen" },
   "kbdHelpTitle": { "message": "Tastenkürzel" },
-  "kbdHelpIntro": { "message": "Diese Tastenkürzel funktionieren in der Leseansicht (nicht hier in den Einstellungen)." },
   "kbdHelpRailBtn": { "message": "Tastenkürzel" },
   "kbdHelpTranslate": { "message": "Übersetzung des Artikels starten oder fortsetzen" },
   "kbdHelpDictionary": { "message": "Die aktuelle Auswahl im Wörterbuch nachschlagen" },
@@ -3763,7 +3799,7 @@
   "hlCopied": { "message": "Markierungen kopiert" },
   "hlFilterEmpty": { "message": "Keine Markierungen entsprechen den ausgewählten Farben" },
   "explainSaveNote": { "message": "Als Notiz speichern" },
-  "explainSavedNote": { "message": "Gespeichert" },
+  "explainSavedNote": { "message": "Als Notiz gespeichert" },
   "hlCardExplain": { "message": "Erklären" },
   "hlCardTranslate": { "message": "Übersetzen" },
   "hlCardAsk": { "message": "Fragen" },
@@ -3774,7 +3810,7 @@
   "srchPrevAria": { "message": "Vorherige Übereinstimmung" },
   "srchNextAria": { "message": "Nächste Übereinstimmung" },
   "srchRegexAria": { "message": "Suche mit regulärem Ausdruck" },
-  "kbdHelpZen": { "message": "Zen-Modus (Fokus) umschalten" },
+  "kbdHelpZen": { "message": "Zen-Modus umschalten" },
   "zenEnterBtn": { "message": "Zen-Modus aktivieren" },
   "zenExitAria": { "message": "Zen-Modus verlassen" },
   "zenWidthAria": { "message": "Inhaltsbreite" },
@@ -3817,8 +3853,8 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "Erste $FIRST$ · Letzte $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Gespeichert um $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "Markierungen und Notizen liegen nur auf diesem Gerät und werden nicht synchronisiert. Um sie auf ein anderes Gerät zu übertragen, exportiere auf der Einstellungsseite eine Sicherung und importiere sie dort." },
-  "libraryNotesScopeOpenBackup": { "message": "Sicherungseinstellungen öffnen" },
+  "libraryNotesScopeHint": { "message": "Markierungen und Notizen werden auf diesem Gerät gespeichert. Um sie auf einem anderen Gerät zu nutzen, aktiviere in den Einstellungen die Google-Drive-Synchronisierung für „Markierungen und Notizen“ oder exportiere eine Sicherung und importiere sie dort." },
+  "libraryNotesScopeOpenBackup": { "message": "Allgemeine Einstellungen öffnen" },
   "libraryRelookup": { "message": "Erneut nachschlagen" },
   "libraryBack": { "message": "Zurück zur Liste" },
   "libraryStatsWords": { "message": "$COUNT$ Wörter", "placeholders": { "count": { "content": "$1" } } },
@@ -3856,12 +3892,12 @@
   "mdVideoLoading": { "message": "Untertitel werden geladen…" },
   "mdVideoTrackAria": { "message": "Untertitelsprache" },
   "mdVideoNoTracks": { "message": "Für dieses Video sind keine Untertitel verfügbar" },
-  "mdVideoBiliLogin": { "message": "Keine Untertitel gefunden. Bilibili liefert Untertitel nur im angemeldeten Zustand – melde dich bei bilibili.com an und versuche es erneut." },
+  "mdVideoBiliLogin": { "message": "Keine Untertitel gefunden. bilibili liefert Untertitel nur an angemeldete Nutzer. Melde dich bei bilibili.com an und versuche es erneut." },
   "mdVideoFailed": { "message": "Für dieses Video sind über die Erweiterung keine Untertitel verfügbar. YouTube schränkt den Untertitelzugriff bei manchen Videos ein." },
-  "mdVideoBlocked": { "message": "YouTube hat diese Anfrage blockiert und verlangt eine Bestätigung, dass du kein Bot bist. Das sagt nichts über die Untertitel des Videos aus. Nutze den Link „Auf YouTube öffnen“ oder aktiviere in den Einstellungen die Anmeldecookies." },
-  "mdVideoOpenTabHint": { "message": "Tipp: Öffne das Video in einem YouTube-Tab, lass ihn geöffnet und versuche es erneut – die Untertitel werden dann über diesen Tab gelesen." },
+  "mdVideoBlocked": { "message": "YouTube hat diese Anfrage blockiert und verlangt eine Bestätigung, dass du kein Bot bist. Das sagt nichts über die Untertitel des Videos aus. Versuche es mit „Auf YouTube öffnen“." },
+  "mdVideoOpenTabHint": { "message": "Tipp: Öffne das Video in einem YouTube-Tab, lass den Tab geöffnet und versuche es erneut. Die Untertitel werden dann über diesen Tab gelesen." },
   "mdVideoBodyBlocked": { "message": "Untertitelspuren wurden gefunden, aber YouTube hat deren Text nicht geliefert. Lass den YouTube-Tab dieses Videos geöffnet und versuche es erneut, oder wähle eine andere Spur." },
-  "mdVideoPermMissing": { "message": "Berechtigung abgelehnt; es wurde nichts geladen" },
+  "mdVideoPermMissing": { "message": "Der Zugriff auf Untertitel wurde nicht erlaubt, daher wurden keine Untertitel geladen" },
   "mdVideoCopyMd": { "message": "Transkript als Markdown kopieren" },
   "mdVideoAiPunct": { "message": "KI-Interpunktion" },
   "mdVideoAiPunctDone": { "message": "Interpunktion fertig" },
@@ -3906,7 +3942,7 @@
   "mdVideoDownloadSrt": { "message": "SRT-Untertitel herunterladen" },
   "mdVideoSrtSaved": { "message": "SRT-Datei gespeichert" },
   "askScopeNear": { "message": "Nahe der aktuellen Stelle" },
-  "askScopeNearHint": { "message": "Nur die zwei Absätze um die aktuelle Untertitelzeile senden – weniger Tokens" },
+  "askScopeNearHint": { "message": "Nur den Absatz an der aktuellen Wiedergabeposition und je zwei davor und danach senden; verbraucht weniger Tokens" },
   "hlTimelineHint": { "message": "Zum Markieren in den Lesetext wechseln" },
   "hlSeekHere": { "message": "Ab hier abspielen" },
   "mdVideoLoop": { "message": "Diesen Untertitel wiederholen" },
@@ -3914,7 +3950,7 @@
   "mdVideoRate": { "message": "Wiedergabegeschwindigkeit" },
   "mdVideoFollowPaused": { "message": "Wiedergabeverfolgung pausiert" },
   "mdVideoBackToCurrent": { "message": "Zurück zum aktuellen Untertitel $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "mdVideoEstimate": { "message": "Geschätzte Position (Bilibili meldet keine Abspielposition: Die Uhr startet bei der angeklickten Zeile und stoppt, sobald du den Player bedienst; zum Neuausrichten eine Zeile anklicken)" },
+  "mdVideoEstimate": { "message": "Geschätzte Position (bilibili meldet keine Abspielposition: Die Uhr startet bei der angeklickten Zeile und stoppt, sobald du den Player bedienst; zum Neuausrichten eine Zeile anklicken)" },
   "mdVideoEstimateIdle": { "message": "Schätzung aktiv: zum Starten eine Zeile anklicken" },
   "mdVideoEstimateStopped": { "message": "Schätzung gestoppt, weil du den Player bedient hast; zum Neuausrichten eine Zeile anklicken" },
   "mdVideoBiliFailed": { "message": "Videodaten konnten nicht geladen werden: Die bilibili-API antwortet nicht, oder das Video ist nicht verfügbar." },
@@ -3922,9 +3958,9 @@
   "mdVideoRelaySilent": { "message": "Der Player meldet keine Position (die YouTube-Player-API wurde nicht geladen): Wiedergabeverfolgung, Tastenkürzel, Wiederholen, automatische Pause und Wiedergabegeschwindigkeit sind vorerst nicht verfügbar" },
   "mdVideoUnplayable": { "message": "YouTube meldet, dass dieses Video derzeit nicht abspielbar ist ($STATUS$); das hat nichts mit Untertiteln zu tun. Öffne es auf YouTube, um den Grund zu sehen.", "placeholders": { "status": { "content": "$1" } } },
   "mdVideoBridgeEnable": { "message": "Wiedergabe-Sync aktivieren" },
-  "mdVideoBridgeEnableHint": { "message": "Erlaubt der Erweiterung, die Abspielposition von player.bilibili.com zu lesen (nur in dieser Vorschau; nur Position und Abspielzustand, sonst nichts), damit das Transkript wie bei YouTube der Wiedergabe folgen, einen Untertitel wiederholen und nach jedem Untertitel pausieren kann." },
+  "mdVideoBridgeEnableHint": { "message": "Erlaubt der Erweiterung, die Abspielposition von player.bilibili.com zu lesen (nur in der Leseansicht; nur Position und Abspielzustand, sonst nichts), damit das Transkript wie bei YouTube der Wiedergabe folgen, einen Untertitel wiederholen und nach jedem Untertitel pausieren kann." },
   "mdVideoGrantScopeBili": { "message": "Die Freigabe umfasst die Untertitel-API und die Player-Seite von bilibili (Untertitel und Abspielposition)" },
-  "mdVideoBridgeSilent": { "message": "Der Player meldet keine Position: Nutze die geschätzte Position oder öffne die Vorschau erneut" },
+  "mdVideoBridgeSilent": { "message": "Der Player meldet keine Position: Nutze die geschätzte Position oder öffne die Leseansicht erneut" },
   "mdVideoTimelineAria": { "message": "Untertitel-Zeitleiste" },
   "kbdHelpVideoPlay": { "message": "Wiedergabe / Pause" },
   "kbdHelpVideoSeek": { "message": "3 s zurück / vor" },
@@ -3933,16 +3969,12 @@
   "kbdHelpVideoFollow": { "message": "Der Wiedergabe folgen" },
   "kbdHelpVideoCurrent": { "message": "Zurück zum aktuellen Untertitel" },
   "kbdHelpVideoView": { "message": "Lesetext / Zeitleiste" },
-  "kbdHelpVideoSection": { "message": "Videoseiten" },
-  "kbdHelpVideoNote": { "message": "Leertaste, Links, Rechts, r und f setzen voraus, dass der Player seine Position meldet: bei YouTube immer, bei bilibili nach Aktivierung der Wiedergabeverfolgung." },
   "secVideoPreview": { "message": "Videoseiten" },
   "optVideoLangPref": { "message": "Bevorzugte Untertitelsprachen" },
   "optVideoLangPrefHint": { "message": "Sprachcodes in der gewünschten Reihenfolge, durch Kommas getrennt, z. B. en, zh (zuerst Englisch, dann Chinesisch); ein vollständiges Tag wie zh-Hant ist ebenfalls zulässig. Die Reihenfolge der Liste hat immer Vorrang; innerhalb einer Sprache wird ein vollständiges Tag zuerst genau abgeglichen, bevor auf den Basiscode zurückgegriffen wird. Leer lassen, um der Oberflächensprache zu folgen." },
   "optVideoLangCodesLink": { "message": "Liste der Sprachcodes" },
   "optVideoPauseOnLookup": { "message": "Wiedergabe beim Nachschlagen pausieren" },
-  "optVideoPauseOnLookupHint": { "message": "Beim Markieren von Text oder Öffnen des Erklärfensters wird die Wiedergabe angehalten (YouTube; bei bilibili nach Aktivierung der Wiedergabeverfolgung) und nach dem Nachschlagen fortgesetzt." },
   "optVideoDarkScheme": { "message": "Videoseiten im dunklen Modus öffnen" },
-  "optVideoDarkSchemeHint": { "message": "Auch bei Design „Automatisch“ oder „Hell“ werden Videoseiten in der dunklen Lesepalette geöffnet. Im „Aa“-Fenster der Leseansicht lässt sich das für alle Leseansichten auf diesem Gerät überschreiben." },
   "mdVideoResumePrompt": { "message": "Du hast bei $TIME$ aufgehört", "placeholders": { "time": { "content": "$1" } } },
   "mdVideoResumeGo": { "message": "Fortsetzen" },
   "mdVideoResumeRestart": { "message": "Von vorn" },
@@ -3952,7 +3984,7 @@
   "mdVideoStateOn": { "message": "an" },
   "mdVideoStateOff": { "message": "aus" },
   "skimWaitingCaptions": { "message": "Kernpunkte werden erzeugt, sobald die Untertitel geladen sind; „Neu erzeugen“ erstellt sie sofort" },
-  "batchResumed": { "message": "Stapel fortgesetzt · Versuch $ATTEMPT$ von $MAX$", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
+  "batchResumed": { "message": "Nach Unterbrechung fortgesetzt ($ATTEMPT$ von $MAX$)", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
   "batchCancelFailed": { "message": "Der Abbruch konnte nicht angefordert werden. Versuche es erneut." },
   "connectionOverviewTitle": { "message": "Verbindungsstatus" },
   "connectionOverviewHint": { "message": "Der Status beruht auf Konfiguration, erteilten Berechtigungen und den letzten manuellen Tests. Beim Öffnen der Einstellungen werden weder Dienste kontaktiert noch Berechtigungen angefordert." },
@@ -3967,7 +3999,7 @@
   "settingsSearchPlaceholder": { "message": "Einstellungen durchsuchen" },
   "settingsSearchNoResults": { "message": "Keine passenden Einstellungen. Suche nach einer Funktion oder einem Bedienelement." },
   "diagnosticsTitle": { "message": "Support-Diagnose" },
-  "diagnosticsHint": { "message": "Kopiert Angaben zu Erweiterung, Browser, Funktionen, Berechtigungen, Speicher und Fehlerkategorien. Zugangsdaten, Kontonamen, Seitenadressen, Inhalte und eigene Endpunkte bleiben ausgeschlossen." },
+  "diagnosticsHint": { "message": "Kopiert Erweiterungsversion, Browser und Sprache, KI-Anbieter, welche Dienste eingerichtet sind, Funktionsschalter, Berechtigungen, Speicher- und Cache-Nutzung, Warteschlangen- und Stapelzähler, Ergebnisse der Verbindungstests und Fehlercodes. Zugangsdaten, Kontonamen, Seitenadressen, Inhalte und eigene Endpunkte bleiben ausgeschlossen." },
   "diagnosticsCopy": { "message": "Diagnose kopieren" },
   "diagnosticsCopied": { "message": "Diagnose kopiert" },
   "diagnosticsCopyFailed": { "message": "Die Diagnose konnte nicht kopiert werden. Prüfe den Zugriff auf die Zwischenablage und versuche es erneut." },
@@ -3996,8 +4028,17 @@
   "popupDraftRestored": {
     "message": "Ungespeicherter Entwurf wiederhergestellt."
   },
+  "mdVideoBlockedLoginHint": {
+    "message": "Du kannst in den Einstellungen auch „YouTube-Anmeldecookies mit Untertitelanfragen senden“ aktivieren."
+  },
   "popupDraftFailed": {
     "message": "Der Entwurf konnte nicht aufbewahrt werden. Speichere das Lesezeichen, bevor du das Popup schließt."
+  },
+  "popupDraftRestoreFailed": {
+    "message": "Dein vorheriger Entwurf konnte nicht wiederhergestellt werden."
+  },
+  "popupDraftDiscardFailed": {
+    "message": "Der Entwurf konnte nicht verworfen werden. Versuche es erneut."
   },
   "optSavePending": { "message": "Änderungen noch nicht gespeichert" },
   "optRetrySave": { "message": "Speichern erneut versuchen" },
@@ -4044,7 +4085,7 @@
       }
     },
     "driveVocabularyNotices": {
-      "message": "Vokabelkonflikte: $COUNT$. Lokale Änderungen wurden beibehalten.",
+      "message": "Vokabelkonflikte: $COUNT$. Bearbeitete Wörter wurden behalten statt gelöscht.",
       "placeholders": {
         "count": {
           "content": "$1"
@@ -4052,7 +4093,7 @@
       }
     },
     "driveNotesNotices": {
-      "message": "Konflikte bei Markierungen und Notizen: $COUNT$. Beide Versionen wurden beibehalten.",
+      "message": "Konflikte bei Markierungen und Notizen: $COUNT$. Bearbeitete Einträge wurden behalten statt gelöscht; bei Notizen mit Konflikt wurden beide Versionen behalten.",
       "placeholders": {
         "count": {
           "content": "$1"

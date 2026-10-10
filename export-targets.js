@@ -198,8 +198,11 @@ const PBP_EXPORT_TARGETS = {
 
   // GitHub Gist — token-api. A gist file IS raw markdown (GitHub renders the
   // YAML frontmatter natively), so no block conversion. Each clip = one new
-  // private gist. NOTE: gists require a CLASSIC PAT with the `gist` scope —
-  // fine-grained tokens cannot create gists (GitHub docs, verified 2026-06).
+  // private gist. NOTE: the onboarding asks for a CLASSIC PAT with the `gist`
+  // scope (the path verified here). GitHub's fine-grained-token endpoint list
+  // now includes POST /gists (account permission "Gists: write"), but that
+  // route is unverified with a real token, so the copy no longer claims
+  // fine-grained tokens can't create gists -- nor that they can.
   github: {
     id: "github",
     label: "GitHub Gist",

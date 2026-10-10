@@ -62,6 +62,11 @@ const cases = [
   { in: "https://x.com/user/status/1?s=20&t=abc", out: "https://x.com/user/status/1", removed: 2 },
   { in: "https://example.com/?ref=github&utm_source=x", out: "https://example.com/?ref=github", removed: 1 },
   { in: "https://example.com/?ref=github&utm_source=x", out: "https://example.com/", removed: 2, settings: { aggressiveMode: true } },
+  // Parameters entered the way they look in a URL ("tag=", " ref = ") still
+  // name the key: aggressive mode would otherwise strip the Amazon tag the
+  // user listed as never-clean, and a custom "foo=" would never match.
+  { in: "https://www.amazon.com/dp/B0001/?tag=mytag-20&ref=x", out: "https://www.amazon.com/dp/B0001/?tag=mytag-20", removed: 1, settings: { aggressiveMode: true, excludeParams: ["tag="] } },
+  { in: "https://example.com/?ref=github&foo=1&id=7", out: "https://example.com/?ref=github&id=7", removed: 1, settings: { aggressiveMode: true, excludeParams: [" ref = "], customParams: ["foo="] } },
 ];
 const root = document.getElementById("results");
 for (const c of cases) {

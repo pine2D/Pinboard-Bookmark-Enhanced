@@ -93,7 +93,7 @@ function restoreBatchButton(batchBtn) {
 async function dispatchBatchSave(snapshot, batchBtn, account) {
   const resp = await chrome.runtime.sendMessage({ action: "startBatchSave", tabs: snapshot, account });
   if (resp && resp.status === "account_changed") {
-    showStatus("status-msg", t("pinboardErrorAuth"), "error");
+    showStatus("status-msg", t("batchAccountChanged"), "error");
     restoreBatchButton(batchBtn);
     return;
   }
@@ -160,7 +160,7 @@ function setupTabSet() {
 
     } catch (e) {
       console.error("Save tab set error:", e);
-      showStatus("status-msg", t("batchFailed", e.message), "error");
+      showStatus("status-msg", t("tabSetFailed", e.message), "error");
       setBtnIcon(btn, "tabs", origLabel);
       btn.disabled = false;
     }
@@ -265,7 +265,9 @@ function setupTabSet() {
       if (current.account !== startAuth.account) throw new Error("account_changed");
       await dispatchBatchSave(snapshot, batchBtn, startAuth.account);
     } catch (e) {
-      showStatus("status-msg", t("batchFailed", e.message), "error");
+      // The account guards above throw the bare reason code; name the cause
+      // instead of printing "account_changed" into the failure template.
+      showStatus("status-msg", e?.message === "account_changed" ? t("batchAccountChanged") : t("batchFailed", e?.message), "error");
       const progress = $id("batch-progress");
       if (progress) progress.classList.add("hidden");
       setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
@@ -292,7 +294,8 @@ function renderBatchProgress(p, currentAccount) {
     progress.classList.remove("dismissing");
     progress.classList.remove("hidden");
     progress.setAttribute("aria-valuenow", String(pct));
-    progress.setAttribute("aria-valuetext", t("batchProgress", String(cur), String(total), String(p.saved || 0), String(p.failed || 0)));
+    // Full sentence for screen readers; the compact "3/10 (2/1)" stays on the button.
+    progress.setAttribute("aria-valuetext", t("batchProgressValue", String(cur), String(total), String(p.saved || 0), String(p.failed || 0)));
   }
   if (fill) fill.style.width = pct + "%";
   // Counts are integers -> safe to interpolate; SVG icons avoid emoji font fallback.
@@ -339,9 +342,9 @@ function renderBatchProgress(p, currentAccount) {
     const skipMsg = p.skipped > 0 ? t("batchSkipped", String(p.skipped)) : "";
     const tooLongMsg = p.tooLong > 0 ? t("batchTooLong", String(p.tooLong)) : "";
     const queuedDoneMsg = p.queued > 0 ? ` · ${t("offlineQueued", String(p.queued))}` : "";
-    const aiWarnMsg = p.aiFailed > 0 ? ` (AI failed: ${p.aiFailed})` : "";
+    const aiWarnMsg = p.aiFailed > 0 ? t("batchAiFailed", String(p.aiFailed)) : "";
     if (p.error === "not_logged_in") showStatus("status-msg", t("batchNotLoggedIn"), "error");
-    else if (p.error === "account_changed") showStatus("status-msg", t("pinboardErrorAuth"), "error");
+    else if (p.error === "account_changed") showStatus("status-msg", t("batchAccountChanged"), "error");
     // The SW's interrupted-batch sweep writes this terminal record; without its
     // own branch the raw token would leak into the UI via batchFailed. Same
     // wording as the notification the sweep fires.

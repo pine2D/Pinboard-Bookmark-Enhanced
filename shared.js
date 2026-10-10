@@ -1412,7 +1412,9 @@ async function pbpMeasureLocalStorage() {
 // report identical numbers. Same precedent as library-notes.js's highlight scan.
 //
 // Returns { freed, removed: { [cat]: { keys, bytes } } }; degrades to
-// { freed: 0, removed: {} } (no throw) on any storage failure.
+// { freed: 0, removed: {}, failed: true } (no throw) on any storage failure,
+// so the caller can tell "the clear failed" from "there was nothing to clear"
+// (both free 0 bytes; only the first may report storageClearFailed).
 async function pbpReclaimLocalStorage(categories, opts) {
   const cats = Array.isArray(categories) ? categories : [];
   // Own-property lookup only: PBP_RECLAIM_CATEGORIES["__proto__"] resolves up
@@ -1425,9 +1427,15 @@ async function pbpReclaimLocalStorage(categories, opts) {
     wanted.set(cat, PBP_RECLAIM_CATEGORIES[cat]);
   }
   if (!wanted.size) return { freed: 0, removed: {} };
+  // Every storage failure below lands here: logged (never the values, only the
+  // platform error) and reported as failed, never as an empty success.
+  const fail = (step, err) => {
+    if (err) console.warn("[storage] reclaim " + step + " failed:", err?.name, err?.message);
+    return { freed: 0, removed: {}, failed: true };
+  };
   let local;
-  try { local = chrome.storage.local; } catch (_) { return { freed: 0, removed: {} }; }
-  if (!local) return { freed: 0, removed: {} };
+  try { local = chrome.storage.local; } catch (e) { return fail("access", e); }
+  if (!local) return fail("access");
   // Fresh enumeration, always -- the caller's hint is not an enumeration source.
   let names = null;
   let values = null;
@@ -1438,7 +1446,7 @@ async function pbpReclaimLocalStorage(categories, opts) {
     } catch (_) { names = null; } // transient failure -> take the get(null) path below
   }
   if (!names) {
-    try { values = await local.get(null); } catch (_) { return { freed: 0, removed: {} }; }
+    try { values = await local.get(null); } catch (e) { return fail("read", e); }
     values = values || {};
     names = Object.keys(values);
   }
@@ -1466,7 +1474,7 @@ async function pbpReclaimLocalStorage(categories, opts) {
   if (!values) {
     // getKeys path: this is the ONLY value read, and it is scoped to the keys
     // that are about to be deleted.
-    try { values = await local.get(candidates); } catch (_) { return { freed: 0, removed: {} }; }
+    try { values = await local.get(candidates); } catch (e) { return fail("read", e); }
     values = values || {};
   }
   const toRemove = [];
@@ -1483,9 +1491,9 @@ async function pbpReclaimLocalStorage(categories, opts) {
     toRemove.push(key);
   }
   if (toRemove.length) {
-    // Failure is silent by design; the caller re-renders from a fresh read
-    // rather than trusting this return value as an optimistic UI update.
-    try { await local.remove(toRemove); } catch (_) { return { freed: 0, removed: {} }; }
+    // The caller re-renders from a fresh read rather than trusting this return
+    // value as an optimistic UI update; `failed` only picks the status line.
+    try { await local.remove(toRemove); } catch (e) { return fail("remove", e); }
   }
   return { freed, removed };
 }
@@ -3559,12 +3567,16 @@ function stripTrackingParams(urlStr, settings = {}) {
 
   if (_isOAuthCallback(u)) return { cleaned: urlStr, removedCount: 0, original };
 
-  const exclude = new Set(excludeParams.map(s => s.trim()).filter(Boolean));
+  // Users type parameters the way they appear in a URL ("tag=", which the
+  // settings hint itself suggested until 2026-10), but searchParams keys never
+  // carry the "=" -- drop a trailing one so "tag=" still matches `tag`.
+  const paramName = (s) => String(s).trim().replace(/=+$/, "").trim();
+  const exclude = new Set(excludeParams.map(paramName).filter(Boolean));
   const toStrip = new Set([
     ...TRACKING_PARAMS_TIER1,
     ...TRACKING_PARAMS_TIER2,
     ...(aggressiveMode ? TRACKING_PARAMS_TIER3 : []),
-    ...customParams.map(s => s.trim()).filter(Boolean),
+    ...customParams.map(paramName).filter(Boolean),
   ]);
   const hostRule = _matchHostRule(u.hostname);
   if (hostRule) hostRule.forEach(p => toStrip.add(p));

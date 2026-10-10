@@ -1335,7 +1335,7 @@ function _pbpTrApplySkips(st) {
 // pbpAiResolveModelOverride, whose undefined is what lets ai.js fall through
 // to the provider's configured model.
 function _pbpTrModelLabel(s) {
-  const provider = (s && s.aiProvider) || "gemini";
+  const provider = (typeof pbpAiProviderName === "function") ? pbpAiProviderName(s) : ((s && s.aiProvider) || "gemini");
   const model = (typeof pbpAiEffectiveModel === "function") ? pbpAiEffectiveModel(s) : "";
   return (model && model !== "default") ? provider + " · " + model : provider;
 }
@@ -2140,7 +2140,11 @@ async function _pbpTrStart(st) {
     if (headProg) headProg.textContent = "";
     _pbpTrSetStatus(st, "partial");
     const prog = document.getElementById("tr-progress");
-    if (prog) prog.textContent = queueResult.permissionError.message || t("aiErrorRetry");
+    // Fallback names the problem, not the "Retry" button label (this line is
+    // a status, not a control): ai.js always sets the message, but a bare
+    // host_permission error would otherwise read as a dead button.
+    if (prog) prog.textContent = queueResult.permissionError.message
+      || t("aiErrorHostPermission", (typeof pbpAiProviderName === "function") ? pbpAiProviderName(st.s) : ((st.s && st.s.aiProvider) || "AI"));
     return;
   }
   st.running = false;
@@ -2335,6 +2339,17 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) {} }
 }
 
+// Error pill tooltip + accessible name. The name must START with the visible
+// label ("Retry this paragraph" / "Grant access and retry") so screen-reader
+// and voice-control users hear and can say the action (WCAG 2.5.3 Label in
+// Name); the failure reason follows it.
+function _pbpTrSetErrTip(btn, tip) {
+  btn.dataset.tip = tip;
+  const lab = btn.querySelector("span");
+  const visible = lab ? lab.textContent : "";
+  btn.setAttribute("aria-label", visible ? visible + ": " + tip : tip);
+}
+
 // Per-block failure: inline error pill after the block. Hover/focus shows the
 // error; click retries this single block.
 function _pbpTrMarkFailed(st, w, message) {
@@ -2348,12 +2363,11 @@ function _pbpTrMarkFailed(st, w, message) {
   btn.type = "button";
   btn.className = "pb-tr-err";
   btn.dataset.pbTrErr = String(w.n);
-  btn.dataset.tip = t("trBlockFailed") + " - " + String(message || "");
-  btn.setAttribute("aria-label", btn.dataset.tip);
   btn.innerHTML = PBP_TR_ERR_SVG;                   // static inline SVG only
   const lab = document.createElement("span");
   lab.textContent = t("trRetryBlock");
   btn.appendChild(lab);
+  _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + String(message || ""));
   orig.insertAdjacentElement("afterend", btn);
   btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
   _pbpTrSyncRetryAll();
@@ -2400,12 +2414,11 @@ function _pbpTrMarkPartial(st, w, failedParts) {
   btn.type = "button";
   btn.className = "pb-tr-err";
   btn.dataset.pbTrErr = String(w.n);
-  btn.dataset.tip = failedParts > 0 ? t("trPartsUntranslated", String(failedParts)) : t("trBlockFailed");
-  btn.setAttribute("aria-label", btn.dataset.tip);
   btn.innerHTML = PBP_TR_ERR_SVG;
   const lab = document.createElement("span");
   lab.textContent = t("trRetryBlock");
   btn.appendChild(lab);
+  _pbpTrSetErrTip(btn, failedParts > 0 ? t("trPartsUntranslated", String(failedParts)) : t("trBlockFailed"));
   anchor.insertAdjacentElement("afterend", btn);
   btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
   _pbpTrSyncRetryAll();
@@ -2559,9 +2572,8 @@ async function _pbpTrRetryBlock(st, w, btn) {
     if (label) label.textContent = t(e && e.code === "host_permission" ? "aiGrantRetry" : "trRetryBlock");
     btn.disabled = false;
     const overrideHint = pbpAiOverrideErrHint(e, st.s);
-    btn.dataset.tip = t("trBlockFailed") + " - " + pbpAiErrorText(e)
-      + (overrideHint ? " " + overrideHint : "");
-    btn.setAttribute("aria-label", btn.dataset.tip);
+    _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + pbpAiErrorText(e)
+      + (overrideHint ? " " + overrideHint : ""));
   } finally {
     window.removeEventListener("pagehide", onHide);
   }

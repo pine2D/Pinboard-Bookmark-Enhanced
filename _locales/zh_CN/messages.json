@@ -12,13 +12,13 @@
     "message": "快速保存到 Pinboard（无弹窗）"
   },
   "cmdReadLater": {
-    "message": "快速标记为稍后阅读（无弹窗）"
+    "message": "快速保存为稍后阅读（无弹窗）"
   },
   "cmdMarkdownPreview": {
-    "message": "将页面转为 Markdown 预览（无弹窗）"
+    "message": "在阅读器中打开当前页面（无弹窗）"
   },
   "cmdSaveTabSet": {
-    "message": "将所有标签页保存为标签集"
+    "message": "将当前窗口的标签页保存为标签页集"
   },
   "appName": {
     "message": "Pinboard 书签增强"
@@ -30,7 +30,7 @@
     "message": "登录"
   },
   "logout": {
-    "message": "退出"
+    "message": "退出登录"
   },
   "cancel": {
     "message": "取消"
@@ -83,10 +83,10 @@
     "message": "Alt+P/R/A 切换"
   },
   "lastUsedTagsLabel": {
-    "message": "上次："
+    "message": "上次使用："
   },
   "loading": {
-    "message": "加载中…"
+    "message": "正在读取页面信息…"
   },
   "private": {
     "message": "私密"
@@ -98,7 +98,7 @@
     "message": "网络错误"
   },
   "uriTooLong": {
-    "message": "请求过长（$LEN$/$MAX$ 字符），请缩短备注或标签",
+    "message": "请求过长（$LEN$/$MAX$ B），请缩短备注、标题或标签",
     "placeholders": {
       "len": {
         "content": "$1"
@@ -126,10 +126,13 @@
     "message": "用户名:XXXXXXXXXXXXXX"
   },
   "loginInvalidFormat": {
-    "message": "格式错误，请使用 用户名:TOKEN 格式"
+    "message": "格式错误，应为「用户名:TOKEN」"
+  },
+  "loginSaveFailed": {
+    "message": "API Token 验证通过，但未能保存。请检查浏览器存储空间后重试。"
   },
   "loginFailed": {
-    "message": "认证失败"
+    "message": "认证失败，请检查 API Token"
   },
   "settingsPassword": {
     "message": "pinboard.in/settings/password"
@@ -177,7 +180,7 @@
     "message": "书签已保存"
   },
   "tagDraftUnsaved": {
-    "message": "标签框里还有未提交的文字"
+    "message": "标签框里的文字没有加入标签"
   },
   "savedSuccess": {
     "message": "已保存！"
@@ -202,6 +205,22 @@
   },
   "editingExisting": {
     "message": "正在编辑已有书签"
+  },
+  "editingExistingDetails": {
+    "message": "$BASE$（$DETAILS$）",
+    "placeholders": {
+      "base": {
+        "content": "$1",
+        "example": "Editing existing bookmark"
+      },
+      "details": {
+        "content": "$2",
+        "example": "saved Oct 2, 2026, 3 tags"
+      }
+    }
+  },
+  "editingExistingDetailSep": {
+    "message": "，"
   },
   "saveNeedsReview": {
     "message": "此页已收藏，核对字段后再按一次更新"
@@ -248,9 +267,6 @@
   "aiGenerateBtn": {
     "message": "生成"
   },
-  "aiGenerate": {
-    "message": "生成"
-  },
   "aiSummaryGenerated": {
     "message": "摘要已生成"
   },
@@ -269,8 +285,11 @@
   "aiNoContent": {
     "message": "页面无可用内容"
   },
+  "aiEmptyResult": {
+    "message": "AI 返回了空结果，请重试或换一个模型。"
+  },
   "aiUrlEdited": {
-    "message": "URL 已修改，AI 只针对最初打开的页面生成。"
+    "message": "URL 已修改。AI 只读取最初打开的页面，改回原 URL 后才能使用。"
   },
   "aiSetKey": {
     "message": "请先在[[设置]]中配置 AI API Key"
@@ -294,7 +313,7 @@
     "message": "替换中…"
   },
   "aiErrorTitle": {
-    "message": "$OP$ 生成失败",
+    "message": "$OP$生成失败",
     "placeholders": {
       "op": {
         "content": "$1"
@@ -323,7 +342,7 @@
     "message": "未知错误"
   },
   "aiErrorModelNotFound": {
-    "message": "$PROVIDER$ 的默认模型可能已过期，请在设置中选择模型",
+    "message": "$PROVIDER$ 找不到当前配置的模型，它可能已下线或名称有误。",
     "placeholders": {
       "provider": {
         "content": "$1"
@@ -364,6 +383,15 @@
   "pinboardErrorAuth": {
     "message": "认证失败，请检查 API Token"
   },
+  "pinboardApiError": {
+    "message": "Pinboard 返回错误：$DETAIL$",
+    "placeholders": {
+      "detail": {
+        "content": "$1",
+        "example": "item not found"
+      }
+    }
+  },
   "pinboardErrorRateLimit": {
     "message": "请求过于频繁，请稍后重试"
   },
@@ -377,7 +405,7 @@
     "message": "请求超时，请稍后重试"
   },
   "qlSets": {
-    "message": "标签集"
+    "message": "标签页集"
   },
   "qlNetwork": {
     "message": "关注"
@@ -392,10 +420,10 @@
     "message": "热门"
   },
   "saveTabsBtn": {
-    "message": "保存标签集"
+    "message": "保存标签页集"
   },
   "batchSaveBtn": {
-    "message": "逐个收藏标签页"
+    "message": "批量保存"
   },
   "batchSaving": {
     "message": "保存中…"
@@ -404,13 +432,13 @@
     "message": "正在后台保存…"
   },
   "batchNoValidTabs": {
-    "message": "没有可保存的标签页"
+    "message": "当前窗口没有可保存的网页"
   },
   "batchNoTabs": {
-    "message": "没有可用的标签页"
+    "message": "当前窗口没有可保存的网页"
   },
   "batchNotLoggedIn": {
-    "message": "尚未登录"
+    "message": "尚未登录，请先在设置中填写 API Token"
   },
   "batchSent": {
     "message": "已发送！"
@@ -432,8 +460,32 @@
       }
     }
   },
+  "batchProgressLabel": {
+    "message": "批量保存进度"
+  },
+  "batchProgressValue": {
+    "message": "已处理 $CURRENT$/$TOTAL$，已保存 $SAVED$ 个，失败 $FAILED$ 个",
+    "placeholders": {
+      "current": {
+        "content": "$1",
+        "example": "3"
+      },
+      "total": {
+        "content": "$2",
+        "example": "10"
+      },
+      "saved": {
+        "content": "$3",
+        "example": "2"
+      },
+      "failed": {
+        "content": "$4",
+        "example": "1"
+      }
+    }
+  },
   "batchDone": {
-    "message": "批量完成：$SAVED$ 已保存，$FAILED$ 失败",
+    "message": "批量保存完成：已保存 $SAVED$ 个，失败 $FAILED$ 个",
     "placeholders": {
       "saved": {
         "content": "$1"
@@ -444,7 +496,7 @@
     }
   },
   "batchSkipped": {
-    "message": "，$COUNT$ 已跳过",
+    "message": "，跳过 $COUNT$ 个",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -452,10 +504,19 @@
     }
   },
   "batchTooLong": {
-    "message": "，$COUNT$ 过长跳过",
+    "message": "，$COUNT$ 个因过长未保存",
     "placeholders": {
       "count": {
         "content": "$1"
+      }
+    }
+  },
+  "batchAiFailed": {
+    "message": "，AI 处理失败 $COUNT$ 个",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
       }
     }
   },
@@ -475,6 +536,18 @@
       }
     }
   },
+  "batchAccountChanged": {
+    "message": "Pinboard 账号已切换，批量保存已停止。"
+  },
+  "tabSetFailed": {
+    "message": "标签页集保存失败：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "No response"
+      }
+    }
+  },
   "batchInterrupted": {
     "message": "批量保存在 $DONE$/$TOTAL$ 处中断，重新运行可保存剩下的标签页。",
     "placeholders": {
@@ -490,7 +563,7 @@
     "message": "取消批量保存"
   },
   "batchCancelled": {
-    "message": "已取消批量保存，此前保存的 $SAVED$ 条不受影响。",
+    "message": "已取消批量保存，已保存的 $SAVED$ 个书签不受影响。",
     "placeholders": {
       "saved": { "content": "$1" }
     }
@@ -515,7 +588,10 @@
     "message": "立即重试"
   },
   "offlineRetryWrongAccount": {
-    "message": "这条是用另一个 Pinboard 账号存的。登录那个账号才能发送。"
+    "message": "这条书签是在另一个 Pinboard 账号下加入队列的，登录该账号后才能发送。"
+  },
+  "offlineRetryAccountChanged": {
+    "message": "重试期间 Pinboard 账号已切换，已停止发送。"
   },
   "offlineRetryFailed": {
     "message": "这条书签没能发送，请重试。",
@@ -525,10 +601,13 @@
     "message": "从队列移除"
   },
   "offlineRemoveConfirm": {
-    "message": "移除此项？"
+    "message": "从队列移除这条书签？它将不会被保存。"
   },
   "offlineQueueEmpty": {
     "message": "队列为空"
+  },
+  "offlineQueueUntitled": {
+    "message": "（无标题）"
   },
   "offlineJustNow": {
     "message": "刚刚"
@@ -558,7 +637,7 @@
     }
   },
   "offlineClearConfirm": {
-    "message": "确定清除所有排队中的书签？"
+    "message": "清除队列中的所有书签？这些书签将不会被保存。"
   },
   "recentLabel": {
     "message": "最近："
@@ -590,16 +669,16 @@
     "message": "书签已移除。"
   },
   "bgQuickSaved": {
-    "message": "Pinboard：快速保存成功！"
+    "message": "Pinboard：快速保存"
   },
   "bgReadLater": {
-    "message": "Pinboard：已标记为稍后阅读！"
+    "message": "Pinboard：稍后阅读"
   },
   "bgCannotSave": {
     "message": "Pinboard：无法保存"
   },
   "bgCannotBookmark": {
-    "message": "此页面无法添加书签。"
+    "message": "只能保存 http 或 https 网页。"
   },
   "bgMdPreviewFailed": {
     "message": "Pinboard：无法转换为 Markdown"
@@ -607,14 +686,17 @@
   "bgMdPreviewNoContent": {
     "message": "未能从该页面提取到可读内容。"
   },
+  "bgMdPreviewUnsupported": {
+    "message": "阅读器只能打开 http 或 https 网页。"
+  },
   "bgMdPreviewTooLarge": {
-    "message": "存储空间已满。请在扩展选项的「存储」中清理缓存数据后重试。"
+    "message": "存储空间已满。请在「设置 > 存储」中清理缓存数据后重试。"
   },
   "mdPreviewOpenFailed": {
-    "message": "无法打开预览。该页面可能过大，无法存储。"
+    "message": "无法打开阅读器，请重试。"
   },
   "mdPreviewQuotaFull": {
-    "message": "存储空间已满，预览无法保存。请先腾出空间再重试。"
+    "message": "存储空间已满，阅读器内容无法保存。请先腾出空间再重试。"
   },
   "manageStorage": {
     "message": "管理存储"
@@ -641,7 +723,7 @@
     "message": "存储管理"
   },
   "storageIntro": {
-    "message": "清理本地缓存以腾出空间。这些缓存清理后会自动重建。你的设置、凭据、待保存书签及进行中的数据绝不会被触碰。"
+    "message": "清理本地缓存以腾出空间，这些缓存之后会按需自动重建。你的设置、凭据、待保存的书签和进行中的数据不受影响。"
   },
   "storageCatJina": {
     "message": "页面阅读缓存"
@@ -653,7 +735,7 @@
     "message": "标签缓存"
   },
   "storageCatMisc": {
-    "message": "AI 用量与兼容性备忘"
+    "message": "AI 用量计数与兼容性记录"
   },
   "storageReclaimable": {
     "message": "可清理：$AMOUNT$",
@@ -698,10 +780,10 @@
     "message": "无法抽取此页面，请重试。"
   },
   "mdEngineTabGone": {
-    "message": "源标签页已不可用。重新打开该页面才能使用 Defuddle"
+    "message": "原标签页已不可用，重新打开该页面才能使用 Defuddle。"
   },
   "mdEngineJinaNeedsHttp": {
-    "message": "Jina Reader 只能抓取 http(s) 页面，用 http(s) 打开此页才能使用"
+    "message": "Jina Reader 只能抓取 http(s) 页面，无法读取此页。"
   },
   "mdEngineGroupAria": {
     "message": "抽取引擎"
@@ -718,10 +800,10 @@
     }
   },
   "bgTabSetFailed": {
-    "message": "Pinboard：标签集保存失败"
+    "message": "Pinboard：标签页集保存失败"
   },
   "bgLoginRequired": {
-    "message": "请先在浏览器中登录 pinboard.in。"
+    "message": "请先在此浏览器中登录 pinboard.in，然后重试。"
   },
   "bgQuickSaveFailed": {
     "message": "Pinboard：快速保存失败"
@@ -739,7 +821,7 @@
     "message": "Pinboard：已加入离线队列"
   },
   "bgTitleSaved": {
-    "message": "\"$TITLE$\" 已保存。",
+    "message": "“$TITLE$”已保存。",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -747,7 +829,7 @@
     }
   },
   "bgTitleSavedAiSkipped": {
-    "message": "\"$TITLE$\" 已保存。AI 未执行；请前往「设置 > AI 服务商 > 测试连接」授权。",
+    "message": "“$TITLE$”已保存。AI 未运行：AI 服务商尚未授权。请前往「设置 > AI 服务商 > 测试连接」授权。",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -755,7 +837,7 @@
     }
   },
   "bgTitleQueued": {
-    "message": "\"$TITLE$\" 将在联网后自动保存。",
+    "message": "“$TITLE$”将在联网后自动保存。",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -763,7 +845,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard：批量保存完成！"
+    "message": "Pinboard：批量保存完成"
+  },
+  "bgBatchCancelled": {
+    "message": "Pinboard：批量保存已取消"
   },
   "bgUndo": {
     "message": "撤销"
@@ -805,7 +890,7 @@
     "message": "笔记"
   },
   "notesFilterPlaceholder": {
-    "message": "按高亮或笔记筛选"
+    "message": "筛选高亮与笔记"
   },
   "notesColLastActive": {
     "message": "最后活动"
@@ -823,7 +908,7 @@
     "message": "未知页面"
   },
   "notesUnknownHint": {
-    "message": "重新打开该页的预览并保存一次高亮，即可自动补全标题与链接。"
+    "message": "在阅读器中重新打开该页并保存一次高亮，即可补全标题与链接。"
   },
   "notesDeleteBtn": {
     "message": "删除本页全部高亮"
@@ -878,7 +963,7 @@
     "message": "重置此页"
   },
   "resetTabTitle": {
-    "message": "将当前页面设置恢复为默认值"
+    "message": "将本页设置恢复为默认值"
   },
   "resetConfirm": {
     "message": "确定重置「$TAB$」？",
@@ -889,13 +974,13 @@
     }
   },
   "resetKeysKept": {
-    "message": "（密钥保留）"
+    "message": "API Key 和 Token 会保留。"
   },
   "resetClearsAuthored": {
     "message": "本页手写的长文本内容（提示词、术语表、列表、自定义 CSS 等）也会一并清空。"
   },
   "secPinboardAccount": {
-    "message": "Pinboard 账户"
+    "message": "Pinboard 账号"
   },
   "labelApiToken": {
     "message": "API Token"
@@ -904,7 +989,7 @@
     "message": "获取地址："
   },
   "secSaveDefaults": {
-    "message": "保存默认设置"
+    "message": "保存时的默认值"
   },
   "optPrivateDefault": {
     "message": "默认设为私密"
@@ -919,7 +1004,7 @@
     "message": "备注行为"
   },
   "optAutoDescription": {
-    "message": "自动填充页面描述到备注"
+    "message": "自动将页面描述填入备注"
   },
   "optBlockquote": {
     "message": "以引用格式包裹选中文本"
@@ -931,7 +1016,7 @@
     "message": "标签"
   },
   "optRespectTagCase": {
-    "message": "尊重已有标签大小写（匹配使用最多的写法）"
+    "message": "沿用已有标签的大小写（以使用最多的写法为准）"
   },
   "optShowSuggestTags": {
     "message": "在弹窗中显示 Pinboard 推荐标签"
@@ -946,7 +1031,7 @@
     "message": "在弹窗中显示快捷链接"
   },
   "optShowQuickRow": {
-    "message": "在弹窗中显示快捷操作按钮（保存标签页 · 批量保存 · Markdown）"
+    "message": "在弹窗中显示快捷操作按钮（保存标签页集 · 批量保存 · 阅读器）"
   },
   "tagSyncLabel": {
     "message": "标签缓存策略"
@@ -976,7 +1061,7 @@
     "message": "弹窗行为"
   },
   "optCheckBookmarkStatus": {
-    "message": "通过图标显示收藏状态（检测当前页面是否已保存）"
+    "message": "在工具栏图标上显示当前页面是否已收藏"
   },
   "optAutoClose": {
     "message": "保存后自动关闭弹窗"
@@ -987,9 +1072,6 @@
   "secBackupRestore": {
     "message": "备份与恢复"
   },
-  "backupHint": {
-    "message": "导出或导入设置及所选数据。除非你主动勾选，导出文件不含凭据。"
-  },
   "backupIncludeHighlightsLabel": {
     "message": "在备份中包含高亮和笔记"
   },
@@ -997,7 +1079,7 @@
     "message": "备份会包含页面 URL、标题、选中文本、笔记、颜色和时间戳。"
   },
   "backupPlaintextDisclosure": {
-    "message": "备份文件是明文 JSON，可能包含设置、高亮、页面 URL、生词和上下文摘录。"
+    "message": "备份文件是明文 JSON，可能包含设置、主题、高亮和笔记、页面 URL、生词和上下文摘录；如果你选择包含凭据，还会有 API Key 和 Token。"
   },
   "backupIncludeVocabularyLabel": {
     "message": "在备份中包含生词"
@@ -1006,19 +1088,19 @@
     "message": "只包含当前 Pinboard 账号的生词。"
   },
   "backupIncludeSecretsLabel": {
-    "message": "在备份中包含 API 密钥和令牌"
+    "message": "在备份中包含 API Key 和 Token"
   },
   "backupIncludeSecretsHint": {
-    "message": "会把全部凭据以明文写进文件：Pinboard 令牌、所有 AI 服务商密钥，以及 Jina、Wayback、Anki、欧路词典、Gist 和 Webhook 的凭据。任何人打开文件都能直接使用。请按保管密码的方式保管这个文件。"
+    "message": "会把全部凭据以明文写进文件：Pinboard API Token、所有 AI 服务商的 API Key，以及 Jina、Wayback、Anki、欧路词典、Notion、Gist 和 Webhook 的凭据。任何人打开文件都能直接使用。请按保管密码的方式保管这个文件。"
   },
   "backupSecretsExportConfirm": {
-    "message": "此备份将以明文保存你的 API 密钥和令牌。不要经由你不信任的渠道传输，恢复完成后请立即删除。"
+    "message": "此备份将以明文保存你的 API Key 和 Token。不要经由你不信任的渠道传输，恢复完成后请立即删除。"
   },
   "backupSecretsExportYes": {
     "message": "导出"
   },
   "backupSectionSecrets": {
-    "message": "API 密钥和令牌"
+    "message": "API Key 和 Token"
   },
   "backupPreviewSecrets": {
     "message": "文件中的凭据：$COUNT$ 项",
@@ -1042,7 +1124,7 @@
     "message": "导入预览"
   },
   "backupPreviewMeta": {
-    "message": "架构版本 $SCHEMA$；创建时间 $CREATED$；扩展版本 $VERSION$。",
+    "message": "格式版本 $SCHEMA$；创建时间 $CREATED$；扩展版本 $VERSION$。",
     "placeholders": {
       "schema": { "content": "$1" },
       "created": { "content": "$2" },
@@ -1086,7 +1168,7 @@
     "message": "语言"
   },
   "backupPreviewLegacyOwner": {
-    "message": "未记录账号的旧版备份"
+    "message": "未记录"
   },
   "backupPreviewNone": {
     "message": "无"
@@ -1104,7 +1186,7 @@
     "message": "本设备已开启设置同步。导入的设置可能会同步到其他 Chrome 设备。"
   },
   "backupPreviewLocalWarning": {
-    "message": "这些已选字段目前仅保存在本设备，或因大小限制只能保存在本设备：$FIELDS$。",
+    "message": "以下字段超出 Chrome Sync 的容量限制，可能只保存在本设备：$FIELDS$。",
     "placeholders": { "fields": { "content": "$1" } }
   },
   "backupPreviewSemantics": {
@@ -1148,7 +1230,7 @@
     }
   },
   "backupImportComplete": {
-    "message": "导入完成。刷新页面后可查看设置和主题更改。"
+    "message": "导入完成。"
   },
   "backupImportPartialResult": {
     "message": "导入已结束，但部分内容未完成或仅保存在本设备。删除备份文件前，请检查下方结果。"
@@ -1157,39 +1239,42 @@
     "message": "没有应用任何备份内容。"
   },
   "exportSettings": {
-    "message": "导出设置"
+    "message": "导出备份"
   },
   "backupExportFailed": {
     "message": "备份文件未能生成，字段 $FIELD$ 的内容无效。",
     "placeholders": { "field": { "content": "$1" } }
   },
+  "backupExportFailedGeneric": {
+    "message": "未能生成备份文件，请重试。"
+  },
   "backupExportSyncPending": {
     "message": "Chrome Sync 尚未把这些数据同步到这台设备。没有写出备份文件，过一分钟再试。"
   },
   "importSettings": {
-    "message": "导入设置"
+    "message": "导入备份"
   },
   "importedReload": {
     "message": "已导入。刷新页面后生效"
   },
   "importInvalid": {
-    "message": "文件格式无效"
+    "message": "不是有效的备份文件"
   },
   "importInvalidField": {
-    "message": "文件格式无效：字段 $FIELD$ 无法读取",
+    "message": "不是有效的备份文件：字段 $FIELD$ 无法读取",
     "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "导入未能完成；部分设置可能已经更改，请检查后重试"
   },
   "importSettingsTitle": {
-    "message": "从 JSON 文件导入设置"
+    "message": "从 JSON 备份文件导入"
   },
   "jinaMdNonWebHint": {
     "message": "仅适用于网页"
   },
   "popSortTitle": {
-    "message": "按热门程度排序此页面"
+    "message": "按收藏人数排序本页书签"
   },
   "importPartial": {
     "message": "已导入。主题已保存到本地（同步配额已满）；刷新页面后生效"
@@ -1197,11 +1282,8 @@
   "secQuickSave": {
     "message": "快速保存"
   },
-  "qsHint": {
-    "message": "通过键盘快捷键即时保存当前页面（无需打开弹窗）。"
-  },
   "labelShortcut": {
-    "message": "快捷键"
+    "message": "快捷键："
   },
   "labelOpenPopupShortcut": {
     "message": "打开弹窗快捷键"
@@ -1215,11 +1297,8 @@
   "mdShortcutUnset": {
     "message": "未设置"
   },
-  "shortcutsManual": {
-    "message": "或手动前往："
-  },
   "qsAutoNotes": {
-    "message": "自动将页面描述添加到备注"
+    "message": "未选中文字时，将页面描述填入备注"
   },
   "qsBlockquote": {
     "message": "以引用格式包裹选中文本"
@@ -1239,14 +1318,8 @@
   "secReadLater": {
     "message": "稍后阅读"
   },
-  "rlHint": {
-    "message": "通过键盘快捷键将当前页面标记为「稍后阅读」，自动标记为未读。"
-  },
   "secBatchSave": {
     "message": "批量保存"
-  },
-  "batchHint": {
-    "message": "将每个已打开的标签页分别保存为独立书签。"
   },
   "batchAutoAddTags": {
     "message": "自动添加标签"
@@ -1255,7 +1328,7 @@
     "message": "标签（逗号分隔）"
   },
   "batchTagsHint": {
-    "message": "多个标签用逗号分隔，如 batch_saved, research"
+    "message": "多个标签用逗号分隔，标签内的空格会转为连字符。如 batch_saved, research"
   },
   "batchAiTags": {
     "message": "为每个标签页自动生成 AI 标签"
@@ -1267,13 +1340,13 @@
     "message": "跳过已收藏的网址"
   },
   "batchAiHint": {
-    "message": "AI 会为每个标签页单独调用，可能较慢。首次使用时，批量保存仅申请列表中的标签页站点和当前 AI 服务商权限。"
+    "message": "AI 会为每个标签页单独调用一次，可能较慢。缺少访问权限时，批量保存只申请待保存标签页所在的站点和当前 AI 服务商。"
   },
   "batchPermDenied": {
-    "message": "未获得列表中的站点权限，批量 AI 未启动。"
+    "message": "未获得列表中站点的访问权限，批量保存未开始。"
   },
   "batchPermConfirm": {
-    "message": "本次批量 AI 需要访问以下 $COUNT$ 个站点：",
+    "message": "批量保存需要访问以下 $COUNT$ 个站点：",
     "placeholders": {
       "count": { "content": "$1" }
     }
@@ -1318,7 +1391,7 @@
     }
   },
   "testOkWithOverride": {
-    "message": "已连接（$RESULT$）· 阅读器模型 $MODEL$ 也能用",
+    "message": "已连接（$RESULT$）· 阅读器模型 $MODEL$ 也已响应",
     "placeholders": {
       "result": {
         "content": "$1"
@@ -1348,13 +1421,13 @@
     }
   },
   "testTimeout": {
-    "message": "连接超时（30秒）"
+    "message": "请求超时"
   },
   "testNoApiKey": {
     "message": "未填写 API Key"
   },
   "showHideKey": {
-    "message": "显示/隐藏密钥"
+    "message": "显示/隐藏凭据"
   },
   "contextHelpTitle": {
     "message": "更多说明"
@@ -1362,17 +1435,14 @@
   "hintOpenAIBaseUrl": {
     "message": "可修改为代理或兼容接口地址"
   },
-  "hintClaudeModel": {
-    "message": "如 claude-haiku-4-5-20251001, claude-sonnet-4-20250514"
-  },
   "hintOllamaModel": {
     "message": "需先运行 ollama pull llama3.2"
   },
   "hintCustomBaseUrl": {
-    "message": "必须支持 /chat/completions 接口"
+    "message": "请求时会在此地址后追加 /chat/completions，接口须支持该路径"
   },
   "hintCustomKey": {
-    "message": "无需密钥时留空"
+    "message": "无需 API Key 时留空"
   },
   "secAiBehavior": {
     "message": "AI 行为"
@@ -1425,7 +1495,7 @@
     "message": "AI 标签、摘要与页面缓存时长（分钟）"
   },
   "aiCacheHint": {
-    "message": "按网址缓存，共用 200 条上限（LRU）。设为 0 则禁用。"
+    "message": "按网址缓存，共用 200 条容量，最久未用的先被清除。设为 0 则不缓存。"
   },
   "labelTagSeparator": {
     "message": "多词标签分隔符"
@@ -1504,7 +1574,7 @@
     "message": "稍后阅读"
   },
   "notifyTabSet": {
-    "message": "标签集保存"
+    "message": "标签页集保存"
   },
   "notifyBatchSave": {
     "message": "批量保存"
@@ -1513,28 +1583,19 @@
     "message": "错误通知"
   },
   "secPinboardTagPages": {
-    "message": "Pinboard.in 标签页"
+    "message": "Pinboard.in 标签浏览页"
   },
   "optTagSortByPop": {
-    "message": "在标签页添加热度排序控件"
-  },
-  "optTagSortByPopHint": {
-    "message": "在 pinboard.in 标签页添加「pop」控件，按收藏人数排序当前页书签，再次点击还原。"
+    "message": "在标签浏览页添加热度排序控件"
   },
   "secCustomStyle": {
     "message": "Pinboard.in 自定义样式"
-  },
-  "customStyleHint": {
-    "message": "为 pinboard.in 页面注入自定义 CSS，可用于调整字体、配色、布局等。"
   },
   "labelCustomFont": {
     "message": "自定义字体"
   },
   "customFontPlaceholder": {
     "message": "如 'Noto Sans SC', 'Fira Code', sans-serif"
-  },
-  "customFontHint": {
-    "message": "应用于 pinboard.in 页面 body 元素，留空则保持默认。"
   },
   "labelThemePresets": {
     "message": "主题预设"
@@ -1551,9 +1612,6 @@
   "themeGroupDark": {
     "message": "深色"
   },
-  "themePresetsHint": {
-    "message": "点击预设加载对应 CSS。自适应主题会跟随你的浅色/深色设置自动切换。"
-  },
   "labelSavedThemes": {
     "message": "已保存的主题"
   },
@@ -1561,7 +1619,7 @@
     "message": "保存为主题"
   },
   "saveAsThemeHint": {
-    "message": "修改自定义 CSS 覆盖后，即可将其保存为可复用主题。"
+    "message": "将「自定义 CSS 覆盖」保存为可复用主题。框内有 CSS 且不超过 50 KB 时可用。"
   },
   "customCSSPlaceholder": {
     "message": "/* pinboard.in 自定义 CSS */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
@@ -1597,7 +1655,7 @@
     "message": "主题名称："
   },
   "themeOverwrite": {
-    "message": "\"$NAME$\" 已存在，是否覆盖？",
+    "message": "「$NAME$」已存在，是否覆盖？",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -1611,22 +1669,22 @@
     "message": "覆盖"
   },
   "saveTabsTitle": {
-    "message": "将所有打开的标签页暂存为一个 Pinboard 标签集（需登录 pinboard.in）"
+    "message": "将当前窗口的标签页暂存为一个 Pinboard 标签页集（需登录 pinboard.in）"
   },
   "batchSaveTitle": {
-    "message": "将每个打开的标签页分别收藏为独立书签（可选 AI 标签与摘要）"
+    "message": "将当前窗口的每个标签页分别收藏为书签（可附 AI 标签与摘要）"
   },
   "qlSetsTitle": {
-    "message": "标签集"
+    "message": "Pinboard 上已保存的标签页集"
   },
   "qlNetworkTitle": {
-    "message": "关注动态"
+    "message": "你关注的用户的书签"
   },
   "qlUnreadTitle": {
-    "message": "未读书签"
+    "message": "你的稍后阅读书签"
   },
   "qlNotesTitle": {
-    "message": "笔记"
+    "message": "你的 Pinboard 笔记"
   },
   "secSync": {
     "message": "数据同步"
@@ -1638,10 +1696,10 @@
     "message": "此开关只对当前设备生效。设置只在开启了它的设备之间共享；关闭的设备使用各自的本地设置。"
   },
   "syncApiKeysLabel": {
-    "message": "通过此 Google 账户同步凭据"
+    "message": "在此 Google 账号下同步凭据"
   },
   "syncApiKeysHint": {
-    "message": "这是一个账号级选项，但只有开启设置同步的设备才会参与；其他设备继续使用本地凭据。新用户默认关闭。若升级时 Chrome Sync 已有非空凭据，为避免数据丢失会保持开启。同步的 API 密钥、令牌、密码和导出凭据仅做混淆存储，并未加密。"
+    "message": "这是一个账号级选项，但只有开启设置同步的设备才会参与；其他设备继续使用本地凭据。新用户默认关闭。若升级时 Chrome Sync 已有非空凭据，为避免数据丢失会保持开启。同步的 API Key、Token、密码和导出凭据仅做混淆存储，并未加密。"
   },
   "syncLocalOnlyStatus": {
     "message": "Chrome Sync 无法保存以下项目，因此它们仅保存在此设备：$FIELDS$。",
@@ -1651,10 +1709,10 @@
     "message": "Chrome Sync 中已有来自其他设备的设置。开启设置同步即可在此设备上使用。"
   },
   "syncApiKeysDisableConfirm": {
-    "message": "要关闭凭据同步吗？本设备将改用本地凭据，Chrome Sync 中的旧凭据会被清除。仍依赖这些云端凭据的其他设备可能无法正常工作。Google Drive OAuth 令牌不受影响。"
+    "message": "要关闭凭据同步吗？Chrome Sync 中的凭据会先保存到本设备，再从 Chrome Sync 清除。仍依赖这些云端凭据的其他设备可能无法正常工作。Google Drive OAuth Token 不受影响。"
   },
   "qlPopularTitle": {
-    "message": "热门"
+    "message": "Pinboard 热门书签"
   },
   "provGemini": {
     "message": "Google Gemini"
@@ -1666,7 +1724,7 @@
     "message": "Anthropic Claude"
   },
   "provDeepseek": {
-    "message": "DeepSeek (深度求索)"
+    "message": "DeepSeek（深度求索）"
   },
   "provQwen": {
     "message": "通义千问"
@@ -1693,13 +1751,16 @@
     "message": "智谱"
   },
   "provKimi": {
-    "message": "Kimi (月之暗面)"
+    "message": "Kimi（月之暗面）"
   },
   "provOllama": {
-    "message": "Ollama (本地)"
+    "message": "Ollama（本地）"
   },
   "provCustom": {
-    "message": "自定义 OpenAI 兼容"
+    "message": "自定义（OpenAI 兼容）"
+  },
+  "provCustomShort": {
+    "message": "自定义"
   },
   "jinaMarkdownBtn": {
     "message": "阅读器"
@@ -1716,33 +1777,33 @@
   "jinaCopied": {
     "message": "已复制！"
   },
+  "popupCopyFailed": {
+    "message": "无法复制到剪贴板。"
+  },
   "jinaFailed": {
     "message": "失败"
   },
   "aiContentSourceLocalHint": {
-    "message": "在本地抓取页面主要内容（离线，速度快）。"
+    "message": "在本地提取页面正文（无需联网，速度快）。"
   },
   "aiContentSourceJinaHint": {
-    "message": "通过 Jina Reader API 获取清洗过的 Markdown（需联网；可选填 API Key 以获得更高配额）。"
+    "message": "把页面 URL 发送给 Jina Reader，由它抓取页面并返回清洗后的 Markdown。需要联网；API Key 可选，填写后配额更高。"
   },
   "jinaAuthFailed": {
     "message": "Jina API Key 无效或已过期，请到设置 > AI 服务商 > Jina Reader 中更新。"
   },
   "jinaFailedDetail": {
-    "message": "Markdown 抓取失败：$ERROR$",
+    "message": "无法将页面转换为 Markdown：$ERROR$",
     "placeholders": {
       "error": {
         "content": "$1"
       }
     }
   },
-  "jinaViewBtn": {
-    "message": "查看"
-  },
   "mdStripPreview": {
-    "message": "预览"
+    "message": "在阅读器中打开"
   },
-  "mdStripPreviewVideo": { "message": "预览字幕" },
+  "mdStripPreviewVideo": { "message": "在阅读器中查看字幕" },
   "mdStripDownloadMd": {
     "message": "下载 .md"
   },
@@ -1755,9 +1816,6 @@
   "mdExportSection": {
     "message": "导出"
   },
-  "mdOptFrontmatter": {
-    "message": "Frontmatter"
-  },
   "mdOptImages": {
     "message": "图片"
   },
@@ -1765,7 +1823,7 @@
     "message": "保留"
   },
   "mdImgAlt": {
-    "message": "Alt 文本"
+    "message": "替代文字"
   },
   "mdImgStrip": {
     "message": "移除"
@@ -1781,14 +1839,14 @@
     "message": "内嵌仅对下载生效，本次导出保留图片链接。"
   },
   "mdImgBrokenNote": {
-    "message": "$COUNT$ 张图片在当前预览中加载失败，导出后可能仍无法显示；下载并选择「内嵌」可打包图片。",
+    "message": "$COUNT$ 张图片在阅读器中加载失败，导出后可能仍无法显示；下载并选择「内嵌」可打包图片。",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdExportRunning": {
     "message": "正在准备导出…"
   },
   "mdObsidianRoute": {
-    "message": "Obsidian 路由"
+    "message": "写入位置"
   },
   "mdObsidianRouteNew": {
     "message": "新建笔记"
@@ -1800,7 +1858,7 @@
     "message": "每日笔记"
   },
   "mdObsidianVault": {
-    "message": "Obsidian 库"
+    "message": "Obsidian 仓库"
   },
   "mdObsidianFolder": {
     "message": "Obsidian 文件夹"
@@ -1833,16 +1891,13 @@
     "message": "移除图片"
   },
   "mdExportImagePolicyHint": {
-    "message": "在预览页面复制或下载 Markdown 时应用。可在每次导出时单独覆盖。"
+    "message": "从弹窗或阅读器复制、下载或发送 Markdown 时的默认处理方式；阅读器里可按次更改。"
   },
   "mdExportIncludeToc": {
     "message": "包含文章目录"
   },
   "mdExportExtendedMeta": {
     "message": "包含扩展元数据（作者、发布日期、来源站点、封面图、字数）"
-  },
-  "mdExportExtendedMetaHint": {
-    "message": "在有值时把这些字段加入 frontmatter、HTML 署名行与 webhook 载荷；关闭后导出与旧版逐字节一致。"
   },
   "mdOptIncludeHl": {
     "message": "包含高亮"
@@ -1851,7 +1906,7 @@
     "message": "随字幕请求发送 YouTube 登录 Cookie"
   },
   "optVideoUseLoginHint": {
-    "message": "没有打开 www.youtube.com 标签页时，阅读器会直接发出兜底请求——此项只影响这个请求。有 YouTube 标签页打开时，字幕经该标签页及其登录态读取，不受此项影响。默认开启：匿名的兜底请求更容易被判定为机器人而遭拒。"
+    "message": "只影响没有打开 www.youtube.com 标签页时阅读器直接发出的兜底请求；打开了 YouTube 标签页时，字幕经该标签页及其登录态读取，不受此项影响。默认开启：匿名的兜底请求更容易被判定为机器人而遭拒。"
   },
   "mdTglToc": {
     "message": "目录"
@@ -1904,7 +1959,7 @@
   "mdPreviewNoContent": {
     "message": "未能从该页面提取到内容。"
   },
-  "mdPreviewFrameHint": { "message": "正文可能在来自 $HOST$ 的内嵌框架里。读取该框架需要你授予该站点的访问权限——Chrome 会弹窗确认，权限会一直保留到你撤销；授权前不会读取框架里的任何内容。", "placeholders": { "host": { "content": "$1" } } },
+  "mdPreviewFrameHint": { "message": "正文可能在来自 $HOST$ 的内嵌框架里。读取该框架需要授予该站点的访问权限：Chrome 会弹窗请你确认，权限会一直保留到你撤销。授权前不会读取框架里的任何内容。", "placeholders": { "host": { "content": "$1" } } },
   "mdStatWords": {
     "message": "$COUNT$ 词",
     "placeholders": {
@@ -1973,13 +2028,13 @@
     "message": "请求过长，请缩短备注、标题或标签"
   },
   "saveAsThemeDisabledHint": {
-    "message": "请先修改 Custom CSS 才能保存为主题"
+    "message": "将「自定义 CSS 覆盖」保存为可复用主题（需有 CSS，且不超过 50 KB）"
   },
   "labelCustomCSSOverlay": {
     "message": "自定义 CSS 覆盖"
   },
   "customCSSOverlayHelp": {
-    "message": "你的 CSS 会叠加在所选预设之上。留空则只使用预设；这里写的规则会覆盖预设里同名规则。"
+    "message": "你的 CSS 在所选预设之后加载，选择器相同时以你的规则为准。留空则只使用预设。"
   },
   "presetPreviewToggle": {
     "message": "查看当前预设 CSS（只读）"
@@ -1988,7 +2043,7 @@
     "message": "仅保存到本机（同步配额已满）"
   },
   "optSaveFailed": {
-    "message": "保存未能完成；部分其他设置可能已保存，请检查后重试"
+    "message": "部分更改未能保存，其余可能已经保存。请检查设置后重试。"
   },
   "confirm": {
     "message": "确认"
@@ -2013,23 +2068,17 @@
     "message": "要用此设备的设置覆盖 Chrome Sync 中的设置吗？\n\n选择「取消」将保持同步关闭。"
   },
   "syncReloadNeeded": {
-    "message": "刷新本页，才能用上 Chrome Sync 中保存的设置。",
+    "message": "刷新本页后，Chrome Sync 中保存的设置才会生效。",
     "description": "Options page alert after adopting the cloud settings profile: the page must be reloaded before the adopted settings take effect."
   },
   "jinaFreeTierHint": {
-    "message": "免费额度：20 RPM。配置 key 可提高配额。"
+    "message": "不填 Key 时每分钟最多 20 次请求。填写 API Key 可提高配额。"
   },
   "openrouterTagline": {
-    "message": "通过单一 API 访问 100+ 模型。"
+    "message": "一个 API 即可调用 100 多个模型。"
   },
   "browseModelsAt": {
     "message": "浏览模型列表："
-  },
-  "hintZhipuModel": {
-    "message": "示例：glm-4.7-flash、glm-4-flash、glm-4-plus"
-  },
-  "hintKimiModel": {
-    "message": "示例：kimi-k2.6、kimi-k2.5、moonshot-v1-32k、moonshot-v1-128k"
   },
   "mdPreviewEmpty": {
     "message": "这里还没有内容。请先打开网页，再在扩展弹窗中点击「阅读器」。"
@@ -2053,17 +2102,14 @@
   "aiSlowHint": {
     "message": "比平常慢"
   },
-  "aiCancel": {
-    "message": "取消"
-  },
   "urlCleanedN": {
     "message": "已清理 {n} 个追踪参数"
   },
   "urlShowOriginal": {
-    "message": "显示原始"
+    "message": "恢复原网址"
   },
   "urlPasteCleanedN": {
-    "message": "移除了 {n} 个追踪参数"
+    "message": "已移除 {n} 个追踪参数"
   },
   "undo": {
     "message": "撤销"
@@ -2078,7 +2124,7 @@
     "message": "打开弹窗时清理（静默，含撤销链接）"
   },
   "optUrlCleanOnPaste": {
-    "message": "粘贴 URL 时清理（toast 提示）"
+    "message": "粘贴 URL 时清理（弹出提示，可撤销）"
   },
   "optUrlCleanAggressive": {
     "message": "激进模式：额外清除 ref / si / igshid 等可能影响功能的参数"
@@ -2087,7 +2133,7 @@
     "message": "自定义参数（每行一个，追加到默认列表）"
   },
   "optUrlCleanExclude": {
-    "message": "永不清理的参数（每行一个，例如保留联盟推广的 `tag=`）"
+    "message": "永不清理的参数（每行一个，例如填 tag 保留联盟推广标记）"
   },
   "emptyRecentBookmarks": {
     "message": "暂无最近书签"
@@ -2099,19 +2145,19 @@
     "message": "弹窗宽度"
   },
   "optPopupWidth450": {
-    "message": "紧凑 (450px)"
+    "message": "紧凑（450px）"
   },
   "optPopupWidth550": {
-    "message": "标准 (550px)"
+    "message": "标准（550px）"
   },
   "optPopupWidth650": {
-    "message": "宽 (650px)"
+    "message": "宽（650px）"
   },
   "optPopupWidthCustom": {
     "message": "自定义："
   },
   "optPopupWidthHelp": {
-    "message": "范围：420–720px（Chrome 弹窗上限）"
+    "message": "范围：420–720px（低于 Chrome 弹窗 800px 的上限）"
   },
   "optUrlCleanCustomPlaceholder": {
     "message": "utm_other\ncustom_track_id\n_branch_referrer"
@@ -2120,13 +2166,10 @@
     "message": "tag\nref\nsi"
   },
   "obsidianInstallHint": {
-    "message": "需要安装 Obsidian 才能打开笔记。笔记内容已复制到剪贴板作为备份。"
+    "message": "需要安装 Obsidian 才能创建笔记。笔记内容也已在剪贴板中，可直接粘贴到别处。"
   },
   "obsidianClipboardFailed": {
     "message": "无法复制到剪贴板，笔记未创建，请重试。"
-  },
-  "apiKeySecurityHint": {
-    "message": "新用户的凭据默认只保存在本机；旧云端凭据可能使账号级同步在升级后保持开启。只有开启设置同步的设备才会参与；同步凭据仅经过混淆处理，并未加密。"
   },
   "batchPermLabel": {
     "message": "旧版所有站点权限："
@@ -2135,7 +2178,7 @@
     "message": "撤销旧版所有站点权限"
   },
   "batchRevokeHint": {
-    "message": "旧版本可能授予所有站点权限。新版批量保存只申请列表中的站点；此按钮用于移除旧版广泛权限。"
+    "message": "旧版本可能持有所有站点的访问权限。现在批量保存只申请待保存标签页所在的站点；此按钮用于移除旧版的所有站点权限。"
   },
   "batchRevokeSuccess": {
     "message": "已撤销"
@@ -2156,10 +2199,10 @@
     "message": "保存页面到互联网档案馆"
   },
   "optWaybackHint": {
-    "message": "每次保存后，请求互联网档案馆为该页面拍摄快照（尽力而为，不会阻挡保存）。将保存的 URL 发送至 archive.org；默认关闭。"
+    "message": "每次保存后，请互联网档案馆为该页面创建快照（尽力而为，不影响保存）。此功能会把保存的网址发送至 archive.org，默认关闭。"
   },
   "optWaybackBatch": {
-    "message": "批量保存时也要存档"
+    "message": "批量保存时也存档"
   },
   "optWaybackBatchHint": {
     "message": "批量保存可能会同时发送多个存档请求；匿名配额有限。"
@@ -2171,13 +2214,13 @@
     "message": "archive.org S3 Secret（可选）"
   },
   "optWaybackS3Hint": {
-    "message": "使用免费的 archive.org 账户密钥，存档将使用已认证的 API：更高的配额、服务器端去重、可靠的结果。"
+    "message": "填入免费 archive.org 账号的 S3 Key 后，存档改用认证 API：配额更高，服务器端去重，结果更可靠。"
   },
   "waybackSkipPrivate": {
     "message": "保存为私密的书签一律不提交到 archive.org"
   },
   "waybackPermDenied": {
-    "message": "请在本页顶部关闭后重新开启「保存页面到互联网档案馆」，以重新申请 web.archive.org 权限。"
+    "message": "存档需要 web.archive.org 的访问权限，目前尚未授予。重新开启存档即可再次申请。"
   },
   "archiveThisSave": {
     "message": "存档"
@@ -2206,7 +2249,7 @@
     "message": "已请求"
   },
   "archiveOutcomeSkipped": {
-    "message": "已跳过（最近已存档）"
+    "message": "已跳过（24 小时内已提交）"
   },
   "archiveOutcomeSkippedPrivate": {
     "message": "已跳过（私密）"
@@ -2215,7 +2258,7 @@
     "message": "缺少 archive.org 权限"
   },
   "archiveOutcomeRateLimited": {
-    "message": "频率限制"
+    "message": "已限流"
   },
   "archiveOutcomeTimeout": {
     "message": "超时"
@@ -2230,7 +2273,7 @@
     "message": "提交成功不代表立即可见；Wayback Machine 通常需要几分钟（有时更久）才会将新快照编入索引。"
   },
   "archiveErrAuth": {
-    "message": "凭证无效"
+    "message": "S3 Key 或 Secret 无效"
   },
   "archiveErrNetwork": {
     "message": "无法连接 archive.org"
@@ -2251,7 +2294,7 @@
     "message": "archive.org 服务端故障，稍后重试"
   },
   "archiveErrRateLimited": {
-    "message": "匿名请求按 IP 限流，稍后再试或填入 S3 key"
+    "message": "archive.org 正在限流，请稍后再试。匿名请求按 IP 限流，填入 S3 Key 可提高额度。"
   },
   "archiveErrTimeoutHint": {
     "message": "请求超时，archive.org 可能繁忙或网络缓慢"
@@ -2277,7 +2320,7 @@
     "message": "近似标签组"
   },
   "tagGovNoGroups": {
-    "message": "未检测到重复标签"
+    "message": "未发现近似标签组"
   },
   "tagGovKindPlural": {
     "message": "单复数"
@@ -2310,7 +2353,7 @@
     "message": "重置忽略列表"
   },
   "tagGovResetIgnoredConfirm": {
-    "message": "清除被忽略的组，重新显示所有重复项？"
+    "message": "重新显示所有已忽略的组？"
   },
   "tagGovAiBtn": {
     "message": "AI 深度分析"
@@ -2319,7 +2362,7 @@
     "message": "分析中…"
   },
   "tagGovAiNone": {
-    "message": "AI 未发现重复项"
+    "message": "AI 未发现近似标签"
   },
   "tagGovAiNoKey": {
     "message": "未配置 AI 服务商，请到「AI 服务商」中设置"
@@ -2355,10 +2398,19 @@
     "message": "这些标签只是大小写不同，Pinboard 本来就把它们视为同一个标签，无需合并。这条建议已移除。"
   },
   "tagGovConfirmDelete": {
-    "message": "删除 $N$ 个标签？（永久操作）",
+    "message": "永久删除所选的 $N$ 个标签？",
     "placeholders": {
       "N": {
         "content": "$1"
+      }
+    }
+  },
+  "tagGovMoreCount": {
+    "message": "另有 $COUNT$ 个",
+    "placeholders": {
+      "COUNT": {
+        "content": "$1",
+        "example": "5"
       }
     }
   },
@@ -2374,7 +2426,7 @@
     }
   },
   "tagGovAborted429": {
-    "message": "已限流，批次停止，已完成的更改保留。重新运行同一合并可安全续传（已改完的书签会自动跳过）。"
+    "message": "触发限流，批次已停止，已完成的更改保留。重新运行即可继续，已改完的书签会自动跳过。"
   },
   "tagGovMergeEstimate": {
     "message": "预计耗时：约 $T$",
@@ -2385,7 +2437,7 @@
     }
   },
   "tagGovRetagProgress": {
-    "message": "已重打标签 $DONE$/$TOTAL$ 个书签",
+    "message": "已更新 $DONE$/$TOTAL$ 个书签的标签",
     "placeholders": {
       "DONE": {
         "content": "$1"
@@ -2474,7 +2526,7 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "无法加载标签。请检查 Pinboard token 或网络后点击刷新"
+    "message": "无法加载标签。请检查 API Token 或网络，然后点击「刷新」。"
   },
   "placeholderOptional": {
     "message": "可选"
@@ -2483,7 +2535,7 @@
     "message": "已下载标签清单快照（仅含标签名和数量，供手工修复参考，不能自动还原）"
   },
   "tagGovSnapshotFailed": {
-    "message": "无法生成快照，合并/删除已阻止"
+    "message": "无法生成标签快照，合并或删除未执行。"
   },
   "tagGovIrreversibleWarn": {
     "message": "合并和删除操作不可撤销。第一次修改前会自动下载你的标签清单快照（仅含标签名和数量，供手工修复参考）。"
@@ -2492,7 +2544,7 @@
     "message": "Pinboard.in 上的标签束不会跟随重命名自动更新，合并后请手动检查。"
   },
   "optBgSaveMode": {
-    "message": "后台保存模式"
+    "message": "快捷键保存遇到已有书签时"
   },
   "optBgSaveModeMerge": {
     "message": "合并（默认，新标签与现有标签合并）"
@@ -2503,35 +2555,23 @@
   "optBgSaveModeOverwrite": {
     "message": "覆盖（完全替换标签，不合并）"
   },
-  "optBgSaveModeHint": {
-    "message": "合并：读取已有书签标签并与新标签合并。跳过：避免保存重复网址。覆盖：完全替换标签（前台编辑始终替换）。"
-  },
   "bgSkippedTitle": {
     "message": "已收藏"
   },
   "bgSkippedExists": {
-    "message": "已收藏过，已跳过保存"
+    "message": "此页已收藏，本次未重复保存"
   },
   "secPreviewAi": {
     "message": "阅读器 AI"
   },
-  "previewAiSectionHint": {
-    "message": "阅读器的划词解释、全文问答和全文翻译均由你主动调用，并使用「AI 服务商」中配置的服务商与 Key。若你开启了 AI 要点摘要，它可能会在阅读器打开时运行；所有功能都不会作为隐藏的后台任务运行。"
-  },
   "previewAiEnabled": {
     "message": "在阅读器启用 AI 功能"
-  },
-  "previewAiEnabledHint": {
-    "message": "关闭后阅读器不再出现任何 AI 入口。未配置 API Key 时入口也会自动隐藏。"
   },
   "previewAiUnavailableHint": {
     "message": "下面这些设置暂时不生效：所选服务商还缺 API Key 或访问授权。到「AI 服务商」补齐即可。"
   },
   "previewAiModelLabel": {
     "message": "模型覆盖（可选）"
-  },
-  "previewAiModelHint": {
-    "message": "仅供阅读器 AI 功能使用的模型名，按服务商分别保存。留空则使用「AI 服务商」中配置的模型。"
   },
   "previewAiModelFor": {
     "message": "作用于 $PROVIDER$。",
@@ -2571,7 +2611,7 @@
     "message": "LLM=大语言模型\nPinboard="
   },
   "translateGlossaryHint": {
-    "message": "每行一条，格式为 术语=译法。等号右侧留空表示该术语保持原文。随每次翻译请求一起发送。"
+    "message": "每行一条，格式为 术语=译法。等号右侧留空表示该术语保持原文。用于全文翻译；每次请求只附带本次文本中出现的术语。"
   },
   "selectionTriggerLabel": {
     "message": "划词解释触发方式"
@@ -2580,7 +2620,7 @@
     "message": "在选中文字旁显示按钮"
   },
   "selectionTriggerHotkey": {
-    "message": "仅使用快捷键 e 和 d"
+    "message": "仅快捷键（e 解释，d 查词）"
   },
   "selectionTriggerOff": {
     "message": "关闭"
@@ -2658,7 +2698,7 @@
     "message": "抽取术语中…"
   },
   "trSkippedTargetLang": {
-    "message": "已有 $COUNT$ 个分段本就是目标语言，已跳过",
+    "message": "$COUNT$ 段已是目标语言，已跳过",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2669,16 +2709,19 @@
     "message": "此段翻译失败"
   },
   "trErrKey": {
-    "message": "API 密钥无效或被拒绝，请到设置中检查"
+    "message": "API Key 无效或被拒绝，请到设置中检查"
   },
   "trErrQuota": {
-    "message": "已触发限流或配额用尽，请稍后再试"
+    "message": "已触发限流或配额用尽，请稍后再试或检查账户余额"
   },
   "trErrNetwork": {
     "message": "网络或服务器错误，请稍后再试"
   },
   "trErrTimeout": {
     "message": "AI 服务响应超时，请重试"
+  },
+  "aiErrRequestFailed": {
+    "message": "AI 请求失败"
   },
   "trRetranslate": {
     "message": "重新翻译"
@@ -2709,7 +2752,7 @@
     }
   },
   "trFailedSummaryMixed": {
-    "message": "$COUNT$ 段翻译失败，原因不同，请逐段重试。",
+    "message": "$COUNT$ 段翻译失败，原因不一；各段重试按钮的提示里有具体原因。",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2766,7 +2809,7 @@
     }
   },
   "askSentPartial": {
-    "message": "（文章较长：发送 $SENT$/$TOTAL$ 段）",
+    "message": "（发送其中 $SENT$/$TOTAL$ 段）",
     "placeholders": {
       "sent": {
         "content": "$1"
@@ -2786,7 +2829,7 @@
     "message": "文中引用了哪些数据？"
   },
   "askChipVerified": {
-    "message": "已验证"
+    "message": "引文已在原文中找到"
   },
   "askErrRetry": {
     "message": "重试"
@@ -2795,7 +2838,7 @@
     "message": "已停止（已保留部分回答）"
   },
   "askEmptyHint": {
-    "message": "回答会标注原文段落出处，每个论断都可点击核对。"
+    "message": "回答会标注出处段落，点击引用即可跳到原文对应位置。"
   },
   "askCopyAnswer": {
     "message": "复制回答"
@@ -2845,10 +2888,10 @@
     "message": "正在查词…"
   },
   "explainAiNotConfigured": {
-    "message": "请先在设置中配置 AI 服务，再解释所选内容。"
+    "message": "要解释所选内容，请在设置中配置 AI 服务商并开启阅读器 AI 功能。"
   },
   "explainTranslateAiNotConfigured": {
-    "message": "请先在设置中配置 AI 服务，再翻译所选内容。"
+    "message": "要翻译所选内容，请在设置中配置 AI 服务商并开启阅读器 AI 功能。"
   },
   "explainErrRetry": {
     "message": "重试"
@@ -2896,7 +2939,7 @@
     "message": "当前连接的词典未找到词条。"
   },
   "dictLangUnknown": {
-    "message": "无法判定这个词的语言，请在「词典语言」菜单中选择。"
+    "message": "无法判定这个词的语言，请在上方的语言菜单中选择。"
   },
   "dictMatchedHeadword": {
     "message": "匹配词条：$TERM$",
@@ -3025,13 +3068,13 @@
     "message": "离线英汉词典"
   },
   "ecdictEmpty": {
-    "message": "未导入。选择一个 ECDICT 字段布局的 CSV 文件后在此导入。"
+    "message": "未导入。请选择符合 ECDICT 列格式的 CSV 文件导入。"
   },
   "ecdictHint": {
     "message": "查英文词时，在英文释义上方加一段中文释义。英文释义照常加载。"
   },
   "ecdictFormatNote": {
-    "message": "需要一个 CSV 文件，首行是列名，且包含 word、translation、tag、collins、oxford、frq、bnc 这几列。mdx、eudic、stardict、mobi、sqlite 这类成品词典包是别的格式，导入不了。本项目不提供、不推荐、不验证数据来源，也与其无关联。文件由你自行取得，其许可由你负责。"
+    "message": "需要 CSV 文件：首行为列名，且包含 word、translation、tag、collins、oxford、frq、bnc 这几列。mdx、eudic、stardict、mobi、sqlite 等成品词典包格式不同，无法导入。本项目不提供、不推荐、不验证数据来源，也与其无关联。文件由你自行取得，其许可由你负责。"
   },
   "ecdictImportFile": {
     "message": "导入文件"
@@ -3048,7 +3091,7 @@
     "message": "这个文件导入失败。"
   },
   "ecdictNotEcdictFormat": {
-    "message": "这个文件不是 ECDICT 的 CSV 字段布局。"
+    "message": "这个文件不符合 ECDICT 的 CSV 列格式。"
   },
   "ecdictTooLarge": {
     "message": "这个文件超出可导入的体积上限。"
@@ -3131,7 +3174,7 @@
       "message": "清除选择"
     },
     "vocabBatchActions": {
-      "message": "选中生词的操作"
+      "message": "对选中生词的操作"
     },
     "vocabGroupNamePlaceholder": {
       "message": "分组名称"
@@ -3146,7 +3189,7 @@
       "message": "所选生词都不在这个分组里"
     },
     "vocabBatchDelete": {
-      "message": "删除选中项"
+      "message": "删除选中的生词"
     },
     "vocabNoResults": {
       "message": "没有符合当前筛选条件的生词。"
@@ -3173,7 +3216,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "同步范围仅适用于本机和当前 Pinboard 账号。设置与 API 密钥不参与同步。"
+      "message": "以下选择仅对本机和当前 Pinboard 账号生效。Google Drive 不同步设置和凭据。"
     },
     "vocabDriveDisclosure": {
       "message": "Google Drive appDataFolder 中的副本以明文保存，未经端到端加密，可能包含生词、释义、高亮摘录、笔记、来源网址、标题和时间。"
@@ -3205,15 +3248,6 @@
     "vocabDriveOwnerLabel": {
       "message": "Pinboard 账号"
     },
-    "vocabDriveLastSuccessLabel": {
-      "message": "最近成功同步"
-    },
-    "vocabDrivePendingWordsLabel": {
-      "message": "待同步生词"
-    },
-    "vocabDrivePendingBatchesLabel": {
-      "message": "待上传批次"
-    },
     "vocabDriveNever": {
       "message": "尚未同步"
     },
@@ -3221,7 +3255,7 @@
       "message": "关闭冲突提示"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Google Drive 同步已停止，不会自动重试。打开设置查看原因。"
+      "message": "Google Drive 同步已暂停，不会自动重试。打开设置查看原因。"
     },
     "vocabDriveConnect": {
       "message": "连接 Google Drive"
@@ -3239,7 +3273,7 @@
       "message": "无法读取 Google Drive 同步状态。"
     },
     "vocabDriveErrorAuth": {
-      "message": "Google Drive 授权不可用。请确认已登录 Chrome 浏览器账户。"
+      "message": "Google Drive 授权不可用。请确认 Chrome 已登录 Google 账号。"
     },
     "vocabDriveErrorPinboardAuth": {
       "message": "尚未登录 Pinboard 账号。请在「通用 → Pinboard 账号」中填写 API Token，然后重新连接。"
@@ -3251,7 +3285,7 @@
       "message": "无法安全读取 Google Drive 同步数据，本机数据未改变。"
     },
     "vocabDriveErrorLocalStore": {
-      "message": "无法保存本机数据，同步已停止。"
+      "message": "无法读取或保存本机数据。"
     },
     "vocabDriveErrorNetwork": {
       "message": "无法连接 Google Drive。"
@@ -3260,7 +3294,7 @@
       "message": "Google Drive 同步失败。"
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Google 账号或 Pinboard 账号已改变。重新打开「通用」后再试。"
+      "message": "同步期间 Google 账号或 Pinboard 账号发生了变化，请重试。"
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "有一条生词或其上下文内容过大，无法同步。请缩短或删除该条内容，然后点击「立即同步」。"
@@ -3277,7 +3311,7 @@
       "message": "请点击「连接 Google Drive」并完成 Google 授权。"
     },
     "vocabDriveSyncNowRequired": {
-      "message": "同步已暂停。请点击「立即同步」重试。"
+      "message": "自动同步已暂停。请点击「立即同步」重试。"
     },
     "vocabDriveReconnectRequired": {
       "message": "请点击「断开此设备」，然后重新连接。"
@@ -3292,16 +3326,16 @@
       "message": "无法加载当前 Pinboard 账号的生词。请重新打开「生词」后再试。"
     },
     "vocabExportFailed": {
-      "message": "无法导出生词。请检查扩展存储后再试。"
+      "message": "无法导出生词，请重试。"
     },
     "vocabAccountChanged": {
-      "message": "Pinboard 账号已切换。请检查当前生词列表后再试。"
+      "message": "操作完成前 Pinboard 账号已切换，请重试。"
     },
     "vocabSettingsSaveFailed": {
       "message": "无法保存刚才修改的集成设置。请检查设置后再试。"
     },
     "vocabSelectHint": {
-      "message": "Ctrl+点击词条即可选中，Shift+点击选中一段区间"
+      "message": "Ctrl+点击条目即可选中，Shift+点击可选中连续多条"
     },
     "vocabResultCount": {
       "message": "找到 $RESULTS$ 条；当前 Pinboard 账号（$OWNER$）共保存 $TOTAL$ 条",
@@ -3343,7 +3377,7 @@
       }
     },
     "vocabBatchDeleteConfirm": {
-      "message": "删除选中的生词？共 $COUNT$ 条。",
+      "message": "删除选中的 $COUNT$ 条生词？",
       "placeholders": {
         "count": {
           "content": "$1"
@@ -3351,10 +3385,10 @@
       }
     },
     "vocabBatchFailed": {
-      "message": "批量操作失败，未更改任何生词。"
+      "message": "操作失败，未更改任何生词。"
     },
     "vocabSelectionChanged": {
-      "message": "选择已发生变化，请检查当前结果后重试。"
+      "message": "列表已发生变化，请检查当前结果后重试。"
     },
     "vocabRefreshFailed": {
       "message": "更改已保存，但列表刷新失败。请重新打开「生词」。"
@@ -3434,7 +3468,7 @@
     }
   },
   "dictAnkiModelMismatch": {
-    "message": "已有的「Pinboard Vocab」笔记类型字段不匹配。请恢复预期字段及顺序后再试。"
+    "message": "Anki 中的「Pinboard Vocab」笔记类型字段不匹配。请恢复其原有字段，或将它改名以便重新创建，然后再试。"
   },
   "dictAnkiHostPermissionDenied": {
     "message": "未授予 Chrome 访问本机 AnkiConnect 地址的权限。请允许访问后再试。"
@@ -3449,13 +3483,16 @@
     "message": "需要 AnkiConnect API 版本 6 或更高版本。请更新 AnkiConnect 后再试。"
   },
   "dictAnkiFieldCheckFailed": {
-    "message": "无法读取「Pinboard Vocab」笔记类型的字段。请检查 AnkiConnect 及其 API 密钥后再试。"
+    "message": "无法读取「Pinboard Vocab」笔记类型的字段。请检查 AnkiConnect 及其 API Key 后再试。"
   },
   "dictAnkiFailed": {
     "message": "无法将生词发送到 Anki。请检查 AnkiConnect 后再试，或导出全部生词为 .tsv。"
   },
   "dictAnkiKeyRequired": {
-    "message": "AnkiConnect 要求 API key，请在下方填写。"
+    "message": "AnkiConnect 要求 API Key，请在上方填写。"
+  },
+  "dictAnkiKeyRejected": {
+    "message": "AnkiConnect 拒绝了这个 API Key。请检查上方填写的 Key 后再试。"
   },
   "dictAnkiDeckLabel": {
     "message": "Anki 牌组"
@@ -3464,7 +3501,7 @@
     "message": "AnkiConnect 端口"
   },
   "dictAnkiKeyLabel": {
-    "message": "AnkiConnect API key（可选）"
+    "message": "AnkiConnect API Key（可选）"
   },
   "dictPackSection": {
     "message": "离线汉英词典"
@@ -3476,7 +3513,7 @@
     "message": "导入文件"
   },
   "dictPackImporting": {
-    "message": "已导入 $N$ 条…",
+    "message": "正在导入…已处理 $N$ 条",
     "placeholders": {
       "n": {
         "content": "$1"
@@ -3513,7 +3550,7 @@
     "message": "无法删除离线词典，请重试。"
   },
   "dictPackEmpty": {
-    "message": "未导入。从 MDBG 下载 CC-CEDICT 发布包（.txt.gz 或 .zip 均可）后在此导入（CC BY-SA 4.0）"
+    "message": "未导入。从 MDBG 下载 CC-CEDICT 发布包（.txt.gz 或 .zip 均可）后在此导入（CC BY-SA 4.0）。"
   },
   "dictPackStatus": {
     "message": "已导入 $N$ 条 · $DATE$",
@@ -3556,7 +3593,7 @@
     "message": "已发送到欧路词典，但无法获取准确数量。"
   },
   "dictEudicRejected": {
-    "message": "欧路词典拒绝了请求。请检查 OpenAPI 令牌，稍后重试。"
+    "message": "欧路词典拒绝了请求。请检查 OpenAPI 授权信息，稍后再试。"
   },
   "dictEudicHostPermissionDenied": {
     "message": "未授予 Chrome 访问欧路词典 API 的权限。请允许访问后再试。"
@@ -3565,7 +3602,7 @@
     "message": "无法将生词发送到欧路词典。请检查授权信息后再试。"
   },
   "dictEudicTokenRequired": {
-    "message": "请在下方填写欧路词典 OpenAPI 授权信息，或检查其是否仍有效。"
+    "message": "请在上方填写欧路词典 OpenAPI 授权信息，或检查其是否仍有效。"
   },
   "dictEudicTokenLabel": {
     "message": "欧路词典 OpenAPI 授权信息"
@@ -3580,7 +3617,7 @@
     "message": "测试欧路词典连接"
   },
   "dictAnkiNothing": {
-    "message": "暂无可发送的生词。"
+    "message": "还没有保存的生词。"
   },
   "dictDeleteWord": {
     "message": "从生词本移除"
@@ -3589,7 +3626,7 @@
     "message": "来源："
   },
   "dictAiNotConfigured": {
-    "message": "在设置中配置 AI 服务后可获得语境释义。"
+    "message": "要获得语境释义，请在设置中配置 AI 服务商并开启阅读器 AI 功能。"
   },
   "dictVocabEmpty": {
     "message": "当前 Pinboard 账号（$OWNER$）还没有生词。可在阅读器的词典视图中保存单词。",
@@ -3612,9 +3649,6 @@
   },
   "secSendDestinations": {
     "message": "发送目标"
-  },
-  "secSendDestinationsHint": {
-    "message": "每个启用的目标都会出现在阅读器的「发送到」菜单中。"
   },
   "mdSendEnableTo": {
     "message": "启用导出到 {name}"
@@ -3659,35 +3693,35 @@
     "message": "无法打开应用 · 全文已复制到剪贴板"
   },
   "mdSendNoneConfigured": {
-    "message": "尚未启用任何目标。请在设置中添加"
+    "message": "尚未启用任何目标，请在设置中启用。"
   },
   "mdManageDestinations": {
     "message": "管理目标 →"
   },
   "mdSendApiDown": { "message": "无法连接到导出服务器。全文已复制到剪贴板，粘贴即可完成。" },
-  "mdSendApiBadToken": { "message": "服务器拒绝了令牌，请从应用中重新复制。全文已复制到剪贴板。" },
+  "mdSendApiBadToken": { "message": "Token 被拒绝，请在设置中检查。全文已复制到剪贴板。" },
   "mdSendNotionNotShared": { "message": "Notion 拒绝了父页面。请打开该页面的 ··· 菜单，选择「添加连接」并加入你的连接，然后重试。全文已复制到剪贴板。" },
   "mdSendApiFailed": { "message": "导出请求失败。全文已复制到剪贴板，粘贴即可完成。" },
   "mdSendTest": { "message": "测试连接" },
   "mdSendTestOk": { "message": "连接成功" },
-  "mdSendTestDown": { "message": "无法连接到服务器。应用是否正在运行？" },
-  "mdSendTestBadToken": { "message": "令牌被拒绝。请从应用中重新复制。" },
-  "mdSendTestNoToken": { "message": "请先输入令牌。" },
-  "mdSendTestPerm": { "message": "本地访问权限被拒绝。" },
+  "mdSendTestDown": { "message": "无法连接到该服务，或服务返回了错误。" },
+  "mdSendTestBadToken": { "message": "Token 被拒绝。请重新复制完整 Token 后粘贴。" },
+  "mdSendTestNoToken": { "message": "请先输入 Token。" },
+  "mdSendTestPerm": { "message": "未授予访问权限。" },
   "mdTargetGithubToken": {
-    "message": "GitHub 令牌（classic 类型，gist 权限）"
+    "message": "GitHub Token（classic 类型，gist 权限）"
   },
   "mdTargetGithubOnboarding": {
-    "message": "在 GitHub → Settings → Developer settings → Tokens (classic) 创建一个经典个人访问令牌，勾选「gist」权限，粘贴到下方。每条剪藏会保存为一个私有 gist。注意：细粒度（fine-grained）令牌暂不支持创建 gist，请使用 classic 令牌。"
+    "message": "在 GitHub → Settings → Developer settings → Tokens (classic) 创建一个 Personal Access Token（classic），勾选「gist」权限，粘贴到下方。每条剪藏会保存为一个 secret gist：不会公开列出，但拿到链接的人都能查看。"
   },
   "mdTargetNotionToken": {
-    "message": "内部连接令牌"
+    "message": "内部连接 Token"
   },
   "mdTargetNotionParent": {
     "message": "父页面（URL 或 ID）"
   },
   "mdTargetNotionOnboarding": {
-    "message": "在 Notion 开发者设置（app.notion.com/developers/connections）点击「新连接」创建连接并复制它的令牌；再打开目标页面的 ··· 菜单，选择「添加连接」并加入该连接，最后把页面链接粘贴到这里。每次发送都会在该页面下新建一个子页面。"
+    "message": "在 Notion 开发者设置（app.notion.com/developers/connections）点击「新连接」创建连接并复制它的 Token；再打开目标页面的 ··· 菜单，选择「添加连接」并加入该连接，最后把页面链接粘贴到这里。每次发送都会在该页面下新建一个子页面。"
   },
   "mdTargetNotebookLmOnboarding": {
     "message": "无需配置。发送时会把全文复制到剪贴板并打开 NotebookLM；在里面新增来源、选择「复制的文字」，然后粘贴即可。NotebookLM 没有公开 API，最后一步只能手动完成。"
@@ -3708,7 +3742,7 @@
     "message": "Authorization 头（可选）"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填写的 Authorization 值会原样发送（如 Bearer <令牌> 或 Token <密钥>），任何认证方案都支持。可对接 n8n、Make、Zapier、Readwise 或任意自建接收端，无需在此注册账号。"
+    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端；开启「包含扩展元数据」时还会附带作者、来源站点等字段。你填写的 Authorization 值会原样发送（如 Bearer <token> 或 Token <key>），任何认证方案都支持。可对接 n8n、Make、Zapier、Readwise 或任意自建接收端，无需在此注册账号。"
   },
   "mdTargetWebhookHttpWarn": {
     "message": "已阻止：请使用 HTTPS；HTTP 仅允许 localhost、127.0.0.1 或 [::1]。局域网/公网 HTTP、无效地址及含账号密码的地址不会发送。"
@@ -3722,13 +3756,16 @@
   "hlColorDoubt": { "message": "存疑" },
   "hlColorTodo": { "message": "待办" },
   "hlTrBadgeAria": { "message": "译文高亮（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
-  "hlNoteBtn": { "message": "带笔记高亮" },
-  "hlSaveFailed": { "message": "高亮未能保存（存储空间已满）" },
+  "hlNoteBtn": { "message": "高亮并添加笔记" },
+  "hlSaveFailed": { "message": "高亮未能保存" },
   "hlNotePlaceholder": { "message": "添加笔记…" },
   "hlSave": { "message": "保存" },
   "hlDelete": { "message": "删除高亮" },
   "hlDeleteConfirm": {
     "message": "删除这条高亮及其笔记？"
+  },
+  "hlGoneElsewhere": {
+    "message": "这条高亮已在别处删除，改动未保存。"
   },
   "hlDegraded": { "message": "位置已失准：周围文本发生了变化，该高亮现已覆盖整段。" },
   "hlOrphanNote": { "message": "$COUNT$ 条高亮未能在当前页面内容中定位（笔记仍保留）", "placeholders": { "count": { "content": "$1" } } },
@@ -3740,10 +3777,9 @@
   "mdImgFixPartial": {"message": "已修复 $OK$/$TOTAL$ 张图片", "placeholders": {"ok": {"content": "$1"}, "total": {"content": "$2"}}},
   "hlSectionTitle": { "message": "高亮" },
   "kbdHelpTitle": { "message": "键盘快捷键" },
-  "kbdHelpIntro": { "message": "以下快捷键仅在阅读器页面生效（本设置页不适用）。" },
   "kbdHelpRailBtn": { "message": "键盘快捷键" },
   "kbdHelpTranslate": { "message": "开始或继续翻译全文" },
-  "kbdHelpDictionary": { "message": "查询当前选中内容" },
+  "kbdHelpDictionary": { "message": "在词典中查询当前选中内容" },
   "kbdHelpExplain": { "message": "解释当前选中内容" },
   "kbdHelpToggleView": { "message": "依次切换原文、双语和仅译文视图" },
   "kbdHelpHighlight": { "message": "高亮当前选中内容（h 使用上次颜色，1-5 指定颜色）" },
@@ -3755,9 +3791,9 @@
   "hlFilterGroupAria": { "message": "按高亮颜色筛选" },
   "hlCopyMd": { "message": "复制为 Markdown" },
   "hlCopied": { "message": "高亮已复制" },
-  "hlFilterEmpty": { "message": "没有高亮匹配所选颜色" },
+  "hlFilterEmpty": { "message": "所选颜色下没有高亮" },
   "explainSaveNote": { "message": "存为笔记" },
-  "explainSavedNote": { "message": "已存" },
+  "explainSavedNote": { "message": "已存为笔记" },
   "hlCardExplain": { "message": "解释" },
   "hlCardTranslate": { "message": "翻译" },
   "hlCardAsk": { "message": "提问" },
@@ -3796,23 +3832,23 @@
   "libraryTitle": { "message": "笔记与生词本" },
   "libraryOpen": { "message": "打开笔记与生词本" },
   "libraryDetailTitle": { "message": "词条详情" },
-  "libraryNotesDetailEmpty": { "message": "从列表里选一条高亮，就能读到全文。" },
-  "libraryPageCount": { "message": "本页 $COUNT$ 条", "placeholders": { "count": { "content": "$1" } } },
+  "libraryNotesDetailEmpty": { "message": "从列表中选一条高亮，查看完整内容。" },
+  "libraryPageCount": { "message": "此网页共 $COUNT$ 条", "placeholders": { "count": { "content": "$1" } } },
   "libraryNotesCoverLead": { "message": "$TOTAL$ 条高亮，来自 $PAGES$ 个网页；最近一次保存在 $DATE$。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" }, "date": { "content": "$3" } } },
   "libraryNotesCoverLeadNoDate": { "message": "$TOTAL$ 条高亮，来自 $PAGES$ 个网页。", "placeholders": { "total": { "content": "$1" }, "pages": { "content": "$2" } } },
   "libraryCountHighlights": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountHighlightsOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountPages": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountPagesOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
-  "libraryThisPage": { "message": "这一页" },
+  "libraryThisPage": { "message": "此网页" },
   "libraryOpenOriginal": { "message": "打开原文" },
   "libraryPageFacts": { "message": "$COUNT$ 条高亮，其中 $NOTED$ 条有笔记", "placeholders": { "count": { "content": "$1" }, "noted": { "content": "$2" } } },
   "libraryCountNoted": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最早 $FIRST$ · 最近 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "保存于 $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "高亮和笔记只保存在本设备，不参与同步。要迁移到别的设备，请在设置页导出备份，再在那台设备导入。" },
-  "libraryNotesScopeOpenBackup": { "message": "打开备份设置" },
+  "libraryNotesScopeHint": { "message": "高亮和笔记保存在本设备上。要在其他设备上使用，可在设置中为「高亮与笔记」开启 Google Drive 同步，或导出备份后在那台设备导入。" },
+  "libraryNotesScopeOpenBackup": { "message": "打开通用设置" },
   "libraryRelookup": { "message": "重新查词典" },
   "libraryBack": { "message": "返回列表" },
   "libraryStatsWords": { "message": "$COUNT$ 个词", "placeholders": { "count": { "content": "$1" } } },
@@ -3823,7 +3859,7 @@
   "libraryStatsGroupsOne": { "message": "$COUNT$ 个分组", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLanguages": { "message": "$COUNT$ 种语言", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsLanguagesOne": { "message": "$COUNT$ 种语言", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsRecent": { "message": "7 天 +$D7$ · 30 天 +$D30$", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
+  "libraryStatsRecent": { "message": "近 7 天 +$D7$ · 近 30 天 +$D30$", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ 条高亮", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsOne": { "message": "$COUNT$ 条高亮", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsPages": { "message": "$COUNT$ 个网页", "placeholders": { "count": { "content": "$1" } } },
@@ -3852,10 +3888,10 @@
   "mdVideoNoTracks": { "message": "该视频没有可用字幕" },
   "mdVideoBiliLogin": { "message": "未找到字幕。B 站仅在登录后返回字幕，请先登录 bilibili.com 再重试。" },
   "mdVideoFailed": { "message": "无法通过扩展获取该视频的字幕。YouTube 对部分视频限制了字幕访问。" },
-  "mdVideoBlocked": { "message": "YouTube 拦截了这次请求（它要求确认你不是机器人），与该视频有没有字幕无关。可以点「在 YouTube 上打开」，或在设置中开启登录 Cookie 选项后重试。" },
-  "mdVideoOpenTabHint": { "message": "提示：打开该视频的 YouTube 标签页并保持开启，然后回来重试——字幕会经由该标签页读取。" },
+  "mdVideoBlocked": { "message": "YouTube 拦截了这次请求（它要求确认你不是机器人），与该视频有没有字幕无关。可以点「在 YouTube 上打开」。" },
+  "mdVideoOpenTabHint": { "message": "提示：在 YouTube 标签页中打开该视频并保持开启，然后回来重试，字幕会经由该标签页读取。" },
   "mdVideoBodyBlocked": { "message": "已找到字幕轨，但 YouTube 未返回字幕内容。保持该视频的 YouTube 标签页打开后重试，或切换另一条字幕轨。" },
-  "mdVideoPermMissing": { "message": "已拒绝授权，未加载任何内容" },
+  "mdVideoPermMissing": { "message": "未授予字幕访问权限，未加载字幕" },
   "mdVideoCopyMd": { "message": "复制字幕为 Markdown" },
   "mdVideoAiPunct": { "message": "AI 标点" },
   "mdVideoAiPunctDone": { "message": "已标点" },
@@ -3892,7 +3928,7 @@
   "mdVideoTranscriptHeading": { "message": "字幕稿" },
   "mdVideoPromoted": { "message": "字幕稿已就绪，已替换原正文" },
   "mdVideoAiCancel": { "message": "取消 AI 标点" },
-  "mdVideoAiPunctEst": { "message": "约 ~$TOKENS$ tokens", "placeholders": { "tokens": { "content": "$1" } } },
+  "mdVideoAiPunctEst": { "message": "约 $TOKENS$ tokens", "placeholders": { "tokens": { "content": "$1" } } },
   "mdVideoAiPunctConfirm": { "message": "AI 标点会替换正文：已有翻译将被清空，问答引用将失效。继续？" },
   "mdStatVideoLen": { "message": "片长 $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "mdVideoCopyMore": { "message": "更多复制格式" },
@@ -3916,9 +3952,9 @@
   "mdVideoRelaySilent": { "message": "播放器未回传进度（YouTube 播放器接口未加载）：跟随播放、快捷键、循环当前句、每句结束后暂停和播放速度暂不可用" },
   "mdVideoUnplayable": { "message": "YouTube 报告该视频当前不可播放（$STATUS$），与字幕无关。可以点「在 YouTube 上打开」查看原因。", "placeholders": { "status": { "content": "$1" } } },
   "mdVideoBridgeEnable": { "message": "启用播放跟随" },
-  "mdVideoBridgeEnableHint": { "message": "授权扩展从 player.bilibili.com 读取播放位置（仅在本预览页内，只读进度与播放状态），字幕稿即可像在 YouTube 上一样跟随播放、循环当前句、每句结束后暂停。" },
+  "mdVideoBridgeEnableHint": { "message": "授权扩展从 player.bilibili.com 读取播放位置（仅在本阅读器页内，只读进度与播放状态），字幕稿即可像在 YouTube 上一样跟随播放、循环当前句、每句结束后暂停。" },
   "mdVideoGrantScopeBili": { "message": "授权范围：B 站字幕接口与播放器页面（读取字幕与播放进度）" },
-  "mdVideoBridgeSilent": { "message": "播放器未回传进度：可改用「估计播放位置」，或重新打开预览再试" },
+  "mdVideoBridgeSilent": { "message": "播放器未回传进度：可改用「估计播放位置」，或重新打开阅读器再试" },
   "mdVideoTimelineAria": { "message": "字幕时间轴" },
   "kbdHelpVideoPlay": { "message": "播放/暂停" },
   "kbdHelpVideoSeek": { "message": "后退/前进 3 秒" },
@@ -3927,16 +3963,12 @@
   "kbdHelpVideoFollow": { "message": "跟随播放进度" },
   "kbdHelpVideoCurrent": { "message": "回到当前句" },
   "kbdHelpVideoView": { "message": "阅读稿/时间轴" },
-  "kbdHelpVideoSection": { "message": "视频页" },
-  "kbdHelpVideoNote": { "message": "空格、左右方向键、r 和 f 需要播放器回传进度：YouTube 始终可用，B 站需先启用播放跟随。" },
   "secVideoPreview": { "message": "视频页" },
   "optVideoLangPref": { "message": "首选字幕语言" },
   "optVideoLangPrefHint": { "message": "按优先顺序填写语言代码，逗号分隔，如 en, zh 表示英语优先、其次中文；也可以填 zh-Hant 这类完整标签。顺序绝对优先；同一语言内先精确匹配完整标签，再退到主语言代码。留空则跟随界面语言。" },
   "optVideoLangCodesLink": { "message": "语言代码列表" },
   "optVideoPauseOnLookup": { "message": "查词时暂停播放" },
-  "optVideoPauseOnLookupHint": { "message": "选中文字或打开解释弹层时暂停播放（YouTube；B 站需先启用播放跟随），查完自动继续。" },
   "optVideoDarkScheme": { "message": "视频页默认使用深色" },
-  "optVideoDarkSchemeHint": { "message": "主题为自动或浅色时，视频页仍以深色阅读配色打开。阅读器的「Aa」面板可以为本设备的所有阅读器页面覆盖此项。" },
   "mdVideoResumePrompt": { "message": "上次看到 $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "mdVideoResumeGo": { "message": "继续" },
   "mdVideoResumeRestart": { "message": "从头开始" },
@@ -3946,7 +3978,7 @@
   "mdVideoStateOn": { "message": "已开启" },
   "mdVideoStateOff": { "message": "已关闭" },
   "skimWaitingCaptions": { "message": "字幕加载完成后自动生成要点；也可点「重新生成」立即生成" },
-  "batchResumed": { "message": "已恢复批量保存 · 第 $ATTEMPT$ 次，共可恢复 $MAX$ 次", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
+  "batchResumed": { "message": "中断后已恢复（第 $ATTEMPT$ 次，最多 $MAX$ 次）", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
   "batchCancelFailed": { "message": "未能发出取消请求，请重试。" },
   "connectionOverviewTitle": { "message": "连接状态" },
   "connectionOverviewHint": { "message": "状态来自当前配置、已授予权限和最近一次手动测试。打开设置不会连接这些服务，也不会申请权限。" },
@@ -3960,8 +3992,8 @@
   "settingsSearchLabel": { "message": "搜索设置" },
   "settingsSearchPlaceholder": { "message": "搜索设置" },
   "settingsSearchNoResults": { "message": "没有匹配的设置，请尝试搜索功能或控件名称。" },
-  "diagnosticsTitle": { "message": "支持诊断信息" },
-  "diagnosticsHint": { "message": "复制扩展版本、浏览器、功能开关、权限、存储和错误分类信息；不会包含凭据、账号名、页面地址、正文或自定义端点。" },
+  "diagnosticsTitle": { "message": "诊断信息" },
+  "diagnosticsHint": { "message": "复制扩展版本、浏览器与语言、AI 服务商、各服务是否已配置、功能开关、权限、存储与缓存用量、队列与批量任务计数、连接测试结果和错误代码；不包含凭据、账号名、页面地址、正文或自定义端点。" },
   "diagnosticsCopy": { "message": "复制诊断信息" },
   "diagnosticsCopied": { "message": "诊断信息已复制" },
   "diagnosticsCopyFailed": { "message": "无法复制诊断信息，请检查剪贴板权限后重试。" },
@@ -3990,8 +4022,17 @@
   "popupDraftRestored": {
     "message": "已恢复未保存的草稿。"
   },
+  "mdVideoBlockedLoginHint": {
+    "message": "也可以在设置中开启「随字幕请求发送 YouTube 登录 Cookie」。"
+  },
   "popupDraftFailed": {
     "message": "草稿未能保留，请在关闭弹窗前保存书签。"
+  },
+  "popupDraftRestoreFailed": {
+    "message": "无法恢复上次的草稿。"
+  },
+  "popupDraftDiscardFailed": {
+    "message": "无法丢弃草稿，请重试。"
   },
   "optSavePending": { "message": "更改尚未保存" },
   "optRetrySave": { "message": "重试保存" },
@@ -4013,10 +4054,10 @@
       "message": "高亮与笔记"
     },
     "driveVocabularyLastSuccess": {
-      "message": "生词上次同步成功"
+      "message": "生词最近成功同步"
     },
     "driveNotesLastSuccess": {
-      "message": "高亮与笔记上次同步成功"
+      "message": "高亮与笔记最近成功同步"
     },
     "driveSyncChooseData": {
       "message": "选择要在本机同步的数据。"
@@ -4038,7 +4079,7 @@
       }
     },
     "driveVocabularyNotices": {
-      "message": "生词冲突：$COUNT$。已保留本机修改。",
+      "message": "生词冲突：$COUNT$ 处。被修改的生词已保留，未被删除。",
       "placeholders": {
         "count": {
           "content": "$1"
@@ -4046,7 +4087,7 @@
       }
     },
     "driveNotesNotices": {
-      "message": "高亮与笔记冲突：$COUNT$。已保留两个版本。",
+      "message": "高亮与笔记冲突：$COUNT$ 处。被修改的条目已保留，未被删除；有冲突的笔记两个版本都已保留。",
       "placeholders": {
         "count": {
           "content": "$1"
@@ -4054,7 +4095,7 @@
       }
     },
     "driveNotesErrorEntryTooLarge": {
-      "message": "一条高亮或笔记过大，无法同步。缩短或移除后，点击「立即同步」。"
+      "message": "有一条高亮或笔记过大，无法同步。请缩短或删除该条内容，然后点击「立即同步」。"
     },
     "driveScopeSaveFailed": {
       "message": "无法保存本机同步范围，请重试。"

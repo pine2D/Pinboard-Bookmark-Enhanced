@@ -357,7 +357,7 @@ async function createBatchSaveHarness(options) {
     showNotification: (...args) => notifications.push(args),
     t: (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
     hasAIKey: () => false,
-    chrome: { storage: { local: { get: async () => ({}) } } },
+    chrome: { storage: { local: { get: opts.storageGet || (async () => ({})) } } },
     buildTagCaseMap: () => ({}),
     pbpEffectivePrivate: (loaded, ctx) => !!(
       loaded.optPrivateDefault || (loaded.optPrivateIncognito && ctx?.incognito)
@@ -763,6 +763,26 @@ await suite("unified save pipeline", async () => {
     assert(previewSource.includes("if (url && previewAccount)"), "ownerless preview still requests bookmark data");
     const shortcut = source.slice(source.indexOf("async function openMarkdownPreviewFromShortcut"));
     assert(shortcut.includes('account: auth.account || ""'), "shortcut preview payload has no owner field");
+  });
+
+  await test("reader shortcut on a non-web tab says unsupported, not empty (B40)", async () => {
+    const source = await getBackgroundSource();
+    const s0 = source.indexOf("async function openMarkdownPreviewFromShortcut");
+    const s1 = source.indexOf("  // Open the preview INSTANTLY", s0);
+    assert(s0 >= 0 && s1 > s0, "shortcut guard source not found");
+    let active = null;
+    const notes = [];
+    const open = new Function("pbpSweepPreviewOrphans", "chrome", "showNotification", "t",
+      source.slice(s0, s1) + "  return \"proceeded\";\n}\nreturn openMarkdownPreviewFromShortcut;"
+    )(() => {}, { tabs: { query: async () => [active] } }, (...args) => notes.push(args), (key) => key);
+    active = { id: 1, url: "chrome://newtab/" };
+    equal(await open(), undefined, "a chrome:// tab was opened in the reader");
+    equal(notes.at(-1)[2], "bgMdPreviewUnsupported", "unsupported page was blamed on missing content");
+    active = { id: 2, url: "httpfoo://example" };
+    await open();
+    equal(notes.at(-1)[2], "bgMdPreviewUnsupported", "a non-http scheme slipped past the prefix check");
+    active = { id: 3, url: "https://example.com/" };
+    equal(await open(), "proceeded", "a web page was refused");
   });
 
   await test("concurrent Batch start messages reserve exactly one run before auth resolves", async () => {
@@ -1457,6 +1477,14 @@ await suite("unified save pipeline", async () => {
     equal(quick.intents[0].archive, undefined);
     equal(quick.intents[0].tags, "quick-tag");
 
+    // B50: the CJK settings label says "comma-separated"; a full-width comma must split too.
+    const cjkTags = await createBackgroundSaveHarness({ cachedSettings: {
+      pinboardToken: "token", bgSaveMode: "merge", optPrivateDefault: false,
+      optPrivateIncognito: false, _defaultTags: "阅读，工具, later", _aiTags: false, _aiSummary: false,
+    } });
+    await runBackgroundSave(cjkTags, { tab: { id: 9, url: BASE_INTENT.url, incognito: false } });
+    equal(cjkTags.intents[0].tags, "阅读 工具 later", "full-width comma did not split default tags");
+
     const readLater = await createBackgroundSaveHarness({ cachedSettings: {
       pinboardToken: "token", bgSaveMode: "overwrite", optPrivateDefault: false,
       optPrivateIncognito: false, _defaultTags: "", _aiTags: false, _aiSummary: false,
@@ -1869,6 +1897,15 @@ await suite("unified save pipeline", async () => {
     equal(h.notifications[0][1], "bgBatchSaved");
     assert(h.notifications[0][2].includes("offlineQueued:1"), "mixed notification omits queued count");
     assert(h.notifications[0][2].includes("batchTaggedSuffix:Batch-Tag"), "Batch tag suffix missing");
+
+    // A user cancel must not be headlined as a finished batch (B31).
+    const cancelled = await createBatchSaveHarness({ storageGet: async (key) => key === "batch_cancel_requested"
+      ? { batch_cancel_requested: { runId: "test-batch-run", account: "alice" } } : {} });
+    await cancelled.handleBatchSave(batchTabs(3));
+    equal(cancelled.intents.length, 0, "cancel requested before the first item still saved");
+    equal(cancelled.progress[cancelled.progress.length - 1].error, "cancelled");
+    equal(cancelled.notifications.length, 1);
+    equal(cancelled.notifications[0][1], "bgBatchCancelled", "cancel toast reused the success title");
 
     const noToken = await createBatchSaveHarness({ settings: { pinboardToken: "" } });
     await noToken.handleBatchSave(batchTabs(3));

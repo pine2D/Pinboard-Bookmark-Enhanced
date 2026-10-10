@@ -24,7 +24,7 @@ function harness(source, seed = {}, results = {}) {
     pbpCreateNotesSyncStore: () => ({ getPreflightState: async () => null }),
     pbpVocabSyncSnapshot: async () => { if (results.vocabSnapshotError) throw new Error("vocabulary storage unavailable"); return results.vocabSnapshot || ({ ...empty, outbox: [{ recordKey: "en|word" }] }); },
     pbpNotesSyncSnapshot: async () => { if (results.notesSnapshotError) throw new Error("notes storage unavailable"); return results.notesSnapshot || ({ ...empty, outbox: [{ recordKey: "pbp_hl_abcd|note" }] }); },
-    pbpVocabGetPreflightState: async () => null,
+    pbpVocabGetPreflightState: async () => { if (results.vocabPreflightError) throw new Error("vocabulary preflight unavailable"); return results.vocabPreflight || null; },
     pbpNotesGetPreflightState: async () => null,
     getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
     pbpPinboardAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
@@ -175,10 +175,19 @@ function bootHarness(source, seed = {}) {
   check("notes-only status identifies current notes account over disabled vocabulary history", notesAccount.drivePermissionId === "google-current" && notesAccount.emailAddress === "current@example.test");
   h = harness(source, { driveSyncNotes: true }, { notesSnapshotError: true });
   let notesFailed = null; try { notesFailed = await h.status(); } catch (_) {}
-  check("notes status read failure retains healthy vocabulary status", notesFailed?.pendingWords === 1 && notesFailed.notes?.lastError === "local_store" && notesFailed.notes.blocked === true);
+  // A failed status READ stops nothing, so it reports status_unavailable, never local_store + blocked (B13).
+  check("notes status read failure retains healthy vocabulary status", notesFailed?.pendingWords === 1 && notesFailed.notes?.lastError === "status_unavailable" && notesFailed.notes.blocked === false);
   h = harness(source, { driveSyncNotes: true }, { vocabSnapshotError: true });
   let vocabularyFailed = null; try { vocabularyFailed = await h.status(); } catch (_) {}
-  check("vocabulary status read failure retains healthy notes status", vocabularyFailed?.lastError === "local_store" && vocabularyFailed.blocked === true && vocabularyFailed.notes?.pendingNotes === 1 && !vocabularyFailed.notes.lastError);
+  check("vocabulary status read failure retains healthy notes status", vocabularyFailed?.lastError === "status_unavailable" && vocabularyFailed.blocked === false && vocabularyFailed.notes?.pendingNotes === 1 && !vocabularyFailed.notes.lastError);
+  // Account rows as vocab-gdrive.js persists them: a backoff row keeps its retryAt.
+  const backoffRow = { states: [{ key: "account:google-a:" + "a".repeat(64), drivePermissionId: "google-a", ownerHash: "a".repeat(64), emailAddress: "current@example.test", displayName: "", bootstrapComplete: true, pageToken: "42", lastSuccessAt: 100, lastError: "network", retryAttempt: 2, retryAt: Date.UTC(2026, 9, 1) }], outbox: [], batches: [], notices: [] };
+  h = harness(source, {}, { vocabSnapshot: backoffRow, vocabPreflightError: true });
+  let preflightFailed = null; try { preflightFailed = await h.status(); } catch (_) {}
+  check("unreadable preflight neither blocks nor promises the account row's stale retry", preflightFailed?.lastError === "status_unavailable" && preflightFailed.blocked === false && preflightFailed.retryAt === null && preflightFailed.lastSuccessAt === 100);
+  h = harness(source, {}, { vocabSnapshotError: true, vocabPreflight: { key: "preflight:" + "a".repeat(64), ownerHash: "a".repeat(64), retryAttempt: 0, retryAt: null, lastError: "corrupt", blocked: true } });
+  let snapshotFailedBlocked = null; try { snapshotFailedBlocked = await h.status(); } catch (_) {}
+  check("readable blocked preflight survives a snapshot read failure", snapshotFailedBlocked?.lastError === "corrupt" && snapshotFailedBlocked.blocked === true);
   h = harness(source, { driveSyncNotes: false }, { notesSnapshotError: true });
   let disabledNotes = null; try { disabledNotes = await h.status(); } catch (_) {}
   check("disabled notes storage failure adds no visible dataset error", disabledNotes?.pendingWords === 1 && disabledNotes.notes?.lastError !== "local_store" && disabledNotes.notes?.blocked !== true);

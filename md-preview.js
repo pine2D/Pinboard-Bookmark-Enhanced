@@ -3559,6 +3559,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         } else if (res.error === "open-blocked") {
           showSendStatus(t("mdSendOpenBlocked"), true);
         } else if (res.ok) {
+          // ok + fellBack: only md-export-send.js's inline url-scheme branch
+          // (a row WITHOUT viaClipboard whose URI is too long) returns this.
+          // No current row takes that branch (Obsidian and NotebookLM both set
+          // viaClipboard), so this copy is reserved for a future inline target.
           showSendStatus(t("mdSendTooLongFellBack").replace("{name}", row.label), false); // long -> roomy block
         } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {
           // isError, like every other failure code here: md-export-send.js's

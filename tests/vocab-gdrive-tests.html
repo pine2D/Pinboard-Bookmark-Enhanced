@@ -1449,6 +1449,22 @@ function syncHarness(options = {}) {
       h.state().needsCheckpoint === undefined;
   });
 
+  await asyncCheck("blocking an account in backoff drops its stale retry time", async () => {
+    // Only a forced run clears a block, so the earlier backoff's retryAt
+    // would otherwise reach the panel as a "next retry" that never comes.
+    const h = syncHarness({
+      accountState: {
+        key: `account:perm-a:${OWNER_HASH}`, drivePermissionId: "perm-a",
+        ownerHash: OWNER_HASH, bootstrapComplete: true, pageToken: "stable-old",
+        retryAttempt: 3, retryAt: 900_000, lastError: "network"
+      },
+      changePages: [{ ok: false, error: "remote", retryable: false }]
+    });
+    const result = await h.runner()();
+    return !result.ok && h.preflight()?.blocked === true &&
+      h.state()?.lastError === h.preflight().lastError && h.state().retryAt === null;
+  });
+
   await asyncCheck("a cursor Drive rejects is dropped only for the forced retry that follows", async () => {
     const rejected = syncHarness({
       accountState: {

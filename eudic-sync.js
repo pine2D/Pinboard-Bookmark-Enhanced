@@ -107,8 +107,9 @@ async function pbpEudicCall(body, token, timeoutMs) {
 // token before a later retry. ownerCheck runs before every POST.
 // Lightweight connectivity probe (roadmap #31): the official read-only
 // category-list endpoint on the SAME already-disclosed origin — no user data
-// leaves, only the Authorization header rides along. 401/403 -> "auth" so the
-// tester can point at the token; anything else network-ish -> "unreachable".
+// leaves, only the Authorization header rides along. 401 -> "auth" and 403 ->
+// "forbidden", the same split pbpEudicSendRows makes, so the tester and the
+// send path give the same advice; anything else network-ish -> "unreachable".
 const PBP_EUDIC_PING_PATH = "/api/open/v1/studylist/category?language=en";
 async function pbpEudicPing(auth, timeoutMs) {
   const ctrl = new AbortController();
@@ -119,7 +120,8 @@ async function pbpEudicPing(auth, timeoutMs) {
       headers: { "Authorization": pbpEudicAuthHeader(auth) },
       signal: ctrl.signal
     });
-    if (resp.status === 401 || resp.status === 403) return { ok: false, error: "auth" };
+    if (resp.status === 401) return { ok: false, error: "auth" };
+    if (resp.status === 403) return { ok: false, error: "forbidden" };
     if (!resp.ok) return { ok: false, error: "http_" + resp.status };
     return { ok: true, error: null };
   } catch (e) {

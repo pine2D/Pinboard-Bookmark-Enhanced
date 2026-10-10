@@ -373,7 +373,15 @@ function selectionRange(n, start, end) {
     await boot(baseRecord());
     setQuiet(KEY, { ...baseRecord(), items: baseRecord().items.filter((it) => it.id !== "h-alpha") });
     const snapshot = JSON.stringify(record());
+    document.getElementById("copy-status").textContent = "";
+    FLASHED = [];
     await path.run("h-alpha");
+    // Says what happened (deleted elsewhere), not a generic save failure that
+    // sends the user hunting for a storage problem. _pbpHlToast routes to the
+    // button's label when it has one, else to #copy-status.
+    const told = FLASHED.length ? FLASHED[FLASHED.length - 1].msg : document.getElementById("copy-status").textContent;
+    check(path.name + " on a vanished id says it was deleted elsewhere",
+      told === "hlGoneElsewhere", told);
     check(path.name + " on a vanished id leaves the record untouched",
       JSON.stringify(record()) === snapshot, JSON.stringify(record()));
     check(path.name + " on a vanished id does not re-insert it",

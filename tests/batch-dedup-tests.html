@@ -416,7 +416,7 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     assert(doc.getElementById("batch-permission-list")?.tagName === "UL", "origins are not a semantic list");
     equal(progress?.getAttribute("tabindex"), "-1", "progress cannot receive focus after Grant");
     equal(progress?.getAttribute("role"), "progressbar");
-    equal(progress?.getAttribute("data-i18n-aria"), "batchSaveTitle", "progress has no localized accessible name");
+    equal(progress?.getAttribute("data-i18n-aria"), "batchProgressLabel", "progress has no localized accessible name of its own (not the button tooltip)");
     for (const id of ["batch-permission-grant", "batch-permission-cancel"]) {
       equal(doc.getElementById(id)?.getAttribute("type"), "button", id + " is not a real button");
     }
@@ -448,7 +448,7 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     h.renderBatchProgress({ running: true, done: false, total: 4, i: 2, saved: 1, queued: 1, failed: 0 });
     assert(h.elements["batch-progress-text"].innerHTML.includes("offlineQueued:1"), "queued count missing from running view");
     equal(h.elements["batch-progress"].attributes["aria-valuenow"], "50");
-    equal(h.elements["batch-progress"].attributes["aria-valuetext"], "batchProgress:2:4:1:0");
+    equal(h.elements["batch-progress"].attributes["aria-valuetext"], "batchProgressValue:2:4:1:0", "screen readers need the labelled sentence, not the compact button text");
     equal(h.elements["batch-bookmark-btn"].disabled, true);
   });
 
@@ -506,6 +506,16 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     assert(early.elements["batch-progress-text"].innerHTML.startsWith("0/3"), "terminal state lost the processed count");
     early.runTimer();
     equal(early.elements["batch-bookmark-btn"].focused, true, "hidden progress kept keyboard focus");
+  });
+
+  await test("completion copy is localized and names an account switch (B33/B51)", async () => {
+    const ai = await createUiHarness(null, 5000);
+    ai.renderBatchProgress({ running: false, done: true, total: 2, saved: 2, queued: 0, failed: 0, skipped: 0, tooLong: 0, aiFailed: 3 });
+    assert(ai.statuses[0].message.includes("batchAiFailed:3"), "AI failure count is not localized: " + ai.statuses[0].message);
+    assert(!/AI failed/.test(ai.statuses[0].message), "hard-coded English AI suffix leaked");
+    const switched = await createUiHarness(null, 5000);
+    switched.renderBatchProgress({ running: false, done: true, total: 3, i: 1, saved: 1, queued: 0, failed: 0, error: "account_changed" });
+    equal(switched.statuses[0].message, "batchAccountChanged", "account switch was reported as a token failure");
   });
 
   await test("reopen restores fresh running/done progress but ignores stale done", async () => {

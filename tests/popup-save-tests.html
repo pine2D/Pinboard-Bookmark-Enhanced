@@ -1908,15 +1908,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
     assert(k44SliceC.includes("ai-error-message"), "showAIError source not found");
     // The real table, sliced out rather than retyped: a renamed label must not
     // be able to pass here and fail in the product.
-    const AI_PROVIDER_LABEL = new Function(popupAiSource.slice(
-      popupAiSource.indexOf("const AI_PROVIDER_LABEL = {"),
-      popupAiSource.indexOf("// Find first provider OTHER than")) +
-      "; return AI_PROVIDER_LABEL;")();
-    assert(AI_PROVIDER_LABEL.openai === "OpenAI", "provider label table not found");
     const tEn = (key, sub) => {
       const raw = enMessages[key] ? enMessages[key].message : key;
       return sub === undefined ? raw : raw.replace(/\$[A-Za-z0-9_]+\$|\{0\}|%s/, sub);
     };
+    const providerLabelSource = popupAiSource.slice(
+      popupAiSource.indexOf("const AI_PROVIDER_LABEL = {"),
+      popupAiSource.indexOf("// Find first provider OTHER than"));
+    const { AI_PROVIDER_LABEL, pbpAiProviderLabel } = new Function("t", providerLabelSource +
+      "; return { AI_PROVIDER_LABEL, pbpAiProviderLabel };")(tEn);
+    assert(AI_PROVIDER_LABEL.openai === "OpenAI", "provider label table not found");
     function fakeEl() {
       const el = {
         textContent: "", dataset: {}, nextSibling: null,
@@ -2019,7 +2020,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         showStatus: (...a) => calls.status.push(a),
         showAIError: (kind, e) => calls.errors.push({ kind, e }),
         t: tEn,
-        AI_PROVIDER_LABEL, pbpAiModelNotFoundText: () => ({ msg: "", hint: "" }),
+        AI_PROVIDER_LABEL, pbpAiProviderLabel, pbpAiModelNotFoundText: () => ({ msg: "", hint: "" }),
         pickFallbackProvider: () => null,
         _aiErrorLastOp: null, _aiErrorLastPermission: null, _aiErrorHideTimer: null,
         pbpAiFastCached: async () => null,
@@ -2075,8 +2076,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(h.calls.summary.length === 0, "an empty summary was still committed via upsertSummary");
       assert(h.calls.status.length === 1 && h.calls.status[0][2] === "error",
         "an empty summary did not surface an error status: " + JSON.stringify(h.calls.status));
-      assert(h.calls.status[0][1] === tEn("aiNoContent"),
-        "the empty-summary status did not use the localized aiNoContent text");
+      // B45: the page text was extracted, so the empty reply is the model's --
+      // "no usable content on this page" would send the user to the wrong place.
+      assert(h.calls.status[0][1] === tEn("aiEmptyResult") && enMessages.aiEmptyResult,
+        "the empty-summary status blamed the page instead of the AI reply: " + h.calls.status[0][1]);
     });
 
     await testAsync("an empty summary from a stale op (URL edited away) paints nothing", async () => {
@@ -2274,6 +2277,28 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // not render at all. (The `invalid` case below also proves the card in this
     // harness really does open, so the "stayed hidden" assertions are not
     // passing on a card that could never have shown.)
+    // B42/B48: progress and error text name the provider by display name, and
+    // the custom endpoint's name follows the UI language.
+    test("AI progress and error text use provider display names", () => {
+      const zh = { provCustomShort: "自定义", aiStage_calling: "调用 {provider}…" };
+      const tZh = (key) => zh[key] || key;
+      const { pbpAiProviderLabel: labelZh } = new Function("t", providerLabelSource +
+        "; return { pbpAiProviderLabel };")(tZh);
+      assert(labelZh("custom") === "自定义", "custom provider name is not localized: " + labelZh("custom"));
+      assert(labelZh("zhipu") === "Zhipu", "brand name lost: " + labelZh("zhipu"));
+      const progressSrc = popupAiSource.slice(popupAiSource.indexOf("function setAiProgress("),
+        popupAiSource.indexOf("function clearAiProgress("));
+      const label = { textContent: "", setAttribute() {} };
+      const btn = { childNodes: [], dataset: {}, classList: { contains: () => false }, querySelector: () => label };
+      new Function("$id", "t", "pbpAiProviderLabel", "AI_BUTTON_BASE_TEXT", "AI_STAGE_STARTED", "AI_STAGE_TIMERS", "Node", "setTimeout",
+        progressSrc + "\nreturn setAiProgress;")(() => btn, tZh, labelZh, new Map(), new Map(), new Map(), { TEXT_NODE: 3 }, () => 0)(
+        "ai-summary-btn", { provider: "custom", stage: "calling" });
+      assert(label.textContent === " · 调用 自定义…", "progress label shows the internal id: " + label.textContent);
+      const card = popupAiSource.slice(popupAiSource.indexOf("function showAIError(op, err, opSettings)"),
+        popupAiSource.indexOf("let _aiErrorHideTimer = null;"));
+      assert(!/AI_PROVIDER_LABEL\[/.test(card), "the error card bypasses the display-name helper");
+    });
+
     await testAsync("a bus answer with no envelope renders the localized unknown error", async () => {
       const h = makePopupAi({ realErrorCard: true, respond: async () => undefined });
       await h.doAISummary(false);
@@ -2420,7 +2445,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       new Function(...Object.keys(deps), loginSource)(...Object.values(deps));
       await loginHandler({ preventDefault() {} });
       assert(mainCalls === 0 && loginSettings.pinboardToken === "", "failed persistence still entered the authenticated UI");
-      assert(errors.some((args) => args[0] === "login-error" && args[1] === "networkError"), "persistence failure was not surfaced on login");
+      assert(errors.some((args) => args[0] === "login-error" && args[1] === "loginSaveFailed"), "persistence failure was not surfaced on login as a storage problem (B52)");
     });
 
     // K155: the first-run login form used to collapse every non-ok
@@ -2475,6 +2500,21 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!resetSource.includes("storage.local") && !logoutSource.includes("storage.local"), "token clear still hand-routes a storage area");
       assert(loginSource.includes("const saved = await persistSettings") && loginSource.indexOf("if (!saved.ok)") < loginSource.indexOf("settings.pinboardToken = token"), "login enters memory before persistence succeeds");
       assert(resetSource.includes('settings.pinboardToken = ""') && resetSource.includes("window.location.reload()"), "session reset does not clear memory and reload");
+    });
+
+    // B38/B51: the retry outcome copy runs through the real retryFailureMessage.
+    test("offline retry failures are localized and name an account switch", () => {
+      const fnStart = popupOfflineSource.indexOf("function retryFailureMessage(result) {");
+      const fnEnd = popupOfflineSource.indexOf("\n  }\n", fnStart);
+      assert(fnStart >= 0 && fnEnd > fnStart, "retryFailureMessage source not found");
+      const message = new Function("t", "POSTS_ADD_URI_BUDGET",
+        popupOfflineSource.slice(fnStart, fnEnd + 4) + "\nreturn retryFailureMessage;"
+      )((key, ...args) => args.length ? `${key}:${args.join(":")}` : key, 4000);
+      assert(message({ status: "failed", reason: "api", detail: "missing url" }) === "pinboardApiError:missing url",
+        "API failure kept a hard-coded English prefix");
+      assert(message({ status: "failed", reason: "account_changed" }) === "offlineRetryAccountChanged",
+        "an account switch was reported as a token failure");
+      assert(!popupOfflineSource.includes('"(untitled)"'), "untitled queue rows are not localized");
     });
 
     // ---- Offline queue remove / clear: promise-form sendMessage failure paths ----
@@ -2940,6 +2980,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(h.elements["description-input"].value === "Notes", "the saved notes were not filled in");
       assert(h.tags().join(" ") === "alpha beta", "the saved tags were not filled in: " + JSON.stringify(h.tags()));
       assert(!h.elements["existing-banner"].classList.contains("hidden"), "the already-saved banner stayed hidden");
+      // B57: brackets and separator come from the catalogue (full-width in CJK), not hard-coded ASCII.
+      assert(h.elements["existing-banner"].textContent === "editingExistingDetails",
+        "the banner details were not routed through the localized template: " + h.elements["existing-banner"].textContent);
       assert(h.sent.some((m) => m.type === "lookup_bookmark"), "the popup never asked the worker to resolve the miss");
       assert(!h.sent.some((m) => m.type === "pinboard_api_call"), "the popup still went to the network itself");
       const cached = h.worker.statusCache.get(K1_CLEAN);

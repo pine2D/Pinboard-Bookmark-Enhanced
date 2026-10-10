@@ -790,7 +790,7 @@ function pbpAskBuildPrompt(args) {
 // pbpAiResolveModelOverride, whose undefined is what lets ai.js fall through
 // to the provider's own configured model.
 function _pbpAskProviderLabel(s) {
-  const provider = (s && s.aiProvider) || "gemini";
+  const provider = pbpAiProviderName(s);
   const model = pbpAiEffectiveModel(s);
   return (model && model !== "default") ? provider + " · " + model : provider;
 }
@@ -900,7 +900,10 @@ function _pbpAskErrorUi(aEl, error, question) {
   const err = document.createElement("p");
   err.className = "ask-err";
   const overrideHint = pbpAiOverrideErrHint(error, _pbpAskState && _pbpAskState.s);
-  err.textContent = ((error && error.message) ? error.message : String(error || ""))
+  // A message-less rejection (String(new Error("")) is the bare English word
+  // "Error") reads as the localized generic reason instead.
+  err.textContent = ((error && error.message) ? error.message
+    : (typeof error === "string" && error) ? error : t("aiErrRequestFailed"))
     + (overrideHint ? " " + overrideHint : "");
   const retry = document.createElement("button");
   retry.type = "button";
@@ -1087,7 +1090,7 @@ async function _pbpAskRun(question, aEl, opts) {
       note.textContent = t("askStopped");
       aEl.appendChild(note);
     } else {
-      _pbpAskErrorUi(aEl, e || new Error("Request failed"), question);
+      _pbpAskErrorUi(aEl, e || new Error(t("aiErrRequestFailed")), question);
     }
   } finally {
     st.running = false;
@@ -2347,7 +2350,7 @@ const PBP_EXPLAIN_CLOSE_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.cross
 // degraded those to a bare provider name. "default" is the custom provider's
 // sentinel, not a model. DISPLAY ONLY -- see _pbpAskProviderLabel.
 function _pbpExplainModelLabel(s) {
-  const p = s.aiProvider || "gemini";
+  const p = pbpAiProviderName(s);
   const m = pbpAiEffectiveModel(s);
   return (m && m !== "default") ? p + " · " + m : p;
 }
@@ -3051,7 +3054,7 @@ async function _pbpExplainRun(cap, ctx, pop) {
     wrap.className = "xp-error";
     const msg = document.createElement("p");
     const overrideHint = pbpAiOverrideErrHint(e, s);
-    msg.textContent = ((e && e.message) || "Request failed") // handleAIError text, plain
+    msg.textContent = ((e && e.message) || t("aiErrRequestFailed")) // handleAIError text, plain
       + (overrideHint ? " " + overrideHint : "");
     const retry = document.createElement("button");
     retry.type = "button";

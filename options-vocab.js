@@ -36,8 +36,10 @@ function _pbpVocabFlashStatus(ok, text) {
   setStatusIcon(el, ok, text);
   // Two flashes in quick succession (e.g. export then Anki) must not race:
   // the earlier call's clear-timer would otherwise wipe the later message.
+  // A failure is a recovery instruction, often two sentences: it stays until
+  // the next message replaces it instead of timing out mid-read.
   clearTimeout(_vocabFlashTimer);
-  _vocabFlashTimer = setTimeout(() => { el.textContent = ""; }, 3000);
+  if (ok) _vocabFlashTimer = setTimeout(() => { el.textContent = ""; }, 3000);
 }
 
 
@@ -140,7 +142,8 @@ function _pbpVocabDriveErrorKey(code) {
     local_store: "vocabDriveErrorLocalStore",
     network: "vocabDriveErrorNetwork",
     account_changed: "vocabDriveErrorAccountChanged",
-    entry_too_large: "vocabDriveErrorEntryTooLarge"
+    entry_too_large: "vocabDriveErrorEntryTooLarge",
+    status_unavailable: "vocabDriveStatusFailed"
   })[code] || "vocabDriveErrorRemote";
 }
 
@@ -167,20 +170,22 @@ function _pbpVocabDriveShowError(code, retryAt, blocked, connected, scope) {
   const key = scope === "notes" && code === "entry_too_large"
     ? "driveNotesErrorEntryTooLarge" : _pbpVocabDriveErrorKey(code);
   const parts = [t(key)];
-  const retry = _pbpVocabDriveDate(retryAt);
+  // A blocked account never retries on its own, so a retryAt next to it is
+  // leftover backoff history, not a promise.
+  const retry = blocked ? "" : _pbpVocabDriveDate(retryAt);
   if (retry) parts.push(t("vocabDriveRetryAt", retry));
   // Every state that cannot proceed on its own names a button that is actually
-  // on screen. A blocked account only clears through a forced run, so Sync now
-  // is the exit for the codes reconnecting cannot fix; while disconnected the
-  // Disconnect button is hidden, so the hint has to point at Connect instead.
+  // on screen. A missing permission is never retried or persisted as blocked,
+  // so it needs the reconnect hint even unblocked. A blocked account only
+  // clears through a forced run: Sync now is the exit for the codes
+  // reconnecting cannot fix, and while disconnected both Sync now and
+  // Disconnect are hidden, so the hint points at Connect (which force-syncs).
   // Anything still retrying already shows its next-retry time and needs no
   // instruction.
-  if (blocked) {
-    if (code === "auth" || code === "permission") {
-      parts.push(t(connected ? "vocabDriveReconnectRequired" : "vocabDriveConnectRequired"));
-    } else if (code !== "entry_too_large") {
-      parts.push(t("vocabDriveSyncNowRequired"));
-    }
+  if (code === "permission" || (blocked && code === "auth")) {
+    parts.push(t(connected ? "vocabDriveReconnectRequired" : "vocabDriveConnectRequired"));
+  } else if (blocked && code !== "entry_too_large") {
+    parts.push(t(connected ? "vocabDriveSyncNowRequired" : "vocabDriveConnectRequired"));
   }
   const message = parts.join(" ");
   setStatusIcon(el, false, scope
@@ -323,11 +328,20 @@ function _pbpVocabDriveApplyResponse(response, fallbackStatus) {
       }
       return status;
     }
-    if (scopedError && (!response.error || status?.blocked || status?.notes?.blocked
-        || response.error === status?.lastError || response.error === status?.notes?.lastError)) return status;
-    const code = response?.error || status?.lastError;
+    // _pbpVocabDriveRender paints dataset errors only while connected, so
+    // skip only an error that is already on screen; a failed Connect from a
+    // disconnected, previously blocked device must still say why.
+    const renderedError = status?.connected === true ? scopedError : null;
+    if (renderedError && (!response.error || response.error === renderedError
+        || (_driveScopes.vocabulary && response.error === status?.lastError)
+        || (_driveScopes.notes && response.error === status?.notes?.lastError))) return status;
+    const code = response?.error || scopedError;
     if (code === "not_connected" || code === "no_data_selected") return status;
-    _pbpVocabDriveShowError(code, status?.retryAt, status?.blocked === true, status?.connected === true);
+    // Backoff and block belong to the dataset that reported this code; the
+    // top-level fields are vocabulary's even when only notes is selected.
+    const dataset = _driveScopes.vocabulary && status?.lastError === code ? status
+      : _driveScopes.notes && status?.notes?.lastError === code ? status.notes : null;
+    _pbpVocabDriveShowError(code, dataset?.retryAt, dataset?.blocked === true, status?.connected === true);
   }
   return status;
 }
@@ -740,7 +754,7 @@ async function _pbpVocabSendAnki() {
     try { granted = await chrome.permissions.request({ origins: [pattern] }); }
     catch (e) {
       console.warn("[vocab] Anki host permission request failed:", e?.name, e?.message);
-      _pbpVocabConnectionResult("anki", false, t("dictAnkiHostPermissionDenied"), "permission_error");
+      _pbpVocabFlashStatus(false, t("dictAnkiHostPermissionDenied"));
       return;
     }
     if (!granted) { _pbpVocabFlashStatus(false, t("dictAnkiHostPermissionDenied")); return; }
@@ -912,6 +926,9 @@ function _pbpVocabFlashLocalStatus(targetId, ok, text) {
   if (el) {
     setStatusIcon(el, ok, text);
     clearTimeout(_vocabLocalFlashTimers.get(targetId));
+    _vocabLocalFlashTimers.delete(targetId);
+    // Failures stay until the next result, as in _pbpVocabFlashStatus.
+    if (!ok) return;
     _vocabLocalFlashTimers.set(targetId, setTimeout(() => {
       _vocabLocalFlashTimers.delete(targetId);
       el.textContent = "";
@@ -968,7 +985,13 @@ async function _pbpVocabTestAnki() {
       const key = deobfuscateSettings(rawKey).dictAnkiKey || "";
       if (!key) { _pbpVocabConnectionResult("anki", false, t("dictAnkiKeyRequired"), "missing_key"); return; }
       const keyed = await pbpAnkiCall("version", {}, key, 10000, port);
-      if (!keyed.ok) { _pbpVocabConnectionResult("anki", false, t("dictAnkiConnectPermissionFailed"), "auth"); return; }
+      // pbpAnkiCall reports only transport failures as unreachable/timeout;
+      // any other error is AnkiConnect answering, i.e. refusing this key.
+      if (!keyed.ok && (keyed.error === "unreachable" || keyed.error === "timeout")) {
+        _pbpVocabConnectionResult("anki", false, t("dictAnkiConnectPermissionFailed"), "unreachable");
+        return;
+      }
+      if (!keyed.ok) { _pbpVocabConnectionResult("anki", false, t("dictAnkiKeyRejected"), "auth"); return; }
     }
     _pbpVocabConnectionResult("anki", true, t("testConnected", "AnkiConnect v" + apiVersion), "connected");
   } catch (e) {
@@ -1010,7 +1033,9 @@ async function _pbpVocabTestEudic() {
     if (!granted) { _pbpVocabConnectionResult("eudic", false, t("dictEudicHostPermissionDenied"), "permission_denied"); return; }
     const r = await pbpEudicPing(s.dictEudicToken, 10000);
     if (r.ok) _pbpVocabConnectionResult("eudic", true, t("testConnected", "OK"), "connected");
-    else if (r.error === "auth") _pbpVocabConnectionResult("eudic", false, t("dictEudicRejected"), "auth");
+    // Same mapping as the send path: 401 asks for the token, 403 is a refusal.
+    else if (r.error === "auth") _pbpVocabConnectionResult("eudic", false, t("dictEudicTokenRequired"), "auth");
+    else if (r.error === "forbidden") _pbpVocabConnectionResult("eudic", false, t("dictEudicRejected"), "forbidden");
     else _pbpVocabConnectionResult("eudic", false, t("dictEudicFailed"), "failed");
   } catch (e) {
     console.warn("[vocab] Eudic connection test failed:", e?.name, e?.message);

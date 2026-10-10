@@ -819,7 +819,9 @@ function pbpCreateVocabDriveSyncRunner({
           }
         }
         if (state) {
-          const failed = stateWith({ lastError: result.error });
+          // Only a forced run clears a block, so a retryAt left over from the
+          // earlier backoff would surface as a "next retry" that never comes.
+          const failed = stateWith({ lastError: result.error, retryAt: null });
           await persistAccountFailure(failed);
         }
         await Promise.all([

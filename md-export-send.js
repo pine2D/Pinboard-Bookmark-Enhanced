@@ -111,11 +111,12 @@ async function pbpSendToTarget(id, ctx) {
         // options.js) with its own 20s deadline -- keep both in sync.
         const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body, redirect: "error", signal: AbortSignal.timeout(20000) });
         if (resp.status === 401) return apiFail("api-token");
-        // GitHub-only: a fine-grained PAT passes the /user precheck (401 never
-        // fires) but POST /gists rejects it with 403/404 -- fine-grained
-        // tokens can't create gists (registry comment, export-targets.js).
-        // Reuse the "api-token" code so the user gets the same "re-copy a
-        // classic PAT" guidance instead of a dead-end "request failed".
+        // GitHub-only: a token can pass the /user precheck (401 never fires)
+        // yet have POST /gists answer 403/404 because it lacks gist write
+        // access (classic PAT without the `gist` scope; fine-grained support
+        // is unverified -- registry comment, export-targets.js). Reuse the
+        // "api-token" code so the user is sent to check the token in Settings
+        // instead of a dead-end "request failed".
         if (id === "github" && (resp.status === 403 || resp.status === 404)) return apiFail("api-token");
         // Notion-only: 404 object_not_found (and 403 restricted_resource) on
         // POST /pages almost always means the parent page was never shared

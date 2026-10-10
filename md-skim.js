@@ -544,9 +544,8 @@ function _pbpSkimShowError(error) {
   // logs the raw shape); pbpAiOverrideErrHint names the preview model override
   // on model-shaped failures — the one failure source the AI Providers test
   // connection never exercises. t("skimFailed") stays the fallback for a
-  // rejection with no message at all: pbpAiErrorText's own fallback there is a
-  // hardcoded English "translation failed" that would read as translate chrome
-  // inside the key-points panel.
+  // rejection with no message at all: it names this panel's own action, which
+  // pbpAiErrorText's generic "the AI request failed" fallback does not.
   const raw = String((error && error.message) || "");
   if (error && error.code === "host_permission" && raw) {
     p.textContent = raw;

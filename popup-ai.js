@@ -54,7 +54,7 @@ function setAiProgress(buttonId, { provider, stage }) {
   }
   btn.dataset.stage = stage;
   const tpl = t(`aiStage_${stage}`) || "";
-  labelEl.textContent = " · " + tpl.replace("{provider}", provider || "AI");
+  labelEl.textContent = " · " + tpl.replace("{provider}", provider ? pbpAiProviderLabel(provider) : "AI");
   labelEl.setAttribute("data-slow-hint", t("aiSlowHint") || "");
 
   const startedAt = AI_STAGE_STARTED.get(buttonId) || Date.now();
@@ -449,6 +449,12 @@ const AI_PROVIDER_LABEL = {
   mistral: "Mistral", cohere: "Cohere", siliconflow: "SiliconFlow", zhipu: "Zhipu",
   kimi: "Kimi", ollama: "Ollama", custom: "Custom"
 };
+// Display name for status/error text: brand names stay literal, the custom
+// endpoint is the one entry that needs translating.
+function pbpAiProviderLabel(key) {
+  if (key === "custom") return t("provCustomShort");
+  return AI_PROVIDER_LABEL[key] || key;
+}
 
 // Find first provider OTHER than `current` that has a usable key, by iterating
 // AI_PROVIDER_ORDER. Returns null if no fallback is available.
@@ -475,7 +481,7 @@ function showAIError(op, err, opSettings) {
   const card = $id("ai-error-card");
   if (!card) return;
   const providerKey = (s.aiProvider || "openai");
-  const provLabel = AI_PROVIDER_LABEL[providerKey] || providerKey;
+  const provLabel = pbpAiProviderLabel(providerKey);
   $id("ai-error-title").textContent = t("aiErrorTitle", op === "tags" ? t("aiErrorOpTags") : t("aiErrorOpSummary"));
   const msgEl = $id("ai-error-message");
 
@@ -508,7 +514,7 @@ function showAIError(op, err, opSettings) {
     // could re-offer the provider that just failed.
     const next = pickFallbackProvider(s);
     if (next) {
-      const nextLabel = AI_PROVIDER_LABEL[next] || next;
+      const nextLabel = pbpAiProviderLabel(next);
       fallbackBtn.textContent = t("aiErrorTryWith", nextLabel) || `Try with ${nextLabel}`;
       fallbackBtn.dataset.provider = next;
       fallbackBtn.classList.remove("hidden");
@@ -1074,7 +1080,8 @@ async function doAISummary(forceRefresh, sOverride) {
     // mid-flight) must not paint an error onto the page now on screen.
     if (summary) await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
-    if (!summary) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
+    // The page text was there (checked above); an empty reply is the model's.
+    if (!summary) { showStatus("status-msg", t("aiEmptyResult"), "error"); return; }
     upsertSummary(summary);
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");

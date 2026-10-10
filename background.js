@@ -1119,7 +1119,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // Default tags
   let tags = [];
   if (s._defaultTags) {
-    tags = s._defaultTags.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
+    // Full-width comma too: the field is labelled "comma-separated" in CJK UIs.
+    tags = s._defaultTags.split(/[,，\s]+/).map(t => t.trim()).filter(Boolean);
   }
 
   // AI features
@@ -2418,7 +2419,14 @@ async function pbpGetVocabDriveStatus() {
       snapshotRead.status === "fulfilled" ? snapshotRead.value : emptySnapshot,
       preflightRead.status === "fulfilled" ? preflightRead.value : null, pendingName
     );
-    if (failed.length && enabled) return { ...status, lastError: "local_store", blocked: true };
+    // A failed READ blocks nothing: no run stopped and no preflight was
+    // written, so it must not borrow local_store/blocked (whose hint names a
+    // button that cannot clear it). A readable preflight error is still the
+    // real one; without it, the account row's retryAt is unconfirmed history.
+    if (failed.length && enabled) {
+      if (preflightRead.status === "fulfilled" && preflightRead.value?.lastError) return status;
+      return { ...status, lastError: "status_unavailable", blocked: false, retryAt: null, retryAttempt: 0 };
+    }
     return status;
   };
   const vocabulary = datasetStatus(0, base.vocabularyEnabled, "pendingWords");
@@ -3874,7 +3882,9 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
           await clearCancel();
           await clearJob();
           await _writeBatchProgress({ running: false, done: true, error: "cancelled", ...base() });
-          showNotification("batch-cancelled", t("bgBatchSaved"), t("batchCancelled", String(saved)), "info");
+          // Neutral title: "finished" over a "cancelled" body contradicts itself
+          // (same reasoning as the interrupted branch above).
+          showNotification("batch-cancelled", t("bgBatchCancelled"), t("batchCancelled", String(saved)), "info");
           return;
         }
       } catch (e) {
@@ -4304,9 +4314,12 @@ async function openMarkdownPreviewFromShortcut() {
   let tab;
   try {
     [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  } catch (_) { /* fall through to the guard below */ }
-  if (!tab?.id || !tab.url || !tab.url.startsWith("http")) {
-    showNotification("mdpv-error", t("bgMdPreviewFailed"), t("bgMdPreviewNoContent"), "error");
+  } catch (e) { console.warn("[mdpv] active tab query failed:", e?.name, e?.message); /* fall through to the guard below */ }
+  if (!tab?.id || !tab.url || !/^https?:\/\//.test(tab.url)) {
+    // chrome://, file:// and friends are unsupported, not empty: say so
+    // instead of sending the user to look for missing page content.
+    const why = tab?.id && tab.url ? "bgMdPreviewUnsupported" : "bgMdPreviewNoContent";
+    showNotification("mdpv-error", t("bgMdPreviewFailed"), t(why), "error");
     return;
   }
   // Open the preview INSTANTLY with a pending placeholder so the shortcut feels

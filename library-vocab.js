@@ -1529,8 +1529,10 @@ function _pbpVocabFlashStatus(ok, text) {
   setStatusIcon(el, ok, text);
   // Two flashes in quick succession (e.g. export then Anki) must not race:
   // the earlier call's clear-timer would otherwise wipe the later message.
+  // A failure is a recovery instruction, often two sentences: it stays until
+  // the next message replaces it instead of timing out mid-read.
   clearTimeout(_vocabFlashTimer);
-  _vocabFlashTimer = setTimeout(() => { el.textContent = ""; }, 3000);
+  if (ok) _vocabFlashTimer = setTimeout(() => { el.textContent = ""; }, 3000);
 }
 
 function _pbpVocabSetLoading(loading) {

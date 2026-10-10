@@ -1966,7 +1966,7 @@ async function pbpHlAttachNote(target, answerText) {
     // making a stale-id miss reachable (item deleted between card open and
     // the async round-trip finishing) -- mirror the null-state toast above
     // instead of failing silently.
-    if (!item) { _pbpHlToast(t("hlSaveFailed")); return false; }
+    if (!item) { _pbpHlToast(t("hlGoneElsewhere")); return false; }
     itemId = item.id;
   } else if (target && target.range) {
     const range = target.range;
@@ -2022,7 +2022,7 @@ async function pbpHlAttachNote(target, answerText) {
   if (!ok) {
     // Deleted elsewhere while the answer was streaming: say so rather than
     // silently dropping it. A real write failure already toasted in _pbpHlSave.
-    if (gone) _pbpHlToast(t("hlSaveFailed"));
+    if (gone) _pbpHlToast(t("hlGoneElsewhere"));
     return false;
   }
   _pbpHlNotebookRender();
@@ -2316,7 +2316,7 @@ async function _pbpHlSwitchColor(color) {
   }, btn);
   if (!ok) {
     if (unchanged) return;
-    if (gone) _pbpHlToast(t("hlSaveFailed"), btn); // _pbpHlSave toasts real write failures itself
+    if (gone) _pbpHlToast(t("hlGoneElsewhere"), btn); // _pbpHlSave toasts real write failures itself
     // Re-render the card off whatever storage actually holds (its active dot
     // still shows the click). Guard: only if it is still the card on screen --
     // the user may have opened a different highlight's card while the save was
@@ -2373,7 +2373,7 @@ function _pbpHlCommitNote() {
     return stored.map((it) => (it.id === pendingId ? { ...it, note: mergedNote } : it));
   }, saveBtn).then((ok) => {
     if (!ok) {
-      if (gone) { _pbpHlToast(t("hlSaveFailed"), saveBtn); return false; }
+      if (gone) { _pbpHlToast(t("hlGoneElsewhere"), saveBtn); return false; }
       _pbpHlNoteDirty = true; // a write failure is retryable, an abandoned edit is not
       const currentNote = _pbpHlCard && _pbpHlCard.querySelector(".hl-card-note");
       if (_pbpHlCardItemId === pendingId && currentNote && currentNote.value === nextNote) _pbpHlOpenCard(pendingId);

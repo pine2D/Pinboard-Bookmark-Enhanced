@@ -86,7 +86,7 @@
 
       const title = document.createElement("div");
       title.className = "offline-queue-title";
-      title.textContent = item.title || item.url || "(untitled)";
+      title.textContent = item.title || item.url || t("offlineQueueUntitled");
       title.title = item.url || "";
 
       const meta = document.createElement("div");
@@ -144,10 +144,10 @@
     const reason = result && typeof result === "object" ? result.reason : "";
     if (reason === "account_mismatch") return t("offlineRetryWrongAccount");
     if (reason === "not_logged_in") return t("batchNotLoggedIn");
-    if (reason === "account_changed") return t("pinboardErrorAuth");
+    if (reason === "account_changed") return t("offlineRetryAccountChanged");
     if (reason === "too_long") return t("uriTooLong", String(result.detail || ""), String(POSTS_ADD_URI_BUDGET));
     if (reason === "http" && result.httpStatus) return `HTTP ${result.httpStatus}`;
-    if (reason === "api" && result.detail) return `Error: ${result.detail}`;
+    if (reason === "api" && result.detail) return t("pinboardApiError", String(result.detail));
     // Only reason "network" (and an answerless send -- a service worker that
     // never replied) may claim the network. The pipeline also produces invalid,
     // storage, internal and conflict, and each of those sends a reader who is

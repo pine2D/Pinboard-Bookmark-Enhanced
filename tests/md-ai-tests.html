@@ -1196,6 +1196,21 @@ suite("pbpAiOverrideErrHint", () => {
     assert(pbpAiOverrideErrHint({ code: "host_permission" }, S) === "", "permission error");
     assert(pbpAiOverrideErrHint(null, S) === "", "null error");
   });
+  // The reader names the provider the way the Settings dropdown does
+  // (prov<Id> keys), never by its internal id: the override hint, the ask
+  // transparency line and the translate estimate all print it.
+  test("reader provider labels use the Settings display name, not the internal id", () => {
+    const realT = window.t;
+    window.t = (k, ...args) => k === "provSiliconflow" ? "SiliconFlow" : (k + (args.length ? "|" + args.join("|") : ""));
+    try {
+      const sf = { aiProvider: "siliconflow", previewAiModelByProvider: { siliconflow: "Qwen/X" } };
+      assertEq(pbpAiOverrideErrHint({ code: "model_not_found" }, sf), "previewAiOverrideErrHint|Qwen/X|SiliconFlow", "override hint");
+      if (typeof _pbpAskProviderLabel === "function") assertEq(_pbpAskProviderLabel(sf), "SiliconFlow · Qwen/X", "ask transparency line");
+      if (typeof _pbpTrModelLabel === "function") assertEq(_pbpTrModelLabel(sf), "SiliconFlow · Qwen/X", "translate estimate");
+      // A provider without a prov* key keeps its id rather than printing a key.
+      assertEq(pbpAiProviderName({ aiProvider: "brandnew" }), "brandnew", "unknown provider falls back to id");
+    } finally { window.t = realT; }
+  });
 });
 
 // ============ Task 6: IDB key conventions + ask-history cap ============
@@ -4714,6 +4729,27 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
       const res = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
       assertEq(res.freed, 0, "zero freed on storage failure");
       assertEq(Object.keys(res.removed).length, 0, "nothing reported removed on storage failure");
+      assertEq(res.failed, true, "a failed read is reported as failed, not as an empty success");
+    });
+
+    // B23: the options Clear button only knew "failed" from a throw, and every
+    // failure here degrades without one -- so a rejected remove() painted the
+    // OK "Freed 0 B." line. The flag must separate the two zero-byte outcomes.
+    await atest("C2-6 reclaim: a rejected remove() reports failed; nothing-to-clear does not" + tag, async () => {
+      const local = mockLocal(freshStore(), shape.caps);
+      local.remove = () => Promise.reject(new Error("QUOTA_BYTES or worse"));
+      window.chrome = { storage: { local } };
+      const res = await pbpReclaimLocalStorage(["jina", "tags"]);
+      assertEq(res.failed, true, "remove() rejection -> failed");
+      assertEq(res.freed, 0, "remove() rejection frees nothing");
+      const empty = mockLocal({}, shape.caps);
+      window.chrome = { storage: { local: empty } };
+      const none = await pbpReclaimLocalStorage(["jina"]);
+      assertEq(none.freed, 0, "nothing to clear frees 0");
+      assert(!none.failed, "nothing to clear is not a failure");
+      window.chrome = { storage: { local: mockLocal(freshStore(), shape.caps) } };
+      const ok = await pbpReclaimLocalStorage(["jina"]);
+      assert(ok.freed > 0 && !ok.failed, "a clean clear is not flagged failed");
     });
   }
 
@@ -8198,7 +8234,10 @@ suiteIf("pbpAiErrorText (ZH-3)", "pbpAiErrorText", () => {
   });
   test("unclassified message passes through, never swallowed", () => {
     assertEq(pbpAiErrorText({ message: "weird provider prose" }), "weird provider prose");
-    assertEq(pbpAiErrorText(null), "translation failed");
+    // No message: the localized generic key (t() echoes keys here), never a
+    // hardcoded English word inside a translated UI.
+    assertEq(pbpAiErrorText(null), "aiErrRequestFailed");
+    assertEq(pbpAiErrorText({ message: "" }), "aiErrRequestFailed");
   });
 });
 
@@ -9198,6 +9237,36 @@ suiteIf("T4 translate: article replacement", "_pbpTrOnArticleWillReplace", () =>
       _pbpTrCommitAssembled(st, w, { text: "stale partial", partial: true }, 1);
       assertEq(view.querySelectorAll(".pb-tr-err").length, 0, "nor through _pbpTrCommitAssembled's partial branch");
       assertEq(view.querySelectorAll(".pb-tr").length, 0, "and its fill half is still refused");
+    } finally {
+      _pbpTrState = saved;
+      view.remove();
+    }
+  });
+
+  // WCAG 2.5.3 Label in Name: every failure pill's accessible name starts with
+  // the label the user SEES ("Retry this paragraph"), not with the error text --
+  // otherwise a screen reader never announces it as a retry action and a voice
+  // command naming the visible label matches nothing.
+  test("failure pills' accessible name starts with their visible label", () => {
+    const saved = _pbpTrState;
+    const st = _t4TrState("https://example.test/t4-label-in-name");
+    const view = _t4View("<p>gamma one</p><p>gamma two</p>");
+    _pbpTrState = st;
+    try {
+      const blocks = pbpAiBlocks();
+      const wFail = _t4Work(blocks[0].n, "gamma one", st.rev);
+      const wPart = _t4Work(blocks[1].n, "gamma two", st.rev);
+      st.work = [wFail, wPart];
+      _pbpTrMarkFailed(st, wFail, "boom");
+      _pbpTrMarkPartial(st, wPart, 1);
+      const pills = Array.from(view.querySelectorAll(".pb-tr-err"));
+      assertEq(pills.length, 2, "both failure paths planted a pill");
+      for (const pill of pills) {
+        const visible = pill.querySelector("span").textContent;
+        const name = pill.getAttribute("aria-label") || "";
+        assert(visible && name.startsWith(visible), "accessible name '" + name + "' starts with visible label '" + visible + "'");
+        assert(name.includes(pill.dataset.tip), "accessible name still carries the failure reason");
+      }
     } finally {
       _pbpTrState = saved;
       view.remove();

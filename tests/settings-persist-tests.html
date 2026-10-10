@@ -3190,7 +3190,9 @@ async function run() {
       // The export catch reported optSaveFailed -- "some other settings may
       // already have been saved" -- for a path that saves nothing at all. A
       // field the snapshot cannot serialize now names itself; an account that
-      // changed mid-export is not a field failure and keeps the old message.
+      // changed mid-export is not a field failure and gets the generic EXPORT
+      // message -- never optSaveFailed, which would send the user off to audit
+      // settings the export never touched.
       {
         const failStatus = document.getElementById("import-status");
         const previousExportFailT = globalThis.t;
@@ -3258,11 +3260,14 @@ async function run() {
           fieldFailureText.includes("backupExportFailed|savedThemes[0]") &&
           !fieldFailureText.includes("optSaveFailed") && !blobAfterFieldFailure);
         check("E7 manual export: an account change mid-export is not reported as a field failure",
-          ownerAbortText.includes("optSaveFailed") &&
-          !ownerAbortText.includes("backupExportFailed"));
+          ownerAbortText.includes("backupExportFailedGeneric") &&
+          !ownerAbortText.includes("backupExportFailed|"));
         check("E7 manual export: an error that only reads like a field rejection keeps the generic message",
-          lookalikeText.includes("optSaveFailed") &&
-          !lookalikeText.includes("backupExportFailed"));
+          lookalikeText.includes("backupExportFailedGeneric") &&
+          !lookalikeText.includes("backupExportFailed|"));
+        check("E7 manual export: no export failure claims settings may have been saved",
+          [fieldFailureText, ownerAbortText, lookalikeText].every((text) =>
+            text && !text.includes("optSaveFailed")));
       }
     } finally {
       globalThis.chrome = prevChromeE7;
@@ -4381,6 +4386,7 @@ async function run() {
     let writesBeforeApply = 0;
     let previewBeforeWrite = false;
     let cleanPreviewAnnounced = false;
+    let previewMetaText = "";
     let highlightWarningRendered = false;
     let overlaySettingsRow = "";
     let badFieldImportText = "";
@@ -4498,6 +4504,7 @@ async function run() {
         beforeApplyCalls === 0 && writesBeforeApply === 0;
       cleanPreviewAnnounced = fixture.querySelector("#import-status").textContent
         .includes("backupPreviewReady");
+      previewMetaText = fixture.querySelector("#backup-preview-meta").textContent;
       fixture.querySelector("#backup-section-settings").checked = true;
       fixture.querySelector("#backup-section-themes").checked = false;
       fixture.querySelector("#backup-section-highlights").checked = false;
@@ -4683,6 +4690,18 @@ async function run() {
         expired === null && expiredCleared && garbage === null);
     }
     check("E11 clean preview announces readiness through the live status", cleanPreviewAnnounced);
+    // The created time is shown as a local date, not the raw ISO string the
+    // file stores: no "T..:..:..", no milliseconds, no "Z" -- for ANY ISO
+    // value, so the check is on the shape, not on this fixture's literal.
+    {
+      const createdArg = previewMetaText.split("|")[2] || "";
+      check("E11 preview shows the backup's creation time localized, not as raw ISO",
+        previewMetaText.startsWith("backupPreviewMeta|3|") && /2026/.test(createdArg) &&
+        !/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(createdArg) && !/\.\d{3}Z/.test(createdArg) &&
+        createdArg !== "backupPreviewUnknown");
+      check("E11 preview keeps an unparseable creation time as written, and a missing one as Unknown",
+        pbpBackupCreatedLabel("yesterday-ish") === "yesterday-ish" && pbpBackupCreatedLabel(undefined) === "");
+    }
     check("E11 preview counts settings fields", preview?.settingsCount === 2);
     check("E11 preview counts custom themes", preview?.themeCount === 2);
     const emptyThemesPreview = task9Ready

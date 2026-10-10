@@ -388,7 +388,7 @@ function setupTagsInput() {
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData("text");
     if (text) {
-      text.split(/[,\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => addTag(t));
+      text.split(/[,，\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => addTag(t));
       input.value = "";
       closeAutocomplete();
     }
@@ -425,7 +425,7 @@ function setupTagsInput() {
       } else if (acVisible) {
         addTag(items[0].dataset.tag);
       } else if (hasPending) {
-        input.value.trim().split(/[\s,]+/).filter(Boolean).forEach((t) => addTag(t));
+        input.value.trim().split(/[\s,，]+/).filter(Boolean).forEach((t) => addTag(t));
       }
       input.value = ""; closeAutocomplete();
     } else if (e.key === " " || e.key === "," || e.key === "，") {
@@ -465,14 +465,19 @@ function setupTagsInput() {
     e.preventDefault();
     if (!currentTags.length) return;
     const text = currentTags.join(" ");
-    try { await navigator.clipboard.writeText(text); }
-    catch (_) {
+    let copied = false;
+    try { await navigator.clipboard.writeText(text); copied = true; }
+    catch (e) {
+      console.warn("[tags] clipboard write failed, trying execCommand:", e?.name, e?.message);
       const ta = document.createElement("textarea");
       ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
       document.body.appendChild(ta); ta.select();
-      try { document.execCommand("copy"); } catch (_) {}
+      // execCommand reports failure by returning false, not only by throwing.
+      try { copied = document.execCommand("copy") === true; }
+      catch (e2) { console.warn("[tags] execCommand copy failed:", e2?.name, e2?.message); }
       document.body.removeChild(ta);
     }
+    if (!copied) { showStatus("status-msg", t("popupCopyFailed"), "error"); return; }
     const btn = $id("tags-copy-all");
     // Swap only the label span -- overwriting the whole button would wipe the
     // .btn-ic SVG the markup now carries.

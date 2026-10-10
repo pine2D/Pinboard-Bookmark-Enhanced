@@ -197,6 +197,47 @@ window.chrome = {
   check("failed local scope reads leave actions closed and cannot request synchronization",
     !$id("vocab-drive-connect").getClientRects().length && !messages.length &&
     $id("vocab-drive-error").textContent.includes("driveScopeSaveFailed"));
+  localReadFailure=false; response=null;
+  // B13: a failed status read is not a blocked local_store failure.
+  _pbpVocabDriveRender({...fixture,vocabularyEnabled:true,notesEnabled:false,lastError:"status_unavailable",blocked:false,retryAt:null});
+  check("an unreadable dataset status says so without a stop or Sync now instruction",
+    $id("vocab-drive-error").textContent.includes("vocabDriveStatusFailed") &&
+    !$id("vocab-drive-error").textContent.includes("vocabDriveErrorLocalStore") &&
+    !$id("vocab-drive-error").textContent.includes("vocabDriveSyncNowRequired"));
+  // B14: Disconnect keeps the blocked preflight, so the next status is both
+  // disconnected and blocked; a failed Connect must still say why.
+  const blockedDisconnected={...fixture,connected:false,vocabularyEnabled:true,notesEnabled:false,lastError:"auth",blocked:true,retryAt:null};
+  send=async message => {messages.push(message);return message.type==="vocabDriveConnect"
+    ? {ok:false,error:"auth",status:blockedDisconnected} : {ok:true,status:blockedDisconnected};};
+  await renderDriveSyncPanel(); await _pbpVocabDriveConnect();
+  check("a failed Connect on a blocked, disconnected device names the failure and the visible Connect button",
+    !$id("vocab-drive-connect").hidden &&
+    $id("vocab-drive-error").textContent.includes("vocabDriveErrorAuth") &&
+    $id("vocab-drive-error").textContent.includes("vocabDriveConnectRequired") &&
+    !$id("vocab-drive-error").textContent.includes("vocabDriveSyncNowRequired"));
+  // The top-level block and retry belong to vocabulary; with only notes
+  // selected they must not decorate an unrelated Connect failure.
+  values={driveSyncVocabulary:false,driveSyncNotes:true};
+  const notesOnlyDisconnected={...fixture,connected:false,vocabularyEnabled:false,notesEnabled:true,
+    lastError:"corrupt",blocked:true,retryAt:Date.now()+60000,notes:{...fixture.notes,lastError:null,blocked:false}};
+  send=async message => {messages.push(message);return message.type==="vocabDriveConnect"
+    ? {ok:false,error:"account_changed",status:notesOnlyDisconnected} : {ok:true,status:notesOnlyDisconnected};};
+  await renderDriveSyncPanel(); await _pbpVocabDriveConnect();
+  check("a Connect failure does not borrow a disabled dataset's block or retry time",
+    $id("vocab-drive-error").textContent.includes("vocabDriveErrorAccountChanged") &&
+    !$id("vocab-drive-error").textContent.includes("vocabDriveSyncNowRequired") &&
+    !$id("vocab-drive-error").textContent.includes("vocabDriveRetryAt"));
+  // B15: a revoked grant is answered as "permission" without persisting a
+  // block, and Connect is hidden while connected, so name Disconnect.
+  values={driveSyncVocabulary:true,driveSyncNotes:false};
+  const connectedHealthy={...fixture,vocabularyEnabled:true,notesEnabled:false};
+  send=async message => {messages.push(message);return message.type==="vocabDriveSyncNow"
+    ? {ok:false,error:"permission",results:{vocabulary:{ok:false,error:"permission"}},status:connectedHealthy}
+    : {ok:true,status:connectedHealthy};};
+  await renderDriveSyncPanel(); await _pbpVocabDriveAction("vocabDriveSyncNow",true);
+  check("an unblocked missing permission still names the Disconnect-and-reconnect exit",
+    $id("vocab-drive-error").textContent.includes("vocabDriveErrorPermission") &&
+    $id("vocab-drive-error").textContent.includes("vocabDriveReconnectRequired"));
   document.title=(failed?"FAIL ":"PASS ")+"options-drive-sync Tests";
 })();
 </script></body></html>

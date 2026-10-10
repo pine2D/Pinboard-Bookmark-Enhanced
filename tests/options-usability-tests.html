@@ -249,7 +249,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     const doc = new DOMParser().parseFromString(html, "text/html");
     const index = pbpBuildSettingsSearchIndex(doc);
     const cases = [
-      ["This checkbox applies to this device only", "opt-sync-enabled"],
+      ["This setting applies to this device only", "opt-sync-enabled"],
       ["This is one account-wide choice", "opt-sync-api-keys"],
       ["Includes page URLs, titles, selected text", "opt-backup-include-highlights"],
       ["Includes vocabulary only for the current Pinboard account", "opt-backup-include-vocabulary"],

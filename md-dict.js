@@ -888,7 +888,10 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
   const src = document.createElement("div");
   src.className = "xp-dict-src";
   const label = document.createElement("span");
-  label.textContent = t("dictSource") + " ";
+  // A label that already ends in full-width punctuation (zh "来源：") carries
+  // its own spacing; only a half-width one (en "Source:", ja "出典:") gets a space.
+  const srcLabel = t("dictSource");
+  label.textContent = /[\u3000-\u303f\uff00-\uffef]$/.test(srcLabel) ? srcLabel : srcLabel + " ";
   const a = document.createElement("a");
   // Defense-in-depth: sourceUrl is already sanitized at the normalize/merge
   // layers, but this is the only point it reaches a live href.
@@ -1354,7 +1357,7 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
       const wrap = document.createElement("div");
       wrap.className = "xp-error";
       const msg = document.createElement("p");
-      msg.textContent = (e && e.message) || "Request failed";
+      msg.textContent = (e && e.message) || t("aiErrRequestFailed");
       const retry = document.createElement("button");
       retry.type = "button";
       retry.className = "xp-retry";

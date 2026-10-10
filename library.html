@@ -119,7 +119,7 @@
         <button type="button" class="btn btn-sm ghost" id="vocab-batch-select-all" data-i18n="vocabSelectAll">Select all</button>
         <span class="lib-cluster">
           <button type="button" class="btn btn-sm ghost" id="vocab-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
-          <button type="button" class="btn btn-sm danger ghost" id="vocab-batch-delete" data-i18n-title="vocabBatchDelete" data-i18n-aria="vocabBatchDelete" aria-label="Delete selected" title="Delete selected"><span class="btn-ic" data-ic="trash"></span></button>
+          <button type="button" class="btn btn-sm danger ghost" id="vocab-batch-delete" data-i18n-title="vocabBatchDelete" data-i18n-aria="vocabBatchDelete" aria-label="Delete selected words" title="Delete selected words"><span class="btn-ic" data-ic="trash"></span></button>
           <button type="button" class="btn btn-sm ghost vocab-clear-selection" id="vocab-clear-selection" data-i18n-title="vocabClearSelection" data-i18n-aria="vocabClearSelection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
         </span>
         <!-- Input + stepper unit (icon audit P0): +/- are icon-only because the
@@ -237,22 +237,21 @@
                  JS between the empty and no-results wordings. -->
             <p id="notes-empty" class="notes-empty" hidden></p>
             <!-- Storage scope, disclosed where the absence is read. Highlights
-                 and notes live in this device's chrome.storage.local and enter
-                 neither sync path -- settled design, but nothing on any screen
-                 said so, and on a second device (where Drive has already
-                 restored the vocabulary next door) an empty Notes tab reads as
+                 and notes live in this device's chrome.storage.local and reach
+                 another device only through the opt-in Drive notes sync or a
+                 backup, so on a second device an empty Notes tab would read as
                  lost data rather than as a per-device store. Its own element,
                  never inside #notes-empty: that paragraph's text is rewritten
                  on every render and would wipe this. Shown only when there are
                  no highlights AT ALL -- with a filter active the user plainly
                  has some, and the sentence would be noise. Same block the
                  signed-out vocabulary state uses (one sentence + one .btn.btn-sm
-                 door into settings), pointed at General, where the backup
-                 export/import that CAN move them lives. -->
+                 door into settings), pointed at General, where both the Drive
+                 notes switch and the backup export/import live. -->
             <div id="notes-scope-note" class="notes-empty vocab-account-empty" hidden>
-              <p data-i18n="libraryNotesScopeHint">Highlights and notes are stored on this device only and are not synced. To move them to another device, export a backup on the settings page and import it there.</p>
+              <p data-i18n="libraryNotesScopeHint">Highlights and notes are saved on this device. To use them on another device, turn on Google Drive sync for Highlights and notes in Settings, or export a backup and import it there.</p>
               <div class="vocab-account-actions">
-                <a class="btn btn-sm" id="notes-open-backup-settings" href="options.html#general" target="_blank" rel="noopener" data-i18n="libraryNotesScopeOpenBackup">Open backup settings</a>
+                <a class="btn btn-sm" id="notes-open-backup-settings" href="options.html#general" target="_blank" rel="noopener" data-i18n="libraryNotesScopeOpenBackup">Open General settings</a>
               </div>
             </div>
           </div>

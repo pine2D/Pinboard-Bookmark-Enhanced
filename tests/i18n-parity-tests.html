@@ -58,8 +58,7 @@ async function loadLocale(loc) {
   // French word + "Defuddle" is a brand; "API Key (optional)" — "API Key" is a
   // brand token and "optional" is the same word in German.
   const CLUSTER = ["secAiContentSource","aiContentSourceLocal","jinaConverting",
-    "jinaCopied","jinaFailed","jinaApiKeyLabel","jinaApiKeyPlaceholder","jinaViewBtn",
-    "jinaMarkdownTitle","jinaMarkdownTitleJina"];
+    "jinaCopied","jinaFailed","jinaApiKeyLabel","jinaApiKeyPlaceholder",    "jinaMarkdownTitle","jinaMarkdownTitleJina"];
   const SAME_AS_EN_OK = new Set(["fr.aiContentSourceLocal","de.jinaApiKeyLabel"]);
   for (const loc of ["de","fr","pl","ru","zh_HK"]) {
     for (const k of CLUSTER) {
@@ -116,15 +115,14 @@ async function loadLocale(loc) {
     "provOpenrouter","provGroq","provMistral","provCohere","provSiliconflow","provZhipu",
     "provKimi","provOllama","provCustom","provHuggingface",
     "jinaMarkdownBtn","aiContentSourceJina","secJinaReader","mdStripObsidian","tabMarkdown",
-    "hintClaudeModel","hintZhipuModel","hintKimiModel","labelAiTags","placeholderTags",
+    "labelAiTags","placeholderTags",
     "optUrlCleanCustomPlaceholder","optUrlCleanExcludePlaceholder","customCSSPlaceholder",
-    "tagPresetsPlaceholder","translateGlossaryPlaceholder","aiCancel",
-    // keyboard shortcuts — same in all locales (platform keys)
+    "tagPresetsPlaceholder","translateGlossaryPlaceholder",    // keyboard shortcuts — same in all locales (platform keys)
     "hintCtrlEnter","aiSummaryBtnTitle",
     // pure placeholder-format strings — no translatable text
-    "batchProgress",
+    "batchProgress", "editingExistingDetails", "editingExistingDetailSep",
     // loanwords / same-word in target language
-    "tabPopup","tabAI","tagGovKindAi","mdOptFrontmatter","secPrompts","labelTagPrompt",
+    "tabPopup","tabAI","tagGovKindAi","secPrompts","labelTagPrompt",
     "tabGroupAI","tabGroupSystem", // sidebar group labels: "AI" is the universal term (matches tabAI); "System" is the same word in de/pl
     "aiErrorDetails","qlSets","labelTags","aiErrorOpTags","secTags","tabTags",
     "placeholderOptional","optPopupWidth550","jinaApiKeyLabel",
@@ -399,40 +397,40 @@ async function loadLocale(loc) {
     "import failure copy is missing, collapses two outcomes into one string, or claims the wrong fate for the installed pack");
   const ACTIONABLE_HINTS = {
     en: [
-      "At the top of this page, turn “Archive saved pages to the Wayback Machine” off and back on to request permission for web.archive.org again.",
-      "Modify Custom CSS to enable saving it as a reusable theme."
+      "Archiving needs access to web.archive.org, which hasn't been granted. Re-enable archiving to request it.",
+      "Saves the Custom CSS Overlay as a reusable theme. Available once the box has CSS (up to 50 KB)."
     ],
     de: [
-      "Deaktiviere oben auf dieser Seite „Gespeicherte Seiten im Wayback Machine archivieren“ und aktiviere die Option erneut, um die Berechtigung für web.archive.org neu anzufordern.",
-      "Bearbeite zuerst die eigene CSS-Überlagerung. Danach kannst du sie als Theme speichern."
+      "Zum Archivieren ist Zugriff auf web.archive.org nötig, der nicht erteilt wurde. Aktiviere das Archivieren erneut, um ihn anzufordern.",
+      "Speichert die eigene CSS-Überlagerung als wiederverwendbares Theme. Verfügbar, sobald das Feld CSS enthält (bis 50 KB)."
     ],
     fr: [
-      "En haut de cette page, désactivez puis réactivez « Archiver les pages enregistrées sur Internet Archive » pour redemander l’autorisation d’accéder à web.archive.org.",
-      "Modifiez d’abord la surcouche CSS personnalisée. Vous pourrez ensuite l’enregistrer comme thème réutilisable."
+      "L’archivage nécessite l’accès à web.archive.org, qui n’a pas été accordé. Réactivez l’archivage pour le demander.",
+      "Enregistre la surcouche CSS personnalisée comme thème réutilisable. Disponible dès que le champ contient du CSS (50 Ko max.)."
     ],
     pl: [
-      "U góry tej strony wyłącz, a następnie ponownie włącz opcję „Archiwizuj zapisane strony w Internet Archive”, aby ponownie poprosić o uprawnienie do web.archive.org.",
-      "Najpierw zmodyfikuj niestandardową nakładkę CSS. Potem możesz zapisać ją jako motyw."
+      "Archiwizacja wymaga dostępu do web.archive.org, którego nie przyznano. Włącz archiwizację ponownie, aby o niego poprosić.",
+      "Zapisuje zawartość pola „Niestandardowa nakładka CSS” jako motyw wielokrotnego użytku. Dostępne, gdy pole zawiera CSS (do 50 KB)."
     ],
     ru: [
-      "В верхней части этой страницы выключите, а затем снова включите параметр «Архивировать сохранённые страницы в Wayback Machine», чтобы повторно запросить разрешение для web.archive.org.",
-      "Сначала измените пользовательское наложение CSS. После этого его можно сохранить как тему."
+      "Для архивирования нужен доступ к web.archive.org, но он не предоставлен. Снова включите архивирование, чтобы запросить его.",
+      "Сохраняет «Пользовательское наложение CSS» как тему для повторного использования. Доступно, когда в поле есть CSS (до 50 КБ)."
     ],
     zh_HK: [
-      "請在本頁頂部先關閉再重新開啟「儲存頁面到互聯網檔案館」，以重新申請 web.archive.org 權限。",
-      "修改自訂 CSS 疊加後，便可將它儲存為可重用的主題。"
+      "存檔需要 web.archive.org 的存取權限，目前尚未授予。重新開啟存檔即可再次申請。",
+      "將「自訂 CSS 疊加」儲存為可重用的主題。框內有 CSS 且不超過 50 KB 時可用。"
     ],
     zh_CN: [
-      "请在本页顶部关闭后重新开启「保存页面到互联网档案馆」，以重新申请 web.archive.org 权限。",
-      "修改自定义 CSS 覆盖后，即可将其保存为可复用主题。"
+      "存档需要 web.archive.org 的访问权限，目前尚未授予。重新开启存档即可再次申请。",
+      "将「自定义 CSS 覆盖」保存为可复用主题。框内有 CSS 且不超过 50 KB 时可用。"
     ],
     zh_TW: [
-      "請在本頁頂端先關閉再重新開啟「儲存頁面到網際網路檔案館」，以重新申請 web.archive.org 權限。",
-      "修改自訂 CSS 疊加後，即可將其儲存為可重複使用的主題。"
+      "存檔需要 web.archive.org 的存取權限，目前尚未授予。重新開啟存檔即可再次申請。",
+      "將「自訂 CSS 疊加」儲存為可重複使用的主題。框內有 CSS 且不超過 50 KB 時可用。"
     ],
     ja: [
-      "このページ上部で「保存したページを Wayback Machine にアーカイブする」をいったんオフにしてから再度オンにし、web.archive.org の権限を再申請してください。",
-      "カスタム CSS オーバーレイを編集すると、再利用可能なテーマとして保存できます。"
+      "アーカイブには web.archive.org へのアクセス権が必要ですが、許可されていません。アーカイブを有効にし直すと、もう一度リクエストできます。",
+      "カスタム CSS オーバーレイを再利用可能なテーマとして保存します。欄に CSS があり、50 KB 以下のときに使用できます。"
     ]
   };
   const actionableFailures = LOCALES.filter((loc) =>
@@ -779,13 +777,13 @@ async function loadLocale(loc) {
       vocabCoverNoDate: "16 個詞，學習中 13 個、已掌握 3 個，來自 4 種語言。",
       pageFacts: "6 筆標記，其中 2 筆有筆記",
       notesResult: "顯示 5 筆，共 10 筆標記",
-      vocabResult: "找到 5 筆；目前 Pinboard 帳戶（alice）共儲存 16 筆",
+      vocabResult: "找到 5 筆；目前 Pinboard 帳號（alice）共儲存 16 筆",
       one: {
         notesCover: "1 筆標記，來自 1 個網頁；最近一次儲存在 D。",
         vocabCover: "1 個詞，學習中 1 個、已掌握 0 個，來自 1 種語言；最近一次收錄在 D。",
         pageFacts: "1 筆標記，其中 1 筆有筆記",
         notesResult: "顯示 1 筆，共 1 筆標記",
-        vocabResult: "找到 1 筆；目前 Pinboard 帳戶（alice）共儲存 1 筆",
+        vocabResult: "找到 1 筆；目前 Pinboard 帳號（alice）共儲存 1 筆",
       },
     },
   };

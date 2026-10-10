@@ -357,6 +357,38 @@ function typeInto(value) {
     assert(!groups[0].contains(addAll), "Add all must not move to the popular group when recommended also renders");
   });
 
+  // B50: pasted tag lists split on the full-width comma a CJK keyboard types.
+  await testAsync("pasting a full-width comma list adds each tag", async () => {
+    resetInput();
+    const data = new DataTransfer();
+    data.setData("text", "阅读，工具, later");
+    tagsInput.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+    assert(currentTags.join("|") === "阅读|工具|later", "full-width comma did not split: " + currentTags.join("|"));
+  });
+
+  // B58: when both the async clipboard and the execCommand fallback fail, the
+  // button must not flash the success label.
+  await testAsync("copy-all reports failure instead of a false Copied", async () => {
+    resetInput();
+    currentTags = ["one", "two"];
+    const clipDesc = Object.getOwnPropertyDescriptor(Navigator.prototype, "clipboard");
+    const origExec = document.execCommand;
+    Object.defineProperty(navigator, "clipboard", { configurable: true, get: () => ({ writeText: () => Promise.reject(new DOMException("denied", "NotAllowedError")) }) });
+    document.execCommand = () => false;
+    const btn = document.getElementById("tags-copy-all");
+    btn.textContent = "Copy all";
+    try {
+      btn.click();
+      for (let i = 0; i < 5; i++) await Promise.resolve();
+    } finally {
+      delete navigator.clipboard;
+      if (clipDesc) Object.defineProperty(Navigator.prototype, "clipboard", clipDesc);
+      document.execCommand = origExec;
+    }
+    assert(btn.textContent === "Copy all", "the failed copy still flashed: " + btn.textContent);
+    assert(statusCalls.some((c) => c.msg === "popupCopyFailed" && c.kind === "error"), "the failed copy was silent");
+  });
+
   await testAsync("a bail-out for another account takes the skeleton down", async () => {
     resetInput();
     settings.pinboardToken = "bob:token";

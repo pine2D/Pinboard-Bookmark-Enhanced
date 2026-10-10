@@ -1568,20 +1568,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!cats.length) { showStorageStatus(t("storageNoneSelected"), "warn"); return; }
       _storageClearBtn.disabled = true;
       let freed = 0;
+      let failed = false;
       try {
-        // { freed, removed: { [cat]: { keys, bytes } } } -- the per-category rows
-        // are deliberately NOT painted onto the panel here: reclaim swallows a
-        // failed remove() and returns zero without rolling back, so the rows have
-        // to come from the fresh re-read below, not from an optimistic update.
-        ({ freed } = await pbpReclaimLocalStorage(cats));
-      } catch (_) {
-        showStorageStatus(t("storageClearFailed"), "err");
-        _storageClearBtn.disabled = false;
-        return;
+        // { freed, removed: { [cat]: { keys, bytes } }, failed? } -- the
+        // per-category rows are deliberately NOT painted onto the panel here:
+        // reclaim folds a failed read/remove() into { freed: 0, failed: true }
+        // without rolling back, so the rows have to come from the fresh re-read
+        // below, not from an optimistic update. `failed` is what keeps that
+        // case from reading as a successful "Freed 0 B.".
+        ({ freed, failed } = await pbpReclaimLocalStorage(cats));
+      } catch (e) {
+        console.warn("[storage] clear failed:", e?.name, e?.message);
+        failed = true;
       }
       await renderStoragePanel();
       _storageClearBtn.disabled = false;
-      showStorageStatus(t("storageCleared", pbpFormatBytes(freed)), "ok");
+      if (failed) showStorageStatus(t("storageClearFailed"), "err");
+      else showStorageStatus(t("storageCleared", pbpFormatBytes(freed)), "ok");
     });
   }
   const _copyDiagnosticsBtn = $id("copy-diagnostics-btn");
@@ -3902,6 +3905,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const inp = document.createElement("input");
     inp.type = "text";
     inp.maxLength = 40;
+    // Only one popover can be open (guard above), so a fixed id is unique; the
+    // label then names the field for screen readers and focuses it on click.
+    inp.id = "theme-name-input";
+    lbl.htmlFor = inp.id;
 
     const overwriteMsg = document.createElement("p");
     overwriteMsg.className = "tnp-overwrite";
@@ -3972,6 +3979,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     inp.addEventListener("keydown", (e) => {
       if (e.key === "Enter") saveBtn.click();
+    });
+    // The overwrite prompt confirms ONE name. Editing the name withdraws it,
+    // so a second click can never overwrite a different existing theme
+    // unasked, and a fresh name goes back to a plain Save.
+    inp.addEventListener("input", () => {
+      if (overwriteMsg.style.display === "none") return;
+      overwriteMsg.style.display = "none";
+      overwriteMsg.textContent = "";
+      saveBtn.textContent = t("themeNameSave");
     });
 
     // close on outside click
@@ -4060,7 +4076,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const expectedAccount = selectedAccounts.values().next().value;
     if (!selected.length) return;
     const btn = $id("tag-gov-delete-selected");
-    const shown = selected.slice(0, 10).join(", ") + (selected.length > 10 ? ", +" + (selected.length - 10) + " more" : "");
+    const shown = selected.slice(0, 10).join(", ")
+      + (selected.length > 10 ? ", " + t("tagGovMoreCount", String(selected.length - 10)) : "");
     const msg = t("tagGovConfirmDelete", String(selected.length))
       + "\n" + shown;
     showConfirmPopover(btn, {
@@ -4143,7 +4160,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       // as pbpClassifyPinboardError and wayback.js.
       let msg = (err?.name === "AbortError" || err?.name === "TimeoutError") ? t("testTimeout") : err.message;
       if (err?.code === "model_not_found") {
-        msg = t("aiErrorModelNotFound", sNow.aiProvider) + " " + t("aiErrorModelNotFoundHint");
+        // Display name from the provider picker's own option, not the internal id.
+        const provOpt = [...($id("opt-ai-provider")?.options || [])].find((o) => o.value === sNow.aiProvider);
+        const mnf = pbpAiModelNotFoundText(provOpt?.textContent.trim() || sNow.aiProvider);
+        msg = mnf.msg + " " + mnf.hint;
       } else if (err?.code === "host_permission" && $id("opt-ai-provider")?.value === sNow.aiProvider) {
         tagGovAiPendingSettings = { ...sNow, _tagGovExpectedAccount: sNow._tagGovExpectedAccount };
         grantRetry = true;
@@ -4453,8 +4473,11 @@ async function confirmMergeGroup(group, canonical, anchorEl, expectedAccount) {
     (m && m.tag && m.tag.toLowerCase() !== canonLower) ? sum + (m.count || 0) : sum, 0);
   const estSec = Math.ceil((renames.length + bookmarkCount) * 3.2);
   const estStr = formatTagGovEst(estSec);
+  // The question ends in its own "?", so the rename list goes on a line of
+  // its own (.confirm-msg is white-space: pre-line) -- "...into X?: a -> X"
+  // read as broken punctuation in every locale.
   const msg = t("tagGovConfirmMerge", String(renames.length), canonical)
-    + (summary ? ": " + summary : "")
+    + (summary ? "\n" + summary : "")
     + "\n" + t("tagGovMergeEstimate", estStr);
   const anchor = anchorEl;
   if (!anchor) return;

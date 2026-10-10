@@ -17,7 +17,7 @@
         <input type="password" id="token-input" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" aria-label="API token" data-i18n-aria="labelApiToken" autocomplete="off" spellcheck="false" />
         <button type="button" class="key-toggle" data-target="token-input" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
       </div>
-      <button id="login-btn" type="submit" class="btn login-submit" data-i18n="login">Login</button>
+      <button id="login-btn" type="submit" class="btn login-submit" data-i18n="login">Log in</button>
       <p id="login-error" class="error-text hidden" role="alert" aria-live="assertive" aria-atomic="true"></p>
     </form>
   </div>
@@ -127,20 +127,20 @@
       <input type="text" id="search-input" placeholder="Search your bookmarks…" class="search-field" aria-label="Search bookmarks" data-i18n-placeholder="placeholderSearchBookmarks" data-i18n-aria="placeholderSearchBookmarks" />
     </div>
     <div class="quick-links">
-      <a id="tabs-link" href="https://pinboard.in/tabs/" target="_blank" title="Tab Sets" data-i18n="qlSets" data-i18n-title="qlSetsTitle" rel="noopener">Sets</a>
+      <a id="tabs-link" href="https://pinboard.in/tabs/" target="_blank" title="Your saved tab sets on Pinboard" data-i18n="qlSets" data-i18n-title="qlSetsTitle" rel="noopener">Sets</a>
       <span class="ql-sep">·</span>
-      <a href="https://pinboard.in/network/" target="_blank" title="Network" data-i18n="qlNetwork" data-i18n-title="qlNetworkTitle" rel="noopener">Network</a>
+      <a href="https://pinboard.in/network/" target="_blank" title="Bookmarks from people you follow" data-i18n="qlNetwork" data-i18n-title="qlNetworkTitle" rel="noopener">Network</a>
       <span class="ql-sep">·</span>
-      <a id="unread-link" href="#" target="_blank" title="Unread bookmarks" data-i18n="qlUnread" data-i18n-title="qlUnreadTitle" rel="noopener">Unread</a>
+      <a id="unread-link" href="#" target="_blank" title="Your unread (Read Later) bookmarks" data-i18n="qlUnread" data-i18n-title="qlUnreadTitle" rel="noopener">Unread</a>
       <span class="ql-sep">·</span>
-      <a href="https://pinboard.in/notes/" target="_blank" title="Notes" data-i18n="qlNotes" data-i18n-title="qlNotesTitle" rel="noopener">Notes</a>
+      <a href="https://pinboard.in/notes/" target="_blank" title="Your Pinboard notes" data-i18n="qlNotes" data-i18n-title="qlNotesTitle" rel="noopener">Notes</a>
       <span class="ql-sep">·</span>
-      <a href="https://pinboard.in/popular/" target="_blank" title="Popular" data-i18n="qlPopular" data-i18n-title="qlPopularTitle" rel="noopener">Popular</a>
+      <a href="https://pinboard.in/popular/" target="_blank" title="Popular bookmarks on Pinboard" data-i18n="qlPopular" data-i18n-title="qlPopularTitle" rel="noopener">Popular</a>
     </div>
     <div class="quick-row">
       <button id="save-tabset-btn" class="qbtn" data-i18n-title="saveTabsTitle"><span class="btn-ic" data-ic="tabs"></span><span data-i18n="saveTabsBtn">Save Tab Set</span></button>
-      <button id="batch-bookmark-btn" class="qbtn" data-i18n-title="batchSaveTitle"><span class="btn-ic" data-ic="pin"></span><span data-i18n="batchSaveBtn">Bookmark All Tabs</span></button>
-      <button id="jina-md-btn" class="qbtn" title="" data-i18n-title="jinaMarkdownBtn"><span class="btn-ic" data-ic="doc"></span><span class="jina-md-label" data-i18n="jinaMarkdownBtn">Markdown</span></button>
+      <button id="batch-bookmark-btn" class="qbtn" data-i18n-title="batchSaveTitle"><span class="btn-ic" data-ic="pin"></span><span data-i18n="batchSaveBtn">Batch Save</span></button>
+      <button id="jina-md-btn" class="qbtn" title="" data-i18n-title="jinaMarkdownBtn"><span class="btn-ic" data-ic="doc"></span><span class="jina-md-label" data-i18n="jinaMarkdownBtn">Reader</span></button>
     </div>
     <section id="batch-permission" class="batch-permission hidden" aria-labelledby="batch-permission-title">
       <p id="batch-permission-title" class="batch-permission-title"></p>
@@ -163,7 +163,7 @@
          role="progressbar" are presentational to AT, so a nested button's
          role/name may never reach the accessibility tree (Codex review). -->
     <div class="batch-progress-wrap">
-      <div id="batch-progress" class="batch-progress hidden" role="progressbar" tabindex="-1" aria-label="Batch save progress" data-i18n-aria="batchSaveTitle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0/0 (0/0)">
+      <div id="batch-progress" class="batch-progress hidden" role="progressbar" tabindex="-1" aria-label="Batch Save progress" data-i18n-aria="batchProgressLabel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div id="batch-progress-fill" class="batch-progress-fill"></div>
         <span id="batch-progress-text" class="batch-progress-text"></span>
       </div>
@@ -174,7 +174,7 @@
         <span id="offline-queue-chevron" aria-hidden="true"></span>
         <span id="offline-queue-text"></span>
       </button>
-      <button type="button" id="offline-queue-clear" class="offline-clear"><span class="btn-ic" data-ic="cross"></span><span class="link-label" data-i18n="clear">clear</span></button>
+      <button type="button" id="offline-queue-clear" class="offline-clear"><span class="btn-ic" data-ic="cross"></span><span class="link-label" data-i18n="clear">Clear</span></button>
     </div>
     <div id="offline-queue-list" class="offline-queue-list hidden"></div>
     <div id="recent-bookmarks" class="recent-bm-area hidden"></div>
