@@ -10,7 +10,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Popup demo](docs/screenshots/demo-popup.png)
+![Saving a page with AI tags and summary, in dark and light themes](docs/screenshots/readme/hero.webp)
 
 ---
 
@@ -20,9 +20,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 - **One click, everything filled in**: title, description, and selected text, with tracking parameters stripped from the URL
 - **Save by hotkey**: skip the popup, or batch-save every open tab
 - **Works offline**: saves are queued locally and retried when you're back online
-- **Recover a draft**: reopen the popup to resume unsaved edits; drafts expire after 24 hours or a browser restart
-
-![One-click save with AI tags and summary](docs/cws-assets/originals/screenshot-1-save.png)
+- **Drafts survive**: close the popup mid-edit and pick up where you left off
 
 ### Tag
 - **AI tags & summary**: reads the article body without the ads, menus, and sidebars; bring your own key (14 providers, or any OpenAI-compatible endpoint)
@@ -33,14 +31,20 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 - **Any page becomes a clean reader**: a Markdown view with table of contents, search, and footnote peek; math, diagrams, and tables render properly
 - **Five-color highlights with notes**: both survive re-renders, translation, even page edits
 - **Translate the page or ask it questions**: full-page translation with a bilingual view; answers cite the source and jump straight to it
-- **Look up words as you read**: definitions open on the sense that fits your sentence; saved words keep notes and a learning status and can be sent to Anki or Eudic; optional offline dictionary packs for Chinese-English and English-Chinese
-- **A full page for notes and vocabulary**: saved words and highlights in one place, with dictionary lookup and batch management; edit notes and change highlight colors directly on this page, or clear filters to find your entries again
+- **Look up words as you read**: definitions open on the sense that fits your sentence; send saved words to Anki or Eudic in one click, or add offline Chinese-English and English-Chinese dictionaries
+- **A full page for notes and vocabulary**: saved words and highlights in one place, with dictionary lookup and batch management
 - **Send or download**: [Obsidian](https://obsidian.md), Notion, NotebookLM, a GitHub Gist, or any webhook; `.md`, `.html`, or `.epub` for your e-reader
-- **Watch while you read**: YouTube and bilibili previews pair the video with its subtitles; the transcript follows playback, any line jumps the player, and AI tags and summaries can read the captions instead of the page
+- **Watch while you read**: YouTube and bilibili videos sit beside a transcript that follows playback; AI tags and summaries can read the captions
 
-![Reader with bilingual translation and highlights](docs/cws-assets/originals/screenshot-2-reader.png)
+![Reader with bilingual translation and highlights](docs/screenshots/readme/reader.webp)
 
-![Ask the page and get cited answers](docs/cws-assets/originals/screenshot-3-ask.png)
+![Ask the page and get cited answers](docs/screenshots/readme/ask.webp)
+
+![Notes page: one article's highlights read as a single excerpt flow](docs/screenshots/readme/notes.webp)
+
+![A saved word with its context and a dictionary column](docs/screenshots/readme/vocab.webp)
+
+![YouTube preview with a transcript that follows playback](docs/screenshots/readme/video.webp)
 
 ### Make Pinboard yours
 - **13 themes for pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus your own custom CSS
@@ -48,7 +52,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 - **Backup and sync**: settings via Chrome Sync; vocabulary and optional highlights and notes via your own Google Drive; manual JSON backups can include highlights, notes, vocabulary, and API keys; all opt-in, see Privacy below for the exact scope
 - **9 languages** · configurable shortcuts · local-first storage · zero tracking
 
-![13 themes for pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
+![13 themes for pinboard.in](docs/screenshots/readme/themes.webp)
 
 ## Install
 

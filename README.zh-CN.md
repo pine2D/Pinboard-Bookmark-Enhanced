@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Popup demo](docs/screenshots/demo-popup.png)
+![AI 生成标签和摘要后保存，深色与浅色主题](docs/screenshots/readme/hero.webp)
 
 ---
 
@@ -20,9 +20,7 @@
 - **一键保存，信息自动填好**：自动填入标题、描述和选中文本，并去掉 URL 追踪参数
 - **快捷键直接保存**：不开弹窗；也能一次保存所有打开的标签页
 - **断网也能保存**：先进本地队列，恢复联网后自动重试
-- **恢复未保存草稿**：重新打开弹窗即可继续编辑；草稿最多保留 24 小时，浏览器重启后清除
-
-![一键保存，AI 生成标签和摘要](docs/cws-assets/originals/screenshot-1-save.png)
+- **草稿不丢**：关掉弹窗再打开，接着写
 
 ### 标签
 - **AI 生成标签和摘要**：只读文章正文，不掺广告、菜单和侧边栏；自备 API key，14 家服务商或任意 OpenAI 兼容接口
@@ -33,14 +31,20 @@
 - **网页变成清爽的阅读器**：Markdown 视图，带目录、搜索和脚注速览；公式、图表、表格都正常显示
 - **五色高亮与笔记**：重渲染、翻译、内容变动后都会保留
 - **整页翻译，或向文章提问**：双语对照；回答附引用，点击直达原文出处
-- **边读边查词**：先显示贴合当前句子的释义；生词可记笔记、标学习状态，可发送到 Anki 和欧路词典；离线汉英、英汉词典包可选
-- **笔记和生词独立成页**：生词和高亮集中一处，随手查词、批量管理；直接编辑笔记、调整高亮颜色；无匹配时一键清除搜索和筛选
+- **边读边查词**：先显示贴合当前句子的释义；生词一键发到 Anki 和欧路词典，还可以选择离线汉英、英汉词典包
+- **笔记和生词独立成页**：生词和高亮集中一处，随手查词、批量管理
 - **发送或下载**：[Obsidian](https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任意 webhook；`.md`、`.html`、`.epub` 供电子书阅读器
-- **边读边看**：YouTube 和 B 站预览把视频和多语种字幕并排放好，字幕跟着播放走，点字幕行即可跳转，AI 标签和摘要还能直接读字幕
+- **边读边看**：YouTube 和 B 站视频旁边配上随播放滚动的字幕，AI 标签和摘要可以直接读字幕
 
-![清爽阅读器：双语对照、五色高亮与笔记](docs/cws-assets/originals/screenshot-2-reader.png)
+![清爽阅读器：双语对照、五色高亮与笔记](docs/screenshots/readme/reader.webp)
 
-![向文章提问，回答附带引用](docs/cws-assets/originals/screenshot-3-ask.png)
+![向文章提问，回答附带引用](docs/screenshots/readme/ask.webp)
+
+![笔记页：同一篇文章的高亮连成摘录流](docs/screenshots/readme/notes.webp)
+
+![生词详情：原文语境与词典参考栏](docs/screenshots/readme/vocab.webp)
+
+![YouTube 预览：字幕随播放滚动](docs/screenshots/readme/video.webp)
 
 ### 个性化
 - **13 套 pinboard.in 主题**（Dracula、Nord、Catppuccin、Solarized 等），还能叠加自定义 CSS
@@ -48,7 +52,7 @@
 - **备份与同步**：设置走 Chrome Sync，生词及可选启用的高亮与笔记走自己的 Google Drive，手动 JSON 备份可含高亮、笔记、生词和 API 密钥；全部可选，细节见下方「隐私」
 - **9 种语言**、可自定义快捷键、本地优先存储、零追踪
 
-![13 套 pinboard.in 主题](docs/cws-assets/originals/screenshot-4-themes.png)
+![13 套 pinboard.in 主题](docs/screenshots/readme/themes.webp)
 
 ## 安装
 

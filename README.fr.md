@@ -10,7 +10,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Popup demo](docs/screenshots/demo-popup.png)
+![Enregistrement avec étiquettes et résumé par IA, en thème sombre et clair](docs/screenshots/readme/hero.webp)
 
 ---
 
@@ -20,9 +20,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 - **Un clic, tout est rempli** : titre, description et texte sélectionné sont repris, les paramètres de suivi retirés de l'URL
 - **Enregistrement par raccourci clavier** : sans ouvrir la fenêtre ; ou tous les onglets ouverts d'un coup
 - **Fonctionne hors ligne** : les enregistrements passent par une file d'attente locale et sont renvoyés au retour de la connexion
-- **Retrouver un brouillon** : rouvrir la fenêtre pour reprendre les modifications non enregistrées ; les brouillons expirent après 24 heures ou au redémarrage du navigateur
-
-![Enregistrement en un clic avec étiquettes et résumé par IA](docs/cws-assets/originals/screenshot-1-save.png)
+- **Brouillons préservés** : fermez la fenêtre en pleine saisie et reprenez là où vous en étiez
 
 ### Étiquettes
 - **Étiquettes et résumé par IA** : l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 14 fournisseurs ou tout point de terminaison compatible OpenAI
@@ -33,14 +31,20 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 - **Chaque page passe en mode lecture épuré** : vue Markdown avec table des matières, recherche et aperçu des notes de bas de page ; formules, diagrammes et tableaux s'affichent correctement
 - **Surlignage en cinq couleurs, avec notes** : les deux survivent aux nouveaux rendus, à la traduction et aux modifications de la page
 - **Traduisez la page ou posez-lui vos questions** : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
-- **Cherchez les mots au fil de la lecture** : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; les mots enregistrés gardent notes et statut d'apprentissage et peuvent partir vers Anki ou Eudic ; packs de dictionnaires hors connexion chinois-anglais et anglais-chinois en option
-- **Une page entière pour les notes et le vocabulaire** : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots ; modifiez les notes et les couleurs sur place, ou effacez la recherche et les filtres pour retrouver vos entrées
+- **Cherchez les mots au fil de la lecture** : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; envoyez les mots enregistrés vers Anki ou Eudic en un clic, et ajoutez si vous le souhaitez des dictionnaires hors connexion chinois-anglais et anglais-chinois
+- **Une page entière pour les notes et le vocabulaire** : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots
 - **Envoyer ou télécharger** : vers [Obsidian](https://obsidian.md), Notion, NotebookLM, un Gist GitHub ou n'importe quel webhook ; ou en `.md`, `.html`, `.epub` pour votre liseuse
-- **Regarder en lisant** : les aperçus YouTube et Bilibili affichent la vidéo et ses sous-titres multilingues côte à côte ; la transcription suit la lecture, un clic sur une ligne déplace le lecteur, et les tags et résumés IA peuvent lire les sous-titres plutôt que la page
+- **Regarder en lisant** : les vidéos YouTube et Bilibili s'affichent à côté d'une transcription qui suit la lecture ; les tags et résumés IA peuvent lire les sous-titres
 
-![Lecture claire avec traduction bilingue et surlignages](docs/cws-assets/originals/screenshot-2-reader.png)
+![Lecture claire avec traduction bilingue et surlignages](docs/screenshots/readme/reader.webp)
 
-![Posez vos questions à la page, les réponses citent la source](docs/cws-assets/originals/screenshot-3-ask.png)
+![Posez vos questions à la page, les réponses citent la source](docs/screenshots/readme/ask.webp)
+
+![Page des notes : les surlignages d'un article réunis en un seul extrait](docs/screenshots/readme/notes.webp)
+
+![Mot enregistré avec son contexte et une colonne de dictionnaire](docs/screenshots/readme/vocab.webp)
+
+![Aperçu YouTube avec une transcription qui suit la lecture](docs/screenshots/readme/video.webp)
 
 ### Personnalisation
 - **13 thèmes pour pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
@@ -48,7 +52,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 - **Sauvegarde et synchronisation** : paramètres via Chrome Sync, vocabulaire et, sur activation, surlignages et notes via votre propre Google Drive ; les sauvegardes JSON manuelles peuvent inclure surlignages, notes, vocabulaire et clés API ; tout est facultatif, voir « Confidentialité » ci-dessous pour le périmètre exact
 - **9 langues** · raccourcis configurables · stockage local en priorité · aucun pistage
 
-![13 thèmes pour pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
+![13 thèmes pour pinboard.in](docs/screenshots/readme/themes.webp)
 
 ## Installation
 

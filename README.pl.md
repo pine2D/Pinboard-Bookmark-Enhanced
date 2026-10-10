@@ -10,7 +10,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Popup demo](docs/screenshots/demo-popup.png)
+![Zapis z tagami i streszczeniem od AI, w motywie ciemnym i jasnym](docs/screenshots/readme/hero.webp)
 
 ---
 
@@ -20,9 +20,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 - **Jedno kliknięcie i wszystko wypełnione** — tytuł, opis i zaznaczony tekst trafiają na miejsce, a z adresu URL znikają parametry śledzące
 - **Zapis skrótem klawiszowym** — bez otwierania okienka; można też zapisać naraz wszystkie otwarte karty
 - **Działa offline** — zapisy trafiają do lokalnej kolejki i są ponawiane po odzyskaniu połączenia
-- **Przywracanie szkicu** — otwórz ponownie okno rozszerzenia, aby kontynuować niezapisane zmiany; szkice wygasają po 24 godzinach lub ponownym uruchomieniu przeglądarki
-
-![Zapis jednym kliknięciem, tagi i streszczenie od AI](docs/cws-assets/originals/screenshot-1-save.png)
+- **Szkice nie przepadają** — zamknij okno w trakcie edycji i wróć do pisania w tym samym miejscu
 
 ### Tagi
 - **Tagi i streszczenie od AI** — AI czyta treść artykułu bez reklam, menu i pasków bocznych; własny klucz API, 14 dostawców lub dowolny endpoint zgodny z OpenAI
@@ -33,14 +31,20 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 - **Każda strona staje się czytelna** — widok Markdown ze spisem treści, wyszukiwaniem i podglądem przypisów; wzory, diagramy i tabele wyświetlają się poprawnie
 - **Zakreślenia w pięciu kolorach, z notatkami** — jedne i drugie przetrwają ponowne renderowanie, tłumaczenie, a nawet zmiany na stronie
 - **Przetłumacz stronę albo zadaj jej pytanie** — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
-- **Sprawdzaj słownictwo podczas czytania** — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka mają notatki i status opanowania i na życzenie trafiają do Anki lub Eudic; pakiety słowników offline (chińsko-angielski i angielsko-chiński) do wyboru
-- **Notatki i słówka mają własną stronę** — zapisane słówka i zakreślenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami; notatki i kolory zakreśleń edytujesz na miejscu, a pustą listę przywrócisz przez wyczyszczenie wyszukiwania i filtrów
+- **Sprawdzaj słownictwo podczas czytania** — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka wyślesz jednym kliknięciem do Anki lub Eudic, a do wyboru masz też słowniki offline chińsko-angielski i angielsko-chiński
+- **Notatki i słówka mają własną stronę** — zapisane słówka i zakreślenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami
 - **Wyślij albo pobierz** — do [Obsidiana](https://obsidian.md), Notion, NotebookLM, do serwisu GitHub Gist lub dowolnego webhooka; albo jako `.md`, `.html`, `.epub` na czytnik e-booków
-- **Oglądaj podczas czytania** — podgląd stron YouTube i Bilibili wczytuje wideo i wielojęzyczne napisy obok siebie; transkrypcja podąża za odtwarzaniem, kliknięcie wiersza przeskakuje odtwarzacz, a tagi i podsumowania AI mogą czytać napisy zamiast strony
+- **Oglądaj podczas czytania** — filmy z YouTube i Bilibili wyświetlają się obok transkrypcji, która podąża za odtwarzaniem; tagi i podsumowania AI mogą czytać napisy
 
-![Czytelny widok z tłumaczeniem dwujęzycznym i zakreśleniami](docs/cws-assets/originals/screenshot-2-reader.png)
+![Czytelny widok z tłumaczeniem dwujęzycznym i zakreśleniami](docs/screenshots/readme/reader.webp)
 
-![Zadaj stronie pytanie — odpowiedzi cytują źródło](docs/cws-assets/originals/screenshot-3-ask.png)
+![Zadaj stronie pytanie — odpowiedzi cytują źródło](docs/screenshots/readme/ask.webp)
+
+![Strona notatek: zakreślenia z jednego artykułu jako ciągły wypis](docs/screenshots/readme/notes.webp)
+
+![Zapisane słówko z kontekstem i kolumną słownika](docs/screenshots/readme/vocab.webp)
+
+![Podgląd YouTube z transkrypcją podążającą za odtwarzaniem](docs/screenshots/readme/video.webp)
 
 ### Personalizacja
 - **13 motywów dla pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) oraz własny CSS
@@ -48,7 +52,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 - **Kopie zapasowe i synchronizacja** — ustawienia przez Chrome Sync, słówka oraz opcjonalnie zaznaczenia i notatki przez własny Dysk Google; ręczna kopia JSON może zawierać zaznaczenia, notatki, słówka i klucze API; wszystko jest opcjonalne, zakres opisano niżej w sekcji „Prywatność”
 - **9 języków** · konfigurowalne skróty · dane przede wszystkim lokalnie · zero śledzenia
 
-![13 motywów dla pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
+![13 motywów dla pinboard.in](docs/screenshots/readme/themes.webp)
 
 ## Instalacja
 

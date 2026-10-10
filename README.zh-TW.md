@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Popup demo](docs/screenshots/demo-popup.png)
+![AI 產生標籤與摘要後儲存，深色與淺色主題](docs/screenshots/readme/hero.webp)
 
 ---
 
@@ -20,9 +20,7 @@
 - **一鍵儲存，資料自動填妥**：自動填入標題、描述與選取文字，並移除 URL 追蹤參數
 - **快捷鍵直接儲存**：不開彈出視窗；也能一次儲存所有開啟的分頁
 - **離線也能儲存**：先進本機佇列，重新連線後自動重試
-- **還原未儲存的草稿**：重新開啟彈出視窗即可繼續編輯；草稿最多保留 24 小時，瀏覽器重新啟動後清除
-
-![一鍵儲存，AI 產生標籤與摘要](docs/cws-assets/originals/screenshot-1-save.png)
+- **草稿不會遺失**：關掉彈出視窗再打開，接著寫
 
 ### 標籤
 - **AI 產生標籤與摘要**：只讀文章正文，不含廣告、選單與側欄；自備 API key，14 家服務商或任何 OpenAI 相容端點
@@ -33,14 +31,20 @@
 - **網頁變成清爽的閱讀器**：Markdown 檢視，內建目錄、搜尋與註腳速覽；數學式、圖表與表格都正確呈現
 - **五色劃重點與筆記**：重新渲染、翻譯、內容變動後依然保留
 - **整頁翻譯，或向文章提問**：雙語對照；回答附引用，一按即跳回原文出處
-- **邊讀邊查詞**：先顯示最貼近句子的釋義；生詞可加筆記、標記學習狀態，也可傳送到 Anki 與歐路詞典；離線中英、英中詞典包可另外選用
-- **筆記與生詞獨立成頁**：生詞與劃重點集中在同一頁，隨手查詞、批次管理；直接編輯筆記、調整劃重點顏色；找不到結果時可清除搜尋與篩選
+- **邊讀邊查詞**：先顯示最貼近句子的釋義；生詞一鍵傳送到 Anki 與歐路詞典，也可以選用離線中英、英中詞典包
+- **筆記與生詞獨立成頁**：生詞與劃重點集中在同一頁，隨手查詞、批次管理
 - **傳送或下載**：[Obsidian](https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任何 webhook；`.md`、`.html`、`.epub` 供電子書閱讀器
-- **邊讀邊看**：YouTube 與 B 站預覽把影片和多語種字幕並排放好，字幕跟著播放走，點字幕行即可跳轉，AI 標籤與摘要也能直接讀字幕
+- **邊讀邊看**：YouTube 與 B 站影片旁邊配上隨播放捲動的字幕，AI 標籤與摘要也能直接讀字幕
 
-![清爽閱讀器：雙語對照、五色劃重點與筆記](docs/cws-assets/originals/screenshot-2-reader.png)
+![清爽閱讀器：雙語對照、五色劃重點與筆記](docs/screenshots/readme/reader.webp)
 
-![向文章提問，回答附帶引用](docs/cws-assets/originals/screenshot-3-ask.png)
+![向文章提問，回答附帶引用](docs/screenshots/readme/ask.webp)
+
+![筆記頁：同一篇文章的劃重點連成摘錄](docs/screenshots/readme/notes.webp)
+
+![生詞詳情：原文語境與詞典參考欄](docs/screenshots/readme/vocab.webp)
+
+![YouTube 預覽：字幕隨播放捲動](docs/screenshots/readme/video.webp)
 
 ### 個人化
 - **13 套 pinboard.in 佈景主題**（Dracula、Nord、Catppuccin、Solarized 等），還可疊加自訂 CSS
@@ -48,7 +52,7 @@
 - **備份與同步**：設定透過 Chrome Sync，生詞及另行啟用的標記與筆記透過自己的 Google Drive，手動 JSON 備份可含標記、筆記、生詞和 API 金鑰；全部可選，詳見下方「隱私」
 - **9 種語言**、可自訂快捷鍵、本機優先儲存、零追蹤
 
-![13 套 pinboard.in 佈景主題](docs/cws-assets/originals/screenshot-4-themes.png)
+![13 套 pinboard.in 佈景主題](docs/screenshots/readme/themes.webp)
 
 ## 安裝
 

@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Popup demo](docs/screenshots/demo-popup.png)
+![AI タグと要約を付けて保存（ダーク／ライトテーマ）](docs/screenshots/readme/hero.webp)
 
 ---
 
@@ -20,9 +20,7 @@
 - **ワンクリック保存**：タイトル・説明・選択テキストを自動入力し、URL のトラッキングパラメーターを除去します
 - **ショートカットで直接保存**：ポップアップを開かず保存でき、開いているタブの一括保存もできます
 - **オフラインでも保存**：いったんローカルキューに入り、再接続後に自動で再試行します
-- **未保存の下書きを復元**：ポップアップを開き直すと編集を再開できます。下書きは24時間後、またはブラウザの再起動時に消去されます
-
-![ワンクリック保存、AI タグと要約](docs/cws-assets/originals/screenshot-1-save.png)
+- **下書きが消えない**：ポップアップを閉じても、開き直せば続きから書けます
 
 ### タグ
 - **AI タグ・要約**：広告・メニュー・サイドバーを除いた記事本文だけを読み取ります。API キーは自前で、14 のプロバイダーまたは任意の OpenAI 互換エンドポイントを使えます
@@ -33,14 +31,20 @@
 - **どんなページもすっきりしたリーダーに**：目次・検索・脚注プレビュー付きの Markdown 表示。数式・図・表もきちんと表示されます
 - **5 色のハイライトとメモ**：再描画・翻訳・ページ内容の変化をまたいでも保持されます
 - **ページ全体の翻訳とページへの質問**：対訳表示に対応し、回答には出典への引用が付き、クリックで該当箇所へジャンプします
-- **読みながら単語を調べる**：読んでいる文に合った語義がまず表示されます。保存した単語にはメモや学習ステータスを付けられ、Anki や Eudic にも送れます。中英・英中のオフライン辞書パックも選べます
-- **メモと単語帳に専用ページ**：保存した単語とハイライトが一か所に集まり、辞書検索も一括管理もできます。メモの編集やハイライトの色変更も直接でき、結果がないときは検索と絞り込みを解除できます
+- **読みながら単語を調べる**：読んでいる文に合った語義がまず表示されます。保存した単語はワンクリックで Anki や Eudic に送れ、中英・英中のオフライン辞書パックも選べます
+- **メモと単語帳に専用ページ**：保存した単語とハイライトが一か所に集まり、辞書検索も一括管理もできます
 - **送信もダウンロードも**：[Obsidian](https://obsidian.md)・Notion・NotebookLM・GitHub Gist・任意の webhook へ送信でき、`.md`・`.html`・`.epub` で電子書籍リーダーにも渡せます
-- **読みながら観る**：YouTube と Bilibili のプレビューは動画と多言語字幕を並べて表示し、字幕は再生に追従、行クリックでジャンプでき、AI タグと要約も字幕を直接読めます
+- **読みながら観る**：YouTube と Bilibili の動画の横に、再生に合わせて流れる字幕を表示。AI タグと要約も字幕を直接読めます
 
-![リーダー：対訳表示とハイライト](docs/cws-assets/originals/screenshot-2-reader.png)
+![リーダー：対訳表示とハイライト](docs/screenshots/readme/reader.webp)
 
-![ページへの質問、回答には出典引用付き](docs/cws-assets/originals/screenshot-3-ask.png)
+![ページへの質問、回答には出典引用付き](docs/screenshots/readme/ask.webp)
+
+![メモページ：1 本の記事のハイライトを抜き書きとして通読](docs/screenshots/readme/notes.webp)
+
+![保存した単語：文脈と辞書欄](docs/screenshots/readme/vocab.webp)
+
+![YouTube プレビュー：再生に合わせて流れる字幕](docs/screenshots/readme/video.webp)
 
 ### カスタマイズ
 - **pinboard.in 用テーマ 13 種**（Dracula、Nord、Catppuccin、Solarized など）に、自分のカスタム CSS を重ねられます
@@ -48,7 +52,7 @@
 - **バックアップと同期**：設定は Chrome Sync、単語と任意で有効にするハイライト・メモは自分の Google ドライブで同期。手動 JSON バックアップにはハイライト、メモ、単語、API キーも含められます。すべて任意で、対象範囲は下の「プライバシー」を参照
 - **9 言語対応** · カスタマイズ可能なショートカット · ローカルファースト保存 · トラッキング一切なし
 
-![pinboard.in 用テーマ 13 種](docs/cws-assets/originals/screenshot-4-themes.png)
+![pinboard.in 用テーマ 13 種](docs/screenshots/readme/themes.webp)
 
 ## インストール
 

@@ -10,7 +10,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Popup demo](docs/screenshots/demo-popup.png)
+![Speichern mit KI-Tags und Zusammenfassung, in dunklem und hellem Theme](docs/screenshots/readme/hero.webp)
 
 ---
 
@@ -20,9 +20,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 - **Ein Klick, alles ausgefüllt** – Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
 - **Per Tastenkürzel speichern** – ohne das Popup zu öffnen; auf Wunsch alle offenen Tabs auf einmal
 - **Funktioniert offline** – Gespeichertes landet in einer lokalen Warteschlange und wird gesendet, sobald du wieder online bist
-- **Entwurf wiederherstellen**: das Popup erneut öffnen und ungespeicherte Änderungen fortsetzen; Entwürfe verfallen nach 24 Stunden oder einem Browserneustart
-
-![Speichern mit einem Klick, KI-Tags und Zusammenfassung](docs/cws-assets/originals/screenshot-1-save.png)
+- **Entwürfe bleiben erhalten**: Popup schließen, wieder öffnen und genau dort weiterschreiben
 
 ### Tags
 - **KI-Tags und Zusammenfassung** – gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 14 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
@@ -33,14 +31,20 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 - **Jede Seite wird zur Leseansicht** – Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
 - **Markieren in fünf Farben, mit Notizen** – beide überstehen erneutes Rendern, Übersetzung und Änderungen an der Seite
 - **Seite übersetzen oder befragen** – Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
-- **Wörter beim Lesen nachschlagen**: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln tragen Notizen und Lernstatus und gehen auf Wunsch an Anki oder Eudic; optionale Offline-Wörterbuchpakete für Chinesisch–Englisch und Englisch–Chinesisch
-- **Eine eigene Seite für Notizen und Vokabeln**: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung; Notizen und Markierungsfarben lassen sich direkt bearbeiten, erfolglose Suchen samt Filtern zurücksetzen
+- **Wörter beim Lesen nachschlagen**: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch
+- **Eine eigene Seite für Notizen und Vokabeln**: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung
 - **Senden oder herunterladen** – an [Obsidian](https://obsidian.md), Notion, NotebookLM, ein GitHub Gist oder einen beliebigen Webhook; als `.md`, `.html` oder `.epub` für den E-Reader
-- **Sehen beim Lesen** – YouTube- und Bilibili-Vorschauen zeigen Video und mehrsprachige Untertitel nebeneinander; das Transkript folgt der Wiedergabe, ein Klick auf eine Zeile springt im Player, und KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel statt der Seite
+- **Sehen beim Lesen** – YouTube- und Bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt; KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel
 
-![Leseansicht mit zweisprachiger Übersetzung und Markierungen](docs/cws-assets/originals/screenshot-2-reader.png)
+![Leseansicht mit zweisprachiger Übersetzung und Markierungen](docs/screenshots/readme/reader.webp)
 
-![Die Seite befragen, Antworten zitieren die Quelle](docs/cws-assets/originals/screenshot-3-ask.png)
+![Die Seite befragen, Antworten zitieren die Quelle](docs/screenshots/readme/ask.webp)
+
+![Notizseite: die Markierungen eines Artikels als durchgehender Auszug](docs/screenshots/readme/notes.webp)
+
+![Gespeichertes Wort mit Kontext und Wörterbuchspalte](docs/screenshots/readme/vocab.webp)
+
+![YouTube-Vorschau mit mitlaufendem Transkript](docs/screenshots/readme/video.webp)
 
 ### Pinboard nach deinem Geschmack
 - **13 Themes für pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
@@ -48,7 +52,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 - **Sichern und synchronisieren**: Einstellungen über Chrome Sync, Vokabeln und optional Markierungen und Notizen über dein eigenes Google Drive; manuelle JSON-Backups können Markierungen, Notizen, Vokabeln und API-Schlüssel enthalten; alles optional, der genaue Umfang steht unten unter „Datenschutz“
 - **9 Sprachen** · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking
 
-![13 Themes für pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
+![13 Themes für pinboard.in](docs/screenshots/readme/themes.webp)
 
 ## Installation
 

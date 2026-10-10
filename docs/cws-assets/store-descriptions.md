@@ -20,7 +20,7 @@
 - One click, everything filled in: title, description, and selected text, with tracking parameters stripped from the URL
 - Save by hotkey: skip the popup, or batch-save every open tab
 - Works offline: saves are queued locally and retried when you're back online
-- Recover a draft: reopen the popup to resume unsaved edits; drafts expire after 24 hours or a browser restart
+- Drafts survive: close the popup mid-edit and pick up where you left off
 
 # Tag
 - AI tags & summary: reads the article body without the ads, menus, and sidebars; bring your own key (14 providers, or any OpenAI-compatible endpoint)
@@ -31,10 +31,10 @@
 - Any page becomes a clean reader: a Markdown view with table of contents, search, and footnote peek; math, diagrams, and tables render properly
 - Five-color highlights with notes: both survive re-renders, translation, even page edits
 - Translate the page or ask it questions: full-page translation with a bilingual view; answers cite the source and jump straight to it
-- Look up words as you read: definitions open on the sense that fits your sentence; saved words keep notes and a learning status and can be sent to Anki or Eudic; optional offline dictionary packs for Chinese-English and English-Chinese
-- A full page for notes and vocabulary: saved words and highlights in one place, with dictionary lookup and batch management; edit notes and change highlight colors directly on this page, or clear filters to find your entries again
+- Look up words as you read: definitions open on the sense that fits your sentence; send saved words to Anki or Eudic in one click, or add offline Chinese-English and English-Chinese dictionaries
+- A full page for notes and vocabulary: saved words and highlights in one place, with dictionary lookup and batch management
 - Send or download: Obsidian (https://obsidian.md), Notion, NotebookLM, a GitHub Gist, or any webhook; .md, .html, or .epub for your e-reader
-- Watch while you read: YouTube and bilibili previews pair the video with its subtitles; the transcript follows playback, any line jumps the player, and AI tags and summaries can read the captions instead of the page
+- Watch while you read: YouTube and bilibili videos sit beside a transcript that follows playback; AI tags and summaries can read the captions
 
 # Make Pinboard yours
 - 13 themes for pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) plus your own custom CSS
@@ -54,7 +54,7 @@
 - 一键保存，信息自动填好：自动填入标题、描述和选中文本，并去掉 URL 追踪参数
 - 快捷键直接保存：不开弹窗；也能一次保存所有打开的标签页
 - 断网也能保存：先进本地队列，恢复联网后自动重试
-- 恢复未保存草稿：重新打开弹窗即可继续编辑；草稿最多保留 24 小时，浏览器重启后清除
+- 草稿不丢：关掉弹窗再打开，接着写
 
 # 标签
 - AI 生成标签和摘要：只读文章正文，不掺广告、菜单和侧边栏；自备 API key，14 家服务商或任意 OpenAI 兼容接口
@@ -65,10 +65,10 @@
 - 网页变成清爽的阅读器：Markdown 视图，带目录、搜索和脚注速览；公式、图表、表格都正常显示
 - 五色高亮与笔记：重渲染、翻译、内容变动后都会保留
 - 整页翻译，或向文章提问：双语对照；回答附引用，点击直达原文出处
-- 边读边查词：先显示贴合当前句子的释义；生词可记笔记、标学习状态，可发送到 Anki 和欧路词典；离线汉英、英汉词典包可选
-- 笔记和生词独立成页：生词和高亮集中一处，随手查词、批量管理；直接编辑笔记、调整高亮颜色；无匹配时一键清除搜索和筛选
+- 边读边查词：先显示贴合当前句子的释义；生词一键发到 Anki 和欧路词典，还可以选择离线汉英、英汉词典包
+- 笔记和生词独立成页：生词和高亮集中一处，随手查词、批量管理
 - 发送或下载：Obsidian (https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任意 webhook；.md、.html、.epub 供电子书阅读器
-- 边读边看：YouTube 和 B 站预览把视频和多语种字幕并排放好，字幕跟着播放走，点字幕行即可跳转，AI 标签和摘要还能直接读字幕
+- 边读边看：YouTube 和 B 站视频旁边配上随播放滚动的字幕，AI 标签和摘要可以直接读字幕
 
 # 个性化
 - 13 套 pinboard.in 主题（Dracula、Nord、Catppuccin、Solarized 等），还能叠加自定义 CSS
@@ -88,7 +88,7 @@
 - 一鍵儲存，資料自動填妥：自動填入標題、描述與選取文字，並移除 URL 追蹤參數
 - 快捷鍵直接儲存：不開彈出視窗；也能一次儲存所有開啟的分頁
 - 離線也能儲存：先進本機佇列，重新連線後自動重試
-- 還原未儲存的草稿：重新開啟彈出視窗即可繼續編輯；草稿最多保留 24 小時，瀏覽器重新啟動後清除
+- 草稿不會遺失：關掉彈出視窗再打開，接著寫
 
 # 標籤
 - AI 產生標籤與摘要：只讀文章正文，不含廣告、選單與側欄；自備 API key，14 家服務商或任何 OpenAI 相容端點
@@ -99,10 +99,10 @@
 - 網頁變成清爽的閱讀器：Markdown 檢視，內建目錄、搜尋與註腳速覽；數學式、圖表與表格都正確呈現
 - 五色劃重點與筆記：重新渲染、翻譯、內容變動後依然保留
 - 整頁翻譯，或向文章提問：雙語對照；回答附引用，一按即跳回原文出處
-- 邊讀邊查詞：先顯示最貼近句子的釋義；生詞可加筆記、標記學習狀態，也可傳送到 Anki 與歐路詞典；離線中英、英中詞典包可另外選用
-- 筆記與生詞獨立成頁：生詞與劃重點集中在同一頁，隨手查詞、批次管理；直接編輯筆記、調整劃重點顏色；找不到結果時可清除搜尋與篩選
+- 邊讀邊查詞：先顯示最貼近句子的釋義；生詞一鍵傳送到 Anki 與歐路詞典，也可以選用離線中英、英中詞典包
+- 筆記與生詞獨立成頁：生詞與劃重點集中在同一頁，隨手查詞、批次管理
 - 傳送或下載：Obsidian (https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任何 webhook；.md、.html、.epub 供電子書閱讀器
-- 邊讀邊看：YouTube 與 B 站預覽把影片和多語種字幕並排放好，字幕跟著播放走，點字幕行即可跳轉，AI 標籤與摘要也能直接讀字幕
+- 邊讀邊看：YouTube 與 B 站影片旁邊配上隨播放捲動的字幕，AI 標籤與摘要也能直接讀字幕
 
 # 個人化
 - 13 套 pinboard.in 佈景主題（Dracula、Nord、Catppuccin、Solarized 等），還可疊加自訂 CSS
@@ -122,7 +122,7 @@
 - 一鍵儲存，資料自動填好：自動填入標題、描述與選取文字，並移除 URL 追蹤參數
 - 快捷鍵直接儲存：無需打開彈出視窗；也能一次儲存所有已打開的分頁
 - 離線也能儲存：先進本機佇列，重新連線後自動重試
-- 恢復未儲存草稿：重新打開彈出視窗即可繼續編輯；草稿最多保留 24 小時，重新啟動瀏覽器後清除
+- 草稿不會遺失：關掉彈出視窗再打開，繼續寫
 
 # 標籤
 - AI 產生標籤與摘要：只讀文章正文，不含廣告、選單與側欄；自備 API key，14 家服務商或任何 OpenAI 兼容端點
@@ -133,10 +133,10 @@
 - 網頁變成清爽的閱讀器：Markdown 檢視，附目錄、搜尋與註腳速覽；數學公式、圖表與表格都正常顯示
 - 五色高亮與筆記：重新渲染、翻譯、內容變動後仍會保留
 - 整頁翻譯，或向文章提問：雙語對照；答案附引註，一按即跳回原文出處
-- 邊讀邊查詞：先顯示切合該句的釋義；生詞可加筆記、標記學習狀態，並可傳送到 Anki 及歐路詞典；離線中英、英中詞典包可另行選用
-- 筆記與生詞獨立成頁：生詞與高亮集中在同一頁，隨手查詞、批量管理；直接編輯筆記、調整高亮顏色；沒有結果時可清除搜尋與篩選
+- 邊讀邊查詞：先顯示切合該句的釋義；生詞一鍵傳送到 Anki 及歐路詞典，亦可選用離線中英、英中詞典包
+- 筆記與生詞獨立成頁：生詞與高亮集中在同一頁，隨手查詞、批量管理
 - 傳送或下載：Obsidian (https://obsidian.md)、Notion、NotebookLM、GitHub Gist 或任何 webhook；.md、.html、.epub 供電子書閱讀器
-- 邊讀邊看：YouTube 與 B 站預覽把影片和多語種字幕並排放好，字幕跟着播放走，點字幕行即可跳轉，AI 標籤與摘要也能直接讀字幕
+- 邊讀邊看：YouTube 與 B 站影片旁邊配上跟着播放捲動的字幕，AI 標籤與摘要亦能直接讀字幕
 
 # 個人化
 - 13 套 pinboard.in 佈景主題（Dracula、Nord、Catppuccin、Solarized 等），更可疊加自訂 CSS
@@ -156,7 +156,7 @@
 - Ein Klick, alles ausgefüllt – Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
 - Per Tastenkürzel speichern – ohne das Popup zu öffnen; auf Wunsch alle offenen Tabs auf einmal
 - Funktioniert offline – Gespeichertes landet in einer lokalen Warteschlange und wird gesendet, sobald du wieder online bist
-- Entwurf wiederherstellen: das Popup erneut öffnen und ungespeicherte Änderungen fortsetzen; Entwürfe verfallen nach 24 Stunden oder einem Browserneustart
+- Entwürfe bleiben erhalten: Popup schließen, wieder öffnen und genau dort weiterschreiben
 
 # Tags
 - KI-Tags und Zusammenfassung – gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 14 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
@@ -167,10 +167,10 @@
 - Jede Seite wird zur Leseansicht – Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
 - Markieren in fünf Farben, mit Notizen – beide überstehen erneutes Rendern, Übersetzung und Änderungen an der Seite
 - Seite übersetzen oder befragen – Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
-- Wörter beim Lesen nachschlagen: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln tragen Notizen und Lernstatus und gehen auf Wunsch an Anki oder Eudic; optionale Offline-Wörterbuchpakete für Chinesisch–Englisch und Englisch–Chinesisch
-- Eine eigene Seite für Notizen und Vokabeln: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung; Notizen und Markierungsfarben lassen sich direkt bearbeiten, erfolglose Suchen samt Filtern zurücksetzen
+- Wörter beim Lesen nachschlagen: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch
+- Eine eigene Seite für Notizen und Vokabeln: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung
 - Senden oder herunterladen – an Obsidian (https://obsidian.md), Notion, NotebookLM, ein GitHub Gist oder einen beliebigen Webhook; als .md, .html oder .epub für den E-Reader
-- Sehen beim Lesen – YouTube- und Bilibili-Vorschauen zeigen Video und mehrsprachige Untertitel nebeneinander; das Transkript folgt der Wiedergabe, ein Klick auf eine Zeile springt im Player, und KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel statt der Seite
+- Sehen beim Lesen – YouTube- und Bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt; KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel
 
 # Pinboard nach deinem Geschmack
 - 13 Themes für pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
@@ -190,7 +190,7 @@
 - Un clic, tout est rempli : titre, description et texte sélectionné sont repris, les paramètres de suivi retirés de l'URL
 - Enregistrement par raccourci clavier : sans ouvrir la fenêtre ; ou tous les onglets ouverts d'un coup
 - Fonctionne hors ligne : les enregistrements passent par une file d'attente locale et sont renvoyés au retour de la connexion
-- Retrouver un brouillon : rouvrir la fenêtre pour reprendre les modifications non enregistrées ; les brouillons expirent après 24 heures ou au redémarrage du navigateur
+- Brouillons préservés : fermez la fenêtre en pleine saisie et reprenez là où vous en étiez
 
 # Étiquettes
 - Étiquettes et résumé par IA : l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 14 fournisseurs ou tout point de terminaison compatible OpenAI
@@ -201,10 +201,10 @@
 - Chaque page passe en mode lecture épuré : vue Markdown avec table des matières, recherche et aperçu des notes de bas de page ; formules, diagrammes et tableaux s'affichent correctement
 - Surlignage en cinq couleurs, avec notes : les deux survivent aux nouveaux rendus, à la traduction et aux modifications de la page
 - Traduisez la page ou posez-lui vos questions : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
-- Cherchez les mots au fil de la lecture : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; les mots enregistrés gardent notes et statut d'apprentissage et peuvent partir vers Anki ou Eudic ; packs de dictionnaires hors connexion chinois-anglais et anglais-chinois en option
-- Une page entière pour les notes et le vocabulaire : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots ; modifiez les notes et les couleurs sur place, ou effacez la recherche et les filtres pour retrouver vos entrées
+- Cherchez les mots au fil de la lecture : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; envoyez les mots enregistrés vers Anki ou Eudic en un clic, et ajoutez si vous le souhaitez des dictionnaires hors connexion chinois-anglais et anglais-chinois
+- Une page entière pour les notes et le vocabulaire : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots
 - Envoyer ou télécharger : vers Obsidian (https://obsidian.md), Notion, NotebookLM, un Gist GitHub ou n'importe quel webhook ; ou en .md, .html, .epub pour votre liseuse
-- Regarder en lisant : les aperçus YouTube et Bilibili affichent la vidéo et ses sous-titres multilingues côte à côte ; la transcription suit la lecture, un clic sur une ligne déplace le lecteur, et les tags et résumés IA peuvent lire les sous-titres plutôt que la page
+- Regarder en lisant : les vidéos YouTube et Bilibili s'affichent à côté d'une transcription qui suit la lecture ; les tags et résumés IA peuvent lire les sous-titres
 
 # Personnalisation
 - 13 thèmes pour pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
@@ -224,7 +224,7 @@
 - ワンクリック保存：タイトル・説明・選択テキストを自動入力し、URL のトラッキングパラメーターを除去します
 - ショートカットで直接保存：ポップアップを開かず保存でき、開いているタブの一括保存もできます
 - オフラインでも保存：いったんローカルキューに入り、再接続後に自動で再試行します
-- 未保存の下書きを復元：ポップアップを開き直すと編集を再開できます。下書きは24時間後、またはブラウザの再起動時に消去されます
+- 下書きが消えない：ポップアップを閉じても、開き直せば続きから書けます
 
 # タグ
 - AI タグ・要約：広告・メニュー・サイドバーを除いた記事本文だけを読み取ります。API キーは自前で、14 のプロバイダーまたは任意の OpenAI 互換エンドポイントを使えます
@@ -235,10 +235,10 @@
 - どんなページもすっきりしたリーダーに：目次・検索・脚注プレビュー付きの Markdown 表示。数式・図・表もきちんと表示されます
 - 5 色のハイライトとメモ：再描画・翻訳・ページ内容の変化をまたいでも保持されます
 - ページ全体の翻訳とページへの質問：対訳表示に対応し、回答には出典への引用が付き、クリックで該当箇所へジャンプします
-- 読みながら単語を調べる：読んでいる文に合った語義がまず表示されます。保存した単語にはメモや学習ステータスを付けられ、Anki や Eudic にも送れます。中英・英中のオフライン辞書パックも選べます
-- メモと単語帳に専用ページ：保存した単語とハイライトが一か所に集まり、辞書検索も一括管理もできます。メモの編集やハイライトの色変更も直接でき、結果がないときは検索と絞り込みを解除できます
+- 読みながら単語を調べる：読んでいる文に合った語義がまず表示されます。保存した単語はワンクリックで Anki や Eudic に送れ、中英・英中のオフライン辞書パックも選べます
+- メモと単語帳に専用ページ：保存した単語とハイライトが一か所に集まり、辞書検索も一括管理もできます
 - 送信もダウンロードも：Obsidian (https://obsidian.md)・Notion・NotebookLM・GitHub Gist・任意の webhook へ送信でき、.md・.html・.epub で電子書籍リーダーにも渡せます
-- 読みながら観る：YouTube と Bilibili のプレビューは動画と多言語字幕を並べて表示し、字幕は再生に追従、行クリックでジャンプでき、AI タグと要約も字幕を直接読めます
+- 読みながら観る：YouTube と Bilibili の動画の横に、再生に合わせて流れる字幕を表示。AI タグと要約も字幕を直接読めます
 
 # カスタマイズ
 - pinboard.in 用テーマ 13 種（Dracula、Nord、Catppuccin、Solarized など）に、自分のカスタム CSS を重ねられます
@@ -258,7 +258,7 @@
 - Jedno kliknięcie i wszystko wypełnione — tytuł, opis i zaznaczony tekst trafiają na miejsce, a z adresu URL znikają parametry śledzące
 - Zapis skrótem klawiszowym — bez otwierania okienka; można też zapisać naraz wszystkie otwarte karty
 - Działa offline — zapisy trafiają do lokalnej kolejki i są ponawiane po odzyskaniu połączenia
-- Przywracanie szkicu — otwórz ponownie okno rozszerzenia, aby kontynuować niezapisane zmiany; szkice wygasają po 24 godzinach lub ponownym uruchomieniu przeglądarki
+- Szkice nie przepadają — zamknij okno w trakcie edycji i wróć do pisania w tym samym miejscu
 
 # Tagi
 - Tagi i streszczenie od AI — AI czyta treść artykułu bez reklam, menu i pasków bocznych; własny klucz API, 14 dostawców lub dowolny endpoint zgodny z OpenAI
@@ -269,10 +269,10 @@
 - Każda strona staje się czytelna — widok Markdown ze spisem treści, wyszukiwaniem i podglądem przypisów; wzory, diagramy i tabele wyświetlają się poprawnie
 - Zakreślenia w pięciu kolorach, z notatkami — jedne i drugie przetrwają ponowne renderowanie, tłumaczenie, a nawet zmiany na stronie
 - Przetłumacz stronę albo zadaj jej pytanie — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
-- Sprawdzaj słownictwo podczas czytania — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka mają notatki i status opanowania i na życzenie trafiają do Anki lub Eudic; pakiety słowników offline (chińsko-angielski i angielsko-chiński) do wyboru
-- Notatki i słówka mają własną stronę — zapisane słówka i zakreślenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami; notatki i kolory zakreśleń edytujesz na miejscu, a pustą listę przywrócisz przez wyczyszczenie wyszukiwania i filtrów
+- Sprawdzaj słownictwo podczas czytania — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka wyślesz jednym kliknięciem do Anki lub Eudic, a do wyboru masz też słowniki offline chińsko-angielski i angielsko-chiński
+- Notatki i słówka mają własną stronę — zapisane słówka i zakreślenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami
 - Wyślij albo pobierz — do Obsidiana (https://obsidian.md), Notion, NotebookLM, do serwisu GitHub Gist lub dowolnego webhooka; albo jako .md, .html, .epub na czytnik e-booków
-- Oglądaj podczas czytania — podgląd stron YouTube i Bilibili wczytuje wideo i wielojęzyczne napisy obok siebie; transkrypcja podąża za odtwarzaniem, kliknięcie wiersza przeskakuje odtwarzacz, a tagi i podsumowania AI mogą czytać napisy zamiast strony
+- Oglądaj podczas czytania — filmy z YouTube i Bilibili wyświetlają się obok transkrypcji, która podąża za odtwarzaniem; tagi i podsumowania AI mogą czytać napisy
 
 # Personalizacja
 - 13 motywów dla pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) oraz własny CSS
@@ -292,7 +292,7 @@
 - Один клик — всё заполнено — заголовок, описание и выделенный текст подставляются сами, а трекинг-параметры удаляются из URL
 - Сохранение горячей клавишей — не открывая окно; можно сохранить и все открытые вкладки разом
 - Работает офлайн — записи попадают в локальную очередь и отправляются повторно после восстановления связи
-- Восстановление черновика — снова откройте окно расширения, чтобы продолжить несохранённые изменения; черновики удаляются через 24 часа или после перезапуска браузера
+- Черновики не теряются — закройте окно на середине правки и продолжите с того же места
 
 # Теги
 - AI-теги и краткое содержание — AI читает текст статьи без рекламы, меню и боковых панелей; свой API-ключ, 14 провайдеров или любой OpenAI-совместимый эндпоинт
@@ -303,10 +303,10 @@
 - Любая страница превращается в режим чтения — Markdown-просмотр с оглавлением, поиском и предпросмотром сносок; формулы, диаграммы и таблицы отображаются правильно
 - Выделения пяти цветов с заметками — и выделения, и заметки переживают перерисовку, перевод и даже изменения на странице
 - Переведите страницу или задайте ей вопрос — полный перевод с двуязычным режимом; ответы ссылаются на источник, и клик ведёт прямо к нему
-- Ищите слова во время чтения — словарь сразу показывает значение, подходящее к предложению; у сохранённых слов есть заметки и статус изучения, их можно отправить в Anki или Eudic; офлайн-словари (китайско-английский и англо-китайский) подключаются по желанию
-- У заметок и словарика своя страница — сохранённые слова и выделения в одном месте, с поиском по словарю и пакетными действиями; заметки и цвета выделений редактируются здесь же, а сброс поиска и фильтров возвращает записи в пустой список
+- Ищите слова во время чтения — словарь сразу показывает значение, подходящее к предложению; сохранённые слова отправляются в Anki или Eudic в один клик, а офлайн-словари (китайско-английский и англо-китайский) подключаются по желанию
+- У заметок и словарика своя страница — сохранённые слова и выделения в одном месте, с поиском по словарю и пакетными действиями
 - Отправить или скачать — в Obsidian (https://obsidian.md), Notion, NotebookLM, GitHub Gist или на любой вебхук; либо скачать .md, .html, .epub для читалки
-- Смотрите, пока читаете — предпросмотр YouTube и Bilibili показывает видео и многоязычные субтитры рядом; расшифровка следует за воспроизведением, клик по строке перематывает плеер, а AI-теги и резюме могут читать субтитры вместо страницы
+- Смотрите, пока читаете — видео с YouTube и Bilibili показываются рядом с расшифровкой, которая следует за воспроизведением; AI-теги и резюме могут читать субтитры
 
 # Персонализация
 - 13 тем для pinboard.in (Dracula · Nord · Catppuccin · Solarized · …) плюс свой CSS
