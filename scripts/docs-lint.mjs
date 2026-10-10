@@ -44,11 +44,11 @@ for (const f of READMES) {
   }
   if ((block.split("**").length - 1) % 2 !== 0) errors.push(`${f}: unbalanced ** in features block`);
   if (!(lines[4] || "").includes("13")) errors.push(`${f}: tagline (line 5) lost the "13 themes" claim`);
-  const dashDelims = (block.match(/\*\* — /g) || []).length;
+  const dashDelims = (block.match(/\*\* [—–] /g) || []).length;
   if (DASH_DELIM_ALLOWED.has(f)) {
     if (dashDelims === 0) errors.push(`${f}: pl/ru keep the native spaced-dash delimiter; found none (policy drift?)`);
   } else if (dashDelims > 0) {
-    errors.push(`${f}: ${dashDelims} "** — " bullet delimiter(s); this locale uses the colon family`);
+    errors.push(`${f}: ${dashDelims} "** — " / "** – " bullet delimiter(s); this locale uses the colon family`);
   }
 }
 

@@ -17,24 +17,24 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 ## Funktionen
 
 ### Speichern
-- **Ein Klick, alles ausgefüllt** – Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
-- **Per Tastenkürzel speichern** – ohne das Popup zu öffnen; auf Wunsch alle offenen Tabs auf einmal
-- **Funktioniert offline** – Gespeichertes landet in einer lokalen Warteschlange und wird gesendet, sobald du wieder online bist
+- **Ein Klick, alles ausgefüllt**: Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
+- **Per Tastenkürzel speichern**: ohne das Popup zu öffnen; auf Wunsch alle offenen Tabs auf einmal
+- **Funktioniert offline**: Gespeichertes landet in einer lokalen Warteschlange und wird gesendet, sobald du wieder online bist
 - **Entwürfe bleiben erhalten**: Popup schließen, wieder öffnen und genau dort weiterschreiben
 
 ### Tags
-- **KI-Tags und Zusammenfassung** – gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 14 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
-- **Autovervollständigung** – aus deinen Tags, Pinboards Vorschlägen und Ein-Klick-Voreinstellungen
-- **Tags aufräumen** – doppelte und selten genutzte Tags finden und stapelweise zusammenführen
+- **KI-Tags und Zusammenfassung**: gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 14 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
+- **Autovervollständigung**: aus deinen Tags, Pinboards Vorschlägen und Ein-Klick-Voreinstellungen
+- **Tags aufräumen**: doppelte und selten genutzte Tags finden und stapelweise zusammenführen
 
 ### Lesen
-- **Jede Seite wird zur Leseansicht** – Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
-- **Markieren in fünf Farben, mit Notizen** – beide überstehen erneutes Rendern, Übersetzung und Änderungen an der Seite
-- **Seite übersetzen oder befragen** – Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
+- **Jede Seite wird zur Leseansicht**: Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
+- **Markieren in fünf Farben, mit Notizen**: beide überstehen erneutes Rendern, Übersetzung und Änderungen an der Seite
+- **Seite übersetzen oder befragen**: Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
 - **Wörter beim Lesen nachschlagen**: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch
 - **Eine eigene Seite für Notizen und Vokabeln**: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung
-- **Senden oder herunterladen** – an [Obsidian](https://obsidian.md), Notion, NotebookLM, ein GitHub Gist oder einen beliebigen Webhook; als `.md`, `.html` oder `.epub` für den E-Reader
-- **Sehen beim Lesen** – YouTube- und Bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt; KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel
+- **Senden oder herunterladen**: an [Obsidian](https://obsidian.md), Notion, NotebookLM, ein GitHub Gist oder einen beliebigen Webhook; als `.md`, `.html` oder `.epub` für den E-Reader
+- **Sehen beim Lesen**: YouTube- und Bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt; KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel
 
 ![Leseansicht mit zweisprachiger Übersetzung und Markierungen](docs/screenshots/readme/reader.webp)
 
@@ -48,7 +48,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 
 ### Pinboard nach deinem Geschmack
 - **13 Themes für pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
-- **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren** – auf Wunsch bei jedem Speichern; Seiten bleiben erreichbar, auch wenn der Originallink tot ist
+- **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren**: auf Wunsch bei jedem Speichern; Seiten bleiben erreichbar, auch wenn der Originallink tot ist
 - **Sichern und synchronisieren**: Einstellungen über Chrome Sync, Vokabeln und optional Markierungen und Notizen über dein eigenes Google Drive; manuelle JSON-Backups können Markierungen, Notizen, Vokabeln und API-Schlüssel enthalten; alles optional, der genaue Umfang steht unten unter „Datenschutz“
 - **9 Sprachen** · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking
 
