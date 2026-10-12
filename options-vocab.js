@@ -432,7 +432,11 @@ async function _pbpVocabDriveCurrent(gen, actionSeq, owner, status) {
 // nothing at all; either way the panel re-reads status under the same
 // generation/action/owner guards and lays this failure over the fresh render
 // (UX-6) instead of leaving the pre-action render with one generic line.
-async function _pbpVocabDriveSettle(response, gen, actionSeq, owner) {
+// When that re-read fails too, the pre-action render must still go: a
+// finished Disconnect is known to have left the device disconnected, and any
+// other action falls back to the failed-status view with a retry, never the
+// busy "syncing…" line nothing would rewrite.
+async function _pbpVocabDriveSettle(response, gen, actionSeq, owner, type) {
   if (!response || typeof response !== "object") response = { ok: false, error: "remote" };
   if (!(await _pbpVocabDriveCurrent(gen, actionSeq, owner, response.status))) return null;
   let fresh = null;
@@ -445,6 +449,20 @@ async function _pbpVocabDriveSettle(response, gen, actionSeq, owner) {
       console.warn("[drive] status re-read failed:", error?.name, error?.message);
       if (gen !== _driveRenderGen || (actionSeq && actionSeq !== _vocabDriveActionSeq)) return null;
     }
+  }
+  if (!response.status && !fresh) {
+    if (type === "vocabDriveDisconnect" && response.ok === true) {
+      _pbpVocabDriveRender({ connected: false });
+      // The render scopes a raw status owner; this one is already scoped.
+      _driveVisibleOwner = typeof owner === "string" ? owner : null;
+    } else {
+      _pbpVocabDriveClear();
+      const state = $id("vocab-drive-state");
+      if (state) state.textContent = t("vocabDriveStatusFailed");
+      _pbpVocabDrivePaintErrors(response.ok ? [] : _pbpVocabDriveResponseLines(response, null), null);
+      _pbpVocabDriveOfferRetry();
+    }
+    return response;
   }
   _pbpVocabDriveApplyResponse(response, fresh);
   return response;
@@ -552,7 +570,7 @@ async function _pbpVocabDriveSend(type, force, gen, actionSeq, sourceButton, foc
       response = { ok: false, error: "remote" };
     }
     const moveFocus = document.activeElement === sourceButton;
-    const settled = await _pbpVocabDriveSettle(response, gen, actionSeq, owner);
+    const settled = await _pbpVocabDriveSettle(response, gen, actionSeq, owner, type);
     if (!settled) return;
     const preferred = moveFocus && focusTargetId ? $id(focusTargetId) : null;
     const target = preferred && !preferred.hidden
@@ -1159,7 +1177,7 @@ if (_vocabDriveClearNotices) _vocabDriveClearNotices.addEventListener("click", a
       console.warn("[drive] notices dismissal failed:", error?.name, error?.message);
       response = { ok: false, error: "remote" };
     }
-    await _pbpVocabDriveSettle(response, gen, 0, await owner);
+    await _pbpVocabDriveSettle(response, gen, 0, await owner, "vocabDriveClearNotices");
   } catch (error) {
     console.warn("[drive] notices dismissal failed:", error?.name, error?.message);
     if (gen === _driveRenderGen) _pbpVocabDriveShowError("remote");

@@ -1020,6 +1020,56 @@ delete document.documentElement.dataset.theme;
       errorText().includes("vocabDriveErrorBusy") && errorText().includes("vocabDriveErrorRemote") &&
       _vocabDriveBusy === false, `${driveMessages.map((message) => message.type).join()} / ${errorText()}`);
 
+    // background.js answers a finished Disconnect with a bare {ok:true} when
+    // its own status read fails. The page then re-reads; whatever that re-read
+    // does, the panel must leave the pre-Disconnect "connected + error" render.
+    const disconnectFrom = withConnection({ lastError:"network", retryAt:RETRY_AT });
+    const disconnectedView = () => ({ state:stateText(), error:errorText(), buttons:shown(),
+      owner:_driveVisibleOwner, busy:_vocabDriveBusy });
+    _pbpVocabDriveRender(disconnectFrom);
+    driveMessages.length = 0;
+    window.chrome.runtime.sendMessage = async (message) => {
+      driveMessages.push({ ...message });
+      return message.type === "vocabDriveStatus" ? { ok:true, status:disconnectedStatus } : { ok:true };
+    };
+    await _pbpVocabDriveAction("vocabDriveDisconnect", false);
+    {
+      const got = { ...disconnectedView(), messages:driveMessages.map((message) => message.type).join() };
+      // Simplest miss: skip the re-read and keep the old connected render.
+      check("a Disconnect answered without status repaints the re-read disconnected view",
+        got.messages === "vocabDriveDisconnect,vocabDriveStatus" &&
+        got.state.includes("vocabDriveDisconnected") && got.error === "" && got.buttons === "+--" && !got.busy,
+        JSON.stringify(got));
+    }
+    _pbpVocabDriveRender(disconnectFrom);
+    window.chrome.runtime.sendMessage = async (message) => {
+      if (message.type === "vocabDriveStatus") throw new Error("Could not establish connection. Receiving end does not exist.");
+      return { ok:true };
+    };
+    await _pbpVocabDriveAction("vocabDriveDisconnect", false);
+    {
+      const got = disconnectedView();
+      // Simplest miss (the pre-fix behaviour): a null fallback paints nothing,
+      // so "connected" and the old network error stay on screen.
+      check("a Disconnect answered without status still shows the disconnected view when the re-read fails",
+        got.state.includes("vocabDriveDisconnected") && got.error === "" && got.buttons === "+--" &&
+        got.owner === "acct_alice" && !got.busy, JSON.stringify(got));
+    }
+    _pbpVocabDriveRender(quiet);
+    window.chrome.runtime.sendMessage = async (message) => message.type === "vocabDriveStatus"
+      ? { ok:false, error:"remote" } : { ok:false, error:"local_store" };
+    await _pbpVocabDriveAction("vocabDriveSyncNow", true);
+    {
+      const got = { state:stateText(), error:errorText(), buttons:shown(),
+        actions:$id("vocab-drive-actions").hidden === false, connectEnabled:$id("vocab-drive-connect").disabled === false };
+      // Simplest miss (the pre-fix behaviour): the state line keeps the busy
+      // "syncing…" text because nothing rewrites it once busy ends.
+      check("an action answered without status and an unreadable re-read reads as a failed status with a retry",
+        got.state.includes("vocabDriveStatusFailed") && !got.state.includes("vocabDriveWorking") &&
+        got.error.includes("vocabDriveErrorLocalStore") && got.buttons === "+--" && got.actions && got.connectEnabled,
+        JSON.stringify(got));
+    }
+
     const manualRetryStatus = withConnection({ lastError:"network", retryAt:Date.UTC(2026, 6, 24, 12, 0) });
     _pbpVocabDriveRender(quiet);
     window.chrome.runtime.sendMessage = async () => networkResponse(manualRetryStatus);
