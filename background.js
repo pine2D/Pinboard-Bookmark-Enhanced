@@ -2635,7 +2635,9 @@ async function pbpConnectDrive() {
       type: "PBP_DRIVE_CONNECT_AUTHORIZED", owner: pbpDictOwnerScope(auth.account)
     });
     if (pending && typeof pending.catch === "function") pending.catch(() => {});
-  } catch (_) {}
+  } catch (error) {
+    console.warn("[vocab-drive] connect: broadcast failed:", error?.name, error?.message);
+  }
   // manual: the page shows this round's outcome, so no system notification.
   return pbpQueueDriveRound({ interactive: false, force: true, manual: true });
 }
@@ -2722,7 +2724,7 @@ async function pbpGetVocabDriveStatus() {
     // button that cannot clear it). Only a readable data-layer preflight error
     // is still real; an account-row error or retryAt is unconfirmed history.
     // An unreadable connection record leaves the whole connection unknown.
-    const preflightError = preflight !== null && status.lastError !== null && status.lastError === preflight.lastError;
+    const preflightError = preflight != null && status.lastError !== null && status.lastError === preflight.lastError;
     if ((failed.length || connectionRead.status === "rejected") && !preflightError) {
       return { status: { ...status, lastError: "status_unavailable", blocked: false, retryAt: null }, account, snapshot };
     }

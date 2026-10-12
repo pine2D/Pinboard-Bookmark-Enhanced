@@ -211,9 +211,10 @@ function statusHarness(source, opts = {}) {
     pbpPinboardAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
     pbpVocabOwnerHash: async () => OWNER_HASH,
     pbpVocabSyncSnapshot: async () => { if (opts.vocabSnapshotError) throw new Error("vocabulary storage unavailable"); return opts.vocabSnapshot || snapshotOf(); },
-    pbpVocabGetPreflightState: async () => { if (opts.vocabPreflightError) throw new Error("vocabulary preflight unavailable"); return opts.vocabPreflight || null; },
+    pbpVocabGetPreflightState: async () => { if (opts.vocabPreflightError) throw new Error("vocabulary preflight unavailable"); return opts.vocabPreflight === undefined ? null : opts.vocabPreflight; }, // vocab-store returns null when absent
     pbpNotesSyncSnapshot: async () => { if (opts.notesSnapshotError) throw new Error("notes storage unavailable"); return opts.notesSnapshot || snapshotOf(); },
-    notesDriveStore: { getPreflightState: async () => opts.notesPreflight || null },
+    // notes-sync.js reads storage[key], so an absent record is undefined, not null.
+    notesDriveStore: { getPreflightState: async () => opts.notesPreflight },
     // The throwing read (Task 3): status must tell "no record" from "unreadable".
     pbpDriveReadConnState: async (hash) => { if (opts.connectionError) throw new Error("connection state unavailable"); return hash === OWNER_HASH ? (opts.connectionState || null) : null; },
     console: spyConsole(warnings)
@@ -601,7 +602,10 @@ function refreshHarness(source, opts = {}) {
   // Simplest miss: Math.max, or reading the vocabulary row alone -- both report 300.
   sh = statusHarness(source, { vocabSnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 300 })] }) });
   let st = await sh.status();
-  check("last successful sync stays empty while one dataset has never synced", probe(() => st.lastSuccessAt === null && st.vocabulary.lastSuccessAt === 300 && st.notes.lastSuccessAt === null));
+  // An absent notes preflight is undefined (notes-sync.js); an account-row data error must still render.
+  const absentPreflight = await statusHarness(source, { notesSnapshot: snapshotOf({ states: [accountRow("google-a", { lastError: "corrupt" })] }) }).status();
+  check("last successful sync stays empty while one dataset has never synced", probe(() => st.lastSuccessAt === null && st.vocabulary.lastSuccessAt === 300 && st.notes.lastSuccessAt === null &&
+    absentPreflight.notes.lastError === "corrupt"));
   // Simplest miss: drop nulls before Math.min (reports 300) or coerce null to 0 (reports 0).
 
   sh = statusHarness(source, {
