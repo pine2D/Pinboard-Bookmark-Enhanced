@@ -42,13 +42,22 @@ function fixture(ownerHash, options = {}) {
       }
       return owner;
     } });
-  // Chrome issues one token per Google account, and offline it cannot mint a
-  // replacement; the rejection text is Chromium's kAuthFailure +
-  // GoogleServiceAuthError::ToString() for ERR_INTERNET_DISCONNECTED.
+  // Chrome issues one token per Google account and keeps it, even offline,
+  // until it expires; only a fresh mint (nothing cached, token expired, or
+  // removeCachedAuthToken) needs the network, and offline that rejects with
+  // Chromium's kAuthFailure + GoogleServiceAuthError::ToString() for
+  // ERR_INTERNET_DISCONNECTED. goOffline() models an offline device whose token
+  // has expired; options.keepTokenOffline keeps the issued token valid.
+  const issued = new Set();
   const identity = { async getAuthToken() {
-    if (offline) throw new Error("OAuth2 request failed: Connection failed (-106).");
-    return { token: "google-token:" + drivePermissionId };
-  }, async removeCachedAuthToken() {} };
+    if (offline && !options.keepTokenOffline) issued.clear();
+    const token = "google-token:" + drivePermissionId;
+    if (!issued.has(token)) {
+      if (offline) throw new Error("OAuth2 request failed: Connection failed (-106).");
+      issued.add(token);
+    }
+    return { token };
+  }, async removeCachedAuthToken(details) { issued.delete(details.token); } };
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
   const client = pbpCreateVocabDriveClient({ identity, protocol: PBP_NOTES_DRIVE_PROTOCOL,
     beforeRequest: async () => {
@@ -162,8 +171,21 @@ function fixture(ownerHash, options = {}) {
   await test("Pinboard switch inside final HTTP gate prevents old-account notes POST", async () => {
     const f = fixture(hash, { switchDuringUploadGuard: true }); await f.addLocal();
     const result = await f.run(), pending = await f.store.listPendingBatches("google-a", hash);
+    // Real Chrome returns an unexpired token silently even offline, so a
+    // dropped connection with a valid token hits the identity cache: the
+    // mid-run identity checks pass without HTTP and the downloaded notes
+    // import (spec 4.2: same token, same account). Only the session's closing
+    // about (never cached) reaches the dead network, so the round still ends
+    // as a retryable network error. The offline cases above cover the
+    // expired-token side.
+    const warm = fixture(hash, { remote: true, keepTokenOffline: true, afterDownload: (ctx) => ctx.goOffline() });
+    const warmResult = await warm.run();
+    const aboutAfterDownload = warm.calls.slice(warm.calls.findIndex((call) => call.startsWith("/drive/v3/files/notes-remote")))
+      .filter((call) => call.startsWith("/drive/v3/about")).length;
     return result.error === "account_changed" && f.uploads.length === 0 && pending.length === 1 &&
-      pending[0].body.includes("Local note") && f.data[ARTICLE].items[0].owner === OWNER;
+      pending[0].body.includes("Local note") && f.data[ARTICLE].items[0].owner === OWNER &&
+      warm.data[ARTICLE]?.items[0].note === "Remote note" && warmResult.error === "network" &&
+      aboutAfterDownload === 1;
   });
   for (const [name, change] of [["disabled notes scope", "disable"], ["Pinboard account switch", "switchOwner"], ["Google account switch", "switchGoogle"]]) {
     await test(name + " during body transfer cannot commit remote notes", async () => {
