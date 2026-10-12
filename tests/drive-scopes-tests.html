@@ -174,6 +174,153 @@ function bootHarness(source, seed = {}) {
     return { boot: pbpBootDriveSync, disconnect: pbpDisconnectVocabDrive, epoch: () => driveScopeEpoch };`);
   return { ...factory(...Object.values(deps)), local, calls, cleared };
 }
+// ---- Isolated slices: connect / disconnect / status / response / identity refresh ----
+function fnSource(source, signature) {
+  const at = source.indexOf(signature);
+  if (at < 0) throw new Error("anchor not found: " + signature);
+  const end = source.indexOf("\n}\n", at);
+  if (end < 0) throw new Error("function end not found: " + signature);
+  return source.slice(at, end + 2);
+}
+const settle = (promise) => Promise.resolve(promise).catch((error) => ({ thrown: String(error?.message || error) }));
+const withTimeout = (promise, ms = 1000) => Promise.race([settle(promise), new Promise((resolve) => setTimeout(() => resolve("timeout"), ms))]);
+// A shape mismatch (e.g. st.connection undefined before the rewrite) must render a
+// failed row, not throw out of the IIFE and stall the whole page.
+const probe = (assertion) => { try { return assertion() === true; } catch (_) { return false; } };
+const OWNER_HASH = "a".repeat(64);
+const spyConsole = (lines) => ({ warn: (...args) => lines.push(args.map(String).join(" ")), log() {}, error() {} });
+// Rows as vocab-store / notes-sync persist them (internal shapes, not server responses).
+const accountRow = (permissionId, patch = {}) => ({ key: "account:" + permissionId + ":" + OWNER_HASH, drivePermissionId: permissionId,
+  ownerHash: OWNER_HASH, emailAddress: permissionId + "@example.test", displayName: "", bootstrapComplete: true, pageToken: "42",
+  lastSuccessAt: 100, lastError: null, retryAttempt: 0, retryAt: null, ...patch });
+const preflightRow = (lastError, patch = {}) => ({ key: "preflight:" + OWNER_HASH, ownerHash: OWNER_HASH, retryAttempt: 0, retryAt: null, lastError, blocked: false, ...patch });
+const snapshotOf = (patch = {}) => ({ states: [], outbox: [], batches: [], notices: [], ...patch });
+const vocabOutbox = (term) => ({ key: "outbox:acct_alice:en|" + term, owner: "acct_alice", recordKey: "en|" + term });
+const batchRow = (permissionId, fileId) => ({ key: "batch:" + permissionId + ":" + OWNER_HASH + ":" + fileId, drivePermissionId: permissionId, ownerHash: OWNER_HASH, driveFileId: fileId });
+
+function statusHarness(source, opts = {}) {
+  const local = { vocabDriveConnected: opts.connected !== false, ...(opts.local || {}) };
+  const warnings = [];
+  const deps = {
+    chrome: { storage: { local: { async get(query) {
+      const out = {}; for (const [key, fallback] of Object.entries(query)) out[key] = key in local ? structuredClone(local[key]) : fallback; return out;
+    } } } },
+    PBP_DRIVE_CONNECTION_ACCOUNT_KEY: "driveConnectionAccount",
+    pbpVocabDriveIsConnected: async () => local.vocabDriveConnected === true,
+    getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
+    pbpPinboardAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
+    pbpVocabOwnerHash: async () => OWNER_HASH,
+    pbpVocabSyncSnapshot: async () => { if (opts.vocabSnapshotError) throw new Error("vocabulary storage unavailable"); return opts.vocabSnapshot || snapshotOf(); },
+    pbpVocabGetPreflightState: async () => { if (opts.vocabPreflightError) throw new Error("vocabulary preflight unavailable"); return opts.vocabPreflight || null; },
+    pbpNotesSyncSnapshot: async () => { if (opts.notesSnapshotError) throw new Error("notes storage unavailable"); return opts.notesSnapshot || snapshotOf(); },
+    notesDriveStore: { getPreflightState: async () => opts.notesPreflight || null },
+    // The throwing read (Task 3): status must tell "no record" from "unreadable".
+    pbpDriveReadConnState: async (hash) => { if (opts.connectionError) throw new Error("connection state unavailable"); return hash === OWNER_HASH ? (opts.connectionState || null) : null; },
+    console: spyConsole(warnings)
+  };
+  const body = [fnSource(source, "function pbpDriveSnapshotStatus"), fnSource(source, "async function pbpGetVocabDriveStatus"),
+    fnSource(source, "async function pbpVocabDriveResponse")].join("\n");
+  const factory = new Function(...Object.keys(deps), body + "\nreturn { status: pbpGetVocabDriveStatus, response: pbpVocabDriveResponse };");
+  const api = factory(...Object.values(deps));
+  return { status: () => settle(api.status()), response: (result) => settle(api.response(result)), warnings };
+}
+
+function connectHarness(source, opts = {}) {
+  const local = { vocabDriveConnected: opts.connected === true };
+  const order = [], rounds = [], messages = [], warnings = [];
+  const deps = {
+    chrome: {
+      permissions: { contains: async () => opts.permissionGranted !== false },
+      identity: { async clearAllCachedAuthTokens() { order.push("clear-all"); } },
+      storage: { local: { async set(values) { order.push("set:" + Object.keys(values).sort().join("+")); Object.assign(local, structuredClone(values)); } } },
+      runtime: { sendMessage: (message) => { order.push("broadcast"); messages.push(structuredClone(message)); return Promise.resolve(); } }
+    },
+    PBP_GOOGLE_API_ORIGIN: "https://www.googleapis.com/*",
+    PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected", PBP_DRIVE_CONNECTION_ACCOUNT_KEY: "driveConnectionAccount",
+    getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
+    pbpPinboardAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
+    pbpVocabDriveIsConnected: async () => local.vocabDriveConnected === true,
+    pbpVocabOwnerHash: async () => OWNER_HASH,
+    // Task 3's forgiving read: never rejects. connectionState is the shared record as Task 2 writes it.
+    driveConnectionStore: { get: async (hash) => (hash === OWNER_HASH ? structuredClone(opts.connectionState || null) : null) },
+    pbpVocabDriveForgetIdentity: (...args) => { order.push("forget:" + args.length); },
+    pbpObserveDriveIdentity: (permissionId) => { order.push("observe:" + permissionId); },
+    driveConnectClient: { async connect() {
+      order.push("authorize");
+      return opts.authorization || { ok: true, permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" };
+    } },
+    pbpQueueDriveRound: async (options) => {
+      order.push("round"); rounds.push(structuredClone(options));
+      return opts.round || { ok: true, results: { vocabulary: { ok: true }, notes: { ok: true } } };
+    },
+    console: spyConsole(warnings)
+  };
+  const factory = new Function(...Object.keys(deps), fnSource(source, "async function pbpConnectDrive") + "\nreturn pbpConnectDrive;");
+  const connect = factory(...Object.values(deps));
+  return { connect: () => settle(connect()), local, order, rounds, messages, warnings };
+}
+
+function disconnectHarness(source, opts = {}) {
+  const local = {
+    vocabDriveConnected: true,
+    driveConnectionAccount: { permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" },
+    ["driveConnState:" + OWNER_HASH]: { lastError: "network", authAttempts: 0, retryAttempt: 1, retryAt: 5000, blocked: false, updatedAt: 1 },
+    pbp_hl_local: { note: "Keep local notes" }
+  };
+  const order = [], warnings = [];
+  const identity = opts.identityMissing ? undefined : {
+    // Offline OAuth endpoint: a silent mint never settles.
+    getAuthToken: () => { order.push("mint"); return new Promise(() => {}); },
+    removeCachedAuthToken: async () => { order.push("remove-token"); },
+    clearAllCachedAuthTokens: async () => { order.push("clear-all:" + local.vocabDriveConnected); }
+  };
+  const deps = {
+    chrome: {
+      identity,
+      storage: { local: {
+        async set(values) { Object.assign(local, structuredClone(values)); },
+        async remove(keys) { for (const key of [].concat(keys)) delete local[key]; }
+      } },
+      permissions: { remove: async () => { order.push("permissions-remove"); return true; }, contains: async () => false }
+    },
+    PBP_VOCAB_DRIVE_CAPABLE: true, PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected",
+    PBP_DRIVE_CONNECTION_ACCOUNT_KEY: "driveConnectionAccount", PBP_GOOGLE_API_ORIGIN: "https://www.googleapis.com/*",
+    driveScopeEpoch: 0,
+    pbpClearDriveAlarms: async () => { order.push("clear-alarms"); },
+    pbpVocabDriveForgetIdentity: (...args) => { order.push("forget:" + args.length); },
+    pbpGetVocabDriveStatus: async () => { if (opts.statusError) throw new Error("status unavailable"); return { connected: local.vocabDriveConnected }; },
+    console: spyConsole(warnings)
+  };
+  const factory = new Function(...Object.keys(deps), fnSource(source, "async function pbpDisconnectVocabDrive") +
+    "\nreturn { disconnect: pbpDisconnectVocabDrive, epoch: () => driveScopeEpoch };");
+  const api = factory(...Object.values(deps));
+  return { disconnect: () => withTimeout(api.disconnect()), epoch: api.epoch, local, order, warnings };
+}
+
+function refreshHarness(source, opts = {}) {
+  const local = { driveConnectionAccount: { permissionId: "google-previous", emailAddress: "previous@example.test", displayName: "Previous" } };
+  const observed = [], aboutCalls = [];
+  let api = null;
+  const about = (name) => async () => {
+    aboutCalls.push(name); opts.duringAbout?.(api);
+    return opts.identity || { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" };
+  };
+  const deps = {
+    chrome: { storage: { local: { async set(values) { Object.assign(local, structuredClone(values)); } } } },
+    PBP_DRIVE_CONNECTION_ACCOUNT_KEY: "driveConnectionAccount",
+    driveScopeEpoch: 0,
+    pbpDriveEnabled: async () => true,
+    vocabDriveClient: { about: about("vocabulary") }, notesDriveClient: { about: about("notes") },
+    getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
+    pbpPinboardAuthIsCurrent: () => true,
+    pbpObserveDriveIdentity: (...args) => { observed.push(args); },
+    console: spyConsole([])
+  };
+  const factory = new Function(...Object.keys(deps), fnSource(source, "async function pbpRefreshDriveConnectionAccount") +
+    "\nreturn { refresh: pbpRefreshDriveConnectionAccount, bumpEpoch: () => { driveScopeEpoch++; } };");
+  api = factory(...Object.values(deps));
+  return { refresh: (...args) => settle(api.refresh(...args)), local, observed, aboutCalls };
+}
 (async () => {
   const source = await fetch("../background.js").then((r) => r.text());
   // ---- One round: vocabulary, then notes ----
@@ -414,35 +561,6 @@ function bootHarness(source, seed = {}) {
   // Simplest miss: Connect observing the new identity without bumping driveScopeEpoch -- run 1's own
   // identity reads still answer google-old here, so nothing else stops its pending page from committing.
   check("Connect cancels an older-Google round through the epoch alone when the run's identity reads still match", epochOnly.first.error === "account_changed" && epochOnly.reconnect.ok && epochOnly.account.permissionId === "google-a" && epochOnly.mutations.every((row) => row.run !== 1) && epochOnly.notesRuns === 1);
-  // ---- Status (interim shape; the status rewrite replaces these) ----
-  h = harness(source);
-  const status = await h.status();
-  check("status exposes both datasets' pending counts on a connected device", status.pendingWords === 1 && status.notes?.pendingNotes === 1);
-  h = harness(source, {}, { notesSnapshotError: true });
-  let notesFailed = null; try { notesFailed = await h.status(); } catch (_) {}
-  // A failed status READ stops nothing, so it reports status_unavailable, never local_store + blocked (B13).
-  check("notes status read failure retains healthy vocabulary status", notesFailed?.pendingWords === 1 && notesFailed.notes?.lastError === "status_unavailable" && notesFailed.notes.blocked === false);
-  h = harness(source, {}, { vocabSnapshotError: true });
-  let vocabularyFailed = null; try { vocabularyFailed = await h.status(); } catch (_) {}
-  check("vocabulary status read failure retains healthy notes status", vocabularyFailed?.lastError === "status_unavailable" && vocabularyFailed.blocked === false && vocabularyFailed.notes?.pendingNotes === 1 && !vocabularyFailed.notes.lastError);
-  // Account rows as vocab-gdrive.js persists them: a backoff row keeps its retryAt.
-  const accountBackoff = { states: [{ key: "account:google-a:" + HASH, drivePermissionId: "google-a", ownerHash: HASH, emailAddress: "current@example.test", displayName: "", bootstrapComplete: true, pageToken: "42", lastSuccessAt: 100, lastError: "network", retryAttempt: 2, retryAt: Date.UTC(2026, 9, 1) }], outbox: [], batches: [], notices: [] };
-  h = harness(source, {}, { vocabSnapshot: accountBackoff, vocabPreflightError: true });
-  let preflightFailed = null; try { preflightFailed = await h.status(); } catch (_) {}
-  check("unreadable preflight neither blocks nor promises the account row's stale retry", preflightFailed?.lastError === "status_unavailable" && preflightFailed.blocked === false && preflightFailed.retryAt === null && preflightFailed.lastSuccessAt === 100);
-  h = harness(source, {}, { vocabSnapshotError: true, vocabPreflight: blockedRow("corrupt") });
-  let snapshotFailedBlocked = null; try { snapshotFailedBlocked = await h.status(); } catch (_) {}
-  check("readable blocked preflight survives a snapshot read failure", snapshotFailedBlocked?.lastError === "corrupt" && snapshotFailedBlocked.blocked === true);
-  h = harness(source); await h.connect();
-  const freshConnection = await h.status();
-  check("fresh connection identifies Google", freshConnection.drivePermissionId === "google-a" && freshConnection.emailAddress === "current@example.test" && h.calls.join() === "authorize,vocabulary,notes");
-  h = harness(source, {}, { vocabSnapshot: snap("google-previous", "previous@example.test") }); await h.connect();
-  const refreshedConnection = await h.status();
-  check("reconnect identity overrides older dataset account history", refreshedConnection.drivePermissionId === "google-a" && refreshedConnection.emailAddress === "current@example.test");
-  const olderVocabulary = snap("google-old", "old@example.test"), newerNotes = snap("google-recent", "recent@example.test"); newerNotes.states[0].lastSuccessAt = 200;
-  h = harness(source, {}, { vocabSnapshot: olderVocabulary, notesSnapshot: newerNotes });
-  const legacyAccount = await h.status();
-  check("legacy connection without shared identity uses the latest dataset account", legacyAccount.drivePermissionId === "google-recent" && legacyAccount.emailAddress === "recent@example.test");
   // ---- Boot and disconnect ----
   const boot = bootHarness(source);
   await boot.boot({ throttleMs: 900000 }); await boot.boot({ throttleMs: 900000 });
@@ -456,10 +574,286 @@ function bootHarness(source, seed = {}) {
   check("boot with revoked permissions disconnects and clears the three drive-sync alarms", bootResult.error === "permission" && revokedBoot.local.vocabDriveConnected === false && revokedBoot.cleared.slice().sort().join() === DRIVE_ALARMS.join() && revokedBoot.calls.length === 0);
   const disconnected = bootHarness(source, { pbp_hl_local: { note: "Keep local notes" } });
   await disconnected.disconnect();
-  check("disconnect invalidates active runs before awaiting OAuth operations", disconnected.calls[0] === "mint:false" && disconnected.local.vocabDriveConnected === false && disconnected.epoch() === 1);
   check("disconnect clears the three drive-sync alarms and retains local notes", DRIVE_ALARMS.every((name) => disconnected.cleared.includes(name)) && !disconnected.cleared.some((name) => /^(vocab|notes)-sync-/.test(name)) && disconnected.local.pbp_hl_local.note === "Keep local notes");
   const disconnectedIdentity = bootHarness(source, { driveConnectionAccount: { permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" }, pbp_hl_local: { note: "Preserve history" } }); await disconnectedIdentity.disconnect();
   check("disconnect clears shared connection identity while preserving dataset history", !("driveConnectionAccount" in disconnectedIdentity.local) && disconnectedIdentity.local.pbp_hl_local.note === "Preserve history");
+  // ---- Task 4: status shape (spec §6.2) ----
+  const datasetKeys = JSON.stringify(["blocked", "hasPending", "lastError", "lastSuccessAt", "notices", "retryAt"]);
+  let sh = statusHarness(source, {
+    local: { driveConnectionAccount: { permissionId: "google-a", emailAddress: "a@example.test", displayName: "A" } },
+    vocabSnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 300 })], outbox: [vocabOutbox("word")],
+      notices: [{ key: "notice:acct_alice:en|apple", owner: "acct_alice", recordKey: "en|apple" }] }),
+    notesSnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 200 })], outbox: [{ owner: "acct_alice", recordKey: "pbp_hl_abcd|n1" }],
+      notices: [{ owner: "acct_alice", recordKey: "pbp_hl_abcd|n2", kind: "delete" }] })
+  });
+  const merged = await sh.status();
+  check("status reports one connection block and two dataset rows with nothing flattened at the top", probe(() =>
+    merged.connected === true && merged.owner === "alice" &&
+    JSON.stringify(merged.connection) === JSON.stringify({ lastError: null, retryAt: null, blocked: false }) &&
+    JSON.stringify(Object.keys(merged.vocabulary || {}).sort()) === datasetKeys && JSON.stringify(Object.keys(merged.notes || {}).sort()) === datasetKeys &&
+    merged.vocabulary.hasPending === true && merged.notes.hasPending === true && merged.hasPending === true &&
+    ["pendingWords", "pendingBatches", "vocabularyEnabled", "notesEnabled", "retryAttempt", "lastError", "blocked"].every((key) => !Object.hasOwn(merged, key))));
+  // Simplest miss: add connection/vocabulary/notes but keep the old flattened pendingWords/lastError at the top level.
+  check("noticeTerms lists vocabulary notice terms only while both rows count their notices", probe(() =>
+    JSON.stringify(merged.noticeTerms) === JSON.stringify(["apple"]) && merged.vocabulary.notices === 1 && merged.notes.notices === 1));
+  // Simplest miss: build noticeTerms from both snapshots, which leaks the note id "n2" as a "term".
+  check("last successful sync is the earlier of the two datasets", probe(() => merged.lastSuccessAt === 200 && merged.vocabulary.lastSuccessAt === 300));
+  // Simplest miss: Math.max, or reading the vocabulary row alone -- both report 300.
+  sh = statusHarness(source, { vocabSnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 300 })] }) });
+  let st = await sh.status();
+  check("last successful sync stays empty while one dataset has never synced", probe(() => st.lastSuccessAt === null && st.vocabulary.lastSuccessAt === 300 && st.notes.lastSuccessAt === null));
+  // Simplest miss: drop nulls before Math.min (reports 300) or coerce null to 0 (reports 0).
+
+  sh = statusHarness(source, {
+    vocabSnapshot: snapshotOf({ states: [accountRow("google-a", { lastError: "network", retryAttempt: 2, retryAt: 5000 })] }),
+    vocabPreflight: preflightRow("network", { retryAttempt: 2, retryAt: 5000 }),
+    notesPreflight: preflightRow("auth", { blocked: true }),
+    connectionState: { lastError: "server", authAttempts: 0, retryAttempt: 1, retryAt: 9000, blocked: false, updatedAt: 1 }
+  });
+  st = await sh.status();
+  check("connection-layer codes come only from the shared connection record", probe(() =>
+    st.connection.lastError === "server" && st.connection.retryAt === 9000 && st.connection.blocked === false &&
+    st.vocabulary.lastError === null && st.vocabulary.retryAt === null && st.notes.lastError === null && st.notes.blocked === false));
+  // Simplest miss: filter connection codes out of the preflight but not out of the account row -- the row's stale "network" lands on vocabulary with retryAt 5000.
+  sh = statusHarness(source, { connectionState: { lastError: "auth", authAttempts: 5, retryAttempt: 5, retryAt: 7000, blocked: true, updatedAt: 1 } });
+  st = await sh.status();
+  check("a blocked connection record reports blocked without a retry time", probe(() => st.connection.lastError === "auth" && st.connection.blocked === true && st.connection.retryAt === null));
+  // Simplest miss: copy retryAt through for a blocked record, so the panel promises a retry that never comes.
+  sh = statusHarness(source, {
+    vocabPreflight: preflightRow("unexpected", { retryAttempt: 1, retryAt: 7000 }),
+    notesPreflight: preflightRow("corrupt", { blocked: true }),
+    notesSnapshot: snapshotOf({ states: [accountRow("google-a", { lastError: "corrupt" })] })
+  });
+  st = await sh.status();
+  check("data-layer errors stay on their own dataset rows with their own retry state", probe(() =>
+    st.vocabulary.lastError === "unexpected" && st.vocabulary.retryAt === 7000 && st.vocabulary.blocked === false &&
+    st.notes.lastError === "corrupt" && st.notes.blocked === true && st.notes.retryAt === null && st.connection.lastError === null));
+  // Simplest miss: treat every preflight code as connection-layer, so the notes block moves into the connection row.
+
+  sh = statusHarness(source, {
+    local: { driveConnectionAccount: { permissionId: "google-a", emailAddress: "a@example.test", displayName: "A" } },
+    vocabSnapshot: snapshotOf({ states: [accountRow("google-old", { lastSuccessAt: 500 }), accountRow("google-a", { lastSuccessAt: 100, lastError: "remote" })],
+      batches: [batchRow("google-old", "f1")] })
+  });
+  st = await sh.status();
+  check("status reads the connected Google account's row before a newer one (A2)", probe(() =>
+    st.vocabulary.lastSuccessAt === 100 && st.vocabulary.lastError === "remote" && st.vocabulary.hasPending === false));
+  // Simplest miss: keep choosing the newest row -- reports 500, no error, and counts google-old's frozen batch as pending.
+  sh = statusHarness(source, { local: { driveConnectionAccount: { permissionId: "google-z" } },
+    vocabSnapshot: snapshotOf({ states: [accountRow("google-old", { lastSuccessAt: 100 }), accountRow("google-new", { lastSuccessAt: 200 })] }) });
+  st = await sh.status();
+  check("without a row for the connected account status falls back to the newest row", probe(() => st.vocabulary.lastSuccessAt === 200));
+  // Simplest miss: return an empty row when the A2 match fails, which reports "never synced".
+  sh = statusHarness(source, { local: { driveConnectionAccount: { permissionId: "google-a" } },
+    vocabSnapshot: snapshotOf({ states: [accountRow("google-a")], batches: [batchRow("google-a", "f2")] }) });
+  st = await sh.status();
+  check("a frozen batch counts as pending even with an empty outbox", probe(() => st.vocabulary.hasPending === true && st.hasPending === true && st.notes.hasPending === false));
+  // Simplest miss: hasPending = outbox.length > 0, so the "unsent changes" line disappears once the outbox is frozen.
+
+  // ---- Task 4: status read failures ----
+  sh = statusHarness(source, { notesSnapshotError: true, vocabSnapshot: snapshotOf({ outbox: [vocabOutbox("word")] }) });
+  st = await sh.status();
+  check("a failed notes read reports status_unavailable on notes only and borrows no block", probe(() =>
+    st.notes.lastError === "status_unavailable" && st.notes.blocked === false && st.notes.retryAt === null &&
+    st.vocabulary.lastError === null && st.vocabulary.hasPending === true && sh.warnings.some((line) => line.includes("notes storage unavailable"))));
+  // Simplest miss: map the failed read to local_store + blocked, whose hint names a button that cannot clear it.
+  sh = statusHarness(source, { vocabSnapshotError: true, notesSnapshot: snapshotOf({ outbox: [{ owner: "acct_alice", recordKey: "pbp_hl_abcd|n1" }] }) });
+  st = await sh.status();
+  check("a failed vocabulary read keeps the notes row healthy", probe(() =>
+    st.vocabulary.lastError === "status_unavailable" && st.vocabulary.blocked === false && st.notes.lastError === null && st.notes.hasPending === true));
+  // Simplest miss: mark both datasets unavailable whenever any single read fails.
+  sh = statusHarness(source, { vocabPreflightError: true,
+    vocabSnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 100, lastError: "unexpected", retryAttempt: 2, retryAt: Date.UTC(2026, 9, 1) })] }) });
+  st = await sh.status();
+  check("an unreadable preflight neither blocks nor promises the account row's stale retry", probe(() =>
+    st.vocabulary.lastError === "status_unavailable" && st.vocabulary.blocked === false && st.vocabulary.retryAt === null && st.vocabulary.lastSuccessAt === 100));
+  // Simplest miss: fall back to the account row when the preflight is unreadable, showing a "next retry" that is not scheduled.
+  sh = statusHarness(source, { vocabSnapshotError: true, vocabPreflight: preflightRow("corrupt", { blocked: true }) });
+  st = await sh.status();
+  check("a readable blocked data-layer preflight survives a snapshot read failure", probe(() => st.vocabulary.lastError === "corrupt" && st.vocabulary.blocked === true));
+  // Simplest miss: always replace the row with status_unavailable on any failed read, hiding a real block.
+  sh = statusHarness(source, { vocabSnapshotError: true, vocabPreflight: preflightRow("auth", { blocked: true }) });
+  st = await sh.status();
+  check("a readable legacy connection-layer preflight does not survive as a dataset error", probe(() =>
+    st.vocabulary.lastError === "status_unavailable" && st.vocabulary.blocked === false && st.connection.lastError === null));
+  // Simplest miss: "preflight readable and has lastError -> keep it" without layer filtering, so auth lands on the vocabulary row.
+  sh = statusHarness(source, { connectionError: true, vocabSnapshot: snapshotOf({ states: [accountRow("google-a")] }) });
+  st = await sh.status();
+  check("an unreadable connection record makes both datasets status_unavailable instead of healthy", probe(() =>
+    st.connection.lastError === null && st.vocabulary.lastError === "status_unavailable" && st.notes.lastError === "status_unavailable" &&
+    st.vocabulary.blocked === false && sh.warnings.some((line) => line.includes("connection state unavailable"))));
+  // Simplest miss: treat a failed connection read as "no error", painting an unknown state as connected and healthy.
+
+  // ---- Task 4: disconnected device and identity ----
+  sh = statusHarness(source, { connected: false, notesSnapshotError: true,
+    local: { driveConnectionAccount: { permissionId: "google-a", emailAddress: "a@example.test" } },
+    vocabSnapshot: snapshotOf({ states: [accountRow("google-a", { lastError: "corrupt" })] }), vocabPreflight: preflightRow("corrupt", { blocked: true }),
+    connectionState: { lastError: "auth", authAttempts: 5, retryAttempt: 0, retryAt: null, blocked: true, updatedAt: 1 } });
+  st = await sh.status();
+  check("a disconnected device shows no dataset error, no connection error and no Google identity", probe(() =>
+    st.connected === false && st.connection.lastError === null && st.connection.blocked === false &&
+    st.vocabulary.lastError === null && st.vocabulary.blocked === false && st.notes.lastError === null &&
+    ["drivePermissionId", "emailAddress", "displayName"].every((key) => !Object.hasOwn(st, key))));
+  // Simplest miss: read driveConnState regardless of connected, so the old auth block still says "needs re-authorization" after disconnect.
+  sh = statusHarness(source, { local: { driveConnectionAccount: { permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" } },
+    vocabSnapshot: snapshotOf({ states: [accountRow("google-previous", { emailAddress: "previous@example.test", lastSuccessAt: 900 })] }) });
+  st = await sh.status();
+  check("connected status names the Google account from the connection record over dataset history", probe(() =>
+    st.drivePermissionId === "google-a" && st.emailAddress === "current@example.test" && st.displayName === "Current"));
+  // Simplest miss: prefer the newest dataset row's identity, which shows the previous Google account after a reconnect.
+  sh = statusHarness(source, {
+    vocabSnapshot: snapshotOf({ states: [accountRow("google-old", { emailAddress: "old@example.test", lastSuccessAt: 100 })] }),
+    notesSnapshot: snapshotOf({ states: [accountRow("google-recent", { emailAddress: "recent@example.test", lastSuccessAt: 200 })] }) });
+  st = await sh.status();
+  check("a legacy connection without a connection record uses the most recent dataset account", probe(() =>
+    st.drivePermissionId === "google-recent" && st.emailAddress === "recent@example.test"));
+  // Simplest miss: fall back to the vocabulary row only, ignoring a newer notes account.
+
+  // ---- Task 4: action response (spec §6.2, A28) ----
+  sh = statusHarness(source);
+  let resp = await sh.response({ ok: false, error: "waiting_for_retry", results: {
+    vocabulary: { ok: true, status: { waitingForRetry: true, retryAt: 5000 } }, notes: { ok: true, changed: false, status: { lastSuccessAt: 1 } } } });
+  const okWaiting = await sh.response({ ok: true, waitingForRetry: true, results: { vocabulary: { ok: true }, notes: { ok: true } } });
+  check("an action in backoff carries waitingForRetry at the top level only", probe(() =>
+    resp.ok === false && resp.waitingForRetry === true && typeof resp.status === "object" &&
+    JSON.stringify(resp.results) === JSON.stringify({ vocabulary: { ok: true }, notes: { ok: true } }) &&
+    okWaiting.ok === true && okWaiting.waitingForRetry === true));
+  // Simplest miss: keep waitingForRetry inside results.vocabulary, so the page's top-level check never sees it and flashes "Synced".
+  resp = await sh.response({ ok: false, error: "network", retryable: true, results: {
+    vocabulary: { ok: false, error: "network", retryable: true }, notes: { ok: false, error: "network" } } });
+  check("connection-layer failures appear only at the top of the action response", probe(() =>
+    resp.error === "network" && !Object.hasOwn(resp, "retryable") &&
+    JSON.stringify(resp.results) === JSON.stringify({ vocabulary: { ok: false }, notes: { ok: false } })));
+  // Simplest miss: pass results[type].error through, so the page renders two subject-prefixed "network" rows.
+  resp = await sh.response({ ok: false, error: "corrupt", results: {
+    vocabulary: { ok: true, changed: true }, notes: { ok: false, error: "corrupt", retryable: false, status: { remoteBody: "must not escape" } } } });
+  check("data-layer results stay per dataset with nothing but ok and error", probe(() =>
+    resp.error === "corrupt" && !Object.hasOwn(resp, "waitingForRetry") &&
+    JSON.stringify(resp.results) === JSON.stringify({ vocabulary: { ok: true }, notes: { ok: false, error: "corrupt" } })));
+  // Simplest miss: strip every per-dataset error, so a notes block loses its subject line.
+  resp = await sh.response({ ok: true, results: { vocabulary: { ok: true }, notes: { ok: true } } });
+  check("a successful round answers ok with no error or waitingForRetry keys", probe(() =>
+    resp.ok === true && !Object.hasOwn(resp, "error") && !Object.hasOwn(resp, "waitingForRetry") && typeof resp.status === "object"));
+  // Simplest miss: always emit waitingForRetry:false / error:undefined, which breaks `"waitingForRetry" in response` consumers.
+
+  // ---- Task 4: Connect (spec §3.5, A4, §10.6, §10.8) ----
+  // Shared records as Task 2's runner writes them.
+  const connRecord = (patch) => ({ lastError: "auth", authAttempts: 5, retryAttempt: 0, retryAt: null, blocked: true, updatedAt: 1, ...patch });
+  // A blocked grant on record: the clear-before-authorize branch would run if the permission check came second.
+  let ch = connectHarness(source, { connected: true, permissionGranted: false, connectionState: connRecord() });
+  let connectResult = await ch.connect();
+  check("Connect checks optional permissions first and, when they are gone, only marks the device disconnected", probe(() =>
+    connectResult.error === "permission" && JSON.stringify(ch.order) === JSON.stringify(["set:vocabDriveConnected"]) &&
+    ch.local.vocabDriveConnected === false));
+  // Simplest misses: clear Chrome's token cache before the permission check, so a denied grant still wipes
+  // tokens; or return permission without the flag write the handler used to do (spec §10.8 keeps it).
+  const resetOrders = [];
+  for (const record of [connRecord(), connRecord({ lastError: "permission", authAttempts: 0 })]) {
+    ch = connectHarness(source, { connected: true, connectionState: record });
+    await ch.connect();
+    resetOrders.push(JSON.stringify(ch.order.slice(0, 3)));
+  }
+  check("re-authorizing after an auth block or a refused permission clears Chrome's token cache and the identity cache before the interactive grant", probe(() =>
+    resetOrders.length === 2 && resetOrders.every((order) => order === JSON.stringify(["clear-all", "forget:0", "authorize"]))));
+  // Simplest miss: clear after connect() returns, so Chrome hands back the stale token and no prompt appears.
+  const keptOrders = [];
+  for (const record of [null, connRecord({ lastError: "network", authAttempts: 0, retryAttempt: 2, retryAt: 9000, blocked: false }),
+    connRecord({ authAttempts: 2, retryAttempt: 2, retryAt: 9000, blocked: false })]) {
+    ch = connectHarness(source, { connected: true, connectionState: record });
+    await ch.connect();
+    keptOrders.push(ch.order[0] === "authorize" && !ch.order.includes("clear-all") && !ch.order.some((step) => step.startsWith("forget")));
+  }
+  check("a connected device that is healthy or only backing off re-authorizes without wiping tokens", probe(() =>
+    keptOrders.length === 3 && keptOrders.every(Boolean)));
+  // Simplest misses (spec §10.6): keep the old "connected -> clear" guard, so one interactive network failure
+  // after a wipe leaves only "OAuth2 not granted or revoked." for the next silent mint; or key on lastError
+  // "auth" without blocked, so an auth backoff that would recover on its own also loses its grant.
+  ch = connectHarness(source, { connected: false });
+  await ch.connect();
+  check("a first-time Connect authorizes without wiping tokens", probe(() => ch.order[0] === "authorize" && !ch.order.includes("clear-all") && !ch.order.some((step) => step.startsWith("forget"))));
+  // Simplest miss: clear whenever the device is not connected yet, resetting this extension's Identity API state on a first Connect.
+  ch = connectHarness(source, { connected: true, authorization: { ok: false, error: "auth", retryable: false } });
+  connectResult = await ch.connect();
+  check("a non-retryable authorization failure clears the connected flag and queues no round", probe(() =>
+    connectResult.error === "auth" && ch.local.vocabDriveConnected === false && ch.rounds.length === 0));
+  // Simplest miss: leave the flag set, so the panel keeps saying "connected" for a revoked grant.
+  ch = connectHarness(source, { connected: true, authorization: { ok: false, error: "auth", retryable: true } });
+  connectResult = await ch.connect();
+  check("a retryable authorization failure keeps the device connected", probe(() =>
+    connectResult.error === "auth" && ch.local.vocabDriveConnected === true && ch.rounds.length === 0));
+  // Simplest miss: ignore retryable and clear on any auth, so the next retry alarm returns early as not connected.
+  ch = connectHarness(source, { connected: true, authorization: { ok: false, error: "permission", retryable: false } });
+  await ch.connect();
+  check("cancelling the Google prompt on a connected device turns it disconnected", probe(() => ch.local.vocabDriveConnected === false));
+  // Simplest miss: clear only for "auth", so a cancelled prompt ("permission") leaves a connected device that cannot mint.
+  ch = connectHarness(source, { connected: true, round: { ok: false, error: "corrupt", results: { vocabulary: { ok: true }, notes: { ok: false, error: "corrupt" } } } });
+  connectResult = await ch.connect();
+  check("a notes failure in the forced round keeps the device connected (A4)", probe(() =>
+    ch.local.vocabDriveConnected === true && connectResult.results?.notes?.error === "corrupt"));
+  // Simplest miss: clear the flag whenever the combined result fails.
+  ch = connectHarness(source, { connected: true, round: { ok: false, error: "auth", retryable: false, results: { vocabulary: { ok: false }, notes: { ok: false } } } });
+  await ch.connect();
+  check("an auth block reached by the round itself does not clear the connected flag", probe(() => ch.local.vocabDriveConnected === true));
+  // Simplest miss: keep the old handler rule (auth/permission && !retryable -> clear) applied to the round result.
+  ch = connectHarness(source);
+  await ch.connect();
+  const setAt = ch.order.indexOf("set:driveConnectionAccount+vocabDriveConnected");
+  check("Connect broadcasts PBP_DRIVE_CONNECT_AUTHORIZED with the owner after writing the connection and before the round", probe(() =>
+    setAt >= 0 && setAt < ch.order.indexOf("broadcast") && ch.order.indexOf("broadcast") < ch.order.indexOf("round") &&
+    JSON.stringify(ch.messages) === JSON.stringify([{ type: "PBP_DRIVE_CONNECT_AUTHORIZED", owner: "acct_alice" }])));
+  // Simplest miss: broadcast after the round returns, so the 15-second slow-authorization hint fires long after the grant.
+  check("Connect observes the identity before persisting it and queues exactly one forced manual round", probe(() =>
+    ch.order.indexOf("observe:google-a") >= 0 && ch.order.indexOf("observe:google-a") < setAt &&
+    JSON.stringify(ch.rounds) === JSON.stringify([{ interactive: false, force: true, manual: true }])));
+  // Simplest miss: omit manual:true, so a block found right after Connect raises a system notification.
+
+  // ---- Task 4: Disconnect (spec §3.5) ----
+  let dh = disconnectHarness(source);
+  const disc = await dh.disconnect();
+  check("disconnect invalidates runs and writes disconnected before clearing Chrome's token cache", probe(() =>
+    disc?.ok === true && dh.epoch() === 1 && dh.order.includes("clear-all:false") &&
+    dh.order.indexOf("clear-all:false") < dh.order.indexOf("permissions-remove")));
+  // Simplest miss: clear tokens after permissions.remove, when the identity namespace no longer exists.
+  check("disconnect never mints a token, so a hung getAuthToken cannot stall it", probe(() =>
+    disc !== "timeout" && !dh.order.includes("mint") && !dh.order.includes("remove-token")));
+  // Simplest miss: keep the silent getAuthToken -> removeCachedAuthToken pair, which hangs while OAuth is unreachable.
+  check("disconnect forgets every cached Drive identity", probe(() => dh.order.includes("forget:0")));
+  // Simplest miss: clear Chrome's tokens but keep the module token->identity cache, so a reconnect trusts stale mappings.
+  check("disconnect clears drive alarms and the connection identity but keeps local data and the connection state", probe(() =>
+    dh.order.includes("clear-alarms") && !Object.hasOwn(dh.local, "driveConnectionAccount") &&
+    dh.local.pbp_hl_local?.note === "Keep local notes" && dh.local["driveConnState:" + OWNER_HASH]?.lastError === "network"));
+  // Simplest miss: remove every drive* key on disconnect, losing driveConnState that only a forced reconnect may clear (§3.3).
+  dh = disconnectHarness(source, { identityMissing: true });
+  const discMissing = await dh.disconnect();
+  check("disconnect without the identity namespace still completes and leaves a trace", probe(() =>
+    discMissing?.ok === true && dh.local.vocabDriveConnected === false && dh.order.includes("permissions-remove") &&
+    dh.warnings.some((line) => line.includes("clearAllCachedAuthTokens"))));
+  // Simplest miss: chrome.identity?.clearAllCachedAuthTokens?.() -- completes, but silently (MV3 rule: swallowed errors must be logged).
+  dh = disconnectHarness(source, { statusError: true });
+  const discNoStatus = await dh.disconnect();
+  check("disconnect answers ok even when the follow-up status read fails", probe(() =>
+    discNoStatus?.ok === true && !Object.hasOwn(discNoStatus, "status") && dh.warnings.some((line) => line.includes("status unavailable"))));
+  // Simplest miss: `status: await pbpGetVocabDriveStatus()` unguarded, reporting a finished disconnect as a remote error.
+
+  // ---- Task 4: connection identity refresh (Task 3's function, locked from this side) ----
+  // Task 3's suite already covers the notes-path write and the post-run switch through its round harness;
+  // these three pin what that harness cannot reach: no observation on mismatch, the epoch re-check, the exemption.
+  const pinboardAuth = { account: "alice", epoch: 1 };
+  let rh = refreshHarness(source, { identity: { ok: true, permissionId: "google-third", emailAddress: "third@example.test" } });
+  let refreshed = await rh.refresh("vocabulary", pinboardAuth, { drivePermissionId: "google-new" });
+  check("identity refresh rejects a Google switch observed after the run without observing it", probe(() =>
+    refreshed.error === "account_changed" && rh.local.driveConnectionAccount.permissionId === "google-previous" && rh.observed.length === 0));
+  // Simplest miss: observe about()'s answer before comparing it to the run's confirmed permissionId, moving the verified identity anyway.
+  rh = refreshHarness(source, { duringAbout: (api) => api.bumpEpoch() });
+  refreshed = await rh.refresh("vocabulary", pinboardAuth, { drivePermissionId: "google-new" });
+  check("identity refresh is dropped when a disconnect moves the epoch during verification", probe(() =>
+    refreshed.error === "account_changed" && rh.local.driveConnectionAccount.permissionId === "google-previous" && rh.observed.length === 0));
+  // Simplest miss: snapshot the epoch after about() returns, so a Disconnect during verification still writes the old identity back.
+  rh = refreshHarness(source);
+  await rh.refresh("vocabulary", pinboardAuth, { drivePermissionId: "google-new" });
+  check("identity refresh observes the verified identity once, exempting the session that just finished", probe(() =>
+    rh.observed.length === 1 && rh.observed[0][0] === "google-new" && rh.observed[0][1] === true));
+  // Simplest miss: pass the dataset type string as the second argument -- truthy, but not the exemption contract Task 3 defined.
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

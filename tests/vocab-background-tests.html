@@ -58,14 +58,19 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
   check("connect message is handled", messages.includes('message.type === "vocabDriveConnect"'));
   check("status message is handled", messages.includes('message.type === "vocabDriveStatus"'));
   const failedHandler = responseFactory?.(async () => ({
-    connected:true, owner:"alice", retryAt:1234, blocked:true
+    connected: true, owner: "alice",
+    connection: { lastError: "network", retryAt: 1234, blocked: false },
+    vocabulary: { lastSuccessAt: 1, lastError: null, retryAt: null, blocked: false, hasPending: true, notices: 0 },
+    notes: { lastSuccessAt: 2, lastError: "corrupt", retryAt: null, blocked: true, hasPending: false, notices: 0 },
+    noticeTerms: [], lastSuccessAt: 1, hasPending: true
   }));
   const failedResponse = failedHandler
-    ? await failedHandler({ ok:false, error:"network" }) : null;
+    ? await failedHandler({ ok: false, error: "network" }) : null;
   check("failed Drive operations return the latest authoritative status",
     failedResponse?.ok === false && failedResponse.error === "network" &&
     failedResponse.status?.connected === true && failedResponse.status?.owner === "alice" &&
-    failedResponse.status?.retryAt === 1234 && failedResponse.status?.blocked === true);
+    failedResponse.status?.connection?.retryAt === 1234 && failedResponse.status?.notes?.blocked === true);
+  // Simplest miss: rebuild a partial status in the response path instead of passing the fresh one through -- notes.blocked disappears.
   const degradedHandler = responseFactory?.(async () => {
     throw new Error("status unavailable");
   });
@@ -87,10 +92,17 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
   // A retryable auth failure means the token could not be minted right now,
   // not that the grant is gone. Dropping the flag makes pbpBootDriveSync
   // return early, so the retry alarm the round just reconciled does nothing.
+  // Only pbpConnectDrive may clear it, and only on connect()'s own refusal (A4).
+  const connectFnAt = source.indexOf("async function pbpConnectDrive");
+  const connectFnEnd = connectFnAt >= 0 ? source.indexOf("\n}\n", connectFnAt) : -1;
+  const connectFn = connectFnEnd > connectFnAt ? source.slice(connectFnAt, connectFnEnd) : "";
+  const retryableGuardAt = connectFn.indexOf("account.retryable !== true");
+  // The first clear is the permission precheck (spec §10.8); the refusal clear is the last one.
+  const refusalClearAt = connectFn.lastIndexOf("PBP_VOCAB_DRIVE_CONNECTED_KEY]: false");
   check("connect keeps the device connected when auth is only retryable",
-    /result\.retryable !== true/.test(connect) &&
-    connect.indexOf("retryable !== true") <
-      connect.indexOf("PBP_VOCAB_DRIVE_CONNECTED_KEY]: false"));
+    retryableGuardAt >= 0 && retryableGuardAt < refusalClearAt &&
+    !connect.includes("PBP_VOCAB_DRIVE_CONNECTED_KEY]: false"));
+  // Simplest miss: leave the old clearing branch in the vocabDriveConnect handler, where it also fires on round results (A4).
   check("disconnect message is handled", messages.includes('message.type === "vocabDriveDisconnect"'));
   // Simplest miss: a second tail left behind for one dataset, which lets the two run concurrently again.
   check("one recovering promise tail serializes every Drive round", source.includes("const queueDriveSync = pbpCreateRecoveringTail();") && (source.match(/return queueDriveSync\(async \(\) =>/g) || []).length === 1 && !/queue(Vocab|Notes)Sync/.test(source));

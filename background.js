@@ -2581,10 +2581,42 @@ async function pbpConnectDrive() {
   const auth = await getCurrentPinboardAuth();
   if (!auth?.account || !pbpPinboardAuthIsCurrent(auth)) return { ok: false, error: "pinboard_auth" };
   if (!await chrome.permissions.contains({ permissions: ["identity"], origins: [PBP_GOOGLE_API_ORIGIN] })) {
+    // Spec §10.8: the grant this device needs is gone, so it is not connected
+    // any more (the handler did this before A4 moved the flag in here).
+    await chrome.storage.local.set({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
     return { ok: false, error: "permission" };
   }
+  // Re-authorizing after the grant itself failed (spec §3.5, §5.3, §10.6):
+  // without this Chrome hands back the cached token it already refused and the
+  // interactive prompt never appears. Only then -- clearAllCachedAuthTokens
+  // also resets this extension's Identity API grant, so wiping on a first
+  // Connect or during a network backoff would turn one failed interactive
+  // attempt into "needs re-authorization". Both caches are local; no network.
+  let ownerHash = "";
+  try { ownerHash = await pbpVocabOwnerHash(pbpDictOwnerScope(auth.account)); }
+  catch (error) { console.warn("[vocab-drive] connect: owner hash failed:", error?.name, error?.message); }
+  const record = ownerHash ? await driveConnectionStore.get(ownerHash) : null;
+  if ((record?.lastError === "auth" && record.blocked === true) || record?.lastError === "permission") {
+    try { await chrome.identity.clearAllCachedAuthTokens(); }
+    catch (error) {
+      console.warn("[vocab-drive] connect: clearAllCachedAuthTokens failed:", error?.name, error?.message);
+    }
+    pbpVocabDriveForgetIdentity();
+  }
+  // Authorization runs outside queueDriveSync: an in-flight round must not hold
+  // the Google prompt behind it, and a Connect to another account has to be able
+  // to cancel that round (pbpObserveDriveIdentity below).
   const account = await driveConnectClient.connect();
-  if (!account.ok) return account;
+  if (!account.ok) {
+    // Only a refusal of the grant itself proves this device is no longer
+    // authorized -- Cancel in the Google window included. A retryable mint
+    // failure is a network or server condition: dropping the flag would turn
+    // the retry alarm into a no-op. Round results never clear it (A4).
+    if (account.retryable !== true && (account.error === "auth" || account.error === "permission")) {
+      await chrome.storage.local.set({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
+    }
+    return account;
+  }
   const currentAuth = await getCurrentPinboardAuth();
   if (currentAuth?.account !== auth.account || !pbpPinboardAuthIsCurrent(auth) ||
       !pbpPinboardAuthIsCurrent(currentAuth)) return { ok: false, error: "account_changed" };
@@ -2596,96 +2628,164 @@ async function pbpConnectDrive() {
       emailAddress: account.emailAddress || "", displayName: account.displayName || ""
     }
   });
+  // Ends the page's "waiting for Google" phase now; the response itself only
+  // arrives after the whole round. Owner scope only, no account details.
+  try {
+    const pending = chrome.runtime.sendMessage({
+      type: "PBP_DRIVE_CONNECT_AUTHORIZED", owner: pbpDictOwnerScope(auth.account)
+    });
+    if (pending && typeof pending.catch === "function") pending.catch(() => {});
+  } catch (_) {}
+  // manual: the page shows this round's outcome, so no system notification.
   return pbpQueueDriveRound({ interactive: false, force: true, manual: true });
 }
 
-function pbpDriveSnapshotStatus(snapshot, preflight, pendingName) {
-  const states = snapshot.states.slice().sort((a, b) => (b.lastSuccessAt || 0) - (a.lastSuccessAt || 0));
-  const state = states[0] || null;
+function pbpDriveSnapshotStatus(snapshot, preflight, currentPermissionId = "") {
+  const rows = snapshot.states.slice().sort((a, b) => (b.lastSuccessAt || 0) - (a.lastSuccessAt || 0));
+  // A2: describe the Google account this device is connected to; the newest
+  // row is only the fallback for a legacy device without that record.
+  const state = (currentPermissionId && rows.find((row) => row.drivePermissionId === currentPermissionId)) ||
+    rows[0] || null;
   const pending = state ? snapshot.batches.filter((row) => row.drivePermissionId === state.drivePermissionId) : [];
+  // Connection-layer codes belong to driveConnectionStore alone. A preflight or
+  // account row still holding one is pre-migration history and reads as clean.
+  const dataError = (code) => typeof code === "string" && code !== "" && !PBP_DRIVE_CONNECTION_ERRORS.has(code);
+  let lastError = null, retryAt = null, blocked = false;
+  if (dataError(preflight?.lastError)) {
+    lastError = preflight.lastError;
+    blocked = preflight.blocked === true;
+    retryAt = !blocked && Number.isFinite(preflight.retryAt) ? preflight.retryAt : null;
+  } else if (dataError(state?.lastError)) {
+    lastError = state.lastError;
+    retryAt = Number.isFinite(state.retryAt) ? state.retryAt : null;
+  }
   return {
-    ...(state || {}),
-    ...(preflight ? { lastError: preflight.lastError, retryAttempt: preflight.retryAttempt,
-      retryAt: preflight.retryAt, blocked: preflight.blocked } : {}),
-    [pendingName]: snapshot.outbox.length, pendingBatches: pending.length,
-    notices: snapshot.notices.length
+    status: {
+      lastSuccessAt: Number.isFinite(state?.lastSuccessAt) ? state.lastSuccessAt : null,
+      lastError, retryAt, blocked,
+      // Frozen batches leave the outbox before upload, so both count.
+      hasPending: snapshot.outbox.length > 0 || pending.length > 0,
+      notices: snapshot.notices.length
+    },
+    account: typeof state?.drivePermissionId === "string" && state.drivePermissionId ? {
+      drivePermissionId: state.drivePermissionId,
+      emailAddress: typeof state.emailAddress === "string" ? state.emailAddress : "",
+      displayName: typeof state.displayName === "string" ? state.displayName : "",
+      lastSuccessAt: state.lastSuccessAt || 0
+    } : null
   };
 }
 async function pbpGetVocabDriveStatus() {
-  const [connected, auth, connection] = await Promise.all([
+  const [connected, auth, stored] = await Promise.all([
     pbpVocabDriveIsConnected(), getCurrentPinboardAuth(),
     chrome.storage.local.get({ [PBP_DRIVE_CONNECTION_ACCOUNT_KEY]: null })
   ]);
-  // Interim until the status rewrite: connected means both datasets sync.
-  const base = { connected, vocabularyEnabled: connected,
-    notesEnabled: connected, owner: "", pendingWords: 0,
-    pendingBatches: 0, notices: 0, notes: { pendingNotes: 0, pendingBatches: 0, notices: 0 } };
+  const neutralDataset = () => ({ lastSuccessAt: null, lastError: null, retryAt: null,
+    blocked: false, hasPending: false, notices: 0 });
+  const neutralConnection = { lastError: null, retryAt: null, blocked: false };
+  const base = { connected, owner: "", connection: neutralConnection, vocabulary: neutralDataset(),
+    notes: neutralDataset(), noticeTerms: [], lastSuccessAt: null, hasPending: false };
   if (!auth?.account || !pbpPinboardAuthIsCurrent(auth)) return base;
   const ownerScope = pbpDictOwnerScope(auth.account);
   const ownerHash = await pbpVocabOwnerHash(ownerScope);
+  const savedAccount = stored[PBP_DRIVE_CONNECTION_ACCOUNT_KEY];
+  const currentAccount = connected && typeof savedAccount?.permissionId === "string" && savedAccount.permissionId
+    ? savedAccount : null;
   const reads = await Promise.allSettled([
     pbpVocabSyncSnapshot(ownerScope, ownerHash), pbpVocabGetPreflightState(ownerHash),
-    pbpNotesSyncSnapshot(ownerScope, ownerHash), notesDriveStore.getPreflightState(ownerHash)
+    pbpNotesSyncSnapshot(ownerScope, ownerHash), notesDriveStore.getPreflightState(ownerHash),
+    // The throwing read: an unreadable record must not look like "no error" (偏离 7).
+    pbpDriveReadConnState(ownerHash)
   ]);
   if (!pbpPinboardAuthIsCurrent(auth)) return base;
   const emptySnapshot = { states: [], outbox: [], batches: [], notices: [] };
-  const snapshot = reads[0].status === "fulfilled" ? reads[0].value : emptySnapshot;
-  const datasetStatus = (at, enabled, pendingName) => {
+  const connectionRead = reads[4];
+  if (connectionRead.status === "rejected") {
+    console.warn("[drive-sync] connection status unavailable:",
+      connectionRead.reason?.name, connectionRead.reason?.message);
+  }
+  const dataset = (at, name) => {
     const snapshotRead = reads[at], preflightRead = reads[at + 1];
     const failed = [snapshotRead, preflightRead].filter((read) => read.status === "rejected");
     for (const read of failed) {
-      console.warn("[drive-sync] dataset status unavailable:", pendingName,
-        read.reason?.name, read.reason?.message);
+      console.warn("[drive-sync] dataset status unavailable:", name, read.reason?.name, read.reason?.message);
     }
-    const status = pbpDriveSnapshotStatus(
-      snapshotRead.status === "fulfilled" ? snapshotRead.value : emptySnapshot,
-      preflightRead.status === "fulfilled" ? preflightRead.value : null, pendingName
-    );
+    const snapshot = snapshotRead.status === "fulfilled" ? snapshotRead.value : emptySnapshot;
+    const preflight = preflightRead.status === "fulfilled" ? preflightRead.value : null;
+    const { status, account } = pbpDriveSnapshotStatus(snapshot, preflight, currentAccount?.permissionId || "");
+    // Not connected: nothing will run, so nothing is shown as an error (§6.1).
+    if (!connected) {
+      return { status: { ...status, lastError: null, retryAt: null, blocked: false }, account: null, snapshot };
+    }
     // A failed READ blocks nothing: no run stopped and no preflight was
     // written, so it must not borrow local_store/blocked (whose hint names a
-    // button that cannot clear it). A readable preflight error is still the
-    // real one; without it, the account row's retryAt is unconfirmed history.
-    if (failed.length && enabled) {
-      if (preflightRead.status === "fulfilled" && preflightRead.value?.lastError) return status;
-      return { ...status, lastError: "status_unavailable", blocked: false, retryAt: null, retryAttempt: 0 };
+    // button that cannot clear it). Only a readable data-layer preflight error
+    // is still real; an account-row error or retryAt is unconfirmed history.
+    // An unreadable connection record leaves the whole connection unknown.
+    const preflightError = preflight !== null && status.lastError !== null && status.lastError === preflight.lastError;
+    if ((failed.length || connectionRead.status === "rejected") && !preflightError) {
+      return { status: { ...status, lastError: "status_unavailable", blocked: false, retryAt: null }, account, snapshot };
     }
-    return status;
+    return { status, account, snapshot };
   };
-  const vocabulary = datasetStatus(0, base.vocabularyEnabled, "pendingWords");
-  const notes = datasetStatus(2, base.notesEnabled, "pendingNotes");
-  // Notes-only connections still identify the shared Google account.
-  const savedAccount = connection[PBP_DRIVE_CONNECTION_ACCOUNT_KEY];
-  const currentAccount = connected && typeof savedAccount?.permissionId === "string" && savedAccount.permissionId
-    ? { drivePermissionId: savedAccount.permissionId,
-        emailAddress: typeof savedAccount.emailAddress === "string" ? savedAccount.emailAddress : "",
-        displayName: typeof savedAccount.displayName === "string" ? savedAccount.displayName : "" } : null;
-  const selectedAccounts = [base.vocabularyEnabled ? vocabulary : null, base.notesEnabled ? notes : null]
-    .filter((state) => state?.drivePermissionId)
-    .sort((a, b) => (b.lastSuccessAt || 0) - (a.lastSuccessAt || 0));
-  const account = currentAccount || selectedAccounts[0] || {};
-  const { drivePermissionId: _vocabularyPermissionId, emailAddress: _vocabularyEmail,
-    displayName: _vocabularyName, ...vocabularyStatus } = vocabulary;
+  const vocabulary = dataset(0, "vocabulary");
+  const notes = dataset(2, "notes");
+  const record = connected && connectionRead.status === "fulfilled" ? connectionRead.value : null;
+  const connectionError = typeof record?.lastError === "string" && PBP_DRIVE_CONNECTION_ERRORS.has(record.lastError)
+    ? record.lastError : null;
+  const connection = connectionError ? {
+    lastError: connectionError,
+    retryAt: record.blocked !== true && Number.isFinite(record.retryAt) ? record.retryAt : null,
+    blocked: record.blocked === true
+  } : neutralConnection;
+  const account = currentAccount
+    ? { drivePermissionId: currentAccount.permissionId, emailAddress: currentAccount.emailAddress,
+        displayName: currentAccount.displayName }
+    : [vocabulary.account, notes.account].filter(Boolean)
+        .sort((a, b) => (b.lastSuccessAt || 0) - (a.lastSuccessAt || 0))[0] || null;
+  const times = [vocabulary.status.lastSuccessAt, notes.status.lastSuccessAt];
   return {
-    ...base, ...vocabularyStatus, connected, owner: auth.account, notes,
-    ...(account.drivePermissionId ? {
+    connected, owner: auth.account,
+    ...(account ? {
       drivePermissionId: account.drivePermissionId,
-      emailAddress: account.emailAddress || "", displayName: account.displayName || ""
+      emailAddress: typeof account.emailAddress === "string" ? account.emailAddress : "",
+      displayName: typeof account.displayName === "string" ? account.displayName : ""
     } : {}),
-    noticeTerms: snapshot.notices.slice(0, 20).map((row) => {
+    connection,
+    vocabulary: vocabulary.status,
+    notes: notes.status,
+    // Only vocabulary notices name a term; a notes notice key is an article id.
+    noticeTerms: vocabulary.snapshot.notices.slice(0, 20).map((row) => {
       const key = String(row.recordKey || ""); const separator = key.indexOf("|");
       return separator >= 0 ? key.slice(separator + 1) : key;
-    }).filter(Boolean)
+    }).filter(Boolean),
+    // "Both datasets are synced as of this moment": the earlier time, or never.
+    lastSuccessAt: times.every(Number.isFinite) ? Math.min(...times) : null,
+    hasPending: vocabulary.status.hasPending || notes.status.hasPending
   };
 }
 
 async function pbpVocabDriveResponse(result) {
+  // Per-dataset rows carry data-layer codes only; connection-layer and control
+  // codes, and backoff, are reported once at the top (spec §6.2, A28).
+  const dataErrors = new Set(["corrupt", "local_store", "entry_too_large", "remote", "unexpected"]);
   const response = result?.ok ? { ok: true } : { ok: false, error: result?.error || "remote" };
-  if (result?.results) {
-    response.results = Object.fromEntries(Object.entries(result.results).map(([type, value]) =>
-      [type, { ok: value?.ok === true, ...(value?.error ? { error: value.error } : {}),
-        ...(value?.status?.waitingForRetry ? { waitingForRetry: true } : {}) }]));
+  const entries = result?.results && typeof result.results === "object" ? result.results : null;
+  if (result?.waitingForRetry === true || result?.error === "waiting_for_retry" ||
+      Object.values(entries || {}).some((value) => value?.status?.waitingForRetry === true)) {
+    response.waitingForRetry = true;
   }
-  try { response.status = await pbpGetVocabDriveStatus(); } catch (_) {}
+  if (entries) {
+    response.results = {};
+    for (const type of ["vocabulary", "notes"]) {
+      const value = entries[type];
+      if (!value) continue;
+      response.results[type] = { ok: value.ok === true,
+        ...(dataErrors.has(value.error) ? { error: value.error } : {}) };
+    }
+  }
+  try { response.status = await pbpGetVocabDriveStatus(); }
+  catch (error) { console.warn("[drive-sync] response status unavailable:", error?.name, error?.message); }
   return response;
 }
 
@@ -2735,20 +2835,22 @@ async function pbpDisconnectVocabDrive() {
   if (!PBP_VOCAB_DRIVE_CAPABLE) {
     return { ok: false, error: "unavailable" };
   }
-  // Invalidate running jobs before awaiting token or permission operations.
+  // Invalidate running jobs before any further await.
   driveScopeEpoch++;
   await chrome.storage.local.set({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
   await chrome.storage.local.remove(PBP_DRIVE_CONNECTION_ACCOUNT_KEY);
   await pbpClearDriveAlarms();
-  let token = "";
+  // Local and immediate (Chrome 87+, manifest minimum 123). The former silent
+  // getAuthToken -> removeCachedAuthToken pair needed the OAuth endpoint and
+  // hung while it was unreachable (spec §3.5). The namespace exists only while
+  // the optional identity grant does, so this runs before permissions.remove;
+  // a missing namespace throws TypeError and is logged, never fatal.
   try {
-    const result = await chrome.identity.getAuthToken({ interactive: false });
-    token = typeof result === "string" ? result : result?.token || "";
-  } catch (_) {}
-  if (token) {
-    try { await chrome.identity.removeCachedAuthToken({ token }); }
-    catch (e) { console.warn("[vocab-drive] disconnect: removeCachedAuthToken failed:", e?.name, e?.message); }
+    await chrome.identity.clearAllCachedAuthTokens();
+  } catch (error) {
+    console.warn("[vocab-drive] disconnect: clearAllCachedAuthTokens failed:", error?.name, error?.message);
   }
+  pbpVocabDriveForgetIdentity();
   let removed = false;
   try {
     removed = await chrome.permissions.remove({
@@ -2776,7 +2878,13 @@ async function pbpDisconnectVocabDrive() {
     console.warn("[vocab-drive] disconnect: permission removal incomplete", removed, residual);
   }
   await pbpClearDriveAlarms();
-  return { ok: true, status: await pbpGetVocabDriveStatus() };
+  // The disconnect is complete either way; a page without status rereads it.
+  try {
+    return { ok: true, status: await pbpGetVocabDriveStatus() };
+  } catch (error) {
+    console.warn("[vocab-drive] disconnect: status read failed:", error?.name, error?.message);
+    return { ok: true };
+  }
 }
 
 pbpBootDriveSync({ throttleMs: PBP_VOCAB_BOOT_SYNC_MIN_MS }).catch((e) => {
@@ -3304,20 +3412,15 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       sendResponse({ ok: false, error: "unavailable" });
       return true;
     }
+    // pbpConnectDrive owns the connected flag: only a non-retryable refusal of
+    // the grant clears it, never a dataset failure in the forced round (A4).
     pbpConnectDrive()
-      .then(async (result) => {
-        // A retryable auth failure means the token could not be minted right
-        // now, not that the grant is gone. Dropping the connected flag would
-        // make pbpBootDriveSync return early and turn the retry alarm the
-        // round just reconciled into a no-op.
-        if (!result.ok && result.retryable !== true &&
-            (result.error === "auth" || result.error === "permission")) {
-          await chrome.storage.local.set({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
-        }
-        return pbpVocabDriveResponse(result);
-      })
+      .then((result) => pbpVocabDriveResponse(result))
       .then(sendResponse)
-      .catch(() => sendResponse({ ok: false, error: "remote" }));
+      .catch((error) => {
+        console.warn("[vocab-drive] connect failed:", error?.name, error?.message);
+        sendResponse({ ok: false, error: "remote" });
+      });
     return true;
   }
 
@@ -3328,7 +3431,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     }
     pbpGetVocabDriveStatus()
       .then((status) => sendResponse({ ok: true, status }))
-      .catch(() => sendResponse({ ok: false, error: "remote" }));
+      .catch((error) => {
+        console.warn("[drive-sync] status failed:", error?.name, error?.message);
+        sendResponse({ ok: false, error: "remote" });
+      });
     return true;
   }
 
@@ -3345,7 +3451,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       })
       .then((result) => pbpVocabDriveResponse(result))
       .then(sendResponse)
-      .catch(() => sendResponse({ ok: false, error: "remote" }));
+      .catch((error) => {
+        console.warn("[drive-sync] clear notices failed:", error?.name, error?.message);
+        sendResponse({ ok: false, error: "remote" });
+      });
     return true;
   }
 
@@ -3358,7 +3467,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       .then(async (connected) => {
         // Not an authorization problem: this device simply has not connected.
         if (!connected) return { ok: false, error: "not_connected" };
+        // The round reconciles drive-sync-retry when it ends (§3.4); clearing
+        // it first only keeps a stale retry from firing in the middle of it.
         if (message.force === true) await chrome.alarms.clear(PBP_DRIVE_RETRY_ALARM);
+        // manual: the page shows this round's outcome, so no system notification.
         return pbpQueueDriveRound({
           interactive: false,
           force: message.force === true,
@@ -3367,7 +3479,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       })
       .then((result) => pbpVocabDriveResponse(result))
       .then(sendResponse)
-      .catch(() => sendResponse({ ok: false, error: "remote" }));
+      .catch((error) => {
+        console.warn("[drive-sync] sync now failed:", error?.name, error?.message);
+        sendResponse({ ok: false, error: "remote" });
+      });
     return true;
   }
 
@@ -3378,7 +3493,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     }
     pbpDisconnectVocabDrive()
       .then(sendResponse)
-      .catch(() => sendResponse({ ok: false, error: "remote" }));
+      .catch((error) => {
+        console.warn("[vocab-drive] disconnect failed:", error?.name, error?.message);
+        sendResponse({ ok: false, error: "remote" });
+      });
     return true;
   }
 

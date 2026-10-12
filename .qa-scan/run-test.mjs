@@ -96,7 +96,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/notes-sync-tests.html": 50,
   "tests/notes-gdrive-tests.html": 14,
   "tests/options-drive-sync-tests.html": 31,
-  "tests/drive-scopes-tests.html": 50,
+  "tests/drive-scopes-tests.html": 84,
   "tests/wayback-tests.html": 44,
 });
 const expected = EXPECTED_RESULTS[rel];
