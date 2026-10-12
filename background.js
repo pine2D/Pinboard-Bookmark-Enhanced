@@ -2534,9 +2534,15 @@ async function pbpQueueDriveRound(options = {}) {
       return { ok: false, error: connected ? "permission" : "not_connected", results: {} };
     }
     const roundEpoch = driveScopeEpoch;
-    const auth = await getCurrentPinboardAuth().catch(() => null);
+    const auth = await getCurrentPinboardAuth().catch((e) => {
+      console.warn("[drive-sync] round owner read failed:", e?.name, e?.message);
+      return null;
+    });
     const ownerScope = auth?.account && pbpPinboardAuthIsCurrent(auth) ? pbpDictOwnerScope(auth.account) : "";
-    const ownerHash = ownerScope ? await pbpVocabOwnerHash(ownerScope).catch(() => "") : "";
+    const ownerHash = ownerScope ? await pbpVocabOwnerHash(ownerScope).catch((e) => {
+      console.warn("[drive-sync] round owner hash failed:", e?.name, e?.message);
+      return "";
+    }) : "";
     const runOptions = { interactive, force };
     const results = {};
     let before = null;
