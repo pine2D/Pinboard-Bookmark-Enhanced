@@ -1038,6 +1038,46 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   delete store["pbp_hl_gamma"];
   await _pbpNotesRefreshPreservingState();
 
+  // ---- a Drive pull's pbp_hl_ write reaches the open list (drive-sync-merge spec §7) ----
+  // notes-sync.js applyRemotePage writes the article record with
+  // storage.local.set -- owner stamped on the item, version metadata under
+  // notesSync.owners -- and library-notes.js does not listen for
+  // PBP_NOTES_SYNCED: the storage.onChanged pbp_hl_ listener (250ms trailing
+  // debounce) is the ONLY path that repaints the open list. Delivered here in
+  // the real onChanged shape (a new key: newValue only, area "local").
+  {
+    const realOwnerFn = window.pbpVocabCurrentOwner;
+    const pulledKey = "pbp_hl_48741251"; // pbpNotesArticleKey("https://drive.example/pulled")
+    window.pbpVocabCurrentOwner = async () => "acct_drive";
+    try {
+      _notesOwnerCache = null;
+      await renderNotesPanel();
+      store[pulledKey] = {
+        v: 1, url: "https://drive.example/pulled", title: "Pulled page",
+        items: [{ id: "d1", n: 1, quote: "highlight pulled from Drive", color: 2, note: "", ts: 1700000000000, owner: "acct_drive" }],
+        notesSync: { v: 1, owners: { acct_drive: {
+          events: { d1: { recordKey: pulledKey + "|d1",
+            vector: { "6f1c2a4e-8b3d-4c5e-9a7f-1b2c3d4e5f60": 1 },
+            dot: { deviceId: "6f1c2a4e-8b3d-4c5e-9a7f-1b2c3d4e5f60", counter: 1 },
+            deleted: false, url: "https://drive.example/pulled", title: "Pulled page" } },
+          pending: {}, notices: {} } } },
+      };
+      fireStorageChange({ [pulledKey]: { newValue: store[pulledKey] } }, "local");
+      await tick();
+      const beforeDebounce = !!rowEl(pulledKey + "#d1");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await settle(() => !!rowEl(pulledKey + "#d1"));
+      check("a Drive pull's pbp_hl_ write repaints the open notes list through the debounced storage.onChanged refresh",
+        !beforeDebounce && !!rowEl(pulledKey + "#d1") && $id("view-notes").hidden === false,
+        "before=" + beforeDebounce + " rows=" + rowKeys());
+    } finally {
+      window.pbpVocabCurrentOwner = realOwnerFn;
+      delete store[pulledKey];
+      _notesOwnerCache = null;
+      await renderNotesPanel();
+    }
+  }
+
   // ---- narrow mode ----
   const realNarrow = _pbpNotesNarrowMode;
   try {

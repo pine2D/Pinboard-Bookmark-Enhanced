@@ -139,7 +139,18 @@ document.documentElement.setAttribute("data-listbox-ready", "");
      reject cleanly, it can leave that lock request unresolved. Same stub the
      pre-split options-vocab-tests.html used. -->
 <script>pbpReadSettingsWithSecrets = async () => ({ pinboardToken: "" });</script>
+<!-- library-vocab.js registers its runtime.onMessage listener at script-load
+     time, and this page has no chrome mock -- stand one up for exactly that
+     one script so the registration itself is observable, then put the page
+     back the way every other case here expects it. -->
+<script>
+const _capturedRuntimeListeners = [];
+const _preLoadHadChrome = "chrome" in window;
+const _preLoadChrome = window.chrome;
+window.chrome = { runtime: { onMessage: { addListener: (fn) => { _capturedRuntimeListeners.push(fn); } } } };
+</script>
 <script src="../library-vocab.js"></script>
+<script>if (_preLoadHadChrome) window.chrome = _preLoadChrome; else delete window.chrome;</script>
 <script src="../library.js"></script>
 <script>
 const results = $id("results");
@@ -1016,6 +1027,88 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       pbpVocabAll = realAll;
       _vocabViewShown = realViewShown;
       _vocabCurrentOwner = realCurrentOwner;
+    }
+  }
+
+  // PBP_VOCAB_SYNCED arriving FROM elsewhere (drive-sync-merge spec §7): the
+  // service worker's Drive pull and another library tab's mutation both write
+  // IndexedDB, which raises no event here. A matching, visible view re-reads
+  // through the soft path (selection survives, broadcast:false) and never
+  // sends the message back -- two open library tabs would otherwise bounce it
+  // forever and every reader would _echoRestart on each bounce.
+  {
+    const realOwner = pbpVocabCurrentOwner;
+    const realAll = pbpVocabAll;
+    const realViewShown = _vocabViewShown;
+    const realCurrentOwner = _vocabCurrentOwner;
+    const hadChrome = "chrome" in window;
+    const realChrome = window.chrome;
+    const sent = [];
+    let reads = 0;
+    const keep = { id: "keep", term: "kept", updatedAt: 2, groups: [], contexts: [] };
+    const pulled = { id: "pulled", term: "pulled", updatedAt: 1, groups: [], contexts: [] };
+    const listener = _capturedRuntimeListeners[0] || (() => "missing");
+    const card = (id) => $id("vocab-list").querySelector(`.vocab-card[data-vocab-id="${id}"]`);
+    try {
+      check("library-vocab.js registers exactly one runtime message listener, a plain non-async function",
+        _capturedRuntimeListeners.length === 1 && typeof _pbpVocabOnSyncedMessage === "function" &&
+        listener === _pbpVocabOnSyncedMessage && listener.constructor.name === "Function",
+        "count=" + _capturedRuntimeListeners.length + " ctor=" + (listener && listener.constructor.name));
+      window.chrome = { runtime: { sendMessage: (msg) => { sent.push(msg); return Promise.resolve(); } } };
+      pbpVocabCurrentOwner = async () => "acct_drive";
+      pbpVocabAll = async () => { reads++; return [{ ...keep }, { ...pulled }]; };
+      _vocabCurrentOwner = "acct_drive";
+      _vocabViewShown = true;
+      _vocabRows = [{ ...keep }];
+      _pbpVocabClearSelection();
+      _pbpVocabApplyView(true);
+      _vocabSelected = new Set(["keep"]);
+      _pbpVocabSyncSelectionUi();
+      const ret = listener({ type: "PBP_VOCAB_SYNCED", owner: "acct_drive" }, { id: "self" }, () => {});
+      await task(); await task(); await task();
+      check("a matching PBP_VOCAB_SYNCED re-reads the visible list and leaves the message channel closed",
+        document.visibilityState === "visible" && ret === undefined && reads === 1 && !!card("pulled"),
+        "visibility=" + document.visibilityState + " ret=" + ret + " reads=" + reads);
+      check("the sync-driven re-read keeps the user's selection (soft reload, not a mutation reload)",
+        reads === 1 && _vocabSelected.size === 1 && _vocabSelected.has("keep") &&
+        card("keep")?.getAttribute("aria-selected") === "true",
+        "reads=" + reads + " selected=" + [..._vocabSelected].join(","));
+      const forwardedOnHear = sent.length;
+      await _pbpVocabReloadAfterMutation("acct_drive");
+      check("hearing PBP_VOCAB_SYNCED never sends one back (while a real mutation reload still does)",
+        forwardedOnHear === 0 && sent.length === 1 && sent[0].type === "PBP_VOCAB_SYNCED",
+        "onHear=" + forwardedOnHear + " total=" + JSON.stringify(sent));
+      const before = reads;
+      const ignored = [];
+      const probe = async (name, message, setup, teardown) => {
+        const r0 = reads;
+        if (setup) setup();
+        try {
+          listener(message, { id: "self" }, () => {});
+          await task(); await task(); await task();
+        } finally { if (teardown) teardown(); }
+        if (reads !== r0) ignored.push(name);
+      };
+      await probe("other owner", { type: "PBP_VOCAB_SYNCED", owner: "acct_other" });
+      await probe("notes type", { type: "PBP_NOTES_SYNCED", owner: "acct_drive" });
+      await probe("missing owner", { type: "PBP_VOCAB_SYNCED" });
+      await probe("view not shown", { type: "PBP_VOCAB_SYNCED", owner: "acct_drive" },
+        () => { _vocabViewShown = false; }, () => { _vocabViewShown = true; });
+      await probe("tab hidden", { type: "PBP_VOCAB_SYNCED", owner: "acct_drive" },
+        () => Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true }),
+        () => { delete document.visibilityState; });
+      await probe("signed out", { type: "PBP_VOCAB_SYNCED", owner: "ownerless" },
+        () => { _vocabCurrentOwner = "ownerless"; }, () => { _vocabCurrentOwner = "acct_drive"; });
+      check("a message for another owner, another type, a hidden tab or another view reads nothing",
+        ignored.length === 0 && reads === before && document.visibilityState === "visible",
+        "read on: " + ignored.join(", "));
+    } finally {
+      if (hadChrome) window.chrome = realChrome; else delete window.chrome;
+      pbpVocabCurrentOwner = realOwner;
+      pbpVocabAll = realAll;
+      _vocabViewShown = realViewShown;
+      _vocabCurrentOwner = realCurrentOwner;
+      _pbpVocabClearSelection();
     }
   }
 

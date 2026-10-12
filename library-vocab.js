@@ -2687,6 +2687,30 @@ document.addEventListener("pbp-lib-view", (e) => {
   renderVocabPanel();
 });
 
+// A Drive pull (service worker) and another library tab's mutation both
+// write IndexedDB, which raises no storage event here -- this is how an open
+// Vocabulary view hears about them. Soft reload only: it re-reads with
+// broadcast:false and keeps selection and render depth, so hearing
+// PBP_VOCAB_SYNCED never sends one back (two open library tabs would bounce
+// it forever, and every open reader would _echoRestart on each bounce).
+// Another account's message, another view, or a hidden tab reads nothing:
+// pbp-lib-view's view re-entry / visibilitychange re-fire re-reads on the
+// way back. Not async and never returns true -- there is no response, and
+// returning true would hold the sender's channel open. Registered above the
+// (hoisted) declaration so the wiring and the message type read together.
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener(_pbpVocabOnSyncedMessage);
+}
+function _pbpVocabOnSyncedMessage(message) {
+  if (!message || message.type !== "PBP_VOCAB_SYNCED") return;
+  const owner = typeof message.owner === "string" ? message.owner : "";
+  if (!owner.startsWith("acct_") || owner !== _vocabCurrentOwner) return;
+  if (!_vocabViewShown || document.visibilityState !== "visible") return;
+  _pbpVocabSoftReload().catch((err) => {
+    console.warn("vocab sync soft reload failed:", err && err.name, err && err.message);
+  });
+}
+
 // Account switch (token rotation, or the sync/keys-routing toggles that
 // change which area holds the effective token) invalidates every row
 // currently shown -- clear first, then re-read for the new owner.
