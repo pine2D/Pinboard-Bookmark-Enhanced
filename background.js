@@ -2893,6 +2893,125 @@ pbpBootDriveSync({ throttleMs: PBP_VOCAB_BOOT_SYNC_MIN_MS }).catch((e) => {
   console.warn("[drive-sync] cold-start sync failed:", e?.name, e?.message);
 });
 
+// One-shot migration (spec 2026-10-12 §2.2). The per-dataset scope switches are
+// gone: connecting Google Drive now syncs vocabulary AND highlights/notes (user
+// ruling A — a vocabulary-only device starts uploading this owner's notes after
+// the upgrade, no confirmation step). This retires the two local scope keys, the
+// notes-only boot throttle stamp and the six per-dataset alarm names, and scrubs
+// the connection-layer codes (auth/permission/network/rate_limited/server) the
+// old runners persisted into each dataset's preflight and account rows: those
+// now live only in the shared driveConnState:<ownerHash> record, and a stale
+// copy would surface a second, contradictory error line. Data-layer codes stay
+// verbatim and nothing is carried over — the boot below re-probes the
+// connection. Placed after the top-level boot call on purpose: outside the
+// drive-scopes and boot test slices. Flag-gated; a refused or failed write
+// leaves the flag unset and the next worker generation retries (every step is
+// idempotent). Retire by 2027-01-15 (CLAUDE.md 临时事项).
+const PBP_DRIVE_SCOPE_RETIRE_FLAG = "_driveScopeKeysRetiredDone";
+const PBP_DRIVE_RETIRED_LOCAL_KEYS = Object.freeze(["driveSyncVocabulary", "driveSyncNotes", "_notesBootSyncTs"]);
+function pbpDriveHasConnectionError(row) {
+  return typeof row?.lastError === "string" && PBP_DRIVE_CONNECTION_ERRORS.has(row.lastError);
+}
+function pbpDriveScrubbedRow(row) {
+  const next = { ...row, lastError: null, retryAttempt: 0, retryAt: null };
+  if (Object.hasOwn(row, "blocked")) next.blocked = false;
+  return next;
+}
+// true: every current-owner row is clean (or there is no owner to clean for).
+// false: a write was refused or failed — the caller leaves the flag unset.
+async function pbpScrubDriveConnectionRows() {
+  const auth = await getCurrentPinboardAuth();
+  // Signed out: nothing is owner-scoped yet. The flag still lands; a later run
+  // for that owner ignores legacy connection codes in these rows (spec §3.3).
+  if (!auth?.account) return true;
+  // Signed in but the auth already moved on: fail closed and retry next wake.
+  if (!pbpPinboardAuthIsCurrent(auth)) return false;
+  const ownerScope = pbpDictOwnerScope(auth.account);
+  const ownerHash = await pbpVocabOwnerHash(ownerScope);
+  const sameOwner = async () => {
+    const current = await getCurrentPinboardAuth();
+    return current?.account === auth.account &&
+      pbpPinboardAuthIsCurrent(auth) && pbpPinboardAuthIsCurrent(current);
+  };
+  // Both stores refuse an account row whose own key disagrees with its
+  // drivePermissionId / ownerHash. The runner never reads such a row (it looks
+  // rows up by that key), so leave it alone: patching it would fail on every
+  // worker wake and the flag would never land.
+  const canonicalAccountRow = (row) => row?.ownerHash === ownerHash &&
+    typeof row.drivePermissionId === "string" &&
+    row.key === "account:" + row.drivePermissionId + ":" + ownerHash;
+  // Vocabulary: vocab-store.js is the only writer of the pbp-vocab IDB; its
+  // sync-row writers are keyed by ownerHash, so the owner is re-checked here
+  // before every write. A preflight with all four fields cleared is exactly
+  // what a successful run leaves (the runner deletes it), so delete it.
+  if (pbpDriveHasConnectionError(await pbpVocabGetPreflightState(ownerHash))) {
+    if (!await sameOwner() || !await pbpVocabDeletePreflightState(ownerHash)) return false;
+  }
+  for (const row of await pbpVocabListAccountStates(ownerHash)) {
+    if (!pbpDriveHasConnectionError(row) || !canonicalAccountRow(row)) continue;
+    if (!await sameOwner() || !await pbpVocabPutAccountState(pbpDriveScrubbedRow(row))) return false;
+  }
+  // Notes: a dedicated store whose owner is "this Pinboard account, still
+  // current". notesDriveStore cannot be used — its owner is "" whenever Drive is
+  // not enabled, and a disconnected device must be scrubbed too. Every write
+  // still passes the store's checkHash boundary; a refused owner throws
+  // account_changed (stateFailure re-throws it) and aborts the whole scrub.
+  const notesStore = pbpCreateNotesSyncStore({
+    getCurrentOwner: async () => (await sameOwner() ? ownerScope : "")
+  });
+  if (pbpDriveHasConnectionError(await notesStore.getPreflightState(ownerHash)) &&
+      !await notesStore.deletePreflightState(ownerHash)) return false;
+  const accountPrefix = PBP_NOTES_SYNC_PREFIX + "account_";
+  const keys = typeof chrome.storage.local.getKeys === "function"
+    ? await chrome.storage.local.getKeys() : Object.keys(await chrome.storage.local.get(null));
+  for (const key of keys) {
+    if (!key.startsWith(accountPrefix)) continue;
+    let id;
+    // A key that does not decode was never written by stateKey(); not a row to scrub.
+    try { id = decodeURIComponent(key.slice(accountPrefix.length)); } catch (_) { continue; }
+    if (!id.endsWith(":" + ownerHash)) continue;
+    const row = await notesStore.getAccountState(id.slice(0, -(ownerHash.length + 1)), ownerHash);
+    if (!pbpDriveHasConnectionError(row) || !canonicalAccountRow(row)) continue;
+    if (!await notesStore.putAccountState(pbpDriveScrubbedRow(row))) return false;
+  }
+  return true;
+}
+async function pbpRetireDriveScopeKeys() {
+  try {
+    const flag = await chrome.storage.local.get(PBP_DRIVE_SCOPE_RETIRE_FLAG);
+    if (flag[PBP_DRIVE_SCOPE_RETIRE_FLAG] === true) return;
+    await chrome.storage.local.remove([...PBP_DRIVE_RETIRED_LOCAL_KEYS]);
+    await Promise.all(PBP_DRIVE_LEGACY_ALARMS.map((name) => chrome.alarms.clear(name)));
+    // Behind any round the top-level boot already queued: patching an account
+    // row read before that round committed a newer cursor would roll it back.
+    if (await queueDriveSync(() => pbpScrubDriveConnectionRows()) !== true) {
+      console.warn("[drive-sync] scope key retirement: row scrub incomplete; will retry");
+      return;
+    }
+    await chrome.storage.local.set({ [PBP_DRIVE_SCOPE_RETIRE_FLAG]: true });
+  } catch (e) {
+    // Key names and error class only — no token, email or vocabulary content.
+    console.warn("[drive-sync] scope key retirement failed:", e?.name, e?.message);
+    return;
+  }
+  // Step 4 runs once, after the flag: a failing sync must not re-run the cleanup.
+  // Not connected: no alarm, no network. Connected with the grant intact: arm the
+  // new periodic and run one unthrottled whole round (vocabulary, then notes —
+  // seedLegacy enrolls this owner's existing highlights; ownerless ones stay
+  // local). Grant revoked: the boot itself flips vocabDriveConnected to false and
+  // clears drive-sync-* without touching the network.
+  try {
+    if (!PBP_VOCAB_DRIVE_CAPABLE) return;
+    const stored = await chrome.storage.local.get({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
+    if (stored[PBP_VOCAB_DRIVE_CONNECTED_KEY] !== true) return;
+    if (await pbpDriveEnabled()) await pbpDriveEnsurePeriodic();
+    await pbpBootDriveSync();
+  } catch (e) {
+    console.warn("[drive-sync] post-migration boot failed:", e?.name, e?.message);
+  }
+}
+pbpRetireDriveScopeKeys();
+
 const queuePrewarmAlarmSync = pbpCreateRecoveringTail();
 function syncPrewarmTagsAlarm() {
   return queuePrewarmAlarmSync(async () => {

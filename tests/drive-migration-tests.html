@@ -1,0 +1,331 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Drive Scope Migration Tests</title>
+<style>body{font-family:monospace;padding:16px}.case{padding:6px}.pass{color:green}.fail{color:red}</style>
+</head><body><h1>Drive Scope Migration Tests</h1><div id="summary"></div><div id="results"></div>
+<script src="../shared.js"></script>
+<script src="../vocab-store.js"></script>
+<script src="../vocab-gdrive.js"></script>
+<script src="../notes-sync.js"></script>
+<script>
+let pass = 0, fail = 0;
+function check(name, ok) { ok ? pass++ : fail++; const el = document.createElement("div"); el.className = "case " + (ok ? "pass" : "fail"); el.textContent = name; document.getElementById("results").append(el); }
+// Handwritten, never read from PBP_DRIVE_LEGACY_ALARMS / PBP_DRIVE_CONNECTION_ERRORS:
+// a constant that lost a member would otherwise agree with itself.
+const LEGACY_ALARMS = ["vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry",
+  "notes-sync-dirty", "notes-sync-periodic", "notes-sync-retry"];
+const NEW_ALARMS = ["drive-sync-dirty", "drive-sync-periodic", "drive-sync-retry"];
+const CONNECTION_CODES = ["auth", "permission", "network", "rate_limited", "server"];
+const ALICE = "acct_alice", BOB = "acct_bob";
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// Stored shapes, handwritten: vocab preflight per _pbpVocabValidPreflightState
+// (exactly six keys), account rows per the runner's stateWith() writes, notes
+// keys per notes-sync.js stateKey() = prefix + kind + "_" + encodeURIComponent(id).
+const vocabPreflight = (hash, lastError, extra = {}) => ({ key: "preflight:" + hash, ownerHash: hash,
+  retryAttempt: 0, retryAt: null, lastError, blocked: false, ...extra });
+const accountRow = (pid, hash, extra = {}) => ({ key: `account:${pid}:${hash}`, drivePermissionId: pid,
+  ownerHash: hash, bootstrapComplete: true, pageToken: "cursor-" + pid, lastSuccessAt: 1759980000000,
+  lastError: null, retryAttempt: 0, retryAt: null, ...extra });
+const notesPreflightKey = (hash) => "pbp_notes_sync_preflight_" + hash;
+const notesAccountKey = (pid, hash) => "pbp_notes_sync_account_" + pid + "%3A" + hash;
+const legacyAlarms = () => LEGACY_ALARMS.map((name) => ({ name, scheduledTime: 1760000000000 }));
+
+function migrationHarness(source, opts = {}) {
+  const start = source.indexOf("const PBP_DRIVE_SCOPE_RETIRE_FLAG");
+  const end = source.indexOf("\npbpRetireDriveScopeKeys();", start);
+  if (start < 0 || end <= start) return null;
+  const local = structuredClone(opts.local || {});
+  const vocab = new Map((opts.vocabRows || []).map((row) => [row.key, structuredClone(row)]));
+  const alarmMap = new Map((opts.alarms || []).map((alarm) => [alarm.name, structuredClone(alarm)]));
+  const removed = [], created = [], cleared = [], boots = [], warns = [];
+  let authReads = 0;
+  const tails = new Map();
+  const locks = { request: async (name, run) => {
+    const previous = tails.get(name) || Promise.resolve();
+    let release; const next = new Promise((resolve) => { release = resolve; }); tails.set(name, next);
+    await previous;
+    try { return await run(); } finally { release(); if (tails.get(name) === next) tails.delete(name); }
+  } };
+  const chrome = {
+    storage: { local: {
+      async get(query) {
+        if (query === null) return structuredClone(local);
+        if (typeof query === "string") return query in local ? { [query]: structuredClone(local[query]) } : {};
+        if (Array.isArray(query)) { const out = {}; for (const key of query) if (key in local) out[key] = structuredClone(local[key]); return out; }
+        const out = {}; for (const [key, fallback] of Object.entries(query)) out[key] = key in local ? structuredClone(local[key]) : fallback; return out;
+      },
+      async set(values) { Object.assign(local, structuredClone(values)); },
+      async remove(keys) { for (const key of [].concat(keys)) { removed.push(key); delete local[key]; } },
+      async getKeys() { return Object.keys(local); }
+    } },
+    alarms: {
+      async get(name) { return alarmMap.has(name) ? structuredClone(alarmMap.get(name)) : undefined; },
+      async getAll() { return [...alarmMap.values()].map((alarm) => structuredClone(alarm)); },
+      create(name, info) { created.push(name); alarmMap.set(name, { name, ...info }); },
+      async clear(name) { cleared.push(name); return alarmMap.delete(name); }
+    }
+  };
+  const deps = {
+    chrome, console: { warn: (...args) => warns.push(args), info() {} },
+    PBP_VOCAB_DRIVE_CAPABLE: true, PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected",
+    getCurrentPinboardAuth: async () => {
+      authReads++;
+      if (opts.switchAfterAuthReads !== undefined && authReads > opts.switchAfterAuthReads) return { account: "bob", epoch: 1 };
+      return { account: opts.account === undefined ? "alice" : opts.account, epoch: 1 };
+    },
+    pbpPinboardAuthIsCurrent: () => true,
+    queueDriveSync: opts.queue === undefined ? pbpCreateRecoveringTail() : opts.queue,
+    // Real notes store over the fake area: the owner-checked write boundary under test is the shipped one.
+    pbpCreateNotesSyncStore: (options = {}) => window.pbpCreateNotesSyncStore({ storage: chrome.storage.local, locks, ...options }),
+    pbpVocabGetPreflightState: async (hash) => {
+      const row = vocab.get("preflight:" + hash);
+      return _pbpVocabValidPreflightState(row) ? structuredClone(row) : null;
+    },
+    pbpVocabDeletePreflightState: async (hash) => { if (opts.vocabWriteFails === true) return false; vocab.delete("preflight:" + hash); return true; },
+    pbpVocabListAccountStates: async (hash) => [...vocab.values()]
+      .filter((row) => row.key.startsWith("account:") && row.ownerHash === hash).map((row) => structuredClone(row)),
+    pbpVocabPutAccountState: async (state) => {
+      if (opts.vocabWriteFails === true || state.key !== `account:${state.drivePermissionId}:${state.ownerHash}`) return false;
+      vocab.set(state.key, structuredClone(state)); return true;
+    },
+    pbpDriveEnabled: async () => local.vocabDriveConnected === true && opts.permissionGranted !== false,
+    pbpDriveEnsurePeriodic: () => window.pbpDriveEnsurePeriodic(chrome.alarms),
+    // Task 3 contract for the revoked branch (the real branch is locked by drive-scopes' bootHarness).
+    pbpBootDriveSync: async (options) => {
+      boots.push(options === undefined ? {} : structuredClone(options));
+      if (local.vocabDriveConnected === true && opts.permissionGranted === false) {
+        local.vocabDriveConnected = false;
+        for (const name of NEW_ALARMS) alarmMap.delete(name);
+        return { ok: false, error: "permission" };
+      }
+      return { ok: true };
+    }
+  };
+  const factory = new Function(...Object.keys(deps), source.slice(start, end) + `
+    return { flag: PBP_DRIVE_SCOPE_RETIRE_FLAG, run: pbpRetireDriveScopeKeys };`);
+  return { ...factory(...Object.values(deps)), local, vocab, alarmMap, removed, created, cleared, boots, warns };
+}
+// Every current-owner row (vocab IDB + notes local) still carrying a connection-layer code.
+function connectionResidue(h, hash) {
+  const notesRows = Object.entries(h.local).filter(([key]) => key.startsWith("pbp_notes_sync_")).map(([, value]) => value);
+  return [...h.vocab.values(), ...notesRows].filter((row) => row && row.ownerHash === hash && CONNECTION_CODES.includes(row.lastError));
+}
+function onAlarmHarness(source) {
+  const start = source.indexOf("chrome.alarms.onAlarm.addListener");
+  const end = source.indexOf("\n});", start);
+  if (start < 0 || end <= start) return null;
+  let listener = null; const boots = [];
+  const deps = {
+    chrome: { alarms: { onAlarm: { addListener(fn) { listener = fn; } } } },
+    PBP_STORAGE_ACCESS_RETRY_ALARM: "storage-access-retry", PBP_UNDO_ALARM: "undo-expire",
+    pbpBootDriveSync: async (options) => { boots.push(options === undefined ? {} : options); return { ok: true }; },
+    console: { warn() {} }
+  };
+  new Function(...Object.keys(deps), source.slice(start, end + 4))(...Object.values(deps));
+  return listener ? { fire: (name) => listener({ name }), boots } : null;
+}
+
+(async () => {
+  const source = await fetch("../background.js").then((r) => r.text());
+  const A = await pbpVocabOwnerHash(ALICE), B = await pbpVocabOwnerHash(BOB);
+  const upgrade = () => ({
+    local: { vocabDriveConnected: true, driveSyncVocabulary: true, driveSyncNotes: false,
+      [notesPreflightKey(A)]: { key: "preflight:" + A, ownerHash: A, retryAttempt: 0, retryAt: null, lastError: "auth", blocked: true },
+      [notesAccountKey("google-a", A)]: accountRow("google-a", A, { pageToken: "notes-cursor-3", lastError: "auth", retryAttempt: 5, retryAt: 1760000300000 }) },
+    vocabRows: [vocabPreflight(A, "network", { retryAttempt: 5, retryAt: 1760000600000 }),
+      accountRow("google-a", A, { pageToken: "vocab-cursor-9", lastError: "network", retryAttempt: 5, retryAt: 1760000600000 })],
+    alarms: legacyAlarms()
+  });
+
+  // 1-5. Every scope-key combination on a connected device ends in the same whole-round state.
+  // Simplest miss: carrying driveSyncNotes:false (or (F,F)) forward as "skip that dataset / skip the boot",
+  // or booting WITH the 15-minute throttle so _vocabBootSyncTs silently swallows the first round.
+  for (const [label, scope] of [["absent", {}],
+    ["(T,F)", { driveSyncVocabulary: true, driveSyncNotes: false }], ["(F,T)", { driveSyncVocabulary: false, driveSyncNotes: true }],
+    ["(F,F)", { driveSyncVocabulary: false, driveSyncNotes: false }], ["(T,T)", { driveSyncVocabulary: true, driveSyncNotes: true }]]) {
+    const h = migrationHarness(source, { local: { vocabDriveConnected: true, _vocabBootSyncTs: Date.now(), ...scope }, alarms: legacyAlarms() });
+    h && await h.run();
+    const periodic = h?.alarmMap.get("drive-sync-periodic");
+    check(`scope keys ${label}: both keys retired, drive-sync-periodic armed (15 min), exactly one unthrottled whole-round boot`,
+      !!h && !("driveSyncVocabulary" in h.local) && !("driveSyncNotes" in h.local) && h.local[h.flag] === true &&
+      periodic?.periodInMinutes === 15 && h.boots.length === 1 && !(h.boots[0].throttleMs > 0));
+  }
+
+  // 6. Simplest miss: deleting every *BootSyncTs (the unified stamp would reset) or forgetting the notes one.
+  {
+    const h = migrationHarness(source, { local: { vocabDriveConnected: true, _vocabBootSyncTs: 1759990000000, _notesBootSyncTs: 1759990000000 } });
+    h && await h.run();
+    check("boot throttle: _notesBootSyncTs is deleted, the unified _vocabBootSyncTs stamp is kept as is",
+      !!h && !("_notesBootSyncTs" in h.local) && h.local._vocabBootSyncTs === 1759990000000);
+  }
+
+  // 7. Simplest miss: clearing only the vocab-sync-* trio, or clearing by a "-sync-" pattern that also kills drive-sync-dirty.
+  {
+    const keep = [{ name: "drive-sync-dirty", scheduledTime: 1760000030000 }, { name: "prewarm-tags", periodInMinutes: 15 }, { name: "keepalive", periodInMinutes: 4 }];
+    const h = migrationHarness(source, { local: { vocabDriveConnected: false }, alarms: [...legacyAlarms(), ...keep] });
+    h && await h.run();
+    check("legacy alarms: all six vocab-sync-* / notes-sync-* are cleared; drive-sync-dirty and unrelated alarms survive untouched",
+      !!h && LEGACY_ALARMS.every((name) => !h.alarmMap.has(name)) && keep.every((alarm) => same(h.alarmMap.get(alarm.name), alarm)));
+  }
+
+  // 8-9. Upgrade fixture: notes preflight blocked:auth + vocab account row in network backoff with retryAttempt=5.
+  {
+    const h = migrationHarness(source, upgrade());
+    h && await h.run();
+    const vRow = h?.vocab.get("account:google-a:" + A), nRow = h?.local[notesAccountKey("google-a", A)];
+    // Simplest miss: nulling lastError but leaving retryAttempt=5 — the very next failure then starts
+    // at the top of the backoff ladder (and auth goes straight to blocked).
+    check("upgrade: no connection-layer code, attempt count or retryAt survives in either dataset's preflight or account rows",
+      !!h && connectionResidue(h, A).length === 0 && !h.vocab.has("preflight:" + A) && !(notesPreflightKey(A) in h.local) &&
+      [vRow, nRow].every((row) => row && row.lastError === null && row.retryAttempt === 0 && row.retryAt === null));
+    // Simplest miss: "cleaning" by deleting the whole account row — every device then re-bootstraps from scratch.
+    check("upgrade: account rows keep cursor, bootstrap flag and success history",
+      !!vRow && !!nRow && vRow.pageToken === "vocab-cursor-9" && nRow.pageToken === "notes-cursor-3" &&
+      vRow.bootstrapComplete === true && nRow.bootstrapComplete === true &&
+      vRow.lastSuccessAt === 1759980000000 && nRow.lastSuccessAt === 1759980000000);
+  }
+
+  // 10. Simplest miss: clearing every lastError instead of only the connection-layer ones.
+  {
+    const rows = {
+      vocabPre: vocabPreflight(A, "remote", { blocked: true }),
+      vocabAcct: accountRow("google-b", A, { lastError: "local_store", retryAttempt: 2, retryAt: 1760000900000 }),
+      notesPre: { key: "preflight:" + A, ownerHash: A, retryAttempt: 3, retryAt: 1760000900000, lastError: "unexpected", blocked: false },
+      notesAcct: accountRow("google-b", A, { lastError: "corrupt" }),
+      // A junk row whose own key disagrees with its drivePermissionId: the store's
+      // write boundary refuses it, so scrubbing it would fail forever and the flag
+      // would never land (re-running on every worker wake). It is skipped instead.
+      vocabJunk: { ...accountRow("google-y", A, { lastError: "network", retryAttempt: 3 }), key: "account:google-z:" + A }
+    };
+    const h = migrationHarness(source, { local: { vocabDriveConnected: true,
+      [notesPreflightKey(A)]: rows.notesPre, [notesAccountKey("google-b", A)]: rows.notesAcct },
+      vocabRows: [rows.vocabPre, rows.vocabAcct, rows.vocabJunk] });
+    h && await h.run();
+    check("data-layer codes (remote blocked, local_store backoff, unexpected, corrupt) are kept byte for byte; a junk-keyed row does not hold the flag hostage",
+      !!h && same(h.vocab.get(rows.vocabPre.key), rows.vocabPre) && same(h.vocab.get(rows.vocabAcct.key), rows.vocabAcct) &&
+      same(h.local[notesPreflightKey(A)], rows.notesPre) && same(h.local[notesAccountKey("google-b", A)], rows.notesAcct) &&
+      same(h.vocab.get(rows.vocabJunk.key), rows.vocabJunk) && h.local[h.flag] === true);
+  }
+
+  // 11. Simplest miss: scanning every account:/pbp_notes_sync_account_ row without the ownerHash filter.
+  {
+    const bob = { notesPre: { key: "preflight:" + B, ownerHash: B, retryAttempt: 0, retryAt: null, lastError: "auth", blocked: true },
+      vocabPre: vocabPreflight(B, "network", { retryAttempt: 1, retryAt: 1760000100000 }),
+      vocabAcct: accountRow("google-a", B, { lastError: "network", retryAttempt: 4, retryAt: 1760000100000 }),
+      notesAcct: accountRow("google-a", B, { lastError: "server", retryAttempt: 2, retryAt: 1760000100000 }) };
+    const h = migrationHarness(source, { local: { vocabDriveConnected: true, [notesPreflightKey(B)]: bob.notesPre,
+      [notesAccountKey("google-a", B)]: bob.notesAcct }, vocabRows: [bob.vocabPre, bob.vocabAcct] });
+    h && await h.run();
+    check("owner isolation: another Pinboard account's connection-layer rows are not touched",
+      !!h && same(h.local[notesPreflightKey(B)], bob.notesPre) && same(h.local[notesAccountKey("google-a", B)], bob.notesAcct) &&
+      same(h.vocab.get(bob.vocabPre.key), bob.vocabPre) && same(h.vocab.get(bob.vocabAcct.key), bob.vocabAcct));
+  }
+
+  // 12. Simplest miss: returning before the flag when signed out (re-running forever), or guessing an owner.
+  {
+    const h = migrationHarness(source, { ...upgrade(), account: "" });
+    h && await h.run();
+    check("signed out of Pinboard: keys and legacy alarms still retire and the flag lands, but no store row is touched",
+      !!h && h.local[h.flag] === true && !("driveSyncVocabulary" in h.local) && !("driveSyncNotes" in h.local) &&
+      LEGACY_ALARMS.every((name) => !h.alarmMap.has(name)) && connectionResidue(h, A).length === 4);
+  }
+
+  // 13. Simplest miss: patching pbp_notes_sync_* with storage.set/remove directly, skipping the store's checkHash.
+  {
+    const notesOnly = { vocabDriveConnected: true,
+      [notesPreflightKey(A)]: { key: "preflight:" + A, ownerHash: A, retryAttempt: 0, retryAt: null, lastError: "auth", blocked: true },
+      [notesAccountKey("google-a", A)]: accountRow("google-a", A, { lastError: "auth", retryAttempt: 5 }) };
+    const h = migrationHarness(source, { local: notesOnly, switchAfterAuthReads: 1 });
+    h && await h.run();
+    check("account switch mid-scrub: the notes store's owner-checked write refuses, nothing is written, flag unset, boot skipped, failure logged",
+      !!h && h.local[h.flag] === undefined && same(h.local[notesPreflightKey(A)], notesOnly[notesPreflightKey(A)]) &&
+      same(h.local[notesAccountKey("google-a", A)], notesOnly[notesAccountKey("google-a", A)]) && h.boots.length === 0 && h.warns.length > 0);
+  }
+
+  // 14. Simplest miss: setting the flag whatever the store writes returned.
+  {
+    const first = migrationHarness(source, { ...upgrade(), vocabWriteFails: true });
+    first && await first.run();
+    const second = first && migrationHarness(source, { local: first.local, vocabRows: [...first.vocab.values()], alarms: [...first.alarmMap.values()] });
+    second && await second.run();
+    check("a failed store write leaves the flag unset and skips the boot; the next worker generation finishes the job",
+      !!first && !!second && first.local[first.flag] === undefined && first.boots.length === 0 && first.warns.length > 0 &&
+      second.local[second.flag] === true && connectionResidue(second, A).length === 0 && second.boots.length === 1);
+  }
+
+  // 15. Simplest miss: read-modify-writing the rows outside queueDriveSync while the top-level boot's round
+  // is committing a newer cursor — the stale copy would roll that cursor back.
+  {
+    const queue = pbpCreateRecoveringTail();
+    let release = null;
+    const inFlight = queue(() => new Promise((resolve) => { release = resolve; }));
+    const h = migrationHarness(source, { ...upgrade(), queue });
+    const running = h ? h.run() : Promise.resolve();
+    // A real timer, not a fixed number of zero-delay ticks: an unqueued scrub awaits
+    // several crypto.subtle digests, which settle on their own task and could outlast
+    // a handful of ticks -- the miss would then look "untouched" and pass.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const untouchedWhileRoundRuns = !!h && connectionResidue(h, A).length === 4 && h.local[h.flag] === undefined;
+    if (release) release();
+    await inFlight; await running;
+    check("the row scrub waits behind an in-flight Drive round, then completes",
+      untouchedWhileRoundRuns && connectionResidue(h, A).length === 0 && h.local[h.flag] === true);
+  }
+
+  // 16. Simplest miss: arming drive-sync-periodic before checking the grant (boot later clears it,
+  // but the create already happened — the created log shows it).
+  {
+    const h = migrationHarness(source, { local: { vocabDriveConnected: true, driveSyncNotes: true }, alarms: legacyAlarms(), permissionGranted: false });
+    h && await h.run();
+    check("connected but the optional grant was revoked: no drive alarm is created, one boot runs and leaves the device disconnected with no old or new drive alarm",
+      !!h && h.created.length === 0 && h.boots.length === 1 && h.local.vocabDriveConnected === false &&
+      [...LEGACY_ALARMS, ...NEW_ALARMS].every((name) => !h.alarmMap.has(name)));
+  }
+
+  // 17. Simplest miss: calling the boot unconditionally and trusting it to bail out.
+  {
+    const fx = upgrade(); fx.local.vocabDriveConnected = false;
+    const h = migrationHarness(source, fx);
+    h && await h.run();
+    check("not connected: only steps 1-3 run — rows scrubbed, no alarm created, no boot (no network)",
+      !!h && h.created.length === 0 && h.boots.length === 0 && h.local[h.flag] === true && connectionResidue(h, A).length === 0);
+  }
+
+  // 18. Simplest miss: checking the flag only around the scrub while still clearing alarms or booting.
+  {
+    const first = migrationHarness(source, upgrade());
+    first && await first.run();
+    const carried = structuredClone(first ? first.local : {});
+    carried.driveSyncNotes = true; // sentinel: a second run that looked at all would delete it
+    const second = first && migrationHarness(source, { local: carried, vocabRows: [...first.vocab.values()],
+      alarms: [{ name: "vocab-sync-periodic", periodInMinutes: 15 }] });
+    second && await second.run();
+    check("done flag makes it a one-shot: a later worker removes, clears, creates and boots nothing",
+      !!second && second.removed.length === 0 && second.cleared.length === 0 && second.created.length === 0 &&
+      second.boots.length === 0 && second.local.driveSyncNotes === true && second.alarmMap.has("vocab-sync-periodic"));
+  }
+
+  // 19. Simplest miss: dropping the migration above the top-level boot call — inside the boot slice that
+  // drive-scopes' bootHarness evaluates — where it would pull undeclared deps into that factory.
+  {
+    const bootSliceStart = source.indexOf("const PBP_VOCAB_BOOT_SYNC_KEY");
+    const bootCall = source.indexOf("\npbpBootDriveSync({ throttleMs:");
+    const migStart = source.indexOf("const PBP_DRIVE_SCOPE_RETIRE_FLAG");
+    const callAt = source.indexOf("\npbpRetireDriveScopeKeys();");
+    const prewarmAt = source.indexOf("const queuePrewarmAlarmSync");
+    check("placement: migration and its single top-level call sit after the top-level boot call, outside the boot and drive-scopes slices",
+      bootSliceStart >= 0 && bootCall > bootSliceStart && migStart > bootCall && callAt > migStart && callAt < prewarmAt &&
+      source.indexOf("\npbpRetireDriveScopeKeys();", callAt + 1) === -1);
+  }
+
+  // 20. Simplest miss: routing only the vocab-sync-* names (a notes-sync-retry already scheduled by the old
+  // build fires after the migration's clear raced it and is silently dropped).
+  {
+    const h = onAlarmHarness(source);
+    if (h) for (const name of [...LEGACY_ALARMS, ...NEW_ALARMS]) h.fire(name);
+    await tick();
+    check("onAlarm: all six legacy names and the three drive-sync-* names route to the unified boot",
+      !!h && h.boots.length === LEGACY_ALARMS.length + NEW_ALARMS.length && h.boots.every((options) => !(options.throttleMs > 0)));
+  }
+  document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
+})();
+</script></body></html>
