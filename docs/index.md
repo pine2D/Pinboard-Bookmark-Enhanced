@@ -16,7 +16,7 @@ A Chrome extension for [Pinboard](https://pinboard.in) with AI tags and summarie
 
 - Chrome Sync can share settings between devices where you enable it. Credential sync is a separate opt-in.
 - Manual schema v3 JSON backups contain settings and can optionally include reader highlights, notes, and vocabulary from the current Pinboard account, plus API keys and tokens if you tick that box.
-- Google Drive can sync the current Pinboard account's vocabulary and, when separately enabled, highlights and notes. Connect it on each device while signed in to Chrome, then choose the data to sync under General → Data Sync; the choices remain local to that device. Highlights and notes are off by default.
+- Google Drive syncs the current Pinboard account's vocabulary, highlights, and notes. Connect it on each device under General → Data Sync while signed in to Chrome; disconnecting a device stops syncing there and keeps your data.
 
 ## Video pages
 

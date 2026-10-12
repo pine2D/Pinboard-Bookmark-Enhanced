@@ -1,13 +1,13 @@
 # Pinboard Bookmark Enhanced 项目配置
 
 作者：pine2D
-更新：2026-09-27
+更新：2026-10-13
 
 > 本文件只保留每个会话都需要的跨领域约定。子系统深水区规则在 `.claude/rules/`（按 paths 匹配自动加载，见文末索引表）；机器可验证的铁律已由 pre-commit / verify.sh / release 硬门强制——prose 是提醒，lint 是底线。
 
 ## 项目概述
 
-Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英 + 用户自备 ECDICT 英汉）；高亮/笔记与生词集中在独立的「笔记与生词本」页（library.html，索引 + 详情平铺双栏）；生词按当前 Pinboard 账号隔离，可管理/导出/发送到 Anki 或欧路词典，支持 Google Drive 生词同步；高亮与笔记可另行启用 Drive 同步。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
+Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英 + 用户自备 ECDICT 英汉）；高亮/笔记与生词集中在独立的「笔记与生词本」页（library.html，索引 + 详情平铺双栏）；生词按当前 Pinboard 账号隔离，可管理/导出/发送到 Anki 或欧路词典；连接 Google Drive 即同步生词、高亮与笔记。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
 
 ## 技术栈
 
@@ -75,12 +75,12 @@ docs/superpowers/ DESIGN-IS-2026-07-22/ release/  # gitignored 本地产物（.q
 | 机制 | 数据 | 边界 |
 |------|------|------|
 | Chrome Sync | 普通设置；另行启用时含凭据 | `optSyncEnabled` 是**每设备** local 开关，普通设置据此路由 sync/local；不含生词、高亮、缓存、任务状态 |
-| Google Drive | 当前 Pinboard owner 的生词，以及另行启用的高亮与笔记 | 每设备单独连接；`driveSyncVocabulary` 默认 true、`driveSyncNotes` 默认 false，均只存 local；只用 `drive.appdata`；不接管设置、凭据 |
+| Google Drive | 当前 Pinboard owner 的生词、高亮与笔记 | 每设备单独连接；连接即同步两类、断开即停止，不设按类型开关；共享连接层状态 `driveConnState:<ownerHash>` 只存 local；只用 `drive.appdata`；不接管设置、凭据 |
 | 手工 JSON schema v3 | 设置、主题 + 用户分项选择的高亮/生词/凭据 | 明文文件；导入先预览分项选择；凭据两端默认关、fail-closed（详见 rules/backup.md） |
 
 - 凭据（API key / token / password / 导出目标）不能硬编码。默认存 `chrome.storage.local`；仅当本机 `optSyncEnabled=true` 且账号级 `syncApiKeys=true` 时用 sync；旧云端已有非空 secret 时迁移保留 `syncApiKeys=true`，避免升级丢凭据。
 - sync 配额：单 item ≤8KB、总约 100KB、写入限流；写后检查 `lastError`。缓存、大对象、瞬态状态一律 local。
-- 生词及其 Drive 协议状态在 IndexedDB（vocab-store.js 是生词唯一写入口）；高亮与笔记及其 Drive 协议状态走 notes-sync.js 的统一写边界；逐设备连接标记和数据范围开关在 local。
+- 生词及其 Drive 协议状态在 IndexedDB（vocab-store.js 是生词唯一写入口）；高亮与笔记及其 Drive 协议状态走 notes-sync.js 的统一写边界；逐设备连接标记与共享连接层状态（`driveConnState:<ownerHash>`）在 local。
 - **离线队列**只存 local：新记录**仅**保存保存模式、URL、标题、备注、标签、私密/稍后读/归档标志、书签时间、队列 ID/入队时间与非秘密 Pinboard 用户名绑定——此外一律不存，禁止保存 token；legacy token 记录读取时改写为账号绑定并删除 token。重放必须用当前登录 token 且用户名与队列绑定精确一致，否则保留队列并 fail-closed。
 
 ## 跨领域安全铁律

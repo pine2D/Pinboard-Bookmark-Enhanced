@@ -73,7 +73,7 @@
 
 零追蹤、零分析、零遙測。新使用者的設定與憑證預設儲存在本機。一般設定同步必須在每台裝置上分別開啟。憑證同步是 Chrome 帳號層級的選項，但只有開啟一般設定同步的裝置才會參與；關閉一般設定同步的裝置會繼續使用本機憑證。新使用者的憑證同步預設關閉；若升級時 Chrome Sync 已有非空憑證，為避免資料遺失會保持開啟。開啟後，API Key、Token、密碼與匯出憑證會透過 Chrome Sync 共用，只經過混淆，沒有加密。書籤內容、頁面內容與離線佇列不會透過 Chrome Sync 同步。AI 請求**只**來自你開啟或使用的 AI 功能，並直接傳送到你設定的服務商。安裝時只授予 Pinboard 存取權限。其他網站（AI 服務商、匯出或存檔目標、詞典、Google Drive、影片字幕，以及批次儲存涉及的網站）都在你首次使用相應功能時逐一申請，且只申請確切網站。自訂網路端點必須使用 HTTPS；HTTP 僅允許用於 `localhost`、`127.0.0.1` 和 `[::1]`。擴充功能頁面採用嚴格的 Content-Security-Policy（不執行遠端程式碼）。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
-Google Drive 需在每台裝置分別連線，只同步目前 Pinboard 帳號的所選資料：連線後預設選取生詞，標記與筆記需另外啟用。同步範圍保存在本機；Drive 私有 appDataFolder 中的副本為明文，未經端對端加密。
+Google Drive 需在每台裝置分別連線，連線後同步目前 Pinboard 帳號的生詞、標記與筆記。Drive 私有 appDataFolder 中的副本為明文，未經端對端加密。
 
 ## 授權
 

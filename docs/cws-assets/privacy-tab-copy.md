@@ -4,8 +4,10 @@
 > Update this file whenever the dashboard text changes, and re-check it against
 > docs/privacy.md whenever a release adds a data exit or permission.
 > Last synced: 2026-08-29 (provider count lowered to 13 after the GitHub Models
-> service retirement and provider removal in v2.107.6; everything else
-> unchanged and still aligned with docs/privacy.md).
+> service retirement and provider removal in v2.107.6).
+> Pending paste (2026-10-13): the identity justification below now says Drive
+> sync always covers vocabulary, highlights, and notes. Paste it into the
+> dashboard at the next submission, then fold this note into Last synced.
 
 ## Single purpose description (994/1000)
 
@@ -49,9 +51,9 @@ Static hosts: api.pinboard.in and pinboard.in, for saving/fetching/managing book
 
 Set the Referer header (to the article page's origin only) on the extension's own image re-fetches during two user actions in Markdown preview: the Fix button for hotlink-blocked images, and the Embed (offline) export retry. Implemented as a temporary session rule scoped to the granted image origins, the fetch request type, and that single preview tab; the rule is removed when the run finishes. It grants no page access by itself and never touches other tabs' or sites' traffic.
 
-## identity justification (937/1000)
+## identity justification (914/1000)
 
-Obtain an OAuth access token for optional Google Drive sync, and nothing else. This is an optional permission: nothing requests it until you click Connect Google Drive in settings, and every other feature works without it. The only scope is drive.appdata, which reaches the extension's own hidden application-data folder and cannot read, list, or modify any other file in your Drive. It stores the current Pinboard account's vocabulary batches, plus highlights and notes if you turn those on, so your devices converge on the same data, and makes one Drive about.get call so settings can show which account is connected. identity never signs you in to this extension, never identifies you to the developer, and is not used for analytics or advertising. Background syncs only check that the permission is granted and never open an OAuth prompt. Disconnect this device removes the cached token and this permission and keeps your local data.
+Obtain an OAuth access token for optional Google Drive sync, and nothing else. This is an optional permission: nothing requests it until you click Connect Google Drive in settings, and every other feature works without it. The only scope is drive.appdata, which reaches the extension's own hidden application-data folder and cannot read, list, or modify any other file in your Drive. It stores the current Pinboard account's vocabulary, highlights, and notes as batches so your devices converge on the same data, and makes one Drive about.get call so settings can show which account is connected. identity never signs you in to this extension, never identifies you to the developer, and is not used for analytics or advertising. Background syncs only check that the permission is granted and never open an OAuth prompt. Disconnect this device removes the cached token and this permission and keeps your local data.
 
 ## Remote code
 

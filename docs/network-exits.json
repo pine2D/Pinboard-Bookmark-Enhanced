@@ -20,7 +20,7 @@
       "purpose": "Notion export (optional exact-origin grant)"
     },
     "www.googleapis.com": {
-      "purpose": "Google Drive appData vocabulary sync (optional exact-origin grant)"
+      "purpose": "Google Drive appData sync of vocabulary, highlights and notes (optional exact-origin grant)"
     },
     "freedictionaryapi.com": {
       "purpose": "Dictionary lookup (optional exact-origin grant)"
