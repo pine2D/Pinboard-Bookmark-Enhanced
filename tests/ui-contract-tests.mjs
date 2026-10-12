@@ -4125,6 +4125,17 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
       if (!id || !known.has(id)) offenders.push(`${p.name}: ${id || "<" + m[1] + " without id>"}`);
     }
   });
+  // Reverse direction: a PANEL_DEFAULTS field whose control left options.html
+  // is a reset that silently does nothing (applyPanelReset skips a null $id)
+  // while the confirm text still promises it -- the two Drive scope switches
+  // retired in 2026-10 (spec §6.1) are the first instance.
+  for (const [name, def] of Object.entries(panelDefaults || {})) {
+    const ids = [...Object.keys(def.fields || {}),
+      ...Object.values(def.nested || {}).flatMap((group) => Object.keys(group))];
+    for (const id of ids) {
+      if (!optionsHtml.includes(`id="${id}"`)) offenders.push(`${name}: PANEL_DEFAULTS field ${id} has no control in options.html`);
+    }
+  }
   check(offenders.length === 0, "options.js: controls missing from the reset map -> " + offenders.join(", "));
   // Non-DOM reset state the walk above cannot see (Codex r2 M3): the active
   // Pinboard preset lives in options.js closure state, so the Appearance
@@ -4183,8 +4194,6 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
 // unwatched.
 {
   const DEFAULT_EQ_ALLOWLIST = {
-    "drive-sync-vocabulary": "device-local Drive scope, not SETTINGS_DEFAULTS or Chrome Sync; defaults true and General reset writes local",
-    "drive-sync-notes": "device-local Drive scope, not SETTINGS_DEFAULTS or Chrome Sync; defaults false and General reset writes local",
     // customOverlayCSS is not a SETTINGS_DEFAULTS key at all -- it is a
     // schema-v2 large-value field synced outside the settings.get() default
     // merge (shared.js:1187-1199, options.js ~1814), so there is nothing in
@@ -4382,6 +4391,13 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
     eqOffenders.push(`${id}: checkbox not resolved through checkMap, NESTED_CHECKBOX_DEFAULTS, or DEFAULT_EQ_ALLOWLIST -- extend one of them with a reason or wire it through checkMap`);
   }
 
+  // Reverse direction: an allowlist entry whose control is gone is a standing
+  // pre-approval for whatever checkbox next reuses that id.
+  for (const id of Object.keys(DEFAULT_EQ_ALLOWLIST)) {
+    if (!optionsHtml.includes(`id="${id}"`)) {
+      eqOffenders.push(`${id}: DEFAULT_EQ_ALLOWLIST entry has no control in options.html -- delete the entry with the control`);
+    }
+  }
   check(eqOffenders.length === 0,
     "default value drifted between SETTINGS_DEFAULTS / options.html / PANEL_DEFAULTS -> " + eqOffenders.join("; "));
 }

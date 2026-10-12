@@ -3594,10 +3594,10 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
   padding-top: 0;
   min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
 }
-#vocab-drive-body > .pref-group > .pref-row:first-child > label {
-  padding-top: 0;
-  min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
-}
+/* The status line leads #vocab-drive-body since the data-scope switches went
+   away (spec §6.1). Its sp-3 top margin collapses into the heading .fg's
+   rhythm margin, so the heading -> first-line gap equals Chrome Sync's
+   heading -> first-row gap (tests/options-drive-sync-tests.html pins it). */
 .vocab-drive-state { display: block; min-height: 18px; margin: var(--opt-sp-3) 0; }
 /* Connection state is neutral; dataset errors and completed actions own color. */
 .vocab-drive-state, html[data-theme] .vocab-drive-state { color: var(--opt-fg-muted); }
@@ -3622,7 +3622,7 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
 .vocab-drive-notices.bad { color: var(--opt-danger); }
 .vocab-drive-notice-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--opt-sp-2);
   margin: var(--opt-sp-2) 0;
 }

@@ -3328,9 +3328,6 @@
     "vocabDriveSyncNowRequired": {
       "message": "自动同步已暂停。请点击「立即同步」重试。"
     },
-    "vocabDriveReconnectRequired": {
-      "message": "请点击「断开此设备」，然后重新连接。"
-    },
     "vocabLearningSection": {
       "message": "导出与集成"
     },
@@ -4062,21 +4059,6 @@
     "driveChromeSyncSection": {
       "message": "Chrome Sync"
     },
-    "driveSyncVocabulary": {
-      "message": "生词"
-    },
-    "driveSyncNotes": {
-      "message": "高亮与笔记"
-    },
-    "driveVocabularyLastSuccess": {
-      "message": "生词最近成功同步"
-    },
-    "driveNotesLastSuccess": {
-      "message": "高亮与笔记最近成功同步"
-    },
-    "driveSyncChooseData": {
-      "message": "选择要在本机同步的数据。"
-    },
     "driveVocabularyStatus": {
       "message": "生词：$STATUS$",
       "placeholders": {
@@ -4099,27 +4081,24 @@
     "drivePendingChanges": {
       "message": "本机还有尚未上传的更改。"
     },
-    "driveVocabularyNotices": {
-      "message": "生词冲突：$COUNT$ 处。被修改的生词已保留，未被删除。",
+    "driveNotices": {
+      "message": "同步冲突 $COUNT$ 处：被修改的条目已保留，删除未生效；如仍需删除，请再删一次。",
       "placeholders": {
         "count": {
           "content": "$1"
         }
       }
     },
-    "driveNotesNotices": {
-      "message": "高亮与笔记冲突：$COUNT$ 处。被修改的条目已保留，未被删除；有冲突的笔记两个版本都已保留。",
+    "driveNoticeTerms": {
+      "message": "涉及生词：$TERMS$",
       "placeholders": {
-        "count": {
+        "terms": {
           "content": "$1"
         }
       }
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "有一条高亮或笔记过大，无法同步。请缩短或删除该条内容，然后点击「立即同步」。"
-    },
-    "driveScopeSaveFailed": {
-      "message": "无法保存本机同步范围，请重试。"
     }
 
 }

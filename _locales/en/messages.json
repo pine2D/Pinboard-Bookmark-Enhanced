@@ -3338,9 +3338,6 @@
     "vocabDriveSyncNowRequired": {
       "message": "Automatic sync is paused. Click Sync now to try again."
     },
-    "vocabDriveReconnectRequired": {
-      "message": "Click Disconnect this device, then connect again."
-    },
     "vocabLearningSection": {
       "message": "Export and integrations"
     },
@@ -4075,21 +4072,6 @@
     "driveChromeSyncSection": {
       "message": "Chrome Sync"
     },
-    "driveSyncVocabulary": {
-      "message": "Vocabulary"
-    },
-    "driveSyncNotes": {
-      "message": "Highlights and notes"
-    },
-    "driveVocabularyLastSuccess": {
-      "message": "Vocabulary last synced"
-    },
-    "driveNotesLastSuccess": {
-      "message": "Highlights and notes last synced"
-    },
-    "driveSyncChooseData": {
-      "message": "Choose what to sync on this device."
-    },
     "driveVocabularyStatus": {
       "message": "Vocabulary: $STATUS$",
       "placeholders": {
@@ -4112,27 +4094,24 @@
     "drivePendingChanges": {
       "message": "This device has changes that haven't been uploaded yet."
     },
-    "driveVocabularyNotices": {
-      "message": "Vocabulary conflicts: $COUNT$. Edited words were kept instead of deleted.",
+    "driveNotices": {
+      "message": "Sync conflicts: $COUNT$. Edited items were kept, so the deletion didn't take effect. To remove them anyway, delete them again.",
       "placeholders": {
         "count": {
           "content": "$1"
         }
       }
     },
-    "driveNotesNotices": {
-      "message": "Highlight and note conflicts: $COUNT$. Edited items were kept instead of deleted, and both versions of conflicting notes were kept.",
+    "driveNoticeTerms": {
+      "message": "Affected words: $TERMS$",
       "placeholders": {
-        "count": {
+        "terms": {
           "content": "$1"
         }
       }
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "A highlight or note is too large to sync. Shorten or remove it, then click Sync now."
-    },
-    "driveScopeSaveFailed": {
-      "message": "Could not save the sync choices for this device. Try again."
     }
 
 }

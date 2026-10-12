@@ -2024,40 +2024,38 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
   const requireState = (ok, message) => { if (!ok) throw new Error(message); };
   try {
     // Opening the default General tab does not click a category. Exercise
-    // that entry with an older same-version dictionary and saved Drive scopes.
+    // that entry with an older same-version dictionary.
     await page.goto(`chrome-extension://${extId}/options.html`);
     const waitReady = () => page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready")
       && document.getElementById("notify-errors").dataset.autosaveReady === "1");
-    // Vocabulary starts checked in the markup, so false proves the async
-    // local scope read finished even when the expected notes value is false.
-    const waitDriveScopes = (chosen) => page.waitForFunction(value =>
-      !document.getElementById("drive-sync-vocabulary").checked
-      && document.getElementById("drive-sync-notes").checked === value, chosen, {timeout:TIMEOUT_MS});
     await waitReady();
+    // Probe key: a label the merged Drive panel still renders (spec §6.1). The
+    // expected text comes from the packaged dictionary, so a later copy edit
+    // to zh_CN cannot turn this into a false failure.
+    const freshLabel = await page.evaluate(async () => {
+      const messages = await (await fetch(chrome.runtime.getURL("_locales/zh_CN/messages.json"))).json();
+      return messages.driveLastSuccess?.message || "";
+    });
+    requireState(!!freshLabel, "zh_CN dictionary lacks driveLastSuccess, the stale-locale probe key");
     await page.evaluate(async () => {
       const oldMessages = await (await fetch(chrome.runtime.getURL("_locales/zh_CN/messages.json"))).json();
-      delete oldMessages.driveSyncNotes;
+      delete oldMessages.driveLastSuccess;
       localStorage.setItem("pp-i18n-lang", "zh_CN");
       localStorage.setItem("pp-i18n-msgs", JSON.stringify(oldMessages));
       localStorage.setItem("pp-i18n-stamp", "zh_CN@" + chrome.runtime.getManifest().version);
-      await chrome.storage.local.set({optLang:"zh_CN",driveSyncVocabulary:false,driveSyncNotes:true});
+      await chrome.storage.local.set({optLang:"zh_CN"});
     });
     await page.reload(); await waitReady(); await page.evaluate(() => pbpI18nReady());
-    await waitDriveScopes(true);
-    requireState(await page.evaluate(() => !location.hash && document.getElementById("drive-sync-notes").checked
-      && !document.getElementById("drive-sync-vocabulary").checked), "default General tab did not restore saved Drive scopes");
-    requireState(await page.locator('[data-i18n="driveSyncNotes"]').textContent() === "高亮与笔记",
+    requireState(await page.evaluate(() => !location.hash), "default General entry unexpectedly carried a hash");
+    requireState(await page.locator('[data-i18n="driveLastSuccess"]').textContent() === freshLabel,
       "same-version reload retained an older manual-language dictionary");
-    for (const chosen of [false, true]) {
-      await page.waitForFunction(() => document.getElementById("vocab-drive-body").getAttribute("aria-busy") === "false");
-      await page.locator("#drive-sync-notes").setChecked(chosen);
-      await page.waitForFunction(async value => (await chrome.storage.local.get("driveSyncNotes")).driveSyncNotes === value, chosen);
-      await page.reload(); await waitReady(); await page.evaluate(() => pbpI18nReady());
-      await waitDriveScopes(chosen);
-      requireState(await page.locator("#drive-sync-notes").isChecked() === chosen,
-        `default General tab lost the displayed Drive notes scope after reload: ${chosen}`);
-    }
-    s.notes.push("PASS: default General entry, same-version stale locale, and both Drive notes scope values survive reload without a language switch.");
+    // The merged panel has no per-device data-scope controls left to persist,
+    // and opening General must not write the retired keys back.
+    requireState(await page.evaluate(async () => !document.getElementById("drive-sync-vocabulary")
+      && !document.getElementById("drive-sync-notes")
+      && !Object.keys(await chrome.storage.local.get(null)).some((key) => /^driveSync/.test(key))),
+      "default General tab still renders or writes the retired Drive data-scope controls");
+    s.notes.push("PASS: default General entry refreshes a same-version stale locale and renders no Drive data-scope controls.");
     await page.goto(`chrome-extension://${extId}/options.html#general`);
     await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready")
       && document.getElementById("notify-errors").dataset.autosaveReady === "1");

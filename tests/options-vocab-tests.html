@@ -31,9 +31,7 @@ body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px soli
       <dl id="vocab-drive-fields" class="vocab-drive-fields" hidden>
         <dt>Google</dt><dd id="vocab-drive-account"></dd>
         <dt>Pinboard</dt><dd id="vocab-drive-owner"></dd>
-        <dt>Last success</dt><dd id="vocab-drive-last-success"></dd>
-        <dt>Pending words</dt><dd id="vocab-drive-pending-words"></dd>
-        <dt>Pending batches</dt><dd id="vocab-drive-pending-batches"></dd>
+        <dt>Last synced</dt><dd id="vocab-drive-last-success"></dd>
       </dl>
       <p id="vocab-drive-error" class="field-error" role="status" aria-live="polite"></p>
       <div class="vocab-drive-notice-row" hidden>
@@ -580,23 +578,39 @@ delete document.documentElement.dataset.theme;
   const driveRealAll = pbpVocabAll;
   const driveMessages = [];
   const permissionRequests = [];
-  const driveStatus = {
-    connected:true,
-    displayName:"Alice Example",
-    emailAddress:"alice@example.test",
-    owner:"alice",
-    lastSuccessAt:Date.UTC(2026, 6, 24, 8, 30),
-    pendingWords:7,
-    pendingBatches:2,
-    retryAt:Date.UTC(2026, 6, 24, 9, 0),
-    lastError:"network",
-    notices:3
+  // Hand-written in the shape background.js pbpGetVocabDriveStatus returns
+  // (spec §6.2): the shared connection record is its own object and each
+  // dataset row carries data-layer codes only. Never derived from the
+  // renderer's own reads. Unset fields are decided with === undefined so an
+  // explicit "" or 0 in a patch survives.
+  const dataset = (patch = {}) => {
+    const row = { lastSuccessAt:null, lastError:null, retryAt:null, blocked:false, hasPending:false, notices:0 };
+    for (const [key, value] of Object.entries(patch)) if (value !== undefined) row[key] = value;
+    return row;
   };
+  const RETRY_AT = Date.UTC(2026, 6, 24, 10, 0);
+  const driveStatus = {
+    connected:true, owner:"alice", drivePermissionId:"perm-alice",
+    displayName:"Alice Example", emailAddress:"alice@example.test",
+    connection:{ lastError:null, retryAt:null, blocked:false },
+    vocabulary:dataset({ lastSuccessAt:Date.UTC(2026, 6, 24, 9, 30), hasPending:true, notices:3 }),
+    notes:dataset({ lastSuccessAt:Date.UTC(2026, 6, 24, 8, 30) }),
+    noticeTerms:["blossom"],
+    lastSuccessAt:Date.UTC(2026, 6, 24, 8, 30),
+    hasPending:true
+  };
+  const quiet = { ...driveStatus, vocabulary:dataset({ lastSuccessAt:driveStatus.vocabulary.lastSuccessAt }),
+    noticeTerms:[], hasPending:false };
+  const disconnectedStatus = { ...quiet, connected:false };
+  const withConnection = (patch, base = driveStatus) => ({ ...base, connection:{ ...base.connection, ...patch } });
+  const withDataset = (scope, patch, base = driveStatus) => ({ ...base, [scope]:dataset({ ...base[scope], ...patch }) });
+  const errorText = () => $id("vocab-drive-error").textContent;
+  const stateText = () => $id("vocab-drive-state").textContent;
+  const shown = () => ["vocab-drive-connect", "vocab-drive-sync", "vocab-drive-disconnect"]
+    .map((id) => ($id(id).hidden ? "-" : "+")).join("");
   const driveResponse = (message) => {
     driveMessages.push({ ...message });
-    if (message.type === "vocabDriveDisconnect") {
-      return Promise.resolve({ ok:true, status:{ connected:false, owner:"alice", pendingWords:7, pendingBatches:0, notices:0 } });
-    }
+    if (message.type === "vocabDriveDisconnect") return Promise.resolve({ ok:true, status:disconnectedStatus });
     return Promise.resolve({ ok:true, status:driveStatus });
   };
   try {
@@ -606,7 +620,7 @@ delete document.documentElement.dataset.theme;
         getManifest:() => ({ optional_host_permissions:["*://*/*"] }),
         sendMessage:driveResponse
       },
-      storage:{ local:{ get:async () => ({driveSyncVocabulary:true,driveSyncNotes:false}) }, onChanged:{ addListener(){} } }
+      storage:{ local:{ get:async () => ({}) }, onChanged:{ addListener(){} } }
     };
     pbpVocabCurrentOwner = async () => "acct_alice";
     pbpVocabAll = async () => [];
@@ -625,13 +639,12 @@ delete document.documentElement.dataset.theme;
     window.chrome = {
       permissions:{ request: async (request) => { permissionRequests.push(request); return true; } },
       runtime:{ getManifest:() => activeDriveManifest, sendMessage: driveResponse },
-      storage:{ local:{ get:async () => ({driveSyncVocabulary:true,driveSyncNotes:false}) }, onChanged:{ addListener(){} } }
+      storage:{ local:{ get:async () => ({}) }, onChanged:{ addListener(){} } }
     };
 
-    if (typeof _pbpVocabDriveRender === "function") _pbpVocabDriveRender({ connected:false, owner:"alice" });
+    _pbpVocabDriveRender(disconnectedStatus);
     check("Google Drive card renders a persistent disconnected state",
-      $id("vocab-drive-state").textContent.includes("vocabDriveDisconnected") &&
-      !$id("vocab-drive-connect").hidden && $id("vocab-drive-sync").hidden && $id("vocab-drive-disconnect").hidden);
+      stateText().includes("vocabDriveDisconnected") && shown() === "+--");
     check("Google Drive disclosure is visible before connection and names every plaintext field",
       $id("vocab-drive-body").closest("details").open &&
       /appDataFolder/.test($id("vocab-drive-disclosure").textContent) &&
@@ -656,32 +669,30 @@ delete document.documentElement.dataset.theme;
     $id("vocab-drive-connect").click();
     await task(); await task();
     check("Google Drive permission denial remains visible in the card",
-      $id("vocab-drive-error").textContent.includes("vocabDrivePermissionDenied") &&
+      errorText().includes("vocabDrivePermissionDenied") &&
       !driveMessages.some((message) => message.type === "vocabDriveConnect"));
 
-    const connectedAfterFailure = {
-      ...driveStatus,
-      pendingWords:11,
-      retryAt:Date.UTC(2026, 6, 24, 10, 0),
-      lastError:"network"
-    };
-    _pbpVocabDriveRender({ connected:false, owner:"alice" });
-    window.chrome.permissions.request = async () => true;
-    window.chrome.runtime.sendMessage = async () => ({
-      ok:false, error:"network", status:connectedAfterFailure
+    const connectedAfterFailure = withConnection({ lastError:"network", retryAt:RETRY_AT });
+    const networkResponse = (status) => ({
+      ok:false, error:"network", results:{ vocabulary:{ ok:false }, notes:{ ok:false } }, status
     });
+    _pbpVocabDriveRender(disconnectedStatus);
+    window.chrome.permissions.request = async () => true;
+    window.chrome.runtime.sendMessage = async () => networkResponse(connectedAfterFailure);
     $id("vocab-drive-connect").focus();
     $id("vocab-drive-connect").click();
     await task(); await task();
-    check("failed initial sync renders its authoritative connected status before the error",
+    // Simplest miss: give the shared connection failure a dataset subject
+    // ("driveVocabularyStatus:…"), or drop the unsent-changes sentence.
+    check("failed initial sync renders its authoritative connected status before the connection error",
       $id("vocab-drive-sync").hidden === false &&
-      $id("vocab-drive-pending-words").textContent === "11" &&
-      $id("vocab-drive-error").textContent.includes("vocabDriveErrorNetwork") &&
-      $id("vocab-drive-error").textContent.includes("vocabDriveRetryAt"));
+      errorText().includes("vocabDriveErrorNetwork") && errorText().includes("vocabDriveRetryAt") &&
+      errorText().includes("drivePendingChanges") && !errorText().includes("driveVocabularyStatus"),
+      errorText());
     check("connecting moves focus from the hidden initiator to Sync now",
       document.activeElement === $id("vocab-drive-sync"));
 
-    _pbpVocabDriveRender({ connected:false, owner:"alice" });
+    _pbpVocabDriveRender(disconnectedStatus);
     let resolveDelayedConnect;
     window.chrome.runtime.sendMessage = () => new Promise((resolve) => {
       resolveDelayedConnect = resolve;
@@ -693,13 +704,13 @@ delete document.documentElement.dataset.theme;
     $id("vocab-drive-connect").click();
     await task();
     outsideDriveControl.focus();
-    resolveDelayedConnect({ ok:false, error:"network", status:connectedAfterFailure });
+    resolveDelayedConnect?.(networkResponse(connectedAfterFailure));
     await task(); await task();
     check("a completed Drive action does not steal focus moved outside the card",
       document.activeElement === outsideDriveControl);
     outsideDriveControl.remove();
 
-    _pbpVocabDriveRender({ connected:false, owner:"alice" });
+    _pbpVocabDriveRender(disconnectedStatus);
     driveMessages.length = 0;
     let resolvePermission;
     window.chrome.permissions.request = () => new Promise((resolve) => {
@@ -709,79 +720,165 @@ delete document.documentElement.dataset.theme;
     $id("vocab-drive-connect").click();
     await task();
     ++_driveRenderGen;
-    const bobStatus = {
-      ...driveStatus,
-      owner:"bob",
-      emailAddress:"bob@example.test",
-      displayName:"Bob Example",
-      retryAt:null,
-      lastError:null,
-      notices:0
-    };
+    const bobStatus = { ...quiet, owner:"bob", emailAddress:"bob@example.test", displayName:"Bob Example" };
     _pbpVocabDriveRender(bobStatus);
-    resolvePermission(true);
+    resolvePermission?.(true);
     await task(); await task();
     check("a stale permission grant cannot connect or overwrite a newer account render",
       !driveMessages.some((message) => message.type === "vocabDriveConnect") &&
       $id("vocab-drive-owner").textContent === "bob" &&
       _vocabDriveBusy === false && $id("vocab-drive-sync").disabled === false);
 
-    const blockedStatus = {
-      ...driveStatus,
-      retryAt:Date.UTC(2026, 6, 24, 11, 0),
-      lastError:"permission",
-      blocked:true
+    // ---- §6.1 display matrix: one check per row; buttons read
+    // [Connect, Sync now, Disconnect]. Every row also forbids the retired
+    // "Disconnect, then reconnect" exit (T2).
+    const paint = (status, response) => {
+      if (response) _pbpVocabDriveApplyResponse(response, status);
+      else _pbpVocabDriveRender(status);
+      return { state:stateText(), error:errorText(), buttons:shown() };
     };
-    window.chrome.runtime.sendMessage = async (message) => message.type === "vocabDriveStatus"
-      ? { ok:true, status:blockedStatus }
-      : { ok:false, error:"network", status:blockedStatus };
-    await _pbpVocabDriveRefresh(++_driveRenderGen, true);
-    // A blocked account never retries by itself, so a leftover retryAt must
-    // not add a "next retry" line beside the instruction (B13).
-    check("a failed automatic sync preserves authoritative blocked reconnect guidance",
-      $id("vocab-drive-owner").textContent === "alice" &&
-      $id("vocab-drive-error").textContent.includes("vocabDriveErrorPermission") &&
-      !$id("vocab-drive-error").textContent.includes("vocabDriveErrorNetwork") &&
-      $id("vocab-drive-error").textContent.includes("vocabDriveReconnectRequired") &&
-      !$id("vocab-drive-error").textContent.includes("vocabDriveRetryAt"));
+    const matrixRow = (name, cases) => {
+      const misses = [];
+      for (const c of cases) {
+        const got = paint(c.status, c.response);
+        const problems = [];
+        if (got.state !== c.state) problems.push(`state=${got.state}`);
+        if (got.buttons !== c.buttons) problems.push(`buttons=${got.buttons}`);
+        for (const part of c.has || []) if (!got.error.includes(part)) problems.push(`missing ${part}`);
+        for (const part of [...(c.not || []), "vocabDriveReconnectRequired"]) {
+          if (got.error.includes(part)) problems.push(`unexpected ${part}`);
+        }
+        if (c.empty && got.error) problems.push(`error=${got.error}`);
+        if (problems.length) misses.push(`${c.label}: ${problems.join(", ")} [${got.error}]`);
+      }
+      check(`display matrix: ${name}`, misses.length === 0, misses.join(" | "));
+    };
+    const NO_INSTRUCTION = ["vocabDriveConnectRequired", "vocabDriveSyncNowRequired"];
+    const NO_SUBJECT = ["driveVocabularyStatus", "driveNotesStatus"];
+    // Simplest miss: paint the kept connection record (Disconnect does not
+    // clear driveConnState, spec §3.3) or a kept dataset block while disconnected.
+    matrixRow("not connected shows nothing but Connect, even with kept failure records", [
+      { label:"kept network backoff", status:withConnection({ lastError:"network", retryAt:RETRY_AT }, disconnectedStatus),
+        state:"vocabDriveDisconnected", buttons:"+--", empty:true },
+      { label:"kept dataset block", status:withDataset("notes", { lastError:"corrupt", blocked:true }, disconnectedStatus),
+        state:"vocabDriveDisconnected", buttons:"+--", empty:true }
+    ]);
+    // Simplest miss: treat a conflict notice or hasPending alone as an error.
+    matrixRow("connected and healthy", [
+      { label:"healthy", status:driveStatus, state:"vocabDriveConnected", buttons:"-++", empty:true }
+    ]);
+    // Simplest miss: map rate_limited/server to vocabDriveErrorRemote, or add
+    // a Connect / Sync now order to a state that retries on its own.
+    matrixRow("connection backoff: no subject, next retry, unsent changes, no instruction",
+      [["auth", "vocabDriveErrorAuth"], ["network", "vocabDriveErrorNetwork"],
+        ["rate_limited", "vocabDriveErrorBusy"], ["server", "vocabDriveErrorBusy"]].map(([code, key]) => ({
+        label:code, status:withConnection({ lastError:code, retryAt:RETRY_AT }),
+        state:"vocabDriveConnected", buttons:"-++",
+        has:[key, "vocabDriveRetryAt", "drivePendingChanges"],
+        not:[...NO_INSTRUCTION, ...NO_SUBJECT, "vocabDriveErrorRemote"]
+      })));
+    // Simplest miss: keep Connect hidden while connected, so the sentence
+    // names a button that is not on screen.
+    matrixRow("refused Google grant (auth blocked, permission at any time) asks for Connect beside Sync now", [
+      { label:"auth blocked", status:withConnection({ lastError:"auth", retryAt:RETRY_AT, blocked:true }),
+        state:"vocabDriveAuthNeeded", buttons:"+++", has:["vocabDriveErrorAuth", "vocabDriveConnectRequired"],
+        not:["vocabDriveRetryAt", "vocabDriveSyncNowRequired", ...NO_SUBJECT] },
+      { label:"permission", status:withConnection({ lastError:"permission" }),
+        state:"vocabDriveAuthNeeded", buttons:"+++", has:["vocabDriveErrorPermission", "vocabDriveConnectRequired"],
+        not:["vocabDriveSyncNowRequired", ...NO_SUBJECT] },
+      { label:"permission blocked", status:withConnection({ lastError:"permission", retryAt:RETRY_AT, blocked:true }),
+        state:"vocabDriveAuthNeeded", buttons:"+++", has:["vocabDriveErrorPermission", "vocabDriveConnectRequired"],
+        not:["vocabDriveRetryAt", ...NO_SUBJECT] }
+    ]);
+    // Simplest misses: drop the dataset subject, treat the retryable
+    // "unexpected" as a stop with a Sync now order, or leave it unmapped so it
+    // falls back to vocabDriveErrorRemote and blames Google (spec §10.9).
+    matrixRow("dataset backoff: one subject line per dataset with its own next retry", [
+      { label:"vocabulary local_store + notes unexpected",
+        status:withDataset("notes", { lastError:"unexpected", retryAt:RETRY_AT },
+          withDataset("vocabulary", { lastError:"local_store", retryAt:RETRY_AT })),
+        state:"vocabDriveConnected", buttons:"-++",
+        has:["driveVocabularyStatus:vocabDriveErrorLocalStore vocabDriveRetryAt:",
+          "driveNotesStatus:vocabDriveErrorUnexpected vocabDriveRetryAt:"],
+        not:[...NO_INSTRUCTION, "vocabDriveErrorRemote"] }
+    ]);
+    // Simplest miss: forget the Sync now exit on a blocked dataset, keep its
+    // stale retry stamp, or give entry_too_large the generic stop line.
+    matrixRow("dataset block names Sync now except for oversized entries", [
+      { label:"vocabulary corrupt + notes local_store",
+        status:withDataset("notes", { lastError:"local_store", blocked:true, retryAt:RETRY_AT },
+          withDataset("vocabulary", { lastError:"corrupt", blocked:true })),
+        state:"vocabDriveConnected", buttons:"-++",
+        has:["driveVocabularyStatus:vocabDriveErrorCorrupt vocabDriveSyncNowRequired",
+          "driveNotesStatus:vocabDriveErrorLocalStore vocabDriveSyncNowRequired"],
+        not:["vocabDriveRetryAt", "vocabDriveConnectRequired"] },
+      { label:"vocabulary oversized", status:withDataset("vocabulary", { lastError:"entry_too_large", blocked:true }),
+        state:"vocabDriveConnected", buttons:"-++", has:["driveVocabularyStatus:vocabDriveErrorEntryTooLarge"],
+        not:["vocabDriveSyncNowRequired", "vocabDriveConnectRequired"] },
+      { label:"notes oversized", status:withDataset("notes", { lastError:"entry_too_large", blocked:true }),
+        state:"vocabDriveConnected", buttons:"-++", has:["driveNotesStatus:driveNotesErrorEntryTooLarge"],
+        not:["vocabDriveSyncNowRequired", "vocabDriveErrorEntryTooLarge"] }
+    ]);
+    // Simplest miss: reuse the disconnected "…then connect again" sentence
+    // while Connect is hidden.
+    matrixRow("pinboard_auth while connected points at Sync now", [
+      { label:"connected", status:quiet, response:{ ok:false, error:"pinboard_auth" },
+        state:"vocabDriveConnected", buttons:"-++", has:["vocabDriveErrorPinboardAuthSync"], not:NO_SUBJECT }
+    ]);
+    matrixRow("pinboard_auth while disconnected keeps the reconnect sentence", [
+      { label:"disconnected", status:disconnectedStatus, response:{ ok:false, error:"pinboard_auth" },
+        state:"vocabDriveDisconnected", buttons:"+--", has:["vocabDriveErrorPinboardAuth"],
+        not:["vocabDriveErrorPinboardAuthSync", ...NO_SUBJECT] }
+    ]);
+    {
+      $id("vocab-drive-actions").hidden = true;
+      $id("vocab-drive-connect").hidden = true;
+      window.chrome.runtime.sendMessage = async () => ({ ok:false, error:"remote" });
+      await _pbpVocabDriveRefresh(++_driveRenderGen);
+      const got = { state:stateText(), buttons:shown(), connectEnabled:$id("vocab-drive-connect").disabled === false,
+        actions:$id("vocab-drive-actions").hidden === false };
+      // Simplest miss: leave the action row hidden after a failed read, so
+      // the panel has an error and no way to retry.
+      check("display matrix: an unreadable status offers Connect as the retry",
+        got.state === "vocabDriveStatusFailed" && got.buttons === "+--" && got.connectEnabled && got.actions,
+        JSON.stringify(got));
+    }
+    // Simplest miss: borrow local_store/blocked for an unreadable dataset and
+    // add a stop line no button can clear.
+    matrixRow("one unreadable dataset is named with its subject and no stop line", [
+      { label:"notes unreadable", status:withDataset("notes", { lastError:"status_unavailable" }),
+        state:"vocabDriveConnected", buttons:"-++", has:["driveNotesStatus:vocabDriveStatusFailed"],
+        not:["vocabDriveSyncNowRequired", "vocabDriveErrorLocalStore", "driveVocabularyStatus"] }
+    ]);
 
-    _pbpVocabDriveRender({
-      ...driveStatus, retryAt:null, lastError:"entry_too_large", blocked:true
-    });
-    check("oversized vocabulary error gives correction guidance without reconnect advice",
-      $id("vocab-drive-error").textContent.includes("vocabDriveErrorEntryTooLarge") &&
-      !$id("vocab-drive-error").textContent.includes("vocabDriveReconnectRequired"));
-
-    _pbpVocabDriveRender({
-      ...driveStatus, retryAt:null, lastError:"local_store", blocked:true
-    });
-    const localStoreText = $id("vocab-drive-error").textContent;
-    _pbpVocabDriveRender({
-      ...driveStatus, retryAt:null, lastError:"corrupt", blocked:true
-    });
-    const corruptText = $id("vocab-drive-error").textContent;
-    check("a local write failure reads differently from remote corruption, neither advises reconnect",
-      localStoreText.includes("vocabDriveErrorLocalStore") &&
-      !localStoreText.includes("vocabDriveErrorCorrupt") &&
-      !localStoreText.includes("vocabDriveReconnectRequired") &&
-      corruptText.includes("vocabDriveErrorCorrupt") &&
-      !corruptText.includes("vocabDriveErrorLocalStore") &&
-      !corruptText.includes("vocabDriveReconnectRequired"));
-
-    $id("vocab-drive-actions").hidden = true;
-    $id("vocab-drive-connect").hidden = true;
-    window.chrome.runtime.sendMessage = async () => ({ ok:false, error:"remote" });
-    await _pbpVocabDriveRefresh(++_driveRenderGen, true);
-    check("a failed status read still leaves a way to retry",
-      $id("vocab-drive-state").textContent.includes("vocabDriveStatusFailed") &&
-      $id("vocab-drive-actions").hidden === false &&
-      $id("vocab-drive-connect").hidden === false &&
-      $id("vocab-drive-connect").disabled === false);
+    _pbpVocabDriveShowError("auth", null, true, true);
+    const connectedHint = errorText();
+    _pbpVocabDriveShowError("auth", null, true, false);
+    const disconnectedHint = errorText();
+    _pbpVocabDriveShowError("permission", null, false, true);
+    const permissionHint = errorText();
+    _pbpVocabDriveShowError("corrupt", null, true, true);
+    const corruptHint = errorText();
+    _pbpVocabDriveShowError("corrupt", null, true, false);
+    const corruptDisconnectedHint = errorText();
+    _pbpVocabDriveShowError("entry_too_large", null, true, true);
+    const oversizedHint = errorText();
+    _pbpVocabDriveShowError("network", 1, false, true);
+    const retryingHint = errorText();
+    // Simplest miss: keep the connected-only "Disconnect, then reconnect"
+    // branch for auth/permission (vocabDriveReconnectRequired).
+    check("every dead end names a button that is on screen in that state, and Disconnect is never the exit",
+      [connectedHint, disconnectedHint, permissionHint].every((text) => text.includes("vocabDriveConnectRequired")) &&
+      corruptHint.includes("vocabDriveSyncNowRequired") && corruptDisconnectedHint.includes("vocabDriveConnectRequired") &&
+      !oversizedHint.includes("vocabDriveSyncNowRequired") &&
+      !retryingHint.includes("vocabDriveSyncNowRequired") && !retryingHint.includes("vocabDriveConnectRequired") &&
+      ![connectedHint, disconnectedHint, permissionHint, corruptHint, corruptDisconnectedHint, oversizedHint, retryingHint]
+        .some((text) => text.includes("vocabDriveReconnectRequired")));
 
     _pbpVocabDriveSetBusy(true, null, "vocabDriveAuthorizing");
-    const authorizingLine = $id("vocab-drive-state").textContent;
+    const authorizingLine = stateText();
     _pbpVocabDriveSetBusy(true);
-    const syncingLine = $id("vocab-drive-state").textContent;
+    const syncingLine = stateText();
     _pbpVocabDriveSetBusy(false);
     check("the authorization wait reads differently from the sync wait",
       authorizingLine.includes("vocabDriveAuthorizing") &&
@@ -789,131 +886,152 @@ delete document.documentElement.dataset.theme;
       syncingLine.includes("vocabDriveWorking") &&
       !syncingLine.includes("vocabDriveAuthorizing"));
 
-    _pbpVocabDriveRender({
-      ...driveStatus, retryAt:null, lastError:null,
-      notices:2, noticeTerms:["blossom", "ephemeral"]
-    });
+    _pbpVocabDriveRender({ ...quiet, vocabulary:dataset({ notices:2 }), notes:dataset({ notices:1 }),
+      noticeTerms:["blossom", "ephemeral"] });
     const noticeText = $id("vocab-drive-notices").textContent;
     const clearShown = $id("vocab-drive-clear-notices").closest(".vocab-drive-notice-row").hidden === false;
-    _pbpVocabDriveRender({ ...driveStatus, retryAt:null, lastError:null, notices:0, noticeTerms:[] });
-    check("a conflict notice identifies the dataset and offers a way to dismiss",
-      noticeText.includes("driveVocabularyNotices") &&
-      clearShown &&
+    _pbpVocabDriveRender(quiet);
+    // Simplest miss: count only the vocabulary dataset, or keep one sentence per dataset.
+    check("one conflict sentence counts both datasets, names vocabulary terms and offers dismissal",
+      noticeText === "driveNotices:3 driveNoticeTerms:blossom, ephemeral" && clearShown &&
       $id("vocab-drive-notices").textContent === "" &&
-      $id("vocab-drive-clear-notices").closest(".vocab-drive-notice-row").hidden === true);
+      $id("vocab-drive-clear-notices").closest(".vocab-drive-notice-row").hidden === true, noticeText);
 
-    _pbpVocabDriveShowError("pinboard_auth", null, false, false);
-    const pinboardText = $id("vocab-drive-error").textContent;
-    _pbpVocabDriveRender({ ...driveStatus, owner:"", retryAt:null, lastError:null });
-    const emptyOwnerRow = $id("vocab-drive-owner").textContent;
-    check("a missing Pinboard account names itself instead of blaming Google Drive",
-      pinboardText.includes("vocabDriveErrorPinboardAuth") &&
-      !pinboardText.includes("vocabDriveErrorAuth") &&
-      !pinboardText.includes("vocabDriveReconnectRequired") &&
-      emptyOwnerRow.includes("vocabOwnerNoAccount"));
-
-    _pbpVocabDriveShowError("auth", null, true, true);
-    const connectedHint = $id("vocab-drive-error").textContent;
-    _pbpVocabDriveShowError("auth", null, true, false);
-    const disconnectedHint = $id("vocab-drive-error").textContent;
-    _pbpVocabDriveShowError("corrupt", null, true, true);
-    const corruptHint = $id("vocab-drive-error").textContent;
-    _pbpVocabDriveShowError("local_store", null, true, true);
-    const localHint = $id("vocab-drive-error").textContent;
-    _pbpVocabDriveShowError("entry_too_large", null, true, true);
-    const oversizedHint = $id("vocab-drive-error").textContent;
-    _pbpVocabDriveShowError("network", 1, false, true);
-    const retryingHint = $id("vocab-drive-error").textContent;
-    check("every dead end names a button that is on screen in that state",
-      connectedHint.includes("vocabDriveReconnectRequired") &&
-      !connectedHint.includes("vocabDriveConnectRequired") &&
-      disconnectedHint.includes("vocabDriveConnectRequired") &&
-      !disconnectedHint.includes("vocabDriveReconnectRequired") &&
-      corruptHint.includes("vocabDriveSyncNowRequired") &&
-      localHint.includes("vocabDriveSyncNowRequired") &&
-      !oversizedHint.includes("vocabDriveSyncNowRequired") &&
-      !retryingHint.includes("vocabDriveSyncNowRequired") &&
-      !retryingHint.includes("vocabDriveReconnectRequired"));
-
-    _pbpVocabDriveRender({ ...driveStatus, retryAt:null, lastError:null, notices:0 });
+    _pbpVocabDriveRender(quiet);
     const quietNotices = $id("vocab-drive-notices").textContent;
-    _pbpVocabDriveRender({ ...driveStatus, retryAt:null, lastError:null, notices:2 });
+    _pbpVocabDriveRender({ ...quiet, vocabulary:dataset({ notices:2 }) });
     const loudNotices = $id("vocab-drive-notices").textContent;
+    // Simplest miss: print "driveNotices:0" on every connected render.
     check("the conflict counter stays silent at zero and speaks when it is not",
-      quietNotices === "" && loudNotices.includes("driveVocabularyNotices") &&
+      quietNotices === "" && loudNotices.includes("driveNotices:2") &&
       $id("vocab-drive-notices").classList.contains("bad"));
 
-    // The sentences around these counts come from t() (extension UI language),
-    // so the digit grouping has to follow the same source rather than the
-    // browser locale. Rendering the same status under two locales that group
-    // differently catches a bare toLocaleString(), which emits the browser's
-    // grouping for both regardless of the locale the page is showing.
-    const bigCounts = { ...driveStatus, retryAt:null, lastError:null,
-      pendingWords:1234567, pendingBatches:12345, notices:4321, noticeTerms:[] };
+    _pbpVocabDriveRender({ ...quiet, notes:dataset({ notices:2 }), noticeTerms:["stale-term"] });
+    // Simplest miss: append noticeTerms whenever the list is non-empty, naming
+    // words for a conflict that is entirely in highlights and notes (UX-7).
+    check("a notes-only conflict names no vocabulary terms",
+      $id("vocab-drive-notices").textContent === "driveNotices:2", $id("vocab-drive-notices").textContent);
+
+    const bigNotices = { ...quiet, vocabulary:dataset({ notices:4000 }), notes:dataset({ notices:321 }) };
     const realUiLang = window.uiLangToBCP47;
     try {
       window.uiLangToBCP47 = () => "de";
-      _pbpVocabDriveRender(bigCounts);
-      const deWords = $id("vocab-drive-pending-words").textContent;
-      const deBatches = $id("vocab-drive-pending-batches").textContent;
+      _pbpVocabDriveRender(bigNotices);
       const deNotices = $id("vocab-drive-notices").textContent;
       window.uiLangToBCP47 = () => "en";
-      _pbpVocabDriveRender(bigCounts);
-      const enWords = $id("vocab-drive-pending-words").textContent;
-      check("Drive counts group digits by the extension UI language, not the browser locale",
-        deWords === (1234567).toLocaleString("de") &&
-        deBatches === (12345).toLocaleString("de") &&
-        deNotices.includes((4321).toLocaleString("de")) &&
-        enWords === (1234567).toLocaleString("en") && deWords !== enWords,
-        `de=${deWords}/${deBatches}/${deNotices} en=${enWords}`);
-
-      // uiLangToBCP47() ends in split("-")[0] over an arbitrary stored tag, so
-      // a malformed one can reduce to a string Intl rejects.
+      _pbpVocabDriveRender(bigNotices);
+      const enNotices = $id("vocab-drive-notices").textContent;
+      // Simplest miss: a bare toLocaleString(), which groups by the browser
+      // locale for both renders.
+      check("the conflict count groups digits by the extension UI language, not the browser locale",
+        deNotices === "driveNotices:" + (4321).toLocaleString("de") &&
+        enNotices === "driveNotices:" + (4321).toLocaleString("en") && deNotices !== enNotices,
+        `de=${deNotices} en=${enNotices}`);
       window.uiLangToBCP47 = () => "";
       let malformedThrew = false;
-      try { _pbpVocabDriveRender(bigCounts); } catch (_) { malformedThrew = true; }
-      check("a malformed UI language tag keeps the counts rendering instead of throwing",
-        !malformedThrew && /\d/.test($id("vocab-drive-pending-words").textContent) &&
+      try { _pbpVocabDriveRender(bigNotices); } catch (_) { malformedThrew = true; }
+      // Simplest miss: let Intl's RangeError escape and abort the whole render.
+      check("a malformed UI language tag keeps the panel rendering instead of throwing",
+        !malformedThrew && /\d/.test($id("vocab-drive-notices").textContent) &&
         $id("vocab-drive-owner").textContent === "alice",
-        `threw=${malformedThrew} words=${$id("vocab-drive-pending-words").textContent}`);
+        `threw=${malformedThrew} notices=${$id("vocab-drive-notices").textContent}`);
     } finally {
       if (realUiLang === undefined) delete window.uiLangToBCP47;
       else window.uiLangToBCP47 = realUiLang;
     }
 
-    window.chrome.runtime.sendMessage = async (message) => message.type === "vocabDriveStatus"
-      ? { ok:true, status:{ ...driveStatus, retryAt:null, lastError:"corrupt", blocked:false } }
-      : { ok:false, error:"network", status:{ ...driveStatus, retryAt:null, lastError:"corrupt", blocked:false } };
-    await _pbpVocabDriveRefresh(++_driveRenderGen, true);
-    await _pbpVocabDriveAction("vocabDriveSyncNow", true);
-    check("an unblocked run reports its own error, not a stale persisted one",
-      $id("vocab-drive-error").textContent.includes("vocabDriveErrorNetwork") &&
-      !$id("vocab-drive-error").textContent.includes("vocabDriveErrorCorrupt"));
+    _pbpVocabDriveRender(driveStatus);
+    const shownSuccess = $id("vocab-drive-last-success").textContent;
+    _pbpVocabDriveRender({ ...driveStatus, lastSuccessAt:null });
+    const neverSuccess = $id("vocab-drive-last-success").textContent;
+    // Simplest miss: show status.vocabulary.lastSuccessAt (the later one),
+    // claiming highlights and notes were synced then too.
+    check("the single last-sync row shows the combined (earlier) time and never while it is empty",
+      shownSuccess === _pbpVocabDriveDate(driveStatus.lastSuccessAt) &&
+      shownSuccess !== _pbpVocabDriveDate(driveStatus.vocabulary.lastSuccessAt) &&
+      neverSuccess === "vocabDriveNever", `shown=${shownSuccess} never=${neverSuccess}`);
 
-    const manualRetryStatus = {
-      ...driveStatus,
-      pendingWords:19,
-      retryAt:Date.UTC(2026, 6, 24, 12, 0),
-      lastError:"network"
+    _pbpVocabDriveRender(driveStatus);
+    const healthyPending = errorText();
+    _pbpVocabDriveRender(withDataset("vocabulary", { lastError:"corrupt", blocked:true }, quiet));
+    const errorWithoutPending = errorText();
+    _pbpVocabDriveRender(withDataset("vocabulary", { lastError:"corrupt", blocked:true }));
+    const errorWithPending = errorText();
+    // Simplest miss: print the sentence whenever hasPending is true -- a
+    // healthy device with a queued edit has nothing to explain.
+    check("the unsent-changes sentence appears only beside an error or backoff, and only when something is pending",
+      healthyPending === "" && !errorWithoutPending.includes("drivePendingChanges") &&
+      errorWithPending.includes("drivePendingChanges"), `${healthyPending} / ${errorWithoutPending} / ${errorWithPending}`);
+
+    _pbpVocabDriveRender(withDataset("notes", { lastError:"network", retryAt:RETRY_AT }, quiet));
+    // Simplest miss: trust a leaked legacy preflight code and print
+    // "driveNotesStatus:vocabDriveErrorNetwork" (spec §3.3 contract 5).
+    check("a connection-layer code in a dataset row is never shown with a dataset subject",
+      !errorText().includes("driveNotesStatus"), errorText());
+
+    _pbpVocabDriveApplyResponse(networkResponse(withConnection({ lastError:"network", retryAt:RETRY_AT }, quiet)));
+    // Simplest miss: paint the status line and the response line for the same failure.
+    check("a failure reported by both the status and the response is shown once",
+      errorText().split("vocabDriveErrorNetwork").length === 2, errorText());
+
+    _pbpVocabDriveApplyResponse({ ok:false, error:"remote", status:quiet });
+    // Simplest miss: route an unattributed failure into the vocabulary line (A27).
+    check("an unattributed failure is shown without a dataset subject",
+      errorText().includes("vocabDriveErrorRemote") && !errorText().includes("driveVocabularyStatus") &&
+      !errorText().includes("driveNotesStatus"), errorText());
+
+    _pbpVocabDriveApplyResponse({ ok:false, error:"corrupt",
+      results:{ vocabulary:{ ok:true }, notes:{ ok:false, error:"corrupt" } }, status:quiet });
+    // Simplest miss: also paint the top-level copy of a dataset code, so the
+    // failure appears twice (once without its subject).
+    check("a dataset failure in the response carries its subject and is not repeated without one",
+      errorText().includes("driveNotesStatus:vocabDriveErrorCorrupt") &&
+      errorText().split("vocabDriveErrorCorrupt").length === 2, errorText());
+
+    driveMessages.length = 0;
+    _pbpVocabDriveRender(quiet);
+    window.chrome.runtime.sendMessage = async (message) => {
+      driveMessages.push({ ...message });
+      return message.type === "vocabDriveStatus"
+        ? { ok:true, status:withDataset("notes", { lastError:"corrupt", blocked:true }, quiet) }
+        : { ok:false, error:"remote" };
     };
-    _pbpVocabDriveRender({ ...driveStatus, pendingWords:7, retryAt:null, lastError:null });
-    window.chrome.runtime.sendMessage = async () => ({
-      ok:false, error:"network", status:manualRetryStatus
-    });
+    await _pbpVocabDriveAction("vocabDriveSyncNow", true);
+    // Simplest miss (the pre-UX-6 behaviour): paint "remote" over the
+    // pre-action render, so the notes block that run produced never shows.
+    check("an action answer without status re-reads status, repaints it, then keeps its own failure",
+      driveMessages.map((message) => message.type).join() === "vocabDriveSyncNow,vocabDriveStatus" &&
+      errorText().includes("driveNotesStatus:vocabDriveErrorCorrupt") && errorText().includes("vocabDriveErrorRemote"),
+      `${driveMessages.map((message) => message.type).join()} / ${errorText()}`);
+
+    driveMessages.length = 0;
+    window.chrome.runtime.sendMessage = async (message) => {
+      driveMessages.push({ ...message });
+      if (message.type === "vocabDriveStatus") {
+        return { ok:true, status:withConnection({ lastError:"server", retryAt:RETRY_AT }, quiet) };
+      }
+      throw new Error("Could not establish connection. Receiving end does not exist.");
+    };
+    await _pbpVocabDriveAction("vocabDriveSyncNow", true);
+    // Simplest miss: catch the throw, paint "remote" and skip the re-read --
+    // or re-read and let that render wipe the failure.
+    check("a thrown action message also re-reads status and keeps the failure on top of it",
+      driveMessages.map((message) => message.type).join() === "vocabDriveSyncNow,vocabDriveStatus" &&
+      errorText().includes("vocabDriveErrorBusy") && errorText().includes("vocabDriveErrorRemote") &&
+      _vocabDriveBusy === false, `${driveMessages.map((message) => message.type).join()} / ${errorText()}`);
+
+    const manualRetryStatus = withConnection({ lastError:"network", retryAt:Date.UTC(2026, 6, 24, 12, 0) });
+    _pbpVocabDriveRender(quiet);
+    window.chrome.runtime.sendMessage = async () => networkResponse(manualRetryStatus);
     $id("vocab-drive-sync").focus();
     $id("vocab-drive-sync").click();
     await task(); await task();
-    check("a failed manual sync renders the returned retry state",
-      $id("vocab-drive-pending-words").textContent === "19" &&
-      $id("vocab-drive-error").textContent.includes("vocabDriveRetryAt") &&
+    check("a failed manual sync renders the returned retry state and keeps focus on Sync now",
+      errorText().includes("vocabDriveRetryAt") && errorText().includes("drivePendingChanges") &&
       document.activeElement === $id("vocab-drive-sync"));
 
-    const staleAliceStatus = {
-      ...manualRetryStatus,
-      owner:"alice",
-      emailAddress:"alice@example.test"
-    };
-    _pbpVocabDriveRender({ ...driveStatus, retryAt:null, lastError:null });
+    const staleAliceStatus = { ...manualRetryStatus, owner:"alice", emailAddress:"alice@example.test" };
+    _pbpVocabDriveRender(quiet);
     let resolveStaleAction, resolveCurrentAction;
     let actionRequestCount = 0;
     window.chrome.runtime.sendMessage = () => new Promise((resolve) => {
@@ -924,12 +1042,12 @@ delete document.documentElement.dataset.theme;
     $id("vocab-drive-sync").click();
     await task();
     ++_driveRenderGen;
-    if (typeof _vocabDriveActionSeq !== "undefined") ++_vocabDriveActionSeq;
+    ++_vocabDriveActionSeq;
     pbpVocabCurrentOwner = async () => "acct_bob";
     _pbpVocabDriveRender(bobStatus);
     $id("vocab-drive-sync").click();
     await task();
-    resolveStaleAction({ ok:false, error:"network", status:staleAliceStatus });
+    resolveStaleAction?.(networkResponse(staleAliceStatus));
     await task(); await task();
     check("a stale sync response and finally cannot overwrite a newer action or its busy state",
       $id("vocab-drive-owner").textContent === "bob" &&
@@ -937,14 +1055,14 @@ delete document.documentElement.dataset.theme;
       _vocabDriveBusy === true && $id("vocab-drive-sync").disabled === false &&
       $id("vocab-drive-sync").getAttribute("aria-disabled") === "true",
       `owner=${$id("vocab-drive-owner").textContent} busy=${_vocabDriveBusy} disabled=${$id("vocab-drive-sync").disabled} aria=${$id("vocab-drive-sync").getAttribute("aria-disabled")}`);
-    resolveCurrentAction({ ok:true, status:bobStatus });
+    resolveCurrentAction?.({ ok:true, results:{ vocabulary:{ ok:true }, notes:{ ok:true } }, status:bobStatus });
     await task(); await task();
     check("a successful Drive action reports inside the Drive card rather than the export toolbar",
       $id("vocab-drive-action-status").textContent.includes("vocabDriveSynced") &&
       !$id("vocab-status").textContent);
 
     pbpVocabCurrentOwner = async () => "acct_alice";
-    _pbpVocabDriveRender({ ...driveStatus, retryAt:null, lastError:null });
+    _pbpVocabDriveRender(quiet);
     let resolveMutationStale;
     window.chrome.runtime.sendMessage = () => new Promise((resolve) => {
       resolveMutationStale = resolve;
@@ -952,14 +1070,9 @@ delete document.documentElement.dataset.theme;
     $id("vocab-drive-sync").click();
     await task();
     ++_driveRenderGen;
-    resolveMutationStale({
+    resolveMutationStale?.({
       ok:true,
-      status:{
-        ...driveStatus,
-        owner:"stale-old",
-        emailAddress:"stale@example.test",
-        displayName:"Stale Account"
-      }
+      status:{ ...quiet, owner:"stale-old", emailAddress:"stale@example.test", displayName:"Stale Account" }
     });
     await task(); await task();
     check("a mutation generation change lets its stale Drive action release its own busy state",
@@ -969,10 +1082,7 @@ delete document.documentElement.dataset.theme;
       !$id("vocab-drive-account").textContent.includes("stale@example.test"));
 
     _pbpVocabDriveRender(driveStatus);
-    window.chrome.runtime.sendMessage = async () => ({
-      ok:true,
-      status:{ connected:false, owner:"alice", pendingWords:7, pendingBatches:0, notices:0 }
-    });
+    window.chrome.runtime.sendMessage = async () => ({ ok:true, status:disconnectedStatus });
     $id("vocab-drive-disconnect").focus();
     $id("vocab-drive-disconnect").click();
     await task(); await task();
@@ -981,29 +1091,16 @@ delete document.documentElement.dataset.theme;
 
     window.chrome.permissions.request = async () => true;
     window.chrome.runtime.sendMessage = driveResponse;
-    if (typeof _pbpVocabDriveRender === "function") _pbpVocabDriveRender(driveStatus);
+    _pbpVocabDriveRender(driveStatus);
     check("connected Google Drive status shows the account email",
       $id("vocab-drive-account").textContent.includes("alice@example.test"));
     check("connected Google Drive status shows the current Pinboard owner",
       $id("vocab-drive-owner").textContent === "alice");
-    check("connected Google Drive status shows the last successful sync",
-      $id("vocab-drive-last-success").textContent &&
-      !$id("vocab-drive-last-success").textContent.includes("vocabDriveNever"));
-    check("connected Google Drive status shows pending words",
-      $id("vocab-drive-pending-words").textContent === "7");
-    check("connected Google Drive status shows pending batches",
-      $id("vocab-drive-pending-batches").textContent === "2");
-    check("Google Drive retry and last error stay visible",
-      $id("vocab-drive-error").textContent.includes("vocabDriveErrorNetwork") &&
-      $id("vocab-drive-error").textContent.includes("vocabDriveRetryAt"));
-    check("Google Drive conflict notices stay visible",
-      $id("vocab-drive-notices").textContent.includes("driveVocabularyNotices:3"));
 
-    window.chrome.permissions.request = async () => true;
     driveMessages.length = 0;
     $id("vocab-drive-sync").click();
     await task(); await task();
-    check("Sync now sends a forced vocabulary sync message",
+    check("Sync now sends a forced sync message",
       driveMessages.some((message) => message.type === "vocabDriveSyncNow" && message.force === true));
 
     driveMessages.length = 0;
@@ -1019,26 +1116,29 @@ delete document.documentElement.dataset.theme;
         ? new Promise((resolve) => { resolveStale = resolve; })
         : Promise.resolve({ ok:true, status:driveStatus });
     };
-    if (typeof _pbpVocabDriveClear === "function") _pbpVocabDriveClear();
+    _pbpVocabDriveClear();
     const staleGen = ++_driveRenderGen;
-    const staleRender = typeof _pbpVocabDriveRefresh === "function"
-      ? _pbpVocabDriveRefresh(staleGen, false) : Promise.resolve();
+    const staleRender = _pbpVocabDriveRefresh(staleGen);
     await task();
     ++_driveRenderGen;
-    if (resolveStale) resolveStale({ ok:true, status:driveStatus });
+    resolveStale?.({ ok:true, status:driveStatus });
     await staleRender;
     check("Drive render generation prevents stale Drive status overwrite",
       !$id("vocab-drive-account").textContent && !$id("vocab-drive-owner").textContent);
 
     const optionsSource = await (await fetch("../options.html")).text();
-    check("production Google Drive disclosure has a persistent accordion key",
+    // Simplest miss: delete the switches but keep a notes-only row or the
+    // per-dataset label, so the merged panel still forks by data type.
+    check("production Google Drive markup keeps its disclosure, live status and hidden actions, with one merged last-sync row",
       /<details class="disclosure" data-acc-key="general-data-sync" open>/.test(optionsSource) &&
       /id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure"/.test(optionsSource) &&
       /id="vocab-drive-state"[^>]*role="status"[^>]*aria-live="polite"/.test(optionsSource) &&
       /id="vocab-drive-actions"[^>]*hidden/.test(optionsSource) &&
       /id="vocab-drive-connect"[^>]*hidden/.test(optionsSource) &&
       ["vocab-drive-connect", "vocab-drive-sync", "vocab-drive-disconnect"].every((id) =>
-        new RegExp(`<button type="button"[^>]*id="${id}"`).test(optionsSource)));
+        new RegExp(`<button type="button"[^>]*id="${id}"`).test(optionsSource)) &&
+      !/id="drive-sync-(?:vocabulary|notes)"/.test(optionsSource) && !/id="drive-notes-/.test(optionsSource) &&
+      /<dt data-i18n="driveLastSuccess">[^<]+<\/dt><dd id="vocab-drive-last-success"><\/dd>/.test(optionsSource));
 
     driveMessages.length = 0;
     window.chrome.runtime.sendMessage = driveResponse;
@@ -1047,6 +1147,11 @@ delete document.documentElement.dataset.theme;
     await renderDriveSyncPanel();
     check("opening General requests only status without authorization or synchronization",
       driveMessages.length === 1 && driveMessages[0].type === "vocabDriveStatus");
+
+    // Simplest miss: leave flex-start, so the 24px dismiss button hangs below
+    // a one-line notice (the reported screenshot).
+    check("the conflict notice row centers its dismiss button on the text",
+      getComputedStyle($id("vocab-drive-clear-notices").closest(".vocab-drive-notice-row")).alignItems === "center");
   } finally {
     pbpVocabCurrentOwner = driveRealOwner;
     pbpVocabAll = driveRealAll;

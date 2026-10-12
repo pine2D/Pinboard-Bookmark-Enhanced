@@ -992,6 +992,39 @@ async function loadLocale(loc) {
     // « Synchroniser maintenant ») or renames the settings path.
     check("H22f the connected pinboard_auth error reuses the settings path and names this locale's Sync now button",
       pathBroken.length === 0, `broken: ${pathBroken.join(", ")}`);
+
+    const MERGED_NOTICES = { driveNotices: ["count", "$COUNT$"], driveNoticeTerms: ["terms", "$TERMS$"] };
+    const MERGED_ZH_CN = {
+      driveNotices: "同步冲突 $COUNT$ 处：被修改的条目已保留，删除未生效；如仍需删除，请再删一次。",
+      driveNoticeTerms: "涉及生词：$TERMS$",
+    };
+    const noticeBroken = [];
+    for (const loc of LOCALES) {
+      for (const [key, [name, token]] of Object.entries(MERGED_NOTICES)) {
+        const entry = msgs[loc][key];
+        const names = Object.keys(entry?.placeholders || {});
+        const uses = (entry?.message || "").split(token).length - 1;
+        if (names.length !== 1 || names[0] !== name || entry.placeholders[name]?.content !== "$1" || uses !== 1)
+          noticeBroken.push(`${loc}.${key}`);
+      }
+    }
+    for (const [key, text] of Object.entries(MERGED_ZH_CN)) {
+      if (msgs.zh_CN[key]?.message !== text) noticeBroken.push(`zh_CN.${key} wording`);
+    }
+    // Simplest miss: pl names the placeholder block "n" -- chrome.i18n then
+    // prints a literal $COUNT$; or a locale repeats $TERMS$ and the list shows twice.
+    check("H22g merged conflict notices carry exactly one $COUNT$ / $TERMS$ placeholder in every locale",
+      noticeBroken.length === 0, `broken: ${noticeBroken.join(", ")}`);
+
+    const RETIRED_DRIVE_KEYS = ["driveSyncVocabulary", "driveSyncNotes", "driveVocabularyLastSuccess",
+      "driveNotesLastSuccess", "driveSyncChooseData", "driveScopeSaveFailed", "driveVocabularyNotices",
+      "driveNotesNotices", "vocabDriveReconnectRequired"];
+    const lingering = LOCALES.flatMap((loc) =>
+      RETIRED_DRIVE_KEYS.filter((key) => key in msgs[loc]).map((key) => `${loc}.${key}`));
+    // Simplest miss: all nine locales keep one retired key -- H6 only
+    // compares locales with each other, so a deletion missed everywhere passes it.
+    check("H22h retired Drive scope messages stay absent in every locale",
+      lingering.length === 0, `still present: ${lingering.slice(0, 12).join(", ")}`);
   }
 
   // A slower refresh for the old language must not overwrite the mirror after

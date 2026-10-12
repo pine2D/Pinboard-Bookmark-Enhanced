@@ -141,24 +141,18 @@
                 <div class="bl" role="heading" aria-level="3" id="sec-google-drive" data-i18n="vocabDriveSection">Google Drive</div>
                 <details class="context-help">
                   <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-                  <p class="hint context-help-body" data-i18n="vocabDriveScope">These choices apply only to this device and the current Pinboard account. Google Drive does not sync settings or credentials.</p>
+                  <p class="hint context-help-body" data-i18n="vocabDriveScope">Once connected, this device syncs vocabulary, highlights, and notes for the current Pinboard account with Google Drive. The connection applies to this device only. Google Drive does not sync settings or credentials.</p>
                   <p class="hint context-help-body" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">Copies in your Google Drive appDataFolder are plaintext, without end-to-end encryption. They can include saved words, definitions, highlighted excerpts, notes, source URLs, titles, and timestamps.</p>
                 </details>
               </div>
               <div id="vocab-drive-body">
-                <div class="pref-group" role="group" aria-labelledby="sec-google-drive">
-                  <div class="pref-row"><label class="switch"><input type="checkbox" id="drive-sync-vocabulary" data-no-autosave checked /> <span class="switch-text" data-i18n="driveSyncVocabulary">Vocabulary</span><span class="switch-track" aria-hidden="true"></span></label></div>
-                  <div class="pref-row"><label class="switch"><input type="checkbox" id="drive-sync-notes" data-no-autosave /> <span class="switch-text" data-i18n="driveSyncNotes">Highlights and notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
-                </div>
                 <p id="vocab-drive-state" class="save-status vocab-drive-state" role="status" aria-live="polite" data-i18n="vocabDriveLoading">Loading Google Drive sync status…</p>
                 <dl id="vocab-drive-fields" class="vocab-drive-fields" hidden>
                   <dt data-i18n="vocabDriveAccountLabel">Google account</dt><dd id="vocab-drive-account"></dd>
                   <dt data-i18n="vocabDriveOwnerLabel">Pinboard account</dt><dd id="vocab-drive-owner"></dd>
-                  <dt id="vocab-drive-last-success-label" data-i18n="driveVocabularyLastSuccess">Vocabulary last synced</dt><dd id="vocab-drive-last-success"></dd>
-                  <dt id="drive-notes-last-success-label" data-i18n="driveNotesLastSuccess">Highlights and notes last synced</dt><dd id="drive-notes-last-success"></dd>
+                  <dt data-i18n="driveLastSuccess">Last synced</dt><dd id="vocab-drive-last-success"></dd>
                 </dl>
                 <p id="vocab-drive-error" class="field-error" role="status" aria-live="polite"></p>
-                <p id="drive-notes-error" class="field-error" role="status" aria-live="polite"></p>
                 <div class="vocab-drive-notice-row" hidden>
                   <p id="vocab-drive-notices" class="vocab-drive-notices" role="status" aria-live="polite"></p>
                   <button type="button" class="btn btn-sm ghost vocab-drive-notice-dismiss" id="vocab-drive-clear-notices" title="Dismiss conflict notice" aria-label="Dismiss conflict notice" data-i18n-title="vocabDriveNoticesClear" data-i18n-aria="vocabDriveNoticesClear"><span class="btn-ic" data-ic="cross"></span></button>

@@ -3328,9 +3328,6 @@
     "vocabDriveSyncNowRequired": {
       "message": "La synchronisation automatique est suspendue. Cliquez sur « Synchroniser maintenant » pour réessayer."
     },
-    "vocabDriveReconnectRequired": {
-      "message": "Sélectionnez « Déconnecter cet appareil », puis reconnectez-vous."
-    },
     "vocabLearningSection": {
       "message": "Exportation et intégrations"
     },
@@ -4068,21 +4065,6 @@
     "driveChromeSyncSection": {
       "message": "Chrome Sync"
     },
-    "driveSyncVocabulary": {
-      "message": "Vocabulaire"
-    },
-    "driveSyncNotes": {
-      "message": "Surlignages et notes"
-    },
-    "driveVocabularyLastSuccess": {
-      "message": "Dernière synchronisation du vocabulaire"
-    },
-    "driveNotesLastSuccess": {
-      "message": "Dernière synchronisation des surlignages et notes"
-    },
-    "driveSyncChooseData": {
-      "message": "Choisissez les données à synchroniser sur cet appareil."
-    },
     "driveVocabularyStatus": {
       "message": "Vocabulaire : $STATUS$",
       "placeholders": {
@@ -4105,27 +4087,24 @@
     "drivePendingChanges": {
       "message": "Cet appareil a des modifications qui n'ont pas encore été envoyées."
     },
-    "driveVocabularyNotices": {
-      "message": "Conflits de vocabulaire : $COUNT$. Les mots modifiés ont été conservés au lieu d'être supprimés.",
+    "driveNotices": {
+      "message": "Conflits de synchronisation : $COUNT$. Les éléments modifiés ont été conservés et la suppression n'a pas été appliquée. Pour les retirer quand même, supprimez-les à nouveau.",
       "placeholders": {
         "count": {
           "content": "$1"
         }
       }
     },
-    "driveNotesNotices": {
-      "message": "Conflits de surlignages et notes : $COUNT$. Les éléments modifiés ont été conservés au lieu d'être supprimés, et les deux versions des notes en conflit ont été gardées.",
+    "driveNoticeTerms": {
+      "message": "Mots concernés : $TERMS$",
       "placeholders": {
-        "count": {
+        "terms": {
           "content": "$1"
         }
       }
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "Un surlignage ou une note est trop volumineux pour la synchronisation. Raccourcissez-le ou supprimez-le, puis cliquez sur « Synchroniser maintenant »."
-    },
-    "driveScopeSaveFailed": {
-      "message": "Impossible d’enregistrer le choix des données à synchroniser sur cet appareil. Réessayez."
     }
 
 }

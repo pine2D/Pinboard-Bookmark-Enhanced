@@ -1483,7 +1483,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   _activateHashPanel();
   // The default General panel is already active in the markup, so opening
-  // options.html without a hash never clicks its tab to hydrate Drive scopes.
+  // options.html without a hash never clicks its tab to hydrate Drive status.
   if (!location.hash) renderDriveSyncPanel();
   window.addEventListener("hashchange", _activateHashPanel);
   setupOptionsSearch();
@@ -1617,7 +1617,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     general: {
       fields: {
         "opt-lang": "auto",
-        "drive-sync-vocabulary": true, "drive-sync-notes": false,
         "opt-backup-include-highlights": true,
         "opt-backup-include-vocabulary": true,
         "notify-quick-save": true, "notify-read-later": true, "notify-tab-set": true,
@@ -2122,10 +2121,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       yesText: t("reset"),
       noText: t("cancel"),
       onConfirm: async () => {
-        // Drive scopes are device-local and bypass collectSettingsFromForm.
-        // Persist them before changing the remaining controls or allowing the
-        // language reset to reload; a failed write leaves the reset unapplied.
-        if (panel === "general" && !(await resetDriveSyncScopes()).ok) return;
         const langBefore = $id("opt-lang")?.value;
         applyPanelReset(def, document);
         // export-targets has no static fields; reset = re-render with the

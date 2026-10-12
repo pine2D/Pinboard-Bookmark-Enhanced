@@ -3328,9 +3328,6 @@
     "vocabDriveSyncNowRequired": {
       "message": "Die automatische Synchronisierung ist pausiert. Klicke auf „Jetzt synchronisieren“, um es erneut zu versuchen."
     },
-    "vocabDriveReconnectRequired": {
-      "message": "Klicke auf „Dieses Gerät trennen“ und verbinde dich dann erneut."
-    },
     "vocabLearningSection": {
       "message": "Export und Integrationen"
     },
@@ -4068,21 +4065,6 @@
     "driveChromeSyncSection": {
       "message": "Chrome Sync"
     },
-    "driveSyncVocabulary": {
-      "message": "Vokabeln"
-    },
-    "driveSyncNotes": {
-      "message": "Markierungen und Notizen"
-    },
-    "driveVocabularyLastSuccess": {
-      "message": "Vokabeln zuletzt synchronisiert"
-    },
-    "driveNotesLastSuccess": {
-      "message": "Markierungen und Notizen zuletzt synchronisiert"
-    },
-    "driveSyncChooseData": {
-      "message": "Wähle die Daten aus, die auf diesem Gerät synchronisiert werden sollen."
-    },
     "driveVocabularyStatus": {
       "message": "Vokabeln: $STATUS$",
       "placeholders": {
@@ -4105,27 +4087,24 @@
     "drivePendingChanges": {
       "message": "Auf diesem Gerät gibt es Änderungen, die noch nicht hochgeladen wurden."
     },
-    "driveVocabularyNotices": {
-      "message": "Vokabelkonflikte: $COUNT$. Bearbeitete Wörter wurden behalten statt gelöscht.",
+    "driveNotices": {
+      "message": "Synchronisierungskonflikte: $COUNT$. Bearbeitete Einträge wurden behalten, das Löschen wurde nicht übernommen. Wenn du sie trotzdem entfernen willst, lösche sie erneut.",
       "placeholders": {
         "count": {
           "content": "$1"
         }
       }
     },
-    "driveNotesNotices": {
-      "message": "Konflikte bei Markierungen und Notizen: $COUNT$. Bearbeitete Einträge wurden behalten statt gelöscht; bei Notizen mit Konflikt wurden beide Versionen behalten.",
+    "driveNoticeTerms": {
+      "message": "Betroffene Vokabeln: $TERMS$",
       "placeholders": {
-        "count": {
+        "terms": {
           "content": "$1"
         }
       }
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "Eine Markierung oder Notiz ist zu groß zum Synchronisieren. Kürze oder entferne sie und klicke auf „Jetzt synchronisieren“."
-    },
-    "driveScopeSaveFailed": {
-      "message": "Die Synchronisierungsauswahl für dieses Gerät konnte nicht gespeichert werden. Versuche es erneut."
     }
 
 }

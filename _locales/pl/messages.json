@@ -3328,9 +3328,6 @@
     "vocabDriveSyncNowRequired": {
       "message": "Automatyczna synchronizacja jest wstrzymana. Kliknij „Synchronizuj teraz”, aby spróbować ponownie."
     },
-    "vocabDriveReconnectRequired": {
-      "message": "Wybierz „Odłącz to urządzenie”, a następnie połącz ponownie."
-    },
     "vocabLearningSection": {
       "message": "Eksport i integracje"
     },
@@ -4068,21 +4065,6 @@
     "driveChromeSyncSection": {
       "message": "Chrome Sync"
     },
-    "driveSyncVocabulary": {
-      "message": "Słówka"
-    },
-    "driveSyncNotes": {
-      "message": "Zaznaczenia i notatki"
-    },
-    "driveVocabularyLastSuccess": {
-      "message": "Ostatnia synchronizacja słówek"
-    },
-    "driveNotesLastSuccess": {
-      "message": "Ostatnia synchronizacja zaznaczeń i notatek"
-    },
-    "driveSyncChooseData": {
-      "message": "Wybierz dane do synchronizacji na tym urządzeniu."
-    },
     "driveVocabularyStatus": {
       "message": "Słówka: $STATUS$",
       "placeholders": {
@@ -4105,27 +4087,24 @@
     "drivePendingChanges": {
       "message": "Na tym urządzeniu są zmiany, których jeszcze nie przesłano."
     },
-    "driveVocabularyNotices": {
-      "message": "Konflikty słówek: $COUNT$. Edytowane słówka zachowano, zamiast je usuwać.",
+    "driveNotices": {
+      "message": "Konflikty synchronizacji: $COUNT$. Edytowane elementy zachowano, więc usunięcie nie zostało zastosowane. Aby mimo to je usunąć, usuń je ponownie.",
       "placeholders": {
         "count": {
           "content": "$1"
         }
       }
     },
-    "driveNotesNotices": {
-      "message": "Konflikty zaznaczeń i notatek: $COUNT$. Edytowane elementy zachowano, zamiast je usuwać, a z notatek w konflikcie zachowano obie wersje.",
+    "driveNoticeTerms": {
+      "message": "Dotyczy słówek: $TERMS$",
       "placeholders": {
-        "count": {
+        "terms": {
           "content": "$1"
         }
       }
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "Zaznaczenie lub notatka ma zbyt duży rozmiar do synchronizacji. Skróć treść lub usuń zapis, a potem kliknij „Synchronizuj teraz”."
-    },
-    "driveScopeSaveFailed": {
-      "message": "Nie można zapisać wyboru danych do synchronizacji na tym urządzeniu. Spróbuj ponownie."
     }
 
 }

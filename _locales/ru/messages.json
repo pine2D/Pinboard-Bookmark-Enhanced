@@ -3328,9 +3328,6 @@
     "vocabDriveSyncNowRequired": {
       "message": "Автоматическая синхронизация приостановлена. Нажмите «Синхронизировать сейчас», чтобы повторить."
     },
-    "vocabDriveReconnectRequired": {
-      "message": "Нажмите «Отключить это устройство», затем подключитесь снова."
-    },
     "vocabLearningSection": {
       "message": "Экспорт и интеграции"
     },
@@ -4068,21 +4065,6 @@
     "driveChromeSyncSection": {
       "message": "Chrome Sync"
     },
-    "driveSyncVocabulary": {
-      "message": "Словарик"
-    },
-    "driveSyncNotes": {
-      "message": "Выделения и заметки"
-    },
-    "driveVocabularyLastSuccess": {
-      "message": "Последняя синхронизация словарика"
-    },
-    "driveNotesLastSuccess": {
-      "message": "Последняя синхронизация выделений и заметок"
-    },
-    "driveSyncChooseData": {
-      "message": "Выберите данные для синхронизации на этом устройстве."
-    },
     "driveVocabularyStatus": {
       "message": "Словарик: $STATUS$",
       "placeholders": {
@@ -4105,27 +4087,24 @@
     "drivePendingChanges": {
       "message": "На этом устройстве есть изменения, которые ещё не отправлены."
     },
-    "driveVocabularyNotices": {
-      "message": "Конфликты словарика: $COUNT$. Изменённые слова сохранены, а не удалены.",
+    "driveNotices": {
+      "message": "Конфликты синхронизации: $COUNT$. Изменённые записи сохранены, поэтому удаление не применено. Чтобы всё же убрать их, удалите их ещё раз.",
       "placeholders": {
         "count": {
           "content": "$1"
         }
       }
     },
-    "driveNotesNotices": {
-      "message": "Конфликты выделений и заметок: $COUNT$. Изменённые записи сохранены, а не удалены; у конфликтующих заметок сохранены обе версии.",
+    "driveNoticeTerms": {
+      "message": "Затронутые слова: $TERMS$",
       "placeholders": {
-        "count": {
+        "terms": {
           "content": "$1"
         }
       }
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "Выделение или заметка слишком велики для синхронизации. Сократите или удалите их, затем нажмите «Синхронизировать сейчас»."
-    },
-    "driveScopeSaveFailed": {
-      "message": "Не удалось сохранить выбор данных для синхронизации на этом устройстве. Повторите попытку."
     }
 
 }

@@ -3328,9 +3328,6 @@
     "vocabDriveSyncNowRequired": {
       "message": "自動同期は一時停止中です。「今すぐ同期」をクリックして再試行してください。"
     },
-    "vocabDriveReconnectRequired": {
-      "message": "「このデバイスの接続を解除」をクリックしてから、もう一度接続してください。"
-    },
     "vocabLearningSection": {
       "message": "エクスポートと連携"
     },
@@ -4068,21 +4065,6 @@
     "driveChromeSyncSection": {
       "message": "Chrome Sync"
     },
-    "driveSyncVocabulary": {
-      "message": "単語"
-    },
-    "driveSyncNotes": {
-      "message": "ハイライトとメモ"
-    },
-    "driveVocabularyLastSuccess": {
-      "message": "単語の最終同期"
-    },
-    "driveNotesLastSuccess": {
-      "message": "ハイライトとメモの最終同期"
-    },
-    "driveSyncChooseData": {
-      "message": "このデバイスで同期するデータを選択してください。"
-    },
     "driveVocabularyStatus": {
       "message": "単語：$STATUS$",
       "placeholders": {
@@ -4105,27 +4087,24 @@
     "drivePendingChanges": {
       "message": "このデバイスには、まだアップロードされていない変更があります。"
     },
-    "driveVocabularyNotices": {
-      "message": "単語の競合：$COUNT$。編集された単語は削除せずに保持しました。",
+    "driveNotices": {
+      "message": "同期の競合：$COUNT$ 件。編集された項目は保持され、削除は反映されていません。削除する場合は、もう一度削除してください。",
       "placeholders": {
         "count": {
           "content": "$1"
         }
       }
     },
-    "driveNotesNotices": {
-      "message": "ハイライトとメモの競合：$COUNT$。編集された項目は削除せずに保持し、競合したメモは両方のバージョンを保持しました。",
+    "driveNoticeTerms": {
+      "message": "対象の単語：$TERMS$",
       "placeholders": {
-        "count": {
+        "terms": {
           "content": "$1"
         }
       }
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "ハイライトまたはメモが大きすぎるため同期できません。短くするか削除してから「今すぐ同期」をクリックしてください。"
-    },
-    "driveScopeSaveFailed": {
-      "message": "このデバイスの同期項目を保存できませんでした。再試行してください。"
     }
 
 }

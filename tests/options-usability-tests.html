@@ -1076,14 +1076,15 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   // Stage-3b Task 2 (2026-09-24-ui-system-stage3b): general + storage move
-  // onto the row model. General's 12 switches: Data Sync (4) + Backup &
-  // Restore (3: highlights/vocabulary/secrets) + Notifications (5) --
-  // counted straight from the brief, re-verified against the live markup.
+  // onto the row model. General's 10 switches: Data Sync (2: Chrome Sync and
+  // synced credentials; the two Google Drive data-scope switches were retired
+  // in 2026-10, spec §6.1) + Backup & Restore (3: highlights/vocabulary/
+  // secrets) + Notifications (5) -- re-verified against the live markup.
   await test("stage3b: every switch in the general panel sits in a .pref-row", async () => {
     const panel = await panelDoc("general");
     assert(!!panel, "panel-general is missing");
     const switches = [...panel.querySelectorAll("label.switch")];
-    assert(switches.length === 12, "expected 12 switches in panel-general, got " + switches.length);
+    assert(switches.length === 10, "expected 10 switches in panel-general, got " + switches.length);
     assert(switches.every((l) => l.parentElement.classList.contains("pref-row") && l.closest(".pref-group")),
       "every switch in panel-general must sit directly in a .pref-row inside a .pref-group");
   });

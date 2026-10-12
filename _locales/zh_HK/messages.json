@@ -3328,9 +3328,6 @@
     "vocabDriveSyncNowRequired": {
       "message": "自動同步已暫停。請按「立即同步」重試。"
     },
-    "vocabDriveReconnectRequired": {
-      "message": "請按「中斷這部裝置的連接」，然後重新連接。"
-    },
     "vocabLearningSection": {
       "message": "匯出及整合"
     },
@@ -4068,21 +4065,6 @@
     "driveChromeSyncSection": {
       "message": "Chrome Sync"
     },
-    "driveSyncVocabulary": {
-      "message": "生詞"
-    },
-    "driveSyncNotes": {
-      "message": "標記與筆記"
-    },
-    "driveVocabularyLastSuccess": {
-      "message": "生詞最近成功同步"
-    },
-    "driveNotesLastSuccess": {
-      "message": "標記與筆記最近成功同步"
-    },
-    "driveSyncChooseData": {
-      "message": "選擇要在這部裝置同步的資料。"
-    },
     "driveVocabularyStatus": {
       "message": "生詞：$STATUS$",
       "placeholders": {
@@ -4105,27 +4087,24 @@
     "drivePendingChanges": {
       "message": "這部裝置還有尚未上傳的更改。"
     },
-    "driveVocabularyNotices": {
-      "message": "生詞衝突：$COUNT$ 處。被修改的生詞已保留，未被刪除。",
+    "driveNotices": {
+      "message": "同步衝突 $COUNT$ 處：被修改的項目已保留，刪除未生效；如仍要刪除，請再刪除一次。",
       "placeholders": {
         "count": {
           "content": "$1"
         }
       }
     },
-    "driveNotesNotices": {
-      "message": "標記與筆記衝突：$COUNT$ 處。被修改的項目已保留，未被刪除；有衝突的筆記兩個版本都已保留。",
+    "driveNoticeTerms": {
+      "message": "涉及生詞：$TERMS$",
       "placeholders": {
-        "count": {
+        "terms": {
           "content": "$1"
         }
       }
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "有一項標記或筆記過大，無法同步。請縮短或刪除該項內容，然後按「立即同步」。"
-    },
-    "driveScopeSaveFailed": {
-      "message": "無法儲存這部裝置的同步範圍，請重試。"
     }
 
 }
