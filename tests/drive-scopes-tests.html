@@ -40,11 +40,12 @@ function harness(source, seed = {}, results = {}) {
   return { ...factory(...Object.values(deps)), calls, local, alarms };
 }
 async function connectDuringSync(source, sessionPermissionId) {
+  pbpVocabDriveForgetIdentity();
   let releaseIdentity, identityPending, connected;
   const identityRead = new Promise((resolve) => { identityPending = resolve; });
   const identityGate = new Promise((resolve) => { releaseIdentity = resolve; });
   const connectionWritten = new Promise((resolve) => { connected = resolve; });
-  let currentPermissionId = sessionPermissionId, clientNumber = 0, aboutReads = 0, runNumber = 0;
+  let currentPermissionId = sessionPermissionId, clientNumber = 0, mints = 0, runNumber = 0;
   const mutations = [], states = new Map();
   const h = harness(source, {
     driveSyncVocabulary: true, driveSyncNotes: false,
@@ -57,14 +58,23 @@ async function connectDuringSync(source, sessionPermissionId) {
     createClient(options = {}) {
       const number = clientNumber++;
       return pbpCreateVocabDriveClient({ ...options,
-        identity: { async getAuthToken() { return { token: "fixture-google-token" }; }, async removeCachedAuthToken() {} },
+        // Chrome issues a different token per Google account; the shared
+        // identity cache relies on exactly that. The explicit Connect client
+        // is where the user picks the newer account, so its mint flips it.
+        identity: { async getAuthToken() {
+          if (number === 2) currentPermissionId = "google-a"; // Explicit Connect client.
+          // The run's first identity re-check after openSession mints here; a
+          // cached identity answers it without HTTP, so the race is held at
+          // the mint. Connect finishes meanwhile and Chrome then hands out the
+          // newer account's token.
+          if (number === 0 && ++mints === 2) { identityPending(); await identityGate; }
+          return { token: "fixture-google-token:" + currentPermissionId };
+        }, async removeCachedAuthToken() {} },
         fetchImpl: async (input) => {
           const path = new URL(input).pathname;
           if (path === "/drive/v3/about") {
-            if (number === 2) currentPermissionId = "google-a"; // Explicit Connect client.
-            // Handwritten Drive response, captured before the pending read.
+            // Handwritten Drive response; the race is now held at the mint above.
             const payload = { user: { permissionId: currentPermissionId, emailAddress: "current@example.test", displayName: "Current" } };
-            if (number === 0 && ++aboutReads === 2) { identityPending(); await identityGate; }
             return new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json" } });
           }
           if (path === "/drive/v3/changes") {

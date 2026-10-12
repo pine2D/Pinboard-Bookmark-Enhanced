@@ -150,6 +150,70 @@ function pbpVocabBuildMultipart(metadata, body, protocol = PBP_VOCAB_DRIVE_PROTO
   };
 }
 
+// Classify a chrome.identity.getAuthToken rejection by Chrome's own wording.
+// The literals are Chromium's: identity_constants.h (kAuthFailure, kNoGrant,
+// kUserNotSignedIn, kBrowserSigninNotAllowed, kUserRejected) and
+// GoogleServiceAuthError::ToString() (ConnectionFailed, ServiceUnavailable),
+// joined as kAuthFailure + ToString(). "Service responded with error" is the
+// persistent ServiceError (4xx invalid_client & co.), NOT a transient 5xx --
+// Chrome maps 5xx/403/407 to ServiceUnavailable -- so it keeps the legacy
+// classification. Anything unrecognised keeps the legacy behaviour too: a
+// silent failure stays retryable, an interactive one does not.
+function pbpVocabDriveClassifyMintError(error, interactive) {
+  const message = typeof error === "string" ? error
+    : (error && typeof error.message === "string" ? error.message : "");
+  if (/^OAuth2 request failed: Connection failed \(-?\d+\)/.test(message)) {
+    return { error: "network", retryable: true };
+  }
+  if (message.startsWith("OAuth2 request failed: Service unavailable; try again later")) {
+    return { error: "server", retryable: true };
+  }
+  if (message.startsWith("OAuth2 not granted or revoked.") ||
+      message.startsWith("The user is not signed in.") ||
+      message.startsWith("The user turned off browser signin")) {
+    return { error: "auth", retryable: false };
+  }
+  if (interactive === true && message.startsWith("The user did not approve access.")) {
+    return { error: "permission", retryable: false };
+  }
+  // Interactive flows only: Google's sign-in page itself never loaded
+  // (identity_constants.h kPageLoadFailure / kPageLoadTimedOut). That is the
+  // network, not a refusal (spec §10.7): an offline, connected device must not
+  // end up disconnected because Connect reported a non-retryable auth.
+  if (/^(?:OAuth2 request failed: )?Authorization page (?:could not be loaded|load timed out)\./.test(message)) {
+    return { error: "network", retryable: true };
+  }
+  return { error: "auth", retryable: interactive !== true };
+}
+
+// Verified Drive identity per OAuth token, shared by every client in this
+// JavaScript context (the vocabulary, notes and connect clients in the service
+// worker). A different Google account always yields a different token, so a
+// hit for the token Chrome hands out right now names the same account the
+// last about.get proved. Worker eviction empties it; 401, disconnect,
+// permission removal and re-authorisation drop entries explicitly. Values are
+// non-secret; the token is only a Map key and is never logged or returned.
+const PBP_VOCAB_DRIVE_IDENTITY_LIMIT = 2;
+const _pbpVocabDriveIdentities = new Map();
+
+function pbpVocabDriveForgetIdentity(token) {
+  if (token === undefined) _pbpVocabDriveIdentities.clear();
+  else _pbpVocabDriveIdentities.delete(token);
+}
+
+function _pbpVocabDriveRememberIdentity(token, identity) {
+  if (typeof token !== "string" || !token) return;
+  _pbpVocabDriveIdentities.delete(token);
+  _pbpVocabDriveIdentities.set(token, {
+    permissionId: identity.permissionId,
+    emailAddress: identity.emailAddress,
+    displayName: identity.displayName
+  });
+  while (_pbpVocabDriveIdentities.size > PBP_VOCAB_DRIVE_IDENTITY_LIMIT) {
+    _pbpVocabDriveIdentities.delete(_pbpVocabDriveIdentities.keys().next().value);
+  }
+}
+
 function pbpCreateVocabDriveClient({
   fetchImpl = fetch,
   identity = null,
@@ -212,39 +276,59 @@ function pbpCreateVocabDriveClient({
       return failure("network", true, undefined, fileId);
     }
     if (response && typeof response === "object") responseSignals.set(response, signal);
-    return { ok: true, response };
+    return { ok: true, response, token };
   }
 
-  // A silent mint failure is transient (offline, or the Chrome profile's Google
-  // session lapsed) -- not a revoked grant, which only a 401 on a fresh token
-  // proves. Marking it retryable keeps the backoff alive instead of blocking
-  // the account until someone presses Sync now by hand.
-  const mintFailure = (interactive, fileId) => failure("auth", !interactive, undefined, fileId);
+  // Chrome's own wording decides the class (pbpVocabDriveClassifyMintError):
+  // a connection timeout is "network", a revoked grant is a permanent "auth".
+  // Unrecognised wording keeps the legacy rule -- a silent mint failure is
+  // transient (offline, or the Chrome profile's Google session lapsed), so it
+  // stays retryable instead of blocking until someone presses Sync now.
+  const mintFailure = (error, interactive, fileId) => {
+    const classified = pbpVocabDriveClassifyMintError(error, interactive);
+    return failure(classified.error, classified.retryable, undefined, fileId);
+  };
 
-  async function request(url, init = {}, interactive = false, fileId, deadlineMs) {
+  async function mint(interactive, fileId) {
     let token;
     try {
       token = tokenValue(await identityApi().getAuthToken({ interactive }));
     } catch (error) {
       console.warn("[vocab-drive] token mint failed:", error?.name, error?.message);
-      return mintFailure(interactive, fileId);
+      return mintFailure(error, interactive, fileId);
     }
-    if (typeof token !== "string" || !token) return mintFailure(interactive, fileId);
+    if (typeof token !== "string" || !token) return mintFailure(undefined, interactive, fileId);
+    return { ok: true, token };
+  }
+
+  // `minted` lets about()'s cached path reuse the token it already looked up.
+  // Success carries the token actually used -- the renewed one after a 401 --
+  // so the identity cache is keyed by the token the response proved.
+  async function request(url, init = {}, interactive = false, fileId, deadlineMs, minted) {
+    let token = minted;
+    if (typeof token !== "string" || !token) {
+      const first = await mint(interactive, fileId);
+      if (!first.ok) return first;
+      token = first.token;
+    }
 
     for (let attempt = 0; attempt < 2; attempt++) {
       const sent = await requestWithToken(token, url, init, fileId, deadlineMs);
       if (!sent.ok) return sent;
       const response = sent.response;
-      if (response.status !== 401) return { ok: true, response };
+      if (response.status !== 401) return { ok: true, response, token };
+      pbpVocabDriveForgetIdentity(token);
       if (attempt === 1) return failure("auth", false, 401, fileId);
       try {
         await identityApi().removeCachedAuthToken({ token });
-        token = tokenValue(await identityApi().getAuthToken({ interactive: false }));
+        // An explicit Connect renews interactively too: a silent renewal
+        // cannot show the consent a lapsed grant needs (A15).
+        token = tokenValue(await identityApi().getAuthToken({ interactive }));
       } catch (error) {
         console.warn("[vocab-drive] token renew failed:", error?.name, error?.message);
-        return mintFailure(false, fileId);
+        return mintFailure(error, interactive, fileId);
       }
-      if (typeof token !== "string" || !token) return mintFailure(false, fileId);
+      if (typeof token !== "string" || !token) return mintFailure(undefined, interactive, fileId);
     }
     return failure("auth", false, 401, fileId);
   }
@@ -291,10 +375,26 @@ function pbpCreateVocabDriveClient({
     }
   }
 
-  async function about(interactive = false, requestFn = request) {
+  // useCache: only the top-level silent client.about() reads the cache. The
+  // session's opening and closing about, the post-401 probe and Connect always
+  // go to Drive, so every run still proves the account at least twice.
+  async function about(interactive = false, requestFn = request, useCache = false) {
     const url = new URL(`${apiBase}/about`);
     url.searchParams.set("fields", "user(permissionId,emailAddress,displayName)");
-    const requested = await requestFn(url, { method: "GET" }, interactive);
+    let minted;
+    if (useCache) {
+      const current = await mint(interactive);
+      if (!current.ok) return current;
+      const known = _pbpVocabDriveIdentities.get(current.token);
+      if (known) {
+        // Keep the client's scope gate: a cache hit must not answer for a
+        // device that was disconnected since the entry was written.
+        if (beforeRequest && !await beforeRequest()) return failure("account_changed", false);
+        return { ok: true, ...known };
+      }
+      minted = current.token;
+    }
+    const requested = await requestFn(url, { method: "GET" }, interactive, undefined, undefined, minted);
     if (!requested.ok) return requested;
     if (!requested.response.ok) return responseFailure(requested.response);
     const parsed = await json(requested.response);
@@ -303,12 +403,13 @@ function pbpCreateVocabDriveClient({
     if (!user || typeof user.permissionId !== "string" || !user.permissionId) {
       return failure("invalid_response", false, requested.response.status);
     }
-    return {
-      ok: true,
+    const identity = {
       permissionId: user.permissionId,
       emailAddress: typeof user.emailAddress === "string" ? user.emailAddress : "",
       displayName: typeof user.displayName === "string" ? user.displayName : ""
     };
+    _pbpVocabDriveRememberIdentity(requested.token, identity);
+    return { ok: true, ...identity };
   }
 
   async function generateId(requestFn = request) {
@@ -528,14 +629,9 @@ function pbpCreateVocabDriveClient({
   async function openSession(interactive = false, {
     beforeRequest: sessionGuard = null, isCurrent: sessionIsCurrent = null
   } = {}) {
-    let token;
-    try {
-      token = tokenValue(await identityApi().getAuthToken({ interactive }));
-    } catch (error) {
-      console.warn("[vocab-drive] token mint failed:", error?.name, error?.message);
-      return mintFailure(interactive);
-    }
-    if (typeof token !== "string" || !token) return mintFailure(interactive);
+    const first = await mint(interactive);
+    if (!first.ok) return first;
+    let token = first.token;
 
     let permissionId = "";
     const guards = { beforeRequest: sessionGuard, isCurrent: sessionIsCurrent };
@@ -543,16 +639,17 @@ function pbpCreateVocabDriveClient({
       const sent = await requestWithToken(token, url, init, fileId, deadlineMs, guards);
       if (!sent.ok || sent.response.status !== 401) return sent;
 
+      pbpVocabDriveForgetIdentity(token);
       let renewed;
       try {
         await identityApi().removeCachedAuthToken({ token });
         renewed = tokenValue(await identityApi().getAuthToken({ interactive: false }));
       } catch (error) {
         console.warn("[vocab-drive] token renew failed:", error?.name, error?.message);
-        return mintFailure(false, fileId);
+        return mintFailure(error, false, fileId);
       }
       if (typeof renewed !== "string" || !renewed) {
-        return mintFailure(false, fileId);
+        return mintFailure(undefined, false, fileId);
       }
 
       if (permissionId) {
@@ -561,6 +658,7 @@ function pbpCreateVocabDriveClient({
             renewed, probeUrl, probeInit, probeFileId, requestTimeoutMs, guards
           );
           if (checked.ok && checked.response.status === 401) {
+            pbpVocabDriveForgetIdentity(renewed);
             return failure("auth", false, 401, probeFileId);
           }
           return checked;
@@ -574,6 +672,7 @@ function pbpCreateVocabDriveClient({
       token = renewed;
       const retried = await requestWithToken(token, url, init, fileId, deadlineMs, guards);
       if (retried.ok && retried.response.status === 401) {
+        pbpVocabDriveForgetIdentity(token);
         return failure("auth", false, 401, fileId);
       }
       return retried;
@@ -602,7 +701,7 @@ function pbpCreateVocabDriveClient({
   void random;
   return {
     connect: () => about(true),
-    about: () => about(false),
+    about: () => about(false, request, true),
     openSession,
     generateId,
     upload,

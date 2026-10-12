@@ -14,6 +14,7 @@ function peerEvent() {
     value: { url: ARTICLE_URL, title: "Article", item: item("Remote note") } };
 }
 function fixture(ownerHash, options = {}) {
+  pbpVocabDriveForgetIdentity(); // the identity cache is module-level; every fixture starts cold
   const data = { pbpNotesSyncDeviceId: "local-a" }, calls = [], uploads = [], alarms = [];
   let owner = OWNER, enabled = true, drivePermissionId = "google-a", activePermissionId = "", offline = false,
     rejectArticles = false, rejectFrozen = false, switchInUploadGate = false, failUpload = options.failUpload === true;
@@ -41,7 +42,13 @@ function fixture(ownerHash, options = {}) {
       }
       return owner;
     } });
-  const identity = { async getAuthToken() { return { token: "google-token" }; }, async removeCachedAuthToken() {} };
+  // Chrome issues one token per Google account, and offline it cannot mint a
+  // replacement; the rejection text is Chromium's kAuthFailure +
+  // GoogleServiceAuthError::ToString() for ERR_INTERNET_DISCONNECTED.
+  const identity = { async getAuthToken() {
+    if (offline) throw new Error("OAuth2 request failed: Connection failed (-106).");
+    return { token: "google-token:" + drivePermissionId };
+  }, async removeCachedAuthToken() {} };
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
   const client = pbpCreateVocabDriveClient({ identity, protocol: PBP_NOTES_DRIVE_PROTOCOL,
     beforeRequest: async () => {

@@ -71,7 +71,12 @@ function splitBodiesValidate(result, envelope = ENVELOPE) {
     pbpVocabValidateDriveBatch(metadata(envelope.ownerHash, envelope.deviceId), batch.body, envelope.ownerHash));
 }
 async function asyncCheck(name, fn) {
-  try { check(name, await fn()); } catch (error) { check(name, false, error && error.message); }
+  // The Drive identity cache is module-level and most cases share "token-a";
+  // every case starts cold so one case's about.get cannot answer another's.
+  try {
+    pbpVocabDriveForgetIdentity();
+    check(name, await fn());
+  } catch (error) { check(name, false, error && error.message); }
 }
 function identityFixture(tokens = ["token-a"]) {
   let index = 0;
@@ -712,6 +717,313 @@ function syncHarness(options = {}) {
     return !silent.ok && silent.error === "auth" && silent.retryable === true &&
       !prompted.ok && prompted.error === "auth" && prompted.retryable === false &&
       !empty.ok && empty.error === "auth" && empty.retryable === true;
+  });
+
+  await asyncCheck("mint rejections are classified by Chrome's own wording", async () => {
+    const c = (message, interactive) => pbpVocabDriveClassifyMintError(new Error(message), interactive);
+    const is = (got, error, retryable) => got.error === error && got.retryable === retryable &&
+      Object.keys(got).length === 2;
+    // Verbatim message from the user's service-worker log (2026-10-12); the
+    // rest are Chromium's identity_constants.h / GoogleServiceAuthError text.
+    // Simplest miss: matching "-118" alone would let -106 fall through to auth.
+    return is(c("OAuth2 request failed: Connection failed (-118).", false), "network", true) &&
+      is(c("OAuth2 request failed: Connection failed (-106).", true), "network", true) &&
+      // Simplest miss: mapping the persistent "Service responded with error"
+      // to server would retry a broken OAuth client forever.
+      is(c("OAuth2 request failed: Service unavailable; try again later (<html>503</html>).", false),
+        "server", true) &&
+      is(c("OAuth2 request failed: Service responded with error: 'invalid_client'", false), "auth", true) &&
+      is(c("OAuth2 request failed: Service responded with error: 'invalid_client'", true), "auth", false) &&
+      // Simplest miss: a classifier that returns network for everything.
+      is(c("OAuth2 not granted or revoked.", false), "auth", false) &&
+      is(c("The user is not signed in.", false), "auth", false) &&
+      is(c("The user turned off browser signin", false), "auth", false) &&
+      // Simplest miss: ignoring `interactive` would call a silent oddity a refusal.
+      is(c("The user did not approve access.", true), "permission", false) &&
+      is(c("The user did not approve access.", false), "auth", true) &&
+      // Spec §10.7: the sign-in page failing to load is the network. Simplest
+      // miss: leaving both texts to the fallback, which an interactive Connect
+      // reports as a non-retryable auth -- Task 4 then turns the device disconnected.
+      is(c("Authorization page could not be loaded.", true), "network", true) &&
+      is(c("Authorization page load timed out.", true), "network", true) &&
+      is(c("Authorization page load timed out.", false), "network", true) &&
+      // Unrecognised text keeps the legacy rule: silent retryable, prompted not.
+      is(c("Invalid credentials", false), "auth", true) &&
+      is(c("Invalid credentials", true), "auth", false) &&
+      is(pbpVocabDriveClassifyMintError(undefined, false), "auth", true) &&
+      is(pbpVocabDriveClassifyMintError({ message: 42 }, true), "auth", false);
+  });
+
+  await asyncCheck("a classified mint failure reaches every client entry point", async () => {
+    const offline = () => ({
+      async getAuthToken() { throw new Error("OAuth2 request failed: Connection failed (-118)."); },
+      async removeCachedAuthToken() {}
+    });
+    let fetches = 0;
+    const make = (identity, fetchImpl = async () => { fetches++; return jsonResponse({}); }) =>
+      pbpCreateVocabDriveClient({ identity, fetchImpl });
+    const entries = [
+      await make(offline()).about(), await make(offline()).connect(),
+      await make(offline()).openSession(false), await make(offline()).generateId()
+    ];
+    // An offline Connect whose Google sign-in page never loads (spec §10.7).
+    const pageLoad = {
+      async getAuthToken() { throw new Error("Authorization page could not be loaded."); },
+      async removeCachedAuthToken() {}
+    };
+    const prompted = await make(pageLoad).connect();
+    // Renewal after a 401 goes through the same classifier.
+    const revokedOnRenew = () => {
+      let mints = 0;
+      return {
+        async getAuthToken() {
+          if (mints++ === 0) return { token: "token-a" };
+          throw new Error("OAuth2 not granted or revoked.");
+        },
+        async removeCachedAuthToken() {}
+      };
+    };
+    const renewed = await make(revokedOnRenew(), async () => new Response(null, { status: 401 }))
+      .generateId();
+    const sessionClient = make(revokedOnRenew(), async (url) =>
+      new URL(url).pathname === "/drive/v3/about"
+        ? jsonResponse({ user: { permissionId: "perm-a" } })
+        : new Response(null, { status: 401 }));
+    const session = await sessionClient.openSession(false);
+    const inSession = session.ok ? await session.generateId() : session;
+    // Simplest miss: mintFailure ignoring its error argument still says "auth";
+    // for `prompted`, an interactive fallback that ignores the page-load text.
+    return fetches === 0 &&
+      entries.every((result) => !result.ok && result.error === "network" && result.retryable === true) &&
+      !prompted.ok && prompted.error === "network" && prompted.retryable === true &&
+      !renewed.ok && renewed.error === "auth" && renewed.retryable === false &&
+      !inSession.ok && inSession.error === "auth" && inSession.retryable === false;
+  });
+
+  await asyncCheck("client.about() answers a repeated token from the identity cache", async () => {
+    const identity = identityFixture(["token-a", "token-a", "token-b", "token-a"]);
+    const fetched = [];
+    const client = pbpCreateVocabDriveClient({
+      identity,
+      fetchImpl: async (url, init) => {
+        fetched.push(init.headers.Authorization);
+        return jsonResponse({ user: init.headers.Authorization === "Bearer token-a"
+          ? { permissionId: "perm-a", emailAddress: "a@example.test", displayName: "A" }
+          : { permissionId: "perm-b", emailAddress: "b@example.test", displayName: "B" } });
+      }
+    });
+    const first = await client.about();
+    const repeated = await client.about();
+    const switched = await client.about();
+    const back = await client.about();
+    // Simplest miss: a single-slot cache that ignores the key answers token-b
+    // with perm-a.
+    return first.ok && first.permissionId === "perm-a" &&
+      repeated.ok && repeated.permissionId === "perm-a" &&
+      repeated.emailAddress === "a@example.test" && repeated.displayName === "A" &&
+      switched.ok && switched.permissionId === "perm-b" && switched.emailAddress === "b@example.test" &&
+      back.ok && back.permissionId === "perm-a" &&
+      fetched.join() === "Bearer token-a,Bearer token-b" &&
+      identity.calls.length === 4 && identity.calls.every((call) => call.interactive === false);
+  });
+
+  await asyncCheck("the identity cache is shared by every client in the worker", async () => {
+    let fetches = 0;
+    const fetchImpl = async () => {
+      fetches++;
+      return jsonResponse({ user: { permissionId: "perm-a" } });
+    };
+    const first = await pbpCreateVocabDriveClient({ identity: identityFixture(), fetchImpl }).about();
+    const second = await pbpCreateVocabDriveClient({ identity: identityFixture(), fetchImpl }).about();
+    // Simplest miss: a cache created inside pbpCreateVocabDriveClient.
+    return first.ok && second.ok && second.permissionId === "perm-a" && fetches === 1;
+  });
+
+  await asyncCheck("openSession, session.about() and connect() always ask Drive and refresh the cache", async () => {
+    const paths = [];
+    let answer = "perm-a";
+    const client = pbpCreateVocabDriveClient({
+      identity: identityFixture(),
+      fetchImpl: async (url) => {
+        paths.push(new URL(url).pathname);
+        return jsonResponse({ user: { permissionId: answer } });
+      }
+    });
+    // The probe changes Drive's answer under one token: only a real request
+    // can observe it, and the cached path then repeats what that request saw.
+    const primed = await client.about();
+    answer = "perm-z";
+    const session = await client.openSession(false);
+    const afterSession = await client.about();
+    answer = "perm-y";
+    const confirmed = session.ok ? await session.about() : session;
+    const afterConfirm = await client.about();
+    answer = "perm-x";
+    const connected = await client.connect();
+    const afterConnect = await client.about();
+    // Simplest miss: openSession reading the cache would open on perm-a.
+    return primed.permissionId === "perm-a" &&
+      session.ok && session.permissionId === "perm-z" && afterSession.permissionId === "perm-z" &&
+      confirmed.ok && confirmed.permissionId === "perm-y" && afterConfirm.permissionId === "perm-y" &&
+      connected.ok && connected.permissionId === "perm-x" && afterConnect.permissionId === "perm-x" &&
+      paths.length === 4 && paths.every((path) => path === "/drive/v3/about");
+  });
+
+  await asyncCheck("a 401 drops the cached identity and the renewed token becomes the key", async () => {
+    let next = "token-a";
+    const removed = [];
+    const fetched = [];
+    let rejectA = false;
+    const client = pbpCreateVocabDriveClient({
+      identity: {
+        async getAuthToken() { return { token: next }; },
+        async removeCachedAuthToken(details) { removed.push(details.token); next = "token-b"; }
+      },
+      fetchImpl: async (url, init) => {
+        const path = new URL(url).pathname;
+        const auth = init.headers.Authorization;
+        fetched.push(path + " " + auth);
+        if (rejectA && auth === "Bearer token-a") return new Response(null, { status: 401 });
+        return path === "/drive/v3/about"
+          ? jsonResponse({ user: { permissionId: "perm-a" } })
+          : jsonResponse({ ids: ["fresh-id"] });
+      }
+    });
+    const primed = await client.about();
+    rejectA = true;
+    const generated = await client.generateId();
+    next = "token-a";
+    const reread = await client.about();
+    const renewedHit = await client.about();
+    const sessionFetched = [];
+    let sessionNext = "session-a";
+    const sessionClient = pbpCreateVocabDriveClient({
+      identity: {
+        async getAuthToken() { return { token: sessionNext }; },
+        async removeCachedAuthToken() { sessionNext = "session-b"; }
+      },
+      fetchImpl: async (url, init) => {
+        const path = new URL(url).pathname;
+        const auth = init.headers.Authorization;
+        sessionFetched.push(path + " " + auth);
+        if (path === "/drive/v3/files/generateIds" && auth === "Bearer session-a") {
+          return new Response(null, { status: 401 });
+        }
+        return path === "/drive/v3/about"
+          ? jsonResponse({ user: { permissionId: "perm-a" } })
+          : jsonResponse({ ids: ["session-id"] });
+      }
+    });
+    const session = await sessionClient.openSession(false);
+    const sessionGenerated = session.ok ? await session.generateId() : session;
+    const probedHit = await sessionClient.about();
+    sessionNext = "session-a";
+    const forgotten = await sessionClient.about();
+    // Simplest misses: a 401 that keeps the entry lets `reread` skip HTTP; a
+    // cache keyed by the first-minted token makes `renewedHit` fetch again.
+    return primed.ok && generated.ok && generated.fileId === "fresh-id" &&
+      reread.ok && renewedHit.ok && renewedHit.permissionId === "perm-a" &&
+      removed.join() === "token-a,token-a" &&
+      fetched.join() === [
+        "/drive/v3/about Bearer token-a",
+        "/drive/v3/files/generateIds Bearer token-a",
+        "/drive/v3/files/generateIds Bearer token-b",
+        "/drive/v3/about Bearer token-a",
+        "/drive/v3/about Bearer token-b"
+      ].join() &&
+      sessionGenerated.ok && sessionGenerated.fileId === "session-id" &&
+      probedHit.ok && forgotten.ok &&
+      sessionFetched.join() === [
+        "/drive/v3/about Bearer session-a",
+        "/drive/v3/files/generateIds Bearer session-a",
+        "/drive/v3/about Bearer session-b",
+        "/drive/v3/files/generateIds Bearer session-b",
+        "/drive/v3/about Bearer session-a"
+      ].join();
+  });
+
+  await asyncCheck("pbpVocabDriveForgetIdentity drops one token or all, and the cache keeps two", async () => {
+    let next = "token-a";
+    const fetched = [];
+    const client = pbpCreateVocabDriveClient({
+      identity: { async getAuthToken() { return { token: next }; }, async removeCachedAuthToken() {} },
+      fetchImpl: async (url, init) => {
+        const token = init.headers.Authorization.slice("Bearer ".length);
+        fetched.push(token);
+        return jsonResponse({ user: { permissionId: "perm-" + token.slice(-1) } });
+      }
+    });
+    const as = async (token) => { next = token; return client.about(); };
+    await as("token-a"); await as("token-b");
+    pbpVocabDriveForgetIdentity("token-a");
+    const keptB = await as("token-b");
+    await as("token-a");
+    pbpVocabDriveForgetIdentity();
+    await as("token-b"); await as("token-c"); await as("token-a");
+    const keptC = await as("token-c");
+    await as("token-b");
+    // Simplest misses: forget(token) clearing everything refetches token-b;
+    // an unbounded cache answers the final token-b without HTTP.
+    return keptB.permissionId === "perm-b" && keptC.permissionId === "perm-c" &&
+      fetched.join() === "token-a,token-b,token-a,token-b,token-c,token-a,token-b";
+  });
+
+  await asyncCheck("a cached identity honours the scope gate, is a copy and never carries the token", async () => {
+    let enabled = true;
+    let fetches = 0;
+    const client = pbpCreateVocabDriveClient({
+      identity: identityFixture(["secret-token-a"]),
+      beforeRequest: async () => enabled,
+      fetchImpl: async (url) => {
+        fetches++;
+        return new URL(url).pathname === "/drive/v3/about"
+          ? jsonResponse({ user: { permissionId: "perm-a", emailAddress: "a@example.test", displayName: "A" } })
+          : jsonResponse({ ids: ["id-a"] });
+      }
+    });
+    const fetched = await client.about();
+    fetched.permissionId = "tampered";
+    const cached = await client.about();
+    const generated = await client.generateId();
+    enabled = false;
+    const gated = await client.about();
+    // Simplest misses: a hit that skips beforeRequest answers a disconnected
+    // device; returning `{ ...requested }` would leak the bearer token.
+    return fetches === 2 && cached.ok && cached.permissionId === "perm-a" &&
+      Object.keys(cached).sort().join() === "displayName,emailAddress,ok,permissionId" &&
+      generated.ok && Object.keys(generated).sort().join() === "fileId,ok" &&
+      !gated.ok && gated.error === "account_changed" &&
+      !JSON.stringify([fetched, cached, generated, gated]).includes("secret-token-a");
+  });
+
+  await asyncCheck("an interactive request renews a 401 interactively", async () => {
+    const identity = identityFixture(["old-token", "new-token"]);
+    let fetches = 0;
+    const client = pbpCreateVocabDriveClient({
+      identity,
+      fetchImpl: async () => ++fetches === 1
+        ? new Response(null, { status: 401 })
+        : jsonResponse({ user: { permissionId: "perm-a" } })
+    });
+    const connected = await client.connect();
+    let mints = 0;
+    const declined = pbpCreateVocabDriveClient({
+      identity: {
+        async getAuthToken() {
+          if (mints++ === 0) return { token: "old-token" };
+          throw new Error("The user did not approve access.");
+        },
+        async removeCachedAuthToken() {}
+      },
+      fetchImpl: async () => new Response(null, { status: 401 })
+    });
+    const refused = await declined.connect();
+    // Simplest miss: a renewal hard-coded to interactive:false passes the
+    // silent 401 case above and fails only here.
+    return connected.ok && fetches === 2 && identity.calls.length === 2 &&
+      identity.calls.every((call) => call.interactive === true) &&
+      identity.removed.join() === "old-token" &&
+      !refused.ok && refused.error === "permission" && refused.retryable === false;
   });
 
   await asyncCheck("second 401 stops without a third request", async () => {
