@@ -1,54 +1,88 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Drive Dataset Scopes Tests</title>
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Drive Round Orchestration Tests</title>
 <style>body{font-family:monospace;padding:16px}.case{padding:6px}.pass{color:green}.fail{color:red}</style>
-</head><body><h1>Drive Dataset Scopes Tests</h1><div id="summary"></div><div id="results"></div>
+</head><body><h1>Drive Round Orchestration Tests</h1><div id="summary"></div><div id="results"></div>
 <script src="../shared.js"></script>
 <script src="../vocab-store.js"></script>
 <script src="../vocab-gdrive.js"></script>
 <script>
 let pass = 0, fail = 0;
 function check(name, ok) { ok ? pass++ : fail++; const el = document.createElement("div"); el.className = "case " + (ok ? "pass" : "fail"); el.textContent = name; document.getElementById("results").append(el); }
+const HASH = "a".repeat(64), CONN_KEY = "driveConnState:" + HASH;
+const DRIVE_ALARMS = ["drive-sync-dirty", "drive-sync-periodic", "drive-sync-retry"];
+// Persisted rows in the shapes vocab-gdrive.js finishFailure and the shared
+// connection store write them (contract: { lastError, authAttempts, retryAttempt, retryAt, blocked, updatedAt }).
+const blockedRow = (code) => ({ key: "preflight:" + HASH, ownerHash: HASH, retryAttempt: 0, retryAt: null, lastError: code, blocked: true });
+const backoffRow = (code, retryAt) => ({ key: "preflight:" + HASH, ownerHash: HASH, retryAttempt: 1, retryAt, lastError: code, blocked: false });
+const connRow = (patch) => ({ lastError: "network", authAttempts: 0, retryAttempt: 1, retryAt: null, blocked: false, updatedAt: 1, ...patch });
 function harness(source, seed = {}, results = {}) {
-  const local = { vocabDriveConnected: true, ...seed }, calls = [], alarms = [];
+  const local = { vocabDriveConnected: true, ...seed }, calls = [], runs = [], alarms = [], deletes = [], notifications = [], forgets = [], removed = [], accountPuts = [];
+  const alarmMap = new Map(Object.entries(structuredClone(results.alarmSeed || {})));
   const empty = { states: [], outbox: [], batches: [], notices: [] };
   const client = { async connect() { calls.push("authorize"); return { ok: true, permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" }; }, async about() { return results.googleIdentity || { ok: true, permissionId: "google-a" }; } };
+  const stubRunner = (type) => (options) => async (runOptions) => {
+    calls.push(type); runs.push({ type, ...runOptions });
+    const custom = results[type + "Run"];
+    const result = custom ? await custom(options, runOptions) : (results[type] || { ok: true });
+    if (result.status?.drivePermissionId) options.onSession?.(result.status.drivePermissionId);
+    return result;
+  };
   const deps = {
     chrome: { runtime: { getManifest: () => ({}), sendMessage: async () => {} }, storage: { local: {
-      async get(query) { if (typeof query === "string") return { [query]: local[query] }; const out = {}; for (const [key, fallback] of Object.entries(query)) out[key] = key in local ? local[key] : fallback; return structuredClone(out); },
-      async set(values) { Object.assign(local, structuredClone(values)); results.afterSet?.(values); }
-    } }, permissions: { contains: async () => results.permissionGranted !== false }, alarms: { async clear(name) { alarms.push(name); }, create() {} } },
+      async get(query) {
+        // connReadError: chrome.storage.local failing for the shared connection record only.
+        if (results.connReadError && (typeof query === "string" ? [query] : Object.keys(query)).some((key) => key.startsWith("driveConnState:"))) throw new Error("connection storage unavailable");
+        if (typeof query === "string") return query in local ? { [query]: structuredClone(local[query]) } : {}; const out = {}; for (const [key, fallback] of Object.entries(query)) out[key] = key in local ? local[key] : fallback; return structuredClone(out);
+      },
+      async set(values) { Object.assign(local, structuredClone(values)); results.afterSet?.(values); },
+      async remove(keys) { for (const key of [].concat(keys)) delete local[key]; }
+    } }, permissions: { contains: async () => results.permissionGranted !== false, onRemoved: { addListener(fn) { removed.push(fn); } } },
+    alarms: {
+      async get(name) { return alarmMap.has(name) ? { name, ...structuredClone(alarmMap.get(name)) } : undefined; },
+      async create(name, info) { alarmMap.set(name, structuredClone(info)); },
+      async clear(name) { alarms.push(name); return alarmMap.delete(name); }
+    } },
     PBP_NOTES_DRIVE_PROTOCOL: {},
     pbpVocabDriveOAuthActive: () => true, pbpCreateRecoveringTail: results.createTail || (() => async (fn) => fn()),
     pbpCreateVocabDriveClient: results.createClient || (() => client),
-    pbpCreateVocabDriveSyncRunner: results.createVocabRunner || ((options) => async () => { calls.push("vocabulary"); const result = results.vocabulary || { ok: true }; if (result.status?.drivePermissionId) options.onSession?.(result.status.drivePermissionId); return result; }),
-    pbpCreateNotesDriveSyncRunner: (options) => async () => { calls.push("notes"); const result = results.notes || { ok: true }; if (result.status?.drivePermissionId) options.onSession?.(result.status.drivePermissionId); return result; },
-    pbpCreateNotesSyncStore: () => ({ getPreflightState: async () => null }),
+    pbpCreateVocabDriveSyncRunner: results.createVocabRunner || stubRunner("vocabulary"),
+    pbpCreateNotesDriveSyncRunner: stubRunner("notes"),
+    pbpCreateNotesSyncStore: () => ({
+      getPreflightState: async () => results.notesPreflight || null,
+      async deletePreflightState(hash) { deletes.push("notes:" + hash); results.notesPreflight = null; return true; },
+      async putAccountState(row) { accountPuts.push({ type: "notes", row: structuredClone(row), runsBefore: runs.length }); return true; }
+    }),
     pbpVocabSyncSnapshot: async () => { if (results.vocabSnapshotError) throw new Error("vocabulary storage unavailable"); return results.vocabSnapshot || ({ ...empty, outbox: [{ recordKey: "en|word" }] }); },
     pbpNotesSyncSnapshot: async () => { if (results.notesSnapshotError) throw new Error("notes storage unavailable"); return results.notesSnapshot || ({ ...empty, outbox: [{ recordKey: "pbp_hl_abcd|note" }] }); },
     pbpVocabGetPreflightState: async () => { if (results.vocabPreflightError) throw new Error("vocabulary preflight unavailable"); return results.vocabPreflight || null; },
-    pbpNotesGetPreflightState: async () => null,
-    getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
+    pbpVocabDeletePreflightState: async (hash) => { deletes.push("vocabulary:" + hash); results.vocabPreflight = null; return true; },
+    // Account rows in the shape vocab-gdrive.js persists them (`account:<permissionId>:<ownerHash>`).
+    pbpVocabListAccountStates: async () => structuredClone(results.vocabAccountRows || []),
+    pbpVocabPutAccountState: async (row) => { accountPuts.push({ type: "vocabulary", row: structuredClone(row), runsBefore: runs.length }); return true; },
+    pbpVocabDriveForgetIdentity: () => { forgets.push(true); },
+    getCurrentPinboardAuth: async () => ({ account: results.account || "alice", epoch: 1 }),
     pbpPinboardAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
-    pbpVocabOwnerHash: async () => "a".repeat(64),
-    showNotification: async () => {}, t: (key) => key, console
+    pbpVocabOwnerHash: async () => HASH,
+    showNotification: async (...args) => { notifications.push(args); }, t: (key) => key, console
   };
   const start = source.indexOf("const PBP_VOCAB_DRIVE_CONNECTED_KEY");
   const end = source.indexOf("// Floor between two cold-start syncs.", start);
   const factory = new Function(...Object.keys(deps), source.slice(start, end) + `
-    return { queue: typeof pbpQueueSelectedDriveSync === "function" ? pbpQueueSelectedDriveSync : null,
-      connect: typeof pbpConnectDrive === "function" ? pbpConnectDrive : null,
-      status: pbpGetVocabDriveStatus };`);
-  return { ...factory(...Object.values(deps)), calls, local, alarms };
+    return { queue: pbpQueueDriveRound, connect: pbpConnectDrive, status: pbpGetVocabDriveStatus,
+      reconcile: pbpReconcileDriveAlarms, connection: driveConnectionStore, epoch: () => driveScopeEpoch };`);
+  return { ...factory(...Object.values(deps)), calls, runs, local, alarms, alarmMap, deletes, notifications, forgets, removed, accountPuts };
 }
-async function connectDuringSync(source, sessionPermissionId) {
+// pinIdentity: run 1's own client keeps minting the token of the account it
+// bound, so its identity re-checks still match and only the epoch Connect
+// bumps can cancel it (spec §10 supplementary test).
+async function connectDuringSync(source, sessionPermissionId, { pinIdentity = false } = {}) {
   pbpVocabDriveForgetIdentity();
-  let releaseIdentity, identityPending, connected;
-  const identityRead = new Promise((resolve) => { identityPending = resolve; });
-  const identityGate = new Promise((resolve) => { releaseIdentity = resolve; });
+  let releaseChanges, changesPending, connected;
+  const changesRead = new Promise((resolve) => { changesPending = resolve; });
+  const changesGate = new Promise((resolve) => { releaseChanges = resolve; });
   const connectionWritten = new Promise((resolve) => { connected = resolve; });
-  let currentPermissionId = sessionPermissionId, clientNumber = 0, mints = 0, runNumber = 0;
+  let currentPermissionId = sessionPermissionId, clientNumber = 0, changesReads = 0, runNumber = 0;
   const mutations = [], states = new Map();
   const h = harness(source, {
-    driveSyncVocabulary: true, driveSyncNotes: false,
     driveConnectionAccount: { permissionId: "google-previous", emailAddress: "previous@example.test", displayName: "Previous" }
   }, {
     createTail: pbpCreateRecoveringTail,
@@ -58,26 +92,28 @@ async function connectDuringSync(source, sessionPermissionId) {
     createClient(options = {}) {
       const number = clientNumber++;
       return pbpCreateVocabDriveClient({ ...options,
-        // Chrome issues a different token per Google account; the shared
-        // identity cache relies on exactly that. The explicit Connect client
-        // is where the user picks the newer account, so its mint flips it.
-        identity: { async getAuthToken() {
-          if (number === 2) currentPermissionId = "google-a"; // Explicit Connect client.
-          // The run's first identity re-check after openSession mints here; a
-          // cached identity answers it without HTTP, so the race is held at
-          // the mint. Connect finishes meanwhile and Chrome then hands out the
-          // newer account's token.
-          if (number === 0 && ++mints === 2) { identityPending(); await identityGate; }
-          return { token: "fixture-google-token:" + currentPermissionId };
-        }, async removeCachedAuthToken() {} },
-        fetchImpl: async (input) => {
+        // Chrome mints a different OAuth token for each Google account, and the
+        // identity cache is keyed on it: the switch has to surface here.
+        identity: {
+          async getAuthToken() {
+            if (number === 2) currentPermissionId = "google-a";
+            const id = pinIdentity && number === 0 && runNumber === 1 ? sessionPermissionId : currentPermissionId;
+            return { token: "token-" + id };
+          },
+          async removeCachedAuthToken() {}, async clearAllCachedAuthTokens() {}
+        },
+        fetchImpl: async (input, init = {}) => {
           const path = new URL(input).pathname;
           if (path === "/drive/v3/about") {
-            // Handwritten Drive response; the race is now held at the mint above.
-            const payload = { user: { permissionId: currentPermissionId, emailAddress: "current@example.test", displayName: "Current" } };
+            // Handwritten Drive about.get response (fields=user(permissionId,emailAddress,displayName))
+            // for the account the bearer token was minted for.
+            const permissionId = String(init.headers?.Authorization || "").replace(/^Bearer token-/, "");
+            const payload = { user: { permissionId, emailAddress: "current@example.test", displayName: "Current" } };
             return new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json" } });
           }
           if (path === "/drive/v3/changes") {
+            // Run 1's changes page is in flight when another options page finishes Connect.
+            if (number === 0 && ++changesReads === 1) { changesPending(); await changesGate; }
             return new Response('{"changes":[],"newStartPageToken":"after-connect"}', { headers: { "Content-Type": "application/json" } });
           }
           throw new Error("Unexpected Drive request: " + path);
@@ -100,23 +136,20 @@ async function connectDuringSync(source, sessionPermissionId) {
         async putAccountState(state) { mutations.push({ run: runNumber, kind: "state" }); states.set(state.drivePermissionId, structuredClone(state)); return true; },
         async listPendingBatches() { return []; }, async listOutbox() { return []; }
       };
-      const runner = pbpCreateVocabDriveSyncRunner({ ...options, store,
-        alarms: { async clear() {}, create() {} }, now: () => 100000 });
+      const runner = pbpCreateVocabDriveSyncRunner({ ...options, store, hashOwner: async () => HASH, now: () => 100000 });
       return (runOptions) => { runNumber++; return runner(runOptions); };
     }
   });
-  // The first run is bound to its Google ID. Its next /about response is
-  // already in flight when another options page finishes Connect.
   const pending = h.queue({});
-  await identityRead;
+  await changesRead;
   const reconnecting = h.connect();
   await connectionWritten;
-  releaseIdentity();
+  releaseChanges();
   const [first, reconnect] = await Promise.all([pending, reconnecting]);
-  return { first, reconnect, mutations, account: h.local.driveConnectionAccount };
+  return { first, reconnect, mutations, account: h.local.driveConnectionAccount, notesRuns: h.calls.filter((call) => call === "notes").length };
 }
 function bootHarness(source, seed = {}) {
-  const local = { vocabDriveConnected: true, driveSyncVocabulary: true, driveSyncNotes: true, ...seed };
+  const local = { vocabDriveConnected: true, ...seed };
   const calls = [], cleared = [];
   const chrome = { storage: { local: {
     async get(query) { const out = {}; for (const [key, fallback] of Object.entries(query)) out[key] = key in local ? local[key] : fallback; return structuredClone(out); },
@@ -127,113 +160,306 @@ function bootHarness(source, seed = {}) {
   alarms: { async clear(name) { cleared.push(name); } } };
   const deps = { chrome, PBP_VOCAB_DRIVE_CAPABLE: true, PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected", PBP_GOOGLE_API_ORIGIN: "https://www.googleapis.com/*",
     PBP_DRIVE_CONNECTION_ACCOUNT_KEY: "driveConnectionAccount",
-    driveScopeEpochs: { vocabulary: 0, notes: 0 },
+    driveScopeEpoch: 0,
     pbpVocabDriveIsConnected: async () => local.vocabDriveConnected === true,
-    pbpDriveTypeEnabled: async (type) => local.vocabDriveConnected === true && local[type === "notes" ? "driveSyncNotes" : "driveSyncVocabulary"] === true,
-    pbpQueueVocabDriveSync: async () => { calls.push("vocabulary"); return { ok: true }; },
-    pbpQueueNotesDriveSync: async () => { calls.push("notes"); return { ok: true }; },
+    pbpQueueDriveRound: async (options) => { calls.push("round:" + JSON.stringify(options)); return { ok: true }; },
     pbpGetVocabDriveStatus: async () => ({ connected: local.vocabDriveConnected }), console
   };
+  // The alarm cleaner lives in the orchestration slice; reuse its real source.
+  const clearAt = source.indexOf("async function pbpClearDriveAlarms");
+  const clearEnd = source.indexOf("\n}\n", clearAt) + 3;
   const start = source.indexOf("const PBP_VOCAB_BOOT_SYNC_KEY");
-  const end = source.indexOf("\npbpBootVocabDriveSync({ throttleMs:", start);
-  const factory = new Function(...Object.keys(deps), source.slice(start, end) + `
-    return { boot: pbpBootVocabDriveSync, notesBoot: pbpBootNotesDriveSync, disconnect: pbpDisconnectVocabDrive };`);
+  const end = source.indexOf("\npbpBootDriveSync({ throttleMs:", start);
+  const factory = new Function(...Object.keys(deps), source.slice(clearAt, clearEnd) + source.slice(start, end) + `
+    return { boot: pbpBootDriveSync, disconnect: pbpDisconnectVocabDrive, epoch: () => driveScopeEpoch };`);
   return { ...factory(...Object.values(deps)), local, calls, cleared };
 }
 (async () => {
   const source = await fetch("../background.js").then((r) => r.text());
-  let h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true });
-  const onlyNotes = h.queue ? await h.queue({}) : null;
-  check("notes-only scope runs notes without enrolling vocabulary", onlyNotes?.ok && h.calls.join() === "notes");
-  h = harness(source, { driveSyncNotes: true }, { vocabulary: { ok: false, error: "corrupt" } });
-  const partial = h.queue ? await h.queue({}) : null;
-  check("blocked vocabulary does not stop selected notes and combined result fails", partial?.ok === false && partial.error === "corrupt" && h.calls.includes("notes"));
+  // ---- One round: vocabulary, then notes ----
+  let h = harness(source);
+  const round = await h.queue({});
+  // Simplest miss: running vocabulary alone (the old default) or notes first.
+  check("a connected device runs vocabulary then notes in one round", round.ok && h.calls.join() === "vocabulary,notes");
   h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false });
-  const none = h.queue ? await h.queue({}) : null;
-  check("no selected data does not open a sync session", none?.error === "no_data_selected" && h.calls.length === 0);
-  const connected = h.connect ? await h.connect() : null;
-  check("connecting without selected data still authorizes Google", connected?.ok && h.calls.join() === "authorize" && h.local.vocabDriveConnected === true);
-  h = harness(source);
-  const defaults = h.queue ? await h.queue({}) : null;
-  check("legacy defaults select vocabulary alone", defaults?.ok && h.calls.join() === "vocabulary");
-  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true });
-  const status = await h.status();
-  check("status preserves vocabulary fields and exposes independent notes counts", status.vocabularyEnabled === false && status.notesEnabled === true && status.pendingWords === 1 && status.notes?.pendingNotes === 1);
-  h = harness(source, { driveSyncNotes: true }, { notes: { ok: true, status: { waitingForRetry: true } } });
-  const waiting = h.queue ? await h.queue({}) : null;
-  check("a selected type in backoff is not reported as completed", waiting?.ok === false && waiting.error === "waiting_for_retry");
-  const boot = bootHarness(source);
-  await boot.boot({ throttleMs: 900000 }); await boot.notesBoot({ throttleMs: 900000 });
-  await boot.boot({ throttleMs: 900000 }); await boot.notesBoot({ throttleMs: 900000 });
-  check("cold-start throttle is independent for each selected type", boot.calls.join() === "vocabulary,notes" && boot.local._vocabBootSyncTs > 0 && boot.local._notesBootSyncTs > 0);
-  const off = bootHarness(source, { driveSyncNotes: false }); await off.notesBoot();
-  check("disabled notes boot clears only notes alarms", off.calls.length === 0 && off.cleared.length === 3 && off.cleared.every((name) => name.startsWith("notes-sync-")));
-  const disconnected = bootHarness(source, { pbp_hl_local: { note: "Keep local notes" } });
-  await disconnected.disconnect();
-  check("disconnect invalidates active runs before awaiting OAuth operations", disconnected.calls[0] === "mint:false" && disconnected.local.vocabDriveConnected === false);
-  check("disconnect clears both alarm groups and retains both datasets", ["notes", "vocab"].every((prefix) => ["dirty", "periodic", "retry"].every((suffix) => disconnected.cleared.includes(prefix + "-sync-" + suffix))) && disconnected.local.pbp_hl_local.note === "Keep local notes" && disconnected.local.driveSyncNotes === true && disconnected.local.driveSyncVocabulary === true);
+  const staleKeys = await h.queue({});
+  // Simplest miss: still honouring a scope key left on disk before the migration.
+  check("stale scope keys on disk no longer gate either dataset", staleKeys.ok && h.calls.join() === "vocabulary,notes");
+  h = harness(source, {}, { vocabulary: { ok: false, error: "corrupt" } });
+  const partial = await h.queue({});
+  // Simplest miss: treating any vocabulary failure as a reason to skip notes.
+  check("a vocabulary data-layer failure still runs notes and fails the round", partial.ok === false && partial.error === "corrupt" && h.calls.join() === "vocabulary,notes");
+  const connectionSkips = [];
+  for (const code of PBP_DRIVE_CONNECTION_ERRORS) {
+    const c = harness(source, {}, { vocabulary: { ok: false, error: code, retryable: code !== "permission" } });
+    const result = await c.queue({});
+    connectionSkips.push(c.calls.join() === "vocabulary" && result.error === code && result.results.notes.skipped === true && result.results.notes.error === code);
+  }
+  // Simplest miss: skipping notes only for "auth" while "network"/"server" still send notes requests.
+  check("every connection-layer vocabulary failure skips notes with zero notes runs", connectionSkips.length === PBP_DRIVE_CONNECTION_ERRORS.size && connectionSkips.every(Boolean));
+  const later = Date.now() + 10 * 60000;
+  h = harness(source, {}, { vocabulary: { ok: true, status: { waitingForRetry: true, connectionWaiting: true, retryAt: later } } });
+  const connectionWait = await h.queue({});
+  // Simplest miss: letting notes hit the same connection backoff gate by itself (a second read, same answer, extra work).
+  check("a shared connection backoff skips notes and reports waiting at the top level", h.calls.join() === "vocabulary" && connectionWait.ok === false && connectionWait.waitingForRetry === true && connectionWait.results.notes.status.retryAt === later);
+  h = harness(source, {}, { vocabulary: { ok: true, status: { waitingForRetry: true } } });
+  const dataWait = await h.queue({});
+  // Simplest miss: keying the skip on waitingForRetry alone, which also skips notes for a vocabulary-only backoff.
+  check("a vocabulary data-layer backoff still runs notes", h.calls.join() === "vocabulary,notes" && dataWait.waitingForRetry === true);
+  h = harness(source, {}, { notes: { ok: true, status: { waitingForRetry: true } } });
+  const waiting = await h.queue({});
+  // Simplest miss: reporting ok because the first dataset finished.
+  check("a dataset in backoff is not reported as completed", waiting.ok === false && waiting.error === "waiting_for_retry" && waiting.waitingForRetry === true);
+  const controlSkips = [];
+  for (const code of ["account_changed", "pinboard_auth", "not_connected"]) {
+    const c = harness(source, {}, { vocabulary: { ok: false, error: code, retryable: false } });
+    const result = await c.queue({});
+    controlSkips.push(c.calls.join() === "vocabulary" && result.error === code);
+  }
+  // Simplest miss: a cancelled vocabulary run whose round still opens a notes session.
+  check("a cancelled, ownerless or disconnected vocabulary run skips notes", controlSkips.every(Boolean));
+  h = harness(source, {}, { permissionGranted: false });
+  const deniedSync = await h.queue({});
+  // Simplest miss: checking only the connected flag.
+  check("revoked permission never starts a dataset runner", deniedSync.error === "permission" && h.calls.length === 0);
+  h = harness(source, { vocabDriveConnected: false });
+  const notConnected = await h.queue({});
+  // Simplest miss: reporting a disconnected device as a permission problem.
+  check("a disconnected device returns not_connected without runners", notConnected.error === "not_connected" && h.calls.length === 0);
+  // ---- force and the shared connection record ----
+  h = harness(source, { [CONN_KEY]: connRow({ lastError: "auth", authAttempts: 5, retryAttempt: 0, blocked: true }) },
+    { vocabPreflight: blockedRow("corrupt"), notesPreflight: blockedRow("remote"), vocabulary: { ok: false, error: "network", retryable: true } });
+  await h.queue({ force: true });
+  // Simplest miss: relying on each runner to clear its own preflight, which leaves the notes block when notes is skipped.
+  check("force clears the shared connection record and both data-layer blocks before running", !(CONN_KEY in h.local) && h.deletes.includes("vocabulary:" + HASH) && h.deletes.includes("notes:" + HASH) && h.calls.join() === "vocabulary" && h.runs[0].force === true);
+  // Spec §10.5. Rows as vocab-gdrive.js / notes-sync.js persist them.
+  const datasetAccountRow = (permissionId, patch = {}) => ({ key: "account:" + permissionId + ":" + HASH, drivePermissionId: permissionId, ownerHash: HASH, bootstrapComplete: true, pageToken: "42", lastSuccessAt: 100, lastError: null, retryAttempt: 0, retryAt: null, ...patch });
+  h = harness(source, { [CONN_KEY]: connRow({ lastError: "auth", authAttempts: 5, retryAttempt: 0, blocked: true }) }, {
+    vocabAccountRows: [datasetAccountRow("google-a", { lastError: "remote", retryAttempt: 2, retryAt: Date.now() + 60000 }), datasetAccountRow("google-old")],
+    notesSnapshot: { states: [datasetAccountRow("google-a", { lastError: "corrupt" })], outbox: [], batches: [], notices: [] },
+    vocabulary: { ok: false, error: "network", retryable: true } });
+  await h.queue({ force: true });
+  const clearedRows = h.accountPuts.map((put) => put.type + ":" + put.row.drivePermissionId).sort().join();
+  // Simplest misses: clearing only the preflights, so the skipped notes half keeps showing "corrupt" from
+  // its account row (status falls back to it once the preflight is gone); or rewriting the rows from
+  // scratch, which drops the cursor and re-bootstraps both datasets.
+  check("force also clears both datasets' account-row errors before running and keeps their cursors", clearedRows === "notes:google-a,vocabulary:google-a" && h.accountPuts.every((put) => put.runsBefore === 0 && put.row.lastError === null && put.row.retryAt === null && put.row.pageToken === "42" && put.row.bootstrapComplete === true) && h.accountPuts.find((put) => put.type === "vocabulary").row.retryAttempt === 2 && h.calls.join() === "vocabulary");
+  h = harness(source, { [CONN_KEY]: connRow({ lastError: "auth", authAttempts: 5, retryAttempt: 0, blocked: true }) }, { vocabulary: { ok: false, error: "auth", retryable: false } });
+  await h.queue({});
+  // Simplest miss: clearing on every round, which turns each wake into a forced retry.
+  check("a non-forced round leaves the shared record and data-layer blocks alone", h.local[CONN_KEY]?.blocked === true && h.deletes.length === 0);
+  const gate = {};
+  gate.vocabularyRun = async (options) => {
+    const fresh = await options.connection.put(HASH, connRow({ retryAt: later }));
+    const otherOwner = await options.connection.put("b".repeat(64), connRow({ lastError: "server" }));
+    gate.account = "bob";
+    const switched = await options.connection.put(HASH, connRow({ lastError: "auth" }));
+    return { ok: false, error: "network", retryable: true, puts: [fresh, otherOwner, switched] };
+  };
+  h = harness(source, {}, gate);
+  const gated = await h.queue({});
+  gate.account = "alice";
+  const outside = await h.connection.put(HASH, connRow({ lastError: "server" }));
+  // Simplest miss: a store that writes whatever ownerHash it is handed, or keeps writing after the Pinboard account switched.
+  check("the shared connection record is written only for the round's owner and Pinboard account", gated.results.vocabulary.puts.join() === "true,false,false" && outside === false && h.local[CONN_KEY]?.lastError === "network" && h.local[CONN_KEY].retryAt === later && !("driveConnState:" + "b".repeat(64) in h.local));
+  // Spec §10.4: chrome.storage.local fails to read the shared record.
+  const readWarnings = [];
+  const realWarn = console.warn;
+  console.warn = (...args) => { readWarnings.push(args.map(String).join(" ")); };
+  let unreadable, unreadableRound;
+  try {
+    h = harness(source, {}, { connReadError: true, alarmSeed: { "drive-sync-retry": { scheduledTime: later } },
+      vocabularyRun: async (options) => ({ ok: true, seen: await options.connection.get(HASH) }) });
+    unreadable = await h.connection.get(HASH).catch((e) => "threw: " + e?.message);
+    unreadableRound = await h.queue({});
+  } finally { console.warn = realWarn; }
+  // Simplest misses: no try/catch in get, so the rejection reaches the runner's readStore and files a
+  // local_store block that only Sync now clears; or alarm reconciliation reading through the forgiving get,
+  // which turns "unreadable" into "no record" and drops a retry alarm that may still be due.
+  check("an unreadable shared record reads as none for runners, is logged, and keeps a pending retry alarm", unreadable === null && unreadableRound?.ok === true && unreadableRound.results.vocabulary.seen === null && h.alarmMap.has("drive-sync-retry") && readWarnings.some((line) => line.includes("connection state read failed") && line.includes("connection storage unavailable")));
+  let removedHarness = null;
+  const removedRun = { vocabularyRun: async (options) => {
+    const epoch = options.getScopeEpoch();
+    removedHarness.removed.forEach((fn) => fn({ permissions: [], origins: ["https://player.bilibili.com/*"] }));
+    const unrelatedKept = options.getScopeEpoch() === epoch;
+    removedHarness.removed.forEach((fn) => fn({ permissions: ["identity"], origins: [] }));
+    const put = await options.connection.put(HASH, connRow());
+    return options.getScopeEpoch() === epoch ? { ok: true } : { ok: false, error: "account_changed", retryable: false, put, unrelatedKept };
+  } };
+  removedHarness = harness(source, {}, removedRun);
+  const revoked = await removedHarness.queue({});
+  // The grant goes away after the vocabulary runner's last own check: it still reports ok.
+  let lateHarness = null;
+  lateHarness = harness(source, {}, { vocabularyRun: async () => {
+    lateHarness.removed.forEach((fn) => fn({ permissions: ["identity"], origins: [] }));
+    return { ok: true };
+  } });
+  const lateRevoked = await lateHarness.queue({});
+  // Simplest miss: bumping only a per-type epoch, so the notes half of the round still runs, or skipping
+  // notes only when vocabulary itself reported account_changed.
+  check("losing the identity grant bumps the single epoch, forgets identities and cancels the rest of the round", revoked.error === "account_changed" && removedHarness.calls.join() === "vocabulary" && removedHarness.forgets.length === 1 && revoked.results.vocabulary.put === false && revoked.results.vocabulary.unrelatedKept === true && removedHarness.epoch() === 1 && lateRevoked.error === "account_changed" && lateRevoked.results.notes.skipped === true && lateHarness.calls.join() === "vocabulary");
+  // Spec §10.3: another options page disconnects while this round runs (Disconnect bumps the epoch, then
+  // writes the flag; the order inside this stub does not matter to the orchestrator).
+  let cutHarness = null;
+  cutHarness = harness(source, {}, { vocabularyRun: async () => {
+    cutHarness.local.vocabDriveConnected = false;
+    cutHarness.removed.forEach((fn) => fn({ permissions: ["identity"], origins: [] }));
+    return { ok: false, error: "account_changed", retryable: false };
+  } });
+  const cutShort = await cutHarness.queue({});
+  // Simplest misses: reading the connected flag only before the round, so the answer is account_changed and
+  // the panel paints it under "not connected"; or mapping every epoch-cancelled round to not_connected
+  // without reading the flag, which the still-connected lateRevoked round above rules out.
+  check("a round cut short by Disconnect answers not_connected, while a still-connected cancel stays account_changed", cutShort.ok === false && cutShort.error === "not_connected" && cutShort.retryable === false && cutHarness.calls.join() === "vocabulary" && cutHarness.notifications.length === 0 && lateRevoked.error === "account_changed");
+  // ---- Alarm reconciliation after each round ----
+  h = harness(source, {}, { alarmSeed: { "drive-sync-periodic": { periodInMinutes: 15, scheduledTime: 777 } }, notesPreflight: blockedRow("corrupt"), notes: { ok: false, error: "corrupt" } });
+  await h.queue({});
+  // Simplest miss: the old runner behaviour of clearing periodic whenever any dataset blocks.
+  check("vocabulary success plus a notes data-layer block keeps the periodic alarm untouched", h.alarmMap.get("drive-sync-periodic")?.scheduledTime === 777 && !h.alarms.includes("drive-sync-periodic"));
+  h = harness(source, {}, { alarmSeed: { "drive-sync-periodic": { periodInMinutes: 15 } }, vocabPreflight: blockedRow("corrupt"), notesPreflight: blockedRow("remote"), vocabulary: { ok: false, error: "corrupt" }, notes: { ok: false, error: "remote" } });
+  await h.queue({});
+  // Simplest miss: never clearing periodic, so two dead datasets wake the worker every 15 minutes.
+  check("both datasets blocked clears the periodic alarm", !h.alarmMap.has("drive-sync-periodic"));
+  h = harness(source, { [CONN_KEY]: connRow({ retryAt: later, retryAttempt: 2 }) }, { alarmSeed: { "drive-sync-retry": { scheduledTime: later } }, notesPreflight: blockedRow("corrupt"), vocabulary: { ok: true, status: { waitingForRetry: true, connectionWaiting: true, retryAt: later } } });
+  await h.queue({});
+  // Simplest miss: clearing all three alarms when a dataset blocks (the old finishFailure path).
+  check("a data-layer block during connection backoff keeps retry at the connection retryAt", h.alarmMap.get("drive-sync-retry")?.when === later && !h.alarms.includes("drive-sync-retry") && h.alarmMap.has("drive-sync-periodic"));
+  // End to end through the real runner (spec §10 supplementary test): each retryable connection-layer
+  // code the runner records must leave drive-sync-retry armed at the record's own retryAt.
+  const retryArmed = [];
+  for (const code of ["network", "server", "rate_limited"]) {
+    const c = harness(source, {}, { createVocabRunner: (options) => pbpCreateVocabDriveSyncRunner({ ...options,
+      client: { async openSession() { return { ok: false, error: code, retryable: true }; } },
+      store: { async getPreflightState() { return null; }, async deletePreflightState() { return true; } },
+      hashOwner: async () => HASH }) });
+    const result = await c.queue({});
+    const record = c.local[CONN_KEY];
+    retryArmed.push(result.error === code && record?.lastError === code && record.blocked === false &&
+      Number.isFinite(record.retryAt) && record.retryAt > Date.now() &&
+      c.alarmMap.get("drive-sync-retry")?.when === record.retryAt && c.alarmMap.has("drive-sync-periodic") &&
+      !c.calls.includes("notes"));
+  }
+  // Simplest misses: retry taken from the two preflights only (the old per-dataset rule), so a connection
+  // failure arms nothing and waits for the 15-minute periodic; or server/rate_limited folded into network.
+  check("network, server and rate_limited failures from the real runner each arm drive-sync-retry at the shared record's retryAt", retryArmed.length === 3 && retryArmed.every(Boolean));
+  const soon = Date.now() + 60000, afterSoon = Date.now() + 5 * 60000;
+  h = harness(source, { [CONN_KEY]: connRow({ retryAt: Date.now() - 60000 }) }, { vocabPreflight: backoffRow("local_store", afterSoon), notesPreflight: backoffRow("network", soon), vocabulary: { ok: true, status: { waitingForRetry: true } } });
+  await h.queue({});
+  // Simplest miss: taking every preflight retryAt, including a legacy connection-layer code the shared record
+  // now owns, or an already-expired retryAt (which fires the retry alarm at once, over and over).
+  check("retry takes the earliest pending data-layer retryAt and ignores legacy connection codes in preflight", h.alarmMap.get("drive-sync-retry")?.when === afterSoon);
+  h = harness(source, { [CONN_KEY]: connRow({ lastError: "auth", authAttempts: 5, retryAttempt: 0, blocked: true }) }, { alarmSeed: { "drive-sync-periodic": { periodInMinutes: 15 }, "drive-sync-retry": { scheduledTime: soon } }, vocabulary: { ok: false, error: "auth", retryable: false } });
+  await h.queue({});
+  // Simplest miss: treating a connection block like a dataset block and keeping periodic alive.
+  check("a connection-layer block clears periodic and retry", !h.alarmMap.has("drive-sync-periodic") && !h.alarmMap.has("drive-sync-retry"));
+  h = harness(source, {}, { alarmSeed: { "drive-sync-dirty": { scheduledTime: 999 } } });
+  await h.queue({});
+  // Simplest miss: rescheduling or dropping a pending dirty alarm while reconciling.
+  check("a healthy round ensures periodic, schedules no retry and leaves a pending dirty alarm alone", h.alarmMap.get("drive-sync-periodic")?.periodInMinutes === 15 && !h.alarmMap.has("drive-sync-retry") && h.alarmMap.get("drive-sync-dirty")?.scheduledTime === 999);
+  h = harness(source, { vocabDriveConnected: false }, { alarmSeed: Object.fromEntries(DRIVE_ALARMS.map((name) => [name, { scheduledTime: 1 }])) });
+  await h.reconcile();
+  // Simplest miss: an early return for disconnected devices that leaves their alarms waking the worker.
+  check("reconciling a disconnected device clears all three drive-sync alarms", h.alarmMap.size === 0 && DRIVE_ALARMS.every((name) => h.alarms.includes(name)));
+  // ---- Notifications: one per round, on a false -> true edge ----
+  const jump = () => {
+    const results = {};
+    results.vocabularyRun = async () => { results.vocabPreflight = blockedRow("corrupt"); return { ok: false, error: "corrupt" }; };
+    results.notesRun = async () => { results.notesPreflight = blockedRow("remote"); return { ok: false, error: "remote" }; };
+    return results;
+  };
+  h = harness(source, {}, jump());
+  await h.queue({}); const firstRoundNotices = h.notifications.length;
+  await h.queue({});
+  // Simplest miss: one notification per dataset, or one on every round while still blocked.
+  check("both datasets blocking in one round notify once, and a still-blocked round stays quiet", firstRoundNotices === 1 && h.notifications.length === 1 && h.notifications[0][0] === "drive-sync-blocked");
+  const manual = harness(source, {}, jump()); await manual.queue({ manual: true });
+  const interactive = harness(source, {}, jump()); await interactive.queue({ interactive: true });
+  // Simplest miss: gating on interactive alone; Sync now runs with interactive:false.
+  check("manual and interactive rounds never notify", manual.notifications.length === 0 && interactive.notifications.length === 0);
+  h = harness(source, {}, { vocabularyRun: async (options) => {
+    await options.connection.put(HASH, connRow({ lastError: "auth", authAttempts: 5, retryAttempt: 0, blocked: true }));
+    return { ok: false, error: "auth", retryable: false };
+  } });
+  await h.queue({});
+  // Simplest miss: reading the edge only from the two preflight rows, so a connection block never notifies.
+  check("a connection-layer block notifies once even though notes is skipped", h.notifications.length === 1 && h.local[CONN_KEY]?.blocked === true && h.calls.join() === "vocabulary");
+  // ---- Connect and Google identity ----
+  h = harness(source, {}, jump());
+  const connected = await h.connect();
+  // Simplest miss: Connect queueing a non-forced round, or one that notifies about the blocks it just hit
+  // (both datasets go false -> true here, so a round without manual:true would notify).
+  check("Connect authorizes, then runs one forced manual round of both datasets", connected.ok === false && connected.error === "corrupt" && h.calls.join() === "authorize,vocabulary,notes" && h.runs.length === 2 && h.runs.every((run) => run.force === true && run.interactive === false) && h.notifications.length === 0);
   h = harness(source, {}, { permissionGranted: false });
   const deniedConnect = await h.connect();
   check("Connect checks optional permissions before token mint or HTTP", deniedConnect.error === "permission" && h.calls.length === 0);
-  const deniedSync = await h.queue({});
-  check("revoked permission never starts selected dataset runners", deniedSync.error === "permission" && h.calls.length === 0);
-  const revokedBoot = bootHarness(source, { permissionGranted: false }); const bootResult = await revokedBoot.notesBoot();
-  check("boot with revoked permissions disconnects and clears both groups", bootResult.error === "permission" && revokedBoot.local.vocabDriveConnected === false && revokedBoot.cleared.length === 6 && revokedBoot.calls.length === 0);
   const snap = (permissionId, emailAddress) => ({ states: [{ drivePermissionId: permissionId, emailAddress, lastSuccessAt: 100 }], outbox: [], batches: [], notices: [] });
-  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true }, { vocabSnapshot: snap("google-old", "old@example.test"), notesSnapshot: snap("google-current", "current@example.test") });
-  const notesAccount = await h.status();
-  check("notes-only status identifies current notes account over disabled vocabulary history", notesAccount.drivePermissionId === "google-current" && notesAccount.emailAddress === "current@example.test");
-  h = harness(source, { driveSyncNotes: true }, { notesSnapshotError: true });
+  const previousConnection = { permissionId: "google-previous", emailAddress: "previous@example.test", displayName: "Previous" };
+  const confirmedNotes = { ok: true, status: { drivePermissionId: "google-new", emailAddress: "new@example.test", displayName: "New", lastSuccessAt: 200 } };
+  h = harness(source, { driveConnectionAccount: previousConnection }, { notes: confirmedNotes, notesSnapshot: snap("google-previous", "previous@example.test"), googleIdentity: { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" } });
+  const silentlySynced = await h.queue({}); const silentlySyncedStatus = await h.status();
+  check("successful background sync refreshes shared Google connection identity", silentlySynced.ok && h.local.driveConnectionAccount?.permissionId === "google-new" && silentlySyncedStatus.drivePermissionId === "google-new" && silentlySyncedStatus.emailAddress === "new@example.test");
+  h = harness(source, { driveConnectionAccount: previousConnection }, { notes: confirmedNotes, googleIdentity: { ok: true, permissionId: "google-third", emailAddress: "third@example.test" } });
+  const switchedAfterRun = await h.queue({});
+  check("connection identity refresh rejects Google switch after successful run", switchedAfterRun.error === "account_changed" && h.local.driveConnectionAccount.permissionId === "google-previous");
+  h = harness(source, { driveConnectionAccount: previousConnection }, { vocabulary: confirmedNotes, notes: confirmedNotes, googleIdentity: { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" } });
+  const sameIdentity = await h.queue({}), nextIdentity = await h.queue({});
+  // Simplest miss: the refresh of the session that just finished bumping the epoch and cancelling notes or the next round.
+  check("consecutive rounds on the same Google account do not cancel each other", sameIdentity.ok && nextIdentity.ok && h.local.driveConnectionAccount.permissionId === "google-new" && h.calls.length === 4);
+  const sameGoogle = await connectDuringSync(source, "google-a");
+  check("Connect preserves a healthy same-Google round despite older connection metadata", sameGoogle.first.ok && sameGoogle.reconnect.ok && sameGoogle.account.permissionId === "google-a" && sameGoogle.mutations.some((row) => row.run === 1 && row.kind === "cursor" && row.pageToken === "after-connect") && sameGoogle.notesRuns === 2);
+  const olderGoogle = await connectDuringSync(source, "google-old");
+  // Simplest miss: cancelling only the vocabulary half, so the cancelled round still runs notes on the old account.
+  check("Connect cancels a bound older-Google round, notes included, before its pending page can commit", olderGoogle.first.error === "account_changed" && olderGoogle.reconnect.ok && olderGoogle.account.permissionId === "google-a" && olderGoogle.mutations.every((row) => row.run !== 1) && olderGoogle.notesRuns === 1);
+  const epochOnly = await connectDuringSync(source, "google-old", { pinIdentity: true });
+  // Simplest miss: Connect observing the new identity without bumping driveScopeEpoch -- run 1's own
+  // identity reads still answer google-old here, so nothing else stops its pending page from committing.
+  check("Connect cancels an older-Google round through the epoch alone when the run's identity reads still match", epochOnly.first.error === "account_changed" && epochOnly.reconnect.ok && epochOnly.account.permissionId === "google-a" && epochOnly.mutations.every((row) => row.run !== 1) && epochOnly.notesRuns === 1);
+  // ---- Status (interim shape; the status rewrite replaces these) ----
+  h = harness(source);
+  const status = await h.status();
+  check("status exposes both datasets' pending counts on a connected device", status.pendingWords === 1 && status.notes?.pendingNotes === 1);
+  h = harness(source, {}, { notesSnapshotError: true });
   let notesFailed = null; try { notesFailed = await h.status(); } catch (_) {}
   // A failed status READ stops nothing, so it reports status_unavailable, never local_store + blocked (B13).
   check("notes status read failure retains healthy vocabulary status", notesFailed?.pendingWords === 1 && notesFailed.notes?.lastError === "status_unavailable" && notesFailed.notes.blocked === false);
-  h = harness(source, { driveSyncNotes: true }, { vocabSnapshotError: true });
+  h = harness(source, {}, { vocabSnapshotError: true });
   let vocabularyFailed = null; try { vocabularyFailed = await h.status(); } catch (_) {}
   check("vocabulary status read failure retains healthy notes status", vocabularyFailed?.lastError === "status_unavailable" && vocabularyFailed.blocked === false && vocabularyFailed.notes?.pendingNotes === 1 && !vocabularyFailed.notes.lastError);
   // Account rows as vocab-gdrive.js persists them: a backoff row keeps its retryAt.
-  const backoffRow = { states: [{ key: "account:google-a:" + "a".repeat(64), drivePermissionId: "google-a", ownerHash: "a".repeat(64), emailAddress: "current@example.test", displayName: "", bootstrapComplete: true, pageToken: "42", lastSuccessAt: 100, lastError: "network", retryAttempt: 2, retryAt: Date.UTC(2026, 9, 1) }], outbox: [], batches: [], notices: [] };
-  h = harness(source, {}, { vocabSnapshot: backoffRow, vocabPreflightError: true });
+  const accountBackoff = { states: [{ key: "account:google-a:" + HASH, drivePermissionId: "google-a", ownerHash: HASH, emailAddress: "current@example.test", displayName: "", bootstrapComplete: true, pageToken: "42", lastSuccessAt: 100, lastError: "network", retryAttempt: 2, retryAt: Date.UTC(2026, 9, 1) }], outbox: [], batches: [], notices: [] };
+  h = harness(source, {}, { vocabSnapshot: accountBackoff, vocabPreflightError: true });
   let preflightFailed = null; try { preflightFailed = await h.status(); } catch (_) {}
   check("unreadable preflight neither blocks nor promises the account row's stale retry", preflightFailed?.lastError === "status_unavailable" && preflightFailed.blocked === false && preflightFailed.retryAt === null && preflightFailed.lastSuccessAt === 100);
-  h = harness(source, {}, { vocabSnapshotError: true, vocabPreflight: { key: "preflight:" + "a".repeat(64), ownerHash: "a".repeat(64), retryAttempt: 0, retryAt: null, lastError: "corrupt", blocked: true } });
+  h = harness(source, {}, { vocabSnapshotError: true, vocabPreflight: blockedRow("corrupt") });
   let snapshotFailedBlocked = null; try { snapshotFailedBlocked = await h.status(); } catch (_) {}
   check("readable blocked preflight survives a snapshot read failure", snapshotFailedBlocked?.lastError === "corrupt" && snapshotFailedBlocked.blocked === true);
-  h = harness(source, { driveSyncNotes: false }, { notesSnapshotError: true });
-  let disabledNotes = null; try { disabledNotes = await h.status(); } catch (_) {}
-  check("disabled notes storage failure adds no visible dataset error", disabledNotes?.pendingWords === 1 && disabledNotes.notes?.lastError !== "local_store" && disabledNotes.notes?.blocked !== true);
-  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false }, { notesSnapshotError: true, vocabSnapshotError: true });
-  let disabledBoth = null; try { disabledBoth = await h.status(); } catch (_) {}
-  check("disabled dataset read failures retain a neutral shared connection status", disabledBoth?.connected === true && disabledBoth.lastError !== "local_store" && disabledBoth.blocked !== true && disabledBoth.notes?.lastError !== "local_store");
-  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false }); await h.connect();
-  const emptySelectionAccount = await h.status();
-  check("fresh connection identifies Google with both datasets disabled", emptySelectionAccount.drivePermissionId === "google-a" && emptySelectionAccount.emailAddress === "current@example.test" && h.calls.join() === "authorize");
-  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false }, { vocabSnapshot: snap("google-previous", "previous@example.test") }); await h.connect();
+  h = harness(source); await h.connect();
+  const freshConnection = await h.status();
+  check("fresh connection identifies Google", freshConnection.drivePermissionId === "google-a" && freshConnection.emailAddress === "current@example.test" && h.calls.join() === "authorize,vocabulary,notes");
+  h = harness(source, {}, { vocabSnapshot: snap("google-previous", "previous@example.test") }); await h.connect();
   const refreshedConnection = await h.status();
-  check("reconnect identity overrides disabled dataset account history", refreshedConnection.drivePermissionId === "google-a" && refreshedConnection.emailAddress === "current@example.test");
+  check("reconnect identity overrides older dataset account history", refreshedConnection.drivePermissionId === "google-a" && refreshedConnection.emailAddress === "current@example.test");
+  const olderVocabulary = snap("google-old", "old@example.test"), newerNotes = snap("google-recent", "recent@example.test"); newerNotes.states[0].lastSuccessAt = 200;
+  h = harness(source, {}, { vocabSnapshot: olderVocabulary, notesSnapshot: newerNotes });
+  const legacyAccount = await h.status();
+  check("legacy connection without shared identity uses the latest dataset account", legacyAccount.drivePermissionId === "google-recent" && legacyAccount.emailAddress === "recent@example.test");
+  // ---- Boot and disconnect ----
+  const boot = bootHarness(source);
+  await boot.boot({ throttleMs: 900000 }); await boot.boot({ throttleMs: 900000 });
+  // Simplest miss: a second, per-dataset stamp that lets the notes half bypass the throttle.
+  check("one cold-start throttle stamp covers the whole round", boot.calls.length === 1 && boot.calls[0] === 'round:{"interactive":false}' && boot.local._vocabBootSyncTs > 0 && !("_notesBootSyncTs" in boot.local));
+  const offline = bootHarness(source, { vocabDriveConnected: false });
+  const offlineBoot = await offline.boot();
+  check("boot on a disconnected device runs nothing", offlineBoot.ok === true && offline.calls.length === 0 && offline.cleared.length === 0);
+  const revokedBoot = bootHarness(source, { permissionGranted: false }); const bootResult = await revokedBoot.boot();
+  // Simplest miss: still clearing the six legacy names, leaving the new alarms alive.
+  check("boot with revoked permissions disconnects and clears the three drive-sync alarms", bootResult.error === "permission" && revokedBoot.local.vocabDriveConnected === false && revokedBoot.cleared.slice().sort().join() === DRIVE_ALARMS.join() && revokedBoot.calls.length === 0);
+  const disconnected = bootHarness(source, { pbp_hl_local: { note: "Keep local notes" } });
+  await disconnected.disconnect();
+  check("disconnect invalidates active runs before awaiting OAuth operations", disconnected.calls[0] === "mint:false" && disconnected.local.vocabDriveConnected === false && disconnected.epoch() === 1);
+  check("disconnect clears the three drive-sync alarms and retains local notes", DRIVE_ALARMS.every((name) => disconnected.cleared.includes(name)) && !disconnected.cleared.some((name) => /^(vocab|notes)-sync-/.test(name)) && disconnected.local.pbp_hl_local.note === "Keep local notes");
   const disconnectedIdentity = bootHarness(source, { driveConnectionAccount: { permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" }, pbp_hl_local: { note: "Preserve history" } }); await disconnectedIdentity.disconnect();
   check("disconnect clears shared connection identity while preserving dataset history", !("driveConnectionAccount" in disconnectedIdentity.local) && disconnectedIdentity.local.pbp_hl_local.note === "Preserve history");
-  const olderVocabulary = snap("google-old", "old@example.test"), newerNotes = snap("google-recent", "recent@example.test"); newerNotes.states[0].lastSuccessAt = 200;
-  h = harness(source, { driveSyncNotes: true }, { vocabSnapshot: olderVocabulary, notesSnapshot: newerNotes });
-  const legacyAccount = await h.status();
-  check("legacy connection without shared identity uses latest selected dataset account", legacyAccount.drivePermissionId === "google-recent" && legacyAccount.emailAddress === "recent@example.test");
-  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false }, { vocabSnapshot: snap("google-previous", "previous@example.test") });
-  const disabledLegacyAccount = await h.status();
-  check("legacy connection with no selected datasets does not leak disabled identity fields", !Object.hasOwn(disabledLegacyAccount, "drivePermissionId") && !Object.hasOwn(disabledLegacyAccount, "emailAddress") && !Object.hasOwn(disabledLegacyAccount, "displayName"));
-  const previousConnection = { permissionId: "google-previous", emailAddress: "previous@example.test", displayName: "Previous" };
-  const confirmedNotes = { ok: true, status: { drivePermissionId: "google-new", emailAddress: "new@example.test", displayName: "New", lastSuccessAt: 200 } };
-  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true, driveConnectionAccount: previousConnection }, { notes: confirmedNotes, notesSnapshot: snap("google-previous", "previous@example.test"), googleIdentity: { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" } });
-  const silentlySynced = await h.queue({}); const silentlySyncedStatus = await h.status();
-  check("successful background sync refreshes shared Google connection identity", silentlySynced.ok && h.local.driveConnectionAccount?.permissionId === "google-new" && silentlySyncedStatus.drivePermissionId === "google-new" && silentlySyncedStatus.emailAddress === "new@example.test");
-  h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: true, driveConnectionAccount: previousConnection }, { notes: confirmedNotes, googleIdentity: { ok: true, permissionId: "google-third", emailAddress: "third@example.test" } });
-  const switchedAfterRun = await h.queue({});
-  check("connection identity refresh rejects Google switch after successful run", switchedAfterRun.error === "account_changed" && h.local.driveConnectionAccount.permissionId === "google-previous");
-  h = harness(source, { driveSyncNotes: true, driveConnectionAccount: previousConnection }, { vocabulary: confirmedNotes, notes: confirmedNotes, googleIdentity: { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" } });
-  const concurrentIdentity = await h.queue({}), nextIdentity = await h.queue({});
-  check("concurrent syncs on the same Google account do not cancel each other or the next run", concurrentIdentity.ok && nextIdentity.ok && h.local.driveConnectionAccount.permissionId === "google-new" && h.calls.length === 4);
-  const sameGoogle = await connectDuringSync(source, "google-a");
-  check("Connect preserves a healthy same-Google run despite older connection metadata", sameGoogle.first.ok && sameGoogle.reconnect.ok && sameGoogle.account.permissionId === "google-a" && sameGoogle.mutations.some((row) => row.run === 1 && row.kind === "cursor" && row.pageToken === "after-connect"));
-  const olderGoogle = await connectDuringSync(source, "google-old");
-  check("Connect cancels a bound older-Google run before its pending identity read can commit", olderGoogle.first.error === "account_changed" && olderGoogle.reconnect.ok && olderGoogle.account.permissionId === "google-a" && olderGoogle.mutations.every((row) => row.run !== 1));
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

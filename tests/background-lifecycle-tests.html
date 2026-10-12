@@ -124,9 +124,9 @@ function buildStorageAccessHarness(source, opts) {
 
 // Cold-start Drive sync: this call sits at the SW top level, so it re-runs on
 // EVERY wake, and an idle browser is still woken every 5 minutes by the
-// storage-warm alarm. Only the wake path carries a throttle; the vocab-sync-*
+// storage-warm alarm. Only the wake path carries a throttle; the drive-sync-*
 // alarms are the real schedule and must stay immediate.
-function buildBootVocabSyncHarness(source, opts) {
+function buildBootDriveSyncHarness(source, opts) {
   const start = source.indexOf("const PBP_VOCAB_BOOT_SYNC_KEY");
   const end = source.indexOf("async function pbpDisconnectVocabDrive", start);
   if (start < 0 || end <= start) return null;
@@ -152,14 +152,39 @@ function buildBootVocabSyncHarness(source, opts) {
     PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected",
     PBP_GOOGLE_API_ORIGIN: "https://www.googleapis.com/*",
     pbpVocabDriveIsConnected: async () => true,
-    pbpDriveTypeEnabled: async () => true,
-    pbpQueueNotesDriveSync: async (options) => { syncs.push(options); return { ok: true }; },
-    pbpQueueVocabDriveSync: async (options) => { syncs.push(options); return { ok: true }; },
+    pbpClearDriveAlarms: async () => {},
+    pbpQueueDriveRound: async (options) => { syncs.push(options); return { ok: true }; },
     console,
   };
   const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
-    return { PBP_VOCAB_BOOT_SYNC_KEY, PBP_VOCAB_BOOT_SYNC_MIN_MS, pbpBootVocabDriveSync };`);
+    return { PBP_VOCAB_BOOT_SYNC_KEY, PBP_VOCAB_BOOT_SYNC_MIN_MS, pbpBootDriveSync };`);
   return { ...factory(...Object.values(deps)), syncs, local };
+}
+
+// The real onAlarm listener, sliced out and fed each alarm name. Only the
+// Drive branch matters here; the other branches get inert stand-ins.
+function buildDriveAlarmRouterHarness(source) {
+  const start = source.indexOf("chrome.alarms.onAlarm.addListener");
+  const end = source.indexOf("// React to settings change", start);
+  if (start < 0 || end <= start) return null;
+  const boots = [], listeners = [];
+  const inert = () => Promise.resolve();
+  const deps = {
+    chrome: { alarms: { onAlarm: { addListener: (fn) => listeners.push(fn) } } },
+    PBP_STORAGE_ACCESS_RETRY_ALARM: "storage-access-retry", PBP_UNDO_ALARM: "undo-expire",
+    // Contract values (vocab-gdrive.js); this page does not load that script.
+    PBP_DRIVE_DIRTY_ALARM: "drive-sync-dirty", PBP_DRIVE_PERIODIC_ALARM: "drive-sync-periodic",
+    PBP_DRIVE_RETRY_ALARM: "drive-sync-retry",
+    PBP_DRIVE_LEGACY_ALARMS: Object.freeze(["vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry",
+      "notes-sync-dirty", "notes-sync-periodic", "notes-sync-retry"]),
+    pbpBootDriveSync: (...args) => { boots.push(args); return Promise.resolve({ ok: true }); },
+    pbpRestrictStorageAccess: inert, processOfflineQueue: inert, pbpSweepInterruptedBatch: inert,
+    ensureKeepAlive: () => {}, _maybeReleaseKeepaliveAlarm: () => {}, updateBadge: inert,
+    pbpSweepExpiredUndo: inert, prewarmTagsNow: inert, primeSettings: inert, pbpMigrateSecretsToLocal: inert,
+    console,
+  };
+  new Function(...Object.keys(deps), source.slice(start, end))(...Object.values(deps));
+  return { fire: (name) => listeners.forEach((fn) => fn({ name })), boots, listeners };
 }
 
 // ---- Retired provider model defaults harness ----
@@ -447,36 +472,48 @@ function buildUndoHarness(source, opts) {
   // ---- Cold-start Drive sync throttle ----
   {
     const local = {};
-    const first = buildBootVocabSyncHarness(source, { local });
+    const first = buildBootDriveSyncHarness(source, { local });
     const window = first.PBP_VOCAB_BOOT_SYNC_MIN_MS;
-    await first.pbpBootVocabDriveSync({ throttleMs: window });
-    const second = buildBootVocabSyncHarness(source, { local });
-    await second.pbpBootVocabDriveSync({ throttleMs: window });
-    const third = buildBootVocabSyncHarness(source, { local });
-    await third.pbpBootVocabDriveSync({ throttleMs: window });
+    await first.pbpBootDriveSync({ throttleMs: window });
+    const second = buildBootDriveSyncHarness(source, { local });
+    await second.pbpBootDriveSync({ throttleMs: window });
+    const third = buildBootDriveSyncHarness(source, { local });
+    await third.pbpBootDriveSync({ throttleMs: window });
     const stamped = Number(local[first.PBP_VOCAB_BOOT_SYNC_KEY]) || 0;
     check("a wake within the throttle window opens no second Drive session",
       window >= 15 * 60 * 1000 && first.syncs.length === 1 &&
       second.syncs.length === 0 && third.syncs.length === 0 && stamped > 0);
 
     local[first.PBP_VOCAB_BOOT_SYNC_KEY] = stamped - window - 1;
-    const later = buildBootVocabSyncHarness(source, { local });
-    await later.pbpBootVocabDriveSync({ throttleMs: window });
+    const later = buildBootDriveSyncHarness(source, { local });
+    await later.pbpBootDriveSync({ throttleMs: window });
     check("a wake past the throttle window syncs again",
       later.syncs.length === 1 && later.syncs[0].interactive === false);
   }
   {
-    // vocab-sync-dirty / -periodic / -retry drive the real schedule: a word the
+    // drive-sync-dirty / -periodic / -retry drive the real schedule: a word the
     // user just saved must not wait out somebody else's cold-start window.
     const local = {};
-    const alarmDriven = buildBootVocabSyncHarness(source, { local });
-    await alarmDriven.pbpBootVocabDriveSync();
-    await alarmDriven.pbpBootVocabDriveSync();
-    await alarmDriven.pbpBootVocabDriveSync();
-    const alarmBranch = source.slice(source.indexOf('alarm.name === "vocab-sync-dirty"'));
-    check("alarm-driven vocabulary syncs are never throttled",
-      alarmDriven.syncs.length === 3 &&
-      /pbpBootVocabDriveSync\(\)\.catch/.test(alarmBranch.slice(0, 400)));
+    const alarmDriven = buildBootDriveSyncHarness(source, { local });
+    await alarmDriven.pbpBootDriveSync();
+    await alarmDriven.pbpBootDriveSync();
+    await alarmDriven.pbpBootDriveSync();
+    const router = buildDriveAlarmRouterHarness(source);
+    ["drive-sync-dirty", "drive-sync-periodic", "drive-sync-retry"].forEach((name) => router?.fire(name));
+    // Simplest miss: the router passing the cold-start throttle, or routing only one of the three names.
+    check("alarm-driven Drive syncs are never throttled",
+      alarmDriven.syncs.length === 3 && !!router && router.listeners.length === 1 &&
+      router.boots.length === 3 && router.boots.every((args) => args.length === 0));
+  }
+  {
+    const router = buildDriveAlarmRouterHarness(source);
+    ["vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry",
+      "notes-sync-dirty", "notes-sync-periodic", "notes-sync-retry"].forEach((name) => router?.fire(name));
+    const legacyBoots = router ? router.boots.length : -1;
+    ["keepalive", "drive-sync-other", "vocab-sync"].forEach((name) => router?.fire(name));
+    // Simplest miss: dropping the six pre-upgrade names, or matching any name with a "sync" prefix.
+    check("legacy vocab-sync-* and notes-sync-* alarms route to the unified boot until the migration retires them",
+      legacyBoots === 6 && router.boots.length === 6 && router.boots.every((args) => args.length === 0));
   }
 
   // ---- Retired provider model defaults ----
@@ -646,8 +683,9 @@ function buildUndoHarness(source, opts) {
       PBP_VOCAB_DRIVE_CAPABLE: false,
       PBP_VOCAB_DRIVE_CONNECTED_KEY: "k",
       pbpVocabDriveIsConnected: spy("vocabConnected", Promise.resolve(false)),
+      pbpDriveEnabled: spy("driveEnabled", Promise.resolve(false)),
       pbpDriveScheduleDirty: spy("driveDirty", Promise.resolve()),
-      pbpQueueVocabDriveSync: spy("vocabSync", Promise.resolve({ ok: true })),
+      pbpQueueDriveRound: spy("driveRound", Promise.resolve({ ok: true })),
       pbpGetVocabDriveStatus: spy("vocabStatus", Promise.resolve({})),
       pbpVocabDriveResponse: (r) => r,
       pbpVocabClearNotices: spy("vocabClear", Promise.resolve()),

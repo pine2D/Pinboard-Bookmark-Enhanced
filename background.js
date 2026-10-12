@@ -2131,38 +2131,39 @@ const PBP_DRIVE_CONNECTION_ACCOUNT_KEY = "driveConnectionAccount";
 const PBP_GOOGLE_API_ORIGIN = "https://www.googleapis.com/*";
 const PBP_VOCAB_DRIVE_CAPABLE =
   pbpVocabDriveOAuthActive(chrome.runtime.getManifest());
-const queueVocabSync = pbpCreateRecoveringTail();
-const queueNotesSync = pbpCreateRecoveringTail();
-// Epochs invalidate only jobs in this worker generation; durable scope flags
-// remain in local storage and are still reread at every asynchronous boundary.
-const driveScopeEpochs = { vocabulary: 0, notes: 0 };
-const driveSessionPermissionIds = { vocabulary: "", notes: "" };
-const driveSessionIdentityVersions = { vocabulary: 0, notes: 0 };
+// One queue runs every Drive round: vocabulary first, then notes.
+const queueDriveSync = pbpCreateRecoveringTail();
+// One epoch for the whole Drive connection. It invalidates only jobs in this
+// worker generation; the durable connected flag remains in local storage and
+// is still reread at every asynchronous boundary.
+let driveScopeEpoch = 0;
+// Rounds are serial, so at most one dataset session is ever in flight. The
+// slot names the dataset that is running and the Google account it bound;
+// pbpRunDriveDataset sets it per dataset and empties it when that run ends.
+const driveSession = { type: "", permissionId: "", identityVersion: 0, auth: null };
 let driveIdentityVersion = 0;
 let driveVerifiedPermissionId = "";
-function pbpDriveSessionOpened(type, permissionId) {
-  driveSessionPermissionIds[type] = permissionId;
-  if (driveSessionIdentityVersions[type] !== driveIdentityVersion &&
-      permissionId !== driveVerifiedPermissionId) driveScopeEpochs[type]++;
+function pbpDriveSessionOpened(permissionId) {
+  driveSession.permissionId = permissionId;
+  if (driveSession.identityVersion !== driveIdentityVersion &&
+      permissionId !== driveVerifiedPermissionId) driveScopeEpoch++;
 }
-function pbpObserveDriveIdentity(permissionId, finishedType = "") {
+// exemptInFlight: the caller is refreshing the identity of the session that
+// just finished, which must not cancel itself.
+function pbpObserveDriveIdentity(permissionId, exemptInFlight = false) {
   if (permissionId !== driveVerifiedPermissionId) {
     driveVerifiedPermissionId = permissionId; driveIdentityVersion++;
   }
-  for (const type of ["vocabulary", "notes"]) {
-    if (type !== finishedType && driveSessionPermissionIds[type] &&
-        driveSessionPermissionIds[type] !== permissionId) driveScopeEpochs[type]++;
-  }
+  if (!exemptInFlight && driveSession.permissionId &&
+      driveSession.permissionId !== permissionId) driveScopeEpoch++;
 }
 chrome.permissions.onRemoved?.addListener((removed) => {
   if (removed.permissions?.includes("identity") || removed.origins?.includes(PBP_GOOGLE_API_ORIGIN)) {
-    driveScopeEpochs.vocabulary++; driveScopeEpochs.notes++;
+    driveScopeEpoch++;
+    try { pbpVocabDriveForgetIdentity(); }
+    catch (e) { console.warn("[drive-sync] identity cache reset failed:", e?.name, e?.message); }
   }
 });
-
-async function pbpDriveScopes() {
-  return chrome.storage.local.get({ driveSyncVocabulary: true, driveSyncNotes: false });
-}
 
 async function pbpVocabDriveIsConnected() {
   if (!PBP_VOCAB_DRIVE_CAPABLE) return false;
@@ -2170,36 +2171,31 @@ async function pbpVocabDriveIsConnected() {
   return stored[PBP_VOCAB_DRIVE_CONNECTED_KEY] === true;
 }
 
-async function pbpDriveTypeEnabled(type) {
+// Connected means both datasets sync; there is no per-dataset switch.
+async function pbpDriveEnabled() {
   if (!await pbpVocabDriveIsConnected()) return false;
-  const scopes = await pbpDriveScopes();
-  const key = type === "notes" ? "driveSyncNotes" : "driveSyncVocabulary";
-  if (scopes[key] !== true || !await chrome.permissions.contains({
+  if (!await chrome.permissions.contains({
     permissions: ["identity"], origins: [PBP_GOOGLE_API_ORIGIN]
   })) return false;
-  const latest = await chrome.storage.local.get({
-    [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false, driveSyncVocabulary: true, driveSyncNotes: false
-  });
-  return latest[PBP_VOCAB_DRIVE_CONNECTED_KEY] === true && latest[key] === true;
+  // Reread after the permission await: a Disconnect landing in between wins.
+  return pbpVocabDriveIsConnected();
 }
 
 const vocabDriveClient = PBP_VOCAB_DRIVE_CAPABLE
-  ? pbpCreateVocabDriveClient({ beforeRequest: () => pbpDriveTypeEnabled("vocabulary") }) : null;
+  ? pbpCreateVocabDriveClient({ beforeRequest: pbpDriveEnabled }) : null;
 const notesDriveClient = PBP_VOCAB_DRIVE_CAPABLE
   ? pbpCreateVocabDriveClient({ protocol: PBP_NOTES_DRIVE_PROTOCOL,
-      beforeRequest: () => pbpDriveTypeEnabled("notes") }) : null;
-// Authorization is independent of the selected datasets, including an empty
-// selection. This client is used only by the explicit Connect action.
+      beforeRequest: pbpDriveEnabled }) : null;
+// Used only by the explicit Connect action, which authorizes before any round.
 const driveConnectClient = PBP_VOCAB_DRIVE_CAPABLE ? pbpCreateVocabDriveClient() : null;
-let notesSessionPermissionId = "";
-let notesSessionAuth = null;
 async function pbpNotesDriveCurrentOwner({ requireDriveAccount = true } = {}) {
-  if (!await pbpDriveTypeEnabled("notes")) return "";
+  if (!await pbpDriveEnabled()) return "";
+  const session = driveSession.type === "notes" ? driveSession : null;
   const auth = await getCurrentPinboardAuth();
   if (!auth?.account || !pbpPinboardAuthIsCurrent(auth) ||
-      (notesSessionAuth && (!pbpPinboardAuthIsCurrent(notesSessionAuth) ||
-        auth.account !== notesSessionAuth.account))) return "";
-  if (requireDriveAccount && notesSessionPermissionId) {
+      (session?.auth && (!pbpPinboardAuthIsCurrent(session.auth) ||
+        auth.account !== session.auth.account))) return "";
+  if (requireDriveAccount && session?.permissionId) {
     const current = await notesDriveClient.about();
     if (!current.ok) {
       const error = new Error("Drive identity verification unavailable");
@@ -2207,11 +2203,77 @@ async function pbpNotesDriveCurrentOwner({ requireDriveAccount = true } = {}) {
       error.retryable = current.retryable === true;
       throw error;
     }
-    if (current.permissionId !== notesSessionPermissionId) return "";
+    if (current.permissionId !== session.permissionId) return "";
   }
-  if (!await pbpDriveTypeEnabled("notes") || !pbpPinboardAuthIsCurrent(auth)) return "";
+  if (!await pbpDriveEnabled() || !pbpPinboardAuthIsCurrent(auth)) return "";
   return pbpDictOwnerScope(auth.account);
 }
+
+// Shared connection-layer state, one record per Pinboard owner. Runners read
+// and write it only through this store; a write lands only while the round
+// that started it is still current for the same owner and epoch.
+const PBP_DRIVE_CONN_STATE_PREFIX = "driveConnState:";
+let driveRoundContext = null;
+function pbpDriveNormalizeConnState(state) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return null;
+  const count = (value) => Number.isInteger(value) && value >= 0 ? value : 0;
+  const lastError = PBP_DRIVE_CONNECTION_ERRORS.has(state.lastError) ? state.lastError : null;
+  return {
+    lastError,
+    authAttempts: count(state.authAttempts),
+    retryAttempt: count(state.retryAttempt),
+    retryAt: Number.isFinite(state.retryAt) ? state.retryAt : null,
+    blocked: lastError !== null && state.blocked === true,
+    updatedAt: Number.isFinite(state.updatedAt) ? state.updatedAt : 0
+  };
+}
+// Throws when chrome.storage.local cannot be read: the status and the alarm
+// reconciliation must tell "no record" from "unreadable".
+async function pbpDriveReadConnState(ownerHash) {
+  if (!/^[0-9a-f]{64}$/.test(ownerHash)) return null;
+  const key = PBP_DRIVE_CONN_STATE_PREFIX + ownerHash;
+  const stored = await chrome.storage.local.get(key);
+  return pbpDriveNormalizeConnState(stored?.[key]);
+}
+const driveConnectionStore = {
+  // Spec §10.4: a runner that cannot read the record runs as if there were
+  // none -- one extra round of requests at worst -- instead of filing a
+  // local_store block that only Sync now would clear.
+  async get(ownerHash) {
+    try {
+      return await pbpDriveReadConnState(ownerHash);
+    } catch (e) {
+      console.warn("[drive-sync] connection state read failed:", e?.name, e?.message);
+      return null;
+    }
+  },
+  async put(ownerHash, state) {
+    const context = driveRoundContext;
+    if (!context || context.ownerHash !== ownerHash || context.epoch !== driveScopeEpoch) return false;
+    const current = await getCurrentPinboardAuth().catch((e) => {
+      console.warn("[drive-sync] connection state owner check failed:", e?.name, e?.message);
+      return null;
+    });
+    if (!current?.account || current.account !== context.auth?.account ||
+        !pbpPinboardAuthIsCurrent(context.auth) || !pbpPinboardAuthIsCurrent(current) ||
+        context.epoch !== driveScopeEpoch || driveRoundContext !== context) return false;
+    const key = PBP_DRIVE_CONN_STATE_PREFIX + ownerHash;
+    try {
+      if (state === null) {
+        await chrome.storage.local.remove(key);
+      } else {
+        const normalized = pbpDriveNormalizeConnState(state);
+        if (!normalized) return false;
+        await chrome.storage.local.set({ [key]: { ...normalized, updatedAt: Date.now() } });
+      }
+      return true;
+    } catch (e) {
+      console.warn("[drive-sync] connection state write failed:", e?.name, e?.message);
+      return false;
+    }
+  }
+};
+
 const notesDriveStore = PBP_VOCAB_DRIVE_CAPABLE
   ? pbpCreateNotesSyncStore({ getCurrentOwner: pbpNotesDriveCurrentOwner }) : null;
 const runVocabDriveSync = PBP_VOCAB_DRIVE_CAPABLE
@@ -2219,10 +2281,10 @@ const runVocabDriveSync = PBP_VOCAB_DRIVE_CAPABLE
       client: vocabDriveClient,
       getCurrentPinboardAuth,
       pinboardAuthIsCurrent: pbpPinboardAuthIsCurrent,
-      isEnabled: () => pbpDriveTypeEnabled("vocabulary"),
-      connection: null,
-      getScopeEpoch: () => driveScopeEpochs.vocabulary,
-      onSession: (permissionId) => pbpDriveSessionOpened("vocabulary", permissionId),
+      isEnabled: pbpDriveEnabled,
+      getScopeEpoch: () => driveScopeEpoch,
+      onSession: pbpDriveSessionOpened,
+      connection: driveConnectionStore,
       getCurrentPermissionId: async () => {
         return vocabDriveClient.about();
       }
@@ -2232,24 +2294,24 @@ const runNotesDriveSync = PBP_VOCAB_DRIVE_CAPABLE
       client: notesDriveClient, store: notesDriveStore,
       getCurrentPinboardAuth,
       pinboardAuthIsCurrent: pbpPinboardAuthIsCurrent,
-      isEnabled: () => pbpDriveTypeEnabled("notes"),
-      connection: null,
-      getScopeEpoch: () => driveScopeEpochs.notes,
-      onSession: (permissionId) => {
-        notesSessionPermissionId = permissionId;
-        pbpDriveSessionOpened("notes", permissionId);
-      },
+      isEnabled: pbpDriveEnabled,
+      getScopeEpoch: () => driveScopeEpoch,
+      onSession: pbpDriveSessionOpened,
+      connection: driveConnectionStore,
       getCurrentPermissionId: async () => {
         return notesDriveClient.about();
       }
     }) : null;
 
-async function pbpAnnounceVocabDriveBlocked(before, after, type = "vocabulary") {
-  if (after?.blocked !== true || before?.blocked === true) return;
-  await showNotification(
-    type === "notes" ? "notes-drive-blocked" : "vocab-drive-blocked",
-    t("extName"), t("vocabDriveBlockedNotice"), "error"
-  );
+// One notification per round, on a false -> true edge only. showNotification
+// suffixes its id with a timestamp, so the edge is the only dedupe there is.
+async function pbpAnnounceDriveBlocked(before, after) {
+  const rose = ["connection", "vocabulary", "notes"].some((name) =>
+    before?.[name]?.known === true && before[name].blocked === false &&
+    after?.[name]?.known === true && after[name].blocked === true);
+  if (!rose) return false;
+  await showNotification("drive-sync-blocked", t("extName"), t("vocabDriveBlockedNotice"), "error");
+  return true;
 }
 
 function pbpBroadcastVocabSynced(owner, type = "vocabulary") {
@@ -2261,29 +2323,22 @@ function pbpBroadcastVocabSynced(owner, type = "vocabulary") {
   } catch (_) {}
 }
 
-function pbpQueueVocabDriveSync(options) {
-  return pbpQueueDriveTypeSync("vocabulary", options);
-}
-function pbpQueueNotesDriveSync(options) {
-  return pbpQueueDriveTypeSync("notes", options);
-}
 async function pbpRefreshDriveConnectionAccount(type, auth, confirmedState) {
   if (typeof confirmedState?.drivePermissionId !== "string" || !confirmedState.drivePermissionId) return { ok: true };
-  const scopeEpoch = driveScopeEpochs[type];
-  if (!await pbpDriveTypeEnabled(type)) return { ok: false, error: "account_changed" };
+  const scopeEpoch = driveScopeEpoch;
+  if (!await pbpDriveEnabled()) return { ok: false, error: "account_changed" };
   const verified = await (type === "notes" ? notesDriveClient : vocabDriveClient).about();
   if (!verified.ok) return verified;
   if (verified.permissionId !== confirmedState.drivePermissionId) return { ok: false, error: "account_changed" };
-  if (!await pbpDriveTypeEnabled(type)) return { ok: false, error: "account_changed" };
+  if (!await pbpDriveEnabled()) return { ok: false, error: "account_changed" };
   const currentAuth = await getCurrentPinboardAuth();
   if (!auth?.account || currentAuth?.account !== auth.account || !pbpPinboardAuthIsCurrent(auth) ||
-      !pbpPinboardAuthIsCurrent(currentAuth) || driveScopeEpochs[type] !== scopeEpoch) {
+      !pbpPinboardAuthIsCurrent(currentAuth) || driveScopeEpoch !== scopeEpoch) {
     return { ok: false, error: "account_changed" };
   }
-  // Keep concurrent runs already bound to this Google account alive. Older
-  // bound sessions are cancelled now; a session still opening checks the
-  // verified identity generation when it receives its permissionId.
-  pbpObserveDriveIdentity(verified.permissionId, type);
+  // The session that just finished is exempt; a Connect that observed a
+  // different Google account meanwhile has already bumped the epoch above.
+  pbpObserveDriveIdentity(verified.permissionId, true);
   try {
     await chrome.storage.local.set({ [PBP_DRIVE_CONNECTION_ACCOUNT_KEY]: {
       permissionId: verified.permissionId,
@@ -2295,65 +2350,225 @@ async function pbpRefreshDriveConnectionAccount(type, auth, confirmedState) {
     return { ok: false, error: "local_store" };
   }
 }
-function pbpQueueDriveTypeSync(type, options) {
-  if (!PBP_VOCAB_DRIVE_CAPABLE) return Promise.resolve({ ok: false, error: "unavailable", retryable: false });
-  const tail = type === "notes" ? queueNotesSync : queueVocabSync;
-  return tail(async () => {
-    if (!await pbpDriveTypeEnabled(type)) {
-      const scopes = await pbpDriveScopes();
-      if (scopes[type === "notes" ? "driveSyncNotes" : "driveSyncVocabulary"] !== true) return { ok: false, error: "disabled" };
-      if (!await pbpVocabDriveIsConnected()) return { ok: false, error: "not_connected" };
-      return { ok: false, error: "permission" };
+
+// Preflight rows written before the shared connection record existed may
+// still carry a connection-layer code; those belong to driveConnState now.
+function pbpDriveDataLayerState(preflight) {
+  if (!preflight || typeof preflight.lastError !== "string" ||
+      PBP_DRIVE_CONNECTION_ERRORS.has(preflight.lastError)) return { blocked: false, retryAt: null };
+  const blocked = preflight.blocked === true;
+  return { blocked, retryAt: !blocked && Number.isFinite(preflight.retryAt) ? preflight.retryAt : null };
+}
+async function pbpDriveReadRoundState(ownerHash) {
+  const reads = await Promise.allSettled([
+    pbpDriveReadConnState(ownerHash),
+    pbpVocabGetPreflightState(ownerHash),
+    notesDriveStore.getPreflightState(ownerHash)
+  ]);
+  const shape = (read, label, toState) => {
+    if (read.status === "rejected") {
+      console.warn("[drive-sync] round state unavailable:", label, read.reason?.name, read.reason?.message);
+      return { known: false, blocked: false, retryAt: null };
     }
-    const auth = await getCurrentPinboardAuth().catch(() => null);
-    const ownerScope = auth?.account ? pbpDictOwnerScope(auth.account) : "";
-    const ownerHash = ownerScope ? await pbpVocabOwnerHash(ownerScope).catch(() => "") : "";
-    const getPreflight = type === "notes"
-      ? (hash) => notesDriveStore.getPreflightState(hash) : pbpVocabGetPreflightState;
-    const before = ownerHash ? await getPreflight(ownerHash).catch(() => null) : null;
-    driveSessionPermissionIds[type] = "";
-    driveSessionIdentityVersions[type] = driveIdentityVersion;
-    if (type === "notes") { notesSessionAuth = auth; notesSessionPermissionId = ""; }
+    return { known: true, ...toState(read.value) };
+  };
+  return {
+    connection: shape(reads[0], "connection", (row) => ({
+      blocked: row?.blocked === true,
+      retryAt: row && row.blocked !== true && Number.isFinite(row.retryAt) ? row.retryAt : null
+    })),
+    vocabulary: shape(reads[1], "vocabulary", pbpDriveDataLayerState),
+    notes: shape(reads[2], "notes", pbpDriveDataLayerState)
+  };
+}
+
+async function pbpClearDriveAlarms() {
+  await Promise.all([PBP_DRIVE_DIRTY_ALARM, PBP_DRIVE_PERIODIC_ALARM, PBP_DRIVE_RETRY_ALARM]
+    .map((name) => chrome.alarms.clear(name)));
+}
+
+// Runners never touch alarms; every round ends here. A data-layer block never
+// clears periodic or dirty, so one stuck dataset cannot starve the other.
+async function pbpReconcileDriveAlarms() {
+  if (!PBP_VOCAB_DRIVE_CAPABLE) return null;
+  if (!await pbpDriveEnabled()) { await pbpClearDriveAlarms(); return null; }
+  const auth = await getCurrentPinboardAuth().catch((e) => {
+    console.warn("[drive-sync] alarm reconcile owner read failed:", e?.name, e?.message);
+    return null;
+  });
+  const ownerHash = auth?.account && pbpPinboardAuthIsCurrent(auth)
+    ? await pbpVocabOwnerHash(pbpDictOwnerScope(auth.account)).catch((e) => {
+      console.warn("[drive-sync] alarm reconcile owner hash failed:", e?.name, e?.message);
+      return "";
+    }) : "";
+  if (!ownerHash) {
+    // No Pinboard owner yet: nothing is blocked or backing off, and the
+    // periodic alarm is what picks the device up after sign-in.
+    await pbpDriveEnsurePeriodic(chrome.alarms);
+    return null;
+  }
+  const state = await pbpDriveReadRoundState(ownerHash);
+  if (!await pbpDriveEnabled()) { await pbpClearDriveAlarms(); return null; }
+  const rows = [state.connection, state.vocabulary, state.notes];
+  const connectionBlocked = state.connection.known && state.connection.blocked;
+  const datasetsBlocked = state.vocabulary.known && state.vocabulary.blocked &&
+    state.notes.known && state.notes.blocked;
+  if (connectionBlocked || datasetsBlocked) await chrome.alarms.clear(PBP_DRIVE_PERIODIC_ALARM);
+  else await pbpDriveEnsurePeriodic(chrome.alarms);
+  const now = Date.now();
+  const due = connectionBlocked ? [] : rows
+    .filter((row) => row.known && !row.blocked && Number.isFinite(row.retryAt) && row.retryAt > now)
+    .map((row) => row.retryAt);
+  if (due.length) {
+    await chrome.alarms.create(PBP_DRIVE_RETRY_ALARM, { when: Math.min(...due) });
+  } else if (connectionBlocked || rows.every((row) => row.known)) {
+    // An unreadable row might still hold a backoff: keep its alarm.
+    await chrome.alarms.clear(PBP_DRIVE_RETRY_ALARM);
+  }
+  return { ownerHash, state };
+}
+
+async function pbpRunDriveDataset(type, auth, ownerScope, runOptions) {
+  driveSession.type = type;
+  driveSession.permissionId = "";
+  driveSession.identityVersion = driveIdentityVersion;
+  driveSession.auth = auth;
+  try {
+    let result;
     try {
-      let result = await (type === "notes" ? runNotesDriveSync : runVocabDriveSync)(options);
-      if (result?.ok && result.changed && auth && pbpPinboardAuthIsCurrent(auth)) {
-        pbpBroadcastVocabSynced(ownerScope, type);
-      }
-      if (result?.ok && !result.status?.waitingForRetry) {
-        const refreshed = await pbpRefreshDriveConnectionAccount(type, auth, result.status);
-        if (!refreshed.ok) result = { ...refreshed, changed: result.changed, status: result.status };
-      }
-      if (!options?.interactive && ownerHash && await pbpDriveTypeEnabled(type)) {
-        const after = await getPreflight(ownerHash).catch(() => null);
-        await pbpAnnounceVocabDriveBlocked(before, after, type).catch(() => {});
-      }
-      return result;
-    } finally {
-      driveSessionPermissionIds[type] = "";
-      if (type === "notes") { notesSessionPermissionId = ""; notesSessionAuth = null; }
+      result = await (type === "notes" ? runNotesDriveSync : runVocabDriveSync)(runOptions);
+    } catch (error) {
+      console.warn("[drive-sync] dataset run failed:", type, error?.name, error?.message);
+      result = null;
     }
+    if (!result || typeof result !== "object") result = { ok: false, error: "unexpected", retryable: true };
+    if (result.ok && result.changed && auth && pbpPinboardAuthIsCurrent(auth)) {
+      pbpBroadcastVocabSynced(ownerScope, type);
+    }
+    if (result.ok && !result.status?.waitingForRetry) {
+      const refreshed = await pbpRefreshDriveConnectionAccount(type, auth, result.status);
+      if (!refreshed.ok) result = { ...refreshed, changed: result.changed, status: result.status };
+    }
+    return result;
+  } finally {
+    driveSession.type = ""; driveSession.permissionId = ""; driveSession.auth = null;
+  }
+}
+
+const PBP_DRIVE_CONTROL_ERRORS = new Set(["account_changed", "pinboard_auth", "not_connected"]);
+// Same conclusion, zero notes requests: the connection layer is shared, and a
+// cancelled or ownerless round has nothing a notes run could still commit.
+function pbpDriveRoundSkip(vocabulary, roundEpoch) {
+  if (driveScopeEpoch !== roundEpoch) {
+    return { ok: false, error: "account_changed", retryable: false, skipped: true };
+  }
+  if (!vocabulary.ok && (PBP_DRIVE_CONNECTION_ERRORS.has(vocabulary.error) ||
+      PBP_DRIVE_CONTROL_ERRORS.has(vocabulary.error))) {
+    return { ok: false, error: vocabulary.error, retryable: vocabulary.retryable === true, skipped: true };
+  }
+  if (vocabulary.ok && vocabulary.status?.connectionWaiting === true) {
+    return { ok: true, skipped: true, status: { waitingForRetry: true, connectionWaiting: true,
+      retryAt: Number.isFinite(vocabulary.status.retryAt) ? vocabulary.status.retryAt : null } };
+  }
+  return null;
+}
+function pbpDriveRoundOutcome(results) {
+  const rows = [results.vocabulary, results.notes].filter(Boolean);
+  const failed = rows.find((row) => !row.ok && PBP_DRIVE_CONNECTION_ERRORS.has(row.error)) ||
+    rows.find((row) => !row.ok && PBP_DRIVE_CONTROL_ERRORS.has(row.error)) ||
+    rows.find((row) => !row.ok);
+  if (failed) {
+    return { ok: false, error: failed.error || "remote", retryable: failed.retryable === true, results };
+  }
+  if (rows.some((row) => row.status?.waitingForRetry === true)) {
+    return { ok: false, error: "waiting_for_retry", waitingForRetry: true, results };
+  }
+  return { ok: true, results };
+}
+
+// Spec §10.5: with its preflight gone, a dataset's status falls back to its
+// account row, so a notes half the forced round skips would keep showing the
+// data-layer error the user just forced past. Only the error fields go; the
+// cursor, bootstrap state and backoff count stay.
+async function pbpDriveClearAccountRowErrors(ownerScope, ownerHash) {
+  const stale = (row) => !!row && (row.lastError != null || row.retryAt != null);
+  const cleared = (row) => ({ ...row, lastError: null, retryAt: null });
+  const [vocabRows, notesSnapshot] = await Promise.all([
+    pbpVocabListAccountStates(ownerHash),
+    pbpNotesSyncSnapshot(ownerScope, ownerHash)
+  ]);
+  const written = await Promise.all([
+    ...vocabRows.filter(stale).map((row) => pbpVocabPutAccountState(cleared(row))),
+    ...(notesSnapshot?.states || []).filter(stale).map((row) => notesDriveStore.putAccountState(cleared(row)))
+  ]);
+  return written.every((value) => value === true);
+}
+
+// Contract: force lifts the shared connection record, BOTH data-layer blocks
+// and both datasets' account-row errors before anything runs, so a forced
+// round whose vocabulary half stops at the connection layer still clears the
+// notes block it skips.
+async function pbpDriveForceClear(auth, ownerHash, roundEpoch) {
+  if (!pbpPinboardAuthIsCurrent(auth) || driveScopeEpoch !== roundEpoch) return;
+  const cleared = await Promise.allSettled([
+    driveConnectionStore.put(ownerHash, null),
+    pbpVocabDeletePreflightState(ownerHash),
+    notesDriveStore.deletePreflightState(ownerHash),
+    pbpDriveClearAccountRowErrors(pbpDictOwnerScope(auth.account), ownerHash)
+  ]);
+  cleared.forEach((row, index) => {
+    if (row.status === "fulfilled" && row.value === true) return;
+    console.warn("[drive-sync] force clear incomplete:", ["connection", "vocabulary", "notes", "account rows"][index],
+      row.reason?.name, row.reason?.message);
   });
 }
 
-async function pbpQueueSelectedDriveSync(options = {}) {
-  if (!await pbpVocabDriveIsConnected()) return { ok: false, error: "not_connected" };
-  const scopes = await pbpDriveScopes();
-  const selected = [];
-  if (scopes.driveSyncVocabulary === true) selected.push(["vocabulary", pbpQueueVocabDriveSync(options)]);
-  if (scopes.driveSyncNotes === true) selected.push(["notes", pbpQueueNotesDriveSync(options)]);
-  if (!selected.length) return { ok: false, error: "no_data_selected" };
-  const completed = await Promise.allSettled(selected.map(([, result]) => result));
-  const results = {};
-  completed.forEach((result, index) => {
-    results[selected[index][0]] = result.status === "fulfilled"
-      ? result.value : { ok: false, error: "remote" };
+async function pbpQueueDriveRound(options = {}) {
+  const interactive = options.interactive === true;
+  const force = options.force === true;
+  const manual = options.manual === true;
+  if (!PBP_VOCAB_DRIVE_CAPABLE) return { ok: false, error: "unavailable", results: {} };
+  return queueDriveSync(async () => {
+    if (!await pbpDriveEnabled()) {
+      const connected = await pbpVocabDriveIsConnected();
+      return { ok: false, error: connected ? "permission" : "not_connected", results: {} };
+    }
+    const roundEpoch = driveScopeEpoch;
+    const auth = await getCurrentPinboardAuth().catch(() => null);
+    const ownerScope = auth?.account && pbpPinboardAuthIsCurrent(auth) ? pbpDictOwnerScope(auth.account) : "";
+    const ownerHash = ownerScope ? await pbpVocabOwnerHash(ownerScope).catch(() => "") : "";
+    const runOptions = { interactive, force };
+    const results = {};
+    let before = null;
+    driveRoundContext = ownerHash ? { auth, ownerHash, epoch: roundEpoch } : null;
+    try {
+      if (force && ownerHash) await pbpDriveForceClear(auth, ownerHash, roundEpoch);
+      if (ownerHash) before = await pbpDriveReadRoundState(ownerHash);
+      results.vocabulary = await pbpRunDriveDataset("vocabulary", auth, ownerScope, runOptions);
+      results.notes = pbpDriveRoundSkip(results.vocabulary, roundEpoch) ||
+        await pbpRunDriveDataset("notes", auth, ownerScope, runOptions);
+    } finally {
+      driveRoundContext = null;
+    }
+    let observed = null;
+    try { observed = await pbpReconcileDriveAlarms(); }
+    catch (e) { console.warn("[drive-sync] alarm reconcile failed:", e?.name, e?.message); }
+    // Manual Sync now and Connect report in the panel; only background rounds notify.
+    if (!interactive && !manual && before && observed?.ownerHash === ownerHash &&
+        await pbpDriveEnabled()) {
+      try { await pbpAnnounceDriveBlocked(before, observed.state); }
+      catch (e) { console.warn("[drive-sync] blocked notice failed:", e?.name, e?.message); }
+    }
+    const outcome = pbpDriveRoundOutcome(results);
+    // Spec §10.3: a round the epoch cut short because this device was
+    // disconnected meanwhile is not an error to paint -- the panel already
+    // shows the disconnected state. Only a still-connected device hears
+    // account_changed.
+    if (!outcome.ok && driveScopeEpoch !== roundEpoch && !await pbpVocabDriveIsConnected()) {
+      return { ok: false, error: "not_connected", retryable: false, results: outcome.results };
+    }
+    return outcome;
   });
-  const failed = Object.values(results).find((result) => !result?.ok);
-  if (failed) return { ...failed, results };
-  if (Object.values(results).some((result) => result.status?.waitingForRetry)) {
-    return { ok: false, error: "waiting_for_retry", results };
-  }
-  return { ok: true, results };
 }
 
 async function pbpConnectDrive() {
@@ -2375,9 +2590,7 @@ async function pbpConnectDrive() {
       emailAddress: account.emailAddress || "", displayName: account.displayName || ""
     }
   });
-  const scopes = await pbpDriveScopes();
-  if (scopes.driveSyncVocabulary !== true && scopes.driveSyncNotes !== true) return { ok: true };
-  return pbpQueueSelectedDriveSync({ interactive: false, force: true });
+  return pbpQueueDriveRound({ interactive: false, force: true, manual: true });
 }
 
 function pbpDriveSnapshotStatus(snapshot, preflight, pendingName) {
@@ -2393,12 +2606,13 @@ function pbpDriveSnapshotStatus(snapshot, preflight, pendingName) {
   };
 }
 async function pbpGetVocabDriveStatus() {
-  const [connected, scopes, auth, connection] = await Promise.all([
-    pbpVocabDriveIsConnected(), pbpDriveScopes(), getCurrentPinboardAuth(),
+  const [connected, auth, connection] = await Promise.all([
+    pbpVocabDriveIsConnected(), getCurrentPinboardAuth(),
     chrome.storage.local.get({ [PBP_DRIVE_CONNECTION_ACCOUNT_KEY]: null })
   ]);
-  const base = { connected, vocabularyEnabled: scopes.driveSyncVocabulary === true,
-    notesEnabled: scopes.driveSyncNotes === true, owner: "", pendingWords: 0,
+  // Interim until the status rewrite: connected means both datasets sync.
+  const base = { connected, vocabularyEnabled: connected,
+    notesEnabled: connected, owner: "", pendingWords: 0,
     pendingBatches: 0, notices: 0, notes: { pendingNotes: 0, pendingBatches: 0, notices: 0 } };
   if (!auth?.account || !pbpPinboardAuthIsCurrent(auth)) return base;
   const ownerScope = pbpDictOwnerScope(auth.account);
@@ -2474,13 +2688,14 @@ async function pbpVocabDriveResponse(result) {
 // this file) — with storage-warm waking an idle browser every 5 minutes, a
 // connected device opened a Drive session (an about() round trip, plus another
 // on a successful finish) that often, while the design cadence is the 15-minute
-// vocab-sync-periodic alarm. Alarm-driven runs carry the real schedule and pass
+// drive-sync-periodic alarm. Alarm-driven runs carry the real schedule and pass
 // no throttle, so a freshly dirtied word still syncs immediately. The stamp is
-// persisted because the throttle has to survive the worker that set it.
+// persisted because the throttle has to survive the worker that set it. One
+// stamp covers the whole round: both datasets run in it.
 const PBP_VOCAB_BOOT_SYNC_KEY = "_vocabBootSyncTs";
 const PBP_VOCAB_BOOT_SYNC_MIN_MS = 15 * 60 * 1000;
 
-async function pbpBootVocabDriveSync({ throttleMs = 0, type = "vocabulary" } = {}) {
+async function pbpBootDriveSync({ throttleMs = 0 } = {}) {
   if (!PBP_VOCAB_DRIVE_CAPABLE) return { ok: true };
   if (!await pbpVocabDriveIsConnected()) return { ok: true };
   const granted = await chrome.permissions.contains({
@@ -2489,39 +2704,25 @@ async function pbpBootVocabDriveSync({ throttleMs = 0, type = "vocabulary" } = {
   });
   if (!granted) {
     await chrome.storage.local.set({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
-    await Promise.all([pbpClearDriveTypeAlarms("vocabulary"), pbpClearDriveTypeAlarms("notes")]);
+    await pbpClearDriveAlarms();
     return { ok: false, error: "permission" };
   }
-  if (!await pbpDriveTypeEnabled(type)) {
-    await pbpClearDriveTypeAlarms(type);
-    return { ok: true };
-  }
-  const bootKey = type === "notes" ? "_notesBootSyncTs" : PBP_VOCAB_BOOT_SYNC_KEY;
   if (throttleMs > 0) {
     const now = Date.now();
     let last = 0;
     try {
-      const stored = await chrome.storage.local.get({ [bootKey]: 0 });
-      last = Number(stored?.[bootKey]) || 0;
+      const stored = await chrome.storage.local.get({ [PBP_VOCAB_BOOT_SYNC_KEY]: 0 });
+      last = Number(stored?.[PBP_VOCAB_BOOT_SYNC_KEY]) || 0;
     } catch (e) {
-      console.warn("[vocab-sync] boot throttle read failed:", e?.name, e?.message);
+      console.warn("[drive-sync] boot throttle read failed:", e?.name, e?.message);
     }
-    // Stamp BEFORE the run: a failed sync sets its own retryAt/backoff and owns
-    // the vocab-sync-retry alarm, so the wake path must not hammer it either.
+    // Stamp BEFORE the run: a failed sync sets its own retryAt/backoff and the
+    // round reconciles drive-sync-retry, so the wake path must not hammer it.
     if (now - last < throttleMs) return { ok: true, throttled: true };
-    try { await chrome.storage.local.set({ [bootKey]: now }); }
-    catch (e) { console.warn("[vocab-sync] boot throttle write failed:", e?.name, e?.message); }
+    try { await chrome.storage.local.set({ [PBP_VOCAB_BOOT_SYNC_KEY]: now }); }
+    catch (e) { console.warn("[drive-sync] boot throttle write failed:", e?.name, e?.message); }
   }
-  return type === "notes" ? pbpQueueNotesDriveSync({ interactive: false })
-    : pbpQueueVocabDriveSync({ interactive: false });
-}
-
-function pbpBootNotesDriveSync(options = {}) {
-  return pbpBootVocabDriveSync({ ...options, type: "notes" });
-}
-async function pbpClearDriveTypeAlarms(type) {
-  const prefix = type === "notes" ? "notes-sync" : "vocab-sync";
-  await Promise.all(["dirty", "periodic", "retry"].map((suffix) => chrome.alarms.clear(`${prefix}-${suffix}`)));
+  return pbpQueueDriveRound({ interactive: false });
 }
 
 async function pbpDisconnectVocabDrive() {
@@ -2529,10 +2730,10 @@ async function pbpDisconnectVocabDrive() {
     return { ok: false, error: "unavailable" };
   }
   // Invalidate running jobs before awaiting token or permission operations.
-  driveScopeEpochs.vocabulary++; driveScopeEpochs.notes++;
+  driveScopeEpoch++;
   await chrome.storage.local.set({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
   await chrome.storage.local.remove(PBP_DRIVE_CONNECTION_ACCOUNT_KEY);
-  await Promise.all([pbpClearDriveTypeAlarms("vocabulary"), pbpClearDriveTypeAlarms("notes")]);
+  await pbpClearDriveAlarms();
   let token = "";
   try {
     const result = await chrome.identity.getAuthToken({ interactive: false });
@@ -2568,12 +2769,13 @@ async function pbpDisconnectVocabDrive() {
   if (removed !== true || residual === true) {
     console.warn("[vocab-drive] disconnect: permission removal incomplete", removed, residual);
   }
-  await Promise.all([pbpClearDriveTypeAlarms("vocabulary"), pbpClearDriveTypeAlarms("notes")]);
+  await pbpClearDriveAlarms();
   return { ok: true, status: await pbpGetVocabDriveStatus() };
 }
 
-pbpBootVocabDriveSync({ throttleMs: PBP_VOCAB_BOOT_SYNC_MIN_MS }).catch(() => {});
-pbpBootNotesDriveSync({ throttleMs: PBP_VOCAB_BOOT_SYNC_MIN_MS }).catch(() => {});
+pbpBootDriveSync({ throttleMs: PBP_VOCAB_BOOT_SYNC_MIN_MS }).catch((e) => {
+  console.warn("[drive-sync] cold-start sync failed:", e?.name, e?.message);
+});
 
 const queuePrewarmAlarmSync = pbpCreateRecoveringTail();
 function syncPrewarmTagsAlarm() {
@@ -2615,14 +2817,14 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       console.warn("[storage-access] retry failed:", e?.name, e?.message);
     });
   }
-  if (alarm.name === "vocab-sync-dirty" ||
-      alarm.name === "vocab-sync-periodic" ||
-      alarm.name === "vocab-sync-retry") {
-    pbpBootVocabDriveSync().catch(() => {});
-  }
-  if (alarm.name === "notes-sync-dirty" ||
-      alarm.name === "notes-sync-periodic" || alarm.name === "notes-sync-retry") {
-    pbpBootNotesDriveSync().catch(() => {});
+  // Legacy vocab-sync-* / notes-sync-* names still route here until
+  // pbpRetireDriveScopeKeys retires them, so a pre-upgrade alarm racing the
+  // migration still runs one unthrottled round instead of being dropped.
+  if (alarm.name === PBP_DRIVE_DIRTY_ALARM || alarm.name === PBP_DRIVE_PERIODIC_ALARM ||
+      alarm.name === PBP_DRIVE_RETRY_ALARM || PBP_DRIVE_LEGACY_ALARMS.includes(alarm.name)) {
+    pbpBootDriveSync().catch((e) => {
+      console.warn("[drive-sync] alarm sync failed:", alarm.name, e?.name, e?.message);
+    });
   }
   if (alarm.name === "keepalive") {
     processOfflineQueue().catch(() => {});
@@ -2662,18 +2864,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
     // the periodic storage-warm run remains the MV3 restart/offline fallback.
     pbpMigrateSecretsToLocal().catch(() => {});
   }
-  if (area === "local") {
-    for (const [key, type] of [["driveSyncVocabulary", "vocabulary"], ["driveSyncNotes", "notes"]]) {
-      if (!changes[key]) continue;
-      driveScopeEpochs[type]++;
-      const enabled = changes[key].newValue === undefined ? type === "vocabulary" : changes[key].newValue === true;
-      if (enabled) pbpBootVocabDriveSync({ type }).catch(() => {});
-      else pbpClearDriveTypeAlarms(type).catch(() => {});
-    }
-    if (changes.vocabDriveConnected?.newValue !== true && changes.vocabDriveConnected) {
-      driveScopeEpochs.vocabulary++; driveScopeEpochs.notes++;
-      Promise.all([pbpClearDriveTypeAlarms("vocabulary"), pbpClearDriveTypeAlarms("notes")]).catch(() => {});
-    }
+  if (area === "local" && changes.vocabDriveConnected &&
+      changes.vocabDriveConnected.newValue !== true) {
+    driveScopeEpoch++;
+    pbpClearDriveAlarms().catch((e) => {
+      console.warn("[drive-sync] alarm cleanup failed:", e?.name, e?.message);
+    });
   }
   const routingChanged = !!(changes.optSyncEnabled || changes.syncApiKeys);
   if ((area === "sync" || area === "local") && (routingChanged || changes.tagSyncMode || changes.pinboardToken)) {
@@ -3089,8 +3285,8 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       sendResponse({ ok: false, error: "unavailable" });
       return true;
     }
-    const notes = message.type === "PBP_NOTES_DIRTY";
-    pbpDriveTypeEnabled(notes ? "notes" : "vocabulary")
+    // Either dataset dirties the one shared alarm; the round syncs both.
+    pbpDriveEnabled()
       .then((enabled) => enabled ? pbpDriveScheduleDirty(chrome.alarms) : false)
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false, error: "remote" }));
@@ -3106,8 +3302,8 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       .then(async (result) => {
         // A retryable auth failure means the token could not be minted right
         // now, not that the grant is gone. Dropping the connected flag would
-        // make pbpBootVocabDriveSync return early and turn the retry alarm the
-        // runner just scheduled into a no-op.
+        // make pbpBootDriveSync return early and turn the retry alarm the
+        // round just reconciled into a no-op.
         if (!result.ok && result.retryable !== true &&
             (result.error === "auth" || result.error === "permission")) {
           await chrome.storage.local.set({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
@@ -3156,12 +3352,11 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       .then(async (connected) => {
         // Not an authorization problem: this device simply has not connected.
         if (!connected) return { ok: false, error: "not_connected" };
-        if (message.force === true) await Promise.all([
-          chrome.alarms.clear("vocab-sync-retry"), chrome.alarms.clear("notes-sync-retry")
-        ]);
-        return pbpQueueSelectedDriveSync({
+        if (message.force === true) await chrome.alarms.clear(PBP_DRIVE_RETRY_ALARM);
+        return pbpQueueDriveRound({
           interactive: false,
-          force: message.force === true
+          force: message.force === true,
+          manual: true
         });
       })
       .then((result) => pbpVocabDriveResponse(result))

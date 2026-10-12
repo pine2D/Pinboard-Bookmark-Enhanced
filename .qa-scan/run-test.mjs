@@ -43,7 +43,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/ai-tags-tests.html": 98,
   "tests/anki-connect-tests.html": 41,
   "tests/background-active-tab-tests.html": 38,
-  "tests/background-lifecycle-tests.html": 55,
+  "tests/background-lifecycle-tests.html": 56,
   "tests/batch-dedup-tests.html": 28,
   "tests/bili-bridge-tests.html": 1,
   "tests/contrast-tests.html": 6,
@@ -96,7 +96,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/notes-sync-tests.html": 50,
   "tests/notes-gdrive-tests.html": 14,
   "tests/options-drive-sync-tests.html": 31,
-  "tests/drive-scopes-tests.html": 31,
+  "tests/drive-scopes-tests.html": 50,
   "tests/wayback-tests.html": 44,
 });
 const expected = EXPECTED_RESULTS[rel];

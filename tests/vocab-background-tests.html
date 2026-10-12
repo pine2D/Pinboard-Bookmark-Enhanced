@@ -20,9 +20,9 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
   const messagesStart = source.indexOf("function handleRuntimeMessage");
   if (messagesStart < 0) throw new Error("anchor not found: handleRuntimeMessage source");
   const messages = source.slice(messagesStart);
-  const bootAt = source.indexOf("function pbpBootVocabDriveSync");
+  const bootAt = source.indexOf("function pbpBootDriveSync");
   const bootEnd = source.indexOf("\nasync function pbpDisconnectVocabDrive", bootAt);
-  if (bootAt < 0 || bootEnd <= bootAt) throw new Error("anchor not found: pbpBootVocabDriveSync source");
+  if (bootAt < 0 || bootEnd <= bootAt) throw new Error("anchor not found: pbpBootDriveSync source");
   const boot = source.slice(bootAt, bootEnd);
   const startupAt = source.indexOf("chrome.runtime.onStartup.addListener");
   const startupEnd = source.indexOf("chrome.runtime.onInstalled.addListener", startupAt);
@@ -37,7 +37,7 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
   if (connectAt < 0 || connectEnd <= connectAt) throw new Error("anchor not found: vocabDriveConnect handler");
   const connect = messages.slice(connectAt, connectEnd);
   const responseAt = source.indexOf("async function pbpVocabDriveResponse");
-  const responseEnd = source.indexOf("\n\nasync function pbpBootVocabDriveSync", responseAt);
+  const responseEnd = source.indexOf("\n\nasync function pbpBootDriveSync", responseAt);
   if (responseAt < 0 || responseEnd <= responseAt) throw new Error("anchor not found: pbpVocabDriveResponse source");
   let responseFactory = null;
   try {
@@ -45,15 +45,16 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
       `${source.slice(responseAt, responseEnd)}; return typeof pbpVocabDriveResponse === "function" ? pbpVocabDriveResponse : null;`);
   } catch (_) {}
   check("store and Drive scripts are imported in dependency order", imports.indexOf('"vocab-store.js"') >= 0 && imports.indexOf('"vocab-gdrive.js"') > imports.indexOf('"vocab-store.js"'));
-  check("all three vocabulary alarm names are wired", ["vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry"].every((name) => source.includes(`"${name}"`)));
+  // Simplest miss: routing only the new names, so a pre-migration vocab-sync-* alarm is dropped.
+  check("all three drive-sync alarm names and the legacy names are routed", ["PBP_DRIVE_DIRTY_ALARM", "PBP_DRIVE_PERIODIC_ALARM", "PBP_DRIVE_RETRY_ALARM"].every((name) => alarms.includes(`alarm.name === ${name}`)) && alarms.includes("PBP_DRIVE_LEGACY_ALARMS.includes(alarm.name)") && !/"(vocab|notes)-sync-/.test(alarms));
   check("alarm listener is registered synchronously at top level", /chrome\.alarms\.onAlarm\.addListener\(\(alarm\) =>/.test(alarms) && !/addListener\(async/.test(alarms));
   check("runtime message listener is not async", /function handleRuntimeMessage\(message, sender, sendResponse\)/.test(messages) &&
     !/async function handleRuntimeMessage/.test(messages) && !/onMessage\.addListener\(async/.test(messages) &&
     messages.includes("chrome.runtime.onMessage.addListener(handleRuntimeMessage);"));
-  // Simplest miss: one DIRTY type still routed to a per-dataset scheduler.
-  check("dirty message schedules synchronization", messages.includes('message.type === "PBP_VOCAB_DIRTY"') &&
-    messages.includes("pbpDriveScheduleDirty") && !messages.includes("pbpVocabScheduleDirty") &&
-    !messages.includes("pbpNotesScheduleDirty"));
+  const dirtyAt = messages.indexOf('message.type === "PBP_VOCAB_DIRTY" || message.type === "PBP_NOTES_DIRTY"');
+  const dirty = messages.slice(dirtyAt, messages.indexOf('message.type === "vocabDriveConnect"', dirtyAt));
+  // Simplest miss: the handler still gating on a per-dataset switch, or one dataset still calling a per-dataset scheduler.
+  check("both dirty messages schedule the one shared drive-sync alarm", dirtyAt >= 0 && dirty.includes("pbpDriveEnabled()") && !/pbpDrive(Type)Enabled/.test(dirty) && (dirty.match(/pbpDriveScheduleDirty\(chrome\.alarms\)/g) || []).length === 1 && !/pbp(Vocab|Notes)ScheduleDirty/.test(source));
   check("connect message is handled", messages.includes('message.type === "vocabDriveConnect"'));
   check("status message is handled", messages.includes('message.type === "vocabDriveStatus"'));
   const failedHandler = responseFactory?.(async () => ({
@@ -80,28 +81,28 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
     (syncNow.match(/pbpVocabDriveResponse\(result\)/g) || []).length === 1);
   check("sync-now message preserves persisted backoff unless explicitly forced",
     syncNowAt >= 0 &&
-    /pbpQueueSelectedDriveSync\(\{\s*interactive: false,\s*force: message\.force === true\s*\}\)/
+    /pbpQueueDriveRound\(\{\s*interactive: false,\s*force: message\.force === true,\s*manual: true\s*\}\)/
       .test(syncNow) &&
-    /if \(message\.force === true\) await Promise\.all/.test(syncNow) &&
-    syncNow.includes('chrome.alarms.clear("vocab-sync-retry")') && syncNow.includes('chrome.alarms.clear("notes-sync-retry")'));
+    /if \(message\.force === true\) await chrome\.alarms\.clear\(PBP_DRIVE_RETRY_ALARM\);/.test(syncNow));
   // A retryable auth failure means the token could not be minted right now,
-  // not that the grant is gone. Dropping the flag makes pbpBootVocabDriveSync
-  // return early, so the retry alarm the runner just scheduled does nothing.
+  // not that the grant is gone. Dropping the flag makes pbpBootDriveSync
+  // return early, so the retry alarm the round just reconciled does nothing.
   check("connect keeps the device connected when auth is only retryable",
     /result\.retryable !== true/.test(connect) &&
     connect.indexOf("retryable !== true") <
       connect.indexOf("PBP_VOCAB_DRIVE_CONNECTED_KEY]: false"));
   check("disconnect message is handled", messages.includes('message.type === "vocabDriveDisconnect"'));
-  check("one recovering promise tail serializes sync", source.includes("const queueVocabSync = pbpCreateRecoveringTail();") && source.includes("const queueNotesSync = pbpCreateRecoveringTail();") && source.includes("return tail(async () =>"));
+  // Simplest miss: a second tail left behind for one dataset, which lets the two run concurrently again.
+  check("one recovering promise tail serializes every Drive round", source.includes("const queueDriveSync = pbpCreateRecoveringTail();") && (source.match(/return queueDriveSync\(async \(\) =>/g) || []).length === 1 && !/queue(Vocab|Notes)Sync/.test(source));
   check("boot invokes only one noninteractive cold-start sync",
     bootAt >= 0 && boot.includes("interactive: false") && !boot.includes("interactive: true") &&
-    !startup.includes("pbpBootVocabDriveSync") &&
+    !startup.includes("pbpBootDriveSync") &&
     boot.includes("if (!await pbpVocabDriveIsConnected()) return { ok: true };") &&
     !boot.includes("status: await pbpGetVocabDriveStatus()") &&
-    !boot.includes("pbpVocabSchedulePeriodic") &&
-    /if \(!granted\) \{[\s\S]*PBP_VOCAB_DRIVE_CONNECTED_KEY[\s\S]*false[\s\S]*pbpClearDriveTypeAlarms[\s\S]*error: "permission"/
+    !boot.includes("pbpDriveEnsurePeriodic") &&
+    /if \(!granted\) \{[\s\S]*PBP_VOCAB_DRIVE_CONNECTED_KEY[\s\S]*false[\s\S]*pbpClearDriveAlarms\(\)[\s\S]*error: "permission"/
       .test(boot) &&
-    !connect.includes("pbpVocabSchedulePeriodic"));
+    !connect.includes("pbpDriveEnsurePeriodic"));
   check("background never requests optional permissions", !source.includes("chrome.permissions.request(") && !source.includes("permissions.request("));
   check("inactive OAuth capability gates boot and every Drive message path",
     source.includes("pbpVocabDriveOAuthActive(chrome.runtime.getManifest())") &&
