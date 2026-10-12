@@ -2715,9 +2715,14 @@ function _pbpVocabInDetail(el) {
   return !!(el && el.closest && el.closest("#vocab-detail, #vocab-detail-tail"));
 }
 function _pbpVocabEditingDetail() {
-  if (_vocabComposing) return true;
   const el = document.activeElement;
-  return _pbpVocabInDetail(el) && el.matches("input, textarea, select, [contenteditable]");
+  const inDetail = _pbpVocabInDetail(el);
+  // A composition lives in the focused control. One torn down without
+  // compositionend (its control removed mid-IME) would otherwise defer every
+  // later sync until reload, so focus outside the detail area ends it.
+  if (_vocabComposing && !inDetail) _vocabComposing = false;
+  if (_vocabComposing) return true;
+  return inDetail && el.matches("input, textarea, select, [contenteditable]");
 }
 function _pbpVocabSyncedGatesOpen(owner) {
   return owner.startsWith("acct_") && owner === _vocabCurrentOwner &&

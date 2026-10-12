@@ -1116,9 +1116,25 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       const oneReadAfter = reads === r1 + 1;
       editInput.remove();
       const deferralOk = editFocused && deferredWhileEditing && oneReadAfter;
+      const readsBeforeIme = reads;
+      // An IME composition torn down without compositionend (its control
+      // removed mid-composition): the flag must not defer every later sync.
+      const imeInput = document.createElement("textarea");
+      $id("vocab-detail-tail").appendChild(imeInput);
+      imeInput.focus();
+      imeInput.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "" }));
+      const composingStarted = _vocabComposing === true;
+      imeInput.remove();
+      await task(); await task(); await task();
+      listener({ type: "PBP_VOCAB_SYNCED", owner: "acct_drive" }, { id: "self" }, () => {});
+      await task(); await task(); await task();
+      // Simplest miss: trust _vocabComposing alone, so a sync after the torn-down composition never reads.
+      const imeRecovered = composingStarted && _vocabComposing === false && reads > readsBeforeIme;
       check("a message for another owner, another type, a hidden tab or another view reads nothing",
-        ignored.length === 0 && reads === before + 1 && deferralOk && document.visibilityState === "visible",
-        "read on: " + ignored.join(", ") + " deferral=" + [editFocused, deferredWhileEditing, oneReadAfter]);
+        ignored.length === 0 && readsBeforeIme === before + 1 && deferralOk && imeRecovered &&
+        document.visibilityState === "visible",
+        "read on: " + ignored.join(", ") + " deferral=" + [editFocused, deferredWhileEditing, oneReadAfter] +
+        " ime=" + [composingStarted, _vocabComposing, reads - readsBeforeIme]);
     } finally {
       if (hadChrome) window.chrome = realChrome; else delete window.chrome;
       pbpVocabCurrentOwner = realOwner;
