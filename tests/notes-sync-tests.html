@@ -123,11 +123,18 @@ test("actual backup restore queues note intent and preserves another account",as
 });
 test("manual highlight backup excludes notes sync metadata and device scopes",async()=>{
  const f=fixture();await write(f,record());
- const output=pbpBuildHighlightBackup({...f.data,driveSyncVocabulary:false,driveSyncNotes:true},OWNER);
+ // Shared connection state as the orchestrator persists it (spec §3.3); a
+ // device-local retry/backoff record must never travel in a JSON backup.
+ const conn={["driveConnState:"+HASH]:{lastError:"network",authAttempts:0,retryAttempt:2,retryAt:1760000000000,blocked:false,updatedAt:1759999990000}};
+ const output=pbpBuildHighlightBackup({...f.data,...conn,driveSyncVocabulary:false,driveSyncNotes:true},OWNER);
  assert(output[KEY].items[0].note==="original");
  assert(!output[KEY].notesSync && !output.pbpNotesSyncDeviceId && !output.driveSyncNotes && !output.driveSyncVocabulary);
- const cleaned=pbpCleanHighlightBackup({[KEY]:{...record(),notesSync:{untrusted:true}}});
+ // 最简单漏判反例：备份过滤改成「pbp_hl_ 或 drive 前缀」之类的宽前缀，driveConnState:<hash> 被带进导出文件。
+ assert(!Object.keys(output).some(key=>key.startsWith("driveConnState:")),"connection state leaked into the backup");
+ const cleaned=pbpCleanHighlightBackup({[KEY]:{...record(),notesSync:{untrusted:true}},...conn});
  assert(!cleaned[KEY].notesSync);
+ // 最简单漏判反例：导入侧清洗只剥 record 内的 notesSync，却把顶层 driveConnState:<hash> 原样写回本机，伪造退避状态。
+ assert(!Object.keys(cleaned).some(key=>key.startsWith("driveConnState:")),"imported backup can plant connection state");
 });
 test("causal revisions interleaved with concurrent notes converge in every arrival order",()=>{
  const a1=event("peer-a","A1"),b1=event("peer-b","B1"),a2=event("peer-a","A2",2);
@@ -181,6 +188,81 @@ test("frontier rejects inflated top causal counter",()=>{
 test("frontier rejects phantom top causal coordinate",()=>{
  const merged=pbpNotesMergeEvents(event("peer-a","A"),event("peer-b","B")).event;
  merged.vector["phantom-device"]=999;assert(!pbpNotesValidateEvent(merged));
+});
+test("legacy seed prefilters article records in one batched read outside the record locks",async()=>{
+ const U2="https://example.com/two",U3="https://example.com/three",U4="https://example.com/four";
+ const K2=pbpNotesArticleKey(U2),K3=pbpNotesArticleKey(U3),K4=pbpNotesArticleKey(U4);
+ const legacy=()=>{const it=item();delete it.id;return it;};
+ const f=fixture({
+  [KEY]:record([legacy()]),
+  [K2]:{v:1,url:U2,title:"Two",items:[legacy()]},
+  [K4]:{v:1,url:U4,title:"Four",items:[item("foreign","foreign",OTHER)]}
+ });
+ await pbpNotesWriteRecord(K3,{v:1,url:U3,title:"Three",items:[item()]},OWNER,f.options);
+ const calls=[];const realGet=f.storage.get;
+ f.storage.get=async(keys)=>{
+  calls.push(keys===null ? null : Array.isArray(keys) ? [...keys] : typeof keys==="string" ? [keys] : Object.keys(keys));
+  return realGet(keys);
+ };
+ const store=f.store();
+ const first=await store.seedLegacy(OWNER,1),second=await store.seedLegacy(OWNER,1),third=await store.seedLegacy(OWNER,1);
+ // 只统计三轮 seedLegacy 自身的读取：下面 listOutbox 的逐键读（4 次）不属于本次优化范围，不能混进计数。
+ f.storage.get=realGet;
+ assert(first.ok&&first.processed===1&&second.ok&&second.processed===1&&third.ok&&third.processed===0,"seed results changed: "+JSON.stringify([first,second,third]));
+ assert(f.data[KEY].items[0].id.startsWith("legacy-")&&f.data[K2].items[0].id.startsWith("legacy-"),"legacy rows were not enrolled");
+ assert((await store.listOutbox(OWNER)).length===3,"seeded rows missing from the outbox");
+ assert(f.data[K4].items[0].note==="foreign"&&!f.data[K4].notesSync,"another owner's article was touched");
+ const touching=key=>calls.filter(list=>list===null||list.includes(key));
+ // 最简单漏判反例：预筛仍是锁外逐键 storage.get(key)（基线行为），只是把同一个 key 包成数组——K4 会以 [K4] 单独被读。
+ assert(touching(K4).length>0&&touching(K4).every(list=>list===null||[KEY,K2,K3,K4].every(key=>list.includes(key))),"prefilter still reads article records one by one: "+JSON.stringify(calls));
+ // 读取次数：基线 = 第1轮 1预筛+3锁内(fresh/previous/deviceId) + 第2轮 2预筛+3 + 第3轮 4预筛 = 13；
+ // 批量后 = (1+3) + (1+3) + 1 = 9。
+ // 最简单漏判反例：批量读取之后锁内又对每个候选多读一遍（或每轮重复批量读多次），结果正确但读次数不降。
+ assert(calls.length===9,"expected 9 storage reads, got "+calls.length+": "+JSON.stringify(calls));
+});
+test("status snapshot lists keys once and reads storage once",async()=>{
+ const OTHER_HASH="b".repeat(64);
+ const otherAccount="pbp_notes_sync_account_"+encodeURIComponent("google:"+OTHER_HASH);
+ const ownBatch="pbp_notes_sync_batch_"+encodeURIComponent("google:"+HASH+":file-1");
+ const otherBatch="pbp_notes_sync_batch_"+encodeURIComponent("google:"+OTHER_HASH+":file-2");
+ // Local rows in the exact shape freezeOutbox/putAccountState persist (not server responses).
+ const f=fixture({
+  [otherAccount]:{key:"account:google:"+OTHER_HASH,ownerHash:OTHER_HASH,drivePermissionId:"google",pageToken:"other"},
+  [ownBatch]:{key:ownBatch,drivePermissionId:"google",ownerHash:HASH,driveFileId:"file-1",body:"{}",bytes:2},
+  [otherBatch]:{key:otherBatch,drivePermissionId:"google",ownerHash:OTHER_HASH,driveFileId:"file-2",body:"{}",bytes:2}
+ });
+ await f.store().applyRemotePage(OWNER,HASH,[batch([event("peer-a","A"),event("peer-b","B")])],null);
+ assert(await f.store().putAccountState({key:"account:google:"+HASH,ownerHash:HASH,drivePermissionId:"google",pageToken:"p1"}));
+ let gets=0,keyCalls=0;const realGet=f.storage.get,realGetKeys=f.storage.getKeys;
+ f.storage.get=async(keys)=>{gets++;return realGet(keys);};
+ f.storage.getKeys=async()=>{keyCalls++;return realGetKeys();};
+ const snap=await f.store().snapshot(OWNER,HASH);
+ // 最简单漏判反例：snapshot 仍先 listOutbox（逐键读）再逐键读 notices、再读账号行——基线是 3 次 getKeys + 3 次 get。
+ assert(gets===1&&keyCalls===1,"expected one key listing and one read, got getKeys="+keyCalls+" get="+gets);
+ // 最简单漏判反例：批量读取后把文章记录当账号行（Object.values(values)）过滤，states 混入文章或丢掉本 owner 的行。
+ assert(snap.states.length===1&&snap.states[0].pageToken==="p1","states wrong: "+JSON.stringify(snap.states));
+ // 最简单漏判反例：outbox 改从批量结果计算时漏掉合并后的 versions 帧或重复计入。
+ assert(snap.outbox.length===1&&snap.outbox[0].owner===OWNER&&snap.outbox[0].event.versions.length===2,"outbox wrong");
+ assert(snap.notices.length===1&&snap.notices[0].kind==="note-conflict"&&snap.notices[0].recordKey===KEY+"|highlight-a","notices wrong: "+JSON.stringify(snap.notices));
+ assert(snap.batches.length===1&&snap.batches[0].driveFileId==="file-1"&&snap.batches[0].drivePermissionId==="google","batches wrong: "+JSON.stringify(snap.batches));
+});
+test("failed notice clear leaves a console trace without account or note data",async()=>{
+ const f=fixture();
+ await f.store().applyRemotePage(OWNER,HASH,[batch([event("peer-a","secret-note-A"),event("peer-b","secret-note-B")])],null);
+ f.fail(true);
+ const warned=[];const realWarn=console.warn;let cleared;
+ console.warn=(...args)=>{warned.push(args);};
+ try { cleared=await f.store().clearNotices(OWNER); } finally { console.warn=realWarn; }
+ assert(cleared===false,"quota failure must still report false");
+ // 最简单漏判反例：catch 仍是 `catch (_) { return false; }`，原因（quota / account_changed / 锁不可用）全部无声折叠。
+ assert(warned.length===1,"expected exactly one trace, got "+warned.length);
+ // 最简单漏判反例：console.warn(..., error) 或 (..., rec) 直接打对象——String() 收集会把它显示成 [object Object] 而掩盖泄露，所以要求每个参数本身就是字符串。
+ assert(warned[0].every(value=>typeof value==="string"),"trace must log only strings");
+ const line=warned[0].join(" ");
+ assert(line.startsWith("[notes-sync] notice clear failed:")&&line.includes("quota"),"trace does not name the cause: "+line);
+ assert(![OWNER,HASH,URL_,KEY,"secret-note"].some(text=>line.includes(text)),"trace leaks account or note data: "+line);
+ f.fail(false);
+ assert((await f.store().snapshot(OWNER,HASH)).notices.length===1,"notice must survive the failed clear");
 });
 (async()=>{let pass=0,fail=0;for(const c of cases){const row=document.createElement("div");try{await c.run();row.className="pass";pass++;row.textContent=c.name;}catch(error){row.className="fail";fail++;row.textContent=c.name+": "+error.message;}document.getElementById("results").appendChild(row);}document.getElementById("summary").textContent=`${pass} passed, ${fail} failed`;})();
 </script></body></html>

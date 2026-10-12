@@ -179,7 +179,12 @@ function pbpCreateNotesSyncStore({
   const accountId = (permissionId,ownerHash) => permissionId + ":" + ownerHash;
   const batchId = (permissionId,ownerHash,fileId) => accountId(permissionId,ownerHash) + ":" + fileId;
   const keys = async() => storage.getKeys ? storage.getKeys() : Object.keys(await storage.get(null));
-  const articleKeys = async() => (await keys()).filter(key=>/^pbp_hl_[0-9a-f]{8}$/.test(key));
+  const isArticleKey = key => /^pbp_hl_[0-9a-f]{8}$/.test(key);
+  const articleKeys = async() => (await keys()).filter(isArticleKey);
+  // Bounded batch size for the lock-free seed prefilter: one storage IPC per
+  // chunk instead of one per article, without materialising a 2000-article
+  // library in a single get when the round only enrols `limit` of them.
+  const SEED_SCAN_CHUNK = 200;
   const ownerState = (rec,owner) => {
     const old = _pbpVocabOwnValue(rec?.notesSync?.owners || {},owner);
     return {events:Object.assign(Object.create(null),old?.events),pending:Object.assign(Object.create(null),old?.pending),notices:Object.assign(Object.create(null),old?.notices)};
@@ -273,31 +278,46 @@ function pbpCreateNotesSyncStore({
     };
     return locked ? work() : withLock(PBP_NOTES_SYNC_RECORD_LOCK_PREFIX+key,work);
   }
-  async function listOutbox(owner) {
-    const rows=[];
-    for (const key of await articleKeys()) {
-      const rec=await read(key),state=ownerState(rec,owner);
-      for (const id of Object.keys(state.pending)) {
-        if (state.pending[id] !== true) continue;
-        const event=eventOf(rec,owner,id,state.events[id]);
-        if (event) rows.push({owner,recordKey:event.recordKey,event});
-      }
+  const pendingRows = (rec,owner) => {
+    const state=ownerState(rec,owner),rows=[];
+    for (const id of Object.keys(state.pending)) {
+      if (state.pending[id] !== true) continue;
+      const event=eventOf(rec,owner,id,state.events[id]);
+      if (event) rows.push({owner,recordKey:event.recordKey,event});
     }
     return rows;
+  };
+  async function listOutbox(owner) {
+    const rows=[];
+    for (const key of await articleKeys()) rows.push(...pendingRows(await read(key),owner));
+    return rows;
   }
+  const seedCandidate = (key,rec,owner) => {
+    if (typeof rec?.url !== "string" || !rec.url || pbpDictSafeUrl(rec.url)!==rec.url || pbpNotesArticleKey(rec.url)!==key) return false;
+    const state=ownerState(rec,owner);
+    return (rec.items || []).some(it=>it.owner===owner && (!it.id || !state.events[it.id]));
+  };
   async function seedLegacy(owner,limit=100) {
     let processed=0;
     try {
-      for (const key of await articleKeys()) {
-        if (processed>=limit) break;
-        const rec=await read(key),state=ownerState(rec,owner);
-        if (typeof rec?.url !== "string" || !rec.url || pbpDictSafeUrl(rec.url)!==rec.url || pbpNotesArticleKey(rec.url)!==key ||
-            !(rec.items || []).some(it=>it.owner===owner && (!it.id || !state.events[it.id]))) continue;
-        await withLock(PBP_NOTES_SYNC_RECORD_LOCK_PREFIX+key,async()=>{
-          const fresh=await read(key);
-          if (fresh) await writeRecord(key,fresh,owner,{locked:true});
-        });
-        processed++;
+      // The runner calls this from the top until processed===0, so the
+      // prefilter used to cost one storage read per article per call (A9).
+      // It stays lock-free and advisory: a stale snapshot only decides
+      // whether to take the record lock, and the lock body re-reads the
+      // record and goes through writeRecord exactly as before.
+      const all=await articleKeys();
+      for (let start=0;start<all.length && processed<limit;start+=SEED_SCAN_CHUNK) {
+        const chunk=all.slice(start,start+SEED_SCAN_CHUNK);
+        const values=await storage.get(chunk);
+        for (const key of chunk) {
+          if (processed>=limit) break;
+          if (!seedCandidate(key,values[key],owner)) continue;
+          await withLock(PBP_NOTES_SYNC_RECORD_LOCK_PREFIX+key,async()=>{
+            const fresh=await read(key);
+            if (fresh) await writeRecord(key,fresh,owner,{locked:true});
+          });
+          processed++;
+        }
       }
       return {ok:true,processed};
     } catch (error) {
@@ -443,15 +463,21 @@ function pbpCreateNotesSyncStore({
     } catch (error) { return stateFailure(error); }
   }
   async function snapshot(owner,ownerHash) {
-    const outbox=await listOutbox(owner),notices=[];
-    for (const key of await articleKeys()) {
-      const rec=await read(key),state=ownerState(rec,owner);
-      for (const [id,kind] of Object.entries(state.notices)) notices.push({owner,recordKey:key+"|"+encodeURIComponent(id),kind});
-    }
+    // Status renders on every panel open and after every round; reading each
+    // article twice (outbox, then notices) scaled with the whole library (A10).
+    // One key listing and one batched read cover articles and account rows.
     const allKeys=await keys();
+    const recordKeys=allKeys.filter(isArticleKey);
     const accountKeys=allKeys.filter(key=>key.startsWith(PBP_NOTES_SYNC_PREFIX+"account_"));
-    const values=accountKeys.length ? await storage.get(accountKeys) : {};
-    const states=Object.values(values).filter(state=>state.ownerHash===ownerHash);
+    const wanted=[...recordKeys,...accountKeys];
+    const values=wanted.length ? await storage.get(wanted) : {};
+    const outbox=[],notices=[];
+    for (const key of recordKeys) {
+      const rec=values[key];
+      outbox.push(...pendingRows(rec,owner));
+      for (const [id,kind] of Object.entries(ownerState(rec,owner).notices)) notices.push({owner,recordKey:key+"|"+encodeURIComponent(id),kind});
+    }
+    const states=accountKeys.map(key=>values[key]).filter(state=>state && state.ownerHash===ownerHash);
     const batches=allKeys.filter(key=>key.startsWith(PBP_NOTES_SYNC_PREFIX+"batch_")).flatMap(key=>{
       try {
         const decoded=decodeURIComponent(key.slice((PBP_NOTES_SYNC_PREFIX+"batch_").length));
@@ -469,7 +495,12 @@ function pbpCreateNotesSyncStore({
         state.notices=Object.create(null);await checkOwner(owner);await storage.set({[key]:saveOwnerState(rec,owner,state)});
       });
       return true;
-    } catch (_) { return false; }
+    } catch (error) {
+      // A quota failure, a switched account and missing Web Locks all fold
+      // into the same false; keep the cause. Never the record or its notes.
+      console.warn("[notes-sync] notice clear failed:",error?.name,error?.message);
+      return false;
+    }
   }
   return {getMeta,getPreflightState,putPreflightState,deletePreflightState,getAccountState,putAccountState,
     seedLegacy,applyRemotePage,checkpointOwner,listPendingBatches,deletePendingBatch,listOutbox,freezeOutbox,
