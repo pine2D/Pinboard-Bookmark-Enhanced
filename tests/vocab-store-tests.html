@@ -364,6 +364,46 @@ async function runIdbChecks() {
     pbpVocabCheckpointOwner("acct_a")
   ]);
   _pbpVocabOpenDB = realOpenDb;
+  // The six sync-state write boundaries each fold an IndexedDB fault into a
+  // bare false/null that the runner then reads as local_store. The console
+  // trace is the only place the cause survives (spec A16).
+  const swallowWarned = [];
+  const realSwallowWarn = console.warn;
+  let swallowResults = [];
+  _pbpVocabOpenDB = async () => {
+    const error = new Error("forced idb write failure");
+    error.name = "QuotaExceededError";
+    throw error;
+  };
+  console.warn = (...args) => { swallowWarned.push(args); };
+  try {
+    swallowResults = [
+      await pbpVocabPutPreflightState(oversizedPreflight),
+      await pbpVocabDeletePreflightState(OWNER_HASH_A),
+      await pbpVocabPutAccountState({ key: `account:drive-a:${OWNER_HASH_A}`, drivePermissionId: "drive-a", ownerHash: OWNER_HASH_A, pageToken: "swallow" }),
+      await pbpVocabFreezeOutbox("acct_a", "drive-a", OWNER_HASH_A, "file-swallow", { body: frozenBody }),
+      await pbpVocabDeletePendingBatch("drive-a", OWNER_HASH_A, "file-a"),
+      await pbpVocabClearNotices("acct_a")
+    ];
+  } finally {
+    console.warn = realSwallowWarn;
+    _pbpVocabOpenDB = realOpenDb;
+  }
+  const swallowLines = swallowWarned.map((args) => args.join(" "));
+  const swallowLabels = ["preflight put", "preflight delete", "account state put",
+    "outbox freeze", "pending batch delete", "notice clear"];
+  // 最简单漏判反例：catch 仍是 `catch (_) { return false; }`（0 条）；或只补了其中几处（条数不足 6 / 某个标签缺席）。
+  // 最简单漏判反例：console.warn(..., error) / (..., state) 直接打对象——要求每个参数都是字符串，且不含 owner、ownerHash、Drive 账号或批次正文（生词）。
+  check("swallowed sync-state write faults leave a console trace without account data",
+    swallowResults.length === 6 &&
+    swallowResults.every((value, index) => value === (index === 3 ? null : false)) &&
+    swallowWarned.length === 6 &&
+    swallowWarned.every((args) => args.every((value) => typeof value === "string")) &&
+    swallowLines.every((line) => line.startsWith("[vocab-store] ") &&
+      line.includes("QuotaExceededError") && line.includes("forced idb write failure")) &&
+    swallowLabels.every((label) => swallowLines.filter((line) => line.startsWith(`[vocab-store] ${label} failed:`)).length === 1) &&
+    !swallowLines.some((line) => [OWNER_HASH_A, "acct_a", "drive-a", "file-", "gloss", "Word"].some((text) => line.includes(text))),
+    JSON.stringify(swallowLines));
   const pendingDeleted = await pbpVocabDeletePendingBatch("drive-a", OWNER_HASH_A, "file-a");
   check("live outbox persists and freezes exactly", task3ApiReady && liveOutbox.length === 1 && !liveOutbox[0].event.deleted && frozen && frozen.body === frozenBody && pending.length === 1 && pending[0].body === frozenBody && afterFreezeMutation.length === 1 && afterFreezeMutation[0].event.value.gloss === "three" && pendingDeleted && (await pbpVocabListPendingBatches("drive-a", OWNER_HASH_A)).length === 0 && readFailures.every((result) => result.status === "rejected"));
   await pbpVocabSaveWord("acct_a", { term: "Word", language: "en", gloss: "four" });
@@ -923,7 +963,7 @@ async function runIdbChecks() {
   try {
     await runIdbChecks();
   } catch (error) {
-    while (pass + fail < 73) check("IDB harness completed", false, error && (error.stack || error.message));
+    while (pass + fail < 77) check("IDB harness completed", false, error && (error.stack || error.message));
   }
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();

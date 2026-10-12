@@ -723,7 +723,12 @@ async function pbpVocabPutPreflightState(state) {
     tx.objectStore("sync").put({ ...state });
     await done;
     return true;
-  } catch (_) { return false; }
+  } catch (error) {
+    // The runner reads false as local_store and blocks the type; keep the
+    // IndexedDB cause. Never the state row (it carries the owner hash).
+    console.warn("[vocab-store] preflight put failed:", error?.name, error?.message);
+    return false;
+  }
 }
 
 async function pbpVocabDeletePreflightState(ownerHash) {
@@ -735,7 +740,10 @@ async function pbpVocabDeletePreflightState(ownerHash) {
     tx.objectStore("sync").delete(_pbpVocabPreflightKey(ownerHash));
     await done;
     return true;
-  } catch (_) { return false; }
+  } catch (error) {
+    console.warn("[vocab-store] preflight delete failed:", error?.name, error?.message);
+    return false;
+  }
 }
 
 async function pbpVocabGetSyncMeta() {
@@ -770,7 +778,10 @@ async function pbpVocabPutAccountState(state) {
     tx.objectStore("sync").put({ ...state });
     await done;
     return true;
-  } catch (_) { return false; }
+  } catch (error) {
+    console.warn("[vocab-store] account state put failed:", error?.name, error?.message);
+    return false;
+  }
 }
 
 // Half-open key range holding exactly the keys that start with `prefix`.
@@ -847,7 +858,11 @@ async function pbpVocabFreezeOutbox(owner, drivePermissionId, ownerHash, driveFi
     sync.put(pending);
     await done;
     return pending;
-  } catch (_) { return null; }
+  } catch (error) {
+    // Never the batch body: it is the user's vocabulary.
+    console.warn("[vocab-store] outbox freeze failed:", error?.name, error?.message);
+    return null;
+  }
 }
 
 async function pbpVocabDeletePendingBatch(drivePermissionId, ownerHash, driveFileId) {
@@ -858,7 +873,10 @@ async function pbpVocabDeletePendingBatch(drivePermissionId, ownerHash, driveFil
     tx.objectStore("sync").delete(_pbpVocabBatchKey(drivePermissionId, ownerHash, driveFileId));
     await done;
     return true;
-  } catch (_) { return false; }
+  } catch (error) {
+    console.warn("[vocab-store] pending batch delete failed:", error?.name, error?.message);
+    return false;
+  }
 }
 
 async function pbpVocabCheckpointOwner(owner) {
@@ -1202,7 +1220,11 @@ async function pbpVocabClearNotices(owner) {
     for (const key of keys) sync.delete(key);
     await done;
     return true;
-  } catch (_) { return false; }
+  } catch (error) {
+    // Notice keys embed the term; log only the IndexedDB cause.
+    console.warn("[vocab-store] notice clear failed:", error?.name, error?.message);
+    return false;
+  }
 }
 
 async function pbpVocabReadNotices(owner) {
