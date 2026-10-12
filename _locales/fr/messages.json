@@ -3297,7 +3297,7 @@
       "message": "Impossible de lire ou d’enregistrer les données sur cet appareil."
     },
     "vocabDriveErrorNetwork": {
-      "message": "Impossible de joindre les services Google. Le réseau est peut-être coupé, ou votre proxy ne couvre pas googleapis.com."
+      "message": "Impossible de joindre les services Google. Le réseau est peut-être coupé, ou votre proxy ne couvre peut-être pas googleapis.com."
     },
     "vocabDriveErrorBusy": {
       "message": "Google Drive est momentanément surchargé."
