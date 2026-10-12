@@ -1099,9 +1099,26 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         () => { delete document.visibilityState; });
       await probe("signed out", { type: "PBP_VOCAB_SYNCED", owner: "ownerless" },
         () => { _vocabCurrentOwner = "ownerless"; }, () => { _vocabCurrentOwner = "acct_drive"; });
+      // Mid-edit deferral: focus + draft inside the detail area -> messages
+      // coalesce, nothing re-read until focus leaves, then exactly one read.
+      const editInput = document.createElement("input");
+      editInput.value = "draft";
+      $id("vocab-detail-tail").appendChild(editInput);
+      editInput.focus();
+      const editFocused = document.activeElement === editInput;
+      const r1 = reads;
+      listener({ type: "PBP_VOCAB_SYNCED", owner: "acct_drive" }, { id: "self" }, () => {});
+      listener({ type: "PBP_VOCAB_SYNCED", owner: "acct_drive" }, { id: "self" }, () => {});
+      await task(); await task(); await task();
+      const deferredWhileEditing = reads === r1 && editInput.value === "draft";
+      editInput.blur();
+      await task(); await task(); await task();
+      const oneReadAfter = reads === r1 + 1;
+      editInput.remove();
+      const deferralOk = editFocused && deferredWhileEditing && oneReadAfter;
       check("a message for another owner, another type, a hidden tab or another view reads nothing",
-        ignored.length === 0 && reads === before && document.visibilityState === "visible",
-        "read on: " + ignored.join(", "));
+        ignored.length === 0 && reads === before + 1 && deferralOk && document.visibilityState === "visible",
+        "read on: " + ignored.join(", ") + " deferral=" + [editFocused, deferredWhileEditing, oneReadAfter]);
     } finally {
       if (hadChrome) window.chrome = realChrome; else delete window.chrome;
       pbpVocabCurrentOwner = realOwner;

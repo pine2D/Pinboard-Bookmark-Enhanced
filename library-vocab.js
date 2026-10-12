@@ -2701,11 +2701,51 @@ document.addEventListener("pbp-lib-view", (e) => {
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener(_pbpVocabOnSyncedMessage);
 }
+// A sync landing mid-edit must not rebuild the detail panel under the user:
+// the rebuild writes drafts back (cursor jumps to the end) and detaches a
+// composing textarea (un-committed IME text becomes literal Latin). While an
+// editable control inside the detail area has focus, or a composition is
+// active there, the soft reload is deferred and coalesced into one pending
+// flag (no per-message listeners). Two persistent document listeners
+// (focusout, compositionend) retry after the event settles; the retry
+// re-checks "still editing" and then every gate again.
+let _vocabSyncPending = false;
+let _vocabComposing = false;
+function _pbpVocabInDetail(el) {
+  return !!(el && el.closest && el.closest("#vocab-detail, #vocab-detail-tail"));
+}
+function _pbpVocabEditingDetail() {
+  if (_vocabComposing) return true;
+  const el = document.activeElement;
+  return _pbpVocabInDetail(el) && el.matches("input, textarea, select, [contenteditable]");
+}
+function _pbpVocabSyncedGatesOpen(owner) {
+  return owner.startsWith("acct_") && owner === _vocabCurrentOwner &&
+    _vocabViewShown && document.visibilityState === "visible";
+}
+function _pbpVocabFlushSynced() {
+  if (!_vocabSyncPending || _pbpVocabEditingDetail()) return;
+  _vocabSyncPending = false;
+  if (!_pbpVocabSyncedGatesOpen(_vocabCurrentOwner || "")) return;
+  _pbpVocabSoftReload().catch((err) => {
+    console.warn("vocab sync soft reload failed:", err && err.name, err && err.message);
+  });
+}
+document.addEventListener("compositionstart", (e) => {
+  if (_pbpVocabInDetail(e.target)) _vocabComposing = true;
+}, true);
+document.addEventListener("compositionend", () => {
+  _vocabComposing = false;
+  if (_vocabSyncPending) setTimeout(_pbpVocabFlushSynced, 0);
+}, true);
+document.addEventListener("focusout", () => {
+  if (_vocabSyncPending) setTimeout(_pbpVocabFlushSynced, 0);
+}, true);
 function _pbpVocabOnSyncedMessage(message) {
   if (!message || message.type !== "PBP_VOCAB_SYNCED") return;
   const owner = typeof message.owner === "string" ? message.owner : "";
-  if (!owner.startsWith("acct_") || owner !== _vocabCurrentOwner) return;
-  if (!_vocabViewShown || document.visibilityState !== "visible") return;
+  if (!_pbpVocabSyncedGatesOpen(owner)) return;
+  if (_pbpVocabEditingDetail()) { _vocabSyncPending = true; return; }
   _pbpVocabSoftReload().catch((err) => {
     console.warn("vocab sync soft reload failed:", err && err.name, err && err.message);
   });
