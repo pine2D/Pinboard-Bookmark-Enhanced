@@ -2387,6 +2387,11 @@ async function pbpClearDriveAlarms() {
     .map((name) => chrome.alarms.clear(name)));
 }
 
+// A data-layer backoff that came due while a long round ran was never served:
+// its runner saw it still pending. It is re-armed this far ahead -- the same
+// 30 s as the dirty alarm, and Chrome's own floor for packed extensions.
+const PBP_DRIVE_OVERDUE_RETRY_MS = 30 * 1000;
+
 // Runners never touch alarms; every round ends here. A data-layer block never
 // clears periodic or dirty, so one stuck dataset cannot starve the other.
 async function pbpReconcileDriveAlarms() {
@@ -2416,11 +2421,31 @@ async function pbpReconcileDriveAlarms() {
   if (connectionBlocked || datasetsBlocked) await chrome.alarms.clear(PBP_DRIVE_PERIODIC_ALARM);
   else await pbpDriveEnsurePeriodic(chrome.alarms);
   const now = Date.now();
+  // While the shared connection still backs off, every dataset waits for it,
+  // so an overdue data-layer backoff adds nothing but a round that can only
+  // wait again. An expired connection retryAt is left out: the next round's
+  // openSession clears or renews it.
+  const connectionWaiting = state.connection.known &&
+    Number.isFinite(state.connection.retryAt) && state.connection.retryAt > now;
   const due = connectionBlocked ? [] : rows
-    .filter((row) => row.known && !row.blocked && Number.isFinite(row.retryAt) && row.retryAt > now)
-    .map((row) => row.retryAt);
+    .filter((row) => row.known && !row.blocked && Number.isFinite(row.retryAt))
+    .map((row) => row.retryAt > now ? row.retryAt
+      : (row !== state.connection && !connectionWaiting ? now + PBP_DRIVE_OVERDUE_RETRY_MS : null))
+    .filter(Number.isFinite);
   if (due.length) {
-    await chrome.alarms.create(PBP_DRIVE_RETRY_ALARM, { when: Math.min(...due) });
+    const when = Math.min(...due);
+    let keepExisting = false;
+    if (!rows.every((row) => row.known)) {
+      // An unreadable row may be what armed the existing alarm: only ever move
+      // retry earlier, never past a backoff this read could not see.
+      try {
+        const existing = await chrome.alarms.get(PBP_DRIVE_RETRY_ALARM);
+        keepExisting = Number.isFinite(existing?.scheduledTime) && existing.scheduledTime <= when;
+      } catch (e) {
+        console.warn("[drive-sync] retry alarm read failed:", e?.name, e?.message);
+      }
+    }
+    if (!keepExisting) await chrome.alarms.create(PBP_DRIVE_RETRY_ALARM, { when });
   } else if (connectionBlocked || rows.every((row) => row.known)) {
     // An unreadable row might still hold a backoff: keep its alarm.
     await chrome.alarms.clear(PBP_DRIVE_RETRY_ALARM);
@@ -2446,8 +2471,16 @@ async function pbpRunDriveDataset(type, auth, ownerScope, runOptions) {
       pbpBroadcastVocabSynced(ownerScope, type);
     }
     if (result.ok && !result.status?.waitingForRetry) {
-      const refreshed = await pbpRefreshDriveConnectionAccount(type, auth, result.status);
-      if (!refreshed.ok) result = { ...refreshed, changed: result.changed, status: result.status };
+      let refreshed;
+      try {
+        refreshed = await pbpRefreshDriveConnectionAccount(type, auth, result.status);
+      } catch (error) {
+        // Same answer as a runner's own uncaught exception, so the round's
+        // tail (alarm reconciliation, the notification) still runs.
+        console.warn("[drive-sync] connection identity refresh failed:", type, error?.name, error?.message);
+        refreshed = { ok: false, error: "unexpected", retryable: true };
+      }
+      if (!refreshed?.ok) result = { ...refreshed, changed: result.changed, status: result.status };
     }
     return result;
   } finally {
@@ -2493,15 +2526,29 @@ function pbpDriveRoundOutcome(results) {
 async function pbpDriveClearAccountRowErrors(ownerScope, ownerHash) {
   const stale = (row) => !!row && (row.lastError != null || row.retryAt != null);
   const cleared = (row) => ({ ...row, lastError: null, retryAt: null });
-  const [vocabRows, notesSnapshot] = await Promise.all([
-    pbpVocabListAccountStates(ownerHash),
-    pbpNotesSyncSnapshot(ownerScope, ownerHash)
+  // Each side is read and cleared on its own: one dataset's unreadable store
+  // must not leave the other dataset's stale errors in place.
+  const sides = await Promise.allSettled([
+    (async () => {
+      const rows = await pbpVocabListAccountStates(ownerHash);
+      return Promise.all((rows || []).filter(stale).map((row) => pbpVocabPutAccountState(cleared(row))));
+    })(),
+    (async () => {
+      const snapshot = await pbpNotesSyncSnapshot(ownerScope, ownerHash);
+      return Promise.all((snapshot?.states || []).filter(stale)
+        .map((row) => notesDriveStore.putAccountState(cleared(row))));
+    })()
   ]);
-  const written = await Promise.all([
-    ...vocabRows.filter(stale).map((row) => pbpVocabPutAccountState(cleared(row))),
-    ...(notesSnapshot?.states || []).filter(stale).map((row) => notesDriveStore.putAccountState(cleared(row)))
-  ]);
-  return written.every((value) => value === true);
+  let complete = true;
+  sides.forEach((side, index) => {
+    if (side.status === "fulfilled" && side.value.every((value) => value === true)) return;
+    complete = false;
+    if (side.status === "rejected") {
+      console.warn("[drive-sync] account row clear failed:", ["vocabulary", "notes"][index],
+        side.reason?.name, side.reason?.message);
+    }
+  });
+  return complete;
 }
 
 // Contract: force lifts the shared connection record, BOTH data-layer blocks
@@ -2696,7 +2743,7 @@ async function pbpGetVocabDriveStatus() {
   const reads = await Promise.allSettled([
     pbpVocabSyncSnapshot(ownerScope, ownerHash), pbpVocabGetPreflightState(ownerHash),
     pbpNotesSyncSnapshot(ownerScope, ownerHash), notesDriveStore.getPreflightState(ownerHash),
-    // The throwing read: an unreadable record must not look like "no error" (偏离 7).
+    // The throwing read: an unreadable record must not look like "no error".
     pbpDriveReadConnState(ownerHash)
   ]);
   if (!pbpPinboardAuthIsCurrent(auth)) return base;
@@ -3524,7 +3571,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     pbpDriveEnabled()
       .then((enabled) => enabled ? pbpDriveScheduleDirty(chrome.alarms) : false)
       .then(() => sendResponse({ ok: true }))
-      .catch(() => sendResponse({ ok: false, error: "remote" }));
+      .catch((e) => {
+        console.warn("[drive-sync] dirty schedule failed:", e?.name, e?.message);
+        sendResponse({ ok: false, error: "remote" });
+      });
     return true;
   }
 

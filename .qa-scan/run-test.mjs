@@ -96,7 +96,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/notes-sync-tests.html": 53,
   "tests/notes-gdrive-tests.html": 14,
   "tests/options-drive-sync-tests.html": 27,
-  "tests/drive-scopes-tests.html": 84,
+  "tests/drive-scopes-tests.html": 88,
   "tests/drive-migration-tests.html": 20,
   "tests/wayback-tests.html": 44,
 });

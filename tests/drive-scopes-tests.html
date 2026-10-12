@@ -392,6 +392,31 @@ function refreshHarness(source, opts = {}) {
   // its account row (status falls back to it once the preflight is gone); or rewriting the rows from
   // scratch, which drops the cursor and re-bootstraps both datasets.
   check("force also clears both datasets' account-row errors before running and keeps their cursors", clearedRows === "notes:google-a,vocabulary:google-a" && h.accountPuts.every((put) => put.runsBefore === 0 && put.row.lastError === null && put.row.retryAt === null && put.row.pageToken === "42" && put.row.bootstrapComplete === true) && h.accountPuts.find((put) => put.type === "vocabulary").row.retryAttempt === 2 && h.calls.join() === "vocabulary");
+  {
+    const refreshWarnings = [];
+    const realRefreshWarn = console.warn;
+    console.warn = (...args) => { refreshWarnings.push(args.map(String).join(" ")); };
+    let refreshRound;
+    try {
+      h = harness(source, {}, { createClient: () => ({ async about() { throw new TypeError("about exploded"); } }),
+        vocabulary: { ok: true, status: { drivePermissionId: "google-a" } } });
+      refreshRound = await h.queue({}).catch((e) => ({ threw: e?.message }));
+    } finally { console.warn = realRefreshWarn; }
+    // Simplest miss: an unguarded await, so the throw skips alarm reconciliation and the round rejects.
+    check("a throwing connection-identity refresh becomes a logged unexpected failure and the round still reconciles alarms", refreshRound?.threw === undefined && refreshRound.results?.vocabulary?.error === "unexpected" && h.alarmMap.get("drive-sync-periodic")?.periodInMinutes === 15 && refreshWarnings.some((line) => line.includes("connection identity refresh failed") && line.includes("about exploded")));
+  }
+  {
+    const clearWarnings = [];
+    const realClearWarn = console.warn;
+    console.warn = (...args) => { clearWarnings.push(args.map(String).join(" ")); };
+    try {
+      h = harness(source, {}, { notesSnapshotError: true,
+        vocabAccountRows: [datasetAccountRow("google-a", { lastError: "remote", retryAt: Date.now() + 60000 })] });
+      await h.queue({ force: true });
+    } finally { console.warn = realClearWarn; }
+    // Simplest miss: one Promise.all over both reads, so an unreadable notes store keeps vocabulary's stale error too.
+    check("an unreadable notes snapshot still lets force clear the vocabulary account rows, and is logged", h.accountPuts.map((put) => put.type + ":" + put.row.lastError).join() === "vocabulary:null" && clearWarnings.some((line) => line.includes("account row clear failed") && line.includes("notes") && line.includes("notes storage unavailable")));
+  }
   h = harness(source, { [CONN_KEY]: connRow({ lastError: "auth", authAttempts: 5, retryAttempt: 0, blocked: true }) }, { vocabulary: { ok: false, error: "auth", retryable: false } });
   await h.queue({});
   // Simplest miss: clearing on every round, which turns each wake into a forced retry.
@@ -496,6 +521,30 @@ function refreshHarness(source, opts = {}) {
   // Simplest miss: taking every preflight retryAt, including a legacy connection-layer code the shared record
   // now owns, or an already-expired retryAt (which fires the retry alarm at once, over and over).
   check("retry takes the earliest pending data-layer retryAt and ignores legacy connection codes in preflight", h.alarmMap.get("drive-sync-retry")?.when === afterSoon);
+  // A data-layer backoff that came due while the round ran: its runner saw it still pending and
+  // answered waitingForRetry, so nothing served it yet.
+  const overdueStart = Date.now();
+  h = harness(source, {}, { vocabPreflight: backoffRow("local_store", overdueStart - 1000), vocabulary: { ok: true, status: { waitingForRetry: true } } });
+  await h.queue({});
+  const overdueWhen = h.alarmMap.get("drive-sync-retry")?.when;
+  const overdueEnd = Date.now();
+  h = harness(source, { [CONN_KEY]: connRow({ retryAt: afterSoon }) }, { vocabPreflight: backoffRow("local_store", overdueStart - 1000), vocabulary: { ok: true, status: { waitingForRetry: true, connectionWaiting: true, retryAt: afterSoon } } });
+  await h.queue({});
+  const behindConnection = h.alarmMap.get("drive-sync-retry")?.when;
+  // Simplest misses: keep only retryAt > now, so the expired backoff clears retry and waits up to 15 minutes for
+  // periodic; or arm it at once even while the shared connection is still backing off, so the retry alarm
+  // wakes a round that can only wait again.
+  check("an expired data-layer backoff the round never served re-arms retry shortly, unless the connection still waits", Number.isFinite(overdueWhen) && overdueWhen >= overdueStart + 30000 && overdueWhen <= overdueEnd + 30000 && behindConnection === afterSoon);
+  h = harness(source, {}, { connReadError: true, alarmSeed: { "drive-sync-retry": { scheduledTime: soon } }, vocabPreflight: backoffRow("local_store", afterSoon), vocabulary: { ok: true, status: { waitingForRetry: true } } });
+  await h.queue({});
+  const keptEarlier = h.alarmMap.get("drive-sync-retry");
+  const farLater = Date.now() + 60 * 60000;
+  h = harness(source, {}, { connReadError: true, alarmSeed: { "drive-sync-retry": { scheduledTime: farLater } }, vocabPreflight: backoffRow("local_store", afterSoon), vocabulary: { ok: true, status: { waitingForRetry: true } } });
+  await h.queue({});
+  const movedEarlier = h.alarmMap.get("drive-sync-retry");
+  // Simplest miss: an unreadable shared record (which may hold the earlier backoff) plus a data-layer due time
+  // overwrites the existing earlier retry alarm with the later one.
+  check("with an unreadable row, retry only moves earlier: an earlier existing alarm is kept, a later one replaced", keptEarlier?.scheduledTime === soon && keptEarlier.when === undefined && movedEarlier?.when === afterSoon);
   h = harness(source, { [CONN_KEY]: connRow({ lastError: "auth", authAttempts: 5, retryAttempt: 0, blocked: true }) }, { alarmSeed: { "drive-sync-periodic": { periodInMinutes: 15 }, "drive-sync-retry": { scheduledTime: soon } }, vocabulary: { ok: false, error: "auth", retryable: false } });
   await h.queue({});
   // Simplest miss: treating a connection block like a dataset block and keeping periodic alive.
