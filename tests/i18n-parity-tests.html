@@ -868,6 +868,132 @@ async function loadLocale(loc) {
         : `chip lost: ${chipOffenders.slice(0, 12).join(", ")}`);
   }
 
+  // H22 (Drive merge, spec 2026-10-12 §5.2-§6.1): connecting syncs vocabulary
+  // AND highlights/notes, so no copy may still describe a per-device data
+  // choice; backoff errors describe the outage and leave the instruction to
+  // the state that actually needs one; the connected pinboard_auth variant
+  // points at Sync now instead of "connect again".
+  {
+    const DRIVE_PLAIN_KEYS = ["vocabDriveErrorBusy", "vocabDriveErrorUnexpected", "vocabDriveAuthNeeded",
+      "vocabDriveAuthorizingSlow", "driveLastSuccess", "drivePendingChanges", "vocabDriveErrorPinboardAuthSync"];
+    const plainBroken = [];
+    for (const loc of LOCALES) {
+      for (const key of DRIVE_PLAIN_KEYS) {
+        const entry = msgs[loc][key];
+        if (typeof entry?.message !== "string" || !entry.message.trim() || entry.placeholders !== undefined)
+          plainBroken.push(`${loc}.${key}`);
+      }
+    }
+    // Simplest miss: a key added to en and zh_CN only -- H6 compares against
+    // en, so when en lacks it too, H6 stays green.
+    check("H22a Drive merge messages exist as placeholder-free text in every locale",
+      plainBroken.length === 0, `missing or malformed: ${plainBroken.slice(0, 12).join(", ")}`);
+
+    const DRIVE_ZH_CN = {
+      vocabDriveScope: "连接后，本机与 Google Drive 同步当前 Pinboard 账号的生词、高亮与笔记。只对本机生效；Google Drive 不同步设置和凭据。",
+      vocabDriveWorking: "正在与 Google Drive 同步…",
+      vocabDriveSynced: "已与 Google Drive 同步。",
+      vocabDriveErrorNetwork: "无法连接 Google 服务，可能是网络中断或代理未覆盖 googleapis.com。",
+      vocabDriveErrorAuth: "暂时无法取得 Google 授权。",
+      vocabDriveErrorBusy: "Google Drive 暂时繁忙。",
+      vocabDriveErrorUnexpected: "同步时发生意外错误。",
+      vocabDriveAuthNeeded: "此设备已连接 Google Drive，但需要重新授权。",
+      vocabDriveAuthorizingSlow: "如果没有出现授权窗口，可能是网络连不上 Google。",
+      driveLastSuccess: "最近成功同步",
+      drivePendingChanges: "本机还有尚未上传的更改。",
+      vocabDriveErrorPinboardAuthSync: "尚未登录 Pinboard 账号。请在「通用 → Pinboard 账号」中填写 API Token，然后点击「立即同步」。",
+    };
+    const zhDrift = Object.entries(DRIVE_ZH_CN)
+      .filter(([key, text]) => msgs.zh_CN[key]?.message !== text).map(([key]) => key);
+    // Simplest miss: zh_CN vocabDriveWorking still reads 「正在与 Google Drive 同步所选数据…」.
+    check("H22b zh_CN Drive copy is the spec wording", zhDrift.length === 0, `drift: ${zhDrift.join(", ")}`);
+
+    // Per-locale markers of the two retired claims: a per-device data choice
+    // ("selected data", "these choices") and "check that you are signed in
+    // to Chrome" printed for what was really a network failure.
+    const RETIRED_CHOICE = {
+      en: /selected|choices/i, zh_CN: /所选|以下选择/, zh_TW: /所選|以下選擇/, zh_HK: /所選|以下選擇/,
+      ja: /選択/, de: /ausgewählt|Auswahl/i, fr: /sélectionn|choix/i, pl: /wybran|wybory/i, ru: /выбран|выбор/i,
+    };
+    const RETIRED_SIGNIN = {
+      en: /signed in/i, zh_CN: /已登录/, zh_TW: /已登入/, zh_HK: /已登入/, ja: /ログイン/,
+      de: /angemeldet/i, fr: /connecté/i, pl: /zalogowan/i, ru: /вход/i,
+    };
+    const retired = [];
+    for (const loc of LOCALES) {
+      for (const key of ["vocabDriveScope", "vocabDriveWorking", "vocabDriveSynced"]) {
+        if (RETIRED_CHOICE[loc].test(msgs[loc][key]?.message || "")) retired.push(`${loc}.${key}`);
+      }
+      if (RETIRED_SIGNIN[loc].test(msgs[loc].vocabDriveErrorAuth?.message || "")) retired.push(`${loc}.vocabDriveErrorAuth`);
+    }
+    // Simplest miss: de vocabDriveWorking left as "Ausgewählte Daten werden ... synchronisiert…".
+    check("H22c no locale still describes a per-device data choice or blames Chrome sign-in",
+      retired.length === 0, `retired wording: ${retired.join(", ")}`);
+
+    // Imperative markers this file's own Drive copy uses for instructions
+    // (vocabDriveConnectRequired / vocabDriveAutoPaused / the old ErrorAuth),
+    // so an instruction that names no button -- "please try again later" --
+    // is caught as well as one that names a button.
+    const IMPERATIVE = {
+      en: /\b(?:click|try|check|sign in|reconnect)\b/i, zh_CN: /请/, zh_TW: /請/, zh_HK: /請/, ja: /ください/,
+      de: /\b(?:klicke|prüfe|versuche|melde dich|verbinde dich)/i,
+      fr: /\b(?:cliquez|vérifiez|réessayez|veuillez|reconnectez)/i,
+      pl: /\b(?:kliknij|sprawdź|spróbuj|połącz ponownie)/i, ru: /(?:Нажмите|Проверьте|Попробуйте|подключитесь)/i,
+    };
+    const instructing = [];
+    for (const loc of LOCALES) {
+      const buttons = ["vocabDriveConnect", "vocabDriveSyncNow", "vocabDriveDisconnect"]
+        .map((key) => msgs[loc][key]?.message).filter((name) => typeof name === "string" && name);
+      if (buttons.length !== 3) { instructing.push(`${loc}: button labels missing`); continue; }
+      for (const key of ["vocabDriveErrorNetwork", "vocabDriveErrorBusy", "vocabDriveErrorAuth", "vocabDriveErrorUnexpected"]) {
+        const text = msgs[loc][key]?.message || "";
+        if (buttons.some((name) => text.includes(name)) || IMPERATIVE[loc].test(text)) instructing.push(`${loc}.${key}`);
+      }
+    }
+    // Simplest miss: ru vocabDriveErrorNetwork gains "Нажмите «Синхронизировать сейчас»",
+    // or zh_CN appends 「请稍后重试。」 -- during backoff the retry is automatic and
+    // vocabDriveRetryAt already says when, so the line must not instruct.
+    check("H22d backoff errors describe the outage without instructing",
+      instructing.length === 0, `instructs: ${instructing.join(", ")}`);
+
+    // H22i (spec §10.9): `unexpected` is an uncaught exception inside this
+    // device's run -- a bug or a lost worker -- so its sentence must not blame
+    // Google, nor reuse the remote / network / local-storage lines.
+    const unexpectedBroken = LOCALES.filter((loc) => {
+      const text = msgs[loc].vocabDriveErrorUnexpected?.message || "";
+      return !text || text.includes("Google") ||
+        ["vocabDriveErrorRemote", "vocabDriveErrorNetwork", "vocabDriveErrorLocalStore"]
+          .some((key) => text === msgs[loc][key]?.message);
+    });
+    // Simplest miss: copying vocabDriveErrorRemote ("Google Drive 同步失败。") into
+    // the new key -- the very fallback Task 8 used before the key existed.
+    check("H22i the unexpected-error message names neither Google nor another failure in any locale",
+      unexpectedBroken.length === 0, `broken: ${unexpectedBroken.join(", ")}`);
+
+    const noDomain = LOCALES.filter((loc) => !(msgs[loc].vocabDriveErrorNetwork?.message || "").includes("googleapis.com"));
+    // Simplest miss: a locale shortens the hint to "or your proxy" and drops the
+    // only concrete thing a proxy rule can match on.
+    check("H22e the network error names googleapis.com in every locale",
+      noDomain.length === 0, `no domain: ${noDomain.join(", ")}`);
+
+    const SETTINGS_PATH = {
+      en: "General → Pinboard Account", zh_CN: "「通用 → Pinboard 账号」", zh_TW: "「一般 → Pinboard 帳號」",
+      zh_HK: "「一般 → Pinboard 帳戶」", ja: "「一般 → Pinboard アカウント」", de: "„Allgemein → Pinboard-Konto“",
+      fr: "« Général → Compte Pinboard »", pl: "„Ogólne → Konto Pinboard”", ru: "«Общие → Аккаунт Pinboard»",
+    };
+    const pathBroken = LOCALES.filter((loc) => {
+      const signedOut = msgs[loc].vocabDriveErrorPinboardAuth?.message || "";
+      const connected = msgs[loc].vocabDriveErrorPinboardAuthSync?.message || "";
+      const syncNow = msgs[loc].vocabDriveSyncNow?.message || "\u0000";
+      return !signedOut.includes(SETTINGS_PATH[loc]) || !connected.includes(SETTINGS_PATH[loc]) ||
+        !connected.includes(syncNow) || connected === signedOut;
+    });
+    // Simplest miss: fr writes « Synchroniser » (not the button's own label
+    // « Synchroniser maintenant ») or renames the settings path.
+    check("H22f the connected pinboard_auth error reuses the settings path and names this locale's Sync now button",
+      pathBroken.length === 0, `broken: ${pathBroken.join(", ")}`);
+  }
+
   // A slower refresh for the old language must not overwrite the mirror after
   // a newer refresh has already selected and loaded another locale.
   // shared.js (loaded for library.js's $id) defines getSettingsStorage, which

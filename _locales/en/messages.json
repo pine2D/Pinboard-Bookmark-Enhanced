@@ -3226,7 +3226,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "These choices apply only to this device and the current Pinboard account. Google Drive does not sync settings or credentials."
+      "message": "Once connected, this device syncs vocabulary, highlights, and notes for the current Pinboard account with Google Drive. The connection applies to this device only. Google Drive does not sync settings or credentials."
     },
     "vocabDriveDisclosure": {
       "message": "Copies in your Google Drive appDataFolder are plaintext, without end-to-end encryption. They can include saved words, definitions, highlighted excerpts, notes, source URLs, titles, and timestamps."
@@ -3243,14 +3243,20 @@
     "vocabDriveAuthorizing": {
       "message": "Waiting for Google authorization. Sign in and approve access in the window Chrome opened."
     },
+    "vocabDriveAuthorizingSlow": {
+      "message": "If no authorization window appeared, your network may not be able to reach Google."
+    },
     "vocabDriveWorking": {
-      "message": "Syncing selected data with Google Drive…"
+      "message": "Syncing with Google Drive…"
     },
     "vocabDriveSynced": {
-      "message": "Selected data synced with Google Drive."
+      "message": "Synced with Google Drive."
     },
     "vocabDriveConnected": {
       "message": "Google Drive is connected on this device."
+    },
+    "vocabDriveAuthNeeded": {
+      "message": "Google Drive is connected on this device but needs to be authorized again."
     },
     "vocabDriveAccountLabel": {
       "message": "Google account"
@@ -3283,10 +3289,13 @@
       "message": "Could not load Google Drive sync status."
     },
     "vocabDriveErrorAuth": {
-      "message": "Google Drive authorization is unavailable. Check that you are signed in to Chrome."
+      "message": "Google authorization is temporarily unavailable."
     },
     "vocabDriveErrorPinboardAuth": {
       "message": "No Pinboard account is signed in. Enter your API Token under General → Pinboard Account, then connect again."
+    },
+    "vocabDriveErrorPinboardAuthSync": {
+      "message": "No Pinboard account is signed in. Enter your API Token under General → Pinboard Account, then click Sync now."
     },
     "vocabDriveErrorPermission": {
       "message": "Google Drive permission is missing."
@@ -3298,10 +3307,16 @@
       "message": "Could not read or save data on this device."
     },
     "vocabDriveErrorNetwork": {
-      "message": "Google Drive could not be reached."
+      "message": "Google services could not be reached. The network may be down, or your proxy may not cover googleapis.com."
+    },
+    "vocabDriveErrorBusy": {
+      "message": "Google Drive is busy right now."
     },
     "vocabDriveErrorRemote": {
       "message": "Google Drive sync failed."
+    },
+    "vocabDriveErrorUnexpected": {
+      "message": "An unexpected error occurred during sync."
     },
     "vocabDriveErrorAccountChanged": {
       "message": "The Google account or Pinboard account changed during sync. Try again."
@@ -4090,6 +4105,12 @@
           "content": "$1"
         }
       }
+    },
+    "driveLastSuccess": {
+      "message": "Last synced"
+    },
+    "drivePendingChanges": {
+      "message": "This device has changes that haven't been uploaded yet."
     },
     "driveVocabularyNotices": {
       "message": "Vocabulary conflicts: $COUNT$. Edited words were kept instead of deleted.",

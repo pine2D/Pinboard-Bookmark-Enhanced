@@ -3216,7 +3216,7 @@
       "message": "Google Диск"
     },
     "vocabDriveScope": {
-      "message": "Этот выбор действует только на этом устройстве и для текущего аккаунта Pinboard. Google Диск не синхронизирует настройки и учётные данные."
+      "message": "После подключения это устройство синхронизирует с Google Диском словарик, выделения и заметки текущего аккаунта Pinboard. Подключение действует только на этом устройстве. Google Диск не синхронизирует настройки и учётные данные."
     },
     "vocabDriveDisclosure": {
       "message": "Копии в папке appDataFolder на Google Диске хранятся открытым текстом, без сквозного шифрования. Они могут содержать слова, определения, выделенные фрагменты, заметки, исходные URL, заголовки и даты."
@@ -3233,14 +3233,20 @@
     "vocabDriveAuthorizing": {
       "message": "Ожидание авторизации Google. Войдите и разрешите доступ в окне, которое открыл Chrome."
     },
+    "vocabDriveAuthorizingSlow": {
+      "message": "Если окно авторизации не появилось, возможно, сеть не может подключиться к Google."
+    },
     "vocabDriveWorking": {
-      "message": "Синхронизация выбранных данных с Google Диском…"
+      "message": "Синхронизация с Google Диском…"
     },
     "vocabDriveSynced": {
-      "message": "Выбранные данные синхронизированы с Google Диском."
+      "message": "Синхронизировано с Google Диском."
     },
     "vocabDriveConnected": {
       "message": "Google Диск подключён на этом устройстве."
+    },
+    "vocabDriveAuthNeeded": {
+      "message": "Google Диск подключён на этом устройстве, но нужна повторная авторизация."
     },
     "vocabDriveAccountLabel": {
       "message": "Аккаунт Google"
@@ -3273,10 +3279,13 @@
       "message": "Не удалось загрузить состояние синхронизации с Google Диском."
     },
     "vocabDriveErrorAuth": {
-      "message": "Авторизация Google Диска недоступна. Проверьте, выполнен ли вход в Chrome."
+      "message": "Авторизация Google временно недоступна."
     },
     "vocabDriveErrorPinboardAuth": {
       "message": "Нет входа в аккаунт Pinboard. Введите API Token в разделе «Общие → Аккаунт Pinboard» и подключитесь снова."
+    },
+    "vocabDriveErrorPinboardAuthSync": {
+      "message": "Нет входа в аккаунт Pinboard. Введите API Token в разделе «Общие → Аккаунт Pinboard», затем нажмите «Синхронизировать сейчас»."
     },
     "vocabDriveErrorPermission": {
       "message": "Нет разрешения на доступ к Google Диску."
@@ -3288,10 +3297,16 @@
       "message": "Не удалось прочитать или сохранить данные на этом устройстве."
     },
     "vocabDriveErrorNetwork": {
-      "message": "Не удалось подключиться к Google Диску."
+      "message": "Не удаётся подключиться к сервисам Google. Возможно, сеть недоступна или правила прокси не охватывают googleapis.com."
+    },
+    "vocabDriveErrorBusy": {
+      "message": "Google Диск временно перегружен."
     },
     "vocabDriveErrorRemote": {
       "message": "Не удалось синхронизировать данные с Google Диском."
+    },
+    "vocabDriveErrorUnexpected": {
+      "message": "Во время синхронизации произошла непредвиденная ошибка."
     },
     "vocabDriveErrorAccountChanged": {
       "message": "Во время синхронизации изменился аккаунт Google или Pinboard. Повторите попытку."
@@ -4083,6 +4098,12 @@
           "content": "$1"
         }
       }
+    },
+    "driveLastSuccess": {
+      "message": "Последняя синхронизация"
+    },
+    "drivePendingChanges": {
+      "message": "На этом устройстве есть изменения, которые ещё не отправлены."
     },
     "driveVocabularyNotices": {
       "message": "Конфликты словарика: $COUNT$. Изменённые слова сохранены, а не удалены.",

@@ -3216,7 +3216,7 @@
       "message": "Google ドライブ"
     },
     "vocabDriveScope": {
-      "message": "これらの選択は、このデバイスと現在の Pinboard アカウントにのみ適用されます。Google Drive では設定や認証情報は同期されません。"
+      "message": "接続すると、このデバイスと Google Drive の間で、現在の Pinboard アカウントの単語、ハイライト、メモが同期されます。接続はこのデバイスにのみ適用されます。Google Drive では設定や認証情報は同期されません。"
     },
     "vocabDriveDisclosure": {
       "message": "Google ドライブの appDataFolder に保存するコピーは平文で、エンドツーエンド暗号化されません。単語、定義、ハイライトした引用、メモ、参照元 URL、タイトル、日時が含まれる場合があります。"
@@ -3233,14 +3233,20 @@
     "vocabDriveAuthorizing": {
       "message": "Google の認可を待っています。Chrome が開いたウィンドウでログインし、アクセスを許可してください。"
     },
+    "vocabDriveAuthorizingSlow": {
+      "message": "認可ウィンドウが表示されない場合は、ネットワークから Google に接続できていない可能性があります。"
+    },
     "vocabDriveWorking": {
-      "message": "選択したデータを Google ドライブと同期しています…"
+      "message": "Google Drive と同期しています…"
     },
     "vocabDriveSynced": {
-      "message": "選択したデータを Google ドライブと同期しました。"
+      "message": "Google Drive と同期しました。"
     },
     "vocabDriveConnected": {
       "message": "このデバイスは Google Drive に接続されています。"
+    },
+    "vocabDriveAuthNeeded": {
+      "message": "このデバイスは Google Drive に接続されていますが、再度の認可が必要です。"
     },
     "vocabDriveAccountLabel": {
       "message": "Google アカウント"
@@ -3273,10 +3279,13 @@
       "message": "Google Drive の同期状態を読み込めませんでした。"
     },
     "vocabDriveErrorAuth": {
-      "message": "Google Drive の認可を利用できません。Chrome にログインしているか確認してください。"
+      "message": "Google の認可を一時的に取得できません。"
     },
     "vocabDriveErrorPinboardAuth": {
       "message": "Pinboard にログインしていません。「一般 → Pinboard アカウント」で API Token を入力してから、接続し直してください。"
+    },
+    "vocabDriveErrorPinboardAuthSync": {
+      "message": "Pinboard にログインしていません。「一般 → Pinboard アカウント」で API Token を入力してから、「今すぐ同期」をクリックしてください。"
     },
     "vocabDriveErrorPermission": {
       "message": "Google Drive の権限がありません。"
@@ -3288,10 +3297,16 @@
       "message": "このデバイスのデータを読み取りまたは保存できませんでした。"
     },
     "vocabDriveErrorNetwork": {
-      "message": "Google Drive に接続できません。"
+      "message": "Google のサービスに接続できません。ネットワークが切断されているか、プロキシが googleapis.com を対象にしていない可能性があります。"
+    },
+    "vocabDriveErrorBusy": {
+      "message": "Google Drive が一時的に混み合っています。"
     },
     "vocabDriveErrorRemote": {
       "message": "Google Drive との同期に失敗しました。"
+    },
+    "vocabDriveErrorUnexpected": {
+      "message": "同期中に予期しないエラーが発生しました。"
     },
     "vocabDriveErrorAccountChanged": {
       "message": "同期中に Google アカウントまたは Pinboard アカウントが変わりました。もう一度お試しください。"
@@ -4083,6 +4098,12 @@
           "content": "$1"
         }
       }
+    },
+    "driveLastSuccess": {
+      "message": "最終同期"
+    },
+    "drivePendingChanges": {
+      "message": "このデバイスには、まだアップロードされていない変更があります。"
     },
     "driveVocabularyNotices": {
       "message": "単語の競合：$COUNT$。編集された単語は削除せずに保持しました。",

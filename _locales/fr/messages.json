@@ -3216,7 +3216,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Ces choix ne concernent que cet appareil et le compte Pinboard actuel. Google Drive ne synchronise ni les paramètres ni les identifiants."
+      "message": "Une fois connecté, cet appareil synchronise avec Google Drive le vocabulaire, les surlignages et les notes du compte Pinboard actuel. La connexion ne concerne que cet appareil. Google Drive ne synchronise ni les paramètres ni les identifiants."
     },
     "vocabDriveDisclosure": {
       "message": "Les copies dans le dossier appDataFolder de Google Drive sont en texte clair, sans chiffrement de bout en bout. Elles peuvent contenir des mots, des définitions, des extraits surlignés, des notes, des URL sources, des titres et des dates."
@@ -3233,14 +3233,20 @@
     "vocabDriveAuthorizing": {
       "message": "En attente de l'autorisation Google. Connectez-vous et autorisez l'accès dans la fenêtre ouverte par Chrome."
     },
+    "vocabDriveAuthorizingSlow": {
+      "message": "Si aucune fenêtre d'autorisation ne s'est ouverte, votre réseau n'arrive peut-être pas à joindre Google."
+    },
     "vocabDriveWorking": {
-      "message": "Synchronisation des données sélectionnées avec Google Drive…"
+      "message": "Synchronisation avec Google Drive…"
     },
     "vocabDriveSynced": {
-      "message": "Les données sélectionnées sont synchronisées avec Google Drive."
+      "message": "Synchronisé avec Google Drive."
     },
     "vocabDriveConnected": {
       "message": "Google Drive est connecté sur cet appareil."
+    },
+    "vocabDriveAuthNeeded": {
+      "message": "Google Drive est connecté sur cet appareil, mais l'accès doit être autorisé à nouveau."
     },
     "vocabDriveAccountLabel": {
       "message": "Compte Google"
@@ -3273,10 +3279,13 @@
       "message": "Impossible de charger l'état de la synchronisation Google Drive."
     },
     "vocabDriveErrorAuth": {
-      "message": "L'autorisation Google Drive est indisponible. Vérifiez que vous êtes connecté à Chrome."
+      "message": "L'autorisation Google est temporairement indisponible."
     },
     "vocabDriveErrorPinboardAuth": {
       "message": "Aucun compte Pinboard connecté. Saisissez votre API Token dans « Général → Compte Pinboard », puis reconnectez-vous."
+    },
+    "vocabDriveErrorPinboardAuthSync": {
+      "message": "Aucun compte Pinboard connecté. Saisissez votre API Token dans « Général → Compte Pinboard », puis cliquez sur « Synchroniser maintenant »."
     },
     "vocabDriveErrorPermission": {
       "message": "L'autorisation d'accès à Google Drive est manquante."
@@ -3288,10 +3297,16 @@
       "message": "Impossible de lire ou d’enregistrer les données sur cet appareil."
     },
     "vocabDriveErrorNetwork": {
-      "message": "Impossible de joindre Google Drive."
+      "message": "Impossible de joindre les services Google. Le réseau est peut-être coupé, ou votre proxy ne couvre pas googleapis.com."
+    },
+    "vocabDriveErrorBusy": {
+      "message": "Google Drive est momentanément surchargé."
     },
     "vocabDriveErrorRemote": {
       "message": "La synchronisation avec Google Drive a échoué."
+    },
+    "vocabDriveErrorUnexpected": {
+      "message": "Une erreur inattendue est survenue pendant la synchronisation."
     },
     "vocabDriveErrorAccountChanged": {
       "message": "Le compte Google ou Pinboard a changé pendant la synchronisation. Réessayez."
@@ -4083,6 +4098,12 @@
           "content": "$1"
         }
       }
+    },
+    "driveLastSuccess": {
+      "message": "Dernière synchronisation"
+    },
+    "drivePendingChanges": {
+      "message": "Cet appareil a des modifications qui n'ont pas encore été envoyées."
     },
     "driveVocabularyNotices": {
       "message": "Conflits de vocabulaire : $COUNT$. Les mots modifiés ont été conservés au lieu d'être supprimés.",

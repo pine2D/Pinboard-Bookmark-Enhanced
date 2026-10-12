@@ -3216,7 +3216,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "以下選擇只適用於這部裝置和目前的 Pinboard 帳戶。Google Drive 不會同步設定和憑證。"
+      "message": "連接後，這部裝置會與 Google Drive 同步目前 Pinboard 帳戶的生詞、標記與筆記。只適用於這部裝置；Google Drive 不會同步設定和憑證。"
     },
     "vocabDriveDisclosure": {
       "message": "Google Drive appDataFolder 中的副本以明文儲存，未經端對端加密，可能包含生詞、釋義、標記摘錄、筆記、來源網址、標題和時間。"
@@ -3233,14 +3233,20 @@
     "vocabDriveAuthorizing": {
       "message": "正在等待 Google 授權。請在 Chrome 彈出的視窗中完成登入與授權。"
     },
+    "vocabDriveAuthorizingSlow": {
+      "message": "如果沒有出現授權視窗，可能是網絡連不上 Google。"
+    },
     "vocabDriveWorking": {
-      "message": "正在與 Google Drive 同步所選資料…"
+      "message": "正在與 Google Drive 同步…"
     },
     "vocabDriveSynced": {
-      "message": "所選資料已與 Google Drive 同步。"
+      "message": "已與 Google Drive 同步。"
     },
     "vocabDriveConnected": {
       "message": "這部裝置已連接 Google Drive。"
+    },
+    "vocabDriveAuthNeeded": {
+      "message": "這部裝置已連接 Google Drive，但需要重新授權。"
     },
     "vocabDriveAccountLabel": {
       "message": "Google 帳戶"
@@ -3273,10 +3279,13 @@
       "message": "無法讀取 Google Drive 同步狀態。"
     },
     "vocabDriveErrorAuth": {
-      "message": "Google Drive 授權無法使用。請確認 Chrome 已登入 Google 帳戶。"
+      "message": "暫時無法取得 Google 授權。"
     },
     "vocabDriveErrorPinboardAuth": {
       "message": "尚未登入 Pinboard 帳戶。請在「一般 → Pinboard 帳戶」填入 API Token，然後重新連線。"
+    },
+    "vocabDriveErrorPinboardAuthSync": {
+      "message": "尚未登入 Pinboard 帳戶。請在「一般 → Pinboard 帳戶」填入 API Token，然後按「立即同步」。"
     },
     "vocabDriveErrorPermission": {
       "message": "缺少 Google Drive 權限。"
@@ -3288,10 +3297,16 @@
       "message": "無法讀取或儲存本機資料。"
     },
     "vocabDriveErrorNetwork": {
-      "message": "無法連接 Google Drive。"
+      "message": "無法連接 Google 服務，可能是網絡中斷，或代理未涵蓋 googleapis.com。"
+    },
+    "vocabDriveErrorBusy": {
+      "message": "Google Drive 暫時繁忙。"
     },
     "vocabDriveErrorRemote": {
       "message": "Google Drive 同步失敗。"
+    },
+    "vocabDriveErrorUnexpected": {
+      "message": "同步時發生意外錯誤。"
     },
     "vocabDriveErrorAccountChanged": {
       "message": "同步期間 Google 帳戶或 Pinboard 帳戶有變，請重試。"
@@ -4083,6 +4098,12 @@
           "content": "$1"
         }
       }
+    },
+    "driveLastSuccess": {
+      "message": "最近成功同步"
+    },
+    "drivePendingChanges": {
+      "message": "這部裝置還有尚未上傳的更改。"
     },
     "driveVocabularyNotices": {
       "message": "生詞衝突：$COUNT$ 處。被修改的生詞已保留，未被刪除。",

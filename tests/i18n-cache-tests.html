@@ -15,10 +15,10 @@
   function page(version = "2.118") {
     const mirror = new Map([
       ["pp-i18n-lang", "zh_CN"], ["pp-i18n-stamp", "zh_CN@2.118"],
-      ["pp-i18n-msgs", JSON.stringify({ driveSyncVocabulary: { message: "旧生词名称" } })]
+      ["pp-i18n-msgs", JSON.stringify({ vocabDriveSyncNow: { message: "旧同步按钮" } })]
     ]);
     const doc = document.implementation.createHTMLDocument();
-    doc.body.innerHTML = '<span data-i18n="driveSyncNotes"></span><span data-i18n="driveSyncVocabulary"></span>';
+    doc.body.innerHTML = '<span data-i18n="vocabDriveDisconnect"></span><span data-i18n="vocabDriveSyncNow"></span>';
     let lang = "zh_CN", reads = 0;
     const storage = { getItem: key => mirror.get(key) ?? null,
       setItem: (key, value) => mirror.set(key, String(value)), removeItem: key => mirror.delete(key) };
@@ -31,26 +31,26 @@
     return {api, doc, mirror, reads:() => reads, language:value => {lang=value;}};
   }
   const cold = page(); cold.api.initI18n(); cold.api.applyI18n();
-  check("cold page may synchronously paint the previous mirror", cold.api.t("driveSyncVocabulary") === "旧生词名称");
+  check("cold page may synchronously paint the previous mirror", cold.api.t("vocabDriveSyncNow") === "旧同步按钮");
   await cold.api.pbpI18nReady();
   check("same-version reload translates newly added keys without changing language",
-    cold.doc.querySelector('[data-i18n="driveSyncNotes"]').textContent === "高亮与笔记");
+    cold.doc.querySelector('[data-i18n="vocabDriveDisconnect"]').textContent === "断开此设备");
   check("same-version reload refreshes changed existing wording",
-    cold.doc.querySelector('[data-i18n="driveSyncVocabulary"]').textContent === "生词");
+    cold.doc.querySelector('[data-i18n="vocabDriveSyncNow"]').textContent === "立即同步");
   check("cold page validates the packaged locale even when the persistent stamp matches", cold.reads() === 1);
   check("cold refresh replaces the persistent dictionary with current translations",
-    JSON.parse(cold.mirror.get("pp-i18n-msgs")).driveSyncNotes?.message === "高亮与笔记");
+    JSON.parse(cold.mirror.get("pp-i18n-msgs")).vocabDriveDisconnect?.message === "断开此设备");
   cold.api.initI18n(); await cold.api.pbpI18nReady();
   check("a dictionary already verified in this page is reused", cold.reads() === 1);
   const upgrade = page("2.119"); upgrade.api.initI18n(); upgrade.api.applyI18n(); await upgrade.api.pbpI18nReady();
   check("a version upgrade refreshes the previous locale cache",
-    upgrade.api.t("driveSyncNotes") === "高亮与笔记" && upgrade.reads() === 1);
+    upgrade.api.t("vocabDriveDisconnect") === "断开此设备" && upgrade.reads() === 1);
   cold.language("auto"); cold.api.initI18n(); await cold.api.pbpI18nReady();
   check("automatic language discards the manual mirror and uses the browser locale",
-    cold.api.t("driveSyncNotes") === "Highlights and notes" && !cold.mirror.has("pp-i18n-msgs"));
+    cold.api.t("vocabDriveDisconnect") === "Disconnect this device" && !cold.mirror.has("pp-i18n-msgs"));
   cold.language("zh_CN"); cold.api.initI18n(); await cold.api.pbpI18nReady();
   check("returning from automatic language loads the selected locale again",
-    cold.api.t("driveSyncNotes") === "高亮与笔记" && cold.reads() === 2);
+    cold.api.t("vocabDriveDisconnect") === "断开此设备" && cold.reads() === 2);
   console.log(`pass=${pass} fail=${fail}`);
 })();
 </script></body></html>
