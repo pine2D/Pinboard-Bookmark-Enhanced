@@ -378,8 +378,10 @@ function pbpCreateNotesSyncStore({
     if (!/^acct_.+/.test(owner)) throw _pbpNotesSyncError("account_changed");
     await checkHash(owner,value.ownerHash,options); await storage.set({[key]:value}); return true;
   }
+  // Owner checks call Drive about(); a connection failure there is the
+  // runner's verdict to record, not a failed local write.
   const stateFailure = error => {
-    if (["network","auth","permission","account_changed"].includes(error.code)) throw error;
+    if (["network","auth","permission","rate_limited","server","account_changed","unexpected"].includes(error.code)) throw error;
     console.warn("[notes-sync] state write failed:",error.name,typeof error.code === "string" ? error.code : "local_store");
     return false;
   };

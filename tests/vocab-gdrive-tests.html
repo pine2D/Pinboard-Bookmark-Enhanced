@@ -143,6 +143,22 @@ function syncHarness(options = {}) {
   const outbox = [...(options.outbox || [])];
   let accountState = options.accountState ? { ...options.accountState } : null;
   let preflightState = options.preflightState ? { ...options.preflightState } : null;
+  // The orchestrator's shared per-owner connection record. `null` opts a
+  // case out of the record entirely; omitted means an empty in-memory one.
+  let connectionState = options.connectionState ? { ...options.connectionState } : null;
+  const connectionReads = [];
+  const connection = options.connection !== undefined ? options.connection : {
+    async get(hash) {
+      connectionReads.push(hash);
+      return connectionState && { ...connectionState };
+    },
+    async put(hash, value) {
+      calls.push(`conn-put:${value === null ? "null" : `${value.lastError}:${value.blocked}`}`);
+      if (hash !== OWNER_HASH) return false;
+      connectionState = value === null ? null : { ...value };
+      return true;
+    }
+  };
   // `||` would swallow "" -- the signed-out case this harness must be able
   // to express.
   let authAccount = options.authAccount === undefined ? "pin-a" : options.authAccount;
@@ -260,14 +276,14 @@ function syncHarness(options = {}) {
       const page = filePages.shift();
       return page
         ? (page.ok === undefined ? { ok: true, ...page } : page)
-        : { ok: false, error: "unexpected", retryable: false };
+        : { ok: false, error: "remote", retryable: false };
     },
     async listChanges(pageToken) {
       calls.push(`changes:${pageToken}`);
       const page = changePages.shift();
       return page
         ? (page.ok === undefined ? { ok: true, ...page } : page)
-        : { ok: false, error: "unexpected", retryable: false };
+        : { ok: false, error: "remote", retryable: false };
     },
     async download(fileId) {
       calls.push(`download:${fileId}`);
@@ -287,20 +303,14 @@ function syncHarness(options = {}) {
       return options.uploadResult || { ok: true, fileId: meta.id };
     }
   };
-  const alarms = options.alarms || {
-    created: [],
-    async clear(name) { calls.push(`clear:${name}`); return true; },
-    create(name, info) { this.created.push({ name, info }); calls.push(`alarm:${name}`); }
-  };
   const runner = () => pbpCreateVocabDriveSyncRunner({
     ...(options.protocol ? { protocol: options.protocol } : {}),
-    ...(options.alarmNames ? { alarmNames: options.alarmNames } : {}),
     ...(options.isEnabled ? { isEnabled: options.isEnabled } : {}),
     ...(options.getCurrentPermissionId ? { getCurrentPermissionId: options.getCurrentPermissionId } : {}),
     ...(options.getScopeEpoch ? { getScopeEpoch: options.getScopeEpoch } : {}),
     client,
     store,
-    alarms,
+    connection,
     getCurrentPinboardAuth: async () => auth(),
     pinboardAuthIsCurrent: (captured) =>
       captured.account === authAccount && captured.epoch === authEpoch,
@@ -309,9 +319,10 @@ function syncHarness(options = {}) {
     random: options.random || (() => 0.5)
   });
   return {
-    calls, client, store, alarms, outbox, pending, ownerArgs, hashInputs, runner,
+    calls, client, store, outbox, pending, ownerArgs, hashInputs, connectionReads, runner,
     state: () => accountState && { ...accountState },
     preflight: () => preflightState && { ...preflightState },
+    connection: () => connectionState && { ...connectionState },
     setAccount(value) { authAccount = value; authEpoch++; }
   };
 }
@@ -1119,7 +1130,8 @@ function syncHarness(options = {}) {
       ]
     });
     const denied = await terminal.runner()();
-    const terminalBlocked = terminal.preflight();
+    const terminalBlocked = terminal.connection();
+    const deniedPreflight = terminal.preflight();
     const firstOpenCount = terminal.calls.filter((call) =>
       call.startsWith("open-session:") || call === "about").length;
     const blocked = await terminal.runner()();
@@ -1144,21 +1156,21 @@ function syncHarness(options = {}) {
       reasons.accessNotConfigured.retryable === false &&
       !JSON.stringify(reasons).includes("private remote detail") &&
       !denied.ok && denied.error === "permission" &&
-      terminalBlocked?.blocked === true &&
+      // Simplest miss: permission still written to the vocabulary preflight.
+      terminalBlocked?.blocked === true && terminalBlocked.lastError === "permission" &&
+      deniedPreflight === null &&
       !blocked.ok && blocked.error === "permission" &&
       blockedOpenCount === firstOpenCount &&
-      recovered.ok && terminal.preflight() === null &&
-      terminal.alarms.created.some((alarm) => alarm.name === "vocab-sync-periodic") &&
-      ["vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry"]
-        .every((name) => terminal.calls.includes(`clear:${name}`)) &&
-      !rateResult.ok && rateResult.retryable === true &&
-      rate.preflight()?.retryAt > 1_000_000 &&
-      rate.alarms.created.some((alarm) => alarm.name === "vocab-sync-retry");
+      recovered.ok && terminal.preflight() === null && terminal.connection() === null &&
+      // Simplest miss: rate_limited folded into "network" as before.
+      !rateResult.ok && rateResult.error === "rate_limited" && rateResult.retryable === true &&
+      rate.connection()?.retryAt > 1_000_000 && rate.connection().blocked === false &&
+      rate.preflight() === null;
     if (!ok) throw new Error(JSON.stringify({
       permanent, download, read, cancelled, reasons, denied, blocked, recovered,
       firstOpenCount, blockedOpenCount, terminalCalls: terminal.calls,
-      terminalBlocked, terminalPreflight: terminal.preflight(), rateResult,
-      ratePreflight: rate.preflight(), rateCalls: rate.calls
+      terminalBlocked, deniedPreflight, terminalConnection: terminal.connection(), rateResult,
+      rateConnection: rate.connection(), ratePreflight: rate.preflight(), rateCalls: rate.calls
     }));
     return true;
   });
@@ -1740,7 +1752,7 @@ function syncHarness(options = {}) {
     const persistedFlag = h.state()?.needsCheckpoint === true &&
       h.state()?.pageToken === "after-removed";
     const resumed = await h.runner()({ force: true });
-    return !interrupted.ok && interrupted.error === "network" && persistedFlag &&
+    return !interrupted.ok && interrupted.error === "server" && persistedFlag &&
       resumed.ok && h.calls.filter((call) => call === "checkpoint").length === 1 &&
       h.state().pageToken === "stable-new" &&
       h.state().needsCheckpoint === undefined;
@@ -1756,7 +1768,7 @@ function syncHarness(options = {}) {
     const interrupted = await h.runner()();
     const persistedFlag = h.state()?.needsCheckpoint === true;
     const resumed = await h.runner()({ force: true });
-    return !interrupted.ok && interrupted.error === "network" && persistedFlag &&
+    return !interrupted.ok && interrupted.error === "server" && persistedFlag &&
       resumed.ok && h.calls.filter((call) => call === "checkpoint").length === 1 &&
       h.state().needsCheckpoint === undefined;
   });
@@ -1823,14 +1835,18 @@ function syncHarness(options = {}) {
   });
 
   await asyncCheck("interrupted legacy seed resumes from committed store work", async () => {
-    const h = syncHarness({ seedResults: [100, new Error("worker stopped"), 0] });
+    let clock = 1_000_000;
+    const h = syncHarness({ seedResults: [100, new Error("worker stopped"), 0], now: () => clock });
     const first = await h.runner()();
     const firstPreflight = h.preflight();
     const firstStarts = h.calls.filter((call) => call === "start").length;
+    clock = firstPreflight.retryAt + 1;
     const second = await h.runner()();
-    return !first.ok && first.error === "remote" && firstPreflight === null &&
-      second.ok && firstStarts === 0 &&
-      h.calls.filter((call) => call === "start").length === 1;
+    // Simplest miss: the uncoded exception still lands as a blocked "remote".
+    return !first.ok && first.error === "unexpected" && first.retryable === true &&
+      firstPreflight.lastError === "unexpected" && firstPreflight.blocked === false &&
+      second.ok && second.status?.waitingForRetry !== true && firstStarts === 0 &&
+      h.calls.filter((call) => call === "start").length === 1 && h.preflight() === null;
   });
 
   await asyncCheck("freezing a batch removes the outbox snapshot", async () => {
@@ -1929,25 +1945,93 @@ function syncHarness(options = {}) {
       !switched.calls.some((call) => call === "delete-pending:pending-switched");
   });
 
-  await asyncCheck("periodic scheduling uses a fifteen-minute alarm", async () => {
-    const alarms = { created: [], create(name, info) { this.created.push({ name, info }); } };
-    await pbpVocabSchedulePeriodic(alarms);
-    return JSON.stringify(alarms.created) === JSON.stringify([{
-      name: "vocab-sync-periodic", info: { periodInMinutes: 15 }
-    }]);
+  await asyncCheck("periodic alarm is created once and never restarted", async () => {
+    // chrome.alarms.get resolves undefined for a missing alarm, an Alarm otherwise.
+    const alarms = {
+      existing: undefined, created: [],
+      async get(name) { return name === "drive-sync-periodic" ? this.existing : undefined; },
+      create(name, info) {
+        this.created.push({ name, info });
+        this.existing = { name, periodInMinutes: info.periodInMinutes, scheduledTime: 900_000 };
+      }
+    };
+    const first = await pbpDriveEnsurePeriodic(alarms);
+    const second = await pbpDriveEnsurePeriodic(alarms);
+    // Simplest miss: calling create on every boot, which restarts the clock.
+    return first === true && second === false &&
+      JSON.stringify(alarms.created) === JSON.stringify([{
+        name: "drive-sync-periodic", info: { periodInMinutes: 15 }
+      }]);
   });
 
   await asyncCheck("dirty scheduling uses an earliest thirty-second one-shot", async () => {
     const alarms = {
-      existing: null, created: [],
-      async get() { return this.existing; },
-      create(name, info) { this.created.push({ name, info }); this.existing = { scheduledTime: info.when }; }
+      existing: undefined, created: [],
+      async get(name) { return name === "drive-sync-dirty" ? this.existing : undefined; },
+      create(name, info) {
+        this.created.push({ name, info });
+        this.existing = { name, scheduledTime: info.when };
+      }
     };
-    await pbpVocabScheduleDirty(alarms, () => 1_000);
-    await pbpVocabScheduleDirty(alarms, () => 2_000);
-    return alarms.created.length === 1 &&
-      alarms.created[0].name === "vocab-sync-dirty" &&
+    const first = await pbpDriveScheduleDirty(alarms, () => 1_000);
+    const second = await pbpDriveScheduleDirty(alarms, () => 2_000);
+    // Simplest miss: the second mark pushes the pending run 1s later.
+    return first === true && second === false && alarms.created.length === 1 &&
+      alarms.created[0].name === "drive-sync-dirty" &&
       alarms.created[0].info.when === 31_000;
+  });
+
+  await asyncCheck("one drive schedule replaces the per-dataset alarms", async () => {
+    // Simplest miss: the old helpers kept around as aliases next to the new ones.
+    return PBP_DRIVE_DIRTY_ALARM === "drive-sync-dirty" &&
+      PBP_DRIVE_PERIODIC_ALARM === "drive-sync-periodic" &&
+      PBP_DRIVE_RETRY_ALARM === "drive-sync-retry" &&
+      Object.isFrozen(PBP_DRIVE_LEGACY_ALARMS) &&
+      JSON.stringify(PBP_DRIVE_LEGACY_ALARMS) === JSON.stringify([
+        "vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry",
+        "notes-sync-dirty", "notes-sync-periodic", "notes-sync-retry"
+      ]) &&
+      [...PBP_DRIVE_CONNECTION_ERRORS].sort().join(",") === "auth,network,permission,rate_limited,server" &&
+      typeof pbpVocabScheduleDirty === "undefined" &&
+      typeof pbpVocabSchedulePeriodic === "undefined" &&
+      typeof PBP_VOCAB_DIRTY_ALARM === "undefined" &&
+      typeof PBP_VOCAB_PERIODIC_ALARM === "undefined" &&
+      typeof PBP_VOCAB_RETRY_ALARM === "undefined";
+  });
+
+  await asyncCheck("the runner never touches chrome.alarms", async () => {
+    const touched = [];
+    const trap = new Proxy({}, {
+      get(_target, name) { touched.push(String(name)); return async () => true; }
+    });
+    const prior = globalThis.chrome;
+    globalThis.chrome = { ...(prior || {}), alarms: trap };
+    let results;
+    try {
+      if (globalThis.chrome.alarms !== trap) throw new Error("chrome.alarms trap not installed");
+      const blockedRecord = {
+        lastError: "permission", authAttempts: 0, retryAttempt: 0,
+        retryAt: null, blocked: true, updatedAt: 1
+      };
+      results = [
+        await syncHarness().runner()(),
+        await syncHarness({ aboutResults: [{ ok: false, error: "network", retryable: true }] }).runner()(),
+        await syncHarness({ aboutResults: [{ ok: false, error: "permission", retryable: false }] }).runner()(),
+        await syncHarness({ connectionState: blockedRecord }).runner()(),
+        await syncHarness({ connectionState: { ...blockedRecord, lastError: "network", blocked: false, retryAt: 2_000_000 } }).runner()(),
+        await syncHarness({ failApply: true, files: [driveFile("trap-page")],
+          filePages: [{ files: [driveFile("trap-page").meta], nextPageToken: null }] }).runner()(),
+        await syncHarness().runner()({ force: true })
+      ];
+    } finally {
+      if (prior === undefined) delete globalThis.chrome;
+      else globalThis.chrome = prior;
+    }
+    // Simplest miss: an `alarms = chrome.alarms` default still read on success.
+    return touched.length === 0 && results.length === 7 &&
+      results[0].ok && results[1].error === "network" && results[2].error === "permission" &&
+      results[3].error === "permission" && results[4].status?.connectionWaiting === true &&
+      results[5].error === "corrupt" && results[6].ok;
   });
 
   await asyncCheck("retry delay follows 1/2/4/8/16/32/60 minute cap", async () => {
@@ -1959,13 +2043,13 @@ function syncHarness(options = {}) {
         ownerHash: OWNER_HASH, bootstrapComplete: true, pageToken: "stable-old",
         retryAttempt: 6, retryAt: 9_999_999
       },
-      changePages: [{ ok: false, error: "server", retryable: true }]
+      sessionOverrides: { async listChanges() { throw new Error("worker lost"); } }
     });
     const result = await h.runner()({ force: true });
     const preflight = syncHarness({
       preflightState: {
         key: `preflight:${OWNER_HASH}`, ownerHash: OWNER_HASH,
-        retryAttempt: 2, retryAt: 9_999_999, lastError: "network", blocked: false
+        retryAttempt: 2, retryAt: 9_999_999, lastError: "unexpected", blocked: false
       }
     });
     const waiting = await preflight.runner()();
@@ -1979,17 +2063,17 @@ function syncHarness(options = {}) {
       }
     });
     const accountWaiting = await accountWait.runner()();
+    // Simplest miss: an uncoded exception blocks instead of backing off.
     return delays.join(",") === "1,2,4,8,16,32,60,60,60" &&
-      !result.ok && result.error === "network" &&
+      !result.ok && result.error === "unexpected" && result.retryable === true &&
       h.state().retryAttempt === 1 && h.state().retryAt === 1_060_000 &&
-      h.calls.indexOf("put:stable-old:true") < h.calls.indexOf("alarm:vocab-sync-retry") &&
+      h.preflight()?.retryAt === 1_060_000 && h.preflight().blocked === false &&
       waiting.ok && waiting.status?.waitingForRetry === true &&
-      waitingCalls.includes("alarm:vocab-sync-retry") &&
       !waitingCalls.some((call) =>
         call.startsWith("open-session:") || call === "about" || call.startsWith("changes:")) &&
       forced.ok && preflight.preflight() === null &&
       accountWaiting.ok && accountWaiting.status?.waitingForRetry === true &&
-      accountWait.calls.includes("alarm:vocab-sync-retry");
+      !accountWait.calls.some((call) => call.startsWith("changes:"));
   });
 
   await asyncCheck("retry delay applies bounded twenty-percent jitter", async () => {
@@ -2062,7 +2146,7 @@ function syncHarness(options = {}) {
         call === "delete-preflight" || call.startsWith("open-session:")) &&
       !failureSwitchResult.ok && failureSwitchResult.error === "account_changed" &&
       !failureSwitch.calls.some((call) =>
-        call.startsWith("put-preflight:") || call.startsWith("alarm:")) &&
+        call.startsWith("put-preflight:") || call.startsWith("conn-put:")) &&
       !accountSwitchResult.ok && accountSwitchResult.error === "account_changed" &&
       !accountSwitch.calls.some((call) => call.startsWith("put:"));
   });
@@ -2109,25 +2193,264 @@ function syncHarness(options = {}) {
   });
 
   await asyncCheck("repeated silent auth failures stop guessing and block", async () => {
-    const preflightAt = (retryAttempt) => ({
-      key: `preflight:${OWNER_HASH}`, ownerHash: OWNER_HASH,
-      retryAttempt, retryAt: null, lastError: "auth", blocked: false
+    const recordAt = (authAttempts) => ({
+      lastError: "auth", authAttempts, retryAttempt: authAttempts,
+      retryAt: 999_999, blocked: false, updatedAt: 1
     });
     const early = syncHarness({
       aboutResults: [{ ok: false, error: "auth", retryable: true }],
-      preflightState: preflightAt(1)
+      connectionState: recordAt(1)
     });
     const earlyResult = await early.runner()();
     const late = syncHarness({
       aboutResults: [{ ok: false, error: "auth", retryable: true }],
-      preflightState: preflightAt(5)
+      connectionState: recordAt(5)
     });
     const lateResult = await late.runner()();
-    return earlyResult.retryable === true && early.preflight().blocked === false &&
-      !early.calls.includes("clear:vocab-sync-periodic") &&
+    // Simplest miss: the limit still read from the dataset preflight.
+    return earlyResult.retryable === true && early.connection()?.blocked === false &&
+      early.connection().authAttempts === 2 && early.preflight() === null &&
       lateResult.retryable === false && lateResult.error === "auth" &&
-      late.preflight().blocked === true &&
-      late.calls.includes("clear:vocab-sync-periodic");
+      late.connection()?.blocked === true && late.connection().retryAt === null &&
+      late.preflight() === null;
+  });
+
+  await asyncCheck("five network failures before an auth failure leave the auth budget intact", async () => {
+    let clock = 1_000_000;
+    const network = () => ({ ok: false, error: "network", retryable: true });
+    // Four auth failures already on record: one more would be the fifth.
+    const h = syncHarness({
+      now: () => clock,
+      connectionState: {
+        lastError: "auth", authAttempts: 4, retryAttempt: 4,
+        retryAt: 999_999, blocked: false, updatedAt: 1
+      },
+      aboutResults: [network(), network(), network(), network(), network(),
+        { ok: false, error: "auth", retryable: true }]
+    });
+    const results = [];
+    const authCounts = [];
+    for (let i = 0; i < 6; i++) {
+      results.push(await h.runner()());
+      authCounts.push(h.connection()?.authAttempts);
+      clock = h.connection().retryAt + 1;
+    }
+    const last = results[5];
+    // Simplest misses: counting every backoff (retryAttempt) toward the auth
+    // limit, or letting a network failure keep the earlier auth count.
+    return results.slice(0, 5).every((result) =>
+      !result.ok && result.error === "network" && result.retryable === true) &&
+      authCounts.join(",") === "0,0,0,0,0,1" &&
+      !last.ok && last.error === "auth" && last.retryable === true &&
+      h.connection()?.blocked === false && h.connection().authAttempts === 1 &&
+      h.connection().retryAttempt === 10 && h.preflight() === null;
+  });
+
+  await asyncCheck("five auth backoffs of about 31 minutes, then the sixth auth failure blocks", async () => {
+    let clock = 1_000_000;
+    const h = syncHarness({
+      now: () => clock,
+      aboutResults: Array.from({ length: 6 }, () => ({ ok: false, error: "auth", retryable: true }))
+    });
+    const results = [];
+    const records = [];
+    for (let i = 0; i < 6; i++) {
+      results.push(await h.runner()());
+      records.push(h.connection());
+      if (Number.isFinite(records[i]?.retryAt)) clock = records[i].retryAt + 1;
+    }
+    const gated = await h.runner()();
+    // Spec §10.1. Simplest miss: blocking on the fifth (>= counted after the bump).
+    return results.slice(0, 5).every((result) => result.error === "auth" && result.retryable === true) &&
+      records.slice(0, 5).every((record, i) => record.blocked === false && record.authAttempts === i + 1) &&
+      records[4].retryAt === 1_000_000 + 31 * 60000 + 4 &&
+      results[5].error === "auth" && results[5].retryable === false &&
+      records[5].blocked === true && records[5].retryAt === null &&
+      !gated.ok && gated.error === "auth" && gated.retryable === false &&
+      h.calls.filter((call) => call.startsWith("open-session:")).length === 6;
+  });
+
+  await asyncCheck("server and rate_limited keep their code and back off only in the shared record", async () => {
+    const outcomes = {};
+    for (const [code, status] of [["server", 503], ["rate_limited", 429]]) {
+      const h = syncHarness({
+        accountState: {
+          key: `account:perm-a:${OWNER_HASH}`, drivePermissionId: "perm-a",
+          ownerHash: OWNER_HASH, bootstrapComplete: true, pageToken: "stable-old"
+        },
+        changePages: [{ ok: false, error: code, retryable: true, status }]
+      });
+      const result = await h.runner()();
+      outcomes[code] = { result, record: h.connection(), preflight: h.preflight(), state: h.state() };
+    }
+    // Simplest miss: the account row still carries the connection backoff.
+    return Object.entries(outcomes).every(([code, o]) =>
+      !o.result.ok && o.result.error === code && o.result.retryable === true &&
+      o.record?.lastError === code && o.record.blocked === false &&
+      o.record.retryAt === 1_060_000 && o.record.retryAttempt === 1 && o.record.authAttempts === 0 &&
+      o.preflight === null && o.state.lastError === undefined && o.state.retryAt === undefined);
+  });
+
+  await asyncCheck("an uncoded exception backs off without blocking; a throwing store read is local", async () => {
+    const warnings = [];
+    const realWarn = console.warn;
+    console.warn = (...args) => { warnings.push(args.map((value) => String(value)).join(" ")); };
+    let thrown;
+    let storeRead;
+    try {
+      const h = syncHarness({
+        sessionOverrides: { async getStartPageToken() { throw new TypeError("boom"); } }
+      });
+      thrown = { result: await h.runner()(), preflight: h.preflight(), record: h.connection() };
+      const broken = syncHarness({});
+      broken.store.listOutbox = async () => { throw new DOMException("closing", "InvalidStateError"); };
+      storeRead = { result: await broken.runner()(), preflight: broken.preflight() };
+    } finally {
+      console.warn = realWarn;
+    }
+    // Simplest miss: the catch-all still returns a blocked "remote".
+    return !thrown.result.ok && thrown.result.error === "unexpected" && thrown.result.retryable === true &&
+      thrown.preflight?.lastError === "unexpected" && thrown.preflight.blocked === false &&
+      Number.isFinite(thrown.preflight.retryAt) && thrown.record === null &&
+      warnings.some((line) => line.includes("TypeError") && line.includes("boom")) &&
+      // Simplest miss: a store read failure filed as "unexpected" and retried forever.
+      !storeRead.result.ok && storeRead.result.error === "local_store" &&
+      storeRead.preflight?.lastError === "local_store" && storeRead.preflight.blocked === true;
+  });
+
+  await asyncCheck("connection codes an earlier release left in preflight or account rows are ignored", async () => {
+    const legacyBackoff = syncHarness({
+      preflightState: {
+        key: `preflight:${OWNER_HASH}`, ownerHash: OWNER_HASH,
+        retryAttempt: 5, retryAt: 9_999_999, lastError: "network", blocked: false
+      },
+      aboutResults: [{ ok: false, error: "auth", retryable: true }]
+    });
+    const backoffResult = await legacyBackoff.runner()();
+    const legacyBlock = syncHarness({
+      preflightState: {
+        key: `preflight:${OWNER_HASH}`, ownerHash: OWNER_HASH,
+        retryAttempt: 0, retryAt: null, lastError: "auth", blocked: true
+      }
+    });
+    const blockResult = await legacyBlock.runner()();
+    const legacyAccount = syncHarness({
+      accountState: {
+        key: `account:perm-a:${OWNER_HASH}`, drivePermissionId: "perm-a",
+        ownerHash: OWNER_HASH, bootstrapComplete: true, pageToken: "stable-old",
+        retryAttempt: 5, retryAt: 9_999_999, lastError: "network"
+      }
+    });
+    const accountResult = await legacyAccount.runner()();
+    // Simplest miss: the legacy "auth" block still returned without a request.
+    return backoffResult.error === "auth" && backoffResult.retryable === true &&
+      legacyBackoff.calls.includes("open-session:false") &&
+      legacyBackoff.connection()?.authAttempts === 1 && legacyBackoff.connection().blocked === false &&
+      blockResult.ok && blockResult.status?.waitingForRetry !== true &&
+      legacyBlock.calls.includes("open-session:false") && legacyBlock.preflight() === null &&
+      accountResult.ok && accountResult.status?.waitingForRetry !== true &&
+      legacyAccount.calls.includes("changes:stable-old") &&
+      legacyAccount.state().lastError === null && legacyAccount.state().retryAttempt === 0;
+  });
+
+  await asyncCheck("the shared connection gate stops a run before any Google request", async () => {
+    const blockedRecord = {
+      lastError: "permission", authAttempts: 0, retryAttempt: 0,
+      retryAt: null, blocked: true, updatedAt: 1
+    };
+    const blocked = syncHarness({ connectionState: blockedRecord });
+    const blockedResult = await blocked.runner()();
+    const waiting = syncHarness({ connectionState: {
+      lastError: "network", authAttempts: 0, retryAttempt: 2,
+      retryAt: 1_200_000, blocked: false, updatedAt: 1
+    } });
+    const waitingResult = await waiting.runner()();
+    const forced = syncHarness({ connectionState: blockedRecord });
+    const forcedResult = await forced.runner()({ force: true });
+    // A forced run that then fails on the data must still have dropped the
+    // connection block, or the next scheduled run is stopped by it again.
+    const forcedCorrupt = syncHarness({
+      connectionState: blockedRecord, failApply: true, files: [driveFile("gate-page")],
+      filePages: [{ files: [driveFile("gate-page").meta], nextPageToken: null }]
+    });
+    const forcedCorruptResult = await forcedCorrupt.runner()({ force: true });
+    // A blocked record always stops the run as non-retryable, whatever its
+    // code; a record carrying a dataset code is not a connection record.
+    const oddBlocked = syncHarness({ connectionState: { ...blockedRecord, lastError: "server" } });
+    const oddResult = await oddBlocked.runner()();
+    const foreign = syncHarness({ connectionState: { ...blockedRecord, lastError: "corrupt" } });
+    const foreignResult = await foreign.runner()();
+    const noGoogle = (h) => !h.calls.some((call) => call.startsWith("open-session:") || call === "about");
+    // Simplest miss: the gate sits after openSession, so one about() still goes out.
+    return !blockedResult.ok && blockedResult.error === "permission" &&
+      blockedResult.retryable === false && noGoogle(blocked) &&
+      waitingResult.ok && waitingResult.status?.waitingForRetry === true &&
+      waitingResult.status.connectionWaiting === true && waitingResult.status.retryAt === 1_200_000 &&
+      noGoogle(waiting) && waiting.connection()?.retryAt === 1_200_000 &&
+      forcedResult.ok && forced.connection() === null && forced.calls.includes("open-session:false") &&
+      !forcedCorruptResult.ok && forcedCorruptResult.error === "corrupt" &&
+      forcedCorrupt.connection() === null && forcedCorrupt.preflight()?.lastError === "corrupt" &&
+      !oddResult.ok && oddResult.error === "server" && oddResult.retryable === false && noGoogle(oddBlocked) &&
+      foreignResult.ok && foreign.calls.includes("open-session:false");
+  });
+
+  await asyncCheck("a working session clears the connection error but keeps the backoff count; a full run clears the record", async () => {
+    const record = {
+      lastError: "auth", authAttempts: 3, retryAttempt: 3,
+      retryAt: 999_000, blocked: false, updatedAt: 1
+    };
+    const corruptRun = (connectionState) => syncHarness({
+      connectionState, failApply: true, files: [driveFile("reset-page")],
+      filePages: [{ files: [driveFile("reset-page").meta], nextPageToken: null }]
+    });
+    const partial = corruptRun(record);
+    const partialResult = await partial.runner()();
+    const offlineRecord = { ...record, lastError: "network", authAttempts: 0 };
+    const offline = corruptRun(offlineRecord);
+    await offline.runner()();
+    const full = syncHarness({ connectionState: record });
+    const fullResult = await full.runner()();
+    // Spec §10.2: Google answered, so the old connection error and its expired
+    // retryAt go now; retryAttempt stays so a flaky link keeps growing.
+    // Simplest misses: resetting authAttempts alone (the stale "auth" sits on
+    // the panel beside the corrupt line), or clearing only when authAttempts > 0
+    // (the network record survives a working session).
+    const cleared = (from) => JSON.stringify({ ...from, lastError: null, retryAt: null, authAttempts: 0 });
+    return !partialResult.ok && partialResult.error === "corrupt" &&
+      JSON.stringify(partial.connection()) === cleared(record) && partial.connection().retryAttempt === 3 &&
+      JSON.stringify(offline.connection()) === cleared(offlineRecord) &&
+      partial.preflight()?.lastError === "corrupt" && partial.preflight().blocked === true &&
+      fullResult.ok && full.connection() === null && full.calls.includes("conn-put:null");
+  });
+
+  await asyncCheck("a round after the upgrade leaves no connection-layer error in the shared record or the preflight", async () => {
+    // What an earlier release left behind (and the Task 5 migration may have
+    // missed): connection codes in the preflight and the account row, plus a
+    // shared record whose backoff has expired.
+    const h = syncHarness({
+      preflightState: {
+        key: `preflight:${OWNER_HASH}`, ownerHash: OWNER_HASH,
+        retryAttempt: 3, retryAt: 9_999_999, lastError: "network", blocked: false
+      },
+      accountState: {
+        key: `account:perm-a:${OWNER_HASH}`, drivePermissionId: "perm-a",
+        ownerHash: OWNER_HASH, bootstrapComplete: true, pageToken: "stable-old",
+        retryAttempt: 2, retryAt: 9_999_999, lastError: "auth"
+      },
+      connectionState: {
+        lastError: "network", authAttempts: 0, retryAttempt: 4,
+        retryAt: 999_000, blocked: false, updatedAt: 1
+      }
+    });
+    const result = await h.runner()();
+    const preflight = h.preflight();
+    // Simplest miss: a final put(null) guarded on the record still carrying an
+    // error -- the session reset already nulled lastError, so { retryAttempt: 4 }
+    // stays behind and the next failure waits 16 minutes instead of one.
+    return result.ok && h.connection() === null &&
+      h.calls.filter((call) => call.startsWith("conn-put:")).join() === "conn-put:null:false,conn-put:null" &&
+      (preflight === null || !PBP_DRIVE_CONNECTION_ERRORS.has(preflight.lastError)) &&
+      !PBP_DRIVE_CONNECTION_ERRORS.has(h.state().lastError);
   });
 
   await asyncCheck("a newly connected Drive account re-uploads existing vocabulary", async () => {
@@ -2149,23 +2472,22 @@ function syncHarness(options = {}) {
       aboutResults: [{ ok: false, error: "auth", retryable: true }]
     });
     const transientResult = await transient.runner()({ force: true });
-    const transientPreflight = transient.preflight();
+    const transientRecord = transient.connection();
     const rejected = syncHarness({
       aboutResults: [{ ok: false, error: "auth", retryable: false, status: 401 }]
     });
     const rejectedResult = await rejected.runner()({ force: true });
-    const rejectedPreflight = rejected.preflight();
+    const rejectedRecord = rejected.connection();
+    // Simplest miss: a 401-rejected token treated as transient like a mint failure.
     return !transientResult.ok && transientResult.error === "auth" &&
       transientResult.retryable === true &&
-      transientPreflight && transientPreflight.blocked === false &&
-      transientPreflight.lastError === "auth" &&
-      Number.isFinite(transientPreflight.retryAt) &&
-      transient.alarms.created.some((alarm) => alarm.name === "vocab-sync-retry") &&
-      !transient.calls.includes("clear:vocab-sync-periodic") &&
+      transientRecord?.blocked === false && transientRecord.lastError === "auth" &&
+      transientRecord.authAttempts === 1 && Number.isFinite(transientRecord.retryAt) &&
+      transient.preflight() === null &&
       !rejectedResult.ok && rejectedResult.error === "auth" &&
       rejectedResult.retryable === false &&
-      rejectedPreflight && rejectedPreflight.blocked === true &&
-      rejected.calls.includes("clear:vocab-sync-periodic");
+      rejectedRecord?.blocked === true && rejectedRecord.retryAt === null &&
+      rejected.preflight() === null;
   });
 
   await asyncCheck("real runner merges differently cased saved words without blocking Drive sync", async () => {
@@ -2225,7 +2547,6 @@ function syncHarness(options = {}) {
     });
     const runner = pbpCreateVocabDriveSyncRunner({
       client,
-      alarms: { create() {}, async clear() { return true; } },
       getCurrentPinboardAuth: async () => ({ account: "alias-runner" }),
       pinboardAuthIsCurrent: () => true,
       hashOwner: async () => ownerHash
@@ -2244,6 +2565,20 @@ function syncHarness(options = {}) {
       (await pbpVocabListOutbox(owner)).length === 0;
   });
 
+  await asyncCheck("the real vocabulary store keeps an unexpected backoff but no new connection code", async () => {
+    const ownerHash = "d".repeat(64);
+    const row = {
+      key: `preflight:${ownerHash}`, ownerHash, retryAttempt: 1,
+      retryAt: 1_060_000, lastError: "unexpected", blocked: false
+    };
+    const stored = await pbpVocabPutPreflightState(row);
+    const read = await pbpVocabGetPreflightState(ownerHash);
+    const server = await pbpVocabPutPreflightState({ ...row, lastError: "server" });
+    await pbpVocabDeletePreflightState(ownerHash);
+    // Simplest miss: the whitelist rejects "unexpected", so the backoff is lost.
+    return stored === true && JSON.stringify(read) === JSON.stringify(row) && server === false;
+  });
+
   const notesProtocol = {
     kind: "notes-batch", schema: 1, filePrefix: "pbp-notes",
     validateEvent: (event) => event?.recordKey === "pbp_hl_abcd|note-a" && event.deleted === true,
@@ -2260,21 +2595,22 @@ function syncHarness(options = {}) {
   };
   const notesBody = JSON.stringify({ schema: 1, ownerHash: OWNER_HASH, deviceId: "device-b",
     createdAt: 123, entries: [notesEvent] });
-  const notesAlarms = { dirty: "notes-sync-dirty", periodic: "notes-sync-periodic", retry: "notes-sync-retry" };
   await asyncCheck("injected notes codec pulls a real Drive metadata shape and uploads notes batches", async () => {
-    const h = syncHarness({ protocol: notesProtocol, alarmNames: notesAlarms,
+    const h = syncHarness({ protocol: notesProtocol,
       files: [{ meta: notesMetadata, body: notesBody }],
       filePages: [{ files: [notesMetadata], nextPageToken: null }],
       outbox: [{ owner: OWNER_SCOPE, recordKey: notesEvent.recordKey, event: notesEvent }] });
     const result = await h.runner()();
     return result.ok && result.changed && h.calls.includes("download:notes-remote") &&
       h.calls.some((call) => call.startsWith("upload:generated-batch:")) &&
-      h.alarms.created.some((alarm) => alarm.name === "notes-sync-periodic");
+      h.calls.includes("conn-put:null") && h.connection() === null;
   });
-  await asyncCheck("disabled type exits before any Google call or sync write", async () => {
+  await asyncCheck("a run that finds Drive disconnected exits before any Google call or sync write", async () => {
     const h = syncHarness({ isEnabled: async () => false });
     const result = await h.runner()();
-    return result.ok === false && result.error === "disabled" && h.calls.length === 0;
+    // Simplest miss: still returning "disabled", which the panel renders as an error.
+    return result.ok === false && result.error === "not_connected" && result.retryable === false &&
+      h.calls.length === 0 && h.connectionReads.length === 0;
   });
   await asyncCheck("disabling a type during download prevents local page and cursor commits", async () => {
     let enabled = true;
@@ -2285,13 +2621,19 @@ function syncHarness(options = {}) {
     return !result.ok && !h.calls.some((call) => call.startsWith("apply:")) &&
       !h.calls.some((call) => call.startsWith("upload:"));
   });
-  await asyncCheck("blocked notes clears only notes alarms", async () => {
-    const h = syncHarness({ protocol: notesProtocol, alarmNames: notesAlarms,
+  await asyncCheck("blocked notes data stays in the notes preflight and leaves the shared record alone", async () => {
+    const record = {
+      lastError: "network", authAttempts: 0, retryAttempt: 2,
+      retryAt: 900_000, blocked: false, updatedAt: 1
+    };
+    const h = syncHarness({ protocol: notesProtocol, connectionState: record,
       filePages: [{ files: [{ ...notesMetadata, mimeType: "text/plain" }], nextPageToken: null }] });
     const result = await h.runner()();
-    return result.error === "corrupt" && notesAlarms.dirty &&
-      Object.values(notesAlarms).every((name) => h.calls.includes(`clear:${name}`)) &&
-      !h.calls.some((call) => call.startsWith("clear:vocab-sync"));
+    // Simplest miss: a dataset block written into (or wiping) the shared record;
+    // the one write allowed is the working session clearing the old error (§10.2).
+    return result.error === "corrupt" && h.preflight()?.lastError === "corrupt" && h.preflight().blocked === true &&
+      JSON.stringify(h.connection()) === JSON.stringify({ ...record, lastError: null, retryAt: null }) &&
+      h.calls.filter((call) => call.startsWith("conn-put:")).join() === "conn-put:null:false";
   });
   await asyncCheck("disabling after sync metadata read prevents seeding local records", async () => {
     let enabled = true;
@@ -2320,9 +2662,10 @@ function syncHarness(options = {}) {
     const h = syncHarness({ getCurrentPermissionId: async () => ({ ok: false, error: "network", retryable: true }),
       outbox: [{ owner: OWNER_SCOPE, recordKey: "en|offline", event: live("Offline") }] });
     const result = await h.runner()();
+    // Simplest miss: the network backoff still written into the preflight.
     return result.error === "network" && result.retryable === true &&
-      h.preflight()?.lastError === "network" && h.preflight()?.blocked === false &&
-      h.alarms.created.some((alarm) => alarm.name === "vocab-sync-retry") && h.outbox.length === 1;
+      h.connection()?.lastError === "network" && h.connection().blocked === false &&
+      h.connection().retryAt === 1_060_000 && h.preflight() === null && h.outbox.length === 1;
   });
   await asyncCheck("disable and re-enable during a pending await cancels the older sync generation", async () => {
     let epoch = 1;

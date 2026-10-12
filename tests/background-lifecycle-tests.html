@@ -646,7 +646,7 @@ function buildUndoHarness(source, opts) {
       PBP_VOCAB_DRIVE_CAPABLE: false,
       PBP_VOCAB_DRIVE_CONNECTED_KEY: "k",
       pbpVocabDriveIsConnected: spy("vocabConnected", Promise.resolve(false)),
-      pbpVocabScheduleDirty: spy("vocabDirty", Promise.resolve()),
+      pbpDriveScheduleDirty: spy("driveDirty", Promise.resolve()),
       pbpQueueVocabDriveSync: spy("vocabSync", Promise.resolve({ ok: true })),
       pbpGetVocabDriveStatus: spy("vocabStatus", Promise.resolve({})),
       pbpVocabDriveResponse: (r) => r,

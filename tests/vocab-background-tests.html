@@ -50,7 +50,10 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
   check("runtime message listener is not async", /function handleRuntimeMessage\(message, sender, sendResponse\)/.test(messages) &&
     !/async function handleRuntimeMessage/.test(messages) && !/onMessage\.addListener\(async/.test(messages) &&
     messages.includes("chrome.runtime.onMessage.addListener(handleRuntimeMessage);"));
-  check("dirty message schedules synchronization", messages.includes('message.type === "PBP_VOCAB_DIRTY"') && messages.includes("pbpVocabScheduleDirty"));
+  // Simplest miss: one DIRTY type still routed to a per-dataset scheduler.
+  check("dirty message schedules synchronization", messages.includes('message.type === "PBP_VOCAB_DIRTY"') &&
+    messages.includes("pbpDriveScheduleDirty") && !messages.includes("pbpVocabScheduleDirty") &&
+    !messages.includes("pbpNotesScheduleDirty"));
   check("connect message is handled", messages.includes('message.type === "vocabDriveConnect"'));
   check("status message is handled", messages.includes('message.type === "vocabDriveStatus"'));
   const failedHandler = responseFactory?.(async () => ({

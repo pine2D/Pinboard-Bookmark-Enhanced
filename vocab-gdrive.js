@@ -713,14 +713,30 @@ function pbpCreateVocabDriveClient({
   };
 }
 
-// Consecutive silent token-mint failures tolerated before the account is
-// blocked. The backoff reaches roughly an hour by then, which is long enough
-// to ride out an outage and short enough that a real revocation gets named.
+// Silent token-mint (auth) failures that back off before the connection is
+// blocked: five backoffs (1+2+4+8+16 min, +/-20%, about 31 minutes), then the
+// sixth auth failure blocks. Long enough to ride out a short outage, short
+// enough that a real revocation gets named.
 const PBP_VOCAB_AUTH_RETRY_LIMIT = 5;
 
-const PBP_VOCAB_DIRTY_ALARM = "vocab-sync-dirty";
-const PBP_VOCAB_PERIODIC_ALARM = "vocab-sync-periodic";
-const PBP_VOCAB_RETRY_ALARM = "vocab-sync-retry";
+// One schedule for both datasets: every run syncs vocabulary, then notes.
+const PBP_DRIVE_DIRTY_ALARM = "drive-sync-dirty";
+const PBP_DRIVE_PERIODIC_ALARM = "drive-sync-periodic";
+const PBP_DRIVE_RETRY_ALARM = "drive-sync-retry";
+const PBP_DRIVE_LEGACY_ALARMS = Object.freeze([
+  "vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry",
+  "notes-sync-dirty", "notes-sync-periodic", "notes-sync-retry"
+]);
+// Failures of the Google connection itself, not of either dataset. They live
+// in one per-owner record shared by both runners and never reach a dataset's
+// preflight or account row.
+const PBP_DRIVE_CONNECTION_ERRORS = new Set(["auth", "permission", "network", "rate_limited", "server"]);
+
+function _pbpDriveConnectionRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (value.lastError != null && !PBP_DRIVE_CONNECTION_ERRORS.has(value.lastError)) return null;
+  return value;
+}
 
 function pbpVocabRetryDelayMinutes(attempt, random = Math.random) {
   const index = Math.max(0, Number.isFinite(attempt) ? Math.floor(attempt) : 0);
@@ -728,17 +744,21 @@ function pbpVocabRetryDelayMinutes(attempt, random = Math.random) {
   return Math.min(60, 2 ** index) * (0.8 + sample * 0.4);
 }
 
-function pbpVocabSchedulePeriodic(alarms = chrome.alarms) {
-  alarms.create(PBP_VOCAB_PERIODIC_ALARM, { periodInMinutes: 15 });
-}
-
-async function pbpVocabScheduleDirty(alarms = chrome.alarms, now = Date.now) {
+async function pbpDriveScheduleDirty(alarms = chrome.alarms, now = Date.now) {
   const when = now() + 30000;
-  const existing = await alarms.get(PBP_VOCAB_DIRTY_ALARM);
+  const existing = await alarms.get(PBP_DRIVE_DIRTY_ALARM);
   if (existing && Number.isFinite(existing.scheduledTime) && existing.scheduledTime <= when) {
     return false;
   }
-  alarms.create(PBP_VOCAB_DIRTY_ALARM, { when });
+  await alarms.create(PBP_DRIVE_DIRTY_ALARM, { when });
+  return true;
+}
+
+// Re-creating a periodic alarm restarts its clock, so a worker that wakes
+// every few minutes would keep pushing the next run away. Create it once.
+async function pbpDriveEnsurePeriodic(alarms = chrome.alarms) {
+  if (await alarms.get(PBP_DRIVE_PERIODIC_ALARM)) return false;
+  await alarms.create(PBP_DRIVE_PERIODIC_ALARM, { periodInMinutes: 15 });
   return true;
 }
 
@@ -763,18 +783,19 @@ function _pbpVocabDriveDefaultStore() {
 function pbpCreateVocabDriveSyncRunner({
   client = pbpCreateVocabDriveClient(),
   store = _pbpVocabDriveDefaultStore(),
-  alarms = chrome.alarms,
   getCurrentPinboardAuth,
   pinboardAuthIsCurrent,
   hashOwner = pbpVocabOwnerHash,
   now = Date.now,
   random = Math.random,
   protocol = PBP_VOCAB_DRIVE_PROTOCOL,
-  alarmNames = { dirty: PBP_VOCAB_DIRTY_ALARM, periodic: PBP_VOCAB_PERIODIC_ALARM, retry: PBP_VOCAB_RETRY_ALARM },
   isEnabled = async () => true,
   getCurrentPermissionId = null,
   onSession = null,
-  getScopeEpoch = null
+  getScopeEpoch = null,
+  // The orchestrator's per-owner record of the shared Google connection:
+  // { get(ownerHash) -> state|null, put(ownerHash, state|null) -> boolean }.
+  connection = null
 } = {}) {
   const accountKey = (permissionId, ownerHash) =>
     `account:${permissionId}:${ownerHash}`;
@@ -790,6 +811,14 @@ function pbpCreateVocabDriveSyncRunner({
       return { ok: false, error: "auth", retryable: source.retryable === true };
     }
     if (source?.error === "network") return { ok: false, error: "network", retryable: true };
+    // Throttling and 5xx are still the connection, but they mean "busy", not
+    // "offline", so they keep their own code for the panel.
+    if (source?.error === "rate_limited" || source?.error === "server") {
+      return { ok: false, error: source.error, retryable: true };
+    }
+    // A bug or a lost worker says nothing about the data: back off and retry
+    // instead of blocking until the user forces a run.
+    if (source?.error === "unexpected") return { ok: false, error: "unexpected", retryable: true };
     if (source?.retryable) return { ok: false, error: "network", retryable: true };
     if (source?.error === "entry_too_large") {
       return { ok: false, error: "entry_too_large", retryable: false };
@@ -820,7 +849,34 @@ function pbpCreateVocabDriveSyncRunner({
     let ownerHash = "";
     let preflight = null;
     let session = null;
+    let connState = null;
     let changedLocal = false;
+    const count = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : 0);
+    const putConnection = async (next) => {
+      if (!connection || !/^[0-9a-f]{64}$/.test(ownerHash)) return false;
+      try {
+        if (!await connection.put(ownerHash, next)) return false;
+      } catch (error) {
+        console.warn("[vocab-drive] connection state unavailable:", error?.name, error?.message);
+        return false;
+      }
+      connState = next;
+      return true;
+    };
+    // A store that throws (IndexedDB closing, a quota, a broken record) is a
+    // failure of this device's storage, not of Drive. A coded error keeps
+    // its own code.
+    const readStore = async (read) => {
+      try {
+        return await read();
+      } catch (error) {
+        if (typeof error?.code === "string") throw error;
+        console.warn("[vocab-drive] store read failed:", error?.name, error?.message);
+        const failure = new Error("Sync store read failed");
+        failure.code = "local_store";
+        throw failure;
+      }
+    };
     const stateWith = (patch, remove = []) => {
       const next = { ...state, ...patch };
       for (const key of remove) delete next[key];
@@ -853,12 +909,51 @@ function pbpCreateVocabDriveSyncRunner({
       return !!startAuth?.account && current?.account === startAuth.account &&
         pinboardAuthIsCurrent(startAuth) && pinboardAuthIsCurrent(current) && scopeIsCurrent();
     };
+    // A connection failure says nothing about this dataset, so it goes to the
+    // shared record only: the preflight and the account row keep whatever
+    // data-layer state they had.
+    const finishConnectionFailure = async (failure) => {
+      let result = failure;
+      const authAttempts = count(connState?.authAttempts);
+      const retryAttempt = count(connState?.retryAttempt);
+      // A revoked grant can never mint a token silently, so it never produces
+      // the 401 that would prove revocation -- it is indistinguishable from
+      // being offline. Retrying forever would leave the panel claiming the
+      // device is connected and never surface the one action that helps, so
+      // back off five times (about 31 minutes), block on the sixth. Only auth
+      // failures count: an outage before them must not spend the budget.
+      if (result.retryable && result.error === "auth" &&
+          authAttempts >= PBP_VOCAB_AUTH_RETRY_LIMIT) {
+        result = { ...result, retryable: false };
+      }
+      const at = now();
+      const nextAuthAttempts = result.error === "auth" ? authAttempts + 1 : 0;
+      await putConnection(result.retryable
+        ? {
+          lastError: result.error,
+          authAttempts: nextAuthAttempts,
+          retryAttempt: retryAttempt + 1,
+          retryAt: at + pbpVocabRetryDelayMinutes(retryAttempt, random) * 60000,
+          blocked: false,
+          updatedAt: at
+        }
+        : {
+          lastError: result.error,
+          authAttempts: nextAuthAttempts,
+          retryAttempt: 0,
+          retryAt: null,
+          blocked: true,
+          updatedAt: at
+        });
+      return result;
+    };
     const finishFailure = async (source) => {
-      let result = normalizedFailure(source);
+      const result = normalizedFailure(source);
       if (result.error === "account_changed") return result;
       if (!await stillCurrent({ checkDrive: false })) {
         return normalizedFailure({ error: "account_changed" });
       }
+      if (PBP_DRIVE_CONNECTION_ERRORS.has(result.error)) return finishConnectionFailure(result);
       const canPersistPreflight = /^[0-9a-f]{64}$/.test(ownerHash);
       const attempts = [state?.retryAttempt, preflight?.retryAttempt]
         .filter((value) => Number.isInteger(value) && value >= 0);
@@ -870,15 +965,6 @@ function pbpCreateVocabDriveSyncRunner({
         try { if (await store.putAccountState(failed)) state = failed; }
         catch (error) { console.warn("[vocab-drive] failure state unavailable:", error?.name, error?.code); }
       };
-      // A revoked grant can never mint a token silently, so it never produces
-      // the 401 that would prove revocation -- it is indistinguishable from
-      // being offline. Retrying forever would leave the panel claiming the
-      // device is connected and never surface the one action that helps, so
-      // stop guessing once the backoff has covered about an hour.
-      if (result.retryable && result.error === "auth" &&
-          attempt >= PBP_VOCAB_AUTH_RETRY_LIMIT) {
-        result = { ...result, retryable: false };
-      }
       if (result.retryable) {
         const retryAt = now() + pbpVocabRetryDelayMinutes(attempt, random) * 60000;
         if (state) {
@@ -898,10 +984,7 @@ function pbpCreateVocabDriveSyncRunner({
             lastError: result.error,
             blocked: false
           };
-          if (await store.putPreflightState(failedPreflight)) {
-            preflight = failedPreflight;
-            alarms.create(alarmNames.retry, { when: retryAt });
-          }
+          if (await store.putPreflightState(failedPreflight)) preflight = failedPreflight;
         }
       } else {
         if (canPersistPreflight) {
@@ -923,11 +1006,6 @@ function pbpCreateVocabDriveSyncRunner({
           const failed = stateWith({ lastError: result.error, retryAt: null });
           await persistAccountFailure(failed);
         }
-        await Promise.all([
-          alarms.clear(alarmNames.dirty),
-          alarms.clear(alarmNames.periodic),
-          alarms.clear(alarmNames.retry)
-        ]);
       }
       return result;
     };
@@ -981,7 +1059,9 @@ function pbpCreateVocabDriveSyncRunner({
     };
 
     try {
-      if (!await isEnabled()) return { ok: false, error: "disabled", retryable: false };
+      // Disconnected, or the optional permission removed, after the caller
+      // checked: a control-flow exit, never an error to persist or render.
+      if (!await isEnabled()) return { ok: false, error: "not_connected", retryable: false };
       startAuth = await getCurrentPinboardAuth();
       // Distinct from "auth": there is no Pinboard account to scope the
       // vocabulary to, so no Google call has been made and reconnecting Drive
@@ -992,25 +1072,37 @@ function pbpCreateVocabDriveSyncRunner({
       }
       owner = pbpDictOwnerScope(startAuth.account);
       ownerHash = await hashOwner(owner);
-      preflight = await store.getPreflightState(ownerHash);
+      preflight = await readStore(() => store.getPreflightState(ownerHash));
+      // Earlier releases wrote connection failures into the dataset's own
+      // preflight. The shared record owns them now; honoring the leftover as
+      // a block or a backoff would resurrect a stale verdict.
+      if (PBP_DRIVE_CONNECTION_ERRORS.has(preflight?.lastError)) preflight = null;
       if (!await stillCurrent()) {
         return normalizedFailure({ error: "account_changed" });
       }
+      connState = connection
+        ? _pbpDriveConnectionRecord(await readStore(() => connection.get(ownerHash)))
+        : null;
+      if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
       if (force) {
         if (!await store.deletePreflightState(ownerHash)) {
           return finishFailure({ error: "local_store" });
         }
         preflight = null;
-        await alarms.clear(alarmNames.retry);
+        // A forced run is the user's way out of a block, so the shared
+        // connection starts over too: its counters must not outlive it.
+        if (connState) await putConnection(null);
+        connState = null;
+      } else if (connState?.blocked === true) {
+        return { ...normalizedFailure({ error: connState.lastError || "auth" }), retryable: false };
+      } else if (Number.isFinite(connState?.retryAt) && connState.retryAt > now()) {
+        return {
+          ok: true,
+          status: { waitingForRetry: true, connectionWaiting: true, retryAt: connState.retryAt }
+        };
       } else if (preflight?.blocked === true) {
-        await Promise.all([
-          alarms.clear(alarmNames.dirty),
-          alarms.clear(alarmNames.periodic),
-          alarms.clear(alarmNames.retry)
-        ]);
         return normalizedFailure({ error: preflight.lastError || "remote" });
       } else if (Number.isFinite(preflight?.retryAt) && preflight.retryAt > now()) {
-        alarms.create(alarmNames.retry, { when: preflight.retryAt });
         return {
           ok: true,
           status: { ...preflight, waitingForRetry: true }
@@ -1026,10 +1118,20 @@ function pbpCreateVocabDriveSyncRunner({
       if (!session.ok) return finishFailure(session);
       if (onSession) onSession(session.permissionId);
       if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
+      // Google answered (spec §10.2): the connection error and its wait are
+      // over, clear them now; retryAttempt stays until the whole run succeeds.
+      if (connState && (connState.lastError != null || connState.retryAt != null || count(connState.authAttempts) > 0)) {
+        await putConnection({ ...connState, lastError: null, retryAt: null, authAttempts: 0 });
+      }
 
-      state = await store.getAccountState(session.permissionId, ownerHash);
+      state = await readStore(() => store.getAccountState(session.permissionId, ownerHash));
       if (!await stillCurrent()) {
         return normalizedFailure({ error: "account_changed" });
+      }
+      // The same leftover as in the preflight: a connection failure an earlier
+      // release kept in the account row is not this dataset's error.
+      if (PBP_DRIVE_CONNECTION_ERRORS.has(state?.lastError)) {
+        state = { ...state, lastError: null, retryAttempt: 0, retryAt: null };
       }
       // seedLegacy only enrols records that still lack sync metadata, so a
       // second Google account starts with an empty outbox and would silently
@@ -1078,11 +1180,10 @@ function pbpCreateVocabDriveSyncRunner({
         state = reset;
       }
       if (!force && Number.isFinite(state.retryAt) && state.retryAt > now()) {
-        alarms.create(alarmNames.retry, { when: state.retryAt });
         return { ok: true, status: { ...state, waitingForRetry: true } };
       }
 
-      const meta = await store.getMeta();
+      const meta = await readStore(() => store.getMeta());
       if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
       if (!meta?.deviceId) return finishFailure({ error: "invalid_response" });
       const deviceId = meta.deviceId;
@@ -1183,9 +1284,9 @@ function pbpCreateVocabDriveSyncRunner({
         if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
         // The checkpoint rewrites one outbox row per record in a single IDB
         // transaction, so a full disk or an exhausted quota aborts it. Claim it
-        // as "local_store" here: letting it reach the outer catch would blame
-        // Drive for a local write failure and skip finishFailure entirely,
-        // leaving the periodic alarm to fail the same way every 15 minutes.
+        // as "local_store" here: letting it reach the outer catch would file
+        // a local write failure as "unexpected" and keep retrying it, failing
+        // the same way on every scheduled run.
         try {
           await store.checkpointOwner(owner);
         } catch (error) {
@@ -1229,14 +1330,14 @@ function pbpCreateVocabDriveSyncRunner({
         return { ok: true };
       };
 
-      for (const pending of await store.listPendingBatches(
+      for (const pending of await readStore(() => store.listPendingBatches(
         state.drivePermissionId, ownerHash
-      )) {
+      ))) {
         const uploaded = await uploadPending(pending);
         if (!uploaded.ok) return finishFailure(uploaded);
       }
 
-      const outbox = await store.listOutbox(owner);
+      const outbox = await readStore(() => store.listOutbox(owner));
       const split = pbpVocabSplitDriveEntries(
         outbox.map((row) => row.event),
         { ownerHash, deviceId, createdAt: now() }, protocol
@@ -1283,16 +1384,22 @@ function pbpCreateVocabDriveSyncRunner({
         return finishFailure({ error: "local_store" });
       }
       preflight = null;
-      await alarms.clear(alarmNames.retry);
+      // Every request of the run went through: the shared connection has no
+      // failure left to report or to wait out.
+      await putConnection(null);
       if (!await isEnabled()) return normalizedFailure({ error: "account_changed" });
-      alarms.create(alarmNames.periodic, { periodInMinutes: 15 });
       return { ok: true, changed: changedLocal, status: { ...state } };
     } catch (error) {
       console.warn("[vocab-drive] sync failed:", error?.name, error?.message);
-      if (typeof error?.code === "string") {
-        return finishFailure({ error: error.code, retryable: error.retryable === true });
+      const source = typeof error?.code === "string"
+        ? { error: error.code, retryable: error.retryable === true }
+        : { error: "unexpected", retryable: true };
+      try {
+        return await finishFailure(source);
+      } catch (inner) {
+        console.warn("[vocab-drive] failure state unavailable:", inner?.name, inner?.message);
+        return normalizedFailure(source);
       }
-      return { ok: false, error: "remote", retryable: false };
     }
   };
 }

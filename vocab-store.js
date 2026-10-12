@@ -669,9 +669,12 @@ function _pbpVocabValidOwnerHash(value) {
 }
 
 function _pbpVocabValidPreflightState(state) {
+  // The runner only writes data-layer codes here now. auth / permission /
+  // network stay readable so rows an earlier release persisted are still
+  // returned (the runner ignores them); rate_limited / server never land here.
   const errors = new Set([
     "auth", "permission", "corrupt", "local_store", "remote", "network",
-    "entry_too_large"
+    "entry_too_large", "unexpected"
   ]);
   return _pbpVocabPlainObject(state) &&
     _pbpVocabOnlyKeys(state, [

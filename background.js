@@ -2220,6 +2220,7 @@ const runVocabDriveSync = PBP_VOCAB_DRIVE_CAPABLE
       getCurrentPinboardAuth,
       pinboardAuthIsCurrent: pbpPinboardAuthIsCurrent,
       isEnabled: () => pbpDriveTypeEnabled("vocabulary"),
+      connection: null,
       getScopeEpoch: () => driveScopeEpochs.vocabulary,
       onSession: (permissionId) => pbpDriveSessionOpened("vocabulary", permissionId),
       getCurrentPermissionId: async () => {
@@ -2232,6 +2233,7 @@ const runNotesDriveSync = PBP_VOCAB_DRIVE_CAPABLE
       getCurrentPinboardAuth,
       pinboardAuthIsCurrent: pbpPinboardAuthIsCurrent,
       isEnabled: () => pbpDriveTypeEnabled("notes"),
+      connection: null,
       getScopeEpoch: () => driveScopeEpochs.notes,
       onSession: (permissionId) => {
         notesSessionPermissionId = permissionId;
@@ -3089,9 +3091,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     }
     const notes = message.type === "PBP_NOTES_DIRTY";
     pbpDriveTypeEnabled(notes ? "notes" : "vocabulary")
-      .then((enabled) => enabled
-        ? (notes ? pbpNotesScheduleDirty(chrome.alarms) : pbpVocabScheduleDirty(chrome.alarms))
-        : false)
+      .then((enabled) => enabled ? pbpDriveScheduleDirty(chrome.alarms) : false)
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false, error: "remote" }));
     return true;
