@@ -269,21 +269,19 @@ button, input, select, textarea { font-family: inherit; }
    #ask-scope-near[aria-pressed] ~:2217, now also adopted here instead of the
    old near-black/near-white invert (--active-bg/--active-fg deleted from
    :root -- this was their last remaining consumer alongside the five sites
-   below that point back to this comment). Two of these ten sites paint no
-   edge at all, by design rather than oversight (T1 review NOTE B / Ruling
-   22): .src-seg (~:311) is `border: 0` -- a segmented control whose pressed
-   cue is fill + text + the tinted shared `.src-seg + .src-seg` divider
-   (~:321), not a border of its own -- and the `option:checked` pair
+   below that point back to this comment). The .view-toggle and .source-badge
+   fused controls use fill + text for selection: their shell owns the edge
+   and their 1px dividers keep the shell's color in every segment state
+   (COMPONENTS.md §8). The `option:checked` pair
    (~:1315) styles a native <option> inside a top-layer picker, which has no
-   border to paint in the first place. No border was added to either;
-   "link-colored edge" below describes the eight sites that actually have
-   one. TEXT is
+   border to paint in the first place. "Link-colored edge" describes only
+   the independent controls that actually have one. TEXT is
    light-dark(var(--link), var(--link-hover)), not a flat var(--link):
    --link against --btn-hover measures 3.97:1 in dark mode (under the 4.5:1
    AA text floor) while --link-hover against the same --btn-hover fill
    measures 5.35:1 -- the identical swap M3-c already applied to
-   .ask-chip:hover (~:2206) for this same pair. BORDER-color, on the eight
-   sites that have one, stays a flat var(--link): it is a non-text edge,
+   .ask-chip:hover (~:2206) for this same pair. BORDER-color on those
+   independent controls stays a flat var(--link): it is a non-text edge,
    WCAG's 3:1 floor applies there (not 4.5:1), and 3.97:1 clears it.
    tests/md-preview-contrast-tests.mjs asserts
    both resolved branches (light-dark's light value against --btn-hover, and
@@ -300,7 +298,6 @@ button, input, select, textarea { font-family: inherit; }
 .toggle-btn.active {
   background: var(--btn-hover);
   color: light-dark(var(--link), var(--link-hover));
-  border-color: var(--link);
   font-weight: 600;
 }
 
@@ -320,6 +317,7 @@ button, input, select, textarea { font-family: inherit; }
   color: var(--fg-secondary);
   background: transparent;
   border: 0;
+  border-radius: 0;
   padding: 1px var(--sp-2);
   cursor: pointer;
   line-height: 16px;       /* fused-shell inner on the sm rung: 1+16+1 = 18 + the shell's border = 20px.
@@ -327,16 +325,14 @@ button, input, select, textarea { font-family: inherit; }
                               so 14 + 2/2 left 1.33px above the text (textInset); 16 + 1/1 centres it 1.67/1.67 */
   transition: background-color 150ms ease, color 150ms ease;
 }
-.src-seg:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
-.src-seg:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
-.src-seg + .src-seg { border-left: 1px solid var(--btn-border); }
+.source-badge > .src-seg + .src-seg { border-left: 1px solid var(--btn-border); }
 /* Same pressed vocabulary as .toggle-btn.active (md-preview.css ~:265) --
-   btn-hover fill + link edge + light-dark(link, link-hover) text, D3 batch3
-   T1 (dark-mode text fix round, Ruling 21). */
-.src-seg.active { background: var(--btn-hover); color: light-dark(var(--link), var(--link-hover)); border-color: var(--link); cursor: default; }
+   btn-hover fill + light-dark(link, link-hover) text; the fused shell and
+   dividers stay neutral in every state. */
+.src-seg.active { background: var(--btn-hover); color: light-dark(var(--link), var(--link-hover)); cursor: default; }
 /* A toggle member (the density switch, aria-pressed) lights up in the same
    tone as its .active siblings; it stays clickable, so no cursor change. */
-.src-seg[aria-pressed="true"] { background: var(--btn-hover); color: light-dark(var(--link), var(--link-hover)); border-color: var(--link); }
+.src-seg[aria-pressed="true"] { background: var(--btn-hover); color: light-dark(var(--link), var(--link-hover)); }
 .src-seg:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: -2px;
@@ -384,10 +380,24 @@ button, input, select, textarea { font-family: inherit; }
   letter-spacing: 0.01em;
 }
 
-.view-toggle { display: flex; }
-.view-toggle .toggle-btn { border-radius: 0; }
-.view-toggle .toggle-btn:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
-.view-toggle .toggle-btn:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-left: -1px; }
+/* Fused buttons: one shell, single neutral seams, and inset keyboard focus.
+   Per-button borders hid the selected edge under the next segment, and a
+   last-child-only overlap left a double seam in the three-way toggle. */
+.view-toggle {
+  display: flex;
+  border: 1px solid var(--btn-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--btn-bg);
+}
+.view-toggle > .toggle-btn {
+  border: 0;
+  border-radius: 0;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.view-toggle > .toggle-btn + .toggle-btn { border-left: 1px solid var(--btn-border); }
+.view-toggle > .toggle-btn:focus-visible { outline-offset: -2px; }
+.view-toggle > .toggle-btn:active { transform: none; }
 
 /* ---- Layout: fixed left rail + centered doc body ---- */
 /* Transitions here (this batch, transition-round): animate zen enter/exit

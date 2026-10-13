@@ -7698,10 +7698,10 @@ const SWEEP_CFG = {
       ".notes-excerpt-color",                       // inline semantic label action; 24px hit floor, can wrap in the hang column
       "summary", ".rail-sec-head", ".notes-hit-btn", ".notes-card-head", ".notes-card-top", ".notes-excerpt-jump", ".connection-health-row", ".hl-item-main", ".send-mi", ".pbv-poster", // row rung: whole-row clickables / section headers / status cards / menu rows / the video poster card
       ".theme-preset-btn", ".saved-theme-btn",       // borderless swatch pills (user-selected variant A, d57cdcf): the sm rung minus the collapsed frame
-      ".tags-input-wrap > input", ".vocab-group-unit > input", ".source-badge > .src-seg", // fused-shell inners: the shell is measured instead
+      ".tags-input-wrap > input", ".vocab-group-unit > input", ".source-badge > .src-seg", ".view-toggle > .toggle-btn", // fused-shell inners: the shell is measured instead
     ],
     // fused shells measured as the control they are (COMPONENTS.md §8)
-    shells: ".tags-input-wrap, .source-badge, .vocab-group-unit",
+    shells: ".tags-input-wrap, .source-badge, .view-toggle, .vocab-group-unit",
   },
   // 7. headerFace -- one computed face (size/weight/colour/transform/tracking)
   //    per surface for its section-heading set; anything off the majority is a hit.
