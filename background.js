@@ -1807,29 +1807,6 @@ ensurePeriodicAlarm("storage-warm", 5);
 
 sweepSuggestCache().catch(() => {});
 
-// One-time cleanup: GitHub Models retired its inference API on 2026-07-30
-// (models.github.ai now answers HTTP 410), so the provider entry is gone from
-// the UI and registry. Reset any user still pointing at it to the default
-// provider and drop the stored PAT copy + model key. Both storage areas are
-// swept because credential routing (optSyncEnabled/syncApiKeys) may have left
-// copies in either; reads are quota-free and writes only fire while legacy
-// keys actually exist, so re-running every SW start stays cheap and idempotent.
-async function migrateGithubModelsRetirement() {
-  for (const area of [chrome.storage.local, chrome.storage.sync]) {
-    try {
-      const raw = await area.get(["aiProvider", "githubModelsApiKey", "githubModelsModel"]);
-      const dead = ["githubModelsApiKey", "githubModelsModel"].filter((k) => raw[k] !== undefined);
-      if (dead.length) await area.remove(dead);
-      if (raw.aiProvider === "githubmodels") await area.set({ aiProvider: "gemini" });
-    } catch (e) {
-      // MV3 rule: leave a trace before folding platform failures away. No
-      // secrets here — key names only, values never logged.
-      console.warn("githubmodels retirement cleanup failed:", e?.name, e?.message);
-    }
-  }
-}
-migrateGithubModelsRetirement();
-
 // One-time data fix: both factory model ids died upstream. Groq decommissioned
 // llama-3.1-8b-instant on 2026-08-16 and its deprecation table names
 // openai/gpt-oss-20b as the replacement; OpenRouter's openai/gpt-oss-20b:free
