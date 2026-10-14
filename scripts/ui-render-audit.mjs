@@ -7803,7 +7803,9 @@ const SWEEP_CFG = {
   //     group label = tab inset sp-5 + the tab's 2px indicator border; popup
   //     form footer = .row inset sp-5 + label column 52 + gap sp-4 = 72px,
   //     --pp-label-indent; library notes dot = (body line 20 - dot 10) / 2 = 5;
-  //     library "My note" hang label = the note box's 10px inner inset (spec §4.3)) --
+  //     library "My note" hang label = the note box's 10px inner inset (spec §4.3);
+  //     options help-bearing switch row = its out-of-flow 28px track + the row
+  //     model's sp-5 copy -> track gap, reserved as the label's right padding) --
   //     computed from a sibling's width, so never a scale value by
   //     construction. `hairline`: 1px is border compensation.
   spacingScale: {
@@ -7827,7 +7829,7 @@ const SWEEP_CFG = {
       ".token-badge", ".bookmark-badge", ".kbd-help-chip", ".hl-item-lang", ".ask-chip", // reader chips/badges (md-preview is not composed)
     ].join(", "),
     shells: ["html", "body", "main", ".rail", ".empty-state", ".preview-loading"],
-    derivedOffsets: [".hl-item-note", ".tab-group-label", ".form-body > .bottom-bar", ".form-body > .submit-bar", ".form-body > .status-msg", ".notes-hit-dot", ".vocab-sec-note > .lib-hang-label"],
+    derivedOffsets: [".hl-item-note", ".tab-group-label", ".form-body > .bottom-bar", ".form-body > .submit-bar", ".form-body > .status-msg", ".notes-hit-dot", ".vocab-sec-note > .lib-hang-label", '.pref-row.context-help-host[data-help-role="choice"] > label.switch'],
   },
 };
 

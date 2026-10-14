@@ -571,32 +571,108 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    the two AI-content-source RADIO rows keep it.
    A .switch choice row carries its help INSIDE the label instead (Ruling 36:
    the icon belongs after the text, not beside the track): details.context-help
-   sits between .switch-text and .switch-track, so the icon follows the copy
-   and the recipe's `margin-left: auto` still parks the track at the row end.
-   That label spans the whole host and wraps: an open answer (the details'
-   ::details-content) takes a full-width second flex line. Closed, the second
-   line is empty and zero-height (row-gap 0, declared here because the row
-   model's `gap` shorthand would otherwise give it a phantom row). Every
-   choice switch host is a preference row (stage 3c), so the rest of the
-   row's geometry -- min-height, block padding, the sub-row indent and the
-   copy's line box -- comes entirely from `.pref-row > label` and its
-   `.pref-row .switch-text` / `.pref-row-sub > label` companions; this rule
-   only adds the grid placement and the wrap. Per HTML, <details> is
-   interactive content, so a click on the summary or the answer does not
-   activate the label (the checkbox does not toggle). */
-.context-help-host[data-help-role="choice"] > label.switch {
+   sits between .switch-text and .switch-track. That label spans the whole
+   host. Per HTML, <details> is interactive content, so a click on the summary
+   or the answer does not activate the label (the checkbox does not toggle).
+   Every choice switch host is a preference row (stage 3c), so the row's
+   min-height, block padding, sub-row indent and the copy's line box come
+   from `.pref-row > label` and its `.pref-row .switch-text` /
+   `.pref-row-sub > label` companions.
+   Inline flow, not flex (narrow-window fix, 2026-10-14). As a wrapping flex
+   row, copy / help target / track were three separate flex items that wrapped
+   as WHOLE items: in a narrow window (German copy at ~380px) the help target
+   dropped alone to the start of a second line, or copy + target filled line 1
+   and pushed the track down to line 2. A flex item cannot join the copy's own
+   line boxes, so the label is a block container here and the copy span and
+   the inline-flex summary share one inline formatting context.
+   Keeping the target on the last word's line takes three parts, because
+   Chromium still offers a break between the copy and an atomic inline even
+   under `white-space: nowrap` on the label (measured: copy that fits one line
+   exactly sent the target alone to line 2):
+   - the copy's own end margin (24px = the target's --target) is laid
+     out with its LAST line fragment, so that room travels with the last word
+     and the line breaker wraps copy + room together (a margin, not padding:
+     the copy's border box -- what the help raster audit reads as "the copy"
+     -- must not grow over the target's glyph);
+   - the summary pulls itself back over that room with a -24px start margin
+     (rule below), a zero-width item that can never be the one that overflows;
+   - `font-size: 0` zeroes the collapsed source space between the copy and the
+     <details> (the space would otherwise be the thing that overflows, and its
+     width differs per font), and `line-height: 0` keeps that zero-size strut
+     from growing the line box (a 0px font with a 20px line-height still
+     centres a 20px strut on the baseline, measured 25.6px lines). Every text
+     box inside sets its own size: the copy via `.pref-row .switch-text`, the
+     answer via `.hint`, the target via `.btn-sm`.
+   The track leaves the flow (rule below) and the label's right padding
+   reserves its column on EVERY line, so long copy wraps before it instead of
+   running under it; the reserve is the track's 28px plus the row model's sp-5
+   copy -> track gap, the same minimum a plain `.pref-row > label` switch
+   keeps (a derived offset, not a rhythm value: registered in the render
+   audit's spacingScale `derivedOffsets`). The open answer (::details-content) is an ordinary block, i.e. the
+   full-width second row; its negative right margin reaches back over that
+   reserve so it spans the whole host as before. */
+.pref-row.context-help-host[data-help-role="choice"] > label.switch {
   grid-column: 1 / -1;
   justify-self: stretch;
-  flex-wrap: wrap;
-  row-gap: 0;
+  display: block;
+  padding-right: calc(28px + var(--opt-sp-5));
+  font-size: 0;
+  line-height: 0;
+}
+.pref-row.context-help-host[data-help-role="choice"] > label.switch > .switch-text { margin-right: 24px; }
+/* The track, out of flow: flush with the row's end edge and centred on the
+   copy's line boxes -- exactly where a plain `.pref-row > label`
+   (align-items: center) puts it, on one line or several, closed or open.
+   Its top and bottom insets are pinned to the edges of that line-box block
+   and margin-block: auto centres the 16px track between them:
+   - top: a zero-size float (`label::before`) sits at the top of the first
+     line box, i.e. the label's content-box top, whatever padding-top the row
+     has (R9's title-led first rows and the Chrome Sync section's own first
+     row drop it to 0; a padding-box 50% would miss both);
+   - bottom: the answer copy's top minus its sp-3 top margin (rule below) is
+     the copy's last line-box bottom. Closed, the answer is skipped content
+     (content-visibility: hidden), which can never be an anchor, so anchor()
+     takes its fallback: the label's own bottom padding, the same edge.
+   Not the copy span's own anchor box: an inline box's anchor box is its font
+   CONTENT area, which sits half a pixel off its line box whenever
+   line-height minus ascent+descent is odd (measured 13.5px vs 14px under
+   Verdana). `anchor-name` repeats per row, but an anchor only counts when it
+   lies inside the positioned box's containing block (this label), so each
+   track resolves its own row. The plain `top` / `bottom` before each anchor()
+   are the fallback for a browser without anchor positioning (Chrome < 125):
+   right for a closed row with top padding, off by that padding otherwise. */
+.pref-row.context-help-host[data-help-role="choice"] > label.switch::before {
+  content: "";
+  float: left;
+  anchor-name: --pbp-switch-copy-top;
+}
+.pref-row.context-help-host[data-help-role="choice"] > label.switch > .context-help > .context-help-body { anchor-name: --pbp-switch-answer; }
+.pref-row.context-help-host[data-help-role="choice"] > label.switch > .switch-track {
+  position: absolute;
+  right: 0;
+  top: var(--opt-row-pad-y);
+  top: anchor(--pbp-switch-copy-top top, var(--opt-row-pad-y));
+  bottom: var(--opt-row-pad-y);
+  bottom: calc(anchor(--pbp-switch-answer top, calc(var(--opt-row-pad-y) - var(--opt-sp-3))) + var(--opt-sp-3));
+  margin-block: auto;
 }
 /* The native input covers the first line only (the 20px row plus the
    recipe's 2px overhang each way): an open answer below it is copy to read,
    not part of the switch's hit target. max-height, not height, so the
    forced-colors fallback (static input, height:auto) is left untouched. */
 .context-help-host[data-help-role="choice"] > label.switch > input[type="checkbox"] { bottom: auto; max-height: 24px; }
+/* Forced colors: the recipe hides the track and puts the native checkbox back
+   in flow, here as the first inline of the copy's line. The label's
+   font-size: 0 (above) leaves no source space after it, so the row's own
+   copy gap is restored as a margin. */
+@media (forced-colors: active) {
+  .pref-row.context-help-host[data-help-role="choice"] > label.switch > input[type="checkbox"] { margin-right: var(--opt-sp-3); }
+}
 label.switch > .context-help { display: contents; }
-label.switch > .context-help::details-content { flex: 0 0 100%; order: 1; min-width: 0; }
+.pref-row.context-help-host[data-help-role="choice"] > label.switch > .context-help::details-content {
+  min-width: 0;
+  margin-right: calc(-1 * (28px + var(--opt-sp-5)));
+}
 /* Text -> answer wants the baseline 4px (.context-help-host > .context-help >
    .context-help-body, sp-2 above), but the label's own sp-1 (2px) bottom
    padding only ever applies after the LAST flex line (closed: after line 1;
@@ -609,16 +685,24 @@ label.switch > .context-help::details-content { flex: 0 0 100%; order: 1; min-wi
    the same step with a matching negative margin-bottom -- the open label's
    total height is unchanged (measured 57/73.5/40.5 before and after on
    #opt-sync-enabled / #opt-sync-api-keys / #opt-backup-include-highlights),
-   only where line 2 sits inside it moves. */
+   only where line 2 sits inside it moves. Since the narrow-window fix the
+   label is block flow, not flex: the two margins now collapse through the
+   ::details-content block onto the copy's last line box (6px) and onto the
+   label's bottom padding edge (-2px), the same result -- measured unchanged
+   (copy line box -> answer 6px, open label heights identical). */
 label.switch > .context-help > .context-help-body {
   margin-top: var(--opt-sp-3);
   margin-bottom: calc(var(--opt-sp-1) * -1);
   cursor: auto;
 }
-/* Text -> help target = sp-1, the host grid's column-gap the radio rows (and
-   every choice row before Ruling 36) get: the label's own gap is sp-3, so
-   the target steps back by the difference. */
-.context-help-host[data-help-role="choice"] > label.switch > .context-help > summary.context-help-toggle { margin-left: calc(var(--opt-sp-1) - var(--opt-sp-3)); }
+/* Text -> help target = sp-1, as before Ruling 36's flex row: the target
+   starts where the copy's 24px end margin starts (zero net advance, see the
+   label rule above), then the relative offset -- paint only, it never moves
+   the line breaker's arithmetic -- steps it sp-1 off the last glyph. */
+.pref-row.context-help-host[data-help-role="choice"] > label.switch > .context-help > summary.context-help-toggle {
+  margin-left: calc(var(--target) * -1);
+  left: var(--opt-sp-1);
+}
 /* Anything the host holds after such a label (the Wayback permission status)
    takes a full-width row of its own, as it did when it followed <details>. */
 .context-help-host[data-help-role="choice"] > label.switch ~ * { grid-column: 1 / -1; min-width: 0; margin-top: var(--opt-sp-2); }
@@ -1631,7 +1715,11 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
    instead of 44 (38 instead of 32 for the row directly under a section
    title), and the open answer's copy -> body gap 12px instead of the
    calibrated 6. Declare column-gap and row-gap as separate longhands so
-   fixing one can never again silently move the other. */
+   fixing one can never again silently move the other.
+   Inert since the narrow-window fix (2026-10-14): a help-bearing switch label
+   is block flow now (context-help block above), where gaps do not apply; the
+   copy -> help target spacing is the copy's end margin + the target's
+   relative offset there. Kept because tests pin its computed column-gap. */
 .pref-row.context-help-host[data-help-role="choice"] > label.switch { column-gap: var(--opt-sp-3); row-gap: 0; }
 /* Task 4 (ui-system-stage2, Controller ruling A): the AI panel's text/
    password fields (#opt-<provider>-key/-model, #opt-<provider>-baseurl)

@@ -105,12 +105,28 @@ function test(name, fn) {
   // The anchor's own row. An in-label help's answer opens INSIDE the label, so
   // the label box grows with it; its first line (padding box around the copy
   // line) is the row the answer must hang under.
+  // A help-bearing switch row's copy is an INLINE span (the label is a block
+  // container so the help target can trail the copy's last word), and an
+  // inline box's rect is its font content area, not its line box -- under
+  // Verdana a 14px/20px copy's rect ends 2px above the line box. The line
+  // box's bottom is read instead from a zero-size inline-block probe aligned
+  // to it (vertical-align: bottom) at the end of the copy; it has no size,
+  // so it cannot move the layout it measures.
+  function copyLineBottom(copy) {
+    const probe = doc.createElement("span");
+    probe.style.cssText = "display:inline-block;width:0;height:0;margin:0;padding:0;border:0;vertical-align:bottom";
+    copy.append(probe);
+    const bottom = probe.getBoundingClientRect().bottom;
+    probe.remove();
+    return bottom;
+  }
+
   function anchorRowRect(anchor) {
     const rect = anchor.getBoundingClientRect();
     const copy = anchor.matches("label.switch") && anchor.querySelector(":scope > details.context-help")
       ? anchor.querySelector(":scope > .switch-text") : null;
     if (!copy) return rect;
-    const bottom = copy.getBoundingClientRect().bottom + parseFloat(frame.contentWindow.getComputedStyle(anchor).paddingBottom);
+    const bottom = copyLineBottom(copy) + parseFloat(frame.contentWindow.getComputedStyle(anchor).paddingBottom);
     return { top: rect.top, left: rect.left, right: rect.right, bottom, width: rect.width, height: bottom - rect.top };
   }
 
@@ -796,7 +812,7 @@ function test(name, fn) {
       ["", "compact"].forEach((tier) => {
         if (tier) doc.documentElement.dataset.density = tier; else delete doc.documentElement.dataset.density;
         details.open = true;
-        const gap = body.getBoundingClientRect().top - copy.getBoundingClientRect().bottom;
+        const gap = body.getBoundingClientRect().top - copyLineBottom(copy);
         if (Math.abs(gap - 6) > 0.5) violations.push(`tier=${tier || "comfortable"} ${id} gap=${gap}`);
         details.open = false;
       });
@@ -1048,6 +1064,78 @@ function test(name, fn) {
     } finally {
       doc.documentElement.removeAttribute("data-theme");
     }
+  });
+
+  // Narrow-window regression (2026-10-14): a help-bearing switch row used to
+  // be a wrapping flex row whose copy / help target / track wrapped as WHOLE
+  // items, so in a narrow window the target dropped alone to the start of a
+  // second line, or copy + target pushed the track down to line 2 (German at
+  // ~380px showed both). Every such row, in the longest-copy locale (German)
+  // and a CJK one, at widths that wrap the copy and at one that does not:
+  // the target trails the copy's LAST line fragment, the track is flush with
+  // the host's end edge, and its centre sits on the centre of the label's
+  // content box (the copy's line boxes), as a plain `.pref-row > label`
+  // (align-items: center) places it -- and opening the answer must not move
+  // the track.
+  const deMessages = await fetch("../_locales/de/messages.json").then((response) => response.json());
+  test("narrow windows keep a switch row's help target after its last word and its track at the row end", () => {
+    const rows = [...doc.querySelectorAll(".pref-row.context-help-host > label.switch")]
+      .filter((label) => label.querySelector(":scope > details.context-help"));
+    assert(rows.length >= 11, "too few help-bearing switch rows: " + rows.length);
+    const win = frame.contentWindow;
+    const originalWidth = frame.style.width;
+    const copies = rows.map((label) => label.querySelector(":scope > .switch-text"));
+    const originalText = copies.map((copy) => copy.textContent);
+    const violations = [];
+    let wrapped = 0;
+    try {
+      for (const [locale, messages] of [["de", deMessages], ["zh-CN", zhMessages]]) {
+        copies.forEach((copy) => {
+          const message = messages[copy.dataset.i18n]?.message;
+          if (typeof message === "string") copy.textContent = message;
+        });
+        for (const width of [380, 520, 1500]) {
+          frame.style.width = width + "px";
+          rows.forEach((label, index) => {
+            const details = label.querySelector(":scope > details.context-help");
+            reveal(details);
+            details.open = false;
+            const copy = copies[index];
+            const id = locale + "@" + width + " " + label.querySelector("input").id;
+            const range = doc.createRange();
+            range.selectNodeContents(copy);
+            const fragments = [...range.getClientRects()].filter((rect) => rect.width > 0.5);
+            if (!fragments.length) { violations.push(id + " copy not rendered"); return; }
+            const last = fragments[fragments.length - 1];
+            if (new Set(fragments.map((rect) => Math.round(rect.top))).size > 1) wrapped++;
+            const glyph = details.querySelector(":scope > summary svg").getBoundingClientRect();
+            const glyphMid = (glyph.top + glyph.bottom) / 2;
+            if (!(glyphMid > last.top - 1 && glyphMid < last.bottom + 1 && glyph.left >= last.right - 1 && glyph.left - last.right <= 12)) {
+              violations.push(`${id} target not after the last word (glyph ${glyph.left.toFixed(1)},${glyphMid.toFixed(1)} vs last fragment right ${last.right.toFixed(1)}, ${last.top.toFixed(1)}..${last.bottom.toFixed(1)})`);
+            }
+            const host = label.parentElement;
+            const hostStyle = win.getComputedStyle(host);
+            const hostRight = host.getBoundingClientRect().right - parseFloat(hostStyle.paddingRight) - parseFloat(hostStyle.borderRightWidth);
+            const track = label.querySelector(":scope > .switch-track").getBoundingClientRect();
+            if (Math.abs(track.right - hostRight) > 1) violations.push(`${id} track right=${track.right} vs row end=${hostRight}`);
+            const box = label.getBoundingClientRect();
+            const style = win.getComputedStyle(label);
+            const contentMid = box.top + (parseFloat(style.paddingTop) + box.height - parseFloat(style.paddingBottom)) / 2;
+            const trackMid = (track.top + track.bottom) / 2;
+            if (Math.abs(trackMid - contentMid) > 0.5) violations.push(`${id} track centre ${trackMid} vs copy centre ${contentMid}`);
+            details.open = true;
+            const openTrack = label.querySelector(":scope > .switch-track").getBoundingClientRect();
+            if (Math.abs(openTrack.top - track.top) > 0.01) violations.push(`${id} opening the answer moved the track ${track.top} -> ${openTrack.top}`);
+            details.open = false;
+          });
+        }
+      }
+    } finally {
+      frame.style.width = originalWidth;
+      copies.forEach((copy, index) => { copy.textContent = originalText[index]; });
+    }
+    assert(wrapped > 0, "no copy wrapped at the narrow widths: the case this test exists for was not exercised");
+    assert(!violations.length, violations.slice(0, 6).join("; ") + (violations.length > 6 ? ` (+${violations.length - 6} more)` : ""));
   });
 })().catch((error) => {
   for (let i = results.children.length; i < 16; i++) report("fixture setup", error);
