@@ -1696,7 +1696,7 @@
     "message": "Ce choix est propre à cet appareil. Les paramètres ne sont partagés qu'entre les appareils où vous l'activez ; les autres conservent leurs paramètres locaux."
   },
   "syncApiKeysLabel": {
-    "message": "Synchroniser les identifiants pour ce compte Google"
+    "message": "Synchroniser les clés API et les jetons pour ce compte Google"
   },
   "syncApiKeysHint": {
     "message": "Il s'agit d'un choix unique à l'échelle du compte, mais seuls les appareils où la synchronisation des paramètres est activée y participent ; les autres continuent d'utiliser leurs identifiants locaux. Il est désactivé par défaut pour les nouveaux utilisateurs. Si une mise à niveau trouve déjà des identifiants non vides dans Chrome Sync, il reste activé afin d'éviter toute perte de données. Les clés API, jetons, mots de passe et identifiants d'exportation synchronisés sont obfusqués, pas chiffrés."
@@ -1909,10 +1909,13 @@
     "message": "N'agit que sur la requête de secours que la page Lecture envoie directement lorsqu'aucun onglet www.youtube.com n'est ouvert ; si un onglet YouTube est ouvert, les sous-titres sont lus via cet onglet et sa session. Activé par défaut : une requête de secours anonyme risque davantage d'être prise pour un robot et refusée."
   },
   "mdTglToc": {
-    "message": "TDM"
+    "message": "Inclure la table des matières"
   },
   "mdTglHl": {
-    "message": "Surlignages"
+    "message": "Inclure les surlignages"
+  },
+  "mdTglFrontmatter": {
+    "message": "Inclure le frontmatter"
   },
   "mdCopy": {
     "message": "Copier"
@@ -2087,7 +2090,7 @@
     "message": "Quels fournisseurs offrent un accès API gratuit ?"
   },
   "freeTierResourcesPrefix": {
-    "message": "Les offres gratuites changent trop souvent pour être listées ici. Ces listes communautaires sont tenues à jour ; votre quota réel est celui qu'affiche la console de votre fournisseur :"
+    "message": "Les offres gratuites changent trop souvent pour être listées ici. Cette liste communautaire est tenue à jour ; votre quota réel est celui qu'affiche la console de votre fournisseur :"
   },
   "aiStage_extracting": {
     "message": "extraction du contenu…"

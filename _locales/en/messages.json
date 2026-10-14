@@ -1702,7 +1702,7 @@
     "message": "This setting applies to this device only. Settings are shared between the devices where you turn it on; devices with it off keep their own local settings."
   },
   "syncApiKeysLabel": {
-    "message": "Sync credentials for this Google account"
+    "message": "Sync API keys and tokens for this Google account"
   },
   "syncApiKeysHint": {
     "message": "This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted."
@@ -1890,10 +1890,13 @@
     "message": "Only affects the fallback request the reader sends directly when no www.youtube.com tab is open; with a YouTube tab open, subtitles are read through that tab and its own session. On by default: an anonymous fallback request is more likely to be treated as a bot and refused."
   },
   "mdTglToc": {
-    "message": "TOC"
+    "message": "Include table of contents"
   },
   "mdTglHl": {
-    "message": "Highlights"
+    "message": "Include highlights"
+  },
+  "mdTglFrontmatter": {
+    "message": "Include frontmatter"
   },
   "mdCopy": {
     "message": "Copy"
@@ -2068,7 +2071,7 @@
     "message": "Which providers offer free API access?"
   },
   "freeTierResourcesPrefix": {
-    "message": "Free tiers change too often to list here. These community lists keep up; your actual quota is whatever your provider's console shows:"
+    "message": "Free tiers change too often to list here. This community list keeps up; your actual quota is whatever your provider's console shows:"
   },
   "aiStage_extracting": {
     "message": "extracting page content…"

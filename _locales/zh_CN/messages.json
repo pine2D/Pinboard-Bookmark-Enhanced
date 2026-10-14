@@ -1696,7 +1696,7 @@
     "message": "此开关只对当前设备生效。设置只在开启了它的设备之间共享；关闭的设备使用各自的本地设置。"
   },
   "syncApiKeysLabel": {
-    "message": "在此 Google 账号下同步凭据"
+    "message": "在此 Google 账号下同步 API Key 和 Token"
   },
   "syncApiKeysHint": {
     "message": "这是一个账号级选项，但只有开启设置同步的设备才会参与；其他设备继续使用本地凭据。新用户默认关闭。若升级时 Chrome Sync 已有非空凭据，为避免数据丢失会保持开启。同步的 API Key、Token、密码和导出凭据仅做混淆存储，并未加密。"
@@ -1909,10 +1909,13 @@
     "message": "只影响没有打开 www.youtube.com 标签页时阅读器直接发出的兜底请求；打开了 YouTube 标签页时，字幕经该标签页及其登录态读取，不受此项影响。默认开启：匿名的兜底请求更容易被判定为机器人而遭拒。"
   },
   "mdTglToc": {
-    "message": "目录"
+    "message": "包含目录"
   },
   "mdTglHl": {
-    "message": "高亮"
+    "message": "包含高亮"
+  },
+  "mdTglFrontmatter": {
+    "message": "包含 frontmatter"
   },
   "mdCopy": {
     "message": "复制"

@@ -1696,7 +1696,7 @@
     "message": "Diese Einstellung gilt nur für dieses Gerät. Einstellungen werden nur zwischen den Geräten geteilt, auf denen du sie aktivierst; alle anderen behalten ihre eigenen lokalen Einstellungen."
   },
   "syncApiKeysLabel": {
-    "message": "Zugangsdaten für dieses Google-Konto synchronisieren"
+    "message": "API-Schlüssel und Tokens für dieses Google-Konto synchronisieren"
   },
   "syncApiKeysHint": {
     "message": "Dies ist eine kontoweite Auswahl, aber nur Geräte mit aktivierter Einstellungssynchronisierung nehmen teil; andere Geräte verwenden weiterhin lokale Zugangsdaten. Bei neuen Nutzern ist sie standardmäßig deaktiviert. Findet ein Upgrade bereits nicht leere Zugangsdaten in Chrome Sync, bleibt sie zur Vermeidung von Datenverlust aktiviert. Synchronisierte API-Schlüssel, Tokens, Passwörter und Export-Zugangsdaten sind nur verschleiert, nicht verschlüsselt."
@@ -1909,10 +1909,13 @@
     "message": "Betrifft nur die Ersatzanfrage, die die Leseansicht selbst sendet, wenn kein www.youtube.com-Tab geöffnet ist; bei geöffnetem YouTube-Tab werden Untertitel über diesen Tab und dessen Sitzung gelesen. Standardmäßig aktiviert, da eine anonyme Ersatzanfrage eher als Bot eingestuft und abgelehnt wird."
   },
   "mdTglToc": {
-    "message": "Inhaltsverzeichnis"
+    "message": "Inhaltsverzeichnis einschließen"
   },
   "mdTglHl": {
-    "message": "Markierungen"
+    "message": "Markierungen einschließen"
+  },
+  "mdTglFrontmatter": {
+    "message": "Frontmatter einschließen"
   },
   "mdCopy": {
     "message": "Kopieren"
@@ -2087,7 +2090,7 @@
     "message": "Welche Anbieter bieten kostenlosen API-Zugang?"
   },
   "freeTierResourcesPrefix": {
-    "message": "Kostenlose Kontingente ändern sich zu häufig für eine Liste an dieser Stelle. Diese Community-Listen bleiben aktuell; maßgeblich ist das Kontingent in der Konsole des jeweiligen Anbieters:"
+    "message": "Kostenlose Kontingente ändern sich zu häufig für eine Liste an dieser Stelle. Diese Community-Liste bleibt aktuell; maßgeblich ist das Kontingent in der Konsole des jeweiligen Anbieters:"
   },
   "aiStage_extracting": {
     "message": "Seiteninhalt wird abgerufen…"

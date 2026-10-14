@@ -1696,7 +1696,7 @@
     "message": "To ustawienie dotyczy tylko tego urządzenia. Ustawienia są współdzielone wyłącznie między urządzeniami, na których je włączysz; pozostałe zachowują własne ustawienia lokalne."
   },
   "syncApiKeysLabel": {
-    "message": "Synchronizuj dane uwierzytelniające dla tego konta Google"
+    "message": "Synchronizuj klucze API i tokeny dla tego konta Google"
   },
   "syncApiKeysHint": {
     "message": "To jeden wybór dla całego konta, ale uczestniczą w nim tylko urządzenia z włączoną synchronizacją ustawień; pozostałe nadal używają lokalnych danych uwierzytelniających. Dla nowych użytkowników jest domyślnie wyłączony. Jeśli aktualizacja znajdzie w Chrome Sync istniejące niepuste dane uwierzytelniające, pozostaje włączony, aby uniknąć utraty danych. Synchronizowane klucze API, tokeny, hasła i dane uwierzytelniające eksportu są jedynie zaciemnione, a nie zaszyfrowane."
@@ -1909,10 +1909,13 @@
     "message": "Dotyczy tylko żądania zapasowego, które czytnik wysyła bezpośrednio, gdy nie jest otwarta żadna karta www.youtube.com; przy otwartej karcie YouTube napisy są odczytywane przez tę kartę i jej sesję. Domyślnie włączone: anonimowe żądanie zapasowe częściej jest uznawane za bota i odrzucane."
   },
   "mdTglToc": {
-    "message": "Spis treści"
+    "message": "Uwzględniaj spis treści"
   },
   "mdTglHl": {
-    "message": "Zaznaczenia"
+    "message": "Uwzględniaj zaznaczenia"
+  },
+  "mdTglFrontmatter": {
+    "message": "Uwzględniaj frontmatter"
   },
   "mdCopy": {
     "message": "Kopiuj"
@@ -2087,7 +2090,7 @@
     "message": "Którzy dostawcy oferują darmowy dostęp do API?"
   },
   "freeTierResourcesPrefix": {
-    "message": "Darmowe limity zmieniają się zbyt często, by je tu wypisywać. Te społecznościowe listy są na bieżąco aktualizowane, a rzeczywisty limit pokazuje konsola dostawcy:"
+    "message": "Darmowe limity zmieniają się zbyt często, by je tu wypisywać. Ta społecznościowa lista jest na bieżąco aktualizowana, a rzeczywisty limit pokazuje konsola dostawcy:"
   },
   "aiStage_extracting": {
     "message": "pobieranie zawartości…"

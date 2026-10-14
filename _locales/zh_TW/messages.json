@@ -1696,7 +1696,7 @@
     "message": "此設定只對目前裝置生效。設定只會在開啟它的裝置之間共用；關閉的裝置各自使用本機設定。"
   },
   "syncApiKeysLabel": {
-    "message": "在此 Google 帳號下同步憑證"
+    "message": "在此 Google 帳號下同步 API Key 和 Token"
   },
   "syncApiKeysHint": {
     "message": "這是帳號層級的單一選項，但只有開啟設定同步的裝置才會參與；其他裝置會繼續使用本機憑證。新使用者預設關閉。若升級時 Chrome Sync 已有非空憑證，為避免資料遺失會保持開啟。同步的 API Key、Token、密碼與匯出憑證僅經過混淆處理，並未加密。"
@@ -1909,10 +1909,13 @@
     "message": "只影響沒有已開啟的 www.youtube.com 分頁時，由閱讀器自行送出的備援請求；有 YouTube 分頁開啟時，字幕會經由該分頁及其登入狀態讀取，不受此項影響。預設開啟：匿名的備援請求更容易被判定為機器人而遭拒。"
   },
   "mdTglToc": {
-    "message": "目錄"
+    "message": "包含目錄"
   },
   "mdTglHl": {
-    "message": "標記"
+    "message": "包含標記"
+  },
+  "mdTglFrontmatter": {
+    "message": "包含 frontmatter"
   },
   "mdCopy": {
     "message": "複製"
