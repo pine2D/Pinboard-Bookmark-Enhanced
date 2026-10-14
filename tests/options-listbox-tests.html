@@ -1196,6 +1196,17 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
           // R9's definition: title -> first copy of a title-led group equals
           // title -> label of a title-led entry block. Compare, don't hardcode.
           const gaps = { group: [], entry: [] };
+          // A help-bearing switch's copy is an inline box (the help target
+          // flows after its last word), and an inline box's rect is the
+          // font's content area, not its line box -- under CI's Liberation
+          // Sans that sits 2px lower than a blockified copy's top. Measure
+          // where the first line box starts, which is what the row lays out.
+          const copyTop = (el) => {
+            const cs = win.getComputedStyle(el);
+            if (cs.display !== "inline") return el.getBoundingClientRect().top;
+            const r = el.getClientRects()[0];
+            return r.top - (parseFloat(cs.lineHeight) - r.height) / 2;
+          };
           panel.querySelectorAll(".settings-section").forEach((section) => {
             const h2 = titleOf(section);
             if (!h2 || !h2.offsetParent) return;
@@ -1203,7 +1214,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
             const group = leadGroup(block);
             if (group) {
               const copy = group.querySelector(":scope > .pref-row:first-child > label > .switch-text, :scope > .pref-row:first-child > label > .pick-text");
-              if (copy && copy.offsetParent) { groups++; gaps.group.push([section.id || h2.textContent.trim(), q(copy.getBoundingClientRect().top - h2.getBoundingClientRect().bottom)]); }
+              if (copy && copy.offsetParent) { groups++; gaps.group.push([section.id || h2.textContent.trim(), q(copyTop(copy) - h2.getBoundingClientRect().bottom)]); }
             } else if (block?.matches(".fg.entry-block")) {
               const bl = block.querySelector(":scope > .bl");
               if (bl && bl.offsetParent) gaps.entry.push([section.id || h2.textContent.trim(), q(bl.getBoundingClientRect().top - h2.getBoundingClientRect().bottom)]);
