@@ -1574,12 +1574,26 @@ async function setAICache(url, type, result, cacheDuration, source, account, s) 
 }
 
 // ---- Build notes/description for a page ----
+// The page's meta description as a notes default, or "" when it says nothing
+// the title does not: compared with case, whitespace, punctuation and symbols
+// ignored, after dropping GitHub's stock "Contribute to owner/repo development
+// by creating an account on GitHub." tail (signed-out repo pages append it to
+// the About line the title already carries).
+function pbpNotesDescription(pageInfo) {
+  const raw = String((pageInfo && pageInfo.metaDescription) || "").trim();
+  if (!raw) return "";
+  const norm = (s) => String(s || "").normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
+  const own = norm(raw.replace(/\.?\s*Contribute to \S+ development by creating an account on GitHub\.?\s*$/i, ""));
+  if (!own) return "";
+  return norm(pageInfo.title).includes(own) ? "" : raw;
+}
+
 function buildAutoNotes(pageInfo, opts) {
   let desc = "";
   if (pageInfo.selectedText) {
     desc = opts.blockquote ? `<blockquote>${escapeForExtended(pageInfo.selectedText)}</blockquote>` : pageInfo.selectedText;
-  } else if (opts.autoDescription && pageInfo.metaDescription) {
-    desc = pageInfo.metaDescription;
+  } else if (opts.autoDescription) {
+    desc = pbpNotesDescription(pageInfo);
   }
   if (opts.includeReferrer && pageInfo.referrer) {
     desc += (desc ? "\n\n" : "") + `via: ${pageInfo.referrer}`;

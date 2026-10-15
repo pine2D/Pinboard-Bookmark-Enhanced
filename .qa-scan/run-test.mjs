@@ -40,7 +40,7 @@ const SAFETY_MARGIN_MS = 1000;
 const EXPECTED_RESULTS = Object.freeze({
   "tests/a11y-tests.html": 28,
   "tests/ai-cache-tests.html": 26,
-  "tests/ai-tags-tests.html": 98,
+  "tests/ai-tags-tests.html": 101,
   "tests/anki-connect-tests.html": 41,
   "tests/background-active-tab-tests.html": 38,
   "tests/background-lifecycle-tests.html": 56,

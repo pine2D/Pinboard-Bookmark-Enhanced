@@ -1196,4 +1196,32 @@ suite("endpoint origin policy", () => {
   }
 })();
 </script>
+<script>
+// Notes default: the meta description only when it adds to the title.
+test("pbpNotesDescription: a description the title already carries is dropped", () => {
+  const gh = "艺术动画skill：35种艺术风格、9种解说语法，用代码让画动起来。";
+  // signed-out GitHub: About line + stock tail, title carries the About line
+  assertEq(pbpNotesDescription({ title: "GitHub - a/b: " + gh, metaDescription: gh + ". Contribute to a/b development by creating an account on GitHub." }), "");
+  // a repo without an About line: the tail alone says nothing
+  assertEq(pbpNotesDescription({ title: "GitHub - a/b", metaDescription: "Contribute to a/b development by creating an account on GitHub." }), "");
+  // case, spacing and punctuation differences do not count as new content
+  assertEq(pbpNotesDescription({ title: "The Cockpit: for Vibe Coding | Site", metaDescription: "the cockpit for vibe-coding." }), "");
+});
+test("pbpNotesDescription: a description that adds to the title is kept verbatim", () => {
+  const d = "A longer summary that the title does not contain.";
+  assertEq(pbpNotesDescription({ title: "Short title", metaDescription: "  " + d + "  " }), d);
+  // the GitHub tail is only ignored for the comparison, never cut from what is kept
+  const kept = "Tool X. Contribute to a/b development by creating an account on GitHub.";
+  assertEq(pbpNotesDescription({ title: "GitHub - a/b: something else", metaDescription: kept }), kept);
+  assertEq(pbpNotesDescription({ title: "", metaDescription: d }), d);
+  assertEq(pbpNotesDescription({ title: "x", metaDescription: "" }), "");
+  assertEq(pbpNotesDescription({}), "");
+});
+test("buildAutoNotes routes the description through the same check", () => {
+  const opts = { autoDescription: true, blockquote: false, includeReferrer: false };
+  assertEq(buildAutoNotes({ title: "Same words", metaDescription: "same words" }, opts), "");
+  assertEq(buildAutoNotes({ title: "T", metaDescription: "More" }, opts), "More");
+  assertEq(buildAutoNotes({ title: "T", metaDescription: "More" }, { ...opts, autoDescription: false }), "");
+});
+</script>
 </body></html>

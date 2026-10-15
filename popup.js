@@ -797,7 +797,7 @@ async function showMain(token) {
   let desc = "";
   if (pageInfo.selectedText) {
     desc = settings.optBlockquote ? `<blockquote>${escapeForExtended(pageInfo.selectedText)}</blockquote>` : pageInfo.selectedText;
-  } else if (settings.optAutoDescription !== false && pageInfo.metaDescription) { desc = pageInfo.metaDescription; }
+  } else if (settings.optAutoDescription !== false) { desc = pbpNotesDescription(pageInfo); }
   if (settings.optIncludeReferrer && pageInfo.referrer) { desc += (desc ? "\n\n" : "") + `via: ${pageInfo.referrer}`; }
   if (shouldUpdateField("description-input")) $id("description-input").value = desc;
   updateCharCount();
