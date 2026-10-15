@@ -738,11 +738,20 @@ html[data-section="login"] .quick-actions { display: none !important; }
 }
 
 /* URL Warning */
+/* Neutral, not warning (impeccable critique 2026-10-15): new tabs, chrome://
+   and extension pages are where a popup lands every day, and nothing went
+   wrong there. A red strip announced as role="alert" treated each of those
+   opens as an error and interrupted screen readers; it is now a neutral
+   strip -- body text on the secondary page surface, a divider below -- and
+   role="status". Not the --pp-info-* / --pp-banner-* blue: on modern-card,
+   github-light and nord-night those resolve to the link colour on a chip or
+   button fill, which COMPONENTS.md §9.1 law 8 forbids (render-audit
+   weakTextOnFill). The id keeps its old name. */
 .url-warning {
   padding: var(--pp-sp-2) var(--pp-sp-5);
-  background: var(--pp-warn-bg);
-  border-bottom: 1px solid var(--pp-warn-bd);
-  color: var(--pp-warn-fg);
+  background: var(--pp-bg2);
+  border-bottom: 1px solid var(--pp-divider);
+  color: var(--pp-fg);
   font-size: 11px;
   line-height: 1.4;
   animation: fadeSlideDown var(--pp-motion-duration) var(--ease-out);
@@ -752,9 +761,9 @@ html[data-section="login"] .quick-actions { display: none !important; }
    amber icon at 2.77:1 inside a RED warning strip whose sentence beside it
    measured 5.26:1 -- a different hue and a different contrast from the text it
    introduces, and currentColor cannot reach inside a url("data:...").
-   #url-warning carries the inline PBP_ICONS.warning span the feedback card
-   already uses (popup.js hydrates .btn-ic[data-ic]), so the mark inherits
-   --pp-warn-fg on every surface. Sized to the 11px text scale the way
+   #url-warning carries an inline PBP_ICONS span (popup.js hydrates
+   .btn-ic[data-ic]; the info mark since 2026-10-15), so the mark inherits
+   the strip's text colour on every surface. Sized to the 11px text scale the way
    .clear-all-link / .offline-clear size theirs (this one keeps .btn-ic's
    margin-right: it is the icon/sentence gap); the -2px baseline
    nudge replaces .btn-ic's button-sized -3px, which is measured against a
@@ -3046,7 +3055,7 @@ html[data-theme] .qbtn:hover { background: var(--pp-btn-hover); color: var(--pp-
 html[data-theme] .qbtn.saving { background: var(--pp-offline-bg); border-color: var(--pp-offline-bd); color: var(--pp-offline-fg); }
 html[data-theme] .qbtn.saved { background: var(--pp-ok-bg); border-color: var(--pp-ok-bd); color: var(--pp-ok-fg); }
 html[data-theme] .existing-banner { background: var(--pp-banner-bg); border-color: var(--pp-banner-bd); color: var(--pp-banner-fg); }
-html[data-theme] .url-warning { background: var(--pp-warn-bg); border-color: var(--pp-warn-bd); color: var(--pp-warn-fg); }
+html[data-theme] .url-warning { background: var(--pp-bg2); border-color: var(--pp-divider); color: var(--pp-fg); }
 html[data-theme] .preset-btn { color: var(--pp-preset-fg); background: var(--pp-preset-bg); }
 html[data-theme] .preset-btn:hover { background: var(--pp-drop-hover); }
 /* Byte-identical to the base rule since 2026-09-18 -- and load-bearing all
