@@ -97,6 +97,9 @@
   "networkError": {
     "message": "ネットワークエラー"
   },
+  "saveFailedGeneric": {
+    "message": "ブックマークを保存できませんでした。もう一度お試しください。"
+  },
   "uriTooLong": {
     "message": "リクエストが長すぎます（$LEN$/$MAX$ B）。メモ、タイトル、またはタグを短くしてください。",
     "placeholders": {

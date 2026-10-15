@@ -3481,7 +3481,21 @@ function showFeedback({ variant = "info", title = "", message = "", messageNode 
     mount.appendChild(card);
   }
 
-  if (autoHide > 0) setTimeout(remove, autoHide);
+  if (autoHide > 0) {
+    // The countdown holds while the pointer or keyboard focus is on the card
+    // (WCAG 2.2.1), and restarts in full once both have left: a card that
+    // vanishes mid-read takes its message and its buttons with it.
+    let timer = setTimeout(remove, autoHide);
+    const hold = () => { clearTimeout(timer); timer = null; };
+    const release = () => {
+      if (dismissed || timer || card.matches(":hover") || card.contains(document.activeElement)) return;
+      timer = setTimeout(remove, autoHide);
+    };
+    card.addEventListener("pointerenter", hold);
+    card.addEventListener("focusin", hold);
+    card.addEventListener("pointerleave", release);
+    card.addEventListener("focusout", () => setTimeout(release, 0));
+  }
 
   return { dismiss: remove, element: card };
 }

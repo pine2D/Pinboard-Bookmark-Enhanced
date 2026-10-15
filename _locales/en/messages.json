@@ -97,6 +97,9 @@
   "networkError": {
     "message": "Network error"
   },
+  "saveFailedGeneric": {
+    "message": "Couldn't save the bookmark. Try again."
+  },
   "uriTooLong": {
     "message": "Request too long ($LEN$/$MAX$ B). Shorten notes, title, or tags.",
     "placeholders": {

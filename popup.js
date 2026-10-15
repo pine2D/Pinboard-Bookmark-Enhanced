@@ -1644,6 +1644,7 @@ function setupSubmit(token) {
       && bookmarkLookup.url === url
       && bookmarkLookup.formLoaded;
     clearTimeout(submitErrorResetTimer);
+    clearSaveError();
     setSubmitState("loading");
 
     if (!url || !$id("title-input").value) {
@@ -1681,7 +1682,7 @@ function setupSubmit(token) {
           showStatus("status-msg", t("saveNeedsReview"), "info");
           setSubmitState("idle");
         } else {
-          showStatus("status-msg", t("networkError"), "error");
+          showSaveError({ reason: "lookup" });
           setSubmitState("error");
           submitErrorResetTimer = setTimeout(() => { if (btn.classList.contains("save-error")) setSubmitState("idle"); }, 3000);
         }
@@ -1808,7 +1809,7 @@ function setupSubmit(token) {
           setSubmitState("idle");
           return;
         }
-        showStatus("status-msg", t("networkError"), "error");
+        showSaveError({ reason: "lookup" });
         setSubmitState("error");
         submitErrorResetTimer = setTimeout(() => { if (btn.classList.contains("save-error")) setSubmitState("idle"); }, 3000);
         return;
@@ -1932,24 +1933,15 @@ function setupSubmit(token) {
         return;
       }
 
-      if (result.status === "failed" && result.reason === "too_long") {
-        showStatus("status-msg", t("uriTooLong", String(result.detail || ""), String(POSTS_ADD_URI_BUDGET)), "error");
-      } else if (result.status === "failed" && result.reason === "http" && result.httpStatus) {
-        showStatus("status-msg", `HTTP ${result.httpStatus}`, "error");
-      } else if (result.status === "failed" && result.reason === "api" && result.detail) {
-        showStatus("status-msg", t("pinboardApiError", String(result.detail)), "error");
-      } else if (result.status === "failed" && result.reason === "account_changed") {
-        showStatus("status-msg", t("pinboardErrorAuth"), "error");
-      } else {
-        showStatus("status-msg", t("networkError"), "error");
-      }
+      showSaveError(result?.status === "failed" ? result : null);
       setSubmitState("error");
     } catch (e) {
       if (!ownsSubmitUi() || (lookupGenerationAtSave !== null && (bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url))) {
         if (ownsSubmitUi()) setSubmitState("idle");
         return;
       }
-      showStatus("status-msg", t("networkError"), "error");
+      console.warn("[popup] save threw:", e?.name, e?.message);
+      showSaveError(null);
       setSubmitState("error");
     }
     // Auto-recover to idle so Ctrl+Enter keeps working after a visible error
@@ -2344,6 +2336,47 @@ function showStatus(id, msg, kind) {
   el.textContent = msg;
   el.className = "status-msg " + (kind || "");
   el.classList.remove("hidden");
+}
+// Save failures stay on screen until the next attempt, a success, or a
+// dismiss, directly under the Save button where the success line appears
+// (impeccable critique 2026-10-15). They used to go through showStatus: a
+// 4s card above the checkboxes plus a button that turned back into "Save"
+// after 3s, so a failed save left no trace once you looked away.
+let _saveErrorFeedback = null;
+function clearSaveError() {
+  if (_saveErrorFeedback) _saveErrorFeedback.dismiss();
+  _saveErrorFeedback = null;
+}
+// result: a save-intent failure ({ reason, httpStatus?, detail? }), or null
+// when the save threw before a result came back.
+function pbpSaveErrorView(result) {
+  const reason = result?.reason;
+  if (reason === "too_long") {
+    return { message: t("uriTooLong", String(result.detail || ""), String(POSTS_ADD_URI_BUDGET)), retry: false };
+  }
+  if (reason === "account_changed" || reason === "not_logged_in") return { message: t("pinboardErrorAuth"), retry: false };
+  if (reason === "network" || reason === "lookup") return { message: t("pinboardErrorOffline"), retry: true };
+  if (reason === "http" && result.httpStatus) {
+    const status = result.httpStatus;
+    const message = status === 429 || status >= 500
+      ? t(classifyPinboardError(status))
+      : t("pinboardApiError", `HTTP ${status}`);
+    return { message, retry: true };
+  }
+  if (reason === "api" && result.detail) return { message: t("pinboardApiError", String(result.detail)), retry: true };
+  return { message: t("saveFailedGeneric"), retry: true };
+}
+function showSaveError(result) {
+  clearSaveError();
+  const { message, retry } = pbpSaveErrorView(result);
+  const feedback = showFeedback({
+    variant: "error",
+    message,
+    // Focus moves to Save first: the retry button leaves with this card.
+    actions: retry ? [{ label: t("saveRetry"), onClick: () => { const btn = $id("submit-btn"); btn.focus(); btn.click(); } }] : [],
+  });
+  $id("submit-btn").closest(".submit-bar").after(feedback.element);
+  _saveErrorFeedback = feedback;
 }
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function enc(s) { return encodeURIComponent(s); }

@@ -97,6 +97,9 @@
   "networkError": {
     "message": "Ошибка сети"
   },
+  "saveFailedGeneric": {
+    "message": "Не удалось сохранить закладку. Попробуйте ещё раз."
+  },
   "uriTooLong": {
     "message": "Запрос слишком длинный ($LEN$/$MAX$ Б). Сократите заметки, заголовок или метки.",
     "placeholders": {

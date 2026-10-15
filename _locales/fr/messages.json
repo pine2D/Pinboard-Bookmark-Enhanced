@@ -97,6 +97,9 @@
   "networkError": {
     "message": "Erreur réseau"
   },
+  "saveFailedGeneric": {
+    "message": "Impossible d'enregistrer le signet. Réessayez."
+  },
   "uriTooLong": {
     "message": "Requête trop longue ($LEN$/$MAX$ o). Raccourcissez les notes, le titre ou les tags.",
     "placeholders": {

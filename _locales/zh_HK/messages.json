@@ -97,6 +97,9 @@
   "networkError": {
     "message": "網絡錯誤"
   },
+  "saveFailedGeneric": {
+    "message": "書籤未能儲存，請重試。"
+  },
   "uriTooLong": {
     "message": "請求過長（$LEN$/$MAX$ B），請縮短備註、標題或標籤",
     "placeholders": {

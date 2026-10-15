@@ -97,6 +97,9 @@
   "networkError": {
     "message": "Netzwerkfehler"
   },
+  "saveFailedGeneric": {
+    "message": "Das Lesezeichen konnte nicht gespeichert werden. Versuche es noch einmal."
+  },
   "uriTooLong": {
     "message": "Anfrage zu lang ($LEN$/$MAX$ B). Kürze Notizen, Titel oder Tags.",
     "placeholders": {

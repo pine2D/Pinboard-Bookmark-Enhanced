@@ -300,6 +300,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         clearTimeout: clearTimeoutStub,
         setTimeout: setTimeoutStub,
         showStatus: (...args) => statuses.push(args),
+        clearSaveError() {},
+        showSaveError: (result) => statuses.push(["status-msg", "save-error:" + (result?.reason || "thrown"), "error"]),
         updateCharCount() {},
         pbpPopupSavePolicy,
         fieldDirtyFlags,
@@ -344,6 +346,36 @@ test("posts/add default remains replace=yes for existing callers", () => {
         reloadCalls: () => reloadCalls,
       };
     }
+
+    // Save failures name their cause and only retryable ones carry a Retry
+    // action (impeccable critique 2026-10-15). Runs the real pbpSaveErrorView
+    // source against the real classifier, then checks every key it can return
+    // exists in the shipped English catalogue.
+    test("save failures name their cause and only retryable ones offer Retry", () => {
+      const viewSource = source.slice(source.indexOf("function pbpSaveErrorView("), source.indexOf("function showSaveError("));
+      const view = new Function("t", "classifyPinboardError", "POSTS_ADD_URI_BUDGET", `${viewSource}\nreturn pbpSaveErrorView;`)(
+        (key, ...args) => key + (args.length ? "(" + args.join(",") + ")" : ""), classifyPinboardError, 3900);
+      const cases = [
+        [{ reason: "http", httpStatus: 503 }, "pinboardErrorServer", true],
+        [{ reason: "http", httpStatus: 429 }, "pinboardErrorRateLimit", true],
+        [{ reason: "http", httpStatus: 400 }, "pinboardApiError(HTTP 400)", true],
+        [{ reason: "network" }, "pinboardErrorOffline", true],
+        [{ reason: "lookup" }, "pinboardErrorOffline", true],
+        [{ reason: "account_changed" }, "pinboardErrorAuth", false],
+        [{ reason: "not_logged_in" }, "pinboardErrorAuth", false],
+        [{ reason: "too_long", detail: "4200" }, "uriTooLong(4200,3900)", false],
+        [{ reason: "api", detail: "missing url" }, "pinboardApiError(missing url)", true],
+        [{ reason: "storage" }, "saveFailedGeneric", true],
+        [null, "saveFailedGeneric", true],
+      ];
+      for (const [result, message, retry] of cases) {
+        const got = view(result);
+        assert(got.message === message && got.retry === retry, JSON.stringify(result) + " -> " + JSON.stringify(got));
+      }
+      for (const key of ["saveFailedGeneric", "pinboardErrorServer", "pinboardErrorRateLimit", "pinboardErrorOffline", "pinboardErrorAuth", "pinboardApiError", "uriTooLong", "saveRetry"]) {
+        assert(enMessages[key]?.message, "en catalogue lacks " + key);
+      }
+    });
 
     test("unchanged submitted tags retain the existing union behavior", () => {
       const result = rebasePopupTags("ServerOnly Alpha", ["Alpha", "Beta"], ["Alpha", "Beta"]);
@@ -2723,6 +2755,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         $id: (id) => (id === nullField ? null : (elements[id] ||= createElementStub())),
         t: (key) => key,
         showStatus: (...args) => statuses.push(args),
+        clearSaveError() {},
+        showSaveError: (result) => statuses.push(["status-msg", "save-error:" + (result?.reason || "thrown"), "error"]),
         console: { warn: (...args) => warns.push(args) },
         enc: encodeURIComponent,
         shouldUpdateField: () => true,
@@ -2937,6 +2971,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         $id: (id) => (elements[id] ||= createElementStub()),
         t: (key) => key,
         showStatus: (...args) => statuses.push(args),
+        clearSaveError() {},
+        showSaveError: (result) => statuses.push(["status-msg", "save-error:" + (result?.reason || "thrown"), "error"]),
         console: { warn: (...args) => warns.push(args) },
         enc: encodeURIComponent,
         shouldUpdateField: () => true,

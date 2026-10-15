@@ -97,6 +97,9 @@
   "networkError": {
     "message": "Błąd sieci"
   },
+  "saveFailedGeneric": {
+    "message": "Nie udało się zapisać zakładki. Spróbuj ponownie."
+  },
   "uriTooLong": {
     "message": "Żądanie zbyt długie ($LEN$/$MAX$ B). Skróć notkę, tytuł lub tagi.",
     "placeholders": {

@@ -651,6 +651,11 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .feedback-card[data-variant="success"] { background: var(--pp-ok-bg);      border-color: var(--pp-ok-bd);      color: var(--pp-ok-fg); }
 .feedback-card[data-variant="warning"] { background: var(--pp-offline-bg); border-color: var(--pp-offline-bd); color: var(--pp-offline-fg); }
 .feedback-card[data-variant="info"]    { background: var(--pp-info-bg);    border-color: var(--pp-info-bd);    color: var(--pp-info-fg); }
+/* A failed save mounts its card right under the Save button (showSaveError,
+   popup.js). .form-body has no bottom inset, so this card owns the sp-4 the
+   submit bar keeps above the quick-actions divider -- without it the card's
+   edge sat on the divider and hid it. */
+.submit-bar + .feedback-card { margin-bottom: var(--pp-sp-4); }
 /* Shared exit for cards that enter via fadeSlideDown. JS adds .dismissing,
    then flips .hidden 120ms later (keep in sync with the fadeOut duration). */
 .feedback-card.dismissing, .batch-permission.dismissing, .batch-progress.dismissing { animation: fadeOut 0.12s var(--ease-out) forwards; }

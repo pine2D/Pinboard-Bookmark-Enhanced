@@ -97,6 +97,9 @@
   "networkError": {
     "message": "网络错误"
   },
+  "saveFailedGeneric": {
+    "message": "书签未能保存，请重试。"
+  },
   "uriTooLong": {
     "message": "请求过长（$LEN$/$MAX$ B），请缩短备注、标题或标签",
     "placeholders": {
