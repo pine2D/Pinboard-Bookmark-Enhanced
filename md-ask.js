@@ -111,14 +111,16 @@ async function pbpAskInit(detail) {
 
 // Rail entry. Generated markup (exact):
 //   <div class="rail-section" id="ask-section">
+//     <div class="rail-label" aria-hidden="true">Ask</div>
 //     <button type="button" id="ask-open" class="action-btn ask-open-btn"
 //             aria-expanded="false" aria-controls="ask-panel">
-//       <svg ...PBP_ASK_BTN_SVG...></svg><span class="btn-label">Ask</span>
+//       <svg ...PBP_ASK_BTN_SVG...></svg><span class="btn-label">Ask the page</span>
 //     </button>
 //   </div>
-// Anchor: directly after #tr-section when the translate entry rendered,
-// else after the Raw/Rendered .view-toggle (the same slot translate uses,
-// Primary rail order: Contents, [tr-section], ask-section, Export; source tools are secondary.
+// Anchor: directly after #tr-section when the translate entry rendered, else
+// before #export-section. Rail order (user ruling, kept on 2026-10-15; see
+// 8c681e0b): [tr-section], ask-section, [hl section], Export, Contents,
+// Source and extraction tools -- Contents stays AFTER Export, do not move it.
 function _pbpAskBuildRailEntry() {
   const rail = document.getElementById("rail");
   if (!rail || document.getElementById("ask-open")) return;
