@@ -3148,7 +3148,7 @@
       "message": "Я–А"
     },
     "librarySortTime": {
-      "message": "Дата"
+      "message": "Обновление"
     },
     "librarySortAlpha": {
       "message": "По алфавиту"
@@ -3868,7 +3868,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "Первое: $FIRST$ · последнее: $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Сохранено в $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "Выделения и заметки хранятся на этом устройстве. Чтобы пользоваться ими на другом, включите в настройках синхронизацию «Выделения и заметки» с Google Диском или экспортируйте резервную копию и импортируйте её там." },
+  "libraryNotesScopeHint": { "message": "Выделения и заметки хранятся на этом устройстве. Чтобы пользоваться ими на другом, подключите Google Диск в настройках «Общие» на обоих устройствах, и они будут синхронизироваться автоматически. Можно также экспортировать резервную копию и импортировать её там." },
   "libraryNotesScopeOpenBackup": { "message": "Открыть настройки «Общие»" },
   "libraryRelookup": { "message": "Найти снова" },
   "libraryBack": { "message": "Назад к списку" },

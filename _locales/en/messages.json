@@ -3158,7 +3158,7 @@
       "message": "Z–A"
     },
     "librarySortTime": {
-      "message": "Date"
+      "message": "Updated"
     },
     "librarySortAlpha": {
       "message": "Alphabetical"
@@ -3874,7 +3874,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$ with a note", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "First $FIRST$ · Latest $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Saved at $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "Highlights and notes are saved on this device. To use them on another device, turn on Google Drive sync for Highlights and notes in Settings, or export a backup and import it there." },
+  "libraryNotesScopeHint": { "message": "Highlights and notes are saved on this device. To use them on another device, connect Google Drive in General settings on both devices; they then sync automatically. You can also export a backup and import it there." },
   "libraryNotesScopeOpenBackup": { "message": "Open General settings" },
   "libraryRelookup": { "message": "Look up again" },
   "libraryBack": { "message": "Back to list" },

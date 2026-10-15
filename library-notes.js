@@ -893,14 +893,17 @@ function _pbpNotesBuildExcerpt(h, index, isCurrent, pageTs, q) {
     edit.type = "button";
     edit.className = "notes-excerpt-note notes-note-edit";
     edit.dataset.notesKey = h.key;
-    edit.title = t("notesEdit");
-    edit.setAttribute("aria-label", t("notesEdit") + (note.trim() ? ": " + note : ""));
+    // An empty note is an invitation, not an edit: "Add note" (the same short
+    // label the vocabulary detail's empty field shows).
+    const verb = note.trim() ? t("notesEdit") : t("libraryNotePlaceholderShort");
+    edit.title = verb;
+    edit.setAttribute("aria-label", verb + (note.trim() ? ": " + note : ""));
     const ic = document.createElement("span");
     ic.className = "notes-note-ic";
     ic.innerHTML = PBP_ICONS.pencil;
     const text = document.createElement("span");
     text.className = "notes-excerpt-note-text";
-    _pbpNotesMarkText(text, note.trim() ? note : t("notesEdit"), q);
+    _pbpNotesMarkText(text, note.trim() ? note : verb, q);
     edit.append(ic, text);
     edit.addEventListener("click", () => _pbpNotesBeginNoteEdit(h));
     body.appendChild(edit);

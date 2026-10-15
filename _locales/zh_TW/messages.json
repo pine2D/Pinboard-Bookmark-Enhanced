@@ -3148,7 +3148,7 @@
       "message": "Z–A"
     },
     "librarySortTime": {
-      "message": "時間"
+      "message": "更新時間"
     },
     "librarySortAlpha": {
       "message": "字母"
@@ -3868,7 +3868,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最早 $FIRST$ · 最近 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "儲存於 $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "標記與筆記儲存在本裝置上。要在其他裝置上使用，可在設定中為「標記與筆記」開啟 Google Drive 同步，或匯出備份後到那台裝置匯入。" },
+  "libraryNotesScopeHint": { "message": "標記與筆記儲存在本裝置上。要在其他裝置上使用，可在兩台裝置的一般設定中都連接 Google Drive，之後會自動同步；也可以匯出備份，再到那台裝置匯入。" },
   "libraryNotesScopeOpenBackup": { "message": "開啟一般設定" },
   "libraryRelookup": { "message": "重新查詞典" },
   "libraryBack": { "message": "返回列表" },

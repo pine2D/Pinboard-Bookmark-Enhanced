@@ -3148,7 +3148,7 @@
       "message": "Z–A"
     },
     "librarySortTime": {
-      "message": "Data"
+      "message": "Aktualizacja"
     },
     "librarySortAlpha": {
       "message": "Alfabetycznie"
@@ -3868,7 +3868,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "Pierwsze: $FIRST$ · ostatnie: $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Zapisano o $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "Zaznaczenia i notatki są zapisywane na tym urządzeniu. Aby korzystać z nich na innym urządzeniu, włącz w ustawieniach synchronizację „Zaznaczenia i notatki” z Dyskiem Google albo wyeksportuj kopię zapasową i zaimportuj ją tam." },
+  "libraryNotesScopeHint": { "message": "Zaznaczenia i notatki są zapisywane na tym urządzeniu. Aby korzystać z nich na innym urządzeniu, połącz Dysk Google w ustawieniach ogólnych na obu urządzeniach; potem synchronizują się automatycznie. Możesz też wyeksportować kopię zapasową i zaimportować ją tam." },
   "libraryNotesScopeOpenBackup": { "message": "Otwórz ustawienia ogólne" },
   "libraryRelookup": { "message": "Sprawdź ponownie w słowniku" },
   "libraryBack": { "message": "Wróć do listy" },

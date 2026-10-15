@@ -3148,7 +3148,7 @@
       "message": "Z–A"
     },
     "librarySortTime": {
-      "message": "Date"
+      "message": "Mise à jour"
     },
     "librarySortAlpha": {
       "message": "Alphabétique"
@@ -3868,7 +3868,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "Premier $FIRST$ · dernier $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Enregistré à $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "Les surlignages et les notes sont enregistrés sur cet appareil. Pour les utiliser sur un autre appareil, activez la synchronisation Google Drive de « Surlignages et notes » dans les Paramètres, ou exportez une sauvegarde et importez-la sur l'autre appareil." },
+  "libraryNotesScopeHint": { "message": "Les surlignages et les notes sont enregistrés sur cet appareil. Pour les utiliser sur un autre appareil, connectez Google Drive dans l'onglet Général des paramètres sur les deux appareils ; la synchronisation se fait ensuite automatiquement. Vous pouvez aussi exporter une sauvegarde et l'importer sur l'autre appareil." },
   "libraryNotesScopeOpenBackup": { "message": "Ouvrir l'onglet Général des paramètres" },
   "libraryRelookup": { "message": "Chercher à nouveau" },
   "libraryBack": { "message": "Retour à la liste" },

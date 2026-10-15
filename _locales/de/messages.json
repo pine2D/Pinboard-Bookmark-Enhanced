@@ -3148,7 +3148,7 @@
       "message": "Z–A"
     },
     "librarySortTime": {
-      "message": "Datum"
+      "message": "Aktualisiert"
     },
     "librarySortAlpha": {
       "message": "Alphabetisch"
@@ -3868,7 +3868,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "Erste $FIRST$ · Letzte $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Gespeichert um $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "Markierungen und Notizen werden auf diesem Gerät gespeichert. Um sie auf einem anderen Gerät zu nutzen, aktiviere in den Einstellungen die Google-Drive-Synchronisierung für „Markierungen und Notizen“ oder exportiere eine Sicherung und importiere sie dort." },
+  "libraryNotesScopeHint": { "message": "Markierungen und Notizen werden auf diesem Gerät gespeichert. Um sie auf einem anderen Gerät zu nutzen, verbinde auf beiden Geräten in den allgemeinen Einstellungen Google Drive; danach werden sie automatisch synchronisiert. Du kannst auch eine Sicherung exportieren und dort importieren." },
   "libraryNotesScopeOpenBackup": { "message": "Allgemeine Einstellungen öffnen" },
   "libraryRelookup": { "message": "Erneut nachschlagen" },
   "libraryBack": { "message": "Zurück zur Liste" },

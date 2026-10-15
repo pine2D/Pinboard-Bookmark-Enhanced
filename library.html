@@ -118,8 +118,8 @@
         <span id="vocab-selected-count" class="notes-count" aria-live="polite"></span>
         <button type="button" class="btn btn-sm ghost" id="vocab-batch-select-all" data-i18n="vocabSelectAll">Select all</button>
         <span class="lib-cluster">
-          <button type="button" class="btn btn-sm ghost" id="vocab-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
           <button type="button" class="btn btn-sm danger ghost" id="vocab-batch-delete" data-i18n-title="vocabBatchDelete" data-i18n-aria="vocabBatchDelete" aria-label="Delete selected words" title="Delete selected words"><span class="btn-ic" data-ic="trash"></span></button>
+          <button type="button" class="btn btn-sm ghost" id="vocab-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
           <button type="button" class="btn btn-sm ghost vocab-clear-selection" id="vocab-clear-selection" data-i18n-title="vocabClearSelection" data-i18n-aria="vocabClearSelection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
         </span>
         <!-- Input + stepper unit (icon audit P0): +/- are icon-only because the
@@ -219,8 +219,8 @@
             <span id="notes-selected-count" class="notes-count" aria-live="polite"></span>
             <button type="button" class="btn btn-sm ghost" id="notes-batch-select-all" data-i18n="vocabSelectAll">Select all</button>
             <span class="lib-cluster">
-              <button type="button" class="btn btn-sm ghost" id="notes-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
               <button type="button" class="btn btn-sm danger ghost" id="notes-batch-delete" data-i18n-title="notesBatchDelete" data-i18n-aria="notesBatchDelete" aria-label="Delete selected highlights" title="Delete selected highlights"><span class="btn-ic" data-ic="trash"></span></button>
+              <button type="button" class="btn btn-sm ghost" id="notes-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
               <button type="button" class="btn btn-sm ghost" id="notes-clear-selection" data-i18n-title="vocabClearSelection" data-i18n-aria="vocabClearSelection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
             </span>
             <span class="lib-batch-status"></span>
@@ -238,8 +238,8 @@
             <p id="notes-empty" class="notes-empty" hidden></p>
             <!-- Storage scope, disclosed where the absence is read. Highlights
                  and notes live in this device's chrome.storage.local and reach
-                 another device only through the opt-in Drive notes sync or a
-                 backup, so on a second device an empty Notes tab would read as
+                 another device only through Google Drive (connecting syncs
+                 them along with vocabulary) or a backup, so on a second device an empty Notes tab would read as
                  lost data rather than as a per-device store. Its own element,
                  never inside #notes-empty: that paragraph's text is rewritten
                  on every render and would wipe this. Shown only when there are
@@ -247,9 +247,9 @@
                  has some, and the sentence would be noise. Same block the
                  signed-out vocabulary state uses (one sentence + one .btn.btn-sm
                  door into settings), pointed at General, where both the Drive
-                 notes switch and the backup export/import live. -->
+                 connection and the backup export/import live. -->
             <div id="notes-scope-note" class="notes-empty vocab-account-empty" hidden>
-              <p data-i18n="libraryNotesScopeHint">Highlights and notes are saved on this device. To use them on another device, turn on Google Drive sync for Highlights and notes in Settings, or export a backup and import it there.</p>
+              <p data-i18n="libraryNotesScopeHint">Highlights and notes are saved on this device. To use them on another device, connect Google Drive in General settings on both devices; they then sync automatically. You can also export a backup and import it there.</p>
               <div class="vocab-account-actions">
                 <a class="btn btn-sm" id="notes-open-backup-settings" href="options.html#general" target="_blank" rel="noopener" data-i18n="libraryNotesScopeOpenBackup">Open General settings</a>
               </div>

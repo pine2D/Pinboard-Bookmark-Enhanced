@@ -3148,7 +3148,7 @@
       "message": "Z–A"
     },
     "librarySortTime": {
-      "message": "时间"
+      "message": "更新时间"
     },
     "librarySortAlpha": {
       "message": "字母"
@@ -3862,7 +3862,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最早 $FIRST$ · 最近 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "保存于 $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "高亮和笔记保存在本设备上。要在其他设备上使用，可在设置中为「高亮与笔记」开启 Google Drive 同步，或导出备份后在那台设备导入。" },
+  "libraryNotesScopeHint": { "message": "高亮和笔记保存在本设备上。要在其他设备上使用，可在两台设备的通用设置中都连接 Google Drive，之后会自动同步；也可以导出备份，再到那台设备导入。" },
   "libraryNotesScopeOpenBackup": { "message": "打开通用设置" },
   "libraryRelookup": { "message": "重新查词典" },
   "libraryBack": { "message": "返回列表" },

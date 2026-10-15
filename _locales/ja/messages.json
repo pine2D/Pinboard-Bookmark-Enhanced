@@ -3868,7 +3868,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最初 $FIRST$ · 最新 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "$TIME$ に保存", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "ハイライトとメモはこのデバイスに保存されます。別のデバイスで使うには、設定で「ハイライトとメモ」の Google Drive 同期を有効にするか、バックアップをエクスポートしてそのデバイスでインポートしてください。" },
+  "libraryNotesScopeHint": { "message": "ハイライトとメモはこのデバイスに保存されます。別のデバイスで使うには、両方のデバイスの一般設定で Google Drive に接続してください。以降は自動で同期されます。バックアップをエクスポートして、そのデバイスでインポートすることもできます。" },
   "libraryNotesScopeOpenBackup": { "message": "一般設定を開く" },
   "libraryRelookup": { "message": "辞書で調べ直す" },
   "libraryBack": { "message": "一覧に戻る" },

@@ -1743,6 +1743,10 @@ html.motion-ready .vocab-note-save {
   resize: none;
 }
 .vocab-note-input:focus { min-height: 96px; }
+/* A long note at rest reads as four lines and scrolls inside; it no longer
+   grows into the heaviest block on the sheet and pushes the dictionary entry
+   off the first screen. Focus gives it back its full writing height. */
+.vocab-note-input:not(:focus):not(:placeholder-shown) { max-height: calc(var(--lib-lh-body) * 4 + 20px); }
 /* The cover (spec §4.11; the notes cover reuses these in T8). */
 .lib-cover { min-width: 0; }
 .lib-cover-lead {
@@ -2364,6 +2368,11 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
 /* Icon-only cells: 6 + glyph + 6 = a square sm cell; names in title/aria. */
 .vocab-batch-bar > .lib-cluster > .btn,
 .notes-batch-bar > .lib-cluster > .btn { padding-inline: 6px; } /* component inset, not rhythm -- spacingScale reads a control's margins only */
+/* Delete leads the cluster and stands one step apart from the two selection
+   tools (invert, clear): the cluster's 4px gap plus this 4px is the 8px
+   action-row gap, so the destructive cell never sits a hair from Clear. */
+.vocab-batch-bar > .lib-cluster > .btn.danger + .btn,
+.notes-batch-bar > .lib-cluster > .btn.danger + .btn { margin-inline-start: var(--lib-sp-1); }
 .vocab-batch-bar input[type="text"] { flex: 1 1 120px; min-width: 0; }
 /* Input + stepper unit -- FUSED CONTROL (COMPONENTS.md §8). The shell owns
    the entire chrome: one border, one radius, one background, one focus ring.

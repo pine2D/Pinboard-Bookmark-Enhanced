@@ -2178,11 +2178,11 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       check('clicking the saved note reopens only its editor with the complete text',input?.value===multiline&&!noteEntry());
       input.value=' \n ';input.dispatchEvent(new Event('input'));
       await _pbpNotesSaveNote(_notesEditSessions.get(realHit.key));
-      check('blank note save restores the pencil-and-edit-note entry in place',
-        !detail().querySelector('textarea')&&noteEntry()?.querySelector('.notes-excerpt-note-text')?.textContent===t('notesEdit')&&noteEntry().querySelectorAll('svg').length===1);
+      check('blank note save restores the pencil-and-add-note entry in place',
+        !detail().querySelector('textarea')&&noteEntry()?.querySelector('.notes-excerpt-note-text')?.textContent===t('libraryNotePlaceholderShort')&&noteEntry().title===t('libraryNotePlaceholderShort')&&noteEntry().querySelectorAll('svg').length===1);
       noteEntry().click();
       _pbpNotesCancelNoteEdit(_notesEditSessions.get(realHit.key));
-      check('cancel from an empty note restores its single focused edit entry',!detail().querySelector('textarea')&&noteEntry()?.textContent===t('notesEdit')&&document.activeElement===noteEntry());
+      check('cancel from an empty note restores its single focused add-note entry',!detail().querySelector('textarea')&&noteEntry()?.textContent===t('libraryNotePlaceholderShort')&&document.activeElement===noteEntry());
       reset();store[key].items[1]={...item,id:'peer',quote:'Second quote',note:'second note',ts:124};await renderNotesPanel();
       _pbpNotesBeginNoteEdit(_pbpNotesHits().find(h=>h.item.id==='editable'));
       _pbpNotesBeginNoteEdit(_pbpNotesHits().find(h=>h.item.id==='peer'));
