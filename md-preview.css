@@ -1,5 +1,5 @@
 /* ============================================================
-   Jina Reader Markdown Preview — Modern Flat Design
+   Reader (md-preview) — warm paper, both schemes (Flexoki light / dark)
    ============================================================ */
 
 /* Loading, article replacement and translation can cross root overflow. */
@@ -49,35 +49,41 @@ html { scrollbar-gutter: stable; }
      ships as its no-preset dark fallback (html[data-theme="flexoki-dark"],
      options.css ~:533-538), so the two surfaces are now visually unified
      by coincidence-turned-decision rather than by a shared stylesheet.
-     Light branch is untouched by this pass. */
+     Light branch (2026-10-15, user ruling after the reader critique): the
+     same Flexoki family's paper side -- paper #FFFCF0, ink #1C1B1A, warm
+     greys for secondary text and rules, blue-600 #205EA6 for links -- so
+     light and dark are one warm reading surface instead of a cool Tailwind
+     slate beside a warm ink. Every text/fill pair is re-measured by
+     tests/md-preview-contrast-tests.mjs. The five highlighter fills stay:
+     they are the user's colours, not the chrome's. */
   color-scheme: light dark;
-  --bg: light-dark(#f8fafc, #1C1B1A);
-  --fg: light-dark(#0f172a, #CECDC3);
-  --fg-secondary: light-dark(#475569, #A6A49F);
+  --bg: light-dark(#FFFCF0, #1C1B1A);
+  --fg: light-dark(#1C1B1A, #CECDC3);
+  --fg-secondary: light-dark(#575653, #A6A49F);
   /* fg-muted dark value is calibrated against its strictest floor, --surface
      (#282726, the panel bg it sits on in cards/rows) -- #92908B clears 4.67:1
      there (old #8C8A85 was 4.32:1, under AA's 4.5 floor for a text color). */
-  --fg-muted: light-dark(#5b6878, #92908B);
-  --border: light-dark(#e2e8f0, #403E3C);
-  --border-light: light-dark(#f1f5f9, #343331);
-  --code-bg: light-dark(#f1f5f9, #282726);
-  --code-fg: light-dark(#334155, #C8C6BC);
-  --link: light-dark(#2563eb, #6095C5);
-  --link-hover: light-dark(#1d4ed8, #7AAEDB);
-  --badge-bg: light-dark(#e0f2fe, #263542);
-  --badge-fg: light-dark(#0369a1, #8DB9DD);
-  --btn-bg: light-dark(#ffffff, #282726);
-  --btn-border: light-dark(#e2e8f0, #403E3C);
-  --btn-hover: light-dark(#f1f5f9, #343331);
-  --btn-fg: light-dark(#334155, #C8C6BC);
-  --success: light-dark(#16a34a, #87A85F);
-  --bq-border: light-dark(#2563eb, #6095C5);
-  --bq-bg: light-dark(#f0f9ff, #22282D);
-  --bq-fg: light-dark(#1e3a5f, #B9CAD6);
-  --table-stripe: light-dark(#f8fafc, #22211F);
-  --selection: light-dark(#bfdbfe, #324B61);
-  --surface: light-dark(#ffffff, #282726);
-  --danger: light-dark(#dc2626, #D9827C);
+  --fg-muted: light-dark(#63625D, #92908B);
+  --border: light-dark(#DAD8CE, #403E3C);
+  --border-light: light-dark(#E6E4D9, #343331);
+  --code-bg: light-dark(#F2F0E5, #282726);
+  --code-fg: light-dark(#403E3C, #C8C6BC);
+  --link: light-dark(#205EA6, #6095C5);
+  --link-hover: light-dark(#1A4F8C, #7AAEDB);
+  --badge-bg: light-dark(#E4E9E7, #263542);
+  --badge-fg: light-dark(#1A4F8C, #8DB9DD);
+  --btn-bg: light-dark(#FFFCF0, #282726);
+  --btn-border: light-dark(#DAD8CE, #403E3C);
+  --btn-hover: light-dark(#ECE9DC, #343331);
+  --btn-fg: light-dark(#403E3C, #C8C6BC);
+  --success: light-dark(#66800B, #87A85F);
+  --bq-border: light-dark(#205EA6, #6095C5);
+  --bq-bg: light-dark(#F2F3EC, #22282D);
+  --bq-fg: light-dark(#1A4F8C, #B9CAD6);
+  --table-stripe: light-dark(#F8F6EA, #22211F);
+  --selection: light-dark(#C6DDE8, #324B61);
+  --surface: light-dark(#F7F5EA, #282726);
+  --danger: light-dark(#AF3029, #D9827C);
   /* Foreground for a SOLID --danger fill -- the confirm popover's destructive
      button is the only one. Same output role popup/options/library derive per
      preset (--pp-on-danger and friends); the reader is the one surface that
@@ -102,7 +108,7 @@ html { scrollbar-gutter: stable; }
      unconditional -- print still forces the light branch via :root's
      print color-scheme (see the print block below), same mechanism as
      every other token, so nothing extra is needed here. */
-  --pre-bg: light-dark(#ffffff, #161513);
+  --pre-bg: light-dark(#F7F5EA, #161513);
   /* Jump flash + user highlights (md-ask.js / md-highlight.js): CSS Custom
      Highlight API backgrounds. Dark variants desaturate each -- was 2
      separate @media (prefers-color-scheme: dark) blocks, now single
@@ -121,12 +127,12 @@ html { scrollbar-gutter: stable; }
      stay visually distinguishable in both color schemes (spec sec.6.3).
      -current is one step deeper/teal so the active match still reads as
      "the same family, emphasized" rather than an unrelated new hue. */
-  --hl-search: light-dark(rgba(100, 116, 139, 0.32), #8C8A854D);
+  --hl-search: light-dark(rgba(135, 133, 128, 0.32), #8C8A854D);
   /* Line color, not an area tint: decoration never sits under text, so the
      dark value keeps chroma instead of the flattened hex the --hl-* fills
      need. */
-  --vocab-echo: light-dark(rgba(59, 130, 246, 0.55), rgba(96, 165, 250, 0.6));
-  --hl-search-current: light-dark(rgba(20, 184, 166, 0.5), #4E9E936B);
+  --vocab-echo: light-dark(rgba(32, 94, 166, 0.55), rgba(96, 165, 250, 0.6));
+  --hl-search-current: light-dark(rgba(36, 131, 123, 0.4), #4E9E936B);
   /* Per-script font stacks — DRY building blocks for the :lang() rules below.
      Latin head first (handles en/de/fr/pl/ru + Latin in CJK articles), then the
      script-preferred Han/Kana/Hangul families, then a covering fallback. */
@@ -521,7 +527,7 @@ body.zen:not(.video-mode) #skim-section { display: none; }
   background: var(--surface);
   border: 1px solid var(--btn-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 4px 16px rgba(28, 27, 26, 0.18);
   transition: opacity 200ms ease, right 200ms var(--ease-drawer), display 200ms allow-discrete;
 }
 body.zen #zen-bar { display: flex; }
@@ -1511,7 +1517,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   width: 38px; height: 38px; padding: 0;
   background: var(--btn-bg); color: var(--btn-fg);
   border: 1px solid var(--btn-border); border-radius: var(--radius-md); cursor: pointer;
-  box-shadow: 0 1px 3px rgba(15,23,42,0.12);
+  box-shadow: 0 1px 3px rgba(28, 27, 26,0.12);
 }
 .rail-toggle:hover { background: var(--btn-hover); border-color: var(--border); }
 .rail-toggle:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
@@ -1519,10 +1525,10 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .rail-toggle .rail-toggle-close { display: none; }
 body.rail-open .rail-toggle .rail-toggle-open { display: none; }
 body.rail-open .rail-toggle .rail-toggle-close { display: block; }
-/* L6: rgba(15,23,42,...) is Slate's cool-blue near-black, a residual from
+/* L6: rgba(28, 27, 26,...) is Slate's cool-blue near-black, a residual from
    the old palette -- the A palette's near-black is warm (#1C1B1A = 28,27,26).
    Same alpha, light branch keeps the original literal. */
-.rail-scrim { position: fixed; inset: 0; z-index: 19; background: light-dark(rgba(15,23,42,0.32), rgba(28,27,26,0.32)); }
+.rail-scrim { position: fixed; inset: 0; z-index: 19; background: light-dark(rgba(28, 27, 26,0.32), rgba(28,27,26,0.32)); }
 .rail-scrim[hidden] { display: none; }
 
 /* ---- Responsive: collapse rail to an off-canvas drawer ---- */
@@ -1539,7 +1545,7 @@ body.rail-open .rail-toggle .rail-toggle-close { display: block; }
     transform: translateX(-100%);
     visibility: hidden;
     transition: transform 200ms var(--ease-drawer), visibility 0s linear 200ms;
-    box-shadow: 6px 0 24px rgba(15,23,42,0.18);
+    box-shadow: 6px 0 24px rgba(28, 27, 26,0.18);
   }
   body.rail-open .rail {
     transform: translateX(0);
@@ -1581,7 +1587,7 @@ body.rail-open .rail-toggle .rail-toggle-close { display: block; }
      screen choice would otherwise reflow the printed page. */
   .doc-body { max-width: 880px; }
   /* Deliberate pure white/black (not --bg/--fg, which are near-white
-     #f8fafc / warm near-black #1C1B1A by design) -- an intentional ink-saving
+     paper #FFFCF0 / warm near-black #1C1B1A by design) -- an intentional ink-saving
      choice, independent of the token system. */
   body { background: white; color: black; }
   /* H2b: forcing color-scheme:light above does NOT stop the dark hljs
@@ -1848,7 +1854,7 @@ html.motion-ready .msg-bar[data-state="busy"] { animation: msg-bar-busy-pulse 1.
   color: var(--fg);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 8px 30px rgba(28, 27, 26, 0.22);
   overflow: hidden;
   /* em base for the popover's own hierarchy -- the same construction as
      #ask-panel: the container rides the typography tier and every chrome
@@ -2190,7 +2196,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 4px 16px rgba(28, 27, 26, 0.18);
   font-size: 0.8em;
 }
 .xp-gear-menu[hidden] { display: none; }
@@ -2305,7 +2311,7 @@ html.motion-ready .xp-gear-menu[hidden] {
   color: var(--fg);
   font-size: 12px;
   line-height: 1.5;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 4px 16px rgba(28, 27, 26, 0.18);
   pointer-events: none;
 }
 #ask-tip .ask-tip-quote { color: var(--fg); }
@@ -2548,7 +2554,7 @@ html.motion-ready .confirm-popover.is-closing {
   border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--fg);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 4px 16px rgba(28, 27, 26, 0.18);
 }
 #pb-hl-bar:popover-open { display: flex; }
 html.motion-ready #pb-hl-bar {
@@ -2787,7 +2793,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--fg);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 4px 16px rgba(28, 27, 26, 0.18);
   font-size: 12px;
   font-weight: normal;
   line-height: 1.5;
@@ -3057,7 +3063,7 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
     border-left: none;
     border-top: 1px solid var(--border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.18);
+    box-shadow: 0 -6px 24px rgba(28, 27, 26, 0.18);
   }
   /* Bottom sheet slides down, not sideways -- only the transform axis
      differs from the base #ask-panel[hidden] rule above; same selector, so
@@ -3174,7 +3180,7 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
   color: var(--fg);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 8px 30px rgba(28, 27, 26, 0.22);
   font-size: 13px;
 }
 
@@ -3402,7 +3408,8 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
    tokens needed. Box-shadow literal matches #explain-pop/#pb-hl-card
    verbatim (this codebase's box-shadow values are not tokenized
    anywhere -- every popover in this file uses the same literal
-   rgba(15,23,42,*) family regardless of light/dark, an existing,
+   rgba(28, 27, 26, *) family (the warm ink, since 2026-10-15; was
+   slate 15,23,42) regardless of light/dark, an existing,
    deliberate repo-wide convention, not a new hardcoded color). ---- */
 #fn-pop {
   position: fixed;

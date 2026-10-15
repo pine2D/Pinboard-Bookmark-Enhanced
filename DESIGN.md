@@ -28,9 +28,9 @@ colors:
   warn-amber: "#9a6700"
   danger-red: "#cc0000"
   danger-red-dark: "#E8705F"
-  reader-paper: "#f8fafc"
-  reader-ink: "#0f172a"
-  reader-link: "#2563eb"
+  reader-paper: "#FFFCF0"
+  reader-ink: "#1C1B1A"
+  reader-link: "#205EA6"
   highlight-yellow: "#facc15"
   highlight-green: "#4ade80"
   highlight-blue: "#60a5fa"
@@ -205,7 +205,7 @@ A low-saturation neutral base with one blue voice, semantic status colors that a
 - **Save Green** (#1a7f37), **Warn Amber** (#9a6700), **Danger Red** (#cc0000; #E8705F dark): Status text. As surfaces they appear as tinted fill + matching text, for example popup ok #e3f3e8 / #1f7a3c, warn #fdeaea / #b13636, offline #fdf3dd / #8a6410, info #edf3fd / #2d5db3. In light mode their borders collapse into the fill.
 
 ### Reader & Highlights
-- **Reader Paper / Reader Ink / Reader Link** (#f8fafc / #0f172a / #2563eb light; Warm Ink #1C1B1A / #CECDC3 / #6095C5 dark): Defined with `light-dark()`. The reader never adopts the 14 presets.
+- **Reader Paper / Reader Ink / Reader Link** (#FFFCF0 / #1C1B1A / #205EA6 light; Warm Ink #1C1B1A / #CECDC3 / #6095C5 dark): Defined with `light-dark()`. Both schemes are the Flexoki family, so the reader is one warm paper in light and dark (light switched from Tailwind slate on 2026-10-15). Its chrome (rail, panels) sits on a slightly deeper paper (#F7F5EA), and every popover shadow uses the warm ink (rgba(28, 27, 26, a)) rather than a cool slate. The reader never adopts the 14 presets.
 - **Highlighter set** (yellow #facc15, green #4ade80, blue #60a5fa, red #f87171, purple #c084fc): Painted at about 40–45% alpha as CSS Custom Highlights, and as muted Flexoki equivalents in dark mode. These are user-content colors and are never reused as UI status or accent.
 
 ### Named Rules
