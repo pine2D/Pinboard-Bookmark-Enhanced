@@ -234,6 +234,20 @@
   --pp-scrim: #000;
 }
 
+/* Label column per UI language. 52px holds the en / zh labels; longer
+   locales widen the column instead of rewording, so the popup keeps the
+   terms the settings page uses ("Предустановки меток", "Predefiniowane
+   tagi"). Each width is the locale's widest .label at 11px in the wider of
+   Verdana (the widest face in the stack) and DejaVu Sans (CI's stand-in),
+   rounded up to an even px; --pp-label-indent derives from it, so every
+   row's control edge stays aligned. tests/popup-label-fit-tests.mjs
+   re-measures every locale against this cascade. */
+html:lang(ja) { --pp-label-w: 56px; }
+html:lang(de) { --pp-label-w: 62px; }
+html:lang(fr) { --pp-label-w: 68px; }
+html:lang(pl) { --pp-label-w: 86px; }
+html:lang(ru) { --pp-label-w: 90px; }
+
 body {
   /* Chrome caps an action popup at 800px wide. The hi-DPI tiers below zoom
      the body, so the width the popup asks for is setting x zoom: 720px at

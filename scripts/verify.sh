@@ -85,6 +85,9 @@ node "scripts/network-exits-check.mjs"
 echo "[ui-contract] checking static UI contracts"
 node "tests/ui-contract-tests.mjs"
 
+echo "[popup-label-fit] checking every popup form label fits its column in every UI locale"
+node "tests/popup-label-fit-tests.mjs"
+
 echo "[md-preview-contrast] checking md-preview.css's light-dark token contrast pairs"
 # md-preview is the one surface outside the theme factory (no @generated
 # regions, no per-preset blocks) -- contrast-audit.mjs never looks at it,

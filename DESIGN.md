@@ -241,7 +241,7 @@ A low-saturation neutral base with one blue voice, semantic status colors that a
 
 ## Layout
 
-- **Popup:** Fixed width of 550px (user-adjustable 420–720px), with a 72px label column (`--pp-label-indent`) aligning every row's control edge. Rows are 4px/16px padded and stacked tightly.
+- **Popup:** Fixed width of 550px (user-adjustable 420–720px), with a 72px label column (`--pp-label-indent`) aligning every row's control edge. Longer UI languages widen the label (`--pp-label-w`, per `html:lang`: ja 56, de 62, fr 68, pl 86, ru 90px) instead of rewording, and the indent follows. Rows are 4px/16px padded and stacked tightly.
 - **Options:** A 1040px max container on a two-column grid. The sidebar is `minmax(160px, max-content)` and sticky at 24px, and content panels sit beside it. Preference rows are at least 44px tall (36px compact), with a 12px rhythm, 32px between sections, and 16px panel padding. Geometry follows Chrome's settings page.
 - **Library:** A flat two-column canvas made of an index rail (`clamp(360px, 20vw, 520px)`) and a detail column (max 840px), separated by a 48px gap (64px at ≥1920px). Page padding is 24 → 32 → 48px by width, and spacing comes from a 10-step scale (2/4/8/12/16/24/32/48/64/96, with no 6px step).
 - **Reader:** A 256px left rail (it becomes a drawer at ≤1000px), with a prose column measured by user preference and main padding of 48/32/96px. The Ask panel docks right and pushes the main column instead of covering it.
