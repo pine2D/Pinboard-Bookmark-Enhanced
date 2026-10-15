@@ -33,7 +33,9 @@ const DEFAULT_LIGHT = {
                                  // #5f6368 (library.css:23), [btn-bg, btn-hover] below) is IDENTITY
                                  // here -- the raw value already clears both (5.12:1 / 4.62:1), unlike
                                  // options/popup's defaults.
-  "danger-quiet-fg": "#c5221f", // = --lib-danger default (library.css:26)
+  "danger-quiet-fg": "#bc201e", // 2026-10-15: fgToAAMulti(--lib-danger default #c5221f, [bg, panel,
+                                 // btn-bg, and the two settled 8% danger hovers]). The verbatim value fell
+                                 // to 4.34:1 on `.btn.danger:hover`; now 5.83 / 6.24 / 5.29 / 5.14 / 4.67:1.
   "on-danger": "#ffffff",       // = .confirm-popover .confirm-yes color: var(--lib-panel, #fff)
                                  // default (library.css:207); already 5.80:1 on --lib-danger default,
                                  // clears AA unmodified.

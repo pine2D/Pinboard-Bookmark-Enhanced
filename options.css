@@ -2814,7 +2814,7 @@ html[data-theme="github-light"] {
   color-scheme: light;
   --opt-btn-fg: #000000;
   --opt-btn-fg-muted: #616161;
-  --opt-danger-quiet-fg: #cc0000;
+  --opt-danger-quiet-fg: #c20000;
   --opt-on-danger: #ffffff;
   --opt-on-accent: #ffffff;
   --opt-chip-bg: #e8edf4;

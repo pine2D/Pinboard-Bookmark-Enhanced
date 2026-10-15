@@ -18,7 +18,9 @@ const DEFAULT_LIGHT = {
                                  // #666 (options.css:92), [btn-bg, btn-hover] below) -- raw fg-muted
                                  // clears btn-bg (4.76:1) but not btn-hover (4.31:1), so this moves.
                                  // #616161 ships at 5.13:1 / 4.65:1.
-  "danger-quiet-fg": "#cc0000", // = --opt-danger default #c00 (options.css:74), 6-digit form
+  "danger-quiet-fg": "#c20000", // 2026-10-15: fgToAAMulti(--opt-danger default #c00, [bg, panel, btn-bg,
+                                 // and the two settled 8% danger hovers]). The verbatim #cc0000 fell to
+                                 // 4.23:1 on `.btn.danger:hover`; now 5.83 / 6.38 / 5.28 / 5.05 / 4.59:1.
   "on-danger": "#ffffff",       // = .confirm-popover .confirm-yes `color` default (options.css:1329);
                                  // already 5.89:1 on --opt-danger default, clears AA unmodified.
   "on-accent": "#ffffff",       // options has no existing "text on filled accent" role -- new for

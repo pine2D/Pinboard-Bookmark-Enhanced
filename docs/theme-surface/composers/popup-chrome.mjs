@@ -48,7 +48,12 @@ const DEFAULT_LIGHT = {
                                  // [chip-bg above, btn-hover below]) — 5.02:1 / 4.66:1, both clear AA
                                  // (raw accent2 measured only 3.97:1 / 4.38:1 against this surface's
                                  // btn-bg/bg2 pre-derivation, Step 0).
-  "danger-quiet-fg": "#bd3d3d", // WAS a verbatim copy of --pp-danger default (#c24343); re-derived
+  "danger-quiet-fg": "#ae3838", // 2026-10-15: fgToAAMulti(danger #c24343, [bg, bg2, btn-bg, and the
+                                 // two settled 8% danger hovers]) -- the hosts every themed block is
+                                 // derived against. #bd3d3d below cleared the resting fills but fell to
+                                 // 4.10:1 on `.btn.danger:hover` (impeccable detector). Now 6.14 / 5.72 /
+                                 // 5.19 / 5.49 / 4.68:1.
+                                 // History: WAS a verbatim copy of --pp-danger default (#c24343); re-derived
                                  // 2026-08-05 because Soft Fill's btn-bg (#eff0f2) is a darker fill
                                  // than the #ffffff this text used to sit on, dropping it to 4.41:1.
                                  // fgToAAMulti(danger, [bg, bg2, btn-bg]) — 5.39 / 5.03 / 4.56:1.

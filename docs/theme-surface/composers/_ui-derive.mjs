@@ -531,6 +531,17 @@ export function fillDistinct(fill, others, toward, hosts = [], minDE = TIER_DIST
 export const PRIMARY_HOVER_FG_MIX = 0.12;
 export const primaryHoverFill = (accentRgb, fgRgb) => mix(accentRgb, fgRgb, PRIMARY_HOVER_FG_MIX);
 
+// Quiet-danger hover fill: `.btn.danger:hover` mixes this share of danger into
+// btn-bg, `.btn.danger.ghost:hover` into bg. One constant for three readers,
+// same shape as the primary hover above: finalizeUiControlRoles (two of
+// danger-quiet-fg's hosts), ui-components.mjs's emitted `color-mix(...)`
+// percentage, and contrast-audit.mjs's "danger-quiet-fg vs danger-hover"
+// gate. That gate exists because the hand-authored DEFAULT_LIGHT blocks never
+// pass through this derivation: all three default quiet-danger inks cleared
+// their resting fills and fell to 4.10-4.34:1 on the hover (2026-10-15).
+export const DANGER_HOVER_MIX = 0.08;
+export const dangerHoverFill = (baseRgb, dangerRgb) => mix(baseRgb, dangerRgb, DANGER_HOVER_MIX);
+
 // S2 list-row states (spec docs/superpowers/specs/2026-10-03-library-redesign-
 // design.md §3.8 / §6.4; facts-s2 §2, re-verified 15/15). USER RULING
 // 2026-10-03: the current row is a neutral fill and nothing else -- no edge,
@@ -969,8 +980,8 @@ export function finalizeUiControlRoles(inputMap, palette, overrides = {}, config
   // fills emitted by ui-components.mjs. Auditing only the three resting
   // hosts is insufficient near AA: github-light clears on bg/btn-bg but
   // falls to 4.44:1 once the ghost hover tint is actually painted.
-  const dangerGhostHoverRgb = mix(bgRgb, dangerRgb, 0.08);
-  const dangerButtonHoverRgb = mix(btnBgRgb, dangerRgb, 0.08);
+  const dangerGhostHoverRgb = dangerHoverFill(bgRgb, dangerRgb);
+  const dangerButtonHoverRgb = dangerHoverFill(btnBgRgb, dangerRgb);
   map.border = rgbToHex(borderToAA(resolveOpaqueBg(map.border, btnBgRgb), [btnBgRgb, panelRgb]));
   map["btn-fg"] = rgbToHex(fgToAAMulti(fgRgb, [btnBgRgb, btnHoverRgb]));
   // Secondary/muted text painted on a control fill (COMPONENTS.md §9.1 law 8,

@@ -12,7 +12,7 @@ import { readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { expandSitePalette } from "../composers/_util.mjs";
-import { isHex, isCompositableBg, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, FIELD_TEXT_PLACEHOLDER_MIN, FIELD_HOST_ROLES, primaryHoverFill, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
+import { isHex, isCompositableBg, resolveOpaqueBg, deltaE2000, TIER_DISTINCT_MIN_DE, FILL_SEPARATE_MIN, FIELD_TEXT_PLACEHOLDER_MIN, FIELD_HOST_ROLES, primaryHoverFill, dangerHoverFill, UI_DERIVED_OUTPUT_ROLES } from "../composers/_ui-derive.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 import { compose } from "../composers/classic-list-v2.mjs";
 import { POPUP_THEME_MAP } from "../composers/popup-chrome.mjs";
@@ -968,6 +968,26 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
     } else {
       const hoverFill = primaryHoverFill(accentForHover.rgb, fgForHover.rgb);
       console.log(check(scope, blockLabel, hoverLabel, cr(onAccent.rgb, hoverFill), 4.5));
+    }
+  }
+
+  // Quiet-danger hover contrast: `.btn.danger:hover` and its ghost twin
+  // repaint the fill via `color-mix(...)` like the primary hover above, so
+  // the COMPONENT_PAIR_SPEC rows (danger-quiet-fg vs bg / panel / btn-bg)
+  // only ever saw the resting fills. All three surfaces, default blocks
+  // strict too: every block declares danger, bg and btn-bg.
+  {
+    const dq = resolveRole("danger-quiet-fg"), danger = resolveRole("danger");
+    const hosts = [["danger-hover", resolveRole("btn-bg")], ["danger-ghost-hover", resolveRole("bg")]];
+    for (const [hostName, base] of hosts) {
+      const label = `danger-quiet-fg vs ${hostName}`;
+      if (!dq.rgb || !danger.rgb || !base.rgb) {
+        const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + label.padEnd(28) + " FAIL (" + (dq.note || danger.note || base.note || "role missing") + ")";
+        console.log(line);
+        violations.push(line);
+        continue;
+      }
+      console.log(check(scope, blockLabel, label, cr(dq.rgb, dangerHoverFill(base.rgb, danger.rgb)), 4.5));
     }
   }
 

@@ -22,13 +22,14 @@
 // ACTIVE_COMPONENT_FAMILIES in apply-ui-themes.mjs, deleting the
 // hand-written rules each family supersedes in the same commit.
 
-import { PRIMARY_HOVER_FG_MIX } from "./_ui-derive.mjs";
+import { PRIMARY_HOVER_FG_MIX, DANGER_HOVER_MIX } from "./_ui-derive.mjs";
 // `.btn.primary:hover`'s `color-mix(...)` percentage, derived from the SAME
 // constant _ui-derive.mjs's on-accent derivation reads (finalizeUiControlRoles)
 // and contrast-audit.mjs's "on-accent vs primary-hover" gate checks against --
 // one source, three consumers, so the recipe's emitted percentage can never
 // drift out of step with what the contrast math actually assumes.
 const PRIMARY_HOVER_ACCENT_PCT = Math.round((1 - PRIMARY_HOVER_FG_MIX) * 100);
+const DANGER_HOVER_PCT = Math.round(DANGER_HOVER_MIX * 100);
 
 // -----------------------------------------------------------------------
 // Spacing adapter (COMPONENTS.md "记号约定"): recipes declare padding/gap in
@@ -352,13 +353,13 @@ function dangerRules(ns) {
       ["border-color", `color-mix(in srgb, var(--${ns}-danger) 55%, var(--${ns}-border))`],
     ]),
     rule(".btn.danger:hover:not(:disabled)", [
-      ["background", `color-mix(in srgb, var(--${ns}-danger) 8%, var(--${ns}-btn-bg))`],
+      ["background", `color-mix(in srgb, var(--${ns}-danger) ${DANGER_HOVER_PCT}%, var(--${ns}-btn-bg))`],
     ], { pairColorWith: ".btn.danger" }),
     rule(".btn.danger.ghost", [
       ["border-color", "transparent"], ["background", "transparent"],
     ], { pairColorWith: ".btn.danger" }),
     rule(".btn.danger.ghost:hover:not(:disabled)", [
-      ["background", `color-mix(in srgb, var(--${ns}-danger) 8%, var(--${ns}-bg))`],
+      ["background", `color-mix(in srgb, var(--${ns}-danger) ${DANGER_HOVER_PCT}%, var(--${ns}-bg))`],
       ["border-color", `color-mix(in srgb, var(--${ns}-danger) 45%, transparent)`],
     ], { pairColorWith: ".btn.danger" }),
     // Focus wins the frame for the WHOLE .btn family, danger tiers included:
