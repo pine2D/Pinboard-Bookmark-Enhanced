@@ -18,6 +18,9 @@ release/
 # Serena MCP local project state
 .serena/
 
+# Impeccable design-skill local state (sidecar regenerable from DESIGN.md; critique snapshots)
+.impeccable/
+
 # Internal planning/design drafts (superpowers skill output)
 docs/superpowers/
 .superpowers/
