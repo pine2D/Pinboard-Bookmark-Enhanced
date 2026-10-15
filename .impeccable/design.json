@@ -1,0 +1,787 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-15T03:28:02.345221+00:00",
+  "title": "Design System: Pinboard Bookmark Enhanced",
+  "extensions": {
+    "colorMeta": {
+      "bookmark-blue": {
+        "role": "primary",
+        "displayName": "Bookmark Blue",
+        "canonical": "#4477bb",
+        "tonalRamp": [
+          "oklch(15% 0.119 256.2)",
+          "oklch(25% 0.119 256.2)",
+          "oklch(38% 0.119 256.2)",
+          "oklch(50% 0.119 256.2)",
+          "oklch(62% 0.119 256.2)",
+          "oklch(74% 0.119 256.2)",
+          "oklch(85% 0.119 256.2)",
+          "oklch(95% 0.119 256.2)"
+        ]
+      },
+      "bookmark-blue-dark": {
+        "role": "primary",
+        "displayName": "Bookmark Blue Dark",
+        "canonical": "#4385BE",
+        "tonalRamp": [
+          "oklch(15% 0.110 247.0)",
+          "oklch(25% 0.110 247.0)",
+          "oklch(38% 0.110 247.0)",
+          "oklch(50% 0.110 247.0)",
+          "oklch(62% 0.110 247.0)",
+          "oklch(74% 0.110 247.0)",
+          "oklch(85% 0.110 247.0)",
+          "oklch(95% 0.110 247.0)"
+        ]
+      },
+      "on-accent": {
+        "role": "neutral",
+        "displayName": "On Accent",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "on-accent-dark": {
+        "role": "neutral",
+        "displayName": "On Accent Dark",
+        "canonical": "#171615",
+        "tonalRamp": [
+          "oklch(15% 0.003 67.7)",
+          "oklch(25% 0.003 67.7)",
+          "oklch(38% 0.003 67.7)",
+          "oklch(50% 0.003 67.7)",
+          "oklch(62% 0.003 67.7)",
+          "oklch(74% 0.003 67.7)",
+          "oklch(85% 0.003 67.7)",
+          "oklch(95% 0.003 67.7)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "canonical": "#f5f5f0",
+        "tonalRamp": [
+          "oklch(15% 0.007 106.5)",
+          "oklch(25% 0.007 106.5)",
+          "oklch(38% 0.007 106.5)",
+          "oklch(50% 0.007 106.5)",
+          "oklch(62% 0.007 106.5)",
+          "oklch(74% 0.007 106.5)",
+          "oklch(85% 0.007 106.5)",
+          "oklch(95% 0.007 106.5)"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#333333",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink Muted",
+        "canonical": "#666666",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "structure-line": {
+        "role": "neutral",
+        "displayName": "Structure Line",
+        "canonical": "#858585",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e8e8e8",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "soft-fill": {
+        "role": "neutral",
+        "displayName": "Soft Fill",
+        "canonical": "#eaeaea",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "soft-fill-hover": {
+        "role": "neutral",
+        "displayName": "Soft Fill Hover",
+        "canonical": "#dfdfdf",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "button-fill": {
+        "role": "neutral",
+        "displayName": "Button Fill",
+        "canonical": "#eaeae5",
+        "tonalRamp": [
+          "oklch(15% 0.007 106.5)",
+          "oklch(25% 0.007 106.5)",
+          "oklch(38% 0.007 106.5)",
+          "oklch(50% 0.007 106.5)",
+          "oklch(62% 0.007 106.5)",
+          "oklch(74% 0.007 106.5)",
+          "oklch(85% 0.007 106.5)",
+          "oklch(95% 0.007 106.5)"
+        ]
+      },
+      "focus-core": {
+        "role": "neutral",
+        "displayName": "Focus Core",
+        "canonical": "#5d88c2",
+        "tonalRamp": [
+          "oklch(15% 0.100 256.2)",
+          "oklch(25% 0.100 256.2)",
+          "oklch(38% 0.100 256.2)",
+          "oklch(50% 0.100 256.2)",
+          "oklch(62% 0.100 256.2)",
+          "oklch(74% 0.100 256.2)",
+          "oklch(85% 0.100 256.2)",
+          "oklch(95% 0.100 256.2)"
+        ]
+      },
+      "chip-wash": {
+        "role": "secondary",
+        "displayName": "Chip Wash",
+        "canonical": "#e8edf4",
+        "tonalRamp": [
+          "oklch(15% 0.011 256.7)",
+          "oklch(25% 0.011 256.7)",
+          "oklch(38% 0.011 256.7)",
+          "oklch(50% 0.011 256.7)",
+          "oklch(62% 0.011 256.7)",
+          "oklch(74% 0.011 256.7)",
+          "oklch(85% 0.011 256.7)",
+          "oklch(95% 0.011 256.7)"
+        ]
+      },
+      "warm-ink": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "canonical": "#1C1B1A",
+        "tonalRamp": [
+          "oklch(15% 0.002 67.7)",
+          "oklch(25% 0.002 67.7)",
+          "oklch(38% 0.002 67.7)",
+          "oklch(50% 0.002 67.7)",
+          "oklch(62% 0.002 67.7)",
+          "oklch(74% 0.002 67.7)",
+          "oklch(85% 0.002 67.7)",
+          "oklch(95% 0.002 67.7)"
+        ]
+      },
+      "warm-ink-raised": {
+        "role": "neutral",
+        "displayName": "Warm Ink Raised",
+        "canonical": "#282726",
+        "tonalRamp": [
+          "oklch(15% 0.002 67.7)",
+          "oklch(25% 0.002 67.7)",
+          "oklch(38% 0.002 67.7)",
+          "oklch(50% 0.002 67.7)",
+          "oklch(62% 0.002 67.7)",
+          "oklch(74% 0.002 67.7)",
+          "oklch(85% 0.002 67.7)",
+          "oklch(95% 0.002 67.7)"
+        ]
+      },
+      "paper-text": {
+        "role": "neutral",
+        "displayName": "Paper Text",
+        "canonical": "#cecdc3",
+        "tonalRamp": [
+          "oklch(15% 0.014 102.1)",
+          "oklch(25% 0.014 102.1)",
+          "oklch(38% 0.014 102.1)",
+          "oklch(50% 0.014 102.1)",
+          "oklch(62% 0.014 102.1)",
+          "oklch(74% 0.014 102.1)",
+          "oklch(85% 0.014 102.1)",
+          "oklch(95% 0.014 102.1)"
+        ]
+      },
+      "paper-text-muted": {
+        "role": "neutral",
+        "displayName": "Paper Text Muted",
+        "canonical": "#9F9D96",
+        "tonalRamp": [
+          "oklch(15% 0.010 93.6)",
+          "oklch(25% 0.010 93.6)",
+          "oklch(38% 0.010 93.6)",
+          "oklch(50% 0.010 93.6)",
+          "oklch(62% 0.010 93.6)",
+          "oklch(74% 0.010 93.6)",
+          "oklch(85% 0.010 93.6)",
+          "oklch(95% 0.010 93.6)"
+        ]
+      },
+      "warm-ink-fill": {
+        "role": "neutral",
+        "displayName": "Warm Ink Fill",
+        "canonical": "#343331",
+        "tonalRamp": [
+          "oklch(15% 0.004 84.6)",
+          "oklch(25% 0.004 84.6)",
+          "oklch(38% 0.004 84.6)",
+          "oklch(50% 0.004 84.6)",
+          "oklch(62% 0.004 84.6)",
+          "oklch(74% 0.004 84.6)",
+          "oklch(85% 0.004 84.6)",
+          "oklch(95% 0.004 84.6)"
+        ]
+      },
+      "focus-core-dark": {
+        "role": "neutral",
+        "displayName": "Focus Core Dark",
+        "canonical": "#4280b6",
+        "tonalRamp": [
+          "oklch(15% 0.105 247.1)",
+          "oklch(25% 0.105 247.1)",
+          "oklch(38% 0.105 247.1)",
+          "oklch(50% 0.105 247.1)",
+          "oklch(62% 0.105 247.1)",
+          "oklch(74% 0.105 247.1)",
+          "oklch(85% 0.105 247.1)",
+          "oklch(95% 0.105 247.1)"
+        ]
+      },
+      "amber-chip-text-dark": {
+        "role": "secondary",
+        "displayName": "Amber Chip Text Dark",
+        "canonical": "#d9a916",
+        "tonalRamp": [
+          "oklch(15% 0.151 87.4)",
+          "oklch(25% 0.151 87.4)",
+          "oklch(38% 0.151 87.4)",
+          "oklch(50% 0.151 87.4)",
+          "oklch(62% 0.151 87.4)",
+          "oklch(74% 0.151 87.4)",
+          "oklch(85% 0.151 87.4)",
+          "oklch(95% 0.151 87.4)"
+        ]
+      },
+      "save-green": {
+        "role": "status",
+        "displayName": "Save Green",
+        "canonical": "#1a7f37",
+        "tonalRamp": [
+          "oklch(15% 0.140 148.0)",
+          "oklch(25% 0.140 148.0)",
+          "oklch(38% 0.140 148.0)",
+          "oklch(50% 0.140 148.0)",
+          "oklch(62% 0.140 148.0)",
+          "oklch(74% 0.140 148.0)",
+          "oklch(85% 0.140 148.0)",
+          "oklch(95% 0.140 148.0)"
+        ]
+      },
+      "warn-amber": {
+        "role": "status",
+        "displayName": "Warn Amber",
+        "canonical": "#9a6700",
+        "tonalRamp": [
+          "oklch(15% 0.117 75.0)",
+          "oklch(25% 0.117 75.0)",
+          "oklch(38% 0.117 75.0)",
+          "oklch(50% 0.117 75.0)",
+          "oklch(62% 0.117 75.0)",
+          "oklch(74% 0.117 75.0)",
+          "oklch(85% 0.117 75.0)",
+          "oklch(95% 0.117 75.0)"
+        ]
+      },
+      "danger-red": {
+        "role": "status",
+        "displayName": "Danger Red",
+        "canonical": "#cc0000",
+        "tonalRamp": [
+          "oklch(15% 0.160 29.2)",
+          "oklch(25% 0.160 29.2)",
+          "oklch(38% 0.160 29.2)",
+          "oklch(50% 0.160 29.2)",
+          "oklch(62% 0.160 29.2)",
+          "oklch(74% 0.160 29.2)",
+          "oklch(85% 0.160 29.2)",
+          "oklch(95% 0.160 29.2)"
+        ]
+      },
+      "danger-red-dark": {
+        "role": "status",
+        "displayName": "Danger Red Dark",
+        "canonical": "#E8705F",
+        "tonalRamp": [
+          "oklch(15% 0.152 29.8)",
+          "oklch(25% 0.152 29.8)",
+          "oklch(38% 0.152 29.8)",
+          "oklch(50% 0.152 29.8)",
+          "oklch(62% 0.152 29.8)",
+          "oklch(74% 0.152 29.8)",
+          "oklch(85% 0.152 29.8)",
+          "oklch(95% 0.152 29.8)"
+        ]
+      },
+      "reader-paper": {
+        "role": "neutral",
+        "displayName": "Reader Paper",
+        "canonical": "#f8fafc",
+        "tonalRamp": [
+          "oklch(15% 0.003 247.9)",
+          "oklch(25% 0.003 247.9)",
+          "oklch(38% 0.003 247.9)",
+          "oklch(50% 0.003 247.9)",
+          "oklch(62% 0.003 247.9)",
+          "oklch(74% 0.003 247.9)",
+          "oklch(85% 0.003 247.9)",
+          "oklch(95% 0.003 247.9)"
+        ]
+      },
+      "reader-ink": {
+        "role": "neutral",
+        "displayName": "Reader Ink",
+        "canonical": "#0f172a",
+        "tonalRamp": [
+          "oklch(15% 0.040 265.8)",
+          "oklch(25% 0.040 265.8)",
+          "oklch(38% 0.040 265.8)",
+          "oklch(50% 0.040 265.8)",
+          "oklch(62% 0.040 265.8)",
+          "oklch(74% 0.040 265.8)",
+          "oklch(85% 0.040 265.8)",
+          "oklch(95% 0.040 265.8)"
+        ]
+      },
+      "reader-link": {
+        "role": "neutral",
+        "displayName": "Reader Link",
+        "canonical": "#2563eb",
+        "tonalRamp": [
+          "oklch(15% 0.160 262.9)",
+          "oklch(25% 0.160 262.9)",
+          "oklch(38% 0.160 262.9)",
+          "oklch(50% 0.160 262.9)",
+          "oklch(62% 0.160 262.9)",
+          "oklch(74% 0.160 262.9)",
+          "oklch(85% 0.160 262.9)",
+          "oklch(95% 0.160 262.9)"
+        ]
+      },
+      "highlight-yellow": {
+        "role": "highlight",
+        "displayName": "Highlight Yellow",
+        "canonical": "#facc15",
+        "tonalRamp": [
+          "oklch(15% 0.160 91.9)",
+          "oklch(25% 0.160 91.9)",
+          "oklch(38% 0.160 91.9)",
+          "oklch(50% 0.160 91.9)",
+          "oklch(62% 0.160 91.9)",
+          "oklch(74% 0.160 91.9)",
+          "oklch(85% 0.160 91.9)",
+          "oklch(95% 0.160 91.9)"
+        ]
+      },
+      "highlight-green": {
+        "role": "highlight",
+        "displayName": "Highlight Green",
+        "canonical": "#4ade80",
+        "tonalRamp": [
+          "oklch(15% 0.160 151.7)",
+          "oklch(25% 0.160 151.7)",
+          "oklch(38% 0.160 151.7)",
+          "oklch(50% 0.160 151.7)",
+          "oklch(62% 0.160 151.7)",
+          "oklch(74% 0.160 151.7)",
+          "oklch(85% 0.160 151.7)",
+          "oklch(95% 0.160 151.7)"
+        ]
+      },
+      "highlight-blue": {
+        "role": "highlight",
+        "displayName": "Highlight Blue",
+        "canonical": "#60a5fa",
+        "tonalRamp": [
+          "oklch(15% 0.143 254.6)",
+          "oklch(25% 0.143 254.6)",
+          "oklch(38% 0.143 254.6)",
+          "oklch(50% 0.143 254.6)",
+          "oklch(62% 0.143 254.6)",
+          "oklch(74% 0.143 254.6)",
+          "oklch(85% 0.143 254.6)",
+          "oklch(95% 0.143 254.6)"
+        ]
+      },
+      "highlight-red": {
+        "role": "highlight",
+        "displayName": "Highlight Red",
+        "canonical": "#f87171",
+        "tonalRamp": [
+          "oklch(15% 0.160 22.2)",
+          "oklch(25% 0.160 22.2)",
+          "oklch(38% 0.160 22.2)",
+          "oklch(50% 0.160 22.2)",
+          "oklch(62% 0.160 22.2)",
+          "oklch(74% 0.160 22.2)",
+          "oklch(85% 0.160 22.2)",
+          "oklch(95% 0.160 22.2)"
+        ]
+      },
+      "highlight-purple": {
+        "role": "highlight",
+        "displayName": "Highlight Purple",
+        "canonical": "#c084fc",
+        "tonalRamp": [
+          "oklch(15% 0.160 305.5)",
+          "oklch(25% 0.160 305.5)",
+          "oklch(38% 0.160 305.5)",
+          "oklch(50% 0.160 305.5)",
+          "oklch(62% 0.160 305.5)",
+          "oklch(74% 0.160 305.5)",
+          "oklch(85% 0.160 305.5)",
+          "oklch(95% 0.160 305.5)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Library cover titles only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Options page title."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Options/library body and control text (popup uses 12px)."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Helper, meta, counts."
+      },
+      "overline": {
+        "displayName": "Overline",
+        "purpose": "Uppercase sidebar group labels and reader rail section heads."
+      },
+      "prose": {
+        "displayName": "Prose",
+        "purpose": "Reader body; user-steppable size, leading, measure."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Code, API keys, prompt templates."
+      }
+    },
+    "shadows": [
+      {
+        "name": "key-lip",
+        "value": "0 1px 0 rgba(0,0,0,.04)",
+        "purpose": "kbd key caps only."
+      },
+      {
+        "name": "float-md",
+        "value": "0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04)",
+        "purpose": "Confirm popovers, toasts, listbox menus."
+      },
+      {
+        "name": "float-lg",
+        "value": "0 8px 24px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.06)",
+        "purpose": "Autocomplete dropdowns."
+      },
+      {
+        "name": "reader-pop",
+        "value": "0 8px 30px rgba(15,23,42,.22)",
+        "purpose": "Reader pop panels."
+      },
+      {
+        "name": "switch-thumb",
+        "value": "0 1px 2px rgba(0,0,0,.28), 0 0 0 0.5px rgba(0,0,0,.06)",
+        "purpose": "Switch thumb edge; only resting-control shadow."
+      },
+      {
+        "name": "focus-glow",
+        "value": "0 0 6px 1px color-mix(in srgb, var(--accent) 45%, transparent)",
+        "purpose": "Focus signal (theme may reshape)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "motion-state",
+        "value": "150ms",
+        "purpose": "Color/border/fill state changes."
+      },
+      {
+        "name": "motion-pop",
+        "value": "140ms",
+        "purpose": "Popover enter."
+      },
+      {
+        "name": "motion-pop-out",
+        "value": "100ms",
+        "purpose": "Popover exit."
+      },
+      {
+        "name": "motion-collapse",
+        "value": "200ms",
+        "purpose": "Disclosure collapse/expand; transition ceiling."
+      },
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Enter/exit."
+      },
+      {
+        "name": "ease-in-out",
+        "value": "cubic-bezier(0.77, 0, 0.175, 1)",
+        "purpose": "On-screen shape change."
+      },
+      {
+        "name": "ease-drawer",
+        "value": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "purpose": "Reader rail and Ask drawer (200ms)."
+      },
+      {
+        "name": "press",
+        "value": "transform: scale(0.97), untransitioned",
+        "purpose": "Button press, instant both ways."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "reader-drawer",
+        "value": "1000px"
+      },
+      {
+        "name": "library-wide",
+        "value": "1280px"
+      },
+      {
+        "name": "library-xwide",
+        "value": "1920px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Soft Fill button: filled, border collapsed into fill, instant press.",
+      "html": "<button class=\"ds-btn\">Export backup</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:32px;padding:0 12px;font:400 14px/30px \"Helvetica Neue\", Verdana, \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif;color:#000;background:#eaeae5;border:1px solid #eaeae5;border-radius:8px;cursor:pointer;transition:background-color 150ms,border-color 150ms,box-shadow 150ms} .ds-btn:hover{background:#dfdfdf;border-color:#dfdfdf} .ds-btn:active{transform:scale(0.97)} .ds-btn:focus-visible{outline:none;border-color:#5d88c2;box-shadow:0 0 6px 1px color-mix(in srgb,#4477bb 45%,transparent)}"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Bookmark Blue primary action; one per view.",
+      "html": "<button class=\"ds-btn-primary\">Save</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 12px;font:600 14px/30px \"Helvetica Neue\", Verdana, \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif;color:#fff;background:#4477bb;border:1px solid #4477bb;border-radius:8px;cursor:pointer;transition:background-color 150ms,box-shadow 150ms} .ds-btn-primary:hover{background:color-mix(in srgb,#4477bb 88%,#333)} .ds-btn-primary:active{transform:scale(0.97)} .ds-btn-primary:focus-visible{outline:none;border-color:#5d88c2;box-shadow:0 0 6px 1px color-mix(in srgb,#4477bb 45%,transparent)}"
+    },
+    {
+      "name": "Quiet Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger-quiet",
+      "description": "Quiet danger tier: danger text on normal fill; solid tier lives only in the confirm bubble.",
+      "html": "<button class=\"ds-btn-danger\">Delete</button>",
+      "css": ".ds-btn-danger{display:inline-flex;align-items:center;height:32px;padding:0 12px;font:400 14px/30px \"Helvetica Neue\", Verdana, \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif;color:#cc0000;background:#eaeae5;border:1px solid color-mix(in srgb,#cc0000 55%,#858585);border-radius:8px;cursor:pointer;transition:background-color 150ms} .ds-btn-danger:hover{background:color-mix(in srgb,#cc0000 8%,#eaeae5)} .ds-btn-danger:active{transform:scale(0.97)} .ds-btn-danger:focus-visible{outline:1px solid #4477bb;outline-offset:2px;box-shadow:0 0 6px 1px color-mix(in srgb,#4477bb 45%,transparent)}"
+    },
+    {
+      "name": "Soft Fill Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Filled text field; no visible border at rest; fill unchanged on focus.",
+      "html": "<input class=\"ds-field\" placeholder=\"API Key\">",
+      "css": ".ds-field{height:32px;box-sizing:border-box;padding:4px 8px;font:400 14px/20px \"Helvetica Neue\", Verdana, \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif;color:#333;background:#eaeaea;border:1px solid #eaeaea;border-radius:8px;min-width:240px;transition:background-color 150ms,border-color 150ms,box-shadow 150ms} .ds-field::placeholder{color:#616161} .ds-field:hover{background:#dfdfdf;border-color:#dfdfdf} .ds-field:focus{outline:none;border-color:#5d88c2} .ds-field:focus-visible{box-shadow:0 0 6px 1px color-mix(in srgb,#4477bb 45%,transparent)}"
+    },
+    {
+      "name": "Tag Chip",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "Full pill; selected state uses chip wash at weight 600.",
+      "html": "<span class=\"ds-chip\">reading</span> <span class=\"ds-chip is-on\">ai</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;padding:2px 10px;font:400 12px/14px \"Helvetica Neue\", Verdana, \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif;color:#333;background:#eaeae5;border-radius:9999px;cursor:pointer;transition:background-color 150ms} .ds-chip:hover{background:#dfdfdf} .ds-chip.is-on{background:#e8edf4;font-weight:600} .ds-chip:focus-visible{outline:1px solid #4477bb;outline-offset:2px}"
+    },
+    {
+      "name": "Switch",
+      "kind": "custom",
+      "refersTo": "switch-track",
+      "description": "28×16 borderless track; whole row is the hit area.",
+      "html": "<label class=\"ds-switch\"><input type=\"checkbox\" checked><span>Sync settings</span><i></i></label>",
+      "css": ".ds-switch{position:relative;display:flex;align-items:center;gap:12px;min-height:20px;width:260px;font:400 14px/20px \"Helvetica Neue\", Verdana, \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif;color:#333;cursor:pointer} .ds-switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer} .ds-switch i{margin-left:auto;position:relative;width:28px;height:16px;border-radius:9999px;background:#858585;transition:background-color 150ms} .ds-switch i::before{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.28),0 0 0 .5px rgba(0,0,0,.06);transition:transform 150ms} .ds-switch input:checked~i{background:#4477bb} .ds-switch input:checked~i::before{transform:translateX(12px)} .ds-switch input:focus-visible~i{outline:1px solid #4477bb;outline-offset:2px;box-shadow:0 0 6px 1px color-mix(in srgb,#4477bb 45%,transparent)}"
+    },
+    {
+      "name": "Sidebar Nav",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Options sidebar: muted text rows with a 2px left edge; active row is ink, 600, filled.",
+      "html": "<nav class=\"ds-nav\"><div class=\"ds-nav-group\">General</div><a class=\"ds-nav-item is-active\" href=\"#\">Account</a><a class=\"ds-nav-item\" href=\"#\">AI</a><a class=\"ds-nav-item\" href=\"#\">Reader</a></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;width:180px;font-family:\"Helvetica Neue\", Verdana, \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif} .ds-nav-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#666;padding:12px 12px 4px} .ds-nav-item{display:flex;align-items:center;height:32px;padding:0 12px;font-size:13px;color:#666;text-decoration:none;border-left:2px solid transparent;border-radius:0 3px 3px 0;transition:color 150ms,background-color 150ms} .ds-nav-item:hover{color:#333;background:rgba(0,0,0,.03);border-left-color:#bbb} .ds-nav-item.is-active{color:#333;font-weight:600;background:rgba(0,0,0,.05);border-left-color:#333} .ds-nav-item:focus-visible{outline:1px solid #4477bb;outline-offset:2px}"
+    },
+    {
+      "name": "Confirm Bubble",
+      "kind": "custom",
+      "refersTo": "confirm-yes",
+      "description": "Anchored danger confirmation; solid danger 'yes' is the only solid-danger control.",
+      "html": "<div class=\"ds-confirm\"><b>Delete this word?</b><button class=\"ds-yes\">Delete</button><button class=\"ds-no\">Cancel</button></div>",
+      "css": ".ds-confirm{display:inline-flex;align-items:center;flex-wrap:wrap;gap:6px;padding:4px 8px;font:700 11px/14px \"Helvetica Neue\", Verdana, \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif;color:#cc0000;background:#fff;border:1px solid #858585;border-radius:3px;box-shadow:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04)} .ds-confirm button{padding:2px 8px;font:inherit;border-radius:3px;cursor:pointer} .ds-yes{background:#cc0000;color:#fff;border:1px solid #cc0000} .ds-yes:hover{box-shadow:inset 0 0 0 1px #fff} .ds-no{background:transparent;color:#333;border:1px solid #858585} .ds-no:hover{background:#dfdfdf} .ds-confirm button:active{transform:scale(0.97)} .ds-confirm button:focus-visible{outline:1px solid #4477bb;outline-offset:2px}"
+    },
+    {
+      "name": "Library Index Row",
+      "kind": "custom",
+      "refersTo": "library-row",
+      "description": "Borderless row: highlight dot + 2-line excerpt + meta; state by background only.",
+      "html": "<button class=\"ds-row\"><span class=\"ds-dot\"></span><span><span class=\"ds-ex\">Highlights stay anchored through translation and later edits to the page.</span><span class=\"ds-meta\">example.com · 3 highlights</span></span></button>",
+      "css": ".ds-row{display:grid;grid-template-columns:10px 1fr;column-gap:12px;width:360px;padding:8px 12px;text-align:left;background:transparent;border:0;border-radius:8px;font-family:\"Helvetica Neue\", Verdana, \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif;color:#1a1a2e;cursor:pointer} .ds-row:hover{background:#ececee} .ds-row:active{background:#e0e0e3} .ds-row:focus-visible{outline:2px solid #3e88e9;outline-offset:-2px} .ds-dot{width:10px;height:10px;margin-top:5px;border-radius:50%;background:#facc15} .ds-ex{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:20px} .ds-meta{display:block;font-size:12px;line-height:16px;color:#5f6368}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precise Toolkit",
+    "overview": "This UI is a well-kept tool drawer. Every control sits in a known slot at a known size, gives instant feedback, and gets out of the way. Quality is not shown through decoration. It shows in alignment that holds to the pixel, contrast that clears AA on every theme, and a response that is already finished by the time the finger lifts. The user opens the popup dozens of times a day on a 4K Windows machine, so the system favors calm, dense, predictable surfaces over expressive ones.\n\nThe default theme is a **neutral skeleton**. Its light side is a warm off-white canvas with soft gray fills and one Bookmark Blue accent. Its dark side is Warm Ink: Flexoki's warm black with paper-colored text, never a cold blue-gray. Personality is delegated to 14 named presets (Dracula, Nord Night, Catppuccin, Solarized, Terminal, and others), all generated by the theme factory from the same role tokens. A preset may change color, radius, and focus-ring shape, but it never changes geometry, density outside the two allowed rungs, or interaction language.\n\nThe reader (md-preview) and the notes and vocabulary page (library) lean **warm and readable**: paper-like canvases, a generous prose measure, and structure carried by type scale and whitespace instead of boxes. The popup and options pages lean **compact and efficient**: label columns, a strict control-height ladder, and dense rows.",
+    "keyCharacteristics": [
+      "Flat by default. Shadows belong only to things that float (popovers, listbox menus, confirm bubbles, toasts).",
+      "Soft Fill controls: filled, never outlined at rest; instant press; one soft focus glow.",
+      "One accent, used for primary action, selection, focus, and links, and nothing decorative.",
+      "Tokens per surface (`--pp-*` popup, `--opt-*` options, `--lib-*` library, unprefixed in the reader), all generated by `docs/theme-surface/`. The frontmatter records the **options** surface's default light values as the canonical reference, plus key dark (Warm Ink) values.",
+      "Fast-font discipline: explicit CJK stacks, named monospace first, no emoji glyphs anywhere in UI."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "Bookmark Blue is the only chromatic accent in the chrome. It marks action, selection, focus, and links, and is never decoration, illustration, or section color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Derived, Not Picked Rule",
+        "body": "Every text/fill pair is derived to WCAG AA (4.5:1 text, 3:1 UI parts) by the theme factory, and focus cores are derived from the accent to at least 3:1. Never hand-pick a hex in a consuming rule. Edit composers or pilots, then run `sync-all`.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weak Text Rule",
+        "body": "Hint, muted, and link text never sit on a control fill. Controls use their own AA-derived `btn-fg-muted`.",
+        "section": "colors"
+      },
+      {
+        "name": "The Fast Fallback Rule",
+        "body": "Every UI font stack names fast CJK families before `sans-serif`, and every mono stack names a real mono font first and CJK before `monospace`. `button, input, select` always `font-family: inherit`. A fallback to a slow font freezes cold first paint on high-DPI Windows for 1–3s.",
+        "section": "typography"
+      },
+      {
+        "name": "The 11px Floor Rule",
+        "body": "No UI text below 11px.",
+        "section": "typography"
+      },
+      {
+        "name": "The Two Rungs Rule",
+        "body": "Density has exactly two rungs, comfortable and compact (only Terminal and Gruvbox Dark use compact). Themes never define their own type sizes.",
+        "section": "typography"
+      },
+      {
+        "name": "The Relationship Owns the Space Rule",
+        "body": "Gaps belong to the relationship between elements (action-row gap 8, cluster gap 4, field rhythm), not to the elements themselves. Surface HTML never carries inline margin, padding, or gap.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Canvas Rule",
+        "body": "On a canvas (especially library), regions are separated by type scale, whitespace, column alignment, hanging labels, and small section heads. No cards, color blocks, inset wells, or divider lines. Floating layers are the only exception (user ruling, 2026-10-03).",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** take every color, radius, and focus ring from the surface's tokens with bare `var(--ns-x)` and no fallback, and change them only through `docs/theme-surface/` composers and pilots followed by `node docs/theme-surface/tools/sync-all.mjs`.",
+      "**Do** keep controls on the ladder: 32/28px (options and library), 26/20px (popup and reader), at least 24px for every icon hit area, and at least 44px for options preference rows.",
+      "**Do** press with `scale(0.97)` (buttons) or a deeper background (whole rows), instantly. Transitions list properties explicitly and stay at 200ms or less (150ms for state changes).",
+      "**Do** use one of three focus placements: bordered (fields, `.btn`), borderless (1px accent outline + glow for links, tabs, chips, and switches), or inset (2px for rows and segment cells).",
+      "**Do** use Lucide v0.525.0 paths at stroke 2 inside a 24 box for every icon. Give icon-only buttons a `title`, an `aria-label`, and a 24px hit area.",
+      "**Do** separate canvas regions with type, whitespace, and alignment."
+    ],
+    "donts": [
+      "**Don't** draw color blocks, cards, inset wells, or divider lines to section a flat canvas (library), and don't go above hairline weight for section edges on options panels.",
+      "**Don't** outline controls at rest or change a field's fill on focus.",
+      "**Don't** add shadows to resting surfaces. Shadows are for floating layers only.",
+      "**Don't** use literal emoji or dingbats (⚠ ✓ ✗ ✕ ↻ ▸ ▾ ℹ) in UI. `×` (U+00D7) is the only literal symbol allowed.",
+      "**Don't** lead a mono stack with `ui-monospace` or bare `monospace`, or omit fast CJK families from any UI stack.",
+      "**Don't** use `transition: all`, add first-paint entrance animations, load remote fonts, or ship any runtime dependency.",
+      "**Don't** open overlays on hover in the reader, and don't apply the 14 presets to the reader.",
+      "**Don't** hand-edit `pinboard-themes.js` or any `@generated:*` region in popup.css, options.css, or library.css.",
+      "**Don't** set hint, muted, or link-colored text on a control fill."
+    ]
+  }
+}
