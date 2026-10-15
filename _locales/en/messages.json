@@ -407,6 +407,9 @@
   "pinboardErrorOffline": {
     "message": "Network error, check connection"
   },
+  "pinboardTestUnreachable": {
+    "message": "Can't reach api.pinboard.in. Check your network or proxy, then test again."
+  },
   "pinboardErrorTimeout": {
     "message": "Request timed out, try again later"
   },
@@ -698,7 +701,7 @@
     "message": "The reader only opens http and https pages."
   },
   "bgMdPreviewTooLarge": {
-    "message": "Storage is full. Clear cached data in Settings > Storage, then try again."
+    "message": "Storage is full. Clear cached data in Settings > Data, then try again."
   },
   "mdPreviewOpenFailed": {
     "message": "Couldn't open the reader. Try again."
@@ -710,7 +713,7 @@
     "message": "Manage storage"
   },
   "tabStorage": {
-    "message": "Storage"
+    "message": "Data"
   },
   "tabGroupSaving": {
     "message": "Saving"
@@ -877,7 +880,7 @@
     "message": "Feedback & Issues"
   },
   "tabGeneral": {
-    "message": "General"
+    "message": "Account"
   },
   "tabBookmarks": {
     "message": "Bookmarks"
@@ -995,6 +998,12 @@
   },
   "hintApiToken": {
     "message": "Get your token at"
+  },
+  "tokenLocalHint": {
+    "message": "Your token stays in this browser and is sent only to Pinboard. It reaches your other devices only if you sync API keys and tokens."
+  },
+  "aiKeyLocalHint": {
+    "message": "Each API key stays in this browser and is sent only to its own provider. It reaches your other devices only if you sync API keys and tokens."
   },
   "secSaveDefaults": {
     "message": "Defaults When Saving"
@@ -1500,6 +1509,9 @@
   "langRu": {
     "message": "Русский"
   },
+  "langPl": {
+    "message": "Polski"
+  },
   "labelAiCache": {
     "message": "Cache Duration for AI Tags, Summaries & Fetched Pages (minutes)"
   },
@@ -1529,6 +1541,12 @@
   },
   "resetToDefault": {
     "message": "Reset to default"
+  },
+  "promptStateDefault": {
+    "message": "Using the built-in prompt"
+  },
+  "promptStateCustom": {
+    "message": "Customized"
   },
   "labelSummaryPrompt": {
     "message": "AI Summary Prompt"
@@ -1767,6 +1785,15 @@
   },
   "provCustom": {
     "message": "Custom OpenAI-compatible"
+  },
+  "providerGroupKey": {
+    "message": "Cloud (API key)"
+  },
+  "providerGroupLocal": {
+    "message": "Local"
+  },
+  "providerGroupCompat": {
+    "message": "OpenAI-compatible"
   },
   "provCustomShort": {
     "message": "Custom",
@@ -2547,9 +2574,6 @@
   "tagGovLoadFailed": {
     "message": "Couldn't load tags. Check your API token or network, then click Refresh."
   },
-  "placeholderOptional": {
-    "message": "optional"
-  },
   "tagGovSnapshotSaved": {
     "message": "Tag list snapshot downloaded (names and counts; a reference for manual repair, not an automatic restore)"
   },
@@ -2642,6 +2666,12 @@
     "message": "Shortcuts only (e to explain, d to look up)"
   },
   "selectionTriggerOff": {
+    "message": "Off"
+  },
+  "stateOn": {
+    "message": "On"
+  },
+  "stateOff": {
     "message": "Off"
   },
   "trTranslate": {
@@ -3094,7 +3124,7 @@
     "message": "Adds Chinese definitions above the English entry when you look up an English word. The English entry still loads as usual."
   },
   "ecdictFormatNote": {
-    "message": "Expects a CSV file whose first line is the column header and includes word, translation, tag, collins, oxford, frq and bnc. Prebuilt dictionary packages such as mdx, eudic, stardict, mobi and sqlite are different formats and cannot be imported. This project does not provide, recommend or verify a source for the data, and is not affiliated with it. You supply the file and are responsible for its license."
+    "message": "Needs a CSV whose header row includes word, translation, tag, collins, oxford, frq and bnc. Prebuilt packages (mdx, eudic, stardict, mobi, sqlite) won't import. You bring the file and answer for its license; this project offers no source and recommends none."
   },
   "ecdictImportFile": {
     "message": "Import file"
@@ -3289,6 +3319,9 @@
     "vocabDriveSyncNow": {
       "message": "Sync now"
     },
+    "vocabDriveManage": {
+      "message": "Manage in Data"
+    },
     "vocabDriveDisconnect": {
       "message": "Disconnect this device"
     },
@@ -3302,10 +3335,10 @@
       "message": "Google authorization is temporarily unavailable."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "No Pinboard account is signed in. Enter your API Token under General → Pinboard Account, then connect again."
+      "message": "No Pinboard account is signed in. Enter your API Token under Account → Pinboard Account, then connect again."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "No Pinboard account is signed in. Enter your API Token under General → Pinboard Account, then click Sync now."
+      "message": "No Pinboard account is signed in. Enter your API Token under Account → Pinboard Account, then click Sync now."
     },
     "vocabDriveErrorPermission": {
       "message": "Google Drive permission is missing."
@@ -3596,6 +3629,17 @@
       }
     }
   },
+  "packSummaryEmpty": {
+    "message": "Not imported"
+  },
+  "packSummaryReady": {
+    "message": "$N$ entries",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "dictPackDeleteConfirm": {
     "message": "Delete the imported dictionary pack?"
   },
@@ -3881,13 +3925,13 @@
   "libraryCountNotedOne": { "message": "$COUNT$ with a note", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "First $FIRST$ · Latest $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Saved at $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "Highlights and notes are saved on this device. To use them on another device, connect Google Drive in General settings on both devices; they then sync automatically. You can also export a backup and import it there." },
-  "libraryNotesScopeOpenBackup": { "message": "Open General settings" },
+  "libraryNotesScopeHint": { "message": "Highlights and notes are saved on this device. To use them on another device, connect Google Drive in the Data settings on both devices; they then sync automatically. You can also export a backup and import it there." },
+  "libraryNotesScopeOpenBackup": { "message": "Open Data settings" },
   "libraryExportMenu": { "message": "Export" },
   "libraryExportSettings": { "message": "Anki and Eudic settings" },
   "libraryDriveSynced": { "message": "Synced with Google Drive: $TIME$", "placeholders": {"time": {"content": "$1"}} },
   "libraryDriveConnected": { "message": "Connected to Google Drive, not synced yet" },
-  "libraryDriveProblem": { "message": "Google Drive sync has a problem. Open General settings" },
+  "libraryDriveProblem": { "message": "Google Drive sync has a problem. Open Data settings" },
   "libraryRelookup": { "message": "Look up again" },
   "libraryBack": { "message": "Back to list" },
   "libraryStatsWords": { "message": "$COUNT$ words", "placeholders": { "count": { "content": "$1" } } },
@@ -4020,6 +4064,14 @@
   "batchResumed": { "message": "Resumed after interruption ($ATTEMPT$ of $MAX$)", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
   "batchCancelFailed": { "message": "Could not request cancellation. Try again." },
   "connectionOverviewTitle": { "message": "Connection Status" },
+  "connectionSummaryIssues": {
+    "message": "Needs attention: $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "connectionOverviewHint": { "message": "Status is based on configuration, granted permissions, and your latest manual tests. Opening Settings never contacts these services or requests permission." },
   "connectionNeverTested": { "message": "Not tested yet" },
   "connectionConnected": { "message": "Connected" },

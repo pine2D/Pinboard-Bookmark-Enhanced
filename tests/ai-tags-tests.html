@@ -892,7 +892,14 @@ suite("endpoint origin policy", () => {
         window.setTimeout = realSetTimeout;
         assertEq(armed.length, 0, "clear timers armed by failing tests");
         assert(document.getElementById("test-gemini-status").textContent.includes("testNoApiKey"), "no-key status");
-        assert(document.getElementById("test-pinboard-status").textContent.includes("loginInvalidFormat"), "invalid-format status");
+        // The format failure is reported once, by the field's own warning
+        // (2026-10-15 options critique): the status slot stays empty and the
+        // field is marked invalid and described by that warning.
+        const tokenField = document.getElementById("opt-pinboard-token");
+        assert(document.getElementById("token-format-warn").classList.contains("visible") &&
+          document.getElementById("test-pinboard-status").textContent === "" &&
+          tokenField.getAttribute("aria-invalid") === "true" &&
+          tokenField.getAttribute("aria-describedby") === "token-format-warn", "invalid-format reported once, on the field");
       } finally {
         window.setTimeout = realSetTimeout;
         fixture.remove();
@@ -928,7 +935,14 @@ suite("endpoint origin policy", () => {
         window.setTimeout = realSetTimeout;
         window.clearTimeout = realClearTimeout;
         assertEq(timers.size, 0, "clear timers still armed after the failure");
-        assert(document.getElementById("test-pinboard-status").textContent.includes("loginInvalidFormat"), "invalid-format status");
+        // The format failure is reported once, by the field's own warning
+        // (2026-10-15 options critique): the status slot stays empty and the
+        // field is marked invalid and described by that warning.
+        const tokenField = document.getElementById("opt-pinboard-token");
+        assert(document.getElementById("token-format-warn").classList.contains("visible") &&
+          document.getElementById("test-pinboard-status").textContent === "" &&
+          tokenField.getAttribute("aria-invalid") === "true" &&
+          tokenField.getAttribute("aria-describedby") === "token-format-warn", "invalid-format reported once, on the field");
       } finally {
         window.setTimeout = realSetTimeout;
         window.clearTimeout = realClearTimeout;

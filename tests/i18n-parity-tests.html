@@ -110,7 +110,7 @@ async function loadLocale(loc) {
     "extName","appName","labelUrl","labelApiKey","labelApiToken","labelBaseUrl",
     // link text that is a URL path on an English-only page — see H18
     "settingsPassword",
-    "langZh","langZhTW","langZhHK","langEn","langJa","langKo","langFr","langDe","langEs","langRu",
+    "langZh","langZhTW","langZhHK","langEn","langJa","langKo","langFr","langDe","langEs","langRu","langPl",
     "provGemini","provOpenai","provClaude","provDeepseek","provQwen","provMinimax",
     "provOpenrouter","provGroq","provMistral","provCohere","provSiliconflow","provZhipu",
     "provKimi","provOllama","provCustom","provHuggingface",
@@ -125,13 +125,14 @@ async function loadLocale(loc) {
     "tabPopup","tabAI","tagGovKindAi","secPrompts","labelTagPrompt",
     "tabGroupAI","tabGroupSystem", // sidebar group labels: "AI" is the universal term (matches tabAI); "System" is the same word in de/pl
     "aiErrorDetails","qlSets","labelTags","aiErrorOpTags","secTags","tabTags",
-    "placeholderOptional","optPopupWidth550","jinaApiKeyLabel",
+    "optPopupWidth550","jinaApiKeyLabel",
     "optWaybackS3Key","optWaybackS3Secret","trViewOriginal",
     "labelNotes","tagCount","tagCountPlural","qlNotes","sepUnderscore",
     "secNotifications","qlNotesTitle","mdOptImages","aiContentSourceLocal",
     "optPopupWidth450","trProgress","labelModel","tagGovKindSeparator",
     "dictLangAuto", // loanword: "Auto" is the same in all target languages
     "librarySortTime", // "Date" is the same word in fr
+    "providerGroupLocal", // "Local" is the same word in fr
     "librarySortFaceAria", // pure placeholder-format string ("$SHORT$, $FULL$") in the Latin-script locales
     "vocabSortAz","vocabSortZa", // locale-neutral sort notation where the script uses Latin terms
     // T8g count phrases that are the bare number ("$COUNT$") wherever the
@@ -901,7 +902,7 @@ async function loadLocale(loc) {
       vocabDriveAuthorizingSlow: "如果没有出现授权窗口，可能是网络连不上 Google。",
       driveLastSuccess: "最近成功同步",
       drivePendingChanges: "本机还有尚未上传的更改。",
-      vocabDriveErrorPinboardAuthSync: "尚未登录 Pinboard 账号。请在「通用 → Pinboard 账号」中填写 API Token，然后点击「立即同步」。",
+      vocabDriveErrorPinboardAuthSync: "尚未登录 Pinboard 账号。请在「账号 → Pinboard 账号」中填写 API Token，然后点击「立即同步」。",
     };
     const zhDrift = Object.entries(DRIVE_ZH_CN)
       .filter(([key, text]) => msgs.zh_CN[key]?.message !== text).map(([key]) => key);
@@ -976,16 +977,21 @@ async function loadLocale(loc) {
     check("H22e the network error names googleapis.com in every locale",
       noDomain.length === 0, `no domain: ${noDomain.join(", ")}`);
 
-    const SETTINGS_PATH = {
-      en: "General → Pinboard Account", zh_CN: "「通用 → Pinboard 账号」", zh_TW: "「一般 → Pinboard 帳號」",
-      zh_HK: "「一般 → Pinboard 帳戶」", ja: "「一般 → Pinboard アカウント」", de: "„Allgemein → Pinboard-Konto“",
-      fr: "« Général → Compte Pinboard »", pl: "„Ogólne → Konto Pinboard”", ru: "«Общие → Аккаунт Pinboard»",
+    // The path is read off the two strings the settings page actually shows --
+    // the sidebar tab (tabGeneral) and the section heading inside it
+    // (secPinboardAccount) -- so renaming either one without the error copy
+    // goes red here instead of leaving a path to a tab that no longer exists.
+    const pathIn = (text, loc) => {
+      const tab = msgs[loc].tabGeneral?.message || "\u0000";
+      const sec = msgs[loc].secPinboardAccount?.message || "\u0000";
+      const at = text.indexOf(tab + " → " + sec);
+      return at >= 0;
     };
     const pathBroken = LOCALES.filter((loc) => {
       const signedOut = msgs[loc].vocabDriveErrorPinboardAuth?.message || "";
       const connected = msgs[loc].vocabDriveErrorPinboardAuthSync?.message || "";
       const syncNow = msgs[loc].vocabDriveSyncNow?.message || "\u0000";
-      return !signedOut.includes(SETTINGS_PATH[loc]) || !connected.includes(SETTINGS_PATH[loc]) ||
+      return !pathIn(signedOut, loc) || !pathIn(connected, loc) ||
         !connected.includes(syncNow) || connected === signedOut;
     });
     // Simplest miss: fr writes « Synchroniser » (not the button's own label

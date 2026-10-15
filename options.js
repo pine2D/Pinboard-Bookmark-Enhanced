@@ -249,7 +249,7 @@ async function renderConnectionOverview() {
       configured: pbpIsValidTokenFormat($id("opt-pinboard-token")?.value.trim() || "") === true, permission: true },
     { id: `ai:${provider}`, name: $id("opt-ai-provider")?.selectedOptions?.[0]?.textContent?.trim() || provider,
       panel: "ai", target: `test-${provider}`, configured: aiConfigured, permission: aiPermission },
-    { id: "drive", name: "Google Drive", panel: "general", target: "vocab-drive-connect",
+    { id: "drive", name: "Google Drive", panel: "storage", target: "vocab-drive-connect",
       connected: stored.vocabDriveConnected === true, permission: drivePermission },
     // The port input ships a default ("8765"), so a non-empty field proves
     // nothing -- reading it as configuration put every user who never touched
@@ -262,6 +262,10 @@ async function renderConnectionOverview() {
       configured: !!$id("dict-eudic-token")?.value.trim(), permission: eudicPermission },
   ];
   host.replaceChildren();
+  // Rows the user has to act on: a missing grant, a failed last test, a warning
+  // tier, plus Pinboard itself while no valid token is set (nothing works
+  // without it). "Not configured" on an optional service is a choice, not a fault.
+  let issues = 0;
   for (const item of items) {
     const record = health[item.id];
     let stateKey = "connectionNeverTested", stateClass = "pending";
@@ -304,7 +308,31 @@ async function renderConnectionOverview() {
       ? t(stateKey, _pbpConnectionHealthDate(record.checkedAt)) : t(stateKey);
     button.append(name, state);
     host.appendChild(button);
+    if (stateClass === "bad" || stateClass === "warn" || (item.id === "pinboard" && !item.configured)) issues++;
   }
+  _pbpConnectionOverviewSummary(issues);
+}
+
+// The overview is the one place that answers "does this work?", so its closed
+// header carries the count, and a page that needs attention opens it -- once,
+// and only while the user has never chosen a state for it themselves (the
+// remembered pp-acc entry wins; the programmatic flag keeps this open from
+// being remembered as their choice).
+function _pbpConnectionOverviewSummary(issues) {
+  const det = $id("acc-connection-overview");
+  const stateEl = $id("connection-overview-state");
+  if (stateEl) {
+    stateEl.textContent = issues ? t("connectionSummaryIssues", String(issues)) : "";
+    stateEl.classList.toggle("bad", issues > 0);
+  }
+  if (!det || !issues || det.open || det.dataset.autoOpened) return;
+  let remembered;
+  try { remembered = (JSON.parse(localStorage.getItem("pp-acc")) || {})["connection-overview"]; } catch (_) {}
+  if (typeof remembered === "boolean") return;
+  det.dataset.autoOpened = "1";
+  _pbpAccProgrammaticOpen = true;
+  det.open = true;
+  setTimeout(() => { _pbpAccProgrammaticOpen = false; }, 0);
 }
 
 // Case folding must be locale-independent: a bare toLocaleLowerCase() follows
@@ -342,7 +370,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
     // weakTarget: the id came from the panel-wide fallback (this panel's first
     // control), not from anything the text names -- the only target a section
     // name is allowed to overwrite.
-    const add = (text, targetId, sectionName, weakTarget) => {
+    const add = (text, targetId, sectionName, weakTarget, isHint) => {
       const clean = String(text || "").replace(/\s+/g, " ").trim();
       if (!clean) return;
       const textKey = `${panel}\n${clean}`;
@@ -363,6 +391,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
       if (seen.has(key)) return;
       seen.add(key);
       const entry = { panel, panelLabel, text: clean, searchText: _pbpSettingsSearchText(`${panelLabel} ${clean}`), targetId: targetId || "" };
+      if (isHint) entry.hint = true;
       if (!prior) seenText.set(textKey, { entry, weak: !!weakTarget });
       entries.push(entry);
     };
@@ -441,23 +470,35 @@ function pbpBuildSettingsSearchIndex(root = document) {
       // (Ruling 36); the answer is indexed as its own .hint row, so the
       // label's row keeps just the label copy.
       let text = node.textContent;
+      // A disclosure header's .summary-state is a live readout ("Not
+      // imported", "On"), not part of the section's name.
+      if (isSectionName && node.querySelector(".summary-state")) {
+        const copy = node.cloneNode(true);
+        copy.querySelectorAll(".summary-state").forEach((st) => st.remove());
+        text = copy.textContent;
+      }
       if (node.matches("label") && node.querySelector("details.context-help")) {
         const copy = node.cloneNode(true);
         copy.querySelectorAll("details.context-help").forEach((help) => help.remove());
         text = copy.textContent;
       }
-      add(text, target, isSectionName, weak);
+      add(text, target, isSectionName, weak, node.matches(".hint"));
     }
   }
   return entries;
 }
 
+// Names first: a setting's label, a section heading or a button is what the
+// reader is looking for, and a long explanatory hint that merely mentions the
+// word ("anki" inside the credential-backup warning) used to top the list.
+// Stable within each tier, so page order still decides among equals.
 function pbpSearchSettings(index, query, limit = 10) {
   const normalized = _pbpSettingsSearchText(query);
   if (!normalized) return [];
   const terms = normalized.split(" ").filter(Boolean);
-  return (Array.isArray(index) ? index : [])
-    .filter((entry) => terms.every((term) => entry.searchText.includes(term)))
+  const hits = (Array.isArray(index) ? index : [])
+    .filter((entry) => terms.every((term) => entry.searchText.includes(term)));
+  return [...hits.filter((entry) => !entry.hint), ...hits.filter((entry) => entry.hint)]
     .slice(0, Math.max(1, Number(limit) || 10));
 }
 
@@ -1441,10 +1482,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     // W3: lazy-init expensive per-panel rendering on first view.
     if (btn.dataset.panel === "appearance") _initAppearancePanel();
     if (btn.dataset.panel === "tags") _initTagGovPanel();
-    if (btn.dataset.panel === "storage") renderStoragePanel();
-    if (btn.dataset.panel === "vocab") renderVocabPanel();
-    if (btn.dataset.panel === "general") renderDriveSyncPanel();
+    if (btn.dataset.panel === "storage") { renderStoragePanel(); renderDriveSyncPanel(); }
     else if (typeof invalidateDriveSyncPanel === "function") invalidateDriveSyncPanel();
+    if (btn.dataset.panel === "vocab") renderVocabPanel();
     history.replaceState(null, "", "#" + btn.dataset.panel);
   }
   _tabBtns.forEach((btn, i) => {
@@ -1482,9 +1522,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (_dlBtn) _dlBtn.click();
   }
   _activateHashPanel();
-  // The default General panel is already active in the markup, so opening
-  // options.html without a hash never clicks its tab to hydrate Drive status.
-  if (!location.hash) renderDriveSyncPanel();
   window.addEventListener("hashchange", _activateHashPanel);
   setupOptionsSearch();
 
@@ -1613,18 +1650,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---- Reset current tab to defaults ----
+  // No `general` entry: the Account tab holds only the Pinboard token and the
+  // connection overview, neither of which has a default to go back to, so
+  // _syncResetBtnVisibility hides "Reset This Tab" there.
   const PANEL_DEFAULTS = {
-    general: {
-      fields: {
-        "opt-lang": "auto",
-        "opt-backup-include-highlights": true,
-        "opt-backup-include-vocabulary": true,
-        "notify-quick-save": true, "notify-read-later": true, "notify-tab-set": true,
-        "notify-batch-save": true, "notify-errors": true
-      },
-      keepsSecrets: true,
-      skip: ["opt-pinboard-token", "opt-sync-enabled"] // never reset token or sync toggle
-    },
     popup: {
       fields: {
         "opt-check-bookmark-status": true, "opt-auto-close": true, "offline-queue-enabled": true,
@@ -1632,7 +1661,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-show-suggest-tags": true,
         "opt-show-ai-summary": true, "opt-show-ai-tags": true,
         "opt-show-quick-links": true, "opt-show-quick-row": true,
-        "opt-popup-width-custom": "550"
+        "opt-popup-width-custom": ""
       },
       radios: { "popup-width-preset": "550" },
       nested: {
@@ -1665,7 +1694,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-custom-baseurl": "", "opt-custom-model": ""
       },
       keepsSecrets: true,
-      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-custom-key","opt-jina-key"]
+      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-custom-key"]
     },
     "ai-behavior": {
       fields: {
@@ -1673,7 +1702,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-ai-auto-tags": false, "opt-ai-use-transcript": true, "opt-ai-tag-separator": "-",
         "opt-custom-tag-prompt": "", "opt-custom-summary-prompt": ""
       },
-      radios: { "ai-content-source": "local" }
+      radios: { "ai-content-source": "local" },
+      // The Jina Reader key sits here now, under the content-source choice it serves.
+      keepsSecrets: true,
+      skip: ["opt-jina-key"]
     },
     reader: {
       fields: {
@@ -1692,7 +1724,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         "qs-auto-notes": true, "qs-blockquote": true, "qs-default-tags": "", "qs-ai-tags": false, "qs-ai-summary": false,
         "rl-auto-notes": true, "rl-blockquote": true, "rl-default-tags": "", "rl-ai-tags": false, "rl-ai-summary": false,
         "opt-batch-tag-enabled": true, "opt-batch-tag": "batch_saved",
-        "batch-ai-tags": false, "batch-ai-summary": false, "batch-skip-existing": false
+        "batch-ai-tags": false, "batch-ai-summary": false, "batch-skip-existing": false,
+        // Notifications moved here from the old General tab with their section.
+        "notify-quick-save": true, "notify-read-later": true, "notify-tab-set": true,
+        "notify-batch-save": true, "notify-errors": true
       }
     },
     markdown: {
@@ -1728,6 +1763,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       // re-applies the page theme, then autosaves. applyPreset is a hoisted
       // function declaration in this same scope.
       after: () => applyPreset("")
+      // The interface language moved to this tab but is deliberately not part of
+      // its reset: a language change only lands through the select's own
+      // save-and-reload path, and a silent field write would leave the page in
+      // the old language while storage already says "auto".
+    },
+    storage: {
+      // The Data tab: backup scope toggles. Chrome Sync and Google Drive are
+      // connections, not preferences, and are never reset from here.
+      fields: {
+        "opt-backup-include-highlights": true,
+        "opt-backup-include-vocabulary": true
+      },
+      skip: ["opt-sync-enabled"]
     },
     tags: {
       // No skip and no keepsSecrets: this panel holds no credential at all.
@@ -1772,7 +1820,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       det.className = "disclosure disclosure-subsection";
       det.dataset.accKey = "et-" + id;
       const head = document.createElement("summary");
-      head.textContent = row.label;
+      const headLabel = document.createElement("span");
+      headLabel.textContent = row.label;
+      // On / Off in the closed header, so the list of destinations reads as a
+      // list of what is switched on without opening each card.
+      const headState = document.createElement("span");
+      headState.className = "summary-state";
+      headState.textContent = t(cfg.enabled ? "stateOn" : "stateOff");
+      head.append(headLabel, headState);
 
       const card = document.createElement("div");
       card.className = "disclosure-body export-target-card";
@@ -1795,6 +1850,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       cb.type = "checkbox";
       cb.dataset.et = id + ".enabled";
       cb.checked = !!cfg.enabled;
+      cb.addEventListener("change", () => { headState.textContent = t(cb.checked ? "stateOn" : "stateOff"); });
       const sp = document.createElement("span");
       sp.className = "switch-text";
       sp.textContent = t("mdSendEnableTo").replace("{name}", row.label);
@@ -2042,6 +2098,41 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Custom-overlay CSS clears via its normal opt-custom-css field reset above;
   // it then persists because the reset handler runs saveAll() right after this
   // (saveAll unconditionally calls saveOverlayWithFallback with the cleared value).
+  // Subordinate rows (`.pref-row-sub[data-parent="<switch id>"]`) follow their
+  // parent switch: while it is off the row's controls are disabled -- the
+  // .switch / .pick disabled recipe dims them -- and their stored values stay
+  // untouched for when it comes back on. Programmatic .checked writes (load,
+  // panel reset) fire no 'change', so those paths call this explicitly.
+  function syncSubRows() {
+    for (const row of document.querySelectorAll(".pref-row-sub[data-parent]")) {
+      const parent = $id(row.dataset.parent);
+      const off = !!parent && !parent.checked;
+      for (const input of row.querySelectorAll("input")) input.disabled = off;
+    }
+  }
+  document.addEventListener("change", (e) => {
+    const id = e.target && e.target.id;
+    if (id && document.querySelector(`.pref-row-sub[data-parent="${CSS.escape(id)}"]`)) syncSubRows();
+  });
+
+  // Empty IS the default for the two prompt fields (see the reset buttons), so
+  // the only cue was placeholder grey versus ink. Say it next to the reset
+  // button, and keep reset disabled while there is nothing to reset.
+  const PROMPT_FIELDS = [
+    ["opt-custom-tag-prompt", "tag-prompt-state", "reset-tag-prompt"],
+    ["opt-custom-summary-prompt", "summary-prompt-state", "reset-summary-prompt"],
+  ];
+  function syncPromptStates() {
+    for (const [fieldId, stateId, resetId] of PROMPT_FIELDS) {
+      const custom = !!$id(fieldId)?.value.trim();
+      const state = $id(stateId);
+      if (state) state.textContent = t(custom ? "promptStateCustom" : "promptStateDefault");
+      const reset = $id(resetId);
+      if (reset) reset.disabled = !custom;
+    }
+  }
+  for (const [fieldId] of PROMPT_FIELDS) $id(fieldId)?.addEventListener("input", syncPromptStates);
+
   function applyPanelReset(def, root) {
     for (const [id, val] of Object.entries(def.fields || {})) {
       const el = $id(id);
@@ -2068,6 +2159,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         else el.value = Array.isArray(dflt) ? dflt.join("\n") : dflt;
       }
     }
+    syncSubRows();
+    syncPromptStates();
   }
   // Test hook (browser test harness; no-op in normal page).
   if (typeof window !== "undefined") window.__PBP_applyPanelReset = applyPanelReset;
@@ -2425,6 +2518,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Show default prompts as placeholder so users see them when field is empty
   $id("opt-custom-tag-prompt").placeholder = DEFAULT_TAG_PROMPT;
   $id("opt-custom-summary-prompt").placeholder = DEFAULT_SUMMARY_PROMPT;
+  syncPromptStates();
 
   // AI Content Source radio
   const srcRadio = document.querySelector(`input[name="ai-content-source"][value="${s.aiContentSource || 'local'}"]`);
@@ -2554,11 +2648,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   const customInput = $id("opt-popup-width-custom");
   if (customInput) {
-    customInput.value = popupWidth;
+    // A preset width leaves the custom box empty (its current width only as the
+    // placeholder) so the page never shows two widths at once; focusing the
+    // box adopts that width as the starting value.
+    const isCustom = !presetValues.includes(popupWidth);
+    customInput.value = isCustom ? popupWidth : "";
+    customInput.placeholder = String(popupWidth);
     const selectCustomRadio = () => {
       const customRadio = document.querySelector('input[name="popup-width-preset"][value="custom"]');
       if (customRadio && !customRadio.checked) customRadio.checked = true;
+      if (!customInput.value) customInput.value = customInput.placeholder;
     };
+    document.querySelectorAll('input[name="popup-width-preset"]:not([value="custom"])').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        if (!radio.checked) return;
+        customInput.value = "";
+        customInput.placeholder = radio.value;
+      });
+    });
     customInput.addEventListener("focus", selectCustomRadio);
     customInput.addEventListener("input", selectCustomRadio);
     // Clamp + writeback only on blur/Enter — never during input,
@@ -2582,6 +2689,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("opt-urlclean-aggressive").checked = !!urlClean.aggressiveMode;
   $id("opt-urlclean-custom").value = (urlClean.customParams || []).join("\n");
   $id("opt-urlclean-exclude").value = (urlClean.excludeParams || []).join("\n");
+  syncSubRows();
 
   // optSyncEnabled is device-local; syncApiKeys is one Chrome-account-wide
   // marker because the credentials themselves share chrome.storage.sync.
@@ -2984,10 +3092,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   // changed the AI cache fingerprint, invalidating every cached tag/summary.
   $id("reset-tag-prompt").addEventListener("click", () => {
     $id("opt-custom-tag-prompt").value = "";
+    syncPromptStates();
     saveAllSafely();
   });
   $id("reset-summary-prompt").addEventListener("click", () => {
     $id("opt-custom-summary-prompt").value = "";
+    syncPromptStates();
     saveAllSafely();
   });
 

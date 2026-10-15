@@ -1,6 +1,6 @@
 import { expandPalette } from "./_util.mjs";
 import { mergeTokens } from "./compose-theme.mjs";
-import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, finalizeUiControlRoles, fieldChevronUri, hexToRgb, rgbToHex } from "./_ui-derive.mjs";
+import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, fieldChevronUri, hexToRgb, rgbToHex } from "./_ui-derive.mjs";
 import { POPUP_THEME_MAP } from "./popup-chrome.mjs";
 
 // Default-surface (no preset selected) component-layer baseline — Task 5,
@@ -114,7 +114,28 @@ const DEFAULT_LIGHT = {
   "field-placeholder": "#616161",   // fg-hint #666666 pushed to 4.5:1 vs the hover fill (4.65)
   "field-fg": "#333333",            // = fg: already 2.04:1 from the placeholder (>= FIELD_TEXT_PLACEHOLDER_MIN)
   "field-chevron": fieldChevronUri("#616161"), // = fieldChevronUri(field-placeholder above)
+  // Link ink (2026-10-15 options critique): text links inside hints
+  // (`.hint a`), the panel footer and the wayback log painted raw --opt-accent,
+  // which nothing gated as TEXT -- #4477bb is only 4.17:1 on this bg and the
+  // flexoki-dark preset's #4385be 3.78:1 on its raised panel. linkInk() below:
+  // fgToAAMulti(accent, [panel, bg, pf-bg]) = 5.26 / 4.81 / 4.98:1 here.
+  "link": "#3f6dac",
 };
+
+// Text-link ink: the accent pushed to AA against every host a link sits on
+// (panel, page bg, provider-field card). Accent itself stays the fill/focus
+// colour; only text reads this role. Hosts must already be opaque hex -- the
+// finalizer resolves every fill before this runs, and a non-hex host here
+// would silently measure the wrong pair, so it throws instead.
+export const LINK_HOST_ROLES = Object.freeze(["panel", "bg", "pf-bg"]);
+export function linkInk(map) {
+  const hosts = LINK_HOST_ROLES.map(role => {
+    const v = map[role];
+    if (!/^#[0-9a-f]{6}$/i.test(String(v))) throw new Error(`options-chrome: link host --opt-${role} is not opaque hex (${v})`);
+    return hexToRgb(v);
+  });
+  return rgbToHex(fgToAAMulti(hexToRgb(map.accent), hosts));
+}
 
 // Map canonical UI colors (from _ui-derive) + a few options-only roles to --opt-* names.
 // `mode` drives the native-control scheme (scrollbar, number spinner, etc.) for
@@ -148,6 +169,7 @@ function emitOpt(ui, palette, overrides, radius, mode) {
   // controls, separates frameless fills from both hosts, and recomputes the
   // five paired output roles against the values that will actually ship.
   map = finalizeUiControlRoles(map, palette, overrides, { fieldRoles: true, fieldChevron: true });
+  map.link = linkInk(map);
 
   // Returns the computed map alongside the rendered text (not just text):
   // composeOptionsThemes needs map.accent AFTER pilot overrides are applied

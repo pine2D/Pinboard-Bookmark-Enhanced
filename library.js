@@ -610,7 +610,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     if (typeof pbpOpenExtensionTab !== "function") return;
     e.preventDefault();
-    pbpOpenExtensionTab("options.html", "general");
+    pbpOpenExtensionTab("options.html", "storage");
   });
   pbpLibRefreshDriveLine();
   document.addEventListener("visibilitychange", () => {

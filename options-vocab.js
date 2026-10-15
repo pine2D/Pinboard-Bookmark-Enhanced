@@ -669,8 +669,25 @@ async function renderDriveSyncPanel() {
   else _pbpVocabDriveRenderUnavailable();
 }
 
+// The Vocabulary tab's one-line pointer to Google Drive sync, which lives on
+// the Data tab with the rest of this device's data plumbing: whether this
+// device is connected, and a button that goes there.
+async function _pbpVocabDrivePointer() {
+  const el = $id("vocab-drive-pointer");
+  if (!el) return;
+  let connected = false;
+  try {
+    connected = (await chrome.storage.local.get({ vocabDriveConnected: false })).vocabDriveConnected === true;
+  } catch (error) {
+    console.warn("[drive] pointer read failed:", error?.name, error?.message);
+  }
+  el.textContent = "Google Drive · " + t(connected ? "connectionConnected" : "connectionNotConnected");
+  el.classList.remove("ok", "pending");
+  el.classList.add(connected ? "ok" : "pending");
+}
 async function renderVocabPanel() {
   ++_vocabRenderGen;
+  _pbpVocabDrivePointer();
   _pbpVocabRefreshEudicConfigured().then(_pbpVocabUpdateExternalActions);
   _pbpPackRefreshStatus();
 }
@@ -925,10 +942,11 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
       invalidateDriveSyncPanel();
       if (active === "vocab") renderVocabPanel();
     }
-    if ((accountChanged || changes.optLang) && active === "general") renderDriveSyncPanel();
+    if ((accountChanged || changes.optLang) && active === "storage") renderDriveSyncPanel();
     // Manual actions render their own authoritative response. Reading status
     // while they run would invalidate it when Connect writes its marker.
-    if (area === "local" && changes.vocabDriveConnected && !_vocabDriveBusy && active === "general") renderDriveSyncPanel();
+    if (area === "local" && changes.vocabDriveConnected && !_vocabDriveBusy && active === "storage") renderDriveSyncPanel();
+    if (area === "local" && changes.vocabDriveConnected && active === "vocab") _pbpVocabDrivePointer();
   });
 }
 
@@ -943,6 +961,24 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
 }
 
 // ---- Offline dictionary pack (dict-pack.js primitives; CC-CEDICT) -------
+// Both pack status lines are .save-status, whose BASE colour is the success
+// green -- a bare textContent write therefore painted "not imported yet" and
+// "could not read" as if they had succeeded. Every write names its tone.
+// The pack's disclosure header repeats the gist -- "Not imported" or the entry
+// count -- so the closed section answers "is it set up?" without opening it.
+// A read failure leaves it blank: the status line inside says what went wrong.
+function _pbpPackSummary(id, meta) {
+  const el = $id(id);
+  if (!el) return;
+  el.textContent = meta && meta.state === "ready" ? t("packSummaryReady", String(meta.entries))
+    : meta && meta.state === "error" ? "" : t("packSummaryEmpty");
+}
+function _pbpPackSetStatus(el, text, tone) {
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove("ok", "bad", "pending", "warn");
+  el.classList.add(tone);
+}
 async function _pbpPackRefreshStatus() {
   const el = $id("dict-pack-status");
   const del = $id("dict-pack-delete");
@@ -953,16 +989,17 @@ async function _pbpPackRefreshStatus() {
   } catch (_) {
     meta = { state:"error" };
   }
+  _pbpPackSummary("dict-pack-summary", meta);
   if (meta && meta.state === "ready") {
     const d = new Date(meta.importedAt);
-    el.textContent = t("dictPackStatus", String(meta.entries),
-      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
+    _pbpPackSetStatus(el, t("dictPackStatus", String(meta.entries),
+      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")), "ok");
     if (del) del.hidden = false;
   } else if (meta && meta.state === "error") {
-    el.textContent = t("dictPackReadFailed");
+    _pbpPackSetStatus(el, t("dictPackReadFailed"), "bad");
     if (del) del.hidden = true;
   } else {
-    el.textContent = t("dictPackEmpty");
+    _pbpPackSetStatus(el, t("dictPackEmpty"), "pending");
     if (del) del.hidden = true;
   }
 }
@@ -987,7 +1024,7 @@ function _pbpPackWire() {
         // TIME-based throttle (~1s): aria-live must not machine-gun the
         // screen reader on a fast import; final state comes from refresh.
         const now = performance.now();
-        if (el && now - lastShown >= 1000) { lastShown = now; el.textContent = t("dictPackImporting", String(n)); }
+        if (el && now - lastShown >= 1000) { lastShown = now; _pbpPackSetStatus(el, t("dictPackImporting", String(n)), "pending"); }
       });
       _pbpVocabFlashLocalStatus("dict-pack-action-status", true, t("dictPackDone", String(res.entries)));
     } catch (error) {
@@ -1058,7 +1095,7 @@ function _pbpPackWire() {
           await _pbpPackRefreshStatus();
         } catch (_) {
           const status = $id("dict-pack-status");
-          if (status) status.textContent = t("dictPackDeleteFailed");
+          _pbpPackSetStatus(status, t("dictPackDeleteFailed"), "bad");
         }
       }
     });
@@ -1066,6 +1103,7 @@ function _pbpPackWire() {
   _pbpPackRefreshStatus();
 }
 _pbpPackWire();
+$id("vocab-drive-pointer-open")?.addEventListener("click", () => pbpOpenOptionsTarget("storage", "vocab-drive-body"));
 
 // ---- Offline English->Chinese pack (ECDICT field layout) -----------------
 // No download link and no "open download page" button, unlike the CC-CEDICT
@@ -1081,25 +1119,26 @@ async function _pbpEcdictRefreshStatus() {
   } catch (_) {
     meta = { state: "error" };
   }
+  _pbpPackSummary("ecdict-pack-summary", meta);
   // A database newer than this page cannot be recovered from by retrying; only
   // a reload can. Say so instead of showing a generic read failure.
   if (typeof pbpPackIsStale === "function" && pbpPackIsStale()) {
-    el.textContent = t("ecdictStaleReload");
+    _pbpPackSetStatus(el, t("ecdictStaleReload"), "warn");
     if (del) del.hidden = true;
     return;
   }
   if (meta && meta.state === "ready") {
     const d = new Date(meta.importedAt);
-    el.textContent = t("ecdictReady", String(meta.entries),
-      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
+    _pbpPackSetStatus(el, t("ecdictReady", String(meta.entries),
+      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")), "ok");
     if (del) del.hidden = false;
   } else if (meta && meta.state === "error") {
-    el.textContent = t("dictPackReadFailed");
+    _pbpPackSetStatus(el, t("dictPackReadFailed"), "bad");
     if (del) del.hidden = true;
   } else {
     // NOT dictPackEmpty: that string names MDBG, CC BY-SA 4.0 and .txt.gz, which
     // belong to the other pack entirely.
-    el.textContent = t("ecdictEmpty");
+    _pbpPackSetStatus(el, t("ecdictEmpty"), "pending");
     if (del) del.hidden = true;
   }
 }
@@ -1121,7 +1160,7 @@ function _pbpEcdictWire() {
       // TIME-based throttle (~1s): aria-live must not machine-gun a screen
       // reader on a long import; the final state comes from the refresh.
       const now = performance.now();
-      if (el && now - lastShown >= 1000) { lastShown = now; el.textContent = t("ecdictImporting", String(n)); }
+      if (el && now - lastShown >= 1000) { lastShown = now; _pbpPackSetStatus(el, t("ecdictImporting", String(n)), "pending"); }
     };
     try {
       // Widest rung, deliberately, and there is no picker: a lookup dictionary
@@ -1165,7 +1204,7 @@ function _pbpEcdictWire() {
           await _pbpEcdictRefreshStatus();
         } catch (_) {
           const status = $id("ecdict-pack-status");
-          if (status) status.textContent = t("dictPackDeleteFailed");
+          _pbpPackSetStatus(status, t("dictPackDeleteFailed"), "bad");
         }
       }
     });

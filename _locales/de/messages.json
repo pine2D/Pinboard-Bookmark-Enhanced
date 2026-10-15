@@ -404,6 +404,9 @@
   "pinboardErrorOffline": {
     "message": "Netzwerkfehler, Verbindung prüfen"
   },
+  "pinboardTestUnreachable": {
+    "message": "api.pinboard.in ist nicht erreichbar. Prüfe Netzwerk oder Proxy und teste dann erneut."
+  },
   "pinboardErrorTimeout": {
     "message": "Zeitüberschreitung, später erneut versuchen"
   },
@@ -693,7 +696,7 @@
     "message": "Die Leseansicht öffnet nur http- und https-Seiten."
   },
   "bgMdPreviewTooLarge": {
-    "message": "Der Speicher ist voll. Lösche zwischengespeicherte Daten unter Einstellungen > Speicher und versuche es erneut."
+    "message": "Der Speicher ist voll. Lösche zwischengespeicherte Daten unter Einstellungen > Daten und versuche es erneut."
   },
   "mdPreviewOpenFailed": {
     "message": "Die Leseansicht konnte nicht geöffnet werden. Versuche es erneut."
@@ -705,7 +708,7 @@
     "message": "Speicher verwalten"
   },
   "tabStorage": {
-    "message": "Speicher"
+    "message": "Daten"
   },
   "tabGroupSaving": {
     "message": "Speichern"
@@ -872,7 +875,7 @@
     "message": "Feedback & Probleme"
   },
   "tabGeneral": {
-    "message": "Allgemein"
+    "message": "Konto"
   },
   "tabBookmarks": {
     "message": "Lesezeichen"
@@ -983,13 +986,19 @@
     "message": " Handgeschriebene Texte auf dieser Seite (Prompts, Glossar, Listen, eigenes CSS) werden ebenfalls gelöscht."
   },
   "secPinboardAccount": {
-    "message": "Pinboard Konto"
+    "message": "Pinboard-Konto"
   },
   "labelApiToken": {
     "message": "API-Token"
   },
   "hintApiToken": {
     "message": "Deinen API-Token erhältst du unter"
+  },
+  "tokenLocalHint": {
+    "message": "Dein Token bleibt in diesem Browser und geht nur an Pinboard. Auf deine anderen Geräte gelangt er nur, wenn du API-Schlüssel und Tokens synchronisierst."
+  },
+  "aiKeyLocalHint": {
+    "message": "Jeder API-Schlüssel bleibt in diesem Browser und geht nur an seinen eigenen Anbieter. Auf deine anderen Geräte gelangt er nur, wenn du API-Schlüssel und Tokens synchronisierst."
   },
   "secSaveDefaults": {
     "message": "Standardwerte beim Speichern"
@@ -1494,6 +1503,9 @@
   "langRu": {
     "message": "Русский"
   },
+  "langPl": {
+    "message": "Polski"
+  },
   "labelAiCache": {
     "message": "Cache-Dauer für KI-Tags, Zusammenfassungen und abgerufene Seiten (Minuten)"
   },
@@ -1523,6 +1535,12 @@
   },
   "resetToDefault": {
     "message": "Auf Standard zurücksetzen"
+  },
+  "promptStateDefault": {
+    "message": "Integrierter Prompt aktiv"
+  },
+  "promptStateCustom": {
+    "message": "Angepasst"
   },
   "labelSummaryPrompt": {
     "message": "KI-Zusammenfassungs-Prompt"
@@ -1761,6 +1779,15 @@
   },
   "provCustom": {
     "message": "Custom OpenAI-compatible"
+  },
+  "providerGroupKey": {
+    "message": "Cloud (API-Schlüssel)"
+  },
+  "providerGroupLocal": {
+    "message": "Lokal"
+  },
+  "providerGroupCompat": {
+    "message": "OpenAI-kompatibel"
   },
   "provCustomShort": {
     "message": "Benutzerdefiniert"
@@ -2538,9 +2565,6 @@
   "tagGovLoadFailed": {
     "message": "Tags konnten nicht geladen werden. Prüfe deinen API-Token oder die Netzwerkverbindung und klicke dann auf „Aktualisieren“."
   },
-  "placeholderOptional": {
-    "message": "optional"
-  },
   "tagGovSnapshotSaved": {
     "message": "Tag-Listen-Snapshot heruntergeladen (nur Namen und Anzahl; Referenz für manuelle Reparatur, keine automatische Wiederherstellung)"
   },
@@ -2633,6 +2657,12 @@
     "message": "Nur Tastenkürzel (e zum Erklären, d zum Nachschlagen)"
   },
   "selectionTriggerOff": {
+    "message": "Aus"
+  },
+  "stateOn": {
+    "message": "An"
+  },
+  "stateOff": {
     "message": "Aus"
   },
   "trTranslate": {
@@ -3084,7 +3114,7 @@
     "message": "Zeigt bei englischen Wörtern chinesische Bedeutungen über dem englischen Eintrag. Der englische Eintrag wird weiterhin geladen."
   },
   "ecdictFormatNote": {
-    "message": "Erwartet eine CSV-Datei, deren erste Zeile die Spaltenüberschrift ist und word, translation, tag, collins, oxford, frq und bnc enthält. Fertige Wörterbuchpakete wie mdx, eudic, stardict, mobi und sqlite sind andere Formate und lassen sich nicht importieren. Dieses Projekt stellt keine Datenquelle bereit, empfiehlt keine und prüft keine, und steht in keiner Verbindung dazu. Du stellst die Datei bereit und bist für ihre Lizenz verantwortlich."
+    "message": "Benötigt eine CSV-Datei, deren Kopfzeile word, translation, tag, collins, oxford, frq und bnc enthält. Fertige Pakete (mdx, eudic, stardict, mobi, sqlite) lassen sich nicht importieren. Datei und Lizenz liegen bei dir; dieses Projekt stellt keine Quelle bereit und empfiehlt keine."
   },
   "ecdictImportFile": {
     "message": "Datei importieren"
@@ -3279,6 +3309,9 @@
     "vocabDriveSyncNow": {
       "message": "Jetzt synchronisieren"
     },
+    "vocabDriveManage": {
+      "message": "Unter „Daten“ verwalten"
+    },
     "vocabDriveDisconnect": {
       "message": "Dieses Gerät trennen"
     },
@@ -3292,10 +3325,10 @@
       "message": "Die Google-Autorisierung ist vorübergehend nicht verfügbar."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Kein Pinboard-Konto angemeldet. Trage unter „Allgemein → Pinboard-Konto“ deinen API-Token ein und verbinde dich erneut."
+      "message": "Kein Pinboard-Konto angemeldet. Trage unter „Konto → Pinboard-Konto“ deinen API-Token ein und verbinde dich erneut."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Kein Pinboard-Konto angemeldet. Trage unter „Allgemein → Pinboard-Konto“ deinen API-Token ein und klicke dann auf „Jetzt synchronisieren“."
+      "message": "Kein Pinboard-Konto angemeldet. Trage unter „Konto → Pinboard-Konto“ deinen API-Token ein und klicke dann auf „Jetzt synchronisieren“."
     },
     "vocabDriveErrorPermission": {
       "message": "Die Berechtigung für Google Drive fehlt."
@@ -3582,6 +3615,17 @@
       },
       "date": {
         "content": "$2"
+      }
+    }
+  },
+  "packSummaryEmpty": {
+    "message": "Nicht importiert"
+  },
+  "packSummaryReady": {
+    "message": "$N$ Einträge",
+    "placeholders": {
+      "n": {
+        "content": "$1"
       }
     }
   },
@@ -3875,13 +3919,13 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "Erste $FIRST$ · Letzte $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Gespeichert um $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "Markierungen und Notizen werden auf diesem Gerät gespeichert. Um sie auf einem anderen Gerät zu nutzen, verbinde auf beiden Geräten in den allgemeinen Einstellungen Google Drive; danach werden sie automatisch synchronisiert. Du kannst auch eine Sicherung exportieren und dort importieren." },
-  "libraryNotesScopeOpenBackup": { "message": "Allgemeine Einstellungen öffnen" },
+  "libraryNotesScopeHint": { "message": "Markierungen und Notizen werden auf diesem Gerät gespeichert. Um sie auf einem anderen Gerät zu nutzen, verbinde auf beiden Geräten unter Einstellungen > Daten Google Drive; danach werden sie automatisch synchronisiert. Du kannst auch eine Sicherung exportieren und dort importieren." },
+  "libraryNotesScopeOpenBackup": { "message": "Dateneinstellungen öffnen" },
   "libraryExportMenu": { "message": "Exportieren" },
   "libraryExportSettings": { "message": "Einstellungen für Anki und Eudic" },
   "libraryDriveSynced": { "message": "Mit Google Drive synchronisiert: $TIME$", "placeholders": {"time": {"content": "$1"}} },
   "libraryDriveConnected": { "message": "Mit Google Drive verbunden, noch nicht synchronisiert" },
-  "libraryDriveProblem": { "message": "Problem bei der Google-Drive-Synchronisierung. Allgemeine Einstellungen öffnen" },
+  "libraryDriveProblem": { "message": "Problem bei der Google-Drive-Synchronisierung. Dateneinstellungen öffnen" },
   "libraryRelookup": { "message": "Erneut nachschlagen" },
   "libraryBack": { "message": "Zurück zur Liste" },
   "libraryStatsWords": { "message": "$COUNT$ Wörter", "placeholders": { "count": { "content": "$1" } } },
@@ -4014,6 +4058,14 @@
   "batchResumed": { "message": "Nach Unterbrechung fortgesetzt ($ATTEMPT$ von $MAX$)", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
   "batchCancelFailed": { "message": "Der Abbruch konnte nicht angefordert werden. Versuche es erneut." },
   "connectionOverviewTitle": { "message": "Verbindungsstatus" },
+  "connectionSummaryIssues": {
+    "message": "Handlungsbedarf: $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "connectionOverviewHint": { "message": "Der Status beruht auf Konfiguration, erteilten Berechtigungen und den letzten manuellen Tests. Beim Öffnen der Einstellungen werden weder Dienste kontaktiert noch Berechtigungen angefordert." },
   "connectionNeverTested": { "message": "Noch nicht getestet" },
   "connectionConnected": { "message": "Verbunden" },
@@ -4023,7 +4075,7 @@
   "connectionLastSuccess": { "message": "Letzter Test erfolgreich · $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "connectionLastFailure": { "message": "Letzter Test fehlgeschlagen · $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "settingsSearchLabel": { "message": "Einstellungen durchsuchen" },
-  "settingsSearchPlaceholder": { "message": "Einstellungen durchsuchen" },
+  "settingsSearchPlaceholder": { "message": "Suchen" },
   "settingsSearchNoResults": { "message": "Keine passenden Einstellungen. Suche nach einer Funktion oder einem Bedienelement." },
   "diagnosticsTitle": { "message": "Support-Diagnose" },
   "diagnosticsHint": { "message": "Kopiert Erweiterungsversion, Browser und Sprache, KI-Anbieter, welche Dienste eingerichtet sind, Funktionsschalter, Berechtigungen, Speicher- und Cache-Nutzung, Warteschlangen- und Stapelzähler, Ergebnisse der Verbindungstests und Fehlercodes. Zugangsdaten, Kontonamen, Seitenadressen, Inhalte und eigene Endpunkte bleiben ausgeschlossen." },

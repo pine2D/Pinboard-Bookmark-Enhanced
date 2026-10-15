@@ -297,6 +297,15 @@ export const COMPONENT_PAIR_SPEC = [
   // on-state gate, so a default block that stops declaring either role FAILs
   // instead of silently dropping the check.
   ["accent", "panel", 3, ["opt"], false, true],
+  // Link ink (2026-10-15 options critique): `.hint a` and the other text
+  // links read --opt-link, derived by options-chrome.mjs linkInk() against
+  // exactly these three hosts. Before it existed they painted raw accent,
+  // gated only by the 3:1 switch row above -- flexoki-dark shipped 3.78:1
+  // link text on its raised panel and the default light 4.17:1 on bg.
+  // defaultStrict like the switch row: the default block must keep declaring it.
+  ["link", "panel", 4.5, ["opt"], false, true],
+  ["link", "bg", 4.5, ["opt"], false, true],
+  ["link", "pf-bg", 4.5, ["opt"]],
   // warn-fg/warn-bg (debt-sweep 2026-08-08, independent review F1): both
   // come out of the same pairToAA(destroy, bg, mode) call in
   // deriveUiColors (_ui-derive.mjs) -- the foreground's lightness is

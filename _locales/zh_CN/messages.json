@@ -404,6 +404,9 @@
   "pinboardErrorOffline": {
     "message": "网络连接失败，请检查网络"
   },
+  "pinboardTestUnreachable": {
+    "message": "连不上 api.pinboard.in。检查网络或代理后再测试一次。"
+  },
   "pinboardErrorTimeout": {
     "message": "请求超时，请稍后重试"
   },
@@ -693,7 +696,7 @@
     "message": "阅读器只能打开 http 或 https 网页。"
   },
   "bgMdPreviewTooLarge": {
-    "message": "存储空间已满。请在「设置 > 存储」中清理缓存数据后重试。"
+    "message": "存储空间已满。请在「设置 > 数据」中清理缓存数据后重试。"
   },
   "mdPreviewOpenFailed": {
     "message": "无法打开阅读器，请重试。"
@@ -705,7 +708,7 @@
     "message": "管理存储"
   },
   "tabStorage": {
-    "message": "存储"
+    "message": "数据"
   },
   "tabGroupSaving": {
     "message": "保存"
@@ -872,7 +875,7 @@
     "message": "反馈与问题"
   },
   "tabGeneral": {
-    "message": "通用"
+    "message": "账号"
   },
   "tabBookmarks": {
     "message": "书签"
@@ -990,6 +993,12 @@
   },
   "hintApiToken": {
     "message": "获取地址："
+  },
+  "tokenLocalHint": {
+    "message": "Token 保存在本浏览器，只发送给 Pinboard。开启 API Key 和 Token 同步后，才会出现在你的其他设备上。"
+  },
+  "aiKeyLocalHint": {
+    "message": "每个 API Key 都保存在本浏览器，只发送给对应的服务商。开启 API Key 和 Token 同步后，才会出现在你的其他设备上。"
   },
   "secSaveDefaults": {
     "message": "保存时的默认值"
@@ -1494,6 +1503,9 @@
   "langRu": {
     "message": "Русский"
   },
+  "langPl": {
+    "message": "Polski"
+  },
   "labelAiCache": {
     "message": "AI 标签、摘要与页面缓存时长（分钟）"
   },
@@ -1523,6 +1535,12 @@
   },
   "resetToDefault": {
     "message": "恢复默认"
+  },
+  "promptStateDefault": {
+    "message": "正在使用内置提示词"
+  },
+  "promptStateCustom": {
+    "message": "已自定义"
   },
   "labelSummaryPrompt": {
     "message": "AI 摘要提示词"
@@ -1761,6 +1779,15 @@
   },
   "provCustom": {
     "message": "自定义（OpenAI 兼容）"
+  },
+  "providerGroupKey": {
+    "message": "云端（需 API Key）"
+  },
+  "providerGroupLocal": {
+    "message": "本地"
+  },
+  "providerGroupCompat": {
+    "message": "OpenAI 兼容接口"
   },
   "provCustomShort": {
     "message": "自定义"
@@ -2538,9 +2565,6 @@
   "tagGovLoadFailed": {
     "message": "无法加载标签。请检查 API Token 或网络，然后点击「刷新」。"
   },
-  "placeholderOptional": {
-    "message": "可选"
-  },
   "tagGovSnapshotSaved": {
     "message": "已下载标签清单快照（仅含标签名和数量，供手工修复参考，不能自动还原）"
   },
@@ -2634,6 +2658,12 @@
   },
   "selectionTriggerOff": {
     "message": "关闭"
+  },
+  "stateOn": {
+    "message": "已开启"
+  },
+  "stateOff": {
+    "message": "已关闭"
   },
   "trTranslate": {
     "message": "翻译"
@@ -3084,7 +3114,7 @@
     "message": "查英文词时，在英文释义上方加一段中文释义。英文释义照常加载。"
   },
   "ecdictFormatNote": {
-    "message": "需要 CSV 文件：首行为列名，且包含 word、translation、tag、collins、oxford、frq、bnc 这几列。mdx、eudic、stardict、mobi、sqlite 等成品词典包格式不同，无法导入。本项目不提供、不推荐、不验证数据来源，也与其无关联。文件由你自行取得，其许可由你负责。"
+    "message": "需要首行为列名的 CSV，含 word、translation、tag、collins、oxford、frq、bnc 列；mdx、eudic、stardict、mobi、sqlite 等成品词典包无法导入。文件及其许可由你自备并负责，本项目不提供也不推荐任何来源。"
   },
   "ecdictImportFile": {
     "message": "导入文件"
@@ -3279,6 +3309,9 @@
     "vocabDriveSyncNow": {
       "message": "立即同步"
     },
+    "vocabDriveManage": {
+      "message": "在「数据」中管理"
+    },
     "vocabDriveDisconnect": {
       "message": "断开此设备"
     },
@@ -3292,10 +3325,10 @@
       "message": "暂时无法取得 Google 授权。"
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "尚未登录 Pinboard 账号。请在「通用 → Pinboard 账号」中填写 API Token，然后重新连接。"
+      "message": "尚未登录 Pinboard 账号。请在「账号 → Pinboard 账号」中填写 API Token，然后重新连接。"
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "尚未登录 Pinboard 账号。请在「通用 → Pinboard 账号」中填写 API Token，然后点击「立即同步」。"
+      "message": "尚未登录 Pinboard 账号。请在「账号 → Pinboard 账号」中填写 API Token，然后点击「立即同步」。"
     },
     "vocabDriveErrorPermission": {
       "message": "缺少 Google Drive 权限。"
@@ -3585,6 +3618,17 @@
       }
     }
   },
+  "packSummaryEmpty": {
+    "message": "未导入"
+  },
+  "packSummaryReady": {
+    "message": "$N$ 条",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "dictPackDeleteConfirm": {
     "message": "删除已导入的词典包？"
   },
@@ -3869,13 +3913,13 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最早 $FIRST$ · 最近 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "保存于 $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "高亮和笔记保存在本设备上。要在其他设备上使用，可在两台设备的通用设置中都连接 Google Drive，之后会自动同步；也可以导出备份，再到那台设备导入。" },
-  "libraryNotesScopeOpenBackup": { "message": "打开通用设置" },
+  "libraryNotesScopeHint": { "message": "高亮和笔记保存在本设备上。要在其他设备上使用，可在两台设备的「数据」设置中都连接 Google Drive，之后会自动同步；也可以导出备份，再到那台设备导入。" },
+  "libraryNotesScopeOpenBackup": { "message": "打开数据设置" },
   "libraryExportMenu": { "message": "导出" },
   "libraryExportSettings": { "message": "Anki 与欧路词典设置" },
   "libraryDriveSynced": { "message": "已与 Google Drive 同步：$TIME$", "placeholders": {"time": {"content": "$1"}} },
   "libraryDriveConnected": { "message": "已连接 Google Drive，尚未同步" },
-  "libraryDriveProblem": { "message": "Google Drive 同步出了问题，打开通用设置查看" },
+  "libraryDriveProblem": { "message": "Google Drive 同步出了问题，打开数据设置查看" },
   "libraryRelookup": { "message": "重新查词典" },
   "libraryBack": { "message": "返回列表" },
   "libraryStatsWords": { "message": "$COUNT$ 个词", "placeholders": { "count": { "content": "$1" } } },
@@ -4008,6 +4052,14 @@
   "batchResumed": { "message": "中断后已恢复（第 $ATTEMPT$ 次，最多 $MAX$ 次）", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
   "batchCancelFailed": { "message": "未能发出取消请求，请重试。" },
   "connectionOverviewTitle": { "message": "连接状态" },
+  "connectionSummaryIssues": {
+    "message": "$N$ 项需要处理",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "connectionOverviewHint": { "message": "状态来自当前配置、已授予权限和最近一次手动测试。打开设置不会连接这些服务，也不会申请权限。" },
   "connectionNeverTested": { "message": "尚未测试" },
   "connectionConnected": { "message": "已连接" },

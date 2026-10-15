@@ -404,6 +404,9 @@
   "pinboardErrorOffline": {
     "message": "ネットワークエラー、接続を確認してください"
   },
+  "pinboardTestUnreachable": {
+    "message": "api.pinboard.in に接続できません。ネットワークまたはプロキシを確認して、もう一度テストしてください。"
+  },
   "pinboardErrorTimeout": {
     "message": "リクエストがタイムアウトしました。後で再試行してください"
   },
@@ -693,7 +696,7 @@
     "message": "リーダーで開けるのは http と https のページだけです。"
   },
   "bgMdPreviewTooLarge": {
-    "message": "ストレージがいっぱいです。「設定 > ストレージ」でキャッシュデータを削除してから、もう一度お試しください。"
+    "message": "ストレージがいっぱいです。「設定 > データ」でキャッシュデータを削除してから、もう一度お試しください。"
   },
   "mdPreviewOpenFailed": {
     "message": "リーダーを開けませんでした。もう一度お試しください。"
@@ -705,7 +708,7 @@
     "message": "ストレージを管理"
   },
   "tabStorage": {
-    "message": "ストレージ"
+    "message": "データ"
   },
   "tabGroupSaving": {
     "message": "保存"
@@ -872,7 +875,7 @@
     "message": "フィードバック・問題報告"
   },
   "tabGeneral": {
-    "message": "一般"
+    "message": "アカウント"
   },
   "tabBookmarks": {
     "message": "ブックマーク"
@@ -990,6 +993,12 @@
   },
   "hintApiToken": {
     "message": "トークンの取得先："
+  },
+  "tokenLocalHint": {
+    "message": "トークンはこのブラウザーに保存され、Pinboard にだけ送信されます。ほかのデバイスに届くのは、API キーとトークンの同期をオンにした場合だけです。"
+  },
+  "aiKeyLocalHint": {
+    "message": "各 API キーはこのブラウザーに保存され、それぞれのプロバイダーにだけ送信されます。ほかのデバイスに届くのは、API キーとトークンの同期をオンにした場合だけです。"
   },
   "secSaveDefaults": {
     "message": "保存時のデフォルト"
@@ -1494,6 +1503,9 @@
   "langRu": {
     "message": "Русский"
   },
+  "langPl": {
+    "message": "Polski"
+  },
   "labelAiCache": {
     "message": "AI タグ・要約と取得したページのキャッシュ時間（分）"
   },
@@ -1523,6 +1535,12 @@
   },
   "resetToDefault": {
     "message": "デフォルトに戻す"
+  },
+  "promptStateDefault": {
+    "message": "組み込みのプロンプトを使用中"
+  },
+  "promptStateCustom": {
+    "message": "カスタマイズ済み"
   },
   "labelSummaryPrompt": {
     "message": "AI 要約プロンプト"
@@ -1761,6 +1779,15 @@
   },
   "provCustom": {
     "message": "カスタム OpenAI互換"
+  },
+  "providerGroupKey": {
+    "message": "クラウド（API キー）"
+  },
+  "providerGroupLocal": {
+    "message": "ローカル"
+  },
+  "providerGroupCompat": {
+    "message": "OpenAI 互換"
   },
   "provCustomShort": {
     "message": "カスタム"
@@ -2538,9 +2565,6 @@
   "tagGovLoadFailed": {
     "message": "タグを読み込めませんでした。API Token またはネットワークを確認してから、「更新」をクリックしてください。"
   },
-  "placeholderOptional": {
-    "message": "任意"
-  },
   "tagGovSnapshotSaved": {
     "message": "タグ一覧のスナップショットをダウンロードしました（名前と件数のみ。手動修復の参考用で、自動復元はできません）"
   },
@@ -2633,6 +2657,12 @@
     "message": "ショートカットのみ（e で解説、d で辞書検索）"
   },
   "selectionTriggerOff": {
+    "message": "オフ"
+  },
+  "stateOn": {
+    "message": "オン"
+  },
+  "stateOff": {
     "message": "オフ"
   },
   "trTranslate": {
@@ -3084,7 +3114,7 @@
     "message": "英単語を調べたとき、英語の項目の上に中国語訳を表示します。英語の項目はこれまでどおり読み込まれます。"
   },
   "ecdictFormatNote": {
-    "message": "1 行目が列名で、word・translation・tag・collins・oxford・frq・bnc の各列を含む CSV ファイルが必要です。mdx・eudic・stardict・mobi・sqlite などの完成品の辞書パックは別形式のため読み込めません。本プロジェクトはデータの入手先を提供・推奨・検証しておらず、提供元とは無関係です。ファイルはご自身で用意し、そのライセンスにはご自身で責任を負ってください。"
+    "message": "1 行目に word・translation・tag・collins・oxford・frq・bnc の列名がある CSV が必要です。mdx・eudic・stardict・mobi・sqlite などの完成品の辞書パックは読み込めません。ファイルとそのライセンスはご自身でご用意ください。本プロジェクトは入手先を提供・推奨しません。"
   },
   "ecdictImportFile": {
     "message": "ファイルを読み込む"
@@ -3279,6 +3309,9 @@
     "vocabDriveSyncNow": {
       "message": "今すぐ同期"
     },
+    "vocabDriveManage": {
+      "message": "「データ」で管理"
+    },
     "vocabDriveDisconnect": {
       "message": "このデバイスの接続を解除"
     },
@@ -3292,10 +3325,10 @@
       "message": "Google の認可を一時的に取得できません。"
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Pinboard にログインしていません。「一般 → Pinboard アカウント」で API Token を入力してから、接続し直してください。"
+      "message": "Pinboard にログインしていません。「アカウント → Pinboard アカウント」で API Token を入力してから、接続し直してください。"
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Pinboard にログインしていません。「一般 → Pinboard アカウント」で API Token を入力してから、「今すぐ同期」をクリックしてください。"
+      "message": "Pinboard にログインしていません。「アカウント → Pinboard アカウント」で API Token を入力してから、「今すぐ同期」をクリックしてください。"
     },
     "vocabDriveErrorPermission": {
       "message": "Google Drive の権限がありません。"
@@ -3582,6 +3615,17 @@
       },
       "date": {
         "content": "$2"
+      }
+    }
+  },
+  "packSummaryEmpty": {
+    "message": "未インポート"
+  },
+  "packSummaryReady": {
+    "message": "$N$ 件",
+    "placeholders": {
+      "n": {
+        "content": "$1"
       }
     }
   },
@@ -3875,13 +3919,13 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最初 $FIRST$ · 最新 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "$TIME$ に保存", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "ハイライトとメモはこのデバイスに保存されます。別のデバイスで使うには、両方のデバイスの一般設定で Google Drive に接続してください。以降は自動で同期されます。バックアップをエクスポートして、そのデバイスでインポートすることもできます。" },
-  "libraryNotesScopeOpenBackup": { "message": "一般設定を開く" },
+  "libraryNotesScopeHint": { "message": "ハイライトとメモはこのデバイスに保存されます。別のデバイスで使うには、両方のデバイスの「データ」設定で Google Drive に接続してください。以降は自動で同期されます。バックアップをエクスポートして、そのデバイスでインポートすることもできます。" },
+  "libraryNotesScopeOpenBackup": { "message": "データ設定を開く" },
   "libraryExportMenu": { "message": "エクスポート" },
   "libraryExportSettings": { "message": "Anki と Eudic の設定" },
   "libraryDriveSynced": { "message": "Google Drive と同期済み：$TIME$", "placeholders": {"time": {"content": "$1"}} },
   "libraryDriveConnected": { "message": "Google Drive に接続済み、まだ同期していません" },
-  "libraryDriveProblem": { "message": "Google Drive の同期に問題があります。一般設定を開いて確認してください" },
+  "libraryDriveProblem": { "message": "Google Drive の同期に問題があります。データ設定を開いて確認してください" },
   "libraryRelookup": { "message": "辞書で調べ直す" },
   "libraryBack": { "message": "一覧に戻る" },
   "libraryStatsWords": { "message": "$COUNT$ 語", "placeholders": { "count": { "content": "$1" } } },
@@ -4014,6 +4058,14 @@
   "batchResumed": { "message": "中断から再開（$MAX$ 回中 $ATTEMPT$ 回目）", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
   "batchCancelFailed": { "message": "キャンセルを要求できませんでした。もう一度お試しください。" },
   "connectionOverviewTitle": { "message": "接続状況" },
+  "connectionSummaryIssues": {
+    "message": "要対応：$N$ 件",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "connectionOverviewHint": { "message": "現在の設定、許可済みの権限、直近の手動テストをもとに表示します。設定を開くだけではサービスへの接続や権限の要求は行いません。" },
   "connectionNeverTested": { "message": "未テスト" },
   "connectionConnected": { "message": "接続済み" },

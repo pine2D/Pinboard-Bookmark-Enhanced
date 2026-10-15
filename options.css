@@ -356,6 +356,12 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
 .listbox-opt[data-active] { background: var(--opt-btn-hover); color: var(--opt-btn-fg); }
 .listbox-opt[aria-selected="true"] { background: var(--opt-accent); color: var(--opt-on-accent); }
 .listbox-opt[aria-disabled="true"] { color: var(--opt-fg-hint); cursor: default; }
+/* <optgroup> (listbox.js): a non-interactive group label in the overline
+   face, inset to the options' text column; the inner list is a plain stack.
+   A group after the first one gets a little air above its label. */
+.listbox-optgroup > ul { margin: 0; padding: 0; list-style: none; }
+.listbox-optgroup-label { padding: var(--opt-sp-2) var(--opt-sp-4) var(--opt-sp-1); font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); font-weight: 600; color: var(--opt-fg-hint); cursor: default; }
+.listbox-optgroup + .listbox-optgroup > .listbox-optgroup-label { padding-top: var(--opt-sp-4); }
 /* The translate select's follow-up free-text input: the relationship rule
    `.fg > select + input` no longer matches once the listbox sits between. */
 .fg > .listbox + input { margin-top: var(--opt-sp-3); }
@@ -923,7 +929,7 @@ label.switch > .context-help > .context-help-body {
 /* ---- Panel footer (e.g. General tab feedback link) ---- */
 .panel-foot { margin-top: var(--opt-sp-6); padding-top: var(--opt-sp-5); border-top: 1px solid var(--opt-border-section); font-size: 11px; text-align: center; }
 .panel-foot a { color: var(--opt-fg-muted); text-decoration: none; transition: color var(--motion-state) ease; display: inline-flex; align-items: center; gap: var(--opt-sp-2); }
-.panel-foot a:hover { color: var(--opt-accent); text-decoration: underline; }
+.panel-foot a:hover { color: var(--opt-link); text-decoration: underline; }
 .panel-foot .ext-icon { width: 10px; height: 10px; flex-shrink: 0; }
 /* External-link mark inside .btn rows (dict-pack-open prefix): the action
    leaves the settings page, say so with the shared icon. No margin-right of
@@ -943,7 +949,10 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
 .fg > .hint { margin: var(--opt-sp-1) 0 0; }   /* inside a form group: tight to its control; the group's own margin-bottom (10px) provides separation */
 .fg + .hint { margin-top: -6px; }  /* a hint owned by the preceding group: pull close (net ~4px gap above, 10px below) */
 .shortcut-current + .btn { margin-left: var(--opt-sp-4); }   /* "Shortcut: <keys> [Open Chrome Shortcut Settings]" lines */
-.hint a { color: var(--opt-accent); }
+/* :not(.btn): a button-styled link inside a hint (the Chrome shortcut
+   links) keeps the .btn recipe's ink -- (0,1,1) used to beat .btn's (0,1,0)
+   and painted accent text on the button fills, 3.4-3.7:1 on hover. */
+.hint a:not(.btn) { color: var(--opt-link); }
 .hint code { background: var(--opt-code-bg); border-radius: var(--opt-radius-sm); padding: 1px var(--opt-sp-2); font-size: 11px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 /* A hint slot that doubles as a failure report (tag governance's AI status,
    Batch's legacy-permission line): setStatusIcon() adds .bad, so the themed
@@ -1425,9 +1434,10 @@ input[type="checkbox"], input[type="radio"] {
 .connection-health-row {
   min-height: 42px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--opt-sp-4);
+  gap: var(--opt-sp-1) var(--opt-sp-4);
   padding: var(--opt-sp-3) var(--opt-sp-4);
   border: 1px solid var(--opt-border-section);
   border-radius: var(--opt-radius-md);
@@ -1445,7 +1455,9 @@ input[type="checkbox"], input[type="radio"] {
    (COMPONENTS.md §9.1 law 8, weak-text-on-fill batch T2). .ok/.bad/.warn
    below are untouched (save/danger/warn are not yet gated against btn-bg in
    contrast-audit's COMPONENT_PAIR_SPEC -- reported, not silently gated here). */
-.connection-health-state { color: var(--opt-btn-fg-muted); font-size: 11px; text-align: right; }
+/* nowrap + the row's flex-wrap: a long "last test failed · date" drops whole
+   onto its own line under the name instead of breaking mid-date. */
+.connection-health-state { color: var(--opt-btn-fg-muted); font-size: 11px; text-align: right; white-space: nowrap; margin-left: auto; }
 .connection-health-state.ok { color: var(--opt-save); }
 .connection-health-state.bad { color: var(--opt-danger); }
 .connection-health-state.warn { color: var(--opt-warn); }
@@ -1782,8 +1794,12 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
    it started rendering with stage 2's provider-panel entry blocks. */
 .entry-block > :is(input:not([type="number"]), .key-wrap) { max-width: none; }
 
-/* Provider sub-panel and action rows on the row-model rhythm (spec stage2 §2). */
-.pf { margin-top: var(--opt-sp-6); padding: var(--opt-panel-pad); }
+/* Provider fields and action rows on the row-model rhythm (spec stage2 §2).
+   Frameless since 2026-10-15 (user ruling after the options critique): once
+   Jina left the AI Providers tab, the box around the selected provider's
+   fields only framed a panel inside a panel. The fields now sit in the
+   panel's own column, directly under the provider select that owns them. */
+.pf { margin-top: var(--opt-sp-6); }
 /* The provider sub-panel title: body face, 600, body colour. The
    `html[data-theme]` twin keeps it body colour under every preset theme;
    the old themed muted-colour `.pf h3` override was deleted in stage 3c. */
@@ -1828,13 +1844,6 @@ html[data-theme] .pf > h3 {
 .save-status { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 
 /* ---- Provider fields ---- */
-/* Provider fieldset: a resting container, so its edge is the hairline section
-   token (COMPONENTS.md §9 law 4), not the 3:1 --opt-border frame that overlays
-   use. It had slipped through C36 with a one-off #e0e0d8 unthemed and a themed
-   override to --opt-border, which painted a near-black box on modern-card
-   (user report 2026-09-18). --opt-border-section is defined per theme, so one
-   rule serves the default surface and every preset. */
-.pf { background: var(--opt-pf-bg); border: 1px solid var(--opt-border-section); border-radius: var(--opt-radius-md); }
 .pf[hidden] { display: none; }
 /* Same reveal recipe as .backup-import-preview, but the transition lives
    inside :not([hidden]): provider switches swap two panels at once, and an
@@ -1849,7 +1858,7 @@ html.motion-ready .pf:not([hidden]) {
 
 /* ---- Markdown export targets (Send-to destination cards) ---- */
 .et-onboarding { margin-top: var(--opt-sp-4); font-size: 12px; color: var(--opt-fg-soft); }
-.et-onboarding summary { cursor: pointer; padding: var(--opt-sp-2) 0; color: var(--opt-accent); user-select: none; }
+.et-onboarding summary { cursor: pointer; padding: var(--opt-sp-2) 0; color: var(--opt-link); user-select: none; }
 .et-onboarding summary:hover { text-decoration: underline; }
 .et-onboarding[open] summary { margin-bottom: var(--opt-sp-2); }
 .et-onboarding .hint { margin: 0; }
@@ -1876,6 +1885,9 @@ html.motion-ready .pf:not([hidden]) {
   border-top: 1px solid var(--opt-border-section, var(--opt-border, #ddd));
 }
 .disclosure + .disclosure { margin-top: 0; }
+/* A disclosure that opens its panel (Data Sync on the Data tab) has nothing
+   above it to be divided from: no rule, no lead-in gap. */
+.panel > .settings-section:first-child > .disclosure:first-child { margin-top: 0; border-top: 0; }
 .disclosure > summary {
   /* Full-bleed hover pill: horizontal padding is given back as negative
      margin so the text column stays aligned with the panel. */
@@ -1888,6 +1900,19 @@ html.motion-ready .pf:not([hidden]) {
   transition: color var(--motion-state), background-color var(--motion-state);
 }
 .disclosure > summary:hover { color: var(--opt-accent-hover); background: var(--opt-panel); }
+/* A live readout inside a disclosure header ("Not imported", "On", "Needs
+   attention: 2"): body weight at the helper size so it reads as state, not as
+   part of the section name, and it keeps its own ink when the header hovers.
+   The summary's flex gap spaces it; the chevron's margin-left:auto still
+   parks on the right edge. */
+.disclosure > summary > .summary-state {
+  font-weight: 400;
+  font-size: var(--opt-text-helper);
+  line-height: var(--opt-lh-helper);
+  color: var(--opt-fg-muted);
+}
+.disclosure > summary > .summary-state:empty { display: none; }
+.disclosure > summary > .summary-state.bad { color: var(--opt-danger-quiet-fg); }
 .disclosure-subsection > summary {
   font-size: var(--opt-text-body);
   line-height: var(--opt-lh-body);
@@ -2013,7 +2038,10 @@ html.motion-ready #preset-preview-section > summary::after {
   gap: 6px;
   border: none;
   border-radius: var(--opt-radius-full);
-  background: color-mix(in srgb, var(--opt-accent) 10%, var(--opt-panel));
+  /* Chip language (DESIGN.md Chips; 2026-10-15 options critique): unselected
+     wears the button fill, selected the chip wash. The old 10% / 16% accent
+     tints were too close to tell apart without the ring. */
+  background: var(--opt-btn-bg);
   color: var(--opt-fg);
 }
 /* Swatch dot: --variant-swatch defaults to the current theme's plain
@@ -2041,7 +2069,7 @@ html.motion-ready #preset-preview-section > summary::after {
 }
 .theme-preset-btn:hover:not(:disabled),
 .saved-theme-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--opt-accent) 18%, var(--opt-panel));
+  background: var(--opt-btn-hover);
 }
 /* .saved-theme-btn shares every other rule in this shared-base block (fill,
    hover, .active ring) but had never gained its own focus core -- its sibling
@@ -2052,8 +2080,8 @@ html.motion-ready #preset-preview-section > summary::after {
 .saved-theme-btn:focus-visible { outline: 1px solid var(--opt-accent); outline-offset: 2px; box-shadow: var(--opt-focus-ring); }
 .theme-preset-btn.active,
 .saved-theme-btn.active {
-  background: color-mix(in srgb, var(--opt-accent) 16%, var(--opt-panel));
-  color: var(--opt-accent);
+  background: var(--opt-chip-bg);
+  color: var(--opt-chip-fg);
   font-weight: 600;
   outline: 2px solid var(--opt-accent);
   outline-offset: 2px; /* ring sits outside the border box -- never touches the label */
@@ -2247,6 +2275,7 @@ html[data-theme="modern-card"] {
   --opt-field-placeholder: #585e64;
   --opt-field-fg: #1a1a2e;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23585e64' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #166ad8;
 }
 html[data-theme="nord-night"] {
   color-scheme: dark;
@@ -2290,6 +2319,7 @@ html[data-theme="nord-night"] {
   --opt-field-placeholder: #c0c6d2;
   --opt-field-fg: #e5e9f0;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23c0c6d2' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #88c0d0;
 }
 html[data-theme="terminal"] {
   color-scheme: dark;
@@ -2334,6 +2364,7 @@ html[data-theme="terminal"] {
   --opt-field-placeholder: #21b621;
   --opt-field-fg: #33ff33;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%2321b621' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #33ff33;
 }
 html[data-theme="paper-ink"] {
   color-scheme: light;
@@ -2378,6 +2409,7 @@ html[data-theme="paper-ink"] {
   --opt-field-placeholder: #5c5c5c;
   --opt-field-fg: #2c2c2c;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235c5c5c' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #1a3a5c;
 }
 html[data-theme="dracula"] {
   color-scheme: dark;
@@ -2421,6 +2453,7 @@ html[data-theme="dracula"] {
   --opt-field-placeholder: #bcc3d8;
   --opt-field-fg: #f8f8f2;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23bcc3d8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #8be9fd;
 }
 html[data-theme="flexoki-light"] {
   color-scheme: light;
@@ -2464,6 +2497,7 @@ html[data-theme="flexoki-light"] {
   --opt-field-placeholder: #555450;
   --opt-field-fg: #100f0f;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23555450' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #205ea6;
 }
 html[data-theme="flexoki-dark"] {
   color-scheme: dark;
@@ -2507,6 +2541,7 @@ html[data-theme="flexoki-dark"] {
   --opt-field-placeholder: #a5a39f;
   --opt-field-fg: #cecdc3;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23a5a39f' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #5a94c6;
 }
 html[data-theme="solarized-light"] {
   color-scheme: light;
@@ -2550,6 +2585,7 @@ html[data-theme="solarized-light"] {
   --opt-field-placeholder: #535d5f;
   --opt-field-fg: #39474b;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23535d5f' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #1e6ca4;
 }
 html[data-theme="solarized-dark"] {
   color-scheme: dark;
@@ -2594,6 +2630,7 @@ html[data-theme="solarized-dark"] {
   --opt-field-placeholder: #9facad;
   --opt-field-fg: #c3cbcb;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%239facad' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #4ca2df;
 }
 html[data-theme="catppuccin-latte"] {
   color-scheme: light;
@@ -2637,6 +2674,7 @@ html[data-theme="catppuccin-latte"] {
   --opt-field-placeholder: #595a71;
   --opt-field-fg: #41445a;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23595a71' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #1a5ad8;
 }
 html[data-theme="catppuccin-mocha"] {
   color-scheme: dark;
@@ -2680,6 +2718,7 @@ html[data-theme="catppuccin-mocha"] {
   --opt-field-placeholder: #999fb6;
   --opt-field-fg: #cdd6f4;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23999fb6' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #89b4fa;
 }
 html[data-theme="gruvbox-dark"] {
   color-scheme: dark;
@@ -2723,6 +2762,7 @@ html[data-theme="gruvbox-dark"] {
   --opt-field-placeholder: #aca093;
   --opt-field-fg: #ebdbb2;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23aca093' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #89a99d;
 }
 html[data-theme="rose-pine"] {
   color-scheme: dark;
@@ -2766,6 +2806,7 @@ html[data-theme="rose-pine"] {
   --opt-field-placeholder: #8e8ba3;
   --opt-field-fg: #e0def4;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%238e8ba3' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #c4a7e7;
 }
 html[data-theme="github-light"] {
   color-scheme: light;
@@ -2809,6 +2850,7 @@ html[data-theme="github-light"] {
   --opt-field-placeholder: #5a626b;
   --opt-field-fg: #1f2328;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235a626b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #0969da;
 }
 :root {
   color-scheme: light;
@@ -2838,6 +2880,7 @@ html[data-theme="github-light"] {
   --opt-field-placeholder: #616161;
   --opt-field-fg: #333333;
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23616161' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #3f6dac;
 }
 .theme-preset-btn[data-theme="flexoki"] {
   --variant-swatch: #205EA6;
@@ -3004,12 +3047,12 @@ html[data-theme] .et-onboarding { color: var(--opt-fg-muted); }
    into --opt-accent. */
 html[data-theme] .section-title { color: var(--opt-fg); }
 html[data-theme] .disclosure > summary { color: var(--opt-fg); }
-html[data-theme] .disclosure > summary:hover { color: var(--opt-accent); }
+html[data-theme] .disclosure > summary:hover { color: var(--opt-link); }
 /* .theme-preset-btn.active / .saved-theme-btn.active / .theme-preset-btn
    :focus-visible no longer need a themed override here: the borderless
    swatch-pill base rule (Tag Presets... options' Theme preset buttons,
-   above) is entirely var()-driven against --opt-accent/--opt-panel, both
-   already theme-reactive, so it renders correctly under every preset with
+   above) is entirely var()-driven against per-theme role tokens
+   (btn-bg / btn-hover / chip-bg / chip-fg / accent), so it renders correctly under every preset with
    no per-theme override -- and the check tick those overrides used to
    recolor (::after) no longer exists. */
 html[data-theme] .saved-theme-del:focus-visible { outline-color: var(--opt-accent); }
@@ -3297,7 +3340,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   color: inherit;
   text-decoration: none;
 }
-.wayback-log-url:hover { color: var(--opt-accent); text-decoration: underline; }
+.wayback-log-url:hover { color: var(--opt-link); text-decoration: underline; }
 .wayback-log-url-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3386,7 +3429,7 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   align-items: center;
   justify-content: center;
 }
-.wayback-log-retry:hover { color: var(--opt-accent); }
+.wayback-log-retry:hover { color: var(--opt-link); }
 .wayback-log-retry:active:not(:disabled) { transform: translateY(1px); }
 .wayback-log-retry:disabled { opacity: .4; cursor: default; }
 .wayback-perm-status {
@@ -3853,7 +3896,9 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
 /* Narrow settings retain complete controls and allow translated labels to wrap. */
 @media (max-width: 480px) {
   .options-nav { grid-template-columns: minmax(0, 1fr); align-items: start; }
-  .reset-tab-btn { justify-self: start; border-left: 0; padding-left: 0; white-space: normal; }
+  /* Tight under the picker it acts on (24px hit floor, no block padding), so
+     the container's larger row gap reads as the break before the panel. */
+  .reset-tab-btn { justify-self: start; border-left: 0; padding-left: 0; padding-block: 0; min-height: 24px; white-space: normal; }
   .panel.active { padding: var(--opt-sp-4); }
   .fg > .listbox { min-width: 0; width: 100%; }
   .fg select { min-width: 0; }

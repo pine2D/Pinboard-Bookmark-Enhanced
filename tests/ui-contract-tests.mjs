@@ -161,6 +161,29 @@ const privacyMd = read("docs/privacy.md");
 check(!optionsHtml.includes('Requires "Access all websites" permission'), "options Batch hint still advertises the retired all-sites request");
 check(optionsHtml.includes('data-i18n="secBackupRestore">Backup &amp; Restore</h2>'),
   "options.html: backup section fallback still advertises sync");
+
+// Subordinate rows follow their parent switch (2026-10-15 options critique):
+// every `.pref-row-sub` names its parent through data-parent, and that id is a
+// checkbox outside the row, so options.js syncSubRows() can dim and disable the
+// row while the parent is off. Exempt rows carry no parent switch on the page.
+{
+  const SUB_ROW_EXEMPT = new Set([
+    "opt-preview-skim", // indented under the translation block it extends; it has no parent switch
+  ]);
+  const html = optionsHtml.replace(/<!--[\s\S]*?-->/g, "");
+  const subRows = [...html.matchAll(/<div\b[^>]*\bclass="[^"]*\bpref-row-sub\b[^"]*"[^>]*>([\s\S]*?)<\/div>/g)];
+  check(subRows.length >= 6, `options.html: expected the six .pref-row-sub rows, found ${subRows.length} -- the scan stopped matching`);
+  for (const m of subRows) {
+    const open = m[0].slice(0, m[0].indexOf(">") + 1);
+    const ownId = (m[1].match(/<input\b[^>]*\bid="([^"]+)"/) || [])[1];
+    const parent = (open.match(/\bdata-parent="([^"]+)"/) || [])[1];
+    if (SUB_ROW_EXEMPT.has(ownId)) { check(!parent, `options.html: exempt sub row ${ownId} gained a data-parent -- drop it from SUB_ROW_EXEMPT`); continue; }
+    check(!!parent, `options.html: .pref-row-sub holding #${ownId} has no data-parent -- it will not dim while its parent switch is off`);
+    if (!parent) continue;
+    check(new RegExp(`<input\\b[^>]*\\btype="checkbox"[^>]*\\bid="${parent}"|<input\\b[^>]*\\bid="${parent}"[^>]*\\btype="checkbox"`).test(html) && !m[1].includes(`id="${parent}"`),
+      `options.html: sub row #${ownId} names data-parent="${parent}", which is not a checkbox outside the row`);
+  }
+}
 const mdHtml = read("md-preview.html");
 const mdPreviewJs = read("md-preview.js");
 const mdExportSendJs = read("md-export-send.js");
@@ -1255,7 +1278,7 @@ const disclosureKeys = [...optionsHtml.matchAll(
   /<details class="disclosure"(?: id="[^"]+")? data-acc-key="([^"]+)"/g
 )].map((match) => match[1]);
 check(disclosureKeys.join(",") ===
-  "connection-overview,general-data-sync,vocab-reading,vocab-learning,vocab-ecdict-pack,vocab-dictionary-pack",
+  "connection-overview,vocab-reading,vocab-learning,vocab-ecdict-pack,vocab-dictionary-pack,general-data-sync",
   "options.html: settings disclosures lack stable pp-acc keys");
 check(optionsJs.includes('querySelectorAll("details[data-acc-key]")') &&
   /addEventListener\("toggle",[\s\S]{0,500}pbpAccSet\(det\.dataset\.accKey, det\.open\)/.test(optionsJs),
@@ -4091,10 +4114,12 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
 // purpose; extend it with a reason, never to make the gate pass.
 {
   const RESET_ALLOWLIST = {
-    general: [
+    // The Data tab (panel id "storage") took Chrome Sync, Google Drive and
+    // Backup & Restore from the old General tab (2026-10-15 options IA).
+    storage: [
       "opt-sync-api-keys",                // credential routing toggle: a reset must never move secrets
       // opt-backup-include-vocabulary is NOT here: 84432e3 made it a real
-      // persisted setting (backupIncludeVocabulary), so PANEL_DEFAULTS.general
+      // persisted setting (backupIncludeVocabulary), so PANEL_DEFAULTS.storage
       // must carry it -- an exemption would cover it instead, and deleting the
       // entry from PANEL_DEFAULTS would then sail through this very gate.
       "opt-backup-include-secrets",        // export picker: per-export, never persisted
@@ -4102,8 +4127,13 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
       "backup-section-vocabulary", "backup-section-secrets",          // import preview pickers: session UI
     ],
     tags: ["tag-gov-select-all"],         // list selection helper, not a setting
+    // Interface language changes only through its own save-and-reload path; a
+    // silent reset write would leave the page in the old language.
+    appearance: ["opt-lang"],
   };
-  const RESET_PANELS_WITHOUT_DEFAULTS = new Set(["storage"]); // nothing persisted to reset
+  // The Account tab (panel id "general") holds only the Pinboard token, which
+  // a reset must never clear -- so it has no entry and no Reset button.
+  const RESET_PANELS_WITHOUT_DEFAULTS = new Set(["general"]);
   const pdStart = optionsJs.indexOf("const PANEL_DEFAULTS = {");
   const pdEnd = optionsJs.indexOf("\n  };", pdStart) + 4;
   let panelDefaults = null;
@@ -8055,6 +8085,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
       constructor(tag) { this.tagName = String(tag).toUpperCase(); this.children = []; this.dataset = {}; this.className = ""; this.id = ""; this.attrs = {}; }
       get classList() { return { add: (...c) => { this.className = [this.className, ...c].join(" ").trim(); } }; }
       appendChild(c) { this.children.push(c); return c; }
+      append(...cs) { for (const c of cs) this.children.push(c); }
       setAttribute(k, v) { this.attrs[k] = String(v); }
       removeAttribute(k) { delete this.attrs[k]; }
       addEventListener() {}

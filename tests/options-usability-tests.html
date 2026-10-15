@@ -309,6 +309,22 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(pbpSearchSettings(index, "   ").length === 0, "empty query returned everything");
   });
 
+  // Names before prose (2026-10-15): a label, heading, summary or button that
+  // matches outranks a .hint that merely mentions the word, and page order
+  // still decides within each tier. Pure ranking check on a synthetic index.
+  await test("settings search ranks names above hint prose, stable within each tier", async () => {
+    const index = [
+      { panel: "a", text: "hint one", searchText: "zq hint one", targetId: "h1", hint: true },
+      { panel: "a", text: "label one", searchText: "zq label one", targetId: "l1" },
+      { panel: "b", text: "hint two", searchText: "zq hint two", targetId: "h2", hint: true },
+      { panel: "b", text: "label two", searchText: "zq label two", targetId: "l2" },
+    ];
+    const order = pbpSearchSettings(index, "zq").map((entry) => entry.targetId).join(",");
+    assert(order === "l1,l2,h1,h2", "order=" + order);
+    const built = pbpBuildSettingsSearchIndex(document);
+    assert(built.some((entry) => entry.hint) && built.some((entry) => !entry.hint), "the index no longer marks hint rows");
+  });
+
   await test("no search result names a target the page keeps hidden", async () => {
     // Category-level, over the WHOLE index: not "the provider blocks behave",
     // but "no row anywhere names a box-less control". focus() on a display:none
@@ -1007,7 +1023,9 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // 3 video-group switches (opt-md-video-dark/-pause-lookup/-use-login) = 5,
   // every one a `.pref-row` now -- reader joins this loop instead of getting
   // its own marker/switch-count exemption.
-  const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 12], ["ai-behavior", 2], ["archive", 3], ["reader", 5]];
+  // quick: 12 own switches + the 5 Notifications switches it took from the
+  // old General tab (2026-10-15 IA).
+  const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 17], ["ai-behavior", 2], ["archive", 3], ["reader", 5]];
 
   for (const [id, switchCount] of STAGE3A_PANELS) {
     await test(`stage3a: every switch in the ${id} panel sits in a .pref-row`, async () => {
@@ -1076,29 +1094,30 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   // Stage-3b Task 2 (2026-09-24-ui-system-stage3b): general + storage move
-  // onto the row model. General's 10 switches: Data Sync (2: Chrome Sync and
-  // synced credentials; the two Google Drive data-scope switches were retired
-  // in 2026-10, spec §6.1) + Backup & Restore (3: highlights/vocabulary/
-  // secrets) + Notifications (5) -- re-verified against the live markup.
-  await test("stage3b: every switch in the general panel sits in a .pref-row", async () => {
-    const panel = await panelDoc("general");
-    assert(!!panel, "panel-general is missing");
+  // onto the row model. Since the 2026-10-15 IA the Data tab (panel id
+  // "storage") holds Data Sync (2: Chrome Sync and synced credentials; the two
+  // Google Drive data-scope switches were retired in 2026-10, spec §6.1) +
+  // Backup & Restore (3: highlights/vocabulary/secrets); Notifications (5)
+  // went to Quick Actions and the Account tab has no switch at all.
+  await test("stage3b: every switch in the Data panel sits in a .pref-row", async () => {
+    const panel = await panelDoc("storage");
+    assert(!!panel, "panel-storage is missing");
     const switches = [...panel.querySelectorAll("label.switch")];
-    assert(switches.length === 10, "expected 10 switches in panel-general, got " + switches.length);
+    assert(switches.length === 5, "expected 5 switches in panel-storage, got " + switches.length);
     assert(switches.every((l) => l.parentElement.classList.contains("pref-row") && l.closest(".pref-group")),
-      "every switch in panel-general must sit directly in a .pref-row inside a .pref-group");
+      "every switch in panel-storage must sit directly in a .pref-row inside a .pref-group");
   });
 
-  await test("stage3b: general panel's language select is a listbox target", async () => {
-    const panel = await panelDoc("general");
-    assert(!!panel, "panel-general is missing");
+  await test("stage3b: appearance panel's language select is a listbox target", async () => {
+    const panel = await panelDoc("appearance");
+    assert(!!panel, "panel-appearance is missing");
     const select = panel.querySelector("#opt-lang");
     assert(select && select.hasAttribute("data-listbox"), "opt-lang is missing data-listbox");
   });
 
   await test("stage3b: backup section picker checkboxes use label.pick.pick-box", async () => {
-    const panel = await panelDoc("general");
-    assert(!!panel, "panel-general is missing");
+    const panel = await panelDoc("storage");
+    assert(!!panel, "panel-storage is missing");
     const fieldset = panel.querySelector("fieldset.backup-section-picker");
     assert(!!fieldset && fieldset.querySelector("legend"), "backup-section-picker lost its fieldset/legend");
     const checkboxes = [...fieldset.querySelectorAll('input[type="checkbox"]')];
@@ -1116,8 +1135,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("stage3b: storage panel keeps its row-model shape", async () => {
     const panel = await panelDoc("storage");
     assert(!!panel, "panel-storage is missing");
-    const section = panel.querySelector("section.settings-section");
-    assert(!!section, "panel-storage's content is not wrapped in a section.settings-section");
+    const section = panel.querySelector("#storage-cats")?.closest("section.settings-section");
+    assert(!!section && section.parentElement === panel, "panel-storage's cache list is not wrapped in a top-level section.settings-section");
     assert(!!section.querySelector("#storage-cats.storage-cats"), "panel-storage lost its #storage-cats mount point");
     const actions = section.querySelector(".fg.fg-actions");
     assert(!!actions && actions.querySelector("#storage-clear-btn") && actions.querySelector("#storage-status"),
@@ -1208,13 +1227,15 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(select && select.hasAttribute("data-listbox"), "opt-theme is missing data-listbox");
   });
 
-  await test("stage3b: appearance panel wraps Theme and Custom Style in their own sections", async () => {
+  // Language joined the Appearance tab ahead of Theme (2026-10-15 IA).
+  await test("stage3b: appearance panel wraps Language, Theme and Custom Style in their own sections", async () => {
     const panel = await panelDoc("appearance");
     assert(!!panel, "panel-appearance is missing");
     const sections = [...panel.querySelectorAll(":scope > section.settings-section")];
-    assert(sections.length === 2, "expected 2 top-level sections in panel-appearance, got " + sections.length);
-    assert(!!sections[0].querySelector("#opt-theme"), "#opt-theme is not inside the Theme section");
-    assert(!!sections[1].querySelector("#opt-custom-css"), "#opt-custom-css is not inside the Custom Style section");
+    assert(sections.length === 3, "expected 3 top-level sections in panel-appearance, got " + sections.length);
+    assert(!!sections[0].querySelector("#opt-lang"), "#opt-lang is not inside the Language section");
+    assert(!!sections[1].querySelector("#opt-theme"), "#opt-theme is not inside the Theme section");
+    assert(!!sections[2].querySelector("#opt-custom-css"), "#opt-custom-css is not inside the Custom Style section");
   });
 
   await test("stage3b: appearance panel's saved-themes and preset-preview sections use the hidden attribute, not inline style", async () => {
@@ -1274,11 +1295,11 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       ".vocab-toolbar must stay outside any .fg (spec: .fg-actions/.vocab-toolbar untouched)");
   });
 
-  await test("Google Drive in General Data Sync retains the shared connection fields and toolbar", async () => {
-    const panel = await panelDoc("general");
-    assert(!!panel, "panel-general is missing");
+  await test("Google Drive in Data Sync (Data tab) retains the shared connection fields and toolbar", async () => {
+    const panel = await panelDoc("storage");
+    assert(!!panel, "panel-storage is missing");
     const drive = panel.querySelector('details.disclosure[data-acc-key="general-data-sync"] #vocab-drive-body');
-    assert(!!drive, "General Data Sync lost the shared Google Drive connection");
+    assert(!!drive, "Data Sync lost the shared Google Drive connection");
     assert(!!drive.querySelector("dl#vocab-drive-fields[hidden]"), "vocab-drive-fields dl or its hidden attribute is missing");
     assert(!drive.querySelector(".fg"), "vocab-google-drive must not gain any .fg wrapper");
   });

@@ -398,6 +398,36 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     assert(custom.classList.contains("hidden"), "custom input not re-hidden");
   });
 
+  // <optgroup> support (2026-10-15): the provider select is grouped (cloud /
+  // local / compatible). Groups render as role=group named by a label that is
+  // never an option, so the active index -- options only -- walks straight
+  // across a group boundary, and a click on a label neither picks nor closes.
+  test("optgroups render as labelled groups that keyboard and pointer pass over", () => {
+    showPanel("panel-ai");
+    setValue(provider(), "gemini");
+    const groups = [...listOf(provider()).querySelectorAll(':scope > [role="group"]')];
+    const optgroups = [...provider().querySelectorAll("optgroup")];
+    assert(optgroups.length === 3 && groups.length === optgroups.length, "groups=" + groups.length + " optgroups=" + optgroups.length);
+    groups.forEach((g, i) => {
+      const label = doc.getElementById(g.getAttribute("aria-labelledby") || "");
+      assert(label && label.textContent.trim() === optgroups[i].label.trim() && !label.matches('[role="option"]'),
+        "group " + i + " is not named by its optgroup label");
+      assert(g.querySelectorAll('[role="option"]').length === optgroups[i].querySelectorAll("option").length,
+        "group " + i + " does not hold its own options");
+    });
+    assert(itemsOf(provider()).length === provider().options.length, "options inside groups were lost or duplicated");
+    const btn = btnOf(provider());
+    const lastCloud = optgroups[0].querySelectorAll("option").length - 1;
+    key(btn, "ArrowDown");
+    while (activeIndex(provider()) < lastCloud) key(btn, "ArrowDown");
+    key(btn, "ArrowDown");
+    assert(itemsOf(provider())[activeIndex(provider())]?.dataset.value === optgroups[1].querySelector("option").value,
+      "ArrowDown across a group boundary landed on " + activeIndex(provider()));
+    doc.getElementById(groups[1].getAttribute("aria-labelledby")).click();
+    assert(provider().value === "gemini" && btn.getAttribute("aria-expanded") === "true", "a group label click picked or closed");
+    close(provider());
+  });
+
   test("programmatic value + pbpListboxSync updates the button text", () => {
     assert(typeof win.pbpListboxSync === "function" && typeof win.pbpEnhanceListbox === "function", "exports missing");
     const count = itemsOf(provider()).length;

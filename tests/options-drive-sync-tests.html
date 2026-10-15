@@ -3,8 +3,8 @@
 <link rel="stylesheet" href="../options.css">
 <style>body{padding:16px}.case{padding:5px}.pass{color:#176}.fail{color:#b00}</style>
 </head><body>
-<button class="tab-btn active" data-panel="general" hidden></button>
-<div id="panel-general" style="position:fixed;left:-9999px;top:0;width:700px">
+<button class="tab-btn active" data-panel="storage" hidden></button>
+<div id="panel-storage" style="position:fixed;left:-9999px;top:0;width:700px">
   <div id="vocab-drive-body">
     <p id="vocab-drive-state"></p>
     <dl id="vocab-drive-fields" hidden>
@@ -81,8 +81,10 @@ window.chrome = {
   const source = await (await fetch("../options.html")).text();
   const production = new DOMParser().parseFromString(source, "text/html");
   const dataSync = production.querySelector('details[data-acc-key="general-data-sync"]');
-  check("data sync uses the existing persisted native disclosure in General",
-    dataSync?.classList.contains("disclosure") && dataSync.closest("#panel-general"));
+  // The Data tab (panel id "storage") holds data sync since the 2026-10-15
+  // options IA; the persisted disclosure key is unchanged.
+  check("data sync uses the existing persisted native disclosure in Data",
+    dataSync?.classList.contains("disclosure") && dataSync.closest("#panel-storage"));
   check("Drive follows Chrome Sync before Backup with one shared connection",
     dataSync?.querySelector("#chrome-sync-section + section #vocab-drive-body") &&
     production.querySelectorAll("#vocab-drive-connect").length === 1 &&

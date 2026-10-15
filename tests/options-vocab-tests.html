@@ -198,6 +198,26 @@ delete document.documentElement.dataset.theme;
     await task(); await task();
     check("pack delete rejection remains visible instead of being swallowed",
       $id("dict-pack-status").textContent === "dictPackDeleteFailed");
+
+    // .save-status's BASE colour is the success green, so every state line has
+    // to name its tone -- an untoned write painted "not imported" and "could
+    // not read" green. Category check over both packs and all three states.
+    const realEcdictMeta = pbpEcdictMeta;
+    const toneBad = [];
+    const tone = (el) => ["ok", "bad", "pending", "warn"].filter((c) => el.classList.contains(c)).join(",");
+    for (const [state, want] of [["empty", "pending"], ["error", "bad"], ["ready", "ok"]]) {
+      const meta = state === "ready" ? { state, entries: 3, importedAt: Date.now() } : { state };
+      pbpPackMeta = async () => meta;
+      pbpEcdictMeta = async () => meta;
+      await _pbpPackRefreshStatus();
+      await _pbpEcdictRefreshStatus();
+      for (const id of ["dict-pack-status", "ecdict-pack-status"]) {
+        if (tone($id(id)) !== want) toneBad.push(`${id} ${state}: "${tone($id(id))}"`);
+      }
+    }
+    pbpEcdictMeta = realEcdictMeta;
+    check("pack status lines carry exactly the tone of their state (empty is pending, not success green)",
+      toneBad.length === 0, toneBad.join("; "));
   } finally {
     pbpPackMeta = realPackMeta;
     pbpPackDelete = realPackDelete;

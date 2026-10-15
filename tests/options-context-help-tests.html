@@ -911,11 +911,14 @@ function test(name, fn) {
     });
   });
 
-  test("support diagnostics belongs to General, not Storage", () => {
+  // 2026-10-15 options IA (user-approved migration table): General became
+  // Account (token + connection overview only), and diagnostics joined backup,
+  // sync and storage on the Data tab (panel id "storage").
+  test("support diagnostics belongs to the Data tab, not Account", () => {
     const diagnostics = doc.getElementById("copy-diagnostics-btn")?.closest(".support-diagnostics");
     assert(diagnostics, "support diagnostics section missing");
-    assert(diagnostics.closest("#panel-general"), "support diagnostics did not move to General");
-    assert(!doc.querySelector("#panel-storage .support-diagnostics"), "Storage still owns support diagnostics");
+    assert(diagnostics.closest("#panel-storage"), "support diagnostics is not on the Data tab");
+    assert(!doc.querySelector("#panel-general .support-diagnostics"), "Account still owns support diagnostics");
   });
 
   test("connection overview is a closed disclosure on first render", () => {
@@ -941,15 +944,17 @@ function test(name, fn) {
   // margin-top (--opt-section-gap) instead of a literal border line. Retitled
   // and rewritten from "presents one separator" (which asserted the OLD
   // divider's border-line count) to assert the boundary that replaced it.
-  test("Pinboard Account and Language are separate sections joined by the row model's margin gap, not a divider", () => {
-    const panel = doc.getElementById("panel-general");
+  // Language moved to the Appearance tab (2026-10-15 IA); the boundary it
+  // shares with Theme is the same row-model margin gap, never a divider.
+  test("Language and Theme are separate sections joined by the row model's margin gap, not a divider", () => {
+    const panel = doc.getElementById("panel-appearance");
     doc.querySelectorAll(".panel").forEach((candidate) => candidate.classList.toggle("active", candidate === panel));
-    const accountSection = doc.getElementById("acc-connection-overview")?.closest("section.settings-section");
     const languageSection = doc.getElementById("sec-language")?.closest("section.settings-section");
-    assert(accountSection && languageSection && accountSection !== languageSection,
-      "connection overview and Language must sit in separate settings-section blocks");
-    const gap = languageSection.getBoundingClientRect().top - accountSection.getBoundingClientRect().bottom;
-    assert(gap >= 30 && gap <= 34, "Pinboard Account -> Language section gap=" + gap);
+    const themeSection = doc.getElementById("sec-theme")?.closest("section.settings-section");
+    assert(languageSection && themeSection && languageSection !== themeSection && languageSection.closest("#panel-appearance"),
+      "Language and Theme must sit in separate settings-section blocks on the Appearance tab");
+    const gap = themeSection.getBoundingClientRect().top - languageSection.getBoundingClientRect().bottom;
+    assert(gap >= 30 && gap <= 34, "Language -> Theme section gap=" + gap);
   });
 
   test("batch AI help opens below an explicit group title", () => {
@@ -987,12 +992,14 @@ function test(name, fn) {
     parts("backupPlaintextDisclosure");
     const note = doc.getElementById("backup-export-note");
     const backupSection = doc.getElementById("backup-import-result")?.closest("section.settings-section");
-    const notificationsSection = doc.getElementById("sec-notifications")?.closest("section.settings-section");
-    assert(note && backupSection && notificationsSection && backupSection !== notificationsSection,
+    // Whatever section follows Backup on its tab (Storage Management on the
+    // Data tab since the 2026-10-15 IA) must sit one section gap below it.
+    const nextSection = backupSection?.nextElementSibling;
+    assert(note && backupSection && nextSection?.matches("section.settings-section"),
       "backup layout fixture incomplete");
     assert(note.getBoundingClientRect().height === 0, "empty status height=" + note.getBoundingClientRect().height);
-    const gap = notificationsSection.getBoundingClientRect().top - backupSection.getBoundingClientRect().bottom;
-    assert(gap >= 30 && gap <= 34, "backup section -> notifications section gap=" + gap);
+    const gap = nextSection.getBoundingClientRect().top - backupSection.getBoundingClientRect().bottom;
+    assert(gap >= 30 && gap <= 34, "backup section -> next section gap=" + gap);
   });
 
   test("other empty standalone status blocks collapse until populated", () => {

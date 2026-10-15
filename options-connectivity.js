@@ -68,6 +68,27 @@ function setupApiTests() {
     statusEl.replaceChildren(ic, document.createTextNode(" " + (text != null ? String(text) : "")));
   }
 
+  // A failure that is about one field (no key, a malformed or rejected token)
+  // marks that field invalid, points its description at the line that says
+  // why, and hands focus back, so the fix starts where the problem is. The
+  // next edit clears the mark. None of these fields carries a description of
+  // its own in options.html, so the reason simply occupies the slot.
+  function markFieldInvalid(field, reasonId) {
+    if (!field) return;
+    field.dataset.invalidMarked = "1";
+    field.setAttribute("aria-invalid", "true");
+    field.setAttribute("aria-describedby", reasonId);
+    field.focus();
+    field.addEventListener("input", () => clearFieldInvalid(field), { once: true });
+  }
+  function clearFieldInvalid(field) {
+    if (!field || !field.dataset.invalidMarked) return;
+    delete field.dataset.invalidMarked;
+    field.removeAttribute("aria-invalid");
+    field.removeAttribute("aria-describedby");
+    if (field === tokenInput) validateTokenField();
+  }
+
   // Only a SUCCESSFUL result is wiped by a timer. A failure is the one line the
   // user has to read and usually copy -- the provider's own error body, the
   // model_not_found hint, the rejected origin -- so it stays on screen until the
@@ -108,6 +129,7 @@ function setupApiTests() {
       if (!hasAIKey(cs)) {
         setStatusResult(statusEl, false, t("testNoApiKey"));
         recordHealth(`ai:${provider}`, false, "missing_key");
+        markFieldInvalid($id(`opt-${provider}-key`), statusEl.id);
         return;
       }
 
@@ -212,7 +234,18 @@ function setupApiTests() {
   const tokenWarn = $id("token-format-warn");
   function validateTokenField() {
     const val = tokenInput.value.trim();
-    tokenWarn.classList.toggle("visible", pbpIsValidTokenFormat(val) === false);
+    const bad = pbpIsValidTokenFormat(val) === false;
+    tokenWarn.classList.toggle("visible", bad);
+    // A mark left by a failed test outranks the live format check until the
+    // next edit clears it (blur alone must not erase "this token was rejected").
+    if (tokenInput.dataset.invalidMarked) return;
+    if (bad) {
+      tokenInput.setAttribute("aria-invalid", "true");
+      tokenInput.setAttribute("aria-describedby", "token-format-warn");
+    } else {
+      tokenInput.removeAttribute("aria-invalid");
+      tokenInput.removeAttribute("aria-describedby");
+    }
   }
   tokenInput?.addEventListener("input", validateTokenField);
   tokenInput?.addEventListener("blur", validateTokenField);
@@ -224,7 +257,12 @@ function setupApiTests() {
     const statusEl = $id("test-pinboard-status");
     const token = tokenInput.value.trim();
     if (pbpIsValidTokenFormat(token) !== true) {
-      setStatusResult(statusEl, false, t("loginInvalidFormat"));
+      // The format warning under the field already says exactly this; a second
+      // copy in the status slot read as two different errors in two colours.
+      statusEl.textContent = "";
+      statusEl.classList.remove("ok", "bad", "pending", "warn");
+      tokenWarn.classList.add("visible");
+      markFieldInvalid(tokenInput, "token-format-warn");
       recordHealth("pinboard", false, "invalid_token");
       // This path returns above the cancelStatusClear below, so a clear armed by
       // a preceding successful run has to be dropped here or it wipes this line.
@@ -241,10 +279,10 @@ function setupApiTests() {
         recordHealth("pinboard", true, "connected");
         scheduleStatusClear("pinboard", statusEl, 5000);
       } else if (resp?.error === "timeout") {
-        setStatusResult(statusEl, false, t("testTimeout"));
+        setStatusResult(statusEl, false, t("pinboardErrorTimeout"));
         recordHealth("pinboard", false, "timeout");
       } else if (resp?.error === "network") {
-        setStatusResult(statusEl, false, t("networkError"));
+        setStatusResult(statusEl, false, t("pinboardTestUnreachable"));
         recordHealth("pinboard", false, "network");
       } else {
         // Same call as popup.js's login submit: a 429/5xx status must not
@@ -253,10 +291,11 @@ function setupApiTests() {
         setStatusResult(statusEl, false, t(key));
         recordHealth("pinboard", false,
           key === "pinboardErrorRateLimit" ? "rate_limit" : key === "pinboardErrorServer" ? "server" : "auth");
+        if (key === "loginFailed") markFieldInvalid(tokenInput, statusEl.id);
       }
     } catch (e) {
       console.warn("[connectivity] Pinboard test failed:", e?.name, e?.message);
-      setStatusResult(statusEl, false, t("networkError"));
+      setStatusResult(statusEl, false, t("pinboardTestUnreachable"));
       recordHealth("pinboard", false, "network");
     } finally {
       btn.disabled = false;

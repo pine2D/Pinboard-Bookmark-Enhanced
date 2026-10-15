@@ -68,7 +68,7 @@ export const FIELD_ROLES = Object.freeze([
 // them either.
 export const UI_DERIVED_OUTPUT_ROLES = Object.freeze({
   popup: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "preset-fg", "spinner-fg", "ai-chip-fg", ...FIELD_ROLES, "tag-chip-fg", "tag-chip-icon", "tag-chip-icon-hover"]),
-  options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron"]),
+  options: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES, "field-chevron", "link"]),
   library: Object.freeze([...COMMON_DERIVED_OUTPUT_ROLES, "on-accent", ...FIELD_ROLES,
     "row-bg-hover", "row-current-bg", "row-current-bg-hover", "row-band-bg", "row-band-bg-hover",
     "row-band-current-bg", "row-band-current-bg-hover", "row-current-fg-muted", "row-selected-fg",

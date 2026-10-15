@@ -1111,6 +1111,7 @@ const AI_OUTPUT_LANG_NAMES = {
   fr: "French (Français)",
   es: "Spanish (Español)",
   ru: "Russian (Русский)",
+  pl: "Polish (Polski)",
 };
 const AI_SUMMARY_LANG_NAMES = { ...AI_OUTPUT_LANG_NAMES, ja: "Japanese", ko: "Korean" };
 

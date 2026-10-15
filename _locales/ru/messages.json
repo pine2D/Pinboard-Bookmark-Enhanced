@@ -289,13 +289,13 @@
     "message": "На этой странице нет пригодного содержимого"
   },
   "aiEmptyResult": {
-    "message": "ИИ вернул пустой результат. Повторите попытку или выберите другую модель."
+    "message": "AI вернул пустой результат. Повторите попытку или выберите другую модель."
   },
   "aiUrlEdited": {
-    "message": "URL изменён. ИИ читает только ту страницу, которую вы открыли; верните исходный URL, чтобы им воспользоваться."
+    "message": "URL изменён. AI читает только ту страницу, которую вы открыли; верните исходный URL, чтобы им воспользоваться."
   },
   "aiSetKey": {
-    "message": "Укажите API-ключ для ИИ в [[Настройках]]"
+    "message": "Укажите API-ключ для AI в [[Настройках]]"
   },
   "aiCached": {
     "message": "из кэша"
@@ -403,6 +403,9 @@
   },
   "pinboardErrorOffline": {
     "message": "Ошибка сети, проверьте подключение"
+  },
+  "pinboardTestUnreachable": {
+    "message": "Не удаётся подключиться к api.pinboard.in. Проверьте сеть или прокси и повторите проверку."
   },
   "pinboardErrorTimeout": {
     "message": "Превышено время ожидания, повторите позже"
@@ -515,7 +518,7 @@
     }
   },
   "batchAiFailed": {
-    "message": ", ошибка ИИ: $COUNT$",
+    "message": ", ошибка AI: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1",
@@ -693,7 +696,7 @@
     "message": "Режим чтения открывает только страницы http и https."
   },
   "bgMdPreviewTooLarge": {
-    "message": "Хранилище заполнено. Очистите кэш в разделе «Настройки > Хранилище» и повторите попытку."
+    "message": "Хранилище заполнено. Очистите кэш в разделе «Настройки > Данные» и повторите попытку."
   },
   "mdPreviewOpenFailed": {
     "message": "Не удалось открыть режим чтения. Повторите попытку."
@@ -705,7 +708,7 @@
     "message": "Управление хранилищем"
   },
   "tabStorage": {
-    "message": "Хранилище"
+    "message": "Данные"
   },
   "tabGroupSaving": {
     "message": "Сохранение"
@@ -738,7 +741,7 @@
     "message": "Кэш тегов"
   },
   "storageCatMisc": {
-    "message": "Использование ИИ и заметки о совместимости"
+    "message": "Использование AI и заметки о совместимости"
   },
   "storageReclaimable": {
     "message": "Можно освободить: $AMOUNT$",
@@ -832,7 +835,7 @@
     }
   },
   "bgTitleSavedAiSkipped": {
-    "message": "«$TITLE$» сохранено. ИИ не запускался: нет доступа к AI-провайдеру. Предоставьте его в разделе Настройки > AI-провайдеры > Проверить соединение.",
+    "message": "«$TITLE$» сохранено. AI не запускался: нет доступа к AI-провайдеру. Предоставьте его в разделе Настройки > AI-провайдеры > Проверить соединение.",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -872,7 +875,7 @@
     "message": "Обратная связь и проблемы"
   },
   "tabGeneral": {
-    "message": "Общие"
+    "message": "Аккаунт"
   },
   "tabBookmarks": {
     "message": "Закладки"
@@ -990,6 +993,12 @@
   },
   "hintApiToken": {
     "message": "Токен можно получить на странице"
+  },
+  "tokenLocalHint": {
+    "message": "Токен хранится в этом браузере и отправляется только в Pinboard. На другие устройства он попадёт, только если вы включите синхронизацию ключей API и токенов."
+  },
+  "aiKeyLocalHint": {
+    "message": "Каждый ключ API хранится в этом браузере и отправляется только своему провайдеру. На другие устройства он попадёт, только если вы включите синхронизацию ключей API и токенов."
   },
   "secSaveDefaults": {
     "message": "Значения по умолчанию при сохранении"
@@ -1343,7 +1352,7 @@
     "message": "Пропускать уже сохранённые URL"
   },
   "batchAiHint": {
-    "message": "ИИ отправляет отдельный запрос для каждой вкладки и может работать медленно. Если доступа нет, пакетное сохранение запрашивает его только к сайтам сохраняемых вкладок и текущему AI-провайдеру."
+    "message": "AI отправляет отдельный запрос для каждой вкладки и может работать медленно. Если доступа нет, пакетное сохранение запрашивает его только к сайтам сохраняемых вкладок и текущему AI-провайдеру."
   },
   "batchPermDenied": {
     "message": "Доступ к перечисленным сайтам не предоставлен, поэтому пакетное сохранение не запущено."
@@ -1453,7 +1462,7 @@
   "optAiAutoTags": {
     "message": "Автоматически генерировать AI-метки при открытии окна"
   },
-  "optAiUseTranscript": { "message": "На страницах видео использовать субтитры как источник контента для ИИ" },
+  "optAiUseTranscript": { "message": "На страницах видео использовать субтитры как источник контента для AI" },
   "optAiUseTranscriptHint": { "message": "На страницах видео YouTube и bilibili AI-метки и аннотации читают субтитры, а не текст страницы. Работает только после того, как вы разрешили доступ к субтитрам; сам этот параметр разрешение не запрашивает." },
   "labelAiTagLang": {
     "message": "Язык AI-меток"
@@ -1494,6 +1503,9 @@
   "langRu": {
     "message": "Русский"
   },
+  "langPl": {
+    "message": "Polski"
+  },
   "labelAiCache": {
     "message": "Время хранения кэша AI-меток, аннотаций и загруженных страниц (минуты)"
   },
@@ -1523,6 +1535,12 @@
   },
   "resetToDefault": {
     "message": "Сбросить на значение по умолчанию"
+  },
+  "promptStateDefault": {
+    "message": "Используется встроенный промпт"
+  },
+  "promptStateCustom": {
+    "message": "Изменён"
   },
   "labelSummaryPrompt": {
     "message": "Промпт для AI-аннотации"
@@ -1675,7 +1693,7 @@
     "message": "Объединить вкладки этого окна в один набор вкладок Pinboard (нужен вход в pinboard.in)"
   },
   "batchSaveTitle": {
-    "message": "Добавить каждую вкладку этого окна в закладки по отдельности (метки и аннотация ИИ — по желанию)"
+    "message": "Добавить каждую вкладку этого окна в закладки по отдельности (метки и аннотация AI — по желанию)"
   },
   "qlSetsTitle": {
     "message": "Ваши сохранённые наборы вкладок в Pinboard"
@@ -1761,6 +1779,15 @@
   },
   "provCustom": {
     "message": "Custom OpenAI-compatible"
+  },
+  "providerGroupKey": {
+    "message": "Облако (ключ API)"
+  },
+  "providerGroupLocal": {
+    "message": "Локально"
+  },
+  "providerGroupCompat": {
+    "message": "Совместимые с OpenAI"
   },
   "provCustomShort": {
     "message": "Свой эндпоинт"
@@ -2013,7 +2040,7 @@
     "message": "Приватная"
   },
   "secAiContentSource": {
-    "message": "Источник контента для ИИ"
+    "message": "Источник контента для AI"
   },
   "aiContentSourceLocal": {
     "message": "Локально (Defuddle)"
@@ -2372,10 +2399,10 @@
     "message": "Анализирование…"
   },
   "tagGovAiNone": {
-    "message": "ИИ не нашёл похожих тегов"
+    "message": "AI не нашёл похожих тегов"
   },
   "tagGovAiNoKey": {
-    "message": "Провайдер ИИ не настроен — настройте его на вкладке «AI-провайдеры»"
+    "message": "Провайдер AI не настроен — настройте его на вкладке «AI-провайдеры»"
   },
   "tagGovLowCountTitle": {
     "message": "Теги с малым количеством использований (1 или менее)"
@@ -2538,9 +2565,6 @@
   "tagGovLoadFailed": {
     "message": "Не удалось загрузить теги. Проверьте API-токен или сеть, затем нажмите «Обновить»."
   },
-  "placeholderOptional": {
-    "message": "необязательно"
-  },
   "tagGovSnapshotSaved": {
     "message": "Снимок списка меток скачан (только имена и количество — справка для ручного исправления, не автоматическое восстановление)"
   },
@@ -2575,7 +2599,7 @@
     "message": "AI на странице «Чтение»"
   },
   "previewAiEnabled": {
-    "message": "Включить функции ИИ на странице «Чтение»"
+    "message": "Включить функции AI на странице «Чтение»"
   },
   "previewAiUnavailableHint": {
     "message": "Настройки ниже пока не действуют: у выбранного провайдера нет ключа API или не выдано разрешение на доступ к нему. Настройте их на вкладке «AI-провайдеры»."
@@ -2633,6 +2657,12 @@
     "message": "Только сочетания клавиш (e — объяснить, d — найти в словаре)"
   },
   "selectionTriggerOff": {
+    "message": "Выключено"
+  },
+  "stateOn": {
+    "message": "Включено"
+  },
+  "stateOff": {
     "message": "Выключено"
   },
   "trTranslate": {
@@ -2728,10 +2758,10 @@
     "message": "Ошибка сети или сервера — повторите попытку позже"
   },
   "trErrTimeout": {
-    "message": "Время ожидания ответа ИИ истекло — попробуйте ещё раз"
+    "message": "Время ожидания ответа AI истекло — попробуйте ещё раз"
   },
   "aiErrRequestFailed": {
-    "message": "Запрос к ИИ не выполнен"
+    "message": "Запрос к AI не выполнен"
   },
   "trRetranslate": {
     "message": "Перевести заново"
@@ -2898,10 +2928,10 @@
     "message": "Поиск в словаре…"
   },
   "explainAiNotConfigured": {
-    "message": "Чтобы объяснять выделенное, настройте AI-провайдера и включите в настройках функции ИИ на странице «Чтение»."
+    "message": "Чтобы объяснять выделенное, настройте AI-провайдера и включите в настройках функции AI на странице «Чтение»."
   },
   "explainTranslateAiNotConfigured": {
-    "message": "Чтобы переводить выделенное, настройте AI-провайдера и включите в настройках функции ИИ на странице «Чтение»."
+    "message": "Чтобы переводить выделенное, настройте AI-провайдера и включите в настройках функции AI на странице «Чтение»."
   },
   "explainErrRetry": {
     "message": "Повторить"
@@ -2982,7 +3012,7 @@
     }
   },
   "dictCtxReady": {
-    "message": "Пояснение ИИ готово · показать"
+    "message": "Пояснение AI готово · показать"
   },
   "mdSkipToContent": {
     "message": "Перейти к содержимому"
@@ -3084,7 +3114,7 @@
     "message": "При поиске английского слова показывает китайские значения над английской статьёй. Английская статья загружается как обычно."
   },
   "ecdictFormatNote": {
-    "message": "Требуется CSV-файл, первая строка которого — заголовок столбцов и содержит word, translation, tag, collins, oxford, frq и bnc. Готовые словарные пакеты вроде mdx, eudic, stardict, mobi и sqlite имеют другой формат и не импортируются. Проект не предоставляет, не рекомендует и не проверяет источник этих данных и не связан с ним. Файл вы предоставляете сами и отвечаете за его лицензию."
+    "message": "Нужен CSV-файл со строкой заголовков, где есть word, translation, tag, collins, oxford, frq и bnc. Готовые пакеты (mdx, eudic, stardict, mobi, sqlite) не импортируются. Файл и его лицензия на вашей стороне; проект не предоставляет и не рекомендует источники."
   },
   "ecdictImportFile": {
     "message": "Импортировать файл"
@@ -3279,6 +3309,9 @@
     "vocabDriveSyncNow": {
       "message": "Синхронизировать сейчас"
     },
+    "vocabDriveManage": {
+      "message": "Управлять в разделе «Данные»"
+    },
     "vocabDriveDisconnect": {
       "message": "Отключить это устройство"
     },
@@ -3292,10 +3325,10 @@
       "message": "Авторизация Google временно недоступна."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Нет входа в аккаунт Pinboard. Введите API Token в разделе «Общие → Аккаунт Pinboard» и подключитесь снова."
+      "message": "Нет входа в аккаунт Pinboard. Введите API Token в разделе «Аккаунт → Аккаунт Pinboard» и подключитесь снова."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Нет входа в аккаунт Pinboard. Введите API Token в разделе «Общие → Аккаунт Pinboard», затем нажмите «Синхронизировать сейчас»."
+      "message": "Нет входа в аккаунт Pinboard. Введите API Token в разделе «Аккаунт → Аккаунт Pinboard», затем нажмите «Синхронизировать сейчас»."
     },
     "vocabDriveErrorPermission": {
       "message": "Нет разрешения на доступ к Google Диску."
@@ -3455,7 +3488,7 @@
     "message": "Экспортировать все (.tsv)"
   },
   "dictAiLabel": {
-    "message": "Сгенерировано ИИ"
+    "message": "Сгенерировано AI"
   },
   "dictLangAuto": {
     "message": "Авто"
@@ -3585,6 +3618,17 @@
       }
     }
   },
+  "packSummaryEmpty": {
+    "message": "Не импортировано"
+  },
+  "packSummaryReady": {
+    "message": "Статей: $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "dictPackDeleteConfirm": {
     "message": "Удалить импортированный пакет словаря?"
   },
@@ -3648,7 +3692,7 @@
     "message": "Источник:"
   },
   "dictAiNotConfigured": {
-    "message": "Чтобы получать контекстные объяснения, настройте AI-провайдера и включите в настройках функции ИИ на странице «Чтение»."
+    "message": "Чтобы получать контекстные объяснения, настройте AI-провайдера и включите в настройках функции AI на странице «Чтение»."
   },
   "dictVocabEmpty": {
     "message": "В текущем аккаунте Pinboard ($OWNER$) пока нет сохранённых слов. Сохраняйте их из словаря в режиме чтения.",
@@ -3848,8 +3892,8 @@
   "typoSchemeAuto": { "message": "Авто" },
   "typoSchemeLight": { "message": "Светлая" },
   "typoSchemeDark": { "message": "Тёмная" },
-  "skimEnable": { "message": "Создавать ИИ-сводку ключевых тезисов на странице «Чтение»" },
-  "skimEnableHint": { "message": "Показывает 3-5 ключевых тезисов вверху страницы «Чтение». Каждая генерация расходует токены ИИ; результаты кэшируются для каждой статьи." },
+  "skimEnable": { "message": "Создавать AI-сводку ключевых тезисов на странице «Чтение»" },
+  "skimEnableHint": { "message": "Показывает 3-5 ключевых тезисов вверху страницы «Чтение». Каждая генерация расходует токены AI; результаты кэшируются для каждой статьи." },
   "skimTitle": { "message": "Ключевые тезисы" },
   "skimRegen": { "message": "Сгенерировать заново" },
   "skimCollapseAria": { "message": "Свернуть или развернуть раздел ключевых тезисов" },
@@ -3875,13 +3919,13 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "Первое: $FIRST$ · последнее: $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "Сохранено в $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "Выделения и заметки хранятся на этом устройстве. Чтобы пользоваться ими на другом, подключите Google Диск в настройках «Общие» на обоих устройствах, и они будут синхронизироваться автоматически. Можно также экспортировать резервную копию и импортировать её там." },
-  "libraryNotesScopeOpenBackup": { "message": "Открыть настройки «Общие»" },
+  "libraryNotesScopeHint": { "message": "Выделения и заметки хранятся на этом устройстве. Чтобы пользоваться ими на другом, подключите Google Диск в настройках «Данные» на обоих устройствах, и они будут синхронизироваться автоматически. Можно также экспортировать резервную копию и импортировать её там." },
+  "libraryNotesScopeOpenBackup": { "message": "Открыть настройки «Данные»" },
   "libraryExportMenu": { "message": "Экспорт" },
   "libraryExportSettings": { "message": "Настройки Anki и Eudic" },
   "libraryDriveSynced": { "message": "Синхронизировано с Google Диском: $TIME$", "placeholders": {"time": {"content": "$1"}} },
   "libraryDriveConnected": { "message": "Google Диск подключён, синхронизации ещё не было" },
-  "libraryDriveProblem": { "message": "Проблема с синхронизацией Google Диска. Откройте настройки «Общие»" },
+  "libraryDriveProblem": { "message": "Проблема с синхронизацией Google Диска. Откройте настройки «Данные»" },
   "libraryRelookup": { "message": "Найти снова" },
   "libraryBack": { "message": "Назад к списку" },
   "libraryStatsWords": { "message": "Слова: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
@@ -3926,9 +3970,9 @@
   "mdVideoBodyBlocked": { "message": "Дорожки субтитров найдены, но YouTube не вернул их текст. Держите вкладку YouTube с этим видео открытой и повторите попытку или выберите другую дорожку." },
   "mdVideoPermMissing": { "message": "Доступ к субтитрам не предоставлен, поэтому они не загружены" },
   "mdVideoCopyMd": { "message": "Копировать расшифровку как Markdown" },
-  "mdVideoAiPunct": { "message": "ИИ-пунктуация" },
+  "mdVideoAiPunct": { "message": "AI-пунктуация" },
   "mdVideoAiPunctDone": { "message": "Пунктуация расставлена" },
-  "mdVideoAiPunctFail": { "message": "ИИ-пунктуация не удалась; сохранён локальный результат" },
+  "mdVideoAiPunctFail": { "message": "AI-пунктуация не удалась; сохранён локальный результат" },
   "mdVideoCopied": { "message": "Расшифровка скопирована" },
   "mdVideoAsr": { "message": "автоматические" },
   "mdVideoViewReading": { "message": "Текст" },
@@ -3944,12 +3988,12 @@
   "mdVideoAiCancelled": { "message": "Отменено на $DONE$ из $TOTAL$ частей. Прогресс сохранён — нажмите, чтобы продолжить.", "placeholders": { "done": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoPunctSource": { "message": "Пунктуация есть" },
   "mdVideoPunctHeuristic": { "message": "Базовая пунктуация" },
-  "mdVideoAiUnconfigured": { "message": "ИИ-провайдер не настроен" },
+  "mdVideoAiUnconfigured": { "message": "AI-провайдер не настроен" },
   "mdVideoGrantScope": { "message": "Плееру разрешение не нужно; доступ используется только для чтения субтитров" },
   "mdVideoFollowReadingOff": { "message": "Слежение за воспроизведением работает только в режиме «Хронология»" },
   "mdVideoOpenExternalBili": { "message": "Открыть на bilibili" },
   "mdVideoAwaitingTranscript": { "message": "Загрузка субтитров; вскоре здесь появится расшифровка…" },
-  "mdVideoAiPunctProgress": { "message": "ИИ-пунктуация $CUR$/$TOTAL$…", "placeholders": { "cur": { "content": "$1" }, "total": { "content": "$2" } } },
+  "mdVideoAiPunctProgress": { "message": "AI-пунктуация $CUR$/$TOTAL$…", "placeholders": { "cur": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoSwitchingTo": { "message": "Переключение на $TRACK$…", "placeholders": { "track": { "content": "$1" } } },
   "mdVideoSeeking": { "message": "Переход к $TIME$; плеер перезагрузится", "placeholders": { "time": { "content": "$1" } } },
   "mdVideoViaPanel": { "message": "Источник субтитров: официальный API" },
@@ -3960,9 +4004,9 @@
   "mdVideoTryDom": { "message": "Чтение панели расшифровки на странице…" },
   "mdVideoTranscriptHeading": { "message": "Расшифровка" },
   "mdVideoPromoted": { "message": "Расшифровка готова; она заменила статью" },
-  "mdVideoAiCancel": { "message": "Отменить ИИ-пунктуацию" },
+  "mdVideoAiCancel": { "message": "Отменить AI-пунктуацию" },
   "mdVideoAiPunctEst": { "message": "≈ $TOKENS$ токенов", "placeholders": { "tokens": { "content": "$1" } } },
-  "mdVideoAiPunctConfirm": { "message": "ИИ-пунктуация заменит статью: готовый перевод будет сброшен, а цитаты в ответах «Спросить страницу» устареют. Продолжить?" },
+  "mdVideoAiPunctConfirm": { "message": "AI-пунктуация заменит статью: готовый перевод будет сброшен, а цитаты в ответах «Спросить страницу» устареют. Продолжить?" },
   "mdStatVideoLen": { "message": "Видео $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "mdVideoCopyMore": { "message": "Другие форматы копирования" },
   "mdVideoCopyTimed": { "message": "Копировать Markdown с метками времени" },
@@ -4014,6 +4058,14 @@
   "batchResumed": { "message": "Возобновлено после прерывания ($ATTEMPT$ из $MAX$)", "placeholders": { "attempt": { "content": "$1" }, "max": { "content": "$2" } } },
   "batchCancelFailed": { "message": "Не удалось запросить отмену. Повторите попытку." },
   "connectionOverviewTitle": { "message": "Состояние подключений" },
+  "connectionSummaryIssues": {
+    "message": "Требует внимания: $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "connectionOverviewHint": { "message": "Состояние определяется настройками, выданными разрешениями и последними ручными проверками. При открытии настроек расширение не обращается к сервисам и не запрашивает разрешения." },
   "connectionNeverTested": { "message": "Ещё не проверялось" },
   "connectionConnected": { "message": "Подключено" },
@@ -4023,7 +4075,7 @@
   "connectionLastSuccess": { "message": "Последняя проверка успешна · $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "connectionLastFailure": { "message": "Последняя проверка не удалась · $TIME$", "placeholders": { "time": { "content": "$1" } } },
   "settingsSearchLabel": { "message": "Поиск по настройкам" },
-  "settingsSearchPlaceholder": { "message": "Поиск по настройкам" },
+  "settingsSearchPlaceholder": { "message": "Поиск" },
   "settingsSearchNoResults": { "message": "Подходящих настроек нет. Попробуйте название функции или элемента управления." },
   "diagnosticsTitle": { "message": "Диагностика для поддержки" },
   "diagnosticsHint": { "message": "Копирует версию расширения, браузер и язык, AI-провайдера, сведения о том, какие сервисы настроены, переключатели функций, разрешения, использование хранилища и кэша, счётчики очереди и пакетных задач, результаты проверки соединения и коды ошибок. Учётные данные, имена аккаунтов, адреса страниц, содержимое и пользовательские конечные точки не включаются." },

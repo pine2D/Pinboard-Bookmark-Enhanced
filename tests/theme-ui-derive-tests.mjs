@@ -38,7 +38,7 @@ import {
   NOTE_MARK_ALPHA_LIGHT,
   UI_DERIVED_OUTPUT_ROLES,
 } from "../docs/theme-surface/composers/_ui-derive.mjs";
-import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
+import { composeOptionsThemeMap, LINK_HOST_ROLES } from "../docs/theme-surface/composers/options-chrome.mjs";
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
 import { composeLibraryThemeMap } from "../docs/theme-surface/composers/library-chrome.mjs";
 import { parseDeclarations, parseStyleRules } from "../docs/theme-surface/tools/css-syntax.mjs";
@@ -2089,6 +2089,47 @@ function f8Failures(id, out, hosts) {
   for (const [id, want] of Object.entries(ANCHORS)) {
     const got = ROLES.map((r) => String(byId[id]?.[r] ?? "").trim().toLowerCase());
     check(JSON.stringify(got) === JSON.stringify(want), `${id} highlighter marks drifted from the spec / D1 anchors: ${got.join(" ")} (want ${want.join(" ")})`);
+  }
+}
+
+// --- Options text-link ink (2026-10-15 options critique). Category check over
+// the 14 composed options maps + the folded shipped default :root: --opt-link
+// clears 4.5:1 on every host a text link sits on, is the accent itself when
+// the accent already clears them all (no gratuitous recolour), and keeps the
+// accent's hue when it has to move. The default face is pinned to a golden
+// hex computed out of band so a drifted default accent goes red here. ---
+{
+  check(UI_DERIVED_OUTPUT_ROLES.options.includes("link"),
+    "UI_DERIVED_OUTPUT_ROLES.options lacks link -- validate-contracts would let a pilot override a derived role");
+  check(JSON.stringify(LINK_HOST_ROLES) === JSON.stringify(["panel", "bg", "pf-bg"]),
+    `options link hosts drifted: ${LINK_HOST_ROLES.join(", ")} -- contrast-audit's three link rows audit panel / bg / pf-bg`);
+  const pilotsL = new Map();
+  const pilotL = (slug) => {
+    if (!pilotsL.has(slug)) pilotsL.set(slug, JSON.parse(readFileSync(new URL(`../docs/theme-surface/pilots/${slug}.tokens.json`, import.meta.url), "utf8")));
+    return pilotsL.get(slug);
+  };
+  const blocksL = POPUP_THEME_MAP.map((e) => [e.id, composeOptionsThemeMap(pilotL(e.pilot), e.mode, e.useDarkMode).map]);
+  const rootL = {};
+  for (const rule of parseStyleRules(readFileSync(new URL("../options.css", import.meta.url), "utf8"))) {
+    if (rule.context.length !== 0 || !rule.selectors.includes(":root")) continue;
+    for (const d of parseDeclarations(rule.body)) if (d.property.startsWith("--opt-")) rootL[d.property.slice(6)] = d.value.trim();
+  }
+  blocksL.push([":root", rootL]);
+  check(String(rootL.link).toLowerCase() === "#3f6dac",
+    `default :root --opt-link drifted from the golden #3f6dac (fgToAAMulti(#4477bb, [#ffffff, #f5f5f0, #f9f9f6])): ${rootL.link}`);
+  for (const [id, m] of blocksL) {
+    const roles = ["accent", "link", ...LINK_HOST_ROLES];
+    const bad = roles.filter((r) => !isHex(String(m[r] ?? "")));
+    if (bad.length) { check(false, `options ${id}: link roles missing or not hex: ${bad.join(", ")}`); continue; }
+    const worst = Math.min(...LINK_HOST_ROLES.map((r) => ratio(m.link, m[r])));
+    check(worst >= 4.5, `options ${id}: --opt-link ${m.link} is only ${worst.toFixed(2)}:1 on its worst host`);
+    const accentClears = LINK_HOST_ROLES.every((r) => ratio(m.accent, m[r]) >= 4.5);
+    if (accentClears) check(m.link.toLowerCase() === m.accent.toLowerCase(), `options ${id}: accent ${m.accent} already clears every host, link must equal it (got ${m.link})`);
+    else {
+      const [ha] = rgbToHsl(hexToRgbLoose(m.accent)), [hl] = rgbToHsl(hexToRgbLoose(m.link));
+      const dh = Math.min(Math.abs(ha - hl), 360 - Math.abs(ha - hl)); // rgbToHsl hue is in degrees
+      check(dh < 3, `options ${id}: link ${m.link} drifted off the accent hue ${m.accent} (${dh.toFixed(2)} deg)`);
+    }
   }
 }
 
