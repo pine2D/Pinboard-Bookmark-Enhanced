@@ -40,6 +40,23 @@ const PBP_POPUP_ADAPTIVE_MAP = {
   }
 })();
 
+// Shortcut hints (impeccable critique 2026-10-15): the four keyboard hints
+// (Shift+Enter, Alt+1-9, Alt+P/R/A, Ctrl+Enter) stay up for the first ten
+// popup opens so a new user can learn them; after that they show only while
+// Alt is held (popup.js toggles .pp-kbd-show). Decided here, before first
+// paint, so a returning user never sees them flash in and drop out. Counted
+// on the bookmark form only -- the login screen shows none of them.
+(function applyKbdHintLearning() {
+  const PBP_KBD_LEARN_OPENS = 10;
+  try {
+    if (document.documentElement.dataset.section !== "main") return;
+    const opens = Number(localStorage.getItem("pp-kbd-hint-opens")) || 0;
+    if (opens >= PBP_KBD_LEARN_OPENS) return;
+    localStorage.setItem("pp-kbd-hint-opens", String(opens + 1));
+    document.documentElement.classList.add("pp-kbd-learn");
+  } catch (_) { /* storage blocked: hints stay behind Alt */ }
+})();
+
 // B4: tab data prefill — populate only public URL/title fields.
 //     synchronously from the last-known tab. popup.js will validate against
 //     chrome.storage.session asynchronously and clear stale prefill if mismatched.

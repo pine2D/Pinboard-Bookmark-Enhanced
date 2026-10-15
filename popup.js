@@ -2402,6 +2402,13 @@ function enc(s) { return encodeURIComponent(s); }
 // Matching either keeps the printed hint (Alt+P/R/A) true on both.
 // No collision with the digits above (disjoint keys) and none with Chrome's
 // own Alt chords in a popup: the popup has no menu bar to accelerate into.
+// Holding Alt shows the shortcut hints that are hidden once the learning
+// opens are used up (popup-theme-early.js). Released, or the popup losing
+// focus mid-hold, puts them away again.
+const pbpShowKbdHints = (on) => document.documentElement.classList.toggle("pp-kbd-show", on);
+document.addEventListener("keydown", (e) => { if (e.key === "Alt") pbpShowKbdHints(true); });
+document.addEventListener("keyup", (e) => { if (e.key === "Alt") pbpShowKbdHints(false); });
+window.addEventListener("blur", () => pbpShowKbdHints(false));
 const PBP_ALT_CHECKBOX_CODES = { KeyP: "private-check", KeyR: "readlater-check", KeyA: "archive-check" };
 const PBP_ALT_CHECKBOX_LETTERS = { p: "private-check", r: "readlater-check", a: "archive-check" };
 document.addEventListener("keydown", (e) => {

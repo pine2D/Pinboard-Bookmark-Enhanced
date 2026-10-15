@@ -906,6 +906,10 @@ html[data-section="login"] .quick-actions { display: none !important; }
    an inline style outranks every rule in this file, which is what kept the
    themed twin below dead and pinned "nearly full" to a literal #e80 (2.57:1 on
    the default surface). --pp-offline-fg is the AA-derived warning role. */
+/* The count speaks up at 80% of the posts/add budget (the same threshold
+   that turns it amber below); under that it keeps its place in .notes-bar,
+   so the AI summary action does not move, but draws nothing. */
+#desc-char-count:not(.near-limit):not(.over-limit) { visibility: hidden; }
 #desc-char-count.near-limit { color: var(--pp-offline-fg); font-weight: 600; }
 #desc-char-count.over-limit { color: var(--pp-danger); font-weight: 600; }
 /* Tag suggestion skeleton — opacity pulse on solid divider color. Gentler than the
@@ -1091,6 +1095,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 }
 .submit-hint { color: var(--pp-fg-hint); font-size: 11px; margin-left: auto; align-self: center; }
 .kb-hint { color: var(--pp-fg-hint); font-size: 11px; align-self: center; }
+/* Shortcut hints show on the first ten opens (.pp-kbd-learn) and while Alt
+   is held (.pp-kbd-show); otherwise they are out of the layout, so a
+   long-locale hint no longer wraps onto a row of its own (impeccable
+   critique 2026-10-15; popup-theme-early.js has the counter). */
+html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display: none; }
 #ai-summary-hint { margin-left: auto; margin-right: var(--pp-sp-3); }
 /* Same .kb-hint family hook as #ai-summary-hint above: the Alt+P/R/A hint
    right-aligns in .bottom-bar so it can never push the three checkbox
