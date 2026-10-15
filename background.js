@@ -4666,7 +4666,9 @@ function extractPageForMarkdown() {
     return {
       contentHtml: result.content, title: result.title || document.title, url: location.href,
       math: !!document.querySelector("math"),
-      author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || ""
+      author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || "",
+      // Source page language for the reader's article lang (see popup.js twin).
+      lang: result.language || document.documentElement.lang || ""
     };
   } catch (e) { return { error: e.message }; }
 }
@@ -4772,7 +4774,8 @@ async function extractForPreview({ tabId, url, engine, sourceTabUrl, frame, fram
     // branch now keeps. The reextractMarkdown handler's `...out` spread
     // (background.js ~943-953) forwards these automatically into storage --
     // no separate edit needed there.
-    author: out.author || "", published: out.published || "", site: out.site || "", image: out.image || ""
+    author: out.author || "", published: out.published || "", site: out.site || "", image: out.image || "",
+    lang: out.lang || ""
   };
 }
 

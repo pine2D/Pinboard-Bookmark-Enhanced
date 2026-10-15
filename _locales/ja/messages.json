@@ -2701,7 +2701,7 @@
     "message": "用語を抽出中…"
   },
   "trSkippedTargetLang": {
-    "message": "$COUNT$ 個のセグメントはすでに翻訳先の言語のため、スキップしました",
+    "message": "$COUNT$ 個のセグメントはすでに翻訳先の言語のため、翻訳は不要です",
     "placeholders": {
       "count": {
         "content": "$1"

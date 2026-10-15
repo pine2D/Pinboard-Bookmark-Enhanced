@@ -2710,7 +2710,7 @@
     "message": "Extracting terminology…"
   },
   "trSkippedTargetLang": {
-    "message": "Skipped $COUNT$ segment(s) already in the target language",
+    "message": "$COUNT$ segment(s) already in the target language; no translation needed",
     "placeholders": {
       "count": {
         "content": "$1"

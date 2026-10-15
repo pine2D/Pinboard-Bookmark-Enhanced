@@ -968,7 +968,11 @@ async function extractLocalMarkdown(tabId) {
           return {
             contentHtml: result.content, title: result.title || document.title, url: location.href,
             math: !!document.querySelector("math"),
-            author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || ""
+            author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || "",
+            // The source page's declared language: the reader can only tell
+            // CJK and RTL scripts apart by glyphs, so Latin / Cyrillic
+            // articles take their lang from here (md-preview.js).
+            lang: result.language || document.documentElement.lang || ""
           };
         } catch (e) { return { error: e.message }; }
       }
@@ -1246,6 +1250,7 @@ async function htmlToMarkdownAsync(html, opts) {
               published: result.published || "",
               site: result.site || "",
               image: result.image || "",
+              lang: result.lang || "",
               tabId: tab.id,
               ts: Date.now() // sweep grace: don't orphan-collect a slot mid-handoff
             }

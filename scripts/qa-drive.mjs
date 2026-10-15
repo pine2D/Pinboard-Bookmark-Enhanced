@@ -1281,10 +1281,13 @@ async function drivePreview(context, worker, extId, rep) {
       if (!found) throw new Error("selection target not found");
       // The creation float bar normally shows on pointerup; force it so the
       // 5-dot palette (digit legend + note button) gets a screenshot state.
+      // Through _pbpHlShowBar with the live selection, so the bar is placed
+      // under the selected text the way pointerup places it -- a bare
+      // showPopover() left it at (0,0), over the rail title, and read as a bug.
       await page.evaluate(() => {
-        const bar = _pbpHlEnsureBar();
-        if (!bar.isConnected) document.body.appendChild(bar);
-        bar.showPopover ? bar.showPopover() : (bar.style.display = "flex");
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) throw new Error("no selection for the highlight bar");
+        _pbpHlShowBar(sel.getRangeAt(0).cloneRange(), false);
       });
       await page.waitForTimeout(400);
       await rep.shot(page, s, "highlight-bar");

@@ -6102,6 +6102,24 @@ suiteIf("pbpReaderCollectAnchorRects", "pbpReaderCollectAnchorRects", () => {
     assertEq(pbpReaderPickScrollAnchor(sparse).n, 3, "falls back to the last (3rd) block");
   });
 });
+
+// Article lang for scripts glyphs cannot place (md-preview.js): the source
+// page's declared language, else "und" -- never the inherited UI language.
+suiteIf("md-preview.js: pbpReaderFallbackLang", "pbpReaderFallbackLang", () => {
+  test("a declared page language wins, normalised to BCP 47 hyphens", () => {
+    assertEq(pbpReaderFallbackLang("The quick brown fox", "en"), "en", "plain tag");
+    assertEq(pbpReaderFallbackLang("Привет, мир", "ru_RU"), "ru-RU", "underscore form");
+    assertEq(pbpReaderFallbackLang("Hallo Welt", " de-AT "), "de-AT", "trimmed");
+  });
+  test("a malformed or missing declaration falls back to und for Latin / Cyrillic text", () => {
+    assertEq(pbpReaderFallbackLang("The quick brown fox", ""), "und", "none");
+    assertEq(pbpReaderFallbackLang("The quick brown fox", "en US; x"), "und", "garbage");
+    assertEq(pbpReaderFallbackLang("Привет, мир", undefined), "und", "undefined");
+  });
+  test("ambiguous Han text without a declaration keeps inheriting (empty)", () => {
+    assertEq(pbpReaderFallbackLang("中文测试 中文測試", ""), "", "Han, no declaration");
+  });
+});
 </script>
 
 <script>
@@ -7774,12 +7792,12 @@ suite("skim status line", () => {
     try {
       button.click();
       await task();
-      // The foot actions carry no text any more, so success has to be visible
-      // some other way: the icon gains a tick and both labels change. Asserting
-      // on textContent would now pass for a button rendered completely blank.
+      // Success is visible in the icon (a tick) AND in the button's own label:
+      // Save to vocabulary is the one foot action that keeps its name on
+      // screen, so its text must move with the state too.
       assert(button.disabled && button.title === "dictSavedVocab" &&
         button.getAttribute("aria-label") === "dictSavedVocab" &&
-        button.querySelector("svg") && button.textContent === "",
+        button.querySelector("svg") && button.textContent === "dictSavedVocab",
         "successful update did not enter the disabled completed state");
     } finally {
       if (realSave === undefined) delete window.pbpDictSaveCurrent; else window.pbpDictSaveCurrent = realSave;

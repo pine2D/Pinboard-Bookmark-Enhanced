@@ -3875,15 +3875,19 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { b
     mdTranslateJs.indexOf("function _pbpTrMarkPartial"));
   const partial = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrMarkPartial"),
     mdTranslateJs.indexOf("function _pbpTrClearPendingFailures"));
-  // Both pills write their tip + accessible name through one helper (which
-  // also keeps the visible label at the front of the name, WCAG 2.5.3).
+  // Both pills write their reason + accessible name through one helper (which
+  // also keeps the visible label at the front of the name, WCAG 2.5.3). The
+  // reason is printed in the pill (.pb-tr-err-reason); the old hover/focus
+  // ::after bubble is gone for good -- the reading view opens no overlay on
+  // hover (user ruling), and touch never reached it.
   const setTip = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrSetErrTip"),
     mdTranslateJs.indexOf("function _pbpTrMarkFailed"));
   check(setTip.includes("btn.dataset.tip") && setTip.includes('btn.setAttribute("aria-label"') &&
     failed.includes("_pbpTrSetErrTip(btn,") && partial.includes("_pbpTrSetErrTip(btn,") &&
     !failed.includes("btn.title") && !partial.includes("btn.title") &&
-    mdCss.includes(".pb-tr-err::after") && mdCss.includes("content: attr(data-tip)"),
-    "translation failure reasons still depend on native title tooltips or lack a themed hover/focus surface");
+    setTip.includes('"pb-tr-err-reason"') && setTip.includes("reason.textContent = tip") &&
+    mdCss.includes(".pb-tr-err-reason {") && !mdCss.includes(".pb-tr-err::after") && !mdCss.includes("content: attr(data-tip)"),
+    "translation failure reasons are not printed in the pill, depend on native title tooltips, or came back as a hover bubble");
 }
 {
   const upsert = popupAiJs.slice(popupAiJs.indexOf("function upsertSummary"),

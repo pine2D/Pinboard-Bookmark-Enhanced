@@ -140,7 +140,7 @@ function _pbpAskBuildRailEntry() {
   btn.innerHTML = PBP_ASK_BTN_SVG; // static inline SVG constant only
   const bl = document.createElement("span");
   bl.className = "btn-label";
-  bl.textContent = t("askOpen");
+  bl.textContent = t("askTitle");
   btn.appendChild(bl);
   sec.appendChild(btn);
   // Rail accordion (spec 2026-07-04): headless mode -- #ask-section's only
@@ -149,6 +149,15 @@ function _pbpAskBuildRailEntry() {
   // above this task). pbpRailCollapsible leaves it untouched; only wires the
   // storage-backed handle for interface conformance.
   _pbpAskRailHandle = pbpRailCollapsible(sec, "ask", { label: btn, defaultCollapsed: true });
+  // Its own section head, like every other rail section -- without one the
+  // button read as the tail of the translation section above it. Added AFTER
+  // pbpRailCollapsible decided headless mode (one child = the button), and
+  // plain text: the button stays the only control, so the head needs none.
+  const head = document.createElement("div");
+  head.className = "rail-label";
+  head.textContent = t("askOpen");
+  head.setAttribute("aria-hidden", "true");
+  sec.insertBefore(head, btn);
   const translation = document.getElementById("tr-section");
   const primaryAnchor = document.getElementById("export-section");
   if (translation) translation.insertAdjacentElement("afterend", sec);
@@ -2339,6 +2348,15 @@ function _pbpExplainIconBtn(btn, svg, label) {
   btn.innerHTML = svg; // static constant, never model or dictionary text
   btn.title = label;
   btn.setAttribute("aria-label", label);
+  // Save to vocabulary is the dictionary view's core action and sat between
+  // look-alike icons (the known tick right after it): it alone keeps its name
+  // on screen, in every state (save / saved / update). textContent, never
+  // markup -- the label is a t() string.
+  if (btn.classList.contains("xp-vocab")) {
+    const text = document.createElement("span");
+    text.textContent = label;
+    btn.appendChild(text);
+  }
 }
 
 const PBP_EXPLAIN_CLOSE_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.cross : "";

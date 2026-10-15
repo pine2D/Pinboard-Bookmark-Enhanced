@@ -2339,19 +2339,30 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) {} }
 }
 
-// Error pill tooltip + accessible name. The name must START with the visible
+// Error pill reason + accessible name. The name must START with the visible
 // label ("Retry this paragraph" / "Grant access and retry") so screen-reader
 // and voice-control users hear and can say the action (WCAG 2.5.3 Label in
-// Name); the failure reason follows it.
+// Name); the failure reason follows it. The reason is also printed in the
+// pill after the label (.pb-tr-err-reason, aria-hidden: the name already says
+// it) -- never a hover bubble, which the reading view does not use and touch
+// never reaches.
 function _pbpTrSetErrTip(btn, tip) {
   btn.dataset.tip = tip;
-  const lab = btn.querySelector("span");
+  const lab = btn.querySelector("span:not(.pb-tr-err-reason)");
   const visible = lab ? lab.textContent : "";
   btn.setAttribute("aria-label", visible ? visible + ": " + tip : tip);
+  let reason = btn.querySelector(".pb-tr-err-reason");
+  if (!reason) {
+    reason = document.createElement("span");
+    reason.className = "pb-tr-err-reason";
+    reason.setAttribute("aria-hidden", "true");
+    btn.appendChild(reason);
+  }
+  reason.textContent = tip;
 }
 
-// Per-block failure: inline error pill after the block. Hover/focus shows the
-// error; click retries this single block.
+// Per-block failure: inline error pill after the block, the reason printed
+// in it; click retries this single block.
 function _pbpTrMarkFailed(st, w, message) {
   if (!_pbpTrItemCurrent(st, w)) return;   // same fence as _pbpTrFill: no pill on a replaced article
   const orig = pbpAiBlockEl(w.n);
@@ -2802,15 +2813,26 @@ function _pbpTrShowViewToggle(st) {
     wrap.appendChild(b);
   }
   document.getElementById("tr-section").appendChild(wrap);
+  // The three segments are glyphs; the view they put the page in is named
+  // here, in words, so nobody has to hover a title to learn it (aria-hidden:
+  // the pressed segment's own label already says it to assistive tech).
+  const name = document.createElement("div");
+  name.id = "tr-view-name";
+  name.className = "tr-meta";
+  name.setAttribute("aria-hidden", "true");
+  wrap.insertAdjacentElement("afterend", name);
   _pbpTrSyncToggle(st.mode);
 }
 
+const PBP_TR_VIEW_NAME_KEYS = { original: "trViewOriginal", bilingual: "trViewBilingual", translated: "trViewTranslated" };
 function _pbpTrSyncToggle(mode) {
   document.querySelectorAll("#tr-view-toggle .toggle-btn").forEach((b) => {
     const active = b.dataset.trMode === mode;
     b.classList.toggle("active", active);
     b.setAttribute("aria-pressed", active ? "true" : "false");
   });
+  const name = document.getElementById("tr-view-name");
+  if (name) name.textContent = PBP_TR_VIEW_NAME_KEYS[mode] ? t(PBP_TR_VIEW_NAME_KEYS[mode]) : "";
 }
 
 // Moving between original-only and translated-only can hide the element that

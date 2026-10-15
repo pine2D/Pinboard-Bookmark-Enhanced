@@ -71,7 +71,10 @@ function renderEmptyState(message, actionKey) {
 // engine-switch control already uses — see the pending-extraction branch below). Bare
 // renderEmptyState stays reserved for states with nothing to retry or switch (no preview
 // data / no content at all); it may still offer a simple close action.
-function renderErrorState(message, retryFn, permissionRequired) {
+// `alt` (optional) = { label, run }: a second way out shown beside Retry --
+// the other extraction engine, so a page one engine cannot read is one click
+// from the engine that can, instead of a Retry that fails the same way again.
+function renderErrorState(message, retryFn, permissionRequired, alt) {
   const view = document.getElementById("rendered-view");
   if (view) {
     view.removeAttribute("aria-busy");
@@ -99,6 +102,20 @@ function renderErrorState(message, retryFn, permissionRequired) {
         finally { btn.disabled = false; }
       });
       wrap.appendChild(btn);
+    }
+    if (alt && typeof alt.run === "function") {
+      const other = document.createElement("button");
+      other.type = "button";
+      other.className = "action-btn";
+      other.textContent = alt.label;
+      other.addEventListener("click", async () => {
+        if (other.disabled) return;
+        other.disabled = true;
+        try { await alt.run(); }
+        catch (e) { console.warn("[preview] engine switch failed", e && e.name, e && e.message); }
+        finally { other.disabled = false; }
+      });
+      wrap.appendChild(other);
     }
     view.replaceChildren(wrap);
   }
@@ -223,6 +240,20 @@ function detectArticleLang(text) {
   if (/[\u0600-\u06FF]/.test(s)) return "ar"; // Arabic
   if (/[\u0590-\u05FF]/.test(s)) return "he"; // Hebrew
   return ""; // Latin / Cyrillic → default stack's Latin head
+}
+
+// The lang a Latin / Cyrillic article gets, which glyphs cannot tell apart:
+// the source page's own declared language (Defuddle's metadata, else its
+// <html lang>), sanitized to a plain BCP 47 tag. With none, "und" -- never
+// the UI language it would otherwise inherit, which made a screen reader
+// speak an English article with a Chinese voice. Han text with no clear
+// Simplified / Traditional majority keeps inheriting (detectArticleLang's
+// "ambiguous → default stack" branch).
+function pbpReaderFallbackLang(text, declared) {
+  const tag = String(declared || "").trim().replace(/_/g, "-");
+  if (/^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(tag)) return tag;
+  if (/[一-鿿]/.test(String(text || "").slice(0, 4000))) return "";
+  return "und";
 }
 
 // Monotonic article generation counter. renderArticleContent() captures it at
@@ -1401,10 +1432,20 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         try { host = new URL(frameOrigin).host; } catch (_) {}
         renderErrorState(t("mdPreviewFrameHint", host), () => grantFrameAndRetry(attemptedEngine, frameOrigin), true);
       } else {
+        // The other engine, when this page can use it: Defuddle needs the
+        // source tab, Jina an http(s) URL (engineUnavailable). The rail's
+        // engine switch lives in the collapsed "Source and extraction tools"
+        // section, so it is opened too -- both ways out are then on screen.
+        const otherEngine = attemptedEngine === "jina" ? "local" : "jina";
+        const alt = engineUnavailable(otherEngine) ? null
+          : { label: t("mdEngineSwitchTo", engineLabel(otherEngine)), run: () => retryExtract(otherEngine, null) };
+        const sourceDetails = document.getElementById("reader-source-details");
+        if (alt && sourceDetails) sourceDetails.open = true;
         renderErrorState(
           friendlyEngineErr(pr),
           () => retryExtract(attemptedEngine, pr),
-          pr && pr.error === "host_permission"
+          pr && pr.error === "host_permission",
+          alt
         );
       }
       // Video pages reach HERE, not the canonical-markdown guard further down:
@@ -2678,7 +2719,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     renderedView.removeAttribute("lang");
     renderedView.removeAttribute("dir");
     const articleLang = detectArticleLang(markdown);
-    if (articleLang) renderedView.lang = articleLang; // article-script font for the reading content
+    // Script first (it picks the CJK font); the source page's language, or
+    // "und", for everything glyphs cannot place.
+    const readingLang = articleLang || pbpReaderFallbackLang(markdown, info && info.lang);
+    if (readingLang) renderedView.lang = readingLang; // article-script font + the language assistive tech reads it in
     // D9-3: RTL article -> container-level dir so blockquote/list/TOC physical
     // direction CSS mirrors along with the text.
     if (articleLang === "ar" || articleLang === "he") renderedView.dir = "rtl";

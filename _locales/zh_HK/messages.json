@@ -2701,7 +2701,7 @@
     "message": "抽取術語中…"
   },
   "trSkippedTargetLang": {
-    "message": "$COUNT$ 段已是目標語言，已跳過",
+    "message": "$COUNT$ 段已是目標語言，毋須翻譯",
     "placeholders": {
       "count": {
         "content": "$1"

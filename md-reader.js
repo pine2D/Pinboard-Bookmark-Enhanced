@@ -987,8 +987,13 @@ function _pbpKbdHelpEnsurePop() {
   pop.id = "kbd-help-pop";
   pop.className = "pop-panel";
   pop.setAttribute("popover", "auto"); // top-layer + Esc + light-dismiss for this transient help surface
+  // A non-modal dialog to assistive tech, named by its own title, so opening
+  // it with "?" announces "Keyboard shortcuts, dialog" instead of nothing.
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-labelledby", "kbd-help-title");
   const title = document.createElement("div");
   title.className = "kbd-help-title";
+  title.id = "kbd-help-title";
   title.textContent = t("kbdHelpTitle");
   pop.appendChild(title);
   const list = document.createElement("ul");

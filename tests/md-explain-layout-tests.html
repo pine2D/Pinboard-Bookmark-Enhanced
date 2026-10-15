@@ -174,7 +174,7 @@ function assertLayout(frame, locale) {
         '<div id="search-pop" class="pop-panel" style="display:flex">Search</div>',
         '<div id="kbd-help-pop" class="pop-panel" style="display:flex">Shortcuts</div>',
         '<div id="typo-pop" class="pop-panel" style="display:flex">Typography</div>',
-        '<button class="pb-tr-err" data-tip="Translation failed">Retry</button>'
+        '<button class="pb-tr-err"><span>Retry</span><span class="pb-tr-err-reason">Translation failed</span></button>'
       ].join("");
       doc.body.appendChild(probes);
       const failures = [];
@@ -188,10 +188,13 @@ function assertLayout(frame, locale) {
           if (style.borderTopWidth === "0px" || ratio < 4.5)
             failures.push(`${mode}/${selector}:${ratio.toFixed(2)}`);
         }
+        // The failure reason is printed in the transparent pill, on the page.
+        const reason = frame.contentWindow.getComputedStyle(doc.querySelector(".pb-tr-err-reason"));
+        const pageBg = frame.contentWindow.getComputedStyle(doc.body).backgroundColor;
+        const reasonRatio = contrastRatio(reason.color, pageBg);
+        if (reasonRatio < 4.5) failures.push(`${mode}/.pb-tr-err-reason:${reasonRatio.toFixed(2)}`);
         const tip = frame.contentWindow.getComputedStyle(doc.querySelector(".pb-tr-err"), "::after");
-        const tipRatio = contrastRatio(tip.color, tip.backgroundColor);
-        if (tip.content === "none" || tip.borderTopWidth === "0px" || tipRatio < 4.5)
-          failures.push(`${mode}/.pb-tr-err::after:${tipRatio.toFixed(2)}`);
+        if (tip.content !== "none" && tip.content !== "normal") failures.push(`${mode}/.pb-tr-err::after is back: ${tip.content}`);
       }
       assert(failures.length === 0, failures.join(", "));
     } finally { frame.remove(); }

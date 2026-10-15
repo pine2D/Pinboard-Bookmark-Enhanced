@@ -653,6 +653,16 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
 #rendered-view h4, #rendered-view h5, #rendered-view h6 {
   text-wrap: balance;
 }
+/* CJK headings opt out: with no spaces to break at, balancing evens the two
+   lines by cutting through a word ("…固定文 / 章"). Greedy wrapping keeps
+   words whole far more often; auto-phrase lets Japanese break at phrase
+   boundaries (other scripts ignore it). */
+#rendered-view :is(h1, h2, h3, h4, h5, h6):lang(zh),
+#rendered-view :is(h1, h2, h3, h4, h5, h6):lang(ja),
+#rendered-view :is(h1, h2, h3, h4, h5, h6):lang(ko) {
+  text-wrap: wrap;
+  word-break: auto-phrase;
+}
 #rendered-view h1 {
   font-size: 2em;
   font-weight: 700;
@@ -1036,6 +1046,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 }
 .empty-state p { font-size: 15px; line-height: 1.6; }
 .empty-state .action-btn { margin-top: var(--sp-4); }
+.empty-state .action-btn + .action-btn { margin-inline-start: var(--sp-2); }
 
 /* ---- Loading State (shortcut pending placeholder) ---- */
 .preview-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-4); text-align: center; padding: 80px 32px; }
@@ -2076,6 +2087,10 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   width: 14px;
   height: 14px; /* px like .xp-gear svg in the same row */
 }
+/* Save to vocabulary carries its label (md-ask.js _pbpExplainIconBtn): same
+   26px rung, width from its content. A long label wraps the footer, which the
+   row already allows for the largest type tiers. */
+.xp-foot .xp-vocab { width: auto; gap: var(--sp-1); padding: 0 var(--sp-2); font-size: 12px; line-height: 16px; white-space: nowrap; }
 /* Dictionary view (md-dict.js) */
 .xp-dict-head { margin-bottom: var(--sp-2); } /* shape: .panel-head */
 /* Joins the .exp-img-row select recipe above (shared border/background/chevron);
@@ -2727,8 +2742,16 @@ html.pbp-tr-view-transition::view-transition-new(pbp-tr-article) { animation-nam
 #rendered-view .pb-tr code { font-size: 0.92em; }
 body.tr-bilingual #rendered-view .pb-tr,
 body.tr-only #rendered-view .pb-tr { display: block; }
-#rendered-view .pb-tr > :first-child { margin-top: 0; }
-#rendered-view .pb-tr > :last-child { margin-bottom: 0; }
+body:not(.tr-only) #rendered-view .pb-tr > :first-child { margin-top: 0; }
+body:not(.tr-only) #rendered-view .pb-tr > :last-child { margin-bottom: 0; }
+/* Translation-only view: the translation is the ONLY text on the page, so it
+   reads as body text. Option A's one-shade-down, 0.95em de-emphasis exists
+   for the bilingual view, where the original sits right above it (user
+   ruling 2026-10-15). The wrapper drops its own margins and keeps the
+   children's (the two rules above skip this view), so paragraphs, headings
+   and lists collapse against their neighbours exactly as in the original. */
+body.tr-only #rendered-view .pb-tr { color: var(--fg); font-size: 1em; margin: 0; }
+body.tr-only #rendered-view .pb-tr code { font-size: 0.875em; }
 
 /* Translated-only view: hide originals that HAVE a translation. pre blocks
    and not-yet-translated blocks never carry data-pb-tr-done, so they stay
@@ -2780,38 +2803,13 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   cursor: pointer;
 }
 .pb-tr-err svg { width: 13px; height: 13px; flex-shrink: 0; }
-.pb-tr-err::after {
-  content: attr(data-tip);
-  position: absolute;
-  z-index: 20;
-  left: 0;
-  bottom: calc(100% + 6px);
-  width: max-content;
-  max-width: min(360px, calc(100vw - 32px));
-  padding: 7px 9px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--fg);
-  box-shadow: 0 4px 16px rgba(28, 27, 26, 0.18);
-  font-size: 12px;
-  font-weight: normal;
-  line-height: 1.5;
-  text-align: left;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  opacity: 0;
-  visibility: hidden;
-  translate: 0 2px;
-  pointer-events: none;
-  transition: opacity 140ms var(--ease-out), translate 140ms var(--ease-out);
-}
-.pb-tr-err:hover::after,
-.pb-tr-err:focus-visible::after {
-  opacity: 1;
-  visibility: visible;
-  translate: 0 0;
-}
+/* The failure reason is printed in the pill itself, after the action -- no
+   hover / focus bubble: the reading view never opens overlays on hover (user
+   ruling), and a reason that only appears under a pointer is lost on touch.
+   The accessible name already carries it (_pbpTrSetErrTip), so this copy is
+   aria-hidden. */
+.pb-tr-err { flex-wrap: wrap; max-width: 100%; text-align: start; }
+.pb-tr-err-reason { color: var(--fg-secondary); font-weight: normal; overflow-wrap: anywhere; }
 /* D8-4: swapping to --btn-hover dropped --danger text under AA (worst case
    3.74:1 dark). Background stays transparent (rest-state contrast already
    clears AA); hover cue is a currentColor ring instead. */
@@ -4240,4 +4238,7 @@ details#video-description .desc-body a { color: var(--link); }
 
 #reader-source-details > summary { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; list-style: none; }
 #reader-source-details > summary::-webkit-details-marker { display: none; }
+/* Chevron at the right edge, like every .rail-sec-head: the label grows and
+   pushes it there (the head rule's own .rail-sec-label does the same). */
+#reader-source-details > summary > span:first-child { flex: 1 1 auto; min-width: 0; }
 #reader-source-details[open] > summary .rail-sec-tri { transform: translateY(1px) rotate(225deg); }

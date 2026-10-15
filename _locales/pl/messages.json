@@ -2701,7 +2701,7 @@
     "message": "Wyodrębnianie terminologii…"
   },
   "trSkippedTargetLang": {
-    "message": "Pominięto segmenty już w języku docelowym: $COUNT$",
+    "message": "Segmenty już w języku docelowym (bez tłumaczenia): $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"
