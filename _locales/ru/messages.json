@@ -2061,6 +2061,10 @@
       }
     }
   },
+  "aiStatusPage": {
+    "message": "Статус сервиса $PROVIDER$",
+    "placeholders": {"provider": {"content": "$1", "example": "DeepSeek"}}
+  },
   "syncMigrationFailed": {
     "message": "Не удалось перенести данные синхронизации. Повторите попытку. Если проблема не исчезнет, проверьте свободное место в Chrome Sync."
   },

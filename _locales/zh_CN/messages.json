@@ -2061,6 +2061,10 @@
       }
     }
   },
+  "aiStatusPage": {
+    "message": "查看 $PROVIDER$ 服务状态",
+    "placeholders": {"provider": {"content": "$1", "example": "DeepSeek"}}
+  },
   "syncMigrationFailed": {
     "message": "同步迁移失败。请重试；如果问题仍然存在，请检查 Chrome Sync 的可用存储空间。"
   },

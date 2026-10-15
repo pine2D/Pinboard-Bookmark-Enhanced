@@ -697,6 +697,21 @@ function pbpAiProviderName(s) {
   return (name && name !== key) ? name : id;
 }
 
+// Inline "check <provider> status" link for a reader failure line, or null
+// when pbpAiStatusPageUrl (ai.js) offers none for this error. Opens in a new
+// tab from the user's click; the reader never fetches the page itself.
+function pbpAiStatusLink(s, err) {
+  const url = pbpAiStatusPageUrl(s, err);
+  if (!url) return null;
+  const a = document.createElement("a");
+  a.className = "ai-status-link";
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.textContent = t("aiStatusPage", PBP_AI_STATUS_PAGES[(s && s.aiProvider) || "gemini"].name);
+  return a;
+}
+
 // Error attribution for the override: when a preview request dies on a
 // model-shaped failure while an override is active, name the override as the
 // suspect -- the AI Providers tab's test connection never exercises it, so

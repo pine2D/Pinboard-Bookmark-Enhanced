@@ -916,6 +916,8 @@ function _pbpAskErrorUi(aEl, error, question) {
   err.textContent = ((error && error.message) ? error.message
     : (typeof error === "string" && error) ? error : t("aiErrRequestFailed"))
     + (overrideHint ? " " + overrideHint : "");
+  const statusLink = pbpAiStatusLink(_pbpAskState && _pbpAskState.s, error);
+  if (statusLink) err.append(" ", statusLink);
   const retry = document.createElement("button");
   retry.type = "button";
   retry.className = "action-btn ask-retry";

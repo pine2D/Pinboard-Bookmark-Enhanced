@@ -2061,6 +2061,10 @@
       }
     }
   },
+  "aiStatusPage": {
+    "message": "$PROVIDER$ の稼働状況を見る",
+    "placeholders": {"provider": {"content": "$1", "example": "DeepSeek"}}
+  },
   "syncMigrationFailed": {
     "message": "同期データの移行に失敗しました。もう一度試してください。解決しない場合は、Chrome Sync の空き容量を確認してください。"
   },

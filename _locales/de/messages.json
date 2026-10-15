@@ -2061,6 +2061,10 @@
       }
     }
   },
+  "aiStatusPage": {
+    "message": "Status von $PROVIDER$ prüfen",
+    "placeholders": {"provider": {"content": "$1", "example": "DeepSeek"}}
+  },
   "syncMigrationFailed": {
     "message": "Die Synchronisierungsmigration ist fehlgeschlagen. Versuche es erneut. Falls das Problem bleibt, prüfe den verfügbaren Chrome-Sync-Speicher."
   },

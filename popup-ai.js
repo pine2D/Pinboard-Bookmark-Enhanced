@@ -499,6 +499,17 @@ function showAIError(op, err, opSettings) {
     msgEl.parentElement.insertBefore(hintEl, msgEl.nextSibling);
   } else {
     msgEl.textContent = `[${provLabel}] ${short}`;
+    // The service itself may be down: point at its status page, inline after
+    // the reason (a fourth button would wrap the action row at popup width).
+    const statusUrl = pbpAiStatusPageUrl(s, err);
+    if (statusUrl) {
+      const link = document.createElement("a");
+      link.href = statusUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = t("aiStatusPage", provLabel);
+      msgEl.append(" ", link);
+    }
   }
 
   const detailsEl = $id("ai-error-details");

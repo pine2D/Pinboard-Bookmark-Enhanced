@@ -552,6 +552,8 @@ function _pbpSkimShowError(error) {
   } else {
     const hint = pbpAiOverrideErrHint(error, _pbpSkimState && _pbpSkimState.s);
     p.textContent = (raw ? pbpAiErrorText(error) : t("skimFailed")) + (hint ? " " + hint : "");
+    const statusLink = pbpAiStatusLink(_pbpSkimState && _pbpSkimState.s, error);
+    if (statusLink) p.append(" ", statusLink);
   }
   const retry = document.createElement("button");
   retry.type = "button";

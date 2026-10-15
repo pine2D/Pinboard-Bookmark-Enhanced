@@ -3123,6 +3123,12 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 
 .ask-stopped { font-size: 0.8em; color: var(--fg-muted); margin: var(--sp-2) 0 0; }
 .ask-err { font-size: 0.85em; color: var(--danger); margin: 0 0 var(--sp-2); overflow-wrap: break-word; }
+/* Provider status page after a failure the service itself may have caused
+   (ask / skim error line, translate rail). Takes the line's own color so it
+   reads as part of the notice; the underline is the link affordance. */
+.ai-status-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.ai-status-link:hover { color: var(--link); }
+.ai-status-link:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: var(--radius-sm); }
 .ask-retry { padding: var(--sp-1) var(--sp-2); font-size: 12px; /* secondary md face in px, not the panel's prose scale */ border-radius: var(--radius-sm); }
 
 /* ---- Ask history chrome: restored note / clear confirm / answer copy ---- */

@@ -2042,6 +2042,10 @@
       }
     }
   },
+  "aiStatusPage": {
+    "message": "Check $PROVIDER$ status",
+    "placeholders": {"provider": {"content": "$1", "example": "DeepSeek"}}
+  },
   "syncMigrationFailed": {
     "message": "Sync migration failed. Try again; if it persists, check available Chrome Sync storage."
   },

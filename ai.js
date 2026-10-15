@@ -1358,6 +1358,55 @@ function pbpAiErrorText(err) {
   return msg;
 }
 
+// Official status pages, for the moment a request came back with nothing and
+// the question is "them or me". Only ever opened as a link by the user's own
+// click; nothing here fetches them. Providers without a public page (zhipu,
+// siliconflow) and the user's own servers (ollama, custom) have no entry.
+// `name` is the short brand the link reads with, in every locale.
+const PBP_AI_STATUS_PAGES = {
+  openai: { url: "https://status.openai.com/", name: "OpenAI" },
+  claude: { url: "https://status.claude.com/", name: "Claude" },
+  gemini: { url: "https://aistudio.google.com/status", name: "Gemini" },
+  deepseek: { url: "https://status.deepseek.com/", name: "DeepSeek" },
+  qwen: { url: "https://status.aliyun.com/", name: "Qwen" },
+  minimax: { url: "https://status.minimaxi.com/", name: "MiniMax" },
+  openrouter: { url: "https://status.openrouter.ai/", name: "OpenRouter" },
+  groq: { url: "https://groqstatus.com/", name: "Groq" },
+  mistral: { url: "https://status.mistral.ai/", name: "Mistral" },
+  cohere: { url: "https://status.cohere.com/", name: "Cohere" },
+  kimi: { url: "https://status.moonshot.cn/", name: "Kimi" },
+};
+
+// The status page worth offering for this failure, or "". Only failures where
+// the service itself may be down or overloaded qualify: 5xx, 408, a 429 that
+// is not about the user's own balance, a timeout, a dropped connection or an
+// empty reply. A key, model, permission or endpoint error is the user's to fix
+// and a status page would point the wrong way. A provider routed through a
+// non-default base URL is a proxy, not that provider's service.
+function pbpAiStatusPageUrl(s, err) {
+  const provider = (s && s.aiProvider) || "gemini";
+  const page = PBP_AI_STATUS_PAGES[provider];
+  if (!page || !err || err.name === "AbortError") return "";
+  const url = page.url;
+  const reg = OPENAI_COMPAT_PROVIDERS[provider];
+  if (reg && reg.baseField) {
+    const own = String(s[reg.baseField] || "").trim().replace(/\/+$/, "");
+    if (own && own !== reg.base) return "";
+  }
+  const code = err.code;
+  if (code === "host_permission" || code === "endpoint_invalid" || code === "model_not_found") return "";
+  const msg = String(err.message || "");
+  const status = err.status;
+  if (typeof status === "number") {
+    if (status >= 500 || status === 408) return url;
+    if (status === 429 && !/quota|balance|credit|billing|exhausted/i.test(msg)) return url;
+    return "";
+  }
+  if (code === "network") return (typeof navigator !== "undefined" && navigator.onLine === false) ? "" : url;
+  if (err.name === "TimeoutError" || /\btimed? ?out\b|timeout|empty response|failed to fetch/i.test(msg)) return url;
+  return "";
+}
+
 // ZH-3 §5: single composer for the model-not-found guidance popup-ai.js and
 // options-connectivity.js previously each assembled by hand. Presentation
 // stays with each caller (panel vs concatenated status line).

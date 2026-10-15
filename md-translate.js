@@ -1484,6 +1484,14 @@ function _pbpTrBuildSection(st) {
   retryAll.addEventListener("click", () => { _pbpTrRetryAllFailed(st).catch(() => {}); });
   prog.insertAdjacentElement("afterend", retryAll);
 
+  // Status page of the provider, under retry-all while a failure that may be
+  // the service's own (timeout, 5xx, empty reply) is still on the page.
+  const statusLine = document.createElement("div");
+  statusLine.id = "tr-status-line";
+  statusLine.className = "tr-meta";
+  statusLine.hidden = true;
+  retryAll.insertAdjacentElement("afterend", statusLine);
+
   // Rail accordion (spec 2026-07-04): install AFTER every direct child above
   // exists (pbpRailCollapsible's CSS-driven hide covers whatever's already
   // in `sec` at install time PLUS anything appended to `sec` later, e.g.
@@ -2050,6 +2058,7 @@ async function _pbpTrStart(st) {
   const queueResult = await pbpTrRunQueue({
     targetCode: st.target.code,
     describeError: (e) => {
+      _pbpTrNoteStatusPage(st, e);
       const hint = pbpAiOverrideErrHint(e, st.s);
       return hint ? pbpAiErrorText(e) + " " + hint : pbpAiErrorText(e);
     },
@@ -2598,6 +2607,8 @@ async function _pbpTrRetryBlock(st, w, btn) {
     const overrideHint = pbpAiOverrideErrHint(e, st.s);
     const cause = pbpAiErrorText(e) + (overrideHint ? " " + overrideHint : "");
     _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + cause, cause);
+    _pbpTrNoteStatusPage(st, e);
+    _pbpTrSyncRetryAll();
   } finally {
     window.removeEventListener("pagehide", onHide);
   }
@@ -2612,13 +2623,34 @@ function _pbpTrClearPendingFailures(pendingNs) {
   _pbpTrSyncRetryAll();
 }
 
-// Show the "retry all failed" button iff >=1 failed block (.pb-tr-err) remains.
+// The status-page link a failed block earned, kept until no failure remains.
+// Any service-side failure among them is enough to offer it.
+let _pbpTrStatusLink = null;
+function _pbpTrNoteStatusPage(st, e) {
+  const link = pbpAiStatusLink(st.s, e);
+  if (link) _pbpTrStatusLink = link;
+}
+
+// Show the "retry all failed" button iff >=1 failed block (.pb-tr-err) remains,
+// and the provider's status link under it while one of those failures earned it.
 function _pbpTrSyncRetryAll() {
   const all = document.getElementById("tr-retry-all");
   if (!all) return;
   const remaining = document.querySelectorAll(".pb-tr-err").length;
   all.hidden = remaining === 0;
-  if (remaining === 0) all.disabled = false;
+  if (remaining === 0) {
+    all.disabled = false;
+    _pbpTrStatusLink = null;
+  }
+  const line = document.getElementById("tr-status-line");
+  if (!line) return;
+  if (_pbpTrStatusLink && remaining > 0) {
+    if (line.firstChild !== _pbpTrStatusLink) line.replaceChildren(_pbpTrStatusLink);
+    line.hidden = false;
+  } else {
+    line.replaceChildren();
+    line.hidden = true;
+  }
 }
 
 // Retry every failed block, SEQUENTIALLY (await each) so we never fire N concurrent

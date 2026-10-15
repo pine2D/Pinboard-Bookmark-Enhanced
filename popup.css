@@ -652,7 +652,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
    has no contrast floor — a blue link on some dark warn-bg drops below 2.5:1).
    At 11px an underline alone is a weak cue, so bold (matching .fc-title) +
    underline-offset make "clickable" unambiguous without recolouring. */
-.fc-message a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.fc-message a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; /* "Check DeepSeek status" moves as one piece */ }
 .model-not-found-hint { margin-top: var(--pp-sp-1); font-size: 11px; /* px, not 0.9em: inserted into .fc-body (11px), which rendered it at 9.9px -- under the textFloor */ opacity: 0.8; }
 /* flex-wrap: ru's grant-retry label runs 31 chars; long labels fold to a new
    line instead of squeezing the row (the buttons stay text by ruling). */

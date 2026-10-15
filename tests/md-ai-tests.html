@@ -7423,7 +7423,8 @@ suiteIf("skim error attribution", "_pbpSkimShowError", () => {
       _pbpSkimShowError({ status: 401, message: "openai: Incorrect API key provided" });
       assertEq(text(), "trErrKey", "401 names the key, not a generic failure");
       _pbpSkimShowError({ status: 429, message: "slow down" });
-      assertEq(text(), "trErrQuota", "429 names the quota");
+      assertEq(body.querySelector(".skim-err").firstChild.textContent, "trErrQuota", "429 names the quota");
+      assert(body.querySelector(".skim-err .ai-status-link"), "a rate-limited service offers its status page");
       _pbpSkimShowError({ code: "model_not_found", message: "model gpt-oops does not exist" });
       assertEq(text(), "model gpt-oops does not exist previewAiOverrideErrHint",
         "a coded failure keeps its own message and names the preview override");
@@ -8258,6 +8259,49 @@ test("explain popover keeps its downward bias but abandons a cramped one", () =>
 </script>
 <script>
 // ============ Translate batch 1 (2026-08-18): ZH-3 / ZH-1a / ZH-0 / ZH-6 ============
+
+suiteIf("pbpAiStatusPageUrl: status link only when the service may be down", "pbpAiStatusPageUrl", () => {
+  const ds = { aiProvider: "deepseek" };
+  const page = "https://status.deepseek.com/";
+  test("service-side failures earn the provider's page", () => {
+    for (const err of [
+      { status: 503, message: "x" }, { status: 500, message: "x" }, { status: 529, message: "overloaded" },
+      { status: 408, message: "x" }, { status: 429, message: "Rate limit reached for requests" },
+      { message: "AI stream timeout" }, { name: "TimeoutError", message: "signal timed out" },
+      { message: "API returned empty response" }, new TypeError("Failed to fetch"),
+      { code: "network", message: "offline text" },
+    ]) assertEq(pbpAiStatusPageUrl(ds, err), page, JSON.stringify(err));
+  });
+  test("failures the user fixes get no link", () => {
+    for (const err of [
+      { status: 401, message: "x" }, { status: 403, message: "x" }, { status: 400, message: "x" },
+      { status: 404, message: "x" }, { status: 404, code: "model_not_found", message: "x" },
+      { code: "host_permission", message: "grant" }, { code: "endpoint_invalid", message: "bad" },
+      { status: 429, message: "Insufficient Balance" }, { status: 429, message: "You exceeded your current quota" },
+      { name: "AbortError", message: "aborted" }, { message: "something else" }, null,
+    ]) assertEq(pbpAiStatusPageUrl(ds, err), "", JSON.stringify(err));
+  });
+  test("no page for providers without one, local servers or a proxied base", () => {
+    const down = { status: 503, message: "x" };
+    for (const p of ["zhipu", "siliconflow", "ollama", "custom"]) assertEq(pbpAiStatusPageUrl({ aiProvider: p }, down), "", p);
+    assertEq(pbpAiStatusPageUrl({ aiProvider: "openai", openaiBaseUrl: "https://proxy.example/v1" }, down), "", "proxied openai");
+    assertEq(pbpAiStatusPageUrl({ aiProvider: "openai", openaiBaseUrl: "https://api.openai.com/v1/" }, down), "https://status.openai.com/", "default base, trailing slash");
+    assertEq(pbpAiStatusPageUrl({}, down), "https://aistudio.google.com/status", "missing provider is gemini");
+  });
+});
+
+suiteIf("pbpAiStatusLink", "pbpAiStatusLink", () => {
+  test("a new-tab link to the page, or null", () => {
+    const a = pbpAiStatusLink({ aiProvider: "claude" }, { status: 529, message: "overloaded" });
+    assertEq(a.tagName, "A");
+    assertEq(a.getAttribute("href"), "https://status.claude.com/");
+    assertEq(a.target, "_blank");
+    assert(/noopener/.test(a.rel), "rel: " + a.rel);
+    assertEq(a.className, "ai-status-link");
+    assert(a.textContent.length > 0, "empty label");
+    assertEq(pbpAiStatusLink({ aiProvider: "claude" }, { status: 401, message: "x" }), null);
+  });
+});
 
 suiteIf("pbpAiErrorText (ZH-3)", "pbpAiErrorText", () => {
   // Contract 1 (the one future refactors will break): an error that ALREADY

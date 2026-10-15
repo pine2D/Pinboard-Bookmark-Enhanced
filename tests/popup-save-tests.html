@@ -1930,6 +1930,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
         },
         querySelector: () => null,
         querySelectorAll: () => [],
+        nodes: [],
+        append(...nodes) {
+          for (const n of nodes) { this.nodes.push(n); this.textContent += typeof n === "string" ? n : n.textContent; }
+        },
       };
       el.parentElement = { querySelector: () => null, insertBefore: () => {} };
       return el;
@@ -2022,6 +2026,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         t: tEn,
         AI_PROVIDER_LABEL, pbpAiProviderLabel, pbpAiModelNotFoundText: () => ({ msg: "", hint: "" }),
         pickFallbackProvider: () => null,
+        pbpAiStatusPageUrl: o.statusPageUrl || (() => ""),
         _aiErrorLastOp: null, _aiErrorLastPermission: null, _aiErrorHideTimer: null,
         pbpAiFastCached: async () => null,
         setAiProgress: () => {},
@@ -2345,6 +2350,30 @@ test("posts/add default remains replace=yes for existing callers", () => {
       await real.doAISummary(false);
       assert(real.el["ai-error-message"].textContent === "[OpenAI] OpenAI: rate limited",
         "a real provider error was flattened: " + real.el["ai-error-message"].textContent);
+    });
+
+    await testAsync("a failure the service may have caused links its status page after the reason", async () => {
+      const seen = [];
+      const h = makePopupAi({
+        realErrorCard: true,
+        statusPageUrl: (s, err) => { seen.push([s.aiProvider, err.status]); return err.status === 503 ? "https://status.openai.com/" : ""; },
+        respond: async () => ({ ok: false, error: { message: "OpenAI failed (HTTP 503)", status: 503 } }),
+      });
+      await h.doAISummary(false);
+      const msg = h.el["ai-error-message"];
+      const link = msg.nodes.find((n) => typeof n !== "string");
+      assert(seen.length === 1 && seen[0][0] === "openai" && seen[0][1] === 503, "judged with the failed op's provider and status: " + JSON.stringify(seen));
+      assert(link && link.tagName === "A" && link.getAttribute("href") === "https://status.openai.com/", "no status link in the message");
+      assert(link.target === "_blank" && /noopener/.test(link.rel), "the link must open a new tab without an opener");
+      assert(link.textContent === "Check OpenAI status", "link label: " + link.textContent);
+      assert(msg.textContent === "[OpenAI] OpenAI failed (HTTP 503) Check OpenAI status", "reason then link: " + msg.textContent);
+      const none = makePopupAi({
+        realErrorCard: true,
+        statusPageUrl: () => "",
+        respond: async () => ({ ok: false, error: { message: "bad key", status: 401 } }),
+      });
+      await none.doAISummary(false);
+      assert(none.el["ai-error-message"].nodes.length === 0, "a user-side failure grew a link");
     });
 
     await testAsync("an account change during the call drops the summary op silently", async () => {
