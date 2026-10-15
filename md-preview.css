@@ -2808,8 +2808,11 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
    ruling), and a reason that only appears under a pointer is lost on touch.
    The accessible name already carries it (_pbpTrSetErrTip), so this copy is
    aria-hidden. */
-.pb-tr-err { flex-wrap: wrap; max-width: 100%; text-align: start; }
-.pb-tr-err-reason { color: var(--fg-secondary); font-weight: normal; overflow-wrap: anywhere; }
+/* With its reason it is a two-line notice -- the action, then why -- so it
+   takes the medium radius: a full pill stretched over two lines reads as a
+   swollen capsule. */
+.pb-tr-err { flex-wrap: wrap; max-width: 100%; text-align: start; border-radius: var(--radius-md); }
+.pb-tr-err-reason { flex-basis: 100%; color: var(--fg-secondary); font-weight: normal; overflow-wrap: anywhere; }
 /* D8-4: swapping to --btn-hover dropped --danger text under AA (worst case
    3.74:1 dark). Background stays transparent (rest-state contrast already
    clears AA); hover cue is a currentColor ring instead. */
@@ -2835,6 +2838,10 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
    (inline-flex overrides the UA [hidden]{display:none}). */
 #tr-retry-all[hidden] { display: none; }
 #tr-retry-all svg { width: 13px; height: 13px; flex-shrink: 0; }
+/* One line, always: a pill that wraps reads as two stacked capsules. A label
+   longer than the rail ends in an ellipsis (its name stays in the title). */
+#tr-retry-all { max-width: 100%; }
+#tr-retry-all > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* D8-4: same fix as .pb-tr-err — keep transparent background on hover, ring instead. */
 #tr-retry-all:hover { box-shadow: inset 0 0 0 1px currentColor; }
 #tr-retry-all:disabled { opacity: 0.5; cursor: wait; }

@@ -1265,7 +1265,8 @@ function _pbpDictDetect(text) {
 // express or the selection's script contradicts.
 async function _pbpDictResolveLang(cap, ctx, manual) {
   const view = document.getElementById("rendered-view");
-  const articleLang = view ? (view.getAttribute("lang") || "") : "";
+  // "und" (an article whose language nothing could establish) is no route.
+  const articleLang = view ? (view.getAttribute("lang") || "").replace(/^und$/i, "") : "";
   if (pbpDictPrimaryLang(manual)) return pbpDictPrimaryLang(manual);
   const sel = String(cap.text || "");
   const explicit = pbpDictAcceptLang(ctx.selLang || "", sel);

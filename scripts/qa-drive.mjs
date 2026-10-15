@@ -1999,6 +1999,136 @@ async function driveNarrowLayouts(context, worker, extId, rep) {
   finally {detach();await page.close();}
 }
 
+// reader-edge: the reader under the inputs the default tour never uses --
+// German UI, dark scheme, a very long title, an English article whose source
+// page declared its language, a block-level translation failure, the
+// extraction-error shell, the <=1000px drawer, and a Chinese UI reading the
+// translation-only view (CJK heading wrap). Screenshots for a human; the
+// article-lang outcome is asserted.
+async function driveReaderEdge(context, worker, extId, rep) {
+  const s = rep.surface("reader-edge");
+  const page = await context.newPage();
+  const detach = rep.attach(page, s);
+  const step = async (state, fn) => {
+    try { await fn(); } catch (e) { s.failures.push(`${state}: ${e.message}`); }
+  };
+  const LONG_TITLE = "Serendipity in Distributed Systems: How Unplanned Discoveries Shape Long-Lived Software Architectures, Teams and the Documents They Leave Behind";
+  const seed = (lang) => worker.evaluate(async ({ storageKey, markdown, title, url, lang }) => {
+    const auth = await getCurrentPinboardAuth();
+    await chrome.storage.local.set({
+      [`md_preview_data_${storageKey}`]: {
+        markdown, contentHtml: "", title, url, baseUrl: url, lang,
+        tags: ["reading", "qa"], tokens: 0, hasApiKey: true,
+        source: "local", math: false, forum: false, account: auth.account || "", ts: Date.now(),
+      },
+    });
+  }, { storageKey: PREVIEW_KEY, markdown: SYNTHETIC_MARKDOWN, title: LONG_TITLE, url: ARTICLE_URL, lang });
+  const open = async () => {
+    await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForFunction(() => document.querySelectorAll("#rendered-view [data-pb]").length > 0, { timeout: TIMEOUT_MS });
+    await page.waitForTimeout(600);
+  };
+  const setLang = (lang) => worker.evaluate(async (lang) => { await chrome.storage.local.set({ optLang: lang }); }, lang);
+  // The reader follows optTheme (seeded "light"), not the OS scheme alone.
+  const setScheme = (mode) => worker.evaluate(async (mode) => { await chrome.storage.local.set({ optTheme: mode }); }, mode);
+  try {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setScheme("dark");
+    await setLang("de");
+
+    await step("de-dark-base", async () => {
+      await seed("en-GB");
+      await open();
+      const lang = await page.evaluate(() => document.getElementById("rendered-view").lang);
+      // The synthetic article mixes Han into its Latin text, so the script
+      // detector may claim it first; when it does not, the declared tag wins.
+      // The fixture is genuinely bilingual (Chinese carries the text), so the
+      // declared en-GB must NOT win: zh-Hans keeps Simplified glyphs and
+      // punctuation (pbpReaderArticleLang's word-unit minority rule).
+      if (lang !== "zh-Hans") s.failures.push(`article lang: expected zh-Hans for the bilingual fixture, got "${lang}"`);
+      s.notes.push(`article lang = "${lang}"`);
+      await rep.shot(page, s, "de-dark-base");
+    });
+
+    await step("de-dark-export", async () => {
+      const head = page.locator("#export-section .rail-sec-head").first();
+      if ((await head.getAttribute("aria-expanded")) !== "true") await head.click();
+      await page.waitForTimeout(300);
+      await page.evaluate(() => document.getElementById("export-section").scrollIntoView({ block: "start", behavior: "instant" }));
+      await rep.shot(page, s, "de-dark-export");
+    });
+
+    await step("de-dark-translate-failure", async () => {
+      await page.locator("#rendered-view").click({ position: { x: 20, y: 10 } });
+      await page.keyboard.press("t");
+      await page.waitForFunction(() => document.querySelectorAll("#rendered-view .pb-tr").length > 2, { timeout: 30_000 });
+      await page.waitForTimeout(800);
+      // A real failure pill on block 2, built by the production helpers with a
+      // long real-world reason, then the rail's "retry all" sync.
+      await page.evaluate(() => {
+        const blocks = [...document.querySelectorAll("#rendered-view [data-pb]")];
+        const target = blocks[2];
+        const btn = document.createElement("button");
+        btn.type = "button"; btn.className = "pb-tr-err"; btn.dataset.pbTrErr = target.dataset.pb || "2";
+        btn.innerHTML = PBP_TR_ERR_SVG;
+        const lab = document.createElement("span"); lab.textContent = t("trRetryBlock"); btn.appendChild(lab);
+        _pbpTrSetErrTip(btn, t("trBlockFailed") + " - HTTP 500: upstream provider returned an internal error while generating the translation for this paragraph");
+        (target.nextElementSibling && target.nextElementSibling.classList.contains("pb-tr") ? target.nextElementSibling : target).insertAdjacentElement("afterend", btn);
+        _pbpTrSyncRetryAll();
+        btn.scrollIntoView({ block: "center", behavior: "instant" });
+      });
+      await page.waitForTimeout(300);
+      await rep.shot(page, s, "de-dark-translate-failure");
+    });
+
+    await step("narrow-drawer", async () => {
+      await page.setViewportSize({ width: 800, height: 900 });
+      await page.waitForTimeout(300);
+      await rep.shot(page, s, "narrow-800");
+      await page.click("#rail-toggle");
+      await page.waitForTimeout(500);
+      await rep.shot(page, s, "narrow-800-drawer");
+      await page.keyboard.press("Escape");
+    });
+
+    await step("extraction-error", async () => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.evaluate(() => {
+        const d = document.getElementById("reader-source-details");
+        if (d) d.open = true;
+        renderErrorState(t("mdEngineExtractFailed"), () => {}, false, { label: t("mdEngineSwitchTo", "Jina Reader"), run: () => {} });
+      });
+      await page.waitForTimeout(300);
+      await rep.shot(page, s, "de-dark-extraction-error");
+    });
+
+    await step("zh-light-tr-only-heading", async () => {
+      await setScheme("light");
+      await setLang("zh_CN");
+      await page.setViewportSize({ width: 900, height: 900 });
+      await seed("");
+      await open();
+      await page.locator("#rendered-view").click({ position: { x: 20, y: 10 } });
+      await page.keyboard.press("t");
+      await page.waitForFunction(() => document.querySelectorAll("#rendered-view .pb-tr").length > 2, { timeout: 30_000 });
+      await page.waitForTimeout(600);
+      // Translating lands in the bilingual view; one "v" is translation-only.
+      await page.keyboard.press("v");
+      await page.waitForTimeout(600);
+      const mode = await page.evaluate(() => document.body.classList.contains("tr-only"));
+      if (!mode) s.failures.push("zh-light-tr-only: one v did not reach the translation-only view");
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(300);
+      await rep.shot(page, s, "zh-light-tr-only");
+    });
+  } finally {
+    await setLang("auto").catch(() => {});
+    await setScheme("light").catch(() => {});
+    detach();
+    await page.close().catch(() => {});
+  }
+}
+
 async function driveTranslateStop(context, worker, extId, rep) {
   const s = rep.surface("translate-stop");
   const page = await context.newPage();
@@ -2381,6 +2511,7 @@ try {
     else if (surface === "options-save") await driveOptionsSaveFeedback(context, extId, rep);
     else if (surface === "themes") await driveThemes(context, worker, extId, rep);
     else if (surface === "faults") await driveFaults(context, worker, extId, rep);
+    else if (surface === "reader-edge") await driveReaderEdge(context, worker, extId, rep);
     else console.warn(`[qa-drive] unknown surface: ${surface}`);
   }
 

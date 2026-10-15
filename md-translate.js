@@ -731,6 +731,15 @@ async function pbpTrRunQueue(plan) {
 // and equal (translating a language into itself is a no-op). Gate on the target,
 // NOT the UI language — a zh UI with an explicit en target must still offer to
 // translate a zh article. Uncertain detection ("" for Latin scripts) always shows it.
+// The article's script-level language as md-preview.js detected it
+// (data-pb-script-lang: CJK / RTL codes, "" otherwise) -- NOT the element's
+// lang, which may carry the source page's declared language. Falls back to
+// lang where the attribute is absent (test harnesses, older shells).
+function _pbpTrViewLang(view) {
+  if (!view) return "";
+  const d = view.dataset && view.dataset.pbScriptLang;
+  return typeof d === "string" ? d : (view.lang || "");
+}
 function _pbpTrShouldHideEntry(articleLang, targetLang) {
   return !!(articleLang && targetLang && articleLang === targetLang);
 }
@@ -1034,7 +1043,7 @@ async function pbpTrInit(detail) {
   if (!detail || _pbpTrState) return; // owner/lifecycle changed during the read
   const uiLang = uiLangToBCP47();
   const target = pbpTrResolveTargetLang(s, uiLang);
-  if (_pbpTrShouldHideEntry(view.lang || "", target.code)) return;
+  if (_pbpTrShouldHideEntry(_pbpTrViewLang(view), target.code)) return;
   if (!pbpAiBlocks().length) pbpAiIndexBlocks(view);
 
   const st = _pbpTrState = {
@@ -1042,7 +1051,7 @@ async function pbpTrInit(detail) {
     url: String((detail && detail.url) || ""),
     title: String((detail && detail.title) || ""),
     account: String((detail && detail.account) || ""),
-    articleLang: view.lang || "",  // detectArticleLang result (md-preview.js:1562); "" for Latin/ambiguous
+    articleLang: _pbpTrViewLang(view),  // script-level verdict (md-preview.js data-pb-script-lang); "" for Latin/ambiguous
     target,
     // pbpAiCacheModelKey (not just the override): with no preview override,
     // switching the provider's configured model must invalidate translation/
@@ -1470,6 +1479,7 @@ function _pbpTrBuildSection(st) {
   retryAll.innerHTML = PBP_TR_RETRY_SVG;               // static inline SVG only (no emoji)
   const raLab = document.createElement("span");
   raLab.textContent = t("trRetryAllFailed");
+  retryAll.title = raLab.textContent; // the full name, should a long locale ellipsize the pill
   retryAll.appendChild(raLab);
   retryAll.addEventListener("click", () => { _pbpTrRetryAllFailed(st).catch(() => {}); });
   prog.insertAdjacentElement("afterend", retryAll);
@@ -2346,7 +2356,10 @@ function _pbpTrFill(st, w, shieldedTranslation) {
 // pill after the label (.pb-tr-err-reason, aria-hidden: the name already says
 // it) -- never a hover bubble, which the reading view does not use and touch
 // never reaches.
-function _pbpTrSetErrTip(btn, tip) {
+// `shown` (optional) is the reason line's text when it should be shorter than
+// the name: the cause alone ("Network or server error…"), since the action
+// line above it already says the block failed.
+function _pbpTrSetErrTip(btn, tip, shown) {
   btn.dataset.tip = tip;
   const lab = btn.querySelector("span:not(.pb-tr-err-reason)");
   const visible = lab ? lab.textContent : "";
@@ -2358,7 +2371,7 @@ function _pbpTrSetErrTip(btn, tip) {
     reason.setAttribute("aria-hidden", "true");
     btn.appendChild(reason);
   }
-  reason.textContent = tip;
+  reason.textContent = shown || tip;
 }
 
 // Per-block failure: inline error pill after the block, the reason printed
@@ -2378,7 +2391,7 @@ function _pbpTrMarkFailed(st, w, message) {
   const lab = document.createElement("span");
   lab.textContent = t("trRetryBlock");
   btn.appendChild(lab);
-  _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + String(message || ""));
+  _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + String(message || ""), String(message || ""));
   orig.insertAdjacentElement("afterend", btn);
   btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
   _pbpTrSyncRetryAll();
@@ -2583,8 +2596,8 @@ async function _pbpTrRetryBlock(st, w, btn) {
     if (label) label.textContent = t(e && e.code === "host_permission" ? "aiGrantRetry" : "trRetryBlock");
     btn.disabled = false;
     const overrideHint = pbpAiOverrideErrHint(e, st.s);
-    _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + pbpAiErrorText(e)
-      + (overrideHint ? " " + overrideHint : ""));
+    const cause = pbpAiErrorText(e) + (overrideHint ? " " + overrideHint : "");
+    _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + cause, cause);
   } finally {
     window.removeEventListener("pagehide", onHide);
   }
@@ -2628,7 +2641,7 @@ async function _pbpTrRetryAllFailed(st) {
   const pills = Array.from(document.querySelectorAll(".pb-tr-err"));
   let canRetry = true;
   if (st.permissionError) {
-    if (allLabel) allLabel.textContent = t("aiGrantRetry");
+    if (allLabel) { allLabel.textContent = t("aiGrantRetry"); all.title = allLabel.textContent; }
     const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
     if (recovered) st.permissionError = null;
     else canRetry = false;
@@ -2671,7 +2684,7 @@ async function _pbpTrRetryAllFailed(st) {
     }
   }
   _pbpTrSyncRetryAll();
-  if (allLabel) allLabel.textContent = t(st.permissionError ? "aiGrantRetry" : "trRetryAllFailed");
+  if (allLabel) { allLabel.textContent = t(st.permissionError ? "aiGrantRetry" : "trRetryAllFailed"); all.title = allLabel.textContent; }
   // If some blocks still failed, the button is shown again but was disabled at entry;
   // re-arm it so the user can run retry-all again. (Kept disabled DURING the run above
   // to prevent concurrent re-clicks.)
@@ -3071,7 +3084,7 @@ function _pbpTrOnArticleReplaced(detail) {
   // an empty block index.
   const view = document.getElementById("rendered-view");
   if (!view) return;
-  st.articleLang = view.lang || "";        // md-preview re-detects lang/dir per render
+  st.articleLang = _pbpTrViewLang(view);   // md-preview re-detects lang/dir per render
   const rev = st.rev;
   // The block index was already rebuilt by md-preview.js before this event.
   const cand = pbpAiBlocks().filter((b) => b.tag !== "pre" && (b.el.textContent || "").trim());

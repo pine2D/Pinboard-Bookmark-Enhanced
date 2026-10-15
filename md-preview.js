@@ -250,10 +250,41 @@ function detectArticleLang(text) {
 // Simplified / Traditional majority keeps inheriting (detectArticleLang's
 // "ambiguous → default stack" branch).
 function pbpReaderFallbackLang(text, declared) {
-  const tag = String(declared || "").trim().replace(/_/g, "-");
-  if (/^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(tag)) return tag;
+  const tag = pbpReaderDeclaredLang(declared);
+  if (tag) return tag;
   if (/[一-鿿]/.test(String(text || "").slice(0, 4000))) return "";
   return "und";
+}
+
+// A plain BCP 47 tag from the source page's declaration, or "".
+function pbpReaderDeclaredLang(declared) {
+  const tag = String(declared || "").trim().replace(/_/g, "-");
+  return /^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(tag) ? tag : "";
+}
+
+// The article's lang. Glyphs decide when they can (they pick the CJK font
+// and the RTL direction), with one exception: a page that DECLARES another
+// language and carries the detected script only as a minority -- an English
+// article quoting a Chinese or Arabic phrase -- is that declared language.
+// Tagging it by the quote made a screen reader voice the whole English text
+// in Chinese, and flipped the whole page right-to-left for one Arabic line.
+// "Minority" = under a tenth of the sampled text, counted in word-sized units:
+// a Latin / Cyrillic / Arabic / Hebrew word, or one CJK character (which
+// carries about a word -- counting letters instead made a bilingual article
+// look like an English one with a few Chinese words). A CJK declaration never
+// overrides the detector (it picks Simplified vs Traditional glyphs better
+// than a site-wide template tag).
+function pbpReaderArticleLang(text, declared) {
+  const detected = detectArticleLang(text);
+  const tag = pbpReaderDeclaredLang(declared);
+  if (detected && tag && !/^(zh|ja|ko)(-|$)/i.test(tag) && tag.split("-")[0].toLowerCase() !== detected.split("-")[0]) {
+    const sample = String(text || "").slice(0, 4000);
+    const script = (sample.match(/[一-鿿぀-ゟ゠-ヿ가-힣]/g) || []).length
+      + (sample.match(/[\u0590-\u05FF\u0600-\u06FF]+/g) || []).length;
+    const latin = (sample.match(/[A-Za-zÀ-ɏЀ-ӿ]+/g) || []).length;
+    if (script * 10 < script + latin) return tag;
+  }
+  return detected || pbpReaderFallbackLang(text, declared);
 }
 
 // Monotonic article generation counter. renderArticleContent() captures it at
@@ -2718,14 +2749,20 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // branches below only ever SET. Detection must therefore be idempotent.
     renderedView.removeAttribute("lang");
     renderedView.removeAttribute("dir");
-    const articleLang = detectArticleLang(markdown);
-    // Script first (it picks the CJK font); the source page's language, or
-    // "und", for everything glyphs cannot place.
-    const readingLang = articleLang || pbpReaderFallbackLang(markdown, info && info.lang);
+    delete renderedView.dataset.pbScriptLang;
+    // Script first (it picks the CJK font), except where the page declares a
+    // non-CJK language and CJK is a minority; the source page's language, or
+    // "und", for everything glyphs cannot place (pbpReaderArticleLang).
+    const readingLang = pbpReaderArticleLang(markdown, info && info.lang);
     if (readingLang) renderedView.lang = readingLang; // article-script font + the language assistive tech reads it in
+    // The script-level verdict translation keys on (entry hiding, the
+    // source-script check, the section's default fold): CJK / RTL only, ""
+    // for everything else -- a site-template lang="en" on a German page must
+    // not hide Translate for an English target.
+    renderedView.dataset.pbScriptLang = /^(zh-Hans|zh-Hant|ja|ko|ar|he)$/.test(readingLang) ? readingLang : "";
     // D9-3: RTL article -> container-level dir so blockquote/list/TOC physical
     // direction CSS mirrors along with the text.
-    if (articleLang === "ar" || articleLang === "he") renderedView.dir = "rtl";
+    if (readingLang === "ar" || readingLang === "he") renderedView.dir = "rtl";
     // First measurement runs in rAF, after article injection/layout. The
     // ResizeObserver that keeps it fresh is installed ONCE at the call site
     // below — it observes #rendered-view, which this function never replaces.

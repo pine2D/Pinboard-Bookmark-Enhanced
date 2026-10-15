@@ -6120,6 +6120,44 @@ suiteIf("md-preview.js: pbpReaderFallbackLang", "pbpReaderFallbackLang", () => {
     assertEq(pbpReaderFallbackLang("中文测试 中文測試", ""), "", "Han, no declaration");
   });
 });
+suiteIf("md-translate.js: _pbpTrViewLang", "_pbpTrViewLang", () => {
+  test("translation reads the script-level verdict, not a declared page language", () => {
+    const v = document.createElement("article");
+    v.lang = "en"; v.dataset.pbScriptLang = "";
+    assertEq(_pbpTrViewLang(v), "", "declared en, Latin script: no script verdict, Translate stays");
+    v.lang = "zh-Hans"; v.dataset.pbScriptLang = "zh-Hans";
+    assertEq(_pbpTrViewLang(v), "zh-Hans", "CJK verdict passes through");
+  });
+  test("without the attribute it falls back to lang (older shells, harnesses)", () => {
+    const v = document.createElement("article");
+    v.lang = "ja";
+    assertEq(_pbpTrViewLang(v), "ja", "lang fallback");
+    assertEq(_pbpTrViewLang(null), "", "no view");
+  });
+});
+suiteIf("md-preview.js: pbpReaderArticleLang", "pbpReaderArticleLang", () => {
+  const english = "Serendipity is the occurrence of events by chance in a happy or beneficial way. ".repeat(8);
+  test("an English page quoting a little Chinese keeps its declared language", () => {
+    assertEq(pbpReaderArticleLang(english + "他说：「这是意外之喜」。", "en"), "en", "declared en, Han minority");
+    assertEq(pbpReaderArticleLang(english + "日本語の引用です。", "en-US"), "en-US", "declared en-US, kana minority");
+  });
+  test("a genuinely bilingual page (Chinese with English running through it) stays Chinese", () => {
+    const mixed = "这是一篇中英混排的文章，The word serendipity appears here so the dictionary has an English target. 混排中文与 English 以覆盖字体与词典回显。".repeat(6);
+    assertEq(pbpReaderArticleLang(mixed, "en"), "zh-Hans", "declared en, but Chinese carries the text");
+  });
+  test("a page that is mostly CJK stays with the glyph detector, whatever it declares", () => {
+    assertEq(pbpReaderArticleLang("这是一篇中文文章，讨论阅读器的设计与实现，以及简体字的字形。".repeat(4), "en"), "zh-Hans", "template lang en, Simplified body");
+  });
+  test("a CJK declaration never overrides the detector's script and glyph choice", () => {
+    assertEq(pbpReaderArticleLang("這是一篇繁體中文文章，討論閱讀器的設計與實現。".repeat(4), "zh-CN"), "zh-Hant", "declared zh-CN, Traditional body");
+  });
+  test("an English page quoting an Arabic line stays English (and so left-to-right)", () => {
+    assertEq(pbpReaderArticleLang("مرحبا بالعالم " + english, "en"), "en", "declared en, Arabic minority");
+    assertEq(pbpReaderArticleLang("مرحبا بالعالم ونرحب بكم في هذه المقالة الطويلة ".repeat(6), "en"), "ar", "Arabic majority stays RTL");
+    assertEq(pbpReaderArticleLang("مرحبا بالعالم " + english, ""), "ar", "no declaration: the detector decides, as before");
+    assertEq(pbpReaderArticleLang(english, ""), "und", "Latin, no declaration");
+  });
+});
 </script>
 
 <script>

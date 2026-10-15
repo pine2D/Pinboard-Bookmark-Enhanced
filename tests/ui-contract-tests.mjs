@@ -3885,7 +3885,7 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { b
   check(setTip.includes("btn.dataset.tip") && setTip.includes('btn.setAttribute("aria-label"') &&
     failed.includes("_pbpTrSetErrTip(btn,") && partial.includes("_pbpTrSetErrTip(btn,") &&
     !failed.includes("btn.title") && !partial.includes("btn.title") &&
-    setTip.includes('"pb-tr-err-reason"') && setTip.includes("reason.textContent = tip") &&
+    setTip.includes('"pb-tr-err-reason"') && setTip.includes("reason.textContent = shown || tip") &&
     mdCss.includes(".pb-tr-err-reason {") && !mdCss.includes(".pb-tr-err::after") && !mdCss.includes("content: attr(data-tip)"),
     "translation failure reasons are not printed in the pill, depend on native title tooltips, or came back as a hover bubble");
 }
@@ -6562,11 +6562,15 @@ function stripJsComments(input) {
 
   // --- lang/dir must be cleared before re-detection, or an RTL article
   // followed by an LTR one keeps dir="rtl" forever (the branches only ever SET).
-  const detectAt = render.indexOf("detectArticleLang(");
+  // Detection runs through pbpReaderArticleLang (script detector + the
+  // source page's declared language); the script-level verdict translation
+  // reads (data-pb-script-lang) is cleared with them.
+  const detectAt = render.indexOf("pbpReaderArticleLang(");
   const langRmAt = render.indexOf('removeAttribute("lang")');
   const dirRmAt = render.indexOf('removeAttribute("dir")');
-  check(langRmAt >= 0 && dirRmAt >= 0 && detectAt > langRmAt && detectAt > dirRmAt,
-    "md-preview.js: renderArticleContent must removeAttribute lang AND dir before detectArticleLang -- otherwise language/direction detection is not idempotent across renders");
+  const scriptRmAt = render.indexOf("delete renderedView.dataset.pbScriptLang");
+  check(langRmAt >= 0 && dirRmAt >= 0 && scriptRmAt >= 0 && detectAt > langRmAt && detectAt > dirRmAt && detectAt > scriptRmAt,
+    "md-preview.js: renderArticleContent must clear lang, dir AND data-pb-script-lang before pbpReaderArticleLang -- otherwise language/direction detection is not idempotent across renders");
 
   // --- Per-article image-fix accounting is dropped with the DOM it describes,
   // and only the per-article half: the page-level ceilings must survive or each

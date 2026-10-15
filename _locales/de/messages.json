@@ -2774,7 +2774,7 @@
     "message": "Diesen Abschnitt erneut versuchen"
   },
   "trRetryAllFailed": {
-    "message": "Alle fehlgeschlagenen wiederholen"
+    "message": "Fehlgeschlagene wiederholen"
   },
   "trShowOriginal": {
     "message": "Klicken, um Original vorübergehend anzuzeigen"
