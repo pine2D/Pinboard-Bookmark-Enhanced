@@ -1933,11 +1933,11 @@ export const CHECKS = [
     expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
   { surface: "options", page: "options.html", selector: "#opt-custom-css", tab: "appearance", state: "focusWithin", focusTarget: ":scope",
     expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
-  { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "default",
+  { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "appearance", state: "default",
     expect: { bgEqVar: "field-bg", borderSidesEqVar: "field-border" } },
-  { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "hover",
+  { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "appearance", state: "hover",
     expect: { bgEqVar: "field-bg-hover", borderSidesEqVar: "field-border-hover" } },
-  { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "general", state: "focusWithin", focusTarget: ":scope",
+  { surface: "options", page: "options.html", selector: "#opt-lang-btn", tab: "appearance", state: "focusWithin", focusTarget: ":scope",
     expect: { focusRecipe: "bordered", bgEqVar: "field-bg-focus", borderSidesEqVar: "field-border-focus" } },
   // The sidebar search box (stage 4, spec 2026-09-30-ui-fields-stage4-design
   // §3.1 / §5.2): a value box outside .fg that joined the family at rest and
@@ -2180,9 +2180,13 @@ export const CHECKS = [
   // Shape C3 (census E-switch-census.md: choice row + help + indent): a
   // choice row that is also a contextual-help host, indented -- the label
   // spans the host and holds its own help between the copy and the track
-  // (Ruling 36; Archive tab, "Also archive during batch save").
-  { surface: "options", page: "options.html", selector: "#opt-wayback-batch ~ .switch-track", state: "default",
-    seedChecked: { input: "#opt-wayback-batch", checked: false },
+  // (Ruling 36). The representative used to be Archive's "Also archive during
+  // batch save", but since 2026-10-15 that row is a dependent sub-row that
+  // sits disabled while archiving is off (the default), so its resting track
+  // reads the disabled recipe. The Reader's skim row has the same shape and
+  // no parent switch.
+  { surface: "options", page: "options.html", selector: "#opt-preview-skim ~ .switch-track", state: "default",
+    seedChecked: { input: "#opt-preview-skim", checked: false },
     expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#opt-wayback-batch", state: "default",
     expect: { hitRectMin: { height: 24 } } },

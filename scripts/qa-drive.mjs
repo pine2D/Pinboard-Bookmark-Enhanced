@@ -2305,7 +2305,10 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
         const clearance = await page.evaluate(() => document.querySelector(".panel.active").getBoundingClientRect().bottom <= innerHeight + 1);
         if (!clearance) throw new Error(`${locale}/${mode}/${density}/${width}: final settings cannot scroll into view`);
         const focusVisible = await page.evaluate(() => {
-          const controls = [...document.querySelectorAll('.panel.active input:not([type="hidden"]), .panel.active button, .panel.active textarea')].filter(el=>el.getBoundingClientRect().height && !el.disabled);
+          // A control inside a closed <details> still reports a box but cannot
+          // take focus; the last REACHABLE control is the one to test (the
+          // Account tab ends in the collapsed connection overview).
+          const controls = [...document.querySelectorAll('.panel.active input:not([type="hidden"]), .panel.active button, .panel.active textarea')].filter(el=>el.getBoundingClientRect().height && !el.disabled && !el.closest("details:not([open]) > :not(summary)"));
           const el = controls.at(-1);
           if (!el) return false;
           el.blur();

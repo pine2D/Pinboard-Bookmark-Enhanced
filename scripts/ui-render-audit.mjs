@@ -4207,7 +4207,37 @@ function probeArgsFor(check, theme) {
   };
 }
 
+// Options tabs: a check whose target sits on a tab that is not active would
+// find a display:none element (scrollIntoViewIfNeeded then times out, hover
+// and geometry read nothing). Activate the target's own panel first and put
+// the previous tab back afterwards, so the many rows written against "the
+// tab the runner left open" keep their footing while settings move between
+// tabs (2026-10-15 options IA moved Data Sync, Backup, Notifications,
+// Language and Diagnostics off the General/Account tab).
 async function runOneCheck(page, theme, check, results, extBase) {
+  let restoreTab = null;
+  if (check.page === "options.html" && check.selector) {
+    restoreTab = await page.evaluate((sel) => {
+      let el = null;
+      try { el = document.querySelector(sel); } catch (_) { return null; }
+      const panel = el && el.closest && el.closest('.panel[id^="panel-"]');
+      if (!panel || panel.classList.contains("active")) return null;
+      const prev = document.querySelector(".tab-btn.active");
+      const tab = document.querySelector(`.tab-btn[data-panel="${panel.id.slice("panel-".length)}"]`);
+      if (!tab || !prev) return null;
+      tab.click();
+      return prev.id;
+    }, check.selector).catch(() => null);
+    if (restoreTab) await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  }
+  try {
+    return await runOneCheckInPanel(page, theme, check, results, extBase);
+  } finally {
+    if (restoreTab) await page.evaluate((id) => document.getElementById(id)?.click(), restoreTab).catch(() => {});
+  }
+}
+
+async function runOneCheckInPanel(page, theme, check, results, extBase) {
   // F1 (final fix wave, Ruling 29, batch-end review F1): this audit runs
   // HEADED (MV3 extensions require it -- the comment on the launch call
   // below). On a real display a genuine OS-level cursor can be resting
@@ -4996,10 +5026,15 @@ const WEAK_TEXT_CFG = {
   // Stage 4 (spec 2026-09-30-ui-fields-stage4-design §3.1): the options value
   // boxes' own fills join the scan -- field-bg / -hover / -focus are control
   // fills like input-bg, and COMPONENTS.md §9.1 law 8 keeps weak inks off them.
+  // 2026-10-15: options now HAS the "link vs <host>" rows the note above says
+  // were missing -- --opt-link is derived against [panel, bg, pf-bg]
+  // (options-chrome.mjs linkInk) and contrast-audit gates exactly those three
+  // -- so link joins the safe-host exemption here the way library's does:
+  // still ratio-gated on the instance like every safe-host hit.
   options: {
     prefix: "opt", textRoles: ["fg-hint", "fg-muted", "link"], fillRoles: ["btn-bg", "btn-hover", "input-bg", "chip-bg", "field-bg", "field-bg-hover", "field-bg-focus"],
     safeHostRoles: ["bg", "panel", "pf-bg", "code-bg"],
-    safeHostExcludeTextRoles: ["link"],
+    safeHostExcludeTextRoles: [],
   },
   // library additionally gates its seven S2 row fills (spec 2026-10-03-
   // library-redesign §6.4 / §9.3), read LIVE as tokens like every other fill
