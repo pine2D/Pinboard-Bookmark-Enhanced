@@ -29,6 +29,15 @@
 //                                       into the rounded corners)
 //       ul.listbox-list#<id>-list[role=listbox]   <- the scroll layer
 //         li.listbox-opt#<id>-opt-<i>[role=option][aria-selected]
+//         li.listbox-optgroup[role=group][aria-labelledby]  <- one per <optgroup>
+//           div.listbox-optgroup-label#<id>-grp-<g>   <- the group's label,
+//                                                        not an option: never
+//                                                        active, never picked
+//           ul[role=none] > li.listbox-opt ...        <- its options
+//
+// Options are addressed by their index in select.options (document order,
+// optgroups flattened), through state.items -- never by position among the
+// list's children, which group wrappers would shift.
 //
 // Placement has two modes:
 //   data-listbox (no value)  absolute: the shell sits inside .listbox and the
@@ -163,7 +172,7 @@
   }
 
   function setActive(state, i) {
-    const items = state.list.children;
+    const items = state.items;
     if (items[state.active]) items[state.active].removeAttribute("data-active");
     state.active = i;
     const li = items[i];
@@ -195,20 +204,59 @@
     }
   }
 
-  function sync(state) {
+  // The select's shape: how its options sit in and out of <optgroup>s. The
+  // list is rebuilt only when this changes; otherwise sync() reuses every node.
+  function shapeOf(select) {
+    return [...select.children].map((c) => (c.tagName === "OPTGROUP" ? `g${c.children.length}` : "o")).join(",");
+  }
+
+  function build(state) {
     const { select, list } = state;
-    const opts = select.options;
-    // Reuse the <li> nodes: ids stay stable, no listener lives on them (the
-    // list owns one delegated handler), so repeated syncs leak nothing.
-    while (list.children.length > opts.length) list.lastElementChild.remove();
-    for (let i = 0; i < opts.length; i++) {
-      let li = list.children[i];
-      if (!li) {
-        li = document.createElement("li");
-        li.className = "listbox-opt";
-        li.setAttribute("role", "option");
-        list.appendChild(li);
+    list.replaceChildren();
+    state.items = [];
+    state.groups = [];
+    const makeOpt = (parent) => {
+      const li = document.createElement("li");
+      li.className = "listbox-opt";
+      li.setAttribute("role", "option");
+      state.items.push(li);
+      parent.appendChild(li);
+    };
+    for (const child of select.children) {
+      if (child.tagName === "OPTGROUP") {
+        const group = document.createElement("li");
+        group.className = "listbox-optgroup";
+        group.setAttribute("role", "group");
+        const label = document.createElement("div");
+        label.className = "listbox-optgroup-label";
+        label.id = `${select.id}-grp-${state.groups.length}`;
+        group.setAttribute("aria-labelledby", label.id);
+        const inner = document.createElement("ul");
+        inner.setAttribute("role", "none");
+        for (const opt of child.children) if (opt.tagName === "OPTION") makeOpt(inner);
+        group.append(label, inner);
+        list.appendChild(group);
+        state.groups.push({ label, optgroup: child });
+      } else if (child.tagName === "OPTION") {
+        makeOpt(list);
       }
+    }
+  }
+
+  function sync(state) {
+    const { select } = state;
+    const opts = select.options;
+    // Reuse the <li> nodes while the shape holds: ids stay stable, no listener
+    // lives on them (the list owns one delegated handler), so repeated syncs
+    // leak nothing.
+    const shape = shapeOf(select);
+    if (state.shape !== shape || state.items.length !== opts.length) { build(state); state.shape = shape; }
+    for (const { label, optgroup } of state.groups) {
+      const text = (optgroup.label || "").trim();
+      if (label.textContent !== text) label.textContent = text;
+    }
+    for (let i = 0; i < opts.length; i++) {
+      const li = state.items[i];
       li.id = `${select.id}-opt-${i}`;
       li.dataset.value = opts[i].value;
       const text = optionText(opts[i]);
@@ -286,7 +334,7 @@
       try { if (state.pop.matches(":popover-open")) state.pop.hidePopover(); }
       catch (err) { console.warn("[listbox] hidePopover failed:", err?.name, err?.message); }
     }
-    const items = state.list.children;
+    const items = state.items;
     if (items[state.active]) items[state.active].removeAttribute("data-active");
     state.pop.hidden = true;
     state.pop.removeAttribute("data-flip");
@@ -451,7 +499,7 @@
     if (label) label.htmlFor = btn.id;
 
     const state = {
-      select, root, btn, pop, list, value, sizer, float, ghost, face: "",
+      select, root, btn, pop, list, value, sizer, float, ghost, face: "", items: [], groups: [], shape: null,
       active: -1, typed: "", typedTimer: 0, outside: null, onResize: null, onScroll: null, anchorRect: null,
     };
     state.outside = (ev) => onOutside(state, ev);
@@ -481,7 +529,7 @@
     list.addEventListener("click", (ev) => {
       const li = ev.target.closest?.(".listbox-opt");
       if (!li || !list.contains(li)) return;
-      const i = [...list.children].indexOf(li);
+      const i = state.items.indexOf(li);
       if (!commit(state, i)) return;   // disabled: stays open, value unchanged
       close(state);
       btn.focus();
@@ -489,7 +537,7 @@
     list.addEventListener("pointermove", (ev) => {
       const li = ev.target.closest?.(".listbox-opt");
       if (!li || !list.contains(li)) return;
-      const i = [...list.children].indexOf(li);
+      const i = state.items.indexOf(li);
       if (i !== state.active && isEnabled(state, i)) setActive(state, i);
     });
     select.addEventListener("change", () => sync(state));

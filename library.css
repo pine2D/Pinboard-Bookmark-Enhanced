@@ -2905,6 +2905,10 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
 .listbox-opt[data-active] { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
 .listbox-opt[aria-selected="true"] { background: var(--lib-accent); color: var(--lib-on-accent); }
 .listbox-opt[aria-disabled="true"] { color: var(--lib-fg-hint); cursor: default; }
+/* <optgroup> (listbox.js): same shape as options.css's group label. */
+.listbox-optgroup > ul { margin: 0; padding: 0; list-style: none; }
+.listbox-optgroup-label { padding: var(--lib-sp-2) var(--lib-sp-3) var(--lib-sp-1); font-size: var(--lib-text-meta); line-height: var(--lib-lh-meta); font-weight: 600; color: var(--lib-fg-hint); cursor: default; }
+.listbox-optgroup + .listbox-optgroup > .listbox-optgroup-label { padding-top: var(--lib-sp-3); }
 /* The group filter takes the filter set's slack (spec §8.4) -- inline on a
    wide index, inside the Filter popover on a narrow one; the 120px floor
    keeps a long group name ellipsed instead of squeezed away. The carrier
