@@ -787,6 +787,14 @@ async function driveLibrary(context, extId, rep) {
       await page.locator("#vocab-clear-selection").click({ timeout: 3000 }).catch(() => {});
     });
 
+    await step("vocab-export-menu", async () => {
+      await page.locator("#vocab-export-open").click({ timeout: 3000 });
+      await page.waitForSelector(".vocab-export-menu:popover-open", { timeout: TIMEOUT_MS });
+      await page.waitForTimeout(200);
+      await rep.shot(page, s, "vocab-export-menu");
+      await page.keyboard.press("Escape");
+    });
+
     await step("notes-two-pane", async () => {
       await page.locator("#lib-tab-notes").click({ timeout: 3000 });
       await page.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS });

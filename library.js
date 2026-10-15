@@ -541,3 +541,91 @@ function pbpLibWireVocabHeaderFit(pane) {
 function pbpLibWireNotesHeaderFit(pane) {
   return pbpLibWireHeaderFit(pane, pane && pane.querySelector(".notes-color-filters"), pbpLibNotesColorNeed);
 }
+
+// ---- Google Drive status (header) --------------------------------------------
+// One read-only line on the right of the header, for both views: "synced at
+// <time>", "connected, not synced yet", or -- when the connection or either
+// dataset reports an error -- a link into General settings, where the Drive
+// panel explains the error and holds every button that can fix it
+// (rules/vocab-sync.md: recovery always names an on-screen button, and that
+// screen is settings). Not connected, unavailable or unreadable: nothing at
+// all; this page never suggests connecting.
+// Account isolation: the worker reports the Pinboard account its status is
+// for; the line shows only when that is still the account this page reads.
+let _libDriveGen = 0;
+
+function pbpLibDriveLine(status, currentOwner) {
+  if (!status || status.connected !== true) return null;
+  const owner = typeof status.owner === "string" && status.owner && typeof pbpDictOwnerScope === "function"
+    ? pbpDictOwnerScope(status.owner) : "";
+  if (!owner || owner !== currentOwner) return null;
+  const errors = [status.connection, status.vocabulary, status.notes]
+    .map((part) => part && part.lastError)
+    .filter((code) => typeof code === "string" && code && code !== "not_connected");
+  if (errors.length) return { kind: "problem", text: t("libraryDriveProblem") };
+  if (Number.isFinite(status.lastSuccessAt) && status.lastSuccessAt > 0) {
+    let when = "";
+    try {
+      const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined;
+      when = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(status.lastSuccessAt));
+    } catch (_) {
+      when = new Date(status.lastSuccessAt).toLocaleString();
+    }
+    return { kind: "ok", text: t("libraryDriveSynced", when) };
+  }
+  return { kind: "ok", text: t("libraryDriveConnected") };
+}
+
+async function pbpLibRefreshDriveLine() {
+  const el = $id("lib-drive");
+  if (!el || typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) return;
+  const gen = ++_libDriveGen;
+  let line = null;
+  try {
+    if (typeof pbpI18nReady === "function") await pbpI18nReady();
+    if (typeof pbpVocabDriveOAuthActive === "function" && !pbpVocabDriveOAuthActive(chrome.runtime.getManifest())) {
+      line = null;
+    } else {
+      const owner = await pbpVocabCurrentOwner();
+      const response = await chrome.runtime.sendMessage({ type: "vocabDriveStatus" });
+      // Re-read after the round trip: an account switch while the worker was
+      // answering must not paint the previous account's state.
+      const ownerNow = await pbpVocabCurrentOwner();
+      if (response && response.ok && owner === ownerNow) line = pbpLibDriveLine(response.status, owner);
+    }
+  } catch (err) {
+    console.warn("[library] drive status read failed", err && err.name, err && err.message);
+    line = null;
+  }
+  if (gen !== _libDriveGen) return;
+  el.hidden = !line;
+  el.classList.toggle("bad", !!line && line.kind === "problem");
+  el.textContent = line ? line.text : "";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const el = $id("lib-drive");
+  if (!el) return;
+  el.addEventListener("click", (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    if (typeof pbpOpenExtensionTab !== "function") return;
+    e.preventDefault();
+    pbpOpenExtensionTab("options.html", "general");
+  });
+  pbpLibRefreshDriveLine();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") pbpLibRefreshDriveLine();
+  });
+  if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message && (message.type === "PBP_VOCAB_SYNCED" || message.type === "PBP_NOTES_SYNCED")) pbpLibRefreshDriveLine();
+    });
+  }
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== "sync" && area !== "local") return;
+      if (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys
+        || Object.keys(changes).some((key) => key.startsWith("driveConnState:"))) pbpLibRefreshDriveLine();
+    });
+  }
+});

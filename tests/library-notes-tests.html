@@ -746,8 +746,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       `side ${sideRect?.top},${sideRect?.left} head ${headRect?.top},${headRect?.right}`);
     const focusOrder = [...detail().querySelectorAll("a[href], button")].filter(shown)
       .map((el) => el.classList[el.classList.length - 1]);
-    check("Tab order reaches each color before its excerpt, then open original and delete",
-      focusOrder.join(",") === ["notes-detail-link", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-open-original", "notes-detail-delete"].join(","),
+    check("Tab order reaches each color before its excerpt, the current excerpt's own delete after its note, then open original and delete",
+      focusOrder.join(",") === ["notes-detail-link", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-excerpt-color", "notes-note-edit", "notes-excerpt-delete", "notes-excerpt-color", "notes-excerpt-jump", "notes-note-edit", "notes-open-original", "notes-detail-delete"].join(","),
       focusOrder.join(","));
     const facts = () => [...(side()?.querySelectorAll(".notes-side-facts > span") || [])].map((s) => s.textContent);
     check("the column's facts count the page's highlights and notes and give its first and last time",
@@ -1562,7 +1562,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   // Run the production confirmation callbacks, with only the external read
   // or Web Lock delayed. Both delete scopes must re-read the live owner at
   // dispatch, even when the credential-change event has not arrived yet.
-  for (const scenario of ["page-lock", "page-read", "batch-read"]) {
+  for (const scenario of ["page-lock", "page-read", "batch-read", "one-read"]) {
     const ownerFn = window.pbpVocabCurrentOwner, getFn = chrome.storage.local.get;
     const confirmFn = window.showConfirmPopover;
     const key = "pbp_hl_delete_owner_race";
@@ -1594,7 +1594,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       if (scenario === "batch-read") {
         _notesSelected = new Set([hit.key]); _pbpNotesSyncSelectionUi();
         _pbpNotesBatchDelete();
-      } else _pbpNotesDelete(hit.row, null);
+      } else if (scenario === "one-read") _pbpNotesDeleteOne(hit, document.createElement("button"));
+      else _pbpNotesDelete(hit.row, null);
       const task = onConfirm();
       if (scenario === "page-lock") {
         for (let i = 0; i < 300; i++) {
@@ -1617,6 +1618,46 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       if (heldLock) await heldLock;
       window.pbpVocabCurrentOwner = ownerFn; chrome.storage.local.get = getFn; window.showConfirmPopover = confirmFn;
       delete store[key]; _notesOwnerCache = null; _pbpNotesClearSelection(); _pbpNotesSetStatus("");
+      await renderNotesPanel();
+    }
+  }
+
+  // ---- one highlight, from the excerpt being read ----
+  // Only the current excerpt carries the delete; confirming removes that one
+  // item (the other account's item on the same record survives), and the
+  // detail stays on the page through its remaining highlight.
+  {
+    const ownerFn = window.pbpVocabCurrentOwner, confirmFn = window.showConfirmPopover;
+    const key = "pbp_hl_delete_one";
+    let onConfirm, confirmMsg;
+    window.pbpVocabCurrentOwner = async () => "acct_one";
+    window.showConfirmPopover = (anchor, opts) => { onConfirm = opts.onConfirm; confirmMsg = opts.msg; };
+    store[key] = { v: 1, url: "https://delete-one.example/p", title: "Delete one", items: [
+      { id: "a", n: 1, quote: "first quote", color: 1, note: "", ts: 990, owner: "acct_one" },
+      { id: "b", n: 2, quote: "second quote", color: 2, note: "", ts: 980, owner: "acct_one" },
+      { id: "c", n: 3, quote: "other account", color: 3, note: "", ts: 970, owner: "acct_two" }
+    ] };
+    try {
+      _notesOwnerCache = null;
+      await renderNotesPanel();
+      _pbpNotesSelectRow(key + "#a");
+      const dels = [...detail().querySelectorAll(".notes-excerpt-delete")];
+      check("only the current excerpt of a multi-highlight page offers a one-highlight delete",
+        dels.length === 1 && dels[0].closest(".notes-excerpt")?.getAttribute("aria-current") === "true" &&
+        dels[0].dataset.notesKey === key + "#a" && dels[0].classList.contains("danger"), dels.map((d) => d.dataset.notesKey).join(","));
+      dels[0].click();
+      check("the one-highlight delete asks with the reader's own sentence", confirmMsg === t("hlDeleteConfirm"), confirmMsg);
+      await onConfirm();
+      check("confirming removes that highlight only, never another account's item on the record",
+        store[key]?.items.map((it) => it.id).join(",") === "b,c", JSON.stringify(store[key]?.items));
+      check("the detail stays on the page through its remaining highlight",
+        _pbpNotesSelectedKey === key + "#b" && !detail().hidden, String(_pbpNotesSelectedKey));
+      check("a page left with one visible highlight offers only the page delete",
+        !detail().querySelector(".notes-excerpt-delete") && !!detail().querySelector(".notes-detail-delete"),
+        detail().querySelectorAll(".notes-excerpt-delete").length);
+    } finally {
+      window.pbpVocabCurrentOwner = ownerFn; window.showConfirmPopover = confirmFn;
+      delete store[key]; _notesOwnerCache = null; _pbpNotesSetStatus("");
       await renderNotesPanel();
     }
   }

@@ -270,7 +270,7 @@ function _pbpVocabDriveNoticeText(status) {
   let text = t("driveNotices", _pbpVocabNum(vocabulary + notes));
   const terms = vocabulary && Array.isArray(status.noticeTerms)
     ? status.noticeTerms.filter((term) => typeof term === "string" && term) : [];
-  if (terms.length) text += " " + t("driveNoticeTerms", _pbpVocabTermList(terms));
+  if (terms.length) text += " " + t("driveNoticeTerms", pbpVocabTermList(terms));
   return text;
 }
 
@@ -676,168 +676,27 @@ async function renderVocabPanel() {
 }
 
 
-// Fail-closed on account switch: owner is re-derived AFTER the rows fetch
-// resolves and compared against the owner the rows were fetched for. If they
-// differ (token rotated, or sync/keys-routing toggled mid-fetch), the export
-// aborts BEFORE the Blob is built -- never download the previous account's
-// words under the new account's export click. The whole chain is wrapped so
-// any rejection (owner read, IDB read) surfaces feedback instead of dying
-// silently (this runs as a click handler; an unhandled rejection there is
-// invisible to the user).
+// The three whole-vocabulary exits live in vocab-send.js (shared with the
+// library page). This page only owns the buttons: double-click guard, the
+// in-flight label, and the auto-save flush -- the deck, port and tokens are
+// edited right here, so a value typed inside the 500ms debounce must land
+// before the send reads it.
+function _pbpVocabSendOptions() {
+  return {
+    flash: _pbpVocabFlashStatus,
+    flush: typeof window.pbpOptionsFlushAutoSave === "function" ? window.pbpOptionsFlushAutoSave : null
+  };
+}
+
 async function _pbpVocabExport() {
   const btn = $id("vocab-export-btn");
   if (!btn || btn.disabled) return; // double-click guard, same as the Anki/Eudic buttons
   btn.disabled = true;
   try {
-    // A just-edited setting may still sit in the options page's debounced
-    // auto-save; flush it first, same ordering as the Anki/Eudic sends
-    // (Codex final-review MEDIUM precedent), and abort if the flush fails.
-    if (typeof window.pbpOptionsFlushAutoSave === "function") {
-      let flushed = null;
-      try { flushed = await window.pbpOptionsFlushAutoSave(); } catch (_) {}
-      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("vocabSettingsSaveFailed")); return; }
-    }
-    const owner = await pbpVocabCurrentOwner();
-    const rows = await pbpVocabAll(owner);
-    const ownerNow = await pbpVocabCurrentOwner();
-    if (ownerNow !== owner) {
-      _pbpVocabFlashStatus(false, t("vocabAccountChanged"));
-      return;
-    }
-    // Nothing to write: pbpDictTsv([]) still emits the three Anki header lines,
-    // so without this the click downloads a wordless file and says nothing.
-    // Answered the same way as the two sibling buttons in this toolbar --
-    // dictAnkiNothing names no target ("No words to send yet."), so it is
-    // reused here instead of duplicated under an export-specific key. Placed
-    // before the enrichment awaits: an empty set has nothing to enrich.
-    if (!rows.length) { _pbpVocabFlashStatus(false, t("dictAnkiNothing")); return; }
-    // Enrichment is another await, so the owner is rechecked AFTER it and before
-    // a Blob exists: the file must never be built from a previous account's rows.
-    const zhMap = await _pbpVocabZhMap(rows);
-    const zhTag = await _pbpVocabEcdictTag();
-    const ownerBeforeBlob = await pbpVocabCurrentOwner();
-    if (ownerBeforeBlob !== owner) {
-      _pbpVocabFlashStatus(false, t("vocabAccountChanged"));
-      return;
-    }
-    const tsv = pbpDictTsv(rows.map((w) => _pbpVocabCanonicalRow(w, zhMap, zhTag)));
-    const blob = new Blob([tsv], { type: "text/tab-separated-values" });
-    const a = document.createElement("a");
-    const d = new Date();
-    const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
-    a.href = URL.createObjectURL(blob);
-    a.download = "vocab-" + stamp + ".tsv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  } catch (_) {
-    _pbpVocabFlashStatus(false, t("vocabExportFailed"));
+    await pbpVocabExportTsv(_pbpVocabSendOptions());
   } finally {
     btn.disabled = false;
   }
-}
-
-// First few names only: the status line is one line, and five terms are
-// enough to spot the pattern (the counts still carry the full totals).
-function _pbpVocabTermList(terms) {
-  const list = terms.slice(0, 5).join(", ");
-  return terms.length > 5 ? list + "…" : list;
-}
-
-// Send-to-Anki click chain. Ordering is the spec (anki spec rev2 §3):
-// (1) FIRST await = chrome.permissions.request (user gesture; already-granted
-// resolves true without UI), (2) requestPermission as the first AnkiConnect
-// action, (3..n) owner derived AFTER the permission awaits and re-checked
-// via ownerCheck before every later dispatch -- the permission dialogs can
-// sit open long enough for an account switch (fail-closed invariant).
-// Canonical row shared by the TSV export and the Anki send (spec: both
-// derive from the SAME canonical shape; the Anki side escapes its own copy).
-// Derived on this device from the local ECDICT pack, for the export paths only.
-// COMPUTE-ONLY: nothing here writes pbp-vocab or reaches Drive. vocab-store.js
-// stays the sole writer, the 13 stored fields are untouched, and "the current
-// owner's whole vocabulary" keeps meaning exactly what it meant before.
-// One batched transaction for the whole export, never one per row.
-async function _pbpVocabZhMap(words) {
-  if (typeof pbpEcdictLookupMany !== "function") return new Map();
-  const keys = [];
-  for (const w of words) {
-    // English only, and the saved lemma is a second chance for an inflected form.
-    // Compared through the same primary-language helper vocab-store uses for
-    // record identity: a stored tag may carry a region, and a bare === "en"
-    // would then match nothing and silently enrich no row at all.
-    if (_pbpVocabPrimary(w.language) !== "en") continue;
-    if (w.term) keys.push(w.term);
-    if (w.lemma) keys.push(w.lemma);
-  }
-  if (!keys.length) return new Map();
-  try { return await pbpEcdictLookupMany(keys); } catch (_) { return new Map(); }
-}
-
-// vocab-store.js defines pbpDictPrimaryLang and options.html loads it; the
-// fallback only keeps this from throwing if the load order ever changes.
-function _pbpVocabPrimary(code) {
-  if (typeof pbpDictPrimaryLang === "function") return pbpDictPrimaryLang(code);
-  return String(code || "").trim().toLowerCase().split(/[-_]/)[0];
-}
-
-function _pbpVocabZhFor(w, zhMap) {
-  if (!zhMap || !zhMap.size || _pbpVocabPrimary(w.language) !== "en") return "";
-  const hit = (w.term && zhMap.get(pbpEcdictKey(w.term))) ||
-              (w.lemma && zhMap.get(pbpEcdictKey(w.lemma)));
-  if (!hit || !hit.length) return "";
-  // Every matching record, not just the first. Case folding collapses distinct
-  // headwords onto one key ("US" and "us"), so hit[0] would export whichever the
-  // imported file listed first and lose the other sense entirely.
-  const seen = new Set();
-  const out = [];
-  for (const r of hit) {
-    for (const sense of pbpEcdictSenses(r.translation)) {
-      if (seen.has(sense)) continue;
-      seen.add(sense);
-      out.push(sense);
-    }
-  }
-  return out.join("; ");
-}
-
-// zh and zhNote stay SEPARATE from definition/license: the Anki path has to
-// escape each piece on its own before joining them with its own trusted <br>,
-// and pre-joining here would either double-escape or smuggle markup through.
-function _pbpVocabCanonicalRow(w, zhMap, tag) {
-  const zh = _pbpVocabZhFor(w, zhMap);
-  return {
-    term: w.term,
-    // Only pbpAnkiNoteFromRow reads these two (they become note tags);
-    // pbpDictTsv ignores unknown keys, so the TSV shape is untouched.
-    language: w.language || "",
-    groups: pbpVocabGroups(w),
-    reading: w.ipa || "",
-    definition: (w.gloss || "").replace(/\s*\n\s*/g, " "),
-    contexts: (Array.isArray(w.contexts) ? w.contexts : []).map((c) => c && c.quote).filter(Boolean),
-    source: (w.contexts && w.contexts[0] && w.contexts[0].articleUrl) || "",
-    license: [w.license, w.sourceUrl].filter(Boolean).join(" "),
-    zh,
-    // Labelled so the local Chinese never looks like it came from the online
-    // entry, and carrying the diagnostic pack identity. Never presented as a
-    // confirmed data licence.
-    zhNote: zh ? t("vocabZhFromPack") + (tag ? " (" + tag + ")" : "") : ""
-  };
-}
-
-// Diagnostic identity of the imported pack: rung plus a short slice of the
-// CRC32. Not an identity or licence claim -- 32 bits collide.
-// Read AFTER the lookup and passed per export, never held in a module variable:
-// reading it first let a pack swapped in mid-export label content that came from
-// a different pack, and one variable let a TSV and an Anki send overwrite each
-// other's label.
-async function _pbpVocabEcdictTag() {
-  try {
-    const meta = (typeof pbpEcdictMeta === "function") ? await pbpEcdictMeta() : null;
-    return meta && meta.state === "ready"
-      ? "ECDICT " + (meta.rung || "") + " " + String(meta.decodedCrc32 || "").slice(0, 8)
-      : "";
-  } catch (_) { return ""; }
 }
 
 async function _pbpVocabSendAnki() {
@@ -847,86 +706,7 @@ async function _pbpVocabSendAnki() {
   const orig = btn.textContent;
   try {
     btn.textContent = t("dictAnkiSending");
-    // The permission pattern depends on the configurable port, so one fast
-    // settings read precedes permissions.request. Transient activation is a
-    // TIME window (~5s), not a microtask budget; a single storage read stays
-    // well inside it. A port typed within the 500ms auto-save debounce may
-    // read stale once -- worst case is a connection error and a retry.
-    const preRead = await pbpReadSettingsWithSecrets({ dictAnkiPort: SETTINGS_DEFAULTS.dictAnkiPort });
-    const port = preRead.dictAnkiPort;
-    const pattern = pbpEndpointOriginPattern(pbpAnkiEndpointFor(port));
-    let granted = false;
-    try { granted = await chrome.permissions.request({ origins: [pattern] }); }
-    catch (e) {
-      console.warn("[vocab] Anki host permission request failed:", e?.name, e?.message);
-      _pbpVocabFlashStatus(false, t("dictAnkiHostPermissionDenied"));
-      return;
-    }
-    if (!granted) { _pbpVocabFlashStatus(false, t("dictAnkiHostPermissionDenied")); return; }
-    // requestPermission FIRST (spec §3): the long human-approval wait happens
-    // BEFORE owner derivation, so the owner snapshot below stays fresh.
-    const perm = await pbpAnkiCall("requestPermission", {}, "", 120000, port);
-    if (!perm.ok || !perm.result) { _pbpVocabFlashStatus(false, t("dictAnkiConnectPermissionFailed")); return; }
-    if (perm.result.permission !== "granted") { _pbpVocabFlashStatus(false, t("dictAnkiConnectPermissionDenied")); return; }
-    const apiVersion = Number(perm.result.version);
-    if (!Number.isFinite(apiVersion) || apiVersion < 6) {
-      _pbpVocabFlashStatus(false, t("dictAnkiVersionUnsupported"));
-      return;
-    }
-    const keyRequired = perm.result.requireApiKey === true || perm.result.requireApikey === true;
-    // A just-edited deck/key may still sit in the options page's 500ms
-    // debounced auto-save; flush it so the read below sees what the user
-    // sees, and abort if the save fails (Codex final-review MEDIUM).
-    if (typeof window.pbpOptionsFlushAutoSave === "function") {
-      let flushed = null;
-      try { flushed = await window.pbpOptionsFlushAutoSave(); } catch (_) {}
-      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("vocabSettingsSaveFailed")); return; }
-    }
-    const raw = await pbpReadSettingsWithSecrets({
-      dictAnkiDeck: SETTINGS_DEFAULTS.dictAnkiDeck,
-      dictAnkiKey: SETTINGS_DEFAULTS.dictAnkiKey
-    });
-    const s = deobfuscateSettings(raw);
-    if (keyRequired && !s.dictAnkiKey) { _pbpVocabFlashStatus(false, t("dictAnkiKeyRequired")); return; }
-    const owner = await pbpVocabCurrentOwner();
-    const rows = await pbpVocabAll(owner);
-    if ((await pbpVocabCurrentOwner()) !== owner) { _pbpVocabFlashStatus(false, t("vocabAccountChanged")); return; }
-    if (!rows.length) { _pbpVocabFlashStatus(false, t("dictAnkiNothing")); return; }
-    const zhMap = await _pbpVocabZhMap(rows);
-    const zhTag = await _pbpVocabEcdictTag();
-    const ownerBeforeSend = await pbpVocabCurrentOwner();
-    if (ownerBeforeSend !== owner) {
-      _pbpVocabFlashStatus(false, t("vocabAccountChanged"));
-      return;
-    }
-    const canonical = rows.map((w) => _pbpVocabCanonicalRow(w, zhMap, zhTag));
-    const res = await pbpAnkiSendRows(canonical, {
-      deck: s.dictAnkiDeck || "Pinboard Vocab",
-      key: s.dictAnkiKey || "",
-      port,
-      ownerCheck: async () => (await pbpVocabCurrentOwner()) === owner
-    });
-    if (res.stage === "done") {
-      let msg = t("dictAnkiResult", String(res.added), String(res.skipped), String(res.failed));
-      // Name the casualties: a bare count leaves "re-send the whole library
-      // and hope" as the only recovery move.
-      if (res.failed > 0 && Array.isArray(res.failedTerms) && res.failedTerms.length) {
-        msg += " · " + t("vocabFailedTerms", _pbpVocabTermList(res.failedTerms));
-      }
-      _pbpVocabFlashStatus(res.failed === 0, msg);
-    } else if (res.stage === "modelMismatch") {
-      _pbpVocabFlashStatus(false, t("dictAnkiModelMismatch"));
-    } else if (res.stage === "modelFields") {
-      _pbpVocabFlashStatus(false, t("dictAnkiFieldCheckFailed"));
-    } else if (res.stage === "owner") {
-      _pbpVocabFlashStatus(false, t("vocabAccountChanged"));
-    } else {
-      // Pipeline stages (deck/model/precheck/add) carry AnkiConnect's own
-      // error text; use the generic send failure only when no detail exists.
-      _pbpVocabFlashStatus(false, res.error || t("dictAnkiFailed"));
-    }
-  } catch (_) {
-    _pbpVocabFlashStatus(false, t("dictAnkiFailed"));
+    await pbpVocabSendToAnki(_pbpVocabSendOptions());
   } finally {
     btn.textContent = orig;
     btn.disabled = false;
@@ -940,61 +720,7 @@ async function _pbpVocabSendEudic() {
   const orig = btn.textContent;
   try {
     btn.textContent = t("dictEudicSending");
-    const pattern = pbpEndpointOriginPattern(PBP_EUDIC_ENDPOINT);
-    let granted = false;
-    try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (_) {}
-    if (!granted) { _pbpVocabFlashStatus(false, t("dictEudicHostPermissionDenied")); return; }
-    if (typeof window.pbpOptionsFlushAutoSave === "function") {
-      let flushed = null;
-      try { flushed = await window.pbpOptionsFlushAutoSave(); } catch (_) {}
-      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("vocabSettingsSaveFailed")); return; }
-    }
-    const raw = await pbpReadSettingsWithSecrets({ dictEudicToken: SETTINGS_DEFAULTS.dictEudicToken });
-    const s = deobfuscateSettings(raw);
-    if (!s.dictEudicToken) { _pbpVocabFlashStatus(false, t("dictEudicTokenRequired")); return; }
-    const owner = await pbpVocabCurrentOwner();
-    const rows = await pbpVocabAll(owner);
-    if ((await pbpVocabCurrentOwner()) !== owner) { _pbpVocabFlashStatus(false, t("vocabAccountChanged")); return; }
-    // pbpEudicSendRows sends nothing for an empty set and still returns
-    // stage "done" with all-zero counters, which the branch below would flash
-    // as a successful send. Same guard, same order and same key as the Anki
-    // twin above (dictAnkiNothing names no target, so it is reused, not
-    // duplicated); the button can outlive the words that revealed it, since
-    // its visibility is only re-evaluated on panel render and token changes.
-    if (!rows.length) { _pbpVocabFlashStatus(false, t("dictAnkiNothing")); return; }
-    const res = await pbpEudicSendRows(rows, {
-      token: s.dictEudicToken,
-      ownerCheck: async () => (await pbpVocabCurrentOwner()) === owner
-    });
-    if (res.stage === "owner") {
-      _pbpVocabFlashStatus(false, t("vocabAccountChanged"));
-    } else if (res.stage === "auth") {
-      _pbpVocabFlashStatus(false, t("dictEudicTokenRequired"));
-    } else if (res.forbidden) {
-      _pbpVocabFlashStatus(false, t("dictEudicRejected"));
-    } else if (res.failed) {
-      // Parameter errors surface the server's own message (spec §2).
-      let msg = res.error || t("dictEudicFailed");
-      if (Array.isArray(res.failedTerms) && res.failedTerms.length) {
-        msg += " · " + t("vocabFailedTerms", _pbpVocabTermList(res.failedTerms));
-      }
-      _pbpVocabFlashStatus(false, msg);
-    } else if (res.generic) {
-      // ANY generic batch poisons the totals -- never show a partial count
-      // as if it were the whole story.
-      _pbpVocabFlashStatus(true, t("dictEudicGenericOk"));
-    } else {
-      let msg = t("dictEudicResult", String(res.added), String(res.skipped), String(res.unsupported));
-      if (res.unsupported > 0 && Array.isArray(res.unsupportedTerms) && res.unsupportedTerms.length) {
-        msg += " · " + t("vocabUnsupportedTerms", _pbpVocabTermList(res.unsupportedTerms));
-      }
-      // Words existed but none were in a language Eudic takes: nothing was
-      // accepted or deduplicated away, so the counts must not read as a
-      // successful send just because no request failed.
-      _pbpVocabFlashStatus(res.added > 0 || res.skipped > 0, msg);
-    }
-  } catch (_) {
-    _pbpVocabFlashStatus(false, t("dictEudicFailed"));
+    await pbpVocabSendToEudic(_pbpVocabSendOptions());
   } finally {
     btn.textContent = orig;
     btn.disabled = false;

@@ -8573,6 +8573,14 @@ async function runSweep(page, sw, extBase) {
   add(await runFamilySweep(page), "library", "vocab-listbox-open");
   await page.keyboard.press("Escape");
   if (filterSetRevealed) await libHideFilterSet(page);
+  // The count row's Export menu (TSV / Anki / Eudic / settings door) exists
+  // only while open -- built per click, like the notes colour menu below.
+  if (await page.locator("#vocab-export-open:not([disabled])").count()) {
+    await page.click("#vocab-export-open");
+    await page.waitForSelector(".vocab-export-menu:popover-open", { timeout: TIMEOUT_MS });
+    add(await runFamilySweep(page), "library", "vocab-export-menu");
+    await page.keyboard.press("Escape");
+  }
   const vocabHead = page.locator("#vocab-list .vocab-card .notes-card-head").first();
   if (await vocabHead.count()) {
     await vocabHead.click(); await page.waitForTimeout(250);

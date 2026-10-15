@@ -14,6 +14,11 @@
       <button type="button" class="lib-tab" id="lib-tab-vocab" role="tab" aria-selected="true" aria-controls="view-vocab" data-i18n="dictVocabSection">Vocabulary</button>
       <button type="button" class="lib-tab" id="lib-tab-notes" role="tab" aria-selected="false" aria-controls="view-notes" data-i18n="tabNotes">Notes</button>
     </nav>
+    <!-- Google Drive status, one read-only line for both views (library.js
+         pbpLibRefreshDriveLine): hidden unless this device is connected for
+         the account on screen. Always a door into General settings, where the
+         Drive panel explains any error and holds the buttons that fix it. -->
+    <a class="lib-drive" id="lib-drive" href="options.html#general" target="_blank" rel="noopener" role="status" aria-live="polite" hidden></a>
   </header>
 
   <main class="lib-main">
@@ -104,6 +109,11 @@
         </span>
         <span class="save-status vocab-main-status" id="vocab-status" role="status" aria-live="polite"></span>
         <div class="lib-cluster" role="group" data-i18n-aria="vocabSelectionActions" aria-label="Selection actions">
+          <!-- Export menu: the whole vocabulary to a TSV file, Anki or Eudic
+               (vocab-send.js), never the selection -- so it lives in the count
+               row, which the batch row replaces while a selection exists.
+               Label before chevron, the Filter button's shape. -->
+          <button type="button" class="btn btn-sm ghost" id="vocab-export-open" aria-haspopup="menu" aria-expanded="false" data-i18n-title="vocabLearningSection" title="Export and integrations" disabled><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="libraryExportMenu">Export</span></button>
           <!-- The multi-select hint lives here, on the one control that is
                always on screen next to the list. -->
           <button type="button" class="btn btn-sm ghost lib-hang-end" id="vocab-select-all" data-i18n="vocabSelectAll" data-i18n-title="vocabSelectHint" title="Ctrl-click a row to add it to the selection, Shift-click for a range">Select all</button>
@@ -280,6 +290,9 @@
   <script defer src="ai-cache.js"></script>
   <script defer src="md-dict.js"></script>
   <script defer src="dict-pack.js"></script>
+  <script defer src="anki-connect.js"></script>
+  <script defer src="eudic-sync.js"></script>
+  <script defer src="vocab-send.js"></script>
   <script defer src="library-notes.js"></script>
   <script defer src="library-vocab.js"></script>
   <script defer src="library.js"></script>

@@ -1188,6 +1188,33 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 @media (forced-colors: active) {
   .notes-color-choice[aria-checked="true"] { background: Highlight; color: HighlightText; }
 }
+/* Export menu (count row): the colour menu's twin -- listbox chrome, rows
+   of icon + label, ghost hover, inset focus. Its door is a ghost sm button
+   shaped like the Filter button (label, then chevron). */
+#vocab-export-open { flex-direction: row-reverse; }
+#vocab-export-open[aria-expanded="true"] { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
+.vocab-export-menu[popover] {
+  padding: var(--lib-sp-1);
+  max-height: var(--listbox-room, 330px);
+  overflow: auto;
+}
+.vocab-export-menu .vocab-export-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--lib-sp-2);
+  box-sizing: border-box;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--lib-fg);
+  font-family: inherit;
+  text-align: start;
+  text-decoration: none;
+}
+.vocab-export-choice > .btn-ic { flex: none; display: inline-flex; color: var(--lib-fg-muted); }
+.vocab-export-choice > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vocab-export-choice:hover { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
+.vocab-export-choice:focus-visible { outline: 2px solid var(--lib-focus-bd); outline-offset: -2px; box-shadow: none; }
 
 /* Quotes: the current one is the loudest thing on the page by size alone. */
 .notes-excerpt-body { min-width: 0; }
@@ -1222,6 +1249,10 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 html.motion-ready .notes-excerpt-jump { transition: background-color var(--motion-state) ease; }
 .notes-excerpt-jump:hover { background: var(--lib-row-bg-hover); }
 .notes-excerpt-jump:focus-visible { outline: 2px solid var(--lib-focus-bd); outline-offset: -2px; box-shadow: none; }
+/* One-highlight delete, current excerpt only (library-notes.js): its own
+   line under the note, the icon hanging into the gutter like the page
+   delete's (.lib-hang-start). */
+.notes-excerpt-body > .notes-excerpt-delete { display: flex; width: max-content; margin-top: var(--lib-sp-2); }
 .notes-excerpt-note {
   display: flex;
   align-items: flex-start;
@@ -2735,6 +2766,22 @@ body { display: flex; flex-direction: column; }
 /* Wrap the navigation as a unit instead of squeezing localized tab labels
    into two lines inside the fixed 32px tab. */
 .lib-tabs { display: flex; flex-wrap: wrap; gap: var(--lib-sp-1); }
+/* Drive status (header, right end): secondary text, quiet until it reports a
+   problem -- then danger-coloured, because the line is the only place on this
+   page a stopped sync can show. A plain link: underline on hover only. */
+.lib-drive {
+  margin-inline-start: auto;
+  min-width: 0;
+  color: var(--lib-fg-muted);
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.lib-drive[hidden] { display: none; }
+.lib-drive.bad { color: var(--lib-danger); }
+.lib-drive:hover { text-decoration: underline; text-underline-offset: 2px; }
+.lib-drive:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; border-radius: var(--lib-radius-sm); box-shadow: var(--lib-focus-ring); }
 /* Real tabs (COMPONENTS.md §9 law 7): a label plus a selection edge, no shell.
    32px tall at every density, 12 of inline padding so the edge spans the
    whole tab. The edge is a 2px bottom BORDER that is always there and only

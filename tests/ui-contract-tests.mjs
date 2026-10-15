@@ -1305,12 +1305,15 @@ check(libraryVocabJs.includes('card.setAttribute("aria-selected", isSelected ? "
   // The one disclosure on this page is the detail's "Edit groups" (T7b, spec
   // §4.5): its writes live in _pbpVocabToggleGroupEditor and on editBtn's own
   // lines inside _pbpVocabRenderDetail (the only place editBtn is built).
-  // Every other aria-expanded in the file -- an editBtn line anywhere else
-  // included -- is still the row lie.
+  // The count row's Export menu button is the second disclosure (a menu
+  // button: aria-haspopup="menu" in the markup), written only by the two
+  // functions that open and close that menu. Every other aria-expanded in the
+  // file -- an editBtn line anywhere else included -- is still the row lie.
   (() => {
-    const fnRe = (name) => new RegExp(`\\nfunction ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n`);
+    const fnRe = (name) => new RegExp(`\\n(?:async )?function ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n`);
     const render = (fnRe("_pbpVocabRenderDetail").exec(libraryVocabJs) || [""])[0];
-    const outside = libraryVocabJs.replace(fnRe("_pbpVocabToggleGroupEditor"), "\n").replace(fnRe("_pbpVocabRenderDetail"), "\n");
+    const outside = libraryVocabJs.replace(fnRe("_pbpVocabToggleGroupEditor"), "\n").replace(fnRe("_pbpVocabRenderDetail"), "\n")
+      .replace(fnRe("_pbpVocabCloseExportMenu"), "\n").replace(fnRe("_pbpVocabOpenExportMenu"), "\n");
     const renderRest = render.split("\n").filter((line) => !/^\s*editBtn\./.test(line)).join("\n");
     return render.includes('editBtn.setAttribute("aria-expanded", "false");') &&
       !outside.includes("aria-expanded") && !renderRest.includes("aria-expanded");

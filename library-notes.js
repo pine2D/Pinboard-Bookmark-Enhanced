@@ -851,7 +851,7 @@ function _pbpNotesExcerptLabel(hit, pageTs) {
 // others are buttons that make themselves current. Every quote wears the
 // half-height highlighter (.lib-mark) in its own colour; the filter query is
 // still marked inside it. A translated-side quote carries its own language.
-function _pbpNotesBuildExcerpt(h, index, isCurrent, pageTs, q) {
+function _pbpNotesBuildExcerpt(h, index, isCurrent, pageTs, q, pageCount) {
   const sec = document.createElement("section");
   sec.className = "notes-excerpt";
   sec.dataset.notesKey = h.key;
@@ -907,6 +907,19 @@ function _pbpNotesBuildExcerpt(h, index, isCurrent, pageTs, q) {
     edit.append(ic, text);
     edit.addEventListener("click", () => _pbpNotesBeginNoteEdit(h));
     body.appendChild(edit);
+  }
+  // Deleting ONE highlight, offered on the excerpt being read only -- one
+  // destructive control per screen, next to what it removes, instead of one
+  // under every quote. The page-wide delete stays in the footer; on a page
+  // with a single highlight that one already says it all.
+  if (isCurrent && pageCount > 1) {
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn btn-sm danger ghost lib-hang-start notes-excerpt-delete";
+    del.dataset.notesKey = h.key;
+    setBtnIcon(del, "trash", t("hlDelete"));
+    del.addEventListener("click", () => _pbpNotesDeleteOne(h, del));
+    body.appendChild(del);
   }
   sec.appendChild(body);
   return sec;
@@ -1225,7 +1238,7 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
   // 1. Page head: title, (hint,) meta
   frag.appendChild(_pbpNotesBuildHead(hit, pageHits.length));
   // 2. Every highlight of the page, oldest first; the opened one is current
-  pageHits.forEach((h, i) => frag.appendChild(_pbpNotesBuildExcerpt(h, i, h.key === hit.key, pageTs, q)));
+  pageHits.forEach((h, i) => frag.appendChild(_pbpNotesBuildExcerpt(h, i, h.key === hit.key, pageTs, q, pageHits.length)));
   // 3. "This page" column (C >= 1312; CSS places it, DOM keeps it last but one)
   frag.appendChild(_pbpNotesBuildSide(hit, pageHits, pageTs));
   // 4. Closing row (shown below C 1312): the page delete, hanging at the main column's start
@@ -1918,6 +1931,64 @@ function _pbpNotesDelete(row, anchor) {
       // pressing Delete asked for.
       _pbpNotesRender();
       _pbpNotesFocusAfterDelete(position);
+    },
+  });
+}
+
+// One highlight, from the excerpt being read (the current one only). Same
+// shape as the batch delete below with a set of one -- read and rewrite inside
+// the record's lock, owner rechecked around the read, the key dropped only
+// once nothing is left -- and the same sentence the reader asks with
+// ("Delete this highlight and its note?"). Afterwards the detail stays on the
+// page when it still has highlights, else returns to the cover.
+function _pbpNotesDeleteOne(hit, anchor) {
+  if (!hit || !anchor) return;
+  const ownerAtOpen = _notesOwnerCache;
+  const revision = _notesAuthRevision;
+  showConfirmPopover(anchor, {
+    msg: t("hlDeleteConfirm"),
+    yesText: t("delete"),
+    noText: t("cancel"),
+    onConfirm: async () => {
+      const position = Math.max(0, _pbpNotesVisibleHits().findIndex((h) => h.key === hit.key));
+      _pbpNotesSetStatus("");
+      anchor.classList.remove("is-error");
+      let result;
+      try {
+        result = await _pbpNotesWithRecordLock(hit.row.key, async () => {
+          if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
+          const fresh = (await chrome.storage.local.get(hit.row.key))[hit.row.key];
+          if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
+          if (!fresh) return;
+          const items = Array.isArray(fresh.items) ? fresh.items : [];
+          const keep = items.filter((it, idx) => !_pbpNotesItemVisible(it, ownerAtOpen) || _pbpNotesHitKey(hit.row.key, it, idx) !== hit.key);
+          if (keep.length === items.length) return;
+          return _pbpNotesStoreRecord(hit.row.key, { ...fresh, items: keep }, ownerAtOpen, revision);
+        });
+      } catch (e) {
+        // Name/message only, never highlight or note content. Nothing was
+        // removed; the confirm's focus restore put the caret back on this
+        // button, so pressing it again is the retry.
+        console.warn("[notes] single delete failed", e && e.name, e && e.message);
+        anchor.classList.add("is-error");
+        _pbpNotesSetStatus(_pbpNotesDeleteFailedText());
+        return;
+      }
+      if (result === "changed") {
+        _notesOwnerCache = null;
+        await _pbpNotesRefreshPreservingState();
+        _pbpNotesSetStatus(t("vocabSelectionChanged"));
+        return;
+      }
+      _notesSelected.delete(hit.key);
+      await renderNotesPanel();
+      const samePage = _pbpNotesVisibleHits().filter((h) => h.row.key === hit.row.key);
+      if (samePage.length) {
+        _pbpNotesJumpTo(samePage[0].key);
+      } else {
+        _pbpNotesRenderDetail(null);
+        _pbpNotesFocusAfterDelete(position);
+      }
     },
   });
 }

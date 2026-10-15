@@ -16,6 +16,8 @@
 // tests already assume.
 var _vocabRenderGen = 0; // guards stale async renders (account switch mid-fetch)
 var _vocabFlashTimer = 0; // guards two flashes racing to clear each other's text early
+var _vocabExportSession = null; // the open Export menu (count row), if any
+var _vocabExportBusy = false;    // a TSV / Anki / Eudic export is running
 let _vocabRows = [];     // last render's rows for the current owner
 let _vocabViewRows = []; // current filtered + sorted view (selection boundary)
 let _vocabSelected = new Set();
@@ -1695,6 +1697,9 @@ function _pbpVocabSyncSelectionUi() {
   const allBtn = $id("vocab-select-all");
   const invertBtn = $id("vocab-invert-selection");
   if (allBtn) allBtn.disabled = _vocabBatchBusy || !_vocabViewRows.length;
+  // The export acts on the whole book, so only an empty book disables it.
+  const exportBtn = $id("vocab-export-open");
+  if (exportBtn) exportBtn.disabled = _vocabExportBusy || !_vocabRows.length;
   if (invertBtn) invertBtn.disabled = _vocabBatchBusy || !_vocabViewRows.length;
   const groupInput = $id("vocab-group-input");
   const addBtn = $id("vocab-add-group");
@@ -2593,6 +2598,140 @@ if (_vocabInvert) _vocabInvert.addEventListener("click", () => {
   // Inverting "everything" empties the selection and hides this very button.
   if (!_vocabSelected.size) _pbpVocabFocusCountRowSelectAll();
 });
+
+// Export menu (count row). The three whole-vocabulary exits from settings,
+// where a reviewing learner already is: the TSV download, Send all to Anki and
+// Send all supported words to Eudic (vocab-send.js, shared with options). They
+// ALWAYS act on the current owner's whole vocabulary -- never the selection or
+// the filtered view -- which is why they sit in the count row (the whole
+// book) and not in the batch row (the selection). The deck, port and tokens
+// stay in settings; the last item is the door there. Built per open, like the
+// notes colour menu: listbox chrome, role=menu, roving tabindex.
+function _pbpVocabCloseExportMenu(restoreFocus) {
+  const session = _vocabExportSession;
+  if (!session) return;
+  _vocabExportSession = null;
+  session.anchor.setAttribute("aria-expanded", "false");
+  session.menu.remove();
+  if (restoreFocus && session.anchor.isConnected) {
+    try { session.anchor.focus({ preventScroll: true }); } catch (_) { session.anchor.focus(); }
+  }
+}
+// The send runs from the menu item's own click, with nothing awaited first:
+// the Anki and Eudic paths open a permission prompt that needs that click's
+// transient activation (vocab-send.js).
+function _pbpVocabRunExport(kind) {
+  const anchor = $id("vocab-export-open");
+  if (_vocabExportBusy) return;
+  _pbpVocabCloseExportMenu(true);
+  const run = kind === "anki" ? pbpVocabSendToAnki : kind === "eudic" ? pbpVocabSendToEudic : pbpVocabExportTsv;
+  const sending = kind === "anki" ? "dictAnkiSending" : kind === "eudic" ? "dictEudicSending" : "";
+  _vocabExportBusy = true;
+  if (anchor) { anchor.disabled = true; anchor.setAttribute("aria-busy", "true"); }
+  const status = _pbpVocabStatusHost();
+  if (sending && status) {
+    clearTimeout(_vocabFlashTimer);
+    status.classList.remove("ok", "bad");
+    status.textContent = t(sending);
+  }
+  const done = run({ flash: _pbpVocabFlashStatus });
+  Promise.resolve(done).catch((err) => {
+    console.warn("vocab export failed:", err && err.name, err && err.message);
+  }).finally(() => {
+    _vocabExportBusy = false;
+    if (anchor) { anchor.removeAttribute("aria-busy"); anchor.disabled = !_vocabRows.length; }
+  });
+}
+function _pbpVocabExportItem(label, icon, onClick) {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = "listbox-opt vocab-export-choice";
+  item.setAttribute("role", "menuitem");
+  item.tabIndex = -1;
+  setBtnIcon(item, icon, label);
+  item.addEventListener("click", onClick);
+  return item;
+}
+async function _pbpVocabOpenExportMenu(anchor) {
+  if (_vocabExportSession?.anchor === anchor) { _pbpVocabCloseExportMenu(true); return; }
+  _pbpVocabCloseExportMenu(false);
+  if (_vocabExportBusy || anchor.disabled) return;
+  const menu = document.createElement("div");
+  menu.className = "listbox-pop vocab-export-menu";
+  menu.setAttribute("popover", "auto");
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", t("vocabLearningSection"));
+  const session = { anchor, menu };
+  _vocabExportSession = session;
+  anchor.setAttribute("aria-expanded", "true");
+  menu.append(
+    _pbpVocabExportItem(t("dictExportTsv"), "download", () => _pbpVocabRunExport("tsv")),
+    _pbpVocabExportItem(t("dictAnkiSend"), "send", () => _pbpVocabRunExport("anki"))
+  );
+  // Eudic only when it has something to do (a token, and words in a language
+  // it takes) -- the same rule the settings button follows. Read before the
+  // menu shows, so the item never pops in under the pointer.
+  let eudic = false;
+  try { eudic = await pbpVocabEudicReady(); } catch (_) {}
+  if (_vocabExportSession !== session) return;
+  if (eudic) menu.append(_pbpVocabExportItem(t("dictEudicSend"), "send", () => _pbpVocabRunExport("eudic")));
+  const settings = document.createElement("a");
+  settings.className = "listbox-opt vocab-export-choice";
+  settings.setAttribute("role", "menuitem");
+  settings.tabIndex = -1;
+  settings.href = "options.html#vocab";
+  settings.target = "_blank";
+  settings.rel = "noopener";
+  setBtnIcon(settings, "gear", t("libraryExportSettings"));
+  settings.addEventListener("click", (e) => {
+    _pbpVocabCloseExportMenu(false);
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    if (typeof pbpOpenExtensionTab !== "function") return;
+    e.preventDefault();
+    pbpOpenExtensionTab("options.html", "vocab");
+  });
+  menu.append(settings);
+  menu.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); _pbpVocabCloseExportMenu(true); return; }
+    if (e.key === "Tab") { _pbpVocabCloseExportMenu(true); return; }
+    const items = [...menu.querySelectorAll(".vocab-export-choice")];
+    const i = items.indexOf(document.activeElement);
+    let next;
+    if (e.key === "ArrowDown") next = (i + 1) % items.length;
+    else if (e.key === "ArrowUp") next = (i + items.length - 1) % items.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = items.length - 1;
+    if (next !== undefined) {
+      e.preventDefault();
+      for (const item of items) item.tabIndex = -1;
+      items[next].tabIndex = 0;
+      items[next].focus({ preventScroll: true });
+    }
+  });
+  menu.addEventListener("toggle", (e) => {
+    if (e.newState === "closed" && _vocabExportSession === session) {
+      _pbpVocabCloseExportMenu(menu.contains(document.activeElement));
+    }
+  });
+  document.body.append(menu);
+  menu.showPopover();
+  if (typeof pbpListboxPlace === "function") pbpListboxPlace(menu, anchor);
+  const first = menu.querySelector(".vocab-export-choice");
+  first.tabIndex = 0;
+  first.focus({ preventScroll: true });
+}
+const _vocabExportOpen = $id("vocab-export-open");
+if (_vocabExportOpen) {
+  _vocabExportOpen.addEventListener("click", () => {
+    _pbpVocabOpenExportMenu(_vocabExportOpen).catch((err) => {
+      console.warn("vocab export menu failed:", err && err.name, err && err.message);
+    });
+  });
+}
+window.addEventListener("scroll", (e) => {
+  if (_vocabExportSession && !_vocabExportSession.menu.contains(e.target)) _pbpVocabCloseExportMenu(false);
+}, true);
+window.addEventListener("resize", () => _pbpVocabCloseExportMenu(false));
 const _vocabLoadMore = $id("vocab-load-more");
 if (_vocabLoadMore) _vocabLoadMore.addEventListener("click", () => {
   const list = $id("vocab-list");

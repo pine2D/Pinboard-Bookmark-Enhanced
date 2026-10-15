@@ -328,6 +328,8 @@
         "vocab-context-quote",
         "vocab-context-source",
         "vocab-detail-status",
+        "vocab-export-choice",
+        "vocab-export-menu",
         "vocab-edit-groups",
         "vocab-filter-set",
         "vocab-group-chip",

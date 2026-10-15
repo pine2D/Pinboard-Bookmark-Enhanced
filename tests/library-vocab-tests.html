@@ -3008,6 +3008,29 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     } finally {
       host.remove();
     }
+    // Header Drive line (library.js pbpLibDriveLine): status shapes as the
+    // worker's pbpGetVocabDriveStatus returns them, owner as auth.account.
+    {
+      const me = pbpDictOwnerScope("alice");
+      const base = { connected: true, owner: "alice", connection: { lastError: null, retryAt: null, blocked: false },
+        vocabulary: { lastError: null }, notes: { lastError: null }, lastSuccessAt: null };
+      check("drive line: not connected, missing or unreadable status shows nothing",
+        pbpLibDriveLine({ ...base, connected: false }, me) === null && pbpLibDriveLine(null, me) === null && pbpLibDriveLine(undefined, me) === null);
+      check("drive line: a status for another Pinboard account shows nothing",
+        pbpLibDriveLine(base, pbpDictOwnerScope("bob")) === null && pbpLibDriveLine({ ...base, owner: "" }, me) === null);
+      const never = pbpLibDriveLine(base, me);
+      check("drive line: connected but never synced says so", never?.kind === "ok" && never.text === t("libraryDriveConnected"), JSON.stringify(never));
+      const synced = pbpLibDriveLine({ ...base, lastSuccessAt: Date.UTC(2026, 9, 15, 3, 0) }, me);
+      check("drive line: synced shows the time through libraryDriveSynced",
+        synced?.kind === "ok" && synced.text.startsWith("libraryDriveSynced:") && synced.text.length > "libraryDriveSynced:".length, JSON.stringify(synced));
+      const problems = [
+        { ...base, connection: { lastError: "auth", retryAt: null, blocked: true } },
+        { ...base, vocabulary: { lastError: "corrupt" } },
+        { ...base, notes: { lastError: "status_unavailable" }, lastSuccessAt: 5 }
+      ].map((status) => pbpLibDriveLine(status, me));
+      check("drive line: any connection or dataset error is a problem line, even with an earlier success",
+        problems.every((line) => line?.kind === "problem" && line.text === t("libraryDriveProblem")), JSON.stringify(problems));
+    }
     // First frame (review round 1): before the counts land the pane carries
     // no data-header-fit and the Filter button keeps its box but not its ink,
     // at ANY width -- a window wide enough for the wide form never paints the
