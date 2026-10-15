@@ -107,6 +107,17 @@
     "lucide.dev": "icon-set attribution comment",
     "www.mdbg.net": "dictionary attribution link the user opens",
     "en.wiktionary.org": "dictionary attribution link the user opens",
-    "cc-cedict.org": "license attribution link the user opens"
+    "cc-cedict.org": "license attribution link the user opens",
+    "status.openai.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "status.claude.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "aistudio.google.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "status.deepseek.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "status.aliyun.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "status.minimaxi.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "status.openrouter.ai": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "groqstatus.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "status.mistral.ai": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "status.cohere.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
+    "status.moonshot.cn": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)"
   }
 }
