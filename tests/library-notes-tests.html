@@ -174,6 +174,16 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("loading library.js into this harness never arms the page's motion gate",
     !document.documentElement.classList.contains("motion-ready"));
 
+  // ---- library.js: with no hash and no remembered view the page opens Notes,
+  // its first tab, as the page's name reads (2026-10-16) ----
+  {
+    let remembered = null;
+    try { remembered = localStorage.getItem(PBP_LIB_VIEW_KEY); localStorage.removeItem(PBP_LIB_VIEW_KEY); } catch (_) {}
+    check("with no hash and no remembered view the page opens Notes, the first tab",
+      _pbpLibInitialView() === "notes" && PBP_LIB_VIEWS[0] === "notes", _pbpLibInitialView());
+    try { if (remembered !== null) localStorage.setItem(PBP_LIB_VIEW_KEY, remembered); } catch (_) {}
+  }
+
   // ---- scan -> one row per highlight, newest first ----
   check("every stored highlight gets its own row, newest first",
     rowKeys() === "pbp_hl_beta#b1,pbp_hl_alpha#a1,pbp_hl_alpha#a2,pbp_hl_alpha#a3,pbp_hl_orphan#c1,pbp_hl_evil#e1",

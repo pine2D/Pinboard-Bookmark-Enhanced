@@ -497,7 +497,11 @@ async function primitiveCases() {
 // read -- is swapped out for the stub. history.replaceState (the tab hash)
 // is a no-op here: an about:srcdoc document may not take an http URL.
 const LIB_FRAME_TOKEN = "listboxtest:0123456789ABCDEF0123";
-async function loadLibraryFrame({ width = 1280, height = 800 } = {}) {
+// `view`: an about:srcdoc document cannot carry #vocab, and with no hash and
+// no remembered view the page opens Notes (2026-10-16), so the loader routes
+// to the view the way a #vocab arrival does -- the toolbar popup and the
+// settings page both open the vocabulary that way.
+async function loadLibraryFrame({ width = 1280, height = 800, view = "vocab" } = {}) {
   const [html, en] = await Promise.all([
     fetch("../library.html").then((r) => r.text()),
     fetch("../_locales/en/messages.json").then((r) => r.json()),
@@ -539,6 +543,7 @@ document.documentElement.dataset.optionsReady = "1";
   document.body.appendChild(frame);
   await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
   const win = frame.contentWindow;
+  if (view) win.eval(`_pbpLibApplyView(${JSON.stringify(view)}, false)`);
   await libFrames(win);
   return { frame, win, doc: frame.contentDocument };
 }

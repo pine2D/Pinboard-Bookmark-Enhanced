@@ -11,8 +11,13 @@
   <header class="lib-header">
     <h1 data-i18n="libraryTitle">Notes &amp; Vocabulary</h1>
     <nav class="lib-tabs" role="tablist" data-i18n-aria="libraryTitle" aria-label="Notes &amp; Vocabulary">
-      <button type="button" class="lib-tab" id="lib-tab-vocab" role="tab" aria-selected="true" aria-controls="view-vocab" data-i18n="dictVocabSection">Vocabulary</button>
+      <!-- Notes first, as the page's name reads (2026-10-16 ruling); with no
+           hash and no remembered view it is also the view that opens
+           (library.js _pbpLibInitialView). Every entry point names its view in
+           the hash, and the static state below stays on Vocabulary: the
+           toolbar popup and the settings page, the common doors, open #vocab. -->
       <button type="button" class="lib-tab" id="lib-tab-notes" role="tab" aria-selected="false" aria-controls="view-notes" data-i18n="tabNotes">Notes</button>
+      <button type="button" class="lib-tab" id="lib-tab-vocab" role="tab" aria-selected="true" aria-controls="view-vocab" data-i18n="dictVocabSection">Vocabulary</button>
     </nav>
     <!-- Google Drive status, one read-only line for both views (library.js
          pbpLibRefreshDriveLine): hidden unless this device is connected for

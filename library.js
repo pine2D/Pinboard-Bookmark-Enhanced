@@ -1,16 +1,17 @@
 // Library page glue: view switching, hash routing, cross-page freshness.
 // Hash precedence: explicit #vocab/#notes in the URL > last-view memory
-// (localStorage) > default #vocab. The memory key is page-local UI state,
+// (localStorage) > default #notes (2026-10-16, the page name leads with
+// notes). The memory key is page-local UI state,
 // never synced.
 const PBP_LIB_VIEW_KEY = "pbp-lib-last-view";
-const PBP_LIB_VIEWS = ["vocab", "notes"];
+const PBP_LIB_VIEWS = ["notes", "vocab"];
 
 function pbpLibActiveView() {
   return $id("view-notes").hidden ? "vocab" : "notes";
 }
 
 function _pbpLibApplyView(view, pushHash) {
-  const v = PBP_LIB_VIEWS.includes(view) ? view : "vocab";
+  const v = PBP_LIB_VIEWS.includes(view) ? view : "notes";
   for (const name of PBP_LIB_VIEWS) {
     const active = name === v;
     $id("view-" + name).hidden = !active;
@@ -40,7 +41,7 @@ function _pbpLibInitialView() {
     const remembered = localStorage.getItem(PBP_LIB_VIEW_KEY);
     if (PBP_LIB_VIEWS.includes(remembered)) return remembered;
   } catch (_) {}
-  return "vocab";
+  return "notes";
 }
 
 // Enable decorative transitions (.confirm-popover enter/exit) only after the
