@@ -1294,7 +1294,7 @@ const disclosureKeys = [...optionsHtml.matchAll(
   /<details class="disclosure"(?: id="[^"]+")? data-acc-key="([^"]+)"/g
 )].map((match) => match[1]);
 check(disclosureKeys.join(",") ===
-  "connection-overview,vocab-reading,vocab-learning,vocab-ecdict-pack,vocab-dictionary-pack,general-data-sync",
+  "connection-overview,vocab-reading,vocab-learning,vocab-ecdict-pack,vocab-dictionary-pack",
   "options.html: settings disclosures lack stable pp-acc keys");
 check(optionsJs.includes('querySelectorAll("details[data-acc-key]")') &&
   /addEventListener\("toggle",[\s\S]{0,500}pbpAccSet\(det\.dataset\.accKey, det\.open\)/.test(optionsJs),

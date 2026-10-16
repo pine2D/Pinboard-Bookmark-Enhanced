@@ -1640,7 +1640,7 @@
     "message": "カスタムフォント"
   },
   "customFontPlaceholder": {
-    "message": "例：'Noto Sans JP', 'Fira Code', sans-serif"
+    "message": "例：'Noto Sans JP', sans-serif"
   },
   "labelThemePresets": {
     "message": "テーマプリセット"

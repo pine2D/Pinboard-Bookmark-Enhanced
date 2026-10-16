@@ -1640,7 +1640,7 @@
     "message": "Пользовательский шрифт"
   },
   "customFontPlaceholder": {
-    "message": "напр. 'Noto Sans SC', 'Fira Code', sans-serif"
+    "message": "напр. 'Noto Sans', sans-serif"
   },
   "labelThemePresets": {
     "message": "Предустановки тем"

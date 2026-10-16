@@ -313,6 +313,9 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    bg/panel, not btn-hover (COMPONENTS.md §9.1 law 8). btn-fg-muted clears
    panel too (measured, not assumed -- weak-text-on-fill batch T2). */
 .options-search-result-panel { color: var(--opt-btn-fg-muted); font-size: 11px; }
+/* A help-text hit: the setting's name is the label, the matched help line is
+   this one-line excerpt under it (same ink pair as the panel name). */
+.options-search-result-snippet { color: var(--opt-btn-fg-muted); font-size: 11px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .options-search-empty { padding: var(--opt-sp-4); color: var(--opt-fg-hint); font-size: 11px; }
 /* ---- Listbox (COMPONENTS.md §6.4 exception 2, spec stage2 §3): the native
    <select> stays as the value carrier and is hidden; the combobox button is
@@ -3310,17 +3313,18 @@ html[data-theme="terminal"] .fg textarea { font-family: "Courier New", Consolas,
 html[data-theme] .overlay-byte-counter.over { color: var(--opt-overlimit-fg); }
 
 /* ---- Preset preview (collapsible read-only) ---- */
+/* Flat (2026-10-15): a disclosure line, not a bordered box. The summary
+   hangs out by its own inline padding so its text lines up with the column
+   while the hover fill still has room around it (optical hang). */
 .preset-preview-section {
   margin-top: var(--opt-sp-6);
-  border: 1px solid var(--opt-border-section);
-  border-radius: var(--opt-radius-md);
-  overflow: hidden;
 }
 .preset-preview-section summary {
-  padding: var(--opt-sp-4) var(--opt-sp-5);
+  padding: var(--opt-sp-2);
+  margin-inline: calc(-1 * var(--opt-sp-2));
+  border-radius: var(--opt-radius-sm);
   cursor: pointer;
   font-size: 12px;
-  background: var(--opt-panel);
   user-select: none;
 }
 .preset-preview-section summary:hover { background: var(--opt-preview-hover-bg); }
@@ -3334,7 +3338,8 @@ html[data-theme] .overlay-byte-counter.over { color: var(--opt-overlimit-fg); }
   font-size: 11px;
   line-height: 1.5;
   white-space: pre;
-  border-top: 1px solid var(--opt-border-section);
+  margin-top: var(--opt-sp-2);
+  border-radius: var(--opt-radius-sm);
 }
 html[data-theme] .preset-preview-section summary { color: var(--opt-fg-muted); }
 /* --opt-btn-fg-muted on hover only: the hover fill is --opt-btn-hover, a
@@ -3360,24 +3365,22 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 }
 
 /* ---- Wayback Log Viewer ---- */
+/* Flat like the rest of the panel (2026-10-15): no frame or fill; the rows'
+   own hairlines separate them and the column edge is the list's edge. */
 #wayback-log {
   margin-top: var(--opt-sp-3);
-  border: 1px solid var(--opt-border-section);
-  border-radius: var(--opt-radius-sm);
-  background: var(--opt-panel);
   font-size: 12px;
   max-height: 200px;
   overflow-y: auto;
 }
 .wayback-log-empty {
-  padding: var(--opt-sp-4);
   color: var(--opt-fg-muted);
 }
 .wayback-log-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 72px minmax(0, 200px) 22px;
   gap: var(--opt-sp-4);
-  padding: var(--opt-sp-2) var(--opt-sp-4);
+  padding: var(--opt-sp-2) 0;
   border-bottom: 1px solid var(--opt-border-section);
   align-items: center;
 }
@@ -3537,16 +3540,18 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
    the frame is hairline, rows are separated by spacing only; law 3: the hover
    band is inset (sp-2 of queue padding) and rounded, never touching the frame's
    corners. ---- */
+/* No frame (2026-10-15): the panel is a flat canvas, so the group list is
+   just its rows. The list hangs out by the rows' own inline padding, so a
+   row's text lines up with the column and only its hover fill reaches past
+   it (the optical-hang pattern; negative margins sit outside the spacing
+   scale by design). */
 #tag-gov-groups {
   display: flex;
   flex-direction: column;
   gap: var(--opt-sp-1);
-  padding: var(--opt-sp-2);
-  margin-bottom: var(--opt-rhythm);
-  border: 1px solid var(--opt-border-section);
-  border-radius: var(--opt-radius-md);
+  margin: 0 calc(-1 * var(--opt-sp-4)) var(--opt-rhythm);
 }
-#tag-gov-groups:empty { display: none; }   /* signed out: no frame around nothing */
+#tag-gov-groups:empty { display: none; }   /* signed out: no gap left for nothing */
 .tag-gov-group-row {
   display: grid;
   /* Content-fitted, not on the --opt-sp-N scale (ui-primitives.md: a track
@@ -3571,7 +3576,7 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
 }
 .tag-gov-group-row:hover { background: color-mix(in srgb, var(--opt-fg) 4%, var(--opt-panel)); }
 #tag-gov-groups > :not(.tag-gov-group-row) {
-  padding: var(--opt-sp-4);  /* empty-state message sits inside the same frame */
+  padding: var(--opt-sp-2) var(--opt-sp-4);  /* empty-state message: same inset as a row's text */
   margin-bottom: 0;
 }
 /* overflow-wrap: anywhere is a locale-proof backstop, not the primary fix --

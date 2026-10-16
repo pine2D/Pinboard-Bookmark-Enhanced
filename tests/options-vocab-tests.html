@@ -1200,8 +1200,8 @@ delete document.documentElement.dataset.theme;
     const optionsSource = await (await fetch("../options.html")).text();
     // Simplest miss: delete the switches but keep a notes-only row or the
     // per-dataset label, so the merged panel still forks by data type.
-    check("production Google Drive markup keeps its disclosure, live status and hidden actions, with one merged last-sync row",
-      /<details class="disclosure" data-acc-key="general-data-sync" open>/.test(optionsSource) &&
+    check("production Google Drive markup keeps its Data Sync section, live status and hidden actions, with one merged last-sync row",
+      /<section class="settings-section" aria-labelledby="sec-sync">\s*<h2 class="section-title" id="sec-sync"/.test(optionsSource) &&
       /id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure"/.test(optionsSource) &&
       /id="vocab-drive-state"[^>]*role="status"[^>]*aria-live="polite"/.test(optionsSource) &&
       /id="vocab-drive-actions"[^>]*hidden/.test(optionsSource) &&

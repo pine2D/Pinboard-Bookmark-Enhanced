@@ -1640,7 +1640,7 @@
     "message": "自定义字体"
   },
   "customFontPlaceholder": {
-    "message": "如 'Noto Sans SC', 'Fira Code', sans-serif"
+    "message": "如 'Noto Sans SC', sans-serif"
   },
   "labelThemePresets": {
     "message": "主题预设"

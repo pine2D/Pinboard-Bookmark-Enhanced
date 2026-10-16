@@ -1640,7 +1640,7 @@
     "message": "Benutzerdefinierte Schriftart"
   },
   "customFontPlaceholder": {
-    "message": "Z.B. 'Noto Sans', 'Fira Code', sans-serif"
+    "message": "z. B. 'Noto Sans', sans-serif"
   },
   "labelThemePresets": {
     "message": "Theme-Vorlagen"

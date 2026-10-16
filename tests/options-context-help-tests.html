@@ -980,9 +980,17 @@ function test(name, fn) {
   test("existing feature disclosures do not nest another unanchored disclosure", () => {
     const nested = doc.querySelectorAll("details.disclosure > .disclosure-body.context-help-host > details.context-help");
     assert(nested.length === 0, "nested contextual disclosures=" + nested.length);
-    ["vocabDriveScope", "vocabDriveDisclosure", "ecdictHint", "ecdictFormatNote", "dictPackHint", "dictPackImportHint"].forEach((key) => {
+    ["ecdictHint", "ecdictFormatNote", "dictPackHint", "dictPackImportHint"].forEach((key) => {
       const copy = doc.querySelector(`[data-i18n="${key}"]`);
       assert(copy?.closest("details.disclosure"), key + " left its feature disclosure");
+    });
+    // Data Sync stopped being a disclosure (2026-10-15, the Data tab's only
+    // collapsible block); the Drive scope note stays the answer behind the
+    // Google Drive heading's own help toggle, with the plaintext disclosure.
+    ["vocabDriveScope", "vocabDriveDisclosure"].forEach((key) => {
+      const copy = doc.querySelector(`[data-i18n="${key}"]`);
+      assert(copy?.closest("details.context-help")?.parentElement?.querySelector("#sec-google-drive"),
+        key + " left the Google Drive heading's help");
     });
     const legacy = doc.querySelector('[data-i18n="batchRevokeHint"]');
     assert(legacy && !legacy.closest("details.context-help"), "conditional legacy guidance is hidden twice");

@@ -1055,7 +1055,7 @@
         <h2 class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</h2>
         <div class="fg entry-block">
           <label class="bl" for="opt-custom-font" data-i18n="labelCustomFont">Custom Font</label>
-          <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans SC', 'Fira Code', sans-serif" data-i18n-placeholder="customFontPlaceholder" />
+          <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans', sans-serif" data-i18n-placeholder="customFontPlaceholder" />
         </div>
         <div class="fg">
           <label class="bl subhead" data-i18n="labelThemePresets">Theme Presets</label>
@@ -1127,12 +1127,10 @@
 
     <!-- Tab 7: Storage -->
     <div id="panel-storage" class="panel" role="tabpanel" aria-labelledby="tab-storage">
-      <section class="settings-section">
-        <details class="disclosure" data-acc-key="general-data-sync" open>
-          <summary id="sec-sync" data-i18n="secSync">Data Sync</summary>
-          <div class="disclosure-body" id="sec-sync-body">
+      <section class="settings-section" aria-labelledby="sec-sync">
+        <h2 class="section-title" id="sec-sync" data-i18n="secSync">Data Sync</h2>
             <section class="settings-section" id="chrome-sync-section" aria-labelledby="sec-chrome-sync">
-              <div class="fg"><div class="bl" role="heading" aria-level="3" id="sec-chrome-sync" data-i18n="driveChromeSyncSection">Chrome Sync</div></div>
+              <div class="fg"><div class="bl subhead" role="heading" aria-level="3" id="sec-chrome-sync" data-i18n="driveChromeSyncSection">Chrome Sync</div></div>
               <div class="pref-group" role="group" aria-labelledby="sec-chrome-sync">
               <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" id="opt-sync-enabled" aria-labelledby="opt-sync-enabled-label" /> <span class="switch-text" id="opt-sync-enabled-label" data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span>
                 <details class="context-help">
@@ -1180,8 +1178,6 @@
                 </div>
               </div>
             </section>
-          </div>
-        </details>
       </section>
       <section class="settings-section">
         <div class="context-help-host context-help-section" data-help-role="section">

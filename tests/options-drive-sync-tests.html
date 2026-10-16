@@ -80,11 +80,14 @@ window.chrome = {
   const stateText = () => $id("vocab-drive-state").textContent;
   const source = await (await fetch("../options.html")).text();
   const production = new DOMParser().parseFromString(source, "text/html");
-  const dataSync = production.querySelector('details[data-acc-key="general-data-sync"]');
+  const dataSync = production.getElementById("sec-sync")?.closest("section");
   // The Data tab (panel id "storage") holds data sync since the 2026-10-15
-  // options IA; the persisted disclosure key is unchanged.
-  check("data sync uses the existing persisted native disclosure in Data",
-    dataSync?.classList.contains("disclosure") && dataSync.closest("#panel-storage"));
+  // options IA. The second critique that day made it a plain titled section:
+  // it was the tab's only collapsible block, opened by default.
+  check("data sync is a plain titled section in Data",
+    dataSync?.matches("section.settings-section") && dataSync.closest("#panel-storage") &&
+    production.getElementById("sec-sync").matches("h2.section-title") &&
+    !production.querySelector('[data-acc-key="general-data-sync"]'));
   check("Drive follows Chrome Sync before Backup with one shared connection",
     dataSync?.querySelector("#chrome-sync-section + section #vocab-drive-body") &&
     production.querySelectorAll("#vocab-drive-connect").length === 1 &&

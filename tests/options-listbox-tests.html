@@ -1411,6 +1411,9 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       const box = doc.createElement("input");
       box.type = "checkbox"; box.className = "storage-cat-cb"; box.dataset.cat = "tags"; box.checked = true;
       host.replaceChildren(box);
+      // The button now follows the selection (disabled while nothing is
+      // checked), so announce the injected pick the way a real click would.
+      box.dispatchEvent(new Event("change", { bubbles: true }));
       status.textContent = "";
     };
     const clickAndWait = async () => {

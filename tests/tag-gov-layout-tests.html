@@ -100,7 +100,10 @@ test("similar-group container is a single-column queue", () => {
       throw new Error("row " + i + " does not sit below row " + (i - 1));
   }
 });
-test("queue rows draw no separator lines (Soft Fill law 4) and inset their hover band (law 3)", () => {
+// 2026-10-15: the queue lost its frame (flat panel canvas). The list now
+// hangs out by the rows' inline padding, so a row's TEXT lines up with the
+// column the list sits in and only the rounded hover band reaches past it.
+test("queue rows draw no separator lines (Soft Fill law 4), the queue no frame, and row text aligns with the column", () => {
   const row = groups.querySelector(".tag-gov-group-row");
   const cs = getComputedStyle(row);
   for (const side of ["Top", "Bottom"]) {
@@ -108,8 +111,15 @@ test("queue rows draw no separator lines (Soft Fill law 4) and inset their hover
     if (w !== 0) throw new Error("row border-" + side.toLowerCase() + " must be 0, got " + w);
   }
   if (parseFloat(cs.borderTopLeftRadius) <= 0) throw new Error("hover band needs a radius > 0");
-  const inset = row.getBoundingClientRect().left - groups.getBoundingClientRect().left;
-  if (inset < 4) throw new Error("band must sit >=4px inside the queue frame, got " + inset);
+  const gs = getComputedStyle(groups);
+  for (const side of ["Top", "Right", "Bottom", "Left"]) {
+    if (parseFloat(gs["border" + side + "Width"]) !== 0) throw new Error("queue draws a border-" + side.toLowerCase());
+  }
+  const parent = groups.parentElement;
+  const columnLeft = parent.getBoundingClientRect().left + parseFloat(getComputedStyle(parent).paddingLeft);
+  const textLeft = row.getBoundingClientRect().left + parseFloat(cs.paddingLeft);
+  if (Math.abs(textLeft - columnLeft) > 0.5) throw new Error("row text starts " + (textLeft - columnLeft).toFixed(1) + "px off the column edge");
+  if (row.getBoundingClientRect().left >= columnLeft) throw new Error("hover band does not hang past the column edge");
 });
 test("kind label fits its track without wrapping or overlapping the chips (longest known label: Trennzeichen)", () => {
   const rows = [...groups.querySelectorAll(".tag-gov-group-row")];

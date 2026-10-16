@@ -1298,7 +1298,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("Google Drive in Data Sync (Data tab) retains the shared connection fields and toolbar", async () => {
     const panel = await panelDoc("storage");
     assert(!!panel, "panel-storage is missing");
-    const drive = panel.querySelector('details.disclosure[data-acc-key="general-data-sync"] #vocab-drive-body');
+    const drive = panel.querySelector('section[aria-labelledby="sec-sync"] #vocab-drive-body');
     assert(!!drive, "Data Sync lost the shared Google Drive connection");
     assert(!!drive.querySelector("dl#vocab-drive-fields[hidden]"), "vocab-drive-fields dl or its hidden attribute is missing");
     assert(!drive.querySelector(".fg"), "vocab-google-drive must not gain any .fg wrapper");

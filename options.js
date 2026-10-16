@@ -398,7 +398,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
     // weakTarget: the id came from the panel-wide fallback (this panel's first
     // control), not from anything the text names -- the only target a section
     // name is allowed to overwrite.
-    const add = (text, targetId, sectionName, weakTarget, isHint) => {
+    const add = (text, targetId, sectionName, weakTarget, isHint, owner) => {
       const clean = String(text || "").replace(/\s+/g, " ").trim();
       if (!clean) return;
       const textKey = `${panel}\n${clean}`;
@@ -420,6 +420,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
       seen.add(key);
       const entry = { panel, panelLabel, text: clean, searchText: _pbpSettingsSearchText(`${panelLabel} ${clean}`), targetId: targetId || "" };
       if (isHint) entry.hint = true;
+      if (isHint && owner) entry.owner = owner;
       if (!prior) seenText.set(textKey, { entry, weak: !!weakTarget });
       entries.push(entry);
     };
@@ -510,7 +511,18 @@ function pbpBuildSettingsSearchIndex(root = document) {
         copy.querySelectorAll("details.context-help").forEach((help) => help.remove());
         text = copy.textContent;
       }
-      add(text, target, isSectionName, weak, node.matches(".hint"));
+      // A help paragraph is found by its words but shown under the name of
+      // the setting it explains (pbpSearchSettings / render below): a result
+      // row that is a whole paragraph of prose reads as noise.
+      let owner = "";
+      if (node.matches(".hint")) {
+        const host = node.closest(".context-help-host, .fg, .pref-row, .pref-group");
+        const nameEl = host?.querySelector(".switch-text, .pick-text, label.bl, .bl, .section-title");
+        if (nameEl && !nameEl.contains(node) && !node.contains(nameEl)) {
+          owner = nameEl.textContent.replace(/\s+/g, " ").trim();
+        }
+      }
+      add(text, target, isSectionName, weak, node.matches(".hint"), owner);
     }
   }
   return entries;
@@ -526,8 +538,12 @@ function pbpSearchSettings(index, query, limit = 10) {
   const terms = normalized.split(" ").filter(Boolean);
   const hits = (Array.isArray(index) ? index : [])
     .filter((entry) => terms.every((term) => entry.searchText.includes(term)));
-  return [...hits.filter((entry) => !entry.hint), ...hits.filter((entry) => entry.hint)]
-    .slice(0, Math.max(1, Number(limit) || 10));
+  const names = hits.filter((entry) => !entry.hint);
+  // A help hit that leads to a control a name hit already leads to adds a
+  // second row for the same jump; the name row stands for both.
+  const named = new Set(names.map((entry) => `${entry.panel}\n${entry.targetId}`));
+  const hints = hits.filter((entry) => entry.hint && !(entry.targetId && named.has(`${entry.panel}\n${entry.targetId}`)));
+  return [...names, ...hints].slice(0, Math.max(1, Number(limit) || 10));
 }
 
 function setupOptionsSearch() {
@@ -569,11 +585,25 @@ function setupOptionsSearch() {
       // message to one spelling of an ellipsis, and copy this file builds
       // renders beside that copy -- H15 only scans _locales, so nothing else
       // would catch the drift. The budget keeps the same 110 total.
-      label.textContent = entry.text.length > 110 ? entry.text.slice(0, 109) + "…" : entry.text;
+      const shown = entry.owner || entry.text;
+      label.textContent = shown.length > 110 ? shown.slice(0, 109) + "…" : shown;
       const panel = document.createElement("span");
       panel.className = "options-search-result-panel";
       panel.textContent = entry.panelLabel;
-      button.append(label, panel);
+      button.append(label);
+      if (entry.owner) {
+        const snippet = document.createElement("span");
+        snippet.className = "options-search-result-snippet";
+        // Open the excerpt on the matched words: the help line is shown only
+        // because of them, and its first 80 characters rarely contain them.
+        const firstTerm = query.toLowerCase().split(/\s+/).find(Boolean) || "";
+        const at = firstTerm ? entry.text.toLowerCase().indexOf(firstTerm) : -1;
+        const from = at > 24 ? at - 20 : 0;
+        const excerpt = entry.text.slice(from);
+        snippet.textContent = (from ? "…" : "") + (excerpt.length > 80 ? excerpt.slice(0, 79) + "…" : excerpt);
+        button.append(snippet);
+      }
+      button.append(panel);
       button.addEventListener("click", () => {
         clear();
         pbpOpenOptionsTarget(entry.panel, entry.targetId);
@@ -1618,6 +1648,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       p.className = "hint";
       p.textContent = t("storageMeasureFailed");
       host.appendChild(p);
+      syncStorageClearBtn();
       return;
     }
     let total = 0;
@@ -1660,13 +1691,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     totalP.className = "hint";
     totalP.textContent = t("storageReclaimable", pbpFormatBytes(total));
     host.appendChild(totalP);
+    syncStorageClearBtn();
   }
+  // "Clear selected" with nothing selected (or nothing left to clear) used to
+  // stay live and answer with a warning after the click; say it up front.
+  function syncStorageClearBtn() {
+    const btn = $id("storage-clear-btn");
+    if (btn && !btn.dataset.busy) btn.disabled = !document.querySelector(".storage-cat-cb:checked");
+  }
+  $id("storage-cats")?.addEventListener("change", syncStorageClearBtn);
   const _storageClearBtn = $id("storage-clear-btn");
   if (_storageClearBtn) {
     _storageClearBtn.addEventListener("click", async () => {
       const cats = [...document.querySelectorAll(".storage-cat-cb:checked")].map((cb) => cb.dataset.cat);
       if (!cats.length) { showStorageStatus(t("storageNoneSelected"), "warn"); return; }
       _storageClearBtn.disabled = true;
+      _storageClearBtn.dataset.busy = "1";
       let freed = 0;
       let failed = false;
       try {
@@ -1681,8 +1721,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.warn("[storage] clear failed:", e?.name, e?.message);
         failed = true;
       }
+      delete _storageClearBtn.dataset.busy;
       await renderStoragePanel();
-      _storageClearBtn.disabled = false;
       if (failed) showStorageStatus(t("storageClearFailed"), "err");
       else showStorageStatus(t("storageCleared", pbpFormatBytes(freed)), "ok");
     });

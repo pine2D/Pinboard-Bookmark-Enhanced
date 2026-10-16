@@ -1640,7 +1640,7 @@
     "message": "Police personnalisée"
   },
   "customFontPlaceholder": {
-    "message": "ex. 'Noto Sans SC', 'Fira Code', sans-serif"
+    "message": "ex. 'Noto Sans', sans-serif"
   },
   "labelThemePresets": {
     "message": "Thèmes prédéfinis"
