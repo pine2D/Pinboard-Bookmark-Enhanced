@@ -4,7 +4,7 @@
 
 Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od AI, wbudowany czytnik z tłumaczeniem i zaznaczeniami oraz 13 motywów dla samej strony.
 
-> **Uwaga:** Wymaga konta Pinboard.in — [Pinboard](https://pinboard.in) to niezależna, **płatna** usługa zakładek. To rozszerzenie jest klientem innej firmy, który łączy się z Twoim istniejącym kontem Pinboard; potrzebny jest do tego Twój własny API Token Pinboard. Nie jest powiązane z Pinboard, sponsorowane ani autoryzowane przez Pinboard. Aby korzystać z tego rozszerzenia, musisz już mieć (lub założyć) płatne konto Pinboard.in.
+> **Uwaga:** Wymaga konta Pinboard.in — [Pinboard](https://pinboard.in) to niezależna, **płatna** usługa zakładek. To rozszerzenie jest klientem innej firmy, który łączy się z Twoim istniejącym kontem Pinboard; potrzebny jest do tego Twój własny token API Pinboard. Nie jest powiązane z Pinboard, sponsorowane ani autoryzowane przez Pinboard. Aby korzystać z tego rozszerzenia, musisz już mieć (lub założyć) płatne konto Pinboard.in.
 
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
@@ -67,7 +67,7 @@ Lub załaduj rozpakowane z ZIP-a release:
 
 Katalog źródłowy ma osobny, stały identyfikator deweloperski, dlatego podczas testów może działać obok wersji z Chrome Web Store. ZIP z release używa identyfikatora Chrome Web Store i nie może działać jednocześnie z wersją sklepową w tym samym profilu Chrome. Ustawienia będą wspólne dzięki Chrome Sync, gdy na każdym urządzeniu włączysz ich synchronizację. Przed zastąpieniem starszego release wczytanego ręcznie kliknij w jego ustawieniach **Eksportuj kopię zapasową**, a po wczytaniu nowego release użyj **Importuj kopię zapasową**.
 
-Po instalacji: kliknij ikonę paska narzędzi → wklej swój [API Token Pinboard](https://pinboard.in/settings/password) → **Zaloguj się**
+Po instalacji: kliknij ikonę paska narzędzi → wklej swój [token API Pinboard](https://pinboard.in/settings/password) → **Zaloguj się**
 
 ## Prywatność
 

@@ -3639,7 +3639,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (revision !== autoSaveRevision) {
         // This snapshot completed, but more edits are still waiting to save.
         clearAutoSaveFailureAlert();
-        setAutoSaveProgress("optSavePending");
+        setAutoSaveProgress("saving");
       } else if (result.fellBackToLocal) {
         flashAutoSave("optSavedLocally", "Saved locally (sync quota full)");
       } else {
@@ -3724,7 +3724,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     autoSaveRevision++;
     // An earlier failure's enabled Retry button must remain available during
     // the debounce; only the active save temporarily disables it.
-    if (!$id("opt-global-alert")?.dataset.autosaveFailure) setAutoSaveProgress("optSavePending");
+    if (!$id("opt-global-alert")?.dataset.autosaveFailure) setAutoSaveProgress("saving");
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveAllSafely, 500);
   }

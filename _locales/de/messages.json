@@ -1395,7 +1395,7 @@
     "message": "KI-Anbieter"
   },
   "labelApiKey": {
-    "message": "API Key"
+    "message": "API-Schlüssel"
   },
   "labelModel": {
     "message": "Modell"
@@ -1454,7 +1454,7 @@
     "message": "Zeitüberschreitung der Anfrage"
   },
   "testNoApiKey": {
-    "message": "Kein API Key"
+    "message": "Kein API-Schlüssel"
   },
   "showHideKey": {
     "message": "Key anzeigen/verbergen"
@@ -1483,8 +1483,8 @@
   "hintCustomKey": {
     "message": "Leer lassen, wenn nicht erforderlich"
   },
-  "secAiBehavior": {
-    "message": "KI-Verhalten"
+  "secAiTagsSummary": {
+    "message": "Tags und Zusammenfassungen"
   },
   "optAiAutoTags": {
     "message": "KI-Tags beim Öffnen des Popups automatisch generieren"
@@ -2091,7 +2091,7 @@
     "message": "Jina Reader"
   },
   "jinaApiKeyLabel": {
-    "message": "API Key (optional)"
+    "message": "API-Schlüssel (optional)"
   },
   "jinaApiKeyPlaceholder": {
     "message": "jina_xxxx (für kostenloses Kontingent leer lassen)"
@@ -4170,7 +4170,6 @@
   "popupDraftDiscardFailed": {
     "message": "Der Entwurf konnte nicht verworfen werden. Versuche es erneut."
   },
-  "optSavePending": { "message": "Änderungen noch nicht gespeichert" },
   "optRetrySave": { "message": "Speichern erneut versuchen" },
   "trRateLimitWaiting": {"message": "Anfragelimit erreicht. Neuer Versuch in $SECONDS$ s…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "Gestoppt. $DONE$ / $TOTAL$ Abschnitte behalten.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},

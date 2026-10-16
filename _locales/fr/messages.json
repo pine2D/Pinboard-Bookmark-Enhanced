@@ -1483,8 +1483,8 @@
   "hintCustomKey": {
     "message": "Laisser vide si non requis"
   },
-  "secAiBehavior": {
-    "message": "Comportement IA"
+  "secAiTagsSummary": {
+    "message": "Tags et résumés"
   },
   "optAiAutoTags": {
     "message": "Générer automatiquement des tags IA à l'ouverture du popup"
@@ -3376,10 +3376,10 @@
       "message": "L'autorisation Google est temporairement indisponible."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Aucun compte Pinboard connecté. Saisissez votre API Token dans « Compte → Compte Pinboard », puis reconnectez-vous."
+      "message": "Aucun compte Pinboard connecté. Saisissez votre jeton API dans « Compte → Compte Pinboard », puis reconnectez-vous."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Aucun compte Pinboard connecté. Saisissez votre API Token dans « Compte → Compte Pinboard », puis cliquez sur « Synchroniser maintenant »."
+      "message": "Aucun compte Pinboard connecté. Saisissez votre jeton API dans « Compte → Compte Pinboard », puis cliquez sur « Synchroniser maintenant »."
     },
     "vocabDriveErrorPermission": {
       "message": "L'autorisation d'accès à Google Drive est manquante."
@@ -4170,7 +4170,6 @@
   "popupDraftDiscardFailed": {
     "message": "Impossible de supprimer le brouillon. Réessayez."
   },
-  "optSavePending": { "message": "Modifications non enregistrées" },
   "optRetrySave": { "message": "Réessayer d’enregistrer" },
   "trRateLimitWaiting": {"message": "Limite atteinte. Nouvel essai dans $SECONDS$ s…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "Arrêté. $DONE$ / $TOTAL$ segments conservés.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},

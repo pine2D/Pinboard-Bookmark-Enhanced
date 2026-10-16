@@ -123,7 +123,7 @@
     "message": "クリア"
   },
   "loginPrompt": {
-    "message": "API Token を入力してください。取得先："
+    "message": "API トークンを入力してください。取得先："
   },
   "loginTokenPlaceholder": {
     "message": "ユーザー名:XXXXXXXXXXXXXX"
@@ -132,10 +132,10 @@
     "message": "形式が正しくありません。ユーザー名:TOKEN の形式で入力してください"
   },
   "loginSaveFailed": {
-    "message": "API Token は有効ですが、保存できませんでした。ブラウザーのストレージに空きがあるか確認して、もう一度お試しください。"
+    "message": "API トークンは有効ですが、保存できませんでした。ブラウザーのストレージに空きがあるか確認して、もう一度お試しください。"
   },
   "loginFailed": {
-    "message": "認証に失敗しました。API Token を確認してください。"
+    "message": "認証に失敗しました。API トークンを確認してください。"
   },
   "settingsPassword": {
     "message": "pinboard.in/settings/password"
@@ -201,7 +201,7 @@
     "message": "このブックマークを削除しますか？"
   },
   "confirmLogout": {
-    "message": "ログアウトしますか？API Token が削除されます。"
+    "message": "ログアウトしますか？API トークンが削除されます。"
   },
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
@@ -384,7 +384,7 @@
     }
   },
   "pinboardErrorAuth": {
-    "message": "認証に失敗しました。APIトークンを確認してください"
+    "message": "認証に失敗しました。API トークンを確認してください"
   },
   "pinboardApiError": {
     "message": "Pinboard がエラーを返しました：$DETAIL$",
@@ -444,7 +444,7 @@
     "message": "このウィンドウには保存できるウェブページがありません"
   },
   "batchNotLoggedIn": {
-    "message": "ログインしていません。設定で API Token を入力してください。"
+    "message": "ログインしていません。設定で API トークンを入力してください。"
   },
   "batchSent": {
     "message": "送信しました！"
@@ -663,7 +663,7 @@
     "message": "Pinboard：未ログイン"
   },
   "bgSetToken": {
-    "message": "拡張機能の設定で API Token を設定してください。"
+    "message": "拡張機能の設定で API トークンを設定してください。"
   },
   "bgUndone": {
     "message": "Pinboard：取り消しました"
@@ -992,7 +992,7 @@
     "message": "Pinboard アカウント"
   },
   "labelApiToken": {
-    "message": "API Token"
+    "message": "API トークン"
   },
   "hintApiToken": {
     "message": "トークンの取得先："
@@ -1121,7 +1121,7 @@
     "message": "バックアップに API キーとトークンを含める"
   },
   "backupIncludeSecretsHint": {
-    "message": "すべての認証情報が平文でファイルに書き込まれます。Pinboard の API Token、各 AI プロバイダーの API キー、Jina、Wayback、Anki、Eudic、Notion、Gist、Webhook の認証情報が対象です。ファイルを開いた人は誰でもそのまま使用できます。パスワードと同じ扱いで保管してください。"
+    "message": "すべての認証情報が平文でファイルに書き込まれます。Pinboard の API トークン、各 AI プロバイダーの API キー、Jina、Wayback、Anki、Eudic、Notion、Gist、Webhook の認証情報が対象です。ファイルを開いた人は誰でもそのまま使用できます。パスワードと同じ扱いで保管してください。"
   },
   "backupSecretsExportConfirm": {
     "message": "このバックアップには API キーとトークンが平文で保存されます。信頼できない経路で送信せず、復元が終わったらすぐに削除してください。"
@@ -1395,7 +1395,7 @@
     "message": "AI プロバイダー"
   },
   "labelApiKey": {
-    "message": "API Key"
+    "message": "API キー"
   },
   "labelModel": {
     "message": "モデル"
@@ -1454,7 +1454,7 @@
     "message": "リクエストがタイムアウトしました"
   },
   "testNoApiKey": {
-    "message": "API Key が未入力です"
+    "message": "API キーが未入力です"
   },
   "showHideKey": {
     "message": "キーの表示/非表示"
@@ -1483,8 +1483,8 @@
   "hintCustomKey": {
     "message": "不要な場合は空欄のままにしてください"
   },
-  "secAiBehavior": {
-    "message": "AI の動作"
+  "secAiTagsSummary": {
+    "message": "タグと要約"
   },
   "optAiAutoTags": {
     "message": "ポップアップを開いたときに AI タグを自動生成"
@@ -2091,7 +2091,7 @@
     "message": "Jina Reader"
   },
   "jinaApiKeyLabel": {
-    "message": "APIキー（任意）"
+    "message": "API キー（任意）"
   },
   "jinaApiKeyPlaceholder": {
     "message": "jina_xxxx（空欄で無料枠を使用）"
@@ -2608,13 +2608,13 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "タグを読み込めませんでした。API Token またはネットワークを確認してから、「更新」をクリックしてください。"
+    "message": "タグを読み込めませんでした。API トークンまたはネットワークを確認してから、「更新」をクリックしてください。"
   },
   "tagGovNeedToken": {
-    "message": "タグを読み込むには、まず「アカウント」で Pinboard の API Token を入力してください。"
+    "message": "タグを読み込むには、まず「アカウント」で Pinboard の API トークンを入力してください。"
   },
   "tagGovEnterToken": {
-    "message": "API Token を入力"
+    "message": "API トークンを入力"
   },
   "tagGovSnapshotSaved": {
     "message": "タグ一覧のスナップショットをダウンロードしました（名前と件数のみ。手動修復の参考用で、自動復元はできません）"
@@ -3376,10 +3376,10 @@
       "message": "Google の認可を一時的に取得できません。"
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Pinboard にログインしていません。「アカウント → Pinboard アカウント」で API Token を入力してから、接続し直してください。"
+      "message": "Pinboard にログインしていません。「アカウント → Pinboard アカウント」で API トークンを入力してから、接続し直してください。"
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Pinboard にログインしていません。「アカウント → Pinboard アカウント」で API Token を入力してから、「今すぐ同期」をクリックしてください。"
+      "message": "Pinboard にログインしていません。「アカウント → Pinboard アカウント」で API トークンを入力してから、「今すぐ同期」をクリックしてください。"
     },
     "vocabDriveErrorPermission": {
       "message": "Google Drive の権限がありません。"
@@ -4170,7 +4170,6 @@
   "popupDraftDiscardFailed": {
     "message": "下書きを破棄できませんでした。もう一度お試しください。"
   },
-  "optSavePending": { "message": "変更は未保存です" },
   "optRetrySave": { "message": "保存を再試行" },
   "trRateLimitWaiting": {"message": "レート制限中。$SECONDS$ 秒後に再試行…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "停止しました。$DONE$ / $TOTAL$ 段落を保持。", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},

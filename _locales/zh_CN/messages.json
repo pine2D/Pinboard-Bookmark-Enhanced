@@ -1483,8 +1483,8 @@
   "hintCustomKey": {
     "message": "无需 API Key 时留空"
   },
-  "secAiBehavior": {
-    "message": "AI 行为"
+  "secAiTagsSummary": {
+    "message": "标签与摘要"
   },
   "optAiAutoTags": {
     "message": "打开弹窗时自动生成 AI 标签"
@@ -4164,7 +4164,6 @@
   "popupDraftDiscardFailed": {
     "message": "无法丢弃草稿，请重试。"
   },
-  "optSavePending": { "message": "更改尚未保存" },
   "optRetrySave": { "message": "重试保存" },
   "trRateLimitWaiting": {"message": "触发限流，$SECONDS$ 秒后重试…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "已停止，保留 $DONE$ / $TOTAL$ 段译文。", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},

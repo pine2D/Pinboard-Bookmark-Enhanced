@@ -2281,7 +2281,7 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
       const e = document.getElementById("notify-batch-save"); e.checked = !e.checked; e.dispatchEvent(new Event("change", {bubbles:true}));
       window.qaReleaseSave();
     });
-    await page.waitForFunction(() => document.getElementById("auto-save-status").textContent === t("optSavePending"));
+    await page.waitForFunction(() => document.getElementById("auto-save-status").textContent === t("saving"));
     await page.waitForFunction(() => document.getElementById("auto-save-status").classList.contains("saved"));
     await page.waitForFunction(() => document.getElementById("auto-save-status").textContent === t("optAutoSave") && !document.getElementById("auto-save-status").classList.contains("saved"));
     if (!await page.evaluate(async () => {

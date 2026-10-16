@@ -1489,8 +1489,8 @@
   "hintCustomKey": {
     "message": "Leave empty if not required"
   },
-  "secAiBehavior": {
-    "message": "AI Behavior"
+  "secAiTagsSummary": {
+    "message": "Tags and Summaries"
   },
   "optAiAutoTags": {
     "message": "Auto-generate AI tags on popup open"
@@ -4177,7 +4177,6 @@
   "popupDraftDiscardFailed": {
     "message": "Couldn't discard the draft. Try again."
   },
-  "optSavePending": { "message": "Unsaved changes" },
   "optRetrySave": { "message": "Retry saving" },
   "trRateLimitWaiting": {"message": "Rate limited; retrying in $SECONDS$s…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "Stopped. $DONE$ / $TOTAL$ segments retained.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},

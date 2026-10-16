@@ -4,7 +4,7 @@
 
 [Pinboard](https://pinboard.in) のための Chrome 拡張機能。AI タグと要約、翻訳・ハイライト付きの内蔵リーダー、pinboard.in 用テーマ 13 種を備えています。
 
-> **注意:** Pinboard.in アカウントが必要です。[Pinboard](https://pinboard.in)（pinboard.in）は独立した**有料**のブックマークサービスです。本拡張機能は、ご自身の Pinboard API Token を使って既存の Pinboard アカウントに接続するサードパーティ製クライアントであり、Pinboard との提携・出資・公式の承認は一切ありません。本拡張機能を利用するには、有料の Pinboard.in アカウントを既にお持ちであるか、新たに登録する必要があります。
+> **注意:** Pinboard.in アカウントが必要です。[Pinboard](https://pinboard.in)（pinboard.in）は独立した**有料**のブックマークサービスです。本拡張機能は、ご自身の Pinboard API トークンを使って既存の Pinboard アカウントに接続するサードパーティ製クライアントであり、Pinboard との提携・出資・公式の承認は一切ありません。本拡張機能を利用するには、有料の Pinboard.in アカウントを既にお持ちであるか、新たに登録する必要があります。
 
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
@@ -67,7 +67,7 @@
 
 ソースディレクトリには、固定された開発用 ID が設定されています。そのため、テスト時には Chrome ウェブストア版と同じプロフィールで併用できます。リリース ZIP は Chrome ウェブストア版と同じ ID を使用するため、両方を同じプロフィールにはインストールできません。各デバイスで設定の同期を有効にすると、Chrome Sync で設定を共有できます。以前のリリース ZIP から移行する場合は、先に旧バージョンの設定ページで **バックアップをエクスポート** をクリックし、新しいリリースを読み込んだら **バックアップをインポート** を使ってください。
 
-インストール後: ツールバーのアイコンをクリック → [Pinboard API Token](https://pinboard.in/settings/password) を貼り付け → **ログイン**
+インストール後: ツールバーのアイコンをクリック → [Pinboard API トークン](https://pinboard.in/settings/password) を貼り付け → **ログイン**
 
 ## プライバシー
 

@@ -1483,8 +1483,8 @@
   "hintCustomKey": {
     "message": "無需 API Key 時留空"
   },
-  "secAiBehavior": {
-    "message": "AI 行為"
+  "secAiTagsSummary": {
+    "message": "標籤與摘要"
   },
   "optAiAutoTags": {
     "message": "開啟彈出視窗時自動產生 AI 標籤"
@@ -4170,7 +4170,6 @@
   "popupDraftDiscardFailed": {
     "message": "無法捨棄草稿，請重試。"
   },
-  "optSavePending": { "message": "變更尚未儲存" },
   "optRetrySave": { "message": "重新儲存" },
   "trRateLimitWaiting": {"message": "觸發限流，$SECONDS$ 秒後重試…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "已停止，保留 $DONE$ / $TOTAL$ 段譯文。", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},

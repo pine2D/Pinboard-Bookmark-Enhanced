@@ -123,7 +123,7 @@
     "message": "Wyczyść"
   },
   "loginPrompt": {
-    "message": "Wprowadź swój API Token z"
+    "message": "Wprowadź swój token API z"
   },
   "loginTokenPlaceholder": {
     "message": "nazwa_użytkownika:XXXXXXXXXXXXXX"
@@ -132,10 +132,10 @@
     "message": "Nieprawidłowy format. Użyj nazwa_użytkownika:TOKEN"
   },
   "loginSaveFailed": {
-    "message": "API Token jest prawidłowy, ale nie udało się go zapisać. Sprawdź, czy przeglądarka ma wolne miejsce, i spróbuj ponownie."
+    "message": "Token API jest prawidłowy, ale nie udało się go zapisać. Sprawdź, czy przeglądarka ma wolne miejsce, i spróbuj ponownie."
   },
   "loginFailed": {
-    "message": "Uwierzytelnianie nie powiodło się. Sprawdź API Token."
+    "message": "Uwierzytelnianie nie powiodło się. Sprawdź token API."
   },
   "settingsPassword": {
     "message": "pinboard.in/settings/password"
@@ -201,7 +201,7 @@
     "message": "Usunąć tę zakładkę?"
   },
   "confirmLogout": {
-    "message": "Wylogować? Twój API Token zostanie usunięty."
+    "message": "Wylogować? Twój token API zostanie usunięty."
   },
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
@@ -384,7 +384,7 @@
     }
   },
   "pinboardErrorAuth": {
-    "message": "Błąd uwierzytelniania, sprawdź API Token"
+    "message": "Błąd uwierzytelniania, sprawdź token API"
   },
   "pinboardApiError": {
     "message": "Pinboard zwrócił błąd: $DETAIL$",
@@ -444,7 +444,7 @@
     "message": "W tym oknie nie ma stron internetowych do zapisania"
   },
   "batchNotLoggedIn": {
-    "message": "Nie zalogowano. Wpisz API Token w ustawieniach."
+    "message": "Nie zalogowano. Wpisz token API w ustawieniach."
   },
   "batchSent": {
     "message": "Wysłano!"
@@ -663,7 +663,7 @@
     "message": "Pinboard: Nie zalogowano"
   },
   "bgSetToken": {
-    "message": "Ustaw swój API Token w ustawieniach rozszerzenia."
+    "message": "Ustaw swój token API w ustawieniach rozszerzenia."
   },
   "bgUndone": {
     "message": "Pinboard: Cofnięto"
@@ -992,7 +992,7 @@
     "message": "Konto Pinboard"
   },
   "labelApiToken": {
-    "message": "API Token"
+    "message": "Token API"
   },
   "hintApiToken": {
     "message": "Token znajdziesz pod adresem"
@@ -1121,7 +1121,7 @@
     "message": "Uwzględniaj klucze API i tokeny w kopiach zapasowych"
   },
   "backupIncludeSecretsHint": {
-    "message": "Zapisuje wszystkie poświadczenia w pliku jawnym tekstem: API Token Pinboard, klucze API wszystkich dostawców AI oraz poświadczenia Jina, Wayback, Anki, Eudic, Notion, Gist i Webhook. Każdy, kto otworzy plik, może ich użyć. Przechowuj go tak jak hasło."
+    "message": "Zapisuje wszystkie poświadczenia w pliku jawnym tekstem: token API Pinboard, klucze API wszystkich dostawców AI oraz poświadczenia Jina, Wayback, Anki, Eudic, Notion, Gist i Webhook. Każdy, kto otworzy plik, może ich użyć. Przechowuj go tak jak hasło."
   },
   "backupSecretsExportConfirm": {
     "message": "Ta kopia zapasowa będzie zawierać klucze API i tokeny jawnym tekstem. Nie wysyłaj jej kanałami, którym nie ufasz, i usuń ją po zakończeniu przywracania."
@@ -1395,7 +1395,7 @@
     "message": "Dostawca AI"
   },
   "labelApiKey": {
-    "message": "API Key"
+    "message": "Klucz API"
   },
   "labelModel": {
     "message": "Model"
@@ -1483,8 +1483,8 @@
   "hintCustomKey": {
     "message": "Pozostaw puste, jeśli nie jest wymagane"
   },
-  "secAiBehavior": {
-    "message": "Zachowanie AI"
+  "secAiTagsSummary": {
+    "message": "Tagi i podsumowania"
   },
   "optAiAutoTags": {
     "message": "Automatycznie generuj tagi AI po otwarciu okienka"
@@ -2608,13 +2608,13 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "Nie udało się wczytać tagów. Sprawdź API Token lub połączenie sieciowe, a potem kliknij „Odśwież”."
+    "message": "Nie udało się wczytać tagów. Sprawdź token API lub połączenie sieciowe, a potem kliknij „Odśwież”."
   },
   "tagGovNeedToken": {
-    "message": "Wpisz Pinboard API Token w sekcji „Konto”, aby wczytać tu swoje tagi."
+    "message": "Wpisz token API Pinboard w sekcji „Konto”, aby wczytać tu swoje tagi."
   },
   "tagGovEnterToken": {
-    "message": "Wpisz API Token"
+    "message": "Wpisz token API"
   },
   "tagGovSnapshotSaved": {
     "message": "Pobrano migawkę listy tagów (tylko nazwy i liczby — pomoc przy ręcznej naprawie, bez automatycznego przywracania)"
@@ -3376,10 +3376,10 @@
       "message": "Autoryzacja Google jest chwilowo niedostępna."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Nie zalogowano konta Pinboard. Wpisz API Token w „Konto → Konto Pinboard”, a potem połącz ponownie."
+      "message": "Nie zalogowano konta Pinboard. Wpisz token API w „Konto → Konto Pinboard”, a potem połącz ponownie."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Nie zalogowano konta Pinboard. Wpisz API Token w „Konto → Konto Pinboard”, a potem kliknij „Synchronizuj teraz”."
+      "message": "Nie zalogowano konta Pinboard. Wpisz token API w „Konto → Konto Pinboard”, a potem kliknij „Synchronizuj teraz”."
     },
     "vocabDriveErrorPermission": {
       "message": "Brakuje uprawnienia do Dysku Google."
@@ -4170,7 +4170,6 @@
   "popupDraftDiscardFailed": {
     "message": "Nie udało się odrzucić szkicu. Spróbuj ponownie."
   },
-  "optSavePending": { "message": "Niezapisane zmiany" },
   "optRetrySave": { "message": "Ponów zapis" },
   "trRateLimitWaiting": {"message": "Limit zapytań. Ponowna próba za $SECONDS$ s…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "Zatrzymano. Zachowano $DONE$ / $TOTAL$ fragmentów.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
