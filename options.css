@@ -2124,10 +2124,14 @@ html.motion-ready #preset-preview-section > summary::after {
    recipe, same call as `.theme-preset-btn` -- both rest on `border: none`. */
 .theme-preset-btn:focus-visible,
 .saved-theme-btn:focus-visible { outline: 1px solid var(--opt-accent); outline-offset: 2px; box-shadow: var(--opt-focus-ring); }
+/* Text in --opt-fg, not --opt-chip-fg (2026-10-15): the ring is the one
+   accent on a selected pill. chip-fg is a tag-chip ink and on Flexoki dark
+   (the default dark mode) it is amber, so the selected pill wore amber text
+   inside a blue ring. fg on chip-bg clears 4.6:1 or more on every preset. */
 .theme-preset-btn.active,
 .saved-theme-btn.active {
   background: var(--opt-chip-bg);
-  color: var(--opt-chip-fg);
+  color: var(--opt-fg);
   font-weight: 600;
   outline: 2px solid var(--opt-accent);
   outline-offset: 2px; /* ring sits outside the border box -- never touches the label */
@@ -2464,7 +2468,7 @@ html[data-theme="dracula"] {
   --opt-tab: #21222c;
   --opt-tab-active: #282a36;
   --opt-fg: #f8f8f2;
-  --opt-fg-muted: #bd93f9;
+  --opt-fg-muted: #aeb6cf;
   --opt-fg-hint: #8995ba;
   --opt-accent: #8be9fd;
   --opt-save: #50fa7b;
@@ -2484,7 +2488,7 @@ html[data-theme="dracula"] {
   --opt-btn-border: #343746;
   --opt-focus-bd: #6ba0b4;
   --opt-btn-fg: #f8f8f2;
-  --opt-btn-fg-muted: #c9a6fa;
+  --opt-btn-fg-muted: #aeb6cf;
   --opt-danger-quiet-fg: #ff8888;
   --opt-on-danger: #282a36;
   --opt-chip-bg: #2e3b47;

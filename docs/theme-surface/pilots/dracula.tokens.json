@@ -105,6 +105,7 @@
     "options": {
       "dark": {
         "input-border": "#6272a4",
+        "fg-muted": "#aeb6cf",
         "btn-bg": "#343746",
         "btn-hover": "#424450",
         "danger": "#ff5555",
