@@ -500,7 +500,6 @@ async function loadLocale(loc) {
   const SPLIT_KEYS = [
     ["libraryStatsWords", ["16"]],
     ["libraryStatsGroups", ["2"]],
-    ["libraryStatsLanguages", ["4"]],
     ["libraryStatsLearning", ["13"]],
     ["libraryStatsKnown", ["3"]],
     ["vocabSelectedCount", ["7"]],
@@ -514,7 +513,6 @@ async function loadLocale(loc) {
     // T8g: the singular twins and the count phrases the sentences now take.
     ["libraryStatsWordsOne", ["1"]],
     ["libraryStatsGroupsOne", ["1"]],
-    ["libraryStatsLanguagesOne", ["1"]],
     ["libraryStatsHighlightsOne", ["1"]],
     ["libraryStatsPagesOne", ["1"]],
     ["libraryStatsWordsFilteredOne", ["0", "1"]],
@@ -564,7 +562,9 @@ async function loadLocale(loc) {
     }
   }
   check("T8g every <key>One is a singular twin: its base exists, same placeholders, and the six locales without singular nouns repeat the base text",
-    ONE_KEYS.length >= 20 && twinBroken.length === 0, `${ONE_KEYS.length} twins; ` + twinBroken.slice(0, 4).join("; "));
+    // Floor = the twins shipped today (libraryStatsLanguagesOne retired with
+    // the count row's language item, 2026-10-16): fewer means some vanished.
+    ONE_KEYS.length >= 19 && twinBroken.length === 0, `${ONE_KEYS.length} twins; ` + twinBroken.slice(0, 4).join("; "));
   // ...and in the three locales that do inflect, a twin that repeats its base
   // is a singular nobody wrote. The few that legitimately match:
   const TWIN_SAME_OK = {

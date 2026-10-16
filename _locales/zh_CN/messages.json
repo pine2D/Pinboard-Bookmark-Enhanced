@@ -3979,8 +3979,6 @@
   "libraryStatsKnown": { "message": "已掌握 $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "$COUNT$ 个分组", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroupsOne": { "message": "$COUNT$ 个分组", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguages": { "message": "$COUNT$ 种语言", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguagesOne": { "message": "$COUNT$ 种语言", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "近 7 天新增 $D7$ · 近 30 天新增 $D30$", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ 条高亮", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsOne": { "message": "$COUNT$ 条高亮", "placeholders": { "count": { "content": "$1" } } },

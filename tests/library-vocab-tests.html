@@ -413,6 +413,35 @@ check("a row keeps language and status as plain text on line one and its groups 
   plainRow.querySelectorAll(".vocab-row-headline .notes-row-meta > span").length === 2 &&
   [...plainRow.querySelectorAll(".notes-card-main > .vocab-row-groups > span")].map((s) => s.textContent).join("|") === "Reading|Close",
   plainRow.innerHTML.slice(0, 300));
+// The book's common language (more than half of the words) leaves its label
+// to screen readers; a minority language still shows, and a search never
+// changes which rows do (the share is read from every saved word).
+{
+  const langRows = [
+    { id: "cl1", term: "one", language: "en", groups: [], contexts: [], updatedAt: 4 },
+    { id: "cl2", term: "two", language: "en", groups: [], contexts: [], updatedAt: 3 },
+    { id: "cl3", term: "drei", language: "de", groups: [], contexts: [], updatedAt: 2 },
+    { id: "cl4", term: "four", language: "en", groups: [], contexts: [], updatedAt: 1 },
+  ];
+  const langOf = (id) => $id("vocab-list").querySelector(`.vocab-card[data-vocab-id="${id}"] .notes-row-meta > span`);
+  _vocabRows = langRows;
+  $id("vocab-search").value = "";
+  _pbpVocabApplyView(true);
+  check("the common language's label is for screen readers only; a minority language still shows",
+    langOf("cl1")?.className === "sr-only" && langOf("cl1")?.textContent !== "" &&
+    langOf("cl3")?.className === "notes-meta-chip");
+  $id("vocab-search").value = "drei";
+  _pbpVocabApplyView(true);
+  check("filtering down to the minority word keeps its label visible", langOf("cl3")?.className === "notes-meta-chip");
+  $id("vocab-search").value = "";
+  _vocabRows = [langRows[0], langRows[2]];
+  _pbpVocabApplyView(true);
+  check("a half-and-half book has no common language: both labels show",
+    _vocabCommonLanguage === "" && langOf("cl1")?.className === "notes-meta-chip" && langOf("cl3")?.className === "notes-meta-chip");
+  _vocabRows = [langRows[2], { id: "cl5", term: "fünf", language: "fr", groups: [], contexts: [], updatedAt: 0 }, { id: "cl6", term: "six", language: "ja", groups: [], contexts: [], updatedAt: 0 }];
+  _pbpVocabApplyView(true);
+  check("with no language holding half the book every label shows", _vocabCommonLanguage === "" && langOf("cl3")?.className === "notes-meta-chip");
+}
 // Row pitch and hit coverage (spec §3.6): 56 comfortable / 44 compact, and the
 // row button owns every pixel of its card plus half of the 2px gap to each
 // neighbour -- a pointer anywhere between the first row's top and the last
@@ -478,8 +507,8 @@ check("status toggles appear once rows exist, with All pressed",
   ["vocab-stat-all", "vocab-stat-learning", "vocab-stat-known"].every((id) => $id(id).hidden === false) &&
   $id("vocab-stat-all").getAttribute("aria-pressed") === "true" &&
   $id("vocab-stat-learning").getAttribute("aria-pressed") === "false");
-check("the count row lists words, groups, languages and the 7-day gain as separate items",
-  countItems() === "libraryStatsWords:3|libraryStatsGroupsOne:1|libraryStatsLanguages:2|libraryStatsRecent7:1", countItems());
+check("the count row lists words, groups and the 7-day gain as separate items (languages live in the cover's sentence)",
+  countItems() === "libraryStatsWords:3|libraryStatsGroupsOne:1|libraryStatsRecent7:1", countItems());
 check("the learning and known toggles keep their number in a .lib-toggle-count span",
   $id("vocab-stat-learning").textContent === "libraryStatsLearning:1" &&
   $id("vocab-stat-learning").querySelector(".lib-toggle-count")?.textContent === "1" &&
@@ -2844,8 +2873,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         <div class="listbox"><button type="button" class="listbox-trigger btn ghost" data-label="sort"><span class="btn-ic"><svg width="14" height="14" viewBox="0 0 24 24"></svg></span><span></span></button></div>
         <button type="button" class="btn btn-sm vocab-lookup-narrow"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button>
       </div>
-      <div class="vocab-context-bar lib-count-row"><span class="vocab-ctx-text"><span class="notes-count"><span class="lib-count-items" aria-hidden="true"><span class="lib-count-item" data-label="ci-0"></span><span class="lib-count-item" data-label="ci-1"></span><span class="lib-count-item" data-label="ci-2"></span><span class="lib-count-item" data-label="ci-3"></span></span></span></span><span class="save-status vocab-main-status">Saved just now</span><div class="lib-cluster"><button class="btn btn-sm ghost lib-hang-end" data-label="all"></button></div></div>
-      <div class="vocab-batch-bar selecting"><span class="notes-count" id="vocab-selected-count" data-label="selected-count">5000</span><button class="btn btn-sm ghost" id="vocab-batch-select-all" data-label="batch-all"></button><span class="lib-cluster"><button class="btn btn-sm ghost" data-label="invert"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm ghost vocab-clear-selection"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><button class="btn btn-sm danger ghost" id="vocab-batch-delete" data-label="batch-delete"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><span class="vocab-group-unit"><input type="text"><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><button class="btn btn-sm" id="vocab-mark-known" data-label="known"></button><button class="btn btn-sm" id="vocab-mark-learning" data-label="learning"></button><span class="lib-batch-status"></span></div>
+      <div class="vocab-context-bar lib-count-row"><span class="vocab-ctx-text"><span class="notes-count" id="vocab-count"><span class="lib-count-items" aria-hidden="true"><span class="lib-count-item" data-label="ci-0"></span><span class="lib-count-item" data-label="ci-1"></span><span class="lib-count-item" data-label="ci-2"></span></span></span></span><div class="lib-cluster"><button type="button" class="btn btn-sm ghost" id="vocab-export-open" data-label="export"><span class="btn-ic"><svg width="16" height="16" viewBox="0 0 24 24"></svg></span><span></span></button><button class="btn btn-sm ghost lib-hang-end" data-label="all"></button></div></div>
+      <div class="vocab-batch-bar selecting"><span class="notes-count" id="vocab-selected-count" data-label="selected-count">5000</span><button class="btn btn-sm ghost" id="vocab-batch-select-all" data-label="batch-all"></button><span class="lib-cluster"><button class="btn btn-sm ghost" data-label="invert"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm ghost vocab-clear-selection"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><button class="btn btn-sm danger ghost" id="vocab-batch-delete" data-label="batch-delete"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><span class="vocab-group-unit"><input type="text"><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button><button class="btn btn-sm vocab-group-step"><svg width="14" height="14" viewBox="0 0 24 24"></svg></button></span><button class="btn btn-sm" id="vocab-mark-known" data-label="known"></button><button class="btn btn-sm" id="vocab-mark-learning" data-label="learning"></button><span class="lib-batch-status"></span></div><span class="save-status vocab-main-status">Saved just now</span>
       <div class="vocab-list-region">
       <article class="notes-card vocab-card"><div class="notes-card-top"><button class="notes-card-head"><span class="notes-card-main"><span class="vocab-row-headline"><span class="notes-row-title">Wortzusammensetzung mit außergewöhnlich langem ausgewähltem Begriff</span><span class="notes-row-meta"><span class="notes-meta-chip" data-label="row-lang"></span><span class="notes-meta-chip vocab-status-chip" data-label="row-known"></span></span></span><span class="vocab-row-gloss">Außergewöhnlich lange Definition, die auf einer Zeile bleiben muss</span><span class="vocab-row-groups" data-label="row-groups"><span>Außergewöhnlich lange Gruppe für Fachbegriffe</span><span>Wiederholung vor der Prüfung</span></span></span></button></div></article>
       </div>
@@ -2907,8 +2936,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         panel.querySelector('[data-label="stat-known"]').textContent = m.libraryStatsKnown.message.replace("$COUNT$", "2500");
         panel.querySelector('[data-label="ci-0"]').textContent = m.libraryStatsWords.message.replace("$COUNT$", "5000");
         panel.querySelector('[data-label="ci-1"]').textContent = m.libraryStatsGroups.message.replace("$COUNT$", "42");
-        panel.querySelector('[data-label="ci-2"]').textContent = m.libraryStatsLanguages.message.replace("$COUNT$", "9");
-        panel.querySelector('[data-label="ci-3"]').textContent = m.libraryStatsRecent7.message.replace("$D7$", "120");
+        panel.querySelector('[data-label="ci-2"]').textContent = m.libraryStatsRecent7.message.replace("$D7$", "120");
+        panel.querySelector('[data-label="export"]').lastElementChild.textContent = m.libraryExportMenu.message;
         const bcp47 = { en: "en", de: "de", fr: "fr", pl: "pl", ru: "ru", zh_HK: "zh-Hant", zh_CN: "zh-Hans", zh_TW: "zh-Hant", ja: "ja" }[locale] || "en";
         // The row's line one / line two as library-vocab.js builds them
         // (T4d): language + "known" as plain text, groups at line two's end.
@@ -2933,7 +2962,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         if (width === 320 && theme === "github-light" && locale === "de") {
           const box = panel.querySelector(".lib-count-items").getBoundingClientRect();
           const items = [...panel.querySelectorAll(".lib-count-item")];
-          germanCountWhole = items.length === 4 && items[0].getBoundingClientRect().top < box.bottom - 0.5 &&
+          germanCountWhole = items.length === 3 && items[0].getBoundingClientRect().top < box.bottom - 0.5 &&
             items.every((it) => {
               const r = it.getBoundingClientRect();
               return (r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5 && r.right <= box.right + 0.5) || r.top >= box.bottom - 0.5;
@@ -3296,7 +3325,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       const one = [word("t8g-a", "alpha", "new", "en", ["G1"], TS)];
       show(one);
       check("T8g stub: one word, one group, one language take the One keys on the row and in the sentence",
-        items().slice(0, 3).join("|") === "libraryStatsWordsOne:1|libraryStatsGroupsOne:1|libraryStatsLanguagesOne:1" &&
+        items().slice(0, 2).join("|") === "libraryStatsWordsOne:1|libraryStatsGroupsOne:1" && items().length === 3 &&
         sr().startsWith("vocabResultCount:vocabResultFoundOne:1,vocabResultSavedOne:1,t8g"),
         items().join("|") + " | " + sr());
       check("T8g stub: the cover takes the singular word and language phrases, four numbers bold",
@@ -3359,7 +3388,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       show(one);
       const day = pbpLibFormatDay(TS);
       check("T8g en: one word reads word / group / language on the row and in the full sentence",
-        items().slice(0, 3).join("|") === "1 word|1 group|1 language" &&
+        items().slice(0, 2).join("|") === "1 word|1 group" &&
         sr().startsWith("1 found · 1 saved for current Pinboard account: t8g"),
         items().join("|") + " | " + sr());
       check("T8g en: the cover reads 1 word ... in 1 language, the four counts bold and the date plain",
@@ -3370,7 +3399,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       const many = [word("t8g-a", "alpha", "new", "en", ["G1"], TS), word("t8g-b", "beta", "known", "de", ["G2"], TS - 1000)];
       show(many);
       check("T8g en: two words keep the plural everywhere, word for word as before",
-        items().slice(0, 3).join("|") === "2 words|2 groups|2 languages" &&
+        items().slice(0, 2).join("|") === "2 words|2 groups" &&
         sr().startsWith("2 found · 2 saved for current Pinboard account: t8g") &&
         lead.textContent === `2 words, 1 learning and 1 known, in 2 languages. Last added on ${day}.` && bold() === "2,1,1,2",
         items().join("|") + " | " + sr() + " | " + lead.textContent);
@@ -3378,7 +3407,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       useLang("de");
       show(one);
       check("T8g de: one word reads Wort / Gruppe / Sprache, and in 1 Sprache on the cover",
-        items().slice(0, 3).join("|") === "1 Wort|1 Gruppe|1 Sprache" &&
+        items().slice(0, 2).join("|") === "1 Wort|1 Gruppe" &&
         lead.textContent === `1 Wort, davon 1 im Lernen und 0 gelernt, in 1 Sprache. Zuletzt hinzugefügt am ${pbpLibFormatDay(TS)}.` &&
         bold() === "1,1,0,1",
         items().join("|") + " | " + lead.textContent);
@@ -3386,7 +3415,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       useLang("fr");
       show(one);
       check("T8g fr: one word reads mot / groupe / langue, and 1 résultat, 1 mot enregistré",
-        items().slice(0, 3).join("|") === "1 mot|1 groupe|1 langue" &&
+        items().slice(0, 2).join("|") === "1 mot|1 groupe" &&
         sr().startsWith("Compte Pinboard actuel (t8g) : 1 résultat · 1 mot enregistré") &&
         lead.textContent === `1 mot, dont 1 en cours d’apprentissage et 0 acquis, dans 1 langue. Dernier ajout le ${pbpLibFormatDay(TS)}.`,
         items().join("|") + " | " + sr() + " | " + lead.textContent);
@@ -3400,7 +3429,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       useLang("en");
       document.dispatchEvent(new Event("pbp:i18n-applied"));
       check("T8g a language switch redraws the count row and its full sentence in the new language",
-        items().slice(0, 3).join("|") === "1 word|1 group|1 language" &&
+        items().slice(0, 2).join("|") === "1 word|1 group" &&
         sr().startsWith("1 found · 1 saved for current Pinboard account: t8g"),
         items().join("|") + " | " + sr());
       // Under a filter the redraw keeps the filtered reading.

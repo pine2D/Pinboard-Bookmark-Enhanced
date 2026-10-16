@@ -3991,8 +3991,6 @@
   "libraryStatsKnown": { "message": "Known $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "$COUNT$ groups", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroupsOne": { "message": "$COUNT$ group", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguages": { "message": "$COUNT$ languages", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguagesOne": { "message": "$COUNT$ language", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "$D7$ new in 7 days · $D30$ in 30 days", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ highlights", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsOne": { "message": "$COUNT$ highlight", "placeholders": { "count": { "content": "$1" } } },

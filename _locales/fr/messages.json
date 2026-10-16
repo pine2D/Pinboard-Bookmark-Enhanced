@@ -3985,8 +3985,6 @@
   "libraryStatsKnown": { "message": "Acquis : $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "$COUNT$ groupes", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroupsOne": { "message": "$COUNT$ groupe", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguages": { "message": "$COUNT$ langues", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguagesOne": { "message": "$COUNT$ langue", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "Ajouts sur 7 jours : $D7$ · sur 30 jours : $D30$", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ surlignages", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsOne": { "message": "$COUNT$ surlignage", "placeholders": { "count": { "content": "$1" } } },

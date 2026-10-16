@@ -3985,8 +3985,6 @@
   "libraryStatsKnown": { "message": "Opanowane: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "Grupy: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroupsOne": { "message": "Grupy: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguages": { "message": "Języki: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguagesOne": { "message": "Języki: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "Nowe w 7 dni: $D7$ · w 30 dni: $D30$", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "Zaznaczenia: $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsOne": { "message": "Zaznaczenia: $COUNT$", "placeholders": { "count": { "content": "$1" } } },

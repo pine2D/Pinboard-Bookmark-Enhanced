@@ -269,8 +269,12 @@ function _pbpVocabBuildRow(w) {
   meta.className = "notes-row-meta";
   const languageLabel = pbpDictLanguageLabel(w.language, document.documentElement.lang);
   if (languageLabel) {
+    // The book's common language is left to screen readers (a column of
+    // "English" under every English word tells the eye nothing); any other
+    // language still shows (_pbpVocabCommonLanguage).
     const langChip = document.createElement("span");
-    langChip.className = "notes-meta-chip";
+    const common = !!_vocabCommonLanguage && String(w.language || "") === _vocabCommonLanguage;
+    langChip.className = common ? "sr-only" : "notes-meta-chip";
     langChip.textContent = languageLabel;
     meta.appendChild(langChip);
   }
@@ -1892,10 +1896,26 @@ function _pbpVocabSyncLoadMore() {
   const next = Math.min(PBP_VOCAB_RENDER_BATCH, remaining);
   more.textContent = t(pbpLibCountKey(next, "vocabLoadMoreOne", "vocabLoadMore"), String(next));
 }
+// The language more than half of the book is in, or "" when none is. Read
+// from every saved word, not the filtered view, so a search never changes
+// which rows show their language.
+let _vocabCommonLanguage = "";
+function _pbpVocabCommonLanguage(rows) {
+  const counts = new Map();
+  for (const w of rows) {
+    const code = String((w && w.language) || "");
+    if (code) counts.set(code, (counts.get(code) || 0) + 1);
+  }
+  let best = "", most = 0;
+  for (const [code, n] of counts) if (n > most) { best = code; most = n; }
+  return rows.length && most * 2 > rows.length ? best : "";
+}
+
 function _pbpVocabRenderList(append) {
   const list = $id("vocab-list");
   if (!list) return;
   const rows = _vocabViewRows;
+  if (!append) _vocabCommonLanguage = _pbpVocabCommonLanguage(_vocabRows);
   const empty = $id("vocab-empty");
   if (empty) {
     empty.textContent = t("dictVocabEmpty", _vocabOwnerLabel);
@@ -1955,10 +1975,12 @@ function _pbpVocabRenderStats() {
   const words = rows.length !== s.total
     ? pbpLibSplitCount((...a) => t(pbpLibCountKey(s.total, "libraryStatsWordsFilteredOne", "libraryStatsWordsFiltered"), ...a), [String(rows.length), String(s.total)])
     : pbpLibSplitCount((...a) => t(pbpLibCountKey(s.total, "libraryStatsWordsOne", "libraryStatsWords"), ...a), [String(s.total)]);
+  // Total, scope, new this week -- the notes row's order. The language count
+  // lives in the cover's sentence beside this row, and as a fourth item it
+  // was the one the single-line row dropped at common widths.
   const items = [
     words,
     pbpLibSplitCount((...a) => t(pbpLibCountKey(s.groups, "libraryStatsGroupsOne", "libraryStatsGroups"), ...a), [String(s.groups)]),
-    pbpLibSplitCount((...a) => t(pbpLibCountKey(s.languages, "libraryStatsLanguagesOne", "libraryStatsLanguages"), ...a), [String(s.languages)]),
     pbpLibSplitCount((...a) => t("libraryStatsRecent7", ...a), [String(s.added7)]),
   ];
   const found = rows.length, saved = _vocabRows.length;

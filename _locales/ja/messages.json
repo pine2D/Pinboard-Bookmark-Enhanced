@@ -3985,8 +3985,6 @@
   "libraryStatsKnown": { "message": "習得済み $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroups": { "message": "$COUNT$ グループ", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsGroupsOne": { "message": "$COUNT$ グループ", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguages": { "message": "$COUNT$ 言語", "placeholders": { "count": { "content": "$1" } } },
-  "libraryStatsLanguagesOne": { "message": "$COUNT$ 言語", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent": { "message": "7日間で $D7$ 件追加 · 30日間で $D30$ 件", "placeholders": { "d7": { "content": "$1" }, "d30": { "content": "$2" } } },
   "libraryStatsHighlights": { "message": "$COUNT$ 件のハイライト", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsHighlightsOne": { "message": "$COUNT$ 件のハイライト", "placeholders": { "count": { "content": "$1" } } },

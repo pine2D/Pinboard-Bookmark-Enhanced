@@ -1197,6 +1197,16 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
    of icon + label, ghost hover, inset focus. Its door is a ghost sm button
    shaped like the Filter button (label, then chevron). */
 #vocab-export-open { flex-direction: row-reverse; }
+/* A window narrower than any Chrome tab (the 320 / 360 sweep): Export and
+   Select all would leave the count row no room for even its first item, so
+   Export keeps only its chevron. The label stays in the accessible name and
+   the title names the menu. */
+@media (max-width: 400px) {
+  #vocab-export-open > .btn-ic + span {
+    position: absolute; width: 1px; height: 1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap;
+  }
+}
 #vocab-export-open[aria-expanded="true"] { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
 .vocab-export-menu[popover] {
   padding: var(--lib-sp-1);
@@ -2716,6 +2726,10 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
 .vocab-card.selected .vocab-row-gloss,
 .vocab-card.selected .vocab-row-groups,
 .vocab-card.selected .notes-row-meta { color: var(--lib-row-selected-fg); }
+/* "Known" is the one learning state the list shows: full ink, not the meta
+   grey it shared with the language label (the band keeps its own ink). */
+.vocab-card .notes-row-meta > .vocab-status-chip { color: var(--lib-fg); }
+.vocab-card.selected .notes-row-meta > .vocab-status-chip { color: var(--lib-row-selected-fg); }
 /* A failed save / delete, pinned to the row it happened on. is-error lands
    on the row being acted on (library-vocab.js) -- the current row when the
    action starts, which may stop being current while the mark stays -- and
