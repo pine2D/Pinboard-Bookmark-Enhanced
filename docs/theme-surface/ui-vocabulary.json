@@ -242,6 +242,7 @@
         "notes-batch-bar",
         "notes-empty",
         "notes-excerpt",
+        "notes-page-head",
         "notes-page-side",
         "notes-toolbar",
         "vocab-batch-bar"
@@ -379,6 +380,7 @@
         "lib-cover",
         "notes-sheet",
         "notes-excerpt",
+        "notes-page-head",
         "notes-page-side"
       ]
     },

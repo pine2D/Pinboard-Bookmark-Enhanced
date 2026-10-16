@@ -359,11 +359,31 @@ function _pbpNotesHits() {
         rec,
         item: it,
         ts: typeof it.ts === "number" ? it.ts : row.lastTs,
+        idx,
       });
     });
   }
   hits.sort((a, b) => b.ts - a.ts);
   return hits;
+}
+
+// The index reads by page (2026-10-16 ruling, option C of the comparison):
+// pages in the order of their newest highlight in view, newest first; inside
+// a page the highlights oldest first, the stored order breaking ties -- the
+// order the detail reads them in, so a page's rows and its excerpts run the
+// same way and the one clicked is where the reader expects it.
+function _pbpNotesGroupByPage(hits) {
+  const pages = new Map();
+  for (const hit of hits) {
+    const group = pages.get(hit.row.key);
+    if (group) group.push(hit);
+    else pages.set(hit.row.key, [hit]);
+  }
+  const groups = [...pages.values()];
+  const newest = new Map(groups.map((g) => [g, g.reduce((max, h) => Math.max(max, h.ts), -Infinity)]));
+  for (const g of groups) g.sort((a, b) => (a.ts - b.ts) || (a.idx - b.idx));
+  groups.sort((a, b) => newest.get(b) - newest.get(a));
+  return groups.flat();
 }
 
 // Per-highlight filtering that REUSES the frozen article-level predicates on a
@@ -376,10 +396,10 @@ function _pbpNotesHits() {
 function _pbpNotesVisibleHits(all) {
   const filterInput = $id("notes-filter");
   const q = filterInput ? filterInput.value : "";
-  return (all || _pbpNotesHits()).filter((hit) => {
+  return _pbpNotesGroupByPage((all || _pbpNotesHits()).filter((hit) => {
     const one = { title: hit.row.title, url: hit.row.url, items: [hit.item] };
     return pbpNotesMatch(one, q) && pbpNotesEntryHasColor(one, _notesActiveColors);
-  });
+  }));
 }
 
 // Lookup over ALL hits, not just the visible ones: the detail pane's
@@ -451,6 +471,34 @@ function _pbpNotesFilterQuery() {
 // Compact left row (spec §3.7): colour dot, two clamped lines of highlight,
 // the note on its own line after a pencil, then host · date. No inline delete -- the one
 // destructive action lives in the detail pane, where its scope is spelled out.
+function _pbpNotesPageName(row) {
+  return (row && (row.title || _pbpNotesHostname(row.url))) || t("notesUnknownPage");
+}
+
+// A page's heading in the index: its title, then its last day and how many of
+// its highlights are listed ("2 / 4" while a filter hides some). A flat-
+// canvas section head -- type and space, no fill or rule. aria-hidden: the
+// grid takes rows only, and every row names its page itself.
+function _pbpNotesBuildPageHead(hit, shown, total) {
+  const head = document.createElement("div");
+  head.className = "notes-page-head";
+  head.setAttribute("aria-hidden", "true");
+  head.dataset.notesPage = hit.row.key;
+  const title = document.createElement("span");
+  title.className = "notes-page-title";
+  title.textContent = _pbpNotesPageName(hit.row);
+  const host = _pbpNotesHostname(hit.row.url);
+  if (host) title.title = host;
+  const count = document.createElement("span");
+  count.className = "notes-page-count";
+  const n = shown === total
+    ? t(pbpLibCountKey(total, "libraryStatsHighlightsOne", "libraryStatsHighlights"), String(total))
+    : t(pbpLibCountKey(total, "libraryStatsHighlightsFilteredOne", "libraryStatsHighlightsFiltered"), String(shown), String(total));
+  count.textContent = [pbpLibFormatDay(hit.row.lastTs), n].filter(Boolean).join(" \u00b7 ");
+  head.append(title, count);
+  return head;
+}
+
 function _pbpNotesBuildRow(hit) {
   const rowEl = document.createElement("div");
   rowEl.className = "notes-hit";
@@ -522,21 +570,24 @@ function _pbpNotesBuildRow(hit) {
     body.appendChild(noteEl);
   }
 
+  // The page heading above (_pbpNotesBuildPageHead) carries the page and its
+  // day, so a row says only when: the time, or day and time for a highlight
+  // from another day than the page's last one -- the excerpt labels' rule.
   const meta = document.createElement("span");
   meta.className = "notes-hit-meta";
-  const site = document.createElement("span");
-  site.className = "notes-meta-chip";
-  site.textContent = _pbpNotesHostname(hit.row.url) || t("notesUnknownPage");
-  meta.appendChild(site);
-  const dateText = pbpLibFormatDay(hit.ts);
-  if (dateText) {
-    const dateSpan = document.createElement("span");
-    dateSpan.className = "notes-meta-chip";
-    dateSpan.textContent = dateText;
-    dateSpan.title = t("notesColLastActive");
-    meta.appendChild(dateSpan);
-  }
+  const when = document.createElement("span");
+  when.className = "notes-meta-chip";
+  const time = pbpLibFormatTime(hit.ts);
+  const day = pbpLibSameDay(hit.ts, hit.row.lastTs) ? "" : pbpLibFormatDay(hit.ts);
+  when.textContent = [day, time].filter(Boolean).join(" ");
+  if (when.textContent) meta.appendChild(when);
   body.appendChild(meta);
+  // The heading is presentation only (a grid takes rows), so each row names
+  // its page to assistive tech itself.
+  const pageName = document.createElement("span");
+  pageName.className = "sr-only";
+  pageName.textContent = " \u2014 " + _pbpNotesPageName(hit.row);
+  body.appendChild(pageName);
 
   btn.appendChild(body);
   // Same three verbs as the vocabulary list, deliberately one grammar across
@@ -1491,7 +1542,7 @@ function _pbpNotesSyncLoadMore(remaining) {
 
 function _pbpNotesLoadMore() {
   const list = $id("notes-list");
-  const appendedAt = list ? list.children.length : 0;
+  const appendedAt = list ? list.querySelectorAll(":scope > .notes-hit").length : 0;
   const all = _pbpNotesHits();
   const hits = _pbpNotesVisibleHits(all);
   _notesRenderLimit = Math.min(hits.length, _notesRenderLimit + PBP_NOTES_RENDER_BATCH);
@@ -1502,7 +1553,7 @@ function _pbpNotesLoadMore() {
   // move the roving stop with it or the list would answer the next Tab from an
   // older row. Twin of the vocabulary list's own load-more handover.
   if ($id("notes-load-more")) return;
-  const appended = list && list.children[appendedAt];
+  const appended = list && list.querySelectorAll(":scope > .notes-hit")[appendedAt];
   const btn = appended ? appended.querySelector(".notes-hit-btn") : null;
   // Nothing appended (a re-render raced this click): the filter box is the
   // landing spot every other path in this file falls back to.
@@ -1563,9 +1614,19 @@ function _pbpNotesRenderList(hits, allHits, append) {
   if (scopeNote) scopeNote.hidden = !!total || hits.length > 0 || _notesHiddenByOwner;
   if (!hits.length) { _pbpNotesSyncLoadMore(0); _pbpNotesSyncSelectionUi(hits); return; }
   const target = Math.min(hits.length, _notesRenderLimit);
-  const start = append ? Math.min(list.children.length, target) : 0;
+  // Rows only: the page headings are children of the list too.
+  const start = append ? Math.min(list.querySelectorAll(":scope > .notes-hit").length, target) : 0;
+  const shownByPage = new Map(), totalByPage = new Map();
+  for (const h of hits) shownByPage.set(h.row.key, (shownByPage.get(h.row.key) || 0) + 1);
+  for (const h of all) totalByPage.set(h.row.key, (totalByPage.get(h.row.key) || 0) + 1);
   const frag = document.createDocumentFragment();
-  for (let i = start; i < target; i++) frag.appendChild(_pbpNotesBuildRow(hits[i]));
+  for (let i = start; i < target; i++) {
+    // A heading opens each page; Load more continuing a page adds none.
+    if (i === 0 || hits[i - 1].row.key !== hits[i].row.key) {
+      frag.appendChild(_pbpNotesBuildPageHead(hits[i], shownByPage.get(hits[i].row.key), totalByPage.get(hits[i].row.key)));
+    }
+    frag.appendChild(_pbpNotesBuildRow(hits[i]));
+  }
   list.appendChild(frag);
   _pbpNotesSyncLoadMore(hits.length - target);
   // A rebuild drops the marker even though the detail pane still reads that

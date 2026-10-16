@@ -184,16 +184,30 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     try { if (remembered !== null) localStorage.setItem(PBP_LIB_VIEW_KEY, remembered); } catch (_) {}
   }
 
-  // ---- scan -> one row per highlight, newest first ----
-  check("every stored highlight gets its own row, newest first",
-    rowKeys() === "pbp_hl_beta#b1,pbp_hl_alpha#a1,pbp_hl_alpha#a2,pbp_hl_alpha#a3,pbp_hl_orphan#c1,pbp_hl_evil#e1",
+  // ---- scan -> one row per highlight, grouped by page (2026-10-16, option
+  // C): pages newest first, a page's highlights oldest first ----
+  check("every stored highlight gets its own row, grouped by page: newest page first, oldest highlight first inside it",
+    rowKeys() === "pbp_hl_beta#b1,pbp_hl_alpha#a3,pbp_hl_alpha#a2,pbp_hl_alpha#a1,pbp_hl_orphan#c1,pbp_hl_evil#e1",
     rowKeys());
   check("the reserved pbp_hl_last_color key never becomes a row",
     !rowKeys().includes("last_color"), rowKeys());
-  check("#notes-list holds grid rows only (role=grid container purity)",
-    $id("notes-list").children.length === 6 &&
-    [...$id("notes-list").children].every((el) => el.getAttribute("role") === "row") &&
-    $id("notes-empty").hidden === true);
+  // A grid takes rows; the page headings between them are presentation only
+  // (aria-hidden), each opening its page's rows.
+  check("#notes-list holds grid rows plus one aria-hidden heading per page, each right before its page's rows",
+    (() => {
+      const kids = [...$id("notes-list").children];
+      const heads = kids.filter((el) => el.classList.contains("notes-page-head"));
+      const rows = kids.filter((el) => el.getAttribute("role") === "row");
+      if (rows.length !== 6 || heads.length !== 4 || rows.length + heads.length !== kids.length) return false;
+      if (!heads.every((h) => h.getAttribute("aria-hidden") === "true")) return false;
+      let page = null;
+      for (const el of kids) {
+        if (el.classList.contains("notes-page-head")) { page = el.dataset.notesPage; continue; }
+        if (!page || !el.dataset.notesKey.startsWith(page + "#")) return false;
+      }
+      return $id("notes-empty").hidden === true;
+    })(),
+    [...$id("notes-list").children].map((el) => el.className).join(","));
   // The count row (spec §3.5): compact items for the eye, the localized
   // sentence (plus the 7/30-day gain) in the .sr-only half for the live region.
   const countItems = () => [...$id("notes-count").querySelectorAll(".lib-count-item")].map((el) => el.textContent).join("|");
@@ -204,11 +218,19 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     $id("notes-count").querySelector(".lib-count-items")?.getAttribute("aria-hidden") === "true" &&
     !!countSr()?.textContent.startsWith("notesResultCount:notesResultShown:6,libraryCountHighlights:6 \u00b7 libraryStatsRecent:"),
     $id("notes-count").innerHTML);
-  check("a row shows the highlight text, its note and the source host",
+  check("a row shows the highlight text and its note, and names its page to screen readers",
     rowEl("pbp_hl_alpha#a2").textContent.includes("second alpha highlight about beta") &&
     rowEl("pbp_hl_alpha#a2").textContent.includes("highlight about beta \u2014 note on a2") &&
-    rowEl("pbp_hl_alpha#a2").textContent.includes("alpha.example"),
+    rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-body > .sr-only:last-child")?.textContent === " \u2014 Alpha article",
     rowEl("pbp_hl_alpha#a2").textContent);
+  {
+    const head = $id("notes-list").querySelector('.notes-page-head[data-notes-page="pbp_hl_alpha"]');
+    check("a page heading reads the page title, then its last day and the count of its highlights",
+      head?.querySelector(".notes-page-title")?.textContent === "Alpha article" &&
+      head?.querySelector(".notes-page-title")?.title === "alpha.example" &&
+      head?.querySelector(".notes-page-count")?.textContent.endsWith("libraryStatsHighlights:3"),
+      head && head.textContent);
+  }
   check("a url-less record falls back to the unknown-page label",
     rowEl("pbp_hl_orphan#c1").textContent.includes("notesUnknownPage"),
     rowEl("pbp_hl_orphan#c1").textContent);
@@ -222,9 +244,9 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-note")?.textContent === "note on a2" &&
     !rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-text .notes-hit-note") &&
     !rowEl("pbp_hl_alpha#a1").querySelector(".notes-hit-note"));
-  check("the row dates the highlight with pbpLibFormatDay",
-    typeof pbpLibFormatDay === "function" &&
-    rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-meta > .notes-meta-chip:last-child")?.textContent === pbpLibFormatDay(400));
+  check("a row on its page's day says only the time (pbpLibFormatTime); the heading carries the day",
+    typeof pbpLibFormatTime === "function" &&
+    rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-meta > .notes-meta-chip")?.textContent === pbpLibFormatTime(400));
   check("pbpNotesStats counts highlights, distinct pages and the 7 / 30-day gain",
     typeof pbpNotesStats === "function" && (() => {
       const NOW = 100 * 86400000;
@@ -373,6 +395,13 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       excerpts().map(idOf).join(",") === "x1,x2,x4,x3,x6,x5", excerpts().map(idOf).join(","));
     check("two highlights saved at the same instant keep their stored order",
       excerpts().findIndex((s) => idOf(s) === "x4") < excerpts().findIndex((s) => idOf(s) === "x3"));
+    const listWhen = (id) => rowEl("pbp_hl_times#" + id)?.querySelector(".notes-hit-meta > .notes-meta-chip")?.textContent;
+    check("the index runs a page's rows in the detail's order",
+      rowKeys().split(",").filter((k) => k.startsWith("pbp_hl_times#")).map((k) => k.split("#")[1]).join(",") === "x1,x2,x4,x3,x6,x5",
+      rowKeys());
+    check("a row from another day than its page's last one gives day and time; one from that day, the time",
+      listWhen("x2") === day(at(-1, 23, 58)) + " " + time(at(-1, 23, 58)) && listWhen("x6") === time(pageTs),
+      `${listWhen("x2")} | ${listWhen("x6")}`);
     check("a highlight from the page's own day is labelled with its time only",
       !!labelOf("x6") && !labelOf("x6").querySelector(".notes-excerpt-date") &&
       labelOf("x6").querySelector(".notes-excerpt-time")?.textContent === time(pageTs), labelOf("x6")?.outerHTML);
@@ -994,7 +1023,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     rowKeys() === "pbp_hl_alpha#a1,pbp_hl_evil#e1" && pressed() === "1", rowKeys() + " | " + pressed());
   toggle(3)?.click();
   check("another colour adds to the set",
-    rowKeys() === "pbp_hl_alpha#a1,pbp_hl_alpha#a2,pbp_hl_evil#e1" && pressed() === "1,3", rowKeys() + " | " + pressed());
+    rowKeys() === "pbp_hl_alpha#a2,pbp_hl_alpha#a1,pbp_hl_evil#e1" && pressed() === "1,3", rowKeys() + " | " + pressed());
   toggle(1)?.click();
   check("clicking a pressed colour takes it out", rowKeys() === "pbp_hl_alpha#a2" && pressed() === "3", rowKeys());
   toggle(3)?.click();

@@ -990,6 +990,38 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   color: var(--lib-fg-muted);
 }
 .notes-hit-meta > .notes-meta-chip + .notes-meta-chip::before { content: "\00a0·\00a0"; }
+/* A page's heading in the index (2026-10-16, option C): the list reads by
+   page, a heading over each page's rows. A flat-canvas section head -- type
+   and space only, no fill, rule or frame (canvasStructures). Its text starts
+   on the rows' dot column; 16 above a heading, none below (the rows' own 2px
+   margin), the first one flush with the list's top. */
+.notes-page-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lib-sp-2);
+  min-width: 0;
+  margin: var(--lib-sp-4) var(--lib-sp-1) 0;
+  padding: var(--lib-sp-1) var(--lib-row-pad-x) var(--lib-sp-0);
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+}
+.notes-page-head:first-child { margin-top: 0; }
+.notes-page-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--lib-fg);
+}
+.notes-page-count {
+  flex: none;
+  font-size: var(--lib-text-meta);
+  line-height: var(--lib-lh-meta);
+  color: var(--lib-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
 
 /* Reading pane (library redesign §2.3-§2.4): its own scroll container and the
    `lib-detail` size container the T7/T8 sheets query (two longhands: the
