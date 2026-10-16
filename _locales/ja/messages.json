@@ -998,7 +998,22 @@
     "message": "トークンはこのブラウザーに保存され、Pinboard にだけ送信されます。ほかのデバイスに届くのは、API キーとトークンの同期をオンにした場合だけです。"
   },
   "aiKeyLocalHint": {
-    "message": "各 API キーはこのブラウザーに保存され、それぞれのプロバイダーにだけ送信されます。ほかのデバイスに届くのは、API キーとトークンの同期をオンにした場合だけです。"
+    "message": "AI は任意です。設定しなくても保存と閲覧はできます。各 API キーはこのブラウザーに保存され、それぞれのプロバイダーにだけ送信されます。"
+  },
+  "connectionTokenNeeded": {
+    "message": "トークンが必要"
+  },
+  "connectionSummaryTokenNeeded": {
+    "message": "まずトークンを入力"
+  },
+  "connectionSummaryNoIssues": {
+    "message": "問題は見つかりません"
+  },
+  "onboardNextAi": {
+    "message": "任意の次のステップ：AI プロバイダーを設定すると、タグと要約を自動で作成し、リーダーで翻訳や質問ができます。"
+  },
+  "onboardNextAiLink": {
+    "message": "AI を設定"
   },
   "secSaveDefaults": {
     "message": "保存時のデフォルト"

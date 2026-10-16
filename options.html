@@ -89,6 +89,14 @@
             <span class="save-status" id="test-pinboard-status" role="status" aria-live="polite"></span>
           </div>
         </div>
+        <!-- First-run follow-up, shown by renderConnectionOverview while the
+             token is well-formed and no AI provider has a key yet. -->
+        <div class="fg entry-block" id="onboard-next-ai" hidden>
+          <p class="hint" data-i18n="onboardNextAi">Optional next step: set up an AI provider to tag and summarize bookmarks, and to translate and ask questions in the reader.</p>
+          <div class="fg-actions">
+            <button type="button" class="btn btn-sm" id="onboard-next-ai-btn" data-i18n="onboardNextAiLink">Set up AI</button>
+          </div>
+        </div>
         <details class="disclosure" id="acc-connection-overview" data-acc-key="connection-overview">
           <summary id="connection-overview-title"><span data-i18n="connectionOverviewTitle">Connection Status</span><span class="summary-state" id="connection-overview-state"></span></summary>
           <div class="disclosure-body">
@@ -111,7 +119,7 @@
           <label class="bl" data-i18n="labelOpenPopupShortcut">Open popup shortcut</label>
           <p class="hint">
             <span class="shortcut-current" data-command="_execute_action"></span>
-            <a href="chrome://extensions/shortcuts" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+            <a href="chrome://extensions/shortcuts" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
           </p>
         </div>
         <div class="pref-group" role="group" aria-labelledby="sec-popup-behavior">
@@ -226,7 +234,7 @@
       <section class="settings-section">
         <h2 class="section-title" data-i18n="secQuickSave">Quick Save</h2>
         <div class="fg entry-block">
-          <p class="hint"><span data-i18n="labelShortcut">Shortcut:</span> <span class="shortcut-current" data-command="quick_save"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
+          <p class="hint"><span data-i18n="labelShortcut">Shortcut:</span> <span class="shortcut-current" data-command="quick_save"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
         </div>
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" id="qs-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Add page description to notes when no text is selected</span><span class="switch-track" aria-hidden="true"></span></label></div>
@@ -244,7 +252,7 @@
       <section class="settings-section">
         <h2 class="section-title" data-i18n="secReadLater">Read Later</h2>
         <div class="fg entry-block">
-          <p class="hint"><span data-i18n="labelShortcut">Shortcut:</span> <span class="shortcut-current" data-command="read_later"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
+          <p class="hint"><span data-i18n="labelShortcut">Shortcut:</span> <span class="shortcut-current" data-command="read_later"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
         </div>
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" id="rl-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Add page description to notes when no text is selected</span><span class="switch-track" aria-hidden="true"></span></label></div>
@@ -345,7 +353,7 @@
               <option value="custom" data-i18n="provCustom">Custom OpenAI-compatible</option>
             </optgroup>
           </select>
-          <p class="hint" data-i18n="aiKeyLocalHint">Each API key stays in this browser and is sent only to its own provider. It reaches your other devices only if you sync API keys and tokens.</p>
+          <p class="hint" data-i18n="aiKeyLocalHint">AI is optional: saving and reading work without it. Each API key stays in this browser and is sent only to its own provider.</p>
         </div>
 
         <!-- Gemini -->
@@ -761,7 +769,7 @@
           <label class="bl" data-i18n="mdShortcutLabel">Open the reader</label>
           <p class="hint">
             <span id="md-shortcut-current" class="shortcut-current" data-command="markdown_preview"></span>
-            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-md" class="btn btn-sm ghost" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-md" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
           </p>
         </div>
       </section>

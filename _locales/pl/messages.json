@@ -998,7 +998,22 @@
     "message": "Token zostaje w tej przeglądarce i trafia wyłącznie do Pinboard. Na inne urządzenia przejdzie tylko wtedy, gdy włączysz synchronizację kluczy API i tokenów."
   },
   "aiKeyLocalHint": {
-    "message": "Każdy klucz API zostaje w tej przeglądarce i trafia wyłącznie do swojego dostawcy. Na inne urządzenia przejdzie tylko wtedy, gdy włączysz synchronizację kluczy API i tokenów."
+    "message": "AI jest opcjonalne: zapisywanie i czytanie działają bez niego. Każdy klucz API zostaje w tej przeglądarce i trafia wyłącznie do swojego dostawcy."
+  },
+  "connectionTokenNeeded": {
+    "message": "Wymagany token"
+  },
+  "connectionSummaryTokenNeeded": {
+    "message": "Najpierw dodaj token"
+  },
+  "connectionSummaryNoIssues": {
+    "message": "Nie wykryto problemów"
+  },
+  "onboardNextAi": {
+    "message": "Opcjonalny następny krok: skonfiguruj dostawcę AI, aby tagować i streszczać zakładki oraz tłumaczyć i zadawać pytania w czytniku."
+  },
+  "onboardNextAiLink": {
+    "message": "Skonfiguruj AI"
   },
   "secSaveDefaults": {
     "message": "Wartości domyślne przy zapisie"

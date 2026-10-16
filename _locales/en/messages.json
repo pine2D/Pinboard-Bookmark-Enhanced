@@ -1003,7 +1003,22 @@
     "message": "Your token stays in this browser and is sent only to Pinboard. It reaches your other devices only if you sync API keys and tokens."
   },
   "aiKeyLocalHint": {
-    "message": "Each API key stays in this browser and is sent only to its own provider. It reaches your other devices only if you sync API keys and tokens."
+    "message": "AI is optional: saving and reading work without it. Each API key stays in this browser and is sent only to its own provider."
+  },
+  "connectionTokenNeeded": {
+    "message": "Token needed"
+  },
+  "connectionSummaryTokenNeeded": {
+    "message": "Add your token first"
+  },
+  "connectionSummaryNoIssues": {
+    "message": "No problems found"
+  },
+  "onboardNextAi": {
+    "message": "Optional next step: set up an AI provider to tag and summarize bookmarks, and to translate and ask questions in the reader."
+  },
+  "onboardNextAiLink": {
+    "message": "Set up AI"
   },
   "secSaveDefaults": {
     "message": "Defaults When Saving"

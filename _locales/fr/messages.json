@@ -998,7 +998,22 @@
     "message": "Votre jeton reste dans ce navigateur et n'est envoyé qu'à Pinboard. Il ne rejoint vos autres appareils que si vous synchronisez les clés API et les jetons."
   },
   "aiKeyLocalHint": {
-    "message": "Chaque clé API reste dans ce navigateur et n'est envoyée qu'à son propre fournisseur. Elle ne rejoint vos autres appareils que si vous synchronisez les clés API et les jetons."
+    "message": "L’IA est facultative : l’enregistrement et la lecture fonctionnent sans elle. Chaque clé API reste dans ce navigateur et n’est envoyée qu’à son propre fournisseur."
+  },
+  "connectionTokenNeeded": {
+    "message": "Jeton requis"
+  },
+  "connectionSummaryTokenNeeded": {
+    "message": "Ajoutez d’abord votre jeton"
+  },
+  "connectionSummaryNoIssues": {
+    "message": "Aucun problème détecté"
+  },
+  "onboardNextAi": {
+    "message": "Étape suivante facultative : configurez un fournisseur IA pour étiqueter et résumer vos signets, et pour traduire et poser des questions en mode lecture."
+  },
+  "onboardNextAiLink": {
+    "message": "Configurer l’IA"
   },
   "secSaveDefaults": {
     "message": "Valeurs par défaut à l'enregistrement"

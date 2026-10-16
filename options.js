@@ -272,6 +272,7 @@ async function renderConnectionOverview() {
   // tier, plus Pinboard itself while no valid token is set (nothing works
   // without it). "Not configured" on an optional service is a choice, not a fault.
   let issues = 0;
+  let okRows = 0;
   for (const item of items) {
     const record = health[item.id];
     let stateKey = "connectionNeverTested", stateClass = "pending";
@@ -285,7 +286,16 @@ async function renderConnectionOverview() {
         stateClass = "ok";
       }
     } else if (!item.configured) {
-      stateKey = "connectionNotConfigured";
+      // Pinboard is the one row nothing works without: say what is missing
+      // in the warning tier instead of the optional services' neutral
+      // "Not configured" -- on a fresh install it was the only row the red
+      // header count referred to, and it looked exactly like the rest.
+      if (item.id === "pinboard") {
+        stateKey = "connectionTokenNeeded";
+        stateClass = "warn";
+      } else {
+        stateKey = "connectionNotConfigured";
+      }
     } else if (item.permission === false) {
       stateKey = "connectionPermissionMissing";
       stateClass = "bad";
@@ -314,9 +324,13 @@ async function renderConnectionOverview() {
       ? t(stateKey, _pbpConnectionHealthDate(record.checkedAt)) : t(stateKey);
     button.append(name, state);
     host.appendChild(button);
-    if (stateClass === "bad" || stateClass === "warn" || (item.id === "pinboard" && !item.configured)) issues++;
+    if (stateClass === "bad" || stateClass === "warn") issues++;
+    if (stateClass === "ok") okRows++;
   }
-  _pbpConnectionOverviewSummary(issues);
+  const tokenMissing = !items[0].configured;
+  _pbpConnectionOverviewSummary(issues, { tokenMissing, okRows });
+  const nextAi = $id("onboard-next-ai");
+  if (nextAi) nextAi.hidden = tokenMissing || aiConfigured;
 }
 
 // The overview is the one place that answers "does this work?", so its closed
@@ -324,12 +338,20 @@ async function renderConnectionOverview() {
 // and only while the user has never chosen a state for it themselves (the
 // remembered pp-acc entry wins; the programmatic flag keeps this open from
 // being remembered as their choice).
-function _pbpConnectionOverviewSummary(issues) {
+// A fresh install's only "issue" is the missing token: name that step in
+// neutral ink instead of a red count before the user has done anything; red
+// stays for real failures and missing grants. With nothing to fix the header
+// says so -- but only once something has actually worked (an ok row), since
+// "no problems" over a page of untested services would claim too much.
+function _pbpConnectionOverviewSummary(issues, { tokenMissing = false, okRows = 0 } = {}) {
   const det = $id("acc-connection-overview");
   const stateEl = $id("connection-overview-state");
   if (stateEl) {
-    stateEl.textContent = issues ? t("connectionSummaryIssues", String(issues)) : "";
-    stateEl.classList.toggle("bad", issues > 0);
+    const onlyToken = tokenMissing && issues === 1;
+    stateEl.textContent = onlyToken ? t("connectionSummaryTokenNeeded")
+      : issues ? t("connectionSummaryIssues", String(issues))
+        : okRows ? t("connectionSummaryNoIssues") : "";
+    stateEl.classList.toggle("bad", issues > 0 && !onlyToken);
   }
   if (!det || !issues || det.open || det.dataset.autoOpened) return;
   let remembered;
@@ -3794,6 +3816,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // (renderConnectionOverview): flipping the Reader master switch decides whether
   // that warning is due at all, and it had no listener of its own until now.
   $id("opt-preview-ai-enabled")?.addEventListener("change", scheduleConnectionOverview);
+  $id("onboard-next-ai-btn")?.addEventListener("click", () => pbpOpenOptionsTarget("ai", "opt-ai-provider-btn"));
   chrome.storage.onChanged?.addListener((changes, area) => {
     if (area === "local" && (changes[PBP_CONNECTION_HEALTH_KEY] || changes.vocabDriveConnected)) {
       scheduleConnectionOverview();
@@ -4208,7 +4231,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         kbd.textContent = sc;
         slot.appendChild(kbd);
       } else {
-        slot.textContent = t("mdShortcutUnset");
+        // Same chip footprint as a bound key, in warning ink: an unbound
+        // command was plain grey text next to its neighbours' key chips and
+        // read as a caption rather than as "this does nothing yet".
+        const unset = document.createElement("span");
+        unset.className = "shortcut-unset";
+        unset.textContent = t("mdShortcutUnset");
+        slot.appendChild(unset);
       }
     });
   } catch (_) { /* commands API unavailable — leave fields blank */ }

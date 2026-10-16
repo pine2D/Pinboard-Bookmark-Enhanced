@@ -998,7 +998,22 @@
     "message": "Dein Token bleibt in diesem Browser und geht nur an Pinboard. Auf deine anderen Geräte gelangt er nur, wenn du API-Schlüssel und Tokens synchronisierst."
   },
   "aiKeyLocalHint": {
-    "message": "Jeder API-Schlüssel bleibt in diesem Browser und geht nur an seinen eigenen Anbieter. Auf deine anderen Geräte gelangt er nur, wenn du API-Schlüssel und Tokens synchronisierst."
+    "message": "KI ist optional: Speichern und Lesen funktionieren auch ohne. Jeder API-Schlüssel bleibt in diesem Browser und geht nur an seinen eigenen Anbieter."
+  },
+  "connectionTokenNeeded": {
+    "message": "Token fehlt"
+  },
+  "connectionSummaryTokenNeeded": {
+    "message": "Zuerst Token eintragen"
+  },
+  "connectionSummaryNoIssues": {
+    "message": "Keine Probleme gefunden"
+  },
+  "onboardNextAi": {
+    "message": "Optionaler nächster Schritt: Richte einen KI-Anbieter ein, um Lesezeichen zu taggen und zusammenzufassen und in der Leseansicht zu übersetzen und Fragen zu stellen."
+  },
+  "onboardNextAiLink": {
+    "message": "KI einrichten"
   },
   "secSaveDefaults": {
     "message": "Standardwerte beim Speichern"

@@ -982,6 +982,16 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
   font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
   font-size: 11px;
 }
+/* An unbound command: the kbd chip's footprint in --opt-warn ink (AA on the
+   panel in every preset) with a currentColor outline, no fill. */
+.shortcut-current .shortcut-unset {
+  display: inline-block;
+  padding: 1px var(--opt-sp-3);
+  border: 1px solid currentColor;
+  border-radius: var(--opt-radius-sm);
+  color: var(--opt-warn);
+  font-size: 11px;
+}
 .hint-warn::before {
   content: "";
   display: inline-block;

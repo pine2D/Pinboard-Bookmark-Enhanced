@@ -998,7 +998,22 @@
     "message": "Token 儲存在這個瀏覽器，只會傳送給 Pinboard。開啟 API Key 和 Token 同步後，才會出現在你的其他裝置上。"
   },
   "aiKeyLocalHint": {
-    "message": "每個 API Key 都儲存在這個瀏覽器，只會傳送給對應的服務商。開啟 API Key 和 Token 同步後，才會出現在你的其他裝置上。"
+    "message": "AI 是選用功能，不設定也可以儲存和閱讀。每個 API Key 都儲存在這個瀏覽器，只會傳送給對應的服務商。"
+  },
+  "connectionTokenNeeded": {
+    "message": "需要 Token"
+  },
+  "connectionSummaryTokenNeeded": {
+    "message": "請先填寫 Token"
+  },
+  "connectionSummaryNoIssues": {
+    "message": "未發現問題"
+  },
+  "onboardNextAi": {
+    "message": "選用的下一步：設定 AI 服務商，用來自動產生標籤和摘要，並在閱讀器中翻譯、提問。"
+  },
+  "onboardNextAiLink": {
+    "message": "設定 AI"
   },
   "secSaveDefaults": {
     "message": "儲存時的預設值"

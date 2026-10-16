@@ -998,7 +998,22 @@
     "message": "Token 保存在本浏览器，只发送给 Pinboard。开启 API Key 和 Token 同步后，才会出现在你的其他设备上。"
   },
   "aiKeyLocalHint": {
-    "message": "每个 API Key 都保存在本浏览器，只发送给对应的服务商。开启 API Key 和 Token 同步后，才会出现在你的其他设备上。"
+    "message": "AI 是可选功能，不配置也能保存和阅读。每个 API Key 都保存在本浏览器，只发送给对应的服务商。"
+  },
+  "connectionTokenNeeded": {
+    "message": "需要 Token"
+  },
+  "connectionSummaryTokenNeeded": {
+    "message": "先填写 Token"
+  },
+  "connectionSummaryNoIssues": {
+    "message": "未发现问题"
+  },
+  "onboardNextAi": {
+    "message": "可选的下一步：配置 AI 服务商，用来自动生成标签和摘要，并在阅读器中翻译、提问。"
+  },
+  "onboardNextAiLink": {
+    "message": "设置 AI"
   },
   "secSaveDefaults": {
     "message": "保存时的默认值"
