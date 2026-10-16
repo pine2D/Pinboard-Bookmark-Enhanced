@@ -2901,7 +2901,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     </div></div></body></html>`;
   document.body.appendChild(frame);
   await new Promise((resolve) => frame.addEventListener("load", resolve, { once:true }));
-  const overflows = [], unreachable = [], groupsBad = [];
+  const overflows = [], unreachable = [], groupsBad = [], deleteTight = [];
   let germanCountWhole = false;
   for (const width of [320, 360, 1280]) {
     frame.style.width = width + "px";
@@ -2984,6 +2984,14 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
             .slice(0, 3).map((el) => `${el.className || el.tagName}:${el.getBoundingClientRect().right.toFixed(1)}`);
           overflows.push(`${width}/${theme}/${locale}:${panel.scrollWidth}>${panel.clientWidth}[${offenders.join(",")}]`);
         }
+        {
+          // Delete stands apart from Clear by at least the action-row gap
+          // and never overlaps it (they share the span over Known/Learning).
+          const clearR = panel.querySelector(".vocab-batch-bar .vocab-clear-selection").getBoundingClientRect();
+          const delR = panel.querySelector('[data-label="batch-delete"]').getBoundingClientRect();
+          if (!(delR.left >= clearR.right + 7.5) || Math.abs(delR.top - clearR.top) > 0.5)
+            deleteTight.push(`${width}/${theme}/${locale}:clear..${clearR.right.toFixed(1)} delete ${delR.left.toFixed(1)}..`);
+        }
         const panelRect = panel.getBoundingClientRect();
         for (const el of panel.querySelectorAll("input, select, button")) {
           const rect = el.getBoundingClientRect();
@@ -2993,6 +3001,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       }
     }
   }
+  check("the batch row's delete stands at least 8px clear of Clear, on the same line, at every width and locale",
+    deleteTight.length === 0, deleteTight.slice(0, 6).join("; "));
   check("production CSS keeps 320/360/1280 vocabulary layouts overflow-free across 9 locales and light/dark",
     overflows.length === 0, overflows.slice(0, 8).join("; "));
   check("production CSS keeps delete and every other batch control reachable across the viewport matrix",
