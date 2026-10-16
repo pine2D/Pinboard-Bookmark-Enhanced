@@ -2408,9 +2408,12 @@ const LIB_GEOMETRY_VOCAB_SCAN = () => {
   const ref = document.getElementById("vocab-ref");
   const tail = document.getElementById("vocab-detail-tail");
   const term = main && main.querySelector(".vocab-detail-term");
-  const note = main && main.querySelector(".vocab-note-input");
+  // The note SECTION's last box: the field, or under it the count and the
+  // "Show full note" button (2026-10-16) -- the tail keeps its 32 from
+  // whatever closes the section, not from the textarea alone.
+  const note = main && main.querySelector(".vocab-note-edit");
   if (!pane || !main || main.hidden || !ref || !tail || !term || !note) {
-    return { error: "the rich LIB_SEED word is not open (head, note box, dictionary column or tail missing)" };
+    return { error: "the rich LIB_SEED word is not open (head, note section, dictionary column or tail missing)" };
   }
   const cs = getComputedStyle(pane);
   const axis = pane.getBoundingClientRect().left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
@@ -2459,7 +2462,7 @@ async function driveLibGeometry(page, check) {
       if (c.labelRightFromAxis != null && (g.labelRight == null || Math.abs(g.labelRight - c.labelRightFromAxis) > 1)) {
         bad.push(`${at}: the context label ends ${g.labelRight}px right of the axis, want ${c.labelRightFromAxis}`);
       }
-      if (c.tailGap != null && Math.abs(g.tailGap - c.tailGap) > 1) bad.push(`${at}: tail top - note box bottom = ${g.tailGap}, want ${c.tailGap}`);
+      if (c.tailGap != null && Math.abs(g.tailGap - c.tailGap) > 1) bad.push(`${at}: tail top - note section bottom = ${g.tailGap}, want ${c.tailGap}`);
       for (const sel of c.ringInside || []) {
         await page.keyboard.press("Shift"); // a keyboard modality, so .focus() matches :focus-visible
         const ring = await page.evaluate((s) => {

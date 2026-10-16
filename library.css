@@ -2446,7 +2446,7 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
 #vocab-batch-select-all { grid-area: 1 / 2; justify-self: end; }
 .vocab-batch-bar > .lib-cluster { grid-area: 1 / 3; justify-self: start; }
 #vocab-batch-delete { grid-area: 1 / 4; justify-self: end; }
-.vocab-batch-bar > .vocab-group-unit { grid-area: 2 / 1; max-width: none; }
+.vocab-batch-bar > .vocab-group-unit { grid-area: 2 / 1; min-width: 0; max-width: none; } /* min-width 0: shrinks with its column instead of sliding under Known (the input inside gives way) */
 #vocab-mark-known { grid-area: 2 / 2; }
 #vocab-mark-learning { grid-area: 2 / 3 / 3 / 5; }
 .vocab-batch-bar > .vocab-group-help,
