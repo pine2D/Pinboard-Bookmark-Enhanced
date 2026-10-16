@@ -123,6 +123,17 @@ function test(name, fn) {
 
   function anchorRowRect(anchor) {
     const rect = anchor.getBoundingClientRect();
+    const anchorStyle = frame.contentWindow.getComputedStyle(anchor);
+    if (anchorStyle.display === "inline") {
+      // An inline anchor (section titles share their line with the toggle,
+      // 2026-10-16) reports its glyph content area, which sits off-centre in
+      // its line box (ascent != descent). Its row is the line boxes: they
+      // start at the host's content edge and stack one line-height each.
+      const lines = new Set([...anchor.getClientRects()].map((r) => Math.round(r.top))).size;
+      const top = anchor.parentElement.getBoundingClientRect().top;
+      const bottom = top + parseFloat(anchorStyle.lineHeight) * lines;
+      return { top, left: rect.left, right: rect.right, bottom, width: rect.width, height: bottom - top };
+    }
     const copy = anchor.matches("label.switch") && anchor.querySelector(":scope > details.context-help")
       ? anchor.querySelector(":scope > .switch-text") : null;
     if (!copy) return rect;

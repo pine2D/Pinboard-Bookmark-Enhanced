@@ -867,6 +867,33 @@ label.switch > .context-help > .context-help-body {
 [data-help-script="cjk"][data-help-role="section"] { --context-help-optical-y: 1.25px; }
 [data-help-script="cjk"][data-help-role="field"] { --context-help-optical-y: 1.5px; }
 [data-help-script="cjk"][data-help-role="group"] { --context-help-optical-y: 1.25px; }
+/* Section help rides the title's last line (2026-10-16). As grid column 1 a
+   title that wrapped (ru/pl/de at phone width) filled the content column,
+   so the "?" parked at the panel's far edge, a column away from the words it
+   explains. Here the title and the toggle share line boxes; the open answer
+   (::details-content, a block) breaks onto its own line below, as before.
+   The toggle keeps its zero-height margin box, so it never grows the line. */
+/* nowrap on the host, normal inside the title: the title still wraps between
+   its own words, but the gap between its last word and the toggle is not a
+   break opportunity, so a title that just fits never leaves the "?" alone on
+   the next line -- the last word moves down with it. */
+/* font-size 0: the markup's whitespace between </h2> and <details> would
+   otherwise render as a space and push the icon ~4px past the 6-8px
+   text -> icon gap every other role keeps. The title, the answer (.hint) and
+   the toggle all set their own font sizes. */
+.context-help-host[data-help-role="section"] { display: block; white-space: nowrap; font-size: 0; }
+.context-help-host[data-help-role="section"] > .section-title { display: inline; white-space: normal; }
+.context-help-host[data-help-role="section"] > .context-help { display: inline; }
+.context-help-host[data-help-role="section"] > .context-help > summary.context-help-toggle {
+  display: inline-flex;
+  vertical-align: baseline;
+  margin-inline-start: var(--opt-sp-1);
+}
+.context-help-host[data-help-role="section"] > .context-help::details-content {
+  display: block;
+  white-space: normal;
+  margin-top: var(--opt-sp-2);
+}
 /* Choice hosts anchor the same way, but their copy is a flex label whose
    startmost item is the checkbox: a flex container's baseline comes from its
    startmost item unless some item takes part in baseline alignment, and a
@@ -1434,6 +1461,11 @@ input[type="checkbox"], input[type="radio"] {
         CJK = Sarasa again. Must also name fast CJK fonts (YaHei/PingFang) BEFORE `monospace`.
    This is why fixing only the Latin half left Bookmark/Appearance still stalling. */
 .fg textarea { resize: vertical; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
+/* The example in an empty code box speaks in the UI face, typed content in
+   the code face: the placeholder ink only has the AA floor's room to differ
+   from typed ink, so a monospace example ("tag / ref / si", a CSS rule) read
+   as content already entered. */
+.fg textarea::placeholder { font-family: "Helvetica Neue", Verdana, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif; }
 .save-status { color: var(--opt-save); }
 /* Connectivity tests used to pin their three states with inline styles
    (#888/#080/#c00), which no theme can override -- #c00 measured 1.71:1 on
@@ -1637,6 +1669,9 @@ html.motion-ready .backup-import-result:not([hidden]) {
 .fg.entry-block-sub[data-off] > label.bl,
 html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-hint); }
 .entry-block-sub[data-off] :is(input, textarea, .listbox-btn):disabled { opacity: 0.45; cursor: default; }
+/* A link in an off block ("Get key" under the archive.org keys) still works,
+   but takes the block's hint ink instead of live link blue. */
+.entry-block-sub[data-off] .hint a:not(.btn) { color: var(--opt-fg-hint); }
 /* A row's own "why is this off" line (#opt-sync-api-keys-requires) sits
    inside its .pref-group, directly under the row: pulled up into the row's
    bottom padding so it reads as that row's caption (control -> hint = sp-1,
@@ -2128,6 +2163,9 @@ html.motion-ready #preset-preview-section > summary::after {
   width: 7px; height: 7px;
   border-radius: 50%;
   background: var(--variant-swatch);
+  /* A hairline in the chip's own ink: a dark preset accent (Paper & Ink's
+     navy) vanished on a dark page's chip without it. */
+  outline: 1px solid color-mix(in srgb, var(--opt-fg) 30%, transparent);
   flex-shrink: 0;
 }
 .theme-preset-btn:hover:not(:disabled),
