@@ -956,7 +956,12 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
 .hint { color: var(--opt-fg-hint); margin: var(--opt-sp-1) 0 var(--opt-rhythm); }
 .fg > .hint { margin: var(--opt-sp-1) 0 0; }   /* inside a form group: tight to its control; the group's own margin-bottom (10px) provides separation */
 .fg + .hint { margin-top: -6px; }  /* a hint owned by the preceding group: pull close (net ~4px gap above, 10px below) */
-.shortcut-current + .btn { margin-left: var(--opt-sp-4); }   /* "Shortcut: <keys> [Open Chrome Shortcut Settings]" lines */
+/* Shortcut rows ("[label] <keys> [Open Chrome Shortcut Settings]") are a plain
+   .fg-actions: its gap spaces the parts and a wrapped button starts flush at
+   the row's edge (the old `.shortcut-current + .btn` margin-left kept its
+   indent after wrapping). A leading "Shortcut:" hint drops its block rhythm. */
+.fg-actions > .hint { margin: 0; }
+.fg.entry-block > .fg-actions:first-child { margin-top: 0; }
 /* :not(.btn): a button-styled link inside a hint (the Chrome shortcut
    links) keeps the .btn recipe's ink -- (0,1,1) used to beat .btn's (0,1,0)
    and painted accent text on the button fills, 3.4-3.7:1 on hover. */

@@ -116,11 +116,11 @@
       <section class="settings-section">
         <h2 class="section-title" id="sec-popup-behavior" data-i18n="secPopupBehavior">Popup Behavior</h2>
         <div class="fg entry-block">
-          <label class="bl" data-i18n="labelOpenPopupShortcut">Open popup shortcut</label>
-          <p class="hint">
+          <div class="bl" id="popup-shortcut-label" data-i18n="labelOpenPopupShortcut">Open popup shortcut</div>
+          <div class="fg-actions" role="group" aria-labelledby="popup-shortcut-label">
             <span class="shortcut-current" data-command="_execute_action"></span>
             <a href="chrome://extensions/shortcuts" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
-          </p>
+          </div>
         </div>
         <div class="pref-group" role="group" aria-labelledby="sec-popup-behavior">
           <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-check-bookmark-status" checked /> <span class="switch-text" data-i18n="optCheckBookmarkStatus">Show on the toolbar icon whether this page is bookmarked</span><span class="switch-track" aria-hidden="true"></span></label></div>
@@ -232,9 +232,13 @@
     <!-- Tab 4: Quick Actions -->
     <div id="panel-quick" class="panel" role="tabpanel" aria-labelledby="tab-quick">
       <section class="settings-section">
-        <h2 class="section-title" data-i18n="secQuickSave">Quick Save</h2>
+        <h2 class="section-title" id="sec-quick-save" data-i18n="secQuickSave">Quick Save</h2>
         <div class="fg entry-block">
-          <p class="hint"><span data-i18n="labelShortcut">Shortcut:</span> <span class="shortcut-current" data-command="quick_save"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
+          <div class="fg-actions" role="group" aria-labelledby="sec-quick-save qs-shortcut-label">
+            <span class="hint" id="qs-shortcut-label" data-i18n="labelShortcut">Shortcut:</span>
+            <span class="shortcut-current" data-command="quick_save"></span>
+            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+          </div>
         </div>
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" id="qs-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Add page description to notes when no text is selected</span><span class="switch-track" aria-hidden="true"></span></label></div>
@@ -250,9 +254,13 @@
         </div>
       </section>
       <section class="settings-section">
-        <h2 class="section-title" data-i18n="secReadLater">Read Later</h2>
+        <h2 class="section-title" id="sec-read-later" data-i18n="secReadLater">Read Later</h2>
         <div class="fg entry-block">
-          <p class="hint"><span data-i18n="labelShortcut">Shortcut:</span> <span class="shortcut-current" data-command="read_later"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
+          <div class="fg-actions" role="group" aria-labelledby="sec-read-later rl-shortcut-label">
+            <span class="hint" id="rl-shortcut-label" data-i18n="labelShortcut">Shortcut:</span>
+            <span class="shortcut-current" data-command="read_later"></span>
+            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+          </div>
         </div>
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" id="rl-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Add page description to notes when no text is selected</span><span class="switch-track" aria-hidden="true"></span></label></div>
@@ -766,11 +774,11 @@
       <section class="settings-section">
         <h2 class="section-title" data-i18n="kbdHelpTitle">Keyboard Shortcuts</h2>
         <div class="fg entry-block">
-          <label class="bl" data-i18n="mdShortcutLabel">Open the reader</label>
-          <p class="hint">
+          <div class="bl" id="md-shortcut-label" data-i18n="mdShortcutLabel">Open the reader</div>
+          <div class="fg-actions" role="group" aria-labelledby="md-shortcut-label">
             <span id="md-shortcut-current" class="shortcut-current" data-command="markdown_preview"></span>
             <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-md" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
-          </p>
+          </div>
         </div>
       </section>
     </div>
