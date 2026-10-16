@@ -1444,6 +1444,15 @@
   "contextHelpTitle": {
     "message": "Weitere Informationen"
   },
+  "contextHelpFor": {
+    "message": "Weitere Informationen: $SETTING$",
+    "placeholders": {
+      "setting": {
+        "content": "$1",
+        "example": "Popup width"
+      }
+    }
+  },
   "hintOpenAIBaseUrl": {
     "message": "Ändern, um einen Proxy oder einen kompatiblen Endpunkt zu nutzen"
   },
@@ -1730,7 +1739,13 @@
     "message": "In Chrome Sync sind bereits Einstellungen von einem anderen Gerät gespeichert. Aktiviere die Einstellungssynchronisierung, um sie hier zu verwenden."
   },
   "syncApiKeysDisableConfirm": {
-    "message": "Synchronisierung der Zugangsdaten deaktivieren? Dieses Gerät behält eine lokale Kopie der synchronisierten Zugangsdaten, und sie werden aus Chrome Sync gelöscht. Andere Geräte, die noch auf diese Cloud-Zugangsdaten angewiesen sind, funktionieren möglicherweise nicht mehr. Dein Google Drive OAuth-Token bleibt davon unberührt."
+    "message": "Dieses Gerät behält eine lokale Kopie der synchronisierten Zugangsdaten, und sie werden aus Chrome Sync gelöscht. Andere Geräte, die noch auf diese Cloud-Zugangsdaten angewiesen sind, funktionieren möglicherweise nicht mehr. Dein Google Drive OAuth-Token bleibt davon unberührt."
+  },
+  "syncApiKeysDisableTitle": {
+    "message": "Synchronisierung der Zugangsdaten deaktivieren?"
+  },
+  "syncApiKeysDisableBtn": {
+    "message": "Deaktivieren"
   },
   "qlPopularTitle": {
     "message": "Beliebte Lesezeichen auf Pinboard"
@@ -2098,11 +2113,17 @@
   "syncMigrationFailed": {
     "message": "Die Synchronisierungsmigration ist fehlgeschlagen. Versuche es erneut. Falls das Problem bleibt, prüfe den verfügbaren Chrome-Sync-Speicher."
   },
-  "syncConflictUseCloud": {
-    "message": "In Chrome Sync sind bereits Einstellungen gespeichert. Möchtest du die Cloud-Einstellungen auf diesem Gerät verwenden?\n\nMit „Abbrechen“ kannst du stattdessen die Einstellungen dieses Geräts verwenden."
+  "syncConflictPrompt": {
+    "message": "In Chrome Sync sind bereits Einstellungen gespeichert. Welche soll dieses Gerät verwenden?"
   },
-  "syncConflictOverwriteCloud": {
-    "message": "Möchtest du die Einstellungen in Chrome Sync mit den Einstellungen dieses Geräts überschreiben?\n\nMit „Abbrechen“ bleibt Chrome Sync deaktiviert."
+  "syncConflictDetail": {
+    "message": "Cloud-Einstellungen verwenden: Dieses Gerät übernimmt die Einstellungen aus Chrome Sync.\nMit diesem Gerät überschreiben: Chrome Sync und alle synchronisierten Geräte übernehmen die Einstellungen dieses Geräts."
+  },
+  "syncConflictUseCloudBtn": {
+    "message": "Cloud-Einstellungen verwenden"
+  },
+  "syncConflictOverwriteBtn": {
+    "message": "Mit diesem Gerät überschreiben"
   },
   "syncReloadNeeded": {
     "message": "Lade diese Seite neu, um den Wechsel zu den in Chrome Sync gespeicherten Einstellungen abzuschließen.",

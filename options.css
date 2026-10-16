@@ -3139,6 +3139,13 @@ html.motion-ready .confirm-popover.is-closing {
    untouched) so that override stays. */
 .confirm-popover .confirm-no { background: none; color: var(--opt-fg); border-color: var(--opt-border); }
 .confirm-popover .confirm-no:hover { background: var(--opt-btn-hover); }
+/* Optional parts (showConfirmPopover's `detail` / `altText`, the Chrome Sync
+   conflict): the detail takes its own line under the bold question, and the
+   alternative choice is an ordinary filled button -- the btn-fg/btn-bg pair is
+   already AA-audited on every preset -- so only Confirm reads as destructive. */
+.confirm-popover .confirm-detail { flex: 1 1 100%; color: var(--opt-fg); white-space: pre-line; overflow-wrap: anywhere; }
+.confirm-popover .confirm-alt { background: var(--opt-btn-bg); color: var(--opt-btn-fg); border-color: var(--opt-btn-border); }
+.confirm-popover .confirm-alt:hover { background: var(--opt-btn-hover); }
 .confirm-popover button:focus-visible { outline: 1px solid var(--opt-accent); outline-offset: 2px; box-shadow: var(--opt-focus-ring); }
 html[data-theme] .confirm-popover { color: var(--opt-fg); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
 /* .confirm-yes themed override deleted (COMPONENTS.md §4.2/C14): it used

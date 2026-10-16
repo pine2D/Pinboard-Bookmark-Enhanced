@@ -1444,6 +1444,15 @@
   "contextHelpTitle": {
     "message": "Więcej informacji"
   },
+  "contextHelpFor": {
+    "message": "Więcej informacji: $SETTING$",
+    "placeholders": {
+      "setting": {
+        "content": "$1",
+        "example": "Popup width"
+      }
+    }
+  },
   "hintOpenAIBaseUrl": {
     "message": "Zmień, aby użyć serwera proxy lub zgodnego endpointu"
   },
@@ -1730,7 +1739,13 @@
     "message": "Chrome Sync zawiera już ustawienia z innego urządzenia. Włącz synchronizację ustawień, aby użyć ich na tym urządzeniu."
   },
   "syncApiKeysDisableConfirm": {
-    "message": "Wyłączyć synchronizację danych uwierzytelniających? To urządzenie zachowa lokalną kopię zsynchronizowanych danych, a z Chrome Sync zostaną one usunięte. Inne urządzenia, które nadal korzystają z tych danych w chmurze, mogą przestać działać. Nie wpłynie to na token OAuth Dysku Google."
+    "message": "To urządzenie zachowa lokalną kopię zsynchronizowanych danych, a z Chrome Sync zostaną one usunięte. Inne urządzenia, które nadal korzystają z tych danych w chmurze, mogą przestać działać. Nie wpłynie to na token OAuth Dysku Google."
+  },
+  "syncApiKeysDisableTitle": {
+    "message": "Wyłączyć synchronizację danych uwierzytelniających?"
+  },
+  "syncApiKeysDisableBtn": {
+    "message": "Wyłącz"
   },
   "qlPopularTitle": {
     "message": "Popularne zakładki w Pinboard"
@@ -2098,11 +2113,17 @@
   "syncMigrationFailed": {
     "message": "Migracja synchronizacji nie powiodła się. Spróbuj ponownie. Jeśli problem nie ustąpi, sprawdź dostępne miejsce w Chrome Sync."
   },
-  "syncConflictUseCloud": {
-    "message": "Chrome Sync zawiera już ustawienia. Czy użyć ustawień z chmury na tym urządzeniu?\n\nWybierz „Anuluj”, aby zamiast tego użyć ustawień z tego urządzenia."
+  "syncConflictPrompt": {
+    "message": "Chrome Sync zawiera już ustawienia. Których ma używać to urządzenie?"
   },
-  "syncConflictOverwriteCloud": {
-    "message": "Czy zastąpić ustawienia w Chrome Sync ustawieniami z tego urządzenia?\n\nWybierz „Anuluj”, aby pozostawić Chrome Sync wyłączone."
+  "syncConflictDetail": {
+    "message": "Użyj ustawień z chmury: to urządzenie przejmie ustawienia z Chrome Sync.\nZastąp ustawieniami z tego urządzenia: Chrome Sync i wszystkie synchronizowane urządzenia przejmą ustawienia z tego urządzenia."
+  },
+  "syncConflictUseCloudBtn": {
+    "message": "Użyj ustawień z chmury"
+  },
+  "syncConflictOverwriteBtn": {
+    "message": "Zastąp ustawieniami z tego urządzenia"
   },
   "syncReloadNeeded": {
     "message": "Odśwież tę stronę, aby dokończyć przejście na ustawienia zapisane w Chrome Sync.",

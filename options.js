@@ -11,6 +11,12 @@ function pbpRefreshContextHelpScriptFamilies(root = document) {
         : anchor;
     if (!copyNode) return;
     host.dataset.helpScript = pbpI18nScriptFamily(copyNode.textContent);
+    // Forty-odd toggles all named "More information" are indistinguishable in
+    // a screen reader's button list; name each after the setting it explains.
+    // The tooltip stays the short generic title.
+    const toggle = details.querySelector(":scope > summary.context-help-toggle");
+    const subject = (copyNode.textContent || "").replace(/\s+/g, " ").trim().slice(0, 80);
+    if (toggle && subject && typeof t === "function") toggle.setAttribute("aria-label", t("contextHelpFor", subject));
   });
 }
 // applyI18n assigns textContent (i18n.js applies every translation as plain
@@ -908,6 +914,41 @@ let pbpCloudHintRetestArmed = false;
 // chrome.storage.sync round-trip; this handle exists so anything that does
 // need the verdict (the fixtures, above all) has something deterministic.
 let pbpCloudHintProbe = Promise.resolve(false);
+
+// Promise form of showConfirmPopover: settles "yes" / "alt" / "no". Every
+// close without a choice -- Cancel, Escape, light dismiss, or another confirm
+// replacing this one -- settles "no", so a caller that paused auto-save around
+// the question never waits forever. onDismiss runs before the chosen handler,
+// so its "no" is deferred a task and loses to a real choice.
+function pbpAskConfirmChoice(anchor, opts) {
+  return new Promise((resolve) => {
+    const opened = showConfirmPopover(anchor, {
+      ...opts,
+      onConfirm: () => resolve("yes"),
+      onAlt: () => resolve("alt"),
+      onCancel: () => resolve("no"),
+      onDismiss: () => setTimeout(() => resolve("no"), 0),
+    });
+    if (!opened) resolve("no");
+  });
+}
+
+// Turning settings sync on while Chrome Sync already holds a real profile is
+// one decision with three outcomes. It used to be two chained native confirm
+// dialogs whose first Cancel meant "use this device's settings" -- the one
+// destructive-to-the-cloud branch hid behind the button that reads as "back
+// out". Overwriting the cloud is the solid-danger Confirm; using the cloud
+// copy is the plain alternative; Cancel leaves sync off.
+async function pbpAskSyncConflict(anchor) {
+  const choice = await pbpAskConfirmChoice(anchor, {
+    msg: t("syncConflictPrompt"),
+    detail: t("syncConflictDetail"),
+    altText: t("syncConflictUseCloudBtn"),
+    yesText: t("syncConflictOverwriteBtn"),
+    noText: t("cancel"),
+  });
+  return choice === "alt" ? "cloud" : choice === "yes" ? "overwrite" : "cancel";
+}
 
 async function pbpRefreshSyncLocalFallbackStatus() {
   const status = $id("opt-sync-local-only");
@@ -2762,11 +2803,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         // overwrite branch, whose Cancel is the only way out of turning sync
         // on. The probe serves the sync-off hint only.
         if (pbpCloudHasMeaningfulSyncSettings(cloud)) {
-          if (confirm(t("syncConflictUseCloud"))) {
-            useCloud = true;
-          } else if (!confirm(t("syncConflictOverwriteCloud"))) {
-            cancelled = true;
-          }
+          // Disabled while the question is open: re-clicking the switch would
+          // start a second migration run under the first one's paused queue.
+          syncToggle.disabled = true;
+          const choice = await pbpAskSyncConflict(syncToggle.closest?.(".pref-row") || syncToggle);
+          syncToggle.disabled = false;
+          if (choice === "cloud") useCloud = true;
+          else if (choice !== "overwrite") cancelled = true;
         }
       }
       if (cancelled) {
@@ -2955,9 +2998,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   // the current sync truth down, then flip the flag and scrub sync.
   syncKeysToggle?.addEventListener("change", async () => {
     const enabling = syncKeysToggle.checked;
-    if (!enabling && !confirm(t("syncApiKeysDisableConfirm"))) {
-      syncKeysToggle.checked = true;
-      return;
+    if (!enabling) {
+      syncKeysToggle.dataset.asking = "1";
+      syncKeysToggle.disabled = true;
+      const choice = await pbpAskConfirmChoice(syncKeysToggle.closest?.(".pref-row") || syncKeysToggle, {
+        msg: t("syncApiKeysDisableTitle"),
+        detail: t("syncApiKeysDisableConfirm"),
+        yesText: t("syncApiKeysDisableBtn"),
+        noText: t("cancel"),
+      });
+      syncKeysToggle.disabled = false;
+      delete syncKeysToggle.dataset.asking;
+      if (choice !== "yes") {
+        syncKeysToggle.checked = true;
+        return;
+      }
     }
     try {
       if (enabling) {

@@ -1450,6 +1450,15 @@
   "contextHelpTitle": {
     "message": "More information"
   },
+  "contextHelpFor": {
+    "message": "More information: $SETTING$",
+    "placeholders": {
+      "setting": {
+        "content": "$1",
+        "example": "Popup width"
+      }
+    }
+  },
   "hintOpenAIBaseUrl": {
     "message": "Change this to use a proxy or a compatible endpoint"
   },
@@ -1736,7 +1745,13 @@
     "message": "Chrome Sync already holds settings from another device. Turn on settings sync to use them here."
   },
   "syncApiKeysDisableConfirm": {
-    "message": "Turn off credential sync? This device will keep a local copy of the synced credentials, and they will be cleared from Chrome Sync. Other devices that still rely on those cloud credentials may stop working. Your Google Drive OAuth token is not affected."
+    "message": "This device will keep a local copy of the synced credentials, and they will be cleared from Chrome Sync. Other devices that still rely on those cloud credentials may stop working. Your Google Drive OAuth token is not affected."
+  },
+  "syncApiKeysDisableTitle": {
+    "message": "Turn off credential sync?"
+  },
+  "syncApiKeysDisableBtn": {
+    "message": "Turn off"
   },
   "qlPopularTitle": {
     "message": "Popular bookmarks on Pinboard"
@@ -2079,11 +2094,17 @@
   "syncMigrationFailed": {
     "message": "Sync migration failed. Try again; if it persists, check available Chrome Sync storage."
   },
-  "syncConflictUseCloud": {
-    "message": "Chrome Sync already has settings. Use the cloud settings on this device?\n\nChoose Cancel to use this device's settings instead."
+  "syncConflictPrompt": {
+    "message": "Chrome Sync already has settings. Which ones should this device use?"
   },
-  "syncConflictOverwriteCloud": {
-    "message": "Replace the settings in Chrome Sync with this device's settings?\n\nChoose Cancel to leave Chrome Sync off."
+  "syncConflictDetail": {
+    "message": "Use cloud settings: this device switches to the settings in Chrome Sync.\nReplace with this device's: Chrome Sync and every device that syncs switch to this device's settings."
+  },
+  "syncConflictUseCloudBtn": {
+    "message": "Use cloud settings"
+  },
+  "syncConflictOverwriteBtn": {
+    "message": "Replace with this device's"
   },
   "syncReloadNeeded": {
     "message": "Reload this page to finish switching to the settings stored in Chrome Sync.",

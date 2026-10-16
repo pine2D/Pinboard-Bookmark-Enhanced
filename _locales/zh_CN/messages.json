@@ -1444,6 +1444,15 @@
   "contextHelpTitle": {
     "message": "更多说明"
   },
+  "contextHelpFor": {
+    "message": "更多说明：$SETTING$",
+    "placeholders": {
+      "setting": {
+        "content": "$1",
+        "example": "Popup width"
+      }
+    }
+  },
   "hintOpenAIBaseUrl": {
     "message": "可修改为代理或兼容接口地址"
   },
@@ -1730,7 +1739,13 @@
     "message": "Chrome Sync 中已有来自其他设备的设置。开启设置同步即可在此设备上使用。"
   },
   "syncApiKeysDisableConfirm": {
-    "message": "要关闭凭据同步吗？Chrome Sync 中的凭据会先保存到本设备，再从 Chrome Sync 清除。仍依赖这些云端凭据的其他设备可能无法正常工作。Google Drive OAuth Token 不受影响。"
+    "message": "Chrome Sync 中的凭据会先保存到本设备，再从 Chrome Sync 清除。仍依赖这些云端凭据的其他设备可能无法正常工作。Google Drive OAuth Token 不受影响。"
+  },
+  "syncApiKeysDisableTitle": {
+    "message": "要关闭凭据同步吗？"
+  },
+  "syncApiKeysDisableBtn": {
+    "message": "关闭同步"
   },
   "qlPopularTitle": {
     "message": "Pinboard 热门书签"
@@ -2098,11 +2113,17 @@
   "syncMigrationFailed": {
     "message": "同步迁移失败。请重试；如果问题仍然存在，请检查 Chrome Sync 的可用存储空间。"
   },
-  "syncConflictUseCloud": {
-    "message": "Chrome Sync 中已有设置。要在此设备上使用云端设置吗？\n\n选择「取消」可改用此设备的设置。"
+  "syncConflictPrompt": {
+    "message": "Chrome Sync 中已有设置，此设备要用哪一份？"
   },
-  "syncConflictOverwriteCloud": {
-    "message": "要用此设备的设置覆盖 Chrome Sync 中的设置吗？\n\n选择「取消」将保持同步关闭。"
+  "syncConflictDetail": {
+    "message": "使用云端设置：此设备改用 Chrome Sync 中的设置。\n用本机设置覆盖云端：Chrome Sync 及所有开启同步的设备都改用此设备的设置。"
+  },
+  "syncConflictUseCloudBtn": {
+    "message": "使用云端设置"
+  },
+  "syncConflictOverwriteBtn": {
+    "message": "用本机设置覆盖云端"
   },
   "syncReloadNeeded": {
     "message": "刷新本页后，Chrome Sync 中保存的设置才会生效。",

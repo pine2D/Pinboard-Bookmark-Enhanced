@@ -1444,6 +1444,15 @@
   "contextHelpTitle": {
     "message": "詳細情報"
   },
+  "contextHelpFor": {
+    "message": "詳細情報：$SETTING$",
+    "placeholders": {
+      "setting": {
+        "content": "$1",
+        "example": "Popup width"
+      }
+    }
+  },
   "hintOpenAIBaseUrl": {
     "message": "プロキシや互換エンドポイントを使う場合に変更します"
   },
@@ -1730,7 +1739,13 @@
     "message": "他のデバイスの設定が Chrome Sync に保存されています。このデバイスで使うには、設定の同期をオンにしてください。"
   },
   "syncApiKeysDisableConfirm": {
-    "message": "認証情報の同期を無効にしますか？同期されている認証情報はこのデバイスにローカルのコピーとして残り、Chrome Sync からは削除されます。そのクラウド上の認証情報を使用している他のデバイスでは、機能しなくなる可能性があります。Google Drive の OAuth トークンには影響しません。"
+    "message": "同期されている認証情報はこのデバイスにローカルのコピーとして残り、Chrome Sync からは削除されます。そのクラウド上の認証情報を使用している他のデバイスでは、機能しなくなる可能性があります。Google Drive の OAuth トークンには影響しません。"
+  },
+  "syncApiKeysDisableTitle": {
+    "message": "認証情報の同期を無効にしますか？"
+  },
+  "syncApiKeysDisableBtn": {
+    "message": "無効にする"
   },
   "qlPopularTitle": {
     "message": "Pinboard の人気ブックマーク"
@@ -2098,11 +2113,17 @@
   "syncMigrationFailed": {
     "message": "同期データの移行に失敗しました。もう一度試してください。解決しない場合は、Chrome Sync の空き容量を確認してください。"
   },
-  "syncConflictUseCloud": {
-    "message": "Chrome Sync に設定があります。このデバイスでクラウド側の設定を使用しますか？\n\nキャンセルすると、このデバイスの設定を使用するか選べます。"
+  "syncConflictPrompt": {
+    "message": "Chrome Sync にはすでに設定があります。このデバイスではどちらの設定を使いますか？"
   },
-  "syncConflictOverwriteCloud": {
-    "message": "このデバイスの設定で Chrome Sync の設定を上書きしますか？\n\nキャンセルすると、Chrome Sync はオフのままになります。"
+  "syncConflictDetail": {
+    "message": "クラウドの設定を使用：このデバイスは Chrome Sync の設定に切り替わります。\nこのデバイスの設定で上書き：Chrome Sync と同期中のすべてのデバイスが、このデバイスの設定に切り替わります。"
+  },
+  "syncConflictUseCloudBtn": {
+    "message": "クラウドの設定を使用"
+  },
+  "syncConflictOverwriteBtn": {
+    "message": "このデバイスの設定で上書き"
   },
   "syncReloadNeeded": {
     "message": "Chrome Sync に保存された設定に切り替えるには、このページを再読み込みしてください。",

@@ -3147,6 +3147,7 @@ function pbpIsValidTokenFormat(token) {
 }
 
 let _activeConfirmPopover = null;
+let _confirmDetailSeq = 0;
 
 // Close the open confirm popover, without running onCancel and without
 // stealing focus back to its opener. For callers that are tearing the
@@ -3167,11 +3168,18 @@ function pbpDismissActiveConfirm(anchor) {
 // Render a .confirm-popover beside `anchor`, portaled to <body> so buttons are
 // never nested inside an interactive anchor.
 // Caller supplies pre-translated strings via { msg, yesText, noText }.
+// Optional: `detail` (plain-weight text under the bold question) and a third
+// choice `altText` + `onAlt`, rendered before the solid-danger Confirm for a
+// decision that has two real outcomes besides Cancel (options' Chrome Sync
+// conflict: use the cloud copy / overwrite it / keep sync off).
+// `onDismiss` runs on EVERY close -- including the silent ones (another
+// confirm replacing this one, pbpDismissActiveConfirm) that skip onCancel --
+// before the chosen handler, if any. Returns false when nothing was opened.
 // Popover self-dismisses on Escape / Cancel / Confirm; only one can be open.
 function showConfirmPopover(anchor, opts) {
-  if (!anchor) return;
-  if (_activeConfirmPopover?.anchor === anchor && _activeConfirmPopover.pop.isConnected) return;
-  const { msg, yesText, noText, onConfirm, onCancel } = opts || {};
+  if (!anchor) return false;
+  if (_activeConfirmPopover?.anchor === anchor && _activeConfirmPopover.pop.isConnected) return false;
+  const { msg, detail, yesText, noText, altText, onConfirm, onCancel, onAlt, onDismiss } = opts || {};
   const opener = document.activeElement;
   _activeConfirmPopover?.dismiss({ restoreFocus: false, animate: false });
   const pop = document.createElement("div");
@@ -3190,7 +3198,24 @@ function showConfirmPopover(anchor, opts) {
   no.type = "button";
   no.className = "confirm-no";
   no.textContent = noText || "Cancel";
-  pop.append(m, yes, no);
+  pop.append(m);
+  if (detail) {
+    const d = document.createElement("span");
+    d.className = "confirm-detail";
+    d.id = `confirm-detail-${++_confirmDetailSeq}`;
+    d.textContent = detail;
+    pop.setAttribute("aria-describedby", d.id);
+    pop.append(d);
+  }
+  let alt = null;
+  if (altText) {
+    alt = document.createElement("button");
+    alt.type = "button";
+    alt.className = "confirm-alt";
+    alt.textContent = altText;
+    pop.append(alt);
+  }
+  pop.append(yes, no);
   document.body.appendChild(pop);
   // Anchors living in the top layer (native [popover] hosts, e.g. the
   // reader's highlight card) would paint OVER a plain body child; promote
@@ -3291,6 +3316,9 @@ function showConfirmPopover(anchor, opts) {
     if (dismissed) return;
     dismissed = true;
     if (_activeConfirmPopover?.pop === pop) _activeConfirmPopover = null;
+    if (onDismiss) {
+      try { onDismiss(); } catch (error) { reportConfirmError(error); }
+    }
     document.removeEventListener("keydown", onKey, true);
     document.removeEventListener("pointerdown", onDocPointerDown, true);
     window.removeEventListener("resize", schedulePosition);
@@ -3372,16 +3400,18 @@ function showConfirmPopover(anchor, opts) {
   pop.addEventListener("click", (e) => e.stopPropagation());
   pop.addEventListener("focusout", onFocusOut);
   no.addEventListener("click", () => { dismiss(); if (onCancel) onCancel(); });
-  yes.addEventListener("click", () => {
+  function runChoice(handler) {
     dismiss();
-    if (!onConfirm) return;
+    if (!handler) return;
     try {
-      const result = onConfirm();
+      const result = handler();
       if (result && typeof result.catch === "function") result.catch(reportConfirmError);
     } catch (error) {
       reportConfirmError(error);
     }
-  });
+  }
+  yes.addEventListener("click", () => runChoice(onConfirm));
+  alt?.addEventListener("click", () => runChoice(onAlt));
   _activeConfirmPopover = { anchor, pop, dismiss };
   document.addEventListener("keydown", onKey, true);
   document.addEventListener("pointerdown", onDocPointerDown, true);
@@ -3400,6 +3430,7 @@ function showConfirmPopover(anchor, opts) {
   // at the viewport edge scrolled the page 6px and lost its confirm).
   no.focus({ preventScroll: true });
   schedulePosition();
+  return true;
 }
 
 // ===================== Feedback Card (B2) =====================

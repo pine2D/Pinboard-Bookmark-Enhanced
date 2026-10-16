@@ -5663,16 +5663,15 @@ check(batchGrantStart >= 0 && batchGrantEnd > batchGrantStart &&
 check(!/\bconfirm\s*\(/.test(popupBatchJs) && !popupBatchJs.includes("BATCH_PERMISSION_DISCLOSE_LIMIT") &&
   !popupBatchJs.includes("batchPermMore") && !popupBatchJs.includes("*://*/*"),
   "popup-batch.js: native confirm, truncated disclosure, or broad wildcard remains");
-// Destructive micro-actions use the anchored confirm popover everywhere. The
-// sanctioned native dialogs are the sync-enable conflict chain and the
-// account-wide credential-sync disable confirmation.
+// Destructive micro-actions use the anchored confirm popover everywhere,
+// options' Chrome Sync conflict and credential-sync disable included (they
+// were the last sanctioned native dialogs until 2026-10-15).
 check(!/\bconfirm\s*\(/.test(popupJs),
   "popup.js: a native confirm() dialog crept back in (use showConfirmPopover)");
 check(!/\bconfirm\s*\(/.test(read("library-notes.js")),
   "library-notes.js: a native confirm() dialog crept back in (use showConfirmPopover)");
-check((optionsJs.match(/\bconfirm\(t\(/g) || []).length === 3 &&
-  optionsJs.includes('confirm(t("syncApiKeysDisableConfirm"))'),
-  "options.js: native confirm() calls drifted from the sanctioned sync transitions");
+check(!/(^|[^.\w])confirm\s*\(/m.test(optionsJs),
+  "options.js: a native confirm() dialog crept back in (use showConfirmPopover / pbpAskConfirmChoice)");
 check(/\.batch-permission-list\s*\{[\s\S]*?max-height:\s*92px;[\s\S]*?overflow:\s*auto;/.test(popupCss),
   "popup.css: complete Batch permission list is not bounded with scrolling");
 
