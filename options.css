@@ -1757,6 +1757,15 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
    to the app-wide rule unopposed; the closed case (this rule's actual job)
    is unaffected -- :not([open]) only adds specificity. */
 .context-help-host[data-help-role="field"] > .context-help:not([open]) + * { margin-top: var(--opt-label-gap); }
+/* A list box under a field's help: listbox.js leaves the hidden <select> in
+   place and inserts its .listbox after it, so the `+ *` gap above lands on
+   the invisible select. Carry both states over to the visible box. */
+.context-help-host[data-help-role="field"] > .context-help:not([open]) + select[data-listbox] + .listbox { margin-top: var(--opt-label-gap); }
+.context-help-host > .context-help[open] + select[data-listbox] + .listbox { margin-top: var(--opt-sp-4); }
+/* ...and keeps the list box's own 240px floor: the host's `.context-help ~ *`
+   min-width: 0 (there for text and inputs that must shrink) outranks the
+   .listbox rule and left Theme's box at its content width. */
+.context-help-host[data-help-role="field"] > .context-help ~ .listbox { min-width: min(240px, 100%); }
 .hint { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 /* `.pref-row > label` (the row model) sets gap: --opt-sp-5 (12px),
    outranking .switch's own base gap: --opt-sp-3 (6px) for a choice-role
@@ -2065,8 +2074,11 @@ html.motion-ready #preset-preview-section > summary::after {
 }
 
 /* ---- Theme preset buttons ---- */
-.theme-presets-group { display: flex; gap: var(--opt-sp-3); flex-wrap: wrap; align-items: center; margin-bottom: var(--opt-sp-3); }
-.theme-group-label { font-size: 11px; color: var(--opt-fg-hint); text-transform: uppercase; letter-spacing: 0.05em; min-width: 60px; flex-shrink: 0; white-space: nowrap; padding-right: var(--opt-sp-3); box-sizing: content-box; }
+.theme-presets-group { display: flex; gap: var(--opt-sp-3); flex-wrap: wrap; align-items: center; margin-bottom: var(--opt-sp-5); }
+/* The group name takes its own line above the chips: as an inline column it
+   was 66-90px wide depending on the locale, so no two groups' chips -- and
+   never the unlabeled "None" -- started at the same x. */
+.theme-group-label { flex-basis: 100%; font-size: 11px; color: var(--opt-fg-hint); text-transform: uppercase; letter-spacing: 0.05em; }
 /* Borderless swatch pill (design-uplift, user-selected Variant A,
    2026-08-04) -- shared base for .theme-preset-btn and .saved-theme-btn; see
    COMPONENTS.md Appendix C's preset-row-redesign entry for the full
@@ -3990,7 +4002,6 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
   .panel.active { padding: var(--opt-sp-4); }
   .fg > .listbox { min-width: 0; width: 100%; }
   .fg select { min-width: 0; }
-  .theme-group-label { flex-basis: 100%; white-space: normal; }
   .connection-health { grid-template-columns: minmax(0, 1fr); }
   .fg-actions > .btn { max-width: 100%; white-space: normal; height: auto; min-height: var(--opt-control-h); }
   .section-title, .hint, .fg > label { overflow-wrap: anywhere; }

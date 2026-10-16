@@ -1227,15 +1227,24 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(select && select.hasAttribute("data-listbox"), "opt-theme is missing data-listbox");
   });
 
-  // Language joined the Appearance tab ahead of Theme (2026-10-15 IA).
-  await test("stage3b: appearance panel wraps Language, Theme and Custom Style in their own sections", async () => {
+  // Language joined the Appearance tab ahead of Theme (2026-10-15 IA); since
+  // 2026-10-16 the tab groups by what it styles: Extension Appearance
+  // (language, theme, follow-preset switch), then Pinboard.in Custom Style
+  // (presets -> font -> CSS).
+  await test("stage3b: appearance panel groups extension appearance and Pinboard.in style in two sections", async () => {
     const panel = await panelDoc("appearance");
     assert(!!panel, "panel-appearance is missing");
     const sections = [...panel.querySelectorAll(":scope > section.settings-section")];
-    assert(sections.length === 3, "expected 3 top-level sections in panel-appearance, got " + sections.length);
-    assert(!!sections[0].querySelector("#opt-lang"), "#opt-lang is not inside the Language section");
-    assert(!!sections[1].querySelector("#opt-theme"), "#opt-theme is not inside the Theme section");
-    assert(!!sections[2].querySelector("#opt-custom-css"), "#opt-custom-css is not inside the Custom Style section");
+    assert(sections.length === 2, "expected 2 top-level sections in panel-appearance, got " + sections.length);
+    for (const id of ["opt-lang", "opt-theme", "opt-popup-follow-theme"]) {
+      assert(!!sections[0].querySelector("#" + id), "#" + id + " is not inside the Extension Appearance section");
+    }
+    const style = sections[1];
+    const order = [".theme-preset-btn", "#opt-custom-font", "#opt-custom-css"].map((sel) => style.querySelector(sel));
+    assert(order.every(Boolean), "Custom Style section lost presets, font or CSS");
+    assert(order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING &&
+      order[1].compareDocumentPosition(order[2]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "Custom Style section is not ordered presets -> font -> CSS");
   });
 
   await test("stage3b: appearance panel's saved-themes and preset-preview sections use the hidden attribute, not inline style", async () => {

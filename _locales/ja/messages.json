@@ -1584,6 +1584,9 @@
   "secTheme": {
     "message": "テーマ"
   },
+  "secExtensionAppearance": {
+    "message": "拡張機能の外観"
+  },
   "themeAuto": {
     "message": "自動（システムに合わせる）"
   },

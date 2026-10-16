@@ -1584,6 +1584,9 @@
   "secTheme": {
     "message": "Motyw"
   },
+  "secExtensionAppearance": {
+    "message": "Wygląd rozszerzenia"
+  },
   "themeAuto": {
     "message": "Auto (według systemu)"
   },

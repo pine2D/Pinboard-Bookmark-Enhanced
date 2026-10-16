@@ -1584,6 +1584,9 @@
   "secTheme": {
     "message": "Design"
   },
+  "secExtensionAppearance": {
+    "message": "Darstellung der Erweiterung"
+  },
   "themeAuto": {
     "message": "Automatisch (Systemeinstellung)"
   },

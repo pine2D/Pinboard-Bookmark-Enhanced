@@ -1034,10 +1034,14 @@
 
     <!-- Tab 6: Appearance -->
     <div id="panel-appearance" class="panel" role="tabpanel" aria-labelledby="tab-appearance">
+      <!-- Two groups by what they style: this extension's own pages, then the
+           pinboard.in site. Field labels carry the names the old one-control
+           sections used as headings. -->
       <section class="settings-section">
-        <h2 class="section-title" id="sec-language" data-i18n="secLanguage">Language</h2>
+        <h2 class="section-title" data-i18n="secExtensionAppearance">Extension Appearance</h2>
         <div class="fg entry-block">
-          <select id="opt-lang" aria-labelledby="sec-language" data-listbox>
+          <label class="bl" id="opt-lang-label" for="opt-lang" data-i18n="secLanguage">Language</label>
+          <select id="opt-lang" aria-labelledby="opt-lang-label" data-listbox>
             <option value="auto" data-i18n="langAuto">Auto (follow browser)</option>
             <option value="en">English</option>
             <option value="ja">日本語</option>
@@ -1050,29 +1054,30 @@
             <option value="ru">Русский</option>
           </select>
         </div>
-      </section>
-      <section class="settings-section">
-        <div class="context-help-host context-help-section" data-help-role="section">
-          <h2 class="section-title" id="sec-theme" data-i18n="secTheme">Theme</h2>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" id="opt-theme-label" for="opt-theme" data-i18n="secTheme">Theme</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" id="opt-theme-hint" data-i18n="optThemeHint">Switches the popup, this settings page, the notes &amp; vocabulary page and the reader between light and dark. Presets with a built-in scheme (Dracula, for example) override it on the pages that follow the preset; the reader can override it per device from its "Aa" panel.</p>
           </details>
-        </div>
-        <div class="fg entry-block">
-          <select id="opt-theme" aria-labelledby="sec-theme" data-listbox>
+          <select id="opt-theme" aria-labelledby="opt-theme-label" data-listbox>
             <option value="auto" data-i18n="themeAuto">Auto (follow system)</option>
             <option value="light" data-i18n="themeLight">Light</option>
             <option value="dark" data-i18n="themeDark">Dark</option>
           </select>
         </div>
+        <div class="pref-group">
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">When on, the popup, this settings page and the notes &amp; vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
+        </div>
       </section>
       <section class="settings-section">
         <h2 class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</h2>
-        <div class="fg entry-block">
-          <label class="bl" for="opt-custom-font" data-i18n="labelCustomFont">Custom Font</label>
-          <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans', sans-serif" data-i18n-placeholder="customFontPlaceholder" />
-        </div>
         <div class="fg">
           <label class="bl subhead" data-i18n="labelThemePresets">Theme Presets</label>
           <div class="theme-presets-group" role="group" aria-labelledby="theme-group-none">
@@ -1104,14 +1109,9 @@
           <label class="bl subhead" data-i18n="labelSavedThemes">Saved Themes</label>
           <div id="saved-themes-list" class="theme-presets-group"></div>
         </div>
-        <div class="pref-group">
-          <div class="pref-row context-help-host" data-help-role="choice">
-            <label class="switch"><input type="checkbox" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
-            <details class="context-help">
-              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">When on, the popup, this settings page and the notes &amp; vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette.</p>
-            </details><span class="switch-track" aria-hidden="true"></span></label>
-          </div>
+        <div class="fg entry-block">
+          <label class="bl" for="opt-custom-font" data-i18n="labelCustomFont">Custom Font</label>
+          <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans', sans-serif" data-i18n-placeholder="customFontPlaceholder" />
         </div>
         <div class="fg edit-area context-help-host" data-help-role="field">
           <label class="bl" for="opt-custom-css" data-i18n="labelCustomCSSOverlay">Custom CSS Overlay</label>

@@ -1584,6 +1584,9 @@
   "secTheme": {
     "message": "Thème"
   },
+  "secExtensionAppearance": {
+    "message": "Apparence de l'extension"
+  },
   "themeAuto": {
     "message": "Auto (suivre le système)"
   },

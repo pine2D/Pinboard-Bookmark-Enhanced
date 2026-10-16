@@ -950,17 +950,22 @@ function test(name, fn) {
   // margin-top (--opt-section-gap) instead of a literal border line. Retitled
   // and rewritten from "presents one separator" (which asserted the OLD
   // divider's border-line count) to assert the boundary that replaced it.
-  // Language moved to the Appearance tab (2026-10-15 IA); the boundary it
-  // shares with Theme is the same row-model margin gap, never a divider.
-  test("Language and Theme are separate sections joined by the row model's margin gap, not a divider", () => {
+  // Language moved to the Appearance tab (2026-10-15 IA). Since 2026-10-16
+  // the tab has two groups by what they style: Language and Theme share
+  // Extension Appearance, and the boundary to Pinboard.in Custom Style is the
+  // same row-model margin gap, never a divider.
+  test("Extension Appearance and Pinboard.in Custom Style are separate sections joined by the row model's margin gap, not a divider", () => {
     const panel = doc.getElementById("panel-appearance");
     doc.querySelectorAll(".panel").forEach((candidate) => candidate.classList.toggle("active", candidate === panel));
-    const languageSection = doc.getElementById("sec-language")?.closest("section.settings-section");
-    const themeSection = doc.getElementById("sec-theme")?.closest("section.settings-section");
-    assert(languageSection && themeSection && languageSection !== themeSection && languageSection.closest("#panel-appearance"),
-      "Language and Theme must sit in separate settings-section blocks on the Appearance tab");
-    const gap = themeSection.getBoundingClientRect().top - languageSection.getBoundingClientRect().bottom;
-    assert(gap >= 30 && gap <= 34, "Language -> Theme section gap=" + gap);
+    const extensionSection = doc.getElementById("opt-lang")?.closest("section.settings-section");
+    const styleSection = doc.getElementById("opt-custom-css")?.closest("section.settings-section");
+    assert(extensionSection && extensionSection.closest("#panel-appearance") &&
+      doc.getElementById("opt-theme")?.closest("section.settings-section") === extensionSection,
+      "Language and Theme must share the Extension Appearance section on the Appearance tab");
+    assert(styleSection && styleSection !== extensionSection,
+      "Pinboard.in Custom Style must be its own settings-section");
+    const gap = styleSection.getBoundingClientRect().top - extensionSection.getBoundingClientRect().bottom;
+    assert(gap >= 30 && gap <= 34, "Extension Appearance -> Custom Style section gap=" + gap);
   });
 
   test("batch AI help opens below an explicit group title", () => {

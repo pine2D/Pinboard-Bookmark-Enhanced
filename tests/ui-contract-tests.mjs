@@ -1675,7 +1675,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     return help >= 0 && control >= 0 && help < control;
   }), "options.html: field contextual help expands after its control instead of directly below the label");
 
-  const themeTitle = optionsHtml.indexOf('id="sec-theme"');
+  const themeTitle = optionsHtml.indexOf('id="opt-theme-label"');
   const themeSelect = optionsHtml.indexOf('id="opt-theme"', themeTitle);
   const themeHelp = optionsHtml.lastIndexOf('<details class="context-help"', themeSelect);
   check(themeTitle >= 0 && themeHelp > themeTitle && themeHelp < themeSelect,
@@ -4114,10 +4114,12 @@ check(/<input type="password" id="opt-pinboard-token"/.test(optionsHtml) && /dat
   "options.html: Pinboard token is not masked with a reveal control");
 check(/<button[^>]+id="import-settings"/.test(optionsHtml) && /id="import-status"[^>]+role="status"/.test(optionsHtml),
   "options.html: settings import is not a keyboard button with live status");
-// Section titles are real <h2>s (outline-navigable); the select borrows the
-// heading as its accessible name via aria-labelledby (settings batch E).
-for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"], ["opt-ai-provider", "secAiProvider", "sec-ai-provider"], ["opt-theme", "secTheme", "sec-theme"]]) {
-  check(new RegExp(`<h2[^>]+id="${heading}"[^>]+data-i18n="${label}"`).test(optionsHtml) &&
+// A select that is its section's only control borrows the <h2> as its
+// accessible name via aria-labelledby (settings batch E); language and theme
+// now share the Extension Appearance section, so each borrows its own field
+// label instead.
+for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-label", "label"], ["opt-ai-provider", "secAiProvider", "sec-ai-provider", "h2"], ["opt-theme", "secTheme", "opt-theme-label", "label"]]) {
+  check(new RegExp(`<${tag}[^>]+id="${heading}"[^>]+data-i18n="${label}"`).test(optionsHtml) &&
     new RegExp(`<select id="${id}"[^>]+aria-labelledby="${heading}"`).test(optionsHtml),
     `options.html: ${id} lacks its section heading as accessible name`);
 }

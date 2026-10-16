@@ -1584,6 +1584,9 @@
   "secTheme": {
     "message": "Тема"
   },
+  "secExtensionAppearance": {
+    "message": "Оформление расширения"
+  },
   "themeAuto": {
     "message": "Авто (по настройкам системы)"
   },

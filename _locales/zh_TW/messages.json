@@ -1584,6 +1584,9 @@
   "secTheme": {
     "message": "主題"
   },
+  "secExtensionAppearance": {
+    "message": "擴充功能外觀"
+  },
   "themeAuto": {
     "message": "自動（跟隨系統）"
   },
