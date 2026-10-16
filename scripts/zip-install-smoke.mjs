@@ -305,7 +305,9 @@ async function checkExtensionPage(number, name, waitMs) {
             : response;
         };
       });
-      await page.locator('#tab-general').click();
+      // Google Drive lives on the Data tab since the 2026-10-15 IA; its panel
+      // only renders (renderDriveSyncPanel) when that tab is activated.
+      await page.locator('#tab-storage').click();
       const connect = page.locator('#vocab-drive-connect');
       const actions = page.locator('#vocab-drive-actions');
       const state = page.locator('#vocab-drive-state');
