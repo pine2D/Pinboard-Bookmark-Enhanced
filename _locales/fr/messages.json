@@ -2607,6 +2607,12 @@
   "tagGovLoadFailed": {
     "message": "Impossible de charger les étiquettes. Vérifiez votre jeton API ou le réseau, puis cliquez sur Actualiser."
   },
+  "tagGovNeedToken": {
+    "message": "Saisissez votre jeton API Pinboard dans l’onglet Compte pour charger vos étiquettes ici."
+  },
+  "tagGovEnterToken": {
+    "message": "Saisir le jeton API"
+  },
   "tagGovSnapshotSaved": {
     "message": "Instantané de la liste des tags téléchargé (noms et compteurs ; référence pour réparation manuelle, pas de restauration automatique)"
   },

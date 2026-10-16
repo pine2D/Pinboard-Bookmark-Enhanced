@@ -2607,6 +2607,12 @@
   "tagGovLoadFailed": {
     "message": "Nie udało się wczytać tagów. Sprawdź API Token lub połączenie sieciowe, a potem kliknij „Odśwież”."
   },
+  "tagGovNeedToken": {
+    "message": "Wpisz Pinboard API Token w sekcji „Konto”, aby wczytać tu swoje tagi."
+  },
+  "tagGovEnterToken": {
+    "message": "Wpisz API Token"
+  },
   "tagGovSnapshotSaved": {
     "message": "Pobrano migawkę listy tagów (tylko nazwy i liczby — pomoc przy ręcznej naprawie, bez automatycznego przywracania)"
   },

@@ -2607,6 +2607,12 @@
   "tagGovLoadFailed": {
     "message": "无法加载标签。请检查 API Token 或网络，然后点击「刷新」。"
   },
+  "tagGovNeedToken": {
+    "message": "先在「账号」中填写 Pinboard API Token，这里才能读取你的标签。"
+  },
+  "tagGovEnterToken": {
+    "message": "填写 API Token"
+  },
   "tagGovSnapshotSaved": {
     "message": "已下载标签清单快照（仅含标签名和数量，供手工修复参考，不能自动还原）"
   },

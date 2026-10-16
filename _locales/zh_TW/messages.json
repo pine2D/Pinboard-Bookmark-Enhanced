@@ -2607,6 +2607,12 @@
   "tagGovLoadFailed": {
     "message": "無法載入標籤。請檢查 API Token 或網路，然後按「重新整理」。"
   },
+  "tagGovNeedToken": {
+    "message": "請先在「帳號」中填寫 Pinboard API Token，這裡才能讀取你的標籤。"
+  },
+  "tagGovEnterToken": {
+    "message": "填寫 API Token"
+  },
   "tagGovSnapshotSaved": {
     "message": "已下載標籤清單快照（僅含標籤名稱與數量，供手動修復參考，無法自動還原）"
   },

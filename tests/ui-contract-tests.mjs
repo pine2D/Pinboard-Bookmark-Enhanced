@@ -5121,7 +5121,9 @@ const tagGovClick = optionsJs.slice(tagGovClickStart, tagGovClickEnd);
 check(tagGovClickStart >= 0 && tagGovClickEnd > tagGovClickStart &&
   tagGovClick.indexOf("btn.disabled = true") >= 0 &&
   tagGovClick.indexOf("btn.disabled = true") < tagGovClick.indexOf("await requestAIHostPermissions(pending)") &&
-  tagGovClick.indexOf("btn.disabled = false") > tagGovClick.indexOf("await requestAIHostPermissions(pending)") &&
+  // The finally re-enables the button only while the panel has tag data
+  // (pbpSetTagGovHasData); with no counts on screen it stays off.
+  tagGovClick.indexOf('btn.disabled = !$id("panel-tags")?.dataset.tagGovHasData') > tagGovClick.indexOf("await requestAIHostPermissions(pending)") &&
   tagGovClick.indexOf("await requestAIHostPermissions(pending)") === tagGovClick.indexOf("await ") &&
   tagGovClick.includes("tagGovAiPendingSettings !== pending") &&
   tagGovClick.includes("await runTagGovAi(pending)"),

@@ -2607,6 +2607,12 @@
   "tagGovLoadFailed": {
     "message": "Tags konnten nicht geladen werden. Prüfe deinen API-Token oder die Netzwerkverbindung und klicke dann auf „Aktualisieren“."
   },
+  "tagGovNeedToken": {
+    "message": "Trage unter „Konto“ deinen Pinboard-API-Token ein, damit hier deine Tags geladen werden."
+  },
+  "tagGovEnterToken": {
+    "message": "API-Token eintragen"
+  },
   "tagGovSnapshotSaved": {
     "message": "Tag-Listen-Snapshot heruntergeladen (nur Namen und Anzahl; Referenz für manuelle Reparatur, keine automatische Wiederherstellung)"
   },

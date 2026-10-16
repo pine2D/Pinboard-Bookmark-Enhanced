@@ -1402,7 +1402,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (refreshBtn) refreshBtn.addEventListener("click", async () => {
       refreshBtn.disabled = true;
       const auth = await getTagGovAuth();
-      if (!auth) { refreshBtn.disabled = false; return; }
+      if (!auth) { _tagGovShowLoadFailed("no-token"); refreshBtn.disabled = false; return; }
       const aiKey = pbpAccountStorageKey("_tagGovAiGroups", auth.account);
       await chrome.storage.local.set({ [aiKey]: { account: auth.account, groups: [], ts: Date.now() } });
       const fresh = await loadTagCounts(true, auth.account);
@@ -1416,7 +1416,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (counts && overview) {
       updateTagGovOverview(counts);
     } else if (overview) {
-      _tagGovShowLoadFailed();
+      _tagGovShowLoadFailed(initialAuth ? "failed" : "no-token");
     }
     // Restore the last run's outcome if it left anything needing attention —
     // all-ok runs are not resurrected (no nagging).
@@ -1516,7 +1516,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // #tag-gov-stats is the only readout neither writes.
         await renderTagGov();
         await renderLowCountTags();
-        _tagGovShowLoadFailed();
+        _tagGovShowLoadFailed("no-token");
         return;
       }
       const counts = await loadTagCounts(false, auth.account);
@@ -4469,6 +4469,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const btn = event.currentTarget;
     if (btn.disabled) return;
     btn.disabled = true;
+    btn.dataset.running = "1";
     try {
       const pending = tagGovAiPendingSettings;
       if (pending && $id("opt-ai-provider")?.value === pending.aiProvider) {
@@ -4489,9 +4490,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       sNow = { ...sNow, ...live, _tagGovExpectedAccount: pbpPinboardAccountFromToken(sNow.pinboardToken) };
       await runTagGovAi(sNow);
     } finally {
-      btn.disabled = false;
+      delete btn.dataset.running;
+      btn.disabled = !$id("panel-tags")?.dataset.tagGovHasData;
     }
   });
+  $id("tag-gov-enter-token")?.addEventListener("click", () => pbpOpenOptionsTarget("general", "opt-pinboard-token"));
 
   await renderWaybackLog();
 });
@@ -4510,6 +4513,7 @@ const TAG_GOV_LIST_RETRY_WAIT_MS = 60000; // posts/all has its own documented on
 function updateTagGovOverview(counts) {
   const stats = $id("tag-gov-stats");
   if (!counts || !stats) return;
+  pbpSetTagGovDataState("ready");
   const tagCount = Object.keys(counts).length;
   const totalUses = Object.values(counts).reduce((a, b) => a + b, 0);
   stats.textContent = t("tagGovOverview", String(tagCount), String(totalUses));
@@ -4529,12 +4533,41 @@ function pbpSetTagGovIgnoredCount(n) {
 // pinboard.in/u:<user>/... links without an extra async hop at render time.
 let _tagGovUser = "";
 
-// Loading tag counts failed (no token / offline / API error): say so in the
-// overview line instead of leaving the unfilled "$TAGS$ tags" template visible.
-// Only writes #tag-gov-stats' text, same as updateTagGovOverview.
-function _tagGovShowLoadFailed() {
+// The overview's load state: "ready" (counts loaded), "no-token", "failed"
+// (offline / API error). With no token the one useful action is the jump
+// to Account.
+function pbpSetTagGovDataState(state) {
+  const panel = $id("panel-tags");
+  if (panel) panel.dataset.tagGovState = state;
+  const needToken = $id("tag-gov-need-token");
+  if (needToken) needToken.hidden = state !== "no-token";
+}
+
+// Whether the panel has tag counts to work on -- what renderTagGov actually
+// rendered from, which can be a cache older than a failed refresh. Without
+// counts there is nothing to analyse or delete, so the AI pass is disabled
+// and the low-count list, the irreversibility warning and the bundles note
+// step aside; with counts on screen (even stale ones beside a failed
+// refresh) the merge buttons are live, so those stay.
+function pbpSetTagGovHasData(hasData) {
+  const panel = $id("panel-tags");
+  if (panel) panel.dataset.tagGovHasData = hasData ? "1" : "";
+  const ai = $id("tag-gov-ai-btn");
+  if (ai && !ai.dataset.running) ai.disabled = !hasData;
+  for (const id of ["tag-gov-lowcount", "tag-gov-irreversible", "tag-gov-bundles-warn"]) {
+    const el = $id(id);
+    if (el) el.hidden = !hasData;
+  }
+}
+
+// Loading tag counts failed: say why in the overview line instead of leaving
+// the unfilled "$TAGS$ tags" template visible. `reason` "no-token" names the
+// missing step; anything else is the offline / API-error message.
+function _tagGovShowLoadFailed(reason = "failed") {
+  const noToken = reason === "no-token";
   const stats = $id("tag-gov-stats");
-  if (stats) stats.textContent = t("tagGovLoadFailed");
+  if (stats) stats.textContent = t(noToken ? "tagGovNeedToken" : "tagGovLoadFailed");
+  pbpSetTagGovDataState(noToken ? "no-token" : "failed");
 }
 
 // Shared token reader for tag-governance operations.
@@ -5405,7 +5438,7 @@ async function renderTagGov() {
   const container = $id("tag-gov-groups");
   if (!container) return;
   const auth = await getTagGovAuth();
-  if (!auth) { pbpSetTagGovIgnoredCount(0); container.replaceChildren(); return; }
+  if (!auth) { pbpSetTagGovIgnoredCount(0); pbpSetTagGovHasData(false); container.replaceChildren(); return; }
 
   // Do NOT empty the container before the awaits below: a paint during the async gap
   // collapses the panel height, Chrome clamps the scroll offset, and the page visibly
@@ -5417,13 +5450,13 @@ async function renderTagGov() {
   const tagCounts = _tagGovOwned(stored.cached_user_tags, auth.account)?.counts;
 
   if (!tagCounts) {
+    // Nothing loaded is not "no similar groups": the overview line says why.
     pbpSetTagGovIgnoredCount(0);
-    const empty = document.createElement("div");
-    empty.className = "fg";
-    empty.textContent = t("tagGovNoGroups");
-    container.replaceChildren(empty);
+    pbpSetTagGovHasData(false);
+    container.replaceChildren();
     return;
   }
+  pbpSetTagGovHasData(true);
 
   const ignoredList = _tagGovOwned(stored[ignoredKey], auth.account)?.ids || [];
   pbpSetTagGovIgnoredCount(ignoredList.length);

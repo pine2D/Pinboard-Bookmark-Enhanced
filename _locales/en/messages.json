@@ -2616,6 +2616,12 @@
   "tagGovLoadFailed": {
     "message": "Couldn't load tags. Check your API token or network, then click Refresh."
   },
+  "tagGovNeedToken": {
+    "message": "Add your Pinboard API Token under Account to load your tags here."
+  },
+  "tagGovEnterToken": {
+    "message": "Enter API Token"
+  },
   "tagGovSnapshotSaved": {
     "message": "Tag list snapshot downloaded (names and counts; a reference for manual repair, not an automatic restore)"
   },

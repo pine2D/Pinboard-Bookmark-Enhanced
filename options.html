@@ -907,9 +907,18 @@
           <span id="tag-gov-stats">…</span><span id="tag-gov-ignored" hidden> · <span id="tag-gov-ignored-count"></span> ·
           <span class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored" data-i18n="tagGovResetIgnored">Reset ignored list</a></span></span>
         </p>
-        <p class="hint" data-i18n="tagGovIrreversibleWarn">Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change, for manual reference only.</p>
+        <!-- No token yet: the one useful action is the jump to Account
+             (pbpSetTagGovDataState shows it). -->
+        <div class="fg" id="tag-gov-need-token" hidden>
+          <div class="fg-actions">
+            <button type="button" class="btn btn-sm" id="tag-gov-enter-token" data-i18n="tagGovEnterToken">Enter API Token</button>
+          </div>
+        </div>
+        <p class="hint" id="tag-gov-irreversible" data-i18n="tagGovIrreversibleWarn">Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change, for manual reference only.</p>
         <div id="tag-gov-ai-status" class="hint"></div>
         <div id="tag-gov-groups"></div>
+        <!-- Beside the groups it qualifies: merging is what leaves bundles stale. -->
+        <p class="hint" id="tag-gov-bundles-warn" data-i18n="tagGovBundlesWarn">Tag bundles on pinboard.in are not updated by renames; review them manually after merging.</p>
         <!-- No <h2> above this disclosure: its own <summary> is the section
              header (the .disclosure primitive: section-title face + chevron; its
              own top rule replaces a .divider). The heading used to be spelled
@@ -948,7 +957,6 @@
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" id="opt-tag-sort-by-pop" checked /> <span class="switch-text" data-i18n="optTagSortByPop">Add a popularity sort control on tag pages</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
-        <p class="hint" id="tag-gov-bundles-warn" data-i18n="tagGovBundlesWarn">Tag bundles on pinboard.in are not updated by renames; review them manually after merging.</p>
       </section>
     </div>
 

@@ -2607,6 +2607,12 @@
   "tagGovLoadFailed": {
     "message": "タグを読み込めませんでした。API Token またはネットワークを確認してから、「更新」をクリックしてください。"
   },
+  "tagGovNeedToken": {
+    "message": "タグを読み込むには、まず「アカウント」で Pinboard の API Token を入力してください。"
+  },
+  "tagGovEnterToken": {
+    "message": "API Token を入力"
+  },
   "tagGovSnapshotSaved": {
     "message": "タグ一覧のスナップショットをダウンロードしました（名前と件数のみ。手動修復の参考用で、自動復元はできません）"
   },
