@@ -236,6 +236,31 @@ function pbpLibRenderCount(host, items, full) {
   else host.removeAttribute("title");
 }
 
+// Typing in a search box rewrites the count sentence on every keystroke, and
+// the count is a polite live region: a screen reader would queue one
+// announcement per letter. While the user types the region goes quiet; a
+// pause later it is live again and says the final count once. The sentence
+// itself still updates with every render -- only its announcement waits.
+const PBP_LIB_COUNT_QUIET_MS = 600;
+const _libQuietTimers = new Map();
+function pbpLibQuietCount(host) {
+  if (!host) return;
+  clearTimeout(_libQuietTimers.get(host));
+  host.setAttribute("aria-live", "off");
+  _libQuietTimers.set(host, setTimeout(() => {
+    _libQuietTimers.delete(host);
+    host.setAttribute("aria-live", "polite");
+    const sr = host.querySelector(":scope > .lib-count-full");
+    const sentence = sr ? sr.textContent : "";
+    if (!sentence) return;
+    // A live region speaks on a change it sees while live: blank the
+    // sentence, then put it back a frame later -- unless a render wrote a
+    // newer one in between, which is then the one announced.
+    sr.textContent = "";
+    requestAnimationFrame(() => { if (!sr.textContent) sr.textContent = sentence; });
+  }, PBP_LIB_COUNT_QUIET_MS));
+}
+
 // Dates and times (spec §5.3, §11 V7). uiLangToBCP47() can hand Intl a
 // malformed stored tag, which throws -- fall back to the browser default
 // rather than losing the date.

@@ -1292,6 +1292,20 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("Clear empties the selection and hides the bar",
     _notesSelected.size === 0 && !$id("notes-batch-toolbar").classList.contains("selecting") &&
     !document.querySelector("#notes-list .notes-hit.selected"));
+  {
+    const esc = (el) => el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    $id("notes-select-all").click();
+    btnOf("pbp_hl_alpha#a1").focus();
+    const fromRow = esc(btnOf("pbp_hl_alpha#a1"));
+    check("Escape on a row clears the selection and keeps focus on the row",
+      fromRow === false && _notesSelected.size === 0 && document.activeElement === btnOf("pbp_hl_alpha#a1"));
+    $id("notes-select-all").click();
+    esc($id("notes-invert-selection"));
+    check("Escape in the batch row clears the selection and hands focus to the count row's Select all",
+      _notesSelected.size === 0 && document.activeElement === $id("notes-select-all"),
+      document.activeElement && (document.activeElement.id || document.activeElement.tagName));
+    check("with nothing selected Escape passes through", esc(btnOf("pbp_hl_alpha#a1")) === true);
+  }
   // A filter changes WHICH rows exist, so it clears the selection (the
   // vocabulary list's shipped rule).
   btnOf("pbp_hl_alpha#a1").dispatchEvent(mouse({ ctrlKey: true }));

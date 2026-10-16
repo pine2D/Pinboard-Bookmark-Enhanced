@@ -336,6 +336,8 @@ function _pbpVocabBuildRow(w) {
 // The word whose resting note the reader expanded ("Show full note"), and one
 // ResizeObserver for every note box (_pbpVocabSyncNoteMore).
 let _vocabNoteExpandedId = null;
+// The note count shows once fewer than this many characters remain.
+const PBP_VOCAB_NOTE_COUNT_FROM = 50;
 const _vocabNoteObserver = typeof ResizeObserver === "function"
   ? new ResizeObserver((entries) => entries.forEach((entry) => _pbpVocabSyncNoteMore(entry.target)))
   : null;
@@ -389,8 +391,24 @@ function _pbpVocabBuildNoteEditor(w) {
     _vocabNoteExpandedId = on ? w.id : null;
     setExpanded(on);
   });
-  noteInput.addEventListener("focus", () => _pbpVocabSyncNoteMore(noteInput));
-  noteInput.addEventListener("blur", () => _pbpVocabSyncNoteMore(noteInput));
+  // The box stops taking text at maxLength without a word: near the limit,
+  // while writing, a count says how close it is (screen readers hear it on
+  // focus through aria-describedby; per-keystroke announcements would drown
+  // the typing).
+  const noteCount = document.createElement("span");
+  noteCount.className = "vocab-note-count";
+  noteCount.id = "vocab-note-count";
+  noteCount.hidden = true;
+  const syncCount = () => {
+    const n = noteInput.value.length;
+    noteCount.textContent = n + " / " + noteInput.maxLength;
+    noteCount.hidden = document.activeElement !== noteInput || n < noteInput.maxLength - PBP_VOCAB_NOTE_COUNT_FROM;
+    if (noteCount.hidden) noteInput.removeAttribute("aria-describedby");
+    else noteInput.setAttribute("aria-describedby", noteCount.id);
+  };
+  noteInput.addEventListener("input", syncCount);
+  noteInput.addEventListener("focus", () => { syncCount(); _pbpVocabSyncNoteMore(noteInput); });
+  noteInput.addEventListener("blur", () => { syncCount(); _pbpVocabSyncNoteMore(noteInput); });
   _vocabNoteObserver?.observe(noteInput);
   const noteSave = document.createElement("button");
   noteSave.type = "button";
@@ -479,7 +497,7 @@ function _pbpVocabBuildNoteEditor(w) {
       noteSave.disabled = false;
     }
   });
-  noteWrap.append(noteInput, noteMore);
+  noteWrap.append(noteInput, noteCount, noteMore);
   return { wrap: noteWrap, save: noteSave };
 }
 
@@ -2532,6 +2550,7 @@ $id("vocab-clear-filters")?.addEventListener("click", _pbpVocabClearFilters);
 
 const _vocabSearch = $id("vocab-search");
 if (_vocabSearch) _vocabSearch.addEventListener("input", () => {
+  pbpLibQuietCount($id("vocab-count"));
   _pbpVocabClearSelection();
   _pbpVocabApplyView(true);
   _pbpVocabResetListScroll();
@@ -2676,6 +2695,22 @@ if (_vocabClearBtn) _vocabClearBtn.addEventListener("click", () => {
   _pbpVocabClearSelection();
   _pbpVocabSyncSelectionUi();
   _pbpVocabFocusCountRowSelectAll();
+});
+// Escape drops the selection from where the reader is working with it -- a
+// row or the batch row -- as it closes every other transient state on this
+// page. Text fields keep their own Escape (a search box empties itself), and
+// with nothing selected the key passes through. From the batch row, focus
+// lands where Clear sends it; on a row it stays on the row.
+const _vocabListPaneEl = $id("vocab-list-pane");
+if (_vocabListPaneEl) _vocabListPaneEl.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || e.isComposing || e.defaultPrevented || !_vocabSelected.size) return;
+  const el = e.target instanceof Element ? e.target : null;
+  if (!el || !el.closest("#vocab-list, #vocab-batch-toolbar") || el.closest("input, textarea")) return;
+  e.preventDefault();
+  const fromBar = !!el.closest("#vocab-batch-toolbar");
+  _pbpVocabClearSelection();
+  _pbpVocabSyncSelectionUi();
+  if (fromBar) _pbpVocabFocusCountRowSelectAll();
 });
 const _vocabSelectAll = $id("vocab-select-all");
 if (_vocabSelectAll) _vocabSelectAll.addEventListener("click", _pbpVocabSelectAllVisible);

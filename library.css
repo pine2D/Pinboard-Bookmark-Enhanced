@@ -1812,6 +1812,19 @@ html.motion-ready .vocab-note-save {
 }
 .vocab-note-input.is-expanded:not(:focus) { max-height: none; }
 .vocab-note-edit > .vocab-note-more { margin-top: var(--lib-sp-1); }
+/* Near the 500-character limit, while writing: the count, under the box's
+   end edge (library-vocab.js PBP_VOCAB_NOTE_COUNT_FROM). */
+.vocab-note-edit > .vocab-note-count {
+  display: block;
+  max-width: var(--lib-main-max);
+  margin-top: var(--lib-sp-1);
+  font-size: var(--lib-text-meta);
+  line-height: var(--lib-lh-meta);
+  color: var(--lib-fg-muted);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.vocab-note-edit > .vocab-note-count[hidden] { display: none; }
 .vocab-note-more[aria-expanded="true"] > .btn-ic { rotate: 180deg; }
 /* The cover (spec §4.11; the notes cover reuses these in T8). */
 .lib-cover { min-width: 0; }

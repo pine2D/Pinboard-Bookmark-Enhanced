@@ -378,6 +378,31 @@ check("inverting a full selection empties it and hands focus back to the count r
   _vocabSelected.size === 0 && getComputedStyle($id("vocab-batch-toolbar")).display === "none" &&
   document.activeElement === $id("vocab-select-all"),
   document.activeElement && (document.activeElement.id || document.activeElement.tagName));
+// Escape drops the selection: from a row it stays on the row, from the batch
+// row it lands where Clear sends it, in a text field it is the field's own,
+// and with nothing selected it passes through untouched.
+{
+  const esc = (el) => el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  const rowHead = () => $id("vocab-list").querySelector(".vocab-card .notes-card-head");
+  $id("vocab-select-all").click();
+  rowHead().focus();
+  const fromRow = esc(rowHead());
+  check("Escape on a row clears the selection and keeps focus on the row",
+    fromRow === false && _vocabSelected.size === 0 && document.activeElement === rowHead() &&
+    getComputedStyle($id("vocab-batch-toolbar")).display === "none");
+  $id("vocab-select-all").click();
+  esc($id("vocab-invert-selection"));
+  check("Escape in the batch row clears the selection and hands focus to the count row's Select all",
+    _vocabSelected.size === 0 && document.activeElement === $id("vocab-select-all"),
+    document.activeElement && (document.activeElement.id || document.activeElement.tagName));
+  $id("vocab-select-all").click();
+  const inField = esc($id("vocab-group-input"));
+  check("Escape in the batch row's group field is the field's own: the selection stays",
+    inField === true && _vocabSelected.size > 0);
+  _pbpVocabClearSelection();
+  _pbpVocabSyncSelectionUi();
+  check("with nothing selected Escape passes through", esc(rowHead()) === true);
+}
 _pbpVocabClearSelection();
 _pbpVocabSyncSelectionUi();
 _vocabRows = [{ id: "row-plain", term: "plain", language: "en", status: "known", groups: ["Reading", "Close"], gloss: "g", contexts: [], updatedAt: 1 }];
@@ -1515,8 +1540,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
           !footer.classList.contains("lib-section") &&
           ["vocab-detail-delete,vocab-note-save", "vocab-detail-delete,vocab-main-status,vocab-note-save"].includes(kinds.join(",")),
           kinds.join(","));
-        check("the note editor keeps its field and the show-full-note button, never Save",
-          [...detailEl().querySelectorAll(".vocab-note-edit > *")].map((el) => el.classList.contains("vocab-note-input") ? "input" : el.classList.contains("vocab-note-more") ? "more" : el.className).join(",") === "input,more" &&
+        check("the note editor keeps its field, its count and the show-full-note button, never Save",
+          [...detailEl().querySelectorAll(".vocab-note-edit > *")].map((el) => el.classList.contains("vocab-note-input") ? "input" : el.classList.contains("vocab-note-count") ? "count" : el.classList.contains("vocab-note-more") ? "more" : el.className).join(",") === "input,count,more" &&
           !detailEl().querySelector(".vocab-note-edit .vocab-note-save"));
         const save = footer.querySelector(".vocab-note-save");
         check("a hidden Save still holds its place in the row",
@@ -2742,11 +2767,46 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("a note that fits its four lines offers nothing",
         more().hidden === true && !field().classList.contains("is-expanded"),
         `sh=${field().scrollHeight} ch=${field().clientHeight}`);
+      // Near the 500-character limit, while writing, the count shows and
+      // describes the field; away from the limit, or at rest, it is gone.
+      const count = () => $id("vocab-detail").querySelector(".vocab-note-edit > .vocab-note-count");
+      field().focus();
+      field().value = "x".repeat(460);
+      field().dispatchEvent(new Event("input", { bubbles: true }));
+      check("writing near the limit shows the count and describes the field by it",
+        count().hidden === false && count().textContent === "460 / 500" && field().getAttribute("aria-describedby") === count().id);
+      field().value = "x".repeat(100);
+      field().dispatchEvent(new Event("input", { bubbles: true }));
+      check("far from the limit the count is gone and describes nothing",
+        count().hidden === true && !field().hasAttribute("aria-describedby"));
+      field().value = "x".repeat(470);
+      field().dispatchEvent(new Event("input", { bubbles: true }));
+      field().blur();
+      check("at rest the count is gone even near the limit", count().hidden === true && !field().hasAttribute("aria-describedby"));
     } finally {
       _pbpVocabDictRun = realDictRun;
       _vocabNoteExpandedId = null;
       _pbpVocabRenderDetail(null);
     }
+  }
+
+  // ---- Typing in the search quiets the count's live region; a pause later
+  // it is live again and says the final count once (pbpLibQuietCount). ----
+  {
+    const host = $id("vocab-count");
+    _vocabRows = sample;
+    $id("vocab-search").value = "a";
+    $id("vocab-search").dispatchEvent(new Event("input", { bubbles: true }));
+    const quiet = host.getAttribute("aria-live");
+    const sentence = host.querySelector(".lib-count-full")?.textContent || "";
+    await new Promise((resolve) => setTimeout(resolve, PBP_LIB_COUNT_QUIET_MS + 100));
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    check("typing quiets the count's live region and a pause re-arms it with the final sentence",
+      quiet === "off" && sentence !== "" && host.getAttribute("aria-live") === "polite" &&
+      host.querySelector(".lib-count-full").textContent === sentence,
+      `${quiet} -> ${host.getAttribute("aria-live")} "${host.querySelector(".lib-count-full").textContent}"`);
+    $id("vocab-search").value = "";
+    _pbpVocabApplyView(true);
   }
 
   // Responsive layout sweep against the REAL vocab-workbench markup and

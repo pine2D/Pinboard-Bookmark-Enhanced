@@ -2215,6 +2215,7 @@ if (typeof $id === "function") {
   const _notesFilterInput = $id("notes-filter");
   if (_notesFilterInput) {
     _notesFilterInput.addEventListener("input", () => {
+      pbpLibQuietCount($id("notes-count"));
       // Filters change WHICH rows exist, so they clear the selection -- the
       // same rule the vocabulary list has shipped since 2026-08-01. (Sorting
       // would keep it; this view has no sort.)
@@ -2245,6 +2246,20 @@ if (typeof $id === "function") {
     // focus to the nearest persistent selection control, not to <body>.
     const allBtn = $id("notes-select-all");
     if (allBtn) _pbpNotesFocus(allBtn);
+  });
+  // Escape drops the selection, the vocabulary list's rule (a row or the
+  // batch row; text fields keep their own Escape; nothing selected, the key
+  // passes through).
+  const _notesListPane = document.querySelector(".notes-list-pane");
+  if (_notesListPane) _notesListPane.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.isComposing || e.defaultPrevented || !_notesSelected.size) return;
+    const el = e.target instanceof Element ? e.target : null;
+    if (!el || !el.closest("#notes-list, #notes-batch-toolbar") || el.closest("input, textarea")) return;
+    e.preventDefault();
+    const fromBar = !!el.closest("#notes-batch-toolbar");
+    _pbpNotesClearSelection();
+    _pbpNotesSyncSelectionUi();
+    if (fromBar) _pbpNotesFocus($id("notes-select-all"));
   });
   const _notesBatchDeleteBtn = $id("notes-batch-delete");
   if (_notesBatchDeleteBtn) _notesBatchDeleteBtn.addEventListener("click", _pbpNotesBatchDelete);
