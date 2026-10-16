@@ -126,11 +126,14 @@
       <div class="vocab-batch-bar" id="vocab-batch-toolbar" role="group" data-i18n-aria="vocabBatchActions" aria-label="Actions for selected words">
         <span id="vocab-selected-count" class="notes-count" aria-live="polite"></span>
         <button type="button" class="btn btn-sm ghost" id="vocab-batch-select-all" data-i18n="vocabSelectAll">Select all</button>
+        <!-- Selection tools beside Select all; the destructive delete stands
+             alone at the row's far end (2026-10-16 ruling: group by job, keep
+             delete away from Clear). DOM order is the reading order. -->
         <span class="lib-cluster">
-          <button type="button" class="btn btn-sm danger ghost" id="vocab-batch-delete" data-i18n-title="vocabBatchDelete" data-i18n-aria="vocabBatchDelete" aria-label="Delete selected words" title="Delete selected words"><span class="btn-ic" data-ic="trash"></span></button>
           <button type="button" class="btn btn-sm ghost" id="vocab-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
           <button type="button" class="btn btn-sm ghost vocab-clear-selection" id="vocab-clear-selection" data-i18n-title="vocabClearSelection" data-i18n-aria="vocabClearSelection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
         </span>
+        <button type="button" class="btn btn-sm danger ghost" id="vocab-batch-delete" data-i18n-title="vocabBatchDelete" data-i18n-aria="vocabBatchDelete" aria-label="Delete selected words" title="Delete selected words"><span class="btn-ic" data-ic="trash"></span></button>
         <!-- Input + stepper unit (icon audit P0): +/- are icon-only because the
              Group-name placeholder disambiguates them; full labels stay in
              title/aria (remove's title is JS-owned, see _pbpVocabSyncSelectionUi). -->
@@ -233,10 +236,10 @@
             <span id="notes-selected-count" class="notes-count" aria-live="polite"></span>
             <button type="button" class="btn btn-sm ghost" id="notes-batch-select-all" data-i18n="vocabSelectAll">Select all</button>
             <span class="lib-cluster">
-              <button type="button" class="btn btn-sm danger ghost" id="notes-batch-delete" data-i18n-title="notesBatchDelete" data-i18n-aria="notesBatchDelete" aria-label="Delete selected highlights" title="Delete selected highlights"><span class="btn-ic" data-ic="trash"></span></button>
               <button type="button" class="btn btn-sm ghost" id="notes-invert-selection" data-i18n-title="vocabInvertSelection" data-i18n-aria="vocabInvertSelection" aria-label="Invert selection" title="Invert selection"><span class="btn-ic" data-ic="arrowRightLeft"></span></button>
               <button type="button" class="btn btn-sm ghost" id="notes-clear-selection" data-i18n-title="vocabClearSelection" data-i18n-aria="vocabClearSelection" aria-label="Clear selection" title="Clear selection"><span class="btn-ic" data-ic="cross"></span></button>
             </span>
+            <button type="button" class="btn btn-sm danger ghost" id="notes-batch-delete" data-i18n-title="notesBatchDelete" data-i18n-aria="notesBatchDelete" aria-label="Delete selected highlights" title="Delete selected highlights"><span class="btn-ic" data-ic="trash"></span></button>
             <span class="lib-batch-status"></span>
           </div>
           <!-- The notes list's own scroll container (spec §2.4). -->
