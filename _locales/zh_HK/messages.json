@@ -4145,6 +4145,8 @@
   "librarySectionContext": { "message": "語境" },
   "librarySectionMyNote": { "message": "我的筆記" },
   "libraryNotePlaceholderShort": { "message": "新增筆記" },
+  "libraryNoteShowAll": { "message": "展開全文" },
+  "libraryNoteShowLess": { "message": "收起" },
   "libraryEditGroups": { "message": "編輯群組" },
   "libraryNotePlaceholder": { "message": "寫點甚麼：聯想、易混淆的詞、用法提醒。離開輸入框時會自動儲存" },
   "libraryVocabCoverTitle": { "message": "生詞本" },

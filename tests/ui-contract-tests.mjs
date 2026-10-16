@@ -1346,16 +1346,22 @@ check(libraryVocabJs.includes('card.setAttribute("aria-selected", isSelected ? "
   // lines inside _pbpVocabRenderDetail (the only place editBtn is built).
   // The count row's Export menu button is the second disclosure (a menu
   // button: aria-haspopup="menu" in the markup), written only by the two
-  // functions that open and close that menu. Every other aria-expanded in the
-  // file -- an editBtn line anywhere else included -- is still the row lie.
+  // functions that open and close that menu. The resting note's "Show full
+  // note" (2026-10-16) is the third, written only on noteMore's own lines in
+  // _pbpVocabBuildNoteEditor. Every other aria-expanded in the file -- an
+  // editBtn or noteMore line anywhere else included -- is still the row lie.
   (() => {
     const fnRe = (name) => new RegExp(`\\n(?:async )?function ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n`);
     const render = (fnRe("_pbpVocabRenderDetail").exec(libraryVocabJs) || [""])[0];
+    const note = (fnRe("_pbpVocabBuildNoteEditor").exec(libraryVocabJs) || [""])[0];
     const outside = libraryVocabJs.replace(fnRe("_pbpVocabToggleGroupEditor"), "\n").replace(fnRe("_pbpVocabRenderDetail"), "\n")
-      .replace(fnRe("_pbpVocabCloseExportMenu"), "\n").replace(fnRe("_pbpVocabOpenExportMenu"), "\n");
+      .replace(fnRe("_pbpVocabCloseExportMenu"), "\n").replace(fnRe("_pbpVocabOpenExportMenu"), "\n")
+      .replace(fnRe("_pbpVocabBuildNoteEditor"), "\n");
     const renderRest = render.split("\n").filter((line) => !/^\s*editBtn\./.test(line)).join("\n");
+    const noteRest = note.split("\n").filter((line) => !/^\s*noteMore\.setAttribute\("aria-expanded"/.test(line)).join("\n");
     return render.includes('editBtn.setAttribute("aria-expanded", "false");') &&
-      !outside.includes("aria-expanded") && !renderRest.includes("aria-expanded");
+      /noteMore\.setAttribute\("aria-expanded"/.test(note) &&
+      !outside.includes("aria-expanded") && !renderRest.includes("aria-expanded") && !noteRest.includes("aria-expanded");
   })() &&
   /\nfunction _pbpVocabToggleGroupEditor\(/.test(libraryVocabJs),
   "library-vocab.js/library.html: vocabulary rows lost the grid/aria-selected selection path or master-detail activation state");

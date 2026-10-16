@@ -333,6 +333,13 @@ function _pbpVocabBuildRow(w) {
   return card;
 }
 
+// The word whose resting note the reader expanded ("Show full note"), and one
+// ResizeObserver for every note box (_pbpVocabSyncNoteMore).
+let _vocabNoteExpandedId = null;
+const _vocabNoteObserver = typeof ResizeObserver === "function"
+  ? new ResizeObserver((entries) => entries.forEach((entry) => _pbpVocabSyncNoteMore(entry.target)))
+  : null;
+
 // Ported verbatim from the pre-migration row builder; _pbpVocabRenderDetail
 // below wires it into the detail pane.
 // Note editor. The field, its concurrent-merge rule and the Drive privacy
@@ -359,10 +366,32 @@ function _pbpVocabBuildNoteEditor(w) {
   noteInput.title = t("libraryNotePlaceholder");
   noteInput.setAttribute("aria-label", t("librarySectionMyNote"));
   noteInput.value = w.note || "";
-  // Announced, not labelled: the chord has no visible affordance of its own,
-  // and the page already declares its shortcuts this way (the row head's
+  // Announced, not labelled: the chords have no visible affordance of their
+  // own, and the page already declares its shortcuts this way (the row head's
   // Control+Space / Shift+Space).
-  noteInput.setAttribute("aria-keyshortcuts", "Control+Enter");
+  noteInput.setAttribute("aria-keyshortcuts", "Control+Enter Escape");
+  // At rest a long note shows four whole lines (library.css clips on the
+  // content box, so nothing hints at the rest): this button, shown only while
+  // the text overflows (_pbpVocabSyncNoteMore), lifts the cap. The choice
+  // outlives a rebuild of the same word -- a save re-renders the detail.
+  const noteMore = document.createElement("button");
+  noteMore.type = "button";
+  noteMore.className = "btn btn-sm ghost lib-hang-start vocab-note-more";
+  noteMore.hidden = true;
+  const setExpanded = (on) => {
+    noteInput.classList.toggle("is-expanded", on);
+    noteMore.setAttribute("aria-expanded", on ? "true" : "false");
+    setBtnIcon(noteMore, "chevronDown", t(on ? "libraryNoteShowLess" : "libraryNoteShowAll"));
+  };
+  setExpanded(_vocabNoteExpandedId === w.id);
+  noteMore.addEventListener("click", () => {
+    const on = !noteInput.classList.contains("is-expanded");
+    _vocabNoteExpandedId = on ? w.id : null;
+    setExpanded(on);
+  });
+  noteInput.addEventListener("focus", () => _pbpVocabSyncNoteMore(noteInput));
+  noteInput.addEventListener("blur", () => _pbpVocabSyncNoteMore(noteInput));
+  _vocabNoteObserver?.observe(noteInput);
   const noteSave = document.createElement("button");
   noteSave.type = "button";
   noteSave.className = "btn btn-sm primary vocab-note-save";
@@ -385,11 +414,23 @@ function _pbpVocabBuildNoteEditor(w) {
   // the propagation stops here because the row handlers upstream read Ctrl as
   // a multi-select modifier.
   noteInput.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
     // Same IME guard the lookup box carries: Chrome fires an Enter keydown
     // with isComposing (keyCode 229 as the fallback signal) when a candidate
     // is confirmed, and that Enter belongs to the composition, not to us.
+    // An Escape mid-composition cancels the composition, never the draft.
     if (e.isComposing || e.keyCode === 229) return;
+    // Escape takes the draft back to the saved note -- the same key that
+    // cancels a highlight's note editor -- so the blur that follows has
+    // nothing left to save. With nothing to undo it passes through.
+    if (e.key === "Escape") {
+      if (noteSave.hidden || noteSave.disabled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      noteInput.value = w.note || "";
+      noteSave.hidden = true;
+      return;
+    }
+    if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
     if (noteSave.hidden || noteSave.disabled) return;
     e.preventDefault();
     e.stopPropagation();
@@ -438,8 +479,22 @@ function _pbpVocabBuildNoteEditor(w) {
       noteSave.disabled = false;
     }
   });
-  noteWrap.appendChild(noteInput);
+  noteWrap.append(noteInput, noteMore);
   return { wrap: noteWrap, save: noteSave };
+}
+
+// Whether the resting note overflows its four lines decides whether "Show
+// full note" is offered; expanded, the button stays to collapse it again, and
+// while the box has focus it is at full writing height and needs no button.
+// A rebuild drops the old box, which reports a last size to the observer as
+// it leaves and is unobserved here.
+function _pbpVocabSyncNoteMore(input) {
+  const more = input.parentNode && input.parentNode.querySelector(":scope > .vocab-note-more");
+  if (!more) return;
+  if (!input.isConnected) { _vocabNoteObserver?.unobserve(input); return; }
+  const expanded = input.classList.contains("is-expanded");
+  const focused = document.activeElement === input;
+  more.hidden = focused || (!expanded && input.scrollHeight <= input.clientHeight + 1);
 }
 
 // The back button is static markup at the top of the pane now, wired once --
@@ -2014,6 +2069,7 @@ function _pbpVocabClearVisibleState() {
 function _pbpVocabDetailFocusTargets(el) {
   if (!el) return [];
   if (el.classList.contains("vocab-note-save")) return [".vocab-note-save", ".vocab-note-input"];
+  if (el.classList.contains("vocab-note-more")) return [".vocab-note-more", ".vocab-note-input"];
   if (el.closest(".vocab-note-edit")) return [".vocab-note-input"];
   if (el.closest(".vocab-group-unit") || el.classList.contains("chip-remove")) return [".vocab-group-unit input", ".vocab-edit-groups"];
   if (el.classList.contains("vocab-edit-groups")) return [".vocab-edit-groups"];

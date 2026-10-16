@@ -1790,10 +1790,21 @@ html.motion-ready .vocab-note-save {
   resize: none;
 }
 .vocab-note-input:focus { min-height: 96px; }
-/* A long note at rest reads as four lines and scrolls inside; it no longer
-   grows into the heaviest block on the sheet and pushes the dictionary entry
-   off the first screen. Focus gives it back its full writing height. */
-.vocab-note-input:not(:focus):not(:placeholder-shown) { max-height: calc(var(--lib-lh-body) * 4 + 20px); }
+/* A long note at rest reads as four lines; it no longer grows into the
+   heaviest block on the sheet and pushes the dictionary entry off the first
+   screen. Focus gives it back its full writing height. The clip sits on the
+   content box: a scrolling box clips at its padding edge, so the fifth line
+   used to show through the bottom padding cut in half. With nothing left to
+   hint at the rest, "Show full note" (.vocab-note-more, library-vocab.js,
+   shown only while the text overflows) lifts the cap. */
+.vocab-note-input:not(:focus):not(:placeholder-shown) {
+  max-height: calc(var(--lib-lh-body) * 4 + 20px);
+  overflow: clip;
+  overflow-clip-margin: content-box;
+}
+.vocab-note-input.is-expanded:not(:focus) { max-height: none; }
+.vocab-note-edit > .vocab-note-more { margin-top: var(--lib-sp-1); }
+.vocab-note-more[aria-expanded="true"] > .btn-ic { rotate: 180deg; }
 /* The cover (spec §4.11; the notes cover reuses these in T8). */
 .lib-cover { min-width: 0; }
 .lib-cover-lead {

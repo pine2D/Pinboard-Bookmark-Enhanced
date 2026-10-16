@@ -1515,9 +1515,9 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
           !footer.classList.contains("lib-section") &&
           ["vocab-detail-delete,vocab-note-save", "vocab-detail-delete,vocab-main-status,vocab-note-save"].includes(kinds.join(",")),
           kinds.join(","));
-        check("the note editor keeps only its field once Save moved out",
-          detailEl().querySelectorAll(".vocab-note-edit > *").length === 1 &&
-          !!detailEl().querySelector(".vocab-note-edit > .vocab-note-input"));
+        check("the note editor keeps its field and the show-full-note button, never Save",
+          [...detailEl().querySelectorAll(".vocab-note-edit > *")].map((el) => el.classList.contains("vocab-note-input") ? "input" : el.classList.contains("vocab-note-more") ? "more" : el.className).join(",") === "input,more" &&
+          !detailEl().querySelector(".vocab-note-edit .vocab-note-save"));
         const save = footer.querySelector(".vocab-note-save");
         check("a hidden Save still holds its place in the row",
           save.hidden === true && save.getBoundingClientRect().width > 0);
@@ -2641,8 +2641,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       };
       const chord = (extra) => field().dispatchEvent(new KeyboardEvent("keydown",
         Object.assign({ key: "Enter", ctrlKey: true, bubbles: true, cancelable: true }, extra || {})));
-      check("the note field announces its commit chord",
-        field().getAttribute("aria-keyshortcuts") === "Control+Enter");
+      check("the note field announces its commit and undo keys",
+        field().getAttribute("aria-keyshortcuts") === "Control+Enter Escape");
       const clean = chord();
       await settle();
       check("the chord is inert on a clean field and lets the key through",
@@ -2663,6 +2663,18 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       await settle();
       check("an IME confirmation Enter never commits the text under it",
         saved.length === 2, JSON.stringify(saved));
+      // Escape: a dirty draft goes back to the saved note (the reload above
+      // re-rendered the word from the store, whose note is still "old"), so
+      // the blur that follows has nothing to save; a clean field lets it by.
+      const esc = () => field().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      type("draft to drop");
+      const dropped = esc();
+      field().dispatchEvent(new Event("blur"));
+      await settle();
+      check("Escape takes a dirty draft back to the saved note and the blur after it saves nothing",
+        dropped === false && field().value === "old" && saveBtn().hidden === true && saved.length === 2,
+        JSON.stringify({ value: field().value, saved }));
+      check("Escape on a clean field passes through", esc() === true && saved.length === 2);
       let release = null;
       pbpVocabSetNote = (id, owner, value) => new Promise((resolve) => {
         saved.push(value);
@@ -2684,6 +2696,55 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       pbpVocabAll = rRealAll;
       pbpVocabSetNote = rRealSetNote;
       _vocabCurrentOwner = rRealCurrentOwner;
+      _pbpVocabRenderDetail(null);
+    }
+  }
+
+  // ---- A resting note: four whole lines, and "Show full note" only when the
+  // text overflows them (the clip on the content box hides the fifth line, so
+  // the button is the only cue that there is more). ----
+  {
+    const realDictRun = _pbpVocabDictRun;
+    try {
+      _pbpVocabDictRun = () => {};
+      const long = { id: "nm1", term: "longnote", groups: [], contexts: [], note: Array.from({ length: 12 }, (_, i) => "note line " + (i + 1)).join("\n") };
+      const short = { id: "nm2", term: "shortnote", groups: [], contexts: [], note: "one line" };
+      _vocabRows = [long, short];
+      _pbpVocabApplyView(true);
+      _vocabNoteExpandedId = null;
+      const field = () => $id("vocab-detail").querySelector(".vocab-note-input");
+      const more = () => $id("vocab-detail").querySelector(".vocab-note-edit > .vocab-note-more");
+      const frames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      _pbpVocabRenderDetail(long);
+      await frames();
+      const cs = getComputedStyle(field());
+      check("a resting long note clips on its content box, so no fifth line shows through the padding",
+        cs.overflow === "clip" && String(cs.overflowClipMargin).includes("content-box") && field().scrollHeight > field().clientHeight,
+        `overflow=${cs.overflow} margin=${cs.overflowClipMargin} sh=${field().scrollHeight} ch=${field().clientHeight}`);
+      check("an overflowing note offers Show full note",
+        !!more() && more().hidden === false && more().getAttribute("aria-expanded") === "false" && more().textContent === "libraryNoteShowAll",
+        more() && `${more().hidden} ${more().textContent}`);
+      more().click();
+      await frames();
+      check("Show full note lifts the cap and turns into Show less",
+        field().classList.contains("is-expanded") && field().scrollHeight <= field().clientHeight + 1 &&
+        more().getAttribute("aria-expanded") === "true" && more().textContent === "libraryNoteShowLess" && more().hidden === false,
+        `sh=${field().scrollHeight} ch=${field().clientHeight}`);
+      _pbpVocabRenderDetail(long);
+      await frames();
+      check("the expanded choice survives a rebuild of the same word",
+        field().classList.contains("is-expanded") && more().hidden === false);
+      field().focus();
+      check("while the box is focused it is at writing height and the button steps aside", more().hidden === true);
+      field().blur();
+      _pbpVocabRenderDetail(short);
+      await frames();
+      check("a note that fits its four lines offers nothing",
+        more().hidden === true && !field().classList.contains("is-expanded"),
+        `sh=${field().scrollHeight} ch=${field().clientHeight}`);
+    } finally {
+      _pbpVocabDictRun = realDictRun;
+      _vocabNoteExpandedId = null;
       _pbpVocabRenderDetail(null);
     }
   }

@@ -4145,6 +4145,8 @@
   "librarySectionContext": { "message": "Contexte" },
   "librarySectionMyNote": { "message": "Ma note" },
   "libraryNotePlaceholderShort": { "message": "Ajouter une note" },
+  "libraryNoteShowAll": { "message": "Afficher toute la note" },
+  "libraryNoteShowLess": { "message": "Afficher moins" },
   "libraryEditGroups": { "message": "Modifier les groupes" },
   "libraryNotePlaceholder": { "message": "Notez ce qui vous aide : associations, mots à ne pas confondre, rappels d’usage. Enregistré quand vous quittez le champ" },
   "libraryVocabCoverTitle": { "message": "Vocabulaire" },

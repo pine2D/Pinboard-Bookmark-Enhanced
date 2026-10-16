@@ -4145,6 +4145,8 @@
   "librarySectionContext": { "message": "Kontekst" },
   "librarySectionMyNote": { "message": "Moja notatka" },
   "libraryNotePlaceholderShort": { "message": "Dodaj notatkę" },
+  "libraryNoteShowAll": { "message": "Pokaż całą notatkę" },
+  "libraryNoteShowLess": { "message": "Pokaż mniej" },
   "libraryEditGroups": { "message": "Edytuj grupy" },
   "libraryNotePlaceholder": { "message": "Zapisz skojarzenia, mylone słowa, wskazówki użycia. Zapisuje się po opuszczeniu pola" },
   "libraryVocabCoverTitle": { "message": "Słówka" },

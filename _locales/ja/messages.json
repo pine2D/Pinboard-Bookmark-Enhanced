@@ -4145,6 +4145,8 @@
   "librarySectionContext": { "message": "文脈" },
   "librarySectionMyNote": { "message": "自分のメモ" },
   "libraryNotePlaceholderShort": { "message": "メモを追加" },
+  "libraryNoteShowAll": { "message": "メモをすべて表示" },
+  "libraryNoteShowLess": { "message": "折りたたむ" },
   "libraryEditGroups": { "message": "グループを編集" },
   "libraryNotePlaceholder": { "message": "連想、紛らわしい語、使い方のメモなどを書けます。入力欄から離れると自動で保存されます" },
   "libraryVocabCoverTitle": { "message": "単語帳" },
