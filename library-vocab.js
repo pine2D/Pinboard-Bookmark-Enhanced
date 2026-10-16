@@ -1404,38 +1404,71 @@ function _pbpVocabFocusNarrowBack() {
 // options-vocab.js's copy (tests/ui-contract-tests.mjs pins it), and the
 // options page has no detail pane to move anything into.
 let _vocabStatusDetailReady = false;
+// Where the last user action started: "list" (the list pane or the export
+// menu it opens), "manage" (the word's status / groups row), "tail" (any
+// other control in the detail), or null before the first one. Read by
+// _pbpVocabStatusHost so a message lands beside the control that caused it,
+// not at the end of a detail the reader may never scroll to. Only controls
+// count: scrolling or selecting text in the detail is not an action.
+// _pbpVocabFlashStatus never re-homes (it is the options page's verbatim
+// twin), so the node moves here, when the origin changes, before the action
+// runs. A sentence about the place being left goes with it -- shown beside
+// another control it would read as that control's result -- except the
+// load notice, which belongs to the whole page.
+let _vocabStatusOrigin = null;
+function _pbpVocabNoteStatusOrigin(e) {
+  const el = e.target instanceof Element ? e.target : null;
+  if (!el || !el.closest("button, input, textarea, select, a[href], [role='menuitem']")) return;
+  const origin = el.closest("#vocab-list-pane, .vocab-export-menu") ? "list"
+    : el.closest("#vocab-detail .vocab-manage-row, #vocab-detail .vocab-group-editor") ? "manage"
+    : el.closest("#vocab-detail-pane") ? "tail" : _vocabStatusOrigin;
+  if (origin === _vocabStatusOrigin) return;
+  _vocabStatusOrigin = origin;
+  const status = $id("vocab-status");
+  if (status && status.dataset.vocabLoading !== "true" && status.textContent) {
+    clearTimeout(_vocabFlashTimer);
+    status.classList.remove("ok", "bad");
+    status.textContent = "";
+  }
+  _pbpVocabStatusHost();
+}
+document.addEventListener("pointerdown", _pbpVocabNoteStatusOrigin, true);
+document.addEventListener("keydown", _pbpVocabNoteStatusOrigin, true);
 function _pbpVocabStatusHost(detailReady) {
   // `undefined` = re-home only (the batch row opening or closing, T4b); the
   // detail's readiness is whatever the last render said it was.
   if (detailReady !== undefined) _vocabStatusDetailReady = !!detailReady;
   const el = $id("vocab-status");
-  const bar = $id("vocab-context-bar");
-  if (!el || !bar) return el || null;
-  // spec §4.7, first match wins: a selection whose batch row is on screen ->
-  // its slot (T4); a detail in its final shape -> the tail's footer, at ANY
-  // width (a behaviour change: the two-pane layout used to keep it in the
-  // count row), between the delete and Save; otherwise -> the count row,
-  // before Select all. The batch row lives in the list pane, which narrow
-  // detail takes off the page (display: none at <=860): "on screen" is read
-  // from what is rendered, not from _pbpVocabNarrowMode, so a selection kept
-  // across that switch never parks the live region in an invisible slot.
+  const pane = $id("vocab-list-pane");
+  if (!el || !pane) return el || null;
+  // spec §4.7 (amended 2026-10-16), first match wins: a selection whose batch
+  // row is on screen -> its slot (T4); an action from the list pane, or no
+  // detail in its final shape -> a line of its own under the count row (a
+  // failure is often two sentences, so it never shares that single-line row);
+  // otherwise the detail: beside the status / groups row when that is where
+  // the action started, else the tail's footer between the delete and Save.
+  // The list pane is taken off the page by narrow detail (display: none at
+  // <=860): "on screen" is read from what is rendered, not from
+  // _pbpVocabNarrowMode, so a message never parks in an invisible host and a
+  // list action seen from narrow detail falls through to the detail.
   // `detailReady` false is the caller about to replaceChildren() the detail
-  // or the tail: park the node in the count row first, or it is removed with
+  // or the tail: park the node in the list pane first, or it is removed with
   // that subtree and every later message is written into nothing ($id would
   // re-query and miss).
-  const pane = $id("vocab-list-pane");
-  const listGone = !pane || pane.getClientRects().length === 0;
+  const listGone = pane.getClientRects().length === 0;
   const batch = $id("vocab-batch-toolbar");
   const slot = !listGone && batch && batch.classList.contains("selecting") ? batch.querySelector(".lib-batch-status") : null;
-  const footer = _vocabStatusDetailReady ? document.querySelector("#vocab-detail-tail .vocab-detail-footer") : null;
-  const host = slot || footer || bar;
+  const detailHost = _vocabStatusDetailReady && (listGone || (_vocabStatusOrigin !== "list" && _vocabStatusOrigin !== null));
+  const manage = detailHost && _vocabStatusOrigin === "manage" ? document.querySelector("#vocab-detail .vocab-manage-row") : null;
+  const footer = detailHost && !manage ? document.querySelector("#vocab-detail-tail .vocab-detail-footer") : null;
+  const host = slot || manage || footer || pane;
   if (host === footer) {
     const save = footer.querySelector(".vocab-note-save");
     if (el.parentNode !== footer || el.nextElementSibling !== save) footer.insertBefore(el, save);
-  } else if (el.parentNode !== host) {
-    if (host === bar) bar.insertBefore(el, bar.querySelector(":scope > .lib-cluster"));
-    else host.appendChild(el);
-  }
+  } else if (host === pane) {
+    const before = $id("vocab-empty");
+    if (el.parentNode !== pane || el.nextElementSibling !== before) pane.insertBefore(el, before);
+  } else if (el.parentNode !== host) host.appendChild(el);
   return el;
 }
 

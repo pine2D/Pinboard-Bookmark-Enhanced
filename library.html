@@ -107,7 +107,6 @@
         <span class="vocab-ctx-text">
           <span id="vocab-count" class="notes-count" aria-live="polite"></span>
         </span>
-        <span class="save-status vocab-main-status" id="vocab-status" role="status" aria-live="polite"></span>
         <div class="lib-cluster" role="group" data-i18n-aria="vocabSelectionActions" aria-label="Selection actions">
           <!-- Export menu: the whole vocabulary to a TSV file, Anki or Eudic
                (vocab-send.js), never the selection -- so it lives in the count
@@ -146,6 +145,11 @@
         <button type="button" class="btn btn-sm" id="vocab-mark-learning" data-i18n="vocabStatusLearning" data-i18n-title="vocabMarkLearning" data-i18n-aria="vocabMarkLearning" aria-label="Back to learning" title="Back to learning">Learning</button>
         <span class="lib-batch-status"></span>
       </div>
+      <!-- The list side's status line (spec §4.7 amended 2026-10-16): under
+           the count row, never in it -- that row is single-line and a failure
+           is often two sentences. _pbpVocabStatusHost moves this one live
+           region beside whichever control an action started from. -->
+      <span class="save-status vocab-main-status" id="vocab-status" role="status" aria-live="polite"></span>
       <div id="vocab-empty" class="notes-empty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
       <div id="vocab-no-results" class="notes-empty" hidden><span data-i18n="vocabNoResults">No words match the current filters.</span><button type="button" id="vocab-clear-filters" class="btn btn-sm ghost" data-i18n="libraryClearFilters">Clear search and filters</button></div>
       <!-- The list's own scroll container (spec §2.4); the header rows above it never scroll. -->

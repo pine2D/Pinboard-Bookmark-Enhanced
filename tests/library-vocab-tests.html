@@ -67,7 +67,6 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
         <span class="vocab-ctx-text">
           <span id="vocab-count" class="notes-count" aria-live="polite"></span>
         </span>
-        <span class="save-status vocab-main-status" id="vocab-status" role="status" aria-live="polite"></span>
         <div class="lib-cluster" role="group" aria-label="Selection actions">
           <button type="button" class="btn btn-sm ghost lib-hang-end" id="vocab-select-all">Select all</button>
         </div>
@@ -90,6 +89,7 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
         <button type="button" class="btn btn-sm" id="vocab-mark-learning" aria-label="Back to learning" title="Back to learning">Learning</button>
         <span class="lib-batch-status"></span>
       </div>
+      <span class="save-status vocab-main-status" id="vocab-status" role="status" aria-live="polite"></span>
       <div id="vocab-empty" class="notes-empty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
       <div id="vocab-no-results" class="notes-empty" hidden><span>No words match the current filters.</span><button type="button" id="vocab-clear-filters">Clear search and filters</button></div>
       <div class="vocab-list-region">
@@ -364,8 +364,9 @@ _pbpVocabSyncSelectionUi();
 check("the batch row's Select all is disabled once everything is selected", $id("vocab-batch-select-all").disabled === true);
 _pbpVocabClearSelection();
 _pbpVocabSyncSelectionUi();
-check("clearing the selection brings the count row and the status region back",
-  $id("vocab-context-bar").hidden === false && $id("vocab-status").parentNode === $id("vocab-context-bar") &&
+check("clearing the selection brings the count row back and the status region to its line under it",
+  $id("vocab-context-bar").hidden === false && $id("vocab-status").parentNode === $id("vocab-list-pane") &&
+  $id("vocab-status").nextElementSibling === $id("vocab-empty") &&
   getComputedStyle($id("vocab-batch-toolbar")).display === "none");
 $id("vocab-select-all").focus();
 $id("vocab-select-all").click();
@@ -1506,10 +1507,13 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         const footer = tail.querySelector(".vocab-detail-footer");
         const kinds = footer ? [...footer.children].map((el) =>
           ["vocab-detail-delete", "vocab-main-status", "vocab-note-save"].find((c) => el.classList.contains(c)) || el.className) : [];
-        check("T7 the detail ends in the tail's closing row: delete, status, save",
+        // The status sentence joins this row only for an action started in
+        // the tail (the status-host block below); wherever it is, the row
+        // still reads delete, (status,) Save.
+        check("T7 the detail ends in the tail's closing row: delete, status when hosted, save",
           !!footer && tail.firstElementChild === footer && footer.tagName === "FOOTER" &&
           !footer.classList.contains("lib-section") &&
-          kinds.join(",") === "vocab-detail-delete,vocab-main-status,vocab-note-save",
+          ["vocab-detail-delete,vocab-note-save", "vocab-detail-delete,vocab-main-status,vocab-note-save"].includes(kinds.join(",")),
           kinds.join(","));
         check("the note editor keeps only its field once Save moved out",
           detailEl().querySelectorAll(".vocab-note-edit > *").length === 1 &&
@@ -1664,9 +1668,12 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       plain.marks.length === 2 && plain.marks.every((text) => text === "cat"));
   }
 
-  // ---- Status host (spec §4.7 table, a behaviour change): multi-select ->
-  // the batch row's slot; a ready detail -> the tail's footer at ANY width;
-  // otherwise (cover, a rebuild in progress, signed out) -> the count row. ---
+  // ---- Status host (spec §4.7, amended 2026-10-16): multi-select -> the
+  // batch row's slot; an action from the list pane, or no ready detail ->
+  // the list pane's own line under the count row; otherwise the detail,
+  // beside the status / groups row when the action started there, else the
+  // tail's footer. The origin is the last control pressed (pointerdown or
+  // keydown, capture phase); scrolling or selecting text is no action. ---
   {
     const realNarrow = _pbpVocabNarrowMode;
     const realDictRun = _pbpVocabDictRun;
@@ -1675,45 +1682,86 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       const word = { id: "st1", term: "statusword", groups: [], contexts: [], note: "" };
       _vocabRows = [word];
       _pbpVocabApplyView(true);
+      const status = () => $id("vocab-status");
+      const detailEl = () => $id("vocab-detail");
       const footer = () => $id("vocab-detail-tail").querySelector(".vocab-detail-footer");
+      const manageRow = () => detailEl().querySelector(".vocab-manage-row");
+      const onListLine = () => status().parentNode === $id("vocab-list-pane") && status().nextElementSibling === $id("vocab-empty");
+      const press = (el) => el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+      _vocabStatusOrigin = null;
       _pbpVocabNarrowMode = () => false;
       _pbpVocabRenderDetail(word);
-      check("T7 a ready detail hosts the status region in the tail's footer in the two-pane layout, right before Save",
-        !!footer() && $id("vocab-status").parentNode === footer() &&
-        $id("vocab-status").nextElementSibling === footer().querySelector(".vocab-note-save"));
+      check("T7 a ready detail nobody has acted in keeps the status on the list pane's line",
+        !!footer() && onListLine(), `parent=${status().parentNode && status().parentNode.className}`);
+      press(footer().querySelector(".vocab-detail-delete"));
+      check("T7 pressing a control in the tail moves the status into the tail's footer, right before Save",
+        status().parentNode === footer() && status().nextElementSibling === footer().querySelector(".vocab-note-save"));
       _pbpVocabFlashStatus(true, "saved in the tail");
       check("T7 a detail action's feedback lands beside the control that caused it",
-        $id("vocab-status").textContent.includes("saved in the tail") && !$id("vocab-status").closest(".vocab-list-pane"));
+        status().textContent.includes("saved in the tail") && !status().closest(".vocab-list-pane"));
       check("T7 the relocated region is still the same live region",
-        $id("vocab-status").getAttribute("role") === "status" && $id("vocab-status").getAttribute("aria-live") === "polite");
+        status().getAttribute("role") === "status" && status().getAttribute("aria-live") === "polite");
+      press(detailEl().querySelector(".vocab-detail-gloss") || detailEl());
+      check("T7 pressing plain text in the detail is no action: the status and its sentence stay",
+        status().parentNode === footer() && status().textContent.includes("saved in the tail"));
+      press(manageRow().querySelector(".vocab-detail-status"));
+      check("T7 pressing the status / groups row moves the status into that row and drops the tail's sentence",
+        status().parentNode === manageRow() && status() === manageRow().lastElementChild && status().textContent === "");
+      _pbpVocabRenderDetail(word);
+      check("T7 the re-render that follows a status-row action keeps the status in the rebuilt row",
+        status().parentNode === manageRow() && status().isConnected);
+      _pbpVocabFlashStatus(false, "mark failed");
+      press($id("vocab-select-all"));
+      check("T7 pressing a list control brings the status back under the count row, its detail sentence dropped",
+        onListLine() && status().textContent === "");
+      _pbpVocabFlashStatus(false, "anki is not running");
+      _pbpVocabRenderDetail(word);
+      check("T7 a list action's failure stays under the count row through a detail re-render",
+        onListLine() && status().textContent.includes("anki is not running"));
+      status().textContent = "";
+      _pbpVocabSetLoading(true);
+      press(footer().querySelector(".vocab-detail-delete"));
+      check("T7 the load notice belongs to the whole page: changing sides moves it but never clears it",
+        status().parentNode === footer() && status().dataset.vocabLoading === "true" && status().textContent === "vocabLoading");
+      _pbpVocabSetLoading(false);
+      // Narrow detail takes the list pane off the page: a list origin has no
+      // visible host there, so the ready detail's footer takes it.
+      press($id("vocab-select-all"));
+      const listPane = $id("vocab-list-pane");
+      const paneDisplay = listPane.style.display;
       _pbpVocabNarrowMode = () => true;
+      listPane.style.display = "none";
       _pbpVocabRenderDetail(word, true);
-      check("T7 narrow mode keeps it in the tail's footer", $id("vocab-status").parentNode === footer());
+      _pbpVocabFlashStatus(false, "sent from the list");
+      check("T7 narrow detail (list pane off the page) hosts a list-origin status in the tail's footer",
+        status().parentNode === footer() && status().getClientRects().length > 0,
+        `parent=${status().parentNode && (status().parentNode.id || status().parentNode.className)} rects=${status().getClientRects().length} origin=${_vocabStatusOrigin}`);
+      listPane.style.display = paneDisplay;
+      _pbpVocabNarrowMode = () => false;
       document.body.classList.remove("lib-narrow-detail");
       _vocabSelected = new Set([word.id]);
       _pbpVocabSyncSelectionUi();
       _pbpVocabStatusHost(true);
       const slot = $id("vocab-batch-toolbar").querySelector(".lib-batch-status");
-      check("T7 with a selection the status rides the batch row's slot", !!slot && $id("vocab-status").parentNode === slot);
+      check("T7 with a selection the status rides the batch row's slot", !!slot && status().parentNode === slot);
       // Narrow detail takes the list pane -- and the batch row in it -- off
       // the page while the selection survives: the slot is no host then, the
       // ready detail's footer is (spec §4.7 "batch row visible").
-      const listPane = $id("vocab-list-pane");
-      const paneDisplay = listPane.style.display;
       listPane.style.display = "none";
       _pbpVocabStatusHost();
       check("T7 a selection behind a hidden list pane (narrow detail) leaves the status in the tail's footer, a visible host",
-        $id("vocab-status").parentNode === footer() && $id("vocab-status").getClientRects().length > 0,
-        `parent=${$id("vocab-status").parentNode && $id("vocab-status").parentNode.className}`);
+        status().parentNode === footer() && status().getClientRects().length > 0,
+        `parent=${status().parentNode && status().parentNode.className}`);
       listPane.style.display = paneDisplay;
       _pbpVocabStatusHost();
       _pbpVocabClearSelection();
       _pbpVocabSyncSelectionUi();
+      press(footer().querySelector(".vocab-detail-delete"));
       _pbpVocabStatusHost(false);
-      check("T7 a rebuild parks the region in the count row first (a live region removed with its subtree is gone)",
-        $id("vocab-status").parentNode === $id("vocab-context-bar"));
+      check("T7 a rebuild parks the region on the list pane's line first (a live region removed with its subtree is gone)",
+        onListLine());
       _pbpVocabRenderDetail(null);
-      check("T7 the cover hosts it in the count row", $id("vocab-status").isConnected && $id("vocab-status").parentNode === $id("vocab-context-bar"));
+      check("T7 the cover hosts it on the list pane's line", status().isConnected && onListLine());
     } finally {
       _pbpVocabNarrowMode = realNarrow;
       _pbpVocabDictRun = realDictRun;

@@ -1552,6 +1552,22 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
   line-height: var(--lib-lh-secondary);
   color: var(--lib-fg-muted);
 }
+/* The two hosts beside where an action started (spec §4.7 amended
+   2026-10-16, _pbpVocabStatusHost): a line of its own under the list pane's
+   count row -- that row is single-line by contract, and a failure is often
+   two sentences -- and a wrapped line closing the word's status / groups
+   row. `.save-status:empty` collapses either when there is nothing to say. */
+.vocab-list-pane > .vocab-main-status,
+.vocab-manage-row > .vocab-main-status {
+  min-width: 0;
+  margin: 0;
+  overflow: visible;
+  white-space: normal;
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+}
+.vocab-list-pane > .vocab-main-status { flex: none; margin-bottom: var(--lib-sp-2); }
+.vocab-manage-row > .vocab-main-status { flex: 1 1 100%; }
 
 /* Note editor, ported from options.css's .vocab-note-edit/-input/-save family
    (--opt-* tokens translated to their --lib-* equivalents; same closed-field
