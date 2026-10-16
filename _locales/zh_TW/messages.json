@@ -1747,6 +1747,9 @@
   "syncApiKeysDisableBtn": {
     "message": "關閉同步"
   },
+  "syncApiKeysRequiresSync": {
+    "message": "需要先開啟上一項 Chrome Sync 設定同步。"
+  },
   "qlPopularTitle": {
     "message": "Pinboard 熱門書籤"
   },

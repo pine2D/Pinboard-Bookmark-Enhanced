@@ -54,6 +54,10 @@ html { scrollbar-gutter: stable both-edges; }
   --opt-text-body: 14px;   --opt-lh-body: 20px;
   --opt-text-helper: 12px; --opt-lh-helper: 18px;
   --opt-text-section: 16px; --opt-lh-section: 24px;
+  /* Group subhead (`.bl.subhead`): the tier between a section title and its
+     rows -- a smaller, heavier face, so it reads as a heading and not as a
+     setting row that lost its control. */
+  --opt-text-subhead: 13px; --opt-lh-subhead: 18px;
   --opt-control-h: 32px;   --opt-control-pad-x: 12px;
   --opt-row-pad-y: var(--opt-sp-5);   /* 12 */
   --opt-row-min-h: 44px;
@@ -192,6 +196,7 @@ html[data-density="compact"] {
   --opt-text-body: 13px;   --opt-lh-body: 18px;
   --opt-text-helper: 12px; --opt-lh-helper: 16px;
   --opt-text-section: 15px; --opt-lh-section: 20px;
+  --opt-text-subhead: 12px; --opt-lh-subhead: 16px;
   --opt-control-h: 28px;   --opt-control-pad-x: 10px;
   --opt-row-pad-y: var(--opt-sp-4);   /* 8 */
   --opt-row-min-h: 36px;
@@ -570,7 +575,7 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
   top: 0;
   right: 0;
   margin-left: 0;
-  transform: translateY(calc((var(--pick-row1-h) - 20px) / 2));
+  transform: translateY(var(--pick-mark-y, calc((var(--pick-row1-h) - 20px) / 2)));
 }
 /* Choice hosts use the shared grid: the copy label shrink-wraps in column 1
    and the help target follows it in column 2, right after the copy -- where
@@ -1605,6 +1610,20 @@ html.motion-ready .backup-import-result:not([hidden]) {
    since an entry block's label already sits flush at the block's own edge
    (no equivalent flex row to indent inside). */
 .entry-block-sub { padding-left: var(--opt-sp-7); }
+/* Indentation = dependency (2026-10-15): an indented row or block only does
+   anything while the switch named by its data-parent is on. syncSubRows
+   (options.js) disables its controls and sets [data-off] while that switch
+   is off; the label takes the same fg-hint ink as a disabled .switch-text,
+   and the disabled controls drop to the .btn:disabled opacity (disabled
+   controls are exempt from the contrast oracle). */
+.fg.entry-block-sub[data-off] > label.bl,
+html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-hint); }
+.entry-block-sub[data-off] :is(input, textarea, .listbox-btn):disabled { opacity: 0.45; cursor: default; }
+/* A row's own "why is this off" line (#opt-sync-api-keys-requires) sits
+   inside its .pref-group, directly under the row: pulled up into the row's
+   bottom padding so it reads as that row's caption (control -> hint = sp-1,
+   the same relationship as `.fg > .hint`). */
+.pref-group > .hint { margin: calc(var(--opt-sp-1) - var(--opt-row-pad-y)) 0 0; }
 /* Stage-3b Task 1 (2026-09-24-ui-system-stage3b) retired the two rules that
    used to live here: `.pref-group-radio`'s own no-hairline 40/36
    row-height variant, and the mixed-group `label:not(.switch) { gap:
@@ -1641,6 +1660,11 @@ html.motion-ready .backup-import-result:not([hidden]) {
   padding-top: 0;
   min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
   --pick-row1-h: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
+  /* The copy in this row sits at the TOP of the reduced box (no top pad,
+     the bottom pad kept), so its centre is (min-h - 2 * pad) / 2 down, not
+     half of --pick-row1-h -- centring the absolutely placed radio mark on
+     the whole box left it 6px (compact 4px) below the Defuddle copy. */
+  --pick-mark-y: calc((var(--opt-row-min-h) - 2 * var(--opt-row-pad-y) - 20px) / 2);
 }
 /* .pref-group is its own row-grouping shape (checkboxes, radios) and was the
    one stage-0 block with no trailing margin of its own: an entry block or
@@ -1684,6 +1708,15 @@ html.motion-ready .backup-import-result:not([hidden]) {
 .fg :is(label, div).bl,
 html[data-theme] .fg :is(label, div).bl {
   font-size: var(--opt-text-body); line-height: var(--opt-lh-body); color: var(--opt-fg); margin-bottom: var(--opt-label-gap);
+}
+/* Hierarchy inside a section is carried by type, never by indentation:
+   section title (16/600) > group subhead (13/600) > setting row (14/400).
+   `.subhead` marks a `.bl` that names a GROUP (radio sets, chip sets, the
+   Chrome Sync / Google Drive blocks) rather than labelling one control.
+   Indentation means one thing only -- see `.entry-block-sub` below. */
+.fg .bl.subhead,
+html[data-theme] .fg .bl.subhead {
+  font-size: var(--opt-text-subhead); line-height: var(--opt-lh-subhead); font-weight: 600;
 }
 /* Inside a help-host field (popup-width-label): the themed twin of the
    label rule above ((0,3,2)) outranks the generic

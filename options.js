@@ -2144,16 +2144,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   // .switch / .pick disabled recipe dims them -- and their stored values stay
   // untouched for when it comes back on. Programmatic .checked writes (load,
   // panel reset) fire no 'change', so those paths call this explicitly.
+  // Indented field blocks (`.entry-block-sub[data-parent]`: the reader's
+  // AI-only fields, Batch Save's tag field, URL cleanup's lists, the
+  // archive.org keys) follow the same rule, and their [data-off] flag dims
+  // the field label too. A <select> enhanced by listbox.js only repaints its
+  // button on pbpListboxSync.
   function syncSubRows() {
-    for (const row of document.querySelectorAll(".pref-row-sub[data-parent]")) {
+    for (const row of document.querySelectorAll(":is(.pref-row-sub, .entry-block-sub)[data-parent]")) {
       const parent = $id(row.dataset.parent);
       const off = !!parent && !parent.checked;
-      for (const input of row.querySelectorAll("input")) input.disabled = off;
+      row.toggleAttribute("data-off", off);
+      for (const control of row.querySelectorAll("input, textarea, select, button.key-toggle")) {
+        if (control.disabled === off) continue;
+        control.disabled = off;
+        if (control.tagName === "SELECT") window.pbpListboxSync?.(control);
+      }
     }
   }
   document.addEventListener("change", (e) => {
     const id = e.target && e.target.id;
-    if (id && document.querySelector(`.pref-row-sub[data-parent="${CSS.escape(id)}"]`)) syncSubRows();
+    if (id && document.querySelector(`[data-parent="${CSS.escape(id)}"]`)) syncSubRows();
   });
 
   // Empty IS the default for the two prompt fields (see the reset buttons), so
@@ -2760,6 +2770,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     // and the checkbox snaps back). Disabled only when there is nothing to
     // recover.
     syncKeysToggle.disabled = !optSyncEnabled && !syncApiKeys;
+  }
+  // A greyed-out switch has to say why. Every path that changes the key
+  // toggle's state writes .disabled (load, both handlers, their rollbacks), so
+  // watch that attribute instead of threading a helper through each of them.
+  // dataset.asking marks the handler's own brief disable while its confirm is
+  // open, which is not the "settings sync is off" reason.
+  const syncKeysRequires = $id("opt-sync-api-keys-requires");
+  if (syncKeysToggle && syncKeysRequires) {
+    const baseDescribedBy = syncKeysToggle.getAttribute("aria-describedby") || "";
+    const showSyncKeysReason = () => {
+      const blocked = syncKeysToggle.disabled && !syncKeysToggle.dataset.asking;
+      syncKeysRequires.hidden = !blocked;
+      syncKeysToggle.setAttribute("aria-describedby",
+        blocked ? `${syncKeysRequires.id} ${baseDescribedBy}`.trim() : baseDescribedBy);
+    };
+    new MutationObserver(showSyncKeysReason).observe(syncKeysToggle, { attributes: true, attributeFilter: ["disabled"] });
+    showSyncKeysReason();
   }
   await pbpRefreshSyncLocalFallbackStatus();
 

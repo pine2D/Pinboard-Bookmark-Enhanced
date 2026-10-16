@@ -1753,6 +1753,9 @@
   "syncApiKeysDisableBtn": {
     "message": "Turn off"
   },
+  "syncApiKeysRequiresSync": {
+    "message": "Turn on Chrome Sync for settings first."
+  },
   "qlPopularTitle": {
     "message": "Popular bookmarks on Pinboard"
   },

@@ -846,9 +846,12 @@ function test(name, fn) {
   // batch heading) stayed at the surface's legacy 13px/body-inherited
   // styling instead of the row model's --opt-text-body/--opt-lh-body face.
   // Widened to `.fg :is(label, div).bl` (options.css ~1451..1465).
-  test("fixwave: batch AI group title matches the widened .fg :is(label, div).bl rule", () => {
+  // 2026-10-15: a group title is now a `.bl.subhead` -- the subhead tier
+  // (--opt-text-subhead, 600) between section title and rows -- so this
+  // tracks that token; colour and the density shrink are unchanged.
+  test("fixwave: batch AI group title takes the .bl.subhead face", () => {
     const title = doc.getElementById("batch-ai-title");
-    assert(title && title.classList.contains("bl") && title.tagName === "DIV", "batch-ai-title fixture incomplete");
+    assert(title && title.classList.contains("bl") && title.classList.contains("subhead") && title.tagName === "DIV", "batch-ai-title fixture incomplete");
     const win = frame.contentWindow;
     const readVar = (name) => parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue(name));
     const probe = doc.createElement("div");
@@ -858,12 +861,15 @@ function test(name, fn) {
     const resolvedFg = win.getComputedStyle(probe).color;
     probe.remove();
     const comfortableFs = parseFloat(win.getComputedStyle(title).fontSize);
-    assert(Math.abs(comfortableFs - 14) < 0.5, "comfortable font-size=" + comfortableFs);
-    assert(Math.abs(comfortableFs - readVar("--opt-text-body")) < 0.5, "font-size does not track --opt-text-body");
+    assert(Math.abs(comfortableFs - 13) < 0.5, "comfortable font-size=" + comfortableFs);
+    assert(Math.abs(comfortableFs - readVar("--opt-text-subhead")) < 0.5, "font-size does not track --opt-text-subhead");
+    assert(Number(win.getComputedStyle(title).fontWeight) >= 600, "subhead is not semibold");
+    assert(comfortableFs < readVar("--opt-text-body") && comfortableFs < readVar("--opt-text-section"),
+      "subhead is not below both the row and the section-title tiers");
     assert(win.getComputedStyle(title).color === resolvedFg, "batch-ai-title color is not --opt-fg");
     doc.documentElement.dataset.density = "compact";
     const compactFs = parseFloat(win.getComputedStyle(title).fontSize);
-    assert(Math.abs(compactFs - readVar("--opt-text-body")) < 0.5, "compact font-size does not track --opt-text-body");
+    assert(Math.abs(compactFs - readVar("--opt-text-subhead")) < 0.5, "compact font-size does not track --opt-text-subhead");
     assert(compactFs < comfortableFs, "compact font-size did not shrink from the comfortable tier");
     delete doc.documentElement.dataset.density;
   });

@@ -1747,6 +1747,9 @@
   "syncApiKeysDisableBtn": {
     "message": "Deaktivieren"
   },
+  "syncApiKeysRequiresSync": {
+    "message": "Aktiviere zuerst Chrome Sync für Einstellungen."
+  },
   "qlPopularTitle": {
     "message": "Beliebte Lesezeichen auf Pinboard"
   },

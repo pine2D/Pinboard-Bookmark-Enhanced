@@ -162,17 +162,20 @@ check(!optionsHtml.includes('Requires "Access all websites" permission'), "optio
 check(optionsHtml.includes('data-i18n="secBackupRestore">Backup &amp; Restore</h2>'),
   "options.html: backup section fallback still advertises sync");
 
-// Subordinate rows follow their parent switch (2026-10-15 options critique):
+// Indentation means dependency (2026-10-15 options critiques, both rounds):
 // every `.pref-row-sub` names its parent through data-parent, and that id is a
 // checkbox outside the row, so options.js syncSubRows() can dim and disable the
-// row while the parent is off. Exempt rows carry no parent switch on the page.
+// row while the parent is off. Exempt rows have their own enable logic.
 {
   const SUB_ROW_EXEMPT = new Set([
-    "opt-preview-skim", // indented under the translation block it extends; it has no parent switch
+    // Indented under Chrome Sync; its disabled state follows the account-wide
+    // marker as well (it stays operable to scrub cloud credentials), so
+    // options.js drives it and #opt-sync-api-keys-requires says why.
+    "opt-sync-api-keys",
   ]);
   const html = optionsHtml.replace(/<!--[\s\S]*?-->/g, "");
   const subRows = [...html.matchAll(/<div\b[^>]*\bclass="[^"]*\bpref-row-sub\b[^"]*"[^>]*>([\s\S]*?)<\/div>/g)];
-  check(subRows.length >= 6, `options.html: expected the six .pref-row-sub rows, found ${subRows.length} -- the scan stopped matching`);
+  check(subRows.length >= 7, `options.html: expected the seven .pref-row-sub rows, found ${subRows.length} -- the scan stopped matching`);
   for (const m of subRows) {
     const open = m[0].slice(0, m[0].indexOf(">") + 1);
     const ownId = (m[1].match(/<input\b[^>]*\bid="([^"]+)"/) || [])[1];
@@ -182,6 +185,19 @@ check(optionsHtml.includes('data-i18n="secBackupRestore">Backup &amp; Restore</h
     if (!parent) continue;
     check(new RegExp(`<input\\b[^>]*\\btype="checkbox"[^>]*\\bid="${parent}"|<input\\b[^>]*\\bid="${parent}"[^>]*\\btype="checkbox"`).test(html) && !m[1].includes(`id="${parent}"`),
       `options.html: sub row #${ownId} names data-parent="${parent}", which is not a checkbox outside the row`);
+  }
+  // Indented field blocks hold controls too; each one that does must name its
+  // parent switch the same way. A block with no control (the archive.org
+  // "Get key" link line) just follows its neighbours' indent.
+  const blockOpens = [...html.matchAll(/<(?:div|p)\b[^>]*\bclass="[^"]*\bentry-block-sub\b[^"]*"[^>]*>/g)];
+  check(blockOpens.length >= 9, `options.html: expected at least nine .entry-block-sub blocks, found ${blockOpens.length}`);
+  for (const m of blockOpens) {
+    const tail = html.slice(m.index + m[0].length, m.index + m[0].length + 1500);
+    const ownId = (tail.match(/<(?:input|textarea|select)\b[^>]*\bid="([^"]+)"/) || [])[1];
+    const parent = (m[0].match(/\bdata-parent="([^"]+)"/) || [])[1];
+    const holdsControl = /^[\s\S]*?<(?:input|textarea|select)\b/.test(tail.split(/<div\b[^>]*\bclass="[^"]*\b(?:fg|pref-group|pref-row)\b/)[0]);
+    if (!holdsControl) continue;
+    check(!!parent, `options.html: .entry-block-sub holding #${ownId} has no data-parent -- indentation must mean dependency`);
   }
 }
 const mdHtml = read("md-preview.html");

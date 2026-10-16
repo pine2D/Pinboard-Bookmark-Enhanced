@@ -1747,6 +1747,9 @@
   "syncApiKeysDisableBtn": {
     "message": "無効にする"
   },
+  "syncApiKeysRequiresSync": {
+    "message": "先に上の Chrome Sync による設定の同期をオンにしてください。"
+  },
   "qlPopularTitle": {
     "message": "Pinboard の人気ブックマーク"
   },

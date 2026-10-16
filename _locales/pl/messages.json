@@ -1747,6 +1747,9 @@
   "syncApiKeysDisableBtn": {
     "message": "Wyłącz"
   },
+  "syncApiKeysRequiresSync": {
+    "message": "Najpierw włącz Chrome Sync dla ustawień."
+  },
   "qlPopularTitle": {
     "message": "Popularne zakładki w Pinboard"
   },
