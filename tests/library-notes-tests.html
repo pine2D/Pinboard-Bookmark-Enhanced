@@ -454,6 +454,27 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("narrow: the same list pick also brings the new current into view, with focus handed to the back button",
       narrowP.before > 0 && narrowP.above && narrowP.current && narrowP.visible && narrowP.after > 0 && narrowP.backFocused,
       JSON.stringify(narrowP));
+    // Arriving from ANOTHER page: the newest highlight (x6, the list's first
+    // row) is fifth in the oldest-first flow, below a 360px fold. Opening at
+    // the page head would show x1..x3 and leave the picked one unseen; the
+    // pane must bring x6 fully into view instead. `after > 0` is the
+    // anti-vacuity guard: x6 already visible at the top would pass "visible"
+    // on a pane that never moved. The page's FIRST excerpt still opens at
+    // the head, its title and source line above the fold.
+    const crossPick = (id) => {
+      rowEl("pbp_hl_longtitle#l1")?.querySelector(".notes-hit-btn").click();
+      pane.scrollTop = 0;
+      rowEl("pbp_hl_times#" + id)?.querySelector(".notes-hit-btn").click();
+      const r = pane.getBoundingClientRect(), c = excerptOf(id)?.getBoundingClientRect();
+      return { after: pane.scrollTop, current: excerptOf(id)?.getAttribute("aria-current") === "true",
+        visible: !!c && c.top >= r.top - 1 && c.bottom <= r.bottom + 1 };
+    };
+    const crossLast = crossPick("x6");
+    check("opening a page at a highlight below the fold brings that highlight fully into view",
+      crossLast.current && crossLast.visible && crossLast.after > 0, JSON.stringify(crossLast));
+    const crossFirst = crossPick("x1");
+    check("opening a page at its first highlight keeps the pane at the page head",
+      crossFirst.current && crossFirst.after === 0, JSON.stringify(crossFirst));
     document.body.classList.remove("test-scroll-pane-tall");
 
     // -- a new current the list filter hides --

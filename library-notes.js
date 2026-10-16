@@ -1260,13 +1260,22 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
   // by a jump button -- keeps the reader's place and only nudges the new
   // current excerpt into view; a refresh of the same highlight moves nothing.
   const pane = $id("notes-detail-pane");
-  if (pane && !samePage) pane.scrollTop = 0;
-  else if (!sameHit) {
-    const cur = detail.querySelector(':scope > .notes-excerpt[aria-current="true"]');
-    if (cur) cur.scrollIntoView({ block: "nearest" });
-  }
+  const cur = detail.querySelector(':scope > .notes-excerpt[aria-current="true"]');
+  if (pane && !samePage) _pbpNotesOpenPageAt(pane, cur);
+  else if (!sameHit && cur) cur.scrollIntoView({ block: "nearest" });
   _notesRenderedPageKey = hit.row.key;
   _notesRenderedDetailKey = hit.key;
+}
+
+// A new page opens at its head unless the picked highlight is not the first
+// excerpt and sits below the fold: the list runs newest first and the
+// excerpts oldest first, so the most likely pick is the last one on the page.
+// It is then centred, or put at the top when taller than the pane.
+function _pbpNotesOpenPageAt(pane, cur) {
+  pane.scrollTop = 0;
+  if (!cur || !cur.previousElementSibling?.classList.contains("notes-excerpt")) return;
+  const p = pane.getBoundingClientRect(), c = cur.getBoundingClientRect();
+  if (c.bottom > p.bottom) pbpScrollIntoView(cur, { block: c.height < p.height ? "center" : "start" });
 }
 
 // Focus inside the detail, captured before a rebuild and put back after it
