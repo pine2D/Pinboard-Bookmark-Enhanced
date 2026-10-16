@@ -1639,6 +1639,13 @@ export const CHECKS = [
     expect: { textContrast: 4.5 } },
   { surface: "popup", page: "popup.html", selector: ".confirm-popover .confirm-no", state: "default",
     expect: { textContrast: 4.5 } },
+  // The two answers sit on the 24px target-size floor (WCAG 2.5.8; library
+  // critique 2026-10-16): every surface's hand-written .confirm-popover button
+  // rule carries min-height 24px, and popup's is the confirm the runner opens.
+  { surface: "popup", page: "popup.html", selector: ".confirm-popover .confirm-yes", state: "default",
+    expect: { minHeightPx: { comfortable: 24, compact: 24 }, hitRectMin: { height: 24 } } },
+  { surface: "popup", page: "popup.html", selector: ".confirm-popover .confirm-no", state: "default",
+    expect: { minHeightPx: { comfortable: 24, compact: 24 }, hitRectMin: { height: 24 } } },
 
   // ---- popup's submit bar, the first two buttons to carry `class="btn"`
   // (campaign C4a). Both had ZERO render coverage before -- scoping found no

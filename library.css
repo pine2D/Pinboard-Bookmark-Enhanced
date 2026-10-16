@@ -533,7 +533,7 @@ html.motion-ready .confirm-popover.is-closing {
    question itself. */
 .confirm-popover .confirm-detail { flex: 1 1 100%; min-width: 0; font-weight: normal; color: var(--lib-fg); white-space: pre-line; overflow-wrap: anywhere; }
 .confirm-popover button {
-  flex: none; padding: 2px var(--lib-sp-2); font-size: 11px; cursor: pointer; border-radius: var(--lib-radius-sm); border: 1px solid;
+  flex: none; min-height: 24px; padding: 2px var(--lib-sp-2); font-size: 11px; cursor: pointer; border-radius: var(--lib-radius-sm); border: 1px solid;
 }
 /* .confirm-yes (solid danger tier, default light state) now comes from
    @generated:ui-components above (COMPONENTS.md §4.2) — only .confirm-no

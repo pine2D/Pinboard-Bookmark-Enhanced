@@ -3226,7 +3226,7 @@ html.motion-ready .confirm-popover.is-closing {
    run far past the viewport with a long member list. */
 .confirm-popover .confirm-msg { flex: 1 1 16ch; min-width: 0; font-weight: bold; color: inherit; white-space: pre-line; overflow-wrap: anywhere; }
 .confirm-popover button {
-  flex: none; padding: var(--opt-sp-1) var(--opt-sp-4); font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm); border: 1px solid;
+  flex: none; min-height: 24px; padding: var(--opt-sp-1) var(--opt-sp-4); font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm); border: 1px solid;
 }
 /* .confirm-yes (solid danger tier, default light state) now comes from
    @generated:ui-components above (COMPONENTS.md §4.2) — only .confirm-no
