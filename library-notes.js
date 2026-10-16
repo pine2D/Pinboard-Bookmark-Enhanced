@@ -479,7 +479,7 @@ function _pbpNotesBuildRow(hit) {
   // multi-select chords -- it fires from anywhere in the list (see the
   // #notes-list keydown below), not just this row, but this is the only
   // per-row control an assistive-tech user reading a row would query.
-  btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /");
+  btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space / Delete Escape");
   // Roving tabindex (see _pbpNotesSyncRowTabStops): every row builds OUT of
   // the tab order, and exactly one is put back after the render.
   btn.tabIndex = -1;
@@ -667,6 +667,21 @@ function _pbpNotesSyncRowTabStops() {
   const list = $id("notes-list");
   const current = list && list.querySelector(".notes-hit[aria-current] .notes-hit-btn");
   _pbpNotesSetRowTabStop(btns.find((el) => el.tabIndex === 0) || current || btns[0]);
+}
+
+// Arrow keys carry the detail along in the two-pane layout: the row that
+// took focus opens a beat later, so a held key does not render a page per
+// row passed. Focus stays on the row; a row already open is left alone.
+const PBP_NOTES_FOLLOW_MS = 160;
+let _notesFollowTimer = 0;
+function _pbpNotesScheduleFollow(btn) {
+  clearTimeout(_notesFollowTimer);
+  if (_pbpNotesNarrowMode()) return;
+  _notesFollowTimer = setTimeout(() => {
+    if (document.activeElement !== btn || !btn.isConnected) return;
+    const row = btn.closest(".notes-hit");
+    if (row && !row.hasAttribute("aria-current")) _pbpNotesSelectRow(row.dataset.notesKey);
+  }, PBP_NOTES_FOLLOW_MS);
 }
 
 function _pbpNotesSelectRow(key) {
@@ -2252,6 +2267,20 @@ if (typeof $id === "function") {
   // passes through).
   const _notesListPane = document.querySelector(".notes-list-pane");
   if (_notesListPane) _notesListPane.addEventListener("keydown", (e) => {
+    // Delete / Backspace: the selection when there is one, else the focused
+    // row's highlight -- the vocabulary list's rule, behind the same confirm.
+    if ((e.key === "Delete" || e.key === "Backspace") && !e.isComposing && !e.defaultPrevented &&
+        !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target || target.closest("input, textarea") || !target.closest("#notes-list, #notes-batch-toolbar")) return;
+      if (_notesSelected.size) { e.preventDefault(); _pbpNotesBatchDelete(); return; }
+      const row = target.closest("#notes-list .notes-hit");
+      const hit = row && _pbpNotesFindHit(row.dataset.notesKey);
+      if (!hit) return;
+      e.preventDefault();
+      _pbpNotesDeleteOne(hit, row.querySelector(".notes-hit-btn"));
+      return;
+    }
     if (e.key !== "Escape" || e.isComposing || e.defaultPrevented || !_notesSelected.size) return;
     const el = e.target instanceof Element ? e.target : null;
     if (!el || !el.closest("#notes-list, #notes-batch-toolbar") || el.closest("input, textarea")) return;
@@ -2266,9 +2295,10 @@ if (typeof $id === "function") {
   // Grid navigation. Bound on the container, so it survives every row rebuild
   // and stays scoped to the list: Home/End must not reach the toolbar's filter
   // field, where they are the caret's own keys. ArrowUp/Down are
-  // preventDefault'd (they would otherwise scroll the page) but never activate
-  // -- opening a highlight stays a click or an unmodified Space, and the
-  // modified Space chords keep their own handler on the row button.
+  // preventDefault'd (they would otherwise scroll the page); in the two-pane
+  // layout the row they land on opens a beat later (_pbpNotesScheduleFollow,
+  // the vocabulary list's rule), in narrow mode opening stays a click or an
+  // unmodified Space. The modified Space chords keep their own handler.
   const _notesListEl = $id("notes-list");
   if (_notesListEl) _notesListEl.addEventListener("keydown", (e) => {
     // K89: "/" jumps back to the search filter, the twin of md-reader.js's
@@ -2301,6 +2331,7 @@ if (typeof $id === "function") {
     if (!next) return;
     _pbpNotesSetRowTabStop(next);
     next.focus();
+    _pbpNotesScheduleFollow(next);
   });
   // Hang labels are measured against the live layout, so anything that moves
   // the detail's container width or the label metrics re-measures them:

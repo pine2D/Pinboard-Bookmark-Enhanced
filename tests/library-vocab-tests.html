@@ -807,7 +807,7 @@ check("every row is a grid row that reports its own selected state",
     card.getAttribute("aria-selected") === "false" &&
     card.querySelector('.notes-card-top[role="gridcell"]')));
 check("the row head advertises its selection keyboard shortcuts",
-  renderedHeads.every((head) => head.getAttribute("aria-keyshortcuts") === "Control+Space Shift+Space /"));
+  renderedHeads.every((head) => head.getAttribute("aria-keyshortcuts") === "Control+Space Shift+Space / K Delete Escape"));
 check("the per-row checkbox is gone from every rendered row",
   !$id("vocab-list").querySelector('input[type="checkbox"]'));
 const unknownLanguageRow = _pbpVocabBuildRow({
@@ -2836,6 +2836,92 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       `${quiet} -> ${host.getAttribute("aria-live")} "${host.querySelector(".lib-count-full").textContent}"`);
     $id("vocab-search").value = "";
     _pbpVocabApplyView(true);
+  }
+
+  // ---- Keyboard (2026-10-16): arrow keys carry the detail a beat later in
+  // the two-pane layout, K flips one word between known and learning, Delete
+  // asks to delete -- the selection when there is one, else the focused row. ----
+  {
+    const real = { narrow: _pbpVocabNarrowMode, owner: pbpVocabCurrentOwner, setStatus: pbpVocabBatchSetStatus,
+      reload: _pbpVocabReloadAfterMutation, flash: _pbpVocabFlashStatus, confirm: showConfirmPopover,
+      dictRun: _pbpVocabDictRun, activate: _pbpVocabOnRowActivate, current: _vocabCurrentOwner };
+    const flashed = [], writes = [], confirms = [], opened = [];
+    const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+    try {
+      _pbpVocabDictRun = () => {};
+      _pbpVocabNarrowMode = () => false;
+      _vocabCurrentOwner = "acct_keys";
+      pbpVocabCurrentOwner = async () => "acct_keys";
+      pbpVocabBatchSetStatus = async (ids, owner, status) => { writes.push(ids.join(",") + ":" + status); return true; };
+      _pbpVocabReloadAfterMutation = async () => { _pbpVocabApplyView(false); return true; };
+      _pbpVocabFlashStatus = (ok, text) => flashed.push(text);
+      showConfirmPopover = (anchor, opts) => confirms.push({ anchor, msg: opts.msg });
+      _pbpVocabOnRowActivate = (w) => { opened.push(w.id); return real.activate(w); };
+      const kw = (id, term, status, updatedAt) => ({ id, term, status, language: "en", groups: [], contexts: [], note: "", updatedAt });
+      _vocabRows = [kw("kb1", "alpha", "new", 3), kw("kb2", "beta", "known", 2), kw("kb3", "gamma", "new", 1)];
+      $id("vocab-search").value = "";
+      _pbpVocabClearSelection();
+      _pbpVocabApplyView(true);
+      _pbpVocabRenderDetail(null);
+      const head = (id) => $id("vocab-list").querySelector(`.vocab-card[data-vocab-id="${id}"] .notes-card-head`);
+      const key = (el, k, extra) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...extra }));
+      head("kb1").focus();
+      key(head("kb1"), "ArrowDown");
+      check("ArrowDown moves focus at once and opens nothing yet",
+        document.activeElement === head("kb2") && opened.length === 0);
+      await tick(PBP_VOCAB_FOLLOW_MS + 80);
+      check("a beat later the focused row opens in the detail, focus still on the row",
+        opened.join(",") === "kb2" && document.activeElement === head("kb2") && head("kb2").closest(".vocab-card").hasAttribute("aria-current"),
+        opened.join(","));
+      key(head("kb2"), "ArrowDown");
+      key(head("kb3"), "ArrowUp");
+      await tick(PBP_VOCAB_FOLLOW_MS + 80);
+      check("a key run through rows opens only where it stops (here the row already open: nothing)", opened.join(",") === "kb2", opened.join(","));
+      _pbpVocabNarrowMode = () => true;
+      key(head("kb2"), "ArrowDown");
+      await tick(PBP_VOCAB_FOLLOW_MS + 80);
+      check("in narrow mode the arrows only move focus: opening a word would replace the list", opened.join(",") === "kb2");
+      _pbpVocabNarrowMode = () => false;
+      head("kb1").focus();
+      key(head("kb1"), "k");
+      await tick();
+      check("K marks the focused row's word known, reports it and keeps focus on the row",
+        writes.join("|") === "kb1:known" && flashed[flashed.length - 1] === "vocabBatchKnownDoneOne:1" && document.activeElement === head("kb1"),
+        writes.join("|") + " / " + flashed.join("|"));
+      key(head("kb2"), "\u043b", { code: "KeyK" });
+      await tick();
+      check("on another layout the same physical key flips a known word back to learning",
+        writes[writes.length - 1] === "kb2:new" && flashed[flashed.length - 1] === "vocabBatchLearningDoneOne:1", writes.join("|"));
+      const before = writes.length;
+      key(head("kb1"), "k", { ctrlKey: true });
+      await tick();
+      check("Ctrl+K is not K", writes.length === before);
+      key(head("kb3"), "Delete");
+      check("Delete on a row with nothing selected asks to delete that word, anchored on the row",
+        confirms.length === 1 && confirms[0].anchor === head("kb3") && confirms[0].msg === "dictDeleteConfirm:gamma",
+        confirms.map((c) => c.msg).join("|"));
+      _vocabSelected = new Set(["kb1", "kb2"]);
+      _pbpVocabSyncSelectionUi();
+      key(head("kb1"), "Backspace");
+      check("Delete / Backspace with a selection asks to delete the selection, anchored on the batch row's delete",
+        confirms.length === 2 && confirms[1].anchor === $id("vocab-batch-delete") && confirms[1].msg === "vocabBatchDeleteConfirm:2",
+        confirms.map((c) => c.msg).join("|"));
+      key($id("vocab-group-input"), "Delete");
+      check("Delete in the batch row's group field is the field's own", confirms.length === 2);
+    } finally {
+      _pbpVocabNarrowMode = real.narrow;
+      pbpVocabCurrentOwner = real.owner;
+      pbpVocabBatchSetStatus = real.setStatus;
+      _pbpVocabReloadAfterMutation = real.reload;
+      _pbpVocabFlashStatus = real.flash;
+      showConfirmPopover = real.confirm;
+      _pbpVocabDictRun = real.dictRun;
+      _pbpVocabOnRowActivate = real.activate;
+      _vocabCurrentOwner = real.current;
+      _pbpVocabClearSelection();
+      _pbpVocabSyncSelectionUi();
+      _pbpVocabRenderDetail(null);
+    }
   }
 
   // Responsive layout sweep against the REAL vocab-workbench markup and

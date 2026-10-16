@@ -1306,6 +1306,40 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       document.activeElement && (document.activeElement.id || document.activeElement.tagName));
     check("with nothing selected Escape passes through", esc(btnOf("pbp_hl_alpha#a1")) === true);
   }
+  // Arrow keys carry the detail a beat later in the two-pane layout; Delete
+  // asks to delete the selection, or the focused row's highlight.
+  {
+    const realNarrow = _pbpNotesNarrowMode, realConfirm = showConfirmPopover;
+    const confirms = [];
+    const key = (el, k) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+    try {
+      _pbpNotesNarrowMode = () => false;
+      showConfirmPopover = (anchor, opts) => confirms.push({ anchor, msg: opts.msg });
+      _pbpNotesSelectRow("pbp_hl_alpha#a1");
+      const order = rowsInOrder();
+      const from = order.findIndex((r) => r.dataset.notesKey === "pbp_hl_alpha#a1");
+      const target = order[from + 1] || order[from - 1];
+      btnOf("pbp_hl_alpha#a1").focus();
+      key(btnOf("pbp_hl_alpha#a1"), from + 1 < order.length ? "ArrowDown" : "ArrowUp");
+      check("an arrow moves focus at once and the detail stays until the beat passes",
+        document.activeElement === target.querySelector(".notes-hit-btn") && _pbpNotesSelectedKey === "pbp_hl_alpha#a1");
+      await new Promise((resolve) => setTimeout(resolve, PBP_NOTES_FOLLOW_MS + 80));
+      check("a beat later the focused row's highlight opens, focus still on the row",
+        _pbpNotesSelectedKey === target.dataset.notesKey && document.activeElement === target.querySelector(".notes-hit-btn"));
+      key(target.querySelector(".notes-hit-btn"), "Delete");
+      check("Delete on a row with nothing selected asks to delete that highlight, anchored on the row",
+        confirms.length === 1 && confirms[0].anchor === target.querySelector(".notes-hit-btn") && confirms[0].msg === "hlDeleteConfirm");
+      $id("notes-select-all").click();
+      key(btnOf("pbp_hl_alpha#a1"), "Delete");
+      check("Delete with a selection asks to delete the selection",
+        confirms.length === 2 && confirms[1].anchor === $id("notes-batch-delete") && confirms[1].msg.startsWith("notesBatchDeleteConfirm"),
+        confirms.map((c) => c.msg).join("|"));
+    } finally {
+      _pbpNotesNarrowMode = realNarrow;
+      showConfirmPopover = realConfirm;
+      _pbpNotesClearSelection(); _pbpNotesSyncSelectionUi();
+    }
+  }
   // A filter changes WHICH rows exist, so it clears the selection (the
   // vocabulary list's shipped rule).
   btnOf("pbp_hl_alpha#a1").dispatchEvent(mouse({ ctrlKey: true }));

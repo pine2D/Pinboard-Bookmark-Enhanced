@@ -1372,7 +1372,7 @@ check(libraryVocabJs.includes('card.setAttribute("aria-selected", isSelected ? "
 // multi-row selection at all.
 check(/head\.addEventListener\("keydown"[\s\S]{0,400}e\.preventDefault\(\)[\s\S]{0,120}_pbpVocabRowSelect\(w, true\)/.test(libraryVocabJs) &&
   /_pbpVocabRowSelect\(w, false\)/.test(libraryVocabJs) &&
-  libraryVocabJs.includes('head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /")'),
+  libraryVocabJs.includes('head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space / K Delete Escape")'),
   "library-vocab.js: the keyboard multi-select path (Ctrl+Space toggle / Shift+Space range, announced via aria-keyshortcuts) is gone");
 // K89: "/" must be tested BEFORE the existing ctrl/meta/alt/shift gate (not
 // gating shiftKey itself) in both list keydown handlers, or German
@@ -1396,7 +1396,7 @@ check(/head\.addEventListener\("keydown"[\s\S]{0,400}e\.preventDefault\(\)[\s\S]
   check(/if \(e\.key === "\/" && !e\.ctrlKey && !e\.metaKey && !e\.altKey\) \{[\s\S]{0,300}\$id\("notes-filter"\)/.test(notesKeydownSlice) &&
     notesKeydownSlice.indexOf('e.key === "/"') < notesKeydownSlice.indexOf("e.ctrlKey || e.metaKey || e.altKey || e.shiftKey"),
     "library-notes.js: #notes-list's \"/\" search-focus branch is missing or no longer precedes the ctrl/meta/alt/shift gate (breaks it on Shift-requiring keyboard layouts)");
-  check(libraryNotesSrc.includes('btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /")'),
+  check(libraryNotesSrc.includes('btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space / Delete Escape")'),
     "library-notes.js: the row button lost its \"/\" aria-keyshortcuts announcement");
 }
 check(vocabStore.includes('const _PBP_VOCAB_DB_VERSION = 2'),

@@ -193,8 +193,9 @@ function _pbpVocabActivateRow(w, card) {
 
 // One Tab stop for the row grid, with Up/Down/Home/End moving among its
 // reading buttons: the same recipe library.js uses for the page's tab strip
-// and options.js for its sidebar. Navigation never activates or selects a
-// row; Ctrl/Shift+Space remains the separate multi-select path.
+// and options.js for its sidebar. Navigation never selects a row (Ctrl/
+// Shift+Space remains the separate multi-select path); in the two-pane
+// layout it opens the focused row a beat later (_pbpVocabScheduleFollow).
 function _pbpVocabRowHeads() {
   const list = $id("vocab-list");
   return list ? [...list.querySelectorAll(".vocab-card .notes-card-head")] : [];
@@ -246,7 +247,7 @@ function _pbpVocabBuildRow(w) {
   // multi-select chords -- it fires from anywhere in the list (see the
   // #vocab-list keydown below), not just this row, but this is the only
   // per-row control an assistive-tech user reading a row would query.
-  head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /");
+  head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space / K Delete Escape");
   // Roving tabindex (see _pbpVocabSyncRowTabStops): every row builds OUT of
   // the tab order and exactly one is put back in per render.
   head.tabIndex = -1;
@@ -2723,8 +2724,24 @@ if (_vocabClearBtn) _vocabClearBtn.addEventListener("click", () => {
 // page. Text fields keep their own Escape (a search box empties itself), and
 // with nothing selected the key passes through. From the batch row, focus
 // lands where Clear sends it; on a row it stays on the row.
+// Delete (and Backspace, the Mac keyboard's delete) asks to delete: the
+// selection when there is one -- from a row or the batch row, anchored on
+// the batch row's delete -- otherwise the focused row's word, anchored on
+// the row. Same confirmation as the buttons; nothing goes without it.
 const _vocabListPaneEl = $id("vocab-list-pane");
 if (_vocabListPaneEl) _vocabListPaneEl.addEventListener("keydown", (e) => {
+  if ((e.key === "Delete" || e.key === "Backspace") && !e.isComposing && !e.defaultPrevented &&
+      !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target || target.closest("input, textarea") || !target.closest("#vocab-list, #vocab-batch-toolbar")) return;
+    if (_vocabSelected.size) { e.preventDefault(); _pbpVocabBatchDeleteSelected(); return; }
+    const card = target.closest("#vocab-list .vocab-card");
+    const w = card && _vocabViewRows.find((row) => row.id === card.dataset.vocabId);
+    if (!w) return;
+    e.preventDefault();
+    _pbpVocabDeleteRow(w, card.querySelector(".notes-card-head"), _vocabCurrentOwner);
+    return;
+  }
   if (e.key !== "Escape" || e.isComposing || e.defaultPrevented || !_vocabSelected.size) return;
   const el = e.target instanceof Element ? e.target : null;
   if (!el || !el.closest("#vocab-list, #vocab-batch-toolbar") || el.closest("input, textarea")) return;
@@ -2904,9 +2921,10 @@ if (_vocabLoadMore) _vocabLoadMore.addEventListener("click", () => {
 // Grid navigation. Bound on the container, so it survives every row rebuild
 // and stays scoped to the list: Home/End must not reach the toolbar's search
 // fields, where they are the caret's own keys. ArrowUp/Down are
-// preventDefault'd (they would otherwise scroll the page) but never activate
-// -- opening a word stays a click or an unmodified Space, and the modified
-// Space chords keep their own handler on the row head.
+// preventDefault'd (they would otherwise scroll the page); in the two-pane
+// layout the row they land on opens a beat later, in narrow mode opening a
+// word stays a click or an unmodified Space. The modified Space chords keep
+// their own handler on the row head.
 const _vocabListEl = $id("vocab-list");
 if (_vocabListEl) _vocabListEl.addEventListener("keydown", (e) => {
   // K89: "/" jumps back to the search box, the twin of md-reader.js's "/"
@@ -2930,6 +2948,16 @@ if (_vocabListEl) _vocabListEl.addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
   const card = e.target && typeof e.target.closest === "function" ? e.target.closest(".vocab-card") : null;
   if (!card) return;
+  // K flips the row's word between known and learning without opening it
+  // (2026-10-16), the keyboard twin of the detail's status button. Matched
+  // by key or by the physical key, so it works on a Cyrillic layout too.
+  if (e.key === "k" || e.key === "K" || e.code === "KeyK") {
+    const w = _vocabViewRows.find((row) => row.id === card.dataset.vocabId);
+    if (!w) return;
+    e.preventDefault();
+    _pbpVocabToggleKnownFromRow(w);
+    return;
+  }
   const heads = _pbpVocabRowHeads();
   const head = card.querySelector(".notes-card-head");
   const at = heads.indexOf(head);
@@ -2943,7 +2971,65 @@ if (_vocabListEl) _vocabListEl.addEventListener("keydown", (e) => {
   if (!next) return;
   _pbpVocabSetRowTabStop(next);
   next.focus();
+  _pbpVocabScheduleFollow(next);
 });
+
+// Arrow keys carry the detail along (2026-10-16 ruling): in the two-pane
+// layout the row that took focus opens a beat later, so holding a key runs
+// down the list without a render -- and a dictionary lookup -- per row
+// passed. Narrow mode keeps Enter / Space: there opening a word replaces the
+// list. Focus stays on the row; a row already open is left alone.
+const PBP_VOCAB_FOLLOW_MS = 160;
+let _vocabFollowTimer = 0;
+function _pbpVocabScheduleFollow(head) {
+  clearTimeout(_vocabFollowTimer);
+  if (_pbpVocabNarrowMode()) return;
+  _vocabFollowTimer = setTimeout(() => {
+    if (document.activeElement !== head || !head.isConnected) return;
+    const card = head.closest(".vocab-card");
+    const w = card && _vocabViewRows.find((row) => row.id === card.dataset.vocabId);
+    if (w && !card.hasAttribute("aria-current")) _pbpVocabActivateRow(w, card);
+  }, PBP_VOCAB_FOLLOW_MS);
+}
+
+// Focus the row of one word after a reload rebuilt the list; false when the
+// word is no longer in view (a status filter can hide a row K just flipped).
+function _pbpVocabFocusRow(id) {
+  const head = [...document.querySelectorAll("#vocab-list .vocab-card")]
+    .find((card) => card.dataset.vocabId === id)?.querySelector(".notes-card-head");
+  if (!head) return false;
+  _pbpVocabSetRowTabStop(head);
+  try { head.focus({ preventScroll: true }); } catch (_) { head.focus(); }
+  return document.activeElement === head;
+}
+
+// K on a row: one word between known and learning, the batch row's status
+// change for a single word. Focus comes back to the same row once the reload
+// has rebuilt the list, or to the search box when the row left the view.
+async function _pbpVocabToggleKnownFromRow(w) {
+  if (_vocabBatchBusy) return;
+  const known = String(w.status || "new") !== "known";
+  const renderOwner = _vocabCurrentOwner;
+  const gen = ++_vocabRenderGen;
+  const restoreSelection = _pbpVocabHoldSelection(gen);
+  let owner = null;
+  try {
+    owner = await pbpVocabCurrentOwner();
+    if (_pbpVocabOwnerMoved(owner, renderOwner, gen)) return;
+    const ok = await pbpVocabBatchSetStatus([w.id], owner, known ? "known" : "new");
+    const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
+    restoreSelection();
+    if (gen !== _vocabRenderGen) return;
+    if (!_pbpVocabFocusRow(w.id)) _pbpVocabFocusStable();
+    if (!ok) _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
+    else if (!refreshed) _pbpVocabFlashStatus(false, t("vocabRefreshFailed"));
+    else _pbpVocabFlashStatus(true, t(known ? "vocabBatchKnownDoneOne" : "vocabBatchLearningDoneOne", "1"));
+  } catch (err) {
+    console.warn("vocab status toggle failed:", err && err.name, err && err.message);
+    if (owner) { await _pbpVocabReloadAfterMutation(owner, gen); restoreSelection(); }
+    if (gen === _vocabRenderGen) _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
+  }
+}
 const _vocabGroupInput = $id("vocab-group-input");
 if (_vocabGroupInput) _vocabGroupInput.addEventListener("input", _pbpVocabSyncSelectionUi);
 const _vocabAddGroup = $id("vocab-add-group");
