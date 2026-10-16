@@ -148,9 +148,12 @@
           <button type="button" class="btn btn-sm vocab-group-step" id="vocab-add-group" data-i18n-title="vocabAddToGroup" data-i18n-aria="vocabAddToGroup"><span class="btn-ic" data-ic="plus"></span></button>
           <button type="button" class="btn btn-sm vocab-group-step" id="vocab-remove-group" data-i18n-aria="vocabRemoveFromGroup"><span class="btn-ic" data-ic="minus"></span></button>
         </span>
-        <!-- Text buttons now (spec §3.9); the full action stays the name. -->
-        <button type="button" class="btn btn-sm" id="vocab-mark-known" data-i18n="vocabStatusKnown" data-i18n-title="vocabMarkKnown" data-i18n-aria="vocabMarkKnown" aria-label="Mark as known" title="Mark as known">Known</button>
-        <button type="button" class="btn btn-sm" id="vocab-mark-learning" data-i18n="vocabStatusLearning" data-i18n-title="vocabMarkLearning" data-i18n-aria="vocabMarkLearning" aria-label="Back to learning" title="Back to learning">Learning</button>
+        <!-- Text buttons (spec §3.9) labelled with a verb, so they read as
+             actions, not as the status they set; short enough for a 320px
+             index in every locale. The visible label IS the accessible name
+             (WCAG 2.5.3, label in name); the full action rides in the title. -->
+        <button type="button" class="btn btn-sm" id="vocab-mark-known" data-i18n="vocabBatchMarkKnown" data-i18n-title="vocabMarkKnown" title="Mark as known">Mark known</button>
+        <button type="button" class="btn btn-sm" id="vocab-mark-learning" data-i18n="vocabBatchMarkLearning" data-i18n-title="vocabMarkLearning" title="Back to learning">Back to learning</button>
         <span class="lib-batch-status"></span>
       </div>
       <!-- The list side's status line (spec §4.7 amended 2026-10-16): under

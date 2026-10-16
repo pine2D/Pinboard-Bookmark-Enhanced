@@ -9226,11 +9226,17 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(!/\.notes-card\.is-error \{[^}]*(?:border-color|box-shadow)/.test(hand) &&
     /\.vocab-card\.is-error \.notes-card-top[^{]*\{ --row-bg: color-mix\(in srgb, var\(--lib-danger\) 10%, var\(--lib-bg\)\); \}/.test(hand),
     "library.css: a failed save / delete marks the row by fill only (spec §3.10) -- no inset bar, no border colour");
-  check(/id="vocab-mark-known"[^>]*data-i18n="vocabStatusKnown"[^>]*data-i18n-title="vocabMarkKnown"[^>]*data-i18n-aria="vocabMarkKnown"/.test(libraryHtml) &&
-    /id="vocab-mark-learning"[^>]*data-i18n="vocabStatusLearning"[^>]*data-i18n-title="vocabMarkLearning"[^>]*data-i18n-aria="vocabMarkLearning"/.test(libraryHtml) &&
+  // Known / Learning carry a verb label (2026-10-16), and that visible label
+  // is the whole accessible name: an aria-label here would replace it, and
+  // in four locales the old status word was not part of the old name (WCAG
+  // 2.5.3). The full action stays in the title.
+  const batchStatusTag = (id) => (new RegExp(`<button[^>]*id="${id}"[^>]*>`).exec(libraryHtml) || [""])[0];
+  check(/data-i18n="vocabBatchMarkKnown"[^>]*data-i18n-title="vocabMarkKnown"/.test(batchStatusTag("vocab-mark-known")) &&
+    /data-i18n="vocabBatchMarkLearning"[^>]*data-i18n-title="vocabMarkLearning"/.test(batchStatusTag("vocab-mark-learning")) &&
+    ["vocab-mark-known", "vocab-mark-learning"].every((id) => !/aria-label|data-i18n-aria/.test(batchStatusTag(id))) &&
     /class="btn btn-sm ghost" id="vocab-batch-select-all" data-i18n="vocabSelectAll"/.test(libraryHtml) &&
     /class="btn btn-sm ghost" id="notes-batch-select-all" data-i18n="vocabSelectAll"/.test(libraryHtml),
-    "library.html: the batch rows' Known / Learning text buttons (names unchanged) or their Select all are missing (spec §3.9, §11 V28)");
+    "library.html: the batch rows' Known / Learning verb buttons (name from the visible label, full action in title) or their Select all are missing (spec §3.9, §11 V28)");
 }
 
 // Library redesign T4e (spec §3.9): a keyboard row move scrolls the list

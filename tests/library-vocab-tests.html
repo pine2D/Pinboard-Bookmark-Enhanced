@@ -85,8 +85,8 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
           <button type="button" class="btn btn-sm vocab-group-step" id="vocab-add-group" aria-label="Add to group" title="Add to group"><span class="btn-ic" data-ic="plus"></span></button>
           <button type="button" class="btn btn-sm vocab-group-step" id="vocab-remove-group" aria-label="Remove from group" title="Remove from group"><span class="btn-ic" data-ic="minus"></span></button>
         </span>
-        <button type="button" class="btn btn-sm" id="vocab-mark-known" aria-label="Mark as known" title="Mark as known">Known</button>
-        <button type="button" class="btn btn-sm" id="vocab-mark-learning" aria-label="Back to learning" title="Back to learning">Learning</button>
+        <button type="button" class="btn btn-sm" id="vocab-mark-known" title="Mark as known">Mark known</button>
+        <button type="button" class="btn btn-sm" id="vocab-mark-learning" title="Back to learning">Back to learning</button>
         <span class="lib-batch-status"></span>
       </div>
       <span class="save-status vocab-main-status" id="vocab-status" role="status" aria-live="polite"></span>
@@ -2829,8 +2829,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         panel.querySelector('[data-label="known"]').title = m.vocabMarkKnown.message;
         panel.querySelector('[data-label="learning"]').title = m.vocabMarkLearning.message;
         panel.querySelector('[data-label="batch-all"]').textContent = m.vocabSelectAll.message;
-        panel.querySelector('[data-label="known"]').textContent = m.vocabStatusKnown.message;
-        panel.querySelector('[data-label="learning"]').textContent = m.vocabStatusLearning.message;
+        panel.querySelector('[data-label="known"]').textContent = m.vocabBatchMarkKnown.message;
+        panel.querySelector('[data-label="learning"]').textContent = m.vocabBatchMarkLearning.message;
         panel.querySelector('[data-label="selected-count"]').textContent = m.vocabSelectedCount.message.replace("$COUNT$", "5000");
         panel.querySelector('[data-label="batch-delete"]').title = m.vocabBatchDelete.message;
         panel.querySelector('input[type="text"]').placeholder = m.vocabGroupNamePlaceholder.message;

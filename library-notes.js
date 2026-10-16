@@ -1028,13 +1028,16 @@ async function _pbpNotesSaveNote(session) {
 
 // The page delete. Scope is the PAGE's record -- the confirm popover names the
 // page before anything is removed. notes-detail-delete stays the LAST class:
-// the refresh finds a focused detail control again by its last class.
-function _pbpNotesBuildDeleteBtn(row) {
+// the refresh finds a focused detail control again by its last class. On a
+// page with one highlight it is that highlight's delete (the excerpt offers
+// none of its own), so it says so instead of "all of this page's".
+function _pbpNotesBuildDeleteBtn(row, pageCount) {
   const del = document.createElement("button");
   del.type = "button";
   del.className = "btn btn-sm danger ghost lib-hang-start notes-detail-delete";
-  setBtnIcon(del, "trash", t("notesDeleteBtn"));
-  del.addEventListener("click", () => _pbpNotesDelete(row, del));
+  const single = pageCount === 1;
+  setBtnIcon(del, "trash", t(single ? "hlDelete" : "notesDeleteBtn"));
+  del.addEventListener("click", () => _pbpNotesDelete(row, del, single));
   return del;
 }
 
@@ -1087,7 +1090,7 @@ function _pbpNotesBuildSide(hit, pageHits, pageTs) {
     facts.appendChild(span);
   }
   side.appendChild(facts);
-  side.appendChild(_pbpNotesBuildDeleteBtn(hit.row));
+  side.appendChild(_pbpNotesBuildDeleteBtn(hit.row, pageHits.length));
   return side;
 }
 
@@ -1244,7 +1247,7 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
   // 4. Closing row (shown below C 1312): the page delete, hanging at the main column's start
   const footer = document.createElement("div");
   footer.className = "notes-detail-footer";
-  footer.appendChild(_pbpNotesBuildDeleteBtn(hit.row));
+  footer.appendChild(_pbpNotesBuildDeleteBtn(hit.row, pageHits.length));
   frag.appendChild(footer);
 
   // The column spans every row of the sheet: head + excerpts + footer.
@@ -1855,7 +1858,7 @@ async function _pbpNotesChooseColor(session, color) {
 // showConfirmPopover lives in shared.js, which the standalone test page does
 // not load; that is fine because the tests exercise only the pure layer and
 // never invoke this handler.
-function _pbpNotesDelete(row, anchor) {
+function _pbpNotesDelete(row, anchor, single) {
   const label = row.title || row.url || t("notesUnknownPage");
   // The account whose rows this popover was opened over. The popover is a
   // body child dismissed only by Escape / an outside pointerdown / scroll / an
@@ -1865,7 +1868,8 @@ function _pbpNotesDelete(row, anchor) {
   const ownerAtOpen = _notesOwnerCache;
   const revision = _notesAuthRevision;
   showConfirmPopover(anchor, {
-    msg: t("notesDeleteConfirm", label),
+    msg: single ? t("hlDeleteConfirm") : t("notesDeleteConfirm", label),
+    detail: pbpLibDeleteDetail("libraryDeleteNotesDetail"),
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {
@@ -1956,6 +1960,7 @@ function _pbpNotesDeleteOne(hit, anchor) {
   const revision = _notesAuthRevision;
   showConfirmPopover(anchor, {
     msg: t("hlDeleteConfirm"),
+    detail: pbpLibDeleteDetail("libraryDeleteNotesDetail"),
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {
@@ -2021,6 +2026,7 @@ function _pbpNotesBatchDelete() {
   const ownerAtOpen = _notesOwnerCache, revision = _notesAuthRevision;
   showConfirmPopover(button, {
     msg: t(pbpLibCountKey(snapshot.length, "notesBatchDeleteConfirmOne", "notesBatchDeleteConfirm"), String(snapshot.length)),
+    detail: pbpLibDeleteDetail("libraryDeleteNotesDetail"),
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {

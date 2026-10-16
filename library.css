@@ -527,6 +527,11 @@ html.motion-ready .confirm-popover.is-closing {
 /* pre-line: messages may embed a real newline (summary line + time estimate);
    under nowrap it collapses to one ever-wider unwrappable line. */
 .confirm-popover .confirm-msg { flex: 1 1 16ch; min-width: 0; font-weight: bold; color: inherit; white-space: pre-line; overflow-wrap: anywhere; }
+/* The consequence line under a delete question (pbpLibDeleteDetail: what else
+   goes, that it is final, other Drive devices): its own row between the
+   question and the buttons, in plain ink so the warning colour stays on the
+   question itself. */
+.confirm-popover .confirm-detail { flex: 1 1 100%; min-width: 0; font-weight: normal; color: var(--lib-fg); white-space: pre-line; overflow-wrap: anywhere; }
 .confirm-popover button {
   flex: none; padding: 2px var(--lib-sp-2); font-size: 11px; cursor: pointer; border-radius: var(--lib-radius-sm); border: 1px solid;
 }
@@ -1198,6 +1203,9 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   max-height: var(--listbox-room, 330px);
   overflow: auto;
 }
+/* The settings link is a door, not an export: space sets it apart from the
+   actions above it, the way listbox groups are set apart (no rule). */
+.vocab-export-menu > a.vocab-export-choice { margin-top: var(--lib-sp-2); }
 .vocab-export-menu .vocab-export-choice {
   display: flex;
   align-items: center;

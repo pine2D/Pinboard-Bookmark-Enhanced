@@ -1679,6 +1679,7 @@ function pbpVocabSelectionSnapshotValid(ids, selected, rows) {
 function _pbpVocabDeleteRow(w, anchor, renderOwner) {
   showConfirmPopover(anchor, {
     msg: t("dictDeleteConfirm", w.term),
+    detail: pbpLibDeleteDetail("libraryDeleteVocabDetail"),
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {
@@ -2372,6 +2373,7 @@ function _pbpVocabBatchDeleteSelected() {
   const ids = [..._vocabSelected];
   showConfirmPopover(button, {
     msg: t("vocabBatchDeleteConfirm", String(ids.length)),
+    detail: pbpLibDeleteDetail("libraryDeleteVocabDetail"),
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {

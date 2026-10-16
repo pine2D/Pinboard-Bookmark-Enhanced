@@ -554,6 +554,19 @@ function pbpLibWireNotesHeaderFit(pane) {
 // Account isolation: the worker reports the Pinboard account its status is
 // for; the line shows only when that is still the account this page reads.
 let _libDriveGen = 0;
+// Whether the header's Drive line is up, i.e. this device syncs the account on
+// screen: a delete then travels to the user's other devices as a tombstone,
+// which the confirmation says (pbpLibDeleteDetail).
+let _libDriveConnected = false;
+
+// The second line of a delete confirmation: what else goes and that it is
+// final, plus the other devices when this one syncs through Google Drive.
+// CJK sentences end in a full-width stop and join without a space.
+function pbpLibDeleteDetail(baseKey) {
+  const parts = [t(baseKey)];
+  if (_libDriveConnected) parts.push(t("libraryDeleteDriveDetail"));
+  return parts.join(/[\u3002\uff01\uff1f]$/.test(parts[0]) ? "" : " ");
+}
 
 function pbpLibDriveLine(status, currentOwner) {
   if (!status || status.connected !== true) return null;
@@ -599,6 +612,7 @@ async function pbpLibRefreshDriveLine() {
     line = null;
   }
   if (gen !== _libDriveGen) return;
+  _libDriveConnected = !!line;
   el.hidden = !line;
   el.classList.toggle("bad", !!line && line.kind === "problem");
   el.textContent = line ? line.text : "";

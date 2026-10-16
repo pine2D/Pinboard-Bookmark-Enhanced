@@ -283,6 +283,14 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     rowEl("pbp_hl_beta#b1").querySelector(".notes-hit-btn").click();
     return detail().querySelectorAll(".notes-excerpt").length === 1 && sibs().length === 0;
   })());
+  // Its only delete is the page one, and with one highlight on the page it
+  // says what it removes -- this highlight, not "all of this page's".
+  check("a single-highlight page's delete is labelled as that highlight's delete",
+    [...detail().querySelectorAll(".notes-detail-delete")].every((b) => b.textContent === "hlDelete") &&
+    detail().querySelectorAll(".notes-detail-delete").length > 0);
+  rowEl("pbp_hl_alpha#a1").querySelector(".notes-hit-btn").click();
+  check("a page with several highlights keeps the page-wide delete label",
+    [...detail().querySelectorAll(".notes-detail-delete")].every((b) => b.textContent === "notesDeleteBtn"));
 
   // ---- switching entries resets the reading pane's scroll ----
   // The scroll container is #notes-detail-pane, not the #notes-detail div the
@@ -922,6 +930,22 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     for (const k of ["pbp_hl_cjk_zh", "pbp_hl_cjk_kana", "pbp_hl_cjk_ko", "pbp_hl_cjk_mixed"]) delete store[k];
     _pbpNotesRenderDetail(null);
     await renderNotesPanel();
+  }
+
+  // ---- library.js: the delete consequence line ----
+  {
+    const realT = t, realConnected = _libDriveConnected;
+    try {
+      _libDriveConnected = false;
+      check("not syncing through Drive, the delete detail is the consequence alone",
+        pbpLibDeleteDetail("libraryDeleteNotesDetail") === "libraryDeleteNotesDetail");
+      _libDriveConnected = true;
+      check("syncing through Drive, it adds that the other devices delete too",
+        pbpLibDeleteDetail("libraryDeleteNotesDetail") === "libraryDeleteNotesDetail libraryDeleteDriveDetail");
+      t = (key) => ({ libraryDeleteNotesDetail: "删除后无法撤销。", libraryDeleteDriveDetail: "其他设备也会删除。" })[key] || key;
+      check("CJK sentences join without a space",
+        pbpLibDeleteDetail("libraryDeleteNotesDetail") === "删除后无法撤销。其他设备也会删除。");
+    } finally { t = realT; _libDriveConnected = realConnected; }
   }
 
   // ---- search marking (textContent-only construction) ----
