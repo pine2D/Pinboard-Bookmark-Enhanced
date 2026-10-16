@@ -868,6 +868,9 @@
   "optAutoSave": {
     "message": "automatyczny zapis włączony"
   },
+  "optAwaitingChoice": {
+    "message": "Czeka na wybór"
+  },
   "optAutoSaved": {
     "message": "Zapisano"
   },

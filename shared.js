@@ -3174,7 +3174,9 @@ function pbpDismissActiveConfirm(anchor) {
 // conflict: use the cloud copy / overwrite it / keep sync off).
 // `onDismiss` runs on EVERY close -- including the silent ones (another
 // confirm replacing this one, pbpDismissActiveConfirm) that skip onCancel --
-// before the chosen handler, if any. Returns false when nothing was opened.
+// before the chosen handler, if any. `variant: "decision"` marks a question
+// the user must read before choosing (body-size copy, md-rung buttons; only
+// options styles it). Returns false when nothing was opened.
 // Popover self-dismisses on Escape / Cancel / Confirm; only one can be open.
 function showConfirmPopover(anchor, opts) {
   if (!anchor) return false;
@@ -3183,7 +3185,7 @@ function showConfirmPopover(anchor, opts) {
   const opener = document.activeElement;
   _activeConfirmPopover?.dismiss({ restoreFocus: false, animate: false });
   const pop = document.createElement("div");
-  pop.className = "confirm-popover";
+  pop.className = opts?.variant === "decision" ? "confirm-popover is-decision" : "confirm-popover";
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-modal", "false");
   pop.setAttribute("aria-label", msg || "Confirm");

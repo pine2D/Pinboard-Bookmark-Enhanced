@@ -873,6 +873,9 @@
   "optAutoSave": {
     "message": "auto-save enabled"
   },
+  "optAwaitingChoice": {
+    "message": "Waiting for your choice"
+  },
   "optAutoSaved": {
     "message": "Saved"
   },

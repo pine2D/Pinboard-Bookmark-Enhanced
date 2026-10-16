@@ -2510,6 +2510,7 @@ async function run() {
       syncGetLarge: async (key) => key === "savedThemes" ? [] : "",
       syncSetLarge: async (key, value) => { handlerLargeWrites.push({ key, value }); },
       pauseOptionsAutoSave: async () => {},
+      setAwaitingChoice: () => {},
       saveAll: async () => ({ ok: true }),
       resumeOptionsAutoSave: () => {},
       pbpAskSyncConflict: async () => "cloud",
@@ -5436,6 +5437,7 @@ async function run() {
       const keysDeps = {
         syncKeysToggle: keysToggle,
         pbpAskConfirmChoice: async () => { confirms++; return "no"; },
+        setAwaitingChoice: () => {},
         t: (key) => key,
         pbpEnableSyncApiKeys: async () => {},
         pbpDisableSyncApiKeys: async () => { disables++; },

@@ -868,6 +868,9 @@
   "optAutoSave": {
     "message": "自動儲存已啟用"
   },
+  "optAwaitingChoice": {
+    "message": "等待你的選擇"
+  },
   "optAutoSaved": {
     "message": "已儲存"
   },

@@ -993,6 +993,7 @@ function pbpAskConfirmChoice(anchor, opts) {
 // copy is the plain alternative; Cancel leaves sync off.
 async function pbpAskSyncConflict(anchor) {
   const choice = await pbpAskConfirmChoice(anchor, {
+    variant: "decision",
     msg: t("syncConflictPrompt"),
     detail: t("syncConflictDetail"),
     altText: t("syncConflictUseCloudBtn"),
@@ -2895,7 +2896,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           // Disabled while the question is open: re-clicking the switch would
           // start a second migration run under the first one's paused queue.
           syncToggle.disabled = true;
+          setAwaitingChoice(true);
           const choice = await pbpAskSyncConflict(syncToggle.closest?.(".pref-row") || syncToggle);
+          setAwaitingChoice(false);
           syncToggle.disabled = false;
           if (choice === "cloud") useCloud = true;
           else if (choice !== "overwrite") cancelled = true;
@@ -3090,12 +3093,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!enabling) {
       syncKeysToggle.dataset.asking = "1";
       syncKeysToggle.disabled = true;
+      setAwaitingChoice(true);
       const choice = await pbpAskConfirmChoice(syncKeysToggle.closest?.(".pref-row") || syncKeysToggle, {
+        variant: "decision",
         msg: t("syncApiKeysDisableTitle"),
         detail: t("syncApiKeysDisableConfirm"),
         yesText: t("syncApiKeysDisableBtn"),
         noText: t("cancel"),
       });
+      setAwaitingChoice(false);
       syncKeysToggle.disabled = false;
       delete syncKeysToggle.dataset.asking;
       if (choice !== "yes") {
@@ -3677,10 +3683,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   function setAutoSaveProgress(key) {
     const el = $id("auto-save-status");
     const retry = $id("auto-save-retry");
-    if (el) { clearTimeout(el._timer); el.textContent = t(key); el.classList.remove("saved"); el.classList.toggle("hidden", $id("opt-global-alert")?.dataset.autosaveFailure === "1"); }
+    if (el && !el.dataset.awaiting) { clearTimeout(el._timer); el.textContent = t(key); el.classList.remove("saved"); el.classList.toggle("hidden", $id("opt-global-alert")?.dataset.autosaveFailure === "1"); }
     // Preserve keyboard focus through a failed retry. aria-disabled plus the
     // click gate prevents duplicate work without native disabled blurring it.
     if (retry && !retry.hidden) { retry.setAttribute("aria-disabled", "true"); retry.textContent = t(key); }
+  }
+
+  // While a decision popover is open the title slot says so, instead of a
+  // "Saved" that reads as if the question were already settled. A standing
+  // save failure keeps the slot hidden behind its own alert.
+  function setAwaitingChoice(waiting) {
+    const el = $id("auto-save-status");
+    if (!el) return;
+    if (waiting) el.dataset.awaiting = "1";
+    else delete el.dataset.awaiting;
+    if ($id("opt-global-alert")?.dataset.autosaveFailure === "1") return;
+    clearTimeout(el._timer);
+    el.classList.remove("saved", "hidden");
+    el.textContent = t(waiting ? "optAwaitingChoice" : "optAutoSave");
   }
 
   function reportAutoSaveFailure(error) {
@@ -3782,7 +3802,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function flashAutoSave(key = "optAutoSaved", fallback = "Saved", ok = true) {
     if (ok) clearAutoSaveFailureAlert();
     const el = $id("auto-save-status");
-    if (!el) return;
+    if (!el || (ok && el.dataset.awaiting)) return;
     setStatusIcon(el, ok, t(key) || fallback);
     el.classList.toggle("saved", ok);
     el.classList.toggle("hidden", !ok);

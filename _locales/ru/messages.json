@@ -868,6 +868,9 @@
   "optAutoSave": {
     "message": "автосохранение включено"
   },
+  "optAwaitingChoice": {
+    "message": "Ожидает выбора"
+  },
   "optAutoSaved": {
     "message": "Сохранено"
   },

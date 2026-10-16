@@ -3198,6 +3198,30 @@ html.motion-ready .confirm-popover.is-closing {
 .confirm-popover .confirm-alt:hover { background: var(--opt-btn-hover); }
 .confirm-popover button:focus-visible { outline: 1px solid var(--opt-accent); outline-offset: 2px; box-shadow: var(--opt-focus-ring); }
 html[data-theme] .confirm-popover { color: var(--opt-fg); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+/* Decision variant (showConfirmPopover `variant: "decision"`): a question whose
+   outcomes the user has to read before choosing -- the Chrome Sync conflict,
+   turning credential sync off. Body-size copy in the foreground colour and
+   md-rung buttons on their own row; only the destructive Confirm keeps the
+   danger fill. The light confirms (reset, tag governance, vocabulary, backup)
+   keep the compact tooltip scale above. */
+.confirm-popover.is-decision {
+  max-width: min(48ch, 88vw);
+  gap: var(--opt-sp-4);
+  padding: var(--opt-sp-5) var(--opt-sp-6);
+  font-size: var(--opt-text-body); line-height: var(--opt-lh-body);
+  color: var(--opt-fg);
+  border-radius: var(--opt-radius-md);
+}
+.confirm-popover.is-decision .confirm-msg { flex-basis: 100%; font-weight: 600; }
+.confirm-popover.is-decision .confirm-detail { padding-bottom: var(--opt-sp-2); }
+.confirm-popover.is-decision button {
+  flex: 0 1 auto; max-width: 100%;
+  min-height: var(--opt-control-h);
+  padding: var(--opt-sp-1) var(--opt-control-pad-x);
+  font-size: var(--opt-text-body); line-height: var(--opt-lh-body);
+  border-radius: var(--opt-radius-md);
+}
+.confirm-popover.is-decision button:first-of-type { margin-inline-start: auto; }
 /* .confirm-yes themed override deleted (COMPONENTS.md §4.2/C14): it used
    var(--opt-panel) as an unaudited foreground borrow and outranked the
    generated (0,2,0) rule by specificity (0,3,0) -- the generated

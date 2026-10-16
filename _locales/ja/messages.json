@@ -868,6 +868,9 @@
   "optAutoSave": {
     "message": "自動保存が有効です"
   },
+  "optAwaitingChoice": {
+    "message": "選択待ち"
+  },
   "optAutoSaved": {
     "message": "保存しました"
   },

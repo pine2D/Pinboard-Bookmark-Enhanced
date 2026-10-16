@@ -868,6 +868,9 @@
   "optAutoSave": {
     "message": "Automatisches Speichern aktiviert"
   },
+  "optAwaitingChoice": {
+    "message": "Auswahl ausstehend"
+  },
   "optAutoSaved": {
     "message": "Gespeichert"
   },
