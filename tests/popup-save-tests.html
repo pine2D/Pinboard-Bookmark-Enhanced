@@ -3756,6 +3756,40 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    // ===================== Shift+Enter: AI shortcut, never in the notes =====================
+    // Critique 2026-10-19: the document-level listener had no focus check, so
+    // Shift+Enter in the notes swallowed the line break and fired the paid AI
+    // call, writing a summary into the words being typed. Runs the SHIPPED
+    // listener, sliced out of popup.js.
+    test("Shift+Enter breaks a line in the notes and runs AI everywhere else", () => {
+      const startAt = source.indexOf('  document.addEventListener("keydown", (e) => {\n    if ((e.ctrlKey || e.metaKey) && e.key === "Enter")');
+      const endAt = source.indexOf("\n  });\n", startAt);
+      assert(startAt >= 0 && endAt > startAt, "popup.js: the Ctrl/Shift+Enter keydown listener was not found");
+      let handler = null;
+      const calls = [];
+      const main = document.createElement("div");
+      new Function("document", "$id", "settings", "doAISummary", "doAITags",
+        source.slice(startAt, endAt + 5))(
+        { addEventListener: (type, fn) => { if (type === "keydown" && !handler) handler = fn; } },
+        (id) => (id === "main-section" ? main : { click() { calls.push("save"); } }),
+        { optShowAiSummary: true, optShowAiTags: true },
+        () => calls.push("summary"), () => calls.push("tags"));
+      const press = (target) => {
+        let prevented = false;
+        handler({ key: "Enter", shiftKey: true, ctrlKey: false, metaKey: false, altKey: false, target, preventDefault() { prevented = true; } });
+        return prevented;
+      };
+      const notes = document.createElement("textarea");
+      const inNotes = press(notes);
+      assert(inNotes === false && calls.length === 0, "Shift+Enter in the notes must keep its line break and spend nothing: " + calls.join(","));
+      const tagsBox = document.createElement("input");
+      const inTags = press(tagsBox);
+      assert(inTags === true && calls.join(",") === "summary,tags", "elsewhere Shift+Enter runs the AI fill: " + calls.join(","));
+      const tagsSource = popupTagsSource.slice(popupTagsSource.indexOf("else if ((e.key === \"Enter\""));
+      assert(tagsSource.startsWith('else if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab")'),
+        "the tags input must not also commit a tag on Shift+Enter (one key, one action)");
+    });
+
     // ===================== K72: Alt+P/R/A (甲) and the chip toolbars (乙) =====================
     // Both routes run the SHIPPED source, sliced out of popup.js / popup-tags.js
     // and executed against real DOM nodes: focus order, focus(), disabled and

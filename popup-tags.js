@@ -404,7 +404,9 @@ function setupTagsInput() {
     let acVisible = !dropdown.classList.contains("hidden") && items.length > 0;
     if (e.key === "ArrowDown" && acVisible) { e.preventDefault(); acIndex = acIndex >= items.length - 1 ? 0 : acIndex + 1; updateAc(items, input); }
     else if (e.key === "ArrowUp" && acVisible) { e.preventDefault(); acIndex = acIndex <= 0 ? items.length - 1 : acIndex - 1; updateAc(items, input); }
-    else if (e.key === "Enter" || e.key === "Tab") {
+    else if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+      // Shift+Enter is the popup's AI shortcut (popup.js): it falls through to
+      // that document handler and commits nothing here -- one key, one action.
       // The rebuild is coalesced into a rAF, and a keydown can drain before
       // that frame runs (cold popup, janked main thread). The dropdown then
       // still describes the PREVIOUS input string -- committing items[0], or

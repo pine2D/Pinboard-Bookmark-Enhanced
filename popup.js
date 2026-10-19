@@ -1959,6 +1959,10 @@ function setupSubmit(token) {
     } else if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === "Enter") {
       const mainSection = $id("main-section");
       if (mainSection.classList.contains("hidden")) return;
+      // In the notes, Shift+Enter is a line break, as in every text box: it
+      // must not spend tokens and write a summary into the words being typed
+      // (critique 2026-10-19). Everywhere else it stays the AI shortcut.
+      if (e.target instanceof HTMLTextAreaElement) return;
       // Gate on the same two display toggles showMain() reads: a hidden action
       // must not stay reachable from the keyboard, or a feature the user turned
       // off still spends tokens and writes into fields they cannot see. With
