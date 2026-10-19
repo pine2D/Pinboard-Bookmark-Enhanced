@@ -1206,17 +1206,24 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display:
    the dropdown's own .ac-count margin-left applies unchanged. Scoped to
    .stag so the dropdown's plain .ac-count is unaffected. */
 .stag .ac-count { color: var(--pp-chip-fg); }
-/* A used chip's whole label -- including its count -- reads as the
-   fg-hint/line-through state above, not the chip-fg the count would
-   otherwise carry. */
-.stag.used .ac-count { color: inherit; }
+/* An AI chip's count and a used chip's whole label take the chip's own text
+   color: ai-chip-fg (one hue per chip -- a blue count beside purple text
+   read as two things, critique 2026-10-19), or the fg-hint/line-through
+   used state above. ai-chip-fg is gated against chip-bg itself. */
+.stag.ai .ac-count, .stag.used .ac-count { color: inherit; }
 /* Alt+N slot digit (pbpAssignAltNumBadges): the badge IS the keyboard mapping,
    so it must ride the chip itself. tabular-nums keeps digits 1-9 from
    jittering the chip's width as slots reassign; aria-hidden in JS -- the
    accessible equivalent is aria-keyshortcuts on the button. Hidden once used:
    a struck-through chip keeps its slot reserved but the digit no longer does
    anything. */
-.stag .stag-num { color: var(--pp-chip-fg); font-size: 11px; font-variant-numeric: tabular-nums; margin-right: var(--pp-sp-1); }
+/* critique 2026-10-19: the digit follows the shortcut-hint rule above (first
+   ten opens, or while Alt is held) instead of sitting on every chip forever,
+   takes the chip's own text color (an AI chip carried a blue digit beside
+   purple text), and stands 6px off the tag so "1reading" / "32024" no longer
+   read as one word. */
+.stag .stag-num { color: inherit; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; margin-right: var(--pp-sp-3); }
+html:not(.pp-kbd-learn):not(.pp-kbd-show) .stag .stag-num { display: none; }
 .stag.used .stag-num { visibility: hidden; }
 .add-all-link { border: 0; background: none; padding: 0; font-family: inherit; color: var(--pp-fg-hint); font-size: 11px; cursor: pointer; }
 .add-all-link:hover { text-decoration: underline; color: var(--pp-fg-muted); }
