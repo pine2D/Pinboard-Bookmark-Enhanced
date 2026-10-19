@@ -79,7 +79,11 @@ html { scrollbar-gutter: stable; }
   --success: light-dark(#66800B, #87A85F);
   --bq-border: light-dark(#205EA6, #6095C5);
   --bq-bg: light-dark(#F2F3EC, #22282D);
-  --bq-fg: light-dark(#1A4F8C, #B9CAD6);
+  /* Quote text is neutral ink (critique 2026-10-19): the old light #1A4F8C
+     sat 1.26:1 from --link, so a whole quote read as one long link and the
+     real links inside it vanished. Blue stays on the bar; --link stays the
+     only blue text. Same values as --btn-fg. */
+  --bq-fg: light-dark(#403E3C, #C8C6BC);
   --table-stripe: light-dark(#F8F6EA, #22211F);
   --selection: light-dark(#C6DDE8, #324B61);
   --surface: light-dark(#F7F5EA, #282726);
@@ -728,11 +732,17 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
 }
 
 /* Links */
+/* Resting underline at low alpha (critique 2026-10-19): --link against body
+   ink is only 2.63:1 in light, under the 3:1 a colour-only cue needs, so a
+   link must not depend on hue alone. Hover takes it to full strength. The
+   offset is em, not 2px: CJK glyphs sit on the em box bottom and swallowed a
+   2px line, so a Chinese link showed no underline at all. */
 #rendered-view a {
   color: var(--link);
   text-decoration: underline;
-  text-decoration-color: transparent;
-  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--link) 50%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
   transition: text-decoration-color 150ms ease;
 }
 #rendered-view a:hover {
@@ -805,10 +815,13 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
   color: var(--bq-fg);
 }
 #rendered-view blockquote p { margin: 0.4em 0; }
-/* Author/floor header line — accent colour so each reply's author scans easily.
-   The .pb-comment-body variant covers forum comments (own body wrapped). */
+/* Author/floor header line: full ink so each reply's author scans against the
+   softer --bq-fg body. Not the accent blue any more (critique 2026-10-19): the
+   selector also catches the first bold word of any ordinary quote, and blue
+   text in the reader means "link". The .pb-comment-body variant covers forum
+   comments (own body wrapped). */
 #rendered-view blockquote > p:first-child > strong:first-child,
-#rendered-view blockquote > .pb-comment-body > p:first-child > strong:first-child { color: var(--bq-border); }
+#rendered-view blockquote > .pb-comment-body > p:first-child > strong:first-child { color: var(--fg); }
 /* Nested levels (deep reply threads): thin neutral guide + a small elbow connector,
    no tint stacking, tighter — reads as a comment tree instead of stacked blue bars.
    Only the outermost quote keeps the accent bar + tint.
@@ -844,7 +857,7 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
    bilingual (original still shown) never gets a duplicate elbow. `blockquote > .pb-tr`
    only matches forum comment translations (a non-forum block's .pb-tr sits beside the
    blockquote, not inside it), so non-forum views are unaffected. */
-body.tr-only #rendered-view blockquote > .pb-tr > p:first-child > strong:first-child { color: var(--bq-border); }
+body.tr-only #rendered-view blockquote > .pb-tr > p:first-child > strong:first-child { color: var(--fg); }
 body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child { position: relative; }
 body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::before {
   content: "";

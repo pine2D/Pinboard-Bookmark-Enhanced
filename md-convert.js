@@ -1285,8 +1285,8 @@ function downloadFile(filename, content, mimeType) {
 // outranks the vendor sheet's bare `.hljs-section` (1 class) regardless of which
 // <style> block ends up first in the exported document.
 const READER_CSS = `
-:root{--x-fg:#1a202c;--x-mut:#5a6473;--x-bd:#e2e8f0;--x-bdl:#eef2f7;--x-link:#2563eb;--x-code-bg:#f1f5f9;--x-code-fg:#334155;--x-bq-bd:#2563eb;--x-bq-bg:#f0f9ff;--x-bq-fg:#1e3a5f;--x-stripe:#f8fafc;--x-surface:#fff;--x-bg:#fff;--x-pre-bg:#fff}
-@media (prefers-color-scheme:dark){:root{--x-fg:#CECDC3;--x-mut:#A6A49F;--x-bd:#403E3C;--x-bdl:#343331;--x-link:#6095C5;--x-code-bg:#282726;--x-code-fg:#C8C6BC;--x-bq-bd:#6095C5;--x-bq-bg:#22282D;--x-bq-fg:#B9CAD6;--x-stripe:#22211F;--x-surface:#282726;--x-bg:#1C1B1A;--x-pre-bg:#161513}.export-doc pre .hljs-section{color:#6cb6ff}}
+:root{--x-fg:#1a202c;--x-mut:#5a6473;--x-bd:#e2e8f0;--x-bdl:#eef2f7;--x-link:#2563eb;--x-code-bg:#f1f5f9;--x-code-fg:#334155;--x-bq-bd:#2563eb;--x-bq-bg:#f0f9ff;--x-bq-fg:#334155;--x-stripe:#f8fafc;--x-surface:#fff;--x-bg:#fff;--x-pre-bg:#fff}
+@media (prefers-color-scheme:dark){:root{--x-fg:#CECDC3;--x-mut:#A6A49F;--x-bd:#403E3C;--x-bdl:#343331;--x-link:#6095C5;--x-code-bg:#282726;--x-code-fg:#C8C6BC;--x-bq-bd:#6095C5;--x-bq-bg:#22282D;--x-bq-fg:#C8C6BC;--x-stripe:#22211F;--x-surface:#282726;--x-bg:#1C1B1A;--x-pre-bg:#161513}.export-doc pre .hljs-section{color:#6cb6ff}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--x-bg)}
 .export-doc{max-width:760px;margin:0 auto;padding:48px 24px 96px;color:var(--x-fg);line-height:1.75;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased}
@@ -1324,7 +1324,7 @@ html,body{margin:0;background:var(--x-bg)}
 .export-doc .pbp-gallery img{margin:0;border-radius:6px}
 .export-doc .pbp-gallery figcaption{margin-top:.4em;font-size:.85em;color:var(--x-mut)}
 .export-doc hr{border:none;border-top:1px solid var(--x-bd);margin:2.5em 0}
-@media print{:root{--x-fg:#1a202c;--x-mut:#5a6473;--x-bd:#e2e8f0;--x-bdl:#eef2f7;--x-link:#2563eb;--x-code-bg:#f1f5f9;--x-code-fg:#334155;--x-bq-bd:#2563eb;--x-bq-bg:#f0f9ff;--x-bq-fg:#1e3a5f;--x-stripe:#f8fafc;--x-surface:#fff;--x-bg:#fff;--x-pre-bg:#fff}html,body{background:#fff}.export-doc{max-width:100%;padding:0}.export-doc pre,.export-doc pre code,.export-doc pre span{color:#1f2328 !important;background:transparent !important}}
+@media print{:root{--x-fg:#1a202c;--x-mut:#5a6473;--x-bd:#e2e8f0;--x-bdl:#eef2f7;--x-link:#2563eb;--x-code-bg:#f1f5f9;--x-code-fg:#334155;--x-bq-bd:#2563eb;--x-bq-bg:#f0f9ff;--x-bq-fg:#334155;--x-stripe:#f8fafc;--x-surface:#fff;--x-bg:#fff;--x-pre-bg:#fff}html,body{background:#fff}.export-doc{max-width:100%;padding:0}.export-doc pre,.export-doc pre code,.export-doc pre span{color:#1f2328 !important;background:transparent !important}}
 `;
 
 // HTML-escape for text contexts (title, header fields).
