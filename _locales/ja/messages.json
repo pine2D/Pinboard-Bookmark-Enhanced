@@ -2052,7 +2052,7 @@
     }
   },
   "mdStatMin": {
-    "message": "~$COUNT$ 分",
+    "message": "約 $COUNT$ 分",
     "placeholders": {
       "count": {
         "content": "$1"

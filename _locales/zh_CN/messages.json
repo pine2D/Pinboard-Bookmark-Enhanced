@@ -2052,7 +2052,7 @@
     }
   },
   "mdStatMin": {
-    "message": "~$COUNT$ 分钟",
+    "message": "约 $COUNT$ 分钟",
     "placeholders": {
       "count": {
         "content": "$1"

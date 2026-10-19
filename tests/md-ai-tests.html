@@ -6157,6 +6157,14 @@ suiteIf("md-preview.js: pbpReaderArticleLang", "pbpReaderArticleLang", () => {
     assertEq(pbpReaderArticleLang("مرحبا بالعالم " + english, ""), "ar", "no declaration: the detector decides, as before");
     assertEq(pbpReaderArticleLang(english, ""), "und", "Latin, no declaration");
   });
+  test("the stats line counts in the unit the article is written in", () => {
+    assertEq(pbpReaderStatUnits({ words: 900, cjkChars: 0 }).join(), "words", "English only");
+    assertEq(pbpReaderStatUnits({ words: 0, cjkChars: 3000 }).join(), "cjk", "Chinese only");
+    assertEq(pbpReaderStatUnits({ words: 12, cjkChars: 3400 }).join(), "cjk", "Chinese with stray Latin names/code");
+    assertEq(pbpReaderStatUnits({ words: 1200, cjkChars: 20 }).join(), "words", "English quoting a few characters");
+    assertEq(pbpReaderStatUnits({ words: 400, cjkChars: 1400 }).join(), "words,cjk", "genuinely mixed: both");
+    assertEq(pbpReaderStatUnits({ words: 0, cjkChars: 0 }).join(), "words", "empty falls back to words");
+  });
   // 2026-10-19 reader critique: glyphs only say "Arabic script".
   test("a page declaring a language of the detected script keeps its own tag", () => {
     const persian = "این یک مقاله فارسی درباره طراحی خواننده و ترجمه است ".repeat(6);

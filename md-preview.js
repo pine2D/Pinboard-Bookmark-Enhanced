@@ -282,6 +282,20 @@ const PBP_READER_SAME_SCRIPT_LANGS = {
   ar: ["ar", "fa", "ur", "ps", "ckb", "ku", "sd", "ug"],
   he: ["he", "yi"],
 };
+// Which counts the stats line shows (2026-10-19 reader critique: a Chinese
+// article read "12 words · 3,400 chars", the stray Latin words of its code and
+// names counted beside the characters it is written in). The unit carrying
+// the text, by reading time (readingStats' 200 words / 350 chars a minute);
+// both only when the minority carries at least a quarter of it.
+function pbpReaderStatUnits(stats) {
+  const w = (stats && stats.words) || 0, c = (stats && stats.cjkChars) || 0;
+  const wt = w / 200, ct = c / 350;
+  if (!ct) return ["words"];
+  if (!wt) return ["cjk"];
+  const minority = Math.min(wt, ct) / (wt + ct);
+  if (minority >= 0.25) return ["words", "cjk"];
+  return ct > wt ? ["cjk"] : ["words"];
+}
 function pbpReaderIsRtlLang(lang) {
   const base = String(lang || "").split("-")[0].toLowerCase();
   return PBP_READER_SAME_SCRIPT_LANGS.ar.includes(base) || PBP_READER_SAME_SCRIPT_LANGS.he.includes(base);
@@ -2214,9 +2228,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     let statBase = "";
     const computeStatBase = () => {
       const stats = readingStats(getMarkdown());
-      const wordLabel = stats.cjkChars > 0
-        ? `${t("mdStatWords", stats.words.toLocaleString(uiLangToBCP47()))} · ${t("mdStatCjk", stats.cjkChars.toLocaleString(uiLangToBCP47()))}`
-        : t("mdStatWords", stats.words.toLocaleString(uiLangToBCP47()));
+      const locale = uiLangToBCP47();
+      const wordLabel = pbpReaderStatUnits(stats).map((u) => u === "cjk"
+        ? t("mdStatCjk", stats.cjkChars.toLocaleString(locale))
+        : t("mdStatWords", stats.words.toLocaleString(locale))).join(" · ");
       // (research T1.6) a transcript's "~N min read" is the wrong axis --
       // neither watch time nor honest read time. The last segment's end IS
       // the video length; md-video.js exposes it, zero when no transcript
