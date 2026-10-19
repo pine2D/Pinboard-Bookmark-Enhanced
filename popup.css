@@ -846,6 +846,12 @@ html[data-section="login"] .quick-actions { display: none !important; }
    Set, batch permission grant, the offline queue) report exclusively through
    them. Hiding both turned every one of those outcomes into zero feedback. */
 #main-section.unsupported-url .form-body > *:not(#url-warning):not(#status-msg):not(.feedback-card) { display: none; }
+/* With the form gone, .form-body's top inset was a strip of page colour
+   between two bg2 bands (header, warning), and the quick actions -- whose
+   divider is hidden here -- sat flush under the warning (critique 2026-10-19).
+   The warning now attaches to the header; the space moves below it. */
+#main-section.unsupported-url .form-body { padding-top: 0; }
+#main-section.unsupported-url + .quick-actions { padding-top: var(--pp-sp-4); }
 .row { --pp-row-control-h: var(--pp-control-h); display: flex; padding: var(--pp-sp-2) var(--pp-sp-5); gap: var(--pp-sp-4); }
 #presets-row, #suggest-row, #ai-tags-row, #ai-setup-row { --pp-row-control-h: var(--pp-control-h-sm); }
 .label {
@@ -1339,8 +1345,12 @@ input[type="text"].search-field:focus-visible:not(:disabled) { box-shadow: var(-
   gap: var(--pp-sp-4);
 }
 .qbtn {
-  flex: 1 1 auto;
-  min-width: 0;
+  /* Equal split (DESIGN.md "quick-row equal-split strip"; critique 2026-10-19:
+     `1 1 auto` sized each by its label, 191/169/157px in zh-CN). Basis 0
+     shares the row evenly; min-width: max-content keeps wrap-not-truncate --
+     a row whose labels cannot fit still folds instead of clipping. */
+  flex: 1 1 0;
+  min-width: max-content;
   display: inline-flex;
   align-items: center;
   justify-content: center;
