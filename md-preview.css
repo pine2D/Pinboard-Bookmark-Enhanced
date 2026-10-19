@@ -1643,6 +1643,8 @@ body.rail-open .rail-toggle .rail-toggle-close { display: block; }
 
 /* Raw view: the TOC navigates the rendered doc, which is hidden in Raw mode. */
 body.raw-active #toc { display: none; }
+/* Raw view is a plain <pre>: "/" search is a no-op there, so its rail button goes too. */
+body.raw-active #rail-search-btn { display: none; }
 /* Skim is an AI overlay on the rendered doc; raw view shows literal
    markdown source with zero AI chrome. */
 body.raw-active #skim-section { display: none; }

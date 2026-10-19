@@ -948,6 +948,23 @@ function _pbpSearchInit() {
   if (_pbpSearchInited) return;
   _pbpSearchInited = true;
   document.addEventListener("keydown", _pbpSearchOnKeyDown);
+  // Search was reachable only through "/" (2026-10-19 reader critique): a
+  // reader who never opened the "?" help never found it. First in the
+  // rail-bottom row (this init runs before _pbpKbdHelpInit / _pbpZenInit);
+  // hidden in raw view, where "/" is a no-op too (md-preview.css).
+  const row = _pbpRailBottomRow();
+  if (row) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "rail-search-btn";
+    btn.className = "rail-kbd-help-btn"; // the rail-bottom family's shared visual
+    btn.innerHTML = PBP_ICONS.search; // static shared constant; label rides title/aria
+    btn.title = t("srchInputAria");
+    btn.setAttribute("aria-label", t("srchInputAria"));
+    btn.setAttribute("aria-keyshortcuts", "/"); // key name, as the "?" button (K87)
+    btn.addEventListener("click", () => _pbpSearchOpen());
+    row.appendChild(btn);
+  }
 }
 
 // ---- Keyboard-shortcuts help (spec 5): the "?" hotkey and the rail-bottom

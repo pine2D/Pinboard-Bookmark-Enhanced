@@ -8615,6 +8615,32 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       assertEq(document.getElementById("tr-stale-act").hidden, true, "running: no re-entry entry point");
     } finally { wrap.remove(); }
   });
+  // 2026-10-19 reader critique: search was reachable only through "/".
+  test("rail-bottom row carries a search button that opens the same search as /", () => {
+    const realT = window.t, realOpen = window._pbpSearchOpen;
+    const rail = document.createElement("aside");
+    rail.id = "rail";
+    document.body.appendChild(rail);
+    let opened = 0;
+    window.t = (k) => k;
+    window._pbpSearchOpen = () => { opened++; };
+    const wasInited = _pbpSearchInited;
+    try {
+      _pbpSearchInited = false;
+      _pbpSearchInit();
+      const btn = document.getElementById("rail-search-btn");
+      assertEq(!!btn && btn.parentElement.id, "rail-bottom-row", "button lives in the shared rail-bottom row");
+      assertEq(btn.getAttribute("aria-label"), "srchInputAria", "labelled like the search field");
+      assertEq(btn.getAttribute("aria-keyshortcuts"), "/", "names the existing shortcut");
+      assertEq(!!btn.querySelector("svg"), true, "icon-only, from PBP_ICONS");
+      btn.click();
+      assertEq(opened, 1, "click opens search");
+    } finally {
+      document.removeEventListener("keydown", _pbpSearchOnKeyDown);
+      _pbpSearchInited = wasInited;
+      window.t = realT; window._pbpSearchOpen = realOpen; rail.remove();
+    }
+  });
   // 2026-10-19 critique + user ruling: in tr-only a click on a translated
   // block still peeks at the original, but the blocks are not buttons (no
   // role/tab stop/title per paragraph); the rail names the click instead.
