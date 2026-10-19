@@ -3394,7 +3394,7 @@
       "message": "Impossible de joindre les services Google. Le réseau est peut-être coupé, ou votre proxy ne couvre peut-être pas googleapis.com."
     },
     "vocabDriveErrorBusy": {
-      "message": "Google Drive est momentanément surchargé."
+      "message": "Google Drive est momentanément occupé."
     },
     "vocabDriveErrorRemote": {
       "message": "La synchronisation avec Google Drive a échoué."

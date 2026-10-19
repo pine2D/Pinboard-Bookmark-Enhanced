@@ -3307,7 +3307,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "连接后，本机与 Google Drive 同步当前 Pinboard 账号的生词、高亮与笔记。只对本机生效；Google Drive 不同步设置和凭据。"
+      "message": "连接后，此设备与 Google Drive 同步当前 Pinboard 账号的生词、高亮与笔记。只对此设备生效；Google Drive 不同步设置和凭据。"
     },
     "vocabDriveDisclosure": {
       "message": "Google Drive appDataFolder 中的副本以明文保存，未经端到端加密，可能包含生词、释义、高亮摘录、笔记、来源网址、标题和时间。"
@@ -3385,10 +3385,10 @@
       "message": "缺少 Google Drive 权限。"
     },
     "vocabDriveErrorCorrupt": {
-      "message": "无法安全读取 Google Drive 同步数据，本机数据未改变。"
+      "message": "无法安全读取 Google Drive 同步数据，此设备上的数据未改变。"
     },
     "vocabDriveErrorLocalStore": {
-      "message": "无法读取或保存本机数据。"
+      "message": "无法读取或保存此设备上的数据。"
     },
     "vocabDriveErrorNetwork": {
       "message": "无法连接 Google 服务，可能是网络中断或代理未覆盖 googleapis.com。"
@@ -3964,7 +3964,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最早 $FIRST$ · 最近 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "保存于 $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "高亮和笔记保存在本设备上。要在其他设备上使用，可在两台设备的「数据」设置中都连接 Google Drive，之后会自动同步；也可以导出备份，再到那台设备导入。" },
+  "libraryNotesScopeHint": { "message": "高亮和笔记保存在此设备上。要在其他设备上使用，可在两台设备的「数据」设置中都连接 Google Drive，之后会自动同步；也可以导出备份，再到那台设备导入。" },
   "libraryNotesScopeOpenBackup": { "message": "打开数据设置" },
   "libraryExportMenu": { "message": "导出" },
   "libraryExportSettings": { "message": "Anki 与欧路词典设置" },
@@ -4201,7 +4201,7 @@
       "message": "最近成功同步"
     },
     "drivePendingChanges": {
-      "message": "本机还有尚未上传的更改。"
+      "message": "此设备还有尚未上传的更改。"
     },
     "driveNotices": {
       "message": "同步冲突 $COUNT$ 处：被修改的条目已保留，删除未生效；如仍需删除，请再删一次。",

@@ -3385,10 +3385,10 @@
       "message": "缺少 Google Drive 權限。"
     },
     "vocabDriveErrorCorrupt": {
-      "message": "無法安全讀取 Google Drive 同步資料，本機資料未變更。"
+      "message": "無法安全讀取 Google Drive 同步資料，這部裝置上的資料未變更。"
     },
     "vocabDriveErrorLocalStore": {
-      "message": "無法讀取或儲存本機資料。"
+      "message": "無法讀取或儲存這部裝置上的資料。"
     },
     "vocabDriveErrorNetwork": {
       "message": "無法連接 Google 服務，可能是網絡中斷，或代理未涵蓋 googleapis.com。"
@@ -3970,7 +3970,7 @@
   "libraryCountNotedOne": { "message": "$COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryPageSpan": { "message": "最早 $FIRST$ · 最近 $LAST$", "placeholders": { "first": { "content": "$1" }, "last": { "content": "$2" } } },
   "libraryPageSavedAt": { "message": "儲存於 $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "libraryNotesScopeHint": { "message": "標記和筆記儲存在本裝置上。要在其他裝置上使用，可在兩部裝置的「資料」設定中都連接 Google Drive，之後會自動同步；亦可以匯出備份，再在那部裝置匯入。" },
+  "libraryNotesScopeHint": { "message": "標記和筆記儲存在這部裝置上。要在其他裝置上使用，可在兩部裝置的「資料」設定中都連接 Google Drive，之後會自動同步；亦可以匯出備份，再在那部裝置匯入。" },
   "libraryNotesScopeOpenBackup": { "message": "開啟資料設定" },
   "libraryExportMenu": { "message": "匯出" },
   "libraryExportSettings": { "message": "Anki 及歐路詞典設定" },

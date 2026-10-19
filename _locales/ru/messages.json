@@ -3394,7 +3394,7 @@
       "message": "Не удаётся подключиться к сервисам Google. Возможно, сеть недоступна или правила прокси не охватывают googleapis.com."
     },
     "vocabDriveErrorBusy": {
-      "message": "Google Диск временно перегружен."
+      "message": "Google Диск временно занят."
     },
     "vocabDriveErrorRemote": {
       "message": "Не удалось синхронизировать данные с Google Диском."

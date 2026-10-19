@@ -3394,7 +3394,7 @@
       "message": "Nie można połączyć się z usługami Google. Być może sieć jest niedostępna albo serwer proxy nie obejmuje googleapis.com."
     },
     "vocabDriveErrorBusy": {
-      "message": "Dysk Google jest chwilowo przeciążony."
+      "message": "Dysk Google jest chwilowo zajęty."
     },
     "vocabDriveErrorRemote": {
       "message": "Synchronizacja z Dyskiem Google nie powiodła się."

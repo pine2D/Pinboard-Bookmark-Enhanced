@@ -3304,13 +3304,13 @@
       "message": "読書中のヒント"
     },
     "vocabDriveSection": {
-      "message": "Google ドライブ"
+      "message": "Google Drive"
     },
     "vocabDriveScope": {
       "message": "接続すると、このデバイスと Google Drive の間で、現在の Pinboard アカウントの単語、ハイライト、メモが同期されます。接続はこのデバイスにのみ適用されます。Google Drive では設定や認証情報は同期されません。"
     },
     "vocabDriveDisclosure": {
-      "message": "Google ドライブの appDataFolder に保存するコピーは平文で、エンドツーエンド暗号化されません。単語、定義、ハイライトした引用、メモ、参照元 URL、タイトル、日時が含まれる場合があります。"
+      "message": "Google Driveの appDataFolder に保存するコピーは平文で、エンドツーエンド暗号化されません。単語、定義、ハイライトした引用、メモ、参照元 URL、タイトル、日時が含まれる場合があります。"
     },
     "vocabDriveLoading": {
       "message": "Google Drive の同期状態を読み込んでいます…"
@@ -3319,7 +3319,7 @@
       "message": "このデバイスは Google Drive に接続されていません。"
     },
     "vocabDriveUnavailable": {
-      "message": "このビルドでは OAuth がまだ有効になっていないため、Google ドライブ同期は利用できません。"
+      "message": "このビルドでは OAuth がまだ有効になっていないため、Google Drive同期は利用できません。"
     },
     "vocabDriveAuthorizing": {
       "message": "Google の認可を待っています。Chrome が開いたウィンドウでログインし、アクセスを許可してください。"
@@ -3352,7 +3352,7 @@
       "message": "競合通知を閉じる"
     },
     "vocabDriveBlockedNotice": {
-      "message": "Google ドライブ同期は一時停止中で、自動では再試行されません。設定を開いて原因を確認してください。"
+      "message": "Google Drive同期は一時停止中で、自動では再試行されません。設定を開いて原因を確認してください。"
     },
     "vocabDriveConnect": {
       "message": "Google Drive に接続"
@@ -3385,7 +3385,7 @@
       "message": "Google Drive の権限がありません。"
     },
     "vocabDriveErrorCorrupt": {
-      "message": "Google ドライブの同期データを安全に読み取れませんでした。ローカルデータは変更していません。"
+      "message": "Google Driveの同期データを安全に読み取れませんでした。ローカルデータは変更していません。"
     },
     "vocabDriveErrorLocalStore": {
       "message": "このデバイスのデータを読み取りまたは保存できませんでした。"

@@ -891,7 +891,9 @@ async function loadLocale(loc) {
       plainBroken.length === 0, `missing or malformed: ${plainBroken.slice(0, 12).join(", ")}`);
 
     const DRIVE_ZH_CN = {
-      vocabDriveScope: "连接后，本机与 Google Drive 同步当前 Pinboard 账号的生词、高亮与笔记。只对本机生效；Google Drive 不同步设置和凭据。",
+      // 2026-10-19: one word for "this device" across the Drive copy (此设备,
+      // the panel's own status lines), retiring the spec's 本机.
+      vocabDriveScope: "连接后，此设备与 Google Drive 同步当前 Pinboard 账号的生词、高亮与笔记。只对此设备生效；Google Drive 不同步设置和凭据。",
       vocabDriveWorking: "正在与 Google Drive 同步…",
       vocabDriveSynced: "已与 Google Drive 同步。",
       vocabDriveErrorNetwork: "无法连接 Google 服务，可能是网络中断或代理未覆盖 googleapis.com。",
@@ -901,7 +903,7 @@ async function loadLocale(loc) {
       vocabDriveAuthNeeded: "此设备已连接 Google Drive，但需要重新授权。",
       vocabDriveAuthorizingSlow: "如果没有出现授权窗口，可能是网络连不上 Google。",
       driveLastSuccess: "最近成功同步",
-      drivePendingChanges: "本机还有尚未上传的更改。",
+      drivePendingChanges: "此设备还有尚未上传的更改。",
       vocabDriveErrorPinboardAuthSync: "尚未登录 Pinboard 账号。请在「账号 → Pinboard 账号」中填写 API Token，然后点击「立即同步」。",
     };
     const zhDrift = Object.entries(DRIVE_ZH_CN)
