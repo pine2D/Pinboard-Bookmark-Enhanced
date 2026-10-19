@@ -6065,6 +6065,12 @@ check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code
     "popup.js: the auto-close is no longer cancelled by both pointer movement and a click");
   check((block.match(/removeEventListener\("pointermove", onAutoCloseMove\)/g) || []).length >= 2,
     "popup.js: the auto-close pointermove listener outlives the countdown on at least one path");
+  // Escape is a third way to cancel. It has to run the same cancel the pointer
+  // paths run: clearing only the timer left " · closing" in the status line
+  // for a close that never came (critique 2026-10-19).
+  check(block.includes("cancelPendingAutoClose = cancelAutoClose;") &&
+    /e\.key === "Escape"[\s\S]{0,1200}if \(autoCloseTimer\) \{ if \(cancelPendingAutoClose\) cancelPendingAutoClose\(\);/.test(popupJs),
+    "popup.js: Escape cancels the auto-close timer without the bar/status-note/listener cleanup the pointer paths run");
 }
 
 // ---- Tag reorder handle: visible while the tags are being edited ----

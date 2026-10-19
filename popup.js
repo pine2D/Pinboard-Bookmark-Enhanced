@@ -1620,6 +1620,9 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
 // ===================== Submit / Delete =====================
 function setupSubmit(token) {
   let autoCloseTimer = null;
+  // The live auto-close's own cancel (bar + status note + pointer listener),
+  // so the Escape handler below undoes all of it, not just the timer.
+  let cancelPendingAutoClose = null;
 
   // Submit state machine: idle -> loading -> success -> idle / loading -> error -> idle (user retry resets)
   const btn = $id("submit-btn");
@@ -1928,6 +1931,7 @@ function setupSubmit(token) {
           $id("status-msg")?.appendChild(closingNote);
           autoCloseTimer = setTimeout(() => {
             autoCloseTimer = null;
+            cancelPendingAutoClose = null;
             document.removeEventListener("pointermove", onAutoCloseMove);
             if (ownsSubmitUi()
                 && bookmarkLookup.generation === autoCloseGeneration
@@ -1951,10 +1955,13 @@ function setupSubmit(token) {
           const cancelAutoClose = () => {
             clearTimeout(autoCloseTimer);
             autoCloseTimer = null;
+            cancelPendingAutoClose = null;
             bar.remove();
             closingNote.remove();
             document.removeEventListener("pointermove", onAutoCloseMove);
+            document.removeEventListener("mousedown", cancelAutoClose);
           };
+          cancelPendingAutoClose = cancelAutoClose;
           let moveOrigin = null;
           const onAutoCloseMove = (e) => {
             if (!moveOrigin) { moveOrigin = { x: e.clientX, y: e.clientY }; return; }
@@ -2018,7 +2025,10 @@ function setupSubmit(token) {
       // capture-phase Escape handler with stopImmediatePropagation -- it
       // closes the popover before this bubble-phase listener ever runs, so a
       // branch here could only ever be dead code that looks live.
-      if (autoCloseTimer) { clearTimeout(autoCloseTimer); autoCloseTimer = null; document.querySelector(".auto-close-bar")?.remove(); return; }
+      // Escape cancels a pending auto-close the same way a pointer does: the
+      // "closing" note in the status line goes with the bar (critique
+      // 2026-10-19 -- it used to stay, announcing a close that never came).
+      if (autoCloseTimer) { if (cancelPendingAutoClose) cancelPendingAutoClose(); else { clearTimeout(autoCloseTimer); autoCloseTimer = null; } return; }
       const tagsInput = $id("tags-input");
       if (tagsInput && document.activeElement === tagsInput) return;
       window.close();
