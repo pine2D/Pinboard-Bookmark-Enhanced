@@ -946,16 +946,6 @@
     },
     {
       "surface": "md-preview",
-      "token": "xp-gear-menu",
-      "structural": true
-    },
-    {
-      "surface": "md-preview",
-      "token": "xp-gear-wrap",
-      "structural": true
-    },
-    {
-      "surface": "md-preview",
       "token": "xp-head",
       "structural": true
     },

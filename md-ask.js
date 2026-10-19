@@ -1951,17 +1951,8 @@ function pbpExplainSelectionValid(text) {
 // ---- Explain: module state ----
 let _pbpExplainPage = { url: "", title: "" };
 let _pbpExplainSettings = null;
-let _pbpExplainTrigger = "icon"; // live value; the in-popover gear updates it
+let _pbpExplainTrigger = "icon"; // read from settings at init; set on Options > Reader
 let _pbpExplainAiOk = false; // live AI-availability snapshot; dict action works without it
-
-// Persist through the shared atomic settings writer. The in-memory trigger has
-// already taken effect, so a storage failure remains non-blocking here.
-async function _pbpExplainPersistTrigger(value) {
-  try {
-    const result = await persistSettings({ selectionTrigger: value });
-    if (!result.ok) throw result.error || new Error("settings write failed");
-  } catch (_) { /* quota/throttle: in-memory switch already applied */ }
-}
 
 // Static inline SVG, consumed by the highlight selection bar's explain button
 // (md-highlight.js, _pbpHlEnsureBar) -- keep this the single source of the
@@ -2013,8 +2004,8 @@ function pbpExplainInvoke(initialAction = "explain") {
 function _pbpExplainOnShortcut(e) {
   const key = String(e.key || "").toLowerCase();
   if (key !== "e" && key !== "d") return;
-  // The settings gear changes this live after the listener was registered.
-  // Initial off still returns before registration in pbpExplainInit below.
+  // Initial off returns before registration in pbpExplainInit below; this
+  // guard stays as the cheap belt for any later in-page change of the value.
   if (_pbpExplainTrigger === "off") return;
   const ae = document.activeElement;
   if (!pbpTrSingleKeyAllowed(e, ae && ae.tagName, !!(ae && ae.isContentEditable),
@@ -2329,13 +2320,10 @@ window.pbpExplainDismissIfUnpinned = () => {
   if (_pbpExplainPopEl && !_pbpExplainPinned) _pbpExplainClose(_pbpExplainPopEl);
 };
 
-// Static inline SVG (Feather settings gear). Constant string, never model text.
-const PBP_EXPLAIN_GEAR_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.gear : "";
 const PBP_EXPLAIN_PIN_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.pin : "";
-// Foot-action icons, taken from Feather so they sit in the same family as the
-// settings gear below (which is Feather's own "settings"). Hand-drawn shapes
-// were the problem before: same stroke width and viewBox, but heavier, denser
-// silhouettes that read as a different icon set sitting next to the gear.
+// Foot-action icons, all from the shared Lucide set (PBP_ICONS). Hand-drawn
+// shapes were the problem before: same stroke width and viewBox, but heavier,
+// denser silhouettes that read as a different icon set beside the rest.
 // Inline SVG rather than glyphs, per CLAUDE.md's font-fallback rules.
 const PBP_EXPLAIN_NOTE_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.doc : "";
 const PBP_EXPLAIN_VOCAB_ADD_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.bookmarkPlus : "";
@@ -2589,8 +2577,10 @@ function _pbpExplainEnsurePop() {
     const myRunId = vocab.dataset.runId; // the run this click belongs to
     const ok = await window.pbpDictSaveCurrent().catch(() => false);
     if (vocab.dataset.runId !== myRunId) return; // a newer dict run owns the button now
-    if (ok) _pbpExplainIconBtn(vocab, PBP_EXPLAIN_DONE_SVG, t("dictSavedVocab"));
-    else {
+    if (ok) {
+      _pbpExplainIconBtn(vocab, PBP_EXPLAIN_DONE_SVG, t("dictSavedVocab"));
+      openVocab.hidden = false; // the word is in the book now: offer the way there
+    } else {
       // A silent re-enable read as "saved" (gap audit). flashButtonLabel is
       // off-limits here -- it swaps textContent and would strip the SVG -- so
       // failure is a border pulse plus the page's one buttonless toast
@@ -2639,62 +2629,17 @@ function _pbpExplainEnsurePop() {
     _pbpExplainClose(pop);
     _pbpExplainOpenAsk(selText);
   });
-  const gearWrap = document.createElement("span");
-  gearWrap.className = "xp-gear-wrap";
-  const gear = document.createElement("button");
-  gear.type = "button";
-  gear.className = "xp-gear";
-  gear.title = t("explainSettings");
-  gear.setAttribute("aria-label", t("explainSettings"));
-  gear.setAttribute("aria-expanded", "false");
-  gear.innerHTML = PBP_EXPLAIN_GEAR_SVG; // static constant, see above
-  const menu = document.createElement("div");
-  menu.className = "xp-gear-menu";
-  menu.hidden = true;
-  // Same key set the options page renders (settings key: selectionTrigger), so
-  // both surfaces name the three modes identically and can never drift apart.
-  [["icon", t("selectionTriggerIcon")], ["hotkey", t("selectionTriggerHotkey")], ["off", t("selectionTriggerOff")]]
-    .forEach(([value, label]) => {
-      const lab = document.createElement("label");
-      const radio = document.createElement("input");
-      radio.type = "radio";
-      radio.name = "xp-trigger";
-      radio.value = value;
-      radio.addEventListener("change", () => {
-        // On-the-spot trigger-ladder switch (spec 5.3), persisted to the
-        // SAME storage area options.js writes (sync when optSyncEnabled,
-        // else local). Takes effect immediately via the live module var; the
-        // highlight bar's explain button is memoized at bar-creation time
-        // (spec 2e known corner), so this doesn't retroactively show/hide it.
-        _pbpExplainTrigger = value;
-        _pbpExplainPersistTrigger(value);   // fire-and-forget; never rejects
-      });
-      lab.appendChild(radio);
-      lab.appendChild(document.createTextNode(" " + label));
-      menu.appendChild(lab);
-    });
-  gear.addEventListener("click", (e) => {
-    e.stopPropagation(); // don't let this same click trigger the outside-close below
-    menu.hidden = !menu.hidden;
-    gear.setAttribute("aria-expanded", String(!menu.hidden));
-  });
-  // Click anywhere outside the gear (but still inside the popover) closes the
-  // menu. The manual popover's outside-dismiss listener is installed below.
-  pop.addEventListener("click", (e) => {
-    if (!menu.hidden && !gearWrap.contains(e.target)) {
-      menu.hidden = true;
-      gear.setAttribute("aria-expanded", "false");
-    }
-  });
-  gearWrap.appendChild(gear);
-  gearWrap.appendChild(menu);
-  foot.appendChild(model);
+  // Footer = two clusters (critique 2026-10-19): the word's own actions on
+  // the left (note / vocab / known / open vocab), the AI follow-up on the
+  // right beside the model label that names who answers it. The selection-
+  // trigger gear left the card: it is a reader setting, and the rail's
+  // settings button opens Options > Reader where it lives.
   foot.appendChild(save);
   foot.appendChild(vocab);
   foot.appendChild(knownBtn);
   foot.appendChild(openVocab);
+  foot.appendChild(model);
   foot.appendChild(ask);
-  foot.appendChild(gearWrap);
   pop.appendChild(head);
   pop.appendChild(body);
   pop.appendChild(foot);
@@ -2711,8 +2656,6 @@ function _pbpExplainEnsurePop() {
       _pbpExplainSetPinned(pop, false);
       _pbpExplainDrag = null;
       pop.classList.remove("xp-dragging");
-      menu.hidden = true;
-      gear.setAttribute("aria-expanded", "false");
       _pbpExplainFocusSource = null;
     }
   });
@@ -2992,7 +2935,9 @@ async function _pbpExplainRun(cap, ctx, pop) {
   // it; aria-busy is only cleared here if this run is still the active one
   // (a newer run may already have taken over the same pop).
   if (_pbpExplainAction === "dict" && typeof window.pbpDictRun === "function") {
-    if (openVocabBtn) openVocabBtn.hidden = false; // dict view: offer the jump to Options > Vocabulary
+    // The jump to the vocabulary page stays hidden until there is a word to
+    // find there: md-dict.js reveals it for an already-saved word, the vocab
+    // button's save reveals it on success (critique 2026-10-19).
     if (typeof window.pbpDictSetSaveTarget === "function") {
       window.pbpDictSetSaveTarget(cap.itemId ? { itemId: cap.itemId } : { range: cap.range });
     }
@@ -3129,12 +3074,6 @@ function _pbpExplainOpenPop(cap, initialAction) {
   // back to explain. Session-only, as before.
   _pbpExplainAction = (initialAction === "translate" || initialAction === "dict") ? initialAction : "explain";
   _pbpExplainSyncActButtons(pop);
-  // Gear radios mirror the live trigger value. Only a real close resets the
-  // menu itself; re-running a pinned popover must not masquerade as dismissal.
-  const menu = pop.querySelector(".xp-gear-menu");
-  menu.querySelectorAll('input[type="radio"]').forEach((r) => {
-    r.checked = (r.value === _pbpExplainTrigger);
-  });
   // Pack context first (reads the live DOM node synchronously), then show.
   const ctx = _pbpExplainPackContext(cap);
   _pbpExplainCap = cap;

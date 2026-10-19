@@ -1456,46 +1456,6 @@ suite("md-ai IDB key conventions", () => {
 })();
 </script>
 
-<script>
-// ============ Group K1: gear-trigger persistence (async) ============
-(async function () {
-  const host = document.createElement("div");
-  host.className = "suite";
-  const h = document.createElement("h2");
-  h.textContent = "_pbpExplainPersistTrigger (async)";
-  host.appendChild(h);
-  document.getElementById("results").appendChild(host);
-  function report(name, err) {
-    const div = document.createElement("div");
-    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
-    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
-    host.appendChild(div);
-  }
-  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
-  if (typeof _pbpExplainPersistTrigger !== "function") {
-    const div = document.createElement("div");
-    div.className = "case skip";
-    div.textContent = "SKIP _pbpExplainPersistTrigger (not loaded)";
-    host.appendChild(div); SKIP++; return;
-  }
-  await atest("resolves even when persistSettings reports a sync quota failure", async () => {
-    const prev = window.persistSettings;
-    let calledWith = null;
-    window.persistSettings = async (o) => { calledWith = o; return { ok: false, error: new Error("quota exceeded") }; };
-    try { await _pbpExplainPersistTrigger("hotkey"); }
-    finally { window.persistSettings = prev; }
-    assert(calledWith && calledWith.selectionTrigger === "hotkey", "wrote selectionTrigger");
-  });
-  await atest("resolves and writes value through healthy persistSettings", async () => {
-    const prev = window.persistSettings;
-    let calledWith = null;
-    window.persistSettings = async (o) => { calledWith = o; return { ok: true }; };
-    try { await _pbpExplainPersistTrigger("off"); }
-    finally { window.persistSettings = prev; }
-    assert(calledWith.selectionTrigger === "off", "value persisted");
-  });
-})();
-</script>
 
 <script>
 // ============ Task 9: md-translate pure core ============
@@ -6187,7 +6147,7 @@ suiteIf("md-preview.js: pbpReaderArticleLang", "pbpReaderArticleLang", () => {
 // FAIL. Worse, since these cases share-and-restore the global `window.chrome`
 // at start/end, unawaited concurrent bodies would race and clobber each
 // other's mock mid-flight. Mirrors this file's own established pattern for
-// async suites (see pbpAiCacheAppend/_pbpExplainPersistTrigger/_pbpStreamRead/
+// async suites (see pbpAiCacheAppend/_pbpStreamRead/
 // pbpTrRunQueue below) so every case fully resolves before the next starts.
 (async function () {
   const host = document.createElement("div");

@@ -2102,7 +2102,6 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-flash-fail { animation: xp-flash-fail 1.2s ease-out; }
 .xp-save:disabled, .xp-vocab:disabled, .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
 .xp-foot {
-  position: relative; /* positioning context for .xp-gear-menu */
   display: flex;
   align-items: center;
   /* The actions are icons now, so the row no longer outgrows the card and has
@@ -2112,7 +2111,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   padding: var(--sp-2) var(--sp-3) var(--sp-3);
   border-top: 1px solid var(--border-light);
 }
-/* Icon-only foot actions. Square, so four of them plus the gear fit on one line
+/* Icon-only foot actions. Square, so all five fit on one line
    at every type tier; the label lives in the native title and in aria-label. */
 .xp-foot :is(.xp-save, .xp-vocab, .xp-known, .xp-open-vocab, .xp-ask) {
   display: inline-flex;
@@ -2120,11 +2119,11 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   justify-content: center;
   padding: 0;
   width: 26px;  /* md rung in px (was 1.9em of the popover's typography-scaled base: 36px at the
-  height: 26px;    default tier, beside a 26px gear -- the four footer buttons "came in different sizes") */
+  height: 26px;    default tier, beside the old 26px gear -- the footer buttons "came in different sizes") */
 }
 .xp-foot :is(.xp-save, .xp-vocab, .xp-known, .xp-open-vocab, .xp-ask) svg {
   width: 14px;
-  height: 14px; /* px like .xp-gear svg in the same row */
+  height: 14px; /* px: the foot row's icon size, independent of the type tier */
 }
 /* Save to vocabulary carries its label (md-ask.js _pbpExplainIconBtn): same
    26px rung, width from its content. A long label wraps the footer, which the
@@ -2205,79 +2204,15 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
      wrap; buttons alone still wrap as the genuine last resort. */
   flex: 1 1 0;
   min-width: 0;
+  /* Sits between the word cluster and "ask more": the label names who answers
+     the follow-up, so it hugs that button (critique 2026-10-19). */
+  text-align: end;
   font-size: 0.75em;
   color: var(--fg-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Static on purpose: the menu below anchors to .xp-foot instead, so it can be
-   capped at the card's width. Anchored to this wrapper it had no width limit
-   and ran straight out of #explain-pop, which is overflow:hidden -- so the far
-   side of the menu was simply clipped away. */
-.xp-gear-wrap { position: static; }
-.xp-gear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  background: transparent;
-  color: var(--fg-secondary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-.xp-gear:hover { background: var(--btn-hover); border-color: var(--btn-border); }
-.xp-gear:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
-.xp-gear svg { width: 14px; height: 14px; }
-.xp-gear-menu {
-  position: absolute;
-  /* Anchored to the footer, not to the gear, and never wider than the card.
-     min-width alone let a long label (German and Russian run much longer than
-     English) push the box past the left edge, where overflow:hidden ate it. */
-  right: 14px;
-  bottom: calc(100% - 6px);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  min-width: min(200px, 100%);
-  width: max-content;
-  max-width: calc(100% - 28px);
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(28, 27, 26, 0.18);
-  font-size: 0.8em;
-}
-.xp-gear-menu[hidden] { display: none; }
-/* Same open/close motion as .send-menu (both are [hidden]-toggled dropdowns). */
-html.motion-ready .xp-gear-menu {
-  opacity: 1;
-  translate: 0 0;
-  transition: opacity var(--motion-pop) var(--ease-out),
-              translate var(--motion-pop) var(--ease-out),
-              display var(--motion-pop) allow-discrete;
-  @starting-style { opacity: 0; translate: 0 -4px; }
-}
-html.motion-ready .xp-gear-menu[hidden] {
-  opacity: 0;
-  translate: 0 -4px;
-  pointer-events: none; /* stays rendered through the 100ms fade-out; must not eat clicks */
-  transition-duration: var(--motion-pop-out);
-}
-.xp-gear-menu label {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-1) 0;
-  cursor: pointer;
-  color: var(--fg-secondary);
-}
-.xp-gear-menu input[type="radio"] { cursor: pointer; }
 
 /* ---- Ask citation chips + tooltip + jump flash (md-ask.js) ---- */
 .ask-chip {
@@ -3828,7 +3763,7 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
    token family as .ask-ic (md-preview.css ~:1442-1450), given its own
    class rather than reusing .ask-ic's name (this codebase's existing
    convention: each feature's near-identical icon-button styles get
-   their own feature-scoped class, e.g. .xp-gear/.fn-pop-jump/
+   their own feature-scoped class, e.g. .fn-pop-jump/
    .srch-regex, rather than sharing one class across files). */
 .skim-ic {
   display: inline-flex; align-items: center; justify-content: center;

@@ -1622,6 +1622,9 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
       face();
       knownBtn.hidden = false;
       knownBtn.disabled = false;
+      // Saved word: the jump to the vocabulary page has something to show.
+      const openVocabBtn = pop.querySelector(".xp-open-vocab");
+      if (openVocabBtn) openVocabBtn.hidden = false;
       // Refusal feedback, shared by the owner gates and by a failed write:
       // nothing was persisted either way, so the button re-enables and pulses
       // instead of silently reading as "done". A run that has been superseded
