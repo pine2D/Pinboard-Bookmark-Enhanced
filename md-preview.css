@@ -2793,6 +2793,15 @@ body:not(.tr-only) #rendered-view .pb-tr > :last-child { margin-bottom: 0; }
    ruling 2026-10-15). The wrapper drops its own margins and keeps the
    children's (the two rules above skip this view), so paragraphs, headings
    and lists collapse against their neighbours exactly as in the original. */
+/* Bilingual headings (2026-10-19 reader critique): a translated h1/h2 at
+   0.95 of full size, rule and all, read as the same heading printed twice.
+   The pair is one unit now -- the original drops its rule and sits on the
+   translation, which steps down to a subtitle size and carries the rule that
+   closes the pair. h3 has no rule, so it only steps down. */
+body.tr-bilingual #rendered-view :is(h1, h2)[data-pb-tr-done] { border-bottom: none; padding-bottom: 0; margin-bottom: 0.15em; }
+body.tr-bilingual #rendered-view .pb-tr > h1 { font-size: 1.5em; }
+body.tr-bilingual #rendered-view .pb-tr > h2 { font-size: 1.2em; }
+body.tr-bilingual #rendered-view .pb-tr > h3 { font-size: 1.1em; }
 body.tr-only #rendered-view .pb-tr { color: var(--fg); font-size: 1em; margin: 0; }
 body.tr-only #rendered-view .pb-tr code { font-size: 0.875em; }
 
