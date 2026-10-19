@@ -1963,11 +1963,12 @@ async function _pbpExplainPersistTrigger(value) {
   } catch (_) { /* quota/throttle: in-memory switch already applied */ }
 }
 
-// Static inline SVG (Feather help-circle). Constant string, never model text.
-// Was #explain-pill's icon; now consumed by the highlight selection bar's
-// explain button instead (md-highlight.js, _pbpHlEnsureBar) -- keep this the
-// single source of the explain glyph.
-const PBP_EXPLAIN_PILL_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.help : "";
+// Static inline SVG, consumed by the highlight selection bar's explain button
+// (md-highlight.js, _pbpHlEnsureBar) -- keep this the single source of the
+// explain glyph. `robot`, not help-circle (2026-10-19 reader critique):
+// explaining spends tokens, which the icon contract gives to robot, and a "?"
+// glyph read as the "?" shortcut-help key.
+const PBP_EXPLAIN_PILL_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.robot : "";
 
 // Current selection if (and only if) it is explainable: non-collapsed, both
 // endpoints inside #rendered-view, and pbpExplainSelectionValid (>= 2 chars,

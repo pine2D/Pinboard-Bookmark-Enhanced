@@ -1554,8 +1554,7 @@ function _pbpHlEnsureBar() {
   bar.appendChild(noteBtn);
   // Explain entry fused into this bar (was a standalone #explain-pill,
   // md-ask.js): one floating control on selection instead of two. Icon is
-  // md-ask.js's PBP_EXPLAIN_PILL_SVG constant -- the same help-circle glyph
-  // the old pill used. pbpExplainInvoke (md-ask.js) captures the live
+  // md-ask.js's PBP_EXPLAIN_PILL_SVG constant (robot: explaining spends tokens). pbpExplainInvoke (md-ask.js) captures the live
   // selection itself and _pbpExplainOpenPop explicitly closes this bar, so
   // the click handler needs nothing else.
   const explainBtn = document.createElement("button");
