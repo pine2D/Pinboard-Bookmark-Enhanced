@@ -1219,6 +1219,56 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "existing bookmark did not restore ownership after lookup: " + events.join(","));
     });
 
+    // 2026-10-19 report: every reopen appended one more copy of the cached
+    // summary. A restored draft already carries the copy inserted last time,
+    // and the restore guard only knew the legacy "[AI Summary]" block. Now
+    // the restore adopts a summary already in the notes, and leaves a
+    // restored draft (the user's own last state) alone.
+    await testAsync("reopening never appends a second copy of the cached summary", async () => {
+      const lookupStart = popupAiSource.indexOf("async function _aiAwaitBookmarkLookup");
+      const lookupEnd = popupAiSource.indexOf("function _aiOpStillCurrent", lookupStart);
+      const blockStart = popupAiSource.indexOf("  const restoreAccount = pbpPopupAiAccount();");
+      const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
+      const run = async ({ notes, adopt, draftRestored }) => {
+        const events = [];
+        new Function(
+          "pbpPopupAiAccount", "pbpAiFastCached", "pageInfo", "settings", "_aiOpStillCurrent",
+          "_aiRestoreSummaryOwnership", "pbpShouldRestoreCachedSummary", "$id",
+          "upsertSummary", "showSummaryActions", "_popupDraftRestored",
+          "let bookmarkLookup = { promise: null }; let existingBookmark = null;" +
+          popupAiSource.slice(lookupStart, lookupEnd) + popupAiSource.slice(blockStart, blockEnd)
+        )(
+          () => "alice",
+          () => Promise.resolve("cached summary"),
+          { url: URL },
+          { aiCacheDuration: 60, aiContentSource: "local" },
+          () => true,
+          async () => { events.push("adopt-check"); return adopt; },
+          pbpShouldRestoreCachedSummary,
+          () => ({ value: notes }),
+          () => { events.push("upsert"); },
+          () => {},
+          draftRestored
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        return events.join(",");
+      };
+      const inDraft = await run({ notes: "<blockquote>cached summary</blockquote>", adopt: "cache", draftRestored: true });
+      assert(inDraft === "adopt-check", "a summary already in the notes must be adopted, not appended: " + inDraft);
+      const removedInDraft = await run({ notes: "my own words", adopt: null, draftRestored: true });
+      assert(removedInDraft === "adopt-check", "a restored draft without the summary must stay as the user left it: " + removedInDraft);
+      const fresh = await run({ notes: "", adopt: null, draftRestored: false });
+      assert(fresh === "adopt-check,upsert", "a fresh, empty page still gets the cached summary: " + fresh);
+      const hs = popupAiSource.indexOf("function pbpAiWrapSummary");
+      const he = popupAiSource.indexOf("const AI_BQ_REGEX", hs);
+      const helpers = new Function("escapeForExtended", popupAiSource.slice(hs, he) +
+        "; return { pbpAiWrapSummary, pbpAiFindLastExactSummaryRange };")((v) => v);
+      const range = helpers.pbpAiFindLastExactSummaryRange("note\n\n" + helpers.pbpAiWrapSummary("cached summary"), "cached summary");
+      assert(range && range.start === 6, "the exact-range finder must locate the current <blockquote> format");
+      assert(pbpShouldRestoreCachedSummary(null, helpers.pbpAiWrapSummary("cached summary")) === true,
+        "documents why the adopt step is needed: the legacy guard alone does not see the current format");
+    });
+
     test("AI ops run on immutable settings snapshots - no global provider mutation (A4)", () => {
       assert(!popupAiSource.includes("settings.aiProvider = "), "global settings.aiProvider mutation must be gone");
       assert(popupAiSource.includes("const s = { ...(sOverride || settings) }"), "op-level snapshot missing");

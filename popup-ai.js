@@ -664,8 +664,18 @@ function setupAIFeatures() {
         await _aiRestoreSummaryOwnership(restoreAccount, pageInfo.url, cached);
         return;
       }
-      if (cached &&
-          pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
+      // The notes may already hold this summary: a restored draft carries the
+      // copy inserted on the last open. Adopt it (regenerate / remove links)
+      // instead of appending another -- with or without a cache entry, since
+      // a legacy block is adoptable on its own. pbpShouldRestoreCachedSummary
+      // only knows the legacy "[AI Summary]" block, so on its own it let every
+      // reopen stack one more copy (2026-10-19 report).
+      const adopted = await _aiRestoreSummaryOwnership(restoreAccount, pageInfo.url, cached);
+      if (!_aiOpStillCurrent(restoreAccount) || adopted || !cached) return;
+      // A restored draft is the user's last state of this form: a summary
+      // missing from it was removed or rewritten on purpose -- never put back.
+      if (typeof _popupDraftRestored !== "undefined" && _popupDraftRestored) return;
+      if (pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
         upsertSummary(cached, { userEdit: false });
         showSummaryActions(true);
       }
