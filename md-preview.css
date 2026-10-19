@@ -793,11 +793,15 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
   /* Inset policy (voice round): text-hugging insets are em (scale with the
      clamp+tier size; 0.7em/1.2em ~= the old 12px/20px at the 17px floor);
      hairline/structure (the 3px bar, borders, radii) stays fixed px. */
-  border-left: 3px solid var(--bq-border);
+  /* Logical sides (2026-10-19): an RTL article (#rendered-view[dir=rtl])
+     puts the bar and the square corners on its right, where the text starts. */
+  border-inline-start: 3px solid var(--bq-border);
   background: var(--bq-bg);
   padding: 0.7em 1.2em;
   margin: 1.5em 0;
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  border-radius: var(--radius-md);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
   color: var(--bq-fg);
 }
 #rendered-view blockquote p { margin: 0.4em 0; }
@@ -814,8 +818,9 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
 #rendered-view blockquote blockquote {
   position: relative;
   background: transparent;
-  border-left: 1px solid rgba(128, 128, 128, 0.9);
-  padding: 4px 0 4px 16px;
+  border-inline-start: 1px solid rgba(128, 128, 128, 0.9);
+  padding-block: 4px;
+  padding-inline: 16px 0;
   margin: 0.4em 0;
   border-radius: 0;
 }
@@ -827,7 +832,7 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
 #rendered-view blockquote blockquote > .pb-comment-body > p:first-child::before {
   content: "";
   position: absolute;
-  left: -16px;
+  inset-inline-start: -16px;
   top: 50%;
   width: 14px;
   height: 1px;
@@ -844,7 +849,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child { pos
 body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::before {
   content: "";
   position: absolute;
-  left: -16px;
+  inset-inline-start: -16px;
   top: 50%;
   width: 14px;
   height: 1px;
@@ -887,7 +892,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 /* Lists */
 #rendered-view ul, #rendered-view ol {
   margin: 1em 0;
-  padding-left: 1.75em;
+  padding-inline-start: 1.75em;
 }
 #rendered-view li {
   margin: 0.35em 0;
@@ -2496,17 +2501,21 @@ html.motion-ready .xp-gear-menu[hidden] {
    bar owns its 3px + breathing room. Padding appears only while the block
    actually carries a mirror, which is a rare, user-initiated state. */
 body.tr-bilingual #rendered-view [data-pb-hl-mirror],
-body.tr-only #rendered-view [data-pb-hl-mirror] { padding-left: 10px; }
+body.tr-only #rendered-view [data-pb-hl-mirror] { padding-inline-start: 10px; --mirror-x: 3px; }
+/* An inset shadow has no logical form: flip its offset where the block reads
+   right-to-left (an RTL article, or an RTL translation inside an LTR one). */
+body.tr-bilingual #rendered-view [data-pb-hl-mirror]:dir(rtl),
+body.tr-only #rendered-view [data-pb-hl-mirror]:dir(rtl) { --mirror-x: -3px; }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="1"],
-body.tr-only #rendered-view [data-pb-hl-mirror="1"] { box-shadow: inset 3px 0 0 0 var(--hl-1); }
+body.tr-only #rendered-view [data-pb-hl-mirror="1"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-1); }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="2"],
-body.tr-only #rendered-view [data-pb-hl-mirror="2"] { box-shadow: inset 3px 0 0 0 var(--hl-2); }
+body.tr-only #rendered-view [data-pb-hl-mirror="2"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-2); }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="3"],
-body.tr-only #rendered-view [data-pb-hl-mirror="3"] { box-shadow: inset 3px 0 0 0 var(--hl-3); }
+body.tr-only #rendered-view [data-pb-hl-mirror="3"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-3); }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="4"],
-body.tr-only #rendered-view [data-pb-hl-mirror="4"] { box-shadow: inset 3px 0 0 0 var(--hl-4); }
+body.tr-only #rendered-view [data-pb-hl-mirror="4"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-4); }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="5"],
-body.tr-only #rendered-view [data-pb-hl-mirror="5"] { box-shadow: inset 3px 0 0 0 var(--hl-5); }
+body.tr-only #rendered-view [data-pb-hl-mirror="5"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-5); }
 
 /* Shared confirm popover (shared.js), reader skin. When its anchor lives in
    the top layer (the highlight card is a native [popover]), shared.js
