@@ -582,11 +582,12 @@ function _pbpNotesBuildRow(hit) {
   when.textContent = [day, time].filter(Boolean).join(" ");
   if (when.textContent) meta.appendChild(when);
   body.appendChild(meta);
-  // The heading is presentation only (a grid takes rows), so each row names
-  // its page to assistive tech itself.
+  // The heading is presentation only (a grid takes rows), so each row gives
+  // assistive tech what the eye reads off it: the page, and the day the
+  // heading carries when the row itself shows only the time.
   const pageName = document.createElement("span");
   pageName.className = "sr-only";
-  pageName.textContent = " \u2014 " + _pbpNotesPageName(hit.row);
+  pageName.textContent = " \u2014 " + [_pbpNotesPageName(hit.row), day ? "" : pbpLibFormatDay(hit.ts)].filter(Boolean).join(" \u00b7 ");
   body.appendChild(pageName);
 
   btn.appendChild(body);
@@ -1095,15 +1096,18 @@ async function _pbpNotesSaveNote(session) {
 // The page delete. Scope is the PAGE's record -- the confirm popover names the
 // page before anything is removed. notes-detail-delete stays the LAST class:
 // the refresh finds a focused detail control again by its last class. On a
-// page with one highlight it is that highlight's delete (the excerpt offers
-// none of its own), so it says so instead of "all of this page's".
-function _pbpNotesBuildDeleteBtn(row, pageCount) {
+// page with one highlight it IS that highlight's delete (the excerpt offers
+// none of its own): it says so, and it deletes that highlight by identity
+// through _pbpNotesDeleteOne -- the page delete re-reads the record when
+// answered, so a highlight the reader or a Drive pull added while the
+// confirm was open would have gone too, unasked.
+function _pbpNotesBuildDeleteBtn(row, pageHits) {
   const del = document.createElement("button");
   del.type = "button";
   del.className = "btn btn-sm danger ghost lib-hang-start notes-detail-delete";
-  const single = pageCount === 1;
-  setBtnIcon(del, "trash", t(single ? "hlDelete" : "notesDeleteBtn"));
-  del.addEventListener("click", () => _pbpNotesDelete(row, del, single));
+  const only = pageHits.length === 1 ? pageHits[0] : null;
+  setBtnIcon(del, "trash", t(only ? "hlDelete" : "notesDeleteBtn"));
+  del.addEventListener("click", () => (only ? _pbpNotesDeleteOne(only, del) : _pbpNotesDelete(row, del)));
   return del;
 }
 
@@ -1156,7 +1160,7 @@ function _pbpNotesBuildSide(hit, pageHits, pageTs) {
     facts.appendChild(span);
   }
   side.appendChild(facts);
-  side.appendChild(_pbpNotesBuildDeleteBtn(hit.row, pageHits.length));
+  side.appendChild(_pbpNotesBuildDeleteBtn(hit.row, pageHits));
   return side;
 }
 
@@ -1313,7 +1317,7 @@ function _pbpNotesRenderDetail(hit, enterNarrow) {
   // 4. Closing row (shown below C 1312): the page delete, hanging at the main column's start
   const footer = document.createElement("div");
   footer.className = "notes-detail-footer";
-  footer.appendChild(_pbpNotesBuildDeleteBtn(hit.row, pageHits.length));
+  footer.appendChild(_pbpNotesBuildDeleteBtn(hit.row, pageHits));
   frag.appendChild(footer);
 
   // The column spans every row of the sheet: head + excerpts + footer.
@@ -1934,7 +1938,7 @@ async function _pbpNotesChooseColor(session, color) {
 // showConfirmPopover lives in shared.js, which the standalone test page does
 // not load; that is fine because the tests exercise only the pure layer and
 // never invoke this handler.
-function _pbpNotesDelete(row, anchor, single) {
+function _pbpNotesDelete(row, anchor) {
   const label = row.title || row.url || t("notesUnknownPage");
   // The account whose rows this popover was opened over. The popover is a
   // body child dismissed only by Escape / an outside pointerdown / scroll / an
@@ -1944,7 +1948,7 @@ function _pbpNotesDelete(row, anchor, single) {
   const ownerAtOpen = _notesOwnerCache;
   const revision = _notesAuthRevision;
   showConfirmPopover(anchor, {
-    msg: single ? t("hlDeleteConfirm") : t("notesDeleteConfirm", label),
+    msg: t("notesDeleteConfirm", label),
     detail: pbpLibDeleteDetail("libraryDeleteNotesDetail"),
     yesText: t("delete"),
     noText: t("cancel"),

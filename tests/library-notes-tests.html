@@ -221,7 +221,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("a row shows the highlight text and its note, and names its page to screen readers",
     rowEl("pbp_hl_alpha#a2").textContent.includes("second alpha highlight about beta") &&
     rowEl("pbp_hl_alpha#a2").textContent.includes("highlight about beta \u2014 note on a2") &&
-    rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-body > .sr-only:last-child")?.textContent === " \u2014 Alpha article",
+    rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-body > .sr-only:last-child")?.textContent === " \u2014 Alpha article \u00b7 " + pbpLibFormatDay(400),
     rowEl("pbp_hl_alpha#a2").textContent);
   {
     const head = $id("notes-list").querySelector('.notes-page-head[data-notes-page="pbp_hl_alpha"]');
@@ -310,7 +310,21 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("a single-highlight page's delete is labelled as that highlight's delete",
     [...detail().querySelectorAll(".notes-detail-delete")].every((b) => b.textContent === "hlDelete") &&
     detail().querySelectorAll(".notes-detail-delete").length > 0);
-  rowEl("pbp_hl_alpha#a1").querySelector(".notes-hit-btn").click();
+  // ...and it deletes that highlight by identity: the page delete re-reads
+  // the record when answered and would take a highlight added meanwhile.
+  {
+    const realOne = _pbpNotesDeleteOne, realPage = _pbpNotesDelete;
+    const calls = [];
+    try {
+      _pbpNotesDeleteOne = (hit) => calls.push("one:" + hit.key);
+      _pbpNotesDelete = (row) => calls.push("page:" + row.key);
+      detail().querySelector(".notes-detail-delete").click();
+      rowEl("pbp_hl_alpha#a1").querySelector(".notes-hit-btn").click();
+      detail().querySelector(".notes-detail-delete").click();
+    } finally { _pbpNotesDeleteOne = realOne; _pbpNotesDelete = realPage; }
+    check("a single-highlight page deletes through the single delete; a fuller page through the page delete",
+      calls.join("|") === "one:pbp_hl_beta#b1|page:pbp_hl_alpha", calls.join("|"));
+  }
   check("a page with several highlights keeps the page-wide delete label",
     [...detail().querySelectorAll(".notes-detail-delete")].every((b) => b.textContent === "notesDeleteBtn"));
 
@@ -402,6 +416,10 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("a row from another day than its page's last one gives day and time; one from that day, the time",
       listWhen("x2") === day(at(-1, 23, 58)) + " " + time(at(-1, 23, 58)) && listWhen("x6") === time(pageTs),
       `${listWhen("x2")} | ${listWhen("x6")}`);
+    const listSr = (id) => rowEl("pbp_hl_times#" + id)?.querySelector(".notes-hit-body > .sr-only:last-child")?.textContent;
+    check("screen readers get the day the heading carries when the row shows only the time, never twice",
+      listSr("x6") === " \u2014 Times page \u00b7 " + day(pageTs) && listSr("x2") === " \u2014 Times page",
+      `${listSr("x6")} | ${listSr("x2")}`);
     check("a highlight from the page's own day is labelled with its time only",
       !!labelOf("x6") && !labelOf("x6").querySelector(".notes-excerpt-date") &&
       labelOf("x6").querySelector(".notes-excerpt-time")?.textContent === time(pageTs), labelOf("x6")?.outerHTML);
