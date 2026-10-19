@@ -2397,7 +2397,14 @@ html.motion-ready .xp-gear-menu[hidden] {
    one place a link/.pb-tr span still kept its low-contrast color under a tint
    (2.4-3.5:1 dark). currentColor = light branch byte-identical. */
 ::highlight(pbp-search) { background-color: var(--hl-search); color: light-dark(currentColor, var(--fg)); }
-::highlight(pbp-search-current) { background-color: var(--hl-search-current); color: light-dark(currentColor, var(--fg)); }
+/* The current match also takes a solid underline in its own teal (2026-10-19
+   reader critique: a tint one step deeper than the other matches was easy to
+   lose among them). Forced colors keep their own 5px rule below. */
+::highlight(pbp-search-current) {
+  background-color: var(--hl-search-current); color: light-dark(currentColor, var(--fg));
+  text-decoration-line: underline; text-decoration-thickness: 2px;
+  text-decoration-color: light-dark(rgb(36, 131, 123), #4E9E93);
+}
 
 /* Vocab echo (md-vocab-echo.js): saved vocabulary re-occurrence marker.
    Decoration LINE only, no background -- highlights are area, vocab is line.
@@ -3615,9 +3622,12 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
   @starting-style { opacity: 0; }
 }
 .kbd-help-title { font-weight: 600; font-size: 14px; }
-.kbd-help-list { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
-.kbd-help-row { display: flex; align-items: center; gap: var(--sp-3); }
-.kbd-help-chips { display: flex; gap: var(--sp-1); flex: none; min-width: 66px; }
+/* Two columns shared by every row (subgrid): the key column is exactly as
+   wide as the widest key group. A 66px min-width per row left single keys
+   floating far from their descriptions (2026-10-19 reader critique). */
+.kbd-help-list { list-style: none; display: grid; grid-template-columns: max-content 1fr; column-gap: var(--sp-3); row-gap: var(--sp-2); }
+.kbd-help-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; }
+.kbd-help-chips { display: flex; gap: var(--sp-1); }
 .kbd-help-chip {
   display: inline-block;
   padding: 1px var(--sp-1);
