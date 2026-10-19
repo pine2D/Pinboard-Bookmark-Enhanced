@@ -6157,6 +6157,16 @@ suiteIf("md-preview.js: pbpReaderArticleLang", "pbpReaderArticleLang", () => {
     assertEq(pbpReaderArticleLang("مرحبا بالعالم " + english, ""), "ar", "no declaration: the detector decides, as before");
     assertEq(pbpReaderArticleLang(english, ""), "und", "Latin, no declaration");
   });
+  // 2026-10-19 reader critique: glyphs only say "Arabic script".
+  test("a page declaring a language of the detected script keeps its own tag", () => {
+    const persian = "این یک مقاله فارسی درباره طراحی خواننده و ترجمه است ".repeat(6);
+    assertEq(pbpReaderArticleLang(persian, "fa"), "fa", "Persian stays Persian");
+    assertEq(pbpReaderArticleLang(persian, "ur-PK"), "ur-PK", "Urdu keeps its region tag");
+    assertEq(pbpReaderArticleLang("שלום עולם וברוכים הבאים ".repeat(6), "yi"), "yi", "Yiddish in Hebrew script");
+    assertEq(pbpReaderArticleLang(persian, "en"), "ar", "an unrelated declaration still yields to the script");
+    assertEq(pbpReaderIsRtlLang("fa") && pbpReaderIsRtlLang("ur-PK") && pbpReaderIsRtlLang("yi") && pbpReaderIsRtlLang("ar"), true, "all of them are RTL");
+    assertEq(pbpReaderIsRtlLang("en") || pbpReaderIsRtlLang("und") || pbpReaderIsRtlLang(""), false, "LTR and unknown are not");
+  });
 });
 </script>
 

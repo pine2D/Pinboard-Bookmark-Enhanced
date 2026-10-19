@@ -274,9 +274,22 @@ function pbpReaderDeclaredLang(declared) {
 // look like an English one with a few Chinese words). A CJK declaration never
 // overrides the detector (it picks Simplified vs Traditional glyphs better
 // than a site-wide template tag).
+// Glyphs can only say "Arabic script" / "Hebrew script": the detector answers
+// "ar" / "he" for a Persian, Urdu or Yiddish page too. A page declaring a
+// language of the SAME script keeps its own tag (2026-10-19 reader critique:
+// a lang="fa" page was read and voiced as Arabic). All of these are RTL.
+const PBP_READER_SAME_SCRIPT_LANGS = {
+  ar: ["ar", "fa", "ur", "ps", "ckb", "ku", "sd", "ug"],
+  he: ["he", "yi"],
+};
+function pbpReaderIsRtlLang(lang) {
+  const base = String(lang || "").split("-")[0].toLowerCase();
+  return PBP_READER_SAME_SCRIPT_LANGS.ar.includes(base) || PBP_READER_SAME_SCRIPT_LANGS.he.includes(base);
+}
 function pbpReaderArticleLang(text, declared) {
   const detected = detectArticleLang(text);
   const tag = pbpReaderDeclaredLang(declared);
+  if (detected && tag && (PBP_READER_SAME_SCRIPT_LANGS[detected] || []).includes(tag.split("-")[0].toLowerCase())) return tag;
   if (detected && tag && !/^(zh|ja|ko)(-|$)/i.test(tag) && tag.split("-")[0].toLowerCase() !== detected.split("-")[0]) {
     const sample = String(text || "").slice(0, 4000);
     const script = (sample.match(/[一-鿿぀-ゟ゠-ヿ가-힣]/g) || []).length
@@ -2759,10 +2772,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // source-script check, the section's default fold): CJK / RTL only, ""
     // for everything else -- a site-template lang="en" on a German page must
     // not hide Translate for an English target.
-    renderedView.dataset.pbScriptLang = /^(zh-Hans|zh-Hant|ja|ko|ar|he)$/.test(readingLang) ? readingLang : "";
-    // D9-3: RTL article -> container-level dir so blockquote/list/TOC physical
-    // direction CSS mirrors along with the text.
-    if (readingLang === "ar" || readingLang === "he") renderedView.dir = "rtl";
+    const rtlArticle = pbpReaderIsRtlLang(readingLang);
+    renderedView.dataset.pbScriptLang = /^(zh-Hans|zh-Hant|ja|ko)$/.test(readingLang) ? readingLang
+      : rtlArticle ? readingLang.split("-")[0].toLowerCase() : "";
+    // D9-3: RTL article -> container-level dir, so the text and the logical
+    // (inline-start) borders/insets of blockquotes, lists and the TOC mirror.
+    if (rtlArticle) renderedView.dir = "rtl";
     // First measurement runs in rAF, after article injection/layout. The
     // ResizeObserver that keeps it fresh is installed ONCE at the call site
     // below — it observes #rendered-view, which this function never replaces.
