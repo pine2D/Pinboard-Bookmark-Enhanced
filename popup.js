@@ -1630,6 +1630,11 @@ function setupSubmit(token) {
   let submitAttemptSeq = 0;
 
   function setSubmitState(state, label) {
+    // The width stays content-adaptive, but a save cycle (Save -> Saving… ->
+    // Saved! / Retry -> Save) must not make the button jump back and forth
+    // under the pointer (critique 2026-10-19): min-width only ever grows to
+    // the widest label shown so far.
+    const widthBefore = btn.getBoundingClientRect().width;
     btn.classList.remove("loading", "saved-success", "save-error");
     if (state === "loading") {
       btn.disabled = true;
@@ -1651,6 +1656,8 @@ function setupSubmit(token) {
         : t("submit");
       updateCharCount();
     }
+    const widest = Math.max(parseFloat(btn.style.minWidth) || 0, widthBefore, btn.getBoundingClientRect().width);
+    if (widest > 0) btn.style.minWidth = widest + "px";
   }
 
   $id("submit-btn").addEventListener("click", async () => {

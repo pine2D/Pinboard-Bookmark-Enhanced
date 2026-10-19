@@ -180,6 +180,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         addEventListener(type, listener) { (listeners[type] ||= []).push(listener); },
         querySelector() { return null; },
         setAttribute() {},
+        style: {},
+        getBoundingClientRect() { return { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 }; },
         appendChild(child) { this.children.push(child); },
         replaceChildren(...children) { this.children = children; },
         remove() { this.removed = true; },
@@ -3754,6 +3756,34 @@ test("posts/add default remains replace=yes for existing callers", () => {
       } finally {
         harness.cleanup();
       }
+    });
+
+    // Critique 2026-10-19: Save -> Saving… -> Saved! -> Save made the
+    // content-sized button jump under the pointer. Real <button>, shipped code.
+    test("submit button width only grows across a save cycle", () => {
+      const fnStart = source.indexOf("  function setSubmitState(state, label) {");
+      const fnEnd = source.indexOf("\n  }\n", fnStart) + 4;
+      assert(fnStart >= 0 && fnEnd > fnStart, "setSubmitState source not found");
+      const btn = document.createElement("button");
+      btn.style.cssText = "font: 13px sans-serif; padding: 0 8px; white-space: nowrap;";
+      btn.textContent = "Save";
+      document.body.appendChild(btn);
+      try {
+        const labels = { saving: "Saving a long while…", savedSuccess: "Saved!", saveRetry: "Retry", submit: "Save", update: "Update" };
+        const setSubmitState = new Function("btn", "t", "$id", "bookmarkLookup", "updateCharCount",
+          source.slice(fnStart, fnEnd) + "; return setSubmitState;")(
+          btn, (k) => labels[k], () => ({ value: "" }), { status: "none" }, () => {});
+        const w0 = btn.getBoundingClientRect().width;
+        setSubmitState("loading");
+        const wLoading = btn.getBoundingClientRect().width;
+        setSubmitState("success");
+        const wDone = btn.getBoundingClientRect().width;
+        setSubmitState("idle");
+        const wIdle = btn.getBoundingClientRect().width;
+        assert(wLoading > w0, "the longer label still widens the button (content-adaptive)");
+        assert(wDone >= wLoading && wIdle >= wLoading,
+          `the button shrank back mid-cycle: ${w0} -> ${wLoading} -> ${wDone} -> ${wIdle}`);
+      } finally { btn.remove(); }
     });
 
     // ===================== Shift+Enter: AI shortcut, never in the notes =====================
