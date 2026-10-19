@@ -656,6 +656,9 @@ html[data-section="login"] .quick-actions { display: none !important; }
    submit bar keeps above the quick-actions divider -- without it the card's
    edge sat on the divider and hid it. */
 .submit-bar + .feedback-card { margin-bottom: var(--pp-sp-4); }
+/* A failed recent-list delete reports inside .recent-bm-area, whose column is
+   inset sp-4 by the area itself: no extra side margin there. */
+.recent-bm-area > .feedback-card { margin: var(--pp-sp-3) 0 0; }
 /* Shared exit for cards that enter via fadeSlideDown. JS adds .dismissing,
    then flips .hidden 120ms later (keep in sync with the fadeOut duration). */
 .feedback-card.dismissing, .batch-permission.dismissing, .batch-progress.dismissing { animation: fadeOut 0.12s var(--ease-out) forwards; }

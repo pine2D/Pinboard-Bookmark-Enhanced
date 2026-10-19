@@ -2215,6 +2215,13 @@ async function fetchRecentBookmarks(token) {
       del.innerHTML = PBP_ICONS.cross;
       del.title = t("recentDeleteTitle");
       del.setAttribute("aria-label", t("recentDeleteTitle"));
+      // A failed delete is reported in the recent list itself, where the row
+      // still stands -- showStatus mounts its card up in the form, far from
+      // the row the user just acted on (critique 2026-10-19).
+      const reportDeleteFailure = (msg) => {
+        if (window._lastStatusFeedback) window._lastStatusFeedback.dismiss();
+        window._lastStatusFeedback = showFeedback({ variant: "error", message: msg, autoHide: 4000, target: container });
+      };
       const doDelete = () => {
         // Anchored confirm popover, matching the other destructive actions —
         // never the browser-modal window.confirm.
@@ -2236,11 +2243,11 @@ async function fetchRecentBookmarks(token) {
                 // Same feedback the main Delete button gives -- a failed delete
                 // that leaves the row in place is otherwise indistinguishable
                 // from a list that simply did not refresh.
-                showStatus("status-msg", t("pinboardApiError", String(data.result_code)), "error");
+                reportDeleteFailure(t("pinboardApiError", String(data.result_code)));
               }
             } catch (e) {
               console.warn("recent delete failed:", e && e.name, e && e.message);
-              showStatus("status-msg", t("networkError"), "error");
+              reportDeleteFailure(t("networkError"));
             }
           },
         });

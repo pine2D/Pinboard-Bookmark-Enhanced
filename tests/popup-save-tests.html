@@ -3786,6 +3786,18 @@ test("posts/add default remains replace=yes for existing callers", () => {
       } finally { btn.remove(); }
     });
 
+    // Critique 2026-10-19: a failed recent-list delete was reported by the
+    // form's status card, far from the row that is still standing.
+    test("recent-list delete failures report inside the recent list", () => {
+      const start = source.indexOf('del.className = "recent-bm-del";');
+      const end = source.indexOf("del.addEventListener(\"click\", doDelete);", start);
+      assert(start >= 0 && end > start, "recent delete block not found");
+      const block = source.slice(start, end);
+      assert(/showFeedback\(\{[^}]*target: container/.test(block), "failure card must mount in the recent list (target: container)");
+      assert(!/showStatus\(/.test(block), "no failure path may fall back to the form's status card");
+      assert((block.match(/reportDeleteFailure\(t\(/g) || []).length === 2, "both failure paths (API result, network) must use the in-list report");
+    });
+
     // ===================== Shift+Enter: AI shortcut, never in the notes =====================
     // Critique 2026-10-19: the document-level listener had no focus check, so
     // Shift+Enter in the notes swallowed the line break and fired the paid AI
