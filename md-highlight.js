@@ -2602,10 +2602,9 @@ function _pbpHlBuildItemEl(m) {
   const blockEl = full ? pbpAiBlockEl(_pbpHlEffN(full)) : null; // effN: a relocated item's row must jump to where it painted
   // tr-only escape hatch mirrors md-translate.js's own visibility rule
   // (body.tr-only + [data-pb-tr-done] hides the original unless .pb-show-orig
-  // is toggled on -- md-preview.css:1045). Dim, don't disable: spec 2.3
-  // wants a silent no-op at click time (checked again in _pbpHlNotebookJump),
-  // not a permanently-disabled control, since this view state can change
-  // within the same page load.
+  // is toggled on -- md-preview.css:1045). Dim, don't disable: the dim says
+  // "in the hidden original"; a click opens that original in place and jumps
+  // to it (_pbpHlNotebookJump, 2026-10-19 -- was spec 2.3's silent no-op).
   const isTr = !!full && full.side === "tr";
   const painted = !!(_pbpHlState.ranges && _pbpHlState.ranges[m.id]);
   const trVisible = document.body.classList.contains("tr-bilingual") || document.body.classList.contains("tr-only");
@@ -2693,7 +2692,13 @@ function _pbpHlNotebookJump(item) {
   }
   const blockEl = pbpAiBlockEl(_pbpHlEffN(item)); // effN: jump to where the highlight actually painted
   if (!blockEl) return;
-  if (document.body.classList.contains("tr-only") && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig")) return; // spec 2.3: silent no-op
+  // Was a silent no-op (spec 2.3): the row looked dead (2026-10-19 reader
+  // critique). Open the original in place -- the same .pb-show-orig peek a
+  // click on its translation toggles (md-translate.js _pbpTrPeekToggle) --
+  // then jump to it as usual.
+  if (document.body.classList.contains("tr-only") && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig")) {
+    blockEl.classList.add("pb-show-orig");
+  }
   pbpFocusArticleTarget(blockEl);
   pbpScrollIntoView(blockEl, { block: "center", behavior: "smooth" });
   const entry = _pbpHlState.ranges[item.id];

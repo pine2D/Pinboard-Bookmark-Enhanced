@@ -8646,6 +8646,34 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       assertEq(pop.matches(":popover-open"), false, "click closes the bar");
     } finally { window.t = realT; }
   });
+  // 2026-10-19 reader critique: in tr-only a highlight on a hidden original
+  // was a dimmed row whose click did nothing (spec 2.3's silent no-op).
+  test("a highlight row whose original is hidden in tr-only opens it and jumps", () => {
+    const real = { blockEl: window.pbpAiBlockEl, focus: window.pbpFocusArticleTarget, scroll: window.pbpScrollIntoView, flash: window._pbpAskFlash, effN: window._pbpHlEffN };
+    const realState = _pbpHlState;
+    const orig = document.createElement("p");
+    orig.setAttribute("data-pb-tr-done", "1");
+    document.body.appendChild(orig);
+    const calls = [];
+    window.pbpAiBlockEl = () => orig;
+    window._pbpHlEffN = (it) => it.n;
+    window.pbpFocusArticleTarget = () => calls.push("focus");
+    window.pbpScrollIntoView = () => calls.push("scroll");
+    window._pbpAskFlash = () => calls.push("flash");
+    _pbpHlState = { ...(realState || {}), ranges: {} };
+    document.body.classList.add("tr-only");
+    try {
+      _pbpHlNotebookJump({ id: "h1", n: 3, side: "orig" });
+      assertEq(orig.classList.contains("pb-show-orig"), true, "the hidden original is opened in place");
+      assertEq(calls.join(","), "focus,scroll,flash", "and the jump runs as in any other view");
+    } finally {
+      document.body.classList.remove("tr-only");
+      orig.remove();
+      _pbpHlState = realState;
+      window.pbpAiBlockEl = real.blockEl; window.pbpFocusArticleTarget = real.focus; window.pbpScrollIntoView = real.scroll;
+      window._pbpAskFlash = real.flash; window._pbpHlEffN = real.effN;
+    }
+  });
   // 2026-10-19 reader critique: search was reachable only through "/".
   test("rail-bottom row carries a search button that opens the same search as /", () => {
     const realT = window.t, realOpen = window._pbpSearchOpen;
