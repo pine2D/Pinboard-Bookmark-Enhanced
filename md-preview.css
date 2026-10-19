@@ -2779,22 +2779,9 @@ body.tr-only #rendered-view .pb-tr code { font-size: 0.875em; }
    visible by construction. .pb-show-orig is the per-block escape hatch
    (click the translated block to peek at its original, click again to hide). */
 body.tr-only #rendered-view [data-pb-tr-done]:not(.pb-show-orig) { display: none; }
+/* Click-to-peek is a pointer convenience only; the blocks are not buttons
+   and take no focus (md-translate.js _pbpTrPeekToggle, 2026-10-19). */
 body.tr-only #rendered-view .pb-tr { cursor: pointer; }
-/* role="button" is only set in tr-only mode (see _pbpTrApplyPeekAttrs), so this
-   never becomes a misleading focus target in original/bilingual view.
-   Soft ring: a full-opacity 2px rectangle around a whole prose block read as
-   jarring, so the ring is translucent link color (70% clears 3:1 non-text
-   contrast on both themes' --bg), rounded, and fades in. Rest-state outline
-   is transparent rather than none so forced-colors mode still paints it. */
-#rendered-view .pb-tr[role="button"] {
-  border-radius: var(--radius-md);
-  outline: 2px solid transparent;
-  outline-offset: 3px;
-  transition: outline-color 140ms var(--ease-out);
-}
-#rendered-view .pb-tr[role="button"]:focus-visible {
-  outline-color: color-mix(in srgb, var(--link) 70%, transparent);
-}
 /* Parking-focus targets: the focus handoffs (view switch `v`, drawer/TOC
    jumps, explain-pop restore) borrow tabindex="-1" on an arbitrary prose
    block and focus it. Keyboard-initiated, so :focus-visible matches and the
