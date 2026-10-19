@@ -345,24 +345,12 @@ export const COMPONENT_PAIR_SPEC = [
   // html[data-theme] .preset-btn:hover rule) while keeping the same text --
   // same pressable-hover shape as chip-fg/btn-hover above.
   ["preset-fg", "btn-hover", 4.5, ["pp"], true],
-  // tag-fg/tag-bg is the pre-chip-migration role pair (COMPONENTS §5.3
-  // marks --pp-chip-fg as chip-fg/chip-bg's intended replacement, but
-  // popup.css:453/2016's .tag-item still reads tag-fg/tag-bg directly).
-  // Both are RAW palette values (tag-fg is not AA-corrected against tag-bg
-  // by any derivation step) -- this row is what actually keeps them legible,
-  // not a proxy for some other row.
-  // CORRECTION (Ruling 25, 2026-09-23): this comment used to claim tag-fg/
-  // tag-bg was "verified identical to chip-fg/chip-bg on every current
-  // theme" and needed no coverage of its own for that reason. That was true
-  // only while popup-chrome.mjs passed chipMode: "verbatim" (chip-bg WAS a
-  // byte-copy of tag-bg). Task 4/D9 (taste-uplift-batch3) tinted chip-bg
-  // (`fillSeparate`+`fillDistinct` in finalizeUiControlRoles, same path
-  // options/library always used) -- chip-bg now differs from tag-bg on
-  // 12/14 popup themes, and chip-fg's own fgToAAMulti call is derived
-  // against the NEW chip-bg, not tag-bg, so it is no longer an identity on
-  // tag-fg either. This row was never redundant with the chip-fg/chip-bg
-  // rows above; it is independent, real coverage for a still-live consumer.
-  ["tag-fg", "tag-bg", 4.5, ["pp"]],
+  // tag-fg/tag-bg row RETIRED (2026-10-19): no rule reads --pp-tag-fg any
+  // more -- since stage 4 .tag-item paints --pp-tag-chip-fg, derived from
+  // tag-fg as a SEED against every backdrop the chip sits on and gated by
+  // tagChipInkRows (F9) below. The row measured a pair nothing renders; it
+  // surfaced when the transparent-tag-bg themes got a real fill and the seed
+  // (correctly) stayed a seed.
   // Loading-spinner ring: a non-text UI indicator (WCAG 1.4.11's 3:1 floor,
   // not the 4.5:1 text minimum), same class as the scrollbar-thumb-vs-track
   // check elsewhere in this file.

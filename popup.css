@@ -975,7 +975,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tags-display { display: contents; }
 .tag-item {
   display: inline-flex; align-items: center; background: var(--pp-tag-bg); color: var(--pp-tag-chip-fg);
-  padding: 1px var(--pp-sp-4); border-radius: var(--pp-radius-tag); font-size: 11px; gap: var(--pp-sp-1);
+  padding: 1px var(--pp-sp-4); border-radius: var(--pp-radius-tag); gap: var(--pp-sp-1);
+  /* 12px (popup critique 2026-10-19): the tags already chosen are the value
+     of this form; at 11px they read smaller than the 12px .stag suggestions
+     under them. */
+  font-size: 12px;
   line-height: 18px; white-space: nowrap;
   /* No `transform` in the transition list: no rule and no JS ever sets a
      transform on .tag-item (drag state is opacity, the drop marker is a
@@ -1975,7 +1979,6 @@ html[data-theme="modern-card"] {
   --pp-input-bg: #e7e7e9;
   --pp-input-focus-bg: #f0f2f5;
   --pp-tag-bg: #e8f0fe;
-  --pp-tag-fg: #1967d2;
   --pp-tag-hover: #f1f3f4;
   --pp-drop-hover: #e8f0fe;
   --pp-chip-bg: #e6effe;
@@ -2039,9 +2042,8 @@ html[data-theme="nord-night"] {
   --pp-divider: #434c5e;
   --pp-input-bg: #434c5e;
   --pp-input-focus-bg: #4c566a;
-  --pp-tag-bg: transparent;
-  --pp-tag-fg: #aec89a;
-  --pp-tag-hover: #434c5e;
+  --pp-tag-bg: #586071;
+  --pp-tag-hover: #646c7d;
   --pp-drop-hover: #3b4252;
   --pp-chip-bg: #485868;
   --pp-chip-fg: #bed3ae;
@@ -2084,9 +2086,9 @@ html[data-theme="nord-night"] {
   --pp-field-border-focus: #759fb0;
   --pp-field-placeholder: #c0c6d2;
   --pp-field-fg: #e5e9f0;
-  --pp-tag-chip-fg: #b9cfa7;
-  --pp-tag-chip-icon: #9db7d1;
-  --pp-tag-chip-icon-hover: #d39198;
+  --pp-tag-chip-fg: #e8f0e3;
+  --pp-tag-chip-icon: #b2c6db;
+  --pp-tag-chip-icon-hover: #e4bdc1;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2105,9 +2107,8 @@ html[data-theme="terminal"] {
   --pp-divider: #33ff3325;
   --pp-input-bg: #111111;
   --pp-input-focus-bg: #0d1a0d;
-  --pp-tag-bg: transparent;
-  --pp-tag-fg: #00cccc;
-  --pp-tag-hover: #0f2a0f;
+  --pp-tag-bg: #163216;
+  --pp-tag-hover: #184518;
   --pp-drop-hover: #1a3a1a;
   --pp-chip-bg: #142914;
   --pp-chip-fg: #00cccc;
@@ -2172,9 +2173,8 @@ html[data-theme="paper-ink"] {
   --pp-divider: #e8dfd0;
   --pp-input-bg: #e6e5e3;
   --pp-input-focus-bg: #faf8f5;
-  --pp-tag-bg: transparent;
-  --pp-tag-fg: #8b4513;
-  --pp-tag-hover: #ede4d0;
+  --pp-tag-bg: #cccbc9;
+  --pp-tag-hover: #bdbcbb;
   --pp-drop-hover: #f5f0e8;
   --pp-chip-bg: #cfd1d0;
   --pp-chip-fg: #8b4513;
@@ -2218,9 +2218,9 @@ html[data-theme="paper-ink"] {
   --pp-field-border-focus: #1a3a5c;
   --pp-field-placeholder: #5c5c5c;
   --pp-field-fg: #2c2c2c;
-  --pp-tag-chip-fg: #8b4513;
+  --pp-tag-chip-fg: #70380f;
   --pp-tag-chip-icon: #6b4c3b;
-  --pp-tag-chip-icon-hover: #c0392b;
+  --pp-tag-chip-icon-hover: #b83729;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2239,9 +2239,8 @@ html[data-theme="dracula"] {
   --pp-divider: #44475a;
   --pp-input-bg: #44475a;
   --pp-input-focus-bg: #51556b;
-  --pp-tag-bg: transparent;
-  --pp-tag-fg: #50fa7b;
-  --pp-tag-hover: #44475a;
+  --pp-tag-bg: #5d606f;
+  --pp-tag-hover: #6c6e7b;
   --pp-drop-hover: #21222c;
   --pp-chip-bg: #2e3b47;
   --pp-chip-fg: #50fa7b;
@@ -2284,9 +2283,9 @@ html[data-theme="dracula"] {
   --pp-field-border-focus: #71a6bb;
   --pp-field-placeholder: #bcc3d8;
   --pp-field-fg: #f8f8f2;
-  --pp-tag-chip-fg: #50fa7b;
-  --pp-tag-chip-icon: #bd93f9;
-  --pp-tag-chip-icon-hover: #ff7474;
+  --pp-tag-chip-fg: #d1fedc;
+  --pp-tag-chip-icon: #dbc3fc;
+  --pp-tag-chip-icon-hover: #ffbbbb;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2306,7 +2305,6 @@ html[data-theme="flexoki-light"] {
   --pp-input-bg: #e7e5da;
   --pp-input-focus-bg: #FFFCF0;
   --pp-tag-bg: #FAEEC6;
-  --pp-tag-fg: #664D01;
   --pp-tag-hover: #F6E2A0;
   --pp-drop-hover: #F2F0E5;
   --pp-chip-bg: #f1e5bf;
@@ -2372,7 +2370,6 @@ html[data-theme="flexoki-dark"] {
   --pp-input-bg: #2f2e2d;
   --pp-input-focus-bg: #343331;
   --pp-tag-bg: #3A2D04;
-  --pp-tag-fg: #D0A215;
   --pp-tag-hover: #503D02;
   --pp-drop-hover: #343331;
   --pp-chip-bg: #3a2d04;
@@ -2437,9 +2434,8 @@ html[data-theme="solarized-light"] {
   --pp-divider: #d6cdb5;
   --pp-input-bg: #e2decd;
   --pp-input-focus-bg: #fdf6e3;
-  --pp-tag-bg: transparent;
-  --pp-tag-fg: #1e746d;
-  --pp-tag-hover: #eee8d5;
+  --pp-tag-bg: #cecdbf;
+  --pp-tag-hover: #c2c3b7;
   --pp-drop-hover: #eee8d5;
   --pp-chip-bg: #d3dbd5;
   --pp-chip-fg: #1a645e;
@@ -2482,9 +2478,9 @@ html[data-theme="solarized-light"] {
   --pp-field-border-focus: #2380c1;
   --pp-field-placeholder: #525e5e;
   --pp-field-fg: #3a484c;
-  --pp-tag-chip-fg: #1a645e;
+  --pp-tag-chip-fg: #16544f;
   --pp-tag-chip-icon: #54696f;
-  --pp-tag-chip-icon-hover: #dc322f;
+  --pp-tag-chip-icon-hover: #ca2522;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2503,9 +2499,8 @@ html[data-theme="solarized-dark"] {
   --pp-divider: #094b5a;
   --pp-input-bg: #103d48;
   --pp-input-focus-bg: #073642;
-  --pp-tag-bg: transparent;
-  --pp-tag-fg: #4aada3;
-  --pp-tag-hover: #073642;
+  --pp-tag-bg: #234c55;
+  --pp-tag-hover: #2e545d;
   --pp-drop-hover: #073642;
   --pp-chip-bg: #0d465d;
   --pp-chip-fg: #63bcb3;
@@ -2549,8 +2544,8 @@ html[data-theme="solarized-dark"] {
   --pp-field-border-focus: #268bd2;
   --pp-field-placeholder: #9facad;
   --pp-field-fg: #c2cbcb;
-  --pp-tag-chip-fg: #5cb9b0;
-  --pp-tag-chip-icon: #8e9e9f;
+  --pp-tag-chip-fg: #87ccc5;
+  --pp-tag-chip-icon: #94a3a4;
   --pp-tag-chip-icon-hover: #e98077;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
@@ -2571,7 +2566,6 @@ html[data-theme="catppuccin-latte"] {
   --pp-input-bg: #dbdee6;
   --pp-input-focus-bg: #eff1f5;
   --pp-tag-bg: #dce0e8;
-  --pp-tag-fg: #116e73;
   --pp-tag-hover: #ccd0da;
   --pp-drop-hover: #dce0e8;
   --pp-chip-bg: #c7d2e8;
@@ -2636,7 +2630,6 @@ html[data-theme="catppuccin-mocha"] {
   --pp-input-bg: #262637;
   --pp-input-focus-bg: #181825;
   --pp-tag-bg: #45475a;
-  --pp-tag-fg: #94e2d5;
   --pp-tag-hover: #585b70;
   --pp-drop-hover: #313244;
   --pp-chip-bg: #484b60;
@@ -2700,9 +2693,8 @@ html[data-theme="gruvbox-dark"] {
   --pp-divider: #504945;
   --pp-input-bg: #1d2021;
   --pp-input-focus-bg: #32302f;
-  --pp-tag-bg: transparent;
-  --pp-tag-fg: #b8bb26;
-  --pp-tag-hover: #3c3836;
+  --pp-tag-bg: #3a3a35;
+  --pp-tag-hover: #4a4941;
   --pp-drop-hover: #3c3836;
   --pp-chip-bg: #494d49;
   --pp-chip-fg: #c0c328;
@@ -2745,7 +2737,7 @@ html[data-theme="gruvbox-dark"] {
   --pp-field-border-focus: #749085;
   --pp-field-placeholder: #aca093;
   --pp-field-fg: #ebdbb2;
-  --pp-tag-chip-fg: #b8bb26;
+  --pp-tag-chip-fg: #c0c328;
   --pp-tag-chip-icon: #b0a390;
   --pp-tag-chip-icon-hover: #fc6a52;
   --pp-info-bg: var(--pp-banner-bg);
@@ -2766,9 +2758,8 @@ html[data-theme="rose-pine"] {
   --pp-divider: #393552;
   --pp-input-bg: #27243b;
   --pp-input-focus-bg: #403d52;
-  --pp-tag-bg: transparent;
-  --pp-tag-fg: #9ccfd8;
-  --pp-tag-hover: #26233a;
+  --pp-tag-bg: #413e55;
+  --pp-tag-hover: #504d64;
   --pp-drop-hover: #26233a;
   --pp-chip-bg: #3a334c;
   --pp-chip-fg: #9ccfd8;
@@ -2811,8 +2802,8 @@ html[data-theme="rose-pine"] {
   --pp-field-placeholder: #9895ae;
   --pp-field-fg: #e0def4;
   --pp-tag-chip-fg: #9ccfd8;
-  --pp-tag-chip-icon: #908caa;
-  --pp-tag-chip-icon-hover: #eb6f92;
+  --pp-tag-chip-icon: #a19eb7;
+  --pp-tag-chip-icon-hover: #ed81a0;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -2832,7 +2823,6 @@ html[data-theme="github-light"] {
   --pp-input-bg: #ececed;
   --pp-input-focus-bg: #f6f8fa;
   --pp-tag-bg: #ddf4ff;
-  --pp-tag-fg: #0550ae;
   --pp-tag-hover: #b6e3ff;
   --pp-drop-hover: #ddf4ff;
   --pp-chip-bg: #ddf4ff;

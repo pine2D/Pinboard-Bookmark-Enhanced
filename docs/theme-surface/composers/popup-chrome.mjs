@@ -1,6 +1,6 @@
 import { expandPalette } from "./_util.mjs";
 import { mergeTokens } from "./compose-theme.mjs";
-import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, resolveOpaqueBg, isCompositableBg, FIELD_HOST_ROLES, FIELD_ROLES } from "./_ui-derive.mjs";
+import { deriveUiColors, deriveUiRadius, regularizeUiRadius, fgToAA, fgToAAMulti, finalizeUiControlRoles, hexToRgb, rgbToHex, mix, resolveOpaqueBg, isCompositableBg, FIELD_HOST_ROLES, FIELD_ROLES } from "./_ui-derive.mjs";
 
 // popup theme id -> { pilot, mode, useDarkMode? }
 // 12 themes map 1:1; the flexoki pilot yields BOTH flexoki-light and flexoki-dark.
@@ -137,12 +137,15 @@ function emitPp(ui, mode) {
   const lines = [`  color-scheme: ${mode};`];
   const set = (k, val) => lines.push(`  --pp-${k}: ${val};`);
   for (const k of ["bg", "bg2", "fg", "fg-muted", "fg-hint", "link", "accent", "accent2",
-    "border", "divider", "input-bg", "input-focus-bg", "tag-bg", "tag-fg", "tag-hover", "drop-hover",
+    "border", "divider", "input-bg", "input-focus-bg", "tag-bg", "tag-hover", "drop-hover",
     "chip-bg", "chip-fg", "ai-chip-fg", "btn-bg", "btn-bd", "btn-hover", "btn-fg", "btn-fg-muted",
     "banner-bg", "banner-bd", "banner-fg", "warn-bg", "warn-bd", "warn-fg",
     "ok-bg", "ok-bd", "ok-fg", "offline-bg", "offline-bd", "offline-fg",
     "danger", "danger-quiet-fg", "on-danger", "spinner-bg", "spinner-fg", "preset-bg", "preset-fg",
     "radius-sm", "radius-md", "radius-lg", "radius-tag", "focus-bd", "focus-ring", "on-accent",
+    // tag-fg RETIRED from emission (2026-10-19), as preset-bd was: no rule
+    // reads --pp-tag-fg since .tag-item moved to tag-chip-fg; it stays the
+    // internal seed tag-chip-fg is derived from.
     // Stage 4 Task 5: the field family and the chip inks. This list is a
     // whitelist -- a role the finalizer computes but this list omits is
     // silently not emitted, and ui-token-coverage cannot see that (it only
@@ -157,6 +160,11 @@ function emitPp(ui, mode) {
   set("info-fg", "var(--pp-banner-fg)");
   return lines.join("\n");
 }
+
+// Fill / hover for a selected tag on themes whose pilot tag-bg is
+// `transparent`: fractions of the way from field-bg to fg.
+const TAG_FILL_FG_MIX = 0.14;
+const TAG_HOVER_FG_MIX = 0.22;
 
 // The three fills a popup tag chip is painted on (see tag-chip-fg below):
 // tag-bg over the resting tags shell, tag-bg over the hovered shell, and
@@ -266,6 +274,20 @@ export function composePopupThemeMap(tk, mode, useDarkMode = false) {
   // their own tag-hover), only catppuccin-mocha moves the icon (2.999 on
   // tag-hover). MUST run after finalizeUiControlRoles: the backdrops read
   // the final field-bg / field-bg-hover.
+  // Selected-tag fill (popup critique 2026-10-19, user ruling): 8/14 pilots
+  // declare tag-bg `transparent`, which left a chosen tag as bare text in the
+  // tags box -- quieter than the filled .stag suggestions under it -- and on
+  // several of them tag-hover equals field-bg, so hovering a chip changed
+  // nothing. Those themes get a fill one step from the shell toward fg, and
+  // a hover one step further; opaque pilot values are kept verbatim. The chip
+  // inks below are derived against the result. MUST run after
+  // finalizeUiControlRoles (reads the final field-bg).
+  if (ui["tag-bg"] === "transparent") {
+    const shell = hexToRgb(ui["field-bg"]);
+    const fgRgb = hexToRgb(ui["fg"]);
+    ui["tag-bg"] = rgbToHex(mix(shell, fgRgb, TAG_FILL_FG_MIX));
+    ui["tag-hover"] = rgbToHex(mix(shell, fgRgb, TAG_HOVER_FG_MIX));
+  }
   const tagChipBases = tagChipBackdrops(ui);
   ui["tag-chip-fg"] = rgbToHex(fgToAAMulti(hexToRgb(ui["tag-fg"]), tagChipBases, 4.5));
   ui["tag-chip-icon"] = rgbToHex(fgToAAMulti(hexToRgb(ui["fg-muted"]), tagChipBases, 3));
