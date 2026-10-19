@@ -3684,7 +3684,26 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
    var(--btn-border)/var(--btn-hover) causes no layout shift. Uses
    --btn-hover, not --btn-bg: --btn-bg equals --surface (the rail's own
    background), so painting it here would be a visible no-op. */
-#rail-bottom-row { margin-top: var(--sp-3); } /* placement only; the row's shape is .row */
+/* Pinned to the rail's bottom edge (critique 2026-10-19): these are the
+   every-read tools, and as the plain last child they scrolled out of view
+   once highlights or export were open, and read as part of the source-tools
+   disclosure above them. margin-top:auto parks the row at the bottom when
+   the rail is short; sticky keeps it there when the rail scrolls. Chrome
+   insets a sticky box by the scroll container's padding, so bottom and
+   margin-bottom both cancel the rail's 20px bottom padding: the row's own
+   sp-5 inset then sits on the scrollport edge in both the stuck and the
+   scrolled-to-end positions (no 20px jump, no rows peeking out below it).
+   The hairline marks where scrolling content passes under. */
+#rail-bottom-row {
+  position: sticky;
+  bottom: -20px;
+  z-index: 1;
+  margin-top: auto;
+  margin-bottom: -20px;
+  padding-block: var(--sp-2) var(--sp-5);
+  background: var(--surface);
+  border-top: 1px solid var(--border-light);
+}
 .rail-kbd-help-btn {
   flex: 1 1 auto;
   height: 26px;            /* md rung (was a stray 28px) */
