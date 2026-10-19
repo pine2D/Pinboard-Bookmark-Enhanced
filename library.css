@@ -1854,6 +1854,10 @@ html.motion-ready .vocab-note-save {
 }
 .vocab-note-input.is-expanded:not(:focus) { max-height: none; }
 .vocab-note-edit > .vocab-note-more { margin-top: var(--lib-sp-1); }
+/* .btn's author display:inline-flex out-ranks the UA [hidden] rule, so the
+   button's `hidden` was never honoured: "Show full note" sat under every
+   note, empty or one line long (user report 2026-10-19, twice). */
+.vocab-note-edit > .vocab-note-more[hidden] { display: none; }
 /* Near the 500-character limit, while writing: the count, under the box's
    end edge (library-vocab.js PBP_VOCAB_NOTE_COUNT_FROM). */
 .vocab-note-edit > .vocab-note-count {

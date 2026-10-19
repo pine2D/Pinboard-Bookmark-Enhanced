@@ -2768,6 +2768,10 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       _vocabNoteExpandedId = null;
       const field = () => $id("vocab-detail").querySelector(".vocab-note-input");
       const more = () => $id("vocab-detail").querySelector(".vocab-note-edit > .vocab-note-more");
+      // Rendered, not the attribute: .btn's display:inline-flex once out-ranked
+      // the UA [hidden] rule, so hidden === true still painted the button and
+      // every attribute-only check here stayed green over a visible button.
+      const shown = () => !!more() && getComputedStyle(more()).display !== "none" && more().getClientRects().length > 0;
       const frames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       _pbpVocabRenderDetail(long);
       await frames();
@@ -2776,25 +2780,25 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         cs.overflow === "clip" && String(cs.overflowClipMargin).includes("content-box") && field().scrollHeight > field().clientHeight,
         `overflow=${cs.overflow} margin=${cs.overflowClipMargin} sh=${field().scrollHeight} ch=${field().clientHeight}`);
       check("an overflowing note offers Show full note",
-        !!more() && more().hidden === false && more().getAttribute("aria-expanded") === "false" && more().textContent === "libraryNoteShowAll",
+        shown() && more().getAttribute("aria-expanded") === "false" && more().textContent === "libraryNoteShowAll",
         more() && `${more().hidden} ${more().textContent}`);
       more().click();
       await frames();
       check("Show full note lifts the cap and turns into Show less",
         field().classList.contains("is-expanded") && field().scrollHeight <= field().clientHeight + 1 &&
-        more().getAttribute("aria-expanded") === "true" && more().textContent === "libraryNoteShowLess" && more().hidden === false,
+        more().getAttribute("aria-expanded") === "true" && more().textContent === "libraryNoteShowLess" && shown(),
         `sh=${field().scrollHeight} ch=${field().clientHeight}`);
       _pbpVocabRenderDetail(long);
       await frames();
       check("the expanded choice survives a rebuild of the same word",
-        field().classList.contains("is-expanded") && more().hidden === false);
+        field().classList.contains("is-expanded") && shown());
       field().focus();
-      check("while the box is focused it is at writing height and the button steps aside", more().hidden === true);
+      check("while the box is focused it is at writing height and the button steps aside", !shown());
       field().blur();
       _pbpVocabRenderDetail(short);
       await frames();
       check("a note that fits its four lines offers nothing",
-        more().hidden === true && !field().classList.contains("is-expanded"),
+        !shown() && !field().classList.contains("is-expanded"),
         `sh=${field().scrollHeight} ch=${field().clientHeight}`);
       // An empty note sits in a one-line box under its placeholder, which a
       // rows=2 textarea's scrollHeight overshoots: the button must not read
@@ -2803,12 +2807,12 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       _vocabRows = [long, short, blank];
       _pbpVocabRenderDetail(blank);
       await frames();
-      check("an empty note offers nothing", more().hidden === true, `sh=${field().scrollHeight} ch=${field().clientHeight}`);
+      check("an empty note offers nothing", !shown(), `sh=${field().scrollHeight} ch=${field().clientHeight}`);
       // Expanded, then edited down to one line: the button goes with the need.
       _vocabNoteExpandedId = long.id;
       _pbpVocabRenderDetail({ ...long, note: "now short" });
       await frames();
-      check("a note expanded and then shortened no longer offers Show less", more().hidden === true);
+      check("a note expanded and then shortened no longer offers Show less", !shown());
       // Near the 500-character limit, while writing, the count shows and
       // describes the field; away from the limit, or at rest, it is gone.
       const count = () => $id("vocab-detail").querySelector(".vocab-note-edit > .vocab-note-count");
