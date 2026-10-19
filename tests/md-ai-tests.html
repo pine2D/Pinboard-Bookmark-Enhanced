@@ -8615,6 +8615,19 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       assertEq(document.getElementById("tr-stale-act").hidden, true, "running: no re-entry entry point");
     } finally { wrap.remove(); }
   });
+  test("the search bar has a visible close button that closes it", () => {
+    const realT = window.t;
+    window.t = (k) => k;
+    try {
+      const pop = _pbpSearchEnsurePop();
+      const close = pop.querySelector("#search-close");
+      assertEq(!!close && close.getAttribute("aria-label"), "srchCloseAria", "close button present and labelled");
+      assertEq(!!close.querySelector("svg"), true, "icon from PBP_ICONS.cross");
+      pop.showPopover();
+      close.click();
+      assertEq(pop.matches(":popover-open"), false, "click closes the bar");
+    } finally { window.t = realT; }
+  });
   // 2026-10-19 reader critique: search was reachable only through "/".
   test("rail-bottom row carries a search button that opens the same search as /", () => {
     const realT = window.t, realOpen = window._pbpSearchOpen;

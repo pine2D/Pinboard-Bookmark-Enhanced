@@ -3929,6 +3929,7 @@
   "srchInputAria": { "message": "Поиск в этом документе" },
   "srchPrevAria": { "message": "Предыдущее совпадение" },
   "srchNextAria": { "message": "Следующее совпадение" },
+  "srchCloseAria": { "message": "Закрыть поиск" },
   "srchRegexAria": { "message": "Поиск по регулярному выражению" },
   "kbdHelpZen": { "message": "Переключить режим дзен" },
   "zenEnterBtn": { "message": "Включить режим дзен" },

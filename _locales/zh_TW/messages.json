@@ -3929,6 +3929,7 @@
   "srchInputAria": { "message": "在文件中搜尋" },
   "srchPrevAria": { "message": "上一個相符項目" },
   "srchNextAria": { "message": "下一個相符項目" },
+  "srchCloseAria": { "message": "關閉搜尋" },
   "srchRegexAria": { "message": "正規表示式搜尋" },
   "kbdHelpZen": { "message": "切換專注模式" },
   "zenEnterBtn": { "message": "進入專注模式" },

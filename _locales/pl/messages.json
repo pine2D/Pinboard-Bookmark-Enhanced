@@ -3929,6 +3929,7 @@
   "srchInputAria": { "message": "Szukaj w tym dokumencie" },
   "srchPrevAria": { "message": "Poprzednie dopasowanie" },
   "srchNextAria": { "message": "Następne dopasowanie" },
+  "srchCloseAria": { "message": "Zamknij wyszukiwanie" },
   "srchRegexAria": { "message": "Wyszukiwanie wyrażeniem regularnym" },
   "kbdHelpZen": { "message": "Przełącz tryb zen" },
   "zenEnterBtn": { "message": "Włącz tryb zen" },

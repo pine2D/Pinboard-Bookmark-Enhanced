@@ -3935,6 +3935,7 @@
   "srchInputAria": { "message": "Search in this document" },
   "srchPrevAria": { "message": "Previous match" },
   "srchNextAria": { "message": "Next match" },
+  "srchCloseAria": { "message": "Close search" },
   "srchRegexAria": { "message": "Regular expression search" },
   "kbdHelpZen": { "message": "Toggle zen mode" },
   "zenEnterBtn": { "message": "Enter zen mode" },

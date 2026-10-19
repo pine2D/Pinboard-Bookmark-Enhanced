@@ -878,6 +878,18 @@ function _pbpSearchEnsurePop() {
   next.addEventListener("click", () => _pbpSearchStep(1));
   pop.appendChild(next);
 
+  // Esc and light-dismiss close it, but nothing on screen said so
+  // (2026-10-19 reader critique): a visible close, same icon-button family.
+  const close = document.createElement("button");
+  close.type = "button";
+  close.id = "search-close";
+  close.className = "srch-nav";
+  close.innerHTML = PBP_ICONS.cross;
+  close.setAttribute("aria-label", t("srchCloseAria"));
+  close.title = t("srchCloseAria");
+  close.addEventListener("click", () => pop.hidePopover());
+  pop.appendChild(close);
+
   pop.addEventListener("toggle", (e) => {
     if (e.newState === "closed") _pbpSearchTeardown();
   });

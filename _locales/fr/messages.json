@@ -3929,6 +3929,7 @@
   "srchInputAria": { "message": "Rechercher dans ce document" },
   "srchPrevAria": { "message": "Correspondance précédente" },
   "srchNextAria": { "message": "Correspondance suivante" },
+  "srchCloseAria": { "message": "Fermer la recherche" },
   "srchRegexAria": { "message": "Recherche par expression régulière" },
   "kbdHelpZen": { "message": "Activer ou quitter le mode zen" },
   "zenEnterBtn": { "message": "Activer le mode zen" },
