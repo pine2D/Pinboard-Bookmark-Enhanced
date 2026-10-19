@@ -645,7 +645,8 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
    invisible measure layer made text blocks end ~74px short of code blocks
    and tables (user-reported as a bug, not read as typography), and made
    normal mode and zen disagree about what a "column" is. A reader who wants
-   the ~68ch measure picks the 680px step; every element shares one edge. */
+   a shorter line keeps the 720px step (the default); every element shares
+   one edge. */
 
 /* Headings */
 /* Balanced heading wrap (plan B): multi-line headings stop stranding a lone

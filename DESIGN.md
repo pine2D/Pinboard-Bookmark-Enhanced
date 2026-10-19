@@ -230,7 +230,7 @@ A low-saturation neutral base with one blue voice, semantic status colors that a
 - **Body** (400, 14px/20px): Options and library body copy and control labels. Popup body is 12px with 11px labels, because 550px of width holds a dense form.
 - **Label** (400, 12px/18px): Helper text, meta, counts.
 - **Overline** (600, 11px, 0.5px tracking, uppercase): Sidebar group labels in options and section heads in the reader rail. Never used for body text.
-- **Prose** (400, 17px→22px fluid clamp, 1.75 leading): Reader body. Users can step the size (×0.9–1.2), leading (1.6 / 1.75 / 1.9), and measure (680 / 880 / 1080px). Headings run h1 2em/700/−0.025em down to h6 .875em, and only headings use `text-wrap: balance`.
+- **Prose** (400, 17px→22px fluid clamp, 1.75 leading): Reader body. Users can step the size (×0.9–1.2), leading (1.6 / 1.75 / 1.9), and measure (720 / 880 / 1080px; 720 is the default). Headings run h1 2em/700/−0.025em down to h6 .875em, and only headings use `text-wrap: balance`.
 
 ### Named Rules
 **The Fast Fallback Rule.** Every UI font stack names fast CJK families before `sans-serif`, and every mono stack names a real mono font first and CJK before `monospace`. `button, input, select` always `font-family: inherit`. A fallback to a slow font freezes cold first paint on high-DPI Windows for 1–3s.
