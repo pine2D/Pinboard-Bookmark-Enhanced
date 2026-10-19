@@ -2865,7 +2865,7 @@
     "message": "重试全部失败"
   },
   "trShowOriginal": {
-    "message": "点击临时显示原文"
+    "message": "点击段落可临时查看原文"
   },
   "askOpen": {
     "message": "问答"

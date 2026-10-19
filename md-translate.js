@@ -1011,39 +1011,25 @@ let _pbpTrState = null;
 window.pbpTrExportTargetLang = () => (_pbpTrState && _pbpTrState.s && _pbpTrState.s.translateTargetLang
   && _pbpTrState.s.translateTargetLang !== "auto") ? _pbpTrState.s.translateTargetLang : "";
 
-// tr-only escape hatch: shared by the click and keydown delegated listeners
-// in pbpTrInit (audit md-translate.js:524). No-op outside tr-only mode.
-// Returns true iff it actually toggled the peek, so the keydown listener
-// only preventDefault()s when it's actually consuming the key (otherwise a
-// stray Enter/Space on e.g. a link inside the block would lose its default
-// action for no reason).
+// tr-only escape hatch: a click on a translated block peeks at its original.
+// No-op outside tr-only mode. A pointer convenience only (2026-10-19 critique,
+// user ruling): the blocks are NOT buttons -- role=button + tabindex=0 on every
+// paragraph turned the article into a list of buttons for screen readers and
+// a tab stop per paragraph. The keyboard route to the original is the view
+// toggle (v), and the rail names the click (#tr-peek-hint).
 function _pbpTrPeekToggle(target) {
   if (!document.body.classList.contains("tr-only")) return false;
   const tr = target.closest(".pb-tr");
   if (!tr || target.closest("a")) return false;      // never hijack links
+  // A drag that selected text (to highlight or copy) also ends in a click.
+  const sel = window.getSelection && window.getSelection();
+  if (sel && !sel.isCollapsed && tr.contains(sel.anchorNode)) return false;
   const orig = tr.previousElementSibling;
   if (!orig || !orig.dataset || !orig.dataset.pb) return false;
   orig.classList.toggle("pb-show-orig");
   return true;
 }
 
-// The peek is only a real affordance in tr-only mode (click/Enter/Space are
-// a no-op otherwise, per _pbpTrPeekToggle above) -- so role/tabindex/title
-// only apply there; elsewhere they'd be a misleading tab stop / hover hint
-// (audit md-translate.js:524). Called both when a .pb-tr is (re)filled and
-// whenever the view mode changes (_pbpTrSetMode), so late-created blocks
-// pick up the right state too.
-function _pbpTrApplyPeekAttrs(div) {
-  if (document.body.classList.contains("tr-only")) {
-    div.setAttribute("role", "button");
-    div.setAttribute("tabindex", "0");
-    div.title = t("trShowOriginal");
-  } else {
-    div.removeAttribute("role");
-    div.removeAttribute("tabindex");
-    div.removeAttribute("title");
-  }
-}
 
 async function pbpTrInit(detail) {
   const view = document.getElementById("rendered-view");
@@ -1140,17 +1126,9 @@ async function pbpTrInit(detail) {
     });
   }
 
-  // tr-only escape hatch: click OR keyboard (Enter/Space, when the block is
-  // focusable in tr-only mode — see _pbpTrApplyPeekAttrs) a translated block
-  // to peek at its original (audit md-translate.js:524).
+  // tr-only escape hatch: click a translated block to peek at its original
+  // (pointer only -- see _pbpTrPeekToggle).
   view.addEventListener("click", (e) => _pbpTrPeekToggle(e.target));
-  view.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    // Only consume the key (and stop Space from scrolling the page) when the
-    // peek actually fires -- otherwise this must not swallow Enter/Space on
-    // e.g. a focusable link inside the block.
-    if (_pbpTrPeekToggle(e.target)) e.preventDefault();
-  });
   // Page close terminates every in-flight request (error matrix last row).
   window.addEventListener("pagehide", () => { if (st.ctrl) st.ctrl.abort(); });
   // ZH-0 §5: pagehide's IDB transaction rarely completes before teardown, so
@@ -2338,7 +2316,6 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   // the stale pbpAiGetSettings memo (md-ai-core.js:460).
   div.dataset.pbTrLang = st.target.code;
   div.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
-  _pbpTrApplyPeekAttrs(div);
   orig.dataset.pbTrDone = "1";
   // In translated-only mode headings arrive progressively after the mode/TOC
   // switch. Refresh now so a newly filled heading never leaves stale original
@@ -2591,8 +2568,6 @@ async function _pbpTrRetryBlock(st, w, btn) {
     if (hadFocus) {
       const tr = pbpAiBlockEl(w.n) && pbpAiBlockEl(w.n).nextElementSibling;
       if (tr && tr.classList && tr.classList.contains("pb-tr")) {
-        // Don't clobber the tabindex=0 _pbpTrApplyPeekAttrs (just run inside
-        // _pbpTrFill) may have already given it for tr-only keyboard peek.
         if (!tr.hasAttribute("tabindex")) tr.tabIndex = -1;
         tr.focus();
       }
@@ -2883,6 +2858,14 @@ function _pbpTrShowViewToggle(st) {
   name.className = "tr-meta";
   name.setAttribute("aria-hidden", "true");
   wrap.insertAdjacentElement("afterend", name);
+  // Names the pointer peek in tr-only (_pbpTrPeekToggle), in place of the
+  // per-paragraph title it used to carry; shown only in that view.
+  const peekHint = document.createElement("div");
+  peekHint.id = "tr-peek-hint";
+  peekHint.className = "tr-meta";
+  peekHint.textContent = t("trShowOriginal");
+  peekHint.hidden = true;
+  name.insertAdjacentElement("afterend", peekHint);
   _pbpTrSyncToggle(st.mode);
 }
 
@@ -2895,6 +2878,8 @@ function _pbpTrSyncToggle(mode) {
   });
   const name = document.getElementById("tr-view-name");
   if (name) name.textContent = PBP_TR_VIEW_NAME_KEYS[mode] ? t(PBP_TR_VIEW_NAME_KEYS[mode]) : "";
+  const peekHint = document.getElementById("tr-peek-hint");
+  if (peekHint) peekHint.hidden = mode !== "translated";
 }
 
 // Moving between original-only and translated-only can hide the element that
@@ -2973,13 +2958,10 @@ function _pbpTrApplyMode(st, mode, anchor, focusHandoff) {
   if (mode !== "translated") {
     document.querySelectorAll("#rendered-view .pb-show-orig").forEach((el) => el.classList.remove("pb-show-orig"));
   }
-  // The class switch makes the destination side visible. Move focus before
-  // removing the source .pb-tr's tabindex; Chromium otherwise drops focus to
-  // body and the stale-focus guard correctly refuses the intended handoff.
+  // The class switch makes the destination side visible; hand focus over
+  // now, before Chromium drops it to body and the stale-focus guard refuses
+  // the intended handoff.
   _pbpTrApplyFocusHandoff(focusHandoff);
-  // Re-sync every already-filled .pb-tr's peek affordance for the new mode
-  // (blocks filled while a DIFFERENT mode was active still need updating).
-  document.querySelectorAll("#rendered-view .pb-tr").forEach(_pbpTrApplyPeekAttrs);
   _pbpTrSyncToggle(mode);
   _pbpTrSyncToc(st, mode);
   // Export follows the view: md-preview.js consults window.pbpViewMarkdown

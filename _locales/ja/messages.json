@@ -2865,7 +2865,7 @@
     "message": "失敗をすべて再試行"
   },
   "trShowOriginal": {
-    "message": "クリックして一時的に原文を表示"
+    "message": "段落をクリックすると原文を一時表示"
   },
   "askOpen": {
     "message": "質問"

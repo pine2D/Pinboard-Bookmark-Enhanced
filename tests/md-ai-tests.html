@@ -8615,6 +8615,41 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       assertEq(document.getElementById("tr-stale-act").hidden, true, "running: no re-entry entry point");
     } finally { wrap.remove(); }
   });
+  // 2026-10-19 critique + user ruling: in tr-only a click on a translated
+  // block still peeks at the original, but the blocks are not buttons (no
+  // role/tab stop/title per paragraph); the rail names the click instead.
+  test("tr-only peek: click kept, no per-paragraph button semantics, rail hint", () => {
+    const realT = window.t;
+    window.t = (k) => k;
+    const sec = document.createElement("div");
+    sec.id = "tr-section";
+    const view = document.createElement("div");
+    view.innerHTML = '<p data-pb="1" data-pb-tr-done="1">orig</p><div class="pb-tr">译文 <a href="#x">link</a></div>';
+    document.body.append(sec, view);
+    try {
+      _pbpTrShowViewToggle({ mode: "translated" });
+      const hint = document.getElementById("tr-peek-hint");
+      assertEq(!!hint && hint.hidden, false, "hint shown in the translated-only view");
+      _pbpTrSyncToggle("bilingual");
+      assertEq(hint.hidden, true, "hint hidden outside the translated-only view");
+      document.body.classList.add("tr-only");
+      const tr = view.querySelector(".pb-tr"), orig = view.querySelector("p");
+      assertEq(tr.hasAttribute("role") || tr.hasAttribute("tabindex") || tr.hasAttribute("title"), false,
+        "a translated paragraph carries no button role, tab stop or title");
+      assertEq(_pbpTrPeekToggle(tr), true, "click toggles the peek");
+      assertEq(orig.classList.contains("pb-show-orig"), true, "original shown");
+      assertEq(_pbpTrPeekToggle(tr.querySelector("a")), false, "links are never hijacked");
+      const range = document.createRange();
+      range.selectNodeContents(tr.firstChild);
+      getSelection().removeAllRanges(); getSelection().addRange(range);
+      assertEq(_pbpTrPeekToggle(tr), false, "a click ending a text selection does not toggle");
+      assertEq(orig.classList.contains("pb-show-orig"), true, "selection left the peek alone");
+    } finally {
+      getSelection().removeAllRanges();
+      document.body.classList.remove("tr-only");
+      window.t = realT; sec.remove(); view.remove();
+    }
+  });
   // 2026-10-19 critique: with the rail in its closed drawer (<1000px) a
   // running translation had no visible sign; the drawer toggle reads this flag.
   test("body.tr-busy marks exactly the translating state, for every exit", () => {

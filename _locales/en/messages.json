@@ -2875,7 +2875,7 @@
     "message": "Retry all failed"
   },
   "trShowOriginal": {
-    "message": "Click to temporarily show the original"
+    "message": "Click a paragraph to see its original"
   },
   "askOpen": {
     "message": "Ask"
