@@ -740,6 +740,22 @@ function _pbpTrViewLang(view) {
   const d = view.dataset && view.dataset.pbScriptLang;
   return typeof d === "string" ? d : (view.lang || "");
 }
+// View-toggle labels (critique 2026-10-19): the A / 文 glyphs hard-wired
+// "source = Latin, target = CJK", which reads backwards for a zh -> en or
+// ja -> ru reader. When both ends are known as BCP 47-ish codes with
+// different primary subtags, the segments name them ("EN" / "ZH"); otherwise
+// null and the glyphs stay. Source = the detected script language, else the
+// article's declared lang; target = st.target.code (custom free text such as
+// "Klingon" is not a code and keeps the glyphs).
+function pbpTrViewLangTags(scriptLang, declaredLang, targetCode) {
+  const primary = (v) => {
+    const m = /^([a-z]{2,3})(?:[-_]|$)/i.exec(String(v || "").trim());
+    return m ? m[1].toUpperCase() : "";
+  };
+  const src = primary(scriptLang) || primary(declaredLang);
+  const tgt = primary(targetCode);
+  return src && tgt && src !== tgt ? { src, tgt } : null;
+}
 function _pbpTrShouldHideEntry(articleLang, targetLang) {
   return !!(articleLang && targetLang && articleLang === targetLang);
 }
@@ -1749,6 +1765,7 @@ async function _pbpTrApplyTargetLang(st, s) {
   if (st.s) st.s.translateTargetLang = s.translateTargetLang;
   if (st.tgtTextEl) st.tgtTextEl.textContent = t("trTargetLang", st.target.display || st.target.name);
   if (st.target.code === prevCode) return;   // label refresh only: no real language change
+  _pbpTrSyncViewLabels(st);
   // Target language actually changed: every language-keyed derived state is now stale.
   // Drop the memoized (old-language) glossary, remove all filled translations + their
   // DOM (.pb-tr), done markers and failure pills, reset to Original view, and re-arm the
@@ -2817,32 +2834,34 @@ function _pbpTrSetStatus(st, status) {
   _pbpTrSyncStaleNote(st);
 }
 
+// Language-glyph segments (device feedback round 3): abstract "view" icons
+// for these three states are unwinnable, but the LANGUAGE metaphor is not --
+// source glyph / both / target glyph (A · A文 · 文), the same iconography
+// the shared translate icon and Google Translate use. Both glyph groups are
+// lifted verbatim from Lucide `languages` (single-pack contract): the solo
+// segments scale their group up with non-scaling strokes so the family's
+// 2px line weight holds. Full labels stay on title/aria. Fallback only since
+// critique 2026-10-19: when both languages are known the segments carry their
+// codes instead (_pbpTrSyncViewLabels).
+const PBP_TR_VIEW_ICONS = {
+  original: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(12 12) scale(1.5) translate(-17 -17)"><path vector-effect="non-scaling-stroke" d="m22 22-5-10-5 10"/><path vector-effect="non-scaling-stroke" d="M14 18h6"/></g></svg>',
+  bilingual: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>',
+  translated: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(12 12) scale(1.5) translate(-8 -8)"><path vector-effect="non-scaling-stroke" d="m5 8 6 6"/><path vector-effect="non-scaling-stroke" d="m4 14 6-6 2-3"/><path vector-effect="non-scaling-stroke" d="M2 5h12"/><path vector-effect="non-scaling-stroke" d="M7 2h1"/></g></svg>',
+};
+
 // Three-state view. mode: "original" | "bilingual" | "translated".
 // Pure DOM show/hide — zero re-requests (spec 4.2). Persisted per URL.
 function _pbpTrShowViewToggle(st) {
-  if (document.getElementById("tr-view-toggle")) return;
+  if (document.getElementById("tr-view-toggle")) { _pbpTrSyncViewLabels(st); return; }
   const wrap = document.createElement("div");
   wrap.id = "tr-view-toggle";
   wrap.className = "view-toggle";
   wrap.setAttribute("aria-keyshortcuts", "v");
-  // Language-glyph segments (device feedback round 3): abstract "view" icons
-  // for these three states are unwinnable, but the LANGUAGE metaphor is not --
-  // source glyph / both / target glyph (A · A文 · 文), the same iconography
-  // the shared translate icon and Google Translate use. Both glyph groups are
-  // lifted verbatim from Lucide `languages` (single-pack contract): the solo
-  // segments scale their group up with non-scaling strokes so the family's
-  // 2px line weight holds. Full labels stay on title/aria.
-  const PBP_TR_VIEW_ICONS = {
-    original: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(12 12) scale(1.5) translate(-17 -17)"><path vector-effect="non-scaling-stroke" d="m22 22-5-10-5 10"/><path vector-effect="non-scaling-stroke" d="M14 18h6"/></g></svg>',
-    bilingual: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>',
-    translated: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(12 12) scale(1.5) translate(-8 -8)"><path vector-effect="non-scaling-stroke" d="m5 8 6 6"/><path vector-effect="non-scaling-stroke" d="m4 14 6-6 2-3"/><path vector-effect="non-scaling-stroke" d="M2 5h12"/><path vector-effect="non-scaling-stroke" d="M7 2h1"/></g></svg>',
-  };
   for (const [mode, key] of [["original", "trViewOriginal"], ["bilingual", "trViewBilingual"], ["translated", "trViewTranslated"]]) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "toggle-btn";
     b.dataset.trMode = mode;
-    b.innerHTML = PBP_TR_VIEW_ICONS[mode]; // static composed constants above
     b.title = t(key) + " (v)"; // "v" is the literal key name, deliberately not translated
     b.setAttribute("aria-label", t(key));
     b.setAttribute("aria-pressed", "false");
@@ -2866,7 +2885,37 @@ function _pbpTrShowViewToggle(st) {
   peekHint.textContent = t("trShowOriginal");
   peekHint.hidden = true;
   name.insertAdjacentElement("afterend", peekHint);
+  _pbpTrSyncViewLabels(st);
   _pbpTrSyncToggle(st.mode);
+}
+
+// Paint the three segments: language codes when both ends are known
+// (pbpTrViewLangTags), the A / A文 / 文 glyphs otherwise. Re-run whenever the
+// article (source) or the target language can have changed.
+function _pbpTrSyncViewLabels(st) {
+  const wrap = document.getElementById("tr-view-toggle");
+  if (!wrap) return;
+  const view = document.getElementById("rendered-view");
+  const tags = pbpTrViewLangTags(st.articleLang, view && view.lang, st.target && st.target.code);
+  wrap.classList.toggle("tr-view-codes", !!tags);
+  wrap.querySelectorAll(".toggle-btn").forEach((b) => {
+    const mode = b.dataset.trMode;
+    if (!tags) { b.innerHTML = PBP_TR_VIEW_ICONS[mode] || ""; return; } // static composed constants
+    b.replaceChildren();
+    const codes = mode === "original" ? [tags.src] : mode === "translated" ? [tags.tgt] : [tags.src, tags.tgt];
+    codes.forEach((c, i) => {
+      if (i) {
+        const sep = document.createElement("span");
+        sep.className = "tr-view-sep";
+        sep.setAttribute("aria-hidden", "true");
+        b.appendChild(sep);
+      }
+      const span = document.createElement("span");
+      span.setAttribute("aria-hidden", "true"); // the segment's aria-label names the view
+      span.textContent = c;
+      b.appendChild(span);
+    });
+  });
 }
 
 const PBP_TR_VIEW_NAME_KEYS = { original: "trViewOriginal", bilingual: "trViewBilingual", translated: "trViewTranslated" };
@@ -3116,6 +3165,7 @@ function _pbpTrOnArticleReplaced(detail) {
   const view = document.getElementById("rendered-view");
   if (!view) return;
   st.articleLang = _pbpTrViewLang(view);   // md-preview re-detects lang/dir per render
+  _pbpTrSyncViewLabels(st);
   const rev = st.rev;
   // The block index was already rebuilt by md-preview.js before this event.
   const cand = pbpAiBlocks().filter((b) => b.tag !== "pre" && (b.el.textContent || "").trim());

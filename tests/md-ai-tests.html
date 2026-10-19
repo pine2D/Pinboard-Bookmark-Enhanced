@@ -2384,6 +2384,15 @@ suiteIf("pbpTrResolveTargetLang / entry visibility", "pbpTrResolveTargetLang", (
     assert(_pbpTrShouldHideEntry("ja", "zh-Hans") === false, "different from target -> show");
     assert(_pbpTrShouldHideEntry("", "") === false, "both empty -> show");
   });
+  test("view toggle names both languages only when both ends are known and differ", () => {
+    // The direction is the point: a zh article read into English must not wear A -> 文.
+    assertEq(JSON.stringify(pbpTrViewLangTags("zh-Hans", "", "en")), '{"src":"ZH","tgt":"EN"}', "zh -> en");
+    assertEq(JSON.stringify(pbpTrViewLangTags("", "de-DE", "zh-Hans")), '{"src":"DE","tgt":"ZH"}', "declared lang fills a Latin script");
+    assertEq(pbpTrViewLangTags("", "", "zh-Hans"), null, "unknown source keeps the glyphs");
+    assertEq(pbpTrViewLangTags("zh-Hant", "", "zh-Hans"), null, "same primary subtag keeps the glyphs");
+    assertEq(pbpTrViewLangTags("ja", "", "Klingon"), null, "custom free-text target is not a code");
+    assertEq(pbpTrViewLangTags("ja", "", "文言文"), null, "CJK custom target is not a code");
+  });
   test("gate uses resolved TARGET lang, not UI lang", () => {
     // zh UI, explicit en target, zh article -> must SHOW (zh->en is useful)
     const tEn = pbpTrResolveTargetLang({ translateTargetLang: "en" }, "zh-Hans");
