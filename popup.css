@@ -1111,6 +1111,9 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    critique 2026-10-15; popup-theme-early.js has the counter). */
 html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display: none; }
 #ai-summary-hint { margin-left: auto; margin-right: var(--pp-sp-3); }
+/* Rides the end of its chip row (popup-tags.js pbpAssignAltNumBadges) so it
+   never shifts where the chips start. */
+.alt-num-hint { margin-left: auto; }
 /* Same .kb-hint family hook as #ai-summary-hint above: the Alt+P/R/A hint
    right-aligns in .bottom-bar so it can never push the three checkbox
    labels, on any of the nine locales. No own spacing -- the row gap is

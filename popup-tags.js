@@ -839,7 +839,8 @@ function pbpAssignAltNumBadges() {
   const hint = document.createElement("span");
   hint.className = "kb-hint alt-num-hint";
   hint.textContent = t("kbdAltTagHint");
-  const groupLabel = host.querySelector(".suggest-group .group-label");
-  if (groupLabel) groupLabel.after(hint);
-  else host.prepend(hint);
+  // At the END of the row holding the first numbered chip, right-aligned
+  // (popup.css): placed after the group label it pushed that row's chips
+  // right of the next row's whenever hints showed (critique 2026-10-19).
+  (first.closest(".suggest-group") || host).append(hint);
 }

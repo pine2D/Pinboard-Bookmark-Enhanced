@@ -4193,6 +4193,29 @@ test("posts/add default remains replace=yes for existing callers", () => {
       };
     }
 
+    // Critique 2026-10-19: the Alt+N hint sat between the first group's label
+    // and its chips, pushing that row's chips right of the next row's.
+    test("the Alt+N hint rides the end of its chip row, never before the chips", () => {
+      const host = document.createElement("div");
+      host.id = "pinboard-suggest-tags";
+      host.className = "suggest-area";
+      host.innerHTML = '<div class="suggest-group"><span class="group-label">popular</span><button class="stag" data-tag="a">a</button><button class="stag" data-tag="b">b</button></div>' +
+        '<div class="suggest-group"><span class="group-label">recommended</span><button class="stag" data-tag="c">c</button></div>';
+      document.body.appendChild(host);
+      try {
+        const pipeline = new Function("currentTags", "$id", "document", "t",
+          `${tagsPipelineSource}\nreturn { pbpAssignAltNumBadges };`
+        )([], (id) => document.getElementById(id), document, (k) => k);
+        pipeline.pbpAssignAltNumBadges();
+        const hints = host.querySelectorAll(".alt-num-hint");
+        const firstGroup = host.querySelector(".suggest-group");
+        assert(hints.length === 1, "exactly one hint, got " + hints.length);
+        assert(hints[0].parentElement === firstGroup && firstGroup.lastElementChild === hints[0],
+          "the hint must be the last child of the first numbered row");
+        assert(firstGroup.children[1].classList.contains("stag"), "the first chip still follows the group label directly");
+      } finally { host.remove(); }
+    });
+
     test("K72 fix1: the cache-hit AI render still leaves #ai-suggest-tags exactly one tab stop", () => {
       const fx = createCachedAiFixture();
       try {
