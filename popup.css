@@ -1113,7 +1113,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    long-locale hint no longer wraps onto a row of its own (impeccable
    critique 2026-10-15; popup-theme-early.js has the counter). */
 html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display: none; }
-#ai-summary-hint { margin-left: auto; margin-right: var(--pp-sp-3); }
+/* The hint names what Shift+Enter does (summary AND tags, critique
+   2026-10-19), which runs long in de/fr at the 450px width: it shrinks and
+   ellipsizes before it can shove the AI summary button, and its title
+   carries the full text. */
+#ai-summary-hint { margin-left: auto; margin-right: var(--pp-sp-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Rides the end of its chip row (popup-tags.js pbpAssignAltNumBadges) so it
    never shifts where the chips start. */
 .alt-num-hint { margin-left: auto; }
@@ -1568,6 +1572,11 @@ html[data-theme] .batch-progress-text {
   margin-left: var(--pp-sp-2);
 }
 .regen-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  line-height: inherit;
   font-size: 11px;
   color: var(--pp-accent2);
   cursor: pointer;
@@ -1589,6 +1598,12 @@ html[data-theme] .batch-progress-text {
    picked by the UA rather than by --pp-accent. */
 .regen-link:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 
+/* "Remove" spends nothing, so it does not wear the AI hue its regenerate
+   neighbour does (critique 2026-10-19): the quiet --pp-fg-hint of the
+   "cached" note beside it. (0,3,0) on purpose -- it has to out-rank the
+   themed html[data-theme] .regen-link (0,2,1) further down. */
+.regen-link[data-action="remove"]:not(.loading) { color: var(--pp-fg-hint); }
+.regen-link[data-action="remove"]:not(.loading):hover { color: var(--pp-fg-muted); }
 .regen-link + .regen-link {
   margin-left: var(--pp-sp-1);
   padding-left: var(--pp-sp-4);

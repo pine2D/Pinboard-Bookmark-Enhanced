@@ -1154,9 +1154,11 @@ function showSummaryActions(fromCache) {
     wrap.appendChild(hint);
   }
 
+  // Real <button>s styled as inline links (critique 2026-10-19): as
+  // <a href="#"> they ignored Space and announced as links that go nowhere.
   function createActionLink(text, action) {
-    const link = document.createElement("a");
-    link.href = "#";
+    const link = document.createElement("button");
+    link.type = "button";
     link.className = "regen-link";
     link.dataset.action = action;
     link.textContent = text;
@@ -1164,7 +1166,6 @@ function showSummaryActions(fromCache) {
   }
 
   const regenLink = createActionLink(t("aiRegenerate"), "regenerate");
-  regenLink.title = t("aiSummaryBtnTitle");
   const removeLink = createActionLink(t("aiRemove"), "remove");
   wrap.appendChild(regenLink);
   wrap.appendChild(removeLink);
@@ -1404,8 +1405,8 @@ function renderAITags(tags, fromCache) {
     hintWrap.appendChild(cachedSpan);
 
     ["append", "replace"].forEach(mode => {
-      const link = document.createElement("a");
-      link.href = "#";
+      const link = document.createElement("button"); // a real button, same as the summary pair
+      link.type = "button";
       link.className = "regen-link";
       link.dataset.mode = mode;
       link.textContent = mode === "append" ? t("aiRegenerate") : t("aiReplace");

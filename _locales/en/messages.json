@@ -270,7 +270,7 @@
     "message": "AI summary"
   },
   "aiSummaryBtnTitle": {
-    "message": "Shift+Enter"
+    "message": "Shift+Enter for summary and tags"
   },
   "aiGenerateBtn": {
     "message": "generate"

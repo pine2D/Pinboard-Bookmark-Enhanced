@@ -268,7 +268,7 @@
     "message": "AI-аннотация"
   },
   "aiSummaryBtnTitle": {
-    "message": "Shift+Enter"
+    "message": "Shift+Enter: аннотация и метки"
   },
   "aiGenerateBtn": {
     "message": "сгенерировать"

@@ -268,7 +268,7 @@
     "message": "KI-Zusammenfassung"
   },
   "aiSummaryBtnTitle": {
-    "message": "Umschalt+Eingabe"
+    "message": "Umschalt+Eingabe für Zusammenfassung und Tags"
   },
   "aiGenerateBtn": {
     "message": "Generieren"

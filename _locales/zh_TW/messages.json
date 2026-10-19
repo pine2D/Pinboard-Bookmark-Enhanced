@@ -268,7 +268,7 @@
     "message": "AI 摘要"
   },
   "aiSummaryBtnTitle": {
-    "message": "Shift+Enter"
+    "message": "Shift+Enter 產生摘要和標籤"
   },
   "aiGenerateBtn": {
     "message": "產生"

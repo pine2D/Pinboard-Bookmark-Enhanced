@@ -268,7 +268,7 @@
     "message": "Podsumowanie AI"
   },
   "aiSummaryBtnTitle": {
-    "message": "Shift+Enter"
+    "message": "Shift+Enter: podsumowanie i tagi"
   },
   "aiGenerateBtn": {
     "message": "generuj"
