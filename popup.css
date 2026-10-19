@@ -494,7 +494,7 @@ input[type="checkbox"], input[type="radio"] {
    the host element's colour; .ok/.bad force green/red where the host has no status colour. */
 .status-ic { display: inline-flex; vertical-align: -2px; }
 .status-ic.ok { color: var(--pp-ok-fg); }
-.status-ic.bad { color: var(--pp-danger); }
+.status-ic.bad { color: var(--pp-danger-quiet-fg); }
 .status-ic svg, .add-all-link svg, .recent-bm-del svg, .recent-bm-edit svg, .offline-queue-remove svg, .offline-queue-retry svg { display: block; }
 
 /* Early section visibility — popup-theme-early.js sets html[data-section] from a synchronous
@@ -618,7 +618,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .login-body button { padding: var(--pp-sp-2) var(--pp-sp-6); font-size: 12px; cursor: pointer; transition: background var(--pp-motion-state), border-color var(--pp-motion-state); }
 .login-body button:active:not(:disabled) { transform: scale(0.97); }
 .login-body button:focus-visible { outline: none; border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
-.error-text { color: var(--pp-danger); font-size: 11px; margin-top: var(--pp-sp-2); }
+.error-text { color: var(--pp-danger-quiet-fg); font-size: 11px; margin-top: var(--pp-sp-2); }
 
 /* ===================== Message-surface family =====================
    Three shapes (2026-07 Claude Design round 2):
@@ -911,7 +911,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
    so the AI summary action does not move, but draws nothing. */
 #desc-char-count:not(.near-limit):not(.over-limit) { visibility: hidden; }
 #desc-char-count.near-limit { color: var(--pp-offline-fg); font-weight: 600; }
-#desc-char-count.over-limit { color: var(--pp-danger); font-weight: 600; }
+#desc-char-count.over-limit { color: var(--pp-danger-quiet-fg); font-weight: 600; }
 /* Tag suggestion skeleton — opacity pulse on solid divider color. Gentler than the
    previous horizontal shimmer (which had a 14-unit luminance jump that read as harsh
    on dark backgrounds). var(--pp-divider) is theme-aware: every preset defines it. */
@@ -1111,7 +1111,7 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display:
   font-size: 11px; color: var(--pp-fg-hint); cursor: pointer;
   margin-top: var(--pp-sp-1); display: inline-flex; align-items: center; gap: var(--pp-sp-1);
 }
-.clear-all-link:hover { color: var(--pp-danger); text-decoration: underline; }
+.clear-all-link:hover { color: var(--pp-danger-quiet-fg); text-decoration: underline; }
 /* Icon anchors on the small link buttons: shrink the shared 13/14px icons to
    the 10-11px text scale, and drop .btn-ic's button-sized margin (gap rules). */
 .clear-all-link .btn-ic, .offline-clear .btn-ic { margin-right: 0; vertical-align: 0; }
@@ -1278,7 +1278,7 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
    a reason the button family could not be unified at all. */
 .status-msg { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-2) var(--pp-label-indent); font-size: 11px; }
 .status-msg.success { color: var(--pp-ok-fg); }
-.status-msg.error { color: var(--pp-danger); }
+.status-msg.error { color: var(--pp-danger-quiet-fg); }
 .wayback-indicator { font-size: 11px; /* px, not 0.9em: appended to #status-msg (11px), i.e. 9.9px rendered -- under the textFloor */ opacity: 0.85; }
 
 /* Search Bar */
@@ -1622,7 +1622,7 @@ html[data-theme] .batch-progress-text {
    for both of them two rules up, and without a gap the glyph and the word
    render flush against each other. */
 .offline-clear {
-  color: var(--pp-danger);
+  color: var(--pp-danger-quiet-fg);
   font-size: var(--pp-text-body-sm);
   cursor: pointer;
   position: relative;
@@ -1741,8 +1741,8 @@ html[data-theme] .batch-progress-text {
 .offline-queue-item > .actions button:hover:not(:disabled) { background: color-mix(in srgb, var(--pp-scrim) 6%, transparent); color: var(--pp-accent); }
 .offline-queue-item > .actions button:active:not(:disabled) { transform: scale(0.97); }
 .offline-queue-item > .actions button:disabled { opacity: 0.5; cursor: default; }
-.offline-queue-item > .actions .offline-queue-remove:hover:not(:disabled) { color: var(--pp-danger); }
-.offline-queue-item > .actions .offline-queue-failed { color: var(--pp-danger); border-color: var(--pp-danger); }
+.offline-queue-item > .actions .offline-queue-remove:hover:not(:disabled) { color: var(--pp-danger-quiet-fg); }
+.offline-queue-item > .actions .offline-queue-failed { color: var(--pp-danger-quiet-fg); border-color: var(--pp-danger); }
 .offline-queue-retry.loading svg { animation: spin 0.6s linear infinite; }
 .offline-queue-retry.loading { opacity: 0.7; cursor: default; }
 
@@ -1812,7 +1812,7 @@ html[data-theme] .batch-progress-text {
   line-height: 1;
   border-radius: var(--pp-radius-sm);
 }
-.recent-bm-del:hover { color: var(--pp-danger); }
+.recent-bm-del:hover { color: var(--pp-danger-quiet-fg); }
 .recent-bm-edit {
   flex-shrink: 0;
   color: var(--pp-fg-hint);
@@ -2298,7 +2298,7 @@ html[data-theme="flexoki-light"] {
   --pp-fg: #100f0f;
   --pp-fg-muted: #6a6964;
   --pp-fg-hint: #6a6964;
-  --pp-link: #205EA6;
+  --pp-link: #205ea6;
   --pp-accent: #205EA6;
   --pp-accent2: #5E409D;
   --pp-border: #867f58;
@@ -2364,7 +2364,7 @@ html[data-theme="flexoki-dark"] {
   --pp-fg: #cecdc3;
   --pp-fg-muted: #9F9D96;
   --pp-fg-hint: #a09e9a;
-  --pp-link: #4385BE;
+  --pp-link: #5a94c6;
   --pp-accent: #4385BE;
   --pp-accent2: #8B7EC8;
   --pp-border: #7a7672;
@@ -2693,7 +2693,7 @@ html[data-theme="gruvbox-dark"] {
   --pp-fg: #ebdbb2;
   --pp-fg-muted: #b0a390;
   --pp-fg-hint: #aca093;
-  --pp-link: #83a598;
+  --pp-link: #89a99d;
   --pp-accent: #83a598;
   --pp-accent2: #d3869b;
   --pp-border: #958b84;
@@ -2908,6 +2908,7 @@ html[data-theme="github-light"] {
   --pp-tag-chip-fg: #33589f;
   --pp-tag-chip-icon: #62676e;
   --pp-tag-chip-icon-hover: #c24343;
+  --pp-link: #3769ce;
 }
 /* @generated:ui-themes end */
 
@@ -3084,7 +3085,7 @@ html[data-theme] .offline-queue-title { color: var(--pp-fg); }
 html[data-theme] .offline-queue-item > .actions button { border-color: color-mix(in srgb, var(--pp-fg) 18%, transparent); color: var(--pp-fg-muted); background: transparent; }
 html[data-theme] .offline-queue-item > .actions button:focus-visible { border-color: var(--pp-focus-bd); box-shadow: var(--pp-focus-ring); }
 html[data-theme] .offline-queue-item > .actions button:hover:not(:disabled) { background: color-mix(in srgb, var(--pp-accent) 10%, transparent); color: var(--pp-accent); }
-html[data-theme] .offline-queue-item > .actions .offline-queue-remove:hover:not(:disabled) { color: var(--pp-danger); background: color-mix(in srgb, var(--pp-danger) 12%, transparent); }
+html[data-theme] .offline-queue-item > .actions .offline-queue-remove:hover:not(:disabled) { color: var(--pp-danger-quiet-fg); background: color-mix(in srgb, var(--pp-danger) 12%, transparent); }
 /* The empty-state line sits ON the tinted .offline-queue-list strip (75%
    --pp-offline-bg over --pp-bg), so it reads the strip's own AA-derived text
    role: --pp-fg-hint painted at 3.7:1 on dracula's strip (4.4-4.5:1 on
@@ -3110,7 +3111,7 @@ html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Cons
   box-sizing: border-box;
   width: max-content; max-width: min(60ch, calc(100vw - 8px));
   display: flex; align-items: center; gap: var(--pp-sp-3); flex-wrap: wrap;
-  padding: var(--pp-sp-2) var(--pp-sp-4); font-size: 11px; color: var(--pp-danger); white-space: normal;
+  padding: var(--pp-sp-2) var(--pp-sp-4); font-size: 11px; color: var(--pp-danger-quiet-fg); white-space: normal;
   background: var(--pp-bg); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-sm);
   box-shadow: var(--pp-shadow-md);
   animation: confirmFadeIn 0.12s var(--ease-out);

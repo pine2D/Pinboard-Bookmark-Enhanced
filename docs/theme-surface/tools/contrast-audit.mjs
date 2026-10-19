@@ -306,6 +306,12 @@ export const COMPONENT_PAIR_SPEC = [
   ["link", "panel", 4.5, ["opt"], false, true],
   ["link", "bg", 4.5, ["opt"], false, true],
   ["link", "pf-bg", 4.5, ["opt"]],
+  // Popup's link ink (2026-10-19 popup critique): popup-chrome.mjs derives
+  // --pp-link against these two hosts; flexoki-dark had shipped 4.37:1. The
+  // danger TEXT rules read danger-quiet-fg, already gated on bg and bg2.
+  // defaultStrict: the default (:root) block must keep declaring both.
+  ["link", "bg", 4.5, ["pp"], false, true],
+  ["link", "bg2", 4.5, ["pp"], false, true],
   // warn-fg/warn-bg (debt-sweep 2026-08-08, independent review F1): both
   // come out of the same pairToAA(destroy, bg, mode) call in
   // deriveUiColors (_ui-derive.mjs) -- the foreground's lightness is
@@ -794,6 +800,8 @@ export const DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS = {
   "tag-fg": "popup-only: legacy pre-chip-migration raw palette pair (COMPONENTS.md §5.3), taken verbatim",
   "tag-bg": "popup-only: same legacy pair as tag-fg",
   "spinner-bg": "popup-only: hand-maintained UI-indicator base fill (spinner-fg IS a derived output; this is only what it's measured against)",
+  link: "popup ONLY: an INPUT role there (4/13 pilots override ui.popup.<mode>.link), taken as the seed and moved only where it misses 4.5 on bg/bg2; on options it IS a UI_DERIVED_OUTPUT_ROLES member and stays strict. The popup link rows are defaultStrict either way",
+  bg2: "popup-only: hand-maintained strip/secondary surface base token (popup's panel), same reasoning as bg; the popup link rows are defaultStrict, so it cannot silently SKIP there",
   "pf-bg": "options-only hand-maintained :root literal (provider sub-panel fill); per theme a composer map value (ui.bg2 or a pilot override), never a finalizeUiControlRoles output",
 };
 

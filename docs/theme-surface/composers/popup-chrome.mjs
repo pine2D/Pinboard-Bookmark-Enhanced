@@ -115,6 +115,10 @@ const DEFAULT_LIGHT = {
   "tag-chip-fg": "#33589f",         // = tag-fg: 5.72:1 on tag-bg #e2eafa, 5.19:1 on tag-hover #d3e0f7
   "tag-chip-icon": "#62676e",       // = fg-muted: 4.72:1 / 4.28:1 on the same two chip fills (min 3)
   "tag-chip-icon-hover": "#c24343", // = danger: the remove-x hover ink, >=3:1 on the same chip backdrops
+  "link": "#3769ce",                // NOT a literal copy (popup critique 2026-10-19): the hand :root's
+                                    // #3f6fd0 cleared 4.78:1 on bg but only 4.46:1 on bg2 #f6f7f9, where
+                                    // the strips' links sit. fgToAAMulti(#3f6fd0, [bg #ffffff, bg2]) --
+                                    // the themed link derivation in composePopupThemeMap, same hosts.
 };
 // DEFAULT_DARK (the popup's `html.dark` component-layer tokens) is gone:
 // since the theme model of 2026-08-25 (batch 2 D6) the popup's no-preset
@@ -296,6 +300,14 @@ export function composePopupThemeMap(tk, mode, useDarkMode = false) {
   // source value (both hx("accent-soft")) so this is currently a single
   // effective constraint, but fgToAAMulti keeps the derivation correct if a
   // future pilot ui.popup override ever splits them apart.
+  // link ink (popup critique 2026-10-19): --pp-link paints text straight on
+  // the popup's two surfaces -- the 11px quick links on --pp-bg, links in
+  // the strips on --pp-bg2 -- and was a raw palette value with no AA
+  // guarantee (flexoki-dark 4.37:1). Seed-then-move like options' linkInk:
+  // verbatim wherever it already clears 4.5 on both. Danger TEXT reads the
+  // already-derived danger-quiet-fg in popup.css instead; --pp-danger stays
+  // the solid fill on-danger is derived against.
+  ui["link"] = rgbToHex(fgToAAMulti(hexToRgb(ui["link"]), [hexToRgb(ui["bg"]), hexToRgb(ui["bg2"])]));
   const presetBgRgb = hexToRgb(ui["preset-bg"]);
   ui["preset-fg"] = rgbToHex(fgToAAMulti(hexToRgb(ui["preset-fg"]), [presetBgRgb, hexToRgb(ui["btn-hover"])]));
   // spinner-fg (design-uplift Task 13, USER RULING): same raw-copy gap as
