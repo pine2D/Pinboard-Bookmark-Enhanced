@@ -643,7 +643,8 @@ function setupAIFeatures() {
     _aiSummaryRange = null;
     _aiResetSummaryActions();
     if (tracked.kind === "merged") {
-      showStatus("status-msg", t("aiSummaryMerged"), "error");
+      // Information, not failure: the user's own edit merged it (critique 2026-10-19).
+      showStatus("status-msg", t("aiSummaryMerged"), "info");
     }
   });
 
@@ -1173,7 +1174,7 @@ function showSummaryActions(fromCache) {
     e.preventDefault();
     const removed = removeSummary();
     _aiResetSummaryActions();
-    showStatus("status-msg", t(removed ? "aiSummaryRemoved" : "aiSummaryMerged"), removed ? "success" : "error");
+    showStatus("status-msg", t(removed ? "aiSummaryRemoved" : "aiSummaryMerged"), removed ? "success" : "info");
   });
 
   regenLink.addEventListener("click", async (e) => {
