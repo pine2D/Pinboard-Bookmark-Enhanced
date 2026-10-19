@@ -188,6 +188,9 @@
   "savedSuccess": {
     "message": "Zapisano!"
   },
+  "autoClosing": {
+    "message": "zamykanie…"
+  },
   "saveRetry": {
     "message": "Ponów"
   },

@@ -188,6 +188,9 @@
   "savedSuccess": {
     "message": "Saved!"
   },
+  "autoClosing": {
+    "message": "closing…"
+  },
   "saveRetry": {
     "message": "Retry"
   },

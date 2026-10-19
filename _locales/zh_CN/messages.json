@@ -188,6 +188,9 @@
   "savedSuccess": {
     "message": "已保存！"
   },
+  "autoClosing": {
+    "message": "即将关闭"
+  },
   "saveRetry": {
     "message": "重试"
   },

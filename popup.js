@@ -1914,6 +1914,11 @@ function setupSubmit(token) {
           bar.className = "auto-close-bar";
           bar.setAttribute("aria-hidden", "true");
           document.body.appendChild(bar);
+          // The bar is visual only: say it in the live status line too, or a
+          // screen-reader user just finds the popup gone (critique 2026-10-19).
+          const closingNote = document.createElement("span");
+          closingNote.textContent = " · " + t("autoClosing");
+          $id("status-msg")?.appendChild(closingNote);
           autoCloseTimer = setTimeout(() => {
             autoCloseTimer = null;
             document.removeEventListener("pointermove", onAutoCloseMove);
@@ -1925,6 +1930,7 @@ function setupSubmit(token) {
               window.close();
             } else {
               bar.remove();
+              closingNote.remove();
             }
           }, 1800);
           // Interaction cancels the auto-close outright -- there is no pause
@@ -1939,6 +1945,7 @@ function setupSubmit(token) {
             clearTimeout(autoCloseTimer);
             autoCloseTimer = null;
             bar.remove();
+            closingNote.remove();
             document.removeEventListener("pointermove", onAutoCloseMove);
           };
           let moveOrigin = null;

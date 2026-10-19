@@ -188,6 +188,9 @@
   "savedSuccess": {
     "message": "保存しました！"
   },
+  "autoClosing": {
+    "message": "まもなく閉じます"
+  },
   "saveRetry": {
     "message": "再試行"
   },

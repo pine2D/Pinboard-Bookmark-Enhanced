@@ -188,6 +188,9 @@
   "savedSuccess": {
     "message": "Gespeichert!"
   },
+  "autoClosing": {
+    "message": "wird geschlossen …"
+  },
   "saveRetry": {
     "message": "Wiederholen"
   },

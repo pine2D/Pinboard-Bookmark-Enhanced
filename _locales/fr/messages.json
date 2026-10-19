@@ -188,6 +188,9 @@
   "savedSuccess": {
     "message": "Enregistré !"
   },
+  "autoClosing": {
+    "message": "fermeture…"
+  },
   "saveRetry": {
     "message": "Réessayer"
   },
