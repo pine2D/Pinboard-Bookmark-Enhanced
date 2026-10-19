@@ -1598,8 +1598,12 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
       cur.saved = true;
       // Icon + tooltip, same contract as the initial setup above: textContent
       // would strip the SVG and overflow the 1.9em icon-only foot button.
+      // The action face, icon and label alike: `refresh` (re-run the save),
+      // not the done check -- "Update saved word" under a completed mark read
+      // as a contradiction (2026-10-19 reader critique). The saved state is
+      // carried by the known/learning toggle, shown only for saved words.
       if (typeof _pbpExplainIconBtn === "function") {
-        _pbpExplainIconBtn(vocabBtn, PBP_EXPLAIN_DONE_SVG, t("dictUpdateVocab"));
+        _pbpExplainIconBtn(vocabBtn, PBP_ICONS.refresh, t("dictUpdateVocab"));
       } else {
         vocabBtn.textContent = t("dictUpdateVocab");
       }
