@@ -1153,8 +1153,12 @@ function _pbpKbdHelpInit() {
 // even if it re-arms R9's own save-scroll debounce (md-preview.js), R9
 // saving that position is harmless (unlike R9's OWN restore-vs-save race,
 // which the suppression window there exists to prevent). ----
-const PBP_ZEN_WIDTHS = [680, 880, 1080];
-let _pbpZenWidth = 880; // in-memory current width (px); loaded async below. Zen ON/OFF itself is never persisted (spec sec.1.1) -- only this width step is.
+// Default 720 (2026-10-19 reader critique, user ruling): 880 ran English to
+// ~110 characters a line. The narrow step moved 680 -> 720 with it, so the
+// default is the first step; a stored 680 is now unrecognized and lands on it.
+const PBP_ZEN_WIDTHS = [720, 880, 1080];
+const PBP_ZEN_DEFAULT_WIDTH = 720;
+let _pbpZenWidth = PBP_ZEN_DEFAULT_WIDTH; // in-memory current width (px); loaded async below. Zen ON/OFF itself is never persisted (spec sec.1.1) -- only this width step is.
 let _pbpZenWidthTouched = false; // user cycled before the async load landed -> late read is stale, ignore it
 let _pbpZenBarEl = null;
 let _pbpZenFadeTimer = null;
@@ -1307,32 +1311,32 @@ function _pbpZenSettleAfterLayout(anchor) {
 // pre-render-apply + handoff pattern _pbpTypoInit already consumes for
 // pbp_font_tier/pbp_leading_tier. On that path this function is only the
 // in-memory mirror plus the control labels: _pbpZenInit runs on "pbp:rendered",
-// which is dispatched long after the first paint, so applying a non-880 step
-// here made every 680/1080 reader watch the article re-lay out from the 880 CSS
+// which is dispatched long after the first paint, so applying an off-default step
+// here made every such reader watch the article re-lay out from the CSS
 // fallback once per open -- .doc-body's max-width has no transition to soften
 // it (md-preview.css) and the re-settle moved their scroll position too.
 //
 // The self-read below stays as the fallback for md-preview.js's init dying
 // before its storage read landed; only that async path can race a click, so
 // only it needs the touched-guard. An unrecognized stored value (a stale format
-// from a future/rolled-back version) degrades to the 880 default on both paths
+// from a future/rolled-back version) degrades to the default on both paths
 // rather than propagating garbage into --pbp-width.
 function _pbpZenLoadWidth() {
   const stored = (typeof window !== "undefined" && window._pbpZenWidthStored) || null;
   if (stored) {
-    _pbpZenWidth = PBP_ZEN_WIDTHS.indexOf(stored.width) !== -1 ? stored.width : 880;
+    _pbpZenWidth = PBP_ZEN_WIDTHS.indexOf(stored.width) !== -1 ? stored.width : PBP_ZEN_DEFAULT_WIDTH;
     _pbpZenUpdateWidthBtn(); // already applied pre-render; re-applying would only churn layout
     return;
   }
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
   try {
-    chrome.storage.local.get({ pbp_zen_width: 880 }, (res) => {
+    chrome.storage.local.get({ pbp_zen_width: PBP_ZEN_DEFAULT_WIDTH }, (res) => {
       // The cycle buttons are clickable before this async read lands; a user
       // interaction is fresher truth than the stored step it already
       // overwrote, so a late arrival must not clobber it (Codex acceptance).
       if (_pbpZenWidthTouched) return;
-      _pbpZenWidth = (res && PBP_ZEN_WIDTHS.indexOf(res.pbp_zen_width) !== -1) ? res.pbp_zen_width : 880;
-      if (_pbpZenWidth !== 880) _pbpZenApplyWidth(); // 880 == CSS fallback: applying would only churn layout
+      _pbpZenWidth = (res && PBP_ZEN_WIDTHS.indexOf(res.pbp_zen_width) !== -1) ? res.pbp_zen_width : PBP_ZEN_DEFAULT_WIDTH;
+      if (_pbpZenWidth !== PBP_ZEN_DEFAULT_WIDTH) _pbpZenApplyWidth(); // default == CSS fallback: applying would only churn layout
       else _pbpZenUpdateWidthBtn(); // still label the buttons with the resolved step
     });
   } catch (_) {}
@@ -1411,8 +1415,8 @@ function _pbpZenEnsureBar() {
   return bar;
 }
 
-// Width-cycle click (zen bar + rail button share this): 680 -> 880 -> 1080
-// -> 680 ..., persisted (spec sec.1.2), applied mode-independently via
+// Width-cycle click (zen bar + rail button share this): 720 -> 880 -> 1080
+// -> 720 ..., persisted (spec sec.1.2), applied mode-independently via
 // _pbpZenApplyWidth. The .set() promise gets a .catch: storage failure must
 // stay silent-but-handled, not an unhandled rejection (Codex review).
 function _pbpZenCycleWidth() {

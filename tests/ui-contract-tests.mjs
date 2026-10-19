@@ -5883,12 +5883,25 @@ check(!mdReaderJs.includes("function pbpTypoApplyVars") && !mdReaderJs.includes(
     applyAt >= 0 && renderAt >= 0 && applyAt < renderAt,
     "md-preview.js: typography tiers not applied before the first render (rode the MP_KEY read)");
   // Same contract for the reading width: md-reader.js's _pbpZenInit only runs
-  // on "pbp:rendered", so a stored 680/1080 painted at the 880 CSS fallback
+  // on "pbp:rendered", so a stored off-default step painted at the CSS fallback
   // and re-laid the whole article out once per open.
   const widthAt = mdPreviewJs.indexOf('document.body.style.setProperty("--pbp-width"');
   check(preReadCall.includes('"pbp_zen_width"') && widthAt >= 0 && widthAt < renderAt &&
     mdPreviewJs.includes("window._pbpZenWidthStored = { width: data.pbp_zen_width }"),
-    "md-preview.js: the stored reading width no longer rides the pre-paint read (or no longer hands md-reader.js the raw value), so an off-default width paints at 880 and re-lays the article out after the first render");
+    "md-preview.js: the stored reading width no longer rides the pre-paint read (or no longer hands md-reader.js the raw value), so an off-default width paints at the CSS fallback and re-lays the article out after the first render");
+  // The default width is hand-mirrored in three places (2026-10-19: 880 ->
+  // 720): md-reader.js's PBP_ZEN_DEFAULT_WIDTH, .doc-body's CSS fallback, and
+  // md-preview.js's pre-paint whitelist, which must name every OTHER step and
+  // never the default. Read the real step list, not a typed copy.
+  const steps = JSON.parse((mdReaderJs.match(/const PBP_ZEN_WIDTHS = (\[[^\]]*\]);/) || [, "[]"])[1]);
+  const dflt = Number((mdReaderJs.match(/const PBP_ZEN_DEFAULT_WIDTH = (\d+);/) || [])[1]);
+  const cssFallback = Number((mdCss.match(/\.doc-body \{ max-width: var\(--pbp-width, (\d+)px\)/) || [])[1]);
+  const whitelistLine = (mdPreviewJs.match(/if \(data\.pbp_zen_width === [^{]*\{/) || [""])[0];
+  const whitelisted = [...whitelistLine.matchAll(/=== (\d+)/g)].map((m) => Number(m[1])).sort((x, y) => x - y);
+  check(steps.includes(dflt) && cssFallback === dflt,
+    `md-reader.js default width ${dflt} is not a step of [${steps}] or disagrees with .doc-body's CSS fallback ${cssFallback}`);
+  check(JSON.stringify(whitelisted) === JSON.stringify(steps.filter((w) => w !== dflt).sort((x, y) => x - y)),
+    `md-preview.js pre-paint width whitelist [${whitelisted}] must be exactly the non-default steps of [${steps}] (default ${dflt})`);
 }
 // (2) Scroll grab: tier changes settle the anchor SYNCHRONOUSLY -- the 300ms
 // second phase belongs to the width path's max-width transition only.

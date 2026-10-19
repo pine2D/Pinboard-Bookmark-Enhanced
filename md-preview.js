@@ -994,17 +994,17 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   if (typeof pbpTypoApplyVars === "function") pbpTypoApplyVars(data.pbp_font_tier, data.pbp_leading_tier);
   // Reading width (pbp_zen_width) rides this same read and is applied here for
   // the same reason as the tiers above: md-reader.js's _pbpZenInit only runs on
-  // "pbp:rendered", long after the first paint, so a stored 680/1080 used to
-  // paint at the 880 CSS fallback and re-lay the whole article out once per
-  // open -- .doc-body's max-width has no transition to soften it. 880 is that
-  // CSS fallback, so only the two off-default steps need an inline style. The
+  // "pbp:rendered", long after the first paint, so a stored off-default step
+  // used to paint at the CSS fallback and re-lay the whole article out once per
+  // open -- .doc-body's max-width has no transition to soften it. 720 (the
+  // default) is that CSS fallback, so only 880/1080 need an inline style. The
   // whitelist is written out literally instead of reading md-reader.js's
   // PBP_ZEN_WIDTHS: that file is a LATER defer script (the same load-order race
   // the tiers comment above documents). _pbpZenWidthStored hands the raw value
   // to md-reader.js's _pbpZenLoadWidth so it neither re-reads storage nor
   // re-applies.
   window._pbpZenWidthStored = { width: data.pbp_zen_width };
-  if (data.pbp_zen_width === 680 || data.pbp_zen_width === 1080) {
+  if (data.pbp_zen_width === 880 || data.pbp_zen_width === 1080) {
     document.body.style.setProperty("--pbp-width", data.pbp_zen_width + "px");
   }
   const info = data[MP_KEY];
