@@ -3982,6 +3982,29 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         }
         if (!held) { sendResponse({ ok: false, error: "host_permission" }); return; }
       }
+      // Refresh-then-extract (2026-10-19): the reader's images carried
+      // time-limited CDN signatures that expired, and only a fresh copy of the
+      // page carries fresh ones. Local engine, top frame only.
+      if (message.reloadSource === true) {
+        if (engine !== "local" || frame) { sendResponse({ ok: false, error: "bad_request" }); return; }
+        const live = await _cbTabsGet(tabId);
+        if (!live) { sendResponse({ ok: false, error: "tab_unavailable" }); return; }
+        // Never reload a tab that has moved on to some other page: that would
+        // throw away whatever the user is doing there.
+        if (live.url !== tabUrl) { sendResponse({ ok: false, error: "tab_navigated" }); return; }
+        // activeTab does not survive the reload (a navigation revokes it), so
+        // the injection after it needs a standing grant for the page's exact
+        // origin -- which the reader requested from the click. contains only:
+        // the SW never prompts.
+        let pageOrigin = "";
+        try { const u = new URL(tabUrl); if (u.protocol === "https:") pageOrigin = u.origin; } catch (_) {}
+        let held = false;
+        if (pageOrigin) {
+          try { held = await chrome.permissions.contains({ origins: [pageOrigin + "/*"] }); } catch (_) { held = false; }
+        }
+        if (!held) { sendResponse({ ok: false, error: "host_permission" }); return; }
+        if (!await pbpReloadTabAndSettle(tabId)) { sendResponse({ ok: false, error: "tab_unavailable" }); return; }
+      }
       const out = await extractForPreview({ tabId, url, engine, sourceTabUrl: tabUrl, frame, frameOrigin });
       if (out.error) {
         // frameOrigin (origin string only) lets the reader offer the one-click
@@ -4634,6 +4657,49 @@ function extractPageForMarkdown() {
 // opener and the in-preview engine toggle (reextractMarkdown). Returns the
 // md_preview_data payload fields (minus tags/description/tabId, added by caller)
 // or { error }. engine is "local" (Defuddle) or "jina".
+// Reload the reader's source tab and wait for it to load again (the
+// reextractMarkdown reloadSource path). true once the tab reports "complete"
+// after passing through "loading"; false if the reload fails or the tab goes
+// away. A page that never settles (long-polling, ad slots) still resolves true
+// after the timeout: its DOM is there, and extractForPreview re-checks the
+// tab's URL before injecting either way. The listeners are added and removed
+// per call -- this is a wait inside one message, not an SW wake-up event.
+function pbpReloadTabAndSettle(tabId, timeoutMs = 20000) {
+  return new Promise((resolve) => {
+    let sawLoading = false;
+    let done = false;
+    let timer = null;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onRemoved.removeListener(onRemoved);
+      resolve(ok);
+    };
+    const onUpdated = (id, info) => {
+      if (id !== tabId || !info) return;
+      if (info.status === "loading") sawLoading = true;
+      else if (info.status === "complete" && sawLoading) finish(true);
+    };
+    const onRemoved = (id) => { if (id === tabId) finish(false); };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.onRemoved.addListener(onRemoved);
+    timer = setTimeout(() => finish(true), timeoutMs);
+    try {
+      chrome.tabs.reload(tabId, {}, () => {
+        if (chrome.runtime.lastError) {
+          console.warn("[pbp-preview] source reload failed:", chrome.runtime.lastError.message);
+          finish(false);
+        }
+      });
+    } catch (e) {
+      console.warn("[pbp-preview] source reload threw:", e && e.name, e && e.message);
+      finish(false);
+    }
+  });
+}
+
 async function extractForPreview({ tabId, url, engine, sourceTabUrl, frame, frameOrigin }) {
   if (engine === "jina") {
     // Fresh read — do NOT use loadSettings() (its _settingsCache can be stale

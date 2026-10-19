@@ -2980,6 +2980,16 @@ section("md-embed: pbpEmbedScan / pbpEmbedRewrite / pbpEmbedBudget (pure layer)"
     "entryValid: NaN byteLength rejected (cannot charge the export budget)");
   assert(pbpEmbedCacheEntryValid({ dataUri: "data:image/png;base64,AA", mime: "image/png", byteLength: 5, decoded: true }),
     "entryValid: decoded entry with a real size accepted");
+  // Signed (expiring) image URLs: the refresh-the-source offer keys off these.
+  assert(pbpImgUrlLooksSigned("https://video.laohuangniu.net/a/snap.jpg?auth_key=1792423845-ab-0-cd"),
+    "signed: Aliyun auth_key recognized");
+  assert(pbpImgUrlLooksSigned("https://b.s3.amazonaws.com/k.png?X-Amz-Expires=300&X-Amz-Signature=ff"),
+    "signed: S3 presigned recognized case-insensitively");
+  assert(!pbpImgUrlLooksSigned("https://cdn.example.com/a.png?w=800&q=80"),
+    "signed: ordinary resize params are not a signature");
+  assert(!pbpImgUrlLooksSigned("https://cdn.example.com/a.png"), "signed: no query, not signed");
+  assert(!pbpImgUrlLooksSigned("http://cdn.example.com/a.png?auth_key=1"), "signed: non-https never offered");
+  assert(!pbpImgUrlLooksSigned("not a url"), "signed: unparseable input is false, not a throw");
 })();
 
 // export honesty counter (plan A, Codex-adjudicated): pbpEmbedBrokenCount counts

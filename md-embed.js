@@ -69,6 +69,24 @@ function pbpEmbedCanonicalUrl(u) {
   try { return new URL(encodeURI(u).replace(/%25/g, "%")).href; } catch (_) { return u; }
 }
 
+// Signed, time-limited image URL (2026-10-19, a video poster on
+// laohuangniu.net): the CDN signature rides in the query -- Aliyun auth_key,
+// S3 / GCS presigned, CloudFront, Azure SAS, Akamai tokens. Once it expires no
+// Referer revives it; only a fresh copy of the page carries a fresh signature,
+// so the reader offers a source-page refresh instead of the hotlink fix.
+// Parameter NAMES only, never values; a false positive just words the failure
+// as "expired" and offers that refresh, which is harmless.
+const PBP_SIGNED_URL_PARAMS = new Set(["auth_key", "expires", "x-amz-signature", "x-amz-expires",
+  "x-goog-signature", "x-goog-expires", "signature", "key-pair-id", "sig", "se", "sign", "token",
+  "__token__", "hdnts", "hdnea", "oe"]);
+function pbpImgUrlLooksSigned(u) {
+  let p;
+  try { p = new URL(u); } catch (_) { return false; }
+  if (p.protocol !== "https:") return false;
+  for (const k of p.searchParams.keys()) if (PBP_SIGNED_URL_PARAMS.has(k.toLowerCase())) return true;
+  return false;
+}
+
 // A4：预览修复缓存条目对导出是否可信。三态判定的"有效性"半边（decoded 由
 // <img> 的 load 事件证明过、data URI 与真实字节数俱在）；预算 reserve 由调用方
 // 单独做——reserve 失败不是 cache miss，是"共享预算已不足"，重抓只会同样失败，

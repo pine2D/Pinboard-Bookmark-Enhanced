@@ -706,6 +706,46 @@ await suite("unified save pipeline", async () => {
     equal(slot.description, "A notes\nline 2");
   });
 
+  await test("refresh-then-extract reloads only the unchanged source tab, with the page grant, before extracting", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf('if (message.type === "reextractMarkdown")');
+    const end = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"', start);
+    assert(start >= 0 && end > start, "reextract branch not found");
+    const key = "md_preview_data_refresh-test";
+    const page = "https://laohuangniu.net/apps/text-audio";
+    async function run({ engine = "local", liveUrl = page, granted = true }) {
+      const log = [];
+      let slot = { url: page, tabId: 9, sourceTabUrl: page, account: "alice", tags: [], description: "" };
+      const chrome = {
+        storage: { local: { get: async () => ({ [key]: slot }), set: async (v) => { slot = v[key]; log.push("write"); } } },
+        permissions: { contains: async ({ origins }) => { log.push("contains:" + origins[0]); return granted; } },
+      };
+      const factory = new Function("chrome", "extractForPreview", "_cbTabsGet", "pbpReloadTabAndSettle", `
+        return function invoke(message, sendResponse) { ${source.slice(start, end)} };
+      `);
+      const invoke = factory(chrome,
+        async () => { log.push("extract"); return { source: "local", contentHtml: "<p>x</p>", markdown: "", title: "T", url: page }; },
+        async () => ({ id: 9, url: liveUrl }),
+        async () => { log.push("reload"); return true; });
+      const res = await new Promise((resolve) => invoke({
+        type: "reextractMarkdown", url: page, tabId: 9, engine, sourceTabUrl: page, k: "refresh-test", reloadSource: true,
+      }, resolve));
+      return { res, log };
+    }
+    const moved = await run({ liveUrl: "https://example.com/elsewhere" });
+    equal(moved.res.error, "tab_navigated", "a tab that moved on must not be reloaded");
+    assert(!moved.log.includes("reload") && !moved.log.includes("extract"), "moved tab was touched: " + moved.log);
+    const denied = await run({ granted: false });
+    equal(denied.res.error, "host_permission", "no page grant -> no reload (activeTab dies with it)");
+    assert(!denied.log.includes("reload"), "reloaded without the grant: " + denied.log);
+    const jina = await run({ engine: "jina" });
+    equal(jina.res.error, "bad_request", "Jina has no source tab to refresh");
+    const ok = await run({});
+    equal(ok.res.ok, true);
+    equal(ok.log.join(","), "contains:https://laohuangniu.net/*,reload,extract,write",
+      "order must be grant check -> reload -> extract -> write");
+  });
+
   await test("preview bookmark lookup never crosses from captured account A into B", async () => {
     const source = await getBackgroundSource();
     const start = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"');

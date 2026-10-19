@@ -2316,6 +2316,18 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   let imgFixTimer = null;
   let imgFixRunning = false;
   let imgFixRerun = false; // a batch arrived DURING a run -> re-arm after it (never drop it)
+  let imgRefreshRunning = false; // the refresh-the-source click is mid-flight
+  let imgRefreshError = "";      // why the last refresh did not land (the row shows it)
+  // The source-refresh offer needs what that path needs: the local engine (a
+  // Jina page is fetched server-side, with no tab to refresh), a live source
+  // tab handle, an https page (the only origins the optional grant ceiling
+  // covers), and not a committed video transcript (re-extracting would
+  // overwrite it -- same guard as attemptExtract).
+  function imgFixCanRefresh() {
+    if (source === "jina" || !srcTabId) return false;
+    if (window.pbpVideoDoc && window.pbpVideoDoc.committed === true) return false;
+    try { return new URL(sourceTabUrl).protocol === "https:"; } catch (_) { return false; }
+  }
 
   // Per-URL admission against the page ceilings. NOT a global "capped" latch:
   // one over-budget origin used to freeze the whole page, so a later lazy image
@@ -2461,7 +2473,14 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       btn.type = "button";
       btn.className = "pbp-img-fix-btn";
       btn.textContent = t("mdImgFixBtn");
-      row.append(msg, btn);
+      // Offered once the hotlink fix has given up on a signed (expiring)
+      // image URL -- see imgFixCanRefresh. Shares the link-button look.
+      const refresh = document.createElement("button");
+      refresh.type = "button";
+      refresh.className = "pbp-img-fix-btn pbp-img-refresh-btn";
+      refresh.textContent = t("mdImgRefreshSource");
+      refresh.hidden = true;
+      row.append(msg, btn, refresh);
       // After the block AND after any translation companions it already has --
       // inserting between a block and its .pb-tr would break the sibling contract
       // md-translate relies on (md-translate.js:1275-1283).
@@ -2471,7 +2490,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         anchor = s;
       }
       anchor.insertAdjacentElement("afterend", row);
-      e = { row, msg, btn, imgs: new Set() };
+      e = { row, msg, btn, refresh, imgs: new Set() };
       imgFixRows.set(block, e);
     }
     if (img) e.imgs.add(img);
@@ -2515,9 +2534,20 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       const u = img.currentSrc || img.src || "";
       return imgFixFailed.has(u) || imgFixInFlight.has(u);
     });
-    e.msg.textContent = actionable ? t("mdImgFixFailed") : t("mdImgFixUnfixable");
+    // Settled and still broken, with a signed URL among them: the signature
+    // most likely expired, which no Referer fixes -- say so, and offer the one
+    // thing that does (a fresh copy of the source page).
+    const expired = !actionable && imgFixCanRefresh()
+      && [...e.imgs].some((img) => pbpImgUrlLooksSigned(img.currentSrc || img.src || ""));
+    e.msg.textContent = actionable ? t("mdImgFixFailed")
+      : !expired ? t("mdImgFixUnfixable")
+      : imgRefreshRunning ? t("mdImgRefreshing")
+      : imgRefreshError || t("mdImgFixExpired");
     if (!actionable && e.btn.contains(document.activeElement)) imgFixMoveFocusOut(e.row);
+    if (!expired && e.refresh.contains(document.activeElement)) imgFixMoveFocusOut(e.row);
     e.btn.hidden = !actionable;           // never a button that would fire an empty batch
+    e.refresh.hidden = !expired;
+    e.refresh.setAttribute("aria-disabled", String(imgRefreshRunning));
     // aria-disabled, NOT the disabled property: disabling the very button the
     // user just activated makes it unfocusable, and the focus falls to <body>
     // mid-run (Chromium, verified). This keeps it focusable and inert, and the
@@ -2675,9 +2705,46 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // exactly the origins the user is being shown, and the grant it returns must
   // not be stretched to cover an origin that arrived while the prompt was open.
   renderedView.addEventListener("click", (e) => {
-    const btn = e.target.closest && e.target.closest(".pbp-img-fix-btn");
+    const btn = e.target.closest && e.target.closest(".pbp-img-fix-btn:not(.pbp-img-refresh-btn)");
     if (!btn || btn.getAttribute("aria-disabled") === "true") return;
     imgFixRun(true, [...imgFixFailed.keys()]);
+  });
+  // "Refresh the original page and reload" (2026-10-19): for images whose
+  // signed URL expired. The source tab is reloaded (fresh signatures), the
+  // article re-extracted from it, and this page reloads onto the new payload
+  // -- the same write-then-reload the engine switch uses. Unlike that switch
+  // it never swaps the article for a loading or error shell: if anything
+  // fails, the article stays and the row says why.
+  renderedView.addEventListener("click", async (e) => {
+    const btn = e.target.closest && e.target.closest(".pbp-img-refresh-btn");
+    if (!btn || btn.getAttribute("aria-disabled") === "true" || imgRefreshRunning || !imgFixCanRefresh()) return;
+    let origin = "";
+    try { origin = new URL(sourceTabUrl).origin; } catch (_) { return; }
+    imgRefreshRunning = true;
+    imgRefreshError = "";
+    imgFixRowsSync();
+    let pr = null;
+    try {
+      // First await in the click chain. activeTab is revoked by the reload (a
+      // navigation), so re-extracting needs this exact origin granted; asked
+      // only here, from the user's click (root CLAUDE.md first-grant rule).
+      let granted = false;
+      try { granted = await chrome.permissions.request({ origins: [origin + "/*"] }); } catch (_) {}
+      if (!granted) return;
+      try {
+        pr = await chrome.runtime.sendMessage({
+          type: "reextractMarkdown", tabId: srcTabId, url, engine: "local", sourceTabUrl,
+          account: previewAccount, tags, description, k, reloadSource: true
+        });
+      } catch (_) { pr = { ok: false, error: "network" }; }
+      if (pr && pr.ok) { location.reload(); return; }
+      imgRefreshError = pr && pr.error === "host_permission" ? t("mdImgFixUnfixable") : friendlyEngineErr(pr);
+    } finally {
+      if (!(pr && pr.ok)) {
+        imgRefreshRunning = false;
+        imgFixRowsSync();
+      }
+    }
   });
   renderedView.addEventListener("error", (e) => {
     const img = e.target;
