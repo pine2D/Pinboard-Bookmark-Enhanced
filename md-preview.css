@@ -2513,16 +2513,22 @@ body.tr-only #rendered-view [data-pb-hl-mirror] { padding-inline-start: 10px; --
    right-to-left (an RTL article, or an RTL translation inside an LTR one). */
 body.tr-bilingual #rendered-view [data-pb-hl-mirror]:dir(rtl),
 body.tr-only #rendered-view [data-pb-hl-mirror]:dir(rtl) { --mirror-x: -3px; }
-body.tr-bilingual #rendered-view [data-pb-hl-mirror="1"],
-body.tr-only #rendered-view [data-pb-hl-mirror="1"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-1); }
-body.tr-bilingual #rendered-view [data-pb-hl-mirror="2"],
-body.tr-only #rendered-view [data-pb-hl-mirror="2"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-2); }
-body.tr-bilingual #rendered-view [data-pb-hl-mirror="3"],
-body.tr-only #rendered-view [data-pb-hl-mirror="3"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-3); }
-body.tr-bilingual #rendered-view [data-pb-hl-mirror="4"],
-body.tr-only #rendered-view [data-pb-hl-mirror="4"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-4); }
-body.tr-bilingual #rendered-view [data-pb-hl-mirror="5"],
-body.tr-only #rendered-view [data-pb-hl-mirror="5"] { box-shadow: inset var(--mirror-x) 0 0 0 var(--hl-5); }
+body.tr-bilingual #rendered-view [data-pb-hl-mirror],
+body.tr-only #rendered-view [data-pb-hl-mirror] { box-shadow: inset var(--mirror-x) 0 0 0 var(--mirror-c); }
+#rendered-view [data-pb-hl-mirror="1"] { --mirror-c: var(--hl-1); }
+#rendered-view [data-pb-hl-mirror="2"] { --mirror-c: var(--hl-2); }
+#rendered-view [data-pb-hl-mirror="3"] { --mirror-c: var(--hl-3); }
+#rendered-view [data-pb-hl-mirror="4"] { --mirror-c: var(--hl-4); }
+#rendered-view [data-pb-hl-mirror="5"] { --mirror-c: var(--hl-5); }
+/* A quote already has its own bar: a mirror on it (or on the .pb-tr that only
+   wraps a translated quote) recolours THAT bar instead of drawing a second
+   one beside it (2026-10-19 reader critique: double bar in tr-only). */
+body.tr-bilingual #rendered-view blockquote[data-pb-hl-mirror],
+body.tr-only #rendered-view blockquote[data-pb-hl-mirror] { box-shadow: none; padding-inline-start: 1.2em; border-inline-start-color: var(--mirror-c); }
+body.tr-bilingual #rendered-view [data-pb-hl-mirror]:has(> blockquote:only-child),
+body.tr-only #rendered-view [data-pb-hl-mirror]:has(> blockquote:only-child) { box-shadow: none; padding-inline-start: 0; }
+body.tr-bilingual #rendered-view [data-pb-hl-mirror] > blockquote:only-child,
+body.tr-only #rendered-view [data-pb-hl-mirror] > blockquote:only-child { border-inline-start-color: var(--mirror-c); }
 
 /* Shared confirm popover (shared.js), reader skin. When its anchor lives in
    the top layer (the highlight card is a native [popover]), shared.js
