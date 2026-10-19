@@ -2796,6 +2796,19 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("a note that fits its four lines offers nothing",
         more().hidden === true && !field().classList.contains("is-expanded"),
         `sh=${field().scrollHeight} ch=${field().clientHeight}`);
+      // An empty note sits in a one-line box under its placeholder, which a
+      // rows=2 textarea's scrollHeight overshoots: the button must not read
+      // that as overflow (2026-10-19 user report).
+      const blank = { id: "nm3", term: "blanknote", groups: [], contexts: [], note: "" };
+      _vocabRows = [long, short, blank];
+      _pbpVocabRenderDetail(blank);
+      await frames();
+      check("an empty note offers nothing", more().hidden === true, `sh=${field().scrollHeight} ch=${field().clientHeight}`);
+      // Expanded, then edited down to one line: the button goes with the need.
+      _vocabNoteExpandedId = long.id;
+      _pbpVocabRenderDetail({ ...long, note: "now short" });
+      await frames();
+      check("a note expanded and then shortened no longer offers Show less", more().hidden === true);
       // Near the 500-character limit, while writing, the count shows and
       // describes the field; away from the limit, or at rest, it is gone.
       const count = () => $id("vocab-detail").querySelector(".vocab-note-edit > .vocab-note-count");

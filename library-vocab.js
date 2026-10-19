@@ -515,9 +515,19 @@ function _pbpVocabSyncNoteMore(input) {
   const more = input.parentNode && input.parentNode.querySelector(":scope > .vocab-note-more");
   if (!more) return;
   if (!input.isConnected) { _vocabNoteObserver?.unobserve(input); return; }
-  const expanded = input.classList.contains("is-expanded");
+  // Offered only when the text needs more than the four resting lines,
+  // measured against that cap itself: comparing scrollHeight with the box
+  // misfires on an empty field (a rows=2 textarea never reports less than
+  // two rows under the one-line placeholder box) and on a short note under
+  // the 64px floor -- both showed "Show full note" over nothing. The same
+  // test holds while expanded, so a note edited short loses the button too
+  // (its leftover is-expanded lifts a cap the note no longer reaches).
   const focused = document.activeElement === input;
-  more.hidden = focused || (!expanded && input.scrollHeight <= input.clientHeight + 1);
+  const cs = getComputedStyle(input);
+  const lineH = parseFloat(cs.lineHeight);
+  const cap = lineH * 4 + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const long = !!input.value.trim() && Number.isFinite(cap) && input.scrollHeight > cap + 1;
+  more.hidden = focused || !long;
 }
 
 // The back button is static markup at the top of the pane now, wired once --
