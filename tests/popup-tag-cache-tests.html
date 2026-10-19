@@ -355,6 +355,9 @@ function typeInto(value) {
     assert(addAll, "Add all missing when both groups render");
     assert(groups[1].contains(addAll), "Add all must stay on the recommended group's tail, unchanged from before K74");
     assert(!groups[0].contains(addAll), "Add all must not move to the popular group when recommended also renders");
+    addAll.click();
+    assert(currentTags.join(",") === "two",
+      "Add all must add only the group it sits in (recommended), got " + currentTags.join(","));
   });
 
   // B50: pasted tag lists split on the full-width comma a CJK keyboard types.

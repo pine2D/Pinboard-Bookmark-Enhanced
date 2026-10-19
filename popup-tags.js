@@ -164,7 +164,11 @@ async function fetchPinboardSuggestTags(token, url) {
       // K71: same hadFocus guard as the chip handler above -- capture before
       // any chip (or this button) gets disabled.
       const hadFocus = document.activeElement === addAllSuggest;
-      container.querySelectorAll(".stag:not(.used)").forEach((el) => { addTag(el.dataset.tag); el.classList.add("used"); });
+      // Scope = the group the button sits in (critique 2026-10-19). With both
+      // groups showing it rides the personal "recommended" tail, and adding
+      // the popular group too smuggled the noisier tags in under it.
+      const scope = addAllSuggest.closest(".suggest-group") || container;
+      scope.querySelectorAll(".stag:not(.used)").forEach((el) => { addTag(el.dataset.tag); el.classList.add("used"); });
       if (addAllSuggest) { addAllSuggest.innerHTML = PBP_ICONS.check; addAllSuggest.disabled = true; addAllSuggest.classList.add("tag-copied-flash"); }
       if (hadFocus) $id("tags-input")?.focus({ preventScroll: true });
     });
