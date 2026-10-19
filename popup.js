@@ -256,6 +256,26 @@ function setupPopupDraftTracking() {
     $id(id).addEventListener("input", mark);
     $id(id).addEventListener("change", mark);
   }
+  $id("tags-input").addEventListener("keydown", pbpPopupHoldEarlyTagKey);
+}
+// The form stays readonly until initPopupDraft knows the account, but
+// #tags-input is autofocused from the first frame: on a cold open, keys typed
+// in that window were silently dropped (critique 2026-10-19). Hold printable
+// keys while readonly and replay them on unlock, as a real input event -- so
+// they count as the user's edit and a restored draft does not overwrite them.
+let _popupEarlyTagKeys = "";
+function pbpPopupHoldEarlyTagKey(e) {
+  if (!e.currentTarget.readOnly || e.isComposing || e.ctrlKey || e.metaKey || e.altKey
+      || typeof e.key !== "string" || e.key.length !== 1) return;
+  _popupEarlyTagKeys += e.key;
+  e.preventDefault();
+}
+function pbpPopupReplayEarlyTagKeys() {
+  if (!_popupEarlyTagKeys) return;
+  const input = $id("tags-input");
+  input.value += _popupEarlyTagKeys;
+  _popupEarlyTagKeys = "";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 function pbpPopupHasWebUrl(value) {
   try { const u = new URL(value); return /^https?:$/.test(u.protocol) && !u.username && !u.password; }
@@ -271,6 +291,7 @@ async function initPopupDraft(account, tab) {
     const el = $id(id);
     if (id.endsWith("check")) el.disabled = false; else el.readOnly = false;
   }
+  pbpPopupReplayEarlyTagKeys();
   if (_popupDraftChangedFields.size) pbpRememberPopupDraft();
   try {
     const result = await chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ...context, action: "read" });
