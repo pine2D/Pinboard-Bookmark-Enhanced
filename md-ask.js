@@ -2440,10 +2440,13 @@ function _pbpExplainEnsurePop() {
   actGroup.className = "xp-act-group";
   actGroup.setAttribute("role", "group");
   const PBP_EXPLAIN_ACTION_LABELS = { explain: "explainActionExplain", translate: "explainActionTranslate", dict: "explainActionDict" };
-  // Icon-only segments (icon audit P0): bubble+? / A-with-glyph / open book,
-  // the same trio the highlight card wears. Labels ride title/aria; the
-  // selected segment is carried by the aria-pressed fill, not text weight.
-  const PBP_EXPLAIN_ACTION_ICONS = { explain: PBP_ICONS.explain, translate: PBP_ICONS.translate, dict: PBP_ICONS.book };
+  // Icon-only segments (icon audit P0): robot / A-with-glyph / open book,
+  // the same trio the highlight card wears. Explain is the robot here too
+  // (critique 2026-10-19): it is the same paid call the selection bar's
+  // robot pill starts, and a speech bubble sat beside the footer's "ask"
+  // bubble with a different meaning. Labels ride title/aria; the selected
+  // segment is carried by the aria-pressed fill, not text weight.
+  const PBP_EXPLAIN_ACTION_ICONS = { explain: PBP_ICONS.robot, translate: PBP_ICONS.translate, dict: PBP_ICONS.book };
   ["explain", "translate", "dict"].forEach((action) => {
     const actBtn = document.createElement("button");
     actBtn.type = "button";

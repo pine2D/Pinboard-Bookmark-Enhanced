@@ -2235,7 +2235,7 @@ function _pbpHlApplyCardI18n(card) {
     b.setAttribute("aria-label", label);
   };
   _hlIconBtn(".hl-card-delete", PBP_ICONS.cross, t("hlDelete"));
-  _hlIconBtn(".hl-card-ai-explain", PBP_ICONS.explain, t("hlCardExplain"));
+  _hlIconBtn(".hl-card-ai-explain", PBP_ICONS.robot, t("hlCardExplain"));
   _hlIconBtn(".hl-card-ai-translate", PBP_ICONS.translate, t("hlCardTranslate"));
   _hlIconBtn(".hl-card-ai-ask", PBP_ICONS.ask, t("hlCardAsk"));
 }
@@ -2576,7 +2576,7 @@ function _pbpHlBuildNotebookDom(rail) {
     const openLib = document.createElement("button");
     openLib.type = "button";
     openLib.className = "rail-sec-open";
-    openLib.innerHTML = (typeof PBP_ICONS === "object" && PBP_ICONS && PBP_ICONS.book) || "";
+    openLib.innerHTML = (typeof PBP_ICONS === "object" && PBP_ICONS && PBP_ICONS.library) || ""; // book is the dictionary glyph
     openLib.title = t("libraryOpen");
     openLib.setAttribute("aria-label", t("libraryOpen"));
     openLib.addEventListener("click", async () => {
