@@ -8465,6 +8465,20 @@ suiteIf("tr source-script skip predicate (EN-1, QVP-0)", "pbpTrBlockLacksSourceS
     assertEq(pbpTrBlockLacksSourceScript(EN_ABSTRACT, "", "en"), false, "latin/ambiguous article");
     assertEq(pbpTrBlockLacksSourceScript(EN_ABSTRACT, "fr", "en"), false, "unsupported articleLang");
   });
+  // 2026-10-19 critique: an English article read with a zh target opened with
+  // the translation section folded away. Expand whenever the article is
+  // visibly not in the target language; only Latin-vs-Latin stays folded.
+  test("tr section opens by default when the article is visibly not in the target language", () => {
+    assertEq(_pbpTrDefaultExpanded("", "zh-Hans"), true, "Latin article, Chinese target");
+    assertEq(_pbpTrDefaultExpanded("", "ja"), true, "Latin article, Japanese target");
+    assertEq(_pbpTrDefaultExpanded("", "ru"), true, "Latin article, Cyrillic target");
+    assertEq(_pbpTrDefaultExpanded("ja", "zh-Hant"), true, "detected CJK article, other target");
+    assertEq(_pbpTrDefaultExpanded("ar", "en"), true, "detected RTL article, Latin target");
+    assertEq(_pbpTrDefaultExpanded("", "en"), false, "Latin article, Latin target: cannot tell, stays folded");
+    assertEq(_pbpTrDefaultExpanded("", "fr"), false, "Latin article, French target");
+    assertEq(_pbpTrDefaultExpanded("", "Classical Chinese"), false, "custom free-text target: cannot judge");
+    assertEq(_pbpTrDefaultExpanded("", ""), false, "no target");
+  });
   test("category: placeholders are stripped before counting", () => {
     assertEq(pbpTrBlockLacksSourceScript("⟦C1⟧ " + EN_ABSTRACT + " ⟦L2⟧", "zh-Hans", "en"), true,
       "shield placeholders must not dilute the ratio");
@@ -8600,6 +8614,22 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       _pbpTrSetStatus(st, "translating");
       assertEq(document.getElementById("tr-stale-act").hidden, true, "running: no re-entry entry point");
     } finally { wrap.remove(); }
+  });
+  // 2026-10-19 critique: with the rail in its closed drawer (<1000px) a
+  // running translation had no visible sign; the drawer toggle reads this flag.
+  test("body.tr-busy marks exactly the translating state, for every exit", () => {
+    const wrap = statusFixture();
+    try {
+      const st = mkSt(null);
+      for (const exit of ["done", "partial", "idle", "error"]) {
+        st.running = true;
+        _pbpTrSetStatus(st, "translating");
+        assertEq(document.body.classList.contains("tr-busy"), true, "translating sets the flag");
+        st.running = false;
+        _pbpTrSetStatus(st, exit);
+        assertEq(document.body.classList.contains("tr-busy"), false, exit + " clears the flag");
+      }
+    } finally { document.body.classList.remove("tr-busy"); wrap.remove(); }
   });
   test("no stale verdict, no link (shape constraint holds both ways)", () => {
     const wrap = statusFixture();

@@ -743,6 +743,18 @@ function _pbpTrViewLang(view) {
 function _pbpTrShouldHideEntry(articleLang, targetLang) {
   return !!(articleLang && targetLang && articleLang === targetLang);
 }
+// Open the rail section by default when the article is visibly NOT in the
+// target language (2026-10-19 critique: an English article read by a zh user
+// -- the common case -- opened with translation folded away). Either the
+// article's script was detected (CJK/RTL; an equal target already hid the
+// entry), or the article is Latin/ambiguous and the target is written in a
+// non-Latin script. Latin article + Latin target cannot be told apart from
+// here, so it keeps the collapsed default. Expanding costs zero tokens.
+const PBP_TR_NON_LATIN_TARGETS = new Set(["zh", "ja", "ko", "ru", "uk", "bg", "el", "ar", "fa", "ur", "he", "hi", "th"]);
+function _pbpTrDefaultExpanded(articleLang, targetCode) {
+  if (articleLang) return true;
+  return PBP_TR_NON_LATIN_TARGETS.has(String(targetCode || "").toLowerCase().split(/[-_]/)[0]);
+}
 
 // Target-language resolution: "auto" -> the UI language (BCP-47 from
 // uiLangToBCP47(), passed in by the caller so this stays pure); otherwise
@@ -1497,10 +1509,11 @@ function _pbpTrBuildSection(st) {
   // in `sec` at install time PLUS anything appended to `sec` later, e.g.
   // _pbpTrShowViewToggle's view-toggle wrap and _pbpTrRenderUsage's #tr-usage
   // line below -- both still land as direct children of `sec`).
-  // EN-5: a non-empty detected article language means the reader landed on a
-  // CJK/RTL article where translation is typically the point of opening the
-  // page -- default the section EXPANDED. detectArticleLang "" (Latin or
-  // ambiguous) keeps the collapsed default. Users who ever toggled the section
+  // EN-5: when the article is visibly not in the target language
+  // (_pbpTrDefaultExpanded: a CJK/RTL article, or a Latin article with a
+  // non-Latin target), translation is typically the point of opening the
+  // page -- default the section EXPANDED. Latin article + Latin target keeps
+  // the collapsed default. Users who ever toggled the section
   // keep their stored choice (pbpRailCollapseState prefers the stored
   // boolean), applied by the async storage catch-up -- so when their stored
   // choice differs from this default, they see pbpRailCollapsible's existing
@@ -1510,7 +1523,7 @@ function _pbpTrBuildSection(st) {
   // Accepted side effect: a zh reader opening a ja/ko article also defaults
   // expanded -- the same "translation is the main purpose" situation, not a
   // bug. Never auto-translates: expanding costs zero tokens.
-  st.railHandle = pbpRailCollapsible(sec, "tr", { label, defaultCollapsed: !st.articleLang });
+  st.railHandle = pbpRailCollapsible(sec, "tr", { label, defaultCollapsed: !_pbpTrDefaultExpanded(st.articleLang, st.target.code) });
 
   const primaryAnchor = document.getElementById("ask-section") || document.getElementById("export-section");
   if (primaryAnchor) rail.insertBefore(sec, primaryAnchor);
@@ -2725,6 +2738,10 @@ async function _pbpTrRetryAllFailed(st) {
 
 function _pbpTrSetStatus(st, status) {
   st.status = status;
+  // Below the 1000px breakpoint the rail is an off-canvas drawer: with it
+  // closed, a running translation was invisible apart from text trickling in.
+  // The flag lets the drawer toggle carry a busy dot (md-preview.css).
+  document.body.classList.toggle("tr-busy", status === "translating");
   const btn = document.getElementById("btn-translate");
   const stop = document.getElementById("btn-tr-stop");
   const prog = document.getElementById("tr-progress");

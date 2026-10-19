@@ -1546,6 +1546,13 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .rail-toggle:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .rail-toggle svg { width: 18px; height: 18px; }
 .rail-toggle .rail-toggle-close { display: none; }
+/* Busy dot: a translation is running while the drawer is closed
+   (body.tr-busy, md-translate.js _pbpTrSetStatus). Static, no pulse. */
+body.tr-busy:not(.rail-open) .rail-toggle::after {
+  content: ""; position: absolute; top: 5px; right: 5px;
+  width: 8px; height: 8px; border-radius: var(--radius-full);
+  background: var(--link); box-shadow: 0 0 0 2px var(--btn-bg);
+}
 body.rail-open .rail-toggle .rail-toggle-open { display: none; }
 body.rail-open .rail-toggle .rail-toggle-close { display: block; }
 /* L6: rgba(28, 27, 26,...) is Slate's cool-blue near-black, a residual from
