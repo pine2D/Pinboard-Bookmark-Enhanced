@@ -1407,7 +1407,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (refreshBtn) refreshBtn.addEventListener("click", async () => {
       refreshBtn.disabled = true;
       const auth = await getTagGovAuth();
-      if (!auth) { _tagGovShowLoadFailed("no-token"); refreshBtn.disabled = false; return; }
+      if (!auth) { _tagGovShowLoadFailed("no-token"); return; }
       const aiKey = pbpAccountStorageKey("_tagGovAiGroups", auth.account);
       await chrome.storage.local.set({ [aiKey]: { account: auth.account, groups: [], ts: Date.now() } });
       const fresh = await loadTagCounts(true, auth.account);
@@ -4584,6 +4584,11 @@ function pbpSetTagGovDataState(state) {
   if (panel) panel.dataset.tagGovState = state;
   const needToken = $id("tag-gov-need-token");
   if (needToken) needToken.hidden = state !== "no-token";
+  // With no token, Refresh could only repeat the line above it; the "enter
+  // your API token" button beside that line is the one way forward. Every
+  // token change re-runs the account reload, which leaves this state.
+  const refresh = $id("tag-gov-refresh");
+  if (refresh) refresh.disabled = state === "no-token";
 }
 
 // Whether the panel has tag counts to work on -- what renderTagGov actually

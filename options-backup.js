@@ -617,9 +617,11 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     else if (busyToken !== token) return;
     else busyToken = null;
     const apply = $id("backup-import-apply");
+    const cancel = $id("backup-import-cancel");
     const importButton = $id("import-settings");
     if (importButton) importButton.disabled = busy;
     if (apply) apply.disabled = busy;
+    if (cancel) cancel.disabled = busy;
   };
   const resetBusyForSelection = () => {
     busyToken = null;
@@ -952,6 +954,21 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       setStatusIcon(status, false, field ? t("importInvalidField", field) : t("importInvalid"));
     }
     e.target.value = "";
+  });
+
+  // The preview's way out (2026-10-20, options critique 4): before this the
+  // only exit was picking another file, so "did closing it import anything?"
+  // had no answer on screen. Dropping the selection token also strands any
+  // read still in flight; disabled while an apply runs (setApplyBusy).
+  $id("backup-import-cancel")?.addEventListener("click", () => {
+    if (busyToken !== null) return;
+    ++selectionToken;
+    selectionText = "";
+    const previewHost = $id("backup-import-preview");
+    if (previewHost) previewHost.hidden = true;
+    const status = $id("import-status");
+    if (status) { status.textContent = ""; status.classList.remove("ok", "bad"); }
+    $id("import-settings")?.focus();
   });
 
   $id("backup-import-apply")?.addEventListener("click", async () => {
