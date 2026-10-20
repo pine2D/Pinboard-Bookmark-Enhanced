@@ -1061,7 +1061,7 @@
     "message": "Afficher la zone de tags IA dans le popup"
   },
   "optShowQuickLinks": {
-    "message": "Afficher les liens rapides dans le popup"
+    "message": "Afficher les liens rapides dans le popup (Ensembles · Réseau · Non lu · Notes · Populaire)"
   },
   "optShowQuickRow": {
     "message": "Afficher les boutons d'actions rapides (Enregistrer l'ensemble d'onglets · Enregistrement groupé · Lecture)"

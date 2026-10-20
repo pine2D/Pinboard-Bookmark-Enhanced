@@ -1066,7 +1066,7 @@
     "message": "Show AI tags row in popup"
   },
   "optShowQuickLinks": {
-    "message": "Show quick links row"
+    "message": "Show quick links row (Sets · Network · Unread · Notes · Popular)"
   },
   "optShowQuickRow": {
     "message": "Show quick action buttons (Save Tab Set · Batch Save · Reader)"

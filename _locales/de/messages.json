@@ -1061,7 +1061,7 @@
     "message": "KI-Tag-Bereich im Popup anzeigen"
   },
   "optShowQuickLinks": {
-    "message": "Schnelllinks im Popup anzeigen"
+    "message": "Schnelllinks im Popup anzeigen (Sets · Netzwerk · Ungelesen · Notizen · Beliebt)"
   },
   "optShowQuickRow": {
     "message": "Schnellaktionsschaltflächen im Popup anzeigen (Tab-Set speichern · Stapelspeicherung · Leseansicht)"
@@ -1229,7 +1229,7 @@
     "message": "Einstellungen"
   },
   "backupSectionThemes": {
-    "message": "Themen"
+    "message": "Eigene Themes"
   },
   "backupSectionHighlights": {
     "message": "Markierungen und Notizen"
@@ -1407,7 +1407,7 @@
     "message": "Base URL"
   },
   "getKey": {
-    "message": "Key erhalten"
+    "message": "Schlüssel holen"
   },
   "testConnection": {
     "message": "Verbindung testen"
@@ -1600,7 +1600,7 @@
     "message": "Dunkel"
   },
   "optPopupFollowTheme": {
-    "message": "Erweiterungsseiten folgen dem Pinboard-Theme-Preset"
+    "message": "Erweiterungsseiten folgen dem Pinboard-Preset"
   },
   "popupFollowHint": {
     "message": "Eingeschaltet verwenden Popup, diese Einstellungsseite und die Seite „Notizen & Vokabeln“ die Farben des gewählten Pinboard-Presets; ausgeschaltet die Standardpalette im oben gewählten Hell-/Dunkelmodus. Die Leseansicht behält immer ihre eigene Lesepalette."
@@ -1652,7 +1652,7 @@
     "message": "z. B. 'Noto Sans', sans-serif"
   },
   "labelThemePresets": {
-    "message": "Theme-Vorlagen"
+    "message": "Presets"
   },
   "themeGroupNone": {
     "message": "Keine"

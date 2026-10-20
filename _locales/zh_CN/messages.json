@@ -1061,7 +1061,7 @@
     "message": "在弹窗中显示 AI 标签区"
   },
   "optShowQuickLinks": {
-    "message": "在弹窗中显示快捷链接"
+    "message": "在弹窗中显示快捷链接（标签页集 · 关注 · 待读 · 笔记 · 热门）"
   },
   "optShowQuickRow": {
     "message": "在弹窗中显示快捷操作按钮（保存标签页集 · 批量保存 · 阅读器）"

@@ -1061,7 +1061,7 @@
     "message": "在彈出視窗中顯示 AI 標籤區"
   },
   "optShowQuickLinks": {
-    "message": "在彈出視窗中顯示快捷連結"
+    "message": "在彈出視窗中顯示快捷連結（標籤頁集 · 社交網絡 · 待讀 · 筆記 · 熱門）"
   },
   "optShowQuickRow": {
     "message": "在彈出視窗中顯示快捷操作按鈕（儲存標籤頁集 · 批量儲存 · 閱讀器）"
