@@ -1046,6 +1046,20 @@ function _pbpTrPeekToggle(target) {
   return true;
 }
 
+// A double-click on a translated block selects a word (to look it up); its
+// first click used to open the original above it at once, shifting the text
+// under the second click (2026-10-20 critique). The peek therefore waits out
+// a short window and a following click (detail > 1) cancels it.
+const PBP_TR_PEEK_DELAY_MS = 300;
+let _pbpTrPeekTimer = 0;
+function _pbpTrPeekOnClick(e) {
+  clearTimeout(_pbpTrPeekTimer);
+  _pbpTrPeekTimer = 0;
+  if (e.detail > 1) return;
+  const target = e.target;
+  _pbpTrPeekTimer = setTimeout(() => { _pbpTrPeekTimer = 0; _pbpTrPeekToggle(target); }, PBP_TR_PEEK_DELAY_MS);
+}
+
 
 async function pbpTrInit(detail) {
   const view = document.getElementById("rendered-view");
@@ -1143,8 +1157,8 @@ async function pbpTrInit(detail) {
   }
 
   // tr-only escape hatch: click a translated block to peek at its original
-  // (pointer only -- see _pbpTrPeekToggle).
-  view.addEventListener("click", (e) => _pbpTrPeekToggle(e.target));
+  // (pointer only -- see _pbpTrPeekToggle; deferred past a double-click).
+  view.addEventListener("click", _pbpTrPeekOnClick);
   // Page close terminates every in-flight request (error matrix last row).
   window.addEventListener("pagehide", () => { if (st.ctrl) st.ctrl.abort(); });
   // ZH-0 §5: pagehide's IDB transaction rarely completes before teardown, so

@@ -8698,6 +8698,26 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       getSelection().removeAllRanges(); getSelection().addRange(range);
       assertEq(_pbpTrPeekToggle(tr), false, "a click ending a text selection does not toggle");
       assertEq(orig.classList.contains("pb-show-orig"), true, "selection left the peek alone");
+      getSelection().removeAllRanges();
+      // The click handler defers the peek so a double-click (word lookup)
+      // never opens the original under the second click.
+      const realSet = window.setTimeout, realClear = window.clearTimeout;
+      const pending = new Map(); let seq = 0;
+      window.setTimeout = (fn) => { pending.set(++seq, fn); return seq; };
+      window.clearTimeout = (id) => { pending.delete(id); };
+      try {
+        orig.classList.remove("pb-show-orig");
+        _pbpTrPeekOnClick({ detail: 1, target: tr });
+        assertEq(orig.classList.contains("pb-show-orig"), false, "a single click does not peek synchronously");
+        _pbpTrPeekOnClick({ detail: 2, target: tr });
+        assertEq(pending.size, 0, "the second click of a double-click cancels the pending peek");
+        _pbpTrPeekOnClick({ detail: 1, target: tr });
+        assertEq(pending.size, 1, "a lone click schedules exactly one peek");
+        [...pending.values()].forEach((fn) => fn());
+        assertEq(orig.classList.contains("pb-show-orig"), true, "the deferred peek opens the original");
+      } finally {
+        window.setTimeout = realSet; window.clearTimeout = realClear;
+      }
     } finally {
       getSelection().removeAllRanges();
       document.body.classList.remove("tr-only");
