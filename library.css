@@ -1739,7 +1739,8 @@ html.motion-ready .vocab-note-save {
   line-height: var(--lib-lh-body);
   color: var(--lib-fg-muted);
 }
-.vocab-pron-ipa + .vocab-pron-lang::before { content: "\00a0·\00a0"; }
+.vocab-pron-ipa + .vocab-pron-lang::before,
+.vocab-pron-row > :is(.vocab-pron-ipa, .vocab-pron-lang) + .vocab-pron-known::before { content: "\00a0·\00a0"; }
 .vocab-pron-row > .vocab-detail-speak { margin-inline-start: var(--lib-sp-1); }
 .vocab-detail-gloss {
   margin: var(--lib-sp-3) 0 0;

@@ -1990,6 +1990,20 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         !pron2.querySelector(".vocab-pron-ipa") && !!pron2.querySelector(".vocab-pron-lang") && !!pron2.querySelector(".vocab-detail-speak") &&
         !bareDetail.querySelector(".vocab-detail-gloss, .vocab-manage-groups, .vocab-sec-context") &&
         bareDetail.querySelector(".vocab-detail-status").textContent.includes("vocabMarkLearning"));
+      check("a known word says so beside its language, and its status button turns back (rotateCcw), not the tick",
+        bareDetail.querySelector(".vocab-pron-row .vocab-pron-known")?.textContent === "vocabStatusKnown" &&
+        bareDetail.querySelector(".vocab-detail-status svg")?.outerHTML === new DOMParser().parseFromString(PBP_ICONS.rotateCcw, "text/html").body.firstElementChild.outerHTML,
+        bareDetail.querySelector(".vocab-pron-row")?.outerHTML);
+      {
+        const learningWord = _vocabRows.find((w) => String(w.status || "new") !== "known");
+        _pbpVocabRenderDetail(learningWord);
+        const d = $id("vocab-detail");
+        check("a word still being learned shows no state word, and its status button is the tick",
+          !!learningWord && !d.querySelector(".vocab-pron-known") &&
+          d.querySelector(".vocab-detail-status svg")?.outerHTML === new DOMParser().parseFromString(PBP_ICONS.checkCircle, "text/html").body.firstElementChild.outerHTML,
+          d.querySelector(".vocab-manage-row")?.outerHTML);
+        _pbpVocabRenderDetail(_vocabRows[1]);
+      }
       const note = bareDetail.querySelector(".vocab-sec-note .vocab-note-input");
       check("T7 the note box keeps a short invitation, full guidance and its My note name",
         !!note && note.placeholder === "libraryNotePlaceholderShort" && note.title === "libraryNotePlaceholder" &&

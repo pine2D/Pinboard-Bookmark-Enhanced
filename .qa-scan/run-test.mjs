@@ -58,7 +58,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/jina-cache-tests.html": 28,
   "tests/library-listbox-tests.html": 72,
   "tests/library-notes-tests.html": 318,
-  "tests/library-vocab-tests.html": 385,
+  "tests/library-vocab-tests.html": 387,
   "tests/md-ai-tests.html": 1025,
   "tests/md-ai-setup-tests.html": 18,
   "tests/md-convert-tests.html": 734,

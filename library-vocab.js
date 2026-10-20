@@ -694,6 +694,16 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
     lang.textContent = langLabel;
     pron.appendChild(lang);
   }
+  const known = String(w.status || "new") === "known";
+  // The word's state in words, the list row's rule (critique round 3,
+  // 2026-10-20): "Known" when it is, nothing while it is still being
+  // learned. Before, the only trace was the status button's verb.
+  if (known) {
+    const state = document.createElement("span");
+    state.className = "vocab-pron-known";
+    state.textContent = t("vocabStatusKnown");
+    pron.appendChild(state);
+  }
   const speak = document.createElement("button");
   speak.type = "button";
   speak.className = "btn btn-sm ghost vocab-detail-speak";
@@ -713,11 +723,13 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
 
   const manage = document.createElement("div");
   manage.className = "vocab-manage-row";
-  const known = String(w.status || "new") === "known";
   const statusBtn = document.createElement("button");
   statusBtn.type = "button";
   statusBtn.className = "btn btn-sm vocab-detail-status";
-  setBtnIcon(statusBtn, "checkCircle", t(known ? "vocabMarkLearning" : "vocabMarkKnown"));
+  // One face per direction, the reader's dictionary toggle pair (md-dict.js
+  // PBP_DICT_KNOWN_SVG / _LEARNING_SVG): tick to mark known, turn-back arrow
+  // to return the word to learning.
+  setBtnIcon(statusBtn, known ? "rotateCcw" : "checkCircle", t(known ? "vocabMarkLearning" : "vocabMarkKnown"));
   statusBtn.addEventListener("click", () => _pbpVocabDetailMutate(w, (owner) =>
     pbpVocabBatchSetStatus([w.id], owner, known ? "new" : "known"), renderOwner));
   manage.appendChild(statusBtn);
