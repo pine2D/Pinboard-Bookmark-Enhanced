@@ -85,7 +85,7 @@ const STYLE_PROPS = ["display", "position", "margin-top", "margin-right", "margi
   "transform", "opacity", "box-shadow"];
 const STATE_PROBES = [
   { panel: "general", selector: "#opt-pinboard-token" },        // .key-wrap password field
-  { panel: "general", selector: "#copy-diagnostics-btn" },      // .btn
+  { panel: "storage", selector: "#copy-diagnostics-btn" },      // .btn (Data panel since the 2026-10-15 IA move)
   { panel: "popup", selector: "#opt-popup-width-custom" },      // number field inside a .pick row
   { panel: "vocab", selector: "#dict-anki-deck" },              // plain entry-block text field
   { panel: "markdown", selector: "#obsidian-vault" },           // Send-to (formerly .et-field) text field
