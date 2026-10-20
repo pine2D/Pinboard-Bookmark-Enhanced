@@ -215,6 +215,19 @@ function _pbpAskBuildPanel() {
   applyI18n(panel);
   document.body.appendChild(panel);
   _pbpAskState.panel = panel;
+  // The bottom sheet's real height, for the article's scroll room under it
+  // (md-preview.css `body.ask-open main { margin-bottom }`, <=1200px). A
+  // fixed 70vh (the sheet's max-height) left most of a blank screen after
+  // the last paragraph whenever the sheet was shorter, e.g. before the first
+  // answer. Side-column mode never reads the variable.
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver((entries) => {
+      const box = entries[entries.length - 1];
+      const size = box && box.borderBoxSize && box.borderBoxSize[0];
+      const h = size ? size.blockSize : panel.getBoundingClientRect().height;
+      document.body.style.setProperty("--pbp-ask-sheet-h", `${Math.ceil(h || 0)}px`);
+    }).observe(panel);
+  }
   // #ask-thread now exists in the live document — restore history straight
   // away instead of polling for it via MutationObserver (audit #28).
   // _pbpAskHistRestore is idempotent (_pbpAskHistRestored guard) and a no-op

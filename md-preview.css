@@ -2861,14 +2861,15 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   cursor: pointer;
 }
 .pb-tr-err svg { width: 13px; height: 13px; flex-shrink: 0; }
-/* The failure reason is printed in the pill itself, after the action -- no
+/* The failure reason is printed in the pill itself, above the action -- no
    hover / focus bubble: the reading view never opens overlays on hover (user
    ruling), and a reason that only appears under a pointer is lost on touch.
    The accessible name already carries it (_pbpTrSetErrTip), so this copy is
    aria-hidden. */
-/* With its reason it is a two-line notice -- the action, then why -- so it
-   takes the medium radius: a full pill stretched over two lines reads as a
-   swollen capsule. */
+/* With its reason it is a multi-line notice -- why (danger, 6.2:1 light /
+   6.1:1 dark on the paper), the provider's own words, then the action -- so
+   it takes the medium radius: a full pill stretched over several lines reads
+   as a swollen capsule. */
 .pb-tr-err { flex-wrap: wrap; max-width: 100%; text-align: start; border-radius: var(--radius-md); }
 .pb-tr-err-reason { flex-basis: 100%; font-weight: normal; overflow-wrap: anywhere; }
 /* Provider's own wording, kept for troubleshooting: small and secondary, and
@@ -3135,9 +3136,11 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 @media (max-width: 1200px) {
   body.ask-open main { margin-right: 0; }
   body.ask-open #zen-bar { right: 12px; } /* bottom-sheet mode: no side dodge */
-  /* Room to scroll the last paragraphs up past the sheet (it is up to 70vh
-     tall), so a citation jump to the end of the article can clear it. */
-  body.ask-open main { margin-bottom: 70vh; }
+  /* Room to scroll the last paragraphs up past the sheet, so a citation jump
+     to the end of the article can clear it: exactly the sheet's own height
+     (md-ask.js measures it into --pbp-ask-sheet-h), not its 70vh ceiling,
+     which left a near-empty screen after the article under a short sheet. */
+  body.ask-open main { margin-bottom: var(--pbp-ask-sheet-h, 0px); }
   #ask-panel {
     top: auto;
     left: 0; right: 0; bottom: 0;
@@ -3730,6 +3733,20 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
   background: var(--surface);
   border-top: 1px solid var(--border-light);
 }
+/* The row's fill ends at the rail's content edge, but the rail's 6px right
+   padding (.rail) still shows what scrolls underneath: the rotated section
+   chevrons (.rail-sec-tri) reach a pixel or two past that edge, and their
+   tips peeked out beside "Aa" (README shots 2026-10-20). A strip of the same
+   fill closes the padding; the scrollbar gutter beyond it clips by itself. */
+#rail-bottom-row::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  bottom: 0;
+  left: 100%;
+  width: 6px;
+  background: var(--surface);
+}
 .rail-kbd-help-btn {
   flex: 1 1 auto;
   height: 26px;            /* md rung (was a stray 28px) */
@@ -3794,9 +3811,15 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
   font-variant-numeric: tabular-nums;
 }
 .typo-seg { display: flex; gap: var(--sp-1); } /* segmented strip, not a button row (actionRowGap exempt) */
+/* flex-basis AUTO, not 0: equal thirds gave every word 57px, and the long
+   "Auto" words (de "Automatisch", fr "Automatique", pl "Automatycznie")
+   ran out of their segment while "Hell" / "Jasny" had room to spare. Each
+   segment now starts at its word and shares what is left, so the row fits
+   all 9 locales inside the 232px panel; nowrap keeps the 26px rung. */
 .typo-seg-btn {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
+  white-space: nowrap;
   padding: var(--sp-1);
   line-height: 16px; /* 4+16+4+2 = 26, the md rung (was 3px + normal line-height = 23.3) */
   border: 1px solid var(--btn-border);

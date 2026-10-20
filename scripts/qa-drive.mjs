@@ -1179,10 +1179,15 @@ async function driveSelection(context, worker, extId, rep) {
     while ((node = walker.nextNode())) {
       const i = node.textContent.indexOf("serendipity");
       if (i < 0) continue;
+      // Skip text the view hides: the translation view is remembered per URL
+      // (the preview surface leaves it translation-only), and a hidden
+      // original measured 0 x 0, so the drag landed on the rail at (0, 0).
+      if (!node.parentElement.getClientRects().length) continue;
       node.parentElement.scrollIntoView({ block: "center", behavior: "instant" });
       const range = document.createRange();
       range.setStart(node, i); range.setEnd(node, i + 11);
       const b = range.getBoundingClientRect();
+      if (!(b.width > 0)) continue;
       return { x: b.x, y: b.y + b.height / 2, w: b.width };
     }
     throw new Error("selection fixture missing");
@@ -2170,20 +2175,40 @@ async function driveReaderEdge(context, worker, extId, rep) {
         for (const chip of [...a.querySelectorAll(".ask-chip")]) {
           chip.click();
           await new Promise((r) => setTimeout(r, 1200));
-          const el = pbpAiBlockEl(Number(chip.dataset.p));
+          // The block the reader sees: in translation-only view (remembered
+          // per URL) the original is hidden and its .pb-tr is on screen; a
+          // hidden block measured 0 x 0 and passed the check vacuously.
+          const orig = pbpAiBlockEl(Number(chip.dataset.p));
+          const sib = orig && orig.nextElementSibling;
+          const el = orig && orig.getClientRects().length ? orig : (sib && sib.classList.contains("pb-tr") ? sib : orig);
           const r = el.getBoundingClientRect();
-          out.push({ p: chip.dataset.p, sy: scrollY, sh: document.documentElement.scrollHeight, ih: innerHeight, top: r.top, bottom: r.bottom, sheetTop: document.getElementById("ask-panel").getBoundingClientRect().top });
+          out.push({ p: chip.dataset.p, sy: scrollY, sh: document.documentElement.scrollHeight, ih: innerHeight, top: r.top, bottom: r.bottom, height: r.height, sheetTop: document.getElementById("ask-panel").getBoundingClientRect().top });
         }
         return out;
       });
       s.notes.push("ask-sheet-jump " + JSON.stringify(res));
       if (res.length < 2) s.failures.push("ask-sheet-jump: chips missing");
-      for (const r of res) if (r.bottom > r.sheetTop + 1 || r.top < 0) s.failures.push("ask-sheet-jump: P" + r.p + " not above the sheet " + JSON.stringify(r));
+      for (const r of res) if (!(r.height > 0) || r.bottom > r.sheetTop + 1 || r.top < 0) s.failures.push("ask-sheet-jump: P" + r.p + " not above the sheet (or not rendered) " + JSON.stringify(r));
+      // The scroll room under the sheet is the sheet's own height, not its
+      // 70vh ceiling: at the end of the article no more than main's bottom
+      // padding may separate the last block from the sheet.
+      const tail = await page.evaluate(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        const blocks = [...document.querySelectorAll("#rendered-view [data-pb], #rendered-view .pb-tr")].filter((b) => b.getClientRects().length);
+        const last = blocks[blocks.length - 1].getBoundingClientRect();
+        const main = document.querySelector("main");
+        return { gap: document.getElementById("ask-panel").getBoundingClientRect().top - last.bottom,
+          pad: parseFloat(getComputedStyle(main).paddingBottom), room: getComputedStyle(main).marginBottom,
+          sheet: document.getElementById("ask-panel").getBoundingClientRect().height };
+      });
+      s.notes.push("ask-sheet-tail " + JSON.stringify(tail));
+      if (tail.gap > tail.pad + 160) s.failures.push("ask-sheet-jump: " + Math.round(tail.gap) + "px of blank above the sheet at the article's end " + JSON.stringify(tail));
       await rep.shot(page, s, "ask-sheet-jump");
     });
 
     await step("de-light-typo", async () => {
       await setScheme("light");
+      await setLang("de"); // ask-sheet-jump above leaves the UI in English
       await page.setViewportSize({ width: 1280, height: 900 });
       await seed("en-GB");
       await open();
@@ -2200,11 +2225,18 @@ async function driveReaderEdge(context, worker, extId, rep) {
       await page.keyboard.press("t");
       await page.waitForFunction(() => document.querySelectorAll("#rendered-view .pb-tr").length > 2, { timeout: 30_000 });
       await page.waitForTimeout(600);
-      // Translating lands in the bilingual view; one "v" is translation-only.
-      await page.keyboard.press("v");
-      await page.waitForTimeout(600);
-      const mode = await page.evaluate(() => document.body.classList.contains("tr-only"));
-      if (!mode) s.failures.push("zh-light-tr-only: one v did not reach the translation-only view");
+      // A fresh article lands in the bilingual view and one "v" is
+      // translation-only; but the view is remembered per URL (trview_), and
+      // the preview surface's view-cycle step leaves this same URL in
+      // translation-only, so walk the documented cycle (original -> bilingual
+      // -> translated) instead of assuming where it starts.
+      let mode = false;
+      for (let i = 0; i < 3 && !mode; i++) {
+        await page.keyboard.press("v");
+        await page.waitForTimeout(600);
+        mode = await page.evaluate(() => document.body.classList.contains("tr-only"));
+      }
+      if (!mode) s.failures.push("zh-light-tr-only: three v presses did not reach the translation-only view");
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.waitForTimeout(300);
       await rep.shot(page, s, "zh-light-tr-only");

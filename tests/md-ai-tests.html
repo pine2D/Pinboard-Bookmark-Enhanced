@@ -8526,6 +8526,30 @@ suiteIf("translation failure pill text (item 6)", "pbpTrErrLines", () => {
     assertEq(btn.querySelectorAll(".pb-tr-err-raw").length, 0);
     assertEq(btn.querySelector(".pb-tr-err-reason").textContent, "key problem");
   });
+  test("selecting the raw provider text to copy it never retries (drag / double-click fire click)", () => {
+    const btn = document.createElement("button");
+    btn.className = "pb-tr-err";
+    const lab = document.createElement("span"); lab.textContent = "Retry this paragraph"; btn.appendChild(lab);
+    _pbpTrSetErrTip(btn, "Translation failed - Network or server error", "Network or server error", "HTTP 500: upstream");
+    document.body.appendChild(btn);
+    try {
+      const raw = btn.querySelector(".pb-tr-err-raw");
+      getSelection().removeAllRanges();
+      assert(_pbpTrErrClickIsCopy({ target: raw }, btn) === true, "a click on the raw line is a copy gesture");
+      assert(_pbpTrErrClickIsCopy({ target: btn }, btn) === false, "keyboard / plain click on the pill retries");
+      assert(_pbpTrErrClickIsCopy({ target: lab }, btn) === false, "a click on the action label retries");
+      const range = document.createRange();
+      range.setStart(btn.querySelector(".pb-tr-err-reason").firstChild, 0);
+      range.setEnd(btn.querySelector(".pb-tr-err-reason").firstChild, 7);
+      getSelection().addRange(range);
+      assert(_pbpTrErrClickIsCopy({ target: lab }, btn) === true, "a click that ends with text selected inside the pill is a copy gesture");
+      getSelection().removeAllRanges();
+      const outside = document.createElement("p"); outside.textContent = "elsewhere in the article"; document.body.appendChild(outside);
+      const r2 = document.createRange(); r2.selectNodeContents(outside); getSelection().addRange(r2);
+      assert(_pbpTrErrClickIsCopy({ target: btn }, btn) === false, "a selection elsewhere does not block the retry");
+      getSelection().removeAllRanges(); outside.remove();
+    } finally { btn.remove(); }
+  });
 });
 
 suiteIf("extraction error shell: open original (item 6)", "renderErrorState", () => {

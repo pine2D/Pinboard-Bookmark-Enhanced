@@ -2551,6 +2551,21 @@ function _pbpTrSetErrTip(btn, tip, shown, raw) {
   }
 }
 
+// A pill click that is really a copy gesture: the raw provider line is
+// selectable text (for troubleshooting), and Chromium fires the button's
+// click at the end of a drag-select inside it and on each click of a
+// double-click word select -- each one used to start a paid retry. Clicks on
+// the raw line, or that end with a text selection inside the pill, retry
+// nothing; keyboard activation (target = the pill, no selection) is
+// untouched.
+function _pbpTrErrClickIsCopy(e, btn) {
+  const target = e && e.target;
+  if (target && typeof target.closest === "function" && target.closest(".pb-tr-err-raw")) return true;
+  const sel = typeof window.getSelection === "function" ? window.getSelection() : null;
+  if (!sel || sel.isCollapsed || !String(sel).trim()) return false;
+  return btn.contains(sel.anchorNode) || btn.contains(sel.focusNode);
+}
+
 // Per-block failure: inline error pill after the block, the reason printed
 // in it; click retries this single block.
 function _pbpTrMarkFailed(st, w, message, err) {
@@ -2571,7 +2586,10 @@ function _pbpTrMarkFailed(st, w, message, err) {
   const lines = pbpTrErrLines(message, err);
   _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + lines.reason, lines.reason, lines.raw);
   orig.insertAdjacentElement("afterend", btn);
-  btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
+  btn.addEventListener("click", (e) => {
+    if (_pbpTrErrClickIsCopy(e, btn)) return;
+    _pbpTrRetryBlock(st, w, btn).catch(() => {});
+  });
   _pbpTrSyncRetryAll();
 }
 
@@ -2622,7 +2640,10 @@ function _pbpTrMarkPartial(st, w, failedParts) {
   btn.appendChild(lab);
   _pbpTrSetErrTip(btn, failedParts > 0 ? t("trPartsUntranslated", String(failedParts)) : t("trBlockFailed"));
   anchor.insertAdjacentElement("afterend", btn);
-  btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
+  btn.addEventListener("click", (e) => {
+    if (_pbpTrErrClickIsCopy(e, btn)) return;
+    _pbpTrRetryBlock(st, w, btn).catch(() => {});
+  });
   _pbpTrSyncRetryAll();
 }
 

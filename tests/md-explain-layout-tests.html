@@ -292,7 +292,7 @@ function assertLayout(frame, locale) {
     } finally { wide.remove(); }
   });
 
-  await test("the Aa panel's reading-width row fits its segments in every locale", async () => {
+  await test("the Aa panel's segmented rows (spacing, width, appearance) fit their segments in every locale", async () => {
     const frame = document.createElement("iframe");
     frame.style.cssText = "width:400px;height:400px;border:0";
     frame.srcdoc = `<!doctype html><html><head><link rel="stylesheet" href="../md-preview.css"></head>
@@ -303,16 +303,30 @@ function assertLayout(frame, locale) {
     try {
       const doc = frame.contentDocument;
       doc.getElementById("typo-pop").showPopover();
-      const keys = ["typoWidthNarrow", "typoWidthMedium", "typoWidthWide"];
+      // Every segmented row md-reader.js builds (_pbpTypoBuildPop): line
+      // spacing, reading width, appearance. The appearance row's "Auto" word
+      // is the longest in de / fr / pl ("Automatisch" was clipped, README
+      // shots 2026-10-20).
+      const rows = [
+        ["typoLeadingLabel", ["typoLeadingCompact", "typoLeadingNormal", "typoLeadingRelaxed"]],
+        ["typoWidthLabel", ["typoWidthNarrow", "typoWidthMedium", "typoWidthWide"]],
+        ["typoSchemeLabel", ["typoSchemeAuto", "typoSchemeLight", "typoSchemeDark"]],
+      ];
+      const pop = doc.getElementById("typo-pop");
       for (const locale of LOCALES) {
-        doc.querySelector(".typo-label").textContent = messages[locale].typoWidthLabel.message;
-        doc.querySelectorAll(".typo-seg-btn").forEach((b, i) => { b.textContent = messages[locale][keys[i]].message; });
-        await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
-        const label = doc.querySelector(".typo-label");
-        assert(label.getBoundingClientRect().height <= 24, `${locale}: width label wraps`);
-        for (const b of doc.querySelectorAll(".typo-seg-btn")) {
-          assert(b.scrollWidth <= b.clientWidth, `${locale}: "${b.textContent}" overflows its segment`);
-          assert(Math.round(b.getBoundingClientRect().height) === 26, `${locale}: segment is ${b.getBoundingClientRect().height}px, off the 26px rung`);
+        for (const [labelKey, keys] of rows) {
+          doc.querySelector(".typo-label").textContent = messages[locale][labelKey].message;
+          doc.querySelectorAll(".typo-seg-btn").forEach((b, i) => { b.textContent = messages[locale][keys[i]].message; });
+          await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
+          const label = doc.querySelector(".typo-label");
+          assert(label.getBoundingClientRect().height <= 24, `${locale}: ${labelKey} wraps`);
+          const popBox = pop.getBoundingClientRect();
+          for (const b of doc.querySelectorAll(".typo-seg-btn")) {
+            const box = b.getBoundingClientRect();
+            assert(b.scrollWidth <= b.clientWidth, `${locale}: "${b.textContent}" overflows its segment (${b.scrollWidth} > ${b.clientWidth})`);
+            assert(box.right <= popBox.right + 0.5 && box.left >= popBox.left - 0.5, `${locale}: "${b.textContent}" sticks out of the panel`);
+            assert(Math.round(box.height) === 26, `${locale}: segment is ${box.height}px, off the 26px rung`);
+          }
         }
       }
     } finally { frame.remove(); }
