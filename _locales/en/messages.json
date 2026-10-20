@@ -2855,6 +2855,9 @@
   "trErrTimeout": {
     "message": "The AI service timed out; try again"
   },
+  "trErrTooLong": {
+    "message": "The text is too long for this model; try one with a larger context window"
+  },
   "aiErrRequestFailed": {
     "message": "The AI request failed",
     "description": "Fallback reason when an AI request fails without any error message (translation failure pill, selection explain panel)."

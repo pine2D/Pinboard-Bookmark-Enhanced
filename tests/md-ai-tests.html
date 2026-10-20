@@ -8410,6 +8410,144 @@ suiteIf("pbpAiErrorText (ZH-3)", "pbpAiErrorText", () => {
   });
 });
 
+suiteIf("translation failure pill text (item 6)", "pbpTrErrLines", () => {
+  const mk = (msg, extra) => Object.assign(new Error(msg), extra || {});
+  const KNOWN = ["trErrKey", "trErrQuota", "trErrTooLong", "trErrNetwork", "trErrTimeout", "aiErrRequestFailed"];
+  // Category-wide: whatever a provider says, the headline is one of the
+  // localized keys and the provider's own wording never leads.
+  test("every error class gets a localized headline; raw provider text is second", () => {
+    const cases = [
+      mk("HTTP 401: Incorrect API key provided: sk-...", { status: 401 }),
+      mk("HTTP 403: forbidden", { status: 403 }),
+      mk("HTTP 429: slow down", { status: 429 }),
+      mk("HTTP 500: upstream provider returned an internal error", { status: 500 }),
+      mk("HTTP 503: overloaded", { status: 503 }),
+      mk("HTTP 413: payload too big", { status: 413 }),
+      mk("This model's maximum context length is 8192 tokens, however you requested 9000"),
+      mk("HTTP 502: bad gateway from upstream"),            // relayed text, no .status
+      mk("the stream timed out after 60s"),
+      mk("Failed to fetch"),
+      mk("some brand new provider prose nobody mapped")     // unclassified
+    ];
+    for (const e of cases) {
+      const lines = pbpTrErrLines(pbpAiErrorText(e), e);
+      assert(KNOWN.includes(lines.reason), "headline is a localized key, got " + JSON.stringify(lines.reason) + " for " + e.message);
+      assert(!lines.reason.includes(e.message), "raw text must not be the headline: " + e.message);
+      assertEq(lines.raw, e.message, "raw kept as second line for " + e.message);
+    }
+  });
+  test("new buckets: too-long and relayed HTTP text", () => {
+    assertEq(pbpAiErrorText(mk("x", { status: 413 })), "trErrTooLong");
+    assertEq(pbpAiErrorText(mk("prompt is too long: 300000 tokens")), "trErrTooLong");
+    assertEq(pbpAiErrorText(mk("HTTP 500: upstream")), "trErrNetwork");
+    assertEq(pbpAiErrorText(mk("HTTP 401: nope")), "trErrKey");
+    assertEq(pbpAiErrorText(mk("HTTP 429: slow")), "trErrQuota");
+  });
+  test("a coded error keeps its (already product-text) message as the headline", () => {
+    const e = mk("Grant access to api.example.com", { code: "host_permission" });
+    const lines = pbpTrErrLines(pbpAiErrorText(e), e);
+    assertEq(lines.reason, "Grant access to api.example.com");
+    assertEq(lines.raw, "");
+  });
+  test("an override hint rides after the generic headline", () => {
+    const e = mk("weird prose");
+    const lines = pbpTrErrLines(pbpAiErrorText(e) + " HINT", e, "");
+    assertEq(lines.reason, "aiErrRequestFailed HINT");
+    assertEq(lines.raw, "weird prose");
+    const l2 = pbpTrErrLines(pbpAiErrorText(e), e, "HINT");
+    assertEq(l2.reason, "aiErrRequestFailed HINT");
+  });
+  test("pill reads reason, raw, then the retry action; name starts with the action", () => {
+    const btn = document.createElement("button");
+    btn.className = "pb-tr-err";
+    const lab = document.createElement("span"); lab.textContent = "Retry this paragraph"; btn.appendChild(lab);
+    _pbpTrSetErrTip(btn, "Translation failed - Network or server error", "Network or server error", "HTTP 500: upstream");
+    const kids = [...btn.children].map((c) => c.className || c.textContent);
+    assertEq(kids[0], "pb-tr-err-reason");
+    assertEq(kids[1], "pb-tr-err-raw");
+    assertEq(kids[2], "Retry this paragraph");
+    assert(btn.getAttribute("aria-label").startsWith("Retry this paragraph"), "aria-label starts with the action");
+    assert(btn.getAttribute("aria-label").includes("HTTP 500: upstream"), "raw is in the accessible name");
+    // Re-tip without raw (a retry that failed differently): the raw line goes.
+    _pbpTrSetErrTip(btn, "Translation failed - key", "key problem", "");
+    assertEq(btn.querySelectorAll(".pb-tr-err-raw").length, 0);
+    assertEq(btn.querySelector(".pb-tr-err-reason").textContent, "key problem");
+  });
+});
+
+suiteIf("extraction error shell: open original (item 6)", "renderErrorState", () => {
+  const shell = (openUrl) => {
+    const host = document.createElement("div");
+    host.id = "rendered-view";
+    document.body.appendChild(host);
+    try { renderErrorState("failed", () => {}, false, null, openUrl); return host.querySelector("a.action-btn"); }
+    finally { host.remove(); document.body.classList.remove("md-empty"); }
+  };
+  test("http(s) source gets a new-tab, noopener link", () => {
+    for (const u of ["https://example.com/a?b=1", "http://example.com/"]) {
+      const a = shell(u);
+      assert(a, "link for " + u);
+      assertEq(a.getAttribute("href"), new URL(u).href);
+      assertEq(a.target, "_blank");
+      assert(/noopener/.test(a.rel), "rel has noopener");
+    }
+  });
+  test("any other scheme, or no source, renders no link", () => {
+    for (const u of ["javascript:alert(1)", "data:text/html,x", "file:///etc/passwd", "chrome-extension://abc/x.html", "ftp://example.com/", "blob:https://example.com/1", "not a url", "", undefined, null, 42]) {
+      assertEq(shell(u), null, "no link for " + String(u));
+    }
+  });
+  test("the retry button still comes first", () => {
+    const host = document.createElement("div"); host.id = "rendered-view"; document.body.appendChild(host);
+    renderErrorState("failed", () => {}, false, null, "https://example.com/");
+    const kids = [...host.querySelectorAll(".action-btn")].map((e) => e.tagName);
+    host.remove();
+    assertEq(kids.join(","), "BUTTON,A");
+  });
+});
+
+suiteIf("Ask jump clears the bottom sheet (item 6)", "pbpAskJumpTop", () => {
+  test("pbpAskJumpTop centres in the free strip and never starts above the margin", () => {
+    assertEq(pbpAskJumpTop(100, 600, 12), 250);
+    assertEq(pbpAskJumpTop(5000, 600, 12), 12);
+    assertEq(pbpAskJumpTop(0, 0, 12), 12);
+    for (const h of [10, 80, 300, 560]) {
+      const top = pbpAskJumpTop(h, 600, 12);
+      assert(top + h <= 600 || top === 12, "block of " + h + " ends above the sheet");
+    }
+  });
+  const withPanel = (panelTop, targetRect, run) => {
+    const panel = document.createElement("div"); panel.id = "ask-panel"; document.body.appendChild(panel);
+    panel.getBoundingClientRect = () => ({ top: panelTop, height: window.innerHeight - panelTop, width: 900, bottom: window.innerHeight, left: 0, right: 900 });
+    const target = document.createElement("p"); document.body.appendChild(target);
+    target.getBoundingClientRect = () => ({ top: targetRect.top, height: targetRect.height, bottom: targetRect.top + targetRect.height });
+    const calls = []; const realBy = window.scrollBy; const realInto = target.scrollIntoView;
+    window.scrollBy = (o) => { calls.push(o); };
+    let intoCalls = 0; target.scrollIntoView = () => { intoCalls++; };
+    try { run(target, calls, () => intoCalls); }
+    finally { window.scrollBy = realBy; target.scrollIntoView = realInto; panel.remove(); target.remove(); }
+  };
+  test("bottom sheet: the scroll puts the block's bottom edge above the sheet top", () => {
+    const sheetTop = Math.floor(window.innerHeight * 0.55);
+    for (const rect of [{ top: window.innerHeight + 400, height: 60 }, { top: -300, height: 120 }, { top: sheetTop + 20, height: 40 }]) {
+      withPanel(sheetTop, rect, (target, calls) => {
+        _pbpAskScrollToTarget(target);
+        assert(calls.length >= 1, "scrollBy was used");
+        const newTop = rect.top - calls[0].top;
+        assert(newTop + rect.height <= sheetTop, "bottom " + (newTop + rect.height) + " must be <= sheet top " + sheetTop);
+        assert(newTop >= 0, "top edge on screen");
+      });
+    }
+  });
+  test("side column (panel at top 0) keeps the plain centred scroll", () => {
+    withPanel(0, { top: 900, height: 60 }, (target, calls, into) => {
+      _pbpAskScrollToTarget(target);
+      assertEq(calls.length, 0, "no scrollBy");
+      assertEq(into(), 1, "scrollIntoView once");
+    });
+  });
+});
+
 suiteIf("tr cache generation ledger (ZH-1a)", "pbpTrGensPush", () => {
   // D1 -- generation ledger: changing any covered prompt text without bumping
   // its GEN constant turns these red. The pinned hashes are re-derived from
@@ -9773,7 +9911,7 @@ suiteIf("T4 translate: article replacement", "_pbpTrOnArticleWillReplace", () =>
       const pills = Array.from(view.querySelectorAll(".pb-tr-err"));
       assertEq(pills.length, 2, "both failure paths planted a pill");
       for (const pill of pills) {
-        const visible = pill.querySelector("span").textContent;
+        const visible = pill.querySelector(":scope > span:not(.pb-tr-err-reason):not(.pb-tr-err-raw)").textContent;
         const name = pill.getAttribute("aria-label") || "";
         assert(visible && name.startsWith(visible), "accessible name '" + name + "' starts with visible label '" + visible + "'");
         assert(name.includes(pill.dataset.tip), "accessible name still carries the failure reason");

@@ -1071,6 +1071,10 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .empty-state p { font-size: 15px; line-height: 1.6; }
 .empty-state .action-btn { margin-top: var(--sp-4); }
 .empty-state .action-btn + .action-btn { margin-inline-start: var(--sp-2); }
+/* The empty state lives inside #rendered-view, whose prose-link rule (ink-blue
+   underline) would otherwise win over the button face. */
+#rendered-view .empty-state a.action-btn,
+#rendered-view .empty-state a.action-btn:hover { color: var(--btn-fg); text-decoration: none; }
 
 /* ---- Loading State (shortcut pending placeholder) ---- */
 .preview-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-4); text-align: center; padding: 80px 32px; }
@@ -2860,7 +2864,10 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
    takes the medium radius: a full pill stretched over two lines reads as a
    swollen capsule. */
 .pb-tr-err { flex-wrap: wrap; max-width: 100%; text-align: start; border-radius: var(--radius-md); }
-.pb-tr-err-reason { flex-basis: 100%; color: var(--fg-secondary); font-weight: normal; overflow-wrap: anywhere; }
+.pb-tr-err-reason { flex-basis: 100%; font-weight: normal; overflow-wrap: anywhere; }
+/* Provider's own wording, kept for troubleshooting: small and secondary, and
+   selectable (a button's text is not by default). */
+.pb-tr-err-raw { flex-basis: 100%; color: var(--fg-secondary); font-size: 11px; font-weight: normal; line-height: 1.4; overflow-wrap: anywhere; user-select: text; cursor: text; }
 /* D8-4: swapping to --btn-hover dropped --danger text under AA (worst case
    3.74:1 dark). Background stays transparent (rest-state contrast already
    clears AA); hover cue is a currentColor ring instead. */
@@ -3122,6 +3129,9 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 @media (max-width: 1200px) {
   body.ask-open main { margin-right: 0; }
   body.ask-open #zen-bar { right: 12px; } /* bottom-sheet mode: no side dodge */
+  /* Room to scroll the last paragraphs up past the sheet (it is up to 70vh
+     tall), so a citation jump to the end of the article can clear it. */
+  body.ask-open main { margin-bottom: 70vh; }
   #ask-panel {
     top: auto;
     left: 0; right: 0; bottom: 0;

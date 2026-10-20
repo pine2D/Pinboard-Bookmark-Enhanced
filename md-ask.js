@@ -1383,6 +1383,63 @@ function _pbpAskFlash(range, targetEl) {
   }
 }
 
+// Where a jump target should sit from the top of the viewport, in px, when the
+// Ask panel is a bottom sheet covering everything below `sheetTop`: centred in
+// the part of the viewport the sheet leaves free, and never above `margin` (a
+// target taller than that space starts at the top edge instead of having its
+// beginning cut off). Pure -- tests/md-ai-tests.html.
+function pbpAskJumpTop(targetHeight, sheetTop, margin) {
+  const m = Number.isFinite(margin) ? margin : 12;
+  const free = Number.isFinite(sheetTop) ? sheetTop : 0;
+  return Math.max(m, (free - Math.max(0, Number(targetHeight) || 0)) / 2);
+}
+
+// The bottom sheet's top edge in viewport px, or null when Ask is closed or
+// is the right-hand column (wide viewports: top 0, nothing below the article).
+function _pbpAskSheetTop() {
+  const panel = document.getElementById("ask-panel");
+  if (!panel || panel.hidden) return null;
+  const r = panel.getBoundingClientRect();
+  if (!(r.height > 0) || !(r.top > 0) || r.top >= window.innerHeight) return null;
+  return r.top;
+}
+
+// Scroll the cited block into view. Side column: centred in the viewport as
+// before. Bottom sheet (narrow windows, up to 70vh tall): the plain centre
+// lands behind it, so scroll by the exact delta that puts the block centred in
+// the free strip above the sheet (pbpAskJumpTop). The article scrolls with the
+// window, so a direct scrollBy is the whole job.
+function _pbpAskScrollToTarget(target) {
+  const sheetTop = _pbpAskSheetTop();
+  if (sheetTop == null) {
+    pbpScrollIntoView(target, { block: "center", behavior: "smooth" });
+    return;
+  }
+  const r = target.getBoundingClientRect();
+  const delta = r.top - pbpAskJumpTop(r.height, sheetTop);
+  const instant = pbpPrefersReducedMotion();
+  window.scrollBy({ top: delta, behavior: instant ? "instant" : "smooth" });
+  // Blocks that were off-screen render at their real height only on the way
+  // past (content-visibility), so the document can shrink mid-scroll and leave
+  // the target short of its mark. Once the scroll settles, take one corrective
+  // step if it is still off by more than a few px.
+  let settled = false;
+  const settle = () => {
+    if (settled) return;
+    settled = true;
+    window.removeEventListener("scrollend", settle);
+    if (!target.isConnected) return;
+    const sheet = _pbpAskSheetTop();
+    if (sheet == null) return;
+    const now = target.getBoundingClientRect();
+    const fix = now.top - pbpAskJumpTop(now.height, sheet);
+    if (Math.abs(fix) > 24) window.scrollBy({ top: fix, behavior: "instant" });
+  };
+  if (instant) { settle(); return; }
+  window.addEventListener("scrollend", settle, { once: true });
+  setTimeout(settle, 1500);
+}
+
 // Chip click: scroll to the cited block (or its translation in
 // translated-only view) and flash the verified quote span / whole block.
 function _pbpAskJump(chip) {
@@ -1403,7 +1460,7 @@ function _pbpAskJump(chip) {
   // instead of its (hidden) translated sibling -- the only case that changes.
   let target = (typeof trOnlyScrollTarget === "function") ? trOnlyScrollTarget(orig) : orig;
   pbpFocusArticleTarget(target);
-  pbpScrollIntoView(target, { block: "center", behavior: "smooth" });
+  _pbpAskScrollToTarget(target);
   // (research T1.5) a timed paragraph also moves the player: jump-to-text
   // and jump-to-moment are the same gesture on a transcript.
   if (document.body.classList.contains("video-mode") && orig.dataset && orig.dataset.t != null

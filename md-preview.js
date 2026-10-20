@@ -74,7 +74,17 @@ function renderEmptyState(message, actionKey) {
 // `alt` (optional) = { label, run }: a second way out shown beside Retry --
 // the other extraction engine, so a page one engine cannot read is one click
 // from the engine that can, instead of a Retry that fails the same way again.
-function renderErrorState(message, retryFn, permissionRequired, alt) {
+// `openUrl` (optional) = the previewed page's own address: a third way out,
+// "Open original", for a page neither engine could read. http(s) only -- any
+// other scheme (javascript:, data:, chrome-extension:, file:) renders nothing.
+function pbpOriginalOpenHref(openUrl) {
+  if (typeof openUrl !== "string" || !openUrl) return "";
+  try {
+    const u = new URL(openUrl);
+    return (u.protocol === "https:" || u.protocol === "http:") ? u.href : "";
+  } catch (_) { return ""; }
+}
+function renderErrorState(message, retryFn, permissionRequired, alt, openUrl) {
   const view = document.getElementById("rendered-view");
   if (view) {
     view.removeAttribute("aria-busy");
@@ -116,6 +126,21 @@ function renderErrorState(message, retryFn, permissionRequired, alt) {
         finally { other.disabled = false; }
       });
       wrap.appendChild(other);
+    }
+    const href = pbpOriginalOpenHref(openUrl);
+    if (href) {
+      // A real external link (extOpen is the true-external-link icon), new tab,
+      // no opener: the reader tab stays where it is.
+      const a = document.createElement("a");
+      a.className = "action-btn";
+      a.href = href;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.innerHTML = (typeof PBP_ICONS !== "undefined" && PBP_ICONS.extOpen) || "";
+      const lab = document.createElement("span");
+      lab.textContent = t("libraryOpenOriginal");
+      a.appendChild(lab);
+      wrap.appendChild(a);
     }
     view.replaceChildren(wrap);
   }
@@ -1488,7 +1513,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       if (frameOrigin) {
         let host = frameOrigin;
         try { host = new URL(frameOrigin).host; } catch (_) {}
-        renderErrorState(t("mdPreviewFrameHint", host), () => grantFrameAndRetry(attemptedEngine, frameOrigin), true);
+        renderErrorState(t("mdPreviewFrameHint", host), () => grantFrameAndRetry(attemptedEngine, frameOrigin), true, null, url);
       } else {
         // The other engine, when this page can use it: Defuddle needs the
         // source tab, Jina an http(s) URL (engineUnavailable). The rail's
@@ -1503,7 +1528,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           friendlyEngineErr(pr),
           () => retryExtract(attemptedEngine, pr),
           pr && pr.error === "host_permission",
-          alt
+          alt,
+          url
         );
       }
       // Video pages reach HERE, not the canonical-markdown guard further down:

@@ -2846,6 +2846,9 @@
   "trErrTimeout": {
     "message": "Zeitüberschreitung beim KI-Dienst; versuche es erneut"
   },
+  "trErrTooLong": {
+    "message": "Der Text ist für dieses Modell zu lang; versuche ein Modell mit größerem Kontextfenster"
+  },
   "aiErrRequestFailed": {
     "message": "Die KI-Anfrage ist fehlgeschlagen"
   },

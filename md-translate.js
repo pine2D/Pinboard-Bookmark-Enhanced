@@ -622,9 +622,12 @@ async function pbpTrRunQueue(plan) {
     try { plan.onProgress(done, total); } catch (_) {}
     reportPhase();
   };
-  const fail = (id, message) => {
+  // `err` (optional) = the caught Error behind `message`, handed on so the
+  // failure pill can print the humanized reason first and the raw provider
+  // text second (the message alone no longer says which is which).
+  const fail = (id, message, err) => {
     failed.push({ id, message: String(message || "translation failed") });
-    try { plan.onBlockFail(id, String(message || "translation failed")); } catch (_) {}
+    try { plan.onBlockFail(id, String(message || "translation failed"), err); } catch (_) {}
     // Mirror fill()'s onProgress call so a run where every block fails (e.g. offline)
     // still repaints #tr-progress -- otherwise it freezes on the pre-run "Extracting
     // terminology..." text forever (D4-1: onProgress was fill()-only, so 0 successes
@@ -657,7 +660,7 @@ async function pbpTrRunQueue(plan) {
             if (!await pbpTrWait(backoff[attempt], signal, plan.sleep)) return;
           } catch (waitError) {
             const msg = describe(waitError);
-            for (const id of _pbpTrMissingIds(batch, filled)) fail(id, msg);
+            for (const id of _pbpTrMissingIds(batch, filled)) fail(id, msg, waitError);
             return;
           }
           continue;
@@ -666,7 +669,7 @@ async function pbpTrRunQueue(plan) {
         // finding #6: per-block describe() re-ran its console.warn per block),
         // then give every unfilled block the same inline text.
         const msg = describe(e);
-        for (const id of _pbpTrMissingIds(batch, filled)) fail(id, msg);
+        for (const id of _pbpTrMissingIds(batch, filled)) fail(id, msg, e);
         return;
       }
     }
@@ -715,7 +718,7 @@ async function pbpTrRunQueue(plan) {
     } catch (e) {
       if (aborted()) break;
       if (e && e.code === "host_permission") { permissionError = e; break; }
-      fail(seg.id, describe(e));
+      fail(seg.id, describe(e), e);
     } finally { phases.delete(seg); reportPhase(); }
   }
 
@@ -2183,17 +2186,17 @@ async function _pbpTrStart(st) {
       const done = _pbpTrPartDone(pb);
       if (done) _pbpTrCommitAssembled(st, w, done, pb.failed);
     },
-    onBlockFail: (id, message) => {
+    onBlockFail: (id, message, err) => {
       const m = segMap.get(id);
       const w = m && byId.get(m.n);
       if (!w) return;
-      if (m.parts === 1) { _pbpTrMarkFailed(st, w, message); return; }  // single-part: unchanged
+      if (m.parts === 1) { _pbpTrMarkFailed(st, w, message, err); return; }  // single-part: unchanged
       const pb = partBuf.get(m.n);
       if (!pb) return;
       _pbpTrPartFail(pb, m.idx);                    // keep this part's original, don't discard the block
       const done = _pbpTrPartDone(pb);
       if (!done) return;
-      if (done.allFailed) { _pbpTrMarkFailed(st, w, message); return; }  // 0 parts translated: whole-block failure, not a fake success (don't fill st.trMd / count as done)
+      if (done.allFailed) { _pbpTrMarkFailed(st, w, message, err); return; }  // 0 parts translated: whole-block failure, not a fake success (don't fill st.trMd / count as done)
       _pbpTrCommitAssembled(st, w, done, pb.failed);                     // partial (>=1 real part) -> displayed, never cached (D7)
     },
     onPhase: (phase, detail) => {
@@ -2458,34 +2461,74 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) {} }
 }
 
+// Error pill text, split into the two lines the reader should see: `reason` is
+// a localized one-liner (pbpAiErrorText's category: key / quota / too long /
+// network or server / timeout), `raw` the provider's own wording kept below it
+// in small type for troubleshooting. `text` is what pbpAiErrorText returned
+// (plus any override hint, passed separately); `err` the Error behind it.
+// An unclassified error (text === raw message, no .code) would otherwise print
+// provider English in a German UI as the headline, so the headline falls back
+// to the generic localized "The AI request failed". A coded error's message is
+// already product text (host permission, network...) and stays the headline.
+// No error object (an internal "invalid translation" string): text as-is.
+function pbpTrErrLines(text, err, hint) {
+  const rawMsg = String((err && err.message) || "").trim();
+  let reason = String(text || "");
+  let raw = "";
+  if (err && rawMsg) {
+    // The queue's describeError may have appended an override hint after the
+    // classified text (" " + hint), so "unclassified" is a prefix test.
+    if (reason === rawMsg || reason.startsWith(rawMsg + " ")) {
+      if (!err.code) { reason = t("aiErrRequestFailed") + reason.slice(rawMsg.length); raw = rawMsg; }
+    } else {
+      raw = rawMsg;
+    }
+  }
+  if (hint) reason += " " + hint;
+  return { reason, raw };
+}
+
 // Error pill reason + accessible name. The name must START with the visible
 // label ("Retry this paragraph" / "Grant access and retry") so screen-reader
 // and voice-control users hear and can say the action (WCAG 2.5.3 Label in
-// Name); the failure reason follows it. The reason is also printed in the
-// pill after the label (.pb-tr-err-reason, aria-hidden: the name already says
-// it) -- never a hover bubble, which the reading view does not use and touch
-// never reaches.
+// Name); the failure reason follows it. On screen the pill reads top-down:
+// reason (.pb-tr-err-reason), the raw provider text (.pb-tr-err-raw, small,
+// selectable), then the retry action -- never a hover bubble, which the
+// reading view does not use and touch never reaches. Both text lines are
+// aria-hidden: the name already carries them.
 // `shown` (optional) is the reason line's text when it should be shorter than
 // the name: the cause alone ("Network or server error…"), since the action
-// line above it already says the block failed.
-function _pbpTrSetErrTip(btn, tip, shown) {
+// line already says the block failed. `raw` (optional) is the second line.
+function _pbpTrSetErrTip(btn, tip, shown, raw) {
   btn.dataset.tip = tip;
-  const lab = btn.querySelector("span:not(.pb-tr-err-reason)");
+  const lab = btn.querySelector(":scope > span:not(.pb-tr-err-reason):not(.pb-tr-err-raw)");
   const visible = lab ? lab.textContent : "";
-  btn.setAttribute("aria-label", visible ? visible + ": " + tip : tip);
+  btn.setAttribute("aria-label", visible ? visible + ": " + tip + (raw ? " (" + raw + ")" : "") : tip);
   let reason = btn.querySelector(".pb-tr-err-reason");
   if (!reason) {
     reason = document.createElement("span");
     reason.className = "pb-tr-err-reason";
     reason.setAttribute("aria-hidden", "true");
-    btn.appendChild(reason);
+    btn.insertBefore(reason, btn.firstChild);   // headline first, action last
   }
   reason.textContent = shown || tip;
+  let rawEl = btn.querySelector(".pb-tr-err-raw");
+  if (raw) {
+    if (!rawEl) {
+      rawEl = document.createElement("span");
+      rawEl.className = "pb-tr-err-raw";
+      rawEl.setAttribute("aria-hidden", "true");
+      reason.insertAdjacentElement("afterend", rawEl);
+    }
+    rawEl.textContent = raw;
+  } else if (rawEl) {
+    rawEl.remove();
+  }
 }
 
 // Per-block failure: inline error pill after the block, the reason printed
 // in it; click retries this single block.
-function _pbpTrMarkFailed(st, w, message) {
+function _pbpTrMarkFailed(st, w, message, err) {
   if (!_pbpTrItemCurrent(st, w)) return;   // same fence as _pbpTrFill: no pill on a replaced article
   const orig = pbpAiBlockEl(w.n);
   if (!orig) return;
@@ -2500,7 +2543,8 @@ function _pbpTrMarkFailed(st, w, message) {
   const lab = document.createElement("span");
   lab.textContent = t("trRetryBlock");
   btn.appendChild(lab);
-  _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + String(message || ""), String(message || ""));
+  const lines = pbpTrErrLines(message, err);
+  _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + lines.reason, lines.reason, lines.raw);
   orig.insertAdjacentElement("afterend", btn);
   btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
   _pbpTrSyncRetryAll();
@@ -2644,7 +2688,7 @@ async function _pbpTrRetryBlock(st, w, btn) {
   // new language's key would be restored as a "hit" indefinitely.
   const lang = st.target.code;
   const langName = st.target.name;
-  const label = btn.querySelector("span");
+  const label = btn.querySelector(":scope > span:not(.pb-tr-err-reason):not(.pb-tr-err-raw)");
   if (st.permissionError) {
     if (label) label.textContent = t("aiGrantRetry");
     const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
@@ -2702,9 +2746,8 @@ async function _pbpTrRetryBlock(st, w, btn) {
     if (e && e.code === "host_permission") st.permissionError = e;
     if (label) label.textContent = t(e && e.code === "host_permission" ? "aiGrantRetry" : "trRetryBlock");
     btn.disabled = false;
-    const overrideHint = pbpAiOverrideErrHint(e, st.s);
-    const cause = pbpAiErrorText(e) + (overrideHint ? " " + overrideHint : "");
-    _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + cause, cause);
+    const lines = pbpTrErrLines(pbpAiErrorText(e), e, pbpAiOverrideErrHint(e, st.s));
+    _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + lines.reason, lines.reason, lines.raw);
     _pbpTrNoteStatusPage(st, e);
     _pbpTrSyncRetryAll();
   } finally {

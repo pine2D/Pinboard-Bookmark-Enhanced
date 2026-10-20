@@ -2846,6 +2846,9 @@
   "trErrTimeout": {
     "message": "AI サービスがタイムアウトしました。もう一度お試しください"
   },
+  "trErrTooLong": {
+    "message": "テキストがこのモデルの上限を超えています。コンテキストの長いモデルをお試しください"
+  },
   "aiErrRequestFailed": {
     "message": "AI リクエストに失敗しました"
   },

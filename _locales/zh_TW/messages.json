@@ -2846,6 +2846,9 @@
   "trErrTimeout": {
     "message": "AI 服務回應逾時，請重試"
   },
+  "trErrTooLong": {
+    "message": "內容超出這個模型的長度上限，請改用上下文更大的模型"
+  },
   "aiErrRequestFailed": {
     "message": "AI 請求失敗"
   },

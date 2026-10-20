@@ -2091,7 +2091,10 @@ async function driveReaderEdge(context, worker, extId, rep) {
         btn.type = "button"; btn.className = "pb-tr-err"; btn.dataset.pbTrErr = target.dataset.pb || "2";
         btn.innerHTML = PBP_TR_ERR_SVG;
         const lab = document.createElement("span"); lab.textContent = t("trRetryBlock"); btn.appendChild(lab);
-        _pbpTrSetErrTip(btn, t("trBlockFailed") + " - HTTP 500: upstream provider returned an internal error while generating the translation for this paragraph");
+        // The production describe + split: localized headline, raw text second.
+        const err = Object.assign(new Error("HTTP 500: upstream provider returned an internal error while generating the translation for this paragraph"), { status: 500 });
+        const lines = pbpTrErrLines(pbpAiErrorText(err), err);
+        _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + lines.reason, lines.reason, lines.raw);
         (target.nextElementSibling && target.nextElementSibling.classList.contains("pb-tr") ? target.nextElementSibling : target).insertAdjacentElement("afterend", btn);
         _pbpTrSyncRetryAll();
         btn.scrollIntoView({ block: "center", behavior: "instant" });
@@ -2136,10 +2139,47 @@ async function driveReaderEdge(context, worker, extId, rep) {
       await page.evaluate(() => {
         const d = document.getElementById("reader-source-details");
         if (d) d.open = true;
-        renderErrorState(t("mdEngineExtractFailed"), () => {}, false, { label: t("mdEngineSwitchTo", "Jina Reader"), run: () => {} });
+        renderErrorState(t("mdEngineExtractFailed"), () => {}, false, { label: t("mdEngineSwitchTo", "Jina Reader"), run: () => {} }, "https://example.com/serendipity");
       });
       await page.waitForTimeout(300);
       await rep.shot(page, s, "de-dark-extraction-error");
+    });
+
+    // Ask as a bottom sheet (<=1200px): a citation jump must land the cited
+    // block in the strip above the sheet, not behind it (2026-10-20 item 6).
+    await step("ask-sheet-jump", async () => {
+      await setScheme("light");
+      await setLang("en");
+      await page.setViewportSize({ width: 1024, height: 900 });
+      await seed("");
+      await open();
+      await page.locator("#ask-open").click({ timeout: 3000 });
+      await page.waitForTimeout(500);
+      const res = await page.evaluate(async () => {
+        const thread = document.getElementById("ask-thread");
+        const blocks = [...document.querySelectorAll("#rendered-view [data-pb]")];
+        const last = blocks.length;
+        const a = document.createElement("div");
+        a.className = "ask-a";
+        a.textContent = "Early point [P2] and a late one [P" + last + "].";
+        thread.appendChild(a);
+        _pbpAskChipPass(a, [], new Set([2, last]));
+        window.scrollTo(0, 0);
+        await new Promise((r) => setTimeout(r, 300));
+        const out = [];
+        for (const chip of [...a.querySelectorAll(".ask-chip")]) {
+          chip.click();
+          await new Promise((r) => setTimeout(r, 1200));
+          const el = pbpAiBlockEl(Number(chip.dataset.p));
+          const r = el.getBoundingClientRect();
+          out.push({ p: chip.dataset.p, sy: scrollY, sh: document.documentElement.scrollHeight, ih: innerHeight, top: r.top, bottom: r.bottom, sheetTop: document.getElementById("ask-panel").getBoundingClientRect().top });
+        }
+        return out;
+      });
+      s.notes.push("ask-sheet-jump " + JSON.stringify(res));
+      if (res.length < 2) s.failures.push("ask-sheet-jump: chips missing");
+      for (const r of res) if (r.bottom > r.sheetTop + 1 || r.top < 0) s.failures.push("ask-sheet-jump: P" + r.p + " not above the sheet " + JSON.stringify(r));
+      await rep.shot(page, s, "ask-sheet-jump");
     });
 
     await step("de-light-typo", async () => {

@@ -1334,9 +1334,10 @@ function refineTags(tags, opts) {
 //      is already specific at its throw site (network's is localized there,
 //      _pbpStreamRead D4-2); a second mapping only blurs it. Tests pin this
 //      pass-through -- do not "unify" it into a table lookup.
-//   2. err.status -> 401/403 key, 429 quota, >=500 network.
-//   3. conservative message keywords (quota/rate limit, api key, timeout,
-//      failed-to-fetch). Never match a bare "model" substring.
+//   2. err.status -> 401/403 key, 429 quota, 413 too long, >=500 network
+//      (a relayed "HTTP nnn" message without .status maps the same way).
+//   3. conservative message keywords (quota/rate limit, api key, context
+//      too long, timeout, failed-to-fetch). Never match a bare "model" substring.
 //   4. unclassified -> String(err.message), never swallowed.
 // Writes nothing; callers put the result into textContent/dataset.tip/
 // aria-label only (spec ZH-3 write-surface allowlist).
@@ -1351,7 +1352,19 @@ function pbpAiErrorText(err) {
   const status = err && err.status;
   if (status === 401 || status === 403) return t("trErrKey");
   if (status === 429) return t("trErrQuota");
+  if (status === 413) return t("trErrTooLong");
   if (typeof status === "number" && status >= 500) return t("trErrNetwork");
+  // A bare "HTTP 5xx: ..." message with no .status field (a relayed error):
+  // same buckets as the numeric branch above.
+  const http = /\bHTTP (\d{3})\b/.exec(msg);
+  if (http && !(typeof status === "number")) {
+    const code = Number(http[1]);
+    if (code === 401 || code === 403) return t("trErrKey");
+    if (code === 429) return t("trErrQuota");
+    if (code === 413) return t("trErrTooLong");
+    if (code >= 500) return t("trErrNetwork");
+  }
+  if (/context.?(?:length|window)|maximum context|prompt is too long|too many tokens|token limit|exceeds? the (?:max|limit)|request entity too large|input.{0,20}too (?:long|large)/i.test(msg)) return t("trErrTooLong");
   if (/rate.?limit|too many requests|quota|resource.*exhausted|insufficient.*(?:balance|credit)/i.test(msg)) return t("trErrQuota");
   if (/invalid.*api.?key|incorrect api key|api key not valid|unauthorized|authentication/i.test(msg)) return t("trErrKey");
   if (/\btimed? ?out\b|timeout/i.test(msg)) return t("trErrTimeout");

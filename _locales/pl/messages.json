@@ -2846,6 +2846,9 @@
   "trErrTimeout": {
     "message": "Przekroczono limit czasu usługi AI, spróbuj ponownie"
   },
+  "trErrTooLong": {
+    "message": "Tekst jest zbyt długi dla tego modelu, spróbuj modelu z większym oknem kontekstu"
+  },
   "aiErrRequestFailed": {
     "message": "Żądanie AI nie powiodło się"
   },

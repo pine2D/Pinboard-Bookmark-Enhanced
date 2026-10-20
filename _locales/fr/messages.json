@@ -2846,6 +2846,9 @@
   "trErrTimeout": {
     "message": "Le service d'IA n'a pas répondu à temps, réessayez"
   },
+  "trErrTooLong": {
+    "message": "Le texte est trop long pour ce modèle, essayez-en un avec une fenêtre de contexte plus large"
+  },
   "aiErrRequestFailed": {
     "message": "La requête IA a échoué"
   },
