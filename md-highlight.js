@@ -2719,6 +2719,14 @@ function _pbpHlBuildItemEl(m) {
   const q = document.createElement("span");
   q.className = "hl-item-quote";
   q.textContent = m.excerpt;
+  // Article text in a UI-language rail: the quote takes the language it was
+  // drawn in -- the translation's for a translated-side item, else the
+  // article's -- so its :lang() font stack matches the page (a Chinese quote
+  // in a Japanese UI otherwise mixed Japanese and fallback glyphs).
+  const quoteLang = isTr
+    ? (typeof pbpTrTargetLangAttr === "function" ? pbpTrTargetLangAttr(full.lang) : "")
+    : ((document.getElementById("rendered-view") || {}).lang || "");
+  if (quoteLang) q.lang = quoteLang;
   main.appendChild(q);
   if (isTr) {
     const badge = document.createElement("span");

@@ -2392,6 +2392,55 @@ suiteIf("pbpTrResolveTargetLang / entry visibility", "pbpTrResolveTargetLang", (
     assertEq(pbpTrViewLangTags("zh-Hant", "", "zh-Hans"), null, "same primary subtag keeps the glyphs");
     assertEq(pbpTrViewLangTags("ja", "", "Klingon"), null, "custom free-text target is not a code");
     assertEq(pbpTrViewLangTags("ja", "", "文言文"), null, "CJK custom target is not a code");
+    // "und" is md-preview's stamp for "language unknown" (pbpReaderFallbackLang):
+    // it named no language and showed as UND / UND | ZH (README shots 2026-10-20).
+    for (const none of ["und", "UND", "mul", "zxx", "mis", "und-Latn"]) {
+      assertEq(pbpTrViewLangTags("", none, "zh-Hans"), null, `declared ${none} is unknown, glyphs stay`);
+      assertEq(pbpTrViewLangTags("zh-Hans", "", none), null, `target ${none} is unknown, glyphs stay`);
+    }
+  });
+  test("translation block lang: every dropdown code kept, Chinese folded onto the script stacks", () => {
+    // Category, not instances: every target the options dropdown offers is a
+    // tag the block must wear (the :lang() font stacks key on it).
+    for (const code of Object.keys(PBP_TR_LANG_NAMES)) {
+      assertEq(pbpTrTargetLangAttr(code), code, `dropdown code ${code}`);
+    }
+    for (const [code, want] of [["zh-CN", "zh-Hans"], ["zh_CN", "zh-Hans"], ["zh", "zh-Hans"], ["zh-SG", "zh-Hans"],
+      ["zh-Hans-CN", "zh-Hans"], ["zh-TW", "zh-Hant"], ["zh-HK", "zh-Hant"], ["zh-MO", "zh-Hant"], ["zh-Hant-TW", "zh-Hant"],
+      ["pt-BR", "pt-BR"], ["en_US", "en-US"]]) {
+      assertEq(pbpTrTargetLangAttr(code), want, `custom ${code}`);
+    }
+    for (const notTag of ["Latin", "Klingon", "Classical Chinese", "文言文", "", "und", "zxx", "zh-"]) {
+      assertEq(pbpTrTargetLangAttr(notTag), "", `not a usable tag: ${JSON.stringify(notTag)}`);
+    }
+  });
+  test("a filled translation block wears the target's lang (zh-CN -> zh-Hans) and RTL dir", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    view.lang = "und";
+    const p = document.createElement("p");
+    p.textContent = "We save more than we read.";
+    view.appendChild(p);
+    document.body.appendChild(view);
+    pbpAiIndexBlocks(view);
+    try {
+      const fill = (code) => {
+        _pbpTrFill({ mode: "bilingual", target: { code }, trMd: {} }, { n: 1, shielded: { slots: [] } }, "x");
+        return p.nextElementSibling;
+      };
+      let tr = fill("zh-CN");
+      assertEq(tr && tr.className, "pb-tr", "block created");
+      assertEq(tr.lang, "zh-Hans", "zh-CN target -> lang zh-Hans (matches :lang(zh-Hans))");
+      assert(tr.matches(":lang(zh-Hans)"), "the Simplified stack selector matches the block");
+      assertEq(tr.dir, "auto", "LTR target -> dir auto");
+      tr = fill("ar");
+      assertEq(tr.lang, "ar", "ar target");
+      assertEq(tr.dir, "rtl", "ar target -> rtl");
+      tr = fill("Latin");
+      assert(!tr.hasAttribute("lang"), "free-text target drops the previous lang and inherits");
+    } finally {
+      view.remove();
+    }
   });
   test("gate uses resolved TARGET lang, not UI lang", () => {
     // zh UI, explicit en target, zh article -> must SHOW (zh->en is useful)
@@ -5022,6 +5071,10 @@ suite("translation view shortcuts and anchors", () => {
       assertEq(link.textContent, "Translated heading", "live TOC text");
       assertEq(link.title, "Translated heading", "live TOC title");
       assertEq(link.dataset.origText, "Original heading", "original retained");
+      assertEq(link.lang, "fr", "translated TOC entry wears the translation's lang");
+      _pbpTrSyncToc(st, "bilingual");
+      assertEq(link.textContent, "Original heading", "original text back in another view");
+      assert(!link.hasAttribute("lang"), "original TOC entry inherits the list's (article) lang again");
     } finally {
       document.body.classList.remove("tr-only");
       view.remove(); toc.remove();

@@ -3000,6 +3000,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // IntersectionObserver and scroll listener never outlive their targets.
     if (_scrollSpyDispose) { _scrollSpyDispose(); _scrollSpyDispose = null; }
     tocList.replaceChildren();
+    // The entries are the article's headings, not UI text: they take the
+    // article's lang (and with it its :lang() font stack), or a Chinese
+    // article read in a Japanese or English UI set its TOC in Japanese /
+    // Traditional-first glyphs. No article lang: inherit the UI's.
+    if (renderedView.lang) tocList.lang = renderedView.lang;
+    else tocList.removeAttribute("lang");
     if (!headings.length) {
       tocNav.hidden = true; // #toc ships hidden, so this is a no-op on first render
       return;

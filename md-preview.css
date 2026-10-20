@@ -150,11 +150,17 @@ html { scrollbar-gutter: stable; }
      popup.css/options.css never used system-ui either. Don't re-add it. */
   --latin: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue";
   --mono-latin: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", Menlo;
-  --han-tc: "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "Noto Sans TC";
-  --han-sc: "PingFang SC", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Hiragino Sans GB";
-  --han-ja: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic", "Meiryo", "Noto Sans JP";
-  --han-ko: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR";
-  --han-rest: "Source Han Sans", "Noto Sans CJK SC", "WenQuanYi Micro Hei";
+  /* Each regional set names the families that really exist on Win / Mac /
+     Linux: "Noto Sans SC" and "Noto Sans CJK SC" (Linux's fonts-noto-cjk)
+     are DIFFERENT families, as are "Source Han Sans SC" and the Pan-CJK
+     "Source Han Sans". A Linux reader with only the CJK packages used to find
+     no SC family before the TC set in the zh-Hans stack, and set Simplified
+     text with Traditional (centred) punctuation. */
+  --han-tc: "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "Noto Sans TC", "Noto Sans CJK TC", "Source Han Sans TC";
+  --han-sc: "PingFang SC", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "Hiragino Sans GB";
+  --han-ja: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic", "Meiryo", "Noto Sans JP", "Noto Sans CJK JP";
+  --han-ko: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", "Noto Sans CJK KR";
+  --han-rest: "Source Han Sans", "WenQuanYi Micro Hei";
   font-variant-emoji: text;
 }
 

@@ -750,14 +750,36 @@ function _pbpTrViewLang(view) {
 // null and the glyphs stay. Source = the detected script language, else the
 // article's declared lang; target = st.target.code (custom free text such as
 // "Klingon" is not a code and keeps the glyphs).
+// BCP 47 primary subtags that name no language: "und" is what md-preview
+// stamps on an article whose language neither its glyphs nor its page
+// declare (pbpReaderFallbackLang), and it rendered as the code "UND" in the
+// view toggle. They count as unknown everywhere a code is shown or applied.
+const PBP_TR_NON_LANG_SUBTAGS = new Set(["und", "mul", "zxx", "mis"]);
 function pbpTrViewLangTags(scriptLang, declaredLang, targetCode) {
   const primary = (v) => {
     const m = /^([a-z]{2,3})(?:[-_]|$)/i.exec(String(v || "").trim());
-    return m ? m[1].toUpperCase() : "";
+    return m && !PBP_TR_NON_LANG_SUBTAGS.has(m[1].toLowerCase()) ? m[1].toUpperCase() : "";
   };
   const src = primary(scriptLang) || primary(declaredLang);
   const tgt = primary(targetCode);
   return src && tgt && src !== tgt ? { src, tgt } : null;
+}
+// The lang attribute a translation block wears, from the target code: a
+// well-formed BCP 47 tag, with Chinese folded onto the script subtags the
+// reader's :lang(zh-Hans) font stack keys on (md-preview.css). A region-only
+// "zh-CN" (a custom target, or a value kept from older builds) matched no
+// stack, so the block fell to the Traditional-first body default and set
+// Simplified text with centred full stops and commas. Free text ("Latin",
+// "文言文") and "und"-class subtags are not tags: "" (the block inherits).
+function pbpTrTargetLangAttr(code) {
+  const tag = String(code || "").trim().replace(/_/g, "-");
+  if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(tag)) return "";
+  const parts = tag.toLowerCase().split("-");
+  if (PBP_TR_NON_LANG_SUBTAGS.has(parts[0])) return "";
+  if (parts[0] !== "zh") return tag;
+  if (parts.includes("hant")) return "zh-Hant";
+  if (parts.includes("hans")) return "zh-Hans";
+  return parts.some((p) => p === "tw" || p === "hk" || p === "mo") ? "zh-Hant" : "zh-Hans";
 }
 function _pbpTrShouldHideEntry(articleLang, targetLang) {
   return !!(articleLang && targetLang && articleLang === targetLang);
@@ -2414,14 +2436,17 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   // D9-1: known RTL target -> explicit rtl (auto's first-char sniff misreads
   // segments that lead with an untranslated Latin brand/code term); custom
   // free-text targets can't be judged statically -> degrade to dir="auto".
-  div.dir = PBP_TR_RTL_LANGS.has(st.target.code) ? "rtl" : "auto";
+  const trLang = pbpTrTargetLangAttr(st.target.code);
+  div.dir = PBP_TR_RTL_LANGS.has(trLang.split("-")[0].toLowerCase()) ? "rtl" : "auto";
   // :lang() font-stack routing: the .pb-tr otherwise inherits the ORIGINAL
   // article's lang (often empty on English pages), so a Simplified
   // translation fell back to the TC-first default Han stack on machines
-  // carrying both (macOS ships PingFang SC and TC). Dropdown and auto both
-  // yield normalized BCP-47 codes; a custom free-text target ("Latin") is
-  // not a tag, so it stays off the attribute and inherits as before.
-  if (PBP_TR_LANG_NAMES[st.target.code]) div.lang = st.target.code;
+  // carrying both (macOS ships PingFang SC and TC). Any well-formed tag
+  // counts, a custom "zh-CN" included (pbpTrTargetLangAttr folds it onto
+  // zh-Hans); a custom free-text target ("Latin") is not a tag, so it stays
+  // off the attribute and inherits as before.
+  if (trLang) div.lang = trLang;
+  else div.removeAttribute("lang");
   div.innerHTML = renderMarkdown(restored);
   // H5 paint gate (spec 1.3): stamp the language this .pb-tr currently shows
   // so a translated-side highlight only re-paints when its recorded lang
@@ -3243,9 +3268,14 @@ function _pbpTrSyncToc(st, mode) {
       if (a.dataset.origText == null) a.dataset.origText = a.textContent;
       a.textContent = txt;
       a.title = txt;
+      // The translated heading wears the translation's lang (the list wears
+      // the article's, md-preview.js rebuildToc).
+      if (sib.lang) a.lang = sib.lang;
+      else a.removeAttribute("lang");
     } else if (a.dataset.origText != null) {
       a.textContent = a.dataset.origText;
       a.title = a.dataset.origText;
+      a.removeAttribute("lang");
     }
   });
 }

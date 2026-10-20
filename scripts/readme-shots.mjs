@@ -213,7 +213,7 @@ async function startSession({ scheme, video }) {
       pinboardToken: obfuscateKey(token), optLang: "en", optTheme: scheme, themePresetKey: "", optPopupFollowTheme: true,
       aiProvider: "openai", openaiApiKey: obfuscateKey("sk-mock"), openaiModel: "gpt-5.4-mini",
       previewAiEnabled: true, previewSkimEnabled: false, optAiAutoTags: false, dictEchoEnabled: true,
-      translateTargetLang: "zh-CN", optShowSuggestTags: true,
+      translateTargetLang: "zh-Hans", optShowSuggestTags: true,
       ...(video ? { mdVideoDarkScheme: false, mdVideoLangPref: "" } : {}),
     });
   }, { token: F.TOKEN, scheme, video });
@@ -282,7 +282,7 @@ async function openReader(S, page) {
   await S.sw.evaluate(async ({ k, md, title, url }) => {
     const auth = await getCurrentPinboardAuth();
     await chrome.storage.local.set({ [`md_preview_data_${k}`]: { markdown: md, contentHtml: "", title, url, baseUrl: url,
-      tags: ["reading", "essay"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, account: auth.account || "", ts: Date.now() } });
+      tags: ["reading", "essay"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, lang: "en", account: auth.account || "", ts: Date.now() } });
   }, { k: PREVIEW_KEY, md: F.ARTICLE_MARKDOWN, title: F.ARTICLE_TITLE, url: F.ARTICLE_URL });
   await page.goto(`chrome-extension://${S.extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load" });
   await page.waitForFunction(() => document.querySelectorAll("#rendered-view [data-pb]").length > 0, { timeout: T });
@@ -433,7 +433,7 @@ async function video(S) {
   await S.sw.evaluate(async ({ k, title, url, desc }) => {
     const auth = await getCurrentPinboardAuth();
     await chrome.storage.local.set({ [`md_preview_data_${k}`]: { markdown: desc, contentHtml: "", title, url, baseUrl: url,
-      tags: ["reading", "talk"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, account: auth.account || "", ts: Date.now() } });
+      tags: ["reading", "talk"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, lang: "en", account: auth.account || "", ts: Date.now() } });
   }, { k: "readme-video", title: F.TITLE, url: F.WATCH_URL, desc: F.PLAYER_RESPONSE.videoDetails.shortDescription });
   const page = await S.ctx.newPage();
   page.on("pageerror", (e) => console.log("[pageerror]", e.message));
