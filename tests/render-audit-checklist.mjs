@@ -1255,8 +1255,12 @@ export const CHECKS = [
   // fixture-tab workaround the read-only screenshot tooling needed). ----
   { surface: "options", page: "options.html", selector: ".theme-preset-btn.active", state: "default",
     expect: { beforeExists: true } },
+  // The selected pill's ring retired 2026-10-20 (options critique 4, user
+  // ruling: rings mean focus only). Selection is now the chip wash + a check
+  // in the pill's own ink, so the oracle pins the fill to the chip-bg token
+  // and the ink pair to AA instead of an outline that no longer exists.
   { surface: "options", page: "options.html", selector: ".theme-preset-btn.active", state: "default",
-    expect: { outlineContrast: 3 } },
+    expect: { bgEqVar: "chip-bg", textContrast: 4.5 } },
 
   // ---- (library redesign T4b) The #vocab-search heightEqWith
   // #vocab-group-filter entry that stood here is gone: at the runner's 1280

@@ -2164,6 +2164,9 @@ html.motion-ready #preset-preview-section > summary::after {
 .saved-theme-btn::before {
   content: "";
   width: 7px; height: 7px;
+  /* 7px dot + 2.5px each side = the 12px check that replaces it on the
+     selected pill, so selecting never shifts the row. */
+  margin: 0 2.5px;
   border-radius: 50%;
   background: var(--variant-swatch);
   /* A hairline in the chip's own ink: a dark preset accent (Paper & Ink's
@@ -2171,8 +2174,12 @@ html.motion-ready #preset-preview-section > summary::after {
   outline: 1px solid color-mix(in srgb, var(--opt-fg) 30%, transparent);
   flex-shrink: 0;
 }
-.theme-preset-btn:hover:not(:disabled),
-.saved-theme-btn:hover:not(:disabled) {
+/* Not on the selected pill: this rule is (0,3,0) and the .active fill below
+   is (0,2,0), so hovering the selected preset used to swap its chip wash for
+   the hover grey -- invisible while a ring carried selection, the whole
+   signal once the fill does (caught by the render oracle, 2026-10-20). */
+.theme-preset-btn:hover:not(:disabled, .active),
+.saved-theme-btn:hover:not(:disabled, .active) {
   background: var(--opt-btn-hover);
 }
 /* .saved-theme-btn shares every other rule in this shared-base block (fill,
@@ -2182,17 +2189,33 @@ html.motion-ready #preset-preview-section > summary::after {
    recipe, same call as `.theme-preset-btn` -- both rest on `border: none`. */
 .theme-preset-btn:focus-visible,
 .saved-theme-btn:focus-visible { outline: 1px solid var(--opt-accent); outline-offset: 2px; box-shadow: var(--opt-focus-ring); }
-/* Text in --opt-fg, not --opt-chip-fg (2026-10-15): the ring is the one
-   accent on a selected pill. chip-fg is a tag-chip ink and on Flexoki dark
-   (the default dark mode) it is amber, so the selected pill wore amber text
-   inside a blue ring. fg on chip-bg clears 4.6:1 or more on every preset. */
+/* Selected = chip wash + 600 + a Lucide check (v0.525.0 `check`) in place of
+   the swatch dot (2026-10-20, options critique 4, user ruling). The 2px
+   accent ring this replaced was nearly the same shape as :focus-visible's
+   1px ring + glow, so tabbing across the 14 presets showed two near-twin
+   rings and "where am I" read as "what is on". Rings now mean focus only.
+   Text in --opt-fg, not --opt-chip-fg (2026-10-15): chip-fg is a tag-chip
+   ink and on Flexoki dark (the default dark mode) it is amber. fg on chip-bg
+   clears 4.6:1 or more on every preset, and the check is drawn in that ink. */
 .theme-preset-btn.active,
-.saved-theme-btn.active {
+.saved-theme-btn.active,
+/* (0,4,0): outranks the generated `.btn:hover:not(:disabled)` (0,3,0), which
+   otherwise repaints the selected pill in the hover grey under the pointer. */
+.theme-preset-btn.active:hover:not(:disabled),
+.saved-theme-btn.active:hover:not(:disabled) {
   background: var(--opt-chip-bg);
   color: var(--opt-fg);
   font-weight: 600;
-  outline: 2px solid var(--opt-accent);
-  outline-offset: 2px; /* ring sits outside the border box -- never touches the label */
+}
+.theme-preset-btn.active::before,
+.saved-theme-btn.active::before {
+  width: 12px; height: 12px;
+  margin: 0;
+  border-radius: 0;
+  outline: none;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 /* ---- Saved theme buttons ---- */

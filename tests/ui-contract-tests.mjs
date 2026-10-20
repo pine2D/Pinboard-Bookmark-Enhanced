@@ -2042,9 +2042,10 @@ check(/\.regen-link:focus-visible \{ [^}]*\}/.test(popupCss) &&
 // that is not literally the theme's own --{ns}-focus-ring token counts as a
 // hand-drawn ring.
 const FOCUS_SHAPE_EXEMPT = {
-  // Selection marks, not focus indicators: no :focus-visible, and the render
-  // oracle gates the ring's contrast separately via outlineContrast.
-  ring: [/\.theme-preset-btn\.active/, /\.saved-theme-btn\.active/],
+  // Selection marks, not focus indicators. Empty since 2026-10-20: the preset
+  // pills' selection ring retired (options critique 4), so every ring left on
+  // the page is a focus ring and must match a placement.
+  ring: [],
   // §7.3's one sanctioned bare `outline: none`: a passenger that hands its
   // indicator to the container drawing the ring on its behalf (§8 law 2).
   // Listed explicitly so "defers to container" stays a deliberate, reviewed

@@ -7050,6 +7050,11 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       await page.click(".theme-preset-btn[data-theme='flexoki']");
       await page.waitForSelector("#preset-preview-section:not([hidden])", { timeout: TIMEOUT_MS });
       for (const check of presetPreviewChecks) await runOneCheck(page, theme, check, results);
+      // The click just started the pill's 150ms background transition (btn-bg
+      // -> chip-bg); since the selection is the fill itself (2026-10-20, ring
+      // retired), read it settled, not mid-fade. The pointer still rests on
+      // the pill, which the .active:hover rule in options.css covers.
+      await settleAnimations(page);
       for (const check of presetRowChecks) await runOneCheck(page, theme, check, results);
       if (savedThemeChecks.length) {
         await page.waitForSelector(".saved-theme-btn", { timeout: TIMEOUT_MS });
