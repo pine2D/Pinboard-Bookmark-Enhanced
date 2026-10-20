@@ -2665,6 +2665,27 @@ document.addEventListener("pbp:i18n-applied", () => {
   // kept them in the mirror's language.
   _pbpVocabRenderStats();
   _pbpVocabSyncLoadMore();
+  // Written once and never again until this (critique round 4, 2026-10-20):
+  // the lookup language names (filled at wiring) and the batch row's group
+  // help (created on first use) kept the mirror's language -- "anglais" on a
+  // Chinese page, a Chinese sentence under a German batch row.
+  const langSel = $id("vocab-lookup-lang");
+  if (langSel && typeof uiLangToBCP47 === "function") _pbpVocabFillLookupLangs(langSel, uiLangToBCP47());
+  const groupHelp = $id("vocab-remove-group-help");
+  if (groupHelp) groupHelp.textContent = t("vocabRemoveGroupNoMatch");
+  // The rows (the Known chip, the empty sentence) and the open word are built
+  // from t() as well. Only once a word list has landed: before that there is
+  // nothing to re-word, and an empty render would read as "no words yet".
+  const list = $id("vocab-list");
+  if (list && String(_vocabCurrentOwner || "").startsWith("acct_") && list.getAttribute("aria-busy") !== "true") {
+    const region = list.closest(".vocab-list-region");
+    const scroll = region ? region.scrollTop : 0;
+    const focusedId = document.activeElement?.closest?.("#vocab-list .vocab-card")?.dataset.vocabId || null;
+    _pbpVocabRenderList();
+    if (region) region.scrollTop = scroll;
+    if (focusedId) _pbpVocabFocusRow(focusedId);
+    _pbpVocabReconcileDetail();
+  }
 });
 // Narrow-screen door to the lookup row. Below 860px the detail pane is
 // display:none until `lib-narrow-detail` is on the body, so the list needs

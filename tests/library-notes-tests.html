@@ -1922,6 +1922,23 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       try { document.dispatchEvent(new Event("pbp:i18n-applied")); } finally { t = tBefore; }
       check("a language switch re-words Load more in the new language",
         more()?.textContent === "L2:vocabLoadMore:50" && rows().length === 100, more()?.textContent);
+      // ...and the index itself (critique round 4): every page heading's
+      // count was built once and kept the old language. Same depth, same
+      // focused row, same scroll offset after the rebuild.
+      const region = document.querySelector(".notes-list-region");
+      rows()[60].querySelector(".notes-hit-btn").focus();
+      const focusedKey = rows()[60].dataset.notesKey;
+      region.scrollTop = 120;
+      const scrollBefore = region.scrollTop;
+      t = (key, ...values) => "L3:" + tBefore(key, ...values);
+      try { document.dispatchEvent(new Event("pbp:i18n-applied")); } finally { t = tBefore; }
+      const heads = [...document.querySelectorAll("#notes-list .notes-page-count")];
+      check("a language switch re-words every page heading in the index, keeping depth, focus and scroll",
+        heads.length > 0 && heads.every((h) => h.textContent.includes("L3:libraryStatsHighlights")) && rows().length === 100 &&
+        document.activeElement?.closest(".notes-hit")?.dataset.notesKey === focusedKey &&
+        region.scrollTop === scrollBefore,
+        `${heads.map((h) => h.textContent).slice(0, 2).join(" | ")} rows=${rows().length} scroll=${region.scrollTop}/${scrollBefore}`);
+      document.dispatchEvent(new Event("pbp:i18n-applied"));
     }
     check("Select all takes every matching highlight, not just the rendered ones", (() => {
       $id("notes-select-all").click();

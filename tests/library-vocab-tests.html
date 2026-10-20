@@ -3527,6 +3527,30 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("a language switch re-words Load more in the new language",
         $id("vocab-load-more").textContent === "L2:vocabLoadMore:2" && !$id("vocab-load-more").hidden,
         $id("vocab-load-more").textContent);
+      {
+        // Critique round 4 (2026-10-20): the lookup language names, the
+        // batch row's group help and the rows' Known chip were written once
+        // and kept the old language. A switch to French re-words all three,
+        // keeps the chosen lookup language and the loaded depth.
+        show([word("i18n-k", "kept", "known", "en", [], TS), ...bulk(PBP_VOCAB_RENDER_BATCH + 1)]);
+        const langSel = $id("vocab-lookup-lang");
+        langSel.value = "de";
+        const help = _pbpVocabGroupHelpEl();
+        const depth = $id("vocab-list").querySelectorAll(".vocab-card").length;
+        setLang("fr");
+        t = (key, ...values) => "L4:" + realT(key, ...values);
+        try { document.dispatchEvent(new Event("pbp:i18n-applied")); } finally { t = realT; }
+        const enName = langSel.querySelector('option[value="en"]')?.textContent;
+        const chip = $id("vocab-list").querySelector(".vocab-status-chip")?.textContent;
+        check("a language switch re-words the lookup language names, the group help and the rows' Known chip",
+          enName === pbpDictLanguageLabel("en", "fr") && enName !== pbpDictLanguageLabel("en", "en") &&
+          langSel.value === "de" && help?.textContent === "L4:vocabRemoveGroupNoMatch" &&
+          chip === "L4:vocabStatusKnown" && $id("vocab-list").querySelectorAll(".vocab-card").length === depth,
+          `${enName} ${langSel.value} ${help?.textContent} ${chip} depth=${$id("vocab-list").querySelectorAll(".vocab-card").length}/${depth}`);
+        setLang("en");
+        document.dispatchEvent(new Event("pbp:i18n-applied"));
+        langSel.value = "en";
+      }
 
       const locs = {};
       for (const loc of ["en", "de", "fr"]) locs[loc] = await (await fetch(`../_locales/${loc}/messages.json`)).json();

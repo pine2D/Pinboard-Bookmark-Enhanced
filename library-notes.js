@@ -2453,14 +2453,19 @@ if (typeof $id === "function") {
     // mirror's language. Before the first scan there is nothing to count.
     // The colour toggles' title / aria-label ("Quote, 3 highlights") are
     // written the same way.
+    // The index rows too (critique round 4, 2026-10-20): each page heading's
+    // date and highlight count are t() / locale strings, and a Chinese index
+    // kept a Russian "19 октября · Выделения: 7". _pbpNotesRender redoes the
+    // count row, colour toggles and Load more with them, at the same depth;
+    // the rebuild drops the scroll offset and a focused row, so both are kept.
     if (_notesScanDone) {
-      const all = _pbpNotesHits();
-      const visible = _pbpNotesVisibleHits(all);
-      _pbpNotesRenderToolbar(all.length, visible.length, all);
-      _pbpNotesSyncColorFilters(all);
-      // "Load N more" is written by the render path only; same remaining
-      // count that render computed, so this only re-words it.
-      _pbpNotesSyncLoadMore(visible.length - Math.min(visible.length, _notesRenderLimit));
+      const region = document.querySelector(".notes-list-region");
+      const scroll = region ? region.scrollTop : 0;
+      const focusedKey = document.activeElement?.closest?.("#notes-list .notes-hit")?.dataset.notesKey || null;
+      _pbpNotesRender(false);
+      if (region) region.scrollTop = scroll;
+      const row = focusedKey && _pbpNotesRowEl(focusedKey);
+      if (row) _pbpNotesFocus(row.querySelector(".notes-hit-btn"));
     }
     const hit = _pbpNotesFindHit(_pbpNotesSelectedKey);
     if (!hit) return;
