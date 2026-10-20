@@ -50,6 +50,7 @@ body.test-narrow-hide.lib-narrow-notes .notes-list-pane{display:none}
         <button type="button" class="btn btn-sm danger ghost" id="notes-batch-delete" aria-label="Delete selected highlights"></button>
         <span class="lib-batch-status"></span>
       </div>
+      <p class="lib-select-hint" id="notes-select-hint" hidden>Ctrl-click an entry to select it, Shift-click to select a range</p>
       <div class="notes-list-region">
         <div id="notes-list" role="grid" aria-multiselectable="true" aria-label="Saved highlights"></div>
         <p id="notes-empty" class="notes-empty" hidden></p>
@@ -1312,8 +1313,16 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       el.getAttribute("aria-selected") === "false" &&
       el.querySelector('[role="gridcell"] > .notes-hit-btn')));
   check("the batch bar starts hidden", !$id("notes-batch-toolbar").classList.contains("selecting"));
+  // The one-time multi-select hint (critique round 4): on screen until the
+  // first selection, which retires it for good.
+  try { localStorage.removeItem(PBP_LIB_SELECT_HINT_KEY); } catch (_) {}
+  _pbpLibSelectHintRetired = false;
+  _pbpNotesSyncSelectionUi();
+  const hintBefore = $id("notes-select-hint").hidden;
   const currentBefore = _pbpNotesSelectedKey;
   btnOf("pbp_hl_alpha#a1").dispatchEvent(mouse({ ctrlKey: true }));
+  check("the notes multi-select hint shows until the first Ctrl-click, then retires for good",
+    hintBefore === false && $id("notes-select-hint").hidden === true && localStorage.getItem(PBP_LIB_SELECT_HINT_KEY) === "1");
   check("Ctrl-click selects a highlight and reveals the batch bar",
     _notesSelected.size === 1 && rowEl("pbp_hl_alpha#a1").classList.contains("selected") &&
     rowEl("pbp_hl_alpha#a1").getAttribute("aria-selected") === "true" &&

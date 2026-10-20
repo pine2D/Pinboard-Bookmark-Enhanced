@@ -179,6 +179,12 @@
         <button type="button" class="btn btn-sm" id="vocab-mark-learning" data-i18n="vocabBatchMarkLearning" data-i18n-title="vocabMarkLearning" title="Back to learning">Back to learning</button>
         <span class="lib-batch-status"></span>
       </div>
+      <!-- The multi-select gesture, said once (critique round 4, 2026-10-20):
+           Select all's title is out of reach for anyone who never hovers it.
+           Under the count row (the batch row in between is display:none
+           until a selection exists), until the first selection ever in
+           either view (library.js pbpLibSyncSelectHint), then never again. -->
+      <p class="lib-select-hint" id="vocab-select-hint" data-i18n="vocabSelectHint" hidden>Ctrl-click an entry to select it, Shift-click to select a range</p>
       <!-- The list side's status line (spec §4.7 amended 2026-10-16): under
            the count row, never in it -- that row is single-line and a failure
            is often two sentences. _pbpVocabStatusHost moves this one live
@@ -273,6 +279,7 @@
             <button type="button" class="btn btn-sm danger ghost" id="notes-batch-delete" data-i18n-title="notesBatchDelete" data-i18n-aria="notesBatchDelete" aria-label="Delete selected highlights" title="Delete selected highlights"><span class="btn-ic" data-ic="trash"></span></button>
             <span class="lib-batch-status"></span>
           </div>
+          <p class="lib-select-hint" id="notes-select-hint" data-i18n="vocabSelectHint" hidden>Ctrl-click an entry to select it, Shift-click to select a range</p>
           <!-- The notes list's own scroll container (spec §2.4). -->
           <div class="notes-list-region">
             <!-- role=grid + aria-multiselectable for the same reason the

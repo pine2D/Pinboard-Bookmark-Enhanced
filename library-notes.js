@@ -661,6 +661,7 @@ function _pbpNotesSyncSelectionUi(hits) {
   if (bar) bar.classList.toggle("selecting", count > 0);
   const ctx = $id("notes-context-bar");
   if (ctx) ctx.hidden = count > 0;
+  if (typeof pbpLibSyncSelectHint === "function") pbpLibSyncSelectHint($id("notes-select-hint"), visible.size, count);
   const status = $id("notes-status");
   const statusHost = status ? _pbpNotesStatusHost() : null;
   if (status && statusHost && status.parentNode !== statusHost) statusHost.appendChild(status);

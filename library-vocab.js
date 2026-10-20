@@ -1825,6 +1825,7 @@ function _pbpVocabSyncSelectionUi() {
   if (toolbar) toolbar.classList.toggle("selecting", selectedCount > 0);
   const ctxBar = $id("vocab-context-bar");
   if (ctxBar) ctxBar.hidden = selectedCount > 0;
+  if (typeof pbpLibSyncSelectHint === "function") pbpLibSyncSelectHint($id("vocab-select-hint"), _vocabViewRows.length, selectedCount);
   _pbpVocabStatusHost();
   const batchAll = $id("vocab-batch-select-all");
   if (batchAll) batchAll.disabled = _vocabBatchBusy || !_vocabViewRows.length || selectedCount >= _vocabViewRows.length;

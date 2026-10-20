@@ -2449,6 +2449,17 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
   color: var(--lib-fg-muted);
 }
 .lib-count-row[hidden] { display: none; }
+/* The one-time multi-select hint under the count row (critique round 4,
+   library.js pbpLibSyncSelectHint): the count row's own voice -- meta size,
+   muted -- so it reads as that row's second line, not as a notice. Wraps
+   (a long locale at 320px is two lines); flex: none like the status line. */
+.lib-select-hint {
+  flex: none;
+  margin: 0 0 var(--lib-sp-2);
+  font-size: var(--lib-text-meta);
+  line-height: var(--lib-lh-meta);
+  color: var(--lib-fg-muted);
+}
 .lib-count-items {
   display: flex;
   flex-wrap: wrap;

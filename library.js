@@ -5,6 +5,30 @@
 // never synced.
 const PBP_LIB_VIEW_KEY = "pbp-lib-last-view";
 const PBP_LIB_VIEWS = ["notes", "vocab"];
+// The multi-select hint is said until the first selection in either view,
+// then retired for good on this device -- page-local UI state like the view
+// memory above. The module flag keeps it retired for the page's life when
+// localStorage is unavailable.
+const PBP_LIB_SELECT_HINT_KEY = "pbp-lib-select-hint-seen";
+let _pbpLibSelectHintRetired = false;
+
+// Called from each view's selection sync (every render and every selection
+// change). A list of fewer than two rows has nothing to multi-select.
+function pbpLibSyncSelectHint(hint, rowCount, selectedCount) {
+  if (!hint) return;
+  if (!_pbpLibSelectHintRetired) {
+    try { _pbpLibSelectHintRetired = localStorage.getItem(PBP_LIB_SELECT_HINT_KEY) === "1"; } catch (_) {}
+  }
+  if (!_pbpLibSelectHintRetired && selectedCount > 0) {
+    _pbpLibSelectHintRetired = true;
+    try { localStorage.setItem(PBP_LIB_SELECT_HINT_KEY, "1"); } catch (_) {}
+    for (const id of ["vocab-select-hint", "notes-select-hint"]) {
+      const el = $id(id);
+      if (el) el.hidden = true;
+    }
+  }
+  hint.hidden = _pbpLibSelectHintRetired || rowCount < 2;
+}
 
 function pbpLibActiveView() {
   return $id("view-notes").hidden ? "vocab" : "notes";
