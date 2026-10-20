@@ -1208,8 +1208,8 @@ let _pbpZenPrevStudyView = null;
 // PBP_SEARCH_NEXT_SVG above -- kept as a local const like those two rather
 // than added to shared.js's PBP_ICONS bank, same precedent). Two arrows
 // pointing outward from center reads as "resize/cycle width."
-// Alias of the shared width-cycle icon (Lucide move-horizontal) so the
-// zen-bar and rail entry points stay pixel-identical with the family.
+// Alias of the shared width-cycle icon (Lucide move-horizontal); the zen bar
+// is its only consumer since the rail-bottom cycle button moved into "Aa".
 const PBP_ZEN_WIDTH_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.widthCycle : "";
 
 // This file's own copy of md-preview.js's pbpScrollMapBlocks() body (see
@@ -1381,24 +1381,21 @@ function _pbpZenApplyWidth() {
   _pbpZenSettleAfterLayout(anchor);
 }
 
-// Width button title/aria (spec sec.1.3: "simplest honest form") -- one
-// i18n key + the concatenated step value, not a 3-way translated string.
-// Updates BOTH entry points (zen bar icon button + rail text button); either
-// may not exist yet (bar is lazy, rail button only after _pbpZenInit).
+// Width control sync (spec sec.1.3: "simplest honest form") -- the zen bar's
+// icon button carries one i18n key + the concatenated step value in its
+// title/aria, never a 3-way translated string; the "Aa" panel's measure row
+// shows the step as its pressed segment. Either may not exist yet (both are
+// lazy). Outside zen the panel row is the only width control: the rail-bottom
+// cycle button it replaced (2026-10-20 reader critique, item 5) kept width
+// apart from the size / spacing / appearance controls it belongs with.
 function _pbpZenUpdateWidthBtn() {
-  const label = t("zenWidthAria") + ": " + _pbpZenWidth + "px";
+  const label = t("typoWidthLabel") + ": " + _pbpZenWidth + "px";
   const btn = document.getElementById("zen-width-btn");
   if (btn) {
     btn.setAttribute("aria-label", label);
     btn.title = label;
   }
-  const railBtn = document.getElementById("rail-width-btn");
-  if (railBtn) {
-    // Icon-only cell: the step value lives in title/aria (label already
-    // concatenates it), never in textContent -- that would wipe the SVG.
-    railBtn.setAttribute("aria-label", label);
-    railBtn.title = label;
-  }
+  _pbpTypoSyncPop(); // function declaration below; no-op until the panel exists
 }
 
 // Lazily builds the singleton #zen-bar (spec sec.1.3): NOT a popover -- no
@@ -1444,18 +1441,26 @@ function _pbpZenEnsureBar() {
   return bar;
 }
 
-// Width-cycle click (zen bar + rail button share this): 720 -> 880 -> 1080
-// -> 720 ..., persisted (spec sec.1.2), applied mode-independently via
-// _pbpZenApplyWidth. The .set() promise gets a .catch: storage failure must
-// stay silent-but-handled, not an unhandled rejection (Codex review).
-function _pbpZenCycleWidth() {
+// One write path for both width controls (the zen bar's cycle button and the
+// "Aa" panel's measure segments): persisted (spec sec.1.2), applied
+// mode-independently via _pbpZenApplyWidth, which also re-labels the other
+// control. An unrecognized step is ignored. The .set() promise gets a .catch:
+// storage failure must stay silent-but-handled, not an unhandled rejection
+// (Codex review).
+function _pbpZenSetWidth(width) {
+  if (PBP_ZEN_WIDTHS.indexOf(width) === -1) return;
   _pbpZenWidthTouched = true; // see _pbpZenLoadWidth: a late storage read must not undo this click
-  const idx = PBP_ZEN_WIDTHS.indexOf(_pbpZenWidth);
-  _pbpZenWidth = PBP_ZEN_WIDTHS[(idx === -1 ? 0 : idx + 1) % PBP_ZEN_WIDTHS.length];
+  _pbpZenWidth = width;
   _pbpZenApplyWidth();
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
     try { chrome.storage.local.set({ pbp_zen_width: _pbpZenWidth }).catch(() => {}); } catch (_) {}
   }
+}
+
+// Zen bar cycle click: 720 -> 880 -> 1080 -> 720 ...
+function _pbpZenCycleWidth() {
+  const idx = PBP_ZEN_WIDTHS.indexOf(_pbpZenWidth);
+  _pbpZenSetWidth(PBP_ZEN_WIDTHS[(idx === -1 ? 0 : idx + 1) % PBP_ZEN_WIDTHS.length]);
 }
 
 // Mouse-idle fade (spec sec.1.3): 2s of stillness fades #zen-bar to near-
@@ -1599,20 +1604,9 @@ function _pbpZenInit() {
     btn.setAttribute("aria-keyshortcuts", "z");
     btn.addEventListener("click", () => _pbpZenEnter());
     row.appendChild(btn);
-    // Unified-width round: with --pbp-width governing normal mode too, the
-    // width cycle needs an entry point OUTSIDE zen (the zen bar is the only
-    // other one) -- same rail-bottom text-button family as its neighbors.
-    // Label is the bare step value ("880px"); full text rides title/aria
-    // (set by _pbpZenUpdateWidthBtn, which also keeps it in sync with the
-    // zen bar's icon button).
-    const widthBtn = document.createElement("button");
-    widthBtn.type = "button";
-    widthBtn.id = "rail-width-btn";
-    widthBtn.className = "rail-kbd-help-btn";
-    widthBtn.innerHTML = PBP_ZEN_WIDTH_SVG; // current step value rides title/aria (_pbpZenUpdateWidthBtn)
-    widthBtn.addEventListener("click", _pbpZenCycleWidth);
-    row.appendChild(widthBtn);
-    _pbpZenUpdateWidthBtn();
+    // No width button here any more: outside zen the reading width lives in
+    // the "Aa" panel's measure row (_pbpTypoEnsurePop), next to size, spacing
+    // and appearance.
   }
 }
 
@@ -1672,16 +1666,18 @@ function _pbpTypoSyncPop() {
   if (plus) plus.setAttribute("aria-disabled", _pbpTypoFont >= 2 ? "true" : "false");
   const scheme = (typeof window.pbpReaderSchemeGet === "function") ? window.pbpReaderSchemeGet() : "auto";
   _pbpTypoPopEl.querySelectorAll(".typo-seg-btn").forEach((b) => {
-    const on = ("scheme" in b.dataset) ? b.dataset.scheme === scheme : Number(b.dataset.tier) === _pbpTypoLeading;
+    const on = ("scheme" in b.dataset) ? b.dataset.scheme === scheme
+      : ("width" in b.dataset) ? Number(b.dataset.width) === _pbpZenWidth
+      : Number(b.dataset.tier) === _pbpTypoLeading;
     b.setAttribute("aria-pressed", on ? "true" : "false");
   });
 }
 
 // Lazily builds the singleton #typo-pop: native popover="auto" (Esc +
-// light-dismiss for free), same family as #fn-pop/#kbd-help-pop. Two rows:
-// font-size stepper ("-" / readout / "+", ASCII only per the font iron rule)
-// and a three-way leading segment (aria-pressed toggles, .srch-regex
-// vocabulary).
+// light-dismiss for free), same family as #fn-pop/#kbd-help-pop. Four rows:
+// font-size stepper ("-" / readout / "+", ASCII only per the font iron rule),
+// then three-way segments (aria-pressed toggles, .srch-regex vocabulary) for
+// leading, reading width and appearance.
 function _pbpTypoEnsurePop() {
   if (_pbpTypoPopEl) return _pbpTypoPopEl;
   const pop = document.createElement("div");
@@ -1744,6 +1740,34 @@ function _pbpTypoEnsurePop() {
   });
   leadRow.appendChild(seg);
   pop.appendChild(leadRow);
+
+  // Measure row (2026-10-20 reader critique, item 5): the three reading-width
+  // steps as the same segment family, so the current step is visible instead
+  // of hiding behind a cycle button's tooltip. Writes through _pbpZenSetWidth,
+  // the zen bar's path -- one storage key (pbp_zen_width), one apply.
+  const widthRow = document.createElement("div");
+  widthRow.className = "typo-row";
+  const widthLabel = document.createElement("span");
+  widthLabel.className = "typo-label";
+  widthLabel.textContent = t("typoWidthLabel");
+  widthRow.appendChild(widthLabel);
+  const widthSeg = document.createElement("div");
+  widthSeg.className = "typo-seg";
+  widthSeg.setAttribute("role", "group");
+  widthSeg.setAttribute("aria-label", t("typoWidthLabel"));
+  const widthKeys = ["typoWidthNarrow", "typoWidthMedium", "typoWidthWide"]; // one per PBP_ZEN_WIDTHS step, in order
+  PBP_ZEN_WIDTHS.forEach((width, i) => {
+    const key = widthKeys[i];
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "typo-seg-btn";
+    b.dataset.width = String(width);
+    b.textContent = t(key);
+    b.addEventListener("click", () => _pbpZenSetWidth(width));
+    widthSeg.appendChild(b);
+  });
+  widthRow.appendChild(widthSeg);
+  pop.appendChild(widthRow);
 
   // Third row (theme model 2026-08-25): the reader's per-device light/dark
   // override -- Follow (the global Theme, plus the video-page default) /

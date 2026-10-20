@@ -37,6 +37,11 @@ html { scrollbar-gutter: stable; }
   --sp-3: 12px;
   --sp-4: 16px;
   --sp-5: 24px;
+  /* Narrow-mode drawer hamburger (.rail-toggle): its fixed inset and box. On
+     :root, not on the button, because the <=1000px main gutter is computed
+     from the same pair and main does not inherit from the button. */
+  --rail-toggle-inset: 12px;
+  --rail-toggle-size: 38px;
   /* A "warm-neutral reading" palette -- document-optimized. Single
      light-dark() definition per token (Chrome 123+); color-scheme tells
      the UA which branch to resolve and also themes native form controls /
@@ -1564,10 +1569,12 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    normal declaration, so a second state source would pin the only opener of
    the off-canvas rail to display:none at every width and strand the whole
    rail (export, TOC, Ask, zen) off screen below the breakpoint. */
+/* Placement + size read --rail-toggle-inset / --rail-toggle-size (:root):
+   the <=1000px main gutter below is computed from the same pair. */
 .rail-toggle {
-  position: fixed; top: 12px; left: 12px; z-index: 30;
+  position: fixed; top: var(--rail-toggle-inset); left: var(--rail-toggle-inset); z-index: 30;
   display: none; align-items: center; justify-content: center;
-  width: 38px; height: 38px; padding: 0;
+  width: var(--rail-toggle-size); height: var(--rail-toggle-size); padding: 0;
   background: var(--btn-bg); color: var(--btn-fg);
   border: 1px solid var(--btn-border); border-radius: var(--radius-md); cursor: pointer;
   box-shadow: 0 1px 3px rgba(28, 27, 26,0.12);
@@ -1593,7 +1600,20 @@ body.rail-open .rail-toggle .rail-toggle-close { display: block; }
 
 /* ---- Responsive: collapse rail to an off-canvas drawer ---- */
 @media (max-width: 1000px) {
-  main { margin-left: 0; padding: 64px 20px 80px; }
+  /* Left gutter clears the fixed hamburger (2026-10-20 reader critique,
+     item 5): with 20px a side the button sat on every line start once the
+     article scrolled under it (800px wide, 200% zoom on a laptop). The gutter
+     is the button's right edge plus sp-3, so line starts begin at 62px, 12px
+     clear of the button at 50px. Physical left, not inline-start: the button
+     is pinned to the physical left (top/left above) and main itself stays
+     LTR; an RTL article only sets dir on #rendered-view, whose full lines
+     still run to this same left edge. Zen and the empty state hide the
+     button, so the gutter goes back to 20px there (screen-only block after
+     this one). */
+  main {
+    margin-left: 0; padding: 64px 20px 80px;
+    padding-left: calc(var(--rail-toggle-inset) + var(--rail-toggle-size) + var(--sp-3));
+  }
   .rail-toggle { display: inline-flex; }
   body.rail-open .rail-ident { grid-template-columns: minmax(0, 1fr) 24px 24px; }
   .rail-ident > .rail-toggle {
@@ -1612,6 +1632,11 @@ body.rail-open .rail-toggle .rail-toggle-close { display: block; }
     visibility: visible;
     transition: transform 200ms var(--ease-drawer), visibility 0s;
   }
+}
+/* screen-scoped: a printed page is <=1000px wide too, and these selectors
+   outrank the print block's bare `main { padding: 0 }`. */
+@media screen and (max-width: 1000px) {
+  body.zen main, body.md-empty main { padding-left: 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rail { transition: none; }

@@ -8751,6 +8751,63 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       window.t = realT; window._pbpSearchOpen = realOpen; rail.remove();
     }
   });
+  // 2026-10-20 reader critique item 5: reading width moved out of the
+  // rail-bottom cycle button into the "Aa" panel, next to size / spacing /
+  // appearance; the zen bar's cycle button stays and shares the write path.
+  test("reading width is an Aa-panel segment row in sync with the zen bar; no rail-bottom width button", () => {
+    const realT = window.t, realStorage = window.chrome.storage;
+    const rail = document.createElement("aside");
+    rail.id = "rail";
+    document.body.appendChild(rail);
+    const writes = [];
+    window.t = (k) => k;
+    window.chrome.storage = { local: { get: (d, cb) => cb && cb(d), set: (o) => { writes.push(o); return Promise.resolve(); } } };
+    const was = { zenInited: _pbpZenInited, typoInited: _pbpTypoInited, width: _pbpZenWidth, touched: _pbpZenWidthTouched, pop: _pbpTypoPopEl, bar: _pbpZenBarEl, stored: window._pbpZenWidthStored, typoStored: window._pbpTypoStored };
+    const cssWidth = document.body.style.getPropertyValue("--pbp-width");
+    try {
+      window._pbpZenWidthStored = { width: 880 };
+      window._pbpTypoStored = { font: 0, leading: 0 };
+      _pbpZenInited = false; _pbpTypoInited = false; _pbpTypoPopEl = null; _pbpZenBarEl = null;
+      _pbpZenInit();
+      _pbpTypoInit();
+      const row = document.getElementById("rail-bottom-row");
+      assertEq(!!row, true, "rail-bottom row exists");
+      assertEq(row.querySelector("#rail-width-btn"), null, "no width button in the rail-bottom row");
+      assertEq([...row.children].map((b) => b.id).join(","), "rail-zen-btn,rail-typo-btn", "the zen and Aa entries are what this row's two inits add");
+      const pop = _pbpTypoEnsurePop();
+      const widthBtns = [...pop.querySelectorAll(".typo-seg-btn[data-width]")];
+      assertEq(widthBtns.map((b) => b.dataset.width).join(","), PBP_ZEN_WIDTHS.join(","), "one segment per stored step, in order");
+      assertEq(widthBtns.map((b) => b.textContent).join(","), "typoWidthNarrow,typoWidthMedium,typoWidthWide", "visible step names, not px");
+      const seg = widthBtns[0].parentElement;
+      assertEq(seg.getAttribute("role") + "|" + seg.getAttribute("aria-label"), "group|typoWidthLabel", "labelled group like the leading and appearance rows");
+      const labels = [...pop.querySelectorAll(".typo-label")].map((l) => l.textContent).join(",");
+      assertEq(labels, "typoFontLabel,typoLeadingLabel,typoWidthLabel,typoSchemeLabel", "width sits with the typography rows, before appearance");
+      _pbpTypoSyncPop();
+      const pressed = () => widthBtns.filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.dataset.width).join(",");
+      assertEq(pressed(), "880", "the stored step is the pressed segment");
+      widthBtns[2].click();
+      assertEq(_pbpZenWidth, 1080, "segment click sets the step");
+      assertEq(document.body.style.getPropertyValue("--pbp-width"), "1080px", "and applies it");
+      assertEq(JSON.stringify(writes[writes.length - 1]), JSON.stringify({ pbp_zen_width: 1080 }), "persisted under the unchanged key and value");
+      assertEq(pressed(), "1080", "pressed state follows");
+      _pbpZenEnsureBar();
+      const zenBtn = document.getElementById("zen-width-btn");
+      zenBtn.click(); // cycle 1080 -> 720
+      assertEq(_pbpZenWidth, 720, "zen bar cycle wraps to the first step");
+      assertEq(pressed(), "720", "the open panel tracks a zen-bar cycle");
+      assertEq(zenBtn.getAttribute("aria-label"), "typoWidthLabel: 720px", "zen bar label shares the panel's term");
+      assertEq(JSON.stringify(writes[writes.length - 1]), JSON.stringify({ pbp_zen_width: 720 }), "zen bar persists through the same path");
+    } finally {
+      document.removeEventListener("keydown", _pbpZenOnKeyDown);
+      _pbpZenSettleClearPending();
+      if (_pbpTypoPopEl) _pbpTypoPopEl.remove();
+      if (_pbpZenBarEl) _pbpZenBarEl.remove();
+      _pbpZenInited = was.zenInited; _pbpTypoInited = was.typoInited; _pbpZenWidth = was.width; _pbpZenWidthTouched = was.touched;
+      _pbpTypoPopEl = was.pop; _pbpZenBarEl = was.bar; window._pbpZenWidthStored = was.stored; window._pbpTypoStored = was.typoStored;
+      if (cssWidth) document.body.style.setProperty("--pbp-width", cssWidth); else document.body.style.removeProperty("--pbp-width");
+      window.t = realT; window.chrome.storage = realStorage; rail.remove();
+    }
+  });
   // 2026-10-19 critique + user ruling: in tr-only a click on a translated
   // block still peeks at the original, but the blocks are not buttons (no
   // role/tab stop/title per paragraph); the rail names the click instead.

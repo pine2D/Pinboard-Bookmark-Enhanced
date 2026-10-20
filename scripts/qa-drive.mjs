@@ -2050,6 +2050,19 @@ async function driveReaderEdge(context, worker, extId, rep) {
       await rep.shot(page, s, "de-dark-base");
     });
 
+    // "Aa" panel with the reading-width row, German (longest labels), dark.
+    const typoShot = async (name) => {
+      await page.locator("#rail-typo-btn").click();
+      await page.waitForTimeout(300);
+      if (!await page.evaluate(() => document.getElementById("typo-pop")?.matches(":popover-open"))) s.failures.push(`${name}: Aa panel did not open`);
+      const rows = await page.evaluate(() => [...document.querySelectorAll("#typo-pop .typo-seg-btn[data-width]")].map((b) => ({ text: b.textContent, pressed: b.getAttribute("aria-pressed"), clipped: b.scrollWidth > b.clientWidth })));
+      if (rows.length !== 3 || rows.filter((r) => r.pressed === "true").length !== 1 || rows.some((r) => r.clipped)) s.failures.push(`${name}: width row ${JSON.stringify(rows)}`);
+      if (await page.locator("#rail-width-btn").count()) s.failures.push(`${name}: rail-bottom width button is back`);
+      await rep.shot(page, s, name);
+      await page.keyboard.press("Escape");
+    };
+    await step("de-dark-typo", () => typoShot("de-dark-typo"));
+
     await step("de-dark-export", async () => {
       const head = page.locator("#export-section .rail-sec-head").first();
       if ((await head.getAttribute("aria-expanded")) !== "true") await head.click();
@@ -2087,14 +2100,35 @@ async function driveReaderEdge(context, worker, extId, rep) {
       await rep.shot(page, s, "de-dark-translate-failure");
     });
 
+    // Drawer mode, scrolled into the article: the fixed hamburger must sit in
+    // its own gutter, never on line starts (2026-10-20 critique item 5).
+    const drawerGeometry = (width) => page.evaluate(() => {
+      const btn = document.getElementById("rail-toggle").getBoundingClientRect();
+      const lefts = [...document.querySelectorAll("#rendered-view [data-pb]")]
+        .map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0 && r.bottom > 0 && r.top < innerHeight).map((r) => r.left);
+      return { toggleRight: btn.right, textLeft: Math.min(...lefts), scroll: document.documentElement.scrollWidth, viewport: innerWidth };
+    }).then((g) => {
+      s.notes.push(`drawer ${width}: ${JSON.stringify(g)}`);
+      if (g.textLeft < g.toggleRight + 8) s.failures.push(`drawer ${width}: text starts at ${g.textLeft}px under the hamburger (right edge ${g.toggleRight}px)`);
+      if (g.scroll > g.viewport) s.failures.push(`drawer ${width}: horizontal overflow (${g.scroll} > ${g.viewport})`);
+    });
     await step("narrow-drawer", async () => {
       await page.setViewportSize({ width: 800, height: 900 });
       await page.waitForTimeout(300);
+      await page.evaluate(() => window.scrollTo(0, 700));
+      await page.waitForTimeout(200);
+      await drawerGeometry(800);
       await rep.shot(page, s, "narrow-800");
       await page.click("#rail-toggle");
       await page.waitForTimeout(500);
       await rep.shot(page, s, "narrow-800-drawer");
       await page.keyboard.press("Escape");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.waitForTimeout(300);
+      await page.evaluate(() => window.scrollTo(0, 700));
+      await page.waitForTimeout(200);
+      await drawerGeometry(390);
+      await rep.shot(page, s, "narrow-390");
     });
 
     await step("extraction-error", async () => {
@@ -2106,6 +2140,14 @@ async function driveReaderEdge(context, worker, extId, rep) {
       });
       await page.waitForTimeout(300);
       await rep.shot(page, s, "de-dark-extraction-error");
+    });
+
+    await step("de-light-typo", async () => {
+      await setScheme("light");
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await seed("en-GB");
+      await open();
+      await typoShot("de-light-typo");
     });
 
     await step("zh-light-tr-only-heading", async () => {

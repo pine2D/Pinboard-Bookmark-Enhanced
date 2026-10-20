@@ -245,5 +245,77 @@ function assertLayout(frame, locale) {
       } finally { frame.remove(); }
     }
   });
+
+  // 2026-10-20 reader critique item 5: in drawer mode (<=1000px, also 200%
+  // zoom) the fixed hamburger sat on line starts once the article scrolled
+  // under it. Production CSS, scrolled, LTR and RTL article, plus zen.
+  async function makeReaderFrame(width, { rtl = false, zen = false } = {}) {
+    const frame = document.createElement("iframe");
+    frame.style.cssText = `width:${width}px;height:500px;border:0`;
+    const para = "Reading text that wraps across the whole measure so a full line touches both edges. ".repeat(8);
+    frame.srcdoc = `<!doctype html><html><head><link rel="stylesheet" href="../md-preview.css"></head>
+      <body${zen ? ' class="zen"' : ""}><button class="rail-toggle" id="rail-toggle"><svg viewBox="0 0 24 24"></svg></button>
+      <aside class="rail" id="rail"></aside>
+      <main><div class="doc-body"><div id="rendered-view"${rtl ? ' dir="rtl"' : ""}>${("<p>" + para + "</p>").repeat(7)}</div></div></main></body></html>`;
+    document.body.appendChild(frame);
+    await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+    frame.contentWindow.scrollTo(0, 400);
+    await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(() => frame.contentWindow.requestAnimationFrame(resolve)));
+    return frame;
+  }
+  await test("drawer mode: the fixed hamburger never shares a column with line starts (LTR + RTL, 800/390px, zen)", async () => {
+    for (const width of [1000, 800, 390]) {
+      for (const rtl of [false, true]) {
+        const frame = await makeReaderFrame(width, { rtl });
+        try {
+          const doc = frame.contentDocument;
+          const btn = doc.getElementById("rail-toggle").getBoundingClientRect();
+          const tag = `${width}px${rtl ? " rtl" : ""}`;
+          assert(btn.width > 0, `${tag}: hamburger not shown in drawer mode`);
+          for (const p of doc.querySelectorAll("#rendered-view p")) {
+            const r = p.getBoundingClientRect();
+            assert(r.left >= btn.right + 8, `${tag}: text column starts at ${r.left}px, under the hamburger (right edge ${btn.right}px)`);
+          }
+          assert(doc.documentElement.scrollWidth <= doc.documentElement.clientWidth, `${tag}: page scrolls sideways`);
+        } finally { frame.remove(); }
+      }
+    }
+    const zen = await makeReaderFrame(800, { zen: true });
+    try {
+      const doc = zen.contentDocument;
+      assert(doc.getElementById("rail-toggle").getBoundingClientRect().width === 0, "zen: hamburger still shown");
+      assert(zen.contentWindow.getComputedStyle(doc.querySelector("main")).paddingLeft === "20px", "zen: the hamburger gutter outlives the hamburger");
+    } finally { zen.remove(); }
+    const wide = await makeReaderFrame(1100);
+    try {
+      assert(wide.contentDocument.getElementById("rail-toggle").getBoundingClientRect().width === 0, "1100px: hamburger shown outside drawer mode");
+    } finally { wide.remove(); }
+  });
+
+  await test("the Aa panel's reading-width row fits its segments in every locale", async () => {
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "width:400px;height:400px;border:0";
+    frame.srcdoc = `<!doctype html><html><head><link rel="stylesheet" href="../md-preview.css"></head>
+      <body><div id="typo-pop" class="pop-panel" popover="manual"><div class="typo-row"><span class="typo-label"></span>
+      <div class="typo-seg" role="group"><button class="typo-seg-btn" data-width="720"></button><button class="typo-seg-btn" data-width="880" aria-pressed="true"></button><button class="typo-seg-btn" data-width="1080"></button></div></div></div></body></html>`;
+    document.body.appendChild(frame);
+    await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+    try {
+      const doc = frame.contentDocument;
+      doc.getElementById("typo-pop").showPopover();
+      const keys = ["typoWidthNarrow", "typoWidthMedium", "typoWidthWide"];
+      for (const locale of LOCALES) {
+        doc.querySelector(".typo-label").textContent = messages[locale].typoWidthLabel.message;
+        doc.querySelectorAll(".typo-seg-btn").forEach((b, i) => { b.textContent = messages[locale][keys[i]].message; });
+        await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
+        const label = doc.querySelector(".typo-label");
+        assert(label.getBoundingClientRect().height <= 24, `${locale}: width label wraps`);
+        for (const b of doc.querySelectorAll(".typo-seg-btn")) {
+          assert(b.scrollWidth <= b.clientWidth, `${locale}: "${b.textContent}" overflows its segment`);
+          assert(Math.round(b.getBoundingClientRect().height) === 26, `${locale}: segment is ${b.getBoundingClientRect().height}px, off the 26px rung`);
+        }
+      }
+    } finally { frame.remove(); }
+  });
 })();
 </script></body></html>
