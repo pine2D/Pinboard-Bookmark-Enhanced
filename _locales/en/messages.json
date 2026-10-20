@@ -3997,6 +3997,7 @@
   "libraryDriveConnected": { "message": "Connected to Google Drive, not synced yet" },
   "libraryDriveProblem": { "message": "Google Drive sync has a problem. Open Data settings" },
   "libraryRelookup": { "message": "Look up again" },
+  "libraryVocabEmptyShort": { "message": "No words yet." },
   "libraryKeysTitle": { "message": "Keyboard shortcuts" },
   "libraryKeysMoveWord": { "message": "Previous or next word" },
   "libraryKeysMoveHighlight": { "message": "Previous or next highlight" },

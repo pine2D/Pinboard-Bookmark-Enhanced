@@ -3991,6 +3991,7 @@
   "libraryDriveConnected": { "message": "Połączono z Dyskiem Google, jeszcze bez synchronizacji" },
   "libraryDriveProblem": { "message": "Problem z synchronizacją z Dyskiem Google. Otwórz ustawienia „Dane”" },
   "libraryRelookup": { "message": "Sprawdź ponownie w słowniku" },
+  "libraryVocabEmptyShort": { "message": "Brak słówek." },
   "libraryKeysTitle": { "message": "Skróty klawiszowe" },
   "libraryKeysMoveWord": { "message": "Poprzednie lub następne słówko" },
   "libraryKeysMoveHighlight": { "message": "Poprzednie lub następne zaznaczenie" },

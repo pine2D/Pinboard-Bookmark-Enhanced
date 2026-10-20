@@ -1466,7 +1466,7 @@ check(sharedJs.includes("async function pbpVocabCurrentOwner()") &&
   // still the sentence's third argument.
   /t\("vocabResultCount",\s*t\(pbpLibCountKey\(found, "vocabResultFoundOne", "vocabResultFound"\), String\(found\)\),\s*t\(pbpLibCountKey\(saved, "vocabResultSavedOne", "vocabResultSaved"\), String\(saved\)\),\s*_vocabOwnerLabel\)/.test(libraryVocabJs) &&
   libraryVocabJs.includes("const found = rows.length, saved = _vocabRows.length;") &&
-  libraryVocabJs.includes('empty.textContent = t("dictVocabEmpty", _vocabOwnerLabel)') &&
+  libraryVocabJs.includes('full.textContent = t("dictVocabEmpty", _vocabOwnerLabel)') &&
   !libraryVocabJs.includes('t("jinaFailed")') && !optionsVocabJs.includes('t("jinaFailed")'),
   "vocabulary account scope is absent or action errors still reuse Jina copy");
 // The library migration deleted the "vocabulary view controls leak into

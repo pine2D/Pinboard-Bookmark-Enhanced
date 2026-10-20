@@ -3985,6 +3985,7 @@
   "libraryDriveConnected": { "message": "已连接 Google Drive，尚未同步" },
   "libraryDriveProblem": { "message": "Google Drive 同步出了问题，打开数据设置查看" },
   "libraryRelookup": { "message": "重新查词典" },
+  "libraryVocabEmptyShort": { "message": "还没有生词" },
   "libraryKeysTitle": { "message": "键盘快捷键" },
   "libraryKeysMoveWord": { "message": "上一个或下一个词" },
   "libraryKeysMoveHighlight": { "message": "上一条或下一条高亮" },

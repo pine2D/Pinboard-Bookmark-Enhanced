@@ -3991,6 +3991,7 @@
   "libraryDriveConnected": { "message": "Google Диск подключён, синхронизации ещё не было" },
   "libraryDriveProblem": { "message": "Проблема с синхронизацией Google Диска. Откройте настройки «Данные»" },
   "libraryRelookup": { "message": "Найти снова" },
+  "libraryVocabEmptyShort": { "message": "Слов пока нет." },
   "libraryKeysTitle": { "message": "Сочетания клавиш" },
   "libraryKeysMoveWord": { "message": "Предыдущее или следующее слово" },
   "libraryKeysMoveHighlight": { "message": "Предыдущее или следующее выделение" },

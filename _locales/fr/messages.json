@@ -3991,6 +3991,7 @@
   "libraryDriveConnected": { "message": "Connecté à Google Drive, pas encore synchronisé" },
   "libraryDriveProblem": { "message": "La synchronisation Google Drive rencontre un problème. Ouvrir l'onglet Données" },
   "libraryRelookup": { "message": "Chercher à nouveau" },
+  "libraryVocabEmptyShort": { "message": "Aucun mot pour l'instant." },
   "libraryKeysTitle": { "message": "Raccourcis clavier" },
   "libraryKeysMoveWord": { "message": "Mot précédent ou suivant" },
   "libraryKeysMoveHighlight": { "message": "Surlignage précédent ou suivant" },

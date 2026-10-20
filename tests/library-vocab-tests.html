@@ -351,6 +351,11 @@ _pbpVocabClearSelection();
 _pbpVocabApplyView(true);
 _vocabSelected = new Set(["a"]);
 _pbpVocabSyncSelectionUi();
+check("the empty index carries a short line beside the cover and the whole sentence for the single-pane layout",
+  (() => { const prev = _vocabRows; _vocabRows = []; _pbpVocabRenderList(); const e = $id("vocab-empty");
+    const ok = e.querySelector(".vocab-empty-short")?.textContent === "libraryVocabEmptyShort" &&
+      e.querySelector(".vocab-empty-full")?.textContent.startsWith("dictVocabEmpty") && e.hidden === false;
+    _vocabRows = prev; _pbpVocabRenderList(); return ok; })(), $id("vocab-empty").innerHTML);
 check("selecting hides the count row and shows the batch row in its place",
   $id("vocab-context-bar").hidden === true && $id("vocab-batch-toolbar").classList.contains("selecting") &&
   getComputedStyle($id("vocab-batch-toolbar")).display === "flex");

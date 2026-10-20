@@ -1941,7 +1941,17 @@ function _pbpVocabRenderList(append) {
   if (!append) _vocabCommonLanguage = _pbpVocabCommonLanguage(_vocabRows);
   const empty = $id("vocab-empty");
   if (empty) {
-    empty.textContent = t("dictVocabEmpty", _vocabOwnerLabel);
+    // Two forms of one message (critique round 3, 2026-10-20): beside the
+    // cover, which already says the whole sentence, the index keeps a short
+    // line; in the single-pane layout the cover is not on screen, so the
+    // index says it all. CSS picks one by the layout's media query.
+    const short = document.createElement("span");
+    short.className = "vocab-empty-short";
+    short.textContent = t("libraryVocabEmptyShort");
+    const full = document.createElement("span");
+    full.className = "vocab-empty-full";
+    full.textContent = t("dictVocabEmpty", _vocabOwnerLabel);
+    empty.replaceChildren(short, full);
     empty.hidden = _vocabRows.length !== 0;
   }
   const noResults = $id("vocab-no-results");

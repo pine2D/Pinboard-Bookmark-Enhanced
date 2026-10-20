@@ -1036,9 +1036,18 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     toggle(1)?.title === "libraryColorFilterAria:hlColorQuote,2" && toggle(1)?.getAttribute("aria-label") === toggle(1)?.title &&
     toggle(1)?.querySelector(".notes-hit-dot.notes-c1") && toggle(1)?.querySelector(".lib-toggle-count")?.textContent === "2",
     toggle(1) && toggle(1).title);
+  // Every colour is in use in this fixture: re-sync over a one-colour set to
+  // get empty ones, then restore the real counts.
+  _pbpNotesSyncColorFilters([{ item: { color: 1 } }]);
+  const zeroToggle = toggle(2);
   check("each colour toggle carries its meaning for the rich header form, hidden from AT (the label names it)",
     toggle(1)?.querySelector(".lib-toggle-name")?.textContent === "hlColorQuote" &&
     toggle(1)?.querySelector(".lib-toggle-name")?.getAttribute("aria-hidden") === "true", toggle(1) && toggle(1).innerHTML);
+  check("a colour with no highlights is aria-disabled and a click on it filters nothing (critique round 3)",
+    !!zeroToggle && zeroToggle.getAttribute("aria-disabled") === "true" && !toggle(1)?.hasAttribute("aria-disabled") &&
+    zeroToggle.querySelector(".lib-toggle-count")?.textContent === "0" &&
+    (zeroToggle.click(), pressed() === "all"), zeroToggle ? zeroToggle.outerHTML : "no colour toggle 2");
+  _pbpNotesRender(true);
   toggle(1)?.click();
   check("a colour clicked under All shows only that colour, per highlight",
     rowKeys() === "pbp_hl_alpha#a1,pbp_hl_evil#e1" && pressed() === "1", rowKeys() + " | " + pressed());

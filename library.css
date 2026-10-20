@@ -795,6 +795,13 @@ html.motion-ready .notes-card-top { transition: background-color var(--motion-st
 /* Inside a list region (which starts 4px outboard of the search box) the
    same 12px text inset needs the rows' 4px margin first. */
 .notes-list-region > .notes-empty { margin-inline: var(--lib-sp-1); }
+/* #vocab-empty's two forms (library-vocab.js _pbpVocabRenderList): the short
+   line beside the cover, the whole sentence where the cover is off screen. */
+.vocab-empty-full { display: none; }
+@media (max-width: 860px) {
+  .vocab-empty-short { display: none; }
+  .vocab-empty-full { display: inline; }
+}
 
 /* ============================================================
    Notes master-detail: one row per highlight on the left, the selected
@@ -2405,8 +2412,11 @@ html.motion-ready .vocab-note-save {
 .lib-toggle-count { font-size: var(--lib-text-secondary); color: var(--lib-fg-muted); }
 .lib-toggle.sm .lib-toggle-count { font-size: var(--lib-text-meta); line-height: var(--lib-lh-meta); }
 /* Hover is the plain row hover fill (spec §3.2): a toggle in the list header steps like a row, not like a filled button. */
-.lib-toggle:hover:not([aria-pressed="true"]):not(:disabled) { background: var(--lib-row-bg-hover); color: var(--lib-btn-fg); }
-.lib-toggle:hover:not([aria-pressed="true"]):not(:disabled) .lib-toggle-count { color: var(--lib-btn-fg); }
+.lib-toggle:hover:not([aria-pressed="true"]):not(:disabled, [aria-disabled="true"]) { background: var(--lib-row-bg-hover); color: var(--lib-btn-fg); }
+.lib-toggle:hover:not([aria-pressed="true"]):not(:disabled, [aria-disabled="true"]) .lib-toggle-count { color: var(--lib-btn-fg); }
+/* A colour with no highlights (critique round 3): named and focusable, but
+   nothing to filter to -- the .btn:disabled look, no hover fill. */
+.lib-toggle[aria-disabled="true"] { opacity: 0.45; cursor: default; }
 .lib-toggle[aria-pressed="true"] { background: var(--lib-btn-bg); color: var(--lib-btn-fg); font-weight: bold; }
 .lib-toggle[aria-pressed="true"] .lib-toggle-count { color: var(--lib-btn-fg); font-weight: bold; }
 /* §7.3 inset, same core as the list rows. */

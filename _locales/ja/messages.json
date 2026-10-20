@@ -3991,6 +3991,7 @@
   "libraryDriveConnected": { "message": "Google Drive に接続済み、まだ同期していません" },
   "libraryDriveProblem": { "message": "Google Drive の同期に問題があります。データ設定を開いて確認してください" },
   "libraryRelookup": { "message": "辞書で調べ直す" },
+  "libraryVocabEmptyShort": { "message": "まだ単語はありません。" },
   "libraryKeysTitle": { "message": "キーボードショートカット" },
   "libraryKeysMoveWord": { "message": "前または次の単語" },
   "libraryKeysMoveHighlight": { "message": "前または次のハイライト" },

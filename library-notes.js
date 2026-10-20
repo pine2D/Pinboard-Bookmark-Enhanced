@@ -1457,8 +1457,13 @@ function _pbpNotesBuildColorFilters() {
     nm.textContent = name;
     const num = document.createElement("span");
     num.className = "lib-toggle-count";
-    b.addEventListener("click", () => _pbpNotesApplyColor(c));
     b.append(dot, nm, num);
+    // A colour with no highlights is aria-disabled (see _pbpNotesSyncColorFilters):
+    // still focusable and named, but a click would only filter to nothing.
+    b.addEventListener("click", () => {
+      if (b.getAttribute("aria-disabled") === "true") return;
+      _pbpNotesApplyColor(c);
+    });
     wrap.appendChild(b);
   });
 }
@@ -1498,6 +1503,11 @@ function _pbpNotesSyncColorFilters(allHits) {
     b.title = label;
     b.setAttribute("aria-label", label);
     b.setAttribute("aria-pressed", String(_notesActiveColors.has(c)));
+    // Nothing in this colour: nothing to filter to (critique round 3,
+    // 2026-10-20). A pressed one stays live so it can always be let go of --
+    // its last highlight may have just been deleted.
+    if (n === 0 && !_notesActiveColors.has(c)) b.setAttribute("aria-disabled", "true");
+    else b.removeAttribute("aria-disabled");
     const nm = b.querySelector(".lib-toggle-name");
     if (nm) nm.textContent = t(PBP_NOTES_COLOR_KEYS[c - 1]);
     const num = b.querySelector(".lib-toggle-count");

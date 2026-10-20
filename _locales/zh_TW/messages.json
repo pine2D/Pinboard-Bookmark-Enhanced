@@ -3991,6 +3991,7 @@
   "libraryDriveConnected": { "message": "已連接 Google Drive，尚未同步" },
   "libraryDriveProblem": { "message": "Google Drive 同步發生問題，請開啟資料設定查看" },
   "libraryRelookup": { "message": "重新查詞典" },
+  "libraryVocabEmptyShort": { "message": "還沒有生詞" },
   "libraryKeysTitle": { "message": "鍵盤快速鍵" },
   "libraryKeysMoveWord": { "message": "上一個或下一個詞" },
   "libraryKeysMoveHighlight": { "message": "上一則或下一則螢光標記" },
