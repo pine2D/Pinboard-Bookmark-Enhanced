@@ -3770,19 +3770,24 @@ const LIST_HEADER_FIT_SCAN = ({ view, extraRows = [] }) => {
     const busy = !!batch.querySelector(".lib-batch-status .save-status:not(:empty)") ||
       [...batch.querySelectorAll(".vocab-group-help")].some((h) => !h.hidden);
     const sm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lib-control-h")) - 4;
-    const wants = vocab ? [2 * sm + 8] : [sm, 2 * sm + 8];
+    // Vocabulary: three sm rows and two 8px gaps (selection tools / the group
+    // unit alone / Known + Learning, critique round 3, 2026-10-20).
+    const wants = vocab ? [3 * sm + 16] : [sm, 2 * sm + 8];
     const h = batch.getBoundingClientRect().height;
     if (!busy && !wants.some((w) => Math.abs(h - w) <= 1)) bad.push(`${batch.id} is ${h.toFixed(1)}px tall, expected ${wants.join(" or ")}px`);
   }
   // The form showing: vocabulary = narrow while the Filter button renders;
-  // notes = narrow while the colour toggles' numbers are hidden.
+  // notes = narrow while the colour toggles' numbers are hidden, rich while
+  // their colour names show (critique round 3, 2026-10-20), else wide.
   let form;
   if (vocab) {
     const btn = document.getElementById("vocab-filter-narrow");
     form = btn && getComputedStyle(btn).display !== "none" ? "narrow" : "wide";
   } else {
     const num = document.querySelector("#notes-color-filters .lib-toggle-count");
-    form = num && getComputedStyle(num).display === "none" ? "narrow" : "wide";
+    const name = document.querySelector("#notes-color-filters .lib-toggle-name");
+    form = num && getComputedStyle(num).display === "none" ? "narrow"
+      : name && getComputedStyle(name).display !== "none" ? "rich" : "wide";
   }
   return { bad, measured, textNodes, form, fit: pane.dataset.headerFit || null, room: right - left };
 };
@@ -3793,7 +3798,9 @@ const LIST_HEADER_FIT_SCAN = ({ view, extraRows = [] }) => {
 // with a px floor (the group filter's min-width) at that floor, on a
 // min-content row, with the sort menu button (T6b) showing the widest face
 // word any of its options can show -- the form must not change with the
-// sort. Notes: the colour row at max-content with every number showing.
+// sort. Notes: the colour row at max-content with every number showing --
+// once with the colour names hidden (the wide need) and once with them
+// showing (the rich need), whatever form the row is in when measured.
 // Every inline style and face text is restored before returning.
 const FILTER_ROW_NEED = () => {
   const row = document.querySelector("#view-vocab .vocab-filter-row");
@@ -3845,15 +3852,20 @@ const NOTES_ROW_NEED = () => {
   const row = document.getElementById("notes-color-filters");
   if (!row || row.hidden) return null;
   const nums = [...row.querySelectorAll(".lib-toggle-count")];
-  const saved = [row, ...nums].map((el) => el.getAttribute("style"));
+  const names = [...row.querySelectorAll(".lib-toggle-name")];
+  const els = [row, ...nums, ...names];
+  const saved = els.map((el) => el.getAttribute("style"));
   nums.forEach((n) => { n.style.display = "inline"; });
   row.style.width = "max-content";
+  names.forEach((n) => { n.style.display = "none"; });
   const need = row.getBoundingClientRect().width;
-  [row, ...nums].forEach((el, i) => {
+  names.forEach((n) => { n.style.display = "inline"; });
+  const richNeed = names.length ? row.getBoundingClientRect().width : Infinity;
+  els.forEach((el, i) => {
     if (saved[i] == null) el.removeAttribute("style");
     else el.setAttribute("style", saved[i]);
   });
-  return need;
+  return { need, richNeed };
 };
 
 // G7. Per view and locale, the index widths are the checklist's fixed ones
@@ -3874,9 +3886,11 @@ async function driveListHeaderFit(page, extBase, theme, check) {
     await scratch.evaluate((px) => document.documentElement.style.setProperty("--lib-index-w", `${px}px`), w);
     await settleAnimations(scratch);
   };
-  const widthsAround = (n) => [...new Set([...indexWidths, Math.floor(n - 1), Math.ceil(n + 1)].filter((w) => w >= lo && w <= hi))].sort((a, b) => a - b);
-  const pass = async (view, locale, n, select) => {
-    for (const w of widthsAround(n)) {
+  const widthsAround = (...ns) => [...new Set([...indexWidths, ...ns.filter(Number.isFinite).flatMap((n) => [Math.floor(n - 1), Math.ceil(n + 1)])].filter((w) => w >= lo && w <= hi))].sort((a, b) => a - b);
+  // `rich` (notes only): the need with the colour names showing -- the wide
+  // form becomes "rich" when that fits too (library.js pbpLibWireHeaderFit).
+  const pass = async (view, locale, n, select, rich = Infinity) => {
+    for (const w of widthsAround(n, rich)) {
       await setIndex(w);
       for (const selecting of [false, true]) {
         await select(selecting);
@@ -3888,9 +3902,10 @@ async function driveListHeaderFit(page, extBase, theme, check) {
         // header that rendered fewer rows than that measured nothing.
         if (res.measured < 3) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: only ${res.measured} header rows rendered (${label})`);
         for (const b of res.bad) bad.push(`${label}: ${b}`);
-        const want = n <= res.room + 0.5 ? "wide" : "narrow";
-        if (Math.abs(n - res.room) > 1 && (res.form !== want || res.fit !== want)) {
-          bad.push(`${label}: shows the ${res.form} form (data-header-fit ${res.fit}) but needs ${round2(n)}px in ${round2(res.room)}px -> ${want}`);
+        const want = n > res.room + 0.5 ? "narrow" : rich <= res.room + 0.5 ? "rich" : "wide";
+        if (Math.abs(n - res.room) > 1 && !(Math.abs(rich - res.room) <= 1) && (res.form !== want || res.fit !== want)) {
+          const needText = Number.isFinite(rich) ? `${round2(n)}px (rich ${round2(rich)}px)` : `${round2(n)}px`;
+          bad.push(`${label}: shows the ${res.form} form (data-header-fit ${res.fit}) but needs ${needText} in ${round2(res.room)}px -> ${want}`);
         }
       }
     }
@@ -3981,10 +3996,11 @@ async function driveListHeaderFit(page, extBase, theme, check) {
     const notesNeeds = [];
     for (const locale of LIB_INDEX_LOCALES) {
       await setLibraryLocale(scratch, extBase, locale);
-      const n = await scratch.evaluate(NOTES_ROW_NEED);
-      if (n == null) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: the notes colour row is missing or hidden`);
-      notesNeeds.push(`${locale} ${round2(n)}`);
-      await pass("notes", locale, n, selectNotes);
+      const m = await scratch.evaluate(NOTES_ROW_NEED);
+      if (m == null) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: the notes colour row is missing or hidden`);
+      if (!Number.isFinite(m.richNeed)) throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|listHeaderFit]: the notes colour toggles carry no .lib-toggle-name (${locale})`);
+      notesNeeds.push(`${locale} ${round2(m.need)}/${round2(m.richNeed)}`);
+      await pass("notes", locale, m.need, selectNotes, m.richNeed);
     }
     notesNeedText = notesNeeds.join(", ");
   } finally {
@@ -4405,7 +4421,7 @@ async function runOneCheckInPanel(page, theme, check, results, extBase) {
     const { bad, need, needs, notesNeedText } = await driveListHeaderFit(page, extBase, theme, check);
     results.push({ surface: check.surface, theme, selector: check.selector, state: check.state,
       ...verdict("listHeaderFit", bad.length === 0, `wide filter row needs ${round2(need.px)}px (${need.locale})`,
-        "every header child inside the index and its group, no overlaps; count items whole; vocabulary batch row 64/56, notes one or two sm rows; form = measured fit",
+        "every header child inside the index and its group, no overlaps; count items whole; vocabulary batch row 100/88, notes one or two sm rows; form = measured fit",
         [bad.length ? bad.slice(0, 4).join("; ") : null, `needs: ${needs.join(", ")}`, `notes colour row: ${notesNeedText}`].filter(Boolean).join(" | ")) });
     return;
   }

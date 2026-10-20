@@ -1111,11 +1111,13 @@ export const CHECKS = [
   // stepper cells inside it can.
   { surface: "library", page: "library.html", selector: "#vocab-batch-toolbar .vocab-group-unit", state: "default",
     expect: { heightEqWith: { selector: "#vocab-invert-selection", tolerancePx: 1 } } },
-  // ---- library T4d (spec §3.9): the batch rows. Vocabulary = two rows at
-  // the sm rung + one 8px gap (64 / 56) whenever its status slot is empty;
-  // notes = one row (min-height 28 / 24).
+  // ---- library T4d (spec §3.9): the batch rows. Vocabulary = three rows at
+  // the sm rung + two 8px gaps (100 / 88) whenever its status slot is empty
+  // -- selection tools / the group unit alone / Known + Learning (critique
+  // round 3, 2026-10-20; two rows, 64 / 56, before); notes = one row
+  // (min-height 28 / 24).
   { surface: "library", page: "library.html", selector: "#vocab-batch-toolbar", state: "default",
-    expect: { heightPx: { comfortable: 64, compact: 56 } } },
+    expect: { heightPx: { comfortable: 100, compact: 88 } } },
   { surface: "library", page: "library.html", selector: ".notes-batch-bar", state: "default",
     expect: { minHeightPx: { comfortable: 28, compact: 24 } } },
 
@@ -1175,14 +1177,15 @@ export const CHECKS = [
   // vocabulary and notes (the notes colour row is nowrap: All + five
   // toggles): no header child past the index's edge or out of its own group
   // box, no two siblings overlapping (optical hangs excepted by category),
-  // count items whole, the vocabulary batch row 64 / 56 and the notes one
-  // one or two sm rows. The form each header shows -- filter row inline or
-  // folded into the Filter popover, colour toggles with or without their
-  // numbers -- must be the one the runner's own measurement of the wide
-  // form's need calls for (user ruling 10-04: no fixed threshold, it fits or
-  // it folds). indexWidths are the fixed probes across the index's range;
-  // the runner adds each locale's own need -1 / +1 so both sides of every
-  // switch point are walked.
+  // count items whole, the vocabulary batch row 100 / 88 (three rows since
+  // critique round 3) and the notes one one or two sm rows. The form each
+  // header shows -- filter row inline or folded into the Filter popover,
+  // colour toggles dots only, with their numbers, or with names and numbers
+  // ("rich", critique round 3) -- must be the one the runner's own
+  // measurement of each form's need calls for (user ruling 10-04: no fixed
+  // threshold, it fits or it folds). indexWidths are the fixed probes across
+  // the index's range; the runner adds each locale's own needs -1 / +1 so
+  // both sides of every switch point are walked.
   { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "listHeaderFit", themes: ["", "terminal"],
     expect: { listHeaderFit: { width: 1600, height: 900, count: 9999, indexWidths: [360, 440, 512, 520] } } },
   // G6, the toggles T3's filterScrollReset does not drive: the status toggle
