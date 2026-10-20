@@ -3739,6 +3739,12 @@
   "dictEudicTokenLabel": {
     "message": "歐路 OpenAPI 授權資訊"
   },
+  "vocabEudicHeading": {
+    "message": "歐路"
+  },
+  "vocabFileExportHeading": {
+    "message": "匯出為檔案"
+  },
   "dictEudicTokenHint": {
     "message": "從歐路授權頁面完整複製授權資訊"
   },

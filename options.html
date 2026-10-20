@@ -833,18 +833,19 @@
         <details class="disclosure" data-acc-key="vocab-learning">
           <summary data-i18n="vocabLearningSection">Export and integrations</summary>
           <div class="disclosure-body">
+            <div class="fg"><div class="bl subhead" role="heading" aria-level="3">Anki</div></div>
             <div class="fg entry-block"><label class="bl" for="dict-anki-deck" data-i18n="dictAnkiDeckLabel">Anki deck</label>
               <input type="text" id="dict-anki-deck" placeholder="Pinboard Vocab" /></div>
             <div class="fg entry-block"><label class="bl" for="dict-anki-port" data-i18n="dictAnkiPortLabel">AnkiConnect port</label>
               <input type="number" id="dict-anki-port" placeholder="8765" min="1" max="65535" step="1" /></div>
             <div class="fg entry-block"><label class="bl" for="dict-anki-key" data-i18n="dictAnkiKeyLabel">AnkiConnect API key (optional)</label><span class="key-wrap"><input type="password" id="dict-anki-key" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-anki-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
-              <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-anki-test-btn" data-i18n="dictAnkiTest">Test AnkiConnect</button><span class="save-status" id="vocab-anki-test-status" role="status" aria-live="polite"></span></div></div>
+              <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-anki-test-btn" data-i18n="dictAnkiTest">Test AnkiConnect</button><button type="button" class="btn btn-sm" id="vocab-anki-btn" data-i18n="dictAnkiSend">Send all to Anki</button><span class="save-status" id="vocab-anki-test-status" role="status" aria-live="polite"></span></div></div>
+            <div class="fg"><div class="bl subhead" role="heading" aria-level="3" data-i18n="vocabEudicHeading">Eudic</div></div>
             <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="dict-eudic-token" data-i18n="dictEudicTokenLabel">Eudic OpenAPI authorization</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="dictEudicSupportedHint">Eudic supports only English, French, German, and Spanish (en/fr/de/es); other words are skipped.</p></details><span class="key-wrap"><input type="password" id="dict-eudic-token" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-eudic-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://my.eudic.net/OpenAPI/Authorization" target="_blank" rel="noopener noreferrer" data-i18n="dictEudicTokenHint">Copy the full authorization value from Eudic</a></p>
-              <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-eudic-test-btn" data-i18n="dictEudicTest">Test Eudic connection</button><span class="save-status" id="vocab-eudic-test-status" role="status" aria-live="polite"></span></div></div>
+              <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-eudic-test-btn" data-i18n="dictEudicTest">Test Eudic connection</button><button type="button" class="btn btn-sm" id="vocab-eudic-btn" data-i18n="dictEudicSend" hidden>Send all supported words to Eudic</button><span class="save-status" id="vocab-eudic-test-status" role="status" aria-live="polite"></span></div></div>
+            <div class="fg"><div class="bl subhead" role="heading" aria-level="3" data-i18n="vocabFileExportHeading">File export</div></div>
             <div class="vocab-toolbar">
               <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportTsv">Export all (.tsv)</button>
-              <button type="button" class="btn btn-sm" id="vocab-anki-btn" data-i18n="dictAnkiSend">Send all to Anki</button>
-              <button type="button" class="btn btn-sm" id="vocab-eudic-btn" data-i18n="dictEudicSend" hidden>Send all supported words to Eudic</button>
               <span class="save-status" id="vocab-status" role="status" aria-live="polite"></span>
             </div>
           </div>

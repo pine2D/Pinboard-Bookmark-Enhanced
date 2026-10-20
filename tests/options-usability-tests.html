@@ -1320,7 +1320,11 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(!!panel, "panel-vocab is missing");
     const learning = panel.querySelector('details.disclosure[data-acc-key="vocab-learning"]');
     assert(!!learning, "panel-vocab lost the vocab-learning disclosure");
-    const blocks = [...learning.querySelectorAll(".fg")];
+    // The three group headings (Anki / Eudic / file export, 2026-10-20) sit in
+    // .fg wrappers of their own; they hold no field, so they are not counted.
+    const heads = [...learning.querySelectorAll(".fg > .bl.subhead[role='heading']")];
+    assert(heads.length === 3, "expected 3 group headings in the vocab-learning disclosure, got " + heads.length);
+    const blocks = [...learning.querySelectorAll(".fg")].filter((f) => !heads.some((h) => h.parentElement === f));
     assert(blocks.length === 4, "expected 4 .fg fields in the vocab-learning disclosure, got " + blocks.length);
     assert(blocks.every((f) => f.classList.contains("entry-block")),
       "every .fg field inside vocab-learning must carry entry-block");

@@ -107,6 +107,7 @@ async function loadLocale(loc) {
   // H5: enumerate English-identical keys per locale, excluding brand/technical tokens
   const BRAND_OK = new Set([
     "vocabDriveSection","driveChromeSyncSection", // product names: Google Drive and Chrome Sync
+    "vocabEudicHeading", // product name: Eudic (only the zh locales write it in their own script)
     "extName","appName","labelUrl","labelApiKey","labelApiToken","labelBaseUrl",
     // link text that is a URL path on an English-only page — see H18
     "settingsPassword",

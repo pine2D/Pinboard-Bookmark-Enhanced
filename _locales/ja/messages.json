@@ -3739,6 +3739,12 @@
   "dictEudicTokenLabel": {
     "message": "Eudic OpenAPI 認証情報"
   },
+  "vocabEudicHeading": {
+    "message": "Eudic"
+  },
+  "vocabFileExportHeading": {
+    "message": "ファイルに書き出す"
+  },
   "dictEudicTokenHint": {
     "message": "Eudic の認証情報を全文コピーしてください"
   },

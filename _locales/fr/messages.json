@@ -3739,6 +3739,12 @@
   "dictEudicTokenLabel": {
     "message": "Autorisation Eudic OpenAPI"
   },
+  "vocabEudicHeading": {
+    "message": "Eudic"
+  },
+  "vocabFileExportHeading": {
+    "message": "Export en fichier"
+  },
   "dictEudicTokenHint": {
     "message": "Copiez la valeur d'autorisation complète depuis Eudic"
   },

@@ -1774,6 +1774,13 @@ html[data-theme] .fg :is(label, div).bl {
 html[data-theme] .fg .bl.subhead {
   font-size: var(--opt-text-subhead); line-height: var(--opt-lh-subhead); font-weight: 600;
 }
+/* A disclosure that stacks several service groups (Vocabulary's Anki / Eudic /
+   file export) opens each later group with extra room above its subhead, so
+   the gap between groups outweighs the 24px between fields inside one.
+   Padding, not margin: a margin-top here collapses into the previous
+   entry-block's 24px margin-bottom (the wrapper .fg has no padding or
+   border to stop it) and adds nothing. */
+.disclosure-body > .fg:not(:first-child) > .bl.subhead[role="heading"] { padding-top: var(--opt-sp-4); }
 /* Inside a help-host field (popup-width-label): the themed twin of the
    label rule above ((0,3,2)) outranks the generic
    `.context-help-host[data-help-role="field"] > label.bl { margin: 0; }`

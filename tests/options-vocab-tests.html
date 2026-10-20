@@ -57,17 +57,17 @@ body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px soli
       <div class="fg"><label class="bl" for="dict-anki-key">AnkiConnect API key (optional)</label><input type="password" id="dict-anki-key" autocomplete="off" spellcheck="false" /></div>
       <div class="fg-actions">
         <button type="button" id="vocab-anki-test-btn">Test AnkiConnect</button>
+        <button type="button" class="btn btn-sm" id="vocab-anki-btn">Send all to Anki</button>
         <span class="save-status" id="vocab-anki-test-status" role="status" aria-live="polite"></span>
       </div>
       <div class="fg"><label class="bl" for="dict-eudic-token">Eudic OpenAPI authorization</label><input type="password" id="dict-eudic-token" autocomplete="off" spellcheck="false" /></div>
       <div class="fg-actions">
         <button type="button" id="vocab-eudic-test-btn">Test Eudic connection</button>
+        <button type="button" class="btn btn-sm" id="vocab-eudic-btn" hidden>Send all supported words to Eudic</button>
         <span class="save-status" id="vocab-eudic-test-status" role="status" aria-live="polite"></span>
       </div>
       <div class="vocab-toolbar">
         <button type="button" class="btn btn-sm" id="vocab-export-btn">Export all (.tsv)</button>
-        <button type="button" class="btn btn-sm" id="vocab-anki-btn">Send all to Anki</button>
-        <button type="button" class="btn btn-sm" id="vocab-eudic-btn" hidden>Send all supported words to Eudic</button>
         <span class="save-status" id="vocab-status" role="status" aria-live="polite"></span>
       </div>
     </div>
@@ -401,37 +401,37 @@ delete document.documentElement.dataset.theme;
     resetActions();
     window.chrome.permissions.request = async () => false;
     await _pbpVocabSendAnki();
-    check("Anki host-permission denial is distinct from an unreachable add-on", $id("vocab-status").textContent.includes("dictAnkiHostPermissionDenied"));
+    check("Anki host-permission denial is distinct from an unreachable add-on", $id("vocab-anki-test-status").textContent.includes("dictAnkiHostPermissionDenied"));
 
     resetActions();
     pbpAnkiCall = async () => ({ ok:false, result:null, error:"unreachable" });
     await _pbpVocabSendAnki();
-    check("AnkiConnect permission check failure has a dedicated message", $id("vocab-status").textContent.includes("dictAnkiConnectPermissionFailed"));
+    check("AnkiConnect permission check failure has a dedicated message", $id("vocab-anki-test-status").textContent.includes("dictAnkiConnectPermissionFailed"));
 
     resetActions();
     pbpAnkiCall = async () => ({ ok:true, result:{ permission:"denied", version:6 } });
     await _pbpVocabSendAnki();
-    check("AnkiConnect permission denial is reported separately", $id("vocab-status").textContent.includes("dictAnkiConnectPermissionDenied"));
+    check("AnkiConnect permission denial is reported separately", $id("vocab-anki-test-status").textContent.includes("dictAnkiConnectPermissionDenied"));
 
     resetActions();
     pbpAnkiCall = async () => ({ ok:true, result:{ permission:"granted", version:5 } });
     await _pbpVocabSendAnki();
-    check("unsupported AnkiConnect API version is reported separately", $id("vocab-status").textContent.includes("dictAnkiVersionUnsupported"));
+    check("unsupported AnkiConnect API version is reported separately", $id("vocab-anki-test-status").textContent.includes("dictAnkiVersionUnsupported"));
 
     resetActions();
     pbpAnkiCall = async () => ({ ok:true, result:{ permission:"granted" } });
     await _pbpVocabSendAnki();
-    check("missing AnkiConnect API version is treated as unsupported", $id("vocab-status").textContent.includes("dictAnkiVersionUnsupported"));
+    check("missing AnkiConnect API version is treated as unsupported", $id("vocab-anki-test-status").textContent.includes("dictAnkiVersionUnsupported"));
 
     resetActions();
     pbpAnkiSendRows = async () => ({ stage:"modelMismatch", error:"model fields incompatible" });
     await _pbpVocabSendAnki();
-    check("Anki note-type field mismatch keeps its repair guidance", $id("vocab-status").textContent.includes("dictAnkiModelMismatch"));
+    check("Anki note-type field mismatch keeps its repair guidance", $id("vocab-anki-test-status").textContent.includes("dictAnkiModelMismatch"));
 
     resetActions();
     pbpAnkiSendRows = async () => ({ stage:"modelFields", error:"field query failed" });
     await _pbpVocabSendAnki();
-    check("Anki field-query failure is not mislabeled as a field mismatch", $id("vocab-status").textContent.includes("dictAnkiFieldCheckFailed"));
+    check("Anki field-query failure is not mislabeled as a field mismatch", $id("vocab-anki-test-status").textContent.includes("dictAnkiFieldCheckFailed"));
 
     resetActions();
     let ankiRows = null;
@@ -454,30 +454,30 @@ delete document.documentElement.dataset.theme;
     };
     await _pbpVocabSendEudic();
     check("an empty vocabulary answers Eudic the way Anki does instead of reporting a successful send",
-      $id("vocab-status").textContent.includes("dictAnkiNothing") &&
-      $id("vocab-status").classList.contains("bad") && emptyEudicCalls === 0,
-      `status=${$id("vocab-status").textContent} calls=${emptyEudicCalls}`);
+      $id("vocab-eudic-test-status").textContent.includes("dictAnkiNothing") &&
+      $id("vocab-eudic-test-status").classList.contains("bad") && emptyEudicCalls === 0,
+      `status=${$id("vocab-eudic-test-status").textContent} calls=${emptyEudicCalls}`);
 
     resetActions();
     pbpEudicSendRows = async () => ({ stage:"done", added:0, skipped:0, unsupported:3,
       unsupportedTerms:["all-zh", "another-zh", "third-zh"], failed:0, forbidden:false, generic:false });
     await _pbpVocabSendEudic();
     check("a send that reached no word at all is not styled as a success",
-      $id("vocab-status").classList.contains("bad") &&
-      !$id("vocab-status").classList.contains("ok") &&
-      $id("vocab-status").textContent.includes("dictEudicResult") &&
-      $id("vocab-status").textContent.includes("vocabUnsupportedTerms"),
-      `class=${$id("vocab-status").className} status=${$id("vocab-status").textContent}`);
+      $id("vocab-eudic-test-status").classList.contains("bad") &&
+      !$id("vocab-eudic-test-status").classList.contains("ok") &&
+      $id("vocab-eudic-test-status").textContent.includes("dictEudicResult") &&
+      $id("vocab-eudic-test-status").textContent.includes("vocabUnsupportedTerms"),
+      `class=${$id("vocab-eudic-test-status").className} status=${$id("vocab-eudic-test-status").textContent}`);
 
     resetActions();
     pbpEudicSendRows = async () => ({ stage:"done", added:0, skipped:0, unsupported:0, failed:3, forbidden:true, generic:false });
     await _pbpVocabSendEudic();
-    check("Eudic 403 uses the request-rejected recovery message", $id("vocab-status").textContent.includes("dictEudicRejected"));
+    check("Eudic 403 uses the request-rejected recovery message", $id("vocab-eudic-test-status").textContent.includes("dictEudicRejected"));
 
     resetActions();
     pbpEudicSendRows = async () => ({ stage:"done", added:0, skipped:0, unsupported:0, failed:3, forbidden:false, generic:false, error:null });
     await _pbpVocabSendEudic();
-    check("generic Eudic failure no longer reuses a Jina conversion error", $id("vocab-status").textContent.includes("dictEudicFailed"));
+    check("generic Eudic failure no longer reuses a Jina conversion error", $id("vocab-eudic-test-status").textContent.includes("dictEudicFailed"));
 
     resetActions();
     pbpReadSettingsWithSecrets = async () => { throw new Error("storage unavailable"); };
@@ -533,15 +533,17 @@ delete document.documentElement.dataset.theme;
       !$id("vocab-anki-test-status").textContent.includes("dictAnkiKeyRejected"));
 
     // B19: a throwing host-permission request during Send all reports beside
-    // the send button and records no connection-test health.
+    // the send button -- which now shares the Anki row (and its status slot)
+    // with the test button -- leaves the export toolbar alone, and records no
+    // connection-test health.
     resetActions();
     healthCalls.length = 0;
     window.chrome.permissions.request = async () => { throw new TypeError("Invalid url pattern"); };
     await _pbpVocabSendAnki();
-    check("a failed Anki host-permission request during send stays on the send status line",
-      $id("vocab-status").textContent.includes("dictAnkiHostPermissionDenied") &&
-      !$id("vocab-anki-test-status").textContent && healthCalls.length === 0,
-      `status=${$id("vocab-status").textContent} test=${$id("vocab-anki-test-status").textContent}`);
+    check("a failed Anki host-permission request during send stays on the Anki row's status line",
+      $id("vocab-anki-test-status").textContent.includes("dictAnkiHostPermissionDenied") &&
+      !$id("vocab-status").textContent && healthCalls.length === 0,
+      `status=${$id("vocab-anki-test-status").textContent} toolbar=${$id("vocab-status").textContent}`);
 
     // B22: the tester maps 401/403 exactly as pbpEudicSendRows does.
     const realFetch = window.fetch;

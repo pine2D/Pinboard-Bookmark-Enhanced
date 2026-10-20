@@ -698,9 +698,13 @@ async function renderVocabPanel() {
 // in-flight label, and the auto-save flush -- the deck, port and tokens are
 // edited right here, so a value typed inside the 500ms debounce must land
 // before the send reads it.
-function _pbpVocabSendOptions() {
+// A send reports beside its own button (2026-10-20, options critique 4: the
+// Anki and Eudic sends moved into their service's group, next to that
+// service's test button), so it writes that row's status slot; export keeps
+// the toolbar's #vocab-status.
+function _pbpVocabSendOptions(statusId = "") {
   return {
-    flash: _pbpVocabFlashStatus,
+    flash: statusId ? (ok, text) => _pbpVocabFlashLocalStatus(statusId, ok, text) : _pbpVocabFlashStatus,
     flush: typeof window.pbpOptionsFlushAutoSave === "function" ? window.pbpOptionsFlushAutoSave : null
   };
 }
@@ -723,7 +727,7 @@ async function _pbpVocabSendAnki() {
   const orig = btn.textContent;
   try {
     btn.textContent = t("dictAnkiSending");
-    await pbpVocabSendToAnki(_pbpVocabSendOptions());
+    await pbpVocabSendToAnki(_pbpVocabSendOptions("vocab-anki-test-status"));
   } finally {
     btn.textContent = orig;
     btn.disabled = false;
@@ -737,7 +741,7 @@ async function _pbpVocabSendEudic() {
   const orig = btn.textContent;
   try {
     btn.textContent = t("dictEudicSending");
-    await pbpVocabSendToEudic(_pbpVocabSendOptions());
+    await pbpVocabSendToEudic(_pbpVocabSendOptions("vocab-eudic-test-status"));
   } finally {
     btn.textContent = orig;
     btn.disabled = false;
