@@ -3905,11 +3905,11 @@
   "mdTargetNotionParentWarn": {
     "message": "输入框里没有找到页面 ID。请从浏览器地址栏复制页面完整链接后粘贴。"
   },
-  "hlColorQuote": { "message": "金句" },
-  "hlColorDefinition": { "message": "定义" },
-  "hlColorExample": { "message": "例子" },
-  "hlColorDoubt": { "message": "存疑" },
-  "hlColorTodo": { "message": "待办" },
+  "hlColorYellow": { "message": "黄色" },
+  "hlColorGreen": { "message": "绿色" },
+  "hlColorBlue": { "message": "蓝色" },
+  "hlColorRed": { "message": "红色" },
+  "hlColorPurple": { "message": "紫色" },
   "hlTrBadgeAria": { "message": "译文高亮（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "高亮并添加笔记" },
   "hlSaveFailed": { "message": "高亮未能保存" },

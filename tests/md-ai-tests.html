@@ -5473,16 +5473,16 @@ suiteIf("pbpHlComposeSection", "pbpHlComposeSection", () => {
   });
   test("single item without note -> blockquote + blank line + slug, no note paragraph", () => {
     const out = pbpHlComposeSection([{ quote: "hello world", color: 1, note: "" }]);
-    assertEq(out, "## Highlights\n\n> hello world\n\n#hl-quote", "no-note shape");
+    assertEq(out, "## Highlights\n\n> hello world\n\n#hl-yellow", "no-note shape");
   });
   test("single item with note -> two-paragraph blockquote (quote, blank quoted line, note) + slug", () => {
     const out = pbpHlComposeSection([{ quote: "hello world", color: 2, note: "my note" }]);
-    assertEq(out, "## Highlights\n\n> hello world\n>\n> my note\n\n#hl-definition", "with-note shape");
+    assertEq(out, "## Highlights\n\n> hello world\n>\n> my note\n\n#hl-green", "with-note shape");
   });
   test("all 5 colors map to their fixed English slug in order", () => {
     const items = [1, 2, 3, 4, 5].map((c) => ({ quote: "q" + c, color: c, note: "" }));
     const out = pbpHlComposeSection(items);
-    assertEq(out, "## Highlights\n\n> q1\n\n#hl-quote\n\n> q2\n\n#hl-definition\n\n> q3\n\n#hl-example\n\n> q4\n\n#hl-doubt\n\n> q5\n\n#hl-todo", "all 5 slugs in order");
+    assertEq(out, "## Highlights\n\n> q1\n\n#hl-yellow\n\n> q2\n\n#hl-green\n\n> q3\n\n#hl-blue\n\n> q4\n\n#hl-red\n\n> q5\n\n#hl-purple", "all 5 slugs in order");
   });
 });
 

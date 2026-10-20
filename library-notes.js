@@ -128,7 +128,8 @@ function pbpNotesStats(hits, now) {
 // ============================================================
 
 const PBP_NOTES_COLORS = [1, 2, 3, 4, 5];
-const PBP_NOTES_COLOR_KEYS = ["hlColorQuote", "hlColorDefinition", "hlColorExample", "hlColorDoubt", "hlColorTodo"];
+// 2026-10-20 user ruling: colours carry no meaning; names are plain colour words.
+const PBP_NOTES_COLOR_KEYS = ["hlColorYellow", "hlColorGreen", "hlColorBlue", "hlColorRed", "hlColorPurple"];
 let _notesAllRows = []; // [{ row, rec }], last full scan, sorted lastTs desc
 // Set by _pbpNotesScan itself (not by its caller) at every successful return,
 // true when that scan's owner filter dropped at least one item from some
@@ -540,7 +541,7 @@ function _pbpNotesBuildRow(hit) {
 
   const body = document.createElement("span");
   body.className = "notes-hit-body";
-  // The dot is decorative; the colour's meaning reaches the accessible name
+  // The dot is decorative; the colour name reaches the accessible name
   // as text (spec §3.7).
   const colorName = document.createElement("span");
   colorName.className = "sr-only";
@@ -1449,7 +1450,7 @@ function _pbpNotesBuildColorFilters() {
     const dot = document.createElement("span");
     dot.className = "notes-hit-dot notes-c" + c;
     dot.setAttribute("aria-hidden", "true");
-    // The colour's meaning, shown only in the "rich" header form (the index
+    // The colour name, shown only in the "rich" header form (the index
     // has room for name + number, library.js pbpLibNotesColorNeed); the
     // accessible name already carries it, so it is aria-hidden like the dot.
     const nm = document.createElement("span");

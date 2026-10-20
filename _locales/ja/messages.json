@@ -3911,11 +3911,11 @@
   "mdTargetNotionParentWarn": {
     "message": "この欄からページ ID を読み取れません。アドレスバーからページの完全な URL を貼り付けてください。"
   },
-  "hlColorQuote": { "message": "引用" },
-  "hlColorDefinition": { "message": "定義" },
-  "hlColorExample": { "message": "例" },
-  "hlColorDoubt": { "message": "疑問" },
-  "hlColorTodo": { "message": "やること" },
+  "hlColorYellow": { "message": "黄" },
+  "hlColorGreen": { "message": "緑" },
+  "hlColorBlue": { "message": "青" },
+  "hlColorRed": { "message": "赤" },
+  "hlColorPurple": { "message": "紫" },
   "hlTrBadgeAria": { "message": "翻訳のハイライト（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "ハイライトしてメモを追加" },
   "hlSaveFailed": { "message": "ハイライトを保存できませんでした" },

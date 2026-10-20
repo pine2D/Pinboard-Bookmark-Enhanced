@@ -3911,11 +3911,11 @@
   "mdTargetNotionParentWarn": {
     "message": "Nie znaleziono ID strony w tym polu. Wklej pełny adres URL strony z paska adresu przeglądarki."
   },
-  "hlColorQuote": { "message": "Cytat" },
-  "hlColorDefinition": { "message": "Definicja" },
-  "hlColorExample": { "message": "Przykład" },
-  "hlColorDoubt": { "message": "Wątpliwość" },
-  "hlColorTodo": { "message": "Do zrobienia" },
+  "hlColorYellow": { "message": "Żółty" },
+  "hlColorGreen": { "message": "Zielony" },
+  "hlColorBlue": { "message": "Niebieski" },
+  "hlColorRed": { "message": "Czerwony" },
+  "hlColorPurple": { "message": "Fioletowy" },
   "hlTrBadgeAria": { "message": "Podświetlenie tłumaczenia ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "Zaznacz i dodaj notatkę" },
   "hlSaveFailed": { "message": "Nie udało się zapisać zaznaczenia" },

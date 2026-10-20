@@ -168,6 +168,9 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     coldToggles.length === 5 &&
     coldToggles.every((b, i) => b.title === PBP_NOTES_COLOR_KEYS[i] && b.getAttribute("aria-label") === b.title),
     coldToggles.map((b) => b.title + "/" + b.getAttribute("aria-label")).join(" "));
+  check("colour names are plain colour words, never a purpose (2026-10-20 ruling: the five colours carry no meaning)",
+    PBP_NOTES_COLOR_KEYS.length === 5 && new Set(PBP_NOTES_COLOR_KEYS).size === 5 &&
+    PBP_NOTES_COLOR_KEYS.every((k) => /^hlColor(Yellow|Green|Blue|Red|Purple)$/.test(k)), PBP_NOTES_COLOR_KEYS.join(","));
   await renderNotesPanel();
   check("the first render with highlights shows the colour toggles",
     $id("notes-color-filters").hidden === false && getComputedStyle($id("notes-color-filters")).display === "flex");
@@ -238,7 +241,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("the row's colour is a decorative 10px dot, named for screen readers inside the row",
     !!rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-dot.notes-c3[aria-hidden='true']") &&
     !!rowEl("pbp_hl_beta#b1").querySelector(".notes-hit-dot.notes-c5") &&
-    rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-body > .sr-only")?.textContent === "hlColorExample" &&
+    rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-body > .sr-only")?.textContent === "hlColorBlue" &&
     !rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-bar"));
   check("a highlight's note sits on its own line, after a pencil icon",
     !!rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-body > .notes-hit-note > svg") &&
@@ -1034,15 +1037,15 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     toggles().length === 6 && toggles().every((b) => b.classList.contains("sm")) &&
     toggles()[0].dataset.color === "all" && pressed() === "all", pressed());
   check("every colour toggle names its colour and count in title and aria-label",
-    toggle(1)?.title === "libraryColorFilterAria:hlColorQuote,2" && toggle(1)?.getAttribute("aria-label") === toggle(1)?.title &&
+    toggle(1)?.title === "libraryColorFilterAria:hlColorYellow,2" && toggle(1)?.getAttribute("aria-label") === toggle(1)?.title &&
     toggle(1)?.querySelector(".notes-hit-dot.notes-c1") && toggle(1)?.querySelector(".lib-toggle-count")?.textContent === "2",
     toggle(1) && toggle(1).title);
   // Every colour is in use in this fixture: re-sync over a one-colour set to
   // get empty ones, then restore the real counts.
   _pbpNotesSyncColorFilters([{ item: { color: 1 } }]);
   const zeroToggle = toggle(2);
-  check("each colour toggle carries its meaning for the rich header form, hidden from AT (the label names it)",
-    toggle(1)?.querySelector(".lib-toggle-name")?.textContent === "hlColorQuote" &&
+  check("each colour toggle carries its colour name for the rich header form, hidden from AT (the label names it)",
+    toggle(1)?.querySelector(".lib-toggle-name")?.textContent === "hlColorYellow" &&
     toggle(1)?.querySelector(".lib-toggle-name")?.getAttribute("aria-hidden") === "true", toggle(1) && toggle(1).innerHTML);
   check("a colour with no highlights is aria-disabled and a click on it filters nothing (critique round 3)",
     !!zeroToggle && zeroToggle.getAttribute("aria-disabled") === "true" && !toggle(1)?.hasAttribute("aria-disabled") &&

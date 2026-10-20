@@ -3916,11 +3916,11 @@
   "mdTargetNotionParentWarn": {
     "message": "No page ID found in this field. Paste the page's full URL from your browser's address bar."
   },
-  "hlColorQuote": { "message": "Quote" },
-  "hlColorDefinition": { "message": "Definition" },
-  "hlColorExample": { "message": "Example" },
-  "hlColorDoubt": { "message": "Doubt" },
-  "hlColorTodo": { "message": "To-do" },
+  "hlColorYellow": { "message": "Yellow" },
+  "hlColorGreen": { "message": "Green" },
+  "hlColorBlue": { "message": "Blue" },
+  "hlColorRed": { "message": "Red" },
+  "hlColorPurple": { "message": "Purple" },
   "hlTrBadgeAria": { "message": "Translated highlight ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "Highlight and add a note" },
   "hlSaveFailed": { "message": "Couldn't save the highlight" },

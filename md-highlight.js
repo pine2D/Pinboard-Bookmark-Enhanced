@@ -336,7 +336,7 @@ function pbpHlLatestColorOnSide(items, n, side, blockTrLang) {
 // ---- H2 export: aggregation section (spec 5). Tag slugs are FIXED
 // English strings (a markdown interchange format, like frontmatter)
 // -- i18n only touches UI labels, never these.
-const PBP_HL_SLUGS = ["#hl-quote", "#hl-definition", "#hl-example", "#hl-doubt", "#hl-todo"];
+const PBP_HL_SLUGS = ["#hl-yellow", "#hl-green", "#hl-blue", "#hl-red", "#hl-purple"];
 
 // Blockquote a possibly-multi-line string: prefix every line with
 // "> " (a bare "> " would print a trailing space, so an empty line
@@ -1529,7 +1529,7 @@ function _pbpHlEnsureBar() {
   const bar = document.createElement("div");
   bar.id = "pb-hl-bar";
   bar.setAttribute("popover", "auto");
-  const names = [t("hlColorQuote"), t("hlColorDefinition"), t("hlColorExample"), t("hlColorDoubt"), t("hlColorTodo")];
+  const names = PBP_HL_COLOR_KEYS.map((k) => t(k));
   for (let c = 1; c <= 5; c++) {
     const dot = document.createElement("button");
     dot.type = "button";
@@ -2150,7 +2150,9 @@ window.pbpHlItemIdAtRange = pbpHlItemIdAtRange;
 
 // ---- Edit card (spec sec.4). Native popover="auto": Esc + light-dismiss for
 // this transient editor; a pinned manual explain-pop may remain open. ----
-const PBP_HL_COLOR_KEYS = ["hlColorQuote", "hlColorDefinition", "hlColorExample", "hlColorDoubt", "hlColorTodo"]; // index 0..4 = color 1..5, fixed order (spec sec.5 slugs)
+// 2026-10-20 user ruling: the five colours carry no meaning and are not user-nameable;
+// their accessible names are plain colour words. index 0..4 = color 1..5.
+const PBP_HL_COLOR_KEYS = ["hlColorYellow", "hlColorGreen", "hlColorBlue", "hlColorRed", "hlColorPurple"];
 let _pbpHlCard = null;
 let _pbpHlCardItemId = null;
 let _pbpHlCardBaseNote = "";

@@ -3911,11 +3911,11 @@
   "mdTargetNotionParentWarn": {
     "message": "Aus diesem Feld lässt sich keine Seiten-ID lesen. Füge die vollständige URL der Seite aus der Adressleiste ein."
   },
-  "hlColorQuote": { "message": "Zitat" },
-  "hlColorDefinition": { "message": "Begriffsdefinition" },
-  "hlColorExample": { "message": "Beispiel" },
-  "hlColorDoubt": { "message": "Zweifel" },
-  "hlColorTodo": { "message": "Aufgabe" },
+  "hlColorYellow": { "message": "Gelb" },
+  "hlColorGreen": { "message": "Grün" },
+  "hlColorBlue": { "message": "Blau" },
+  "hlColorRed": { "message": "Rot" },
+  "hlColorPurple": { "message": "Violett" },
   "hlTrBadgeAria": { "message": "Hervorhebung der Übersetzung ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "Markieren und Notiz hinzufügen" },
   "hlSaveFailed": { "message": "Die Markierung konnte nicht gespeichert werden" },

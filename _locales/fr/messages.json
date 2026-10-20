@@ -3911,11 +3911,11 @@
   "mdTargetNotionParentWarn": {
     "message": "Aucun ID de page trouvé dans ce champ. Collez l'URL complète de la page depuis la barre d'adresse."
   },
-  "hlColorQuote": { "message": "Citation" },
-  "hlColorDefinition": { "message": "Définition" },
-  "hlColorExample": { "message": "Exemple" },
-  "hlColorDoubt": { "message": "Doute" },
-  "hlColorTodo": { "message": "À faire" },
+  "hlColorYellow": { "message": "Jaune" },
+  "hlColorGreen": { "message": "Vert" },
+  "hlColorBlue": { "message": "Bleu" },
+  "hlColorRed": { "message": "Rouge" },
+  "hlColorPurple": { "message": "Violet" },
   "hlTrBadgeAria": { "message": "Surlignage de la traduction ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "Surligner et ajouter une note" },
   "hlSaveFailed": { "message": "Impossible d'enregistrer le surlignage" },

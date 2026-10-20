@@ -524,7 +524,7 @@ function assertEq(actual, expected, label) {
   // Non-empty: section appended, inline mark applied by default (highlightsInline unset -> true).
   const withHl = composeExport(cmd, cmeta, { frontmatter: false, imagePolicy: "keep", includeToc: false, highlights: hlItems });
   assert(withHl.includes("## Highlights"), "highlights section appended");
-  assert(withHl.includes("#hl-quote") && withHl.includes("#hl-doubt"), "fixed color slugs present");
+  assert(withHl.includes("#hl-yellow") && withHl.includes("#hl-red"), "fixed color slugs present");
   assert(withHl.includes("==Section One=="), "unique quote gets opportunistic inline mark by default");
 
   // highlightsInline:false -- section only, no "==...==".
@@ -564,7 +564,7 @@ function assertEq(actual, expected, label) {
   const sect = pbpHlComposeSection(h5items);
   check("composeSection lists both quotes", sect.includes("Section One") && sect.includes("translated body"), sect);
   check("composeSection tags the tr item with [tr:zh-CN]", sect.includes("[tr:zh-CN]"), sect);
-  check("composeSection does not tag the original item's slug", !/#hl-quote[^\n]*\[tr:/.test(sect), sect);
+  check("composeSection does not tag the original item's slug", !/#hl-yellow[^\n]*\[tr:/.test(sect), sect);
 
   // Back-compat: 2-arg pbpHlInlineMark (no view) still wraps a unique quote.
   check("pbpHlInlineMark 2-arg back-compat still wraps", pbpHlInlineMark("a Section One b", [{ quote: "Section One", color: 1 }]).includes("==Section One=="), "back-compat");

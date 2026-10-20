@@ -3911,11 +3911,11 @@
   "mdTargetNotionParentWarn": {
     "message": "無法從這個欄位解析出頁面 ID。請從瀏覽器網址列複製頁面完整連結後貼上。"
   },
-  "hlColorQuote": { "message": "金句" },
-  "hlColorDefinition": { "message": "定義" },
-  "hlColorExample": { "message": "例子" },
-  "hlColorDoubt": { "message": "存疑" },
-  "hlColorTodo": { "message": "待辦" },
+  "hlColorYellow": { "message": "黃色" },
+  "hlColorGreen": { "message": "綠色" },
+  "hlColorBlue": { "message": "藍色" },
+  "hlColorRed": { "message": "紅色" },
+  "hlColorPurple": { "message": "紫色" },
   "hlTrBadgeAria": { "message": "譯文標記（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "標記並加入筆記" },
   "hlSaveFailed": { "message": "標記未能儲存" },

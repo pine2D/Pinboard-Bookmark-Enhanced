@@ -3911,11 +3911,11 @@
   "mdTargetNotionParentWarn": {
     "message": "В этом поле не найден ID страницы. Вставьте полный URL страницы из адресной строки."
   },
-  "hlColorQuote": { "message": "Цитата" },
-  "hlColorDefinition": { "message": "Определение" },
-  "hlColorExample": { "message": "Пример" },
-  "hlColorDoubt": { "message": "Сомнение" },
-  "hlColorTodo": { "message": "Задача" },
+  "hlColorYellow": { "message": "Жёлтый" },
+  "hlColorGreen": { "message": "Зелёный" },
+  "hlColorBlue": { "message": "Синий" },
+  "hlColorRed": { "message": "Красный" },
+  "hlColorPurple": { "message": "Фиолетовый" },
   "hlTrBadgeAria": { "message": "Выделение перевода ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "Выделить и добавить заметку" },
   "hlSaveFailed": { "message": "Не удалось сохранить выделение" },
