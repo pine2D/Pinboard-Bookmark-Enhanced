@@ -867,7 +867,7 @@ function _pbpNotesBuildHead(hit, count) {
   return head;
 }
 
-// One excerpt's label (spec §5.4): time, then the colour's dot and name; the
+// One excerpt's label (spec §5.4): time, then the colour's dot; the
 // day too when it is not the page's own day. Two spans for day and time so a
 // label that does not fit the 96px hang column can stack them
 // (_pbpNotesStackLabels). It carries the UI language for hyphens: auto, and
@@ -905,13 +905,13 @@ function _pbpNotesExcerptLabel(hit, pageTs) {
   color.setAttribute("aria-haspopup", "menu");
   color.setAttribute("aria-expanded", "false");
   color.addEventListener("click", () => _pbpNotesOpenColorMenu(hit, color));
+  // The dot alone (user ruling 2026-10-20: the five colours carry no names
+  // on screen; a visible "Yellow" beside a yellow dot only repeated it). The
+  // colour word stays in the button's accessible name above.
   const dot = document.createElement("span");
   dot.className = "notes-hit-dot notes-c" + c;
   dot.setAttribute("aria-hidden", "true");
-  const name = document.createElement("span");
-  name.className = "notes-excerpt-color-name";
-  name.textContent = t(PBP_NOTES_COLOR_KEYS[c - 1]);
-  color.append(dot, name);
+  color.append(dot);
   label.appendChild(color);
   return label;
 }
@@ -1447,19 +1447,14 @@ function _pbpNotesBuildColorFilters() {
     const name = t(PBP_NOTES_COLOR_KEYS[c - 1]);
     b.title = name;
     b.setAttribute("aria-label", name);
+    // Dot and number only: the colour word lives in the title and the
+    // accessible name (user ruling 2026-10-20, no visible colour names).
     const dot = document.createElement("span");
     dot.className = "notes-hit-dot notes-c" + c;
     dot.setAttribute("aria-hidden", "true");
-    // The colour name, shown only in the "rich" header form (the index
-    // has room for name + number, library.js pbpLibNotesColorNeed); the
-    // accessible name already carries it, so it is aria-hidden like the dot.
-    const nm = document.createElement("span");
-    nm.className = "lib-toggle-name";
-    nm.setAttribute("aria-hidden", "true");
-    nm.textContent = name;
     const num = document.createElement("span");
     num.className = "lib-toggle-count";
-    b.append(dot, nm, num);
+    b.append(dot, num);
     // A colour with no highlights is aria-disabled (see _pbpNotesSyncColorFilters):
     // still focusable and named, but a click would only filter to nothing.
     b.addEventListener("click", () => {
@@ -1510,8 +1505,6 @@ function _pbpNotesSyncColorFilters(allHits) {
     // its last highlight may have just been deleted.
     if (n === 0 && !_notesActiveColors.has(c)) b.setAttribute("aria-disabled", "true");
     else b.removeAttribute("aria-disabled");
-    const nm = b.querySelector(".lib-toggle-name");
-    if (nm) nm.textContent = t(PBP_NOTES_COLOR_KEYS[c - 1]);
     const num = b.querySelector(".lib-toggle-count");
     if (num) num.textContent = String(n);
   }
@@ -2444,10 +2437,10 @@ if (typeof $id === "function") {
       if (width > 0) _pbpNotesScheduleStack();
     }).observe(notesDetail);
   }
-  // A language switch rewrites colour names and the page count, which are
-  // built from t() at render time: re-render the open detail (same highlight,
-  // so the pane keeps its scroll and keyboard focus is put back where it
-  // was); the render ends with a fresh measurement.
+  // A language switch rewrites the colour buttons' accessible names and the
+  // page count, which are built from t() at render time: re-render the open
+  // detail (same highlight, so the pane keeps its scroll and keyboard focus
+  // is put back where it was); the render ends with a fresh measurement.
   document.addEventListener("pbp:i18n-applied", () => {
     _pbpNotesRenderCover(false);
     // The count row is JS-written as well: without this a cold load whose

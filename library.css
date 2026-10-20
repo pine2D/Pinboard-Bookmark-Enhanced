@@ -639,11 +639,6 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
    in each one's title and accessible name -- and keep one line. Square at the
    sm rung so a dot-only toggle still clears the 24px hit area in compact. */
 .notes-list-pane[data-header-fit="narrow"] .notes-color-filters .lib-toggle-count { display: none; }
-/* Room for name + number ("rich", critique round 3): each colour's meaning
-   (Quote, To-do...) shows between its dot and its number; otherwise it lives
-   in the title and accessible name only. */
-.lib-toggle-name { display: none; }
-.notes-list-pane[data-header-fit="rich"] .notes-color-filters .lib-toggle-name { display: inline; }
 .notes-list-pane[data-header-fit="narrow"] .notes-color-filters .lib-toggle[data-color]:not([data-color="all"]) {
   justify-content: center;
   min-width: calc(var(--lib-control-h) - 4px);
@@ -1101,11 +1096,9 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   /* Until _pbpNotesStackLabels has measured this width (a resize is answered
      one frame later), a label that does not fit wraps inside its column
      instead of running out of its left edge; the measurement then turns it
-     into the stacked form below. A colour name wider than the whole column
-     breaks inside itself in either state. */
+     into the stacked form below. */
   .notes-excerpt > .notes-excerpt-label { flex-wrap: wrap; white-space: normal; }
   .notes-excerpt > .notes-excerpt-label > * { max-width: 100%; }
-  .notes-excerpt > .notes-excerpt-label .notes-excerpt-color-name { min-width: 0; overflow-wrap: anywhere; hyphens: auto; text-align: end; }
   .notes-excerpt > .notes-excerpt-body { grid-column: 2; }
   /* The measured form (_pbpNotesStackLabels): the label keeps the height of
      one line and lets its other lines hang below; when they hang past the
@@ -1191,13 +1184,16 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   outline-offset: 2px;
   box-shadow: var(--lib-focus-ring);
 }
+/* The dot alone, centred in a 24px square hit area (user ruling 2026-10-20:
+   no visible colour names). Its synthesized baseline is the dot's bottom
+   edge, so the label's baseline row still sets the dot on the time's
+   baseline, where it sat beside the old name. */
 .notes-excerpt-color {
   display: inline-flex;
-  align-items: baseline;
-  gap: var(--lib-sp-1);
-  min-width: 24px;
-  min-height: 24px;
-  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
   border-radius: var(--lib-radius-sm);
@@ -1207,7 +1203,7 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
   text-align: inherit;
   cursor: pointer;
 }
-.notes-excerpt-color:hover .notes-excerpt-color-name { text-decoration: underline; text-underline-offset: 2px; }
+.notes-excerpt-color:hover { background: var(--lib-row-bg-hover); }
 .notes-excerpt-color:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
 .notes-excerpt-color > .notes-hit-dot { flex: none; margin-top: 0; }
 .notes-color-menu[popover] {

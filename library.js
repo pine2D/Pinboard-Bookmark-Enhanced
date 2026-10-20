@@ -478,18 +478,13 @@ function pbpLibVocabFilterNeed(row) {
   });
 }
 
-// The notes colour row's two roomier forms: "wide", every toggle with its
-// number; "rich" (critique round 3, 2026-10-20), the colour's meaning before
-// the number as well -- the dots alone made the reader remember which colour
-// was a quote and which a to-do. { need, richNeed }: the wide need decides
-// wide vs narrow as before, the rich one only lifts wide to rich.
+// The notes colour row's roomy form: every toggle with its number (the
+// narrow form shows the dots alone).
 function pbpLibNotesColorNeed(row) {
   if (!row || row.hidden) return NaN;
-  const measure = (names) => pbpLibMeasureCopyWidth(row, (copy) => {
+  return pbpLibMeasureCopyWidth(row, (copy) => {
     for (const num of copy.querySelectorAll(".lib-toggle-count")) num.style.display = "inline";
-    for (const nm of copy.querySelectorAll(".lib-toggle-name")) nm.style.display = names ? "inline" : "none";
   });
-  return { need: measure(false), richNeed: measure(true) };
 }
 
 // Wires one pane: decides now, then again on every trigger above. `opts`:
@@ -538,15 +533,10 @@ function pbpLibWireHeaderFit(pane, row, measureNeed, opts = {}) {
         apply(lastForm);
         return pane.dataset.headerFit || null;
       }
-      // A measure may return { need, richNeed } (the notes colour row): the
-      // rich form needs the wide one to fit first and its own need to fit too.
-      const measured = measureNeed(row);
-      const need = measured && typeof measured === "object" ? measured.need : measured;
-      const richNeed = measured && typeof measured === "object" ? measured.richNeed : NaN;
+      const need = measureNeed(row);
       if (Number.isFinite(need)) {
         lastSig = sig;
         lastForm = pbpLibHeaderFitForm(need, room);
-        if (lastForm === "wide" && pbpLibHeaderFitForm(richNeed, room) === "wide") lastForm = "rich";
         apply(lastForm);
       }
     } catch (err) {

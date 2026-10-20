@@ -1180,12 +1180,12 @@ export const CHECKS = [
   // count items whole, the vocabulary batch row 100 / 88 (three rows since
   // critique round 3) and the notes one one or two sm rows. The form each
   // header shows -- filter row inline or folded into the Filter popover,
-  // colour toggles dots only, with their numbers, or with names and numbers
-  // ("rich", critique round 3) -- must be the one the runner's own
-  // measurement of each form's need calls for (user ruling 10-04: no fixed
-  // threshold, it fits or it folds). indexWidths are the fixed probes across
-  // the index's range; the runner adds each locale's own needs -1 / +1 so
-  // both sides of every switch point are walked.
+  // colour toggles dots only or with their numbers (never colour names, user
+  // ruling 2026-10-20) -- must be the one the runner's own measurement of
+  // the wide form's need calls for (user ruling 10-04: no fixed threshold, it
+  // fits or it folds). indexWidths are the fixed probes across the index's
+  // range; the runner adds each locale's own need -1 / +1 so both sides of
+  // every switch point are walked.
   { surface: "library", page: "library.html", selector: ".vocab-list-pane", state: "listHeaderFit", themes: ["", "terminal"],
     expect: { listHeaderFit: { width: 1600, height: 900, count: 9999, indexWidths: [360, 440, 512, 520] } } },
   // G6, the toggles T3's filterScrollReset does not drive: the status toggle
