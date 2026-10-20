@@ -8969,7 +8969,7 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
   // 2026-10-20 reader critique item 5: reading width moved out of the
   // rail-bottom cycle button into the "Aa" panel, next to size / spacing /
   // appearance; the zen bar's cycle button stays and shares the write path.
-  test("reading width is an Aa-panel segment row in sync with the zen bar; no rail-bottom width button", () => {
+  test("reading width is an Aa-panel segment row; neither the rail bottom nor the zen bar has a width button", () => {
     const realT = window.t, realStorage = window.chrome.storage;
     const rail = document.createElement("aside");
     rail.id = "rail";
@@ -9005,13 +9005,9 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       assertEq(document.body.style.getPropertyValue("--pbp-width"), "1080px", "and applies it");
       assertEq(JSON.stringify(writes[writes.length - 1]), JSON.stringify({ pbp_zen_width: 1080 }), "persisted under the unchanged key and value");
       assertEq(pressed(), "1080", "pressed state follows");
-      _pbpZenEnsureBar();
-      const zenBtn = document.getElementById("zen-width-btn");
-      zenBtn.click(); // cycle 1080 -> 720
-      assertEq(_pbpZenWidth, 720, "zen bar cycle wraps to the first step");
-      assertEq(pressed(), "720", "the open panel tracks a zen-bar cycle");
-      assertEq(zenBtn.getAttribute("aria-label"), "typoWidthLabel: 720px", "zen bar label shares the panel's term");
-      assertEq(JSON.stringify(writes[writes.length - 1]), JSON.stringify({ pbp_zen_width: 720 }), "zen bar persists through the same path");
+      const bar = _pbpZenEnsureBar();
+      assertEq([...bar.querySelectorAll("button")].map((b) => b.id).join(","), "zen-typo-btn,zen-exit-btn",
+        "the zen bar carries no width control of its own: width lives in Aa");
     } finally {
       document.removeEventListener("keydown", _pbpZenOnKeyDown);
       _pbpZenSettleClearPending();

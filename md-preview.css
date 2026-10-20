@@ -525,7 +525,7 @@ body.zen main { margin-left: 0; }
 body.zen:not(.video-mode) #skim-section { display: none; }
 
 /* #zen-bar: the ONLY new chrome zen introduces -- fixed top-right, two
-   icon buttons (width cycle / exit). Same border/surface/radius/focus-
+   buttons ("Aa" typography / exit; width lives in "Aa"). Same border/surface/radius/focus-
    visible token family as #search-pop/.srch-nav (this file, R4 search) --
    deliberately NOT a popover (no Esc/light-dismiss semantics; it stays put
    for the whole zen session, only fading via mouse-idle below). */
