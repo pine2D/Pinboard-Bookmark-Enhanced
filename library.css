@@ -2061,7 +2061,13 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-more:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
 #vocab-ref-result .xp-dict-src { margin-top: var(--lib-sp-5); font-size: 12px; line-height: 16px; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-dict-src a { color: inherit; text-decoration: underline; }
-#vocab-ref-result .xp-dict-msg { padding: var(--lib-sp-1) 0; font-size: 13px; line-height: 18px; color: var(--lib-fg-muted); }
+/* A message (no entry, cooling down, a failure and why) is the section's
+   whole answer, so it is in body ink; its Wiktionary exit follows at sp-2
+   (the message's own sp-1 inset plus sp-1) instead of the sp-5 that parts a
+   source line from an entry -- message, exit and "Look up again" read as one
+   group (critique round 4, 2026-10-20). */
+#vocab-ref-result .xp-dict-msg { padding: var(--lib-sp-1) 0; font-size: 13px; line-height: 18px; color: var(--lib-fg); }
+#vocab-ref-result .xp-dict-msg + .xp-dict-src { margin-top: var(--lib-sp-1); }
 /* The local pack's block: no fill, no frame -- a small bold title and its senses. */
 #vocab-ref-result .xp-dict-local-title { margin-bottom: var(--lib-sp-2); font-size: 13px; line-height: 18px; font-weight: 700; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-skel {

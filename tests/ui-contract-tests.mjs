@@ -9392,6 +9392,13 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(declarationValueMap(hand, "#vocab-ref-result .xp-retry").get("display") === "none" &&
     /foot\.className = "vocab-ref-foot";/.test(libraryVocabJs),
     "library.css: md-dict's Retry shows beside the page's own Look up again -- two buttons for the same action");
+  // A message is the dictionary section's whole answer (critique round 4,
+  // 2026-10-20): body ink, and its Wiktionary exit close under it rather than
+  // the sp-5 that parts a source line from an entry.
+  check(declarationValueMap(hand, "#vocab-ref-result .xp-dict-msg").get("color") === "var(--lib-fg)" &&
+    declarationValueMap(hand, "#vocab-ref-result .xp-dict-msg + .xp-dict-src").get("margin-top") === "var(--lib-sp-1)" &&
+    declarationValueMap(hand, "#vocab-ref-result .xp-dict-src").get("margin-top") === "var(--lib-sp-5)",
+    "library.css: a dictionary message went back to muted ink, or its Wiktionary exit to the entry's sp-5 gap (a failure read as three unrelated pieces)");
 }
 
 // ---- Library redesign T7b (spec §4.2-§4.7, §4.11, §6.5): the word's main
