@@ -353,7 +353,7 @@ _vocabSelected = new Set(["a"]);
 _pbpVocabSyncSelectionUi();
 check("selecting hides the count row and shows the batch row in its place",
   $id("vocab-context-bar").hidden === true && $id("vocab-batch-toolbar").classList.contains("selecting") &&
-  getComputedStyle($id("vocab-batch-toolbar")).display === "grid");
+  getComputedStyle($id("vocab-batch-toolbar")).display === "flex");
 check("the batch row bolds the selected count through the sentinel split",
   $id("vocab-selected-count").textContent === "vocabSelectedCount:1" &&
   $id("vocab-selected-count").querySelector("b")?.textContent === "1");
@@ -3004,7 +3004,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     </div></div></body></html>`;
   document.body.appendChild(frame);
   await new Promise((resolve) => frame.addEventListener("load", resolve, { once:true }));
-  const overflows = [], unreachable = [], groupsBad = [], deleteTight = [];
+  const overflows = [], unreachable = [], groupsBad = [], deleteTight = [], groupNarrow = [];
   let germanCountWhole = false;
   for (const width of [320, 360, 1280]) {
     frame.style.width = width + "px";
@@ -3095,6 +3095,16 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
           if (!(delR.left >= clearR.right + 7.5) || Math.abs(delR.top - clearR.top) > 0.5)
             deleteTight.push(`${width}/${theme}/${locale}:clear..${clearR.right.toFixed(1)} delete ${delR.left.toFixed(1)}..`);
         }
+        {
+          // The group field keeps room for a name in every locale (critique
+          // round 3, 2026-10-20: sharing a grid column with Known / Learning
+          // it kept two characters in de / ru). It has a row of its own, as
+          // wide as the batch row less its two steppers.
+          const field = panel.querySelector('.vocab-batch-bar .vocab-group-unit input[type="text"]').getBoundingClientRect();
+          const bar = panel.querySelector(".vocab-batch-bar").getBoundingClientRect();
+          if (!(field.width >= 120) || !(field.width >= bar.width - 2 * 40))
+            groupNarrow.push(`${width}/${theme}/${locale}:field ${field.width.toFixed(1)} of ${bar.width.toFixed(1)}`);
+        }
         const panelRect = panel.getBoundingClientRect();
         for (const el of panel.querySelectorAll("input, select, button")) {
           const rect = el.getBoundingClientRect();
@@ -3106,6 +3116,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
   }
   check("the batch row's delete stands at least 8px clear of Clear, on the same line, at every width and locale",
     deleteTight.length === 0, deleteTight.slice(0, 6).join("; "));
+  check("the batch row's group field keeps a row of its own, wide enough for a name, at every width and locale",
+    groupNarrow.length === 0, groupNarrow.slice(0, 6).join("; "));
   check("production CSS keeps 320/360/1280 vocabulary layouts overflow-free across 9 locales and light/dark",
     overflows.length === 0, overflows.slice(0, 8).join("; "));
   check("production CSS keeps delete and every other batch control reachable across the viewport matrix",
@@ -3120,9 +3132,17 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
   check("the batch row sits in the list header right after the count row",
     !!batchBar.previousElementSibling?.classList.contains("vocab-context-bar") && !batchBar.closest(".vocab-list-region"));
   const batchCs = frame.contentWindow.getComputedStyle(batchBar);
-  check("the selecting batch row is a two-row grid that does not float",
-    batchCs.display === "grid" && batchCs.position !== "sticky" && batchCs.gridTemplateRows.trim().split(/\s+/).length === 2,
-    `${batchCs.display} ${batchCs.position} rows=${batchCs.gridTemplateRows}`);
+  {
+    // Three rows (critique round 3, 2026-10-20): selection tools, then the
+    // group unit alone, then Known / Learning -- never floating.
+    const box = (sel) => batchBar.querySelector(sel).getBoundingClientRect();
+    const all = box("#vocab-batch-select-all"), unit = box(".vocab-group-unit"), known = box("#vocab-mark-known"), learning = box("#vocab-mark-learning");
+    check("the selecting batch row stacks selection tools / the group unit alone / Known + Learning, and does not float",
+      batchCs.display === "flex" && batchCs.position !== "sticky" &&
+      unit.top >= all.bottom - 0.5 && known.top >= unit.bottom - 0.5 && learning.top >= unit.bottom - 0.5 &&
+      Math.abs(unit.width - batchBar.getBoundingClientRect().width) < 1,
+      `${batchCs.display} ${batchCs.position} all.bottom=${all.bottom} unit=${unit.top}..${unit.bottom} w${unit.width} known.top=${known.top}`);
+  }
   batchBar.classList.remove("selecting");
   await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
   check("the browse-state batch row is display:none", frame.contentWindow.getComputedStyle(batchBar).display === "none");

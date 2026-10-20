@@ -1431,9 +1431,12 @@ check(vocabStore.includes("function _pbpVocabLocalMutation") && vocabStore.inclu
   const batchHand = stripGeneratedRegions(libraryCss);
   check(!/\.(?:vocab|notes)-batch-bar[^{}]*\{[^}]*position:\s*sticky/.test(batchHand) &&
     /\.vocab-batch-bar:not\(\.selecting\),\s*\n\.notes-batch-bar:not\(\.selecting\) \{ display: none; \}/.test(batchHand) &&
-    /\.vocab-batch-bar \{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*calc\(var\(--lib-control-h\) - 4px\) calc\(var\(--lib-control-h\) - 4px\)/.test(batchHand) &&
+    // 2026-10-20 (critique round 3): the group unit owns a row of its own --
+    // in a shared grid column it kept two characters in de / ru.
+    !/\.vocab-batch-bar \{[^}]*display:\s*grid/.test(batchHand) &&
+    /\.vocab-batch-bar > \.vocab-group-unit \{[^}]*flex:\s*1 1 100%/.test(batchHand) &&
     /\.lib-batch-status \{ display: contents; \}/.test(batchHand),
-    "library.css: the batch rows must be display:none at rest, never sticky, the vocabulary one a two-row grid at the sm rung, with a contents-only status slot (spec §3.9)");
+    "library.css: the batch rows must be display:none at rest, never sticky, the vocabulary one a wrapping row whose group unit takes a line of its own, with a contents-only status slot (spec §3.9)");
   check(libraryCss.includes(".vocab-card .notes-card-top") &&
     libraryHtml.indexOf('id="vocab-list"') < libraryHtml.indexOf('id="vocab-load-more"') &&
     libraryHtml.indexOf('id="vocab-batch-toolbar"') < libraryHtml.indexOf('class="vocab-list-region"'),
