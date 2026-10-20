@@ -2017,8 +2017,17 @@ function setupSubmit(token) {
       // API call: whichever runs first issues the combined request and caches the
       // other half, so the second is an instant cache hit (one call fills both).
       // Already-present halves re-render from cache; re-roll uses the regenerate links.
-      if (wantSummary && typeof doAISummary === "function") doAISummary(false);
-      if (wantTags && typeof doAITags === "function") doAITags(false);
+      const runs = [];
+      if (wantSummary && typeof doAISummary === "function") runs.push(doAISummary(false));
+      if (wantTags && typeof doAITags === "function") runs.push(doAITags(false));
+      // Each op reports only itself, so the summary's "generated" line used to
+      // stand for both. When both came back freshly generated, say so
+      // (critique 2026-10-20); a cache hit or a failure keeps its own line.
+      if (runs.length === 2) {
+        Promise.all(runs).then(([summaryDone, tagsDone]) => {
+          if (summaryDone === true && tagsDone === true) showStatus("status-msg", t("aiSummaryTagsGenerated"), "success");
+        }, () => {});
+      }
     } else if (e.key === "Escape") {
       // No .del-confirm-popover branch here any more: the delete confirm is
       // a shared showConfirmPopover() now, and that helper installs its own

@@ -276,6 +276,9 @@
   "aiSummaryGenerated": {
     "message": "摘要已產生"
   },
+  "aiSummaryTagsGenerated": {
+    "message": "摘要和標籤已產生"
+  },
   "aiSummaryRegenerated": {
     "message": "摘要已重新產生"
   },
@@ -286,7 +289,7 @@
     "message": "摘要已與備註合併，無法再單獨移除。"
   },
   "aiTagsRegenerated": {
-    "message": "標籤已重新產生"
+    "message": "已換一組標籤"
   },
   "aiNoContent": {
     "message": "頁面無可用內容"
@@ -307,7 +310,7 @@
     "message": "重新產生"
   },
   "aiReplace": {
-    "message": "替換"
+    "message": "換一組"
   },
   "aiRemove": {
     "message": "移除"
@@ -316,7 +319,7 @@
     "message": "重新產生中…"
   },
   "aiReplacing": {
-    "message": "替換中…"
+    "message": "正在換一組…"
   },
   "aiErrorTitle": {
     "message": "$OP$生成失敗",

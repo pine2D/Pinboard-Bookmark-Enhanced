@@ -4305,8 +4305,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const fx = createCachedAiFixture();
       try {
         fx.renderAITags(["alpha", "beta", "gamma"], true);
-        assert(fx.links().length === 2,
-          "setup: the cached path did not render the two regen links (fixture out of sync with renderAITags)");
+        assert(fx.links().length === 1,
+          "setup: the cached path did not render its one re-roll button (fixture out of sync with renderAITags)");
         assert(fx.container.getAttribute("role") === "toolbar" && fx.container.getAttribute("tabindex") === "0",
           "the cached render left #ai-suggest-tags without its container-level tab stop");
         const strays = [...fx.container.querySelectorAll("*")]
@@ -4317,22 +4317,38 @@ test("posts/add default remains replace=yes for existing callers", () => {
       } finally { fx.cleanup(); }
     });
 
-    test("K72 fix1: End and ArrowRight reach the cached-path regen links (tabindex -1 must not mean unreachable)", () => {
+    test("K72 fix1: End and ArrowRight reach the cached-path regen link (tabindex -1 must not mean unreachable)", () => {
       const fx = createCachedAiFixture();
       try {
         fx.renderAITags(["alpha", "beta"], true);
         const links = fx.links();
-        assert(links.length === 2, "setup: the two regen links did not render");
+        assert(links.length === 1, "setup: the re-roll button did not render");
         fx.container.focus();
         assert(document.activeElement === fx.chips()[0], "container focus did not reach the first chip");
         fx.key("End");
-        assert(document.activeElement === links[1],
-          "End did not reach the last regen link -- pushing it out of the tab order without putting it in the ring makes it keyboard-dead");
+        assert(document.activeElement === links[0],
+          "End did not reach the re-roll button -- pushing it out of the tab order without putting it in the ring makes it keyboard-dead");
         fx.key("ArrowLeft");
-        assert(document.activeElement === links[0], "ArrowLeft did not walk back to the first regen link");
-        fx.key("ArrowLeft");
-        assert(document.activeElement === fx.addAll(), "ArrowLeft did not continue on to Add all");
+        assert(document.activeElement === fx.addAll(), "ArrowLeft did not walk back to Add all");
       } finally { fx.cleanup(); }
+    });
+
+    // Critique 2026-10-20: a fresh run offered no re-roll at all until the
+    // popup was reopened, and the cached pair meant append vs replace.
+    test("fresh and cached AI tag results offer the same single replace-mode re-roll", () => {
+      for (const fromCache of [false, true]) {
+        const fx = createCachedAiFixture();
+        try {
+          fx.renderAITags(["alpha", "beta"], fromCache);
+          const links = fx.links();
+          assert(links.length === 1 && links[0].dataset.mode === "replace",
+            `fromCache=${fromCache}: expected one replace-mode re-roll, got ` + links.map((l) => l.dataset.mode).join(","));
+          assert(!!fx.container.querySelector(".cache-hint") === fromCache,
+            `fromCache=${fromCache}: the "cached" note does not match where the result came from`);
+        } finally { fx.cleanup(); }
+      }
+      assert(/^[a-z]/.test(enMessages.aiReplace.message) && !/^replace$/i.test(enMessages.aiReplace.message),
+        "the re-roll still reads as a bare Replace: " + enMessages.aiReplace.message);
     });
 
     await testAsync("K72: the real popup markup, in the 3-5-tags state, is <= 6 tab stops between #tags-input and #private-check", async () => {

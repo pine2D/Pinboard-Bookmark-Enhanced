@@ -276,6 +276,9 @@
   "aiSummaryGenerated": {
     "message": "Аннотация сгенерирована"
   },
+  "aiSummaryTagsGenerated": {
+    "message": "Аннотация и метки сгенерированы"
+  },
   "aiSummaryRegenerated": {
     "message": "Аннотация пересоздана"
   },
@@ -286,7 +289,7 @@
     "message": "Сводка объединена с заметками, поэтому удалить её отдельно больше нельзя."
   },
   "aiTagsRegenerated": {
-    "message": "Метки пересозданы"
+    "message": "Новый набор меток готов"
   },
   "aiNoContent": {
     "message": "На этой странице нет пригодного содержимого"
@@ -307,7 +310,7 @@
     "message": "пересоздать"
   },
   "aiReplace": {
-    "message": "заменить"
+    "message": "другой набор"
   },
   "aiRemove": {
     "message": "удалить"
@@ -316,7 +319,7 @@
     "message": "пересоздание…"
   },
   "aiReplacing": {
-    "message": "замена…"
+    "message": "новый набор…"
   },
   "aiErrorTitle": {
     "message": "Генерация $OP$ не удалась",

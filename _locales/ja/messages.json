@@ -276,6 +276,9 @@
   "aiSummaryGenerated": {
     "message": "要約を生成しました"
   },
+  "aiSummaryTagsGenerated": {
+    "message": "要約とタグを生成しました"
+  },
   "aiSummaryRegenerated": {
     "message": "要約を再生成しました"
   },
@@ -286,7 +289,7 @@
     "message": "要約がメモと結合されたため、個別には削除できなくなりました。"
   },
   "aiTagsRegenerated": {
-    "message": "タグを再生成しました"
+    "message": "別のタグ候補を生成しました"
   },
   "aiNoContent": {
     "message": "このページには利用できる内容がありません"
@@ -307,7 +310,7 @@
     "message": "再生成"
   },
   "aiReplace": {
-    "message": "置換"
+    "message": "別の候補"
   },
   "aiRemove": {
     "message": "削除"
@@ -316,7 +319,7 @@
     "message": "再生成中…"
   },
   "aiReplacing": {
-    "message": "置換中…"
+    "message": "別の候補を生成中…"
   },
   "aiErrorTitle": {
     "message": "$OP$ の生成に失敗",

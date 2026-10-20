@@ -276,6 +276,9 @@
   "aiSummaryGenerated": {
     "message": "Zusammenfassung erstellt"
   },
+  "aiSummaryTagsGenerated": {
+    "message": "Zusammenfassung und Tags erstellt"
+  },
   "aiSummaryRegenerated": {
     "message": "Zusammenfassung neu erstellt"
   },
@@ -286,7 +289,7 @@
     "message": "Die Zusammenfassung wurde mit deinen Notizen zusammengeführt und kann nicht mehr separat entfernt werden."
   },
   "aiTagsRegenerated": {
-    "message": "Tags neu generiert"
+    "message": "Neue Tags erstellt"
   },
   "aiNoContent": {
     "message": "Auf dieser Seite gibt es keinen verwertbaren Inhalt"
@@ -307,7 +310,7 @@
     "message": "Neu generieren"
   },
   "aiReplace": {
-    "message": "Ersetzen"
+    "message": "Andere Tags"
   },
   "aiRemove": {
     "message": "Entfernen"
@@ -316,7 +319,7 @@
     "message": "Wird neu generiert…"
   },
   "aiReplacing": {
-    "message": "Wird ersetzt…"
+    "message": "Neue Tags werden geholt…"
   },
   "aiErrorTitle": {
     "message": "$OP$-Erstellung fehlgeschlagen",

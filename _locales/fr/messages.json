@@ -276,6 +276,9 @@
   "aiSummaryGenerated": {
     "message": "Résumé généré"
   },
+  "aiSummaryTagsGenerated": {
+    "message": "Résumé et tags générés"
+  },
   "aiSummaryRegenerated": {
     "message": "Résumé régénéré"
   },
@@ -286,7 +289,7 @@
     "message": "Ce résumé a été fusionné avec vos notes et ne peut plus être supprimé séparément."
   },
   "aiTagsRegenerated": {
-    "message": "Tags régénérés"
+    "message": "Nouveaux tags générés"
   },
   "aiNoContent": {
     "message": "Aucun contenu exploitable sur cette page"
@@ -307,7 +310,7 @@
     "message": "régénérer"
   },
   "aiReplace": {
-    "message": "remplacer"
+    "message": "autres tags"
   },
   "aiRemove": {
     "message": "supprimer"
@@ -316,7 +319,7 @@
     "message": "régénération…"
   },
   "aiReplacing": {
-    "message": "remplacement…"
+    "message": "nouveaux tags…"
   },
   "aiErrorTitle": {
     "message": "Échec de la génération $OP$",

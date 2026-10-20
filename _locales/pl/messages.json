@@ -276,6 +276,9 @@
   "aiSummaryGenerated": {
     "message": "Podsumowanie wygenerowane"
   },
+  "aiSummaryTagsGenerated": {
+    "message": "Podsumowanie i tagi wygenerowane"
+  },
   "aiSummaryRegenerated": {
     "message": "Podsumowanie wygenerowane ponownie"
   },
@@ -286,7 +289,7 @@
     "message": "Podsumowanie zostało połączone z notatkami i nie można go już usunąć osobno."
   },
   "aiTagsRegenerated": {
-    "message": "Tagi wygenerowane ponownie"
+    "message": "Wygenerowano nowy zestaw tagów"
   },
   "aiNoContent": {
     "message": "Na tej stronie nie ma treści, z której można skorzystać"
@@ -307,7 +310,7 @@
     "message": "generuj ponownie"
   },
   "aiReplace": {
-    "message": "zamień"
+    "message": "inny zestaw"
   },
   "aiRemove": {
     "message": "usuń"
@@ -316,7 +319,7 @@
     "message": "ponowne generowanie…"
   },
   "aiReplacing": {
-    "message": "zamiana…"
+    "message": "nowy zestaw…"
   },
   "aiErrorTitle": {
     "message": "Generowanie $OP$ nie powiodło się",

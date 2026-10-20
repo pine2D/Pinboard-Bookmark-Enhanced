@@ -278,6 +278,9 @@
   "aiSummaryGenerated": {
     "message": "Summary generated"
   },
+  "aiSummaryTagsGenerated": {
+    "message": "Summary and tags generated"
+  },
   "aiSummaryRegenerated": {
     "message": "Summary regenerated"
   },
@@ -288,7 +291,7 @@
     "message": "This summary has been merged with your notes and can no longer be removed separately."
   },
   "aiTagsRegenerated": {
-    "message": "Tags regenerated"
+    "message": "New set of tags ready"
   },
   "aiNoContent": {
     "message": "No usable content on this page"
@@ -309,7 +312,7 @@
     "message": "regenerate"
   },
   "aiReplace": {
-    "message": "replace"
+    "message": "new set"
   },
   "aiRemove": {
     "message": "remove"
@@ -318,7 +321,7 @@
     "message": "regenerating…"
   },
   "aiReplacing": {
-    "message": "replacing…"
+    "message": "getting a new set…"
   },
   "aiErrorTitle": {
     "message": "$OP$ generation failed",

@@ -1128,6 +1128,7 @@ async function doAISummary(forceRefresh, sOverride) {
     upsertSummary(summary);
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
+    return true;
   } catch (e) {
     if (!_aiOpStillCurrent(account)) return;
     if (pbpAiOpDisowned(e)) return;
@@ -1280,6 +1281,7 @@ async function doAITags(forceRefresh, sOverride) {
     if (forceRefresh) {
       showStatus("status-msg", t("aiTagsRegenerated"), "success");
     }
+    return tags.length > 0;
   } catch (e) {
     if (!_aiOpStillCurrent(account)) return;
     if (pbpAiOpDisowned(e)) return;
@@ -1408,105 +1410,106 @@ function renderAITags(tags, fromCache) {
   });
   container.appendChild(aa);
 
-  if (fromCache) {
-    const cachedTagSet = new Set(tags.map(t => t.toLowerCase()));
-    // No inline display/margin-left here (T5 fix round F2, dropped): #ai-
-    // suggest-tags is a flex row (popup.css chip-flow rule), which blockifies
-    // every child regardless of its own `display` -- an explicit
-    // `inline-block` was already inert -- and the container's own `gap`
-    // already spaces this wrap from `.add-all-link` the same way it spaces
-    // every other chip; the old literal 8px margin stacked on top of that
-    // gap (12px total) instead of sharing it.
-    const hintWrap = document.createElement("span");
-    hintWrap.className = "cache-hint-wrap";
+  // One re-roll action, on fresh and cached results alike (critique
+  // 2026-10-20): a fresh run used to offer none until the popup was reopened,
+  // and the cached pair "Regenerate" (append) / "Replace" read as the
+  // opposite of the summary's "Regenerate" (replace). "New set" retracts the
+  // chips this round added, then asks again.
+  const cachedTagSet = new Set(tags.map(t => t.toLowerCase()));
+  // No inline display/margin-left here (T5 fix round F2, dropped): #ai-
+  // suggest-tags is a flex row (popup.css chip-flow rule), which blockifies
+  // every child regardless of its own `display` -- an explicit
+  // `inline-block` was already inert -- and the container's own `gap`
+  // already spaces this wrap from `.add-all-link` the same way it spaces
+  // every other chip; the old literal 8px margin stacked on top of that
+  // gap (12px total) instead of sharing it.
+  const hintWrap = document.createElement("span");
+  hintWrap.className = "cache-hint-wrap";
 
+  if (fromCache) {
     const cachedSpan = document.createElement("span");
     cachedSpan.className = "cache-hint";
     cachedSpan.textContent = t("aiCached");
     hintWrap.appendChild(cachedSpan);
-
-    ["append", "replace"].forEach(mode => {
-      const link = document.createElement("button"); // a real button, same as the summary pair
-      link.type = "button";
-      link.className = "regen-link";
-      link.dataset.mode = mode;
-      link.textContent = mode === "append" ? t("aiRegenerate") : t("aiReplace");
-      link.addEventListener("click", async (e) => {
-        e.preventDefault();
-        // Codex r2 M3: the form may have been switched to another bookmark
-        // (edit-from-recent) since these links rendered - doAITags would
-        // refuse below, but the replace-mode removal would already have
-        // fired. Gate the whole handler on op liveness first - and before the
-        // label/loading swap, which otherwise pinned the link on
-        // "Regenerating..." forever (these links are not covered by
-        // pbpAiSyncUrlEditState's disabled-link pass), with no feedback.
-        if (!_aiUrlEquivalent($id("url-input").value, pageInfo.url)) {
-          showStatus("status-msg", t("aiUrlEdited"), "error");
-          return;
-        }
-        // The account this op belongs to, captured before the first await so
-        // the finally below can tell whether the form still holds it.
-        const opAccount = pbpPopupAiAccount();
-        hintWrap.querySelectorAll(".regen-link").forEach((l) => l.classList.add("loading"));
-        link.textContent = mode === "replace" ? t("aiReplacing") : t("aiRegenerating");
-        // Retract only tags this session's AI chips added: a same-named
-        // tag with no AI provenance (typed, or from the saved bookmark)
-        // stays (audit A10).
-        const wasAddedByThisRound = (t) =>
-          cachedTagSet.has(t.toLowerCase()) && _aiSessionAddedTags.has(t.toLowerCase());
-        let retracted = [];
-        // Finding 5: snapshot _tagsUserTouched before the removal below so a
-        // refused regen's rollback (finally block) can restore it -- addTag
-        // sets the flag unconditionally on every real push, but a retracted
-        // tag that shares a name with one already on the form with no AI
-        // provenance (audit A10: a dup-named chip click still records
-        // provenance even though addTag no-ops) re-adds as a genuine push on
-        // rollback and would force-dirty a form whose tag list never
-        // actually changed.
-        let tagsUserTouchedBeforeRetract;
-        if (mode === "replace") {
-          if (typeof _tagsUserTouched !== "undefined") tagsUserTouchedBeforeRetract = _tagsUserTouched;
-          retracted = currentTags.filter(wasAddedByThisRound);
-          currentTags = currentTags.filter(t => !wasAddedByThisRound(t));
-          renderTags();
-        }
-        try {
-          await doAITags(true);
-        } finally {
-          // Every doAITags path that actually ran rebuilds this bar (success
-          // re-renders the chips, catch clears them), so a hintWrap still in the
-          // document means it refused early -- no key, account drift, no page
-          // text. Undo the optimistic swap: otherwise the link stays pinned on
-          // its in-flight label with .regen-link.loading making it inert, and
-          // replace mode has silently dropped tags that nothing will bring back.
-          if (hintWrap.isConnected) {
-            hintWrap.querySelectorAll(".regen-link").forEach((l) => l.classList.remove("loading"));
-            link.textContent = mode === "replace" ? t("aiReplace") : t("aiRegenerate");
-            // Resetting the label is pure appearance, but putting tags BACK is a
-            // write to the form, and isConnected cannot tell "refused early"
-            // from "the form was switched to another bookmark (or the account
-            // drifted) mid-flight" -- nothing clears this bar on a URL edit, so
-            // it stays connected there too. Re-check op liveness or the
-            // retraction gets replayed into a DIFFERENT bookmark's tag field.
-            if (_aiOpStillCurrent(opAccount)) {
-              retracted.forEach((tag) => addTag(tag));
-              // addTag above force-sets the flag -- restore the pre-retract
-              // snapshot so a rollback that nets to a byte-identical tag
-              // list does not leave the form spuriously dirty.
-              if (typeof _tagsUserTouched !== "undefined" && tagsUserTouchedBeforeRetract !== undefined) {
-                _tagsUserTouched = tagsUserTouchedBeforeRetract;
-              }
-            }
-          }
-        }
-      });
-      hintWrap.appendChild(link);
-    });
-
-    container.appendChild(hintWrap);
   }
 
-  // LAST, not before the fromCache block: this single call is what re-slots
+  const link = document.createElement("button"); // a real button, same as the summary pair
+  link.type = "button";
+  link.className = "regen-link";
+  link.dataset.mode = "replace";
+  link.textContent = t("aiReplace");
+  link.addEventListener("click", async (e) => {
+    e.preventDefault();
+    // Codex r2 M3: the form may have been switched to another bookmark
+    // (edit-from-recent) since these links rendered - doAITags would
+    // refuse below, but the replace-mode removal would already have
+    // fired. Gate the whole handler on op liveness first - and before the
+    // label/loading swap, which otherwise pinned the link on
+    // "Regenerating..." forever (these links are not covered by
+    // pbpAiSyncUrlEditState's disabled-link pass), with no feedback.
+    if (!_aiUrlEquivalent($id("url-input").value, pageInfo.url)) {
+      showStatus("status-msg", t("aiUrlEdited"), "error");
+      return;
+    }
+    // The account this op belongs to, captured before the first await so
+    // the finally below can tell whether the form still holds it.
+    const opAccount = pbpPopupAiAccount();
+    hintWrap.querySelectorAll(".regen-link").forEach((l) => l.classList.add("loading"));
+    link.textContent = t("aiReplacing");
+    // Retract only tags this session's AI chips added: a same-named
+    // tag with no AI provenance (typed, or from the saved bookmark)
+    // stays (audit A10).
+    const wasAddedByThisRound = (t) =>
+      cachedTagSet.has(t.toLowerCase()) && _aiSessionAddedTags.has(t.toLowerCase());
+    let retracted = [];
+    // Finding 5: snapshot _tagsUserTouched before the removal below so a
+    // refused regen's rollback (finally block) can restore it -- addTag
+    // sets the flag unconditionally on every real push, but a retracted
+    // tag that shares a name with one already on the form with no AI
+    // provenance (audit A10: a dup-named chip click still records
+    // provenance even though addTag no-ops) re-adds as a genuine push on
+    // rollback and would force-dirty a form whose tag list never
+    // actually changed.
+    let tagsUserTouchedBeforeRetract;
+    if (typeof _tagsUserTouched !== "undefined") tagsUserTouchedBeforeRetract = _tagsUserTouched;
+    retracted = currentTags.filter(wasAddedByThisRound);
+    currentTags = currentTags.filter(t => !wasAddedByThisRound(t));
+    renderTags();
+    try {
+      await doAITags(true);
+    } finally {
+      // Every doAITags path that actually ran rebuilds this bar (success
+      // re-renders the chips, catch clears them), so a hintWrap still in the
+      // document means it refused early -- no key, account drift, no page
+      // text. Undo the optimistic swap: otherwise the link stays pinned on
+      // its in-flight label with .regen-link.loading making it inert, and
+      // replace mode has silently dropped tags that nothing will bring back.
+      if (hintWrap.isConnected) {
+        hintWrap.querySelectorAll(".regen-link").forEach((l) => l.classList.remove("loading"));
+        link.textContent = t("aiReplace");
+        // Resetting the label is pure appearance, but putting tags BACK is a
+        // write to the form, and isConnected cannot tell "refused early"
+        // from "the form was switched to another bookmark (or the account
+        // drifted) mid-flight" -- nothing clears this bar on a URL edit, so
+        // it stays connected there too. Re-check op liveness or the
+        // retraction gets replayed into a DIFFERENT bookmark's tag field.
+        if (_aiOpStillCurrent(opAccount)) {
+          retracted.forEach((tag) => addTag(tag));
+          // addTag above force-sets the flag -- restore the pre-retract
+          // snapshot so a rollback that nets to a byte-identical tag
+          // list does not leave the form spuriously dirty.
+          if (typeof _tagsUserTouched !== "undefined" && tagsUserTouchedBeforeRetract !== undefined) {
+            _tagsUserTouched = tagsUserTouchedBeforeRetract;
+          }
+        }
+      }
+    }
+  });
+  hintWrap.appendChild(link);
+
+  container.appendChild(hintWrap);
+
+  // LAST, not before the re-roll button above: this single call is what re-slots
   // Alt+1-9 AND (through syncSuggestTagStates -> pbpSyncRovingToolbars) what
   // pushes every focusable in this toolbar out of the tab sequence and into
   // the arrow ring. Running it while the cached-hit branch had yet to append

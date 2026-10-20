@@ -276,6 +276,9 @@
   "aiSummaryGenerated": {
     "message": "摘要已生成"
   },
+  "aiSummaryTagsGenerated": {
+    "message": "摘要和标签已生成"
+  },
   "aiSummaryRegenerated": {
     "message": "摘要已重新生成"
   },
@@ -286,7 +289,7 @@
     "message": "摘要已与备注合并，无法再单独移除。"
   },
   "aiTagsRegenerated": {
-    "message": "标签已重新生成"
+    "message": "已换一组标签"
   },
   "aiNoContent": {
     "message": "页面无可用内容"
@@ -307,7 +310,7 @@
     "message": "重新生成"
   },
   "aiReplace": {
-    "message": "替换"
+    "message": "换一组"
   },
   "aiRemove": {
     "message": "移除"
@@ -316,7 +319,7 @@
     "message": "重新生成中…"
   },
   "aiReplacing": {
-    "message": "替换中…"
+    "message": "正在换一组…"
   },
   "aiErrorTitle": {
     "message": "$OP$生成失败",
