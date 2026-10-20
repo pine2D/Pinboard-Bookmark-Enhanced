@@ -1900,6 +1900,9 @@
   "mdExportSection": {
     "message": "エクスポート"
   },
+  "mdExportMore": {
+    "message": "その他の形式とオプション"
+  },
   "mdOptImages": {
     "message": "画像"
   },
@@ -2770,6 +2773,20 @@
       }
     }
   },
+  "trDoneUsage": {
+    "message": "$COUNT$ 件翻訳済み · 入力 $IN$ / 出力 $OUT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "in": {
+        "content": "$2"
+      },
+      "out": {
+        "content": "$3"
+      }
+    }
+  },
   "trStop": {
     "message": "停止"
   },
@@ -2883,7 +2900,7 @@
     "message": "失敗をすべて再試行"
   },
   "trShowOriginal": {
-    "message": "段落をクリックすると原文を一時表示"
+    "message": "段落をクリックで原文を表示"
   },
   "askOpen": {
     "message": "質問"

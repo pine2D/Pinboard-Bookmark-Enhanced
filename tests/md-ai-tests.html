@@ -8866,6 +8866,139 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
   });
 });
 
+// Critique 2026-10-20 #3 (distill): the done state is one status line, the
+// view toggle, the view line and a fold. Built through the real section
+// builder so the assertions see production's DOM, not a hand-made copy.
+suiteIf("tr done-state distill (critique 2026-10-20 #3)", "_pbpTrPaintDone", () => {
+  function build() {
+    const rail = document.createElement("div");
+    rail.id = "rail";
+    rail.innerHTML = '<div class="view-toggle"></div>';
+    document.body.appendChild(rail);
+    const st = {
+      target: { code: "zh-CN", name: "Chinese", display: "中文" },
+      articleLang: "en", url: "https://example.com/a", mode: "original",
+      s: { aiProvider: "gemini" },
+      work: [
+        { n: 1, md: "a", shielded: { text: "alpha beta gamma" } },
+        { n: 2, md: "b", shielded: { text: "delta epsilon zeta" } },
+        { n: 3, md: "c", shielded: { text: "eta theta iota" } },
+      ],
+      trMd: Object.create(null),
+    };
+    _pbpTrBuildSection(st);
+    _pbpTrSetStatus(st, "idle");
+    return { rail, st, sec: document.getElementById("tr-section") };
+  }
+  // Same sequence as a real run's end: toggle shown at the start, status
+  // settles to done, then the usage renders.
+  function finishRun(st, usage) {
+    st.trMd = { 1: "x", 2: "y", 3: "z" };
+    st.skippedSet = new Set([3]); st.skippedCount = 1;
+    const skip = document.getElementById("tr-skip-note");
+    skip.textContent = "trSkippedTargetLang|1"; skip.hidden = false;
+    _pbpTrShowViewToggle(st);
+    st.mode = "translated"; _pbpTrSyncToggle("translated");
+    st.usage = usage;
+    _pbpTrSetStatus(st, "done");
+    _pbpTrRenderUsage(st);
+  }
+  // Visible = rendered AND not inside a closed <details>. Category check: any
+  // text carrying the run's figures must satisfy it, whichever element it is.
+  const seen = (el) => !!el && el.checkVisibility() && !el.closest("details:not([open])");
+  const visibleTextHas = (sec, needle) => {
+    const walker = document.createTreeWalker(sec, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (n.nodeValue.includes(needle) && seen(n.parentElement)) return true;
+    }
+    return false;
+  };
+  // An emptied row (the button row once its buttons hide) takes no height.
+  const visibleRows = (sec) => [...sec.children].filter((el) => !el.classList.contains("rail-sec-head") && el.checkVisibility() && el.getBoundingClientRect().height > 0);
+  test("done: the run's usage stays on an always-visible line, never in a fold", () => {
+    const realT = window.t;
+    window.t = (k, ...a) => k + "|" + a.join("|");
+    const { rail, st, sec } = build();
+    try {
+      finishRun(st, { inTok: 758, outTok: 911, approx: false });
+      assert(visibleTextHas(sec, "758") && visibleTextHas(sec, "911"), "in/out figures readable without opening anything");
+      const prog = document.getElementById("tr-progress");
+      assertEq(prog.textContent, "trDoneUsage|3|758|911", "count and usage share the one status line");
+      assertEq(seen(prog), true, "status line visible");
+      // No cost-carrying node may live in ANY details, open or not.
+      for (const id of ["tr-progress", "tr-usage", "tr-estimate", "tr-stale-note", "tr-stale-act"]) {
+        const el = document.getElementById(id);
+        assertEq(!!el && !!el.closest("details"), false, "#" + id + " is outside every disclosure");
+      }
+      // Approximate figures keep their marker on the figures themselves.
+      st.usage = { inTok: 5, outTok: 6, approx: true };
+      _pbpTrRenderUsage(st);
+      assertEq(prog.textContent, "trDoneUsage|3|≈5|≈6", "estimate marked on each figure");
+    } finally { window.t = realT; rail.remove(); }
+  });
+  test("done: four rows -- status, view toggle, view line, fold; reference info is folded", () => {
+    const realT = window.t;
+    window.t = (k, ...a) => k + "|" + a.join("|");
+    const { rail, st, sec } = build();
+    try {
+      finishRun(st, { inTok: 1, outTok: 2, approx: false });
+      const rows = visibleRows(sec).map((el) => el.id || el.className);
+      assertEq(rows.join(","), "tr-progress,tr-view-toggle,tr-view-line,tr-done-fold", "done-state rows");
+      const fold = document.getElementById("tr-done-fold");
+      assertEq(fold.open, false, "fold starts closed");
+      assertEq(fold.firstElementChild.tagName, "SUMMARY", "native disclosure: keyboard + expanded state from the UA");
+      assertEq(fold.querySelector("summary").textContent, "trTargetLang|中文", "summary names the target language");
+      assert(fold.contains(document.getElementById("tr-target")) && fold.contains(document.getElementById("tr-skip-note")),
+        "target row (with its Change link) and skip count live in the fold");
+      fold.open = true;
+      assertEq(seen(document.getElementById("tr-change-lang")), true, "Change stays one click away");
+      // The peek hint is the pointer peek's only discovery path: it rides
+      // the always-visible view line in tr-only.
+      assertEq(seen(document.getElementById("tr-peek-hint")), true, "peek hint visible in the translated-only view");
+      assertEq(document.getElementById("tr-peek-hint").parentElement.id, "tr-view-line", "on the view line");
+    } finally { window.t = realT; rail.remove(); }
+  });
+  test("leaving done puts the target row back in place and hides the fold", () => {
+    const realT = window.t;
+    window.t = (k, ...a) => k + "|" + a.join("|");
+    const { rail, st, sec } = build();
+    try {
+      finishRun(st, { inTok: 1, outTok: 2, approx: false });
+      for (const next of ["translating", "partial", "idle"]) {
+        _pbpTrSetStatus(st, "done");
+        _pbpTrSetStatus(st, next);
+        const tgt = document.getElementById("tr-target");
+        assertEq(document.getElementById("tr-done-fold").hidden, true, next + ": fold hidden");
+        assertEq(tgt.parentElement, sec, next + ": target row back in the section");
+        assertEq(tgt.previousElementSibling, document.getElementById("btn-translate").parentElement, next + ": right under the button row");
+        assertEq(seen(st.tgtTextEl), true, next + ": target text shown again");
+        assertEq(document.getElementById("tr-skip-note").previousElementSibling.id, "tr-estimate", next + ": skip note back under the estimate");
+      }
+      // partial after a merged done line: the usage line returns on its own.
+      st.usage = { inTok: 7, outTok: 8, approx: false };
+      _pbpTrSetStatus(st, "done"); _pbpTrRenderUsage(st);
+      _pbpTrSetStatus(st, "partial");
+      assertEq(seen(document.getElementById("tr-usage")), true, "partial shows the usage line again");
+      assertEq(document.getElementById("tr-progress").hasAttribute("title"), false, "the done-only title does not linger");
+    } finally { window.t = realT; rail.remove(); }
+  });
+  test("a done state restored from cache (no run usage) reports the count alone", () => {
+    const realT = window.t;
+    window.t = (k, ...a) => k + "|" + a.join("|");
+    const { rail, st } = build();
+    try {
+      st.trMd = { 1: "x", 2: "y", 3: "z" };
+      _pbpTrSetStatus(st, "done");
+      assertEq(document.getElementById("tr-progress").textContent, "trDone|3", "no stale figures");
+      // A stale done keeps its retranslate price visible, outside the fold.
+      st.staleVerdict = "prompt";
+      _pbpTrSetStatus(st, "done");
+      const est = document.getElementById("tr-estimate");
+      assertEq(seen(est) && !est.closest("details"), true, "retranslate price stays resident");
+    } finally { window.t = realT; rail.remove(); }
+  });
+});
+
 suiteIf("tr progress live region (#99)", "_pbpTrSetStatus", () => {
   function liveFixture() {
     const wrap = document.createElement("div");

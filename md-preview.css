@@ -1429,6 +1429,11 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    format) -- its single download action spans the primary+icon columns and
    carries a visible label instead of being icon-only. */
 .exp-fmt-span { grid-column: 2 / 4; justify-content: center; }
+/* Export's resident actions (critique 2026-10-20 #3): Copy Markdown, then the
+   Send-to split below it; every other format and the three options sit in
+   #export-more (.rail-disclosure). */
+#btn-copy-md { width: 100%; justify-content: center; }
+#export-more > .row { margin-top: var(--sp-2); }
 
 /* TOC inside the rail (no longer a fixed gutter; the rail is fixed) */
 /* No inner max-height: the TOC is the rail's LAST section, so capping it buys
@@ -1465,7 +1470,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .toc-list a:focus-visible,
 .rail-sec-head:focus-visible,
 .send-mi:focus-visible,
-#tr-section .tr-glossary > summary:focus-visible,
+.rail-disclosure > summary:focus-visible,
 .hl-item-main:focus-visible {
   outline: 1px solid var(--link);
   outline-offset: 2px;
@@ -1501,7 +1506,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 }
 .rail-sec-head[aria-expanded="true"] .rail-sec-tri { transform: translateY(1px) rotate(225deg); }
 @media (prefers-reduced-motion: reduce) {
-  .rail-sec-tri, #tr-section .tr-glossary > summary::after { transition: none; }
+  .rail-sec-tri, .rail-disclosure > summary::after { transition: none; }
 }
 .rail-sec-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-sec-count { flex: none; color: var(--fg-muted); }
@@ -2870,9 +2875,21 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #tr-section .row .action-btn svg { width: 14px; height: 14px; }
 #tr-section .tr-meta { margin-top: var(--sp-2); font-size: 12px; color: var(--fg-secondary); }
 #tr-section .tr-meta[hidden] { display: none; }
-#tr-section .tr-glossary > summary { cursor: pointer; display: flex; align-items: center; gap: 6px; list-style: none; }
-#tr-section .tr-glossary > summary::-webkit-details-marker { display: none; }
-#tr-section .tr-glossary > summary::after {
+/* .rail-disclosure: the disclosure INSIDE a rail section (COMPONENTS.md
+   §10) -- native <details>/<summary> (keyboard + expanded state for free), a
+   12px secondary-text summary with the rail's thin right-edge chevron, 24px
+   tall so it stays a comfortable target. Consumers: the glossary hits and
+   the done-state fold (#tr-section), "More formats and options"
+   (#export-section). Section-level folding stays .rail-sec-head. */
+.rail-disclosure { margin-top: var(--sp-2); }
+.rail-disclosure > summary {
+  cursor: pointer; display: flex; align-items: center; gap: var(--sp-2); min-height: 24px;
+  list-style: none; font-size: 12px; color: var(--fg-secondary);
+  transition: color 120ms ease;
+}
+.rail-disclosure > summary:hover { color: var(--fg); }
+.rail-disclosure > summary::-webkit-details-marker { display: none; }
+.rail-disclosure > summary::after {
   content: ""; width: 5px; height: 5px; flex: none; margin-left: auto;
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
@@ -2880,7 +2897,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   transform: translateY(-1px) rotate(45deg);
   transition: transform 120ms var(--ease-in-out);
 }
-#tr-section .tr-glossary[open] > summary::after { transform: translateY(1px) rotate(225deg); }
+.rail-disclosure[open] > summary::after { transform: translateY(1px) rotate(225deg); }
 /* Focus ring: shared soft-focus recipe (rail section). */
 #tr-section .tr-glossary-list {
   display: grid;
@@ -2913,6 +2930,8 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #tr-section .tr-link:hover { color: var(--link-hover); }
 #tr-section .tr-link:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 #tr-section .view-toggle { margin-top: var(--sp-2); }
+/* View name and, in tr-only, the peek hint share the line under the toggle. */
+#tr-peek-hint::before { content: "\00B7"; margin: 0 var(--sp-1); }
 
 /* ---- Ask panel (md-ask.js): fixed right column on wide viewports ---- */
 #ask-panel {

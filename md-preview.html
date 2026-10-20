@@ -34,58 +34,13 @@
     </div>
     <div class="rail-section" id="export-section">
       <div class="rail-label" data-i18n="mdExportSection">Export</div>
-      <div class="row" role="group" aria-label="Export" data-i18n-aria="mdExportSection">
-        <!-- Icon-only toggles (Lucide braces / table-of-contents / highlighter):
-             text labels wrapped the row in wordy locales; identity moved to
-             title + aria-label (same i18n keys), pressed state stays aria-pressed. -->
-        <button type="button" id="exp-frontmatter" class="action-btn exp-tgl" aria-pressed="true" title="Include frontmatter" data-i18n-title="mdTglFrontmatter" aria-label="Include frontmatter" data-i18n-aria="mdTglFrontmatter">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg>
-        </button>
-        <button type="button" id="exp-include-toc" class="action-btn exp-tgl" aria-pressed="false" title="Include table of contents" data-i18n-title="mdTglToc" aria-label="Include table of contents" data-i18n-aria="mdTglToc">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 12H3"/><path d="M16 18H3"/><path d="M16 6H3"/><path d="M21 12h.01"/><path d="M21 18h.01"/><path d="M21 6h.01"/></svg>
-        </button>
-        <button type="button" id="exp-include-hl" class="action-btn exp-tgl" aria-pressed="true" title="Include highlights" data-i18n-title="mdTglHl" aria-label="Include highlights" data-i18n-aria="mdTglHl">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
-        </button>
-      </div>
-      <label class="exp-img-row"><span data-i18n="mdOptImages">Images</span>
-        <select id="exp-image-policy">
-          <option value="keep" data-i18n="mdImgKeep">Keep</option>
-          <option value="alt" data-i18n="mdImgAlt">Alt text</option>
-          <option value="strip" data-i18n="mdImgStrip">Remove</option>
-          <option value="embed" data-i18n="mdImgEmbed">Embed (offline, downloads only)</option>
-        </select>
-      </label>
-      <div class="export-grid">
-        <div class="export-fmt">
-          <span class="fmt-name">Markdown</span>
-          <button id="btn-copy-md" class="action-btn" aria-label="Copy Markdown" data-i18n-aria="mdCopyMarkdown">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <span class="btn-label" data-i18n="mdCopy">Copy</span>
-          </button>
-          <button id="btn-dl-md" class="action-btn icon-only" title="Download Markdown file" data-i18n-title="mdDownloadMdTitle" aria-label="Download .md" data-i18n-aria="mdDownloadMd">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          </button>
-        </div>
-        <div class="export-fmt">
-          <span class="fmt-name">HTML</span>
-          <button id="btn-copy-html" class="action-btn" aria-label="Copy HTML" data-i18n-aria="mdCopyHtml">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <span class="btn-label" data-i18n="mdCopy">Copy</span>
-          </button>
-          <button id="btn-dl-html" class="action-btn icon-only" title="Download HTML file" data-i18n-title="mdDownloadHtmlTitle" aria-label="Download .html" data-i18n-aria="mdDownloadHtml">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          </button>
-        </div>
-        <div class="export-fmt">
-          <span class="fmt-name">EPUB</span>
-          <button id="btn-dl-epub" class="action-btn exp-fmt-span" title="Download EPUB (e-book)" data-i18n-title="mdDownloadEpubTitle" aria-label="Download .epub" data-i18n-aria="mdDownloadEpub">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span class="btn-label" data-i18n="mdDownload">Download</span>
-          </button>
-        </div>
-      </div>
-      <div id="export-note" class="export-note" aria-live="polite" hidden></div>
+      <!-- Resident actions (critique 2026-10-20 #3): the two most used exits.
+           Everything else -- the other downloads and the three options plus
+           the image policy that shape every output -- is one disclosure down. -->
+      <button id="btn-copy-md" class="action-btn" type="button" aria-label="Copy Markdown" data-i18n-aria="mdCopyMarkdown">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span class="btn-label" data-i18n="mdCopyMarkdown">Copy Markdown</span>
+      </button>
       <div class="send-split" id="send-split">
         <button id="send-primary" class="action-btn send-primary" type="button">
           <span class="send-ic" id="send-primary-ic" aria-hidden="true"></span>
@@ -98,7 +53,59 @@
         </button>
         <div id="send-menu" class="send-menu" role="menu" hidden></div>
       </div>
-        <div id="send-status" class="send-status msg-bar" role="status" aria-live="polite" hidden></div>
+      <div id="send-status" class="send-status msg-bar" role="status" aria-live="polite" hidden></div>
+      <div id="export-note" class="export-note" aria-live="polite" hidden></div>
+      <details id="export-more" class="rail-disclosure">
+        <summary data-i18n="mdExportMore">More formats and options</summary>
+        <div class="export-grid">
+          <div class="export-fmt">
+            <span class="fmt-name">Markdown</span>
+            <button id="btn-dl-md" class="action-btn exp-fmt-span" title="Download Markdown file" data-i18n-title="mdDownloadMdTitle" aria-label="Download .md" data-i18n-aria="mdDownloadMd">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span class="btn-label" data-i18n="mdDownload">Download</span>
+            </button>
+          </div>
+          <div class="export-fmt">
+            <span class="fmt-name">HTML</span>
+            <button id="btn-copy-html" class="action-btn" aria-label="Copy HTML" data-i18n-aria="mdCopyHtml">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span class="btn-label" data-i18n="mdCopy">Copy</span>
+            </button>
+            <button id="btn-dl-html" class="action-btn icon-only" title="Download HTML file" data-i18n-title="mdDownloadHtmlTitle" aria-label="Download .html" data-i18n-aria="mdDownloadHtml">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+          </div>
+          <div class="export-fmt">
+            <span class="fmt-name">EPUB</span>
+            <button id="btn-dl-epub" class="action-btn exp-fmt-span" title="Download EPUB (e-book)" data-i18n-title="mdDownloadEpubTitle" aria-label="Download .epub" data-i18n-aria="mdDownloadEpub">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span class="btn-label" data-i18n="mdDownload">Download</span>
+            </button>
+          </div>
+        </div>
+        <label class="exp-img-row"><span data-i18n="mdOptImages">Images</span>
+          <select id="exp-image-policy">
+            <option value="keep" data-i18n="mdImgKeep">Keep</option>
+            <option value="alt" data-i18n="mdImgAlt">Alt text</option>
+            <option value="strip" data-i18n="mdImgStrip">Remove</option>
+            <option value="embed" data-i18n="mdImgEmbed">Embed (offline, downloads only)</option>
+          </select>
+        </label>
+        <div class="row" role="group" aria-label="Export" data-i18n-aria="mdExportSection">
+          <!-- Icon-only toggles (Lucide braces / table-of-contents / highlighter):
+               text labels wrapped the row in wordy locales; identity moved to
+               title + aria-label (same i18n keys), pressed state stays aria-pressed. -->
+          <button type="button" id="exp-frontmatter" class="action-btn exp-tgl" aria-pressed="true" title="Include frontmatter" data-i18n-title="mdTglFrontmatter" aria-label="Include frontmatter" data-i18n-aria="mdTglFrontmatter">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg>
+          </button>
+          <button type="button" id="exp-include-toc" class="action-btn exp-tgl" aria-pressed="false" title="Include table of contents" data-i18n-title="mdTglToc" aria-label="Include table of contents" data-i18n-aria="mdTglToc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 12H3"/><path d="M16 18H3"/><path d="M16 6H3"/><path d="M21 12h.01"/><path d="M21 18h.01"/><path d="M21 6h.01"/></svg>
+          </button>
+          <button type="button" id="exp-include-hl" class="action-btn exp-tgl" aria-pressed="true" title="Include highlights" data-i18n-title="mdTglHl" aria-label="Include highlights" data-i18n-aria="mdTglHl">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
+          </button>
+        </div>
+      </details>
     </div>
     <nav id="toc" class="toc rail-section" aria-label="Table of contents" data-i18n-aria="mdTocContents" hidden>
       <div class="rail-label" data-i18n="mdTocContents">Contents</div>

@@ -1900,6 +1900,9 @@
   "mdExportSection": {
     "message": "Exporter"
   },
+  "mdExportMore": {
+    "message": "Autres formats et options"
+  },
   "mdOptImages": {
     "message": "Images"
   },
@@ -2770,6 +2773,20 @@
       }
     }
   },
+  "trDoneUsage": {
+    "message": "$COUNT$ segments · entrée $IN$ / sortie $OUT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "in": {
+        "content": "$2"
+      },
+      "out": {
+        "content": "$3"
+      }
+    }
+  },
   "trStop": {
     "message": "Arrêter"
   },
@@ -2883,7 +2900,7 @@
     "message": "Tout réessayer"
   },
   "trShowOriginal": {
-    "message": "Cliquez sur un paragraphe pour revoir l'original"
+    "message": "Cliquez sur un paragraphe pour l'original"
   },
   "askOpen": {
     "message": "Questions"

@@ -8448,7 +8448,7 @@ function reconcileSpacing(sweepHits) {
 // the dictionary view), so "explain-pop" leaves it open and "explain-dict"
 // closes it. The answered-state footer actions are unhidden by hand: they
 // appear once a reply lands, and the sweep measures geometry, not the flow.
-const READER_SURFACES = ["reader-source-details", "explain-pop", "explain-dict", "ask-panel", "search-pop", "kbd-help-pop", "typo-pop", "pb-hl-card", "send-menu", "confirm-popover"];
+const READER_SURFACES = ["reader-source-details", "export-more", "explain-pop", "explain-dict", "ask-panel", "search-pop", "kbd-help-pop", "typo-pop", "pb-hl-card", "send-menu", "confirm-popover"];
 async function openReaderSurface(name) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const shown = (el) => !!(el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getBoundingClientRect().width > 0);
@@ -8458,6 +8458,16 @@ async function openReaderSurface(name) {
       if (!details) return false;
       details.open = true;
       return shown(details.querySelector("#source-badge"));
+    }
+    case "export-more": {
+      // Export's "More formats and options" disclosure, inside a section
+      // that starts collapsed: unfold the section, then open the details.
+      const sec = document.getElementById("export-section");
+      const details = document.getElementById(name);
+      if (!sec || !details) return false;
+      if (sec.classList.contains("rail-collapsed")) { sec.querySelector(".rail-sec-head")?.click(); await wait(400); }
+      details.open = true;
+      return shown(document.getElementById("btn-dl-epub"));
     }
     case "explain-pop": {
       const p = document.querySelector("#rendered-view p");
@@ -8510,6 +8520,7 @@ function closeReaderSurface(name) {
   const hide = (el) => { try { if (el && el.matches(":popover-open")) el.hidePopover(); } catch (_) {} };
   switch (name) {
     case "reader-source-details": { document.getElementById(name).open = false; return; }
+    case "export-more": { document.getElementById(name).open = false; return; }
     case "explain-pop": return; // stays open for explain-dict
     case "explain-dict": { const pop = document.getElementById("explain-pop"); if (pop && typeof _pbpExplainClose === "function") _pbpExplainClose(pop); return; }
     case "ask-panel": { const btn = document.getElementById("ask-open"); const panel = document.getElementById("ask-panel"); if (btn && panel && !panel.hidden) btn.click(); return; }

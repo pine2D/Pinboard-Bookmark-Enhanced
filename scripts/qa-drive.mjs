@@ -2054,6 +2054,12 @@ async function driveReaderEdge(context, worker, extId, rep) {
       const head = page.locator("#export-section .rail-sec-head").first();
       if ((await head.getAttribute("aria-expanded")) !== "true") await head.click();
       await page.waitForTimeout(300);
+      // The other formats and the options live one disclosure down; open it
+      // the keyboard way (focus the summary, Enter) and check it took.
+      await page.locator("#export-more > summary").focus();
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(200);
+      if (!await page.evaluate(() => document.getElementById("export-more")?.open === true)) s.failures.push("de-dark-export: Enter on the summary did not open #export-more");
       await page.evaluate(() => document.getElementById("export-section").scrollIntoView({ block: "start", behavior: "instant" }));
       await rep.shot(page, s, "de-dark-export");
     });

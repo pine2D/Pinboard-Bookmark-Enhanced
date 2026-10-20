@@ -6918,6 +6918,39 @@ function stripJsComments(input) {
   check(!/\shidden(\s|=|>)/.test(toggleTag),
     "md-preview.html: #rail-toggle carries a `hidden` attribute again -- the page-wide `[hidden]{display:none!important}` rule outranks the <=1000px `.rail-toggle{display:inline-flex}` reveal, so the off-canvas rail loses its only opener and every rail control (export, TOC, engine switch, Ask, zen) becomes unreachable on a narrow window. Visibility for this button lives in md-preview.css and nowhere else");
 }
+// (1a) Export distill (critique 2026-10-20 #3): the expanded section keeps at
+// most three resident actions; every other control sits one native
+// disclosure down. A split button's caret is part of its primary action, not
+// a fourth one. Counted over every control tag, so a new button, select or
+// input added outside the disclosure trips this whatever it is.
+{
+  const start = mdHtml.indexOf('id="export-section"');
+  const end = mdHtml.indexOf('<nav id="toc"', start);
+  const sec = start >= 0 && end > start ? mdHtml.slice(start, end) : "";
+  check(!!sec, "md-preview.html: #export-section markup not found");
+  const CONTROL = /<(button|select|input|textarea)\b[^>]*>/g;
+  const detailsBlocks = [...sec.matchAll(/<details\b[^>]*>[\s\S]*?<\/details>/g)].map((m) => m[0]);
+  const resident = detailsBlocks.reduce((acc, d) => acc.replace(d, ""), sec);
+  const residentActions = [...resident.matchAll(CONTROL)].filter((m) => !/class="[^"]*\bsend-caret\b/.test(m[0]));
+  check(residentActions.length >= 1 && residentActions.length <= 3,
+    `md-preview.html: #export-section shows ${residentActions.length} resident action(s); keep 1-3 (Copy Markdown + Send to) and move the rest into its .rail-disclosure`);
+  const folded = detailsBlocks.filter((d) => /<(button|select|input|textarea)\b/.test(d));
+  check(folded.length === 1, `md-preview.html: #export-section should fold its other formats and options into exactly one <details>, found ${folded.length}`);
+  for (const d of folded) {
+    const open = (d.match(/^<details\b[^>]*>/) || [""])[0];
+    check(/class="[^"]*\brail-disclosure\b/.test(open), "md-preview.html: the export disclosure must use the .rail-disclosure family");
+    check(!/\sopen(\s|=|>)/.test(open), "md-preview.html: the export disclosure must start closed");
+    const sum = d.slice(open.length).match(/^\s*<summary\b([^>]*)>/);
+    check(!!sum, "md-preview.html: the export disclosure's first child must be its <summary> (native keyboard toggle + expanded state)");
+    check(!!sum && !/tabindex="-1"|\binert\b/.test(sum[1]), "md-preview.html: the export summary must stay keyboard-reachable");
+    const key = sum && (sum[1].match(/data-i18n="([^"]+)"/) || [])[1];
+    check(!!key, "md-preview.html: the export summary needs a data-i18n label");
+    for (const loc of readdirSync(resolve(root, "_locales"))) {
+      const msgs = JSON.parse(read(`_locales/${loc}/messages.json`));
+      check(!!key && !!(msgs[key] && msgs[key].message), `_locales/${loc}: missing ${key} for the export disclosure summary`);
+    }
+  }
+}
 // (1b) Any render path that SHOWS the hamburger must also wire it. The error
 // shell drops body.md-empty (md-preview.js renderErrorState) so the toggle
 // paints below 1000px, and that branch returns before the fully-rendered

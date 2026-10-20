@@ -1900,6 +1900,9 @@
   "mdExportSection": {
     "message": "匯出"
   },
+  "mdExportMore": {
+    "message": "更多格式與選項"
+  },
   "mdOptImages": {
     "message": "圖片"
   },
@@ -2770,6 +2773,20 @@
       }
     }
   },
+  "trDoneUsage": {
+    "message": "已譯 $COUNT$ 段 · 輸入 $IN$ / 輸出 $OUT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "in": {
+        "content": "$2"
+      },
+      "out": {
+        "content": "$3"
+      }
+    }
+  },
   "trStop": {
     "message": "停止"
   },
@@ -2883,7 +2900,7 @@
     "message": "重試全部失敗"
   },
   "trShowOriginal": {
-    "message": "點擊段落即可暫時查看原文"
+    "message": "點擊段落看原文"
   },
   "askOpen": {
     "message": "問答"

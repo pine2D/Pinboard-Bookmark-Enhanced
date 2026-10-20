@@ -1624,6 +1624,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | library | `.notes-page-side` | 「这一页」栏（C ≥1312 才显示；DOM 在最后一条摘录之后，靠明确网格放置到右侧顶部，Tab 先走完摘录）：小标题 13/18 Bold muted（`.lib-first-line`）→ sp-3「打开原文」sm 链接按钮 → sp-4 两行事实 12/16 → sp-5 删除钮 quiet danger sm `.lib-hang-start`；C <1312 时删除钮在 `.notes-detail-footer`，任何宽度只显示一份 |
 | library | `.lib-mark` | 荧光笔：引文包在 `span.lib-mark.notes-cN` 里，`linear-gradient(transparent 0 48%, var(--lib-note-mark-cN) 48% 88%, transparent 88%)`，`box-decoration-break: clone`（带 `-webkit-` 前缀），`padding: 0 2px` 以 `margin: 0 -2px` 抵消；颜色由 composer `deriveNoteMarks` 派生（fg 对合成色 ≥4.5，alpha 地板 0.14）；强制色改 2px 下划线 |
 | md-preview | `.rail-section` / `.rail-label` / `.rail-sec-head` | 侧栏分区容器 / 静态标题 / 可折叠标题（共享 margin sp-3 0 sp-2 契约） |
+| md-preview | `.rail-disclosure` | 分区内的二级折叠：原生 `<details>` + `<summary>`（键盘与展开态由浏览器给），summary 12px secondary、`min-height` 24、右缘细箭头（与 `.rail-sec-head` 同形），本体上距 sp-2；不画底色、边框或分隔线。用于术语命中、翻译完成态的目标语言与跳过段、导出的「更多格式与选项」；分区级折叠仍用 `.rail-sec-head`，成本信息（预估 / 用量）不进折叠 |
 | md-preview | `.msg-bar` | 状态/提示/错误条（padding sp-2 sp-3，与 `.send-status` / `.export-note` / `#ask-tip` 同一条家族；`data-state`） |
 | md-preview | `.send-menu` / `.send-mi` | 下拉菜单与菜单项 |
 | md-preview | `.pop-panel` | 浮层面板 chrome：`--surface` 底、`--border` 1px 边、`--radius-lg`、统一阴影、13px、内距 sp-3；高亮卡 / 脚注 / 字号面板 / 快捷键帮助 / 搜索条五个 popover 共用，id 规则只留各自的定位与尺寸（帮助对话框内距 sp-4、搜索条 sp-2 sp-3 属有意覆盖） |

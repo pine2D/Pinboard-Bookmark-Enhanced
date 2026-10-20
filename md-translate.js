@@ -1420,6 +1420,7 @@ function _pbpTrBuildSection(st) {
   // configured in options (translateTargetLang); surface it BEFORE the first request
   // so the user knows what they'll get, and let them change it without hunting.
   const tgt = document.createElement("div");
+  tgt.id = "tr-target";
   tgt.className = "tr-meta tr-target";
   const tgtText = document.createElement("span");
   tgtText.textContent = t("trTargetLang", st.target.display || st.target.name);
@@ -1427,6 +1428,7 @@ function _pbpTrBuildSection(st) {
   tgt.appendChild(tgtText);
   const tgtLink = document.createElement("button");
   tgtLink.type = "button";
+  tgtLink.id = "tr-change-lang";
   tgtLink.className = "tr-link";
   tgtLink.textContent = t("trChangeLang");
   tgtLink.addEventListener("click", () => {
@@ -1480,7 +1482,7 @@ function _pbpTrBuildSection(st) {
 
   const glossaryHits = document.createElement("details");
   glossaryHits.id = "tr-glossary-hits";
-  glossaryHits.className = "tr-meta tr-glossary";
+  glossaryHits.className = "tr-meta tr-glossary rail-disclosure";
   glossaryHits.hidden = true;
   sec.appendChild(glossaryHits);
 
@@ -1511,6 +1513,20 @@ function _pbpTrBuildSection(st) {
   statusLine.className = "tr-meta";
   statusLine.hidden = true;
   retryAll.insertAdjacentElement("afterend", statusLine);
+
+  // Done-state fold (critique 2026-10-20 #3): once the run is finished the
+  // target language, its Change link and the "already in the target
+  // language" count are reference, not status. _pbpTrSyncDoneFold moves the
+  // target row and the skip note in here at "done" and back out for every
+  // other status. The summary names the target, so the fold hides nothing a
+  // glance needs. Always the LAST child: the view toggle and its line are
+  // inserted before it (_pbpTrShowViewToggle). Never holds a price.
+  const fold = document.createElement("details");
+  fold.id = "tr-done-fold";
+  fold.className = "tr-meta rail-disclosure";
+  fold.hidden = true;
+  fold.appendChild(document.createElement("summary"));
+  sec.appendChild(fold);
 
   // Rail accordion (spec 2026-07-04): install AFTER every direct child above
   // exists (pbpRailCollapsible's CSS-driven hide covers whatever's already
@@ -1619,7 +1635,69 @@ function _pbpTrRenderUsage(st) {
   }
   const line = t("trActualUsage", String(st.usage.inTok), String(st.usage.outTok));
   el.textContent = st.usage.approx ? "\u2248 " + line : line;
-  el.hidden = false;
+  // "live" = these numbers belong to the translation now on the page. Cleared
+  // wherever a new run or a reset hides the line. At "done" the figures ride
+  // on the status line instead of a line of their own (_pbpTrPaintDone).
+  el.dataset.live = "1";
+  if (st.status === "done") _pbpTrPaintDone(st);
+  else el.hidden = false;
+}
+
+// The done state's one status line: translated count plus what the run
+// cost (critique 2026-10-20 #3). The usage is a product promise, so it is
+// never folded: it moves from #tr-usage onto this always-visible line, with
+// the full sentence kept as the line's title. A done state without a live
+// usage (restored from cache) has nothing to report but the count.
+function _pbpTrPaintDone(st) {
+  const prog = document.getElementById("tr-progress");
+  if (!prog) return;
+  const n = st.work.filter((w) => w.n in st.trMd).length;
+  const usg = document.getElementById("tr-usage");
+  if (usg && usg.dataset.live === "1" && st.usage) {
+    // U+2248 is text in the body font, not an icon glyph (see _pbpTrRenderUsage).
+    const ap = st.usage.approx ? "\u2248" : "";
+    prog.textContent = t("trDoneUsage", String(n), ap + st.usage.inTok, ap + st.usage.outTok);
+    prog.title = usg.textContent;
+    usg.hidden = true;
+  } else {
+    prog.textContent = t("trDone", String(n));
+    prog.removeAttribute("title");
+  }
+  prog.hidden = false;
+}
+
+// Done-state fold: at "done" the target row (its text shown by the summary
+// instead) and the skip note move into #tr-done-fold; every other status
+// puts them back where _pbpTrBuildSection placed them -- before the first
+// request the target language is exactly what the reader needs to see.
+function _pbpTrSyncDoneFold(st) {
+  const fold = document.getElementById("tr-done-fold");
+  const tgt = document.getElementById("tr-target");
+  if (!fold || !tgt) return;
+  const skip = document.getElementById("tr-skip-note");
+  const sum = fold.querySelector("summary");
+  const tgtText = st.tgtTextEl || tgt.firstElementChild;
+  if (st.status === "done") {
+    if (sum) sum.textContent = t("trTargetLang", (st.target && (st.target.display || st.target.name)) || "");
+    if (tgtText) tgtText.hidden = true;           // the summary says it
+    if (tgt.parentElement !== fold) fold.append(tgt);
+    if (skip && skip.parentElement !== fold) fold.append(skip);
+    fold.hidden = false;
+    return;
+  }
+  fold.hidden = true;
+  if (tgtText) tgtText.hidden = false;
+  if (tgt.parentElement === fold) {
+    const btnRow = document.getElementById("btn-translate");
+    const row = btnRow && btnRow.parentElement;
+    if (row && row.parentElement === fold.parentElement) row.insertAdjacentElement("afterend", tgt);
+    else fold.insertAdjacentElement("beforebegin", tgt);
+  }
+  if (skip && skip.parentElement === fold) {
+    const est = document.getElementById("tr-estimate");
+    if (est && est.parentElement === fold.parentElement) est.insertAdjacentElement("afterend", skip);
+    else tgt.insertAdjacentElement("afterend", skip);
+  }
 }
 
 function _pbpTrRenderGlossaryHits(st) {
@@ -1778,6 +1856,7 @@ async function _pbpTrApplyTargetLang(st, s) {
   // raw setting even though st.target.code does not move.
   if (st.s) st.s.translateTargetLang = s.translateTargetLang;
   if (st.tgtTextEl) st.tgtTextEl.textContent = t("trTargetLang", st.target.display || st.target.name);
+  _pbpTrSyncDoneFold(st);
   if (st.target.code === prevCode) return;   // label refresh only: no real language change
   _pbpTrSyncViewLabels(st);
   // Target language actually changed: every language-keyed derived state is now stale.
@@ -2760,7 +2839,7 @@ function _pbpTrSetStatus(st, status) {
     prog.hidden = false;
     est.hidden = true;
     const usg = document.getElementById("tr-usage");
-    if (usg) usg.hidden = true;          // T4: clear last run's usage line before the new run
+    if (usg) { usg.hidden = true; delete usg.dataset.live; }   // T4: clear last run's usage line before the new run
     // Move focus to the now-visible Stop button before disabling Translate,
     // so a keyboard user doesn't drop to <body> (audit md-translate.js:1000).
     if (document.activeElement === btn) stop.focus();
@@ -2778,6 +2857,9 @@ function _pbpTrSetStatus(st, status) {
     btn.hidden = false;
     if (document.activeElement === stop) btn.focus();
     stop.hidden = true;
+    // Back from a done line that carried the usage: the line returns.
+    const usgBack = document.getElementById("tr-usage");
+    if (usgBack && usgBack.dataset.live === "1") usgBack.hidden = false;
     // A cache-probe partial used to leave the estimate at the whole-article
     // figure _pbpTrBuildSection painted -- several times the real cost of
     // Continue. Re-estimate only what is still untranslated.
@@ -2814,10 +2896,9 @@ function _pbpTrSetStatus(st, status) {
     }
     // Explicit completion indicator (the view toggle is already shown from
     // the progressive-display start, so without this the run has no visible
-    // "finished" signal). Show the translated-block count.
-    const n = st.work.filter((w) => w.n in st.trMd).length;
-    prog.hidden = false;
-    prog.textContent = t("trDone", String(n));
+    // "finished" signal): the translated-block count, plus the run's usage
+    // when there is one.
+    _pbpTrPaintDone(st);
   } else if (status === "idle") {
     // Pristine pre-translation state (used when a target-language change resets the
     // page): re-arm the Translate button, hide progress, show the cost estimate again.
@@ -2829,7 +2910,7 @@ function _pbpTrSetStatus(st, status) {
     prog.hidden = true;
     est.hidden = false;
     const usg = document.getElementById("tr-usage");
-    if (usg) usg.hidden = true;          // T4: language reset clears the stale usage line
+    if (usg) { usg.hidden = true; delete usg.dataset.live; }   // T4: language reset clears the stale usage line
   }
   // #tr-progress is role=status + aria-live=polite and onProgress rewrites it
   // once per filled OR failed block, so a long article queued one polite
@@ -2842,7 +2923,9 @@ function _pbpTrSetStatus(st, status) {
   if (prog) {
     if (status === "translating") prog.setAttribute("aria-busy", "true");
     else prog.removeAttribute("aria-busy");
+    if (status !== "done") prog.removeAttribute("title");   // only the done line carries the full usage sentence
   }
+  _pbpTrSyncDoneFold(st);
   // The stale note's second action is status-dependent (partial-only): keep it
   // in step with every status transition through the one sync point.
   _pbpTrSyncStaleNote(st);
@@ -2882,23 +2965,30 @@ function _pbpTrShowViewToggle(st) {
     b.addEventListener("click", () => _pbpTrSetMode(st, mode, true));
     wrap.appendChild(b);
   }
-  document.getElementById("tr-section").appendChild(wrap);
-  // The three segments are glyphs; the view they put the page in is named
-  // here, in words, so nobody has to hover a title to learn it (aria-hidden:
-  // the pressed segment's own label already says it to assistive tech).
-  const name = document.createElement("div");
+  const sec = document.getElementById("tr-section");
+  const fold = document.getElementById("tr-done-fold");
+  if (fold && fold.parentElement === sec) sec.insertBefore(wrap, fold);
+  else sec.appendChild(wrap);
+  // One line under the toggle (critique 2026-10-20 #3): the view's name, and
+  // in tr-only the peek hint after it. The three segments are glyphs or
+  // codes; the name says the view in words so nobody has to hover a title to
+  // learn it (aria-hidden: the pressed segment's own label already says it
+  // to assistive tech).
+  const line = document.createElement("div");
+  line.id = "tr-view-line";
+  line.className = "tr-meta";
+  const name = document.createElement("span");
   name.id = "tr-view-name";
-  name.className = "tr-meta";
   name.setAttribute("aria-hidden", "true");
-  wrap.insertAdjacentElement("afterend", name);
   // Names the pointer peek in tr-only (_pbpTrPeekToggle), in place of the
-  // per-paragraph title it used to carry; shown only in that view.
-  const peekHint = document.createElement("div");
+  // per-paragraph title it used to carry; shown only in that view. It is the
+  // peek's only discovery path, so it stays on the always-visible line.
+  const peekHint = document.createElement("span");
   peekHint.id = "tr-peek-hint";
-  peekHint.className = "tr-meta";
   peekHint.textContent = t("trShowOriginal");
   peekHint.hidden = true;
-  name.insertAdjacentElement("afterend", peekHint);
+  line.append(name, peekHint);
+  wrap.insertAdjacentElement("afterend", line);
   _pbpTrSyncViewLabels(st);
   _pbpTrSyncToggle(st.mode);
 }

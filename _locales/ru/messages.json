@@ -1900,6 +1900,9 @@
   "mdExportSection": {
     "message": "Экспорт"
   },
+  "mdExportMore": {
+    "message": "Другие форматы и параметры"
+  },
   "mdOptImages": {
     "message": "Изображения"
   },
@@ -2770,6 +2773,20 @@
       }
     }
   },
+  "trDoneUsage": {
+    "message": "$COUNT$ сегментов · вход $IN$ / выход $OUT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "in": {
+        "content": "$2"
+      },
+      "out": {
+        "content": "$3"
+      }
+    }
+  },
   "trStop": {
     "message": "Остановить"
   },
@@ -2883,7 +2900,7 @@
     "message": "Повторить все неудачные"
   },
   "trShowOriginal": {
-    "message": "Нажмите на абзац, чтобы на время увидеть оригинал"
+    "message": "Нажмите на абзац, чтобы увидеть оригинал"
   },
   "askOpen": {
     "message": "Вопросы"
