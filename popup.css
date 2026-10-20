@@ -912,7 +912,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 }
 
 .notes-bar { display: flex; justify-content: space-between; align-items: center; margin-top: var(--pp-sp-1); }
-#desc-char-count { font-size: 11px; color: var(--pp-fg-hint); }
+#desc-char-count { font-size: 11px; color: var(--pp-fg-hint); white-space: nowrap; }
 /* Both states carry their colour here, not from an inline style in popup.js --
    an inline style outranks every rule in this file, which is what kept the
    themed twin below dead and pinned "nearly full" to a literal #e80 (2.57:1 on
@@ -920,7 +920,10 @@ html[data-section="login"] .quick-actions { display: none !important; }
 /* The count speaks up at 80% of the posts/add budget (the same threshold
    that turns it amber below); under that it keeps its place in .notes-bar,
    so the AI summary action does not move, but draws nothing. */
-#desc-char-count:not(.near-limit):not(.over-limit) { visibility: hidden; }
+/* Hidden, it may shrink to nothing: squeezed by a long-locale hint and the
+   AI button it used to wrap its invisible text onto four lines and stretch
+   the bar to 61px (de at 420px, critique 2026-10-20). */
+#desc-char-count:not(.near-limit):not(.over-limit) { visibility: hidden; min-width: 0; overflow: hidden; }
 #desc-char-count.near-limit { color: var(--pp-offline-fg); font-weight: 600; }
 #desc-char-count.over-limit { color: var(--pp-danger-quiet-fg); font-weight: 600; }
 /* Tag suggestion skeleton — opacity pulse on solid divider color. Gentler than the
@@ -1123,11 +1126,17 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display:
 /* Rides the end of its chip row (popup-tags.js pbpAssignAltNumBadges) so it
    never shifts where the chips start. */
 .alt-num-hint { margin-left: auto; }
-/* Same .kb-hint family hook as #ai-summary-hint above: the Alt+P/R/A hint
-   right-aligns in .bottom-bar so it can never push the three checkbox
-   labels, on any of the nine locales. No own spacing -- the row gap is
-   .bottom-bar's. */
-#bottom-kb-hint { margin-left: auto; }
+/* The AI summary button keeps its one line; the hint beside it is the part
+   that gives way (de "KI-Zusammenfassung" broke in two at 420px). */
+#ai-summary-btn { flex-shrink: 0; white-space: nowrap; }
+/* The Alt+P/R/A hint shares the Save row's hint line with Ctrl+Enter
+   (popup.js appends .submit-hint after it): in .bottom-bar a long locale
+   wrapped it onto a row of its own under the checkboxes (critique
+   2026-10-20). It takes the row's free space and ellipsizes first; its
+   title carries the full text. Both hints show and hide together. */
+#bottom-kb-hint { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bottom-kb-hint + .submit-hint { margin-left: 0; white-space: nowrap; }
+#bottom-kb-hint + .submit-hint::before { content: "\00B7"; margin-right: var(--pp-sp-4); }
 
 .clear-all-link {
   font-size: 11px; color: var(--pp-fg-hint); cursor: pointer;

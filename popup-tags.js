@@ -843,8 +843,11 @@ function pbpAssignAltNumBadges() {
   const hint = document.createElement("span");
   hint.className = "kb-hint alt-num-hint";
   hint.textContent = t("kbdAltTagHint");
-  // At the END of the row holding the first numbered chip, right-aligned
-  // (popup.css): placed after the group label it pushed that row's chips
-  // right of the next row's whenever hints showed (critique 2026-10-19).
-  (first.closest(".suggest-group") || host).append(hint);
+  // At the END of that area's last row, right-aligned (popup.css): placed
+  // after the group label it pushed that row's chips right of the next
+  // row's (critique 2026-10-19), and at the end of the FIRST row a long
+  // locale wrapped it onto a line of its own between the popular and
+  // recommended groups (de at 420px, critique 2026-10-20).
+  const groups = host.querySelectorAll(".suggest-group");
+  (groups.length ? groups[groups.length - 1] : host).append(hint);
 }

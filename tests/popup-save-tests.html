@@ -4279,7 +4279,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     // Critique 2026-10-19: the Alt+N hint sat between the first group's label
     // and its chips, pushing that row's chips right of the next row's.
-    test("the Alt+N hint rides the end of its chip row, never before the chips", () => {
+    test("the Alt+N hint rides the end of the last chip row, never before the chips or between groups", () => {
       const host = document.createElement("div");
       host.id = "pinboard-suggest-tags";
       host.className = "suggest-area";
@@ -4292,11 +4292,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
         )([], (id) => document.getElementById(id), document, (k) => k);
         pipeline.pbpAssignAltNumBadges();
         const hints = host.querySelectorAll(".alt-num-hint");
-        const firstGroup = host.querySelector(".suggest-group");
+        const [firstGroup, lastGroup] = host.querySelectorAll(".suggest-group");
         assert(hints.length === 1, "exactly one hint, got " + hints.length);
-        assert(hints[0].parentElement === firstGroup && firstGroup.lastElementChild === hints[0],
-          "the hint must be the last child of the first numbered row");
+        assert(hints[0].parentElement === lastGroup && lastGroup.lastElementChild === hints[0],
+          "the hint must close the area's last row, not sit between the groups");
         assert(firstGroup.children[1].classList.contains("stag"), "the first chip still follows the group label directly");
+        assert(firstGroup.lastElementChild.classList.contains("stag"), "the first row still ends in the hint");
       } finally { host.remove(); }
     });
 
