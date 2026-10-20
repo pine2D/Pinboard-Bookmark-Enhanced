@@ -1774,6 +1774,9 @@
   "syncApiKeysRequiresSync": {
     "message": "Сначала включите Chrome Sync для настроек."
   },
+  "dependentsNeedParent": {
+    "message": "Включите его, чтобы настроить параметры ниже."
+  },
   "qlPopularTitle": {
     "message": "Популярные закладки в Pinboard"
   },

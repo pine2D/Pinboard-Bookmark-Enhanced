@@ -1325,9 +1325,12 @@ input[type="checkbox"], input[type="radio"] {
 }
 .switch > input:disabled ~ .switch-track, .switch > input:disabled:checked ~ .switch-track {
   background: var(--opt-btn-bg);
-  color: var(--opt-fg-hint);
+  color: var(--opt-border);
   box-shadow: inset 0 0 0 1px var(--opt-border);
   cursor: default;
+}
+.switch > input:disabled ~ .switch-track::before {
+  box-shadow: none;
 }
 .switch > input:disabled ~ .switch-text {
   color: var(--opt-fg-hint);

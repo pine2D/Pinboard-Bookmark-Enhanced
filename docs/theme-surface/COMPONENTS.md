@@ -707,7 +707,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); 
 | `input`（第一个子元素） | `position: absolute; top/bottom: -2px; left/right: 0; opacity: 0`——铺满整行并上下各溢出 2px：20px 行上命中高 **24px**（§1.1 图标命中下限） | — |
 | `.switch-text` | `flex: 0 1 auto; min-width: 0`（收缩包裹，行内帮助图标紧跟其后） | 继承 |
 | `.switch-track` | **28×16**，**无边框**，`--opt-radius-full`，`margin-left: auto`（对齐用的 auto 外边距，把轨道推到行尾，不是间距字面量） | off：`border` 底；on：`accent` 底；disabled：`btn-bg` 底 |
-| 滑块（`.switch-track::before`） | **12×12** 圆，四边 **2px** 内缩；off→on 位移 **12px**（28 − 12 − 2×2）；阴影 `0 1px 2px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06)`（alpha 黑，与主题无关，只作浮起提示） | `currentColor`：off `panel`，on `on-accent`，disabled `fg-hint` |
+| 滑块（`.switch-track::before`） | **12×12** 圆，四边 **2px** 内缩；off→on 位移 **12px**（28 − 12 − 2×2）；阴影 `0 1px 2px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06)`（alpha 黑，与主题无关，只作浮起提示） | `currentColor`：off `panel`，on `on-accent`，disabled `border`（且去掉阴影，2026-10-20 options 第四轮评审：`fg-hint` 滑块比可用的关闭态还醒目） |
 
 几何取 B′（2026-09-23 密度研究后用户裁决 Ruling 36，取代 D3 的 32×20 带框轨道）：去掉 1px 边框，
 因为「1px 边框 + 1px 内缩」在高 DPR 设备像素上取整不对称，滑块读作偏上；单一 2px 内缩没有这层拆分。

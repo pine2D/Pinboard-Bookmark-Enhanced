@@ -1774,6 +1774,9 @@
   "syncApiKeysRequiresSync": {
     "message": "Activez d’abord Chrome Sync pour les paramètres."
   },
+  "dependentsNeedParent": {
+    "message": "Activez cette option pour régler les paramètres ci-dessous."
+  },
   "qlPopularTitle": {
     "message": "Signets populaires sur Pinboard"
   },

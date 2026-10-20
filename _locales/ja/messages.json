@@ -1774,6 +1774,9 @@
   "syncApiKeysRequiresSync": {
     "message": "先に上の Chrome Sync による設定の同期をオンにしてください。"
   },
+  "dependentsNeedParent": {
+    "message": "オンにすると、下の項目を設定できます。"
+  },
   "qlPopularTitle": {
     "message": "Pinboard の人気ブックマーク"
   },

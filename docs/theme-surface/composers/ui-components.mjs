@@ -890,7 +890,7 @@ function fieldTargetRules(ns) {
 //   off thumb   --opt-panel       on the track   same pair, symmetric (min 3.20)
 //   on track    bg --opt-accent   on the panel   `accent vs panel` >=3 (min 3.53 solarized-dark)
 //   on thumb    --opt-on-accent   on the track   `on-accent vs accent` >=4.5 (min 4.51 modern-card)
-//   disabled    btn-bg track, fg-hint thumb + text (WCAG 1.4.3/1.4.11 exempt)
+//   disabled    btn-bg track, border thumb (no lift), fg-hint text (WCAG 1.4.3/1.4.11 exempt)
 // Hover changes nothing but the cursor: fill and thumb position are the
 // state cues, and a hover tint on a border-grey track would need a new
 // derived role with no gate behind it. The thumb shadow is alpha black, so
@@ -973,12 +973,19 @@ function switchRules(ns) {
     // receives focus, so an inset ring here cannot clash with the focus
     // ring, and it restores the same >=3:1 edge the resting `border vs
     // panel` contrast-audit row already gates (Ruling 37 fix round).
+    // The thumb takes the ring's own --border grey, not fg-hint (2026-10-20,
+    // options critique 4): an fg-hint thumb on the pale btn-bg track out-
+    // weighed a live OFF switch (white thumb on a border-grey track), so the
+    // switches the user cannot touch were the loudest in the row. A border-
+    // grey thumb with no lift shadow reads as recessed; position still
+    // carries on/off.
     rule(`.switch > input:disabled ~ .switch-track, .switch > input:disabled:checked ~ .switch-track`, [
       ["background", `var(--${ns}-btn-bg)`],
-      ["color", `var(--${ns}-fg-hint)`],
+      ["color", `var(--${ns}-border)`],
       ["box-shadow", `inset 0 0 0 1px var(--${ns}-border)`],
       ["cursor", "default"],
     ]),
+    rule(`.switch > input:disabled ~ .switch-track::before`, [["box-shadow", "none"]]),
     rule(`.switch > input:disabled ~ .switch-text`, [["color", `var(--${ns}-fg-hint)`]]),
     // Forced colors (Windows High Contrast): author backgrounds are flattened
     // to system colours, so a drawn track would lose its on/off fill. Hand

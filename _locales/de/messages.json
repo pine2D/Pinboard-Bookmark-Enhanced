@@ -1774,6 +1774,9 @@
   "syncApiKeysRequiresSync": {
     "message": "Aktiviere zuerst Chrome Sync für Einstellungen."
   },
+  "dependentsNeedParent": {
+    "message": "Schalte diese Option ein, um die Einstellungen darunter zu ändern."
+  },
   "qlPopularTitle": {
     "message": "Beliebte Lesezeichen auf Pinboard"
   },

@@ -2217,17 +2217,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   // archive.org keys) follow the same rule, and their [data-off] flag dims
   // the field label too. A <select> enhanced by listbox.js only repaints its
   // button on pbpListboxSync.
+  // A greyed-out block has to say why (the rule #opt-sync-api-keys-requires
+  // set for its one row): every parent switch that greys rows out gets one
+  // caption directly under its own row while it is off, built here from the
+  // same data-parent wiring so no panel hand-writes its own. It describes the
+  // parent switch for screen readers too -- the disabled rows themselves drop
+  // out of the tab order, so the parent is the control a keyboard user is on.
+  const parentNotes = new Map();
+  function parentNoteFor(parent) {
+    let note = parentNotes.get(parent.id);
+    if (note !== undefined) return note;
+    note = null;
+    const row = parent.closest(".pref-row");
+    if (row) {
+      note = document.createElement("p");
+      note.className = "hint";
+      note.id = `${parent.id}-dependents-note`;
+      note.dataset.parentNote = "";
+      note.textContent = t("dependentsNeedParent");
+      note.hidden = true;
+      row.after(note);
+      const describedBy = parent.getAttribute("aria-describedby") || "";
+      parent.setAttribute("aria-describedby", `${describedBy} ${note.id}`.trim());
+    }
+    parentNotes.set(parent.id, note);
+    return note;
+  }
   function syncSubRows() {
+    const offParents = new Set();
     for (const row of document.querySelectorAll(":is(.pref-row-sub, .entry-block-sub)[data-parent]")) {
       const parent = $id(row.dataset.parent);
       const off = !!parent && !parent.checked;
       row.toggleAttribute("data-off", off);
+      if (parent) {
+        parentNoteFor(parent);
+        if (off) offParents.add(parent.id);
+      }
       for (const control of row.querySelectorAll("input, textarea, select, button.key-toggle")) {
         if (control.disabled === off) continue;
         control.disabled = off;
         if (control.tagName === "SELECT") window.pbpListboxSync?.(control);
       }
     }
+    for (const [id, note] of parentNotes) if (note) note.hidden = !offParents.has(id);
   }
   document.addEventListener("change", (e) => {
     const id = e.target && e.target.id;

@@ -1774,6 +1774,9 @@
   "syncApiKeysRequiresSync": {
     "message": "要先開啟上一項 Chrome Sync 設定同步。"
   },
+  "dependentsNeedParent": {
+    "message": "開啟後才可設定下面的選項。"
+  },
   "qlPopularTitle": {
     "message": "Pinboard 熱門書籤"
   },

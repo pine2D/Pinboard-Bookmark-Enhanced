@@ -1780,6 +1780,9 @@
   "syncApiKeysRequiresSync": {
     "message": "Turn on Chrome Sync for settings first."
   },
+  "dependentsNeedParent": {
+    "message": "Turn this on to set the options below."
+  },
   "qlPopularTitle": {
     "message": "Popular bookmarks on Pinboard"
   },
