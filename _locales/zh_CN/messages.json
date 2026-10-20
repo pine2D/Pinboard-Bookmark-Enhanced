@@ -586,12 +586,18 @@
     }
   },
   "offlineQueued": {
-    "message": "$COUNT$ 个书签排队中（离线）",
+    "message": "$COUNT$ 个书签排队待重试",
     "placeholders": {
       "count": {
         "content": "$1"
       }
     }
+  },
+  "saveQueuedNetwork": {
+    "message": "连不上 Pinboard，请检查网络。书签已排队，稍后会自动重试。"
+  },
+  "saveQueuedServer": {
+    "message": "Pinboard 暂时无法处理请求。书签已排队，稍后会自动重试。"
   },
   "offlineRetry": {
     "message": "立即重试"

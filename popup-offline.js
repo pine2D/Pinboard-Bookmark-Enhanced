@@ -157,20 +157,27 @@
     return t("networkError");
   }
 
+  // One queued item, sent now. Resolves to background's { ok, result } or
+  // null when the worker never answered. Shared by the row button and the
+  // "queued" card under Save (popup.js).
+  function retryItem(queueId) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: "retry_offline_item", queueId }, (r) => {
+        if (chrome.runtime.lastError) {
+          console.warn("offline retry message failed:", chrome.runtime.lastError.message);
+          resolve(null);
+          return;
+        }
+        resolve(r || null);
+      });
+    });
+  }
+
   async function onRetry(queueId, btn) {
     btn.disabled = true;
     btn.classList.add("loading");
     try {
-      const resp = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: "retry_offline_item", queueId }, (r) => {
-          if (chrome.runtime.lastError) {
-            console.warn("offline retry message failed:", chrome.runtime.lastError.message);
-            resolve(null);
-            return;
-          }
-          resolve(r || null);
-        });
-      });
+      const resp = await retryItem(queueId);
       if (!resp || !resp.ok) {
         btn.disabled = false;
         btn.classList.remove("loading");
@@ -227,5 +234,5 @@
   }
 
   // Expose for popup.js
-  window.PPOffline = { init, refresh: refreshBar };
+  window.PPOffline = { init, refresh: refreshBar, retry: retryItem, retryFailureMessage };
 })();

@@ -586,12 +586,18 @@
     }
   },
   "offlineQueued": {
-    "message": "$COUNT$ zakładek w kolejce (offline)",
+    "message": "Zakładki w kolejce do ponowienia: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"
       }
     }
+  },
+  "saveQueuedNetwork": {
+    "message": "Brak połączenia z Pinboard, sprawdź połączenie. Zakładka czeka w kolejce i zostanie automatycznie wysłana ponownie."
+  },
+  "saveQueuedServer": {
+    "message": "Pinboard chwilowo nie odpowiada. Zakładka czeka w kolejce i zostanie automatycznie wysłana ponownie."
   },
   "offlineRetry": {
     "message": "Spróbuj ponownie"

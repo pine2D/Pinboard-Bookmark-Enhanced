@@ -1300,6 +1300,7 @@ await suite("unified save pipeline", async () => {
       const h = await createHarness({ pinboardFetch: async () => response(status, null, true) });
       const result = await h.submitSaveIntent(intent({ mode: "overwrite" }));
       equal(result.status, "queued", `HTTP ${status} should queue`);
+      equal(result.cause, "server", `HTTP ${status} must not be reported as offline`);
       equal(h.storageData.offlineQueue.length, 1);
       equal(h.storageData.offlineQueue[0].mode, "overwrite");
     }
@@ -1319,6 +1320,7 @@ await suite("unified save pipeline", async () => {
     const h = await createHarness({ pinboardFetch: async () => { throw new TypeError("offline"); } });
     const result = await h.submitSaveIntent(intent({ archive: true }));
     equal(result.status, "queued");
+    equal(result.cause, "network");
     const queued = h.storageData.offlineQueue[0];
     equal(queued.queueId, result.queueId);
     equal(queued.mode, "merge");

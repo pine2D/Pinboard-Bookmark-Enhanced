@@ -586,12 +586,18 @@
     }
   },
   "offlineQueued": {
-    "message": "$COUNT$ Lesezeichen in Warteschlange (offline)",
+    "message": "$COUNT$ Lesezeichen warten auf erneutes Senden",
     "placeholders": {
       "count": {
         "content": "$1"
       }
     }
+  },
+  "saveQueuedNetwork": {
+    "message": "Pinboard ist nicht erreichbar, Verbindung prüfen. Das Lesezeichen wartet in der Warteschlange und wird automatisch erneut gesendet."
+  },
+  "saveQueuedServer": {
+    "message": "Pinboard antwortet gerade nicht. Das Lesezeichen wartet in der Warteschlange und wird automatisch erneut gesendet."
   },
   "offlineRetry": {
     "message": "Jetzt erneut versuchen"

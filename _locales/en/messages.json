@@ -591,12 +591,18 @@
     }
   },
   "offlineQueued": {
-    "message": "$COUNT$ bookmark(s) queued (offline)",
+    "message": "$COUNT$ bookmark(s) queued to retry",
     "placeholders": {
       "count": {
         "content": "$1"
       }
     }
+  },
+  "saveQueuedNetwork": {
+    "message": "Couldn't reach Pinboard. Check your connection. The bookmark is queued and will be retried automatically."
+  },
+  "saveQueuedServer": {
+    "message": "Pinboard isn't responding right now. The bookmark is queued and will be retried automatically."
   },
   "offlineRetry": {
     "message": "Retry now"

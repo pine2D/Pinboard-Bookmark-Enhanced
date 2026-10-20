@@ -586,12 +586,18 @@
     }
   },
   "offlineQueued": {
-    "message": "$COUNT$ закладок в очереди (офлайн)",
+    "message": "Закладок в очереди на повтор: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"
       }
     }
+  },
+  "saveQueuedNetwork": {
+    "message": "Не удаётся связаться с Pinboard, проверьте подключение. Закладка в очереди и будет отправлена повторно автоматически."
+  },
+  "saveQueuedServer": {
+    "message": "Pinboard сейчас не отвечает. Закладка в очереди и будет отправлена повторно автоматически."
   },
   "offlineRetry": {
     "message": "Повторить сейчас"

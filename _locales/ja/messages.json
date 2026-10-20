@@ -586,12 +586,18 @@
     }
   },
   "offlineQueued": {
-    "message": "$COUNT$ 件のブックマークを待機中（オフライン）",
+    "message": "$COUNT$ 件のブックマークが再送待ち",
     "placeholders": {
       "count": {
         "content": "$1"
       }
     }
+  },
+  "saveQueuedNetwork": {
+    "message": "Pinboard に接続できません。接続を確認してください。ブックマークはキューに入り、あとで自動的に再送されます。"
+  },
+  "saveQueuedServer": {
+    "message": "Pinboard が一時的に応答していません。ブックマークはキューに入り、あとで自動的に再送されます。"
   },
   "offlineRetry": {
     "message": "今すぐ再試行"

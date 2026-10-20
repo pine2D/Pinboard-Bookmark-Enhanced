@@ -586,12 +586,18 @@
     }
   },
   "offlineQueued": {
-    "message": "$COUNT$ 個書籤排隊中（離線）",
+    "message": "$COUNT$ 個書籤在佇列中等候重試",
     "placeholders": {
       "count": {
         "content": "$1"
       }
     }
+  },
+  "saveQueuedNetwork": {
+    "message": "無法連接 Pinboard，請檢查網絡。書籤已放入佇列，稍後會自動重試。"
+  },
+  "saveQueuedServer": {
+    "message": "Pinboard 暫時未能處理請求。書籤已放入佇列，稍後會自動重試。"
   },
   "offlineRetry": {
     "message": "立即重試"

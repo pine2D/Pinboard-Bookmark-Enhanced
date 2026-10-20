@@ -971,7 +971,10 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "" } =
 
     try {
       const queueId = await enqueueOfflineSave(queueRecordFromSaveIntent(intent, deliverySettings.pinboardToken));
-      return { status: "queued", queueId };
+      // cause lets the popup say why: Pinboard answered 429/5xx ("server")
+      // or the request never got an HTTP answer ("network").
+      const cause = Number.isInteger(envelope.result?.httpStatus) ? "server" : "network";
+      return { status: "queued", queueId, cause };
     } catch (_) {
       return pbpSaveFailure("storage");
     }

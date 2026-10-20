@@ -586,12 +586,18 @@
     }
   },
   "offlineQueued": {
-    "message": "$COUNT$ signet(s) en file d'attente (hors ligne)",
+    "message": "$COUNT$ signet(s) en file d'attente pour un nouvel essai",
     "placeholders": {
       "count": {
         "content": "$1"
       }
     }
+  },
+  "saveQueuedNetwork": {
+    "message": "Impossible de joindre Pinboard, vérifiez la connexion. Le signet attend dans la file et sera renvoyé automatiquement."
+  },
+  "saveQueuedServer": {
+    "message": "Pinboard ne répond pas pour le moment. Le signet attend dans la file et sera renvoyé automatiquement."
   },
   "offlineRetry": {
     "message": "Réessayer maintenant"

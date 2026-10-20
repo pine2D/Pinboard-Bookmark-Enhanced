@@ -1819,7 +1819,7 @@ function setupSubmit(token) {
       }
 
       if (result.status === "queued") {
-        showStatus("status-msg", t("offlineQueued", "1"), "info");
+        showSaveQueued(result);
         setSubmitState("idle");
         try { if (window.PPOffline) await window.PPOffline.refresh(); } catch (_) {}
         return;
@@ -2430,6 +2430,40 @@ function showSaveError(result) {
     message,
     // Focus moves to Save first: the retry button leaves with this card.
     actions: retry ? [{ label: t("saveRetry"), onClick: () => { const btn = $id("submit-btn"); btn.focus(); btn.click(); } }] : [],
+  });
+  $id("submit-btn").closest(".submit-bar").after(feedback.element);
+  _saveErrorFeedback = feedback;
+}
+// A retryable failure (no answer, or Pinboard 429/5xx) is queued and retried
+// in the background. Say which of the two happened -- "offline" was wrong for
+// a server error -- in the warning palette, where the save error would sit,
+// with a way to send it now instead of waiting for the next retry.
+function showSaveQueued(result) {
+  clearSaveError();
+  const queueId = typeof result?.queueId === "string" ? result.queueId : "";
+  const actions = [];
+  if (queueId && window.PPOffline?.retry) {
+    actions.push({
+      label: t("offlineRetry"),
+      onClick: async (card) => {
+        const btn = card?.querySelector(".fc-actions .fc-btn");
+        if (btn) btn.disabled = true;
+        const resp = await window.PPOffline.retry(queueId);
+        try { await window.PPOffline.refresh(); } catch (_) {}
+        if (resp && resp.ok) {
+          clearSaveError();
+          showStatus("status-msg", t("bookmarkSaved"), "success");
+          return;
+        }
+        if (btn) btn.disabled = false;
+        showStatus("status-msg", window.PPOffline.retryFailureMessage(resp && resp.result), "error");
+      },
+    });
+  }
+  const feedback = showFeedback({
+    variant: "warning",
+    message: t(result?.cause === "server" ? "saveQueuedServer" : "saveQueuedNetwork"),
+    actions,
   });
   $id("submit-btn").closest(".submit-bar").after(feedback.element);
   _saveErrorFeedback = feedback;

@@ -304,6 +304,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         showStatus: (...args) => statuses.push(args),
         clearSaveError() {},
         showSaveError: (result) => statuses.push(["status-msg", "save-error:" + (result?.reason || "thrown"), "error"]),
+        showSaveQueued: (result) => statuses.push(["status-msg", "save-queued:" + (result?.cause || ""), "warning"]),
         updateCharCount() {},
         pbpPopupSavePolicy,
         fieldDirtyFlags,
@@ -379,6 +380,49 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    // A queued save used to print "queued (offline)" in body colour even when
+    // Pinboard itself answered 5xx (impeccable critique 2026-10-20).
+    await testAsync("a queued save names its cause in the warning card and can be sent now", async () => {
+      const cardSource = source.slice(source.indexOf("function showSaveQueued("), source.indexOf("function esc(s)"));
+      assert(cardSource.includes("function showSaveQueued("), "showSaveQueued source not found");
+      const run = (result, retryResp) => {
+        const log = { cards: [], status: [], retried: [], cleared: 0, placed: 0 };
+        const btn = { disabled: false };
+        const element = { querySelector: () => btn };
+        const win = { PPOffline: {
+          retry: async (id) => { log.retried.push(id); return retryResp; },
+          refresh: async () => {},
+          retryFailureMessage: (r) => "fail:" + (r?.reason || ""),
+        } };
+        const show = new Function("t", "$id", "showFeedback", "showStatus", "clearSaveError", "window", "_saveErrorFeedback",
+          `${cardSource}\nreturn showSaveQueued;`)(
+          (k) => k,
+          () => ({ closest: () => ({ after: () => { log.placed++; } }) }),
+          (opts) => { log.cards.push(opts); return { element, dismiss() {} }; },
+          (...a) => log.status.push(a),
+          () => { log.cleared++; },
+          win, null);
+        show(result);
+        return { log, element, btn };
+      };
+      const server = run({ status: "queued", queueId: "q1", cause: "server" }, { ok: true });
+      assert(server.log.cards[0].variant === "warning", "queued card is not in the warning palette");
+      assert(server.log.cards[0].message === "saveQueuedServer", "a 5xx was not named: " + server.log.cards[0].message);
+      assert(server.log.placed === 1, "the card was not placed under Save");
+      await server.log.cards[0].actions[0].onClick(server.element);
+      assert(server.log.retried[0] === "q1", "Retry now did not send the queued item");
+      assert(JSON.stringify(server.log.status.at(-1)) === JSON.stringify(["status-msg", "bookmarkSaved", "success"]), "a sent item did not report saved");
+      const net = run({ status: "queued", queueId: "q2", cause: "network" }, { ok: false, result: { reason: "network" } });
+      assert(net.log.cards[0].message === "saveQueuedNetwork", "a network failure was not named");
+      await net.log.cards[0].actions[0].onClick(net.element);
+      assert(net.btn.disabled === false, "a failed retry left the button disabled");
+      assert(JSON.stringify(net.log.status.at(-1)) === JSON.stringify(["status-msg", "fail:network", "error"]), "a failed retry gave no reason");
+      for (const key of ["saveQueuedServer", "saveQueuedNetwork", "offlineRetry", "bookmarkSaved"]) {
+        assert(enMessages[key]?.message, "en catalogue lacks " + key);
+      }
+      assert(!/offline\)/i.test(enMessages.offlineQueued.message), "the queue bar still blames the network");
+    });
+
     test("unchanged submitted tags retain the existing union behavior", () => {
       const result = rebasePopupTags("ServerOnly Alpha", ["Alpha", "Beta"], ["Alpha", "Beta"]);
       assert(JSON.stringify(result) === JSON.stringify(["ServerOnly", "Alpha", "Beta"]), result.join(" "));
@@ -402,13 +446,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const harness = createSubmitHarness();
       const pending = harness.click();
       assert(harness.messages.length === 1, "save_intent was not sent");
-      harness.resolveSave({ status: "queued", queueId: "q1" });
+      harness.resolveSave({ status: "queued", queueId: "q1", cause: "server" });
       await pending;
       assert(harness.queueRefreshes() === 1, "queue bar was not refreshed");
       assert(harness.savedTagCalls.length === 0, "queued saved last-used tags");
       assert(harness.timers.every((timer) => timer.delay !== 1800), "queued created an auto-close timer");
       assert(harness.closeCalls() === 0, "queued closed the Popup");
-      assert(JSON.stringify(harness.statuses.at(-1)) === JSON.stringify(["status-msg", "offlineQueued", "info"]), "queued did not leave the info status visible");
+      assert(JSON.stringify(harness.statuses.at(-1)) === JSON.stringify(["status-msg", "save-queued:server", "warning"]), "queued did not hand its cause to the queued card");
       assert(!harness.elements["submit-btn"].classList.contains("save-error"), "queued fell through into the error state");
       assert(!harness.elements["submit-btn"].classList.contains("saved-success"), "queued entered the saved state");
     });
@@ -1018,7 +1062,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const queuedStart = submit.indexOf('if (result.status === "queued")');
       const queuedEnd = submit.indexOf('if (result.status === "skipped"', queuedStart);
       const queued = submit.slice(queuedStart, queuedEnd);
-      assert(queued.includes('t("offlineQueued", "1")') && queued.includes("window.PPOffline.refresh()"), "queued UI or queue refresh missing");
+      assert(queued.includes("showSaveQueued(result)") && queued.includes("window.PPOffline.refresh()"), "queued UI or queue refresh missing");
       assert(queued.includes('setSubmitState("idle")'), "queued submit does not leave loading state");
       for (const forbidden of ["saveLastUsedTags", 'setSubmitState("success")', "optAutoCloseAfterSave", "pbpWaybackShouldAttempt", "checkExistingBookmark"] ) {
         assert(!queued.includes(forbidden), `queued path contains saved side effect ${forbidden}`);
@@ -2835,6 +2879,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         showStatus: (...args) => statuses.push(args),
         clearSaveError() {},
         showSaveError: (result) => statuses.push(["status-msg", "save-error:" + (result?.reason || "thrown"), "error"]),
+        showSaveQueued: (result) => statuses.push(["status-msg", "save-queued:" + (result?.cause || ""), "warning"]),
         console: { warn: (...args) => warns.push(args) },
         enc: encodeURIComponent,
         shouldUpdateField: () => true,
@@ -3051,6 +3096,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         showStatus: (...args) => statuses.push(args),
         clearSaveError() {},
         showSaveError: (result) => statuses.push(["status-msg", "save-error:" + (result?.reason || "thrown"), "error"]),
+        showSaveQueued: (result) => statuses.push(["status-msg", "save-queued:" + (result?.cause || ""), "warning"]),
         console: { warn: (...args) => warns.push(args) },
         enc: encodeURIComponent,
         shouldUpdateField: () => true,
