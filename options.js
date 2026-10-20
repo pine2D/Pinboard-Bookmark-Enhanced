@@ -232,23 +232,28 @@ async function renderConnectionOverview() {
   ]);
   const drivePermission = driveIdentity === false || driveHost === false
     ? false : (driveIdentity === true && driveHost === true ? true : null);
-  // The Reader panel's indented AI controls (model override, translation
-  // target, glossary, skim) are inert while pbpAiAvailable() is false
-  // (md-ai-core.js), and the page used to say nothing. Same two factors the AI
-  // row below reports, because a key WITHOUT the origin grant fails just as
-  // silently as no key at all. Three deliberate silences: the master switch
-  // being off is a choice, not a fault; `aiPermission === null` means the
-  // query failed or no origin could be derived, so the answer is unknown and a
-  // warning there would be a false alarm; and #opt-selection-trigger is out of
-  // scope -- it drives the non-AI dictionary too (md-ask.js, md-highlight.js).
+  // Every switch that spends AI -- the Reader's indented controls, the
+  // shortcut and Batch Save auto tags/summaries, auto tags on popup open --
+  // is inert while pbpAiAvailable() is false (md-ai-core.js), and the page
+  // used to say so only in the Reader. Each [data-ai-unavailable] block lists
+  // the switches it speaks for and sits right under them, so flipping one on
+  // shows the warning at the moment of the choice without moving the switch
+  // under the pointer. Same two factors the AI row below reports, because a
+  // key WITHOUT the origin grant fails just as silently as no key at all.
+  // Three deliberate silences: every listed switch being off is a choice, not
+  // a fault; `aiPermission === null` means the query failed or no origin could
+  // be derived, so the answer is unknown and a warning there would be a false
+  // alarm; and #opt-selection-trigger is out of scope -- it drives the non-AI
+  // dictionary too (md-ask.js, md-highlight.js). A listed switch missing from
+  // the page counts as on, as the Reader master switch always did.
   // This sits after the early return above rather than before it: both factors
   // are only known past it (liveAi needs pbpLiveAiSettingsSnapshot, the grant
   // needs the awaits above), and the return only fires on a page that carries
-  // neither #connection-health nor this hint.
-  const previewAiHint = $id("preview-ai-unavailable");
-  if (previewAiHint) {
-    previewAiHint.hidden = !($id("opt-preview-ai-enabled")?.checked !== false
-      && (!aiConfigured || aiPermission === false));
+  // neither #connection-health nor these hints.
+  const aiDead = !aiConfigured || aiPermission === false;
+  for (const block of document.querySelectorAll("[data-ai-unavailable]")) {
+    const ids = block.dataset.aiUnavailable.split(/\s+/).filter(Boolean);
+    block.hidden = !(aiDead && ids.some((id) => $id(id)?.checked !== false));
   }
   const items = [
     { id: "pinboard", name: "Pinboard", panel: "general", target: "test-pinboard-token",
@@ -3872,11 +3877,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const el = $id(id);
     el?.addEventListener(el.tagName === "SELECT" ? "change" : "input", scheduleConnectionOverview);
   }
-  // Not a connection source, but the second factor behind #preview-ai-unavailable
-  // (renderConnectionOverview): flipping the Reader master switch decides whether
-  // that warning is due at all, and it had no listener of its own until now.
-  $id("opt-preview-ai-enabled")?.addEventListener("change", scheduleConnectionOverview);
-  $id("onboard-next-ai-btn")?.addEventListener("click", () => pbpOpenOptionsTarget("ai", "opt-ai-provider-btn"));
+  // Not connection sources, but the second factor behind every
+  // [data-ai-unavailable] warning (renderConnectionOverview): the switches a
+  // block lists decide whether it is due at all.
+  for (const block of document.querySelectorAll("[data-ai-unavailable]")) {
+    for (const id of block.dataset.aiUnavailable.split(/\s+/).filter(Boolean)) {
+      $id(id)?.addEventListener("change", scheduleConnectionOverview);
+    }
+  }
+  for (const btn of [$id("onboard-next-ai-btn"), ...document.querySelectorAll("[data-ai-setup]")]) {
+    btn?.addEventListener("click", () => pbpOpenOptionsTarget("ai", "opt-ai-provider-btn"));
+  }
   chrome.storage.onChanged?.addListener((changes, area) => {
     if (area === "local" && (changes[PBP_CONNECTION_HEALTH_KEY] || changes.vocabDriveConnected)) {
       scheduleConnectionOverview();

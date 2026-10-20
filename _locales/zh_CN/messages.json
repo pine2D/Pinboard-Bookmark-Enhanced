@@ -2658,6 +2658,9 @@
   "previewAiUnavailableHint": {
     "message": "下面这些设置暂时不生效：所选服务商还缺 API Key 或访问授权。到「AI 服务商」补齐即可。"
   },
+  "aiUnavailableHint": {
+    "message": "上面的 AI 选项暂时不生效：所选服务商还缺 API Key 或访问授权。"
+  },
   "previewAiModelLabel": {
     "message": "模型覆盖（可选）"
   },

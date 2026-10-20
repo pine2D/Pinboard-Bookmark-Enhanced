@@ -2658,6 +2658,9 @@
   "previewAiUnavailableHint": {
     "message": "以下の設定はまだ機能しません。選択中のプロバイダーに API キーがないか、権限が許可されていません。「AI プロバイダー」タブで設定してください。"
   },
+  "aiUnavailableHint": {
+    "message": "上の AI オプションはまだ機能しません。選択中のプロバイダーに API キーがないか、権限が許可されていません。"
+  },
   "previewAiModelLabel": {
     "message": "モデルの上書き（任意）"
   },

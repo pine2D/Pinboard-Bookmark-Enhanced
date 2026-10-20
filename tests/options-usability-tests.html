@@ -117,9 +117,13 @@
 <input id="batch-ai-tags" type="checkbox" />
 <input id="batch-ai-summary" type="checkbox" checked />
 <input id="opt-preview-ai-enabled" type="checkbox" checked />
-<!-- The Reader panel's "these settings do nothing yet" warning (options.html),
-     hidden until renderConnectionOverview judges the AI controls dead. -->
-<p class="hint hint-warn" id="preview-ai-unavailable" role="status" aria-live="polite" hidden>Reader AI is not usable yet</p>
+<!-- The "these settings do nothing yet" warnings (options.html), hidden until
+     renderConnectionOverview judges the AI controls they list dead: the
+     Reader's, and one shortcut-save block standing in for the others. -->
+<div class="fg entry-block" id="preview-ai-unavailable" data-ai-unavailable="opt-preview-ai-enabled" hidden><p class="hint hint-warn" role="status" aria-live="polite">Reader AI is not usable yet</p><div class="fg-actions"><button type="button" class="btn btn-sm" data-ai-setup>Set up AI</button></div></div>
+<input id="qs-ai-tags" type="checkbox" />
+<input id="qs-ai-summary" type="checkbox" />
+<div class="fg entry-block" id="qs-ai-unavailable-fixture" data-ai-unavailable="qs-ai-tags qs-ai-summary" hidden><p class="hint hint-warn" role="status" aria-live="polite">Quick Save AI is not usable yet</p></div>
 <input id="opt-preview-skim" type="checkbox" />
 <input id="dict-echo-enabled" type="checkbox" checked />
 <input id="opt-wayback-enabled" type="checkbox" />
@@ -762,6 +766,31 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     });
   });
 
+  const qsHintEl = () => document.getElementById("qs-ai-unavailable-fixture");
+  const qsTags = () => document.getElementById("qs-ai-tags");
+  const qsSummary = () => document.getElementById("qs-ai-summary");
+
+  await test("a shortcut-save AI warning waits until one of its switches is on", async () => {
+    await withAiState({ key: false, permission: false }, async () => {
+      qsTags().checked = false; qsSummary().checked = false;
+      await renderConnectionOverview();
+      assert(qsHintEl().hidden === true, "both AI switches off was reported as a fault");
+      qsSummary().checked = true;
+      await renderConnectionOverview();
+      assert(qsHintEl().hidden === false, "an AI switch turned on with no key stayed silent");
+    });
+    qsTags().checked = false; qsSummary().checked = false;
+  });
+
+  await test("a shortcut-save AI warning clears once the provider is usable", async () => {
+    await withAiState({ key: true, permission: true }, async () => {
+      qsTags().checked = true;
+      await renderConnectionOverview();
+      assert(qsHintEl().hidden === true, "a fully configured provider still raised the shortcut warning");
+    });
+    qsTags().checked = false;
+  });
+
   await test("the Reader master switch re-renders the connection overview", async () => {
     // The wiring lives inside the DOMContentLoaded closure this fixture blocks,
     // so run that slice of the real file with the two dependencies injected --
@@ -780,6 +809,8 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(scheduled === 1, "the Reader master switch scheduled " + scheduled + " re-renders");
     document.getElementById("opt-openai-key").dispatchEvent(new Event("input", { bubbles: true }));
     assert(scheduled === 2, "the provider-key leg stopped scheduling re-renders");
+    qsSummary().dispatchEvent(new Event("change", { bubbles: true }));
+    assert(scheduled === 3, "a switch listed by a [data-ai-unavailable] block did not schedule a re-render");
   });
 
   await test("default options hint text meets WCAG AA against the page background", async () => {

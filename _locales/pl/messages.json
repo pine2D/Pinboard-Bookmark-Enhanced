@@ -2658,6 +2658,9 @@
   "previewAiUnavailableHint": {
     "message": "Ustawienia poniżej na razie nic nie robią: wybranemu dostawcy brakuje klucza API lub uprawnienia do niego. Skonfiguruj je na karcie „Dostawcy AI”."
   },
+  "aiUnavailableHint": {
+    "message": "Powyższe opcje AI na razie nic nie robią: wybranemu dostawcy brakuje klucza API lub uprawnienia do niego."
+  },
   "previewAiModelLabel": {
     "message": "Zastąpienie modelu (opcjonalne)"
   },

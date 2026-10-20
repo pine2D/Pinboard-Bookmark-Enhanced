@@ -2658,6 +2658,9 @@
   "previewAiUnavailableHint": {
     "message": "Die Einstellungen unten haben noch keine Wirkung: Dem ausgewählten Anbieter fehlt der API-Schlüssel oder die Berechtigung dafür. Richte beides im Tab „KI-Anbieter“ ein."
   },
+  "aiUnavailableHint": {
+    "message": "Die KI-Optionen oben haben noch keine Wirkung: Dem ausgewählten Anbieter fehlt der API-Schlüssel oder die Berechtigung dafür."
+  },
   "previewAiModelLabel": {
     "message": "Modell-Überschreibung (optional)"
   },

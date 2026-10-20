@@ -74,7 +74,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/options-context-help-tests.html": 34,
   "tests/options-listbox-tests.html": 47,
   "tests/options-reset-tests.html": 14,
-  "tests/options-usability-tests.html": 89,
+  "tests/options-usability-tests.html": 91,
   "tests/options-vocab-tests.html": 97,
   "tests/pinboard-sort-tests.html": 45,
   "tests/pinboard-style-cloak-tests.html": 21,

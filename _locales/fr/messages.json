@@ -2658,6 +2658,9 @@
   "previewAiUnavailableHint": {
     "message": "Les paramètres ci-dessous n'ont encore aucun effet : il manque la clé API ou l'autorisation pour le fournisseur sélectionné. Configurez-les dans l'onglet « Fournisseurs IA »."
   },
+  "aiUnavailableHint": {
+    "message": "Les options IA ci-dessus n'ont encore aucun effet : il manque la clé API ou l'autorisation pour le fournisseur sélectionné."
+  },
   "previewAiModelLabel": {
     "message": "Remplacement du modèle (optionnel)"
   },
