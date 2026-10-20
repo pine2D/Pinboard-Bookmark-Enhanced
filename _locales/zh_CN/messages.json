@@ -3046,6 +3046,12 @@
   "dictLoadFailed": {
     "message": "词典暂不可用"
   },
+  "dictOffline": {
+    "message": "当前离线，联网后才能查词典"
+  },
+  "dictServiceBusy": {
+    "message": "词典服务暂时没有响应，稍后再试"
+  },
   "mdCopyCode": {
     "message": "复制代码"
   },

@@ -421,6 +421,18 @@ assertEq(pbpDictClassifyResponse({ status: 200, data: { entries: [{ partOfSpeech
 assertEq(pbpDictClassifyResponse({ status: 404, data: null }).kind, "miss", "404 is a semantic miss");
 assertEq(pbpDictClassifyResponse({ status: 500, data: null }).kind, "failure", "500 is a failure, never no-entry");
 assertEq(pbpDictClassifyResponse(null).kind, "failure", "missing response is a failure");
+assertEq(pbpDictClassifyResponse({ status: 503, data: null }).status, 503, "a failure carries its HTTP status for the message choice");
+// Failure sentence by cause: offline wins over any status; 429 / 5xx / timeout
+// read as "busy"; everything else (bad JSON, a network error while online)
+// stays the neutral "unavailable".
+assertEq(pbpDictFailureKey({ status: 503 }, false), "dictOffline", "offline wins over a server status");
+assertEq(pbpDictFailureKey(new TypeError("Failed to fetch"), false), "dictOffline", "a network error while offline reads as offline");
+assertEq(pbpDictFailureKey({ status: 429 }, true), "dictServiceBusy", "429 reads as busy");
+assertEq(pbpDictFailureKey({ status: 500 }, true), "dictServiceBusy", "5xx reads as busy");
+assertEq(pbpDictFailureKey(new DOMException("Aborted", "AbortError"), true), "dictServiceBusy", "the 8s timeout reads as busy");
+assertEq(pbpDictFailureKey(new TypeError("Failed to fetch"), true), "dictLoadFailed", "a network error while online stays neutral");
+assertEq(pbpDictFailureKey(new SyntaxError("bad json"), undefined), "dictLoadFailed", "a bad body with no online signal stays neutral");
+assertEq(pbpDictFailureKey(null, true), "dictLoadFailed", "no error object stays neutral");
 assertEq(pbpDictWiktionaryUrl("Défense"), "https://en.wiktionary.org/wiki/D%C3%A9fense", "fallback URL encodes accents on fixed English Wiktionary");
 assertEq(pbpDictWiktionaryUrl("New York"), "https://en.wiktionary.org/wiki/New%20York", "fallback URL encodes spaces");
 assert(pbpDictWiktionaryUrl("mot").startsWith("https://en.wiktionary.org/"), "fallback never derives a language subdomain");

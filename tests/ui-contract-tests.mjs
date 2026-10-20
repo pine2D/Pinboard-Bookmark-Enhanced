@@ -9384,8 +9384,14 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "library.css: a hand rule still styles the retired relookup select / head or a native lookup select");
   check(declarationValueMap(hand, "#vocab-ref-result[data-same-word] :is(.xp-dict-ipa, .xp-dict-ipa-tag)").get("display") === "none",
     "library.css: a lookup of the open word repeats its IPA in the dictionary result (spec §4.9: hide .xp-dict-ipa / -tag under #vocab-ref-result[data-same-word])");
-  check(!/border-radius:\s*6px/.test((/#vocab-ref-result :is\(\.xp-retry, \.xp-dict-connect\)\s*\{([^}]*)\}/.exec(hand) || [, "border-radius: 6px"])[1]),
-    "library.css: the dictionary retry / connect buttons lost their scoped rule or went back to a literal 6px radius (spec §4.9: --lib-radius-md)");
+  const connectDecl = declarationValueMap(hand, "#vocab-ref-result .xp-dict-connect");
+  check(connectDecl.get("border-radius") === "var(--lib-radius-md)" && connectDecl.get("background") === "var(--lib-btn-bg)",
+    "library.css: the dictionary connect button lost its scoped rule, went back to a literal radius (spec §4.9: --lib-radius-md) or stopped using the .btn fill (Soft Fill)");
+  // One retry for one action (critique round 3, 2026-10-20): the page's own
+  // "Look up again" stays; md-dict's Retry beside it is not shown.
+  check(declarationValueMap(hand, "#vocab-ref-result .xp-retry").get("display") === "none" &&
+    /foot\.className = "vocab-ref-foot";/.test(libraryVocabJs),
+    "library.css: md-dict's Retry shows beside the page's own Look up again -- two buttons for the same action");
 }
 
 // ---- Library redesign T7b (spec §4.2-§4.7, §4.11, §6.5): the word's main

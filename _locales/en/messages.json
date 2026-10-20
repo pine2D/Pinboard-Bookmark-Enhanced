@@ -3056,6 +3056,12 @@
   "dictLoadFailed": {
     "message": "Dictionary unavailable"
   },
+  "dictOffline": {
+    "message": "You're offline. The dictionary needs an internet connection."
+  },
+  "dictServiceBusy": {
+    "message": "The dictionary isn't responding. Try again in a moment."
+  },
   "mdCopyCode": {
     "message": "Copy code"
   },

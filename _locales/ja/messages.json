@@ -3046,6 +3046,12 @@
   "dictLoadFailed": {
     "message": "辞書を利用できません"
   },
+  "dictOffline": {
+    "message": "オフラインです。辞書を使うにはインターネット接続が必要です。"
+  },
+  "dictServiceBusy": {
+    "message": "辞書が応答していません。しばらくしてからもう一度お試しください。"
+  },
   "mdCopyCode": {
     "message": "コードをコピー"
   },

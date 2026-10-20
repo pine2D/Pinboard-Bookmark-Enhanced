@@ -3046,6 +3046,12 @@
   "dictLoadFailed": {
     "message": "Wörterbuch nicht verfügbar"
   },
+  "dictOffline": {
+    "message": "Du bist offline. Das Wörterbuch braucht eine Internetverbindung."
+  },
+  "dictServiceBusy": {
+    "message": "Das Wörterbuch antwortet gerade nicht. Versuche es gleich noch einmal."
+  },
   "mdCopyCode": {
     "message": "Code kopieren"
   },

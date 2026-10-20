@@ -478,7 +478,24 @@ function pbpDictClassifyResponse(out) {
   const norm = status === 200 ? pbpDictNormalizeEntry(out.data) : null;
   if (norm) return { kind: "hit", norm };
   if (status === 404 || status === 200) return { kind: "miss", norm: null };
-  return { kind: "failure", norm: null };
+  return { kind: "failure", norm: null, status: status || 0 };
+}
+
+// Which sentence a load failure gets. The reader cannot fix "unavailable";
+// they can fix "offline" (reconnect) and wait out "busy" (429 / 5xx / the 8s
+// timeout -- a parent cancel never reaches here). Anything else, a bad JSON
+// body or a network error while the browser still says online, stays the
+// neutral "unavailable". Pure: `online` is navigator.onLine, passed in.
+function pbpDictFailureKey(err, online) {
+  if (online === false) return "dictOffline";
+  const status = err && err.status;
+  if (status === 429 || status >= 500 || (err && err.name === "AbortError")) return "dictServiceBusy";
+  return "dictLoadFailed";
+}
+function _pbpDictFailureError(res) {
+  const err = new Error("Dictionary request failed");
+  err.status = (res && res.status) || 0;
+  return err;
 }
 
 function pbpDictWiktionaryUrl(term) {
@@ -1137,7 +1154,7 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
   try {
     for (const cand of pbpDictQueryCandidates(exact, lang)) {
       const res = await runCandidate(cand.term, cand.skipCache);
-      if (res.kind === "failure") throw new Error("Dictionary request failed");
+      if (res.kind === "failure") throw _pbpDictFailureError(res);
       if (res.kind !== "hit") continue;
       if (res.norm && res.norm.formOfOnly) {
         if (!pointer) pointer = [cand.term, res, cand.aliasExact];
@@ -1150,7 +1167,7 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
     if (parentSignal && parentSignal.aborted) return null;
     if (lemma && lemma !== "-" && !tried.has(pbpDictCacheKeyExact(lang, lemma))) {
       const third = await runCandidate(lemma, false);
-      if (third.kind === "failure") throw new Error("Dictionary request failed");
+      if (third.kind === "failure") throw _pbpDictFailureError(third);
       if (third.kind === "hit") {
         if (!(third.norm && third.norm.formOfOnly)) return finish(lemma, third, false);
         if (!pointer) pointer = [lemma, third, false];
@@ -1167,7 +1184,7 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
       _pbpDictSlotFallback(slot, t("dictCircuitCooling", String(secs)), term);
       return null;
     }
-    _pbpDictSlotFallback(slot, t("dictLoadFailed"), term);
+    _pbpDictSlotFallback(slot, t(pbpDictFailureKey(e, typeof navigator === "undefined" ? undefined : navigator.onLine)), term);
     // Same affordance the AI slot has had all along: a plain failure gets a
     // retry that restarts the whole run (never slot-local recursion).
     if (typeof onRerun === "function") {

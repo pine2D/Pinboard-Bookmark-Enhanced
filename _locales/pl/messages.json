@@ -3046,6 +3046,12 @@
   "dictLoadFailed": {
     "message": "Słownik niedostępny"
   },
+  "dictOffline": {
+    "message": "Jesteś offline. Słownik wymaga połączenia z internetem."
+  },
+  "dictServiceBusy": {
+    "message": "Słownik nie odpowiada. Spróbuj ponownie za chwilę."
+  },
   "mdCopyCode": {
     "message": "Kopiuj kod"
   },

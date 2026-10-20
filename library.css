@@ -2061,26 +2061,30 @@ html.motion-ready .vocab-note-save {
 }
 #vocab-ref-result .xp-skel:nth-child(3) { width: 62%; }
 @keyframes xp-dict-shimmer { to { background-position: -200% 0; } }
-/* Connect (manual path only) and retry: sm buttons in md-dict's own classes. */
-#vocab-ref-result :is(.xp-retry, .xp-dict-connect) {
+/* Connect (manual path only): an sm button in md-dict's own class, painted
+   with the .btn fill (Soft Fill: filled at rest, never a white outlined box --
+   it used the code-block fill until critique round 3, 2026-10-20). */
+#vocab-ref-result .xp-dict-connect {
   height: calc(var(--lib-control-h) - 4px);
   margin-top: var(--lib-sp-2);
   padding: 0 var(--lib-control-pad-x-sm);
   border: 1px solid var(--lib-btn-border);
   border-radius: var(--lib-radius-md);
-  background: var(--lib-code-bg);
-  color: var(--lib-fg);
+  background: var(--lib-btn-bg);
+  color: var(--lib-btn-fg);
   font: inherit;
   font-size: calc(var(--lib-text-body) - 1px);
   cursor: pointer;
   white-space: nowrap;
 }
-#vocab-ref-result :is(.xp-retry, .xp-dict-connect):hover:not(:disabled) { background: var(--lib-btn-hover, var(--lib-code-bg)); }
-/* Spelled out, not :is(): the §7.3 focus-placement gate reads each subject. */
-#vocab-ref-result .xp-retry:focus-visible,
+#vocab-ref-result .xp-dict-connect:hover:not(:disabled) { background: var(--lib-btn-hover); }
 #vocab-ref-result .xp-dict-connect:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
-#vocab-ref-result .xp-retry svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
+/* md-dict's own Retry after a load failure: this page already has "Look up
+   again" under the source line (.vocab-ref-foot), which re-runs the same
+   query -- two buttons for one action, side by side (critique round 3).
+   The page keeps its own, always in the same place; md-dict's is not shown. */
+#vocab-ref-result .xp-retry { display: none; }
 /* ---- Sheet tiers (spec §4.2). The pane is the container (it cannot query
    itself); every rule below is on the sheet or its descendants. ---- */
 @container lib-detail (min-width: 640px) {
