@@ -639,6 +639,11 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
    in each one's title and accessible name -- and keep one line. Square at the
    sm rung so a dot-only toggle still clears the 24px hit area in compact. */
 .notes-list-pane[data-header-fit="narrow"] .notes-color-filters .lib-toggle-count { display: none; }
+/* Room for name + number ("rich", critique round 3): each colour's meaning
+   (Quote, To-do...) shows between its dot and its number; otherwise it lives
+   in the title and accessible name only. */
+.lib-toggle-name { display: none; }
+.notes-list-pane[data-header-fit="rich"] .notes-color-filters .lib-toggle-name { display: inline; }
 .notes-list-pane[data-header-fit="narrow"] .notes-color-filters .lib-toggle[data-color]:not([data-color="all"]) {
   justify-content: center;
   min-width: calc(var(--lib-control-h) - 4px);
@@ -2285,6 +2290,53 @@ html.motion-ready .vocab-note-save {
   overflow: visible;
 }
 .vocab-status-toggles { display: inline-flex; flex: none; align-items: center; gap: var(--lib-sp-0); }
+/* Keyboard shortcuts panel (critique round 3, 2026-10-20): opened by the
+   header's keyboard button, placed by pbpListboxPlace. Popover chrome =
+   the Filter panel's (panel fill, 1px frame, radius-lg, sp-3 inset). Keys on
+   the left, what they do on the right; the key caps are fills, not frames
+   (Soft Fill), in the page's own font -- the UA's monospace for <kbd> would
+   fall back to the profile's Fixed-width face on a cold open. */
+.lib-keys:popover-open {
+  display: block;
+  inset: auto;
+  margin: 0;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 2 * var(--lib-sp-2)));
+  padding: var(--lib-sp-3);
+  border: 1px solid var(--lib-border);
+  border-radius: var(--lib-radius-lg);
+  background: var(--lib-panel);
+  color: var(--lib-fg);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--lib-fg) 22%, transparent), 0 2px 4px color-mix(in srgb, var(--lib-fg) 12%, transparent);
+  font-size: var(--lib-text-secondary);
+  line-height: var(--lib-lh-secondary);
+}
+.lib-keys-title { margin: 0 0 var(--lib-sp-2); font-weight: bold; }
+.lib-keys dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--lib-sp-2) var(--lib-sp-3); align-items: baseline; margin: 0; }
+.lib-keys dl > div { display: contents; }
+.lib-keys dt { white-space: nowrap; color: var(--lib-fg-muted); }
+.lib-keys[data-view="vocab"] [data-keys-for="notes"],
+.lib-keys[data-view="notes"] [data-keys-for="vocab"] { display: none; }
+.lib-keys dd { margin: 0; }
+.lib-keys kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--lib-sp-1);
+  border-radius: var(--lib-radius-sm);
+  /* Mixed from the panel's own ink, not --lib-btn-bg: in dark presets the
+     button fill sits within a shade of --lib-panel and the caps vanished. */
+  background: color-mix(in srgb, var(--lib-fg) 12%, var(--lib-panel));
+  color: var(--lib-fg);
+  font-family: inherit;
+  font-size: var(--lib-text-meta);
+  line-height: var(--lib-lh-meta);
+}
+.lib-keys kbd svg { width: 12px; height: 12px; }
+#lib-keys-open[aria-expanded="true"] { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
 /* Wide form (the row fits): the same nodes inline. All UA [popover] styles
    reset (spec §3.4): without width/height/overflow/color the group select's
    flex:1 would collapse to fit-content, its focus glow would be clipped and
@@ -2855,8 +2907,10 @@ body { display: flex; flex-direction: column; }
 /* Drive status (header, right end): secondary text, quiet until it reports a
    problem -- then danger-coloured, because the line is the only place on this
    page a stopped sync can show. A plain link: underline on hover only. */
+/* The header's right end (Drive line + keyboard shortcuts button): one
+   group pushed to the end, its two items a button-row gap apart. */
+.lib-corner { display: flex; align-items: center; gap: var(--lib-sp-3); min-width: 0; margin-inline-start: auto; }
 .lib-drive {
-  margin-inline-start: auto;
   min-width: 0;
   color: var(--lib-fg-muted);
   font-size: var(--lib-text-secondary);

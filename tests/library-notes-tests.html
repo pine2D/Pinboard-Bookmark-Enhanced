@@ -1036,6 +1036,9 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     toggle(1)?.title === "libraryColorFilterAria:hlColorQuote,2" && toggle(1)?.getAttribute("aria-label") === toggle(1)?.title &&
     toggle(1)?.querySelector(".notes-hit-dot.notes-c1") && toggle(1)?.querySelector(".lib-toggle-count")?.textContent === "2",
     toggle(1) && toggle(1).title);
+  check("each colour toggle carries its meaning for the rich header form, hidden from AT (the label names it)",
+    toggle(1)?.querySelector(".lib-toggle-name")?.textContent === "hlColorQuote" &&
+    toggle(1)?.querySelector(".lib-toggle-name")?.getAttribute("aria-hidden") === "true", toggle(1) && toggle(1).innerHTML);
   toggle(1)?.click();
   check("a colour clicked under All shows only that colour, per highlight",
     rowKeys() === "pbp_hl_alpha#a1,pbp_hl_evil#e1" && pressed() === "1", rowKeys() + " | " + pressed());
@@ -2056,36 +2059,46 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     const fitFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const host = document.createElement("div");
     const toggles = [1, 2, 3, 4, 5].map((c) =>
-      `<button type="button" class="lib-toggle sm" data-color="${c}" aria-pressed="false" title="Colour ${c}: 2000" aria-label="Colour ${c}: 2000"><span class="notes-hit-dot notes-c${c}" aria-hidden="true"></span><span class="lib-toggle-count">2000</span></button>`).join("");
-    host.innerHTML = `<div class="notes-list-pane" data-header-fit="wide" style="position:fixed;left:-9999px;top:0;width:520px">
+      `<button type="button" class="lib-toggle sm" data-color="${c}" aria-pressed="false" title="Colour ${c}: 2000" aria-label="Colour ${c}: 2000"><span class="notes-hit-dot notes-c${c}" aria-hidden="true"></span><span class="lib-toggle-name" aria-hidden="true">Colour ${c}</span><span class="lib-toggle-count">2000</span></button>`).join("");
+    host.innerHTML = `<div class="notes-list-pane" data-header-fit="wide" style="position:fixed;left:-9999px;top:0;width:900px">
       <div class="notes-color-filters" role="group"><button type="button" class="lib-toggle sm" data-color="all" aria-pressed="true">Wszystkie</button>${toggles}</div></div>`;
     document.body.appendChild(host);
     const pane = host.firstElementChild;
     const row = pane.querySelector(".notes-color-filters");
     const counts = () => [...row.querySelectorAll(".lib-toggle-count")];
+    const names = () => [...row.querySelectorAll(".lib-toggle-name")];
+    const shown = (els) => els.every((n) => getComputedStyle(n).display !== "none");
+    const gone = (els) => els.every((n) => getComputedStyle(n).display === "none");
     try {
       pbpLibWireNotesHeaderFit(pane);
-      const need = pbpLibNotesColorNeed(row);
-      check("notes header fit: room for the numbers keeps them", pane.dataset.headerFit === "wide" &&
-        counts().every((n) => getComputedStyle(n).display !== "none"), `${need} ${pane.dataset.headerFit}`);
+      const { need, richNeed } = pbpLibNotesColorNeed(row);
+      check("notes header fit: the rich form (names + numbers) needs more room than the wide one",
+        Number.isFinite(need) && richNeed > need + 10, `${need} ${richNeed}`);
+      check("notes header fit: room for names and numbers shows both (critique round 3)", pane.dataset.headerFit === "rich" &&
+        shown(counts()) && shown(names()), `${need} ${richNeed} ${pane.dataset.headerFit}`);
+      pane.style.width = `${Math.floor(richNeed) - 1}px`;
+      await fitFrames();
+      check("notes header fit: room for the numbers only keeps them and drops the names", pane.dataset.headerFit === "wide" &&
+        shown(counts()) && gone(names()), `${pane.dataset.headerFit} ${pane.style.width}`);
       pane.style.width = `${Math.floor(need) - 1}px`;
       await fitFrames();
       const r = row.getBoundingClientRect();
       const btns = [...row.children].map((b) => b.getBoundingClientRect());
       check("notes header fit: 1px short of the need -> dots only, one line, inside the pane, counts still named",
-        pane.dataset.headerFit === "narrow" && counts().every((n) => getComputedStyle(n).display === "none") &&
+        pane.dataset.headerFit === "narrow" && gone(counts()) && gone(names()) &&
         btns.every((b) => Math.abs(b.top - btns[0].top) < 0.5 && b.right <= r.right + 0.5) &&
         [...row.querySelectorAll('[data-color]:not([data-color="all"])')].every((b) => /2000/.test(b.title) && /2000/.test(b.getAttribute("aria-label"))),
         `${pane.dataset.headerFit} ${pane.style.width}`);
       check("notes header fit: a dot-only toggle keeps a >=24px square hit area",
         [...row.querySelectorAll('[data-color]:not([data-color="all"])')].every((b) => { const r = b.getBoundingClientRect(); return r.width >= 24 && r.height >= 24; }),
         [...row.querySelectorAll('[data-color]:not([data-color="all"])')].map((b) => { const r = b.getBoundingClientRect(); return `${r.width}x${r.height}`; }).join(" "));
-      check("notes header fit: the need is measured with the numbers showing, in either form",
-        Math.abs(pbpLibNotesColorNeed(row) - need) < 0.5 && pane.children.length === 1, String(pbpLibNotesColorNeed(row)));
+      const again = pbpLibNotesColorNeed(row);
+      check("notes header fit: both needs are measured with their parts showing, in any form",
+        Math.abs(again.need - need) < 0.5 && Math.abs(again.richNeed - richNeed) < 0.5 && pane.children.length === 1, JSON.stringify(again));
       pane.style.width = `${Math.ceil(need)}px`;
       await fitFrames();
       check("notes header fit: widening back to the need brings the numbers back", pane.dataset.headerFit === "wide" &&
-        counts().every((n) => getComputedStyle(n).display !== "none"), pane.dataset.headerFit);
+        shown(counts()), pane.dataset.headerFit);
       for (const n of counts()) n.textContent = "200000";
       await new Promise((resolve) => setTimeout(resolve, 0));
       check("notes header fit: bigger numbers are re-measured at once", pane.dataset.headerFit === "narrow", pane.dataset.headerFit);

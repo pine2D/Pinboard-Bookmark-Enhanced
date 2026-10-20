@@ -23,7 +23,30 @@
          pbpLibRefreshDriveLine): hidden unless this device is connected for
          the account on screen. Always a door into the Data settings tab, where the
          Drive panel explains any error and holds the buttons that fix it. -->
-    <a class="lib-drive" id="lib-drive" href="options.html#storage" target="_blank" rel="noopener" role="status" aria-live="polite" hidden></a>
+    <!-- The header's right end: the Drive line, then the keyboard shortcuts
+         button (critique round 3, 2026-10-20). The list's keys were only in
+         aria-keyshortcuts and a tooltip; one button for the page, its panel
+         showing the open view's keys (data-view, set by _pbpLibApplyView).
+         Click-opened, never on hover; placed by pbpListboxPlace like the
+         Filter panel. The rows mirror the two lists' keydown handlers. -->
+    <div class="lib-corner">
+      <a class="lib-drive" id="lib-drive" href="options.html#storage" target="_blank" rel="noopener" role="status" aria-live="polite" hidden></a>
+      <button type="button" class="btn btn-sm ghost" id="lib-keys-open" popovertarget="lib-keys" aria-expanded="false" data-i18n-title="libraryKeysTitle" data-i18n-aria="libraryKeysTitle" aria-label="Keyboard shortcuts" title="Keyboard shortcuts"><span class="btn-ic" data-ic="keyboard"></span></button>
+    </div>
+    <div class="lib-keys" id="lib-keys" popover="auto" data-view="vocab">
+      <p class="lib-keys-title" data-i18n="libraryKeysTitle">Keyboard shortcuts</p>
+      <dl>
+        <div data-keys-for="vocab"><dt><kbd><span class="btn-ic" data-ic="arrowUpLine"></span></kbd> <kbd><span class="btn-ic" data-ic="arrowDownLine"></span></kbd></dt><dd data-i18n="libraryKeysMoveWord">Previous or next word</dd></div>
+        <div data-keys-for="notes"><dt><kbd><span class="btn-ic" data-ic="arrowUpLine"></span></kbd> <kbd><span class="btn-ic" data-ic="arrowDownLine"></span></kbd></dt><dd data-i18n="libraryKeysMoveHighlight">Previous or next highlight</dd></div>
+        <div><dt><kbd data-i18n="libraryKeyHome">Home</kbd> <kbd data-i18n="libraryKeyEnd">End</kbd></dt><dd data-i18n="libraryKeysEnds">First or last in the list</dd></div>
+        <div><dt><kbd data-i18n="libraryKeyCtrl">Ctrl</kbd>+<kbd data-i18n="libraryKeySpace">Space</kbd></dt><dd data-i18n="libraryKeysAdd">Add to or remove from the selection (or Ctrl-click)</dd></div>
+        <div><dt><kbd data-i18n="libraryKeyShift">Shift</kbd>+<kbd data-i18n="libraryKeySpace">Space</kbd></dt><dd data-i18n="libraryKeysRange">Select a range (or Shift-click)</dd></div>
+        <div data-keys-for="vocab"><dt><kbd>K</kbd></dt><dd data-i18n="libraryKeysKnown">Switch between known and learning</dd></div>
+        <div><dt><kbd data-i18n="libraryKeyDelete">Delete</kbd></dt><dd data-i18n="libraryKeysDelete">Delete, after you confirm</dd></div>
+        <div><dt><kbd data-i18n="libraryKeyEsc">Esc</kbd></dt><dd data-i18n="libraryKeysClear">Clear the selection</dd></div>
+        <div><dt><kbd>/</kbd></dt><dd data-i18n="libraryKeysSearch">Go to the search box</dd></div>
+      </dl>
+    </div>
   </header>
 
   <main class="lib-main">

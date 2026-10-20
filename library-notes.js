@@ -1448,10 +1448,17 @@ function _pbpNotesBuildColorFilters() {
     const dot = document.createElement("span");
     dot.className = "notes-hit-dot notes-c" + c;
     dot.setAttribute("aria-hidden", "true");
+    // The colour's meaning, shown only in the "rich" header form (the index
+    // has room for name + number, library.js pbpLibNotesColorNeed); the
+    // accessible name already carries it, so it is aria-hidden like the dot.
+    const nm = document.createElement("span");
+    nm.className = "lib-toggle-name";
+    nm.setAttribute("aria-hidden", "true");
+    nm.textContent = name;
     const num = document.createElement("span");
     num.className = "lib-toggle-count";
-    b.append(dot, num);
     b.addEventListener("click", () => _pbpNotesApplyColor(c));
+    b.append(dot, nm, num);
     wrap.appendChild(b);
   });
 }
@@ -1491,6 +1498,8 @@ function _pbpNotesSyncColorFilters(allHits) {
     b.title = label;
     b.setAttribute("aria-label", label);
     b.setAttribute("aria-pressed", String(_notesActiveColors.has(c)));
+    const nm = b.querySelector(".lib-toggle-name");
+    if (nm) nm.textContent = t(PBP_NOTES_COLOR_KEYS[c - 1]);
     const num = b.querySelector(".lib-toggle-count");
     if (num) num.textContent = String(n);
   }

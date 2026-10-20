@@ -29,6 +29,9 @@ function _pbpLibApplyView(view, pushHash) {
   // views never share one flag, so neither can strand the other's pane.)
   if (v === "vocab") document.body.classList.remove("lib-narrow-detail");
   if (v === "notes") document.body.classList.remove("lib-narrow-notes");
+  // The keyboard-shortcut panel lists the open view's keys.
+  const keys = $id("lib-keys");
+  if (keys) keys.dataset.view = v;
   try { localStorage.setItem(PBP_LIB_VIEW_KEY, v); } catch (_) {}
   if (pushHash) history.replaceState(null, "", "#" + v);
   document.dispatchEvent(new CustomEvent("pbp-lib-view", { detail: { view: v } }));
@@ -125,6 +128,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   pbpLibWireFilterPopover($id("vocab-filter-set"), $id("vocab-filter-narrow"), $id("vocab-list-pane"));
+  // The keyboard-shortcut panel opens, places and closes the Filter panel's
+  // way (its button never hides, so no index observer).
+  pbpLibWireFilterPopover($id("lib-keys"), $id("lib-keys-open"));
   pbpLibWireVocabHeaderFit($id("vocab-list-pane"));
   pbpLibWireNotesHeaderFit(document.querySelector(".notes-list-pane"));
   _pbpLibApplyView(_pbpLibInitialView(), true);
@@ -448,12 +454,18 @@ function pbpLibVocabFilterNeed(row) {
   });
 }
 
-// The notes colour row's wide form: every toggle with its number showing.
+// The notes colour row's two roomier forms: "wide", every toggle with its
+// number; "rich" (critique round 3, 2026-10-20), the colour's meaning before
+// the number as well -- the dots alone made the reader remember which colour
+// was a quote and which a to-do. { need, richNeed }: the wide need decides
+// wide vs narrow as before, the rich one only lifts wide to rich.
 function pbpLibNotesColorNeed(row) {
   if (!row || row.hidden) return NaN;
-  return pbpLibMeasureCopyWidth(row, (copy) => {
+  const measure = (names) => pbpLibMeasureCopyWidth(row, (copy) => {
     for (const num of copy.querySelectorAll(".lib-toggle-count")) num.style.display = "inline";
+    for (const nm of copy.querySelectorAll(".lib-toggle-name")) nm.style.display = names ? "inline" : "none";
   });
+  return { need: measure(false), richNeed: measure(true) };
 }
 
 // Wires one pane: decides now, then again on every trigger above. `opts`:
@@ -502,10 +514,15 @@ function pbpLibWireHeaderFit(pane, row, measureNeed, opts = {}) {
         apply(lastForm);
         return pane.dataset.headerFit || null;
       }
-      const need = measureNeed(row);
+      // A measure may return { need, richNeed } (the notes colour row): the
+      // rich form needs the wide one to fit first and its own need to fit too.
+      const measured = measureNeed(row);
+      const need = measured && typeof measured === "object" ? measured.need : measured;
+      const richNeed = measured && typeof measured === "object" ? measured.richNeed : NaN;
       if (Number.isFinite(need)) {
         lastSig = sig;
         lastForm = pbpLibHeaderFitForm(need, room);
+        if (lastForm === "wide" && pbpLibHeaderFitForm(richNeed, room) === "wide") lastForm = "rich";
         apply(lastForm);
       }
     } catch (err) {
