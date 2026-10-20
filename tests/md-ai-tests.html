@@ -8065,6 +8065,88 @@ suite("skim status line", () => {
     }
   });
 
+  // ---- Footer price (critique 2026-10-20 #2) ----
+  // The paid tabs fire on press, so the price must already be on screen in
+  // every view -- as visible text, not only a hover title -- and it must be
+  // the estimate of the request that press actually sends (captured from the
+  // real callAIStream call, not recomputed from the builder under test).
+  function priceFixture() {
+    const realGet = chrome.i18n.getMessage;
+    const saved = { s: _pbpExplainSettings, ok: _pbpExplainAiOk, stream: window.callAIStream,
+      cap: _pbpExplainCap, ctx: _pbpExplainCtx, action: _pbpExplainAction };
+    chrome.i18n.getMessage = (key, args) => key === "explainEstCost" ? "~" + args[0] + " tokens" : "";
+    _pbpExplainSettings = { aiProvider: "gemini", geminiApiKey: "test-key" };
+    _pbpExplainAiOk = true;
+    _pbpExplainCap = { text: "ubiquitous", range: document.createRange() };
+    _pbpExplainCtx = {
+      sentence: "Phones are ubiquitous now.",
+      blockText: "Phones are ubiquitous now. Nobody notices them any more.",
+      prevText: "An earlier paragraph about devices.",
+      nextText: "A later paragraph about attention."
+    };
+    const sent = [];
+    window.callAIStream = async (s, prompt, opts) => { sent.push(opts.system + prompt); return "ok"; };
+    const restore = () => {
+      chrome.i18n.getMessage = realGet;
+      _pbpExplainSettings = saved.s; _pbpExplainAiOk = saved.ok; window.callAIStream = saved.stream;
+      _pbpExplainCap = saved.cap; _pbpExplainCtx = saved.ctx; _pbpExplainAction = saved.action;
+    };
+    return { sent, restore };
+  }
+  const shownPrice = () => {
+    const cost = pop.querySelector(".xp-cost");
+    assert(cost && !cost.hidden && getComputedStyle(cost).display !== "none", "price is not visible");
+    const m = /~(\d+) tokens/.exec(cost.textContent);
+    assert(m, "price text carries no number: " + JSON.stringify(cost.textContent));
+    return Number(m[1]);
+  };
+
+  await atest("every explain view shows the price of a paid press before it, equal to what that press sends", async () => {
+    await reset();
+    const fx = priceFixture();
+    try {
+      await show();
+      _pbpExplainAction = "dict";
+      _pbpExplainSyncActButtons(pop);
+      _pbpExplainRenderMeta(pop);
+      const inDict = shownPrice();
+      const cost = pop.querySelector(".xp-cost");
+      const name = pop.querySelector(".xp-model-name");
+      const model = pop.querySelector(".xp-model");
+      const ask = pop.querySelector(".xp-ask");
+      assert(cost.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING, "price must lead the model name");
+      assert(model.contains(cost) && model.contains(name) && model.contains(ask),
+        "price, name and ask more must stay one footer item (they wrap together)");
+      assert(name.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING, "model name must precede ask more");
+      assert(model.textContent.includes(_pbpExplainModelLabel(_pbpExplainSettings)), "model label lost its provider/model");
+      const priced = {};
+      for (const action of ["explain", "translate"]) {
+        pop.querySelector('.xp-act[data-action="' + action + '"]').click(); // real tab press: re-price, then run
+        priced[action] = shownPrice();
+        await task();
+        const req = fx.sent[fx.sent.length - 1];
+        assert(req, action + " press sent nothing");
+        assertEq(priced[action], pbpAiEstimateTokensText(req), action + " price vs. the request it sent");
+      }
+      assertEq(inDict, Math.max(priced.explain, priced.translate), "dictionary view quotes the costlier paid tab");
+      assert(priced.explain !== priced.translate, "fixture must tell the two paid requests apart");
+    } finally { fx.restore(); }
+  });
+
+  await atest("no AI configured: no price, the model label alone", async () => {
+    await reset();
+    const fx = priceFixture();
+    try {
+      for (const action of ["dict", "explain", "translate"]) {
+        _pbpExplainAiOk = false;
+        _pbpExplainAction = action;
+        _pbpExplainRenderMeta(pop);
+        assert(pop.querySelector(".xp-cost").hidden, action + ": price shown without AI");
+        assertEq(pop.querySelector(".xp-model").textContent, _pbpExplainModelLabel(_pbpExplainSettings), action + " model label");
+      }
+    } finally { fx.restore(); }
+  });
+
   await reset();
 })();
 </script>
@@ -12179,6 +12261,88 @@ suiteIf("reader drawer: one close control and focus ownership", "setupDrawer", (
       assertEq(toggle.parentElement, doc.body, "crossing the wide breakpoint restores the opener");
       assert(!doc.body.classList.contains("rail-open") && toggle.getAttribute("aria-expanded") === "false", "breakpoint clears open state");
     } finally { frame.remove(); }
+  });
+});
+
+// ---- Selection bar: dictionary-first for a lone foreign word (critique 2026-10-20 #2) ----
+suiteIf("selection bar: dictionary-first ordering", "pbpHlDictFirst", () => {
+  test("a lone word in a language the reader does not read puts the dictionary first", () => {
+    const cases = [
+      // [text, context lang, reader langs, label]
+      ["serendipity", "zh-Hans", ["zh-Hans", "zh-Hans"], "Latin word in a zh article, zh reader"],
+      ["serendipity", "", ["ja", "ja"], "Latin word, unknown article, ja reader"],
+      ["ubiquitous.", "und", ["zh-Hant", "zh-Hant"], "drag took the full stop along"],
+      ["Schadenfreude", "de", ["en", "en"], "German word in a declared German article, en reader"],
+      ["呼吸", "zh-Hans", ["en", "en"], "Han word, en reader"],
+      ["漢字", "ja", ["zh-Hans", "zh-Hans"], "Han word in a ja article routes ja, zh reader"],
+      ["привет", "", ["en", "fr"], "Cyrillic word, Latin readers"],
+    ];
+    for (const [text, ctx, readers, label] of cases) {
+      assertEq(pbpHlDictFirst(text, ctx, readers), true, label);
+    }
+  });
+  test("the reader's own language, more than one word, or no letters keep explain first", () => {
+    const cases = [
+      ["serendipity", "", ["en", "en"], "Latin word, no article language, Latin reader (no guessing)"],
+      ["Schadenfreude", "", ["de", "en"], "German word, undeclared page, German reader"],
+      ["Schadenfreude", "de", ["en", "de"], "translation target is the word's language"],
+      ["serendipity", "en", ["zh-Hans", "en"], "UI zh but the article language is the target"],
+      ["呼吸", "zh-Hans", ["zh-Hans", "en"], "Han word, zh UI"],
+      ["漢字", "ja", ["ja", "en"], "Han word in a ja article, ja reader"],
+      ["привет", "", ["ru", "en"], "Cyrillic word, ru reader"],
+      ["serendipity appears", "zh-Hans", ["zh-Hans"], "two words"],
+      ["可以呼吸的长文让人愿意读下去", "zh-Hans", ["en"], "a CJK run past the term cap"],
+      ["12345", "", ["zh-Hans"], "digits are not a word"],
+      ["...", "", ["zh-Hans"], "punctuation only"],
+      ["serendipity", "zh-Hans", [], "no reader language known"],
+    ];
+    for (const [text, ctx, readers, label] of cases) {
+      assertEq(pbpHlDictFirst(text, ctx, readers), false, label);
+    }
+  });
+  test("the bar moves the existing dictionary button, in DOM order, and only when the order changes", () => {
+    const bar = _pbpHlEnsureBar();
+    const ex = bar.querySelector(".pb-hl-explain-btn");
+    const dict = bar.querySelector(".pb-hl-dict-btn");
+    const note = bar.querySelector(".pb-hl-note-btn");
+    const savedHidden = [ex.hidden, dict.hidden];
+    const savedSettings = _pbpExplainSettings;
+    const host = document.createElement("div");
+    host.lang = "de";
+    host.innerHTML = "<p>Die Schadenfreude war groß.</p>";
+    document.body.appendChild(host);
+    const textNode = host.querySelector("p").firstChild;
+    const rangeOf = (word) => {
+      const r = document.createRange();
+      const i = textNode.data.indexOf(word);
+      r.setStart(textNode, i); r.setEnd(textNode, i + word.length);
+      return r;
+    };
+    const mo = new MutationObserver(() => {});
+    try {
+      ex.hidden = false; dict.hidden = false;
+      _pbpExplainSettings = { translateTargetLang: "en" }; // reader: en UI (test page) + en target
+      _pbpHlOrderLookup(bar, rangeOf("Schadenfreude"));
+      assertEq(note.nextElementSibling, dict, "dictionary leads the action pair right after the note button");
+      assertEq(dict.nextElementSibling, ex, "explain follows the dictionary");
+      assertEq(bar.querySelector(".pb-hl-dict-btn"), dict, "same node moved, not rebuilt");
+      mo.observe(bar, { childList: true, subtree: true, attributes: true });
+      _pbpHlOrderLookup(bar, rangeOf("Schadenfreude"));
+      assertEq(mo.takeRecords().length, 0, "an unchanged verdict must not touch the bar");
+      _pbpHlOrderLookup(bar, rangeOf("Die Schadenfreude"));
+      assertEq(note.nextElementSibling, ex, "two words: explain leads again");
+      assertEq(ex.nextElementSibling, dict, "dictionary back after explain");
+      assertEq(mo.takeRecords().filter((m) => m.type === "childList").length, 2, "one move = one remove + one insert");
+      dict.hidden = true;
+      _pbpHlOrderLookup(bar, rangeOf("Schadenfreude"));
+      assertEq(note.nextElementSibling, ex, "a hidden dictionary never takes the lead");
+    } finally {
+      mo.disconnect();
+      _pbpHlOrderLookup(bar, null);
+      [ex.hidden, dict.hidden] = savedHidden;
+      _pbpExplainSettings = savedSettings;
+      host.remove();
+    }
   });
 });
 </script>

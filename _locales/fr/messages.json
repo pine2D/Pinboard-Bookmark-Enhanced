@@ -3029,6 +3029,14 @@
   "explainActionDict": {
     "message": "Dictionnaire"
   },
+  "explainEstCost": {
+    "message": "Environ $TOKENS$ tokens",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      }
+    }
+  },
   "dictLookupSelection": {
     "message": "Chercher dans le dictionnaire"
   },

@@ -1519,6 +1519,10 @@ let _pbpHlBarRange = null;
 // dismiss the bar before their write even starts. _pbpHlFlashFail needs them to
 // put the bar back when that write fails.
 let _pbpHlBarLastShown = null;
+// Settings snapshot taken at bar creation, for the dictionary-first ordering
+// (translation target). md-ask.js keeps _pbpExplainSettings live across
+// option changes and wins when present; this copy is the fallback.
+let _pbpHlBarSettings = null;
 
 function _pbpHlEnsureBar() {
   if (_pbpHlBarEl) return _pbpHlBarEl;
@@ -1620,15 +1624,99 @@ function _pbpHlEnsureBar() {
   // change mid-session needs a reopen to update them (same known corner as
   // the card row). dictBtn additionally requires pbpDictRun to exist.
   pbpAiGetSettings().then((s) => {
+    _pbpHlBarSettings = s;
     if ((s.selectionTrigger || "icon") === "icon") {
       explainBtn.hidden = false;
       dictBtn.hidden = typeof window.pbpDictRun !== "function";
+      // The first selection of a page opens the bar before this read lands,
+      // with both buttons still hidden -- order them now that they appear,
+      // so that first word gets the same dictionary-first verdict.
+      if (bar.matches(":popover-open")) _pbpHlOrderLookup(bar, _pbpHlBarRange);
     }
   }).catch(() => {});
   bar.addEventListener("toggle", (e) => { if (e.newState === "closed") _pbpHlBarRange = null; });
   document.body.appendChild(bar);
   _pbpHlBarEl = bar;
   return bar;
+}
+
+// ---- Dictionary-first ordering (critique 2026-10-20 #2) ----
+// One foreign word selected: the free dictionary is the likely want, so it
+// leads the action pair and the paid robot moves after it. Everything else
+// keeps explain first. Pure (no DOM): text + the language the selection sits
+// in + the reader's own languages (UI and translation target) -> boolean.
+// Built only from the dictionary's own routing pieces, so the bar and the
+// dictionary agree on what a "word" and its language are:
+//   * word = the dictionary's lookup candidate (pbpDictNormalizeTerm, then the
+//     edge-punctuation clean pbpDictCleanCandidate applies to a drag that
+//     took the full stop along) that pbpExplainIsTerm counts as one term AND
+//     that contains no whitespace -- a spaceless run is one word, CJK capped
+//     at 8 characters by that same term rule;
+//   * its language = the selection-script rung (pbpDictScriptLang, CJK
+//     corrected by the article's ja) for non-Latin scripts, else the
+//     surrounding element's declared language when the word can be written
+//     in it (pbpDictAcceptLang -- a Latin word inside a zh article is not zh).
+// Still unknown (a Latin word, no Latin article language on record): foreign
+// only when none of the reader's languages is written in the word's script,
+// so an undeclared German page read by an en user keeps the default order.
+// Any missing helper (stripped-down test page) -> false, the default order.
+function pbpHlDictFirst(text, contextLang, readerLangs) {
+  if (typeof pbpDictNormalizeTerm !== "function" || typeof pbpDictCleanCandidate !== "function"
+      || typeof pbpExplainIsTerm !== "function" || typeof pbpDictScriptLang !== "function"
+      || typeof pbpDictAcceptLang !== "function" || typeof pbpDictScriptCompatible !== "function"
+      || typeof pbpDictPrimaryLang !== "function") return false;
+  const term = pbpDictNormalizeTerm(text);
+  // The clean step is language-independent; "en" only satisfies its gate.
+  const word = pbpDictCleanCandidate(term, "en") || term;
+  if (!word || /\s/.test(word) || !pbpExplainIsTerm(word)) return false;
+  const readers = (Array.isArray(readerLangs) ? readerLangs : [])
+    .map((l) => pbpDictPrimaryLang(l)).filter(Boolean);
+  if (!readers.length) return false;
+  const ctx = String(contextLang || "").replace(/^und$/i, "");
+  const byScript = pbpDictScriptLang(word, "");
+  const lang = byScript
+    ? (typeof pbpDictCorrectCjkLang === "function" ? pbpDictCorrectCjkLang(byScript, ctx) : byScript)
+    : pbpDictAcceptLang(ctx, word);
+  if (lang) return !readers.includes(lang);
+  // Unknown language: only a word made of letters can be foreign at all
+  // (digits, symbols) -- pbpDictLatinFallback is the dictionary's own
+  // "is this a Latin-letter word" test.
+  if (typeof pbpDictLatinFallback !== "function" || !pbpDictLatinFallback(word, "", "")) return false;
+  return readers.every((r) => !pbpDictScriptCompatible(r, word));
+}
+
+// The language the selection sits in: the nearest declared lang below <html>
+// (#rendered-view's detected article language, or a .pb-tr's target
+// language), never <html> itself -- that one is the UI locale.
+function _pbpHlRangeLang(range) {
+  let node = range && range.startContainer;
+  if (node && node.nodeType !== 1) node = node.parentElement;
+  const el = node && node.closest ? node.closest("[lang]") : null;
+  return el && el !== document.documentElement ? el.getAttribute("lang") || "" : "";
+}
+
+// Minimal reorder: at most one insertBefore, only when the pair is not already
+// in the wanted order, so repeated selections never rebuild or re-flash the
+// bar. DOM order (not CSS order) so Tab walks the buttons as they read; the
+// group divider follows whichever button leads (md-preview.css).
+function _pbpHlOrderLookup(bar, range) {
+  const explainBtn = bar.querySelector(".pb-hl-explain-btn");
+  const dictBtn = bar.querySelector(".pb-hl-dict-btn");
+  if (!explainBtn || !dictBtn) return;
+  let dictFirst = false;
+  if (!dictBtn.hidden && !explainBtn.hidden) {
+    try {
+      const s = (typeof _pbpExplainSettings !== "undefined" && _pbpExplainSettings) || _pbpHlBarSettings || {};
+      const ui = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : "en";
+      const target = typeof pbpTrResolveTargetLang === "function" ? pbpTrResolveTargetLang(s, ui).code : ui;
+      dictFirst = pbpHlDictFirst(range ? range.toString() : "", _pbpHlRangeLang(range), [ui, target]);
+    } catch (e) {
+      console.warn("[hl] lookup order:", e && e.name, e && e.message);
+    }
+  }
+  const first = dictFirst ? dictBtn : explainBtn;
+  const second = dictFirst ? explainBtn : dictBtn;
+  if (second.previousElementSibling !== first) bar.insertBefore(first, second);
 }
 
 function _pbpHlShowBar(range, timeline) {
@@ -1638,6 +1726,7 @@ function _pbpHlShowBar(range, timeline) {
   _pbpHlBarLastShown = { range, timeline: !!timeline };
   if (typeof window.pbpExplainDismissIfUnpinned === "function") window.pbpExplainDismissIfUnpinned();
   try { bar.hidePopover(); } catch (_) {} // re-invoke while open: reset first (mirrors _pbpExplainOpenPop)
+  _pbpHlOrderLookup(bar, range);
   bar.showPopover();
   const rect = range.getBoundingClientRect();
   const pos = pbpTrPeekPopPos(rect, bar.offsetHeight, window.innerHeight);

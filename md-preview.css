@@ -2205,18 +2205,40 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-msg { color: var(--fg-muted); padding: var(--sp-1) 0; }
 
 .xp-model {
-  /* basis 0, not auto: flex-wrap breaks lines on HYPOTHETICAL sizes before
-     any shrinking, so an auto-basis model forced the whole foot onto two
-     rows instead of ellipsizing. With basis 0 the label never causes a
-     wrap; buttons alone still wrap as the genuine last resort. */
+  /* The AI end of the footer: price + model label + "ask more" (md-ask.js).
+     basis 0, not auto: flex-wrap breaks lines on HYPOTHETICAL sizes before
+     any shrinking, so an auto-basis label forced the whole foot onto two
+     rows instead of ellipsizing. With basis 0 the hypothetical size is the
+     automatic minimum -- price + "ask more" (the model name contributes
+     nothing, see .xp-model-name) -- so the row wraps only when those no
+     longer fit beside the word's buttons, and then all three move down
+     together, where the name grows to show itself whole. */
   flex: 1 1 0;
-  min-width: 0;
-  /* Sits between the word cluster and "ask more": the label names who answers
-     the follow-up, so it hugs that button (critique 2026-10-19). */
-  text-align: end;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.xp-model-text {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-end; /* hugs "ask more": it names what an AI press costs and who answers (critique 2026-10-19) */
+  align-items: baseline;
+  gap: var(--sp-1);
   font-size: 0.75em;
   color: var(--fg-muted);
   white-space: nowrap;
+}
+/* Pre-request price of the paid tabs (critique 2026-10-20 #2, md-ask.js
+   _pbpExplainRenderMeta): "≈ N tokens" leads and never shrinks -- it is the
+   one part that must survive a crowded row. */
+.xp-cost { flex: none; }
+/* "· provider · model": width 0 keeps it out of the footer's min-content (see
+   .xp-model), growth fills the room left up to its own text width, and the
+   ellipsis takes the rest. */
+.xp-model-name {
+  flex: 1 1 auto;
+  width: 0;
+  max-width: max-content;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -2684,8 +2706,10 @@ html.motion-ready #pb-hl-bar:popover-open {
   content: ""; position: absolute; inset: -1px;
 }
 /* Only the first of the pair carries the group divider -- they act as one
-   action group off the color dots/note button. */
-.pb-hl-explain-btn { margin-left: var(--sp-0); border-left: 1px solid var(--border); }
+   action group off the color dots/note button. "First" is whichever leads in
+   the DOM: md-highlight.js moves the dictionary ahead of explain for a lone
+   foreign word (_pbpHlOrderLookup), and the divider follows it. */
+.pb-hl-note-btn + :is(.pb-hl-explain-btn, .pb-hl-dict-btn) { margin-left: var(--sp-0); border-left: 1px solid var(--border); }
 .pb-hl-explain-btn:hover,
 .pb-hl-dict-btn:hover,
 .pb-hl-seek-btn:hover { color: var(--fg); background: var(--btn-hover); }

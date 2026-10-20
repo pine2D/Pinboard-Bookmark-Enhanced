@@ -2366,6 +2366,80 @@ function _pbpExplainModelLabel(s) {
   return (m && m !== "default") ? p + " · " + m : p;
 }
 
+// The exact system/prompt pair a paid action sends. Shared by _pbpExplainRun
+// and the footer's pre-request estimate, so the number the reader sees before
+// pressing a paid tab is computed from the very request that tab would send.
+// translate is a lightweight single-shot prompt (no term/passage routing, no
+// neighbor blocks); explain keeps the routed prompt (spec 2.1).
+function _pbpExplainBuildRequest(action, cap, ctx, s) {
+  if (action === "translate") {
+    const targetLangName = (typeof pbpTrResolveTargetLang === "function")
+      ? pbpTrResolveTargetLang(s, uiLangToBCP47()).name
+      : "English";
+    return pbpExplainBuildTranslatePrompt({
+      selection: cap.text,
+      blockText: ctx.blockText,
+      title: _pbpExplainPage.title || document.title,
+      targetLangName
+    });
+  }
+  return pbpExplainBuildPrompt({
+    selection: cap.text,
+    sentence: ctx.sentence,
+    blockText: ctx.blockText,
+    prevText: ctx.prevText,
+    nextText: ctx.nextText,
+    title: _pbpExplainPage.title || document.title,
+    answerLang: pbpExplainLangName(uiLangToBCP47()),
+    isTerm: pbpExplainIsTerm(cap.text)
+  });
+}
+
+// Estimated input tokens for the paid action the footer speaks for: the
+// running action itself, or -- in the free dictionary view -- the larger of
+// the two paid tabs, i.e. the most a single press there would send. Same
+// script-aware estimator and input-only scope as Ask's "will send N tokens"
+// line (_pbpAskUpdateMeta). Cost transparency only, never an admission test.
+function pbpExplainEstimateTokens(action, cap, ctx, s) {
+  const est = (a) => {
+    const r = _pbpExplainBuildRequest(a, cap, ctx, s);
+    return pbpAiEstimateTokensText(r.system + r.prompt);
+  };
+  return action === "dict" ? Math.max(est("explain"), est("translate")) : est(action);
+}
+
+// Footer meta (critique 2026-10-20 #2): the explain / translate tabs fire a
+// paid request the moment they are pressed, so the price has to be on screen
+// BEFORE that press, not in a hover title. "≈ N tokens" leads and never
+// shrinks; "· provider · model" follows and is the part that ellipsizes when
+// the word's own buttons crowd the row. Rewritten on every open and every tab
+// switch. No AI configured -> no price (both paid tabs only render the
+// not-configured message), the model label stays as before.
+function _pbpExplainRenderMeta(pop) {
+  const s = _pbpExplainSettings || {};
+  const costEl = pop.querySelector(".xp-cost");
+  const nameEl = pop.querySelector(".xp-model-name");
+  const modelEl = pop.querySelector(".xp-model-text");
+  if (!modelEl || !nameEl) return;
+  const label = _pbpExplainModelLabel(s);
+  let cost = "";
+  if (costEl && _pbpExplainAiOk && _pbpExplainCap && _pbpExplainCtx) {
+    try {
+      cost = t("explainEstCost", String(pbpExplainEstimateTokens(_pbpExplainAction, _pbpExplainCap, _pbpExplainCtx, s)));
+    } catch (e) {
+      console.warn("[explain] cost estimate failed:", e && e.name, e && e.message);
+    }
+  }
+  if (costEl) {
+    costEl.textContent = cost;
+    costEl.hidden = !cost;
+  }
+  nameEl.textContent = cost ? "· " + label : label;
+  // The visible line already carries the price and as much of the model as
+  // fits; the native title only completes a truncated model name.
+  modelEl.title = cost ? cost + " · " + label : label;
+}
+
 // Bridge into the ask panel: close the popover, open the panel, prefill the
 // question box with the quoted selection, focus it. Prefers the ask
 // section's opener when exposed; otherwise drives the contract-fixed shell
@@ -2451,6 +2525,7 @@ function _pbpExplainEnsurePop() {
       _pbpExplainAction = action;
       if (action !== "dict" && typeof window.pbpDictOnActionSwitch === "function") window.pbpDictOnActionSwitch();
       _pbpExplainSyncActButtons(pop);
+      _pbpExplainRenderMeta(pop);
       // Re-run with the SAME cap/ctx: existing abort-previous-stream in
       // _pbpExplainRun handles the concurrency, no extra dedup needed.
       if (_pbpExplainCap && _pbpExplainCtx) _pbpExplainRun(_pbpExplainCap, _pbpExplainCtx, pop);
@@ -2535,8 +2610,22 @@ function _pbpExplainEnsurePop() {
   body.className = "xp-body";
   const foot = document.createElement("div");
   foot.className = "xp-foot";
+  // The AI end of the footer: pre-request price + "provider · model"
+  // (_pbpExplainRenderMeta) + "ask more", one flex item so a crowded row moves
+  // all three to a second row together instead of orphaning the button. The
+  // price is its own span so it never shares the name's ellipsis.
   const model = document.createElement("span");
   model.className = "xp-model";
+  const modelText = document.createElement("span");
+  modelText.className = "xp-model-text";
+  const cost = document.createElement("span");
+  cost.className = "xp-cost";
+  cost.hidden = true;
+  const modelName = document.createElement("span");
+  modelName.className = "xp-model-name";
+  modelText.appendChild(cost);
+  modelText.appendChild(modelName);
+  model.appendChild(modelText);
   // H4 2.2: "Save as note" -- hidden while streaming/on error, shown once an
   // answer finishes; typeof-guarded (window.pbpHlAttachNote may not exist if
   // md-highlight.js failed to load/init). Disabled immediately on click to
@@ -2631,15 +2720,16 @@ function _pbpExplainEnsurePop() {
   });
   // Footer = two clusters (critique 2026-10-19): the word's own actions on
   // the left (note / vocab / known / open vocab), the AI follow-up on the
-  // right beside the model label that names who answers it. The selection-
-  // trigger gear left the card: it is a reader setting, and the rail's
-  // settings button opens Options > Reader where it lives.
+  // right beside the price and model label that name what an AI press costs
+  // and who answers it. The selection-trigger gear left the card: it is a
+  // reader setting, and the rail's settings button opens Options > Reader
+  // where it lives.
   foot.appendChild(save);
   foot.appendChild(vocab);
   foot.appendChild(knownBtn);
   foot.appendChild(openVocab);
+  model.appendChild(ask);
   foot.appendChild(model);
-  foot.appendChild(ask);
   pop.appendChild(head);
   pop.appendChild(body);
   pop.appendChild(foot);
@@ -2959,33 +3049,11 @@ async function _pbpExplainRun(cap, ctx, pop) {
     body.removeAttribute("aria-busy");
     return;
   }
-  // Action switch (spec 2.1): translate is a lightweight single-shot prompt
-  // (no term/passage routing, no neighbor blocks); explain keeps the existing
-  // routed prompt. maxTokens 2048 for translate vs 1024 for explain.
+  // Action switch (spec 2.1): the prompt pair comes from the same builder the
+  // footer estimate reads (_pbpExplainBuildRequest). maxTokens 2048 for
+  // translate vs 1024 for explain.
   const isTranslate = _pbpExplainAction === "translate";
-  let system, prompt;
-  if (isTranslate) {
-    const targetLangName = (typeof pbpTrResolveTargetLang === "function")
-      ? pbpTrResolveTargetLang(s, uiLangToBCP47()).name
-      : "English";
-    ({ system, prompt } = pbpExplainBuildTranslatePrompt({
-      selection: cap.text,
-      blockText: ctx.blockText,
-      title: _pbpExplainPage.title || document.title,
-      targetLangName
-    }));
-  } else {
-    ({ system, prompt } = pbpExplainBuildPrompt({
-      selection: cap.text,
-      sentence: ctx.sentence,
-      blockText: ctx.blockText,
-      prevText: ctx.prevText,
-      nextText: ctx.nextText,
-      title: _pbpExplainPage.title || document.title,
-      answerLang: pbpExplainLangName(uiLangToBCP47()),
-      isTerm: pbpExplainIsTerm(cap.text)
-    }));
-  }
+  const { system, prompt } = _pbpExplainBuildRequest(_pbpExplainAction, cap, ctx, s);
   pbpAiBumpCounter("explain"); // local usage counter, storage.local only (both actions share the bucket)
   const stream = document.createElement("div");
   stream.className = "xp-stream";
@@ -3063,11 +3131,6 @@ function _pbpExplainOpenPop(cap, initialAction) {
   const wasOpen = pop.matches(":popover-open");
   if (!wasOpen) _pbpExplainFocusSource = document.activeElement;
   pop.querySelector(".xp-term").textContent = cap.text; // ellipsized via CSS
-  const modelEl = pop.querySelector(".xp-model");
-  modelEl.textContent = _pbpExplainModelLabel(_pbpExplainSettings || {});
-  // The footer's button row can squeeze the flexed label to nothing; the
-  // native title keeps the full "provider · model" reachable on hover.
-  modelEl.title = modelEl.textContent;
   // Two explicit entry points (bar help-circle -> explain, bar book-open ->
   // dict) plus the card's explicit actions replaced the old term-based smart
   // default: the action is now always caller-declared. Unknown values fall
@@ -3078,6 +3141,8 @@ function _pbpExplainOpenPop(cap, initialAction) {
   const ctx = _pbpExplainPackContext(cap);
   _pbpExplainCap = cap;
   _pbpExplainCtx = ctx;
+  // Price + model in the footer before anything is sent or any tab pressed.
+  _pbpExplainRenderMeta(pop);
   const rect = cap.rect || cap.range.getBoundingClientRect(); // frozen snapshot
   // A manual popover no longer closes auto popovers implicitly. Preserve the
   // old mutual exclusion when Explain itself is invoked (not when another

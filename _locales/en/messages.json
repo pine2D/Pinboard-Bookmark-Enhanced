@@ -3039,6 +3039,14 @@
   "explainActionDict": {
     "message": "Dictionary"
   },
+  "explainEstCost": {
+    "message": "≈ $TOKENS$ tokens",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      }
+    }
+  },
   "dictLookupSelection": {
     "message": "Look up in dictionary"
   },

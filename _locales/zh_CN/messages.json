@@ -3029,6 +3029,14 @@
   "explainActionDict": {
     "message": "词典"
   },
+  "explainEstCost": {
+    "message": "约 $TOKENS$ tokens",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      }
+    }
+  },
   "dictLookupSelection": {
     "message": "查词典"
   },

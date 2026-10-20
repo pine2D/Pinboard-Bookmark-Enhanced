@@ -3029,6 +3029,14 @@
   "explainActionDict": {
     "message": "Словарь"
   },
+  "explainEstCost": {
+    "message": "≈ $TOKENS$ токенов",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      }
+    }
+  },
   "dictLookupSelection": {
     "message": "Найти в словаре"
   },

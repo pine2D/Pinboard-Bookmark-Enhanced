@@ -3029,6 +3029,14 @@
   "explainActionDict": {
     "message": "Wörterbuch"
   },
+  "explainEstCost": {
+    "message": "≈ $TOKENS$ Tokens",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      }
+    }
+  },
   "dictLookupSelection": {
     "message": "Im Wörterbuch nachschlagen"
   },

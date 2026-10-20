@@ -46,8 +46,7 @@ async function makeFrame(width) {
         <button class="xp-save"><svg viewBox="0 0 24 24"></svg></button>
         <button class="xp-vocab"><svg viewBox="0 0 24 24"></svg></button>
         <button class="xp-open-vocab"><svg viewBox="0 0 24 24"></svg></button>
-        <span class="xp-model">model</span>
-        <button class="xp-ask"><svg viewBox="0 0 24 24"></svg></button>
+        <span class="xp-model"><span class="xp-model-text"><span class="xp-cost">cost</span><span class="xp-model-name">model</span></span><button class="xp-ask"><svg viewBox="0 0 24 24"></svg></button></span>
       </div>
     </div></body></html>`;
   document.body.appendChild(frame);
@@ -69,9 +68,10 @@ function applyLocale(frame, messages, locale) {
   }
 }
 
-// Footer = word cluster on the left, model label + "ask more" on the right
-// (critique 2026-10-19). A long model id must ellipsize, never wrap the row or
-// push "ask more" off the card's right edge.
+// Footer = word cluster on the left, price + model label + "ask more" on the
+// right (critiques 2026-10-19 / 2026-10-20 #2). A long model id must
+// ellipsize, never wrap the row or push "ask more" off the card's right edge,
+// and the price must stay whole whatever the model name does.
 function assertFooterClusters(frame, locale) {
   const doc = frame.contentDocument;
   const foot = doc.querySelector(".xp-foot");
@@ -79,7 +79,16 @@ function assertFooterClusters(frame, locale) {
   const ask = doc.querySelector(".xp-ask").getBoundingClientRect();
   const save = doc.querySelector(".xp-save").getBoundingClientRect();
   const openVocab = doc.querySelector(".xp-open-vocab").getBoundingClientRect();
-  const model = doc.querySelector(".xp-model").getBoundingClientRect();
+  const model = doc.querySelector(".xp-model-text").getBoundingClientRect();
+  const costEl = doc.querySelector(".xp-cost");
+  if (!costEl.hidden) {
+    const cost = costEl.getBoundingClientRect();
+    assert(cost.width > 0 && costEl.scrollWidth <= costEl.clientWidth + 0.5,
+      `${locale}: price clipped (${costEl.scrollWidth} > ${costEl.clientWidth})`);
+    const name = doc.querySelector(".xp-model-name").getBoundingClientRect();
+    assert(cost.left >= openVocab.right && cost.right <= name.left + 0.5,
+      `${locale}: price is not between the word cluster and the model name`);
+  }
   assert(ask.top === save.top, `${locale}: footer wrapped (ask ${ask.top} vs save ${save.top})`);
   assert(fr.right - ask.right <= 16, `${locale}: "ask more" is not at the right edge (${fr.right - ask.right}px gap)`);
   assert(save.left - fr.left <= 16, `${locale}: word cluster is not at the left edge`);
@@ -172,6 +181,45 @@ function assertLayout(frame, locale) {
     } finally { frame.remove(); }
   });
 
+  // The dictionary view of a saved word is the crowded case: the vocab button
+  // carries its longest label beside the known / open-vocab icons. Whatever
+  // the row does there, the price stays whole, the label and "ask more" stay
+  // together on one row, and "ask more" keeps the right edge -- never an
+  // orphaned button on a second row with the price left behind on the first.
+  await test("a crowded dictionary footer moves price, model and ask more as one unit", async () => {
+    for (const width of [320, 420]) {
+      const frame = await makeFrame(width);
+      try {
+        const doc = frame.contentDocument;
+        const known = doc.createElement("button");
+        known.className = "xp-known";
+        known.innerHTML = '<svg viewBox="0 0 24 24"></svg>';
+        doc.querySelector(".xp-vocab").after(known);
+        doc.querySelector(".xp-save").hidden = true;
+        for (const locale of LOCALES) {
+          applyLocale(frame, messages, locale);
+          const vocab = doc.querySelector(".xp-vocab");
+          vocab.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14"></svg><span></span>';
+          vocab.querySelector("span").textContent = messages[locale].dictUpdateVocab.message;
+          doc.querySelector(".xp-cost").textContent = messages[locale].explainEstCost.message.replace("$TOKENS$", "12345");
+          doc.querySelector(".xp-model-name").textContent = "· Custom OpenAI-compatible · a-long-model-id";
+          await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
+          const tag = `${locale}@${width}`;
+          const foot = doc.querySelector(".xp-foot").getBoundingClientRect();
+          const costEl = doc.querySelector(".xp-cost");
+          const model = doc.querySelector(".xp-model-text").getBoundingClientRect();
+          const ask = doc.querySelector(".xp-ask").getBoundingClientRect();
+          assert(costEl.scrollWidth <= costEl.clientWidth + 0.5 && costEl.getBoundingClientRect().right <= foot.right,
+            `${tag}: price clipped`);
+          assert(Math.abs((model.top + model.height / 2) - (ask.top + ask.height / 2)) <= 4,
+            `${tag}: label and "ask more" split across rows`);
+          assert(foot.right - ask.right <= 16, `${tag}: "ask more" left the right edge`);
+          assert(doc.querySelector(".xp-foot").scrollWidth <= doc.querySelector(".xp-foot").clientWidth + 1, `${tag}: footer overflows`);
+        }
+      } finally { frame.remove(); }
+    }
+  });
+
   await test("the footer keeps its two clusters on one row in every locale, at 320px and 420px", async () => {
     for (const width of [320, 420]) {
       const frame = await makeFrame(width);
@@ -179,10 +227,19 @@ function assertLayout(frame, locale) {
         for (const locale of LOCALES) {
           applyLocale(frame, messages, locale);
           for (const longModel of [false, true]) {
-            frame.contentDocument.querySelector(".xp-model").textContent =
-              longModel ? "a-very-long-model-identifier".repeat(2) : "model";
-            await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
-            assertFooterClusters(frame, `${locale}@${width}${longModel ? " long model" : ""}`);
+            for (const priced of [true, false]) {
+              // Production markup: the price leads ("≈ N tokens", a 5-digit N
+              // as the widest realistic case) and the model label carries the
+              // "· " joint; with no AI the price is hidden and the label stands
+              // alone (md-ask.js _pbpExplainRenderMeta).
+              const costEl = frame.contentDocument.querySelector(".xp-cost");
+              costEl.textContent = messages[locale].explainEstCost.message.replace("$TOKENS$", "12345");
+              costEl.hidden = !priced;
+              const label = longModel ? "a-very-long-model-identifier".repeat(2) : "model";
+              frame.contentDocument.querySelector(".xp-model-name").textContent = priced ? "· " + label : label;
+              await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
+              assertFooterClusters(frame, `${locale}@${width}${longModel ? " long model" : ""}${priced ? "" : " no AI"}`);
+            }
           }
         }
       } finally { frame.remove(); }
