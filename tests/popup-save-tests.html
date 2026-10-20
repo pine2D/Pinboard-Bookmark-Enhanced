@@ -2388,6 +2388,32 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!/AI_PROVIDER_LABEL\[/.test(card), "the error card bypasses the display-name helper");
     });
 
+    // Ollama has no key, so hasAIKey() is true for it unconditionally; the
+    // fallback must not offer it to a user who never set it up.
+    await testAsync("the error card offers Ollama as a fallback only once it is granted or configured", async () => {
+      const aiSource = await (await fetch("../ai.js")).text();
+      const realHasKey = new Function("OPENAI_COMPAT_PROVIDERS",
+        aiSource.slice(aiSource.indexOf("function hasAIKey(s)"), aiSource.indexOf("// ---- Host-permission gate")) + "\nreturn hasAIKey;")({});
+      assert(realHasKey({ aiProvider: "ollama" }) === true, "precondition changed: hasAIKey no longer waves Ollama through");
+      const src = popupAiSource.slice(popupAiSource.indexOf("const AI_PROVIDER_ORDER = ["),
+        popupAiSource.indexOf("function showAIError(op, err, opSettings)"));
+      const hasAIKey = (s) => s.aiProvider === "ollama" || (s.aiProvider === "custom" ? !!s.customApiKey : !!s[s.aiProvider + "ApiKey"]);
+      const build = (granted) => new Function("hasAIKey", "SETTINGS_DEFAULTS", "_aiTargetOriginPattern", "chrome", "t",
+        src + "\nreturn { pickFallbackProvider, probe: _aiProbeOllamaGrant };")(
+        hasAIKey, SETTINGS_DEFAULTS, () => "http://localhost/*",
+        { permissions: { contains: async () => granted } }, (k) => k);
+      const defaults = { ...SETTINGS_DEFAULTS, aiProvider: "openai", openaiApiKey: "k" };
+      const fresh = build(false);
+      await fresh.probe(defaults);
+      assert(fresh.pickFallbackProvider(defaults) === null, "a single-provider user was offered " + fresh.pickFallbackProvider(defaults));
+      assert(fresh.pickFallbackProvider({ ...defaults, customApiKey: "c" }) === "custom", "Ollama still shadows a configured custom endpoint");
+      assert(fresh.pickFallbackProvider({ ...defaults, ollamaModel: "qwen3:8b" }) === "ollama", "a changed Ollama model does not count as set up");
+      const granted = build(true);
+      await granted.probe(defaults);
+      assert(granted.pickFallbackProvider(defaults) === "ollama", "a granted Ollama origin does not count as set up");
+      assert(granted.pickFallbackProvider({ ...defaults, aiProvider: "ollama" }) === "openai", "a failed Ollama did not fall back to the keyed provider");
+    });
+
     await testAsync("a bus answer with no envelope renders the localized unknown error", async () => {
       const h = makePopupAi({ realErrorCard: true, respond: async () => undefined });
       await h.doAISummary(false);

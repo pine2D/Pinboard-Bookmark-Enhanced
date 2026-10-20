@@ -456,13 +456,33 @@ function pbpAiProviderLabel(key) {
   return AI_PROVIDER_LABEL[key] || key;
 }
 
-// Find first provider OTHER than `current` that has a usable key, by iterating
-// AI_PROVIDER_ORDER. Returns null if no fallback is available.
+// Ollama needs no key, so hasAIKey() is always true for it and every
+// single-provider user used to be offered "Try with Ollama" on failure.
+// It only counts as set up once its origin is granted (the options Test
+// button asks for it) or the user changed its URL/model from the defaults.
+// Probed once at setup, read-only; the card renders synchronously.
+let _aiOllamaGranted = false;
+function _aiOllamaConfigured(s) {
+  if (_aiOllamaGranted) return true;
+  const d = typeof SETTINGS_DEFAULTS === "object" && SETTINGS_DEFAULTS ? SETTINGS_DEFAULTS : {};
+  return (s.ollamaBaseUrl !== undefined && s.ollamaBaseUrl !== d.ollamaBaseUrl)
+    || (s.ollamaModel !== undefined && s.ollamaModel !== d.ollamaModel);
+}
+async function _aiProbeOllamaGrant(s) {
+  try {
+    const pattern = _aiTargetOriginPattern({ ...s, aiProvider: "ollama" });
+    _aiOllamaGranted = !!pattern
+      && (await chrome.permissions.contains({ origins: [pattern] })) === true;
+  } catch (_) { _aiOllamaGranted = false; }
+}
+
+// Find first provider OTHER than `current` that the user actually set up, by
+// iterating AI_PROVIDER_ORDER. Returns null if no fallback is available.
 function pickFallbackProvider(s) {
   const current = s.aiProvider || "gemini";
   for (const p of AI_PROVIDER_ORDER) {
     if (p === current) continue;
-    if (hasAIKey({ ...s, aiProvider: p })) return p;
+    if (p === "ollama" ? _aiOllamaConfigured(s) : hasAIKey({ ...s, aiProvider: p })) return p;
   }
   return null;
 }
@@ -572,6 +592,7 @@ function hideAIError({ animate = false } = {}) {
 }
 
 function setupAIFeatures() {
+  _aiProbeOllamaGrant(settings);
   // Wire error card controls once
   $id("ai-error-dismiss")?.addEventListener("click", (e) => { e.preventDefault(); hideAIError({ animate: true }); });
   $id("ai-error-retry")?.addEventListener("click", async (event) => {
