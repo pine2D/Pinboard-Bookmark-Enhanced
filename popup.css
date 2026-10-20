@@ -693,12 +693,14 @@ html[data-section="login"] .quick-actions { display: none !important; }
    variant colour), so re-tinting it to the focus colour would erase the
    warn/ok/offline signal exactly when focus lands on it. §7.3 names .fc-btn
    as a borderless site by hand. */
-.fc-btn:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
+.fc-btn:focus-visible, .fc-btn-secondary:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 /* Secondary/dismiss controls sit ON the variant card (warn/ok/offline/info) bg, so they
    must inherit the card's foreground — which is AA against the card bg by construction.
    (Using --pp-fg-hint here, a main-bg grey, made "Details"/× unreadable on dark cards.)
    De-emphasis comes from smaller size + a subtle hover wash, not a different colour. */
-.fc-btn-secondary { border: 0; color: inherit; font-size: 11px; line-height: 16px; /* borderless: 2+16+2 = 20, the sm rung */ padding: var(--pp-sp-1) var(--pp-sp-3); }
+/* background/radius/cursor were missing, so "Details" rendered as the UA's
+   grey square (1.6:1 on the dark error card; critique 2026-10-20). */
+.fc-btn-secondary { background: transparent; border: 0; border-radius: var(--pp-radius-sm); color: inherit; cursor: pointer; font-family: inherit; font-size: 11px; line-height: 16px; /* borderless: 2+16+2 = 20, the sm rung */ padding: var(--pp-sp-1) var(--pp-sp-3); white-space: nowrap; }
 .fc-btn-secondary:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
 .fc-btn-secondary:active:not(:disabled) { transform: scale(0.97); }
 .fc-dismiss {
