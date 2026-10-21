@@ -136,8 +136,18 @@ function renderErrorState(message, retryFn, permissionRequired, alt, openUrl, pr
     // assertive, unlike renderEmptyState: this state carries a recoverable
     // failure and (usually) a retry the reader is expected to act on.
     wrap.setAttribute("role", "alert");
+    // A failure, not an empty result: the reason takes body ink behind the
+    // warning icon, the grammar of a translation failure card (.pb-tr-err),
+    // instead of renderEmptyState's lone muted line.
+    wrap.classList.add("es-error");
     const p = document.createElement("p");
-    p.textContent = message;
+    const ico = document.createElement("span");
+    ico.className = "es-ico";
+    ico.setAttribute("aria-hidden", "true");
+    ico.innerHTML = (typeof PBP_ICONS !== "undefined" && PBP_ICONS.warning) || ""; // static constant
+    const msg = document.createElement("span");
+    msg.textContent = message;
+    p.append(ico, msg);
     wrap.appendChild(p);
     // One control row (.row: flex, centred items, sp-2 gap): the <a> and the
     // <button>s share a line box only by baseline otherwise, and the link's

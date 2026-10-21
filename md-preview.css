@@ -1117,6 +1117,19 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   color: var(--fg-muted);
 }
 .empty-state p { font-size: 15px; line-height: 1.6; }
+/* renderErrorState: icon hung beside the reason, the pair centred as one
+   block and the reason left-aligned inside it, so a three-sentence hint
+   (the frame grant) wraps under itself rather than around the icon. */
+.empty-state.es-error > p {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  max-width: 36em;
+  color: var(--fg);
+  text-align: start;
+}
+.empty-state .es-ico { display: inline-flex; align-items: center; height: 1.6em; color: var(--danger); }
+.empty-state .es-ico svg { width: 16px; height: 16px; }
 /* The actions sit in one .row (flex, centred items, sp-2 gap), so the "Open
    original" <a> lines up with the buttons instead of riding its SVG's
    synthesized baseline 2px above them. */
