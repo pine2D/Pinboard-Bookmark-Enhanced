@@ -756,7 +756,7 @@
     "message": "Użycie AI i notatki o zgodności"
   },
   "storageReclaimable": {
-    "message": "Do zwolnienia: $AMOUNT$",
+    "message": "Zaznaczone zwolnią: $AMOUNT$",
     "placeholders": { "amount": { "content": "$1" } }
   },
   "storageClear": {
@@ -1794,9 +1794,6 @@
   "syncApiKeysDisableBtn": {
     "message": "Wyłącz"
   },
-  "syncApiKeysRequiresSync": {
-    "message": "Najpierw włącz Chrome Sync dla ustawień."
-  },
   "dependentsNeedParent": {
     "message": "Włącz tę opcję, aby skonfigurować ustawienia poniżej."
   },
@@ -2755,7 +2752,7 @@
     "message": "Jedna reguła na wiersz w postaci termin=tłumaczenie. Pozostaw prawą stronę pustą, aby zachować termin bez tłumaczenia. Używane przy tłumaczeniu całego tekstu; każde żądanie zawiera tylko te wpisy, których terminy występują w wysyłanym fragmencie."
   },
   "selectionTriggerLabel": {
-    "message": "Wyzwalacz wyjaśniania zaznaczenia"
+    "message": "Wyjaśnianie i sprawdzanie zaznaczenia"
   },
   "selectionTriggerIcon": {
     "message": "Przycisk obok zaznaczenia"

@@ -1691,7 +1691,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       syncStorageClearBtn();
       return;
     }
-    let total = 0;
     // Task 2 (2026-09-24-ui-system-stage3b): the row model's .pick.pick-box
     // (COMPONENTS.md §6.4 exception 3) replaces the bare <label><input><span>
     // checkbox row -- one .pref-group per render, one .pref-row per category,
@@ -1700,7 +1699,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     group.className = "pref-group";
     STORAGE_CATS.forEach((c) => {
       const m = measured[c.id] || { keys: [], bytes: 0 };
-      total += m.bytes;
       const row = document.createElement("div");
       row.className = "pref-row";
       const label = document.createElement("label");
@@ -1713,6 +1711,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // still matches the :checked collection query used by "clear selected".
       cb.checked = c.defaultOn && m.keys.length > 0;
       cb.disabled = m.keys.length === 0;
+      cb.dataset.bytes = String(m.bytes);
       const span = document.createElement("span");
       span.className = "pick-text";
       span.textContent = `${t(c.labelKey)} — ${pbpFormatBytes(m.bytes)} (${m.keys.length})`;
@@ -1729,15 +1728,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     host.appendChild(group);
     const totalP = document.createElement("p");
     totalP.className = "hint";
-    totalP.textContent = t("storageReclaimable", pbpFormatBytes(total));
+    totalP.id = "storage-selected-total";
     host.appendChild(totalP);
     syncStorageClearBtn();
   }
   // "Clear selected" with nothing selected (or nothing left to clear) used to
   // stay live and answer with a warning after the click; say it up front.
+  // The total beside it is what that button would free -- the checked rows
+  // only; it used to add up every category, unchecked ones included.
   function syncStorageClearBtn() {
+    const checked = [...document.querySelectorAll(".storage-cat-cb:checked")];
     const btn = $id("storage-clear-btn");
-    if (btn && !btn.dataset.busy) btn.disabled = !document.querySelector(".storage-cat-cb:checked");
+    if (btn && !btn.dataset.busy) btn.disabled = !checked.length;
+    const total = $id("storage-selected-total");
+    if (total) total.textContent = t("storageReclaimable", pbpFormatBytes(checked.reduce((n, cb) => n + (Number(cb.dataset.bytes) || 0), 0)));
   }
   $id("storage-cats")?.addEventListener("change", syncStorageClearBtn);
   const _storageClearBtn = $id("storage-clear-btn");

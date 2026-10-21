@@ -1116,13 +1116,19 @@ function pickRules(ns) {
       ["outline", "none"],
       ["box-shadow", `var(--${ns}-focus-ring)`],
     ]),
-    // Disabled: the unchecked mark dims its border; a disabled-AND-checked mark
-    // (no producer today -- options-backup.js and renderStoragePanel force
+    // Disabled: the unchecked mark goes flat -- the btn-bg fill with its ring
+    // collapsed into it, the same recessed well a disabled .switch track is
+    // (2026-10-21 options critique 5: the old fg-hint ring was darker than a
+    // live mark's --border ring, so an empty storage category read as the
+    // most clickable box in its group). A disabled-AND-checked mark (no
+    // producer today -- options-backup.js and renderStoragePanel force
     // checked=false when disabled) fills with the hint role and a bg tick
     // instead of drawing a hint tick on an accent fill.
-    rule(".pick > input:disabled ~ .pick-text, .pick > input:disabled:not(:checked) ~ .pick-mark", [
+    rule(".pick > input:disabled ~ .pick-text", [["color", `var(--${ns}-fg-hint)`]]),
+    rule(".pick > input:disabled:not(:checked) ~ .pick-mark", [
+      ["background", `var(--${ns}-btn-bg)`],
+      ["border-color", `var(--${ns}-btn-bg)`],
       ["color", `var(--${ns}-fg-hint)`],
-      ["border-color", `var(--${ns}-fg-hint)`],
     ]),
     rule(".pick > input:disabled:checked ~ .pick-mark", [
       ["background", `var(--${ns}-fg-hint)`],

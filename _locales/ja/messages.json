@@ -756,7 +756,7 @@
     "message": "AI使用量と互換性メモ"
   },
   "storageReclaimable": {
-    "message": "整理可能: $AMOUNT$",
+    "message": "選択分の解放量: $AMOUNT$",
     "placeholders": { "amount": { "content": "$1" } }
   },
   "storageClear": {
@@ -1794,9 +1794,6 @@
   "syncApiKeysDisableBtn": {
     "message": "無効にする"
   },
-  "syncApiKeysRequiresSync": {
-    "message": "先に上の Chrome Sync による設定の同期をオンにしてください。"
-  },
   "dependentsNeedParent": {
     "message": "オンにすると、下の項目を設定できます。"
   },
@@ -2755,7 +2752,7 @@
     "message": "1 行に 1 ルール、形式は 用語=訳語。右側を空欄にするとその用語は翻訳されません。全文翻訳で使用され、各リクエストには送信するテキストに出現する用語だけが添付されます。"
   },
   "selectionTriggerLabel": {
-    "message": "選択説明のトリガー"
+    "message": "選択テキストの解説と辞書検索"
   },
   "selectionTriggerIcon": {
     "message": "選択範囲の横にボタンを表示"

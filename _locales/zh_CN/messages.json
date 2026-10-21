@@ -756,7 +756,7 @@
     "message": "AI 用量计数与兼容性记录"
   },
   "storageReclaimable": {
-    "message": "可清理：$AMOUNT$",
+    "message": "已选可释放：$AMOUNT$",
     "placeholders": { "amount": { "content": "$1" } }
   },
   "storageClear": {
@@ -1794,9 +1794,6 @@
   "syncApiKeysDisableBtn": {
     "message": "关闭同步"
   },
-  "syncApiKeysRequiresSync": {
-    "message": "需要先开启上一项 Chrome Sync 设置同步。"
-  },
   "dependentsNeedParent": {
     "message": "打开后才能设置下面的选项。"
   },
@@ -2755,7 +2752,7 @@
     "message": "每行一条，格式为 术语=译法。等号右侧留空表示该术语保持原文。用于全文翻译；每次请求只附带本次文本中出现的术语。"
   },
   "selectionTriggerLabel": {
-    "message": "划词解释触发方式"
+    "message": "划词解释与查词"
   },
   "selectionTriggerIcon": {
     "message": "在选中文字旁显示按钮"

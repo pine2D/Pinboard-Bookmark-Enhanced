@@ -756,7 +756,7 @@
     "message": "KI-Nutzung & Kompatibilitätshinweise"
   },
   "storageReclaimable": {
-    "message": "Freigebbar: $AMOUNT$",
+    "message": "Auswahl gibt $AMOUNT$ frei",
     "placeholders": { "amount": { "content": "$1" } }
   },
   "storageClear": {
@@ -1794,9 +1794,6 @@
   "syncApiKeysDisableBtn": {
     "message": "Deaktivieren"
   },
-  "syncApiKeysRequiresSync": {
-    "message": "Aktiviere zuerst Chrome Sync für Einstellungen."
-  },
   "dependentsNeedParent": {
     "message": "Schalte diese Option ein, um die Einstellungen darunter zu ändern."
   },
@@ -2755,7 +2752,7 @@
     "message": "Eine Regel pro Zeile im Format Begriff=Übersetzung. Rechte Seite leer lassen, um den Begriff unübersetzt zu behalten. Wird für die Volltextübersetzung genutzt; jede Anfrage enthält nur die Einträge, deren Begriffe im gesendeten Text vorkommen."
   },
   "selectionTriggerLabel": {
-    "message": "Auslöser für Auswahlbeschreibung"
+    "message": "Auswahl erklären und nachschlagen"
   },
   "selectionTriggerIcon": {
     "message": "Schaltfläche neben der Auswahl"

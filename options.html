@@ -74,7 +74,7 @@
         <button class="tab-btn" id="tab-appearance" data-panel="appearance" role="tab" aria-describedby="tg-system" aria-selected="false" aria-controls="panel-appearance" data-i18n="tabAppearance">Appearance</button>
         <button class="tab-btn" id="tab-storage" data-panel="storage" role="tab" aria-describedby="tg-system" aria-selected="false" aria-controls="panel-storage" data-i18n="tabStorage">Data</button>
       </div>
-      <button class="reset-tab-btn" id="reset-panel-btn" title="Reset current tab settings to defaults" data-i18n="resetTabBtn" data-i18n-title="resetTabTitle">Reset This Tab</button>
+      <button class="reset-tab-btn" id="reset-panel-btn" title="Reset current tab settings to defaults" data-i18n="resetTabBtn" data-i18n-title="resetTabTitle">Reset this tab</button>
     </nav>
 
     <!-- Tab 1: General -->
@@ -89,7 +89,7 @@
           <p class="hint"><span data-i18n="hintApiToken">Get your token at</span> <a href="https://pinboard.in/settings/password" target="_blank" rel="noopener">pinboard.in/settings/password</a></p>
           <p class="hint" data-i18n="tokenLocalHint">Your token stays in this browser and is sent only to Pinboard. It reaches your other devices only if you sync API keys and tokens.</p>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-pinboard-token" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-pinboard-token" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-pinboard-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -123,7 +123,7 @@
           <div class="bl" id="popup-shortcut-label" data-i18n="labelOpenPopupShortcut">Open popup shortcut</div>
           <div class="fg-actions" role="group" aria-labelledby="popup-shortcut-label">
             <span class="shortcut-current" data-command="_execute_action"></span>
-            <a href="chrome://extensions/shortcuts" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+            <a href="chrome://extensions/shortcuts" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome shortcut settings</a>
           </div>
         </div>
         <div class="pref-group" role="group" aria-labelledby="sec-popup-behavior">
@@ -241,7 +241,7 @@
           <div class="fg-actions" role="group" aria-labelledby="sec-quick-save qs-shortcut-label">
             <span class="hint" id="qs-shortcut-label" data-i18n="labelShortcut">Shortcut:</span>
             <span class="shortcut-current" data-command="quick_save"></span>
-            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome shortcut settings</a>
           </div>
         </div>
         <div class="pref-group">
@@ -267,7 +267,7 @@
           <div class="fg-actions" role="group" aria-labelledby="sec-read-later rl-shortcut-label">
             <span class="hint" id="rl-shortcut-label" data-i18n="labelShortcut">Shortcut:</span>
             <span class="shortcut-current" data-command="read_later"></span>
-            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome shortcut settings</a>
           </div>
         </div>
         <div class="pref-group">
@@ -389,7 +389,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-gemini-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-gemini-key" placeholder="AIzaSy…" /><button type="button" class="key-toggle" data-target="opt-gemini-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-gemini-model" data-i18n="labelModel">Model</label><input type="text" id="opt-gemini-model" value="gemini-3.5-flash-lite" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-gemini" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-gemini" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-gemini-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -401,7 +401,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-openai-model" data-i18n="labelModel">Model</label><input type="text" id="opt-openai-model" value="gpt-5.4-nano" /></div>
           <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-openai-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintOpenAIBaseUrl">Change this to use a proxy or a compatible endpoint</p></details><input type="text" class="fg-url" id="opt-openai-baseurl" value="https://api.openai.com/v1" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-openai" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-openai" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-openai-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -412,7 +412,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-claude-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-claude-key" placeholder="sk-ant-…" /><button type="button" class="key-toggle" data-target="opt-claude-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-claude-model" data-i18n="labelModel">Model</label><input type="text" id="opt-claude-model" value="claude-haiku-4-5" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-claude" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-claude" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-claude-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -423,7 +423,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-deepseek-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-deepseek-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-deepseek-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-deepseek-model" data-i18n="labelModel">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-v4-flash" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-deepseek" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-deepseek" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-deepseek-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -434,7 +434,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-qwen-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-qwen-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-qwen-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-qwen-model" data-i18n="labelModel">Model</label><input type="text" id="opt-qwen-model" value="qwen-flash" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-qwen" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-qwen" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-qwen-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -445,7 +445,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-minimax-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-minimax-key" /><button type="button" class="key-toggle" data-target="opt-minimax-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-minimax-model" data-i18n="labelModel">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-M2" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-minimax" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-minimax" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-minimax-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -456,7 +456,7 @@
           <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-openrouter-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="openrouterTagline">Access 100+ models from one API.</p></details><span class="key-wrap"><input type="password" id="opt-openrouter-key" placeholder="sk-or-…" /><button type="button" class="key-toggle" data-target="opt-openrouter-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://openrouter.ai/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-openrouter-model" data-i18n="labelModel">Model</label><input type="text" id="opt-openrouter-model" value="openai/gpt-oss-20b" /><p class="hint"><span data-i18n="browseModelsAt">Browse models at</span> <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a></p></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-openrouter" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-openrouter" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-openrouter-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -467,7 +467,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-groq-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-groq-key" placeholder="gsk_…" /><button type="button" class="key-toggle" data-target="opt-groq-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.groq.com/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-groq-model" data-i18n="labelModel">Model</label><input type="text" id="opt-groq-model" value="openai/gpt-oss-20b" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-groq" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-groq" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-groq-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -478,7 +478,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-mistral-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-mistral-key" /><button type="button" class="key-toggle" data-target="opt-mistral-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.mistral.ai/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-mistral-model" data-i18n="labelModel">Model</label><input type="text" id="opt-mistral-model" value="mistral-small-latest" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-mistral" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-mistral" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-mistral-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -489,7 +489,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-cohere-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-cohere-key" /><button type="button" class="key-toggle" data-target="opt-cohere-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://dashboard.cohere.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-cohere-model" data-i18n="labelModel">Model</label><input type="text" id="opt-cohere-model" value="command-r7b-12-2024" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-cohere" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-cohere" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-cohere-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -500,7 +500,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-siliconflow-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-siliconflow-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-siliconflow-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://cloud.siliconflow.cn/account/ak" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-siliconflow-model" data-i18n="labelModel">Model</label><input type="text" id="opt-siliconflow-model" value="Qwen/Qwen3-8B" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-siliconflow" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-siliconflow" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-siliconflow-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -511,7 +511,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-zhipu-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-zhipu-key" /><button type="button" class="key-toggle" data-target="opt-zhipu-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-zhipu-model" data-i18n="labelModel">Model</label><input type="text" id="opt-zhipu-model" value="glm-4.7-flash" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-zhipu" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-zhipu" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-zhipu-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -522,7 +522,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-kimi-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-kimi-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-kimi-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.moonshot.cn/console/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-kimi-model" data-i18n="labelModel">Model</label><input type="text" id="opt-kimi-model" value="kimi-k2.6" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-kimi" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-kimi" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-kimi-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -533,7 +533,7 @@
           <div class="fg entry-block"><label class="bl" for="opt-ollama-baseurl" data-i18n="labelBaseUrl">Base URL</label><input type="text" class="fg-url" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
           <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-ollama-model" data-i18n="labelModel">Model</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintOllamaModel">Run <code>ollama pull llama3.2</code> first</p></details><input type="text" id="opt-ollama-model" value="llama3.2" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-ollama" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-ollama" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-ollama-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -545,7 +545,7 @@
           <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-custom-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomKey">Leave empty if not required</p></details><span class="key-wrap"><input type="password" id="opt-custom-key" /><button type="button" class="key-toggle" data-target="opt-custom-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span></div>
           <div class="fg entry-block"><label class="bl" for="opt-custom-model" data-i18n="labelModel">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
           <div class="fg-actions">
-            <button class="btn btn-sm" id="test-custom" data-i18n="testConnection">Test Connection</button>
+            <button class="btn btn-sm" id="test-custom" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-custom-status" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -770,15 +770,6 @@
             </details><span class="switch-track" aria-hidden="true"></span></label>
           </div>
         </div>
-
-        <div class="fg entry-block">
-          <label class="bl" for="opt-selection-trigger" data-i18n="selectionTriggerLabel">Explain-selection trigger</label>
-          <select id="opt-selection-trigger" data-listbox>
-            <option value="icon" data-i18n="selectionTriggerIcon">Button next to the selection</option>
-            <option value="hotkey" data-i18n="selectionTriggerHotkey">Shortcuts only (e to explain, d to look up)</option>
-            <option value="off" data-i18n="selectionTriggerOff">Off</option>
-          </select>
-        </div>
       </section>
       <section class="settings-section">
         <h2 class="section-title" id="sec-video-preview" data-i18n="secVideoPreview">Video Pages</h2>
@@ -809,8 +800,16 @@
           <div class="bl" id="md-shortcut-label" data-i18n="mdShortcutLabel">Open the reader</div>
           <div class="fg-actions" role="group" aria-labelledby="md-shortcut-label">
             <span id="md-shortcut-current" class="shortcut-current" data-command="markdown_preview"></span>
-            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-md" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+            <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-md" class="btn btn-sm" data-i18n="openShortcuts">Open Chrome shortcut settings</a>
           </div>
+        </div>
+        <div class="fg entry-block">
+          <label class="bl" for="opt-selection-trigger" data-i18n="selectionTriggerLabel">Explain and look up selected text</label>
+          <select id="opt-selection-trigger" data-listbox>
+            <option value="icon" data-i18n="selectionTriggerIcon">Button next to the selection</option>
+            <option value="hotkey" data-i18n="selectionTriggerHotkey">Shortcuts only (e to explain, d to look up)</option>
+            <option value="off" data-i18n="selectionTriggerOff">Off</option>
+          </select>
         </div>
       </section>
     </div>
@@ -952,7 +951,7 @@
              (pbpSetTagGovDataState shows it). -->
         <div class="fg" id="tag-gov-need-token" hidden>
           <div class="fg-actions">
-            <button type="button" class="btn btn-sm" id="tag-gov-enter-token" data-i18n="tagGovEnterToken">Enter API Token</button>
+            <button type="button" class="btn btn-sm" id="tag-gov-enter-token" data-i18n="tagGovEnterToken">Enter API token</button>
           </div>
         </div>
         <p class="hint" id="tag-gov-irreversible" data-i18n="tagGovIrreversibleWarn">Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change, for manual reference only.</p>
@@ -1189,13 +1188,13 @@
                   <p class="hint context-help-body" data-i18n="optSyncHint">This setting applies to this device only. Settings are shared between the devices where you turn it on; devices with it off keep their own local settings.</p>
                 </details><span class="switch-track" aria-hidden="true"></span></label>
               </div>
+              <p id="opt-sync-api-keys-requires" class="hint" data-parent-note data-i18n="dependentsNeedParent" hidden>Turn this on to set the options below.</p>
               <div class="pref-row pref-row-sub context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" role="switch" id="opt-sync-api-keys" aria-labelledby="opt-sync-api-keys-label" aria-describedby="opt-sync-api-keys-hint" /> <span class="switch-text" id="opt-sync-api-keys-label" data-i18n="syncApiKeysLabel">Sync API keys and tokens for this Google account</span>
                 <details class="context-help">
                   <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
                   <p class="hint context-help-body" id="opt-sync-api-keys-hint" data-i18n="syncApiKeysHint">This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted.</p>
                 </details><span class="switch-track" aria-hidden="true"></span></label>
               </div>
-              <p id="opt-sync-api-keys-requires" class="hint entry-block-sub" data-i18n="syncApiKeysRequiresSync" hidden>Turn on Chrome Sync for settings first.</p>
               </div>
               <p id="opt-sync-local-only" class="sync-local-only" role="status" aria-live="polite" hidden></p>
               <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>

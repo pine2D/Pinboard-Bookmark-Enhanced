@@ -924,7 +924,8 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
   DOM：`label.pick`（`input` 首位 → `span.pick-text` 文案，可跟一个行内控件（popup-width 自定义行的
   `input[type=number]`）→ `span.pick-mark[aria-hidden=true]` 末位，20×20，圆形（radio）或
   `.pick-box` 修饰符给 4px 圆角方形（Task 2 的 checkbox 列表用）)。选中态：`background: --opt-accent`
-  + `border-color: --opt-accent`；未选中：1px `--opt-border` 描边、透明底；勾用 `.pick-mark::after`
+  + `border-color: --opt-accent`；未选中：1px `--opt-border` 描边、透明底；禁用且未选中：填 `--opt-btn-bg`、
+  描边并入填充（与禁用 `.switch` 轨道同一种凹陷感，2026-10-21 第五轮评审：旧的 `fg-hint` 描边比可用态还深）；勾用 `.pick-mark::after`
   的 CSS 边框旋转 45°画出 L 形，不用字面字符。行几何与 `.switch` 完全相同（`--opt-row-min-h`
   44/36、`--opt-row-pad-y`、相邻 1px `--opt-border-section` 分隔线）——`.pref-group-radio` 不再是
   「无线 40/36 行」变体，那条旧规则已删除（options.css，同 commit 留有退役说明）；选中行文案不加粗。

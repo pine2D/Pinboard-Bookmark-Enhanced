@@ -1435,9 +1435,13 @@ input[type="checkbox"], input[type="radio"] {
   outline: none;
   box-shadow: var(--opt-focus-ring);
 }
-.pick > input:disabled ~ .pick-text, .pick > input:disabled:not(:checked) ~ .pick-mark {
+.pick > input:disabled ~ .pick-text {
   color: var(--opt-fg-hint);
-  border-color: var(--opt-fg-hint);
+}
+.pick > input:disabled:not(:checked) ~ .pick-mark {
+  background: var(--opt-btn-bg);
+  border-color: var(--opt-btn-bg);
+  color: var(--opt-fg-hint);
 }
 .pick > input:disabled:checked ~ .pick-mark {
   background: var(--opt-fg-hint);

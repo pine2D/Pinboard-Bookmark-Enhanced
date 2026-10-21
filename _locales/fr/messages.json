@@ -756,7 +756,7 @@
     "message": "Usage de l'IA et notes de compatibilité"
   },
   "storageReclaimable": {
-    "message": "Récupérable : $AMOUNT$",
+    "message": "La sélection libère $AMOUNT$",
     "placeholders": { "amount": { "content": "$1" } }
   },
   "storageClear": {
@@ -1794,9 +1794,6 @@
   "syncApiKeysDisableBtn": {
     "message": "Désactiver"
   },
-  "syncApiKeysRequiresSync": {
-    "message": "Activez d’abord Chrome Sync pour les paramètres."
-  },
   "dependentsNeedParent": {
     "message": "Activez cette option pour régler les paramètres ci-dessous."
   },
@@ -2755,7 +2752,7 @@
     "message": "Une règle par ligne, sous la forme terme=traduction. Laissez la partie droite vide pour garder le terme tel quel. Utilisé par la traduction de l'article ; chaque requête n'inclut que les entrées dont le terme figure dans le texte envoyé."
   },
   "selectionTriggerLabel": {
-    "message": "Déclencheur d'explication de sélection"
+    "message": "Expliquer et chercher la sélection"
   },
   "selectionTriggerIcon": {
     "message": "Bouton à côté de la sélection"

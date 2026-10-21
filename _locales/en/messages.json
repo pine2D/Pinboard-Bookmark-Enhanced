@@ -761,7 +761,7 @@
     "message": "AI usage & compatibility memos"
   },
   "storageReclaimable": {
-    "message": "Reclaimable: $AMOUNT$",
+    "message": "Selected: $AMOUNT$ to free up",
     "placeholders": { "amount": { "content": "$1" } }
   },
   "storageClear": {
@@ -855,7 +855,7 @@
     }
   },
   "bgTitleSavedAiSkipped": {
-    "message": "\"$TITLE$\" saved. AI skipped: access to your AI provider isn't granted. Grant it via Settings > AI Providers > Test Connection.",
+    "message": "\"$TITLE$\" saved. AI skipped: access to your AI provider isn't granted. Grant it via Settings > AI Providers > Test connection.",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -989,7 +989,7 @@
     "message": "Appearance"
   },
   "resetTabBtn": {
-    "message": "Reset This Tab"
+    "message": "Reset this tab"
   },
   "resetTabTitle": {
     "message": "Reset current tab settings to defaults"
@@ -1340,7 +1340,7 @@
     "message": "Open popup shortcut"
   },
   "openShortcuts": {
-    "message": "Open Chrome Shortcut Settings"
+    "message": "Open Chrome shortcut settings"
   },
   "mdShortcutLabel": {
     "message": "Open the reader"
@@ -1428,7 +1428,7 @@
     "message": "Get key"
   },
   "testConnection": {
-    "message": "Test Connection"
+    "message": "Test connection"
   },
   "testTesting": {
     "message": "Testing…"
@@ -1799,9 +1799,6 @@
   },
   "syncApiKeysDisableBtn": {
     "message": "Turn off"
-  },
-  "syncApiKeysRequiresSync": {
-    "message": "Turn on Chrome Sync for settings first."
   },
   "dependentsNeedParent": {
     "message": "Turn this on to set the options below."
@@ -2670,7 +2667,7 @@
     "message": "Add your Pinboard API Token under Account to load your tags here."
   },
   "tagGovEnterToken": {
-    "message": "Enter API Token"
+    "message": "Enter API token"
   },
   "tagGovSnapshotSaved": {
     "message": "Tag list snapshot downloaded (names and counts; a reference for manual repair, not an automatic restore)"
@@ -2718,7 +2715,7 @@
     "message": "AI options you turned on are waiting for this provider's API key. Add it below and they start working."
   },
   "aiProviderAccessMissing": {
-    "message": "AI options you turned on can't reach this provider yet. Use Test Connection below to grant access."
+    "message": "AI options you turned on can't reach this provider yet. Use “Test connection” below to grant access."
   },
   "previewAiModelLabel": {
     "message": "Model override (optional)"
@@ -2764,7 +2761,7 @@
     "message": "One rule per line, in the form term=translation. Leave the right side empty to keep the term untranslated. Used by full-text translation; each request includes only the entries whose terms appear in the text being sent."
   },
   "selectionTriggerLabel": {
-    "message": "Explain-selection trigger"
+    "message": "Explain and look up selected text"
   },
   "selectionTriggerIcon": {
     "message": "Button next to the selection"
