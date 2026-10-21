@@ -1399,13 +1399,16 @@ function _pbpTrApplySkips(st) {
   if (st.status === "done" && st.staleVerdict) _pbpTrSetStatus(st, "done");
   const note = document.getElementById("tr-skip-note");
   if (!note) return;
-  if (st.skippedCount > 0) {
-    note.textContent = t("trSkippedTargetLang", String(st.skippedCount));
-    note.hidden = false;
-  } else {
-    note.hidden = true;
-    note.textContent = "";
-  }
+  note.textContent = st.skippedCount > 0 ? t("trSkippedTargetLang", String(st.skippedCount)) : "";
+  _pbpTrSyncSkipNote(st);
+}
+
+// The skip count only means something once a run has started: before it, the
+// idle rail already carries the target and the price, and a standing "N
+// blocks need no translation" was one more line to read past.
+function _pbpTrSyncSkipNote(st) {
+  const note = document.getElementById("tr-skip-note");
+  if (note) note.hidden = !(st.skippedCount > 0 && st.status !== "idle");
 }
 
 // "provider · model" for the cost line. pbpAiEffectiveModel resolves preview
@@ -1856,6 +1859,7 @@ function _pbpTrSyncDoneRef(st) {
   const tgt = document.getElementById("tr-target");
   if (!ref || !tgt) return;
   const skip = document.getElementById("tr-skip-note");
+  _pbpTrSyncSkipNote(st);
   if (st.status === "done") {
     if (tgt.parentElement !== ref) ref.append(tgt);
     if (skip && skip.parentElement !== ref) ref.append(skip);

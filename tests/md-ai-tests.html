@@ -4031,6 +4031,29 @@ suiteIf("_pbpTrApplySkips", "_pbpTrApplySkips", () => {
       window.chrome = prevChrome;
     }
   });
+  test("idle: the count is written but the note waits until a run starts", () => {
+    const prevChrome = window.chrome;
+    window.chrome = { i18n: { getMessage: (key, subs) => key === "trSkippedTargetLang" ? ((subs && subs[0]) + " skipped") : "" } };
+    const note = document.createElement("div");
+    note.id = "tr-skip-note";
+    note.hidden = true;
+    document.body.appendChild(note);
+    try {
+      const zhHit = "这是一段完全用简体中文书写的句子用来测试翻译跳过逻辑是否正确工作";
+      const st = { status: "idle", target: { code: "zh-Hans" }, trMd: Object.create(null),
+        work: [{ n: 1, md: zhHit, shielded: { text: zhHit } }] };
+      _pbpTrApplySkips(st);
+      assertEq(st.skippedCount, 1, "skip still detected while idle");
+      assertEq(note.hidden, true, "idle rail does not show the skip note");
+      st.status = "translating";
+      _pbpTrSyncSkipNote(st);
+      assertEq(note.hidden, false, "shown once the run starts");
+      assert(note.textContent.indexOf("1") !== -1, "count already written: " + note.textContent);
+    } finally {
+      document.body.removeChild(note);
+      window.chrome = prevChrome;
+    }
+  });
   test("re-invocation is cumulative + idempotent (a second call, e.g. Continue click, doesn't double-count)", () => {
     const prevChrome = window.chrome;
     window.chrome = { i18n: { getMessage: () => "" } };
