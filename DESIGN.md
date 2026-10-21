@@ -31,6 +31,15 @@ colors:
   reader-paper: "#FFFCF0"
   reader-ink: "#1C1B1A"
   reader-link: "#205EA6"
+  reader-link-dark: "#6095C5"
+  reader-link-on-raised-dark: "#7AAEDB"
+  reader-quote: "#F4F2E7"
+  reader-quote-dark: "#242321"
+  reader-badge: "#E6E4D9"
+  reader-badge-dark: "#343331"
+  reader-success: "#536907"
+  reader-danger: "#AF3029"
+  reader-danger-dark: "#DC8983"
   highlight-yellow: "#facc15"
   highlight-green: "#4ade80"
   highlight-blue: "#60a5fa"
@@ -206,6 +215,9 @@ A low-saturation neutral base with one blue voice, semantic status colors that a
 
 ### Reader & Highlights
 - **Reader Paper / Reader Ink / Reader Link** (#FFFCF0 / #1C1B1A / #205EA6 light; Warm Ink #1C1B1A / #CECDC3 / #6095C5 dark): Defined with `light-dark()`. Both schemes are the Flexoki family, so the reader is one warm paper in light and dark (light switched from Tailwind slate on 2026-10-15). Its chrome (rail, panels) sits on a slightly deeper paper (#F7F5EA), and every popover shadow uses the warm ink (rgba(28, 27, 26, a)) rather than a cool slate. The reader never adopts the 14 presets.
+- **Link on Raised** (`--link-on-raised`: #205EA6 light, #7AAEDB dark): Accent-colored *text* on a raised fill (`--btn-hover`, `--border-light`, `--badge-bg`), meaning pressed toggles and segments, the pressed pin, the active TOC row, and the hover chips. It is derived to 4.5:1 on the deepest of those fills. Light keeps the plain link blue (5.12:1). In dark, the plain link #6095C5 measures 3.97:1 on #343331, so the token takes the next lighter blue (5.35:1). Edges and outlines on the same controls stay `--link`, because a non-text part only needs 3:1.
+- **Quote & Badge fills** (quote #F4F2E7 / #242321, badge #E6E4D9 / #343331, both warm since 2026-10-21): Warm paper and Warm Ink steps, not the earlier teal and slate tints. The quote sits between the page and the code fill, so inline code inside a quote keeps its chip. Quote text is neutral ink (#403E3C / #C8C6BC), and blue appears only on the quote's 3px bar, so real links inside a quote still read as links. Badges sit one step above the rail surface with #1A4F8C / #8DB9DD text.
+- **Reader status** (success #536907 light, #87A85F dark; danger #AF3029 light, #DC8983 dark): Picked by hand because the reader does not go through the theme factory, and checked against the reader's own fills. Success clears 4.5:1 for 12px text on the rail surface. Danger dark clears 4.5:1 on the `--btn-hover` fill of its own hover state.
 - **Highlighter set** (yellow #facc15, green #4ade80, blue #60a5fa, red #f87171, purple #c084fc): Painted at about 40–45% alpha as CSS Custom Highlights, and as muted Flexoki equivalents in dark mode. These are user-content colors and are never reused as UI status or accent.
 
 ### Named Rules
@@ -213,7 +225,7 @@ A low-saturation neutral base with one blue voice, semantic status colors that a
 
 **The Derived, Not Picked Rule.** Every text/fill pair is derived to WCAG AA (4.5:1 text, 3:1 UI parts) by the theme factory, and focus cores are derived from the accent to at least 3:1. Never hand-pick a hex in a consuming rule. Edit composers or pilots, then run `sync-all`.
 
-**The Weak Text Rule.** Hint, muted, and link text never sit on a control fill. Controls use their own AA-derived `btn-fg-muted`.
+**The Weak Text Rule.** Hint, muted, and link text never sit on a control fill. Controls use their own AA-derived `btn-fg-muted`. In the reader, a control whose state is shown in the accent (pressed, active, or hovered on a raised fill) colors its text with `--link-on-raised`, never a flat `--link`. That token is derived to 4.5:1 on those fills in both schemes.
 
 ## Typography
 
@@ -312,7 +324,7 @@ A small anchored bubble rather than a modal. It has panel ground, a 1px structur
 A full-width row button with no border, laid out as a 10px highlight-color dot and the content. The excerpt is 14/20 clamped to 2 lines, the note line is 13/18 muted with a 12px pencil, and meta is 12/16. State is carried by background alone: hover, current, batch-selected band, and selected-and-current, each a derived fill with 8px inset corners. Pressing deepens the row instead of scaling it. Focus is a 2px inset outline.
 
 ### Reader Rail & Pills (signature)
-The reader's rail is a 256px surface column with uppercase overline section heads, each over a 1px top rule, and CSS-drawn disclosure triangles. Pill toggles and segmented buttons show "pressed" as the hover fill plus a link-colored border and link text. Inverted near-black chips are not used. Reader focus is its own 2px link-colored outline offset 2px. Hover never opens an overlay in the reader.
+The reader's rail is a 256px surface column with uppercase overline section heads, each over a 1px top rule, and CSS-drawn disclosure triangles. Pill toggles and segmented buttons show "pressed" as the hover fill plus a `--link` border and `--link-on-raised` text (the plain link blue fails 4.5:1 on that fill in dark). Inverted near-black chips are not used. Reader focus is its own 2px link-colored outline offset 2px. Hover never opens an overlay in the reader.
 
 ## Do's and Don'ts
 
@@ -333,4 +345,4 @@ The reader's rail is a 256px surface column with uppercase overline section head
 - **Don't** use `transition: all`, add first-paint entrance animations, load remote fonts, or ship any runtime dependency.
 - **Don't** open overlays on hover in the reader, and don't apply the 14 presets to the reader.
 - **Don't** hand-edit `pinboard-themes.js` or any `@generated:*` region in popup.css, options.css, or library.css.
-- **Don't** set hint, muted, or link-colored text on a control fill.
+- **Don't** set hint, muted, or link-colored text on a control fill. The reader's pressed and raised states are the one place accent text sits on a fill, and they use `--link-on-raised`, never `--link`.
