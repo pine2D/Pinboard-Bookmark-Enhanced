@@ -2696,6 +2696,10 @@ html.motion-ready .confirm-popover.is-closing {
    same tokens as the edit card / rail controls; no new color literal. Lives
    inside the rail, which @media print already hides. */
 .hl-item-lang {
+  /* Never wraps: in a 390px drawer "в оригинале" broke onto two lines; the
+     quote beside it is the part that ellipsizes. */
+  flex-shrink: 0;
+  white-space: nowrap;
   margin-left: var(--sp-2);
   padding: 0 var(--sp-1);
   font-size: 10px;
