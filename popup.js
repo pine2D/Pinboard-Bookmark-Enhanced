@@ -2548,6 +2548,21 @@ const pbpShowKbdHints = (on) => document.documentElement.classList.toggle("pp-kb
 document.addEventListener("keydown", (e) => { if (e.key === "Alt") pbpShowKbdHints(true); });
 document.addEventListener("keyup", (e) => { if (e.key === "Alt") pbpShowKbdHints(false); });
 window.addEventListener("blur", () => pbpShowKbdHints(false));
+// The two row-sharing hints shrink before they push their row's control, and
+// an ellipsis left "Umschalt+Eingabe f…" -- a fragment that names neither
+// key nor action (critique 2026-10-21). A hint that doesn't fit is hidden
+// whole instead; its box keeps its size, so hiding it can't re-trigger this.
+if (typeof ResizeObserver === "function") {
+  const clipObserver = new ResizeObserver((entries) => {
+    for (const { target } of entries) {
+      target.classList.toggle("kb-clipped", target.clientWidth > 0 && target.scrollWidth > target.clientWidth + 1);
+    }
+  });
+  for (const id of ["ai-summary-hint", "bottom-kb-hint"]) {
+    const hint = document.getElementById(id);
+    if (hint) clipObserver.observe(hint);
+  }
+}
 const PBP_ALT_CHECKBOX_CODES = { KeyP: "private-check", KeyR: "readlater-check", KeyA: "archive-check" };
 const PBP_ALT_CHECKBOX_LETTERS = { p: "private-check", r: "readlater-check", a: "archive-check" };
 document.addEventListener("keydown", (e) => {

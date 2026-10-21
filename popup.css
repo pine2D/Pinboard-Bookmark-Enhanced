@@ -1142,6 +1142,10 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display:
 #bottom-kb-hint { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #bottom-kb-hint + .submit-hint { margin-left: 0; white-space: nowrap; }
 #bottom-kb-hint + .submit-hint::before { content: "\00B7"; margin-right: var(--pp-sp-4); }
+/* popup.js marks a hint that would ellipsize; it goes invisible whole (and
+   takes the dot that joins it to Ctrl+Enter along). visibility, not display:
+   the row keeps its layout, so the measurement that set this stays true. */
+.kb-hint.kb-clipped, #bottom-kb-hint.kb-clipped + .submit-hint::before { visibility: hidden; }
 
 .clear-all-link {
   font-size: 11px; color: var(--pp-fg-hint); cursor: pointer;

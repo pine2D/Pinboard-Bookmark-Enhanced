@@ -80,7 +80,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/pinboard-style-cloak-tests.html": 21,
   "tests/popup-ai-sw-tests.html": 52,
   "tests/popup-tag-cache-tests.html": 25,
-  "tests/popup-save-tests.html": 201,
+  "tests/popup-save-tests.html": 202,
   "tests/popup-draft-tests.html": 41,
   "tests/save-pipeline-tests.html": 70,
   "tests/settings-cache-invalidate-tests.html": 8,

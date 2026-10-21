@@ -3881,6 +3881,30 @@ test("posts/add default remains replace=yes for existing callers", () => {
       } finally { btn.remove(); }
     });
 
+    // Critique 2026-10-21: a shortcut hint too long for its row used to end
+    // in an ellipsis fragment; it is now hidden whole, and one that fits stays.
+    await testAsync("a shortcut hint that would ellipsize is hidden whole", async () => {
+      const start = source.indexOf('if (typeof ResizeObserver === "function") {\n  const clipObserver');
+      const end = source.indexOf("\n}\n", start) + 3;
+      assert(start > 0 && end > start, "hint clip observer not found");
+      const make = (id, text) => {
+        const el = document.createElement("span");
+        el.id = id;
+        el.textContent = text;
+        el.style.cssText = "display:inline-block;width:60px;overflow:hidden;white-space:nowrap;font:11px sans-serif";
+        document.body.appendChild(el);
+        return el;
+      };
+      const long = make("ai-summary-hint", "Umschalt+Eingabe fasst zusammen und schlägt Tags vor");
+      const short = make("bottom-kb-hint", "Alt");
+      try {
+        new Function("document", source.slice(start, end))({ getElementById: (id) => ({ "ai-summary-hint": long, "bottom-kb-hint": short })[id] || null });
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        assert(long.classList.contains("kb-clipped"), "an overflowing hint was left to ellipsize");
+        assert(!short.classList.contains("kb-clipped"), "a hint that fits was hidden");
+      } finally { long.remove(); short.remove(); }
+    });
+
     // Critique 2026-10-21: an IME's Escape (dropping the candidate list) must
     // not reach the branch that closes the popup.
     test("Escape closes the popup only outside IME composition", () => {
