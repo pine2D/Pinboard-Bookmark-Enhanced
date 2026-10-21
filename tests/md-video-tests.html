@@ -1822,6 +1822,36 @@ window.pbpVideoFixture = {
   check("with the toggle hidden p does nothing and leaves the live set", pressed(ap) === "false" && !w.pbpVideoShortcutKeys().has("p"));
   ap.hidden = false;
 
+  // Screen-reader line for the toggle (2026-10-21): the short panel name +
+  // the state, not the button title with its "(for shadowing)" aside.
+  const srLine = async () => { await new Promise((r) => setTimeout(r, 60)); const el = d.querySelector(".pbv-sr-only[role=status]"); return el ? el.textContent : ""; };
+  ap.click();
+  const onLine = await srLine();
+  check("auto-pause on is announced with the short panel name and the state",
+    onLine === window.__pbvEnMsgs.kbdHelpVideoAutoPause.message + " · " + window.__pbvEnMsgs.mdVideoStateOn.message, onLine);
+  check("the announcement drops the title's parenthesised purpose", !/[()（）]/.test(onLine) && onLine.length < window.__pbvEnMsgs.mdVideoAutoPause.message.length, onLine);
+  ap.click();
+  const offLine = await srLine();
+  check("auto-pause off is announced the same way", offLine === window.__pbvEnMsgs.kbdHelpVideoAutoPause.message + " · " + window.__pbvEnMsgs.mdVideoStateOff.message, offLine);
+
+  // Narrow stacked workspace (2026-10-21): the layout observer parks the
+  // follow toggle with .pbv-follow-narrow (display:none, `hidden` stays
+  // false). Keys and the "?" panel must go by what is on screen.
+  const helpChips = () => { const u = d.createElement("ul"); w._pbpKbdHelpFillList(u); return Array.from(u.querySelectorAll(".kbd-help-chip")).map((k) => k.textContent); };
+  check("control: the follow toggle is live and listed while it is on screen", w.pbpVideoShortcutKeys().has("f") && helpChips().includes("f"));
+  follow.click(); // switch follow off while it can be reached
+  const followOff = pressed(follow);
+  follow.classList.add("pbv-follow-narrow");
+  check("narrow layout: follow is out of the live key set", !w.pbpVideoShortcutKeys().has("f"));
+  check("narrow layout: the ? panel no longer lists f", !helpChips().includes("f"));
+  ev = key("f");
+  check("narrow layout: f does nothing and leaves the key to the page", pressed(follow) === followOff && !ev.defaultPrevented);
+  key("c");
+  check("narrow layout: c does not re-arm a follow the toolbar cannot show", pressed(follow) === followOff);
+  follow.classList.remove("pbv-follow-narrow");
+  check("wide again: f is back in the live set and the panel", w.pbpVideoShortcutKeys().has("f") && helpChips().includes("f"));
+  follow.click(); // restore follow on
+
   // No collisions, judged on the tables the "?" panel actually renders: the
   // reader-wide rows plus the video rows, every chip unique.
   // Top-level consts are not window properties; read them in the frame's scope.

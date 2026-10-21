@@ -2459,7 +2459,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     // Key NAMES, not arrow glyphs: the chips are rendered as text and a literal
     // symbol risks the slow-font fallback (CLAUDE.md font iron rule).
     if (list && !list.hidden && _relayAlive && _lastRelayTime != null) { s.add("Space"); s.add("Left"); s.add("Right"); }
-    if (_followBtn && !_followBtn.hidden && !_followBtn.disabled) s.add("f");
+    if (followOffered()) s.add("f"); // narrow stack hides it by class, not [hidden]
     if (_loopBtn && !_loopBtn.hidden) s.add("r");
     if (_autoPauseBtn && !_autoPauseBtn.hidden) s.add("p");
     return s;
@@ -3238,7 +3238,10 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   function setAutoPause(on) {
     _autoPauseOn = !!on;
     if (_autoPauseBtn) _autoPauseBtn.setAttribute("aria-pressed", _autoPauseOn ? "true" : "false");
-    srAnnounce(t("mdVideoAutoPause") + " · " + t(_autoPauseOn ? "mdVideoStateOn" : "mdVideoStateOff"));
+    // The short shortcut-panel name, not the button's title: that one carries
+    // a parenthesised purpose ("for shadowing") that made every toggle a long
+    // sentence to listen to (2026-10-21).
+    srAnnounce(t("kbdHelpVideoAutoPause") + " · " + t(_autoPauseOn ? "mdVideoStateOn" : "mdVideoStateOff"));
   }
   // "Back to the current cue" (research T3.7): scrolls to where playback
   // is, in whichever study view is showing. No follow re-arm on its own.
@@ -3446,7 +3449,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       case "[": case "]": stepCue(e.key === "[" ? -1 : 1); break;
       case "r": case "R": if (!_loopBtn || _loopBtn.hidden) return; setLoop(!_loopOn); break;
       case "p": case "P": if (!_autoPauseBtn || _autoPauseBtn.hidden) return; setAutoPause(!_autoPauseOn); break;
-      case "f": case "F": if (!_followBtn || _followBtn.hidden || _followBtn.disabled) return; setFollow(!_followOn); break;
+      case "f": case "F": if (!followOffered()) return; setFollow(!_followOn); break;
       // Same action as .pbv-back-current, which declares this key with
       // aria-keyshortcuts="c" -- that is a promise that the key activates the
       // button, so it re-arms follow too. Re-arming is gated exactly like the
@@ -3454,7 +3457,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       // switched on invisibly.
       case "c": case "C":
         jumpToCurrent();
-        if (_followBtn && !_followBtn.hidden && !_followBtn.disabled) setFollow(true);
+        if (followOffered()) setFollow(true);
         break;
       case "b": case "B": toggleStudyView(); break;
       default: handled = false;
@@ -3710,6 +3713,14 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // all read THIS, never _followOn alone (Codex r9 M2 / review C4).
   function followEffective() {
     return _followOn && !(_followBtn && _followBtn.classList.contains("pbv-follow-narrow")) && playerHoldsPosition();
+  }
+  // Follow as the toolbar OFFERS it: shown, enabled, and not parked by the
+  // narrow stacked layout -- .pbv-follow-narrow hides it with display:none
+  // while `hidden` stays false (loadFlow owns that attribute). The f key, c's
+  // re-arm and the live key set behind the "?" panel all read this, so no key
+  // acts on, or is listed for, a toggle that is not on screen (2026-10-21).
+  function followOffered() {
+    return !!(_followBtn && !_followBtn.hidden && !_followBtn.disabled && !_followBtn.classList.contains("pbv-follow-narrow"));
   }
 
   // Move the current-row marker. Cheap by design: the relay reports 4x/second
