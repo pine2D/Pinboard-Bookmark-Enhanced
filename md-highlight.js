@@ -2247,7 +2247,13 @@ function _pbpHlEnsureCard() {
   askBtn.addEventListener("click", _pbpHlCardAskCurrent);
   aiRow.appendChild(askBtn);
   card.appendChild(aiRow);
-  pbpAiGetSettings().then((s) => { if (pbpAiAvailable(s)) aiRow.hidden = false; }).catch(() => {});
+  pbpAiGetSettings().then((s) => {
+    if (!pbpAiAvailable(s)) return;
+    aiRow.hidden = false;
+    // On the very first open this settles AFTER the card was placed, and the
+    // row's 34px would push a card placed above down over its own highlight.
+    if (card.matches(":popover-open")) _pbpHlPlaceCard(card);
+  }).catch(() => {});
 
   const note = document.createElement("textarea");
   note.className = "hl-card-note";
@@ -2413,11 +2419,21 @@ function _pbpHlOpenCard(id) {
   if (!card.matches(":popover-open")) card.showPopover();
   // Position AFTER showPopover so offsetHeight is real (measure-then-place
   // two-step, same as the ask subsystem's #explain-pop pattern).
+  _pbpHlCardAnchor = { left: rect.left, top: rect.top, bottom: rect.bottom };
+  _pbpHlPlaceCard(card);
+  noteEl.focus();
+  noteEl.setSelectionRange(noteEl.value.length, noteEl.value.length); // caret at end, no accidental select-all
+}
+
+// The anchor rect of the open card, kept so a late height change (the AI row
+// settling on first open) can re-place it against the same highlight.
+let _pbpHlCardAnchor = null;
+function _pbpHlPlaceCard(card) {
+  const rect = _pbpHlCardAnchor;
+  if (!rect) return;
   card.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - card.offsetWidth - 8)) + "px";
   const pos = pbpTrPeekPopPos(rect, card.offsetHeight, window.innerHeight);
   card.style.top = pos.top + "px";
-  noteEl.focus();
-  noteEl.setSelectionRange(noteEl.value.length, noteEl.value.length); // caret at end, no accidental select-all
 }
 
 window._pbpHlOpenCard = _pbpHlOpenCard; // explicit window attach: makes the "Task 4 calls it directly" contract self-documenting.

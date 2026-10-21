@@ -3401,6 +3401,9 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 .hl-card-dot-4 { background: light-dark(#ef4444, #B86F8C); }
 .hl-card-dot-5 { background: light-dark(#a855f7, #8B72AF); }
 .hl-card-dot.active, .hl-card-dot:focus-visible { border-color: var(--fg); }
+/* The border alone marks the selected colour too, so focus also takes the
+   reader's 2px link ring (same as .hl-filter-dot) to stay distinct from it. */
+.hl-card-dot:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 /* The card dots are opted out of forced-colors mapping above (K115 block) so
    their hue survives as the only classifier -- but that opt-out covers every
    colour on the element, border included, and this border is the ONLY signal
@@ -3410,6 +3413,7 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
    the same idiom .msg-bar.error / .pbv-row--current use. */
 @media (forced-colors: active) {
   .hl-card-dot.active, .hl-card-dot:focus-visible { border-color: Highlight; }
+  .hl-card-dot:focus-visible { outline-color: Highlight; }
 }
 .hl-card-ai { display: flex; gap: var(--sp-2); }
 .hl-card-ai[hidden] { display: none; }
@@ -3446,8 +3450,14 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
   resize: vertical;
   box-sizing: border-box;
 }
-/* Delete (icon, left) vs Save (text CTA, right): the delete has no confirm
-   popover, so the row's full width is the misclick guard. */
+/* The n key exists so a keyboard reader can write a note, so the card it
+   opens joins the reader's 2px link focus ring instead of the UA default
+   (same offsets as #ask-input and the explain-pop buttons). */
+.hl-card-note:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.hl-card-ai-explain:focus-visible, .hl-card-ai-translate:focus-visible, .hl-card-ai-ask:focus-visible,
+.hl-card-save:focus-visible, .hl-card-delete:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+/* Delete (icon, left) vs Save (text CTA, right): delete asks first in a
+   confirm popover, and the row's full width keeps the two apart. */
 .hl-card-foot { display: flex; justify-content: space-between; gap: var(--sp-2); }
 .hl-card-save, .hl-card-delete {
   padding: var(--sp-1) var(--sp-2);
