@@ -9147,15 +9147,17 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
   });
   // 2026-10-21: the first highlight inserted the notebook above Export and
   // Contents and the TOC dropped ~117px. At scrollTop 0 Chrome anchors
-  // nothing, so the creation path pays the jump back itself.
-  test("first highlight keeps the on-screen rail block below the notebook in place", () => {
+  // nothing, so the creation path pays the jump back itself -- but only when
+  // the reader is at the rail below the insertion (pointer or focus there);
+  // reading in the article leaves the rail at its top, title on screen.
+  test("first highlight keeps the rail block below the notebook in place only while the reader is there", () => {
     const realT = window.t;
     window.t = (k) => k;
     const was = { els: _pbpHlNbEls, state: _pbpHlState, filter: _pbpHlColorFilter };
     const rail = document.createElement("aside"); rail.id = "rail";
     rail.style.cssText = "position:fixed;left:0;top:0;width:256px;height:300px;overflow-y:auto;display:flex;flex-direction:column";
-    rail.innerHTML = '<div style="height:60px;flex:none">ident</div><div id="export-section" style="height:40px;flex:none">export</div>' +
-      '<nav id="toc" style="flex:none">' + '<div style="height:24px">h</div>'.repeat(30) + "</nav>" +
+    rail.innerHTML = '<div id="t-ident" tabindex="-1" style="height:60px;flex:none">ident</div><div id="export-section" style="height:40px;flex:none">export</div>' +
+      '<nav id="toc" style="flex:none">' + '<div tabindex="-1" style="height:24px">h</div>'.repeat(30) + "</nav>" +
       '<div id="rail-bottom-row" style="position:sticky;bottom:0;flex:none;height:30px">tools</div>';
     document.body.appendChild(rail);
     try {
@@ -9164,6 +9166,11 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       _pbpHlNotebookRender(); // init: section built, hidden
       const toc = document.getElementById("toc");
       const before = toc.getBoundingClientRect().top;
+      document.activeElement && document.activeElement.blur && document.activeElement.blur();
+      assertEq(_pbpHlRailAnchorSnap(), null, "reader elsewhere (pointer off the rail, focus outside): the rail keeps its top");
+      document.getElementById("t-ident").focus();
+      assertEq(_pbpHlRailAnchorSnap(), null, "focus above the insertion point: holding the TOC would move what the reader is on");
+      toc.children[2].focus();
       const snap = _pbpHlRailAnchorSnap();
       assertEq(snap && snap.el.id, "export-section", "anchors the first visible block after the section (never the sticky tools row)");
       _pbpHlState.items = [{ id: "a", n: 1, quote: "first", color: 1, ts: 1 }];
@@ -9181,6 +9188,7 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
         "creation snaps before the render and restores after the auto-expand");
       for (const fn of [pbpHlRestore, _pbpHlDeleteItem]) assert(!String(fn).includes("_pbpHlRailAnchor"), fn.name + " never scrolls the rail");
     } finally {
+      if (rail.contains(document.activeElement)) document.activeElement.blur();
       rail.remove();
       _pbpHlNbEls = was.els; _pbpHlState = was.state; _pbpHlColorFilter = was.filter; window.t = realT;
     }

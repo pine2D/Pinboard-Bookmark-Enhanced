@@ -1825,14 +1825,19 @@ async function _pbpHlCreateFromRange(range, color, btn) {
 
 // Rail anchor across the notebook's first appearance (2026-10-21). The
 // highlights section sits above Export and Contents, so the first highlight
-// pushed the TOC ~117px down under a pointer on its way back to it. A
-// scrolled rail already keeps its place (CSS scroll anchoring), but at
-// scrollTop 0 Chrome selects no anchor; that one jump is paid back here: the
-// first rail block below the section that is on screen stays put and the
-// rail scrolls by the inserted height (clamped by its own scroll range). The
-// section keeps its place in the rail order. Only the creation path calls
-// this -- a restore on load, another tab's write or a delete never scrolls
-// the rail.
+// pushes the TOC ~117px down. A scrolled rail already keeps its place (CSS
+// scroll anchoring), but at scrollTop 0 Chrome selects no anchor -- on
+// purpose: at the top, the top is what stays. So this only pays the jump back
+// when the reader is actually AT the rail below the insertion point: the
+// pointer rests on Export / Contents, or keyboard focus is there. Then the
+// first on-screen block below the section stays put and the rail scrolls by
+// the inserted height (clamped by its own scroll range). Reading in the
+// article and highlighting from the keyboard or the selection toolbar leaves
+// the rail at its top -- title and URL stay on screen, the TOC moves down
+// like any peripheral content (an unasked scroll there hid the title for
+// good, 2026-10-21 review). The section keeps its place in the rail order.
+// Only the creation path calls this -- a restore on load, another tab's
+// write or a delete never scrolls the rail.
 function _pbpHlRailAnchorSnap() {
   const rail = document.getElementById("rail");
   if (!rail || rail.scrollTop > 0) return null;
@@ -1842,6 +1847,7 @@ function _pbpHlRailAnchorSnap() {
   // inserted where _pbpHlBuildNotebookDom puts it (before Export, else TOC).
   let el = sec ? sec.nextElementSibling
     : (document.getElementById("export-section") || document.getElementById("toc"));
+  if (!el || !_pbpHlRailEngagedFrom(rail, el)) return null;
   const rr = rail.getBoundingClientRect();
   for (; el; el = el.nextElementSibling) {
     if (el.id === "rail-bottom-row" || !el.getClientRects().length) continue; // sticky: never moves
@@ -1849,6 +1855,16 @@ function _pbpHlRailAnchorSnap() {
     if (r.bottom > rr.top && r.top < rr.bottom) return { rail, el, top: r.top };
   }
   return null;
+}
+// Is the pointer or keyboard focus on the rail at or below `from` (the first
+// block the insertion would push)? The sticky tools row never moves, so it
+// does not count. `:hover` is read at creation time: no listener is kept.
+function _pbpHlRailEngagedFrom(rail, from) {
+  const hovered = rail.querySelectorAll(":hover");
+  const targets = [hovered.length ? hovered[hovered.length - 1] : null, document.activeElement];
+  return targets.some((n) => n && n !== rail && rail.contains(n)
+    && !n.closest("#rail-bottom-row")
+    && (n === from || (from.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)));
 }
 function _pbpHlRailAnchorRestore(snap) {
   if (!snap || !snap.el.isConnected) return;
