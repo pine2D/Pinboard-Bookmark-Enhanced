@@ -20,7 +20,7 @@ async function fixture() {
   const state = {
     settings: { exportTargets: { github: { enabled: true, token: "first" } } },
     flags: { optSyncEnabled: false, syncApiKeys: false },
-    reads: [], lastReads: [], listeners: [], sends: [], sendWaits: [], permissionWaits: [], lastWrites: []
+    reads: [], lastReads: [], listeners: [], sends: [], sendWaits: [], permissionWaits: [], lastWrites: [], optionsTabs: []
   };
   const params = {
     exportSettings: {},
@@ -41,7 +41,8 @@ async function fixture() {
     composeExport: body => body,
     getViewMarkdown: () => "Fixture body",
     imgFixExportNote: () => {},
-    pbpOpenOptionsTab: () => {},
+    PBP_ICONS: { gear: "<svg data-ic=gear></svg>" },
+    pbpOpenOptionsTab: tab => state.optionsTabs.push(tab),
     t: key => key === "mdSendTo" ? "Send to {name}" : key,
     chrome: { storage: { onChanged: { addListener: fn => state.listeners.push(fn) } } }
   };
@@ -74,6 +75,27 @@ async function test(name, fn) {
 }
 (async () => {
   source = await (await fetch("../md-preview.js")).text();
+  await test("empty state names the settings action: label, gear, no caret, click opens settings", async f => {
+    f.state.settings = { exportTargets: {} }; await f.refresh();
+    const p = f.d.getElementById("send-primary");
+    assert(f.d.getElementById("send-primary-label").textContent === "mdSendSetupEllipsis", "label is not the setup key");
+    assert(f.d.getElementById("send-primary-ic").querySelector("svg[data-ic=gear]"), "gear icon missing");
+    assert(f.d.getElementById("send-caret").hasAttribute("hidden"), "caret visible in empty state");
+    assert(p.title === "mdSendNoneConfigured", "supplementary title lost");
+    f.click(); await settle();
+    assert(f.state.optionsTabs.length === 1 && f.state.optionsTabs[0] === "markdown" && f.state.sends.length === 0, "click did not go to settings");
+  });
+  await test("leaving the empty state restores target label, icon and caret", async f => {
+    f.state.settings = { exportTargets: {} }; await f.refresh();
+    f.state.settings = { exportTargets: { notebooklm: { enabled: true } } }; await f.refresh();
+    const label = f.d.getElementById("send-primary-label").textContent;
+    assert(label.startsWith("Send to ") && label !== "mdSendSetupEllipsis", "label not restored: " + label);
+    assert(!f.d.querySelector("#send-primary-ic svg[data-ic=gear]") , "gear survived");
+    assert(!f.d.getElementById("send-caret").hasAttribute("hidden"), "caret still hidden");
+    assert(!f.d.getElementById("send-split").classList.contains("send-empty"), "send-empty survived");
+    f.click(); await settle();
+    assert(f.state.optionsTabs.length === 0 && f.state.sends.length === 1, "old settings click handler survived");
+  });
   await test("normal send captures configured target and article", async f => {
     f.click(); await settle();
     assert(f.state.sends.length === 1 && f.state.sends[0].id === "github"

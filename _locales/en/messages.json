@@ -3851,6 +3851,9 @@
   "mdSendToEllipsis": {
     "message": "Send to…"
   },
+  "mdSendSetupEllipsis": {
+    "message": "Set up a destination…"
+  },
   "mdSentTo": {
     "message": "Sent to {name}"
   },

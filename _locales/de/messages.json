@@ -3840,6 +3840,9 @@
   "mdSendToEllipsis": {
     "message": "Senden an…"
   },
+  "mdSendSetupEllipsis": {
+    "message": "Ziel einrichten…"
+  },
   "mdSentTo": {
     "message": "Gesendet an {name}"
   },

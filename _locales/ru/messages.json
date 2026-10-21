@@ -3840,6 +3840,9 @@
   "mdSendToEllipsis": {
     "message": "Отправить в…"
   },
+  "mdSendSetupEllipsis": {
+    "message": "Настроить отправку…"
+  },
   "mdSentTo": {
     "message": "Отправлено в {name}"
   },

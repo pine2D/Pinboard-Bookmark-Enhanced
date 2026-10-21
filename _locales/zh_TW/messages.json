@@ -3840,6 +3840,9 @@
   "mdSendToEllipsis": {
     "message": "傳送到…"
   },
+  "mdSendSetupEllipsis": {
+    "message": "設定傳送目標…"
+  },
   "mdSentTo": {
     "message": "已傳送到 {name}"
   },

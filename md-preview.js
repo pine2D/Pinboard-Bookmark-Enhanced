@@ -3697,8 +3697,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       delete primary.dataset.targetId;
       menu.innerHTML = "";
       split.classList.add("send-empty");
-      primaryIc.innerHTML = "";
-      primaryLabel.textContent = t("mdSendToEllipsis");
+      // The label names what the click does (opens Settings), so the gear and
+      // "Set up…" replace the "Send to…" that promised a menu this state lacks.
+      primaryIc.innerHTML = (typeof PBP_ICONS !== "undefined" && PBP_ICONS.gear) || "";
+      primaryLabel.textContent = t("mdSendSetupEllipsis");
       caret.setAttribute("hidden", "");
       primary.title = t("mdSendNoneConfigured");
       primary.addEventListener("click", () => pbpOpenOptionsTab("markdown"), { signal: _sig });
