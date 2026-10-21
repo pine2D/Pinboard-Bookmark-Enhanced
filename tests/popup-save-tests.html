@@ -2485,6 +2485,29 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!/establish connection/i.test(shown), "the raw Chrome bus string reached the card: " + shown);
     });
 
+    // Critique 2026-10-21: "[Custom] Failed to fetch" named neither the cause
+    // nor the fix. A transport failure says what it could not reach and what
+    // to check; the browser's raw words stay under Details.
+    await testAsync("an unreachable endpoint renders a localized reason, raw text under Details", async () => {
+      const h = makePopupAi({
+        realErrorCard: true,
+        respond: async () => ({ ok: false, error: { message: "Failed to fetch", name: "TypeError" } }),
+      });
+      await h.doAISummary(false);
+      const shown = h.el["ai-error-message"].textContent;
+      const lead = enMessages.aiErrorUnreachable.message.split("$PROVIDER$")[0];
+      assert(shown.startsWith(lead + "OpenAI"), "the unreachable case is not localized, got: " + shown);
+      assert(!/failed to fetch/i.test(shown), "the raw fetch error reached the card: " + shown);
+      assert(/Failed to fetch/.test(h.el["ai-error-details"].textContent), "the raw error left Details");
+      const provider = makePopupAi({
+        realErrorCard: true,
+        respond: async () => ({ ok: false, error: { message: "Failed to fetch upstream", status: 502 } }),
+      });
+      await provider.doAISummary(false);
+      assert(provider.el["ai-error-message"].textContent.includes("Failed to fetch upstream"),
+        "a provider reply with a status was flattened into the unreachable text");
+    });
+
     await testAsync("a worker diagnostic code renders as the generic failure, not its log string", async () => {
       const h = makePopupAi({
         realErrorCard: true,

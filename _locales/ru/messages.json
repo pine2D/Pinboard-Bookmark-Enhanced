@@ -162,7 +162,7 @@
     "message": "AI-метки"
   },
   "urlWarning": {
-    "message": "Эту страницу нельзя сохранить в Pinboard (неподдерживаемый URL)"
+    "message": "Эту страницу нельзя сохранить в Pinboard (неподдерживаемый URL). Наборы вкладок и пакетное сохранение ниже по-прежнему работают."
   },
   "urlCannotSave": {
     "message": "Невозможно сохранить: неподдерживаемый URL"
@@ -4337,5 +4337,7 @@
   "saveWaitRateLimit": { "message": "Сохранение продолжается: Pinboard принимает не больше одного запроса в 3 секунды." },
   "batchConfirmMsg": { "message": "Сохранить вкладки этого окна ($COUNT$)?", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "Уже сохранённые страницы будут пропущены." },
-  "batchConfirmDetailAi": { "message": "Уже сохранённые страницы будут пропущены. Для каждой новой вкладки запускается AI, оплата идёт с вашего API-ключа." }
+  "batchConfirmDetailAi": { "message": "Уже сохранённые страницы будут пропущены. Для каждой новой вкладки запускается AI, оплата идёт с вашего API-ключа." },
+  "aiErrorUnreachable": { "message": "Не удаётся подключиться к $PROVIDER$ ($HOST$). Проверьте базовый URL, сеть или прокси.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
+  "loginNeedsPaid": { "message": "Нужна платная учётная запись Pinboard." }
 }

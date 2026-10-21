@@ -162,7 +162,7 @@
     "message": "AI 標籤"
   },
   "urlWarning": {
-    "message": "此頁面無法儲存到 Pinboard（不支援的網址類型）"
+    "message": "此頁面無法儲存到 Pinboard（不支援的網址類型）。下方的標籤頁集和批量儲存仍可使用。"
   },
   "urlCannotSave": {
     "message": "無法儲存：不支援的網址類型"
@@ -4337,5 +4337,7 @@
   "saveWaitRateLimit": { "message": "仍在儲存：Pinboard 每 3 秒只接受一次請求。" },
   "batchConfirmMsg": { "message": "要儲存目前視窗的 $COUNT$ 個標籤頁嗎？", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "已收藏的頁面會略過。" },
-  "batchConfirmDetailAi": { "message": "已收藏的頁面會略過。每個新標籤頁都會呼叫一次 AI，費用計入你的 API Key。" }
+  "batchConfirmDetailAi": { "message": "已收藏的頁面會略過。每個新標籤頁都會呼叫一次 AI，費用計入你的 API Key。" },
+  "aiErrorUnreachable": { "message": "無法連接 $PROVIDER$（$HOST$）。請檢查端點網址、網絡或代理伺服器。", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
+  "loginNeedsPaid": { "message": "需要付費的 Pinboard 帳戶。" }
 }

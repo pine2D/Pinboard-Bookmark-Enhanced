@@ -162,7 +162,7 @@
     "message": "AI 标签"
   },
   "urlWarning": {
-    "message": "此页面无法保存到 Pinboard（不支持的网址类型）"
+    "message": "此页面无法保存到 Pinboard（不支持的网址类型）。下方的标签页集和批量保存仍可使用。"
   },
   "urlCannotSave": {
     "message": "无法保存：不支持的网址类型"
@@ -4331,5 +4331,7 @@
   "saveWaitRateLimit": { "message": "仍在保存：Pinboard 每 3 秒只接受一次请求。" },
   "batchConfirmMsg": { "message": "保存当前窗口的 $COUNT$ 个标签页？", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "已收藏的页面会跳过。" },
-  "batchConfirmDetailAi": { "message": "已收藏的页面会跳过。每个新标签页都会调用一次 AI，费用计入你的 API Key。" }
+  "batchConfirmDetailAi": { "message": "已收藏的页面会跳过。每个新标签页都会调用一次 AI，费用计入你的 API Key。" },
+  "aiErrorUnreachable": { "message": "连不上 $PROVIDER$（$HOST$）。请检查接口地址、网络或代理。", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
+  "loginNeedsPaid": { "message": "需要付费的 Pinboard 账号。" }
 }

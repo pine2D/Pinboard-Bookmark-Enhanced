@@ -517,6 +517,11 @@ function showAIError(op, err, opSettings) {
     hintEl.className = "model-not-found-hint";
     hintEl.textContent = mnf.hint;
     msgEl.parentElement.insertBefore(hintEl, msgEl.nextSibling);
+  } else if (_aiIsUnreachableError(err, short)) {
+    // fetch()'s bare TypeError ("Failed to fetch") names neither the cause
+    // nor the fix. Say which endpoint could not be reached and what to check;
+    // the raw text stays under Details (critique 2026-10-21).
+    msgEl.textContent = t("aiErrorUnreachable", provLabel, _aiEndpointHost(s) || provLabel);
   } else {
     msgEl.textContent = `[${provLabel}] ${short}`;
     // The service itself may be down: point at its status page, inline after
@@ -561,6 +566,20 @@ function showAIError(op, err, opSettings) {
   clearTimeout(_aiErrorHideTimer);
   card.classList.remove("dismissing");
   card.classList.remove("hidden");
+}
+
+// A transport failure, not a provider reply: no HTTP status, and the message
+// is the browser's own wording for a connection that never opened.
+function _aiIsUnreachableError(err, message) {
+  if (err?.code || err?.status) return false;
+  return /failed to fetch|networkerror when attempting|load failed|err_connection|err_name_not_resolved/i.test(message || "");
+}
+
+function _aiEndpointHost(s) {
+  try {
+    const pattern = _aiTargetOriginPattern(s);
+    return pattern ? new URL(pattern.replace(/\/\*$/, "")).host : "";
+  } catch (_) { return ""; }
 }
 
 let _aiErrorHideTimer = null;

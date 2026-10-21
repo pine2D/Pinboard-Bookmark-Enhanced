@@ -162,7 +162,7 @@
     "message": "Tagi AI"
   },
   "urlWarning": {
-    "message": "Tej strony nie można zapisać w Pinboard (nieobsługiwany URL)"
+    "message": "Tej strony nie można zapisać w Pinboard (nieobsługiwany URL). Zestawy kart i zapis zbiorczy poniżej nadal działają."
   },
   "urlCannotSave": {
     "message": "Nie można zapisać: nieobsługiwany URL"
@@ -4337,5 +4337,7 @@
   "saveWaitRateLimit": { "message": "Nadal zapisywanie: Pinboard przyjmuje jedno żądanie co 3 sekundy." },
   "batchConfirmMsg": { "message": "Zapisać karty z tego okna ($COUNT$)?", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "Strony, które już zapisano, zostaną pominięte." },
-  "batchConfirmDetailAi": { "message": "Strony, które już zapisano, zostaną pominięte. Dla każdej nowej karty uruchomi się AI, a koszt obciąży twój klucz API." }
+  "batchConfirmDetailAi": { "message": "Strony, które już zapisano, zostaną pominięte. Dla każdej nowej karty uruchomi się AI, a koszt obciąży twój klucz API." },
+  "aiErrorUnreachable": { "message": "Nie można połączyć się z $PROVIDER$ ($HOST$). Sprawdź Base URL, sieć lub serwer proxy.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
+  "loginNeedsPaid": { "message": "Wymaga płatnego konta Pinboard." }
 }

@@ -532,6 +532,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 
 .login-body { padding: var(--pp-sp-6) var(--pp-sp-5); }
 .login-body p { margin-bottom: var(--pp-sp-4); font-size: 12px; color: var(--pp-fg); }
+.login-body .login-hint { margin: var(--pp-sp-4) 0 0; font-size: 11px; color: var(--pp-fg-muted); }
 .login-body input {
   width: 100%; padding: var(--pp-sp-2) var(--pp-sp-3); border-width: 1px; border-style: solid; border-radius: var(--pp-radius-md); font-size: 12px;
   line-height: 16px; /* md rung (26px) like every other field; `normal` measured 23.33px (controlRung scan) */
@@ -625,7 +626,8 @@ html[data-section="login"] .quick-actions { display: none !important; }
    - strip: edge-glued bar (existing-banner / url-warning / offline-bar).
      4px vertical inset, 1px border on the glued edge only, no radius.
    - card: bordered block (feedback-card / batch-permission). 8px inset,
-     full 1px border, radius-md; floating cards add --pp-toast-shadow.
+     full 1px border, radius-md, flat: every popup card sits in the form's
+     flow, so none carries --pp-toast-shadow (critique 2026-10-21).
    - inline: text-only (status-msg). *-fg colour swap, never bg/bd.
    Payload text 11px; secondary controls 10px. Ghost button (.fc-btn) is
    the card-family action standard.
@@ -644,9 +646,12 @@ html[data-section="login"] .quick-actions { display: none !important; }
   border: 1px solid var(--pp-border);
   border-radius: var(--pp-radius-md);
   font-size: 11px;
-  box-shadow: var(--pp-toast-shadow);
   animation: fadeSlideDown var(--pp-motion-duration) var(--ease-out);
 }
+/* Cards in the form column start where the fields do, not at the label
+   gutter: the AI error card used to run under the "AI tags" label and break
+   the column every row above it keeps (critique 2026-10-21). */
+.form-body > .feedback-card { margin-inline-start: var(--pp-label-indent); }
 .feedback-card[data-variant="error"]   { background: var(--pp-warn-bg);    border-color: var(--pp-warn-bd);    color: var(--pp-warn-fg); }
 .feedback-card[data-variant="success"] { background: var(--pp-ok-bg);      border-color: var(--pp-ok-bd);      color: var(--pp-ok-fg); }
 .feedback-card[data-variant="warning"] { background: var(--pp-offline-bg); border-color: var(--pp-offline-bd); color: var(--pp-offline-fg); }
@@ -1261,6 +1266,11 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) .stag .stag-num { display: none; }
    list would have re-animated the press the recipe deliberately keeps
    instant (COMPONENTS.md §3.1 decisions 1/2). What stays below is only what
    is genuinely specific to these two buttons. */
+/* #login-btn is the logged-out screen's one action and takes the same
+   primary fill (critique 2026-10-21: it read as a neutral secondary). */
+#login-btn { background: var(--pp-accent); color: var(--pp-on-accent); border-color: var(--pp-accent); font-weight: 600; }
+#login-btn:hover { background: color-mix(in srgb, var(--pp-accent) 92%, #000); }
+#login-btn:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
 #submit-btn {
   background: var(--pp-accent); color: var(--pp-on-accent); border-color: var(--pp-accent); font-weight: 600;
   /* Content-adaptive width (2a canvas feedback: the 200px-basis button read as
@@ -3075,7 +3085,7 @@ html[data-theme] .regen-link + .regen-link { border-color: var(--pp-divider); }
    --pp-on-accent in all 15 blocks (14 presets + the generated default :root),
    and rules/theme-factory.md names this exact site -- custom-property
    inheritance makes the fallback dead code either way. */
-html[data-theme] #submit-btn { background: var(--pp-accent); color: var(--pp-on-accent); border-color: var(--pp-accent); }
+html[data-theme] #submit-btn, html[data-theme] #login-btn { background: var(--pp-accent); color: var(--pp-on-accent); border-color: var(--pp-accent); }
 html[data-theme] .submit-bar button.loading { color: var(--pp-fg-hint); }
 html[data-theme] .submit-bar button.loading::before, html[data-theme] .action-link.loading::before {
   border-color: var(--pp-spinner-bg); border-top-color: var(--pp-spinner-fg);

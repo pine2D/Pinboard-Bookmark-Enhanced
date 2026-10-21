@@ -18,6 +18,7 @@
         <button type="button" class="key-toggle" data-target="token-input" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
       </div>
       <button id="login-btn" type="submit" class="btn login-submit" data-i18n="login">Log in</button>
+      <p class="login-hint" data-i18n="loginNeedsPaid">Requires a paid Pinboard account.</p>
       <p id="login-error" class="error-text hidden" role="alert" aria-live="assertive" aria-atomic="true"></p>
     </form>
   </div>
@@ -31,7 +32,7 @@
     <div class="form-body">
       <div id="existing-banner" class="existing-banner hidden" role="status" aria-live="polite"></div>
       <div id="url-warning" class="url-warning hidden" role="status">
-        <span class="btn-ic" data-ic="info"></span><span data-i18n="urlWarning">This page cannot be saved to Pinboard (unsupported URL)</span>
+        <span class="btn-ic" data-ic="info"></span><span data-i18n="urlWarning">This page cannot be saved to Pinboard (unsupported URL). Tab Sets and Batch Save below still work.</span>
       </div>
       <div class="row">
         <label class="label" for="url-input" data-i18n="labelUrl">URL</label>

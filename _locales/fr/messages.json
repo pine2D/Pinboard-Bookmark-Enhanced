@@ -162,7 +162,7 @@
     "message": "Tags IA"
   },
   "urlWarning": {
-    "message": "Cette page ne peut pas être enregistrée sur Pinboard (URL non prise en charge)"
+    "message": "Cette page ne peut pas être enregistrée sur Pinboard (URL non prise en charge). Les ensembles d’onglets et l’enregistrement groupé ci-dessous restent disponibles."
   },
   "urlCannotSave": {
     "message": "Impossible d'enregistrer : URL non prise en charge"
@@ -4337,5 +4337,7 @@
   "saveWaitRateLimit": { "message": "Enregistrement en cours : Pinboard n’accepte qu’une requête toutes les 3 secondes." },
   "batchConfirmMsg": { "message": "Enregistrer les $COUNT$ onglets de cette fenêtre ?", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "Les pages déjà enregistrées sont ignorées." },
-  "batchConfirmDetailAi": { "message": "Les pages déjà enregistrées sont ignorées. L’IA s’exécute pour chaque nouvel onglet et est facturée sur votre clé API." }
+  "batchConfirmDetailAi": { "message": "Les pages déjà enregistrées sont ignorées. L’IA s’exécute pour chaque nouvel onglet et est facturée sur votre clé API." },
+  "aiErrorUnreachable": { "message": "Impossible de joindre $PROVIDER$ ($HOST$). Vérifiez l’URL de base, votre réseau ou votre proxy.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
+  "loginNeedsPaid": { "message": "Nécessite un compte Pinboard payant." }
 }

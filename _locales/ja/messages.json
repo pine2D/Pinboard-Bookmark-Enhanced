@@ -162,7 +162,7 @@
     "message": "AI タグ"
   },
   "urlWarning": {
-    "message": "このページは Pinboard に保存できません（非対応の URL）"
+    "message": "このページは Pinboard に保存できません（非対応の URL）。下のタブセットと一括保存は引き続き使えます。"
   },
   "urlCannotSave": {
     "message": "保存できません：非対応の URL"
@@ -4337,5 +4337,7 @@
   "saveWaitRateLimit": { "message": "保存しています。Pinboard が受け付けるリクエストは 3 秒に 1 回です。" },
   "batchConfirmMsg": { "message": "このウィンドウの $COUNT$ 個のタブを保存しますか？", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "保存済みのページはスキップします。" },
-  "batchConfirmDetailAi": { "message": "保存済みのページはスキップします。新しいタブごとに AI を呼び出し、料金は API キーに請求されます。" }
+  "batchConfirmDetailAi": { "message": "保存済みのページはスキップします。新しいタブごとに AI を呼び出し、料金は API キーに請求されます。" },
+  "aiErrorUnreachable": { "message": "$PROVIDER$（$HOST$）に接続できません。Base URL、ネットワーク、プロキシを確認してください。", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
+  "loginNeedsPaid": { "message": "有料の Pinboard アカウントが必要です。" }
 }
