@@ -2119,6 +2119,21 @@
   "optSaveFailed": {
     "message": "Some changes weren't saved, and others may already have been. Check your settings and try again."
   },
+  "optSaveFailedRate": {
+    "message": "Chrome Sync is turning away saves for a moment: too many in a short time. Wait a minute, then retry."
+  },
+  "optSaveFailedQuota": {
+    "message": "Browser storage is full, so this change wasn't saved. Free up space on the Data page, then retry."
+  },
+  "optSaveFailedStale": {
+    "message": "The extension was updated or reloaded, so this page is out of date. Reload it and make the change again."
+  },
+  "optReloadPage": {
+    "message": "Reload page"
+  },
+  "optTabUnsaved": {
+    "message": "Has unsaved changes"
+  },
   "confirm": {
     "message": "Confirm"
   },

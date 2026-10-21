@@ -2138,6 +2138,21 @@
   "optSaveFailed": {
     "message": "Części zmian nie zapisano, a inne mogły już zostać zapisane. Sprawdź ustawienia i spróbuj ponownie."
   },
+  "optSaveFailedRate": {
+    "message": "Chrome Sync chwilowo odrzuca zapisy: zbyt wiele w krótkim czasie. Odczekaj minutę i spróbuj ponownie."
+  },
+  "optSaveFailedQuota": {
+    "message": "Pamięć przeglądarki jest pełna, więc tej zmiany nie zapisano. Zwolnij miejsce w sekcji „Dane” i spróbuj ponownie."
+  },
+  "optSaveFailedStale": {
+    "message": "Rozszerzenie zostało zaktualizowane lub przeładowane, więc ta strona jest nieaktualna. Odśwież ją i wprowadź zmianę ponownie."
+  },
+  "optReloadPage": {
+    "message": "Odśwież stronę"
+  },
+  "optTabUnsaved": {
+    "message": "Zawiera niezapisane zmiany"
+  },
   "confirm": {
     "message": "Potwierdź"
   },

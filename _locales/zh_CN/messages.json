@@ -2138,6 +2138,21 @@
   "optSaveFailed": {
     "message": "部分更改未能保存，其余可能已经保存。请检查设置后重试。"
   },
+  "optSaveFailedRate": {
+    "message": "短时间内保存次数太多，Chrome 同步暂时不接收。等一分钟再重试。"
+  },
+  "optSaveFailedQuota": {
+    "message": "浏览器存储空间已满，这次更改没能保存。到「数据」页腾出空间后再重试。"
+  },
+  "optSaveFailedStale": {
+    "message": "扩展刚更新或重新加载过，这个页面已失效。刷新页面后再改一次。"
+  },
+  "optReloadPage": {
+    "message": "刷新页面"
+  },
+  "optTabUnsaved": {
+    "message": "有未保存的更改"
+  },
   "confirm": {
     "message": "确认"
   },

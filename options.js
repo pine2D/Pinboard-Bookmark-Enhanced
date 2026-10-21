@@ -3737,15 +3737,57 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function clearAutoSaveFailureAlert() {
+    _unsavedPanels.clear();
+    markUnsavedTabs(false);
     const errEl = $id("opt-global-alert");
     if (!errEl || errEl.dataset.autosaveFailure !== "1") return;
     delete errEl.dataset.autosaveFailure;
+    delete errEl.dataset.failureKind;
     errEl.textContent = "";
     errEl.classList.add("hidden");
     $id("opt-global-error")?.classList.add("hidden");
     const retry = $id("auto-save-retry");
     if (retry) retry.hidden = true;
   }
+
+  // Panels with edits since the last successful save. A save writes the whole
+  // page, so a failure cannot say which field broke it -- but it can say where
+  // the unsaved edits are: those tabs carry a dot (and a description for
+  // screen readers) until a save goes through.
+  const _unsavedPanels = new Set();
+  function noteUnsavedPanel(ev) {
+    const panel = (ev?.target?.closest?.(".panel")) || document.querySelector(".panel.active");
+    const id = panel?.id?.replace(/^panel-/, "");
+    if (id) _unsavedPanels.add(id);
+  }
+  function markUnsavedTabs(on) {
+    for (const tab of document.querySelectorAll(".tab-btn[data-panel]")) {
+      const unsaved = on && _unsavedPanels.has(tab.dataset.panel);
+      tab.classList.toggle("tab-unsaved", unsaved);
+      const ids = (tab.getAttribute("aria-describedby") || "").split(/\s+/).filter((x) => x && x !== "tab-unsaved-desc");
+      if (unsaved) ids.push("tab-unsaved-desc");
+      if (ids.length) tab.setAttribute("aria-describedby", ids.join(" "));
+      else tab.removeAttribute("aria-describedby");
+    }
+  }
+
+  // What the storage layer's rejection actually means for the user. Sync's
+  // own quota is already absorbed by the local fallback (persistSettings), so
+  // what reaches here is the write-rate limit, a full local area, or a page
+  // left behind by an extension reload -- each with a different next step.
+  function saveFailureKind(error) {
+    const msg = String(error?.message || error || "");
+    if (/context invalidated/i.test(msg)) return "stale";
+    if (/MAX_WRITE_OPERATIONS/i.test(msg)) return "rate";
+    if (/QUOTA/i.test(msg)) return "quota";
+    return "other";
+  }
+  const SAVE_FAILURE_TEXT = {
+    stale: ["optSaveFailedStale", "The extension was updated or reloaded, so this page is out of date. Reload it and make the change again."],
+    rate: ["optSaveFailedRate", "Chrome Sync is turning away saves for a moment: too many in a short time. Wait a minute, then retry."],
+    quota: ["optSaveFailedQuota", "Browser storage is full, so this change wasn't saved. Free up space on the Data page, then retry."],
+    other: ["optSaveFailed", "Some changes weren't saved, and others may already have been. Check your settings and try again."],
+  };
 
   function setAutoSaveProgress(key) {
     const el = $id("auto-save-status");
@@ -3772,9 +3814,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function reportAutoSaveFailure(error) {
     console.error("[options] save failed", error);
-    const msg = t("optSaveFailed") || "Save did not complete; some settings may already have been saved";
-    flashAutoSave("optSaveFailed", "Save did not complete; some settings may already have been saved", false);
-    setAutoSaveFailureAlert(msg);
+    const kind = saveFailureKind(error);
+    const [key, fallback] = SAVE_FAILURE_TEXT[kind];
+    flashAutoSave(key, fallback, false);
+    const errEl = $id("opt-global-alert");
+    if (errEl) errEl.dataset.failureKind = kind;
+    setAutoSaveFailureAlert(t(key) || fallback);
+    // A stale page cannot save again; the button reloads it instead.
+    const retry = $id("auto-save-retry");
+    if (retry && kind === "stale") retry.textContent = t("optReloadPage") || "Reload page";
+    markUnsavedTabs(true);
     return { ok: false, error };
   }
 
@@ -3786,8 +3835,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Debounced auto-save: triggers 500ms after last change
   let saveTimer = null;
-  function scheduleAutoSave() {
+  function scheduleAutoSave(ev) {
     if (autoSaveState.suspended) return;
+    noteUnsavedPanel(ev);
     autoSaveRevision++;
     // An earlier failure's enabled Retry button must remain available during
     // the debounce; only the active save temporarily disables it.
@@ -3882,6 +3932,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const retrySave = $id("auto-save-retry");
   retrySave?.addEventListener("click", () => {
     if (retrySave.getAttribute("aria-disabled") === "true") return;
+    if ($id("opt-global-alert")?.dataset.failureKind === "stale") { location.reload(); return; }
     setAutoSaveProgress("saving");
     saveAllSafely();
   });

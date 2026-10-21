@@ -9,12 +9,15 @@
 </head>
 <body>
   <main class="container">
-    <!-- Peripheral feedback stays in the original title slot, without live announcements on every save. -->
-    <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced - Settings</span> <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span></h1>
-    <div id="opt-global-error" class="fg-actions hidden">
-      <p id="opt-global-alert" class="opt-error hidden" role="alert"></p>
-      <button type="button" class="btn btn-sm" id="auto-save-retry" data-i18n="optRetrySave" hidden>Retry saving</button>
-    </div>
+    <!-- Peripheral feedback stays in the title row, without live announcements on every save;
+         a save failure takes the same row instead of pushing the page down. -->
+    <header>
+      <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced - Settings</span> <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span></h1>
+      <div id="opt-global-error" class="fg-actions hidden">
+        <p id="opt-global-alert" class="opt-error hidden" role="alert"></p>
+        <button type="button" class="btn btn-sm" id="auto-save-retry" data-i18n="optRetrySave" hidden>Retry saving</button>
+      </div>
+    </header>
 
     <nav class="options-nav" aria-label="Settings category" data-i18n-aria="settingsCategory">
       <div class="options-search" role="search">
@@ -50,6 +53,7 @@
           </optgroup>
         </select>
       </div>
+      <span class="sr-only" id="tab-unsaved-desc" data-i18n="optTabUnsaved">Has unsaved changes</span>
       <div class="tabs" role="tablist" aria-orientation="vertical">
         <div class="tab-group-label" id="tg-saving" role="presentation" data-i18n="tabGroupSaving">Saving</div>
         <button class="tab-btn active" id="tab-general" data-panel="general" role="tab" aria-describedby="tg-saving" aria-selected="true" aria-controls="panel-general" data-i18n="tabGeneral">Account</button>

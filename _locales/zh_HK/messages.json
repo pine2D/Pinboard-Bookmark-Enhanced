@@ -2138,6 +2138,21 @@
   "optSaveFailed": {
     "message": "部分變更未能儲存，其餘可能已經儲存。請檢查設定後再試。"
   },
+  "optSaveFailedRate": {
+    "message": "短時間內儲存次數太多，Chrome 同步暫時不接收。等一分鐘再試。"
+  },
+  "optSaveFailedQuota": {
+    "message": "瀏覽器儲存空間已滿，這次變更未能儲存。到「資料」頁騰出空間後再試。"
+  },
+  "optSaveFailedStale": {
+    "message": "擴充功能剛更新或重新載入，這個頁面已失效。重新整理頁面後再改一次。"
+  },
+  "optReloadPage": {
+    "message": "重新整理頁面"
+  },
+  "optTabUnsaved": {
+    "message": "有未儲存的變更"
+  },
   "confirm": {
     "message": "確認"
   },

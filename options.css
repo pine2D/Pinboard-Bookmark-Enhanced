@@ -235,12 +235,21 @@ button, input, select { font-family: inherit; }
   align-items: start;
 }
 html[data-options-ready] .container { visibility: visible; }
-.container > h1 { grid-column: 1 / -1; }
-h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); border-bottom: 1px solid var(--opt-border-section); padding-bottom: var(--opt-sp-4); }
-
-/* Failure-only feedback occupies the original row below the title. */
-#opt-global-error { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; align-items: center; margin: 0 0 var(--opt-sp-5); }
-#opt-global-alert { flex: 1 1 240px; margin: 0; }
+/* Title row. A save failure shares it with the title (the auto-save hint is
+   hidden meanwhile), so the alert no longer pushes the whole grid down. The
+   title's line box is the Retry button's height (.btn-sm, control-h - 4px),
+   so an alert that fits beside the title moves nothing. */
+.container > header {
+  grid-column: 1 / -1;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--opt-sp-3) var(--opt-sp-5);
+  margin-bottom: var(--opt-sp-7); border-bottom: 1px solid var(--opt-border-section); padding-bottom: var(--opt-sp-4);
+}
+h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-control-h) - 4px); color: var(--opt-fg); }
+/* Shrink-wrapped and pushed right while it fits beside the title; a message
+   too long for that drops to its own line and takes the full width there. */
+#opt-global-error { flex: 0 1 auto; max-width: 100%; flex-wrap: wrap; align-items: center; margin: 0 0 0 auto; }
+#opt-global-alert { flex: 1 1 240px; margin: 0; padding-block: var(--opt-sp-2); }
+#auto-save-retry { flex: none; white-space: nowrap; }
 
 /* ---- Tabs ---- */
 /* z-index: a sticky box is a stacking context of its own, so at z auto the
@@ -250,7 +259,7 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    and a click on it toggled the setting underneath. The static breakpoints
    below ignore it. */
 .options-nav {
-  grid-column: 1; grid-row: 3;
+  grid-column: 1; grid-row: 2;
   align-self: start;
   position: sticky; top: 24px;
   z-index: var(--opt-z-sticky);
@@ -456,6 +465,19 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
   0%, 100% { opacity: 0.35; }
   50% { opacity: 1; }
 }
+/* Edits on this tab that the last save did not take (reportAutoSaveFailure).
+   Static, in the danger ink, and after the busy dot so it wins when both apply. */
+.tab-btn.tab-unsaved::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: var(--opt-sp-3);
+  border-radius: 50%;
+  background: var(--opt-danger);
+  animation: none;
+  vertical-align: middle;
+}
 
 /* ---- Panels ---- */
 /* display:none (not visibility:hidden) so opening Settings only lays out the active
@@ -467,7 +489,7 @@ h1 { font-size: 18px; color: var(--opt-fg); margin-bottom: var(--opt-sp-7); bord
    card -- its own fill separates it from the page, so the edge drops from
    the 3:1 structural --opt-border to the hairline divider weight. */
 .panel { background: var(--opt-panel); border: 1px solid var(--opt-border-section); display: none; }
-.panel.active { min-width: 0; grid-column: 2; grid-row: 3; display: block; padding: var(--opt-sp-6); border-width: 1px; border-radius: var(--opt-radius-md); }
+.panel.active { min-width: 0; grid-column: 2; grid-row: 2; display: block; padding: var(--opt-sp-6); border-width: 1px; border-radius: var(--opt-radius-md); }
 
 /* ---- Form groups ---- */
 .fg { margin-bottom: var(--opt-rhythm); }
@@ -3966,7 +3988,7 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
     grid-template-columns: minmax(0, 1fr);
     row-gap: var(--opt-sp-6);
   }
-  .container > h1,
+  .container > header,
   .options-nav,
   .panel.active {
     grid-column: 1;

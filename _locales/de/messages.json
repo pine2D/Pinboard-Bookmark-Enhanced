@@ -2138,6 +2138,21 @@
   "optSaveFailed": {
     "message": "Einige Änderungen wurden nicht gespeichert, andere möglicherweise schon. Prüfe deine Einstellungen und versuche es erneut."
   },
+  "optSaveFailedRate": {
+    "message": "Chrome Sync nimmt gerade keine Speicherungen an: zu viele in kurzer Zeit. Warte eine Minute und versuche es dann erneut."
+  },
+  "optSaveFailedQuota": {
+    "message": "Der Browserspeicher ist voll, die Änderung wurde nicht gespeichert. Schaffe auf der Seite „Daten“ Platz und versuche es dann erneut."
+  },
+  "optSaveFailedStale": {
+    "message": "Die Erweiterung wurde aktualisiert oder neu geladen, diese Seite ist veraltet. Lade sie neu und nimm die Änderung noch einmal vor."
+  },
+  "optReloadPage": {
+    "message": "Seite neu laden"
+  },
+  "optTabUnsaved": {
+    "message": "Enthält nicht gespeicherte Änderungen"
+  },
   "confirm": {
     "message": "Bestätigen"
   },

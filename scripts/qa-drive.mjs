@@ -2389,7 +2389,7 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
     await rep.shot(page, s, "failure-at-title");
     const measure = () => page.evaluate(() => {
       const rect = (e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; };
-      return { alert: rect(document.getElementById("opt-global-alert")), retry: rect(document.getElementById("auto-save-retry")), header: rect(document.querySelector(".container > h1")), viewport: {width:innerWidth, height:innerHeight} };
+      return { alert: rect(document.getElementById("opt-global-alert")), retry: rect(document.getElementById("auto-save-retry")), header: rect(document.querySelector(".container > header")), viewport: {width:innerWidth, height:innerHeight} };
     });
     const assertVisible = (g) => {
       for (const name of ["alert", "retry", "header"]) {

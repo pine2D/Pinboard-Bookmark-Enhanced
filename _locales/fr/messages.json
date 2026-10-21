@@ -2138,6 +2138,21 @@
   "optSaveFailed": {
     "message": "Certaines modifications n’ont pas été enregistrées, d’autres l’ont peut-être été. Vérifiez vos paramètres, puis réessayez."
   },
+  "optSaveFailedRate": {
+    "message": "Chrome Sync refuse momentanément les enregistrements : trop nombreux en peu de temps. Patientez une minute, puis réessayez."
+  },
+  "optSaveFailedQuota": {
+    "message": "Le stockage du navigateur est plein : cette modification n’a pas été enregistrée. Libérez de l’espace dans « Données », puis réessayez."
+  },
+  "optSaveFailedStale": {
+    "message": "L’extension a été mise à jour ou rechargée : cette page n’est plus à jour. Rechargez-la, puis refaites la modification."
+  },
+  "optReloadPage": {
+    "message": "Recharger la page"
+  },
+  "optTabUnsaved": {
+    "message": "Contient des modifications non enregistrées"
+  },
   "confirm": {
     "message": "Confirmer"
   },
