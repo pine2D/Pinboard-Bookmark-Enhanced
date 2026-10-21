@@ -3930,9 +3930,9 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { b
   // ::after bubble is gone for good -- the reading view opens no overlay on
   // hover (user ruling), and touch never reached it.
   const setTip = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrSetErrTip"),
-    mdTranslateJs.indexOf("function _pbpTrMarkFailed"));
-  check(setTip.includes("btn.dataset.tip") && setTip.includes('btn.setAttribute("aria-label"') &&
-    failed.includes("_pbpTrSetErrTip(btn,") && partial.includes("_pbpTrSetErrTip(btn,") &&
+    mdTranslateJs.indexOf("function _pbpTrBuildErrCard"));
+  check(setTip.includes("card.dataset.tip") && setTip.includes('"aria-describedby"') && !setTip.includes('"aria-label"') &&
+    failed.includes("_pbpTrSetErrTip(card,") && partial.includes("_pbpTrSetErrTip(card,") &&
     !failed.includes("btn.title") && !partial.includes("btn.title") &&
     setTip.includes('"pb-tr-err-reason"') && setTip.includes("reason.textContent = shown || tip") &&
     mdCss.includes(".pb-tr-err-reason {") && !mdCss.includes(".pb-tr-err::after") && !mdCss.includes("content: attr(data-tip)"),

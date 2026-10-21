@@ -365,6 +365,12 @@ button, input, select, textarea { font-family: inherit; }
   transition: background-color 150ms ease, color 150ms ease;
 }
 .source-badge > .src-seg + .src-seg { border-left: 1px solid var(--btn-border); }
+/* In the rail the engine switch is the sibling of the Raw/Rendered .view-toggle,
+   so it takes that control's shape and rung: full-width shell, segments
+   sharing the row, md rung (13px face, 1 + 4 + 16 + 4 + 1 = 26px). The 20px sm
+   rung above stays for the video-column toggles that reuse .src-seg. */
+.rail .source-badge { display: flex; width: 100%; background: var(--btn-bg); }
+.rail .source-badge > .src-seg { flex: 1 1 auto; min-width: 0; padding: var(--sp-1) var(--sp-3); font-size: 13px; line-height: 16px; text-align: center; }
 /* Same pressed vocabulary as .toggle-btn.active (md-preview.css ~:265) --
    btn-hover fill + --link-on-raised text; the fused shell and
    dividers stay neutral in every state. */
@@ -2891,69 +2897,76 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   border-radius: var(--radius-md);
 }
 
-/* Per-block failure pill: inline SVG + retry label; hover/focus exposes the reason. */
+/* Per-block failure card: a non-interactive notice (status icon + reason +
+   the provider's raw text) with ONE real button, the retry. Only the button
+   is clickable; the text lines are plain, selectable copy. The reason is
+   printed in the card -- no hover / focus bubble: the reading view never
+   opens overlays on hover (user ruling), and a reason that only appears
+   under a pointer is lost on touch. Grid: the warning icon hangs in column 1
+   beside the text column, so reason, raw and button share one left edge.
+   Medium radius: a full pill stretched over several lines reads as a swollen
+   capsule. Danger text 6.2:1 light / 6.1:1 dark on the paper. */
 .pb-tr-err {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0.25em 0 1em;
-  padding: 3px 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  row-gap: var(--sp-1);
+  width: fit-content;
+  max-width: 100%;
+  margin: var(--sp-1) 0 var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--danger);
-  border-radius: var(--radius-full);
-  background: transparent;
+  border-radius: var(--radius-md);
   color: var(--danger);
   font-size: 12px;
-  cursor: pointer;
+  text-align: start;
 }
-.pb-tr-err svg { width: 13px; height: 13px; flex-shrink: 0; }
-/* The failure reason is printed in the pill itself, above the action -- no
-   hover / focus bubble: the reading view never opens overlays on hover (user
-   ruling), and a reason that only appears under a pointer is lost on touch.
-   The accessible name already carries it (_pbpTrSetErrTip), so this copy is
-   aria-hidden. */
-/* With its reason it is a multi-line notice -- why (danger, 6.2:1 light /
-   6.1:1 dark on the paper), the provider's own words, then the action -- so
-   it takes the medium radius: a full pill stretched over several lines reads
-   as a swollen capsule. */
-.pb-tr-err { flex-wrap: wrap; max-width: 100%; text-align: start; border-radius: var(--radius-md); }
-.pb-tr-err-reason { flex-basis: 100%; font-weight: normal; overflow-wrap: anywhere; }
+.pb-tr-err-ico { display: inline-flex; align-items: center; height: 18px; grid-column: 1; }
+.pb-tr-err-ico svg { width: 13px; height: 13px; flex-shrink: 0; }
+.pb-tr-err-reason { grid-column: 2; font-weight: normal; overflow-wrap: anywhere; }
 /* Provider's own wording, kept for troubleshooting: small and secondary, and
-   selectable (a button's text is not by default). */
-.pb-tr-err-raw { flex-basis: 100%; color: var(--fg-secondary); font-size: 11px; font-weight: normal; line-height: 1.4; overflow-wrap: anywhere; user-select: text; cursor: text; }
-/* D8-4: swapping to --btn-hover dropped --danger text under AA (worst case
-   3.74:1 dark). Background stays transparent (rest-state contrast already
-   clears AA); hover cue is a currentColor ring instead. */
-.pb-tr-err:hover { box-shadow: inset 0 0 0 1px currentColor; }
-.pb-tr-err:disabled { opacity: 0.5; cursor: wait; }
-.pb-tr-err:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-
-/* One-click "retry all failed" — shown in the rail translate section when >=1 block failed. */
-#tr-retry-all {
+   selectable. */
+.pb-tr-err-raw { grid-column: 2; color: var(--fg-secondary); font-size: 11px; font-weight: normal; line-height: 1.4; overflow-wrap: anywhere; user-select: text; }
+/* The retry: a quiet sm-rung action (20px: 1 + 16 + 1 inner + the 1px border
+   each side = 20; 11px face, same arithmetic as .src-seg's old rung) -- danger
+   text on the neutral button fill, refresh icon. Hover keeps the fill and
+   rings the edge in danger (D8-4: swapping to --btn-hover dropped --danger
+   text under AA, worst case 3.74:1 dark). */
+.pb-tr-err-retry {
+  grid-column: 2;
+  justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: var(--sp-2);
-  padding: var(--sp-1) var(--sp-3);
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-full);
-  background: transparent;
+  gap: var(--sp-1);
+  max-width: 100%;
+  padding: 1px var(--sp-2);
+  line-height: 16px;
+  border: 1px solid var(--btn-border);
+  border-radius: var(--radius-md);
+  background: var(--btn-bg);
   color: var(--danger);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
+  transition: border-color 150ms ease;
 }
-/* MUST restate [hidden] AFTER display:inline-flex or the button shows while hidden
-   (inline-flex overrides the UA [hidden]{display:none}). */
+.pb-tr-err-retry svg { width: 12px; height: 12px; flex-shrink: 0; }
+.pb-tr-err-retry:hover { border-color: var(--danger); }
+.pb-tr-err-retry:disabled { opacity: 0.5; cursor: wait; }
+.pb-tr-err-retry:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+
+/* One-click "retry all failed" -- shown in the rail translate section when >=1
+   block failed. An ordinary rail action button (.action-btn, md rung 26px,
+   same family as the translate button); this only adds the danger text tone
+   and hover ring (see .pb-tr-err-retry for why hover is a ring). */
+#tr-retry-all { margin-top: var(--sp-2); max-width: 100%; color: var(--danger); }
+/* MUST restate [hidden] AFTER the display of .action-btn or the button shows while hidden. */
 #tr-retry-all[hidden] { display: none; }
-#tr-retry-all svg { width: 13px; height: 13px; flex-shrink: 0; }
-/* One line, always: a pill that wraps reads as two stacked capsules. A label
-   longer than the rail ends in an ellipsis (its name stays in the title). */
-#tr-retry-all { max-width: 100%; }
+/* One line, always; a label longer than the rail ends in an ellipsis (its
+   name stays in the title). */
 #tr-retry-all > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* D8-4: same fix as .pb-tr-err — keep transparent background on hover, ring instead. */
-#tr-retry-all:hover { box-shadow: inset 0 0 0 1px currentColor; }
+#tr-retry-all:hover { background: var(--btn-bg); border-color: var(--danger); }
 #tr-retry-all:disabled { opacity: 0.5; cursor: wait; }
-#tr-retry-all:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
 /* Rail translate section */
 #tr-section .row .action-btn { flex: 1; justify-content: center; }

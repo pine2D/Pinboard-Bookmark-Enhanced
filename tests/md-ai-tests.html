@@ -8518,45 +8518,27 @@ suiteIf("translation failure pill text (item 6)", "pbpTrErrLines", () => {
     const l2 = pbpTrErrLines(pbpAiErrorText(e), e, "HINT");
     assertEq(l2.reason, "aiErrRequestFailed HINT");
   });
-  test("pill reads reason, raw, then the retry action; name starts with the action", () => {
-    const btn = document.createElement("button");
-    btn.className = "pb-tr-err";
-    const lab = document.createElement("span"); lab.textContent = "Retry this paragraph"; btn.appendChild(lab);
-    _pbpTrSetErrTip(btn, "Translation failed - Network or server error", "Network or server error", "HTTP 500: upstream");
-    const kids = [...btn.children].map((c) => c.className || c.textContent);
-    assertEq(kids[0], "pb-tr-err-reason");
-    assertEq(kids[1], "pb-tr-err-raw");
-    assertEq(kids[2], "Retry this paragraph");
-    assert(btn.getAttribute("aria-label").startsWith("Retry this paragraph"), "aria-label starts with the action");
-    assert(btn.getAttribute("aria-label").includes("HTTP 500: upstream"), "raw is in the accessible name");
+  test("failure card reads status icon + reason, raw, then the retry button (refresh icon, action name)", () => {
+    const card = _pbpTrBuildErrCard({}, { n: 7 });
+    _pbpTrSetErrTip(card, "Translation failed - Network or server error", "Network or server error", "HTTP 500: upstream");
+    const kids = [...card.children].map((c) => c.className);
+    assertEq(kids.join("|"), "pb-tr-err-ico|pb-tr-err-reason|pb-tr-err-raw|pb-tr-err-retry");
+    assert(card.tagName === "DIV", "the card itself is not a button");
+    const act = card.querySelector(".pb-tr-err-retry");
+    assert(act && act.tagName === "BUTTON", "the retry is a real button");
+    const norm = (h) => { const d = document.createElement("div"); d.innerHTML = h; return d.innerHTML; };
+    assertEq(norm(act.querySelector("svg").outerHTML), norm(PBP_ICONS.refresh), "the retry button carries the refresh icon");
+    assert(!act.innerHTML.includes(PBP_ICONS.warning), "no warning icon on the action");
+    assert(norm(card.querySelector(".pb-tr-err-ico").innerHTML) === norm(PBP_ICONS.warning), "the warning icon sits on the status line");
+    assertEq(act.textContent.trim(), t("trRetryBlock"), "the button's name is the action only");
+    assert(!act.hasAttribute("aria-label"), "no concatenated aria-label");
+    const desc = act.getAttribute("aria-describedby").split(" ").map((id) => card.querySelector("#" + id));
+    assertEq(desc.length, 2); assert(desc[0] && desc[1], "describedby resolves to the reason and raw lines");
     // Re-tip without raw (a retry that failed differently): the raw line goes.
-    _pbpTrSetErrTip(btn, "Translation failed - key", "key problem", "");
-    assertEq(btn.querySelectorAll(".pb-tr-err-raw").length, 0);
-    assertEq(btn.querySelector(".pb-tr-err-reason").textContent, "key problem");
-  });
-  test("selecting the raw provider text to copy it never retries (drag / double-click fire click)", () => {
-    const btn = document.createElement("button");
-    btn.className = "pb-tr-err";
-    const lab = document.createElement("span"); lab.textContent = "Retry this paragraph"; btn.appendChild(lab);
-    _pbpTrSetErrTip(btn, "Translation failed - Network or server error", "Network or server error", "HTTP 500: upstream");
-    document.body.appendChild(btn);
-    try {
-      const raw = btn.querySelector(".pb-tr-err-raw");
-      getSelection().removeAllRanges();
-      assert(_pbpTrErrClickIsCopy({ target: raw }, btn) === true, "a click on the raw line is a copy gesture");
-      assert(_pbpTrErrClickIsCopy({ target: btn }, btn) === false, "keyboard / plain click on the pill retries");
-      assert(_pbpTrErrClickIsCopy({ target: lab }, btn) === false, "a click on the action label retries");
-      const range = document.createRange();
-      range.setStart(btn.querySelector(".pb-tr-err-reason").firstChild, 0);
-      range.setEnd(btn.querySelector(".pb-tr-err-reason").firstChild, 7);
-      getSelection().addRange(range);
-      assert(_pbpTrErrClickIsCopy({ target: lab }, btn) === true, "a click that ends with text selected inside the pill is a copy gesture");
-      getSelection().removeAllRanges();
-      const outside = document.createElement("p"); outside.textContent = "elsewhere in the article"; document.body.appendChild(outside);
-      const r2 = document.createRange(); r2.selectNodeContents(outside); getSelection().addRange(r2);
-      assert(_pbpTrErrClickIsCopy({ target: btn }, btn) === false, "a selection elsewhere does not block the retry");
-      getSelection().removeAllRanges(); outside.remove();
-    } finally { btn.remove(); }
+    _pbpTrSetErrTip(card, "Translation failed - key", "key problem", "");
+    assertEq(card.querySelectorAll(".pb-tr-err-raw").length, 0);
+    assertEq(card.querySelector(".pb-tr-err-reason").textContent, "key problem");
+    assertEq(act.getAttribute("aria-describedby"), card.querySelector(".pb-tr-err-reason").id);
   });
 });
 
@@ -10204,12 +10186,43 @@ suiteIf("T4 translate: article replacement", "_pbpTrOnArticleWillReplace", () =>
       const pills = Array.from(view.querySelectorAll(".pb-tr-err"));
       assertEq(pills.length, 2, "both failure paths planted a pill");
       for (const pill of pills) {
-        const visible = pill.querySelector(":scope > span:not(.pb-tr-err-reason):not(.pb-tr-err-raw)").textContent;
-        const name = pill.getAttribute("aria-label") || "";
-        assert(visible && name.startsWith(visible), "accessible name '" + name + "' starts with visible label '" + visible + "'");
-        assert(name.includes(pill.dataset.tip), "accessible name still carries the failure reason");
+        const act = pill.querySelector(".pb-tr-err-retry");
+        const visible = act.querySelector(":scope > span").textContent;
+        assert(visible && act.textContent.trim() === visible, "the button's name is its visible label '" + visible + "'");
+        assert(!act.hasAttribute("aria-label"), "no override label");
+        assert(document.getElementById(act.getAttribute("aria-describedby").split(" ")[0]).textContent.length > 0, "the failure reason hangs off the button via aria-describedby");
       }
     } finally {
+      _pbpTrState = saved;
+      view.remove();
+    }
+  });
+
+  test("only the retry button retries -- clicking the reason or raw text never does", () => {
+    const saved = _pbpTrState;
+    const st = _t4TrState("https://example.test/err-card-click");
+    const view = _t4View("<p>delta one</p>");
+    _pbpTrState = st;
+    const realRetry = _pbpTrRetryBlock;
+    const started = [];
+    _pbpTrRetryBlock = async (_st, work, card) => { started.push(card); };   // the paid path, spied
+    try {
+      const blocks = pbpAiBlocks();
+      const w = _t4Work(blocks[0].n, "delta one", st.rev);
+      st.work = [w];
+      _pbpTrMarkFailed(st, w, "boom", Object.assign(new Error("HTTP 500: raw words"), { status: 500 }));
+      const card = view.querySelector(".pb-tr-err");
+      assert(card, "card planted");
+      card.querySelector(".pb-tr-err-reason").click();
+      card.querySelector(".pb-tr-err-raw").click();
+      card.querySelector(".pb-tr-err-ico").click();
+      card.click();
+      assertEq(started.length, 0, "clicking the status text or the card spends nothing");
+      card.querySelector(".pb-tr-err-retry").click();
+      assertEq(started.length, 1, "the retry button does");
+      assert(started[0] === card, "and hands the card over");
+    } finally {
+      _pbpTrRetryBlock = realRetry;
       _pbpTrState = saved;
       view.remove();
     }

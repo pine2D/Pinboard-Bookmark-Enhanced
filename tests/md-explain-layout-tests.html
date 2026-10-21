@@ -155,7 +155,7 @@ function assertLayout(frame, locale) {
         '<div id="search-pop" class="pop-panel" style="display:flex">Search</div>',
         '<div id="kbd-help-pop" class="pop-panel" style="display:flex">Shortcuts</div>',
         '<div id="typo-pop" class="pop-panel" style="display:flex">Typography</div>',
-        '<button class="pb-tr-err"><span>Retry</span><span class="pb-tr-err-reason">Translation failed</span></button>'
+        '<div class="pb-tr-err"><span class="pb-tr-err-reason">Translation failed</span><button class="pb-tr-err-retry"><span>Retry</span></button></div>'
       ].join("");
       doc.body.appendChild(probes);
       const failures = [];

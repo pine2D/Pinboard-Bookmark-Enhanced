@@ -1578,6 +1578,7 @@ function _pbpTrBuildSection(st) {
   const retryAll = document.createElement("button");
   retryAll.type = "button";
   retryAll.id = "tr-retry-all";
+  retryAll.className = "action-btn";                  // the rail's md-rung button; #tr-retry-all only adds the danger tone
   retryAll.hidden = true;
   retryAll.innerHTML = PBP_TR_RETRY_SVG;               // static inline SVG only (no emoji)
   const raLab = document.createElement("span");
@@ -2661,92 +2662,91 @@ function pbpTrErrLines(text, err, hint) {
   return { reason, raw };
 }
 
-// Error pill reason + accessible name. The name must START with the visible
-// label ("Retry this paragraph" / "Grant access and retry") so screen-reader
-// and voice-control users hear and can say the action (WCAG 2.5.3 Label in
-// Name); the failure reason follows it. On screen the pill reads top-down:
-// reason (.pb-tr-err-reason), the raw provider text (.pb-tr-err-raw, small,
-// selectable), then the retry action -- never a hover bubble, which the
-// reading view does not use and touch never reaches. Both text lines are
-// aria-hidden: the name already carries them.
+// Failure card (critique 2026-10-21): a non-interactive container -- the
+// warning icon + reason line (status), the provider's raw text (small,
+// selectable, nothing happens on click), then ONE real button, the retry,
+// with the refresh icon. Only that button spends tokens. The reason is
+// printed (never a hover bubble: the reading view opens none, and touch never
+// reaches one); the button's accessible name is its visible action label
+// (WCAG 2.5.3) and the reason/raw lines hang off it via aria-describedby.
 // `shown` (optional) is the reason line's text when it should be shorter than
-// the name: the cause alone ("Network or server error…"), since the action
-// line already says the block failed. `raw` (optional) is the second line.
-function _pbpTrSetErrTip(btn, tip, shown, raw) {
-  btn.dataset.tip = tip;
-  const lab = btn.querySelector(":scope > span:not(.pb-tr-err-reason):not(.pb-tr-err-raw)");
-  const visible = lab ? lab.textContent : "";
-  btn.setAttribute("aria-label", visible ? visible + ": " + tip + (raw ? " (" + raw + ")" : "") : tip);
-  // The pill sits inside the article, whose lang is the ARTICLE's; its reason
+// the tip: the cause alone ("Network or server error..."), since the button
+// already says the block failed. `raw` (optional) is the second line.
+function _pbpTrSetErrTip(card, tip, shown, raw) {
+  card.dataset.tip = tip;
+  // The card sits inside the article, whose lang is the ARTICLE's; its reason
   // line is UI-locale text, so it carries the UI lang (a Chinese UI over an
   // English article otherwise drew the reason in the Traditional-first stack).
-  if (document.documentElement.lang) btn.lang = document.documentElement.lang;
-  let reason = btn.querySelector(".pb-tr-err-reason");
+  if (document.documentElement.lang) card.lang = document.documentElement.lang;
+  const n = card.dataset.pbTrErr || "";
+  let ico = card.querySelector(":scope > .pb-tr-err-ico");
+  if (!ico) {
+    ico = document.createElement("span");
+    ico.className = "pb-tr-err-ico";
+    ico.setAttribute("aria-hidden", "true");
+    ico.innerHTML = PBP_TR_ERR_SVG;                  // static inline SVG only
+    card.insertBefore(ico, card.firstChild);         // status icon first, action last
+  }
+  let reason = card.querySelector(".pb-tr-err-reason");
   if (!reason) {
     reason = document.createElement("span");
     reason.className = "pb-tr-err-reason";
-    reason.setAttribute("aria-hidden", "true");
-    btn.insertBefore(reason, btn.firstChild);   // headline first, action last
+    ico.insertAdjacentElement("afterend", reason);
   }
   reason.textContent = shown || tip;
-  let rawEl = btn.querySelector(".pb-tr-err-raw");
+  if (n) reason.id = "pb-tr-err-reason-" + n;
+  let rawEl = card.querySelector(".pb-tr-err-raw");
   if (raw) {
     if (!rawEl) {
       rawEl = document.createElement("span");
       rawEl.className = "pb-tr-err-raw";
-      rawEl.setAttribute("aria-hidden", "true");
       reason.insertAdjacentElement("afterend", rawEl);
     }
     rawEl.textContent = raw;
+    if (n) rawEl.id = "pb-tr-err-raw-" + n;
     // The provider's own words: usually English, sometimes Chinese (DeepSeek,
-    // Qwen, ...). Latin judges to "" and keeps the pill's lang.
+    // Qwen, ...). Latin judges to "" and keeps the card's lang.
     if (typeof pbpAiContentLang === "function" && typeof pbpAiSetLang === "function") {
-      pbpAiSetLang(rawEl, pbpAiContentLang(raw, [btn.lang]));
+      pbpAiSetLang(rawEl, pbpAiContentLang(raw, [card.lang]));
     }
   } else if (rawEl) {
     rawEl.remove();
   }
+  const act = card.querySelector(".pb-tr-err-retry");
+  if (act && n) act.setAttribute("aria-describedby", reason.id + (raw ? " " + rawEl.id : ""));
 }
 
-// A pill click that is really a copy gesture: the raw provider line is
-// selectable text (for troubleshooting), and Chromium fires the button's
-// click at the end of a drag-select inside it and on each click of a
-// double-click word select -- each one used to start a paid retry. Clicks on
-// the raw line, or that end with a text selection inside the pill, retry
-// nothing; keyboard activation (target = the pill, no selection) is
-// untouched.
-function _pbpTrErrClickIsCopy(e, btn) {
-  const target = e && e.target;
-  if (target && typeof target.closest === "function" && target.closest(".pb-tr-err-raw")) return true;
-  const sel = typeof window.getSelection === "function" ? window.getSelection() : null;
-  if (!sel || sel.isCollapsed || !String(sel).trim()) return false;
-  return btn.contains(sel.anchorNode) || btn.contains(sel.focusNode);
+// The failure card for block w: the retry button is built here (refresh icon +
+// "retry this block" label) and is the card's only click target.
+function _pbpTrBuildErrCard(st, w) {
+  const card = document.createElement("div");
+  card.className = "pb-tr-err";
+  card.dataset.pbTrErr = String(w.n);
+  const act = document.createElement("button");
+  act.type = "button";
+  act.className = "pb-tr-err-retry";
+  act.innerHTML = PBP_TR_RETRY_SVG;                  // static inline SVG only
+  const lab = document.createElement("span");
+  lab.textContent = t("trRetryBlock");
+  act.appendChild(lab);
+  card.appendChild(act);
+  act.addEventListener("click", () => { _pbpTrRetryBlock(st, w, card).catch(() => {}); });
+  return card;
 }
 
-// Per-block failure: inline error pill after the block, the reason printed
-// in it; click retries this single block.
+// Per-block failure: inline failure card after the block, the reason printed
+// in it; its retry button retries this single block.
 function _pbpTrMarkFailed(st, w, message, err) {
-  if (!_pbpTrItemCurrent(st, w)) return;   // same fence as _pbpTrFill: no pill on a replaced article
+  if (!_pbpTrItemCurrent(st, w)) return;   // same fence as _pbpTrFill: no card on a replaced article
   const orig = pbpAiBlockEl(w.n);
   if (!orig) return;
   const sib = orig.nextElementSibling;
   if (sib && sib.classList && (sib.classList.contains("pb-tr") || sib.classList.contains("pb-tr-err"))) sib.remove();
-  delete orig.dataset.pbTrDone; // tr-only scroll targeting assumes pbTrDone ⇒ a visible .pb-tr sibling
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "pb-tr-err";
-  btn.dataset.pbTrErr = String(w.n);
-  btn.innerHTML = PBP_TR_ERR_SVG;                   // static inline SVG only
-  const lab = document.createElement("span");
-  lab.textContent = t("trRetryBlock");
-  btn.appendChild(lab);
+  delete orig.dataset.pbTrDone; // tr-only scroll targeting assumes pbTrDone => a visible .pb-tr sibling
+  const card = _pbpTrBuildErrCard(st, w);
   const lines = pbpTrErrLines(message, err);
-  _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + lines.reason, lines.reason, lines.raw);
-  orig.insertAdjacentElement("afterend", btn);
-  btn.addEventListener("click", (e) => {
-    if (_pbpTrErrClickIsCopy(e, btn)) return;
-    _pbpTrRetryBlock(st, w, btn).catch(() => {});
-  });
+  _pbpTrSetErrTip(card, t("trBlockFailed") + " - " + lines.reason, lines.reason, lines.raw);
+  orig.insertAdjacentElement("afterend", card);
   _pbpTrSyncRetryAll();
 }
 
@@ -2787,20 +2787,9 @@ function _pbpTrMarkPartial(st, w, failedParts) {
   const anchor = (tr && tr.classList && tr.classList.contains("pb-tr")) ? tr : orig;
   const after = anchor.nextElementSibling;
   if (after && after.classList && after.classList.contains("pb-tr-err")) after.remove();
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "pb-tr-err";
-  btn.dataset.pbTrErr = String(w.n);
-  btn.innerHTML = PBP_TR_ERR_SVG;
-  const lab = document.createElement("span");
-  lab.textContent = t("trRetryBlock");
-  btn.appendChild(lab);
-  _pbpTrSetErrTip(btn, failedParts > 0 ? t("trPartsUntranslated", String(failedParts)) : t("trBlockFailed"));
-  anchor.insertAdjacentElement("afterend", btn);
-  btn.addEventListener("click", (e) => {
-    if (_pbpTrErrClickIsCopy(e, btn)) return;
-    _pbpTrRetryBlock(st, w, btn).catch(() => {});
-  });
+  const card = _pbpTrBuildErrCard(st, w);
+  _pbpTrSetErrTip(card, failedParts > 0 ? t("trPartsUntranslated", String(failedParts)) : t("trBlockFailed"));
+  anchor.insertAdjacentElement("afterend", card);
   _pbpTrSyncRetryAll();
 }
 
@@ -2880,8 +2869,11 @@ async function _pbpTrRetryBlock(st, w, btn) {
   // replaced article buys a translation of text nobody can see any more.
   if (!_pbpTrItemCurrent(st, w)) { btn.remove(); _pbpTrSyncRetryAll(); return; }
   if (st.running) return;   // a batch run owns the queue + cache; don't fire a concurrent single-block request
-  if (btn.disabled) return;
-  btn.disabled = true;
+  // `btn` is the failure card; the real <button> inside it carries disabled
+  // state and the label (a bare button passed by older callers is its own act).
+  const act = btn.querySelector(".pb-tr-err-retry") || btn;
+  if (act.disabled) return;
+  act.disabled = true;
   // Target-language snapshot, same discipline as _pbpTrFlushCache's D8
   // constraint: a language change is only DEFERRED while st.running is set,
   // and this path deliberately never sets it -- so the switch (and the reset
@@ -2891,11 +2883,11 @@ async function _pbpTrRetryBlock(st, w, btn) {
   // new language's key would be restored as a "hit" indefinitely.
   const lang = st.target.code;
   const langName = st.target.name;
-  const label = btn.querySelector(":scope > span:not(.pb-tr-err-reason):not(.pb-tr-err-raw)");
+  const label = act.querySelector(":scope > span");
   if (st.permissionError) {
     if (label) label.textContent = t("aiGrantRetry");
     const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
-    if (!recovered) { btn.disabled = false; return; }
+    if (!recovered) { act.disabled = false; return; }
     st.permissionError = null;
     if (label) label.textContent = t("trRetryBlock");
   }
@@ -2920,7 +2912,7 @@ async function _pbpTrRetryBlock(st, w, btn) {
     // sibling we want to move focus into. If the pill (btn) is the currently
     // focused element, hand focus to that new .pb-tr instead of letting
     // btn.remove() drop focus to <body> (audit md-translate.js:1000).
-    const hadFocus = document.activeElement === btn;
+    const hadFocus = btn.contains(document.activeElement);
     _pbpTrFill(st, w, result.text);
     if (hadFocus) {
       const tr = pbpAiBlockEl(w.n) && pbpAiBlockEl(w.n).nextElementSibling;
@@ -2948,7 +2940,7 @@ async function _pbpTrRetryBlock(st, w, btn) {
   } catch (e) {
     if (e && e.code === "host_permission") st.permissionError = e;
     if (label) label.textContent = t(e && e.code === "host_permission" ? "aiGrantRetry" : "trRetryBlock");
-    btn.disabled = false;
+    act.disabled = false;
     const lines = pbpTrErrLines(pbpAiErrorText(e), e, pbpAiOverrideErrHint(e, st.s));
     _pbpTrSetErrTip(btn, t("trBlockFailed") + " - " + lines.reason, lines.reason, lines.raw);
     _pbpTrNoteStatusPage(st, e);

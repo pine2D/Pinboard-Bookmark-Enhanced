@@ -2092,10 +2092,7 @@ async function driveReaderEdge(context, worker, extId, rep) {
       await page.evaluate(() => {
         const blocks = [...document.querySelectorAll("#rendered-view [data-pb]")];
         const target = blocks[2];
-        const btn = document.createElement("button");
-        btn.type = "button"; btn.className = "pb-tr-err"; btn.dataset.pbTrErr = target.dataset.pb || "2";
-        btn.innerHTML = PBP_TR_ERR_SVG;
-        const lab = document.createElement("span"); lab.textContent = t("trRetryBlock"); btn.appendChild(lab);
+        const btn = _pbpTrBuildErrCard({}, { n: Number(target.dataset.pb || 2) });
         // The production describe + split: localized headline, raw text second.
         const err = Object.assign(new Error("HTTP 500: upstream provider returned an internal error while generating the translation for this paragraph"), { status: 500 });
         const lines = pbpTrErrLines(pbpAiErrorText(err), err);
