@@ -2816,6 +2816,19 @@
       }
     }
   },
+  "trHotkeyAsk": {
+    "message": "Около $COUNT$ токенов · $MODEL$. Нажмите t ещё раз, чтобы перевести.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trHotkeyNoAsk": {
+    "message": "Больше не спрашивать"
+  },
+  "optTrHotkeyConfirm": {
+    "message": "Спрашивать перед переводом по клавише t"
+  },
   "trActualUsage": {
     "message": "Расход: вход $IN$ / выход $OUT$ токенов",
     "placeholders": {

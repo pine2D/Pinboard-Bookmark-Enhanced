@@ -999,6 +999,19 @@ function pbpTrSingleKeyAllowed(event, tagName, isContentEditable, rawActive) {
   return !pbpTrIsTypingContext(tagName, isContentEditable);
 }
 
+// The bare t key spends tokens like the rail button, but without the rail's
+// price line when the rail is not on screen (drawer closed, zen) -- and a long
+// article is tens of thousands of tokens. It starts at once only when the
+// reader can SEE a small price; every other case asks first (2026-10-21).
+// Code constants, deliberately not settings.
+const PBP_TR_HOTKEY_FREE_TOKENS = 5000;
+const PBP_TR_HOTKEY_ASK_MS = 8000;
+function pbpTrHotkeyShouldAsk(confirmSetting, railVisible, tokens) {
+  if (confirmSetting === false) return false;
+  if (!railVisible) return true;
+  return !(Number.isFinite(tokens) && tokens < PBP_TR_HOTKEY_FREE_TOKENS);
+}
+
 function pbpTrNextMode(mode) {
   if (mode === "original") return "bilingual";
   if (mode === "bilingual") return "translated";
@@ -1181,6 +1194,23 @@ async function pbpTrInit(detail) {
     });
   }
 
+  // "Don't ask again" lives in ordinary settings, so the options switch (or the
+  // bar's own checkbox on another reader tab) reaches this page live. Re-read
+  // the EFFECTIVE value from the routed area; never trust one area's newValue.
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+    let askGen = 0;
+    chrome.storage.onChanged.addListener(async (changes, area) => {
+      if (area !== "sync" && area !== "local") return;
+      if (!(changes.trHotkeyConfirm || changes.optSyncEnabled)) return;
+      if (typeof pbpSettingsAreaName === "function" && area !== await pbpSettingsAreaName() && !changes.optSyncEnabled) return;
+      const gen = ++askGen;
+      try {
+        const v = (await (await getSettingsStorage()).get({ trHotkeyConfirm: true })).trHotkeyConfirm;
+        if (gen === askGen && st.s) st.s.trHotkeyConfirm = v !== false;
+      } catch (_) { /* keep the value this page already holds */ }
+    });
+  }
+
   // tr-only escape hatch: click a translated block to peek at its original
   // (pointer only -- see _pbpTrPeekToggle; deferred past a double-click).
   view.addEventListener("click", _pbpTrPeekOnClick);
@@ -1226,7 +1256,7 @@ async function pbpTrInit(detail) {
     if (key === "t") {
       if (!document.getElementById("tr-section")) return;
       e.preventDefault();
-      _pbpTrTrigger(st);
+      _pbpTrHotkey(st);
       return;
     }
     if (!document.getElementById("tr-view-toggle")) return;
@@ -1413,6 +1443,7 @@ function _pbpTrRenderEstimate(st, est) {
 // keeps its own word order: it is split at the model's slot, not rebuilt.
 function _pbpTrPaintEstimate(est, chars, s) {
   const count = String(pbpAiEstimateTokens(chars) * 3);
+  est.dataset.tokens = count;
   const model = _pbpTrModelLabel(s);
   const SLOT = "\u0001";
   const shaped = t("trEstCost", count, SLOT);
@@ -1606,9 +1637,101 @@ function _pbpTrBuildSection(st) {
   stop.addEventListener("click", () => { if (st.ctrl) st.ctrl.abort(); });
 }
 
+// ---- t key: confirm before spending tokens the reader cannot see ----------
+let _pbpTrAsk = null; // { bar, timer, onKey } while the confirm bar is up
+
+// True only when the rail's price line is really on screen: not zen, not a
+// closed drawer (the rail turns visibility:hidden), not a collapsed section.
+function _pbpTrHotkeyRailVisible() {
+  if (document.body.classList.contains("zen")) return false;
+  const est = document.getElementById("tr-estimate");
+  if (!est || est.hidden || est.getClientRects().length === 0) return false;
+  return getComputedStyle(est).visibility === "visible";
+}
+
+// The same figure the rail prints (data-tokens is stamped by the painter);
+// NaN when the painter has not run.
+function _pbpTrHotkeyTokens(st) {
+  const est = document.getElementById("tr-estimate");
+  const shown = est && est.dataset ? Number(est.dataset.tokens) : NaN;
+  if (Number.isFinite(shown) && shown > 0) return shown;
+  const chars = st.approxChars || (st.work || []).reduce((a, w) => a + w.shielded.text.length, 0);
+  return chars > 0 ? pbpAiEstimateTokens(chars) * 3 : NaN;
+}
+
+function _pbpTrAskClose() {
+  const a = _pbpTrAsk;
+  if (!a) return;
+  _pbpTrAsk = null;
+  clearTimeout(a.timer);
+  document.removeEventListener("keydown", a.onKey, true);
+  if (a.bar.isConnected) a.bar.remove();
+}
+
+function _pbpTrHotkey(st) {
+  if (_pbpTrAsk) { _pbpTrTrigger(st); return; } // second t: confirmed
+  // Nothing to spend (running, or a completed current translation): the
+  // normal path only expands the section / ignores the key.
+  if (st.running || (st.status === "done" && !st.staleVerdict)) { _pbpTrTrigger(st); return; }
+  const tokens = _pbpTrHotkeyTokens(st);
+  if (!pbpTrHotkeyShouldAsk(st.s && st.s.trHotkeyConfirm, _pbpTrHotkeyRailVisible(), tokens)) {
+    _pbpTrTrigger(st);
+    return;
+  }
+  _pbpTrAskOpen(st, tokens);
+}
+
+function _pbpTrAskOpen(st, tokens) {
+  const view = document.getElementById("rendered-view");
+  if (!view || !view.parentNode) { _pbpTrTrigger(st); return; }
+  const bar = document.createElement("div");
+  bar.id = "tr-ask";
+  bar.className = "msg-bar";
+  bar.setAttribute("role", "alert");
+  const msg = document.createElement("span");
+  msg.textContent = t("trHotkeyAsk", Number.isFinite(tokens) ? String(tokens) : "?", _pbpTrModelLabel(st.s));
+  const lab = document.createElement("label");
+  const box = document.createElement("input");
+  box.type = "checkbox";
+  lab.append(box, document.createTextNode(t("trHotkeyNoAsk")));
+  bar.append(msg, lab);
+  view.parentNode.insertBefore(bar, view);
+
+  // Esc or any other key cancels; t confirms (also from the checkbox, where the
+  // typing gate would swallow it). Tab/modifiers/Space/Enter are how the
+  // checkbox is reached and toggled, so they leave the bar up.
+  const onKey = (e) => {
+    const k = String(e.key || "");
+    if (k === "Tab" || k === "Shift" || k === "Control" || k === "Alt" || k === "Meta" || k === "CapsLock") return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const inBar = bar.contains(e.target);
+    if (inBar && (k === " " || k === "Enter")) return;
+    if (k.toLowerCase() === "t" && !e.shiftKey) {
+      if (inBar) { e.preventDefault(); e.stopPropagation(); _pbpTrTrigger(st); }
+      return; // outside the bar: the normal handler starts it
+    }
+    if (k === "Escape") e.stopPropagation();
+    _pbpTrAskClose();
+  };
+  document.addEventListener("keydown", onKey, true);
+  const timer = setTimeout(_pbpTrAskClose, PBP_TR_HOTKEY_ASK_MS);
+  _pbpTrAsk = { bar, timer, onKey };
+  // Keyboard users who Tab in get the time they need.
+  box.addEventListener("focus", () => { if (_pbpTrAsk && _pbpTrAsk.bar === bar) clearTimeout(_pbpTrAsk.timer); });
+  box.addEventListener("change", () => {
+    const keepAsking = !box.checked;
+    if (st.s) st.s.trHotkeyConfirm = keepAsking;
+    Promise.resolve().then(async () => {
+      try { await (await getSettingsStorage()).set({ trHotkeyConfirm: keepAsking }); }
+      catch (err) { console.warn("trHotkeyConfirm save failed", err && err.name, err && err.message); }
+    });
+  });
+}
+
 // One launch chain for the button and t. Expanding a completed section is
 // useful, but must not re-enter translation or consume more tokens.
 function _pbpTrTrigger(st) {
+  _pbpTrAskClose();
   if (st.running) return;
   if (st.railHandle) st.railHandle.expand(true);
   if (st.status === "done") {

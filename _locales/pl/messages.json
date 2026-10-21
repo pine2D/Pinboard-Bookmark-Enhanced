@@ -2816,6 +2816,19 @@
       }
     }
   },
+  "trHotkeyAsk": {
+    "message": "Około $COUNT$ tokenów · $MODEL$. Naciśnij t ponownie, aby przetłumaczyć.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trHotkeyNoAsk": {
+    "message": "Nie pytaj ponownie"
+  },
+  "optTrHotkeyConfirm": {
+    "message": "Pytaj, zanim klawisz t zacznie tłumaczenie"
+  },
   "trActualUsage": {
     "message": "Zużycie: wejście $IN$ / wyjście $OUT$ tokenów",
     "placeholders": {

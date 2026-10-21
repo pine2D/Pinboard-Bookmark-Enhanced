@@ -3966,6 +3966,13 @@ html.motion-ready #skim-collapse.motion-toggle svg { transition: transform 150ms
   display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
   margin-top: var(--sp-2); font-size: 0.8em;
 }
+/* t-key confirm (md-translate.js _pbpTrAskOpen): .msg-bar plus layout only. */
+#tr-ask {
+  display: flex; align-items: center; gap: var(--sp-1) var(--sp-3); flex-wrap: wrap;
+  margin-bottom: var(--sp-3); font-size: 13px;
+}
+#tr-ask label { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 24px; cursor: pointer; }
+#tr-ask input { margin: 0; accent-color: var(--link); }
 .skim-stale-btn { padding: var(--sp-1) var(--sp-2); font-size: 12px; /* secondary md face in px, not the panel's prose scale */ }
 #skim-body { margin-top: var(--sp-2); }
 #skim-body > :first-child { margin-top: 0; }

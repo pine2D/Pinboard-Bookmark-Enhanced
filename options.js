@@ -1819,7 +1819,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     reader: {
       fields: {
         "opt-preview-ai-enabled": true, "opt-preview-skim": false, "opt-preview-ai-model": "",
-        "translate-target-lang": "auto", "translate-target-lang-custom": "",
+        "translate-target-lang": "auto", "translate-target-lang-custom": "", "opt-tr-hotkey-confirm": true,
         "opt-translate-glossary": "", "opt-selection-trigger": "icon",
         // Video pages (moved here from the Export tab, settings batch A1):
         // defaults mirror shared.js mdVideoLangPref / mdVideoDarkScheme /
@@ -2758,6 +2758,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-wayback-skip-private": s.waybackSkipPrivate !== false,
     "opt-preview-ai-enabled": s.previewAiEnabled !== false,
     "opt-preview-skim": s.previewSkimEnabled === true,
+    "opt-tr-hotkey-confirm": s.trHotkeyConfirm !== false,
     "dict-echo-enabled": s.dictEchoEnabled === true
   };
   for (const [id, val] of Object.entries(checkMap)) {
@@ -3561,6 +3562,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       previewAiModel: "",
       translateTargetLang: resolveTranslateTargetLang(),
       translateGlossary: $id("opt-translate-glossary").value,
+      trHotkeyConfirm: $id("opt-tr-hotkey-confirm").checked,
       dictEchoEnabled: $id("dict-echo-enabled").checked,
       dictAnkiDeck: $id("dict-anki-deck").value.trim(),
       dictAnkiPort: $id("dict-anki-port").value.trim(),

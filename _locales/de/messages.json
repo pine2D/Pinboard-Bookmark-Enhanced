@@ -2816,6 +2816,19 @@
       }
     }
   },
+  "trHotkeyAsk": {
+    "message": "Ca. $COUNT$ tokens · $MODEL$. Drücke erneut t, um zu übersetzen.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trHotkeyNoAsk": {
+    "message": "Nicht mehr fragen"
+  },
+  "optTrHotkeyConfirm": {
+    "message": "Vor dem Übersetzen mit der Taste t nachfragen"
+  },
   "trActualUsage": {
     "message": "Verbrauch: Eingabe $IN$ / Ausgabe $OUT$ Tokens",
     "placeholders": {

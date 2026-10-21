@@ -519,6 +519,7 @@ const SETTINGS_DEFAULTS = {
   previewAiModelByProvider: {},
   translateTargetLang: "auto",
   translateGlossary: "",
+  trHotkeyConfirm: true,    // reader t key asks first when the rail price is not visible / >= 5000 tokens
   dictEchoEnabled: true,    // md-vocab-echo: underline saved vocab words in the reader
   dictAnkiDeck: "Pinboard Vocab", // anki-connect: target deck for Send to Anki
   dictAnkiPort: "8765",         // anki-connect: AnkiConnect port (host stays loopback-only)

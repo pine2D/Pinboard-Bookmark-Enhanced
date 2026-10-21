@@ -2825,6 +2825,19 @@
       }
     }
   },
+  "trHotkeyAsk": {
+    "message": "About $COUNT$ tokens · $MODEL$. Press t again to translate.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trHotkeyNoAsk": {
+    "message": "Don't ask again"
+  },
+  "optTrHotkeyConfirm": {
+    "message": "Ask before the t key starts a translation"
+  },
   "trActualUsage": {
     "message": "Run usage: in $IN$ / out $OUT$ tokens",
     "placeholders": {

@@ -2816,6 +2816,19 @@
       }
     }
   },
+  "trHotkeyAsk": {
+    "message": "约 $COUNT$ tokens · $MODEL$，再按 t 开始翻译",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trHotkeyNoAsk": {
+    "message": "不再提示"
+  },
+  "optTrHotkeyConfirm": {
+    "message": "按 t 翻译前先确认"
+  },
   "trActualUsage": {
     "message": "本次用量：入 $IN$ / 出 $OUT$ tokens",
     "placeholders": {

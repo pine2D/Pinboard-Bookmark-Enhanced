@@ -13078,5 +13078,167 @@ suiteIf("selection bar: dictionary-first ordering", "pbpHlDictFirst", () => {
     }
   });
 });
+
+suite("t key confirms before spending tokens the reader cannot see", () => {
+  // Fixture: a visible rail price line, the article node the bar mounts before,
+  // fake timers, and a counting stand-in for the paid start.
+  function rig(opts) {
+    opts = opts || {};
+    const host = document.createElement("div");
+    host.innerHTML = '<div id="tr-ask-doc"><article id="rendered-view"></article></div>';
+    document.body.appendChild(host);
+    const prevView = document.getElementById("rendered-view");
+    const est = document.createElement("div");
+    est.id = "tr-estimate";
+    est.textContent = "About 1200 tokens";
+    est.dataset.tokens = String(opts.tokens === undefined ? 1200 : opts.tokens);
+    if (opts.railHidden) est.style.visibility = "hidden";
+    host.appendChild(est);
+    const realStart = window._pbpTrStart, realST = window.setTimeout, realCT = window.clearTimeout, realStore = window.getSettingsStorage;
+    const timers = [];
+    window.setTimeout = (fn, ms) => { timers.push({ fn, ms, live: true }); return timers.length; };
+    window.clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].live = false; };
+    const saved = [];
+    window.getSettingsStorage = async () => ({ set: async (o) => { saved.push(o); } });
+    let starts = 0;
+    window._pbpTrStart = () => { starts++; return Promise.resolve(); };
+    const st = { running: false, status: "idle", s: { trHotkeyConfirm: opts.confirm === undefined ? true : opts.confirm, aiProvider: "ollama" }, work: [], railHandle: { expand() {} } };
+    return {
+      st, est, timers, saved, starts: () => starts,
+      bar: () => document.getElementById("tr-ask"),
+      done() {
+        _pbpTrAskClose();
+        window._pbpTrStart = realStart; window.setTimeout = realST; window.clearTimeout = realCT; window.getSettingsStorage = realStore;
+        document.body.classList.remove("zen");
+        host.remove();
+      }
+    };
+  }
+  const key = (k, extra) => document.dispatchEvent(new KeyboardEvent("keydown", Object.assign({ key: k, bubbles: true, cancelable: true }, extra || {})));
+
+  test("pure gate: setting off never asks; hidden rail or >= 5000 asks; visible small price does not", () => {
+    assertEq(pbpTrHotkeyShouldAsk(false, false, 99999), false, "setting off");
+    assertEq(pbpTrHotkeyShouldAsk(true, true, 1200), false, "visible + small");
+    assertEq(pbpTrHotkeyShouldAsk(true, true, 4999), false, "just under");
+    assertEq(pbpTrHotkeyShouldAsk(true, true, 5000), true, "at threshold");
+    assertEq(pbpTrHotkeyShouldAsk(true, false, 10), true, "rail not visible");
+    assertEq(pbpTrHotkeyShouldAsk(true, false, NaN), true, "unknown + hidden");
+    assertEq(pbpTrHotkeyShouldAsk(true, true, NaN), true, "unknown price is never free");
+    assertEq(pbpTrHotkeyShouldAsk(undefined, true, 1200), false, "undefined setting + small");
+  });
+  test("rail visible + small estimate: t starts at once, no bar", () => {
+    const r = rig();
+    try {
+      _pbpTrHotkey(r.st);
+      assertEq(r.starts(), 1, "started");
+      assertEq(r.bar(), null, "no bar");
+    } finally { r.done(); }
+  });
+  test("rail not visible (drawer closed): first t asks, second t starts", () => {
+    const r = rig({ railHidden: true });
+    try {
+      _pbpTrHotkey(r.st);
+      assertEq(r.starts(), 0, "not started yet");
+      const bar = r.bar();
+      assert(!!bar && bar.classList.contains("msg-bar"), "msg-bar shown");
+      assertEq(bar.getAttribute("role"), "alert", "role");
+      assert(bar.querySelector('input[type="checkbox"]'), "has the don't-ask checkbox");
+      assertEq(bar.nextElementSibling && bar.nextElementSibling.id, "rendered-view", "mounted right before the article");
+      _pbpTrHotkey(r.st);
+      assertEq(r.starts(), 1, "second t starts");
+      assertEq(r.bar(), null, "bar gone");
+    } finally { r.done(); }
+  });
+  test("zen mode counts as rail not visible", () => {
+    const r = rig();
+    try {
+      document.body.classList.add("zen");
+      _pbpTrHotkey(r.st);
+      assertEq(r.starts(), 0, "asked, not started");
+      assert(!!r.bar(), "bar shown");
+    } finally { r.done(); }
+  });
+  test("estimate >= 5000 asks even with the rail visible", () => {
+    const r = rig({ tokens: 5000 });
+    try {
+      _pbpTrHotkey(r.st);
+      assertEq(r.starts(), 0, "not started");
+      assert(!!r.bar(), "bar shown");
+    } finally { r.done(); }
+  });
+  test("setting off: starts at once even when the rail is hidden and the price is large", () => {
+    const r = rig({ railHidden: true, tokens: 90000, confirm: false });
+    try {
+      _pbpTrHotkey(r.st);
+      assertEq(r.starts(), 1, "started");
+      assertEq(r.bar(), null, "no bar");
+    } finally { r.done(); }
+  });
+  test("Esc and any other key cancel without translating", () => {
+    for (const k of ["Escape", "j", "ArrowDown"]) {
+      const r = rig({ railHidden: true });
+      try {
+        _pbpTrHotkey(r.st);
+        assert(!!r.bar(), k + ": bar shown");
+        key(k);
+        assertEq(r.bar(), null, k + ": bar cancelled");
+        assertEq(r.starts(), 0, k + ": nothing started");
+      } finally { r.done(); }
+    }
+  });
+  test("Tab, Shift and Space/Enter inside the bar leave it up", () => {
+    const r = rig({ railHidden: true });
+    try {
+      _pbpTrHotkey(r.st);
+      key("Tab"); key("Shift", { shiftKey: true });
+      assert(!!r.bar(), "still up after Tab/Shift");
+      const box = r.bar().querySelector("input");
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true }));
+      assert(!!r.bar(), "still up after Space on the checkbox");
+    } finally { r.done(); }
+  });
+  test("8 second timeout dismisses; focusing the checkbox stops the clock", () => {
+    const r = rig({ railHidden: true });
+    try {
+      _pbpTrHotkey(r.st);
+      const timer = r.timers.find((x) => x.ms === PBP_TR_HOTKEY_ASK_MS);
+      assert(!!timer && timer.live, "8s timer armed");
+      timer.fn();
+      assertEq(r.bar(), null, "dismissed by timeout");
+      assertEq(r.starts(), 0, "no translation");
+      _pbpTrHotkey(r.st);
+      const t2 = r.timers.filter((x) => x.ms === PBP_TR_HOTKEY_ASK_MS).pop();
+      r.bar().querySelector("input").dispatchEvent(new Event("focus"));
+      assertEq(t2.live, false, "clock stopped while the checkbox is focused");
+    } finally { r.done(); }
+  });
+  test("t pressed with the checkbox focused confirms; ticking it updates the page copy", () => {
+    const r = rig({ railHidden: true });
+    try {
+      _pbpTrHotkey(r.st);
+      const box = r.bar().querySelector("input");
+      box.checked = true;
+      box.dispatchEvent(new Event("change"));
+      assertEq(r.st.s.trHotkeyConfirm, false, "page copy updated (storage write is async, see below)");
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "t", bubbles: true, cancelable: true }));
+      assertEq(r.starts(), 1, "t from the checkbox started it");
+      assertEq(r.bar(), null, "bar gone");
+    } finally { r.done(); }
+  });
+  test("a completed current translation never opens the bar", () => {
+    const r = rig({ railHidden: true });
+    try {
+      r.st.status = "done";
+      _pbpTrHotkey(r.st);
+      assertEq(r.bar(), null, "no bar");
+      assertEq(r.starts(), 0, "nothing started");
+    } finally { r.done(); }
+  });
+  test("the price paint stamps data-tokens with the figure the rail shows", () => {
+    const el = document.createElement("div");
+    _pbpTrPaintEstimate(el, 4000, { aiProvider: "ollama" });
+    assertEq(el.dataset.tokens, String(pbpAiEstimateTokens(4000) * 3), "stamped");
+  });
+});
 </script>
 </body></html>

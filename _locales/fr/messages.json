@@ -2816,6 +2816,19 @@
       }
     }
   },
+  "trHotkeyAsk": {
+    "message": "Environ $COUNT$ tokens · $MODEL$. Appuyez à nouveau sur t pour traduire.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trHotkeyNoAsk": {
+    "message": "Ne plus demander"
+  },
+  "optTrHotkeyConfirm": {
+    "message": "Demander confirmation avant de traduire avec la touche t"
+  },
   "trActualUsage": {
     "message": "Consommation : entrée $IN$ / sortie $OUT$ jetons",
     "placeholders": {

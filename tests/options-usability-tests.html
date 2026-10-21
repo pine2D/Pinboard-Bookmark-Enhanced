@@ -1051,12 +1051,13 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // from a `.fg.entry-block.entry-block-sub` into a `.pref-row-sub` choice
   // host, same shape as Archive's #opt-wayback-batch) has 1 plain switch
   // (opt-preview-ai-enabled) + 1 rewrapped choice host (opt-preview-skim) +
-  // 3 video-group switches (opt-md-video-dark/-pause-lookup/-use-login) = 5,
+  // opt-tr-hotkey-confirm (2026-10-21) +
+  // 3 video-group switches (opt-md-video-dark/-pause-lookup/-use-login) = 6,
   // every one a `.pref-row` now -- reader joins this loop instead of getting
   // its own marker/switch-count exemption.
   // quick: 12 own switches + the 5 Notifications switches it took from the
   // old General tab (2026-10-15 IA).
-  const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 17], ["ai-behavior", 2], ["archive", 3], ["reader", 5]];
+  const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 17], ["ai-behavior", 2], ["archive", 3], ["reader", 6]];
 
   for (const [id, switchCount] of STAGE3A_PANELS) {
     await test(`stage3a: every switch in the ${id} panel sits in a .pref-row`, async () => {

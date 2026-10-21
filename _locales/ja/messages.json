@@ -2816,6 +2816,19 @@
       }
     }
   },
+  "trHotkeyAsk": {
+    "message": "約 $COUNT$ tokens · $MODEL$。もう一度 t を押すと翻訳を始めます",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trHotkeyNoAsk": {
+    "message": "今後は表示しない"
+  },
+  "optTrHotkeyConfirm": {
+    "message": "t キーで翻訳を始める前に確認する"
+  },
   "trActualUsage": {
     "message": "今回の使用量：入力 $IN$ / 出力 $OUT$ トークン",
     "placeholders": {
