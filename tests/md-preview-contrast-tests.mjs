@@ -41,6 +41,7 @@ import { fileURLToPath } from "node:url";
 // pulling in this one function does not pull in any theme-factory state
 // (pilots, composed themes, etc.) -- md-preview stays outside that system.
 import { mix } from "../docs/theme-surface/composers/_ui-derive.mjs";
+import { parseStyleRules, parseDeclarations } from "../docs/theme-surface/tools/css-syntax.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cssPath = resolve(root, "md-preview.css");
@@ -282,20 +283,36 @@ const PAIRS = [
     note: "a second, pre-existing hover family that swaps text to --fg over --btn-hover -- .rail-sec-open:hover/:focus-visible ~:1454/1460, .pb-hl-note-btn:hover/:focus-visible ~:2589/2596, .ask-ic:hover ~:2914.",
   },
   {
-    id: "pressed-text/btn-hover",
-    // The pressed-state TEXT is light-dark(var(--link), var(--link-hover)),
-    // not a flat --link (Ruling 21's fix round): a flat --link against
+    id: "link-on-raised/btn-hover",
+    // The pressed-state TEXT is var(--link-on-raised) =
+    // light-dark(var(--link), var(--link-hover)), not a flat --link (Ruling
+    // 21's fix round, named as a token 2026-10-21): a flat --link against
     // --btn-hover measures 3.97:1 in dark mode, under the 4.5:1 AA text
-    // floor. Resolving this literal expression per mode -- rather than
-    // looking up one token name -- makes this pair's light row assert
-    // --link's number (light-dark's light branch) and its dark row assert
-    // --link-hover's number (its dark branch), i.e. exactly what every one
-    // of the ten consumers now paints in each mode. border-color on all ten
-    // stays a flat var(--link): a non-text edge, WCAG's 3:1 floor applies
-    // there, and 3.97:1 clears it (not asserted by this text/fill table,
-    // which is normal-text-only per the file header's min=4.5 note).
-    text: { expr: "light-dark(var(--link), var(--link-hover))" }, fill: "btn-hover", min: 4.5,
+    // floor. Resolving the token per mode makes the light row assert
+    // --link's number and the dark row --link-hover's. border-color on the
+    // consumers stays a flat var(--link): a non-text edge, 3:1 floor.
+    text: "link-on-raised", fill: "btn-hover", min: 4.5,
     note: "the pressed-state vocabulary -- .srch-regex[aria-pressed] ~:3481, .typo-seg-btn[aria-pressed] ~:3638, .pbv-*[aria-pressed] ~:3851, #ask-scope-near[aria-pressed] ~:2217, .toggle-btn.active ~:279, .src-seg.active/[aria-pressed] ~:314/317, .exp-tgl[aria-pressed] ~:1217, .xp-pin[aria-pressed] ~:1910, option:checked ~:1303, .xp-act[aria-pressed] ~:1934 (ten consumers total, all migrated to this recipe by Ruling 21's fix round).",
+  },
+  {
+    id: "link-on-raised/border-light",
+    text: "link-on-raised", fill: "border-light", min: 4.5,
+    note: "the active TOC row -- .toc-list a.active (13px) paints --border-light; dark --link was 3.97:1 there.",
+  },
+  {
+    id: "danger/btn-hover",
+    text: "danger", fill: "btn-hover", min: 4.5,
+    note: "danger-coloured TEXT buttons keep their text on hover -- .ask-clear-confirm .ask-clear-yes is an .action-btn, whose :hover paints --btn-hover (dark was 4.47:1 before #DC8983).",
+  },
+  {
+    id: "success/surface",
+    text: "success", fill: "surface", min: 4.5,
+    note: "#ask-tip .ask-tip-status (12px) on #ask-tip's --surface (light was 4.12:1 on green-600).",
+  },
+  {
+    id: "on-success/success",
+    text: "on-success", fill: "success", min: 4.5,
+    note: "the copied flash -- .action-btn.copied paints a SOLID --success fill.",
   },
   {
     id: "on-danger/danger",
@@ -353,6 +370,78 @@ for (const pair of PAIRS) {
 }
 console.log("");
 for (const pair of PAIRS) console.log(`  ${pair.id.padEnd(24)} -- ${pair.note}`);
+
+// ---- rule scan: text that sits on a RAISED fill ----------------------------
+// The PAIRS table above is token-level, so it only knows the pairs someone
+// remembered to list. Two 12-13px links (#rail-typo-btn's hover/pressed look
+// and the active TOC row) sat at 3.97:1 in dark mode for weeks because no
+// pair named them. This scan finds the pairs from the CSS itself: every rule
+// (outside print / forced-colors) that paints a raised fill -- --btn-hover,
+// --border-light or --badge-bg, the hover, pressed and current-row grounds --
+// is paired with the text colour that rule paints, or, for a state rule that
+// only swaps the fill (`.x:hover { background: ... }`), with the colour of
+// its own base rule (the selector minus its state pseudo-classes). Both
+// schemes must clear 4.5:1 -- the icon-only consumers (.hl-item-del's cross)
+// clear the text floor too, so there is no 3:1 carve-out to keep honest.
+const RAISED_FILLS = ["btn-hover", "border-light", "badge-bg"];
+// Rules come from the theme factory's CSS parser (tools/css-syntax.mjs:
+// comments, strings and grouping at-rules handled), not a private regex --
+// a hand-rolled walker here once tripped over a comment that closed early.
+// Selectors whose base rule cannot be found by stripping state pseudo-
+// classes are reported as skipped, so a rewrite that hides a consumer from
+// this scan shows up as a count change rather than as silence.
+const declsOf = (body) => Object.fromEntries(parseDeclarations(body).map((d) => [d.property, d.value]));
+const STATE_RE = /:(hover|focus-visible|focus|active)\b|\[aria-pressed="true"\]|\[aria-expanded="true"\]|:where\(:not\(:disabled\)\)|:not\(:disabled\)/g;
+const stripState = (s) => s.replace(STATE_RE, "").replace(/\s+/g, " ").trim();
+{
+  const live = parseStyleRules(css)
+    .filter((r) => !r.context.some((c) => /print|forced-colors/.test(c)))
+    .map((r) => ({ sels: r.selectors, body: r.body, line: r.lineNum }));
+  const baseColor = new Map(); // base selector -> colour expression (last rule wins)
+  for (const r of live) {
+    const d = declsOf(r.body);
+    if (!d.color) continue;
+    for (const s of r.sels) if (s === stripState(s)) baseColor.set(s, d.color);
+  }
+  const fillToken = (v) => {
+    const m = v && v.match(/^var\(--([\w-]+)\)$/);
+    return m && RAISED_FILLS.includes(m[1]) ? m[1] : null;
+  };
+  let checked = 0;
+  const skipped = [];
+  const seen = new Set();
+  console.log("\nrule scan: text on raised fills (" + RAISED_FILLS.map((f) => "--" + f).join(", ") + ")\n");
+  for (const r of live) {
+    const d = declsOf(r.body);
+    const fill = fillToken(d["background-color"]) || fillToken(d.background);
+    if (!fill) continue;
+    for (const s of r.sels) {
+      const expr = d.color || baseColor.get(stripState(s));
+      if (!expr || /^(inherit|currentcolor|transparent)$/i.test(expr)) { skipped.push(`${s} (:${r.line})`); continue; }
+      const min = 4.5;
+      for (const mode of MODES) {
+        let ratio;
+        try { ratio = contrastRatio(resolveColor(expr, mode), resolveToken(fill, mode)); }
+        catch (e) { check(false, `rule scan: ${s} (md-preview.css:${r.line}) colour "${expr}" is unresolvable -- ${e.message}`); continue; }
+        checked++;
+        seen.add(s);
+        if (ratio < min) {
+          console.log(`FAIL ${s} ${mode} ${ratio.toFixed(2)}:1 (${expr} on --${fill}, >= ${min})`);
+          check(false, `rule scan: ${s} (md-preview.css:${r.line}) paints ${expr} on --${fill}: ${ratio.toFixed(2)}:1 in ${mode} mode < ${min}:1`);
+        }
+      }
+    }
+  }
+  console.log(`  ${checked} selector x scheme pairs checked; ${skipped.length} raised-fill selectors take their text colour from the DOM (inherit/unset) and are skipped:`);
+  for (const s of skipped) console.log(`    ${s}`);
+  // Floor on coverage: the scan reached the two consumers that started this
+  // gate and the pressed family; a parser regression that finds nothing
+  // must not pass as "no failures".
+  check(checked >= 120, `rule scan checked only ${checked} pairs (134 when written) -- the CSS walker likely broke`);
+  for (const must of [".toc-list a.active", ".rail-kbd-help-btn:hover", ".rail-kbd-help-btn:focus-visible", ".toggle-btn.active", ".typo-seg-btn[aria-pressed=\"true\"]", ".pbv-back-current:hover"]) {
+    check(seen.has(must), `rule scan: expected consumer ${must} was not checked -- renamed, or its fill/colour no longer resolves`);
+  }
+}
 
 if (fail.length) {
   console.error("\n" + fail.join("\n"));

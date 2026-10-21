@@ -75,13 +75,27 @@ html { scrollbar-gutter: stable; }
   --code-fg: light-dark(#403E3C, #C8C6BC);
   --link: light-dark(#205EA6, #6095C5);
   --link-hover: light-dark(#1A4F8C, #7AAEDB);
+  /* Link/accent TEXT on a raised fill (--btn-hover, --border-light,
+     --badge-bg): pressed toggles, the active TOC row, rail-bottom hover.
+     Light keeps --link (5.12:1 on the deepest of them, --border-light);
+     dark --link drops to 3.97:1 on #343331, under the 4.5:1 text floor, so
+     the dark branch takes the next lighter blue (--link-hover's #7AAEDB,
+     5.35:1). Edges and outlines stay var(--link) -- non-text, 3:1 floor. */
+  --link-on-raised: light-dark(var(--link), var(--link-hover));
   --badge-bg: light-dark(#E4E9E7, #263542);
   --badge-fg: light-dark(#1A4F8C, #8DB9DD);
   --btn-bg: light-dark(#FFFCF0, #282726);
   --btn-border: light-dark(#DAD8CE, #403E3C);
   --btn-hover: light-dark(#ECE9DC, #343331);
   --btn-fg: light-dark(#403E3C, #C8C6BC);
-  --success: light-dark(#66800B, #87A85F);
+  /* Light #536907 (Flexoki green-700), not green-600 #66800B: the copied
+     tip's 12px status text sat at 4.12:1 on --surface. */
+  --success: light-dark(#536907, #87A85F);
+  /* Foreground for a SOLID --success fill (.action-btn.copied): white
+     6.19:1 on the light green, page ink 6.38:1 on the dark one. The old
+     fixed #04270f was measured against a Tailwind green and fell to 3.58:1
+     on the Flexoki light branch. */
+  --on-success: light-dark(#fff, #1C1B1A);
   --bq-border: light-dark(#205EA6, #6095C5);
   --bq-bg: light-dark(#F2F3EC, #22282D);
   /* Quote text is neutral ink (critique 2026-10-19): the old light #1A4F8C
@@ -92,14 +106,16 @@ html { scrollbar-gutter: stable; }
   --table-stripe: light-dark(#F8F6EA, #22211F);
   --selection: light-dark(#C6DDE8, #324B61);
   --surface: light-dark(#F7F5EA, #282726);
-  --danger: light-dark(#AF3029, #D9827C);
+  /* Dark #DC8983 (was #D9827C): the clear-history confirm's text sat at
+     4.47:1 on the --btn-hover fill of its own hover state. */
+  --danger: light-dark(#AF3029, #DC8983);
   /* Foreground for a SOLID --danger fill -- the confirm popover's destructive
      button is the only one. Same output role popup/options/library derive per
      preset (--pp-on-danger and friends); the reader is the one surface that
      does not go through the theme factory, so it names the role by hand.
-     White holds 4.83:1 on the light branch, but only 2.82:1 over the dark
+     White holds 6.41:1 on the light branch, but under 3:1 over the dark
      branch's lighter coral -- under AA at the popover's 12px. The page's own
-     near-black gets 6.09:1 there, the same call library.css's flexoki-dark
+     near-black gets 6.51:1 there, the same call library.css's flexoki-dark
      block already makes on this palette. */
   --on-danger: light-dark(#fff, #1C1B1A);
   /* D8-7: --pre-bg is intentionally darker than --surface's dark value so
@@ -297,17 +313,14 @@ button, input, select, textarea { font-family: inherit; }
    (~:1315) styles a native <option> inside a top-layer picker, which has no
    border to paint in the first place. "Link-colored edge" describes only
    the independent controls that actually have one. TEXT is
-   light-dark(var(--link), var(--link-hover)), not a flat var(--link):
-   --link against --btn-hover measures 3.97:1 in dark mode (under the 4.5:1
-   AA text floor) while --link-hover against the same --btn-hover fill
-   measures 5.35:1 -- the identical swap M3-c already applied to
-   .ask-chip:hover (~:2206) for this same pair. BORDER-color on those
+   var(--link-on-raised) (:root), not a flat var(--link): --link against
+   --btn-hover measures 3.97:1 in dark mode (under the 4.5:1 AA text floor)
+   while the token's dark branch measures 5.35:1 on the same fill -- the
+   swap M3-c applied to .ask-chip:hover first. BORDER-color on those
    independent controls stays a flat var(--link): it is a non-text edge,
    WCAG's 3:1 floor applies there (not 4.5:1), and 3.97:1 clears it.
-   tests/md-preview-contrast-tests.mjs asserts
-   both resolved branches (light-dark's light value against --btn-hover, and
-   its dark value against --btn-hover) with no exemption -- see that file's
-   PAIRS table. Kept as six separate declarations rather than one shared
+   tests/md-preview-contrast-tests.mjs asserts both branches against every
+   raised fill with no exemption -- its PAIRS table and its rule scan. Kept as six separate declarations rather than one shared
    selector list: these controls sit in six different sections of this file
    interleaved with many unrelated :hover/:focus-visible rules at the same
    (0,2,0) specificity, so a merged block would have to be positioned after
@@ -318,7 +331,7 @@ button, input, select, textarea { font-family: inherit; }
    comments. */
 .toggle-btn.active {
   background: var(--btn-hover);
-  color: light-dark(var(--link), var(--link-hover));
+  color: var(--link-on-raised);
   font-weight: 600;
 }
 
@@ -348,12 +361,12 @@ button, input, select, textarea { font-family: inherit; }
 }
 .source-badge > .src-seg + .src-seg { border-left: 1px solid var(--btn-border); }
 /* Same pressed vocabulary as .toggle-btn.active (md-preview.css ~:265) --
-   btn-hover fill + light-dark(link, link-hover) text; the fused shell and
+   btn-hover fill + --link-on-raised text; the fused shell and
    dividers stay neutral in every state. */
-.src-seg.active { background: var(--btn-hover); color: light-dark(var(--link), var(--link-hover)); cursor: default; }
+.src-seg.active { background: var(--btn-hover); color: var(--link-on-raised); cursor: default; }
 /* A toggle member (the density switch, aria-pressed) lights up in the same
    tone as its .active siblings; it stays clickable, so no cursor change. */
-.src-seg[aria-pressed="true"] { background: var(--btn-hover); color: light-dark(var(--link), var(--link-hover)); }
+.src-seg[aria-pressed="true"] { background: var(--btn-hover); color: var(--link-on-raised); }
 .src-seg:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: -2px;
@@ -1058,13 +1071,12 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 #rendered-view em { font-style: italic; }
 
 /* ---- Copy Feedback ---- */
-/* White text on --success failed AA at 13px (light 3.3:1, dark 2.3:1 — v2.87
-   popup progress bar hit the same green-bg/white-text trap). A fixed dark-green
-   foreground clears 4.5:1 against BOTH --success values (light #16a34a: 4.89:1,
-   dark #87a85f: ~6.0:1), so no per-mode override is needed. */
+/* Foreground is the --on-success role (white on the light green, page ink on
+   the dark one), same pattern as --on-danger. The old fixed #04270f was tuned
+   for a Tailwind green and fell to 3.58:1 once light --success became Flexoki. */
 .action-btn.copied {
   background: var(--success);
-  color: #04270f;
+  color: var(--on-success);
   border-color: var(--success);
 }
 
@@ -1315,7 +1327,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    (6+14+6 tall, 9+14+9 wide). */
 .exp-tgl { flex: none; padding: 6px var(--sp-2); justify-content: center; } /* the toggles sit in a .row */
 /* Same pressed vocabulary as .toggle-btn.active (md-preview.css ~:265) --
-   btn-hover fill + link edge + light-dark(link, link-hover) text, D3 batch3
+   btn-hover fill + link edge + --link-on-raised text, D3 batch3
    T1 (dark-mode text fix round, Ruling 21). No font-weight bump here
    (unlike .toggle-btn.active): historically a weight change alone shifted
    line width enough to jitter the then-text chips on toggle (the
@@ -1323,7 +1335,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    weight to bump. */
 .exp-tgl[aria-pressed="true"] {
   background: var(--btn-hover);
-  color: light-dark(var(--link), var(--link-hover));
+  color: var(--link-on-raised);
   border-color: var(--link);
 }
 .exp-img-row {
@@ -1373,7 +1385,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    the same slow-font-fallback trap as any literal dingbat (CLAUDE.md font
    section); checked state uses the same pressed vocabulary as
    .toggle-btn.active (md-preview.css ~:265 -- btn-hover fill +
-   light-dark(link, link-hover) text, D3 batch3 T1, dark-mode text fix
+   --link-on-raised text, D3 batch3 T1, dark-mode text fix
    round Ruling 21) instead, and is declared after :hover so the current
    choice keeps its look while pointed at. */
 @supports selector(::picker(select)) {
@@ -1410,7 +1422,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   .exp-img-row option:focus-visible, .xp-dict-lang option:focus-visible { background: var(--row-hover, rgba(127,127,127,.14));
     outline: 2px solid var(--link); outline-offset: -2px; }
   .exp-img-row option::checkmark, .xp-dict-lang option::checkmark { display: none; }
-  .exp-img-row option:checked, .xp-dict-lang option:checked { background: var(--btn-hover); color: light-dark(var(--link), var(--link-hover)); }
+  .exp-img-row option:checked, .xp-dict-lang option:checked { background: var(--btn-hover); color: var(--link-on-raised); }
 }
 /* Format grid: 3 columns (name / primary action / icon-only download).
    .export-fmt keeps its div wrapper for markup readability but hands box
@@ -1474,7 +1486,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .toc-list a[data-level="4"] { padding-left: var(--sp-5); font-size: 12px; }
 /* No font-weight bump on .active: 600 was outside the transition list, so
    scroll-driven active handoff made the label (and its ellipsis point) jump. */
-.toc-list a.active { color: var(--link); border-left-color: var(--link); background: var(--border-light); }
+.toc-list a.active { color: var(--link-on-raised); border-left-color: var(--link); background: var(--border-light); }
 
 /* Soft focus ring for large hit-areas (full-width rows/headers/summaries):
    a hard 2px rectangle around a row-sized target reads like a debug box, so
@@ -2048,9 +2060,9 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-pin:hover, .xp-close:hover { background: var(--btn-hover); border-color: var(--btn-border); }
 .xp-pin:focus-visible, .xp-close:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 /* Same pressed vocabulary as .toggle-btn.active (md-preview.css ~:265) --
-   btn-hover fill + link edge + light-dark(link, link-hover) text, D3 batch3
+   btn-hover fill + link edge + --link-on-raised text, D3 batch3
    T1 (dark-mode text fix round, Ruling 21). */
-.xp-pin[aria-pressed="true"] { background: var(--btn-hover); color: light-dark(var(--link), var(--link-hover)); border-color: var(--link); }
+.xp-pin[aria-pressed="true"] { background: var(--btn-hover); color: var(--link-on-raised); border-color: var(--link); }
 .xp-pin svg, .xp-close svg { width: 14px; height: 14px; }
 .xp-act {
   /* Icon-only segment (icon audit P0): fixed-height cell, label in
@@ -2070,14 +2082,14 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-act svg { width: 15px; height: 15px; }
 .xp-act:hover { background: var(--btn-hover); }
 /* Same pressed vocabulary as .toggle-btn.active (md-preview.css ~:265) --
-   btn-hover fill + link edge + light-dark(link, link-hover) text, D3 batch3
+   btn-hover fill + link edge + --link-on-raised text, D3 batch3
    T1 (dark-mode text fix round, Ruling 21). (Formerly a harsh-design-audit-C
    pilot with its own tinted/color-mix recipe pending a revert decision; the
    pilot read well on device and D3 converges the whole toggle family onto
    this exact recipe instead of reverting it.) */
 .xp-act[aria-pressed="true"] {
   background: var(--btn-hover);
-  color: light-dark(var(--link), var(--link-hover));
+  color: var(--link-on-raised);
   border-color: var(--link);
   cursor: default;
 }
@@ -2303,14 +2315,11 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   cursor: pointer;
 }
 /* M3-c: inline citation chip text (--link, identity color) sat under
-   3.97:1 against --btn-hover's dark hover bg. light-dark(var(--link), ...)
-   -- not currentColor -- because this is a plain hover pseudo-CLASS on a
-   real element, not a highlight pseudo-element: currentColor here would
-   mean "inherit from the chip's DOM parent", not "fall back to .ask-chip's
-   own base rule". Referencing the same --link token for the light branch
-   keeps the resolved light value byte-identical to today (falls through to
-   the base rule); dark switches to --link-hover for 5.35:1. */
-.ask-chip:hover { background: var(--btn-hover); border-color: var(--link); color: light-dark(var(--link), var(--link-hover)); }
+   3.97:1 against --btn-hover's dark hover bg. --link-on-raised (a token,
+   not currentColor -- this is a hover pseudo-CLASS on a real element, where
+   currentColor would mean the chip's DOM parent) keeps light at --link and
+   switches dark to the lighter blue for 5.35:1. */
+.ask-chip:hover { background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised); }
 .ask-chip:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 /* Timed chip on transcripts (research T1.4/T1.5): shows the cited
    paragraph's mm:ss instead of a sequence number -- a little wider, and
@@ -2321,11 +2330,11 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
    Stop/Send. Hidden unless the transcript paragraphs are timed. */
 #ask-scope-near { margin-right: auto; }
 #ask-scope-near[hidden] { display: none; }
-/* Text is light-dark(link, link-hover), not a flat link -- see the .toggle-
+/* Text is --link-on-raised, not a flat link -- see the .toggle-
    btn.active comment (md-preview.css ~:265) for the measured numbers;
    border-color stays a flat link (non-text edge, 3:1 floor). Dark-mode text
    fix round, Ruling 21. */
-#ask-scope-near[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: light-dark(var(--link), var(--link-hover)); }
+#ask-scope-near[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised); }
 /* Verified marker: pure CSS dot (no glyph). */
 .ask-chip.verified::after {
   content: "";
@@ -2383,7 +2392,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
    light mode byte-identical (falls back to the underlying text's own
    color) and only pulls dark-mode text to --fg, so a highlighted link or
    .pb-tr secondary span reads at the full body-text contrast (>=5.2:1
-   against every --hl-*/--hl-flash flattened over --bg) instead of keeping
+   against every --hl-* and --hl-flash fill flattened over --bg) instead of keeping
    its own lower-contrast --link/--fg-secondary color under the tint. */
 ::highlight(pbp-flash) { background-color: var(--hl-flash); color: light-dark(currentColor, var(--fg)); }
 /* Fallback when CSS.highlights is unavailable: flash the whole block. */
@@ -3627,11 +3636,11 @@ html.motion-ready #fn-pop:popover-open {
 }
 .srch-regex:hover { background: var(--btn-hover); border-color: var(--border); }
 .srch-regex:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-/* Text is light-dark(link, link-hover), not a flat link -- see the .toggle-
+/* Text is --link-on-raised, not a flat link -- see the .toggle-
    btn.active comment (md-preview.css ~:265) for the measured numbers;
    border-color stays a flat link (non-text edge, 3:1 floor). Dark-mode text
    fix round, Ruling 21. */
-.srch-regex[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: light-dark(var(--link), var(--link-hover)); }
+.srch-regex[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised); }
 /* Invalid regex pattern (compile failure) -- flagged on the input itself. */
 #search-input.srch-bad { border-color: var(--danger); }
 
@@ -3764,7 +3773,7 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
 }
 .rail-kbd-help-btn svg { width: 15px; height: 15px; }
 .rail-kbd-help-btn:hover, .rail-kbd-help-btn:focus-visible {
-  color: var(--link);
+  color: var(--link-on-raised);
   border-color: var(--btn-border);
   background: var(--btn-hover);
 }
@@ -3830,7 +3839,7 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
   cursor: pointer;
 }
 .typo-seg-btn:hover { background: var(--btn-hover); }
-.typo-seg-btn[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: light-dark(var(--link), var(--link-hover)); } /* same pressed vocabulary as .srch-regex -- text is light-dark(link, link-hover), dark-mode text fix round, Ruling 21 */
+.typo-seg-btn[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised); } /* same pressed vocabulary as .srch-regex -- text is --link-on-raised, dark-mode text fix round, Ruling 21 */
 .typo-step:focus-visible, .typo-seg-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 /* UI chrome, never article content -- printing with the panel open must not
    put it on paper (same rule every popover family here carries). The user's
@@ -4023,7 +4032,7 @@ html.motion-ready #skim-collapse.motion-toggle svg { transition: transform 150ms
   box-shadow: 0 4px 14px rgba(0,0,0,.12);
 }
 .pbv-back-current[hidden] { display: none; }
-.pbv-back-current:hover { background: var(--btn-hover); }
+.pbv-back-current:hover { background: var(--btn-hover); color: var(--link-on-raised); }
 .pbv-back-current:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 /* Narrow stacked workspace: no sticky player to follow (audit B14); the
    layout observer in md-video.js sets this class on the button. */
@@ -4043,11 +4052,11 @@ html.motion-ready #skim-collapse.motion-toggle svg { transition: transform 150ms
    checkbox, no checkmark glyph), pressed in the same vocabulary as
    .srch-regex / .typo-seg-btn. Declared after :hover so the pressed state
    wins while the pointer is over it. */
-/* Text is light-dark(link, link-hover), not a flat link -- see the .toggle-
+/* Text is --link-on-raised, not a flat link -- see the .toggle-
    btn.active comment (md-preview.css ~:265) for the measured numbers;
    border-color stays a flat link (non-text edge, 3:1 floor). Dark-mode text
    fix round, Ruling 21. */
-.pbv-follow[aria-pressed="true"], .pbv-loop[aria-pressed="true"], .pbv-autopause[aria-pressed="true"], .pbv-estimate[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: light-dark(var(--link), var(--link-hover)); }
+.pbv-follow[aria-pressed="true"], .pbv-loop[aria-pressed="true"], .pbv-autopause[aria-pressed="true"], .pbv-estimate[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised); }
 /* Forced colors strip the pressed tint (T7.8): a system-color outline is
    the one signal that survives, and this state is otherwise colour-only. */
 @media (forced-colors: active) {

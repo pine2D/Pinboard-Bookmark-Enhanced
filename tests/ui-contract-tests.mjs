@@ -7421,10 +7421,11 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
 // reverting a single CSS site's `color` does not move `--link`/`--link-hover`
 // so that gate does not trip. This is the selector-level companion: every
 // md-preview.css rule whose selector list contains "[aria-pressed", ".active"
-// or ":checked" AND whose declarations paint `background: var(--btn-hover)`
-// must also paint `color: light-dark(var(--link), var(--link-hover))` --
-// the exact recipe documented in the comment above .toggle-btn.active
-// (md-preview.css ~:263).
+// or ":checked" AND whose declarations paint a raised fill
+// (`background: var(--btn-hover)` or `var(--border-light)`) must also paint
+// `color: var(--link-on-raised)` -- the :root token documented above
+// .toggle-btn.active (2026-10-21: the recipe became a token, and the active
+// TOC row on --border-light joined the gate after measuring 3.97:1 dark).
 {
   const rules = parseStyleRules(mdCss);
   const offenders = [];
@@ -7441,16 +7442,16 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
     // layer must not silently fall outside this gate.
     const bg = decls.find((d) =>
       (d.property === "background" || d.property === "background-color") &&
-      d.value.includes("var(--btn-hover)"));
+      (d.value.includes("var(--btn-hover)") || d.value.includes("var(--border-light)")));
     if (!bg) continue;
     matchedSelectors.push(rule.selectorText);
     const color = decls.find((d) => d.property === "color");
-    if (!color || color.value !== "light-dark(var(--link), var(--link-hover))") {
+    if (!color || color.value !== "var(--link-on-raised)") {
       offenders.push(`${rule.selectorText} (md-preview.css:${rule.lineNum})`);
     }
   }
   check(offenders.length === 0,
-    "md-preview.css: a pressed-state rule (selector matches [aria-pressed]/.active/:checked, paints background:var(--btn-hover)) does not pair it with color: light-dark(var(--link), var(--link-hover)) -- offenders: " + offenders.join(", "));
+    "md-preview.css: a pressed-state rule (selector matches [aria-pressed]/.active/:checked, paints background:var(--btn-hover) or var(--border-light)) does not pair it with color: var(--link-on-raised) -- offenders: " + offenders.join(", "));
   // Expected matches today: the ten pressed-state consumers named in that
   // comment -- .toggle-btn.active, .src-seg.active, .src-seg[aria-pressed="true"],
   // .exp-tgl[aria-pressed="true"], ".exp-img-row option:checked, .xp-dict-lang
@@ -7458,14 +7459,15 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   // #ask-scope-near[aria-pressed="true"], .srch-regex[aria-pressed="true"],
   // .typo-seg-btn[aria-pressed="true"], and the grouped four-selector rule
   // ".pbv-follow/.pbv-loop/.pbv-autopause/.pbv-estimate[aria-pressed=\"true\"]"
-  // -- eleven CSS rules in total (.src-seg alone contributes two declarations,
+  // -- eleven CSS rules (.src-seg alone contributes two declarations,
   // .active and [aria-pressed="true"], for one control family, which is why
-  // "ten consumers" and "eleven rules" are both correct at once). Expected
-  // non-matches, which correctly stay OUT of this gate: .toc-list a.active
-  // (paints `background: var(--border-light)`, not --btn-hover) and
-  // .hl-card-dot.active (no background declared at all).
-  check(matchedSelectors.length === 11,
-    `md-preview.css: pressed-state background:var(--btn-hover) rule count drifted from the expected 11 (found ${matchedSelectors.length}) -- a consumer was added, removed, or changed its fill; update this gate's comment and expectation once the drift is intentional`);
+  // "ten consumers" and "eleven rules" are both correct at once) -- plus
+  // .toc-list a.active on --border-light: twelve. Expected non-match, which
+  // correctly stays OUT of this gate: .hl-card-dot.active (no background
+  // declared at all). The contrast numbers themselves, including non-pressed
+  // hover rules, live in tests/md-preview-contrast-tests.mjs's rule scan.
+  check(matchedSelectors.length === 12,
+    `md-preview.css: pressed-state raised-fill rule count drifted from the expected 12 (found ${matchedSelectors.length}) -- a consumer was added, removed, or changed its fill; update this gate's comment and expectation once the drift is intentional`);
 }
 
 // T3 (D5, taste-uplift batch3): browsers synthesize an oblique for CJK glyphs
