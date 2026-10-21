@@ -2968,7 +2968,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
    block failed. An ordinary rail action button (.action-btn, md rung 26px,
    same family as the translate button); this only adds the danger text tone
    and hover ring (see .pb-tr-err-retry for why hover is a ring). */
-#tr-retry-all { margin-top: var(--sp-2); max-width: 100%; color: var(--danger); }
+#tr-retry-all { margin-top: var(--sp-2); width: 100%; justify-content: center; color: var(--danger); } /* full width like every rail action (translate, ask, copy) */
 /* MUST restate [hidden] AFTER the display of .action-btn or the button shows while hidden. */
 #tr-retry-all[hidden] { display: none; }
 /* One line, always; a label longer than the rail ends in an ellipsis (its
