@@ -2777,7 +2777,7 @@
     }
   },
   "trDoneUsage": {
-    "message": "已译 $COUNT$ 段 · $IN$ 入 / $OUT$ 出 tokens",
+    "message": "已译 $COUNT$ 段 · 入 $IN$ / 出 $OUT$ tokens",
     "placeholders": {
       "count": {
         "content": "$1"

@@ -2777,7 +2777,7 @@
     }
   },
   "trDoneUsage": {
-    "message": "$COUNT$ сегментов · вход $IN$ / выход $OUT$ tokens",
+    "message": "$COUNT$ сегментов · вход $IN$ / выход $OUT$ токенов",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2806,7 +2806,7 @@
     "message": "Перевод"
   },
   "trEstCost": {
-    "message": "Около $COUNT$ tokens · $MODEL$",
+    "message": "Около $COUNT$ токенов · $MODEL$",
     "placeholders": {
       "count": {
         "content": "$1"
