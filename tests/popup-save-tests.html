@@ -3858,6 +3858,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
       } finally { btn.remove(); }
     });
 
+    // Critique 2026-10-21: an IME's Escape (dropping the candidate list) must
+    // not reach the branch that closes the popup.
+    test("Escape closes the popup only outside IME composition", () => {
+      const closeAt = source.indexOf("window.close();", source.indexOf('e.key === "Escape"'));
+      const branchAt = source.lastIndexOf("e.key === \"Escape\"", closeAt);
+      assert(closeAt > 0 && branchAt > 0, "Escape close branch not found");
+      const guard = source.slice(branchAt, source.indexOf("{", branchAt));
+      assert(guard.includes("!e.isComposing") && guard.includes("229"), "the closing Escape branch ignores IME state: " + guard);
+    });
+
     // Critique 2026-10-21: the lookup on open spends Pinboard's 3s slot, so a
     // save waits 2-3s at "Saving…". Past 800ms the status line says why, and
     // the note goes away with the loading state unless something replaced it.

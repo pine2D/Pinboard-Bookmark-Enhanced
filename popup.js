@@ -2047,7 +2047,11 @@ function setupSubmit(token) {
           if (summaryDone === true && tagsDone === true) showStatus("status-msg", t("aiSummaryTagsGenerated"), "success");
         }, () => {});
       }
-    } else if (e.key === "Escape") {
+    } else if (e.key === "Escape" && !e.isComposing && e.keyCode !== 229) {
+      // An IME uses Escape to drop its candidate list; that keystroke is the
+      // input method's, not a request to close the popup (critique
+      // 2026-10-21). keyCode 229 covers engines that report the composing
+      // Escape without isComposing.
       // No .del-confirm-popover branch here any more: the delete confirm is
       // a shared showConfirmPopover() now, and that helper installs its own
       // capture-phase Escape handler with stopImmediatePropagation -- it
