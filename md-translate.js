@@ -2603,6 +2603,11 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   if (trLang) div.lang = trLang;
   else div.removeAttribute("lang");
   div.innerHTML = renderMarkdown(restored);
+  // A loose source list (items wrapped in <p>) usually comes back from the
+  // model without its blank lines, so marked renders it tight and the
+  // translation's items sat closer than the original's (58px vs 44px pitch).
+  // Keep the source's spacing; the text itself is left as the model wrote it.
+  div.classList.toggle("pb-tr-loose", /^(UL|OL)$/.test(orig.tagName) && !!orig.querySelector(":scope > li > p"));
   // H5 paint gate (spec 1.3): stamp the language this .pb-tr currently shows
   // so a translated-side highlight only re-paints when its recorded lang
   // still matches. Read straight off the element by md-highlight -- immune to

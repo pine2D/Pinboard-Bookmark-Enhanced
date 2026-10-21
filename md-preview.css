@@ -2916,6 +2916,10 @@ body.tr-bilingual #rendered-view .pb-tr > h1 { font-size: 1.5em; }
 body.tr-bilingual #rendered-view .pb-tr > h2 { font-size: 1.2em; }
 body.tr-bilingual #rendered-view .pb-tr > h3 { font-size: 1.1em; }
 body.tr-only #rendered-view .pb-tr { color: var(--fg); font-size: 1em; margin: 0; }
+/* md-translate.js _pbpTrFill: a translated loose list keeps the source's
+   item spacing -- the 1em a loose item's <p> would carry, collapsing to one
+   1em between neighbours as it does in the original. */
+#rendered-view .pb-tr.pb-tr-loose li { margin-block: 1em; }
 body.tr-only #rendered-view .pb-tr code { font-size: 0.875em; }
 
 /* Translated-only view: hide originals that HAVE a translation. pre blocks
