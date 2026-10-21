@@ -1832,7 +1832,12 @@ function _pbpTrPaintDone(st) {
   if (usg && usg.dataset.live === "1" && st.usage) {
     // U+2248 is text in the body font, not an icon glyph (see _pbpTrRenderUsage).
     const ap = st.usage.approx ? "\u2248" : "";
-    prog.textContent = t("trDoneUsage", String(n), ap + st.usage.inTok, ap + st.usage.outTok);
+    // The rail is ~220px, so this line wraps in de/ru/pl. Glue each figure to
+    // its words (U+00A0) and leave only the spaces beside the " \u00b7 " and " / "
+    // separators breakable: the line breaks between groups, never between a
+    // number and its "out" / "tokens" (2026-10-21 shots: a lone "aus").
+    prog.textContent = t("trDoneUsage", String(n), ap + st.usage.inTok, ap + st.usage.outTok)
+      .replace(/(?<![\u00b7/]) (?![\u00b7/])/g, "\u00a0");
     prog.title = usg.textContent;
     usg.hidden = true;
   } else {

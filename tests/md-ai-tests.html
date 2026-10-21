@@ -9539,6 +9539,31 @@ suiteIf("tr done-state distill (critique 2026-10-20 #3)", "_pbpTrPaintDone", () 
       assertEq(prog.textContent, "trDoneUsage|3|≈5|≈6", "estimate marked on each figure");
     } finally { window.t = realT; rail.remove(); }
   });
+  test("done: the usage line breaks only beside its separators, never inside a figure group", () => {
+    const realT = window.t;
+    // Real locale shapes (de / ru / zh_CN messages.json): word order differs,
+    // so the rule must hold for figure-first and label-first groups alike.
+    const shapes = [
+      (n, i, o) => `${n} Abschnitte · ${i} Tokens ein / ${o} aus`,
+      (n, i, o) => `${n} сегментов · вход ${i} / выход ${o} токенов`,
+      (n, i, o) => `已译 ${n} 段 · 入 ${i} / 出 ${o} tokens`,
+    ];
+    try {
+      for (const shape of shapes) {
+        window.t = (k, ...a) => k === "trDoneUsage" ? shape(...a) : k;
+        const { rail, st } = build();
+        try {
+          finishRun(st, { inTok: 758, outTok: 911, approx: true });
+          const text = document.getElementById("tr-progress").textContent;
+          // Every ordinary space touches a separator; all others are U+00A0.
+          const loose = [...text.matchAll(/ /g)].filter((m) => !/[·/]/.test(text[m.index - 1] + text[m.index + 1]));
+          assertEq(loose.length, 0, "only separator-adjacent spaces stay breakable: " + JSON.stringify(text));
+          assert(/ /.test(text), "figure groups are glued with U+00A0");
+          assertEq(text.replace(/ /g, " "), shape("3", "≈758", "≈911"), "same words, only the space kind changes");
+        } finally { rail.remove(); }
+      }
+    } finally { window.t = realT; }
+  });
   test("done: four rows -- status, view toggle, view line, reference block; same target control as before the run", () => {
     const realT = window.t;
     window.t = (k, ...a) => k + "|" + a.join("|");
