@@ -1968,7 +1968,8 @@ async function _pbpAskHistRestore() {
   const frag = document.createDocumentFragment();
   const note = document.createElement("div");
   note.className = "ask-restored";
-  note.textContent = t("askRestoredNote", String(hist.length));
+  // Singular twin: English/German/French/Russian/Polish inflect on the count.
+  note.textContent = t(hist.length === 1 ? "askRestoredNoteOne" : "askRestoredNote", String(hist.length));
   frag.appendChild(note);
   // Block-fingerprint check (audit #29): a persisted answer's [Pn] chips
   // index into the CURRENT block list (pbpAiBlockEl(p) is a plain array

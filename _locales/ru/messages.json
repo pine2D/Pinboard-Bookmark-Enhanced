@@ -3003,6 +3003,7 @@
   "askClearNo": {
     "message": "Отмена"
   },
+  "askRestoredNoteOne": { "message": "Восстановлено $COUNT$ ранее заданных вопросов", "placeholders": { "count": { "content": "$1" } } },
   "askRestoredNote": {
     "message": "Восстановлено $COUNT$ ранее заданных вопросов",
     "placeholders": {

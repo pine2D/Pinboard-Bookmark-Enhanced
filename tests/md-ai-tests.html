@@ -11905,6 +11905,40 @@ window._t4AsyncDone = (async function () {
     }
   });
 
+  await atest("the restored-history note picks the singular key for one round, the plural for more", async () => {
+    const realT = window.t;
+    window.t = (k, ...a) => k + "|" + a.join("|");
+    const root = document.createElement("div");
+    root.innerHTML = "<p>alpha beta gamma</p><p>second block text</p>";
+    pbpAiIndexBlocks(root);
+    const saved = _pbpAskState;
+    const savedUrl = _pbpAskHistUrl, savedAcct = _pbpAskHistAccount, savedFlag = _pbpAskHistRestored;
+    try {
+      for (const [rounds, want] of [[1, "askRestoredNoteOne|1"], [3, "askRestoredNote|3"]]) {
+        const bits = mkThread();
+        const url = "https://example.test/plural-" + rounds + "-" + Date.now() + "-" + Math.random();
+        try {
+          for (let i = 1; i <= rounds; i++) await pbpAskHistAppend(url, { q: "q" + i, a: "Answer [P1] " + i + ".", blocksHash: "old-fp" }, "");
+          _pbpAskState = mkAskState(url);
+          _pbpAskHistUrl = url; _pbpAskHistAccount = ""; _pbpAskHistRestored = false;
+          _pbpAskHistRestore();
+          await settleRestore(bits.thread);
+          const note = bits.thread.querySelector(".ask-restored");
+          assert(note, rounds + " round(s): note present");
+          assertEq(note.textContent, want, rounds + " round(s): note key and count");
+        } finally {
+          bits.wrap.remove();
+          const clear = document.getElementById("ask-clear");
+          if (clear) clear.remove();
+        }
+      }
+    } finally {
+      window.t = realT;
+      _pbpAskState = saved;
+      _pbpAskHistUrl = savedUrl; _pbpAskHistAccount = savedAcct; _pbpAskHistRestored = savedFlag;
+    }
+  });
+
   await atest("a replacement landing mid-chunk re-arms the restore exactly once", async () => {
     // The other ordering: the restore is already PAST its IDB read and inside
     // the rAF-chunked build when the swap lands. Two of its three bail points

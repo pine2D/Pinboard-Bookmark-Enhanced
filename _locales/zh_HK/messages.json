@@ -3003,6 +3003,7 @@
   "askClearNo": {
     "message": "取消"
   },
+  "askRestoredNoteOne": { "message": "已恢復 $COUNT$ 條歷史問答", "placeholders": { "count": { "content": "$1" } } },
   "askRestoredNote": {
     "message": "已恢復 $COUNT$ 條歷史問答",
     "placeholders": {

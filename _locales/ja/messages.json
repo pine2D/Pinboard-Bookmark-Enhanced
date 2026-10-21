@@ -3003,6 +3003,7 @@
   "askClearNo": {
     "message": "キャンセル"
   },
+  "askRestoredNoteOne": { "message": "過去の質問 $COUNT$ 件を復元しました", "placeholders": { "count": { "content": "$1" } } },
   "askRestoredNote": {
     "message": "過去の質問 $COUNT$ 件を復元しました",
     "placeholders": {

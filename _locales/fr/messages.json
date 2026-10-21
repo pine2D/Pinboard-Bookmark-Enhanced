@@ -3003,8 +3003,9 @@
   "askClearNo": {
     "message": "Annuler"
   },
+  "askRestoredNoteOne": { "message": "$COUNT$ question précédente restaurée", "placeholders": { "count": { "content": "$1" } } },
   "askRestoredNote": {
-    "message": "$COUNT$ question(s) précédente(s) restaurée(s)",
+    "message": "$COUNT$ questions précédentes restaurées",
     "placeholders": {
       "count": {
         "content": "$1"

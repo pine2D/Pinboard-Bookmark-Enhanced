@@ -3003,6 +3003,7 @@
   "askClearNo": {
     "message": "Anuluj"
   },
+  "askRestoredNoteOne": { "message": "Przywrócono $COUNT$ wcześniejszych pytań", "placeholders": { "count": { "content": "$1" } } },
   "askRestoredNote": {
     "message": "Przywrócono $COUNT$ wcześniejszych pytań",
     "placeholders": {

@@ -3003,8 +3003,9 @@
   "askClearNo": {
     "message": "Abbrechen"
   },
+  "askRestoredNoteOne": { "message": "$COUNT$ frühere Frage wiederhergestellt", "placeholders": { "count": { "content": "$1" } } },
   "askRestoredNote": {
-    "message": "$COUNT$ frühere Frage(n) wiederhergestellt",
+    "message": "$COUNT$ frühere Fragen wiederhergestellt",
     "placeholders": {
       "count": {
         "content": "$1"
