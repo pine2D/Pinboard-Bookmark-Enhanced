@@ -1711,6 +1711,148 @@ await (async () => {
 })();
 
 
+section("auto-pause toggle: icon, pressed state, p shortcut (mounted workbench)");
+await (async () => {
+  try { await videoToolbarCases(); } catch (e) { check("auto-pause suite ran to completion", false, String((e && e.stack) || e)); }
+})();
+async function videoToolbarCases() {
+  // The real workbench, mounted offline: md-video.js's runtime IIFE honours
+  // window.pbpVideoFixture (the same QA path scripts/ui-render-audit.mjs
+  // drives), so the poster click builds the actual .pbv-bar and wires the
+  // actual document keydown listener. It runs in a same-origin srcdoc frame
+  // so its chrome stub and body.video-mode never leak into the suites above;
+  // md-translate.js supplies the production single-key gate and md-reader.js
+  // the "?" panel's row table, both as shipped.
+  // Real English catalogue behind the stubbed chrome.i18n, so copy checks
+  // compare against shipped strings rather than echoed key names.
+  window.__pbvEnMsgs = await fetch("../_locales/en/messages.json").then((r) => r.json());
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "width:900px;height:600px;border:0;position:absolute;left:-10000px";
+  frame.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body class="video-mode">
+<div id="rendered-view"><p>Reading text.</p></div>
+<script>
+window.chrome = {
+  i18n: { getMessage: (k) => ((parent.__pbvEnMsgs || {})[k] || {}).message || "" },
+  runtime: { getURL: (p) => p },
+  permissions: { contains: async () => true },
+  storage: { local: { get: async () => ({}), set: async () => {} }, onChanged: { addListener: () => {} } }
+};
+window.pbpVideoFixture = {
+  tracks: [{ baseUrl: "https://x/en.xml", lang: "en", label: "English", asr: false }],
+  track: { baseUrl: "https://x/en.xml", lang: "en", label: "English", asr: false },
+  segments: [{ from: 0, to: 2.4, content: "First cue." }, { from: 2.4, to: 5.1, content: "Second cue." }],
+  meta: { title: "Fixture", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", trackLabel: "English" }
+};
+<\/script>
+<script src="../i18n.js"><\/script><script src="../shared.js"><\/script><script src="../ai.js"><\/script>
+<script src="../md-translate.js"><\/script><script src="../md-video.js"><\/script><script src="../md-reader.js"><\/script>
+</body></html>`;
+  const loaded = new Promise((r) => frame.addEventListener("load", r, { once: true }));
+  document.body.appendChild(frame);
+  await loaded;
+  const w = frame.contentWindow, d = frame.contentDocument;
+  let mountErr = "";
+  try {
+    w.pbpVideoInit({ pageUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", title: "Fixture", account: "u" });
+    d.querySelector(".pbv-poster").click();
+    for (let i = 0; i < 40 && !(d.querySelector(".pbv-autopause") && !d.querySelector(".pbv-autopause").hidden); i++) await new Promise((r) => setTimeout(r, 50));
+  } catch (e) { mountErr = String((e && e.message) || e); }
+  const ap = d.querySelector(".pbv-autopause"), loop = d.querySelector(".pbv-loop"), follow = d.querySelector(".pbv-follow");
+  check("workbench mounts offline and shows the auto-pause toggle", ap && !ap.hidden && loop && follow, mountErr || "no visible .pbv-autopause");
+  if (!ap) return;
+  const pressed = (b) => b.getAttribute("aria-pressed");
+  const key = (k, target, init) => {
+    const ev = new w.KeyboardEvent("keydown", Object.assign({ key: k, bubbles: true, cancelable: true }, init || {}));
+    (target || d.body).dispatchEvent(ev);
+    return ev;
+  };
+
+  // Icon: a mode toggle must not wear the transport's two-bar "pause now"
+  // glyph. Lucide's pause is two <rect>s and nothing else; octagon-pause
+  // adds the stop-sign outline (identified by its path's opening command).
+  const svg = ap.querySelector("svg");
+  const rects = svg ? svg.querySelectorAll("rect").length : -1;
+  const ds = svg ? Array.from(svg.querySelectorAll("path")).map((n) => n.getAttribute("d")) : [];
+  check("icon is not the player's two-bar pause glyph", svg && rects === 0 && ds.length > 0, "rects=" + rects + " paths=" + ds.length);
+  check("icon is Lucide octagon-pause (stop-sign outline + two bars), 24-box stroke 2, no <text>",
+    svg && svg.getAttribute("viewBox") === "0 0 24 24" && svg.getAttribute("stroke-width") === "2" && !svg.querySelector("text")
+      && ds.length === 3 && ds.includes("M10 15V9") && ds.includes("M14 15V9") && ds.some((x) => x.startsWith("M2.586 16.726")),
+    svg ? svg.outerHTML : "no svg");
+  const others = Array.from(d.querySelectorAll(".pbv-bar button svg, .pbv-poster svg")).filter((x) => x !== svg).map((x) => x.innerHTML);
+  check("icon is distinct from every other glyph in the bar and on the poster", svg && !others.includes(svg.innerHTML));
+  check("icon-only button carries title + aria-label, and the label says it is automatic",
+    ap.title && ap.title === ap.getAttribute("aria-label") && ap.title === window.__pbvEnMsgs.mdVideoAutoPause.message
+      && /^Auto-pause\b/.test(ap.title), ap.title);
+
+  // Pressed state follows every toggle path.
+  check("starts unpressed", pressed(ap) === "false");
+  ap.click();
+  check("click presses it", pressed(ap) === "true");
+  ap.click();
+  check("second click releases it", pressed(ap) === "false");
+
+  // The shortcut: declared, live, and scoped like r.
+  check("declares aria-keyshortcuts=\"p\"", ap.getAttribute("aria-keyshortcuts") === "p");
+  check("p is in the live shortcut set while the toggle is on screen", w.pbpVideoShortcutKeys().has("p"));
+  let ev = key("p");
+  check("p in video-mode presses it and consumes the key", pressed(ap) === "true" && ev.defaultPrevented);
+  key("P");
+  check("P (Caps Lock) toggles it back", pressed(ap) === "false");
+  const loopBefore = pressed(loop), followBefore = pressed(follow);
+  key("p");
+  check("p touches neither repeat nor follow", pressed(loop) === loopBefore && pressed(follow) === followBefore);
+  key("p");
+  key("r");
+  check("r toggles repeat and leaves auto-pause alone", pressed(loop) !== loopBefore && pressed(ap) === "false");
+  key("r");
+  const input = d.createElement("input");
+  d.body.appendChild(input);
+  input.focus();
+  ev = key("p", input);
+  check("p typed into a text field does nothing", pressed(ap) === "false" && !ev.defaultPrevented);
+  input.remove();
+  key("p", d.body, { ctrlKey: true });
+  check("Ctrl+p is not the shortcut", pressed(ap) === "false");
+  d.body.classList.remove("video-mode");
+  ev = key("p");
+  check("outside video-mode p does nothing", pressed(ap) === "false" && !ev.defaultPrevented);
+  d.body.classList.add("video-mode");
+  ap.hidden = true;
+  key("p");
+  check("with the toggle hidden p does nothing and leaves the live set", pressed(ap) === "false" && !w.pbpVideoShortcutKeys().has("p"));
+  ap.hidden = false;
+
+  // No collisions, judged on the tables the "?" panel actually renders: the
+  // reader-wide rows plus the video rows, every chip unique.
+  // Top-level consts are not window properties; read them in the frame's scope.
+  const readerRows = new w.Function("return PBP_KBD_HELP_ROWS")();
+  const videoRows = new w.Function("return PBP_KBD_HELP_VIDEO_ROWS")();
+  const allRows = readerRows.concat(videoRows);
+  const chips = allRows.flatMap((r) => r.chips.map((c) => c.toLowerCase()));
+  const dupes = chips.filter((c, i) => chips.indexOf(c) !== i);
+  check("no key is claimed twice across the reader and video shortcut tables", dupes.length === 0, "duplicates: " + dupes.join(","));
+  check("p is claimed exactly once, by the auto-pause row",
+    allRows.filter((r) => r.chips.includes("p")).length === 1 && videoRows.some((r) => r.chips.includes("p") && r.key === "kbdHelpVideoAutoPause"));
+  // ...and every key a reader-wide handler owns is left alone by the video
+  // layer: none of them may flip the toggle.
+  for (const r of readerRows) for (const c of r.chips) if (c.length === 1) key(c);
+  check("no reader-wide single key flips auto-pause", pressed(ap) === "false");
+
+  // "?" panel: lists p with its own copy while the toggle is live.
+  const ul = d.createElement("ul");
+  w._pbpKbdHelpFillList(ul);
+  const pRow = Array.from(ul.querySelectorAll(".kbd-help-row")).find((li) => li.querySelector(".kbd-help-chip").textContent === "p");
+  check("the shortcuts panel lists p in video-mode", !!pRow);
+  check("the p row reads its own locale key", pRow && pRow.querySelector(".kbd-help-desc").textContent === window.__pbvEnMsgs.kbdHelpVideoAutoPause.message,
+    pRow ? pRow.textContent : "no p row");
+  // Every bar control that promises a key is backed by the live set and the panel.
+  const promised = Array.from(d.querySelectorAll(".pbv-bar [aria-keyshortcuts]")).filter((b) => !b.hidden).map((b) => b.getAttribute("aria-keyshortcuts"));
+  const listed = Array.from(ul.querySelectorAll(".kbd-help-chip")).map((k) => k.textContent);
+  const live = w.pbpVideoShortcutKeys();
+  check("every visible bar key promise is live and listed in the panel", promised.length >= 3 && promised.every((k) => live.has(k) && listed.includes(k)), "promised: " + promised.join(","));
+  frame.remove();
+}
+
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

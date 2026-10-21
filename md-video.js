@@ -2037,9 +2037,12 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // playback toggle's icon: a locked crosshair reads as "stay locked onto
   // the position". Local for the same single-consumer reason as PLAY above.
   const PBV_FOLLOW_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg>';
-  // Learning-loop glyphs (research T3.2/T3.6), Lucide v0.525.0 repeat-1 / pause / timer.
+  // Learning-loop glyphs (research T3.2/T3.6), Lucide v0.525.0 repeat-1 /
+  // octagon-pause / timer. Auto-pause is a MODE ("stop at every cue end"),
+  // so it wears octagon-pause -- a stop sign, not the player's bare two-bar
+  // pause, which read as "pause now" on a pressed-state toggle.
   const PBV_LOOP_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/><path d="M11 10h1v4"/></svg>';
-  const PBV_PAUSE_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>';
+  const PBV_AUTOPAUSE_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15V9"/><path d="M14 15V9"/><path d="M2.586 16.726A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2h6.624a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586z"/></svg>';
   const PBV_CLOCK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>';
   // extOpen is PBP_ICONS's real-external-link icon (shared.js, already loaded
   // by md-preview.html before this file); guarded for the standalone test page.
@@ -2458,6 +2461,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     if (list && !list.hidden && _relayAlive && _lastRelayTime != null) { s.add("Space"); s.add("Left"); s.add("Right"); }
     if (_followBtn && !_followBtn.hidden && !_followBtn.disabled) s.add("f");
     if (_loopBtn && !_loopBtn.hidden) s.add("r");
+    if (_autoPauseBtn && !_autoPauseBtn.hidden) s.add("p");
     return s;
   };
   // Seek entry for reader modules (Ask/skim chips): same best-effort seekTo.
@@ -3234,6 +3238,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   function setAutoPause(on) {
     _autoPauseOn = !!on;
     if (_autoPauseBtn) _autoPauseBtn.setAttribute("aria-pressed", _autoPauseOn ? "true" : "false");
+    srAnnounce(t("mdVideoAutoPause") + " · " + t(_autoPauseOn ? "mdVideoStateOn" : "mdVideoStateOff"));
   }
   // "Back to the current cue" (research T3.7): scrolls to where playback
   // is, in whichever study view is showing. No follow re-arm on its own.
@@ -3416,7 +3421,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // Video shortcut layer (research T3.3): scoped to video pages with a
   // transcript, behind the same typing/modifier gate as the reader's single
   // keys. Space and the arrows defer to focused controls and to the
-  // timeline list (whose own arrow keys navigate rows); [ ] r f c b are
+  // timeline list (whose own arrow keys navigate rows); [ ] r p f c b are
   // free in the reader's key map.
   function onVideoKeydown(e) {
     if (!_segments.length || !document.body.classList.contains("video-mode")) return;
@@ -3440,6 +3445,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       case "ArrowLeft": case "ArrowRight": if (onControl || inList || !playerKeys) return; seekBy(e.key === "ArrowLeft" ? -3 : 3); break;
       case "[": case "]": stepCue(e.key === "[" ? -1 : 1); break;
       case "r": case "R": if (!_loopBtn || _loopBtn.hidden) return; setLoop(!_loopOn); break;
+      case "p": case "P": if (!_autoPauseBtn || _autoPauseBtn.hidden) return; setAutoPause(!_autoPauseOn); break;
       case "f": case "F": if (!_followBtn || _followBtn.hidden || _followBtn.disabled) return; setFollow(!_followOn); break;
       // Same action as .pbv-back-current, which declares this key with
       // aria-keyshortcuts="c" -- that is a promise that the key activates the
@@ -6298,10 +6304,11 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         const apBtn = el("button", "pbv-autopause");
         apBtn.type = "button";
         apBtn.hidden = true;
-        apBtn.innerHTML = PBV_PAUSE_SVG;
+        apBtn.innerHTML = PBV_AUTOPAUSE_SVG;
         apBtn.title = t("mdVideoAutoPause");
         apBtn.setAttribute("aria-label", t("mdVideoAutoPause"));
         apBtn.setAttribute("aria-pressed", "false");
+        apBtn.setAttribute("aria-keyshortcuts", "p");
         apBtn.addEventListener("click", () => setAutoPause(!_autoPauseOn));
         _autoPauseBtn = apBtn;
         bar.appendChild(apBtn);

@@ -1004,6 +1004,7 @@ const PBP_KBD_HELP_VIDEO_ROWS = [
   { chips: ["Left", "Right"], key: "kbdHelpVideoSeek" }, // key names, not arrow glyphs (font iron rule; mirrors pbpVideoShortcutKeys)
   { chips: ["[", "]"], key: "kbdHelpVideoCue" },
   { chips: ["r"], key: "kbdHelpVideoLoop" },
+  { chips: ["p"], key: "kbdHelpVideoAutoPause" },
   { chips: ["f"], key: "kbdHelpVideoFollow" },
   { chips: ["c"], key: "kbdHelpVideoCurrent" },
   { chips: ["b"], key: "kbdHelpVideoView" }
