@@ -2679,6 +2679,12 @@
   "aiUnavailableHint": {
     "message": "Die KI-Optionen oben haben noch keine Wirkung: Dem ausgewählten Anbieter fehlt der API-Schlüssel oder die Berechtigung dafür."
   },
+  "aiProviderKeyMissing": {
+    "message": "Die KI-Optionen, die du eingeschaltet hast, warten auf den API-Schlüssel dieses Anbieters. Trag ihn unten ein, dann wirken sie."
+  },
+  "aiProviderAccessMissing": {
+    "message": "Die KI-Optionen, die du eingeschaltet hast, erreichen diesen Anbieter noch nicht. Erteile die Berechtigung unten über „Verbindung testen“."
+  },
   "previewAiModelLabel": {
     "message": "Modell-Überschreibung (optional)"
   },

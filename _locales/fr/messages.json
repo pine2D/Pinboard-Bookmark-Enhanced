@@ -2679,6 +2679,12 @@
   "aiUnavailableHint": {
     "message": "Les options IA ci-dessus n'ont encore aucun effet : il manque la clé API ou l'autorisation pour le fournisseur sélectionné."
   },
+  "aiProviderKeyMissing": {
+    "message": "Les options IA que vous avez activées attendent la clé API de ce fournisseur. Saisissez-la ci-dessous pour qu'elles fonctionnent."
+  },
+  "aiProviderAccessMissing": {
+    "message": "Les options IA que vous avez activées ne peuvent pas encore joindre ce fournisseur. Accordez l'accès avec « Tester la connexion » ci-dessous."
+  },
   "previewAiModelLabel": {
     "message": "Remplacement du modèle (optionnel)"
   },

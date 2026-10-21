@@ -197,6 +197,20 @@ function _pbpConnectionHealthDate(ts) {
   } catch (_) { return new Date(ts).toLocaleString(); }
 }
 
+let _pbpAiPermissionMissing = false;
+// Where "Set up AI" sends the user: the field that is actually missing (the
+// current provider's key, re-read at click time), or Test Connection when only
+// the origin grant is, else the provider picker as before.
+function pbpAiSetupTarget() {
+  const provider = $id("opt-ai-provider")?.value || "gemini";
+  let configured = true;
+  try { configured = hasAIKey(pbpLiveAiSettingsSnapshot(provider)); }
+  catch (e) { console.warn("[options] AI key check failed:", e?.name, e?.message); }
+  const id = !configured ? `opt-${provider}-key`
+    : (_pbpAiPermissionMissing ? `test-${provider}` : "opt-ai-provider-btn");
+  return $id(id) ? id : "opt-ai-provider-btn";
+}
+
 async function renderConnectionOverview() {
   const host = $id("connection-health");
   if (!host || typeof pbpLiveAiSettingsSnapshot !== "function") return;
@@ -251,9 +265,23 @@ async function renderConnectionOverview() {
   // needs the awaits above), and the return only fires on a page that carries
   // neither #connection-health nor these hints.
   const aiDead = !aiConfigured || aiPermission === false;
+  let aiSwitchOn = false;
   for (const block of document.querySelectorAll("[data-ai-unavailable]")) {
     const ids = block.dataset.aiUnavailable.split(/\s+/).filter(Boolean);
-    block.hidden = !(aiDead && ids.some((id) => $id(id)?.checked !== false));
+    const on = ids.some((id) => $id(id)?.checked !== false);
+    if (on) aiSwitchOn = true;
+    block.hidden = !(aiDead && on);
+  }
+  // The provider panel's own half of that warning. "Set up AI" lands here, so
+  // it says which of the two factors is missing; same silence when every AI
+  // switch is off. The grant only comes from Test Connection's click.
+  _pbpAiPermissionMissing = aiConfigured && aiPermission === false;
+  const providerNote = $id("ai-provider-unavailable");
+  if (providerNote) {
+    providerNote.hidden = !(aiDead && aiSwitchOn);
+    if (!providerNote.hidden) {
+      providerNote.querySelector("p").textContent = t(aiConfigured ? "aiProviderAccessMissing" : "aiProviderKeyMissing");
+    }
   }
   const items = [
     { id: "pinboard", name: "Pinboard", panel: "general", target: "test-pinboard-token",
@@ -3920,7 +3948,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
   for (const btn of [$id("onboard-next-ai-btn"), ...document.querySelectorAll("[data-ai-setup]")]) {
-    btn?.addEventListener("click", () => pbpOpenOptionsTarget("ai", "opt-ai-provider-btn"));
+    btn?.addEventListener("click", () => pbpOpenOptionsTarget("ai", pbpAiSetupTarget()));
   }
   chrome.storage.onChanged?.addListener((changes, area) => {
     if (area === "local" && (changes[PBP_CONNECTION_HEALTH_KEY] || changes.vocabDriveConnected)) {

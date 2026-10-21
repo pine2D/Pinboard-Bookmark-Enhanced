@@ -2679,6 +2679,12 @@
   "aiUnavailableHint": {
     "message": "上の AI オプションはまだ機能しません。選択中のプロバイダーに API キーがないか、権限が許可されていません。"
   },
+  "aiProviderKeyMissing": {
+    "message": "オンにした AI オプションは、このプロバイダーの API キーを待っています。下で入力すると機能します。"
+  },
+  "aiProviderAccessMissing": {
+    "message": "オンにした AI オプションは、まだこのプロバイダーにアクセスできません。下の「接続テスト」で許可してください。"
+  },
   "previewAiModelLabel": {
     "message": "モデルの上書き（任意）"
   },

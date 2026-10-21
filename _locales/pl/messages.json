@@ -2679,6 +2679,12 @@
   "aiUnavailableHint": {
     "message": "Powyższe opcje AI na razie nic nie robią: wybranemu dostawcy brakuje klucza API lub uprawnienia do niego."
   },
+  "aiProviderKeyMissing": {
+    "message": "Włączone opcje AI czekają na klucz API tego dostawcy. Wpisz go poniżej, a zaczną działać."
+  },
+  "aiProviderAccessMissing": {
+    "message": "Włączone opcje AI nie mają jeszcze dostępu do tego dostawcy. Udziel go przyciskiem „Testuj połączenie” poniżej."
+  },
   "previewAiModelLabel": {
     "message": "Zastąpienie modelu (opcjonalne)"
   },

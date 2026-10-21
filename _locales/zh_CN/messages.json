@@ -2679,6 +2679,12 @@
   "aiUnavailableHint": {
     "message": "上面的 AI 选项暂时不生效：所选服务商还缺 API Key 或访问授权。"
   },
+  "aiProviderKeyMissing": {
+    "message": "你开启的 AI 选项还在等这个服务商的 API Key，在下面填好就能生效。"
+  },
+  "aiProviderAccessMissing": {
+    "message": "你开启的 AI 选项还无法访问这个服务商，点下面的「测试连接」授权即可。"
+  },
   "previewAiModelLabel": {
     "message": "模型覆盖（可选）"
   },

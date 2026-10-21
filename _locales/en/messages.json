@@ -2688,6 +2688,12 @@
   "aiUnavailableHint": {
     "message": "The AI options above do nothing yet: the selected AI provider is missing an API key or access to it."
   },
+  "aiProviderKeyMissing": {
+    "message": "AI options you turned on are waiting for this provider's API key. Add it below and they start working."
+  },
+  "aiProviderAccessMissing": {
+    "message": "AI options you turned on can't reach this provider yet. Use Test Connection below to grant access."
+  },
   "previewAiModelLabel": {
     "message": "Model override (optional)"
   },
