@@ -9249,9 +9249,9 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
     try {
       _pbpTrShowViewToggle({ mode: "translated" });
       const hint = document.getElementById("tr-peek-hint");
-      assertEq(!!hint && hint.hidden, false, "hint shown in the translated-only view");
+      assertEq(!!hint && hint.closest("[hidden]"), null, "hint shown in the translated-only view");
       _pbpTrSyncToggle("bilingual");
-      assertEq(hint.hidden, true, "hint hidden outside the translated-only view");
+      assertEq(!!hint.closest("[hidden]"), true, "hint hidden outside the translated-only view");
       document.body.classList.add("tr-only");
       const tr = view.querySelector(".pb-tr"), orig = view.querySelector("p");
       assertEq(tr.hasAttribute("role") || tr.hasAttribute("tabindex") || tr.hasAttribute("title"), false,
@@ -9440,6 +9440,10 @@ suiteIf("tr done-state distill (critique 2026-10-20 #3)", "_pbpTrPaintDone", () 
       // the always-visible view line in tr-only.
       assertEq(seen(document.getElementById("tr-peek-hint")), true, "peek hint visible in the translated-only view");
       assertEq(document.getElementById("tr-peek-hint").parentElement.id, "tr-view-line", "on the view line");
+      assertEq(document.getElementById("tr-view-line").textContent, document.getElementById("tr-peek-hint").textContent, "the line holds the hint alone, never the view's name");
+      _pbpTrSyncToggle("original");
+      assertEq(seen(document.getElementById("tr-view-line")), false, "outside tr-only the line is gone: the segments already name the view");
+      _pbpTrSyncToggle("translated");
     } finally { window.t = realT; rail.remove(); }
   });
   test("leaving done puts the target row back in place and hides the fold", () => {

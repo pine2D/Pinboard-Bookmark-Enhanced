@@ -3023,8 +3023,6 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #tr-section .tr-link:hover { color: var(--link-hover); }
 #tr-section .tr-link:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 #tr-section .view-toggle { margin-top: var(--sp-2); }
-/* View name and, in tr-only, the peek hint share the line under the toggle. */
-#tr-peek-hint::before { content: "\00B7"; margin: 0 var(--sp-1); }
 
 /* ---- Ask panel (md-ask.js): fixed right column on wide viewports ---- */
 #ask-panel {

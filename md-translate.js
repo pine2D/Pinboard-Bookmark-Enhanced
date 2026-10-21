@@ -3092,25 +3092,19 @@ function _pbpTrShowViewToggle(st) {
   const fold = document.getElementById("tr-done-fold");
   if (fold && fold.parentElement === sec) sec.insertBefore(wrap, fold);
   else sec.appendChild(wrap);
-  // One line under the toggle (critique 2026-10-20 #3): the view's name, and
-  // in tr-only the peek hint after it. The three segments are glyphs or
-  // codes; the name says the view in words so nobody has to hover a title to
-  // learn it (aria-hidden: the pressed segment's own label already says it
-  // to assistive tech).
+  // The line under the toggle names the pointer peek in tr-only
+  // (_pbpTrPeekToggle), in place of the per-paragraph title it used to carry;
+  // it is the peek's only discovery path. It no longer repeats the view's
+  // name: the pressed segment's codes or glyph already say it (2026-10-21
+  // review), so outside tr-only the line is hidden.
   const line = document.createElement("div");
   line.id = "tr-view-line";
   line.className = "tr-meta";
-  const name = document.createElement("span");
-  name.id = "tr-view-name";
-  name.setAttribute("aria-hidden", "true");
-  // Names the pointer peek in tr-only (_pbpTrPeekToggle), in place of the
-  // per-paragraph title it used to carry; shown only in that view. It is the
-  // peek's only discovery path, so it stays on the always-visible line.
+  line.hidden = true;
   const peekHint = document.createElement("span");
   peekHint.id = "tr-peek-hint";
   peekHint.textContent = t("trShowOriginal");
-  peekHint.hidden = true;
-  line.append(name, peekHint);
+  line.append(peekHint);
   wrap.insertAdjacentElement("afterend", line);
   _pbpTrSyncViewLabels(st);
   _pbpTrSyncToggle(st.mode);
@@ -3145,17 +3139,14 @@ function _pbpTrSyncViewLabels(st) {
   });
 }
 
-const PBP_TR_VIEW_NAME_KEYS = { original: "trViewOriginal", bilingual: "trViewBilingual", translated: "trViewTranslated" };
 function _pbpTrSyncToggle(mode) {
   document.querySelectorAll("#tr-view-toggle .toggle-btn").forEach((b) => {
     const active = b.dataset.trMode === mode;
     b.classList.toggle("active", active);
     b.setAttribute("aria-pressed", active ? "true" : "false");
   });
-  const name = document.getElementById("tr-view-name");
-  if (name) name.textContent = PBP_TR_VIEW_NAME_KEYS[mode] ? t(PBP_TR_VIEW_NAME_KEYS[mode]) : "";
-  const peekHint = document.getElementById("tr-peek-hint");
-  if (peekHint) peekHint.hidden = mode !== "translated";
+  const line = document.getElementById("tr-view-line");
+  if (line) line.hidden = mode !== "translated";
 }
 
 // Moving between original-only and translated-only can hide the element that
