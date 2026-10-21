@@ -8464,7 +8464,7 @@ async function openReaderSurface(name) {
       pbpExplainInvoke("explain"); await wait(700);
       const pop = document.getElementById("explain-pop");
       if (!shown(pop)) return false;
-      pop.querySelectorAll(".xp-foot button").forEach((b) => { b.hidden = false; });
+      pop.querySelectorAll(".xp-foot :is(button, .xp-vocab-status)").forEach((b) => { b.hidden = false; });
       return true;
     }
     case "explain-dict": {

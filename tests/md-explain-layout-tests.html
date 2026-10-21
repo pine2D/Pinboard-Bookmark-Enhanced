@@ -181,38 +181,43 @@ function assertLayout(frame, locale) {
     } finally { frame.remove(); }
   });
 
-  // The dictionary view of a saved word is the crowded case: the "In
-  // vocabulary" state (tick + text, 2026-10-21) and its short "Update" button
-  // beside the known / open-vocab icons. Whatever the row does there, the
-  // price stays whole, the label and "ask more" stay together on one row,
-  // "ask more" keeps the right edge, and the state never parts from its
-  // button or loses its text.
-  await test("a crowded dictionary footer moves price, model and ask more as one unit", async () => {
+  // The dictionary view of a saved word is the crowded case (critique
+  // 2026-10-21): the Learning | Known control, the quiet "Update" (shown when
+  // the lookup would add to the record), the open-vocab icon, then price +
+  // model + "ask more". Whatever the row does there, the control stays ONE
+  // unbroken 26px control, the left cluster keeps one row, the price stays
+  // whole, the label and "ask more" stay together, "ask more" keeps the
+  // right edge, and nothing overflows.
+  await test("a crowded saved-word footer keeps Learning | Known whole and moves price, model and ask more as one unit", async () => {
     for (const width of [320, 420]) {
       const frame = await makeFrame(width);
       try {
         const doc = frame.contentDocument;
-        const known = doc.createElement("button");
-        known.className = "xp-known";
-        known.innerHTML = '<svg viewBox="0 0 24 24"></svg>';
-        doc.querySelector(".xp-vocab").after(known);
-        const state = doc.createElement("span");
-        state.className = "xp-vocab-state";
-        state.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14"></svg><span></span>';
-        doc.querySelector(".xp-vocab").before(state);
+        const status = doc.createElement("div");
+        status.className = "view-toggle xp-vocab-status";
+        status.setAttribute("role", "group");
+        status.innerHTML = '<button type="button" class="toggle-btn active" data-status="new" aria-pressed="true"></button>' +
+          '<button type="button" class="toggle-btn" data-status="known" aria-pressed="false"></button>';
+        doc.querySelector(".xp-vocab").before(status);
         doc.querySelector(".xp-save").hidden = true;
+        const vocab = doc.querySelector(".xp-vocab");
+        vocab.dataset.face = "update";
+        // .xp-vocab transitions background-color (150ms): let the quiet face settle.
+        await new Promise((resolve) => setTimeout(resolve, 250));
         for (const locale of LOCALES) {
           applyLocale(frame, messages, locale);
-          const vocab = doc.querySelector(".xp-vocab");
-          vocab.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14"></svg><span></span>';
-          // Production (md-dict.js): visible "Update", full name on title.
+          // Production (md-dict.js): text-only quiet "Update", full name on title.
+          vocab.innerHTML = "<span></span>";
           vocab.querySelector("span").textContent = messages[locale].update.message;
-          state.querySelector("span").textContent = messages[locale].dictSavedVocab.message;
+          const [learn, known] = status.querySelectorAll(".toggle-btn");
+          learn.textContent = messages[locale].vocabStatusLearning.message;
+          known.textContent = messages[locale].vocabStatusKnown.message;
           doc.querySelector(".xp-cost").textContent = messages[locale].explainEstCost.message.replace("$TOKENS$", "12345");
           doc.querySelector(".xp-model-name").textContent = "· Custom OpenAI-compatible · a-long-model-id";
           await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
           const tag = `${locale}@${width}`;
-          const foot = doc.querySelector(".xp-foot").getBoundingClientRect();
+          const footEl = doc.querySelector(".xp-foot");
+          const foot = footEl.getBoundingClientRect();
           const costEl = doc.querySelector(".xp-cost");
           const model = doc.querySelector(".xp-model-text").getBoundingClientRect();
           const ask = doc.querySelector(".xp-ask").getBoundingClientRect();
@@ -221,13 +226,31 @@ function assertLayout(frame, locale) {
           assert(Math.abs((model.top + model.height / 2) - (ask.top + ask.height / 2)) <= 4,
             `${tag}: label and "ask more" split across rows`);
           assert(foot.right - ask.right <= 16, `${tag}: "ask more" left the right edge`);
-          assert(doc.querySelector(".xp-foot").scrollWidth <= doc.querySelector(".xp-foot").clientWidth + 1, `${tag}: footer overflows`);
-          const st = state.getBoundingClientRect(), vb = vocab.getBoundingClientRect();
+          assert(footEl.scrollWidth <= footEl.clientWidth + 1, `${tag}: footer overflows`);
+          const st = status.getBoundingClientRect(), lb = learn.getBoundingClientRect(), kb = known.getBoundingClientRect();
+          assert(Math.round(st.height) === 26 && lb.top === kb.top && lb.right <= kb.left + 0.5,
+            `${tag}: Learning | Known broke apart (h ${st.height}, tops ${lb.top}/${kb.top})`);
+          for (const seg of [learn, known]) {
+            assert(seg.scrollWidth <= seg.clientWidth + 0.5 && Math.round(seg.getBoundingClientRect().height) === 24,
+              `${tag}: segment "${seg.textContent}" clipped or wrapped`);
+          }
+          const vb = vocab.getBoundingClientRect(), ob = doc.querySelector(".xp-open-vocab").getBoundingClientRect();
+          // Update always sits right after the control on its row.
           assert(Math.abs((st.top + st.height / 2) - (vb.top + vb.height / 2)) <= 1 && st.right <= vb.left,
-            `${tag}: the "In vocabulary" state parted from its Update button`);
-          assert(state.scrollWidth <= state.clientWidth + 0.5 && st.width > 30, `${tag}: the state text is clipped`);
-          assert(frame.contentWindow.getComputedStyle(state).backgroundColor === "rgba(0, 0, 0, 0)" && frame.contentWindow.getComputedStyle(state).borderTopWidth === "0px",
-            `${tag}: the state is drawn like a control`);
+            `${tag}: Update parted from the Learning | Known control`);
+          // At the 420px card the whole word cluster holds one row in every
+          // locale. At 320px the longest pair (de) may push the vocabulary
+          // icon down, where it leads the row that price + "ask more" share.
+          if (width >= 420 || Math.abs(vb.top - ob.top) > 1) {
+            assert(Math.abs(vb.top - ob.top) <= 1 ? vb.right <= ob.left
+              : width < 420 && ob.top >= vb.bottom && ob.left - foot.left <= 16 &&
+                Math.abs((ob.top + ob.height / 2) - (ask.top + ask.height / 2)) <= 4,
+              `${tag}: the word cluster does not hold one row, or wrapped badly (status ${st.width} update ${vb.width} foot ${footEl.clientWidth})`);
+          }
+          const vs = frame.contentWindow.getComputedStyle(vocab);
+          assert(vs.backgroundColor === "rgba(0, 0, 0, 0)" && vs.borderTopColor === "rgba(0, 0, 0, 0)" && Math.round(vb.height) === 26,
+            `${tag}: the quiet Update is drawn like a primary button or left the 26px rung (${vs.backgroundColor} / ${vs.borderTopColor} / ${vb.height})`);
+          assert(!/[\u2713\u2714\u2705]/.test(footEl.textContent), `${tag}: literal tick in the footer`);
         }
       } finally { frame.remove(); }
     }

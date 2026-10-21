@@ -1327,30 +1327,111 @@ async function runDictNoAiAndSavedStateTests() {
   const realSlotRun = _pbpDictSlotRun;
   const realCtxRun = _pbpDictCtxRun;
   const realVocabGet = pbpVocabGet;
+  const realSetStatus = pbpVocabBatchSetStatus;
   const previousOwner = _pbpDictOwner;
   _pbpDictResolveLang = async () => "en";
   _pbpDictSlotRun = async () => pbpDictNormalizeEntry(FDA_SAMPLE);
   _pbpDictCtxRun = async (_el, _cap, _ctx, _s, _signal, resolveLemmaOnce) => { resolveLemmaOnce(""); return null; };
-  pbpVocabGet = async () => ({ id: "acct_a|en|hello" });
   _pbpDictOwner = "acct_a";
+  // The gloss and IPA a "hello" lookup in the sentence "hello" saves -- the
+  // context-ordered first entry, exactly what pbpDictRun writes into cur.
+  const ordered = pbpDictOrderForContext(pbpDictNormalizeEntry(FDA_SAMPLE).entries, "hello");
+  const sameGloss = ordered[0].senses[0].definition;
+  const writes = [];
+  pbpVocabBatchSetStatus = async (ids, owner, status) => { writes.push([ids.join(","), owner, status]); return true; };
+  // Production shell order (md-ask.js): status control, then the vocab button.
+  const shell = '<div class="xp-body"></div>' +
+    '<div class="view-toggle xp-vocab-status" role="group" aria-label="dictSavedVocab" hidden>' +
+    '<button type="button" class="toggle-btn" data-status="new" aria-pressed="false">vocabStatusLearning</button>' +
+    '<button type="button" class="toggle-btn" data-status="known" aria-pressed="false">vocabStatusKnown</button></div>' +
+    '<button class="xp-vocab"></button><button class="xp-open-vocab" hidden></button>';
+  const pressedOf = (pop) => [...pop.querySelectorAll(".xp-vocab-status .toggle-btn")]
+    .map((b) => b.dataset.status + "=" + b.getAttribute("aria-pressed") + (b.classList.contains("active") ? "+active" : "")).join(" ");
   try {
     const pop = document.createElement("div");
-    pop.innerHTML = '<div class="xp-body"></div><span class="xp-vocab-state" hidden></span><button class="xp-vocab"></button>';
-    await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
+    pop.innerHTML = shell;
+    document.body.appendChild(pop);
+    const status = pop.querySelector(".xp-vocab-status");
     const button = pop.querySelector(".xp-vocab");
-    assert(button.textContent === "dictUpdateVocab" && !button.disabled,
-      "an existing word offers an enabled update action instead of the completed-state label");
-    assert(pop.querySelector(".xp-vocab-state").hidden === false,
-      "an existing word shows its saved state beside the update action (2026-10-21)");
+
+    // 1. Saved, and this lookup adds nothing: the control alone.
+    pbpVocabGet = async () => ({ id: "acct_a|en|hello", status: "new", gloss: sameGloss, ipa: "x", lemma: "hello",
+      contexts: [{ quote: "hello", articleUrl: "https://example.com/" }] });
+    await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
+    assert(status.hidden === false && pressedOf(pop) === "new=true+active known=false",
+      "a saved learning word shows Learning | Known with Learning pressed: " + pressedOf(pop));
+    assert(button.hidden === true,
+      "a saved word whose lookup adds nothing hides the save/update button (the control is the state)");
+    assert(pop.querySelector(".xp-open-vocab").hidden === false, "a saved word offers the jump to the vocabulary page");
+    assert(!/[\u2713\u2714\u2705]/.test(pop.textContent), "no literal tick text anywhere in the footer");
+
+    // 2. Pressing the pressed segment writes nothing; pressing the other one
+    // writes through pbpVocabBatchSetStatus and moves the pressed state.
+    status.querySelector('[data-status="new"]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    assert(writes.length === 0, "pressing the current state is a no-op");
+    status.querySelector('[data-status="known"]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    assert(writes.length === 1 && writes[0].join("|") === "acct_a|en|hello|acct_a|known",
+      "Known writes status=known for this record and owner: " + JSON.stringify(writes));
+    assert(pressedOf(pop) === "new=false known=true+active", "after the write Known is pressed: " + pressedOf(pop));
+    status.querySelector('[data-status="new"]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    assert(writes.length === 2 && writes[1][2] === "new" && pressedOf(pop) === "new=true+active known=false",
+      "Learning writes status=new back (the unmaster path) and re-presses Learning");
+
+    // 3. A refused write keeps the pressed segment where it was.
+    pbpVocabBatchSetStatus = async () => false;
+    status.querySelector('[data-status="known"]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    assert(pressedOf(pop) === "new=true+active known=false" && status.classList.contains("xp-flash-fail"),
+      "a failed status write leaves Learning pressed and pulses the control");
+    pbpVocabBatchSetStatus = async (ids, owner, st) => { writes.push([ids.join(","), owner, st]); return true; };
+
+    // 4. Owner switch after render: the control refuses, nothing is written.
+    _pbpDictOwner = "acct_b";
+    status.classList.remove("xp-flash-fail");
+    status.querySelector('[data-status="known"]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    assert(writes.length === 2 && status.classList.contains("xp-flash-fail"),
+      "a status press after an account switch is refused and writes nothing");
+    _pbpDictOwner = "acct_a";
+
+    // 5. Saved as known, met in a NEW sentence: Known pressed, and the
+    // labeled Update stays reachable (re-saving would add this context).
+    pbpVocabGet = async () => ({ id: "acct_a|en|hello", status: "known", gloss: sameGloss, ipa: "x", lemma: "hello",
+      contexts: [{ quote: "an older sentence", articleUrl: "https://example.com/" }] });
+    await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
+    assert(pressedOf(pop) === "new=false known=true+active", "a saved known word shows Known pressed");
+    assert(button.hidden === false && !button.disabled && button.textContent === "dictUpdateVocab",
+      "a lookup that would add to the saved record keeps an enabled Update action");
+
+    // 6. A different gloss alone also re-offers Update.
+    pbpVocabGet = async () => ({ id: "acct_a|en|hello", status: "new", gloss: "an older gloss", ipa: "x", lemma: "hello",
+      contexts: [{ quote: "hello", articleUrl: "https://example.com/" }] });
+    await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
+    assert(button.hidden === false && button.textContent === "dictUpdateVocab", "a changed gloss re-offers Update");
+
+    // 7. Unsaved word: the control goes, the save action stays.
     pbpVocabGet = async () => null;
     await pbpDictRun({ text: "fresh" }, { sentence: "fresh" }, pop, new AbortController(), {});
-    assert(pop.querySelector(".xp-vocab-state").hidden === true,
-      "the next lookup of an unsaved word drops the saved state again");
+    assert(status.hidden === true && status.onclick === null,
+      "the next lookup of an unsaved word drops the Learning | Known control and its handler");
+    assert(button.hidden === false && !button.disabled && button.textContent === "dictSaveVocab",
+      "an unsaved word keeps the labeled save action");
+
+    // 8. After a save, md-ask asks for the saved face: the control appears
+    // for the record just written, Learning pressed.
+    _pbpDictCurrent.savedRecord = { id: "acct_a|en|fresh", status: "new" };
+    assert(window.pbpDictShowSavedFace(pop) === true && status.hidden === false &&
+      pressedOf(pop) === "new=true+active known=false", "a fresh save switches the footer to Learning | Known");
+    pop.remove();
   } finally {
     _pbpDictResolveLang = realResolveLang;
     _pbpDictSlotRun = realSlotRun;
     _pbpDictCtxRun = realCtxRun;
     pbpVocabGet = realVocabGet;
+    pbpVocabBatchSetStatus = realSetStatus;
     _pbpDictOwner = previousOwner;
   }
 }

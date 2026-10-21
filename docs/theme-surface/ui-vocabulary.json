@@ -571,7 +571,6 @@
         "xp-dict-more",
         "xp-dict-speak",
         "xp-drag-zone",
-        "xp-known",
         "xp-md",
         "xp-model",
         "xp-open-vocab",
@@ -581,6 +580,7 @@
         "xp-skel",
         "xp-term",
         "xp-vocab",
+        "xp-vocab-status",
         "zen-btn"
       ]
     },

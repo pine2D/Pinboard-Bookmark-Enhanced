@@ -2164,7 +2164,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   .xp-skel { animation-duration: 1.2s !important; animation-iteration-count: infinite !important; }
 }
 .xp-error p { color: var(--danger); margin: 0 0 var(--sp-2); font-size: 0.9em; }
-.xp-retry, .xp-ask, .xp-save, .xp-vocab, .xp-known, .xp-open-vocab, .xp-dict-connect {
+.xp-retry, .xp-ask, .xp-save, .xp-vocab, .xp-open-vocab, .xp-dict-connect {
   box-sizing: border-box; min-height: 26px; display: inline-flex; align-items: center; justify-content: center; /* md rung pinned in px; only the label scales with the popover's em base */
   padding: 0 var(--sp-2);
   border: 1px solid var(--btn-border);
@@ -2178,12 +2178,12 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
      stays untransitioned so the press still reads instantly. */
   transition: background-color 150ms ease;
 }
-.xp-retry:hover, .xp-ask:hover, .xp-save:hover:not(:disabled), .xp-vocab:hover:not(:disabled), .xp-known:hover:not(:disabled), .xp-open-vocab:hover, .xp-dict-connect:hover:not(:disabled) { background: var(--btn-hover); }
-.xp-retry:focus-visible, .xp-ask:focus-visible, .xp-save:focus-visible, .xp-vocab:focus-visible, .xp-known:focus-visible, .xp-open-vocab:focus-visible, .xp-dict-connect:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.xp-retry:hover, .xp-ask:hover, .xp-save:hover:not(:disabled), .xp-vocab:hover:not(:disabled), .xp-open-vocab:hover, .xp-dict-connect:hover:not(:disabled) { background: var(--btn-hover); }
+.xp-retry:focus-visible, .xp-ask:focus-visible, .xp-save:focus-visible, .xp-vocab:focus-visible, .xp-open-vocab:focus-visible, .xp-dict-connect:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 /* Press feedback, same family as .action-btn above. These hand off to
    multi-second network calls, so the press is the only thing that can confirm
    the click landed. Not transitioned: a press must read instantly. */
-.xp-retry:active, .xp-ask:active, .xp-save:active:not(:disabled), .xp-vocab:active:not(:disabled), .xp-known:active:not(:disabled), .xp-open-vocab:active, .xp-dict-connect:active:not(:disabled) { transform: translateY(1px); }
+.xp-retry:active, .xp-ask:active, .xp-save:active:not(:disabled), .xp-vocab:active:not(:disabled), .xp-open-vocab:active, .xp-dict-connect:active:not(:disabled) { transform: translateY(1px); }
 /* Retry buttons carry the shared refresh icon before their label (icon+text
    per the icon audit); the xp family is not flex, so align/space inline. */
 .xp-retry svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: var(--sp-1); }
@@ -2205,7 +2205,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 }
 /* Icon-only foot actions. Square, so all five fit on one line
    at every type tier; the label lives in the native title and in aria-label. */
-.xp-foot :is(.xp-save, .xp-vocab, .xp-known, .xp-open-vocab, .xp-ask) {
+.xp-foot :is(.xp-save, .xp-vocab, .xp-open-vocab, .xp-ask) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2213,7 +2213,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   width: 26px;  /* md rung in px (was 1.9em of the popover's typography-scaled base: 36px at the
   height: 26px;    default tier, beside the old 26px gear -- the footer buttons "came in different sizes") */
 }
-.xp-foot :is(.xp-save, .xp-vocab, .xp-known, .xp-open-vocab, .xp-ask) svg {
+.xp-foot :is(.xp-save, .xp-vocab, .xp-open-vocab, .xp-ask) svg {
   width: 14px;
   height: 14px; /* px: the foot row's icon size, independent of the type tier */
 }
@@ -2221,11 +2221,20 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
    26px rung, width from its content. A long label wraps the footer, which the
    row already allows for the largest type tiers. */
 .xp-foot .xp-vocab { width: auto; gap: var(--sp-1); padding: 0 var(--sp-2); font-size: 12px; line-height: 16px; white-space: nowrap; }
-/* A saved word's state, beside its "Update" button (md-ask.js, md-dict.js):
-   text + tick, no fill, no border -- a status, not a control. Same 12px face
-   as the vocab label so the pair reads as one phrase. */
-.xp-vocab-state { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: 12px; line-height: 16px; white-space: nowrap; color: var(--fg-secondary); }
-.xp-vocab-state svg { width: 14px; height: 14px; flex: none; }
+/* A saved word's quiet "Update" (md-dict.js sets data-face only when this
+   lookup would add to the saved record): text only, no fill, no edge until
+   hover -- secondary to the Learning | Known control beside it. Same recipe
+   as .empty-state .action-btn.es-quiet. The hover rule outranks the shared
+   .xp-vocab:hover tie on purpose. */
+.xp-foot .xp-vocab[data-face="update"] { background: transparent; border-color: transparent; }
+.xp-foot .xp-vocab[data-face="update"]:hover:not(:disabled) { background: var(--btn-hover); }
+/* A saved word's Learning | Known control (md-ask.js shell, md-dict.js
+   state): the reader's .view-toggle segments, densified to the foot's 12px
+   secondary face and sp-2 inset beside .xp-vocab. Rung: 1px shell edge +
+   4 + 16 + 4 + 1px = 26px. flex: none + the segments' nowrap keep it one
+   control on a crowded row -- the foot wraps around it, never through it. */
+.xp-foot .xp-vocab-status { flex: none; }
+.xp-foot .xp-vocab-status > .toggle-btn { padding: var(--sp-1) var(--sp-2); font-size: 12px; }
 /* Dictionary view (md-dict.js) */
 .xp-dict-head { margin-bottom: var(--sp-2); } /* shape: .panel-head */
 /* Joins the .exp-img-row select recipe above (shared border/background/chevron);

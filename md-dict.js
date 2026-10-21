@@ -607,10 +607,6 @@ const PBP_DICT_SPEAKER_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.speake
 // explain-pop action switch and the highlight card use for Dictionary.
 const PBP_DICT_BOOK_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.book : "";
 
-// Known-word toggle faces (Feather check-circle / rotate-ccw).
-const PBP_DICT_KNOWN_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.checkCircle : "";
-const PBP_DICT_LEARNING_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.rotateCcw : "";
-
 // Ready-signal dot (inline SVG, never a literal glyph). Filled circle plus a
 // down chevron so it also reads as "there is more below".
 // Composed from pack parts (Lucide chevron-down + a plain dot primitive):
@@ -1447,18 +1443,16 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   // language-detection gap and can save an und/empty record for a
   // selection this run has already superseded.
   const vocabBtn = pop.querySelector(".xp-vocab");
-  // Known-toggle resets with the run, not just with the action switch: a
-  // language-dropdown rerun that no longer hits a saved word must not leave
-  // last run's button (wired to the OLD record id) sitting in the foot.
-  const knownReset = pop.querySelector(".xp-known");
-  if (knownReset) { knownReset.hidden = true; knownReset.onclick = null; }
-  // The "In vocabulary" state belongs to one run's hit, like the toggle.
-  const stateReset = pop.querySelector(".xp-vocab-state");
-  if (stateReset) stateReset.hidden = true;
+  // The Learning | Known control resets with the run, not just with the
+  // action switch: a language-dropdown rerun that no longer hits a saved word
+  // must not leave last run's control (wired to the OLD record id) in the foot.
+  const statusReset = pop.querySelector(".xp-vocab-status");
+  if (statusReset) { statusReset.hidden = true; statusReset.onclick = null; }
   if (vocabBtn) {
     vocabBtn.hidden = false;
     vocabBtn.disabled = true;
     vocabBtn.dataset.runId = String(runId);
+    delete vocabBtn.dataset.face; // quiet "Update" face is per saved-word hit
     // Icon + tooltip, not text: assigning textContent here would strip the SVG
     // and leave a blank button. Guarded because md-dict.js can be injected
     // before md-ask.js has run in some entry points.
@@ -1601,7 +1595,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   if (vocabBtn && vocabBtn.dataset.runId === String(runId)) {
     // Owner gate on the READ side as well: `hit` comes out of cur.owner's
     // partition and everything derived from it -- the "already saved" face,
-    // the known toggle and the record id it carries -- answers "what is in
+    // the Learning | Known control and the record id it carries -- answers "what is in
     // THAT account's vocabulary". After a switch this popover must not answer
     // that question for the account that is no longer signed in, so skip the
     // lookup and keep the neutral save face. The save button still enables:
@@ -1616,84 +1610,125 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     if (cur.owner !== _pbpDictOwner) { vocabBtn.disabled = false; return; } // switch landed during the read
     if (hit) {
       cur.saved = true;
-      // Icon + tooltip, same contract as the initial setup above: textContent
-      // would strip the SVG and overflow the 1.9em icon-only foot button.
-      // The action face, icon and label alike: `refresh` (re-run the save),
-      // not the done check -- "Update saved word" under a completed mark read
-      // as a contradiction (2026-10-19 reader critique). The STATE is its own
-      // non-control text beside it (2026-10-21): tick + "In vocabulary", so
-      // the button's visible text shortens to "Update" -- title and
-      // aria-label keep "Update saved word".
-      const state = pop.querySelector(".xp-vocab-state");
-      if (state) state.hidden = false;
-      if (typeof _pbpExplainIconBtn === "function") {
-        _pbpExplainIconBtn(vocabBtn, PBP_ICONS.refresh, t("dictUpdateVocab"), state ? t("update") : "");
+      // Saved-word face (critique 2026-10-21): the Learning | Known control
+      // carries the state, so the save button is only needed when THIS lookup
+      // has something the saved record lacks -- then it stays as a quiet
+      // "Update" (re-saving merges the sentence as a new context and replaces
+      // the gloss with this lookup's; see pbpVocabSaveWord). Icon-free: the
+      // refresh glyph beside a two-state control read as "reset". Title and
+      // aria-label keep "Update saved word". Without the control (an entry
+      // point that did not build it) the old labeled Update face stays.
+      const shown = _pbpDictShowSaved(pop, cur, hit);
+      if (shown && !_pbpDictLookupAddsTo(hit, cur)) {
+        vocabBtn.hidden = true;
+      } else if (typeof _pbpExplainIconBtn === "function") {
+        _pbpExplainIconBtn(vocabBtn, shown ? "" : PBP_ICONS.refresh, t("dictUpdateVocab"), shown ? t("update") : "");
+        if (shown) vocabBtn.dataset.face = "update";
       } else {
         vocabBtn.textContent = t("dictUpdateVocab");
       }
     }
     vocabBtn.disabled = false;
-    // Known-word toggle: only meaningful for an already-saved word. onclick
-    // is a PROPERTY assignment on purpose -- the button outlives runs, and
-    // addEventListener here would stack one handler per lookup.
-    const knownBtn = pop.querySelector(".xp-known");
-    if (knownBtn && typeof _pbpExplainIconBtn === "function"
-      && typeof pbpVocabBatchSetStatus === "function" && hit) {
-      let known = String(hit.status || "new") === "known";
-      const face = () => _pbpExplainIconBtn(knownBtn,
-        known ? PBP_DICT_LEARNING_SVG : PBP_DICT_KNOWN_SVG,
-        t(known ? "vocabMarkLearning" : "vocabMarkKnown"));
-      face();
-      knownBtn.hidden = false;
-      knownBtn.disabled = false;
-      // Saved word: the jump to the vocabulary page has something to show.
-      const openVocabBtn = pop.querySelector(".xp-open-vocab");
-      if (openVocabBtn) openVocabBtn.hidden = false;
-      // Refusal feedback, shared by the owner gates and by a failed write:
-      // nothing was persisted either way, so the button re-enables and pulses
-      // instead of silently reading as "done". A run that has been superseded
-      // owns the button now -- leave it alone, same invariant as below.
-      const refuse = () => {
-        if (_pbpDictCurrent !== cur) return;
-        knownBtn.disabled = false;
-        knownBtn.classList.remove("xp-flash-fail");
-        void knownBtn.offsetWidth; // restart the pulse on a repeat refusal
-        knownBtn.classList.add("xp-flash-fail");
-      };
-      knownBtn.onclick = async () => {
-        if (knownBtn.disabled) return;
-        knownBtn.disabled = true;
-        // This handler is closed over `hit.id`, a record resolved under
-        // cur.owner, so it needs the SAME two commit gates pbpDictSaveCurrent
-        // applies -- re-scoping _pbpDictOwner on pbp:account-changed cannot
-        // reach into this closure. Without them a Pinboard account switch left
-        // the popover on screen fully live: the click would flip a status
-        // inside the PREVIOUS account's partition and queue that change into
-        // that account's Drive outbox. Snapshot check first (a switch this
-        // page already saw), then the live account before the write (a token
-        // swap made in another tab or in Options, which _pbpDictOwner has not
-        // caught up with yet -- both sides of the snapshot comparison come
-        // from the same previewAccount). Fail-closed: a read that throws
-        // counts as a mismatch.
-        if (cur.owner !== _pbpDictOwner) { refuse(); return; }
-        if (typeof pbpVocabCurrentOwner === "function") {
-          const live = await pbpVocabCurrentOwner().catch(() => null);
-          if (live !== cur.owner) { refuse(); return; }
-        }
-        const ok = await pbpVocabBatchSetStatus([hit.id], cur.owner, known ? "new" : "known")
-          .catch(() => false);
-        if (_pbpDictCurrent !== cur) return; // superseded: leave the new run's button alone
-        if (!ok) { refuse(); return; }
-        knownBtn.disabled = false;
-        known = !known;
-        face();
-        try {
-          document.dispatchEvent(new CustomEvent("pbp:vocab-changed", { detail: { owner: cur.owner } }));
-        } catch (_) {}
-      };
-    }
   }
 }
+
+// Would re-saving this lookup change the saved record? Mirrors what
+// pbpVocabSaveWord merges: a non-empty gloss replaces the stored one, lemma
+// and IPA fill only when missing, and the sentence joins contexts[] unless it
+// is already there. Context identity is articleUrl+quote in the store; the
+// quote alone is compared here (the article URL can be a video deep link
+// computed only at save time), so the same sentence met on another page does
+// not re-offer Update -- the one case this under-reports, and a harmless one.
+function _pbpDictLookupAddsTo(hit, cur) {
+  if (cur.gloss && cur.gloss !== String(hit.gloss || "")) return true;
+  if (cur.lemma && !hit.lemma) return true;
+  if (cur.ipa && !hit.ipa) return true;
+  if (!cur.sentence) return false;
+  const contexts = Array.isArray(hit.contexts) ? hit.contexts : [];
+  return !contexts.some((c) => c && c.quote === cur.sentence);
+}
+
+// Paint and arm the Learning | Known control for `record` (a vocab row read
+// or just written under cur.owner). Returns false when it cannot be shown --
+// no control in this popover, or no status write path loaded. onclick is a
+// PROPERTY assignment on purpose: the control outlives runs, and
+// addEventListener here would stack one handler per lookup.
+function _pbpDictShowSaved(pop, cur, record) {
+  const statusEl = pop.querySelector(".xp-vocab-status");
+  if (!statusEl || !record || !record.id || typeof pbpVocabBatchSetStatus !== "function") return false;
+  const segs = [...statusEl.querySelectorAll(".toggle-btn[data-status]")];
+  if (segs.length !== 2) return false;
+  let status = String(record.status || "new") === "known" ? "known" : "new";
+  const paint = () => segs.forEach((b) => {
+    const on = b.dataset.status === status;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  paint();
+  statusEl.hidden = false;
+  // Saved word: the jump to the vocabulary page has something to show.
+  const openVocabBtn = pop.querySelector(".xp-open-vocab");
+  if (openVocabBtn) openVocabBtn.hidden = false;
+  // Refusal feedback, shared by the owner gates and by a failed write:
+  // nothing was persisted either way, so the pressed segment stays where it
+  // was and the control pulses instead of silently reading as "done". A run
+  // that has been superseded owns the control now -- leave it alone.
+  const refuse = () => {
+    if (_pbpDictCurrent !== cur) return;
+    statusEl.classList.remove("xp-flash-fail");
+    void statusEl.offsetWidth; // restart the pulse on a repeat refusal
+    statusEl.classList.add("xp-flash-fail");
+  };
+  // A busy flag, not `disabled`: disabling the segment the reader just
+  // pressed would drop keyboard focus out of the popover mid-write.
+  let busy = false;
+  statusEl.onclick = async (e) => {
+    const seg = e.target && e.target.closest ? e.target.closest(".toggle-btn[data-status]") : null;
+    if (!seg || !statusEl.contains(seg) || busy) return;
+    const next = seg.dataset.status === "known" ? "known" : "new";
+    if (next === status) return; // the pressed segment is the current state: nothing to write
+    busy = true;
+    try {
+      // This handler is closed over `record.id`, a record resolved under
+      // cur.owner, so it needs the SAME two commit gates pbpDictSaveCurrent
+      // applies -- re-scoping _pbpDictOwner on pbp:account-changed cannot
+      // reach into this closure. Without them a Pinboard account switch left
+      // the popover on screen fully live: the click would flip a status
+      // inside the PREVIOUS account's partition and queue that change into
+      // that account's Drive outbox. Snapshot check first (a switch this
+      // page already saw), then the live account before the write (a token
+      // swap made in another tab or in Options, which _pbpDictOwner has not
+      // caught up with yet -- both sides of the snapshot comparison come
+      // from the same previewAccount). Fail-closed: a read that throws
+      // counts as a mismatch.
+      if (cur.owner !== _pbpDictOwner) { refuse(); return; }
+      if (typeof pbpVocabCurrentOwner === "function") {
+        const live = await pbpVocabCurrentOwner().catch(() => null);
+        if (live !== cur.owner) { refuse(); return; }
+      }
+      const ok = await pbpVocabBatchSetStatus([record.id], cur.owner, next).catch(() => false);
+      if (_pbpDictCurrent !== cur) return; // superseded: leave the new run's control alone
+      if (!ok) { refuse(); return; }
+      status = next;
+      paint();
+      try {
+        document.dispatchEvent(new CustomEvent("pbp:vocab-changed", { detail: { owner: cur.owner } }));
+      } catch (_) {}
+    } finally {
+      busy = false;
+    }
+  };
+  return true;
+}
+
+// md-ask.js's save handler, after a successful save or update: switch the
+// footer to the saved-word face for the record just written. False when this
+// run never captured one (superseded, or the write came from elsewhere).
+window.pbpDictShowSavedFace = (pop) => {
+  const cur = _pbpDictCurrent;
+  if (!cur || !cur.savedRecord || !pop) return false;
+  return _pbpDictShowSaved(pop, cur, cur.savedRecord);
+};
 window.pbpDictRun = pbpDictRun;
 
 async function pbpDictSaveCurrent() {
@@ -1758,7 +1793,7 @@ async function pbpDictSaveCurrent() {
     // own state when it is still the live one. The vocabulary list itself
     // lives in the options tab now (options-vocab.js); it rescans on its own
     // next activation, same as every other options panel.
-    if (_pbpDictCurrent === cur) cur.saved = true;
+    if (_pbpDictCurrent === cur) { cur.saved = true; cur.savedRecord = entry; }
     try {
       document.dispatchEvent(new CustomEvent("pbp:vocab-changed", { detail: { owner: cur.owner } }));
     } catch (_) {}
@@ -1803,7 +1838,7 @@ document.addEventListener("pbp:article-replaced", (e) => pbpDictOnArticle((e && 
 // itself neutralise the popover already on screen -- `cur`, its buttons and
 // the handlers closed over them all survive this listener untouched. What
 // fences it is that every vocabulary write in this file (pbpDictSaveCurrent
-// and the .xp-known toggle alike) compares cur.owner against _pbpDictOwner
+// and the .xp-vocab-status control alike) compares cur.owner against _pbpDictOwner
 // AND re-reads the live account before it commits, so both refuse an entry
 // captured under the previous owner. Any new write path added here owes the
 // same two gates -- do not assume this listener covers it.

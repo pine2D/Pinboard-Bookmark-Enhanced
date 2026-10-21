@@ -726,9 +726,9 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   const statusBtn = document.createElement("button");
   statusBtn.type = "button";
   statusBtn.className = "btn btn-sm vocab-detail-status";
-  // One face per direction, the reader's dictionary toggle pair (md-dict.js
-  // PBP_DICT_KNOWN_SVG / _LEARNING_SVG): tick to mark known, turn-back arrow
-  // to return the word to learning.
+  // One face per direction: tick to mark known, turn-back arrow to return
+  // the word to learning (the reader's dictionary popover shows the same
+  // state as a labeled Learning | Known control instead, md-dict.js).
   setBtnIcon(statusBtn, known ? "rotateCcw" : "checkCircle", t(known ? "vocabMarkLearning" : "vocabMarkKnown"));
   statusBtn.addEventListener("click", () => _pbpVocabDetailMutate(w, (owner) =>
     pbpVocabBatchSetStatus([w.id], owner, known ? "new" : "known"), renderOwner));

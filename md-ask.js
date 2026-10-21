@@ -2491,12 +2491,11 @@ function _pbpExplainIconBtn(btn, svg, label, shortLabel) {
   btn.innerHTML = svg; // static constant, never model or dictionary text
   btn.title = label;
   btn.setAttribute("aria-label", label);
-  // Save to vocabulary is the dictionary view's core action and sat between
-  // look-alike icons (the known tick right after it): it alone keeps its name
-  // on screen, in every state (save / saved / update). textContent, never
-  // markup -- the label is a t() string. `shortLabel` (optional) is the
-  // visible text when the full name already stands beside the button (the
-  // saved word's "Update" next to its "In vocabulary" state); title and
+  // Save to vocabulary is the dictionary view's core action: it alone keeps
+  // its name on screen, in every state (save / saved / update). textContent,
+  // never markup -- the label is a t() string. `shortLabel` (optional) is the
+  // visible text when the context already says the rest (the saved word's
+  // quiet "Update" beside its Learning | Known control); title and
   // aria-label keep the full name either way.
   if (btn.classList.contains("xp-vocab")) {
     const text = document.createElement("span");
@@ -2808,17 +2807,29 @@ function _pbpExplainEnsurePop() {
       if (_pbpExplainSaveTarget === myTarget) save.disabled = false;
     });
   });
-  // "Already in your vocabulary" as a state, not a control (2026-10-21): a
-  // looked-up word that is saved showed only the action "Update saved word",
-  // so the state itself was never on screen. Text + tick, beside the button;
-  // md-dict.js shows it on a saved-word hit, every reset below hides it.
-  const vocabState = document.createElement("span");
-  vocabState.className = "xp-vocab-state";
-  vocabState.hidden = true;
-  vocabState.innerHTML = PBP_EXPLAIN_DONE_SVG; // static constant
-  const vocabStateText = document.createElement("span");
-  vocabStateText.textContent = t("dictSavedVocab");
-  vocabState.appendChild(vocabStateText);
+  // A saved word's learning state, as ONE labeled control (critique
+  // 2026-10-21): "Learning | Known", the reader's own .view-toggle segments
+  // with the same aria-pressed semantics as the translate view toggle. It
+  // replaced a tick + "In vocabulary" status beside an icon-only check-circle
+  // "mark known" button -- two ticks meaning opposite things (a state, an
+  // action) side by side, and the action had no visible name. The group's
+  // accessible name keeps "In vocabulary", so the state still reads to a
+  // screen reader. Shell only: md-dict.js shows it on a saved-word hit (or
+  // right after a save) and re-wires .onclick per run; every reset hides it.
+  const vocabStatus = document.createElement("div");
+  vocabStatus.className = "view-toggle xp-vocab-status";
+  vocabStatus.setAttribute("role", "group");
+  vocabStatus.setAttribute("aria-label", t("dictSavedVocab"));
+  vocabStatus.hidden = true;
+  for (const [status, key] of [["new", "vocabStatusLearning"], ["known", "vocabStatusKnown"]]) {
+    const seg = document.createElement("button");
+    seg.type = "button";
+    seg.className = "toggle-btn";
+    seg.dataset.status = status;
+    seg.textContent = t(key); // same names the library's status filter uses
+    seg.setAttribute("aria-pressed", "false");
+    vocabStatus.appendChild(seg);
+  }
   const vocab = document.createElement("button");
   vocab.type = "button";
   vocab.className = "xp-vocab";
@@ -2826,13 +2837,29 @@ function _pbpExplainEnsurePop() {
   _pbpExplainIconBtn(vocab, PBP_EXPLAIN_VOCAB_ADD_SVG, t("dictSaveVocab"));
   vocab.addEventListener("click", async () => {
     if (vocab.disabled || typeof window.pbpDictSaveCurrent !== "function") return;
+    // Read before `disabled`: Chromium drops focus from a button the moment
+    // it is disabled, so after the await activeElement is already <body>.
+    const hadFocus = vocab.contains(document.activeElement);
     vocab.disabled = true;
     const myRunId = vocab.dataset.runId; // the run this click belongs to
     const ok = await window.pbpDictSaveCurrent().catch(() => false);
     if (vocab.dataset.runId !== myRunId) return; // a newer dict run owns the button now
     if (ok) {
-      _pbpExplainIconBtn(vocab, PBP_EXPLAIN_DONE_SVG, t("dictSavedVocab"));
-      vocabState.hidden = true; // the button says it now; never "In vocabulary" twice
+      // The word is in the book now, so the footer takes the saved-word face:
+      // the save (or update) button steps aside and the Learning | Known
+      // control appears with the record's state pressed -- it IS the
+      // confirmation. Keyboard focus follows to the pressed segment instead of
+      // falling to <body> with the hidden button. If md-dict cannot paint the
+      // control (no record captured), keep the old done face.
+      if (typeof window.pbpDictShowSavedFace === "function" && window.pbpDictShowSavedFace(pop)) {
+        vocab.hidden = true;
+        if (hadFocus) {
+          const pressed = vocabStatus.querySelector('.toggle-btn[aria-pressed="true"]');
+          if (pressed) pressed.focus({ preventScroll: true });
+        }
+      } else {
+        _pbpExplainIconBtn(vocab, PBP_EXPLAIN_DONE_SVG, t("dictSavedVocab"));
+      }
       openVocab.hidden = false; // the word is in the book now: offer the way there
     } else {
       // A silent re-enable read as "saved" (gap audit). flashButtonLabel is
@@ -2840,6 +2867,7 @@ function _pbpExplainEnsurePop() {
       // failure is a border pulse plus the page's one buttonless toast
       // channel (#copy-status aria-live, via _pbpHlToast).
       vocab.disabled = false;
+      if (hadFocus) vocab.focus({ preventScroll: true }); // disabling dropped it; give it back
       vocab.classList.remove("xp-flash-fail");
       void vocab.offsetWidth; // restart the pulse on a repeat failure
       vocab.classList.add("xp-flash-fail");
@@ -2867,13 +2895,6 @@ function _pbpExplainEnsurePop() {
         && await pbpOpenExtensionTab("library.html", "vocab")) return;
     try { window.open(chrome.runtime.getURL("library.html#vocab")); } catch (_) {}
   });
-  // Known-word toggle: shell only. md-dict.js shows it when the looked-up
-  // word is already saved, and rewires .onclick per dictionary run (property
-  // assignment, so runs never stack listeners). Hidden for every other action.
-  const knownBtn = document.createElement("button");
-  knownBtn.type = "button";
-  knownBtn.className = "xp-known";
-  knownBtn.hidden = true;
   const ask = document.createElement("button");
   ask.type = "button";
   ask.className = "xp-ask";
@@ -2884,15 +2905,14 @@ function _pbpExplainEnsurePop() {
     _pbpExplainOpenAsk(selText);
   });
   // Footer = two clusters (critique 2026-10-19): the word's own actions on
-  // the left (note / vocab / known / open vocab), the AI follow-up on the
-  // right beside the price and model label that name what an AI press costs
-  // and who answers it. The selection-trigger gear left the card: it is a
-  // reader setting, and the rail's settings button opens Options > Reader
-  // where it lives.
+  // the left (note / Learning|Known / save or update / open vocab), the AI
+  // follow-up on the right beside the price and model label that name what
+  // an AI press costs and who answers it. The selection-trigger gear left
+  // the card: it is a reader setting, and the rail's settings button opens
+  // Options > Reader where it lives.
   foot.appendChild(save);
-  foot.appendChild(vocabState);
+  foot.appendChild(vocabStatus);
   foot.appendChild(vocab);
-  foot.appendChild(knownBtn);
   foot.appendChild(openVocab);
   model.appendChild(ask);
   foot.appendChild(model);
@@ -3151,13 +3171,12 @@ async function _pbpExplainRun(cap, ctx, pop) {
     // Resetting with textContent would delete the icon: these buttons carry no
     // text now, so every reset has to restore the SVG and both labels.
     _pbpExplainIconBtn(vocabBtn, PBP_EXPLAIN_VOCAB_ADD_SVG, t("dictSaveVocab"));
+    delete vocabBtn.dataset.face; // the quiet "Update" face belongs to one saved-word hit
   }
-  const vocabStateReset = pop.querySelector(".xp-vocab-state");
-  if (vocabStateReset) vocabStateReset.hidden = true; // md-dict shows it per saved-word hit
+  const vocabStatusReset = pop.querySelector(".xp-vocab-status");
+  if (vocabStatusReset) { vocabStatusReset.hidden = true; vocabStatusReset.onclick = null; } // md-dict re-arms it per run
   const openVocabBtn = pop.querySelector(".xp-open-vocab");
   if (openVocabBtn) openVocabBtn.hidden = true;
-  const knownBtnReset = pop.querySelector(".xp-known");
-  if (knownBtnReset) knownBtnReset.hidden = true; // md-dict re-arms it per run
   // No-AI users never initialize the ask panel, so "Ask more" would silently
   // no-op for them -- hide it whenever AI is unavailable, any action.
   const askBtn = pop.querySelector(".xp-ask");

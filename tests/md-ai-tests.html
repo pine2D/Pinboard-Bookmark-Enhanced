@@ -7859,35 +7859,75 @@ suite("skim status line", () => {
     }
   });
 
-  await atest("updating an existing saved word enters the disabled completion state", async () => {
+  await atest("the footer shell carries one labeled Learning | Known control and no tick status", async () => {
     await reset();
+    const status = pop.querySelector(".xp-foot .xp-vocab-status");
+    const segs = status ? [...status.querySelectorAll(".toggle-btn")] : [];
+    assert(status && status.classList.contains("view-toggle") && status.getAttribute("role") === "group" &&
+      status.getAttribute("aria-label") === "dictSavedVocab" && status.hidden,
+      "a hidden .view-toggle group named \"In vocabulary\" sits in the foot");
+    assert(segs.length === 2 && segs.map((b) => b.dataset.status + ":" + b.textContent + ":" + b.getAttribute("aria-pressed") + ":" + b.type).join(",") ===
+      "new:vocabStatusLearning:false:button,known:vocabStatusKnown:false:button",
+      "two visible-text toggle buttons, Learning then Known, aria-pressed false");
+    assert(status.nextElementSibling === pop.querySelector(".xp-vocab"), "the control leads the vocab button in focus order");
+    assert(!pop.querySelector(".xp-known") && !pop.querySelector(".xp-vocab-state"),
+      "the icon-only known toggle and the tick status are gone");
+  });
+
+  await atest("a successful save or update switches the foot to the saved-word face and keeps focus", async () => {
+    await reset();
+    await show();
     const realSave = window.pbpDictSaveCurrent;
+    const realCurrent = _pbpDictCurrent;
     const button = pop.querySelector(".xp-vocab");
-    button.hidden = false;
-    button.disabled = false;
-    button.dataset.runId = "existing-run";
-    // A saved-word hit (md-dict.js): the state beside it, "Update" visible,
-    // the full name on title / aria-label.
-    const state = pop.querySelector(".xp-vocab-state");
-    assert(state && state.nextElementSibling === button && state.hidden, "the saved state sits hidden right before the vocab button");
-    state.hidden = false;
-    _pbpExplainIconBtn(button, PBP_ICONS.refresh, "dictUpdateVocab", "update");
-    assert(button.textContent === "update" && button.title === "dictUpdateVocab" && button.getAttribute("aria-label") === "dictUpdateVocab",
-      "short visible label, full accessible name");
-    window.pbpDictSaveCurrent = async () => true;
+    const status = pop.querySelector(".xp-vocab-status");
+    const realSetStatus = pbpVocabBatchSetStatus;
     try {
+      // Quiet "Update" face of a saved word (md-dict.js), focused.
+      button.hidden = false;
+      button.disabled = false;
+      button.dataset.runId = "existing-run";
+      _pbpExplainIconBtn(button, "", "dictUpdateVocab", "update");
+      button.dataset.face = "update";
+      assert(button.textContent === "update" && button.title === "dictUpdateVocab" &&
+        button.getAttribute("aria-label") === "dictUpdateVocab" && !button.querySelector("svg"),
+        "quiet Update: short visible text, full accessible name, no icon");
+      button.focus();
+      assert(document.activeElement === button, "fixture: Update holds focus before the click (active: " + (document.activeElement && (document.activeElement.className || document.activeElement.tagName)) + ")");
+      window.pbpDictSaveCurrent = async () => {
+        _pbpDictCurrent = { owner: _pbpDictOwner, savedRecord: { id: "acct|en|word", status: "known" } };
+        return true;
+      };
+      pbpVocabBatchSetStatus = async () => true;
       button.click();
       await task();
-      assert(state.hidden, "after the update the button says it; the state does not repeat it");
-      // Success is visible in the icon (a tick) AND in the button's own label:
-      // Save to vocabulary is the one foot action that keeps its name on
-      // screen, so its text must move with the state too.
-      assert(button.disabled && button.title === "dictSavedVocab" &&
-        button.getAttribute("aria-label") === "dictSavedVocab" &&
-        button.querySelector("svg") && button.textContent === "dictSavedVocab",
-        "successful update did not enter the disabled completed state");
+      assert(button.hidden && !status.hidden, "the button steps aside and Learning | Known appears");
+      const pressed = status.querySelector('[aria-pressed="true"]');
+      assert(pressed && pressed.dataset.status === "known" && document.activeElement === pressed,
+        "the record's state is pressed and keyboard focus moved onto it (active: " + (document.activeElement && (document.activeElement.className || document.activeElement.tagName)) + ", pressed: " + (pressed && pressed.dataset.status) + ")");
+      // Without a captured record md-dict cannot paint the control: the old
+      // done face stays as the confirmation.
+      status.hidden = true;
+      button.hidden = false;
+      button.disabled = false;
+      window.pbpDictSaveCurrent = async () => { _pbpDictCurrent = null; return true; };
+      button.click();
+      await task();
+      assert(button.disabled && button.title === "dictSavedVocab" && button.querySelector("svg") &&
+        button.textContent === "dictSavedVocab" && status.hidden,
+        "no record: the save button shows its done face, the control stays hidden");
+      // An action switch resets the saved-word face.
+      status.hidden = false;
+      button.dataset.face = "update";
+      _pbpExplainAction = "explain";
+      await _pbpExplainRun({ text: "term", range: document.createRange() },
+        { sentence: "term", blockText: "term", prevText: "", nextText: "" }, pop);
+      assert(status.hidden && status.onclick === null && !button.dataset.face,
+        "an action switch hides the control, drops its handler and the quiet face");
     } finally {
       if (realSave === undefined) delete window.pbpDictSaveCurrent; else window.pbpDictSaveCurrent = realSave;
+      _pbpDictCurrent = realCurrent;
+      pbpVocabBatchSetStatus = realSetStatus;
     }
   });
 
