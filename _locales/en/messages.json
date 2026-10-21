@@ -2786,7 +2786,7 @@
     }
   },
   "trDoneUsage": {
-    "message": "$COUNT$ segments · $IN$ in / $OUT$ out",
+    "message": "$COUNT$ segments · $IN$ tokens in / $OUT$ out",
     "placeholders": {
       "count": {
         "content": "$1"

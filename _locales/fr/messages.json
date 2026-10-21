@@ -2777,7 +2777,7 @@
     }
   },
   "trDoneUsage": {
-    "message": "$COUNT$ segments · entrée $IN$ / sortie $OUT$",
+    "message": "$COUNT$ segments · $IN$ tokens en entrée / $OUT$ en sortie",
     "placeholders": {
       "count": {
         "content": "$1"

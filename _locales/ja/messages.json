@@ -2777,7 +2777,7 @@
     }
   },
   "trDoneUsage": {
-    "message": "$COUNT$ 件翻訳済み · 入力 $IN$ / 出力 $OUT$",
+    "message": "$COUNT$ 件翻訳済み · 入力 $IN$ / 出力 $OUT$ tokens",
     "placeholders": {
       "count": {
         "content": "$1"

@@ -9539,22 +9539,28 @@ suiteIf("tr done-state distill (critique 2026-10-20 #3)", "_pbpTrPaintDone", () 
       assertEq(prog.textContent, "trDoneUsage|3|≈5|≈6", "estimate marked on each figure");
     } finally { window.t = realT; rail.remove(); }
   });
-  test("done: four rows -- status, view toggle, view line, fold; reference info is folded", () => {
+  test("done: four rows -- status, view toggle, view line, reference block; same target control as before the run", () => {
     const realT = window.t;
     window.t = (k, ...a) => k + "|" + a.join("|");
     const { rail, st, sec } = build();
     try {
+      const beforeText = st.tgtTextEl.textContent;
+      const beforeLink = document.getElementById("tr-change-lang");
       finishRun(st, { inTok: 1, outTok: 2, approx: false });
       const rows = visibleRows(sec).map((el) => el.id || el.className);
-      assertEq(rows.join(","), "tr-progress,tr-view-toggle,tr-view-line,tr-done-fold", "done-state rows");
-      const fold = document.getElementById("tr-done-fold");
-      assertEq(fold.open, false, "fold starts closed");
-      assertEq(fold.firstElementChild.tagName, "SUMMARY", "native disclosure: keyboard + expanded state from the UA");
-      assertEq(fold.querySelector("summary").textContent, "trTargetLang|中文", "summary names the target language");
-      assert(fold.contains(document.getElementById("tr-target")) && fold.contains(document.getElementById("tr-skip-note")),
-        "target row (with its Change link) and skip count live in the fold");
-      fold.open = true;
-      assertEq(seen(document.getElementById("tr-change-lang")), true, "Change stays one click away");
+      assertEq(rows.join(","), "tr-progress,tr-view-toggle,tr-view-line,tr-done-ref", "done-state rows");
+      assertEq(document.getElementById("tr-done-fold"), null, "no disclosure left in the done state");
+      const ref = document.getElementById("tr-done-ref");
+      assertEq(ref.tagName, "DIV", "plain container, not a disclosure");
+      assert(ref.contains(document.getElementById("tr-target")) && ref.contains(document.getElementById("tr-skip-note")),
+        "target row and skip count live in the reference block");
+      // One control across states: the SAME text node content and the SAME
+      // Change button, visible without opening anything.
+      assertEq(st.tgtTextEl.textContent, beforeText, "target text identical to the pre-run row");
+      assertEq(document.getElementById("tr-change-lang"), beforeLink, "the same Change link element");
+      assertEq(seen(st.tgtTextEl), true, "target language readable in place");
+      assertEq(seen(beforeLink), true, "Change is one click away, no fold to open");
+      assertEq(seen(document.getElementById("tr-skip-note")), true, "skip count readable too");
       // The peek hint is the pointer peek's only discovery path: it rides
       // the always-visible view line in tr-only.
       assertEq(seen(document.getElementById("tr-peek-hint")), true, "peek hint visible in the translated-only view");
@@ -9565,7 +9571,7 @@ suiteIf("tr done-state distill (critique 2026-10-20 #3)", "_pbpTrPaintDone", () 
       _pbpTrSyncToggle("translated");
     } finally { window.t = realT; rail.remove(); }
   });
-  test("leaving done puts the target row back in place and hides the fold", () => {
+  test("leaving done puts the target row back in place and hides the reference block", () => {
     const realT = window.t;
     window.t = (k, ...a) => k + "|" + a.join("|");
     const { rail, st, sec } = build();
@@ -9575,7 +9581,7 @@ suiteIf("tr done-state distill (critique 2026-10-20 #3)", "_pbpTrPaintDone", () 
         _pbpTrSetStatus(st, "done");
         _pbpTrSetStatus(st, next);
         const tgt = document.getElementById("tr-target");
-        assertEq(document.getElementById("tr-done-fold").hidden, true, next + ": fold hidden");
+        assertEq(document.getElementById("tr-done-ref").hidden, true, next + ": reference block hidden");
         assertEq(tgt.parentElement, sec, next + ": target row back in the section");
         assertEq(tgt.previousElementSibling, document.getElementById("btn-translate").parentElement, next + ": right under the button row");
         assertEq(seen(st.tgtTextEl), true, next + ": target text shown again");

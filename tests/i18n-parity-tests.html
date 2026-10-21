@@ -495,6 +495,11 @@ async function loadLocale(loc) {
   check("H18 the Pinboard token link text stays an untranslated URL path",
     LOCALES.every((loc) => msgs[loc].settingsPassword?.message === "pinboard.in/settings/password"),
     "settingsPassword was translated again");
+  check("H19 the translate done line names the unit of its token figures, and its singular twin keeps the count",
+    LOCALES.every((loc) => /token/i.test(msgs[loc].trDoneUsage?.message || "") &&
+      /\$IN\$/.test(msgs[loc].trDoneUsage.message) && /\$OUT\$/.test(msgs[loc].trDoneUsage.message) &&
+      /\$COUNT\$/.test(msgs[loc].askRestoredNoteOne?.message || "")),
+    LOCALES.filter((loc) => !/token/i.test(msgs[loc].trDoneUsage?.message || "")).join(","));
   // libraryTitle is the page's own name, so the Chinese locales carry exactly
   // one word for the vocabulary book.
   // T4 (library redesign §3.5): the library bolds the numbers inside its

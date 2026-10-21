@@ -1596,19 +1596,18 @@ function _pbpTrBuildSection(st) {
   statusLine.hidden = true;
   retryAll.insertAdjacentElement("afterend", statusLine);
 
-  // Done-state fold (critique 2026-10-20 #3): once the run is finished the
-  // target language, its Change link and the "already in the target
-  // language" count are reference, not status. _pbpTrSyncDoneFold moves the
-  // target row and the skip note in here at "done" and back out for every
-  // other status. The summary names the target, so the fold hides nothing a
-  // glance needs. Always the LAST child: the view toggle and its line are
-  // inserted before it (_pbpTrShowViewToggle). Never holds a price.
-  const fold = document.createElement("details");
-  fold.id = "tr-done-fold";
-  fold.className = "tr-meta rail-disclosure";
-  fold.hidden = true;
-  fold.appendChild(document.createElement("summary"));
-  sec.appendChild(fold);
+  // Done-state reference block (critique 2026-10-20 #3, revised 2026-10-21):
+  // once the run is finished the target row (the SAME "Target language: X
+  // Change" control as before the first request -- one control across states)
+  // and the "already in the target language" count are reference, not status.
+  // _pbpTrSyncDoneRef moves them in here at "done", below the view toggle and
+  // its line, and back out for every other status. A plain container, not a
+  // disclosure: nothing in it needs hiding. Always the LAST child: the view
+  // toggle and its line are inserted before it (_pbpTrShowViewToggle).
+  const ref = document.createElement("div");
+  ref.id = "tr-done-ref";
+  ref.hidden = true;
+  sec.appendChild(ref);
 
   // Rail accordion (spec 2026-07-04): install AFTER every direct child above
   // exists (pbpRailCollapsible's CSS-driven hide covers whatever's already
@@ -1843,36 +1842,31 @@ function _pbpTrPaintDone(st) {
   prog.hidden = false;
 }
 
-// Done-state fold: at "done" the target row (its text shown by the summary
-// instead) and the skip note move into #tr-done-fold; every other status
-// puts them back where _pbpTrBuildSection placed them -- before the first
-// request the target language is exactly what the reader needs to see.
-function _pbpTrSyncDoneFold(st) {
-  const fold = document.getElementById("tr-done-fold");
+// Done-state reference block: at "done" the target row (unchanged: same text,
+// same Change link as before the run) and the skip note move into
+// #tr-done-ref under the view toggle; every other status puts them back where
+// _pbpTrBuildSection placed them.
+function _pbpTrSyncDoneRef(st) {
+  const ref = document.getElementById("tr-done-ref");
   const tgt = document.getElementById("tr-target");
-  if (!fold || !tgt) return;
+  if (!ref || !tgt) return;
   const skip = document.getElementById("tr-skip-note");
-  const sum = fold.querySelector("summary");
-  const tgtText = st.tgtTextEl || tgt.firstElementChild;
   if (st.status === "done") {
-    if (sum) sum.textContent = t("trTargetLang", (st.target && (st.target.display || st.target.name)) || "");
-    if (tgtText) tgtText.hidden = true;           // the summary says it
-    if (tgt.parentElement !== fold) fold.append(tgt);
-    if (skip && skip.parentElement !== fold) fold.append(skip);
-    fold.hidden = false;
+    if (tgt.parentElement !== ref) ref.append(tgt);
+    if (skip && skip.parentElement !== ref) ref.append(skip);
+    ref.hidden = false;
     return;
   }
-  fold.hidden = true;
-  if (tgtText) tgtText.hidden = false;
-  if (tgt.parentElement === fold) {
+  ref.hidden = true;
+  if (tgt.parentElement === ref) {
     const btnRow = document.getElementById("btn-translate");
     const row = btnRow && btnRow.parentElement;
-    if (row && row.parentElement === fold.parentElement) row.insertAdjacentElement("afterend", tgt);
-    else fold.insertAdjacentElement("beforebegin", tgt);
+    if (row && row.parentElement === ref.parentElement) row.insertAdjacentElement("afterend", tgt);
+    else ref.insertAdjacentElement("beforebegin", tgt);
   }
-  if (skip && skip.parentElement === fold) {
+  if (skip && skip.parentElement === ref) {
     const est = document.getElementById("tr-estimate");
-    if (est && est.parentElement === fold.parentElement) est.insertAdjacentElement("afterend", skip);
+    if (est && est.parentElement === ref.parentElement) est.insertAdjacentElement("afterend", skip);
     else tgt.insertAdjacentElement("afterend", skip);
   }
 }
@@ -2033,7 +2027,7 @@ async function _pbpTrApplyTargetLang(st, s) {
   // raw setting even though st.target.code does not move.
   if (st.s) st.s.translateTargetLang = s.translateTargetLang;
   if (st.tgtTextEl) st.tgtTextEl.textContent = t("trTargetLang", st.target.display || st.target.name);
-  _pbpTrSyncDoneFold(st);
+  _pbpTrSyncDoneRef(st);
   if (st.target.code === prevCode) return;   // label refresh only: no real language change
   _pbpTrSyncViewLabels(st);
   // Target language actually changed: every language-keyed derived state is now stale.
@@ -3166,7 +3160,7 @@ function _pbpTrSetStatus(st, status) {
     else prog.removeAttribute("aria-busy");
     if (status !== "done") prog.removeAttribute("title");   // only the done line carries the full usage sentence
   }
-  _pbpTrSyncDoneFold(st);
+  _pbpTrSyncDoneRef(st);
   // The stale note's second action is status-dependent (partial-only): keep it
   // in step with every status transition through the one sync point.
   _pbpTrSyncStaleNote(st);
@@ -3207,8 +3201,8 @@ function _pbpTrShowViewToggle(st) {
     wrap.appendChild(b);
   }
   const sec = document.getElementById("tr-section");
-  const fold = document.getElementById("tr-done-fold");
-  if (fold && fold.parentElement === sec) sec.insertBefore(wrap, fold);
+  const ref = document.getElementById("tr-done-ref");
+  if (ref && ref.parentElement === sec) sec.insertBefore(wrap, ref);
   else sec.appendChild(wrap);
   // The line under the toggle names the pointer peek in tr-only
   // (_pbpTrPeekToggle), in place of the per-paragraph title it used to carry;

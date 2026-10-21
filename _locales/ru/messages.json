@@ -2777,7 +2777,7 @@
     }
   },
   "trDoneUsage": {
-    "message": "$COUNT$ сегментов · вход $IN$ / выход $OUT$",
+    "message": "$COUNT$ сегментов · вход $IN$ / выход $OUT$ tokens",
     "placeholders": {
       "count": {
         "content": "$1"

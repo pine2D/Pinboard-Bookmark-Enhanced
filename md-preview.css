@@ -2993,8 +2993,8 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 /* .rail-disclosure: the disclosure INSIDE a rail section (COMPONENTS.md
    §10) -- native <details>/<summary> (keyboard + expanded state for free), a
    12px secondary-text summary with the rail's thin right-edge chevron, 24px
-   tall so it stays a comfortable target. Consumers: the glossary hits and
-   the done-state fold (#tr-section), "More formats and options"
+   tall so it stays a comfortable target. Consumers: the glossary hits
+   (#tr-section), "More formats and options"
    (#export-section). Section-level folding stays .rail-sec-head. */
 .rail-disclosure { margin-top: var(--sp-2); }
 .rail-disclosure > summary {

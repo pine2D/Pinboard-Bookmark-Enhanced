@@ -2777,7 +2777,7 @@
     }
   },
   "trDoneUsage": {
-    "message": "$COUNT$ Abschnitte · $IN$ ein / $OUT$ aus",
+    "message": "$COUNT$ Abschnitte · $IN$ tokens ein / $OUT$ aus",
     "placeholders": {
       "count": {
         "content": "$1"
