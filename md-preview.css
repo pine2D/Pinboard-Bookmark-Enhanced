@@ -82,7 +82,12 @@ html { scrollbar-gutter: stable; }
      the dark branch takes the next lighter blue (--link-hover's #7AAEDB,
      5.35:1). Edges and outlines stay var(--link) -- non-text, 3:1 floor. */
   --link-on-raised: light-dark(var(--link), var(--link-hover));
-  --badge-bg: light-dark(#E4E9E7, #263542);
+  /* Badge and quote fills are warm paper/ink steps (2026-10-21): the old
+     #E4E9E7 / #263542 and #F2F3EC / #22282D were teal- and slate-tinted,
+     the cold blue-gray the warm-ink reader is not. Badge sits one Flexoki
+     step above the rail's --surface (base-100 / base-850); the quote sits
+     between --bg and --code-bg so inline code inside it keeps its chip. */
+  --badge-bg: light-dark(#E6E4D9, #343331);
   --badge-fg: light-dark(#1A4F8C, #8DB9DD);
   --btn-bg: light-dark(#FFFCF0, #282726);
   --btn-border: light-dark(#DAD8CE, #403E3C);
@@ -97,7 +102,7 @@ html { scrollbar-gutter: stable; }
      on the Flexoki light branch. */
   --on-success: light-dark(#fff, #1C1B1A);
   --bq-border: light-dark(#205EA6, #6095C5);
-  --bq-bg: light-dark(#F2F3EC, #22282D);
+  --bq-bg: light-dark(#F4F2E7, #242321);
   /* Quote text is neutral ink (critique 2026-10-19): the old light #1A4F8C
      sat 1.26:1 from --link, so a whole quote read as one long link and the
      real links inside it vanished. Blue stays on the bar; --link stays the
@@ -852,7 +857,7 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
    Only the outermost quote keeps the accent bar + tint.
    Alpha 0.9 (not var(--border), which is only ~1:1 against --bq-bg dark) is the
    lowest value that clears 3:1 non-text-UI contrast against both --bq-bg tints
-   (D8-3): light 3.16:1, dark 3.28:1. */
+   (D8-3; re-measured on the warm tints 2026-10-21): light 3.03:1, dark 3.51:1. */
 #rendered-view blockquote blockquote {
   position: relative;
   background: transparent;
@@ -1351,7 +1356,9 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    options.css's .fg select). Stroke color is a fixed neutral gray, not a
    theme token -- it needs to read at low contrast against both --btn-bg
    branches (13 themes x light/dark) and no existing var() is guaranteed
-   legible on all of them; #8a94a0 is picked to sit around 3:1 on both.
+   legible on all of them; #878580 (Flexoki base-500, warm like the rest of
+   the palette -- the old #8a94a0 was a cool slate and only 2.53:1 on the
+   light hover fill) clears 3:1 on both fills in both schemes.
    The OPEN option list is a separate problem: the UA popup ignores the
    page's light-dark() tokens (on Windows it can even follow the browser
    theme against a forced-dark page) and can't be made to match .send-menu
@@ -1363,7 +1370,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   padding: 0 var(--sp-5) 0 var(--sp-3);
   border: 1px solid var(--btn-border); border-radius: var(--radius-md);
   background-color: var(--btn-bg); color: var(--btn-fg);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a94a0' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23878580' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 8px center;
   font-size: 13px; cursor: pointer;
@@ -1395,7 +1402,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
     appearance: base-select;
     margin-top: var(--sp-1);
     background: var(--bg, #fff);
-    border: 1px solid var(--border, #d8dee4);
+    border: 1px solid var(--border, #DAD8CE);
     border-radius: var(--radius-md);
     box-shadow: 0 8px 24px rgba(0,0,0,.12);
     padding: var(--sp-1);
@@ -1823,7 +1830,7 @@ body.md-shell .rail > .view-toggle { display: none; }
 .send-empty .send-primary { justify-content: center;
   border-top-right-radius: 6px; border-bottom-right-radius: 6px; opacity: .85; }
 .send-menu { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
-  background: var(--bg, #fff); border: 1px solid var(--border, #d8dee4); border-radius: var(--radius-md);
+  background: var(--bg, #fff); border: 1px solid var(--border, #DAD8CE); border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: var(--sp-1); max-height: 320px; overflow: auto; }
 .send-menu[hidden] { display: none; }
 html.motion-ready .send-menu {
@@ -1852,7 +1859,7 @@ html.motion-ready .send-menu[hidden] {
    is a solid token that clears 4.5:1 against --bg in both light/dark (5.43:1 /
    6.09:1) regardless of what's behind it. */
 .send-mi-tag { margin-left: auto; font-size: 11px; color: var(--fg-muted); }
-.send-mi-foot { border-top: 1px solid var(--border, #d8dee4); margin-top: var(--sp-1);
+.send-mi-foot { border-top: 1px solid var(--border, #DAD8CE); margin-top: var(--sp-1);
   border-radius: 0; opacity: .8; font-size: 12px; }
 /* Message bar (T7.9): the one look every inline notice shares -- own row,
    light ground, 3px semantic stripe. Tones: info/busy ride the link stripe
@@ -4103,7 +4110,7 @@ html.motion-ready #skim-collapse.motion-toggle svg { transition: transform 150ms
 .pbv-toast {
   position: absolute; left: 10px; bottom: 12px; z-index: 3;
   padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-md); font-size: 0.8em;
-  background: rgba(17, 22, 28, 0.85); color: #fff;
+  background: rgba(28, 27, 26, 0.85); color: #fff;
   opacity: 1; pointer-events: none;
 }
 .pbv-toast[data-fading="1"] { opacity: 0; }
