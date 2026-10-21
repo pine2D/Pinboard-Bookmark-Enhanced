@@ -4339,5 +4339,6 @@
   "batchConfirmDetail": { "message": "Strony, które już zapisano, zostaną pominięte." },
   "batchConfirmDetailAi": { "message": "Strony, które już zapisano, zostaną pominięte. Dla każdej nowej karty uruchomi się AI, a koszt obciąży twój klucz API." },
   "aiErrorUnreachable": { "message": "Nie można połączyć się z $PROVIDER$ ($HOST$). Sprawdź Base URL, sieć lub serwer proxy.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
-  "loginNeedsPaid": { "message": "Wymaga płatnego konta Pinboard." }
+  "loginNeedsPaid": { "message": "Wymaga płatnego konta Pinboard." },
+  "popupDraftDiscard": { "message": "Odrzuć szkic" }
 }

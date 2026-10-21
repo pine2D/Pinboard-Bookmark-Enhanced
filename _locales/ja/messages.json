@@ -4339,5 +4339,6 @@
   "batchConfirmDetail": { "message": "保存済みのページはスキップします。" },
   "batchConfirmDetailAi": { "message": "保存済みのページはスキップします。新しいタブごとに AI を呼び出し、料金は API キーに請求されます。" },
   "aiErrorUnreachable": { "message": "$PROVIDER$（$HOST$）に接続できません。Base URL、ネットワーク、プロキシを確認してください。", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
-  "loginNeedsPaid": { "message": "有料の Pinboard アカウントが必要です。" }
+  "loginNeedsPaid": { "message": "有料の Pinboard アカウントが必要です。" },
+  "popupDraftDiscard": { "message": "下書きを破棄" }
 }

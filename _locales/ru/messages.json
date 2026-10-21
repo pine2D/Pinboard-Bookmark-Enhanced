@@ -4339,5 +4339,6 @@
   "batchConfirmDetail": { "message": "Уже сохранённые страницы будут пропущены." },
   "batchConfirmDetailAi": { "message": "Уже сохранённые страницы будут пропущены. Для каждой новой вкладки запускается AI, оплата идёт с вашего API-ключа." },
   "aiErrorUnreachable": { "message": "Не удаётся подключиться к $PROVIDER$ ($HOST$). Проверьте базовый URL, сеть или прокси.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
-  "loginNeedsPaid": { "message": "Нужна платная учётная запись Pinboard." }
+  "loginNeedsPaid": { "message": "Нужна платная учётная запись Pinboard." },
+  "popupDraftDiscard": { "message": "Удалить черновик" }
 }

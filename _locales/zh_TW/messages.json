@@ -4339,5 +4339,6 @@
   "batchConfirmDetail": { "message": "已收藏的頁面會略過。" },
   "batchConfirmDetailAi": { "message": "已收藏的頁面會略過。每個新分頁都會呼叫一次 AI，費用計入你的 API Key。" },
   "aiErrorUnreachable": { "message": "無法連線到 $PROVIDER$（$HOST$）。請檢查端點網址、網路或 Proxy。", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
-  "loginNeedsPaid": { "message": "需要付費的 Pinboard 帳號。" }
+  "loginNeedsPaid": { "message": "需要付費的 Pinboard 帳號。" },
+  "popupDraftDiscard": { "message": "捨棄草稿" }
 }

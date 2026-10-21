@@ -319,6 +319,23 @@ async function initPopupDraft(account, tab) {
       context.ready = true;
       renderTags();
       showStatus("status-msg", t("popupDraftRestored"), "info");
+      // A restored draft used to be a one-way door: starting over meant
+      // clearing every field by hand (critique 2026-10-21). Discarding clears
+      // the stored draft, then reopens the form from the page as on a first
+      // open -- the same init path, not a hand-rolled reset.
+      const statusEl = $id("status-msg");
+      if (statusEl?.appendChild) {
+        const discard = document.createElement("button");
+        discard.type = "button";
+        discard.className = "action-link";
+        discard.textContent = t("popupDraftDiscard");
+        discard.addEventListener("click", async () => {
+          discard.disabled = true;
+          if (await pbpDiscardPopupDraft()) window.location.reload();
+          else discard.disabled = false;
+        });
+        statusEl.append(" · ", discard);
+      }
     }
     context.ready = true;
     if (revision !== _popupDraftRevision) pbpRememberPopupDraft();

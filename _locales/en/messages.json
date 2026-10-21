@@ -4346,5 +4346,6 @@
   "batchConfirmDetail": { "message": "Pages you’ve already saved are skipped." },
   "batchConfirmDetailAi": { "message": "Pages you’ve already saved are skipped. AI runs on each new tab and bills your API key." },
   "aiErrorUnreachable": { "message": "Couldn’t reach $PROVIDER$ ($HOST$). Check the Base URL, your network, or your proxy.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
-  "loginNeedsPaid": { "message": "Requires a paid Pinboard account." }
+  "loginNeedsPaid": { "message": "Requires a paid Pinboard account." },
+  "popupDraftDiscard": { "message": "Discard draft" }
 }

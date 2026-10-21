@@ -1640,13 +1640,20 @@ html[data-theme] .batch-progress-text {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--pp-sp-2);
-  padding: 0 var(--pp-sp-4) var(--pp-sp-4);
+  gap: var(--pp-sp-1);
+  padding: 0 var(--pp-sp-4) var(--pp-sp-2);
   font-size: 11px;
 }
+/* 24px tall, 2px side pad: the hit area icon buttons get, for 11px text
+   links that measured 15px (critique 2026-10-21). The row gives back the
+   added height below so the strip keeps its footprint. */
 .quick-links a {
   color: var(--pp-link);
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--pp-sp-1);
 }
 .quick-links a:hover {
   text-decoration: underline;

@@ -4339,5 +4339,6 @@
   "batchConfirmDetail": { "message": "Bereits gespeicherte Seiten werden übersprungen." },
   "batchConfirmDetailAi": { "message": "Bereits gespeicherte Seiten werden übersprungen. Für jeden neuen Tab läuft die KI und wird über deinen API-Schlüssel abgerechnet." },
   "aiErrorUnreachable": { "message": "$PROVIDER$ ($HOST$) ist nicht erreichbar. Prüfe die Base URL, dein Netzwerk oder deinen Proxy.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
-  "loginNeedsPaid": { "message": "Erfordert ein kostenpflichtiges Pinboard-Konto." }
+  "loginNeedsPaid": { "message": "Erfordert ein kostenpflichtiges Pinboard-Konto." },
+  "popupDraftDiscard": { "message": "Entwurf verwerfen" }
 }

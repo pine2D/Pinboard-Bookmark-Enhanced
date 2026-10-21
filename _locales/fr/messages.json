@@ -4339,5 +4339,6 @@
   "batchConfirmDetail": { "message": "Les pages déjà enregistrées sont ignorées." },
   "batchConfirmDetailAi": { "message": "Les pages déjà enregistrées sont ignorées. L’IA s’exécute pour chaque nouvel onglet et est facturée sur votre clé API." },
   "aiErrorUnreachable": { "message": "Impossible de joindre $PROVIDER$ ($HOST$). Vérifiez l’URL de base, votre réseau ou votre proxy.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
-  "loginNeedsPaid": { "message": "Nécessite un compte Pinboard payant." }
+  "loginNeedsPaid": { "message": "Nécessite un compte Pinboard payant." },
+  "popupDraftDiscard": { "message": "Supprimer le brouillon" }
 }
