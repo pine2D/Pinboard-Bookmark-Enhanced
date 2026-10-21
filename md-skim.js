@@ -356,10 +356,28 @@ async function _pbpSkimLoad(rev) {
   await _pbpSkimRun();
 }
 
+// Key points are written in the summary language setting, or "the content's
+// language" on auto -- rarely html[lang] on a non-Chinese UI -- so the body
+// carries its own tag (see pbpAiContentLang, md-ask.js, for why). An explicit
+// setting is a code (aiSummaryLang); auto is judged from the text itself, with
+// the article's lang for ambiguous Han.
+function _pbpSkimStampLang(body, text) {
+  if (!body || typeof pbpAiSetLang !== "function") return;
+  const st = _pbpSkimState;
+  const setting = String((st && st.s && st.s.aiSummaryLang) || "auto");
+  const view = document.getElementById("rendered-view");
+  const viewLang = (view && view.getAttribute("lang")) || "";
+  let lang = "";
+  if (setting !== "auto" && typeof pbpTrTargetLangAttr === "function") lang = pbpTrTargetLangAttr(setting);
+  if (!lang) lang = pbpAiContentLang(text, [viewLang]);
+  pbpAiSetLang(body, lang);
+}
+
 function _pbpSkimRenderCached(r) {
   const body = document.getElementById("skim-body");
   if (!body) return;
   _pbpSkimSetStatus("");
+  _pbpSkimStampLang(body, r.md);
   body.innerHTML = renderMarkdown(r.md);
   // Rebuild the sampled-paragraph set persisted at generation time so a
   // cache hit applies the same sent-gate as the live pass; legacy entries
@@ -408,7 +426,16 @@ async function _pbpSkimRun() {
   // before its abort took effect) cannot stomp a newer run's
   // freshly-cleared body with its own frozen `acc` (a one-frame flicker
   // otherwise -- see _pbpSkimRegen below).
-  const paint = () => { raf = 0; if (myGen === st.gen) body.textContent = acc; };
+  let langJudged = false;
+  const paint = () => {
+    raf = 0;
+    if (myGen !== st.gen) return;
+    if (!langJudged && acc.replace(/\s+/g, "").length >= PBP_ASK_LANG_SAMPLE) {
+      langJudged = true;
+      _pbpSkimStampLang(body, acc);
+    }
+    body.textContent = acc;
+  };
   let gotUsage = false;
   const usage = { inTok: 0, outTok: 0, approx: false };
   let built = null;
@@ -483,6 +510,7 @@ function _pbpSkimFinalize(fullText, usage, sent) {
   if (!body) return;
   st.permissionError = null;
   const parsed = pbpAiParseCites(fullText);
+  _pbpSkimStampLang(body, parsed.body);
   body.innerHTML = renderMarkdown(parsed.body);
   // Same sent-gate as ask (A7): a cite of a paragraph the sampler never
   // sent must not earn the solid verified state even when its guessed

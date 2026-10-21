@@ -2529,6 +2529,10 @@ function _pbpTrSetErrTip(btn, tip, shown, raw) {
   const lab = btn.querySelector(":scope > span:not(.pb-tr-err-reason):not(.pb-tr-err-raw)");
   const visible = lab ? lab.textContent : "";
   btn.setAttribute("aria-label", visible ? visible + ": " + tip + (raw ? " (" + raw + ")" : "") : tip);
+  // The pill sits inside the article, whose lang is the ARTICLE's; its reason
+  // line is UI-locale text, so it carries the UI lang (a Chinese UI over an
+  // English article otherwise drew the reason in the Traditional-first stack).
+  if (document.documentElement.lang) btn.lang = document.documentElement.lang;
   let reason = btn.querySelector(".pb-tr-err-reason");
   if (!reason) {
     reason = document.createElement("span");
@@ -2546,6 +2550,11 @@ function _pbpTrSetErrTip(btn, tip, shown, raw) {
       reason.insertAdjacentElement("afterend", rawEl);
     }
     rawEl.textContent = raw;
+    // The provider's own words: usually English, sometimes Chinese (DeepSeek,
+    // Qwen, ...). Latin judges to "" and keeps the pill's lang.
+    if (typeof pbpAiContentLang === "function" && typeof pbpAiSetLang === "function") {
+      pbpAiSetLang(rawEl, pbpAiContentLang(raw, [btn.lang]));
+    }
   } else if (rawEl) {
     rawEl.remove();
   }

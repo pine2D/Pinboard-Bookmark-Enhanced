@@ -889,6 +889,57 @@ function _pbpAskKeepPinned(mutate) {
   return out;
 }
 
+// ---- Language of model/user text (the :lang() font-stack hook) ----
+// html[lang] is the UI locale, and the body default stack is Traditional-first
+// (md-preview.css), so on an English / Japanese / German UI a Simplified
+// Chinese answer drew Traditional glyph forms and centred punctuation until
+// something under it carried lang="zh-Hans". #rendered-view and the .pb-tr
+// blocks already do; the Ask thread, the skim points and the explain-translate
+// result did not. One resolver for all of them, built from the readers the page
+// already trusts: pbpReaderArticleLang (glyph-level zh-Hans / zh-Hant / ja / ko
+// plus the "a quoted phrase is not the language" minority rule) fed the
+// non-tag "und" so it never borrows a declared page language -- "und" back
+// means "glyphs cannot place this" (Latin, Cyrillic, a minority quote).
+// Han text with no Simplified / Traditional marker (a short "好的") is the one
+// ambiguous case: it takes the first CJK tag in `fallbacks` (the question's,
+// then the article's) and otherwise inherits -- never a guess.
+function pbpAiContentLang(text, fallbacks) {
+  const s = String(text == null ? "" : text).slice(0, 4000);
+  if (!s.trim() || typeof pbpReaderArticleLang !== "function") return "";
+  const decided = pbpReaderArticleLang(s, "und");
+  if (decided && decided !== "und") return decided;
+  const han = (s.match(/\p{Script=Han}/gu) || []).length;
+  if (!han || han < (s.match(/[A-Za-z\u00C0-\u024F\u0400-\u04FF]+/g) || []).length) return "";
+  for (const fb of (fallbacks || [])) {
+    const tag = (typeof pbpTrTargetLangAttr === "function") ? pbpTrTargetLangAttr(fb) : String(fb || "");
+    if (/^(zh|ja|ko)(-|$)/i.test(tag)) return tag;
+  }
+  return "";
+}
+// Set (or clear) el's lang to `lang`, touching the DOM only on a real change so
+// a streaming bubble is not re-styled for nothing.
+function pbpAiSetLang(el, lang) {
+  if (!el) return "";
+  const cur = el.getAttribute("lang") || "";
+  if (lang && cur !== lang) el.setAttribute("lang", lang);
+  else if (!lang && cur) el.removeAttribute("lang");
+  return lang || "";
+}
+// The language the article itself reads in (the fallback for ambiguous Han).
+function _pbpAskViewLang() {
+  const v = document.getElementById("rendered-view");
+  return (v && v.getAttribute("lang")) || "";
+}
+// An answer follows its question's language (prompt rule 1), so the question's
+// tag is the right guess until the answer's own glyphs are in.
+function _pbpAskAnswerLang(answer, questionLang) {
+  return pbpAiContentLang(answer, [questionLang, _pbpAskViewLang()]);
+}
+// Stream stamp: the first sample long enough to judge (an answer's opening
+// words can be a quoted phrase), applied once; the finalize pass re-judges the
+// whole text.
+const PBP_ASK_LANG_SAMPLE = 24;
+
 // Append one Q/A round. Question is USER text -> textContent only. The
 // .ask-q/.ask-a structure is a cross-task contract (the history restore
 // task replicates it verbatim).
@@ -903,9 +954,12 @@ function _pbpAskAppendRound(question) {
   qEl.className = "ask-q";
   qEl.dir = "auto"; // D9-2: user question may be RTL, independent of UI language
   qEl.textContent = question;
+  const qLang = pbpAiContentLang(question, [_pbpAskViewLang()]);
+  pbpAiSetLang(qEl, qLang);
   const aEl = document.createElement("div");
   aEl.className = "ask-a streaming";
   aEl.dataset.askQuestion = question;
+  pbpAiSetLang(aEl, qLang); // best guess until the answer's own glyphs are in
   aEl.dir = "auto"; // D9-2: answer follows the question's language (system prompt rule)
   // #ask-thread is aria-live=polite; without aria-busy, every rAF-throttled
   // textContent replace during streaming re-announces the whole accumulated
@@ -923,6 +977,9 @@ function _pbpAskAppendRound(question) {
 function _pbpAskErrorUi(aEl, error, question) {
   const err = document.createElement("p");
   err.className = "ask-err";
+  // The reason is UI-language text (or the provider's own); the bubble above
+  // may have been stamped with the question's language.
+  if (aEl.hasAttribute("lang")) err.lang = document.documentElement.lang || "en";
   const overrideHint = pbpAiOverrideErrHint(error, _pbpAskState && _pbpAskState.s);
   // A message-less rejection (String(new Error("")) is the bare English word
   // "Error") reads as the localized generic reason instead.
@@ -985,7 +1042,15 @@ async function _pbpAskRun(question, aEl, opts) {
   if (sendBtn) sendBtn.disabled = true;
   let raf = 0;
   let acc = "";
-  const paint = () => { raf = 0; _pbpAskKeepPinned(() => { aEl.textContent = acc; }); };
+  let langJudged = false;
+  const paint = () => {
+    raf = 0;
+    if (!langJudged && acc.replace(/\s+/g, "").length >= PBP_ASK_LANG_SAMPLE) {
+      langJudged = true;
+      pbpAiSetLang(aEl, _pbpAskAnswerLang(acc, pbpAiContentLang(question, [_pbpAskViewLang()])));
+    }
+    _pbpAskKeepPinned(() => { aEl.textContent = acc; });
+  };
   try {
     _pbpAskEnsureCtx(st);
     // Regenerate must not show the model the very answer it is replacing:
@@ -1560,6 +1625,10 @@ function _pbpAskFinalize(el, fullText, sent) {
   // md-preview.js pattern (renderedView.innerHTML = renderMarkdown(...),
   // md-preview.js ~line 330-333). NEVER assign raw model text to innerHTML.
   el.dir = "auto"; // D9-2: also covers the history-restore aEl, which skips _pbpAskAppendRound
+  // The whole answer is in: judge its language for good (also the only stamp a
+  // history-restored answer ever gets).
+  const qText = el.dataset ? el.dataset.askQuestion : "";
+  pbpAiSetLang(el, _pbpAskAnswerLang(parsed.body, pbpAiContentLang(qText, [_pbpAskViewLang()])));
   el.innerHTML = renderMarkdown(parsed.body);
   _pbpAskChipPass(el, parsed.cites, sent);
   // Task 15 hook (copy button + history chrome). typeof-guarded so this
@@ -1931,6 +2000,7 @@ async function _pbpAskHistRestore() {
         qEl.className = "ask-q";
         qEl.dir = "auto"; // D9-2: mirror the live _pbpAskAppendRound path (structure is replicated verbatim, see comment above)
         qEl.textContent = String(rec.q || "");
+        pbpAiSetLang(qEl, pbpAiContentLang(qEl.textContent, [_pbpAskViewLang()]));
         const aEl = document.createElement("div");
         aEl.className = "ask-a";
         aEl.dataset.askQuestion = String(rec.q || "");
@@ -3127,6 +3197,11 @@ async function _pbpExplainRun(cap, ctx, pop) {
   pbpAiBumpCounter("explain"); // local usage counter, storage.local only (both actions share the bucket)
   const stream = document.createElement("div");
   stream.className = "xp-stream";
+  // Translate result is in the configured target language, which on an English
+  // UI is usually not html[lang]; explain answers in the UI language already.
+  const resultLang = (isTranslate && typeof pbpTrResolveTargetLang === "function" && typeof pbpTrTargetLangAttr === "function")
+    ? pbpTrTargetLangAttr(pbpTrResolveTargetLang(s, uiLangToBCP47()).code) : "";
+  if (resultLang) stream.lang = resultLang;
   let started = false;
   let pending = "";
   let rafId = 0;
@@ -3149,6 +3224,7 @@ async function _pbpExplainRun(cap, ctx, pop) {
     // marked + DOMPurify, md-convert.js). Never innerHTML raw model text.
     const md = document.createElement("div");
     md.className = "xp-md";
+    if (resultLang) md.lang = resultLang;
     md.innerHTML = renderMarkdown(full);
     body.replaceChildren(md);
     // H4 2.2: the answer is now final -- stash the raw markdown text (never

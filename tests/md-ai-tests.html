@@ -11249,6 +11249,118 @@ window._t4AsyncDone = (async function () {
     }
   });
 
+  // ---- :lang() routing of the Ask thread (Han glyph forms) ----
+  // html[lang] is the UI locale and the body stack is Traditional-first, so on a
+  // non-Chinese UI only an explicit lang on the subtree picks the right glyphs.
+  async function askLangRun(question, answer, hold) {
+    const bits = mkThread();
+    const saved = _pbpAskState, savedStream = window.callAIStream;
+    _pbpAskState = mkAskState("https://example.test/t4-lang-" + Date.now() + Math.random());
+    window.callAIStream = hold || ((s, prompt, opts, onDelta) => { onDelta(answer, answer); return Promise.resolve(answer); });
+    const aEl = mkAnswerEl(bits.thread, question);
+    return { bits, aEl, saved, savedStream, run: () => _pbpAskRun(question, aEl) };
+  }
+  await atest("a Simplified Chinese answer under a non-Chinese UI lands in :lang(zh-Hans)", async () => {
+    assert(!document.documentElement.matches(":lang(zh)"), "control: the page UI is not Chinese");
+    const c = await askLangRun("What does this say?", "这个方案的核心是把对话和数据分开保存，这样用户可以随时关闭同步。");
+    try {
+      await c.run();
+      assert(c.aEl.matches(":lang(zh-Hans)"), "answer lang = " + c.aEl.getAttribute("lang"));
+      assert(!c.aEl.matches(":lang(zh-Hant)"), "and not the Traditional tag");
+    } finally { askCleanup(c.bits, c.saved, c.savedStream); }
+  });
+  await atest("a Traditional Chinese answer lands in :lang(zh-Hant)", async () => {
+    const c = await askLangRun("這篇文章在說什麼？", "這個方案的核心是把對話與資料分開保存，這樣使用者可以隨時關閉同步。");
+    try {
+      await c.run();
+      assert(c.aEl.matches(":lang(zh-Hant)"), "answer lang = " + c.aEl.getAttribute("lang"));
+    } finally { askCleanup(c.bits, c.saved, c.savedStream); }
+  });
+  await atest("an English answer is never tagged Chinese, even when the question was", async () => {
+    const c = await askLangRun("这篇文章在说什么？", "The article argues that conversations and data should be stored apart, so sync can be switched off at any time.");
+    try {
+      await c.run();
+      assertEq(c.aEl.getAttribute("lang"), null, "Latin answer carries no lang (inherits)");
+      assert(!c.aEl.matches(":lang(zh)"), "and does not match :lang(zh)");
+    } finally { askCleanup(c.bits, c.saved, c.savedStream); }
+  });
+  await atest("an English answer quoting one Chinese phrase stays untagged", async () => {
+    const c = await askLangRun("What is the term?", "The term 数据库 is used throughout the article to mean a database, and the author contrasts it with the plain file store described earlier.");
+    try {
+      await c.run();
+      assertEq(c.aEl.getAttribute("lang"), null, "a quoted phrase is not the answer's language");
+    } finally { askCleanup(c.bits, c.saved, c.savedStream); }
+  });
+  await atest("an ambiguous short Han answer follows its question's script", async () => {
+    const c = await askLangRun("为什么这样设计？", "好的");
+    try {
+      await c.run();
+      assert(c.aEl.matches(":lang(zh-Hans)"), "answer lang = " + c.aEl.getAttribute("lang"));
+    } finally { askCleanup(c.bits, c.saved, c.savedStream); }
+  });
+  await atest("the question bubble is tagged by its own text and the lang is written once while streaming", async () => {
+    const bits = mkThread();
+    const saved = _pbpAskState, savedStream = window.callAIStream;
+    _pbpAskState = mkAskState("https://example.test/t4-lang-stream-" + Date.now());
+    const chunks = ["Here is ", "the answer: ", "这个方案的核心是把对话和数据分开保存，", "这样用户可以随时关闭同步，", "并且不影响其他设备。"];
+    window.callAIStream = (s, prompt, opts, onDelta) => new Promise((resolve, reject) => {
+      let acc = "", i = 0;
+      const step = () => {
+        if (i >= chunks.length) return;
+        acc += chunks[i++];
+        onDelta(chunks[i - 1], acc);
+        requestAnimationFrame(() => requestAnimationFrame(step));
+      };
+      step();
+      opts.signal.addEventListener("abort", () => { const e = new Error("aborted"); e.name = "AbortError"; reject(e); });
+    });
+    try {
+      const aEl = _pbpAskAppendRound("为什么这样设计？");
+      const qEl = bits.thread.parentNode && document.querySelector("#ask-thread .ask-q:last-of-type");
+      const own = document.getElementById("ask-thread");
+      assert(own, "control: the round landed in the harness thread");
+      assert(own.querySelector(".ask-q").matches(":lang(zh-Hans)"), "Simplified question bubble is :lang(zh-Hans)");
+      const writes = [];
+      const mo = new MutationObserver((recs) => recs.forEach((r) => writes.push(aEl.getAttribute("lang"))));
+      mo.observe(aEl, { attributes: true, attributeFilter: ["lang"] });
+      const p = _pbpAskRun("为什么这样设计？", aEl);
+      for (let i = 0; i < 24; i++) await new Promise((r) => requestAnimationFrame(r));
+      _pbpAskState.ctrl.abort();
+      await p;
+      mo.disconnect();
+      assert(aEl.matches(":lang(zh-Hans)"), "the answer ends up :lang(zh-Hans)");
+      assert(writes.length <= 1, "lang rewritten " + writes.length + " times during the stream: " + JSON.stringify(writes));
+    } finally { askCleanup(bits, saved, savedStream); }
+  });
+  await atest("the translation failure pill speaks the UI lang and its raw provider line is judged by content", async () => {
+    const btn = document.createElement("button");
+    const view = document.createElement("div");
+    view.lang = "en";
+    view.appendChild(btn);
+    document.body.appendChild(view);
+    try {
+      _pbpTrSetErrTip(btn, "Translation failed - quota", "quota", "请求被拒绝：这个密钥的额度不足，请稍后再试。");
+      assertEq(btn.lang, document.documentElement.lang, "the pill carries the UI lang, not the article's");
+      assert(btn.querySelector(".pb-tr-err-raw").matches(":lang(zh-Hans)"), "Simplified provider text gets zh-Hans");
+      _pbpTrSetErrTip(btn, "Translation failed - quota", "quota", "HTTP 429: rate limit exceeded");
+      assertEq(btn.querySelector(".pb-tr-err-raw").getAttribute("lang"), null, "English provider text keeps the pill's lang");
+    } finally { view.remove(); }
+  });
+  await atest("skim key points take an explicit summary language, else the text's own", async () => {
+    const body = document.createElement("div");
+    const saved = _pbpSkimState;
+    try {
+      _pbpSkimState = { s: { aiSummaryLang: "zh" } };
+      _pbpSkimStampLang(body, "Plain English that the setting overrides");
+      assert(body.matches(":lang(zh-Hans)"), "aiSummaryLang zh -> zh-Hans");
+      _pbpSkimState = { s: { aiSummaryLang: "auto" } };
+      _pbpSkimStampLang(body, "- 这个方案把对话和数据分开保存，这样用户可以随时关闭同步。");
+      assert(body.matches(":lang(zh-Hans)"), "auto + Simplified text -> zh-Hans");
+      _pbpSkimStampLang(body, "- The plan stores conversations apart from data.");
+      assertEq(body.getAttribute("lang"), null, "auto + Latin text clears the tag");
+    } finally { _pbpSkimState = saved; }
+  });
+
   await atest("a reader who scrolled up is not dragged back by a streaming answer", async () => {
     const bits = mkScrollingThread();
     const saved = _pbpAskState, savedStream = window.callAIStream;
