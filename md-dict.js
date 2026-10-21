@@ -1452,6 +1452,9 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   // last run's button (wired to the OLD record id) sitting in the foot.
   const knownReset = pop.querySelector(".xp-known");
   if (knownReset) { knownReset.hidden = true; knownReset.onclick = null; }
+  // The "In vocabulary" state belongs to one run's hit, like the toggle.
+  const stateReset = pop.querySelector(".xp-vocab-state");
+  if (stateReset) stateReset.hidden = true;
   if (vocabBtn) {
     vocabBtn.hidden = false;
     vocabBtn.disabled = true;
@@ -1617,10 +1620,14 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
       // would strip the SVG and overflow the 1.9em icon-only foot button.
       // The action face, icon and label alike: `refresh` (re-run the save),
       // not the done check -- "Update saved word" under a completed mark read
-      // as a contradiction (2026-10-19 reader critique). The saved state is
-      // carried by the known/learning toggle, shown only for saved words.
+      // as a contradiction (2026-10-19 reader critique). The STATE is its own
+      // non-control text beside it (2026-10-21): tick + "In vocabulary", so
+      // the button's visible text shortens to "Update" -- title and
+      // aria-label keep "Update saved word".
+      const state = pop.querySelector(".xp-vocab-state");
+      if (state) state.hidden = false;
       if (typeof _pbpExplainIconBtn === "function") {
-        _pbpExplainIconBtn(vocabBtn, PBP_ICONS.refresh, t("dictUpdateVocab"));
+        _pbpExplainIconBtn(vocabBtn, PBP_ICONS.refresh, t("dictUpdateVocab"), state ? t("update") : "");
       } else {
         vocabBtn.textContent = t("dictUpdateVocab");
       }

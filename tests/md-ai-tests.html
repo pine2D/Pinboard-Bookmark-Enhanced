@@ -7866,11 +7866,19 @@ suite("skim status line", () => {
     button.hidden = false;
     button.disabled = false;
     button.dataset.runId = "existing-run";
-    _pbpExplainIconBtn(button, PBP_EXPLAIN_VOCAB_ADD_SVG, "dictUpdateVocab");
+    // A saved-word hit (md-dict.js): the state beside it, "Update" visible,
+    // the full name on title / aria-label.
+    const state = pop.querySelector(".xp-vocab-state");
+    assert(state && state.nextElementSibling === button && state.hidden, "the saved state sits hidden right before the vocab button");
+    state.hidden = false;
+    _pbpExplainIconBtn(button, PBP_ICONS.refresh, "dictUpdateVocab", "update");
+    assert(button.textContent === "update" && button.title === "dictUpdateVocab" && button.getAttribute("aria-label") === "dictUpdateVocab",
+      "short visible label, full accessible name");
     window.pbpDictSaveCurrent = async () => true;
     try {
       button.click();
       await task();
+      assert(state.hidden, "after the update the button says it; the state does not repeat it");
       // Success is visible in the icon (a tick) AND in the button's own label:
       // Save to vocabulary is the one foot action that keeps its name on
       // screen, so its text must move with the state too.
@@ -8635,6 +8643,32 @@ suiteIf("extraction error shell: open original (item 6)", "renderErrorState", ()
         assertEq(E(raw, "jina"), "mdEngineExtractFailed", "unrecognised code stays generic: " + raw);
       assertEq(pbpEngineErrText(null), "mdEngineExtractFailed", "no answer at all");
     } finally { window.t = realT; }
+  });
+});
+
+// 2026-10-21: the citation tip hangs off <body> (html[lang] = UI locale) but
+// shows article text; its quote and excerpt take the article's lang.
+suiteIf("Ask citation tip: article text carries the article's lang", "_pbpAskTipShow", () => {
+  test("quote and paragraph excerpt follow #rendered-view's lang; the P-label and a lang-less article inherit", () => {
+    const view = document.createElement("div"); view.id = "rendered-view";
+    document.body.appendChild(view);
+    const chip = document.createElement("button"); chip.dataset.p = "1"; chip.dataset.quote = "这个方案的核心";
+    document.body.appendChild(chip);
+    try {
+      view.setAttribute("lang", "zh-Hans");
+      _pbpAskTipShow(chip);
+      const tip = document.getElementById("ask-tip");
+      assertEq(tip.querySelector(".ask-tip-quote").getAttribute("lang"), "zh-Hans", "quote");
+      const block = tip.querySelector(".ask-tip-block");
+      assertEq(block.getAttribute("lang"), null, "the P-number label stays in the UI language");
+      assertEq(block.querySelector("span").getAttribute("lang"), "zh-Hans", "excerpt");
+      view.removeAttribute("lang");
+      _pbpAskTipShow(chip);
+      assertEq(tip.querySelector(".ask-tip-quote").getAttribute("lang"), null, "no article lang: inherit, never a guess");
+    } finally {
+      _pbpAskTipHide();
+      view.remove(); chip.remove();
+    }
   });
 });
 

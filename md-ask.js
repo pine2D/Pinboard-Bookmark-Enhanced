@@ -1579,16 +1579,26 @@ function _pbpAskTipShow(chip) {
   const tip = _pbpAskTipEl;
   tip.replaceChildren();
   const p = Number(chip.dataset.p);
+  // The tip lives on <body>, so it inherits html[lang] -- the UI locale --
+  // while the quote and the paragraph excerpt are article text. Tag both
+  // with the article's language (as the Notebook rows do), or a Chinese
+  // article quoted in a Japanese UI draws Japanese glyph forms.
+  const viewLang = _pbpAskViewLang();
   if (chip.dataset.quote) {
     const q = document.createElement("div");
     q.className = "ask-tip-quote";
     q.textContent = '"' + chip.dataset.quote + '"';
+    pbpAiSetLang(q, viewLang);
     tip.appendChild(q);
   }
   const blockText = pbpAiTextOfKatex(p).replace(/\s+/g, " ").trim();
   const b = document.createElement("div");
   b.className = "ask-tip-block";
-  b.textContent = "P" + p + " · " + blockText.slice(0, 80) + (blockText.length > 80 ? "…" : "");
+  b.textContent = "P" + p + " · ";
+  const excerpt = document.createElement("span");
+  excerpt.textContent = blockText.slice(0, 80) + (blockText.length > 80 ? "…" : "");
+  pbpAiSetLang(excerpt, viewLang);
+  b.appendChild(excerpt);
   tip.appendChild(b);
   if (chip.classList.contains("verified")) {
     const v = document.createElement("div");
@@ -2477,17 +2487,20 @@ const PBP_EXPLAIN_DONE_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.check 
 // browser tooltip rather than a floating panel of ours -- the ban on hover
 // overlays in the reader is about the latter. aria-label carries the same text
 // so the button is never nameless to a screen reader.
-function _pbpExplainIconBtn(btn, svg, label) {
+function _pbpExplainIconBtn(btn, svg, label, shortLabel) {
   btn.innerHTML = svg; // static constant, never model or dictionary text
   btn.title = label;
   btn.setAttribute("aria-label", label);
   // Save to vocabulary is the dictionary view's core action and sat between
   // look-alike icons (the known tick right after it): it alone keeps its name
   // on screen, in every state (save / saved / update). textContent, never
-  // markup -- the label is a t() string.
+  // markup -- the label is a t() string. `shortLabel` (optional) is the
+  // visible text when the full name already stands beside the button (the
+  // saved word's "Update" next to its "In vocabulary" state); title and
+  // aria-label keep the full name either way.
   if (btn.classList.contains("xp-vocab")) {
     const text = document.createElement("span");
-    text.textContent = label;
+    text.textContent = shortLabel || label;
     btn.appendChild(text);
   }
 }
@@ -2795,6 +2808,17 @@ function _pbpExplainEnsurePop() {
       if (_pbpExplainSaveTarget === myTarget) save.disabled = false;
     });
   });
+  // "Already in your vocabulary" as a state, not a control (2026-10-21): a
+  // looked-up word that is saved showed only the action "Update saved word",
+  // so the state itself was never on screen. Text + tick, beside the button;
+  // md-dict.js shows it on a saved-word hit, every reset below hides it.
+  const vocabState = document.createElement("span");
+  vocabState.className = "xp-vocab-state";
+  vocabState.hidden = true;
+  vocabState.innerHTML = PBP_EXPLAIN_DONE_SVG; // static constant
+  const vocabStateText = document.createElement("span");
+  vocabStateText.textContent = t("dictSavedVocab");
+  vocabState.appendChild(vocabStateText);
   const vocab = document.createElement("button");
   vocab.type = "button";
   vocab.className = "xp-vocab";
@@ -2808,6 +2832,7 @@ function _pbpExplainEnsurePop() {
     if (vocab.dataset.runId !== myRunId) return; // a newer dict run owns the button now
     if (ok) {
       _pbpExplainIconBtn(vocab, PBP_EXPLAIN_DONE_SVG, t("dictSavedVocab"));
+      vocabState.hidden = true; // the button says it now; never "In vocabulary" twice
       openVocab.hidden = false; // the word is in the book now: offer the way there
     } else {
       // A silent re-enable read as "saved" (gap audit). flashButtonLabel is
@@ -2865,6 +2890,7 @@ function _pbpExplainEnsurePop() {
   // reader setting, and the rail's settings button opens Options > Reader
   // where it lives.
   foot.appendChild(save);
+  foot.appendChild(vocabState);
   foot.appendChild(vocab);
   foot.appendChild(knownBtn);
   foot.appendChild(openVocab);
@@ -3126,6 +3152,8 @@ async function _pbpExplainRun(cap, ctx, pop) {
     // text now, so every reset has to restore the SVG and both labels.
     _pbpExplainIconBtn(vocabBtn, PBP_EXPLAIN_VOCAB_ADD_SVG, t("dictSaveVocab"));
   }
+  const vocabStateReset = pop.querySelector(".xp-vocab-state");
+  if (vocabStateReset) vocabStateReset.hidden = true; // md-dict shows it per saved-word hit
   const openVocabBtn = pop.querySelector(".xp-open-vocab");
   if (openVocabBtn) openVocabBtn.hidden = true;
   const knownBtnReset = pop.querySelector(".xp-known");

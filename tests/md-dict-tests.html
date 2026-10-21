@@ -1335,11 +1335,17 @@ async function runDictNoAiAndSavedStateTests() {
   _pbpDictOwner = "acct_a";
   try {
     const pop = document.createElement("div");
-    pop.innerHTML = '<div class="xp-body"></div><button class="xp-vocab"></button>';
+    pop.innerHTML = '<div class="xp-body"></div><span class="xp-vocab-state" hidden></span><button class="xp-vocab"></button>';
     await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
     const button = pop.querySelector(".xp-vocab");
     assert(button.textContent === "dictUpdateVocab" && !button.disabled,
       "an existing word offers an enabled update action instead of the completed-state label");
+    assert(pop.querySelector(".xp-vocab-state").hidden === false,
+      "an existing word shows its saved state beside the update action (2026-10-21)");
+    pbpVocabGet = async () => null;
+    await pbpDictRun({ text: "fresh" }, { sentence: "fresh" }, pop, new AbortController(), {});
+    assert(pop.querySelector(".xp-vocab-state").hidden === true,
+      "the next lookup of an unsaved word drops the saved state again");
   } finally {
     _pbpDictResolveLang = realResolveLang;
     _pbpDictSlotRun = realSlotRun;

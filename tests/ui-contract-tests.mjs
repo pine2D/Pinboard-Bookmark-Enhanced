@@ -6155,7 +6155,9 @@ check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code
   // the first time. Names must come from title AND aria-label, never from text.
   check(!/\b(?:save|vocab|vocabBtn|openVocab|ask)\.textContent\s*=/.test(mdAskJs),
     "md-ask.js: a foot action is assigned textContent, which erases its icon");
-  check(/function _pbpExplainIconBtn\(btn, svg, label\)[\s\S]{0,200}btn\.title = label;[\s\S]{0,120}aria-label", label/.test(mdAskJs),
+  // (shortLabel: the saved word's visible "Update" beside its state; the full
+  // name still goes to title and aria-label.)
+  check(/function _pbpExplainIconBtn\(btn, svg, label(?:, shortLabel)?\)[\s\S]{0,200}btn\.title = label;[\s\S]{0,120}aria-label", label/.test(mdAskJs),
     "md-ask.js: the foot-action helper stopped setting both the tooltip and the accessible name");
   // Either a literal inline <svg> or a guarded alias of a shared PBP_ICONS
   // member (the Lucide family) -- both are SVG; the contract's target is

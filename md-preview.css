@@ -2212,6 +2212,11 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
    26px rung, width from its content. A long label wraps the footer, which the
    row already allows for the largest type tiers. */
 .xp-foot .xp-vocab { width: auto; gap: var(--sp-1); padding: 0 var(--sp-2); font-size: 12px; line-height: 16px; white-space: nowrap; }
+/* A saved word's state, beside its "Update" button (md-ask.js, md-dict.js):
+   text + tick, no fill, no border -- a status, not a control. Same 12px face
+   as the vocab label so the pair reads as one phrase. */
+.xp-vocab-state { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: 12px; line-height: 16px; white-space: nowrap; color: var(--fg-secondary); }
+.xp-vocab-state svg { width: 14px; height: 14px; flex: none; }
 /* Dictionary view (md-dict.js) */
 .xp-dict-head { margin-bottom: var(--sp-2); } /* shape: .panel-head */
 /* Joins the .exp-img-row select recipe above (shared border/background/chevron);

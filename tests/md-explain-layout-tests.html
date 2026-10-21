@@ -181,11 +181,12 @@ function assertLayout(frame, locale) {
     } finally { frame.remove(); }
   });
 
-  // The dictionary view of a saved word is the crowded case: the vocab button
-  // carries its longest label beside the known / open-vocab icons. Whatever
-  // the row does there, the price stays whole, the label and "ask more" stay
-  // together on one row, and "ask more" keeps the right edge -- never an
-  // orphaned button on a second row with the price left behind on the first.
+  // The dictionary view of a saved word is the crowded case: the "In
+  // vocabulary" state (tick + text, 2026-10-21) and its short "Update" button
+  // beside the known / open-vocab icons. Whatever the row does there, the
+  // price stays whole, the label and "ask more" stay together on one row,
+  // "ask more" keeps the right edge, and the state never parts from its
+  // button or loses its text.
   await test("a crowded dictionary footer moves price, model and ask more as one unit", async () => {
     for (const width of [320, 420]) {
       const frame = await makeFrame(width);
@@ -195,12 +196,18 @@ function assertLayout(frame, locale) {
         known.className = "xp-known";
         known.innerHTML = '<svg viewBox="0 0 24 24"></svg>';
         doc.querySelector(".xp-vocab").after(known);
+        const state = doc.createElement("span");
+        state.className = "xp-vocab-state";
+        state.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14"></svg><span></span>';
+        doc.querySelector(".xp-vocab").before(state);
         doc.querySelector(".xp-save").hidden = true;
         for (const locale of LOCALES) {
           applyLocale(frame, messages, locale);
           const vocab = doc.querySelector(".xp-vocab");
           vocab.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14"></svg><span></span>';
-          vocab.querySelector("span").textContent = messages[locale].dictUpdateVocab.message;
+          // Production (md-dict.js): visible "Update", full name on title.
+          vocab.querySelector("span").textContent = messages[locale].update.message;
+          state.querySelector("span").textContent = messages[locale].dictSavedVocab.message;
           doc.querySelector(".xp-cost").textContent = messages[locale].explainEstCost.message.replace("$TOKENS$", "12345");
           doc.querySelector(".xp-model-name").textContent = "· Custom OpenAI-compatible · a-long-model-id";
           await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
@@ -215,6 +222,12 @@ function assertLayout(frame, locale) {
             `${tag}: label and "ask more" split across rows`);
           assert(foot.right - ask.right <= 16, `${tag}: "ask more" left the right edge`);
           assert(doc.querySelector(".xp-foot").scrollWidth <= doc.querySelector(".xp-foot").clientWidth + 1, `${tag}: footer overflows`);
+          const st = state.getBoundingClientRect(), vb = vocab.getBoundingClientRect();
+          assert(Math.abs((st.top + st.height / 2) - (vb.top + vb.height / 2)) <= 1 && st.right <= vb.left,
+            `${tag}: the "In vocabulary" state parted from its Update button`);
+          assert(state.scrollWidth <= state.clientWidth + 0.5 && st.width > 30, `${tag}: the state text is clipped`);
+          assert(frame.contentWindow.getComputedStyle(state).backgroundColor === "rgba(0, 0, 0, 0)" && frame.contentWindow.getComputedStyle(state).borderTopWidth === "0px",
+            `${tag}: the state is drawn like a control`);
         }
       } finally { frame.remove(); }
     }
