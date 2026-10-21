@@ -3800,8 +3800,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const tab of document.querySelectorAll(".tab-btn[data-panel]")) {
       const unsaved = on && _unsavedPanels.has(tab.dataset.panel);
       tab.classList.toggle("tab-unsaved", unsaved);
-      const ids = (tab.getAttribute("aria-describedby") || "").split(/\s+/).filter((x) => x && x !== "tab-unsaved-desc");
-      if (unsaved) ids.push("tab-unsaved-desc");
+      const ids = (tab.getAttribute("aria-describedby") || "").split(/\s+/).filter((x) => x && x !== "unsaved-tab-desc");
+      if (unsaved) ids.push("unsaved-tab-desc");
       if (ids.length) tab.setAttribute("aria-describedby", ids.join(" "));
       else tab.removeAttribute("aria-describedby");
     }
