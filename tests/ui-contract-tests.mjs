@@ -4870,6 +4870,13 @@ for (const m of optionsHtml.matchAll(/<details class="disclosure"[^>]*>\s*<(\w+)
 // copy span, then the drawn track, appended to the label in that order.
 check(/enableLabel\.className = "switch";[\s\S]{0,200}cb\.type = "checkbox";[\s\S]{0,300}sp\.className = "switch-text";[\s\S]{0,300}track\.className = "switch-track";[\s\S]{0,200}enableLabel\.appendChild\(cb\); enableLabel\.appendChild\(sp\); enableLabel\.appendChild\(track\);/.test(optionsJs),
   "options.js: Send-to enable toggle is not rendered as label.switch > input + span.switch-text + span.switch-track");
+// Options critique 5 (2026-10-21): a .switch is announced as a switch, not a
+// checkbox -- every static one and the Send-to builder's.
+for (const m of optionsHtml.matchAll(/<label class="switch">\s*<input\b[^>]*>/g)) {
+  check(/\brole="switch"/.test(m[0]), `options.html: a .switch checkbox lacks role="switch" -> ${m[0]}`);
+}
+check(/cb\.type = "checkbox";\s*cb\.setAttribute\("role", "switch"\);/.test(optionsJs),
+  'options.js: the Send-to enable toggle lacks role="switch"');
 
 const helperSource = optionsJs.slice(0, optionsJs.indexOf('document.addEventListener("DOMContentLoaded"'));
 const permissionHelpers = Function(helperSource + "; return { pbpExactOriginPermissionSnapshot, pbpRevokeLegacyAllSitesPermission }; ")();

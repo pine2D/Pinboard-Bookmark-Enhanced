@@ -1696,7 +1696,7 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
 .entry-block-sub[data-off] :is(input, textarea, .listbox-btn):disabled { opacity: 0.45; cursor: default; }
 /* A link in an off block ("Get key" under the archive.org keys) still works,
    but takes the block's hint ink instead of live link blue. */
-.entry-block-sub[data-off] .hint a:not(.btn) { color: var(--opt-fg-hint); }
+.entry-block-sub[data-off] .hint a:not(.btn) { color: var(--opt-fg-hint); pointer-events: none; }
 /* A row's own "why is this off" line (#opt-sync-api-keys-requires) sits
    inside its .pref-group, directly under the row: pulled up into the row's
    bottom padding so it reads as that row's caption (control -> hint = sp-1,

@@ -1991,6 +1991,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       enableLabel.className = "switch";
       const cb = document.createElement("input");
       cb.type = "checkbox";
+      cb.setAttribute("role", "switch");
       cb.dataset.et = id + ".enabled";
       cb.checked = !!cfg.enabled;
       cb.addEventListener("change", () => { headState.textContent = t(cb.checked ? "stateOn" : "stateOff"); });
@@ -2291,6 +2292,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (control.disabled === off) continue;
         control.disabled = off;
         if (control.tagName === "SELECT") window.pbpListboxSync?.(control);
+      }
+      // A link has no disabled state: an off row's "Get key" stayed in the
+      // Tab order while everything around it was skipped.
+      for (const link of row.querySelectorAll("a[href]")) {
+        if (off) { link.setAttribute("tabindex", "-1"); link.setAttribute("aria-disabled", "true"); }
+        else { link.removeAttribute("tabindex"); link.removeAttribute("aria-disabled"); }
       }
     }
     for (const [id, note] of parentNotes) if (note) note.hidden = !offParents.has(id);
