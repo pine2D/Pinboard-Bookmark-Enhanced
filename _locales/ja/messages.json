@@ -1046,7 +1046,7 @@
     "message": "デフォルトであとで読むにする"
   },
   "secNotesBehavior": {
-    "message": "メモの動作"
+    "message": "ポップアップのメモ"
   },
   "optAutoDescription": {
     "message": "ページの説明をメモに自動入力"

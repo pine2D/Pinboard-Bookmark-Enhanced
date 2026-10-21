@@ -1046,7 +1046,7 @@
     "message": "預設標記為稍後閱讀"
   },
   "secNotesBehavior": {
-    "message": "備註行為"
+    "message": "彈窗中的備註"
   },
   "optAutoDescription": {
     "message": "自動將頁面描述填入備註"

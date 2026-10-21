@@ -431,7 +431,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
     // weakTarget: the id came from the panel-wide fallback (this panel's first
     // control), not from anything the text names -- the only target a section
     // name is allowed to overwrite.
-    const add = (text, targetId, sectionName, weakTarget, isHint, owner) => {
+    const add = (text, targetId, sectionName, weakTarget, isHint, owner, section) => {
       const clean = String(text || "").replace(/\s+/g, " ").trim();
       if (!clean) return;
       const textKey = `${panel}\n${clean}`;
@@ -454,6 +454,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
       const entry = { panel, panelLabel, text: clean, searchText: _pbpSettingsSearchText(`${panelLabel} ${clean}`), targetId: targetId || "" };
       if (isHint) entry.hint = true;
       if (isHint && owner) entry.owner = owner;
+      if (section && section !== clean && section !== panelLabel) entry.section = section;
       if (!prior) seenText.set(textKey, { entry, weak: !!weakTarget });
       entries.push(entry);
     };
@@ -555,7 +556,12 @@ function pbpBuildSettingsSearchIndex(root = document) {
           owner = nameEl.textContent.replace(/\s+/g, " ").trim();
         }
       }
-      add(text, target, isSectionName, weak, node.matches(".hint"), owner);
+      // The section a row sits in, shown after the panel name: the Quick
+      // Actions panel lists the same switches under Quick Save and Read
+      // Later, and without it the two results read identically.
+      const section = node.closest("section.settings-section")?.querySelector(".section-title")
+        ?.textContent.replace(/\s+/g, " ").trim() || "";
+      add(text, target, isSectionName, weak, node.matches(".hint"), owner, section);
     }
   }
   return entries;
@@ -622,7 +628,7 @@ function setupOptionsSearch() {
       label.textContent = shown.length > 110 ? shown.slice(0, 109) + "…" : shown;
       const panel = document.createElement("span");
       panel.className = "options-search-result-panel";
-      panel.textContent = entry.panelLabel;
+      panel.textContent = entry.section ? `${entry.panelLabel} › ${entry.section}` : entry.panelLabel;
       button.append(label);
       if (entry.owner) {
         const snippet = document.createElement("span");

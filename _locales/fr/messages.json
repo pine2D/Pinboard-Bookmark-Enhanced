@@ -1046,7 +1046,7 @@
     "message": "À lire par défaut"
   },
   "secNotesBehavior": {
-    "message": "Comportement des notes"
+    "message": "Notes dans le popup"
   },
   "optAutoDescription": {
     "message": "Remplir automatiquement la méta-description dans les notes"

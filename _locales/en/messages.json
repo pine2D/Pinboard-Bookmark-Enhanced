@@ -1051,7 +1051,7 @@
     "message": "Read Later by default"
   },
   "secNotesBehavior": {
-    "message": "Notes Behavior"
+    "message": "Notes in the Popup"
   },
   "optAutoDescription": {
     "message": "Auto-fill meta description into notes"

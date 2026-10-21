@@ -1046,7 +1046,7 @@
     "message": "默认标记为稍后阅读"
   },
   "secNotesBehavior": {
-    "message": "备注行为"
+    "message": "弹窗中的备注"
   },
   "optAutoDescription": {
     "message": "自动将页面描述填入备注"
