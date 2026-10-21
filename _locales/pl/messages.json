@@ -1617,6 +1617,17 @@
   "popupFollowHint": {
     "message": "Po włączeniu okienko, ta strona ustawień i strona „Notatki i słówka” używają palety wybranego motywu Pinboard; po wyłączeniu używają domyślnej palety w wybranym wyżej trybie jasnym/ciemnym. Czytnik zawsze zachowuje własną paletę czytania."
   },
+  "optFollowNeedsPreset": {
+    "message": "Najpierw wybierz poniżej motyw Pinboard. Przy „Brak” nie ma palety, za którą można podążać."
+  },
+  "optThemeOverridden": {
+    "message": "Okienko, ta strona ustawień i strona „Notatki i słówka” korzystają z motywu $PRESET$, więc to on decyduje tam o trybie jasnym lub ciemnym.",
+    "placeholders": {
+      "preset": {
+        "content": "$1"
+      }
+    }
+  },
   "optThemeHint": { "message": "Przełącza okienko, tę stronę ustawień, stronę „Notatki i słówka” i czytnik między trybem jasnym a ciemnym. Motywy z własnym schematem (np. Dracula) mają pierwszeństwo na stronach, które podążają za motywem; czytnik może to zmienić osobno na każdym urządzeniu w panelu „Aa”." },
   "secPopupElements": {
     "message": "Elementy okienka"

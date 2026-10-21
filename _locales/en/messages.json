@@ -1623,6 +1623,17 @@
   "popupFollowHint": {
     "message": "When on, the popup, this settings page and the notes & vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette."
   },
+  "optFollowNeedsPreset": {
+    "message": "Pick a Pinboard preset below first. With None there is no palette to follow."
+  },
+  "optThemeOverridden": {
+    "message": "The popup, this settings page and the notes & vocabulary page follow $PRESET$, so its own light or dark scheme applies there.",
+    "placeholders": {
+      "preset": {
+        "content": "$1"
+      }
+    }
+  },
   "optThemeHint": { "message": "Switches the popup, this settings page, the notes & vocabulary page and the reader between light and dark. Presets with a built-in scheme (Dracula, for example) override it on the pages that follow the preset; the reader can override it per device from its \"Aa\" panel." },
   "secPopupElements": {
     "message": "Popup Elements"

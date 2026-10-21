@@ -1617,6 +1617,17 @@
   "popupFollowHint": {
     "message": "Eingeschaltet verwenden Popup, diese Einstellungsseite und die Seite „Notizen & Vokabeln“ die Farben des gewählten Pinboard-Presets; ausgeschaltet die Standardpalette im oben gewählten Hell-/Dunkelmodus. Die Leseansicht behält immer ihre eigene Lesepalette."
   },
+  "optFollowNeedsPreset": {
+    "message": "Wähle zuerst unten ein Pinboard-Preset. Bei „Keine“ gibt es keine Farben, denen die Seiten folgen könnten."
+  },
+  "optThemeOverridden": {
+    "message": "Popup, diese Einstellungsseite und die Seite „Notizen & Vokabeln“ folgen $PRESET$, dort bestimmt also dieses Preset Hell oder Dunkel.",
+    "placeholders": {
+      "preset": {
+        "content": "$1"
+      }
+    }
+  },
   "optThemeHint": { "message": "Schaltet Popup, diese Einstellungsseite, die Seite „Notizen & Vokabeln“ und die Leseansicht zwischen Hell und Dunkel um. Presets mit eigenem Farbschema (z. B. Dracula) überschreiben dies auf den Seiten, die dem Preset folgen; die Leseansicht kann es im „Aa“-Fenster je Gerät überschreiben." },
   "secPopupElements": {
     "message": "Popup-Elemente"

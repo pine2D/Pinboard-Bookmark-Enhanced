@@ -3217,6 +3217,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   // call site stays a two-argument call.
   function applyOptionsPageTheme(presetKey, themeMode) {
     pbpApplyOptionsEarlyTheme(themeMode, presetKey, $id("opt-popup-follow-theme").checked);
+    syncFollowThemeState(presetKey);
+  }
+  // "Follow the preset" does nothing while no preset is picked (None, or a
+  // saved custom theme), so it is disabled with the reason under it. While it
+  // follows a preset with a single built-in scheme (anything outside the
+  // light/dark umbrella pairs), that preset decides light or dark on the
+  // extension pages, and the Theme field says so instead of silently losing.
+  function syncFollowThemeState(presetKey) {
+    const follow = $id("opt-popup-follow-theme");
+    const none = !presetKey;
+    follow.disabled = none;
+    $id("opt-popup-follow-theme-needs-preset").hidden = !none;
+    const note = $id("opt-theme-overridden");
+    const fixed = !none && follow.checked && !Object.prototype.hasOwnProperty.call(PBP_OPTIONS_ADAPTIVE_MAP, presetKey);
+    note.hidden = !fixed;
+    if (fixed) {
+      const name = document.querySelector(`.theme-preset-btn[data-theme="${CSS.escape(presetKey)}"]`)?.textContent.trim() || presetKey;
+      note.textContent = t("optThemeOverridden", name);
+    }
   }
   // Track active preset key — schema v2: themePresetKey is authoritative
   let currentPresetKey = s.themePresetKey || "";

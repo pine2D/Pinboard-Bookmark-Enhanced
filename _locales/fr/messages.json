@@ -1617,6 +1617,17 @@
   "popupFollowHint": {
     "message": "Lorsque l'option est activée, le popup, cette page de réglages et la page Bloc-notes et vocabulaire utilisent la palette du préréglage Pinboard sélectionné ; lorsqu'elle est désactivée, ils utilisent la palette par défaut dans le mode clair/sombre ci-dessus. La page Lecture conserve toujours sa propre palette de lecture."
   },
+  "optFollowNeedsPreset": {
+    "message": "Choisissez d’abord un préréglage Pinboard ci-dessous. Avec « Aucun », il n’y a aucune palette à suivre."
+  },
+  "optThemeOverridden": {
+    "message": "Le popup, cette page de réglages et la page Bloc-notes et vocabulaire suivent $PRESET$ : c’est lui qui y décide du mode clair ou sombre.",
+    "placeholders": {
+      "preset": {
+        "content": "$1"
+      }
+    }
+  },
   "optThemeHint": { "message": "Bascule le popup, cette page de réglages, la page Bloc-notes et vocabulaire et la page Lecture entre clair et sombre. Les préréglages dotés de leur propre schéma (Dracula, par exemple) remplacent ce réglage sur les pages qui suivent le préréglage ; la page Lecture permet de le redéfinir sur chaque appareil depuis son panneau « Aa »." },
   "secPopupElements": {
     "message": "Éléments du popup"

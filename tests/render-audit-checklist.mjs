@@ -358,7 +358,9 @@
 //                      mark's off/on fill, without depending on the storage
 //                      default. state "checked" REQUIRES
 //                      seedChecked.checked === true (it is only a distinct
-//                      results key for the on state).
+//                      results key for the on state). Optional
+//                      `enabled: true` also clears a state-driven
+//                      `disabled` for the probe and restores it after.
 //   tab            -- optional (options only): the tab id whose panel owns the
 //                      row (e.g. "storage" -> #tab-storage). The runner clicks
 //                      it, waits for the selector to attach (JS-built rows),
@@ -2232,9 +2234,10 @@ export const CHECKS = [
   // Shape F1: a plain `.fg` that is a choice help host, no stack -- the label
   // takes its 20px min box and 2px padding from the help-host rule, not from
   // `.choice-row` (Appearance tab, "Extension pages follow the Pinboard theme
-  // preset"). Its default is ON, hence the explicit off seed.
+  // preset"). Its default is ON, hence the explicit off seed; it is disabled
+  // while no preset is picked (the default surface), hence `enabled`.
   { surface: "options", page: "options.html", selector: "#opt-popup-follow-theme ~ .switch-track", state: "default",
-    seedChecked: { input: "#opt-popup-follow-theme", checked: false },
+    seedChecked: { input: "#opt-popup-follow-theme", checked: false, enabled: true },
     expect: { heightPx: { value: 16 }, widthPx: { min: 28, max: 28 }, bgEqVar: "border" } },
   { surface: "options", page: "options.html", selector: "#opt-popup-follow-theme", state: "default",
     expect: { hitRectMin: { height: 24 } } },

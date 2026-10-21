@@ -1617,6 +1617,17 @@
   "popupFollowHint": {
     "message": "啟用後，彈出視窗、此設定頁和筆記與生詞本頁會使用所選 Pinboard 預設的配色；關閉則按上方的明暗模式使用預設配色。閱讀器一律使用自己的閱讀配色。"
   },
+  "optFollowNeedsPreset": {
+    "message": "先在下方選一個 Pinboard 預設。選「無」時沒有可跟隨的配色。"
+  },
+  "optThemeOverridden": {
+    "message": "彈出視窗、此設定頁和筆記與生詞本頁正在跟隨 $PRESET$，這些頁面的明暗由它決定。",
+    "placeholders": {
+      "preset": {
+        "content": "$1"
+      }
+    }
+  },
   "optThemeHint": { "message": "切換彈出視窗、此設定頁、筆記與生詞本頁和閱讀器的明暗。自帶明暗的預設（例如 Dracula）會在跟隨預設的頁面上覆寫此項；閱讀器可在其「Aa」面板中按裝置單獨覆寫。" },
   "secPopupElements": {
     "message": "彈出視窗元素"

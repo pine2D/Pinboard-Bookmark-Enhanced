@@ -1098,15 +1098,17 @@
             <option value="light" data-i18n="themeLight">Light</option>
             <option value="dark" data-i18n="themeDark">Dark</option>
           </select>
+          <p class="hint" id="opt-theme-overridden" hidden></p>
         </div>
         <div class="pref-group">
           <div class="pref-row context-help-host" data-help-role="choice">
-            <label class="switch"><input type="checkbox" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
+            <label class="switch"><input type="checkbox" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" aria-describedby="opt-popup-follow-theme-needs-preset" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
             <details class="context-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
               <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">When on, the popup, this settings page and the notes &amp; vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette.</p>
             </details><span class="switch-track" aria-hidden="true"></span></label>
           </div>
+          <p class="hint" id="opt-popup-follow-theme-needs-preset" data-i18n="optFollowNeedsPreset" hidden>Pick a Pinboard preset below first. With None there is no palette to follow.</p>
         </div>
       </section>
       <section class="settings-section">

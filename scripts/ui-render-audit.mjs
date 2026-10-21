@@ -4285,9 +4285,9 @@ async function runOneCheckInPanel(page, theme, check, results, extBase) {
   // the DOM would be read by every later row on this page.
   const restoreSeed = async () => {
     if (!seedRestore) return;
-    await page.evaluate(({ input, checked }) => {
+    await page.evaluate(({ input, checked, disabled }) => {
       const el = document.querySelector(input);
-      if (el) el.checked = checked;
+      if (el) { el.checked = checked; el.disabled = disabled; }
     }, seedRestore);
     await settleAnimations(page);
   };
@@ -4295,22 +4295,26 @@ async function runOneCheckInPanel(page, theme, check, results, extBase) {
     throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: state "checked" requires seedChecked: { input, checked: true }`);
   }
   if (check.seedChecked) {
-    const { input, checked } = check.seedChecked;
+    // `enabled: true` also lifts a state-driven `disabled` for the probe (the
+    // Appearance follow switch is disabled while no preset is picked, which is
+    // exactly the default surface), restored with the checked value below.
+    const { input, checked, enabled } = check.seedChecked;
     // type: "radio" too (stage-3b Task 1, .pick) -- writing `.checked = true`
     // on a radio input is the SAME spec-defined DOM side effect as a real
     // user click for the rest of its native `name` group (every OTHER radio
     // sharing that name is automatically un-checked, no `change` event
     // needed either), so a `.pick-mark` checked-state seed needs nothing
     // beyond what this already does for a checkbox-backed `.switch-track`.
-    const prev = await page.evaluate(({ input, checked }) => {
+    const prev = await page.evaluate(({ input, checked, enabled }) => {
       const el = document.querySelector(input);
       if (!el || (el.type !== "checkbox" && el.type !== "radio")) return null;
-      const was = el.checked;
+      const was = { checked: el.checked, disabled: el.disabled };
       el.checked = checked;
+      if (enabled) el.disabled = false;
       return was;
-    }, { input, checked: !!checked });
+    }, { input, checked: !!checked, enabled: !!enabled });
     if (prev === null) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: seedChecked input not found or not a checkbox/radio: ${input}`);
-    seedRestore = { input, checked: prev };
+    seedRestore = { input, checked: prev.checked, disabled: prev.disabled };
     // The `.switch-track` transition this settles lives on the row wrapping
     // the checkbox, not the checkbox itself (switchRules,
     // docs/theme-surface/composers/ui-components.mjs) -- settleAnimations
