@@ -848,15 +848,28 @@ function _pbpAskUpdateMeta() {
   // x3 cushion; a Chinese article used to under-report by about 2.5x. Display
   // only -- the admission side (sampleFit / PBP_ASK_CTX_BUDGET) is untouched.
   const tokens = pbpAiEstimateTokensText(_askBuilt.system + _askBuilt.prompt);
-  let line = t("askWillSend", String(tokens), _pbpAskProviderLabel(st.s));
+  // Glue each figure to its words the way the rail's done line does
+  // (md-translate.js _pbpTrPaintDone) so the price never splits between a
+  // number and "tokens". The model goes in its own no-wrap span: an id such
+  // as "gpt-5.4-nano" otherwise breaks at its hyphens. The locale string keeps
+  // its word order; it is split at the model's slot, not rebuilt.
+  const SLOT = "\u0001";
+  const shaped = t("askWillSend", String(tokens), SLOT)
+    .replace(/(?<![\u00b7/]) (?![\u00b7/])/g, "\u00a0");
+  const at = shaped.indexOf(SLOT);
+  let tail = at < 0 ? "" : shaped.slice(at + 1);
   if (st.ctx.sentBlocks < st.ctx.totalBlocks) {
-    line += " " + t("askSentPartial", String(st.ctx.sentBlocks), String(st.ctx.totalBlocks));
+    tail += " " + t("askSentPartial", String(st.ctx.sentBlocks), String(st.ctx.totalBlocks));
   }
   // History-window disclosure (context-rot line of the ask campaign):
   // once the thread outgrows the 4-round prompt window, say so instead
   // of silently reinterpreting follow-ups against a truncated history.
-  if (_askRounds.length > 4) line += " " + t("askHistWindowNote");
-  meta.textContent = line;
+  if (_askRounds.length > 4) tail += " " + t("askHistWindowNote");
+  if (at < 0) { meta.textContent = shaped + tail; return; }
+  const model = document.createElement("span");
+  model.className = "ask-meta-model";
+  model.textContent = model.title = _pbpAskProviderLabel(st.s);
+  meta.replaceChildren(document.createTextNode(shaped.slice(0, at)), model, document.createTextNode(tail));
 }
 
 // One-time Stop wiring (the panel markup belongs to Task 12; same

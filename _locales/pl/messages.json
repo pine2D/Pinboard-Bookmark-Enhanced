@@ -2943,7 +2943,7 @@
     "message": "Zadaj pytanie o ten artykuł… (Enter wysyła, Shift+Enter nowa linia)"
   },
   "askWillSend": {
-    "message": "Wyśle około $TOKENS$ tokenów do $MODEL$",
+    "message": "Wyśle około $TOKENS$ tokenów · $MODEL$",
     "placeholders": {
       "tokens": {
         "content": "$1"

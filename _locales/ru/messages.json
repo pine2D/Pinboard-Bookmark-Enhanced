@@ -2943,7 +2943,7 @@
     "message": "Задайте вопрос об этой статье… (Enter отправить, Shift+Enter новая строка)"
   },
   "askWillSend": {
-    "message": "Будет отправлено около $TOKENS$ токенов в $MODEL$",
+    "message": "Будет отправлено около $TOKENS$ токенов · $MODEL$",
     "placeholders": {
       "tokens": {
         "content": "$1"

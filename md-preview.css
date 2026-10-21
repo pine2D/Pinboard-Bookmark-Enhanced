@@ -3221,6 +3221,13 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 #ask-send svg { width: 14px; height: 14px; flex-shrink: 0; }
 
 #ask-meta { min-height: 16px; font-size: 0.75em; line-height: 1.5; color: var(--fg-muted); }
+/* "provider · model" stays on one line (a model id would otherwise break at
+   its hyphens) and, like the rail's .tr-est-model, is the part that
+   ellipsizes; its title carries the full name. */
+#ask-meta .ask-meta-model {
+  display: inline-block; max-width: 100%; vertical-align: bottom;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* Keep at least ~460px of article beside the rail and Ask; use a sheet earlier. */
 @media (max-width: 1200px) {

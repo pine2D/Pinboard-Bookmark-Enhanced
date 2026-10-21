@@ -2953,7 +2953,7 @@
     "message": "Ask about this article… (Enter to send, Shift+Enter for a new line)"
   },
   "askWillSend": {
-    "message": "Will send about $TOKENS$ tokens to $MODEL$",
+    "message": "Will send about $TOKENS$ tokens · $MODEL$",
     "placeholders": {
       "tokens": {
         "content": "$1"

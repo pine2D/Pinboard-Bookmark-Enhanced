@@ -2943,7 +2943,7 @@
     "message": "针对本文提问…（Enter 发送，Shift+Enter 换行）"
   },
   "askWillSend": {
-    "message": "将向 $MODEL$ 发送约 $TOKENS$ tokens",
+    "message": "将发送约 $TOKENS$ tokens · $MODEL$",
     "placeholders": {
       "tokens": {
         "content": "$1"
