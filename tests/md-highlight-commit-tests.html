@@ -1480,6 +1480,35 @@ function selectionRange(n, start, end) {
     iconCopy.innerHTML === originalIcon && iconCopy.title === "hlCopyMd" && iconCopy.getAttribute("aria-label") === "hlCopyMd");
   iconCopy.remove();
 
+  // ================= scenario 10: selection edge whitespace =================
+  section("(10) a selection that stops at the next block's start makes one item, never a blank one");
+
+  // marked emits "<ul>\n<li>": a triple-click on the paragraph above ends at the
+  // li's first character, so the list block is intersected by its newline alone.
+  await bootEmpty();
+  const spillList = document.createElement("ul");
+  spillList.dataset.pb = "3";
+  spillList.innerHTML = "\n<li>Gamma item</li>\n";
+  pbpAiBlockEl(1).after(spillList);
+  const spill = document.createRange();
+  spill.setStart(pbpAiBlockEl(1).firstChild, 0);
+  spill.setEnd(spillList.querySelector("li").firstChild, 0);
+  const spilled = await _pbpHlCreateFromRange(spill, 5, null);
+  check("only the block holding selected text becomes a highlight",
+    spilled.length === 1 && spilled[0].n === 1, JSON.stringify(spilled));
+  check("no stored item quotes whitespace only",
+    ((record() && record().items) || []).every((it) => it.quote.trim() === it.quote && it.quote),
+    JSON.stringify(record()));
+
+  await bootEmpty();
+  const padded = await _pbpHlCreateFromRange(selectionRange(1, 0, 6), 3, null);
+  check("edge whitespace is trimmed from the quote", padded.length === 1 && padded[0].quote === "Alpha",
+    JSON.stringify(padded));
+  check("the painted range is the trimmed quote, so it matches what restore will find",
+    !!padded[0] && _pbpHlState.ranges[padded[0].id].range.toString() === "Alpha",
+    padded[0] && _pbpHlState.ranges[padded[0].id].range.toString());
+  spillList.remove();
+
   document.getElementById("summary").textContent =
     "PASS " + PASS + " / FAIL " + FAIL + " (total " + (PASS + FAIL) + ")";
   document.getElementById("summary").style.color = FAIL ? "#c00" : "#0a0";

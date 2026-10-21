@@ -25,6 +25,20 @@ function pbpHlSelectorOf(blockText, startOff, endOff) {
   };
 }
 
+// Shrink a [start, end) selection past whitespace at either edge; null when
+// nothing but whitespace is left. A selection that stops at the very start of
+// the next block (triple-click, or a drag released just past the line end)
+// still intersects that block through the newline marked puts before its first
+// child -- without this, one gesture stored a second, blank highlight
+// (2026-10-21).
+function pbpHlTrimOffsets(blockText, start, end) {
+  const text = typeof blockText === "string" ? blockText : "";
+  let s = start, e = end;
+  while (s < e && /\s/.test(text[s])) s++;
+  while (e > s && /\s/.test(text[e - 1])) e--;
+  return e > s ? { start: s, end: e } : null;
+}
+
 // Longest common SUFFIX of a and b (scores how well the text
 // immediately BEFORE a candidate occurrence matches the recorded
 // prefix).
@@ -1762,13 +1776,19 @@ async function _pbpHlCreateFromRange(range, color, btn) {
   // overwritten by each new batch and mislabel older items (Codex review).
   const batchFp = _pbpHlCurrentFp();
   for (const seg of segments) {
-    const offsets = _pbpHlOffsetsFromRange(seg.el, seg.range);
-    if (!offsets) continue;
+    const raw = _pbpHlOffsetsFromRange(seg.el, seg.range);
+    if (!raw) continue;
     // NOT pbpAiTextOf(seg.n): that cache may be frozen pre-hljs/KaTeX and can
     // diverge from the live DOM _pbpHlOffsetsFromRange just walked (same
     // same-source rule _pbpHlReanchorBlock already follows with
     // blockEl.textContent -- see its comment above).
     const blockText = seg.el.textContent || "";
+    const offsets = pbpHlTrimOffsets(blockText, raw.start, raw.end);
+    if (!offsets) continue;
+    // The painted range follows the trimmed quote, so what shows is what restore will find.
+    const range = (offsets.start === raw.start && offsets.end === raw.end)
+      ? seg.range
+      : (_pbpAskRangeFromOffsets(seg.el, offsets.start, offsets.end) || seg.range);
     const sel = pbpHlSelectorOf(blockText, offsets.start, offsets.end);
     const item = {
       id: _pbpHlNewId(),
@@ -1792,7 +1812,7 @@ async function _pbpHlCreateFromRange(range, color, btn) {
     // Account scope (roadmap #19): stamp the page-boot owner. Logged-out
     // creation stays fieldless — the legacy shape, visible to everyone.
     if (_pbpHlOwner) item.owner = _pbpHlOwner;
-    created.push({ item, seg });
+    created.push({ item, seg: { ...seg, range } });
   }
   if (!created.length) return [];
   // Append to what storage HOLDS, not to the in-memory array: anything another
