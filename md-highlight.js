@@ -2251,8 +2251,9 @@ function _pbpHlEnsureCard() {
 
   const foot = document.createElement("div");
   foot.className = "hl-card-foot";
-  // Delete left, Save right (space-between): this delete has no confirm
-  // popover, so physical distance from the commit CTA is the misclick guard.
+  // Delete left, Save right (space-between): the delete asks first
+  // (_pbpHlDeleteCurrent -> showConfirmPopover), and the physical distance from
+  // the commit CTA keeps the two from being mis-hit in the first place.
   const del = document.createElement("button");
   del.type = "button";
   del.className = "hl-card-delete";
