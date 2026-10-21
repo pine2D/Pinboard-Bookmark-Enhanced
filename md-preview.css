@@ -3899,11 +3899,25 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
    <body> the instant the boundary tier is reached under the user's pointer --
    same Chromium behavior the image-fix button already works around. */
 .typo-step[aria-disabled="true"] { color: var(--fg-muted); cursor: default; background: var(--btn-bg); }
+/* The readout is a button (reset to 100%): flat, so it still reads as the
+   figure between the two steppers; hover/focus say it is clickable only when
+   it is (aria-disabled at the default, like .typo-step's end-stop). */
 .typo-value {
   flex: 1 1 auto;
+  align-self: stretch;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
   text-align: center;
   font-variant-numeric: tabular-nums;
+  cursor: pointer;
 }
+.typo-value[aria-disabled="true"] { cursor: default; }
+.typo-value:not([aria-disabled="true"]):hover { background: var(--btn-hover); }
+.typo-value:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .typo-seg { display: flex; gap: var(--sp-1); } /* segmented strip, not a button row (actionRowGap exempt) */
 /* flex-basis AUTO, not 0: equal thirds gave every word 57px, and the long
    "Auto" words (de "Automatisch", fr "Automatique", pl "Automatycznie")

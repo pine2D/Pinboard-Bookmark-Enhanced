@@ -9254,6 +9254,40 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       pop.remove();
     } finally { _pbpTypoPopEl = was; window.t = realT; }
   });
+  // 2026-10-21 critique: the stepper had no way back to 100%. The readout
+  // between - and + is the reset: inert at the default, a named button off it.
+  test("Aa font-size readout resets to 100% when off-default and is inert at the default", () => {
+    const realT = window.t;
+    window.t = (k) => k;
+    const was = _pbpTypoPopEl, wasFont = _pbpTypoFont, wasLead = _pbpTypoLeading, wasTouched = _pbpTypoTouched;
+    try {
+      _pbpTypoPopEl = null;
+      const pop = _pbpTypoEnsurePop();
+      document.body.appendChild(pop);
+      const val = pop.querySelector(".typo-value");
+      assertEq(val.tagName, "BUTTON", "the readout is a real button");
+      _pbpTypoSet(0, _pbpTypoLeading);
+      assertEq(val.getAttribute("aria-disabled") + "|" + val.hasAttribute("title"), "true|false", "at the default it is inert and carries no action name");
+      assertEq(val.textContent, "100%", "readout unchanged");
+      _pbpTypoSet(2, _pbpTypoLeading);
+      assertEq(val.getAttribute("aria-disabled"), "false", "off-default it is live");
+      assertEq(val.title, "resetToDefault", "title names the action");
+      assert(val.getAttribute("aria-label").includes("resetToDefault") && val.getAttribute("aria-label").includes(val.textContent), "aria-label keeps the figure and names the action");
+      val.click();
+      assertEq(_pbpTypoFont, 0, "click returns to the default tier");
+      assertEq(val.textContent, "100%", "readout back to 100%");
+      assertEq(val.getAttribute("aria-disabled"), "true", "inert again");
+      _pbpTypoSet(-1, _pbpTypoLeading);
+      val.click();
+      assertEq(_pbpTypoFont, 0, "also from below the default");
+      val.click();
+      assertEq(_pbpTypoFont, 0, "a click at the default is a no-op");
+      pop.remove();
+    } finally {
+      _pbpTypoPopEl = was; window.t = realT;
+      _pbpTypoSet(wasFont, wasLead); _pbpTypoTouched = wasTouched;
+    }
+  });
   // 2026-10-19 critique + user ruling: in tr-only a click on a translated
   // block still peeks at the original, but the blocks are not buttons (no
   // role/tab stop/title per paragraph); the rail names the click instead.

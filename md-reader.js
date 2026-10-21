@@ -1628,7 +1628,17 @@ function _pbpTypoSet(fontTier, leadingTier) {
 function _pbpTypoSyncPop() {
   if (!_pbpTypoPopEl) return;
   const val = _pbpTypoPopEl.querySelector(".typo-value");
-  if (val) val.textContent = Math.round(PBP_TYPO_FONT_SCALES[String(_pbpTypoFont)] * 100) + "%";
+  if (val) {
+    const pct = Math.round(PBP_TYPO_FONT_SCALES[String(_pbpTypoFont)] * 100) + "%";
+    val.textContent = pct;
+    const atDefault = _pbpTypoFont === 0;
+    val.setAttribute("aria-disabled", atDefault ? "true" : "false");
+    if (atDefault) { val.removeAttribute("title"); val.removeAttribute("aria-label"); }
+    else {
+      val.title = t("resetToDefault");
+      val.setAttribute("aria-label", pct + " \u00b7 " + t("resetToDefault")); // keep the figure in the accessible name
+    }
+  }
   const minus = _pbpTypoPopEl.querySelector("#typo-font-minus");
   const plus = _pbpTypoPopEl.querySelector("#typo-font-plus");
   if (minus) minus.setAttribute("aria-disabled", _pbpTypoFont <= -2 ? "true" : "false");
@@ -1644,7 +1654,7 @@ function _pbpTypoSyncPop() {
 
 // Lazily builds the singleton #typo-pop: native popover="auto" (Esc +
 // light-dismiss for free), same family as #fn-pop/#kbd-help-pop. Four rows:
-// font-size stepper (Lucide minus / readout / Lucide plus -- drawn, not the
+// font-size stepper (Lucide minus / readout, which resets to 100% / Lucide plus -- drawn, not the
 // ASCII "-" / "+" it used to print, 2026-10-21),
 // then three-way segments (aria-pressed toggles, .srch-regex vocabulary) for
 // leading, reading width and appearance.
@@ -1672,9 +1682,15 @@ function _pbpTypoEnsurePop() {
   minus.setAttribute("aria-label", t("typoFontSmaller"));
   minus.title = t("typoFontSmaller");
   minus.addEventListener("click", () => { if (minus.getAttribute("aria-disabled") !== "true") _pbpTypoSet(_pbpTypoFont - 1, _pbpTypoLeading); });
-  const val = document.createElement("span");
+  // The readout doubles as the way back to 100%: a button while the size is
+  // off-default (title + aria-label name the action), inert at the default
+  // (aria-disabled, same end-stop convention as the steppers). _pbpTypoSyncPop
+  // keeps its label and state in step.
+  const val = document.createElement("button");
+  val.type = "button";
   val.className = "typo-value";
   val.setAttribute("aria-live", "polite"); // readout announces the new tier for AT users
+  val.addEventListener("click", () => { if (val.getAttribute("aria-disabled") !== "true") _pbpTypoSet(0, _pbpTypoLeading); });
   const plus = document.createElement("button");
   plus.type = "button";
   plus.id = "typo-font-plus";
