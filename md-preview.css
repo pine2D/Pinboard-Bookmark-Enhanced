@@ -2591,9 +2591,14 @@ body.tr-only #rendered-view [data-pb-hl-mirror] > blockquote:only-child { border
 /* Shared confirm popover (shared.js), reader skin. When its anchor lives in
    the top layer (the highlight card is a native [popover]), shared.js
    promotes the confirm to a manual popover -- hence the margin/inset resets
-   against the UA popover defaults. */
+   against the UA popover defaults. Every other anchor leaves it a plain body
+   child, so it needs a z-index of its own: at auto the rail (20) painted over
+   a confirm opened from a highlight row's delete button (2026-10-21). 90 sits
+   above every fixed layer here (#ask-tip tops them at 80) and under the skip
+   link (100). */
 .confirm-popover {
   position: fixed;
+  z-index: 90;
   box-sizing: border-box;
   margin: 0;
   inset: auto;
