@@ -331,5 +331,85 @@ function assertLayout(frame, locale) {
       }
     } finally { frame.remove(); }
   });
+
+  // 2026-10-21 distill: the rail's pre-request translate estimate is one line
+  // in every locale; the price never clips, only "provider · model" takes the
+  // ellipsis. The span pair is what md-translate.js _pbpTrPaintEstimate
+  // writes (structure pinned in md-ai-tests); this checks the stylesheet.
+  await test("translate estimate stays on one line in a 256px rail; the price is never clipped", async () => {
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "width:1200px;height:300px;border:0";
+    frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../md-preview.css"></head>
+      <body><aside class="rail" id="rail"><div class="rail-section" id="tr-section"><div id="tr-estimate" class="tr-meta"></div></div></aside></body></html>`;
+    document.body.appendChild(frame);
+    await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+    try {
+      const doc = frame.contentDocument, est = doc.getElementById("tr-estimate");
+      for (const locale of LOCALES) {
+        for (const model of ["Gemini", "Custom OpenAI-compatible · anthropic/claude-sonnet-4.5-20260929-preview-extended-thinking"]) {
+          const shaped = messages[locale].trEstCost.message.replace("$COUNT$", "123456").replace("$MODEL$", "\u0001");
+          const at = shaped.indexOf("\u0001");
+          const cost = doc.createElement("span"); cost.className = "tr-est-cost"; cost.textContent = shaped.slice(0, at);
+          const name = doc.createElement("span"); name.className = "tr-est-model"; name.textContent = model;
+          est.replaceChildren(cost, name, doc.createTextNode(shaped.slice(at + 1)));
+          await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
+          const tag = `${locale}${model.length > 10 ? " long model" : ""}`;
+          const line = parseFloat(frame.contentWindow.getComputedStyle(est).lineHeight) || 18;
+          assert(est.getBoundingClientRect().height <= line + 1, `${tag}: estimate wraps (${est.getBoundingClientRect().height}px)`);
+          assert(cost.scrollWidth <= cost.clientWidth + 0.5 && cost.getBoundingClientRect().right <= est.getBoundingClientRect().right + 0.5,
+            `${tag}: price clipped`);
+          assert(est.scrollWidth <= est.clientWidth + 1, `${tag}: estimate overflows the rail`);
+        }
+      }
+    } finally { frame.remove(); }
+  });
+
+  // 2026-10-21 harden pass: the extraction-failure page. The REAL
+  // renderErrorState (md-preview.js) builds the DOM against the production
+  // stylesheet: the "Open original" <a> rode 2px above the buttons on its
+  // SVG's synthesized baseline, and three equal faces named no next step.
+  await test("extraction-failure page: one leading action, quiet others, link and buttons level in every locale", async () => {
+    for (const width of [900, 390]) {
+      const frame = document.createElement("iframe");
+      frame.style.cssText = `width:${width}px;height:500px;border:0`;
+      // Scripts after the markup, as md-preview.html loads them: the boot
+      // touches document.body and #rendered-view.
+      frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../md-preview.css"></head>
+        <body><main><div class="doc-body"><div id="rendered-view"></div></div></main>
+        <script>window.chrome = { runtime: { getURL: (p) => p, sendMessage: async () => ({}), onMessage: { addListener() {} } },
+          storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} }, sync: { get: async () => ({}) }, onChanged: { addListener() {} } },
+          i18n: { getMessage: () => "", getUILanguage: () => "en" } };<\/script>
+        <script src="../i18n.js"><\/script><script src="../shared.js"><\/script><script src="../md-preview.js"><\/script></body></html>`;
+      document.body.appendChild(frame);
+      await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+      await new Promise((resolve) => setTimeout(resolve, 50)); // md-preview.js's own boot settles first (no payload -> its empty state)
+      try {
+        const w = frame.contentWindow, doc = frame.contentDocument;
+        for (const locale of LOCALES) {
+          const msg = (k, ...a) => a.reduce((s, v) => s.replace(/\$[A-Z_]+\$/, v), messages[locale][k].message);
+          w.t = msg;
+          w.renderErrorState(msg("mdPreviewNoContent") + " " + msg("mdEngineJinaNoLogin"), () => {}, false,
+            { label: msg("mdEngineSwitchTo", "Defuddle"), run: () => {} }, "https://example.com/a", "alt");
+          await new Promise((resolve) => w.requestAnimationFrame(resolve));
+          const tag = `${locale}@${width}`;
+          const acts = [...doc.querySelectorAll(".empty-state .action-btn")];
+          assert(acts.length === 3, `${tag}: expected three ways out, got ${acts.length}`);
+          assert(acts[0].classList.contains("es-primary") && acts[0].textContent === msg("mdEngineSwitchTo", "Defuddle"),
+            `${tag}: the other engine does not lead`);
+          const cs = acts.map((a) => w.getComputedStyle(a));
+          assert(cs[0].backgroundColor !== "rgba(0, 0, 0, 0)" && cs[0].borderTopColor !== cs[1].borderTopColor,
+            `${tag}: the lead is not distinguishable from the quiet actions`);
+          assert(cs.slice(1).every((c) => c.backgroundColor === "rgba(0, 0, 0, 0)"), `${tag}: a secondary action still wears a fill`);
+          const boxes = acts.map((a) => a.getBoundingClientRect());
+          assert(boxes.every((b) => Math.round(b.height) === 26), `${tag}: off the 26px rung: ${boxes.map((b) => b.height).join("/")}`);
+          for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+            const a = boxes[i], b = boxes[j];
+            if (a.top < b.bottom && b.top < a.bottom) assert(Math.abs(a.top - b.top) <= 0.5, `${tag}: ${acts[i].tagName} and ${acts[j].tagName} are ${a.top - b.top}px apart on one line`);
+          }
+          assert(doc.documentElement.scrollWidth <= doc.documentElement.clientWidth, `${tag}: page scrolls sideways`);
+        }
+      } finally { frame.remove(); }
+    }
+  });
 })();
 </script></body></html>

@@ -808,6 +808,9 @@
   "mdEngineJinaNeedsHttp": {
     "message": "Jina Reader can only fetch http(s) pages, so it can't read this one."
   },
+  "mdEngineJinaNoLogin": {
+    "message": "Jina Reader fetches pages from its own servers, so it can't see anything that needs you to sign in."
+  },
   "mdEngineGroupAria": {
     "message": "Extraction engine"
   },

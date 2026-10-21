@@ -1808,6 +1808,7 @@ async function _pbpHlCreateFromRange(range, color, btn) {
   });
   await _pbpHlLastColorSet(color);
   for (const { item } of created) pbpHlSyncMirror(item.n); // H5 (spec 1.5)
+  const railSnap = _pbpHlRailAnchorSnap(); // before the section can appear
   _pbpHlNotebookRender();
   // Spec 1.3 trigger 4: the FIRST highlight created this session
   // auto-expands the rail's hl section (session-visual only, via
@@ -1818,7 +1819,41 @@ async function _pbpHlCreateFromRange(range, color, btn) {
     _pbpHlAutoExpandedThisSession = true;
     if (_pbpHlNbEls && _pbpHlNbEls.handle) _pbpHlNbEls.handle.expand(true);
   }
+  _pbpHlRailAnchorRestore(railSnap);
   return created.map((x) => x.item);
+}
+
+// Rail anchor across the notebook's first appearance (2026-10-21). The
+// highlights section sits above Export and Contents, so the first highlight
+// pushed the TOC ~117px down under a pointer on its way back to it. A
+// scrolled rail already keeps its place (CSS scroll anchoring), but at
+// scrollTop 0 Chrome selects no anchor; that one jump is paid back here: the
+// first rail block below the section that is on screen stays put and the
+// rail scrolls by the inserted height (clamped by its own scroll range). The
+// section keeps its place in the rail order. Only the creation path calls
+// this -- a restore on load, another tab's write or a delete never scrolls
+// the rail.
+function _pbpHlRailAnchorSnap() {
+  const rail = document.getElementById("rail");
+  if (!rail || rail.scrollTop > 0) return null;
+  const sec = _pbpHlNbEls ? _pbpHlNbEls.sec : null;
+  if (sec && !sec.hidden) return null; // already on screen: nothing is inserted
+  // Before the first render the section does not exist yet; it will be
+  // inserted where _pbpHlBuildNotebookDom puts it (before Export, else TOC).
+  let el = sec ? sec.nextElementSibling
+    : (document.getElementById("export-section") || document.getElementById("toc"));
+  const rr = rail.getBoundingClientRect();
+  for (; el; el = el.nextElementSibling) {
+    if (el.id === "rail-bottom-row" || !el.getClientRects().length) continue; // sticky: never moves
+    const r = el.getBoundingClientRect();
+    if (r.bottom > rr.top && r.top < rr.bottom) return { rail, el, top: r.top };
+  }
+  return null;
+}
+function _pbpHlRailAnchorRestore(snap) {
+  if (!snap || !snap.el.isConnected) return;
+  const delta = snap.el.getBoundingClientRect().top - snap.top;
+  if (delta > 0.5) snap.rail.scrollTop += delta;
 }
 
 function _pbpHlRegisterRange(item, range) {
@@ -2558,8 +2593,21 @@ function _pbpHlNotebookRender() {
   // .rail-sec-progress by selector rather than relying on the engine to re-poll.
   const countEl = _pbpHlNbEls.sec.querySelector(".rail-sec-count");
   if (countEl) countEl.textContent = "(" + items.length + ")";
+  // Progressive disclosure (2026-10-21): the colour filter appears once two
+  // or more colours are in use, and offers only those colours. Five dots all
+  // pressed over a one-colour list read as decoration, not a filter. A colour
+  // with no highlights drops back to "on", so a later highlight in it is
+  // never born filtered out of the list -- and with the row gone, no colour
+  // can stay switched off with no control left on screen to undo it.
+  // Out-of-range colours count as colour 1, as pbpHlNotebookModel files them.
+  const inUse = new Set(items.map((it) => { const c = Number(it && it.color); return (c >= 1 && c <= 5) ? c : 1; }));
+  PBP_HL_COLORS.forEach((c) => { if (!inUse.has(c)) _pbpHlColorFilter.add(c); });
+  if (inUse.size < 2) PBP_HL_COLORS.forEach((c) => _pbpHlColorFilter.add(c));
+  _pbpHlNbEls.filterRow.hidden = inUse.size < 2;
   _pbpHlNbEls.filterBtns.forEach((b) => {
-    const on = _pbpHlColorFilter.has(Number(b.dataset.color));
+    const c = Number(b.dataset.color);
+    const on = _pbpHlColorFilter.has(c);
+    b.hidden = !inUse.has(c);
     b.setAttribute("aria-pressed", String(on));
     b.classList.toggle("off", !on);
   });
@@ -2587,6 +2635,7 @@ function _pbpHlBuildNotebookDom(rail) {
 
   const filterRow = document.createElement("div");
   filterRow.className = "hl-filter-row";
+  filterRow.hidden = true; // shown by _pbpHlNotebookRender once 2+ colours are in use
   filterRow.setAttribute("role", "group");
   filterRow.setAttribute("aria-label", t("hlFilterGroupAria"));
   const filterBtns = PBP_HL_COLORS.map((c) => {
@@ -2681,7 +2730,7 @@ function _pbpHlBuildNotebookDom(rail) {
     toolbar.appendChild(openLib); // Tab order: fold, copy, library.
   }
 
-  return { sec, list, filterBtns, emptyHint, copyBtn, handle, orphanNote };
+  return { sec, list, filterRow, filterBtns, emptyHint, copyBtn, handle, orphanNote };
 }
 
 // One <li> per notebook entry (spec 2.1). textContent/title only for all

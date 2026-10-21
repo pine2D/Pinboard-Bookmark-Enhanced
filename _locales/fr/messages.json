@@ -803,6 +803,9 @@
   "mdEngineJinaNeedsHttp": {
     "message": "Jina Reader ne récupère que les pages http(s) : il ne peut pas lire celle-ci."
   },
+  "mdEngineJinaNoLogin": {
+    "message": "Jina Reader récupère les pages depuis ses propres serveurs : il ne voit pas ce qui demande d'être connecté."
+  },
   "mdEngineGroupAria": {
     "message": "Moteur d'extraction"
   },

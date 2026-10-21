@@ -803,6 +803,9 @@
   "mdEngineJinaNeedsHttp": {
     "message": "Jina Reader 只能擷取 http(s) 頁面，無法讀取此頁。"
   },
+  "mdEngineJinaNoLogin": {
+    "message": "Jina Reader 從自己的伺服器擷取頁面，看不到需要登入才能看的內容。"
+  },
   "mdEngineGroupAria": {
     "message": "擷取引擎"
   },

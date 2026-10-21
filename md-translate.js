@@ -1402,7 +1402,32 @@ function _pbpTrRenderEstimate(st, est) {
   est = est || document.getElementById("tr-estimate");
   if (!est) return;
   const chars = st.approxChars || st.work.reduce((a, w) => a + w.shielded.text.length, 0);
-  est.textContent = t("trEstCost", String(pbpAiEstimateTokens(chars) * 3), _pbpTrModelLabel(st.s));
+  _pbpTrPaintEstimate(est, chars, st.s);
+}
+
+// One line, price first (2026-10-21 distill): "About N tokens · " never
+// shrinks, and only the "provider · model" tail gives way to an ellipsis --
+// a long model id wrapped the line to three rows in a 256px rail. The full
+// sentence stays the element's text (screen readers, copy) and its title,
+// the model name being the only part a narrow rail can cut. The locale string
+// keeps its own word order: it is split at the model's slot, not rebuilt.
+function _pbpTrPaintEstimate(est, chars, s) {
+  const count = String(pbpAiEstimateTokens(chars) * 3);
+  const model = _pbpTrModelLabel(s);
+  const SLOT = "\u0001";
+  const shaped = t("trEstCost", count, SLOT);
+  const at = shaped.indexOf(SLOT);
+  est.title = t("trEstCost", count, model);
+  if (at < 0) { est.textContent = est.title; return; }
+  const cost = document.createElement("span");
+  cost.className = "tr-est-cost";
+  cost.textContent = shaped.slice(0, at);
+  const name = document.createElement("span");
+  name.className = "tr-est-model";
+  name.textContent = model;
+  const parts = [cost, name];
+  if (at + 1 < shaped.length) parts.push(document.createTextNode(shaped.slice(at + 1)));
+  est.replaceChildren(...parts);
 }
 
 function _pbpTrBuildSection(st) {
@@ -2964,7 +2989,7 @@ function _pbpTrSetStatus(st, status) {
     const remaining = st.work.reduce((a, w) => (w.n in st.trMd) ? a : a + w.shielded.text.length, 0);
     if (remaining > 0) {
       est.hidden = false;
-      est.textContent = t("trEstCost", String(pbpAiEstimateTokens(remaining) * 3), _pbpTrModelLabel(st.s));
+      _pbpTrPaintEstimate(est, remaining, st.s);
     } else {
       est.hidden = true;
     }
@@ -2988,7 +3013,7 @@ function _pbpTrSetStatus(st, status) {
       const chars = st.work.reduce((a, w) =>
         (st.skippedSet && st.skippedSet.has(w.n)) ? a : a + w.shielded.text.length, 0);
       est.hidden = false;
-      est.textContent = t("trEstCost", String(pbpAiEstimateTokens(chars) * 3), _pbpTrModelLabel(st.s));
+      _pbpTrPaintEstimate(est, chars, st.s);
     } else {
       est.hidden = true;
     }

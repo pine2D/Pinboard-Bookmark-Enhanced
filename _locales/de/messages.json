@@ -803,6 +803,9 @@
   "mdEngineJinaNeedsHttp": {
     "message": "Jina Reader kann nur http(s)-Seiten abrufen und diese Seite daher nicht lesen."
   },
+  "mdEngineJinaNoLogin": {
+    "message": "Jina Reader ruft Seiten über eigene Server ab und sieht deshalb nichts, wofür man angemeldet sein muss."
+  },
   "mdEngineGroupAria": {
     "message": "Extraktions-Engine"
   },

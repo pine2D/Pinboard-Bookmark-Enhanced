@@ -4714,7 +4714,17 @@ async function extractForPreview({ tabId, url, engine, sourceTabUrl, frame, fram
     });
     const key = raw.jinaApiKey ? deobfuscateKey(raw.jinaApiKey) : "";
     const r = await fetchJinaMarkdown(url, { apiKey: key, cacheDuration: raw.aiCacheDuration });
-    if (r.error) return { error: r.error };
+    // Reasons the reader can name (md-preview.js pbpEngineErrText): Jina's
+    // quota, a key it rejected, and its 30s deadline. A 401/403 only means
+    // "your key" when one was sent; without a key it stays the generic line.
+    if (r.error) {
+      const code = r.error === "host_permission" ? "host_permission"
+        : r.status === 429 ? "rate_limited"
+        : (r.authFailed && key) ? "jina_auth"
+        : r.timeout === true ? "timeout"
+        : r.error;
+      return { error: code };
+    }
     if (!r.markdown || !r.markdown.trim()) return { error: "empty" };
     return {
       source: "jina", markdown: r.markdown, contentHtml: "",

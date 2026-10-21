@@ -418,6 +418,10 @@ button, input, select, textarea { font-family: inherit; }
   border-radius: var(--radius-full);
   letter-spacing: 0.01em;
 }
+/* Same empty rule as .engine-status / .rail-stats: the extraction shell
+   (body.md-shell) returns before the token line is written or hidden, and an
+   empty badge painted as a bare grey pill under the URL. */
+.token-badge:empty { display: none; }
 
 /* Fused buttons: one shell, single neutral seams, and inset keyboard focus.
    Per-button borders hid the selected edge under the next segment, and a
@@ -1092,8 +1096,18 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   color: var(--fg-muted);
 }
 .empty-state p { font-size: 15px; line-height: 1.6; }
-.empty-state .action-btn { margin-top: var(--sp-4); }
-.empty-state .action-btn + .action-btn { margin-inline-start: var(--sp-2); }
+/* The actions sit in one .row (flex, centred items, sp-2 gap), so the "Open
+   original" <a> lines up with the buttons instead of riding its SVG's
+   synthesized baseline 2px above them. */
+.empty-state > .row { justify-content: center; margin-top: var(--sp-4); }
+/* One leading action (md-preview.js pbpExtractFailPrimary): the button face
+   plus the link-coloured edge -- the reader's "the one primary" mark, as on
+   the first-run video poster (.pbv-poster--enable). No solid accent fill: a
+   white-on-accent button falls to ~3.2:1 on the dark palette. The other ways
+   out keep their 26px box and 1px edge slot, but drop the fill until hover. */
+.empty-state .action-btn.es-primary { border-color: var(--link); }
+.empty-state .action-btn.es-quiet { background: transparent; border-color: transparent; }
+.empty-state .action-btn.es-quiet:hover { background: var(--btn-hover); border-color: transparent; }
 /* The empty state lives inside #rendered-view, whose prose-link rule (ink-blue
    underline) would otherwise win over the button face. */
 #rendered-view .empty-state a.action-btn,
@@ -1767,11 +1781,14 @@ body.md-empty main { margin-left: 0; }
    ones; #send-split and #send-status are inside #export-section and go with it.
    The video panel is NOT hidden -- md-video.js mounts a fully wired one onto
    this same shell. Same shape as the body.raw-active hides above.
-   `.rail > .view-toggle` is the STATIC Raw/Rendered pair only; md-translate.js
-   builds its own .view-toggle nested inside #tr-section, which cannot exist
-   here (it is created on "pbp:rendered") and must not be caught either way. */
+   `#reader-source-details > .view-toggle` is the STATIC Raw/Rendered pair
+   only (it moved into "Source and extraction tools", where the old
+   `.rail > .view-toggle` no longer reached it and the dead pair showed again
+   on the failure page -- 2026-10-21); md-translate.js builds its own
+   .view-toggle nested inside #tr-section, which cannot exist here (it is
+   created on "pbp:rendered") and must not be caught either way. */
 body.md-shell #export-section,
-body.md-shell .rail > .view-toggle { display: none; }
+body.md-shell #reader-source-details > .view-toggle { display: none; }
 
 /* ---- Screen-reader only utility ---- */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
@@ -2930,6 +2947,12 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #tr-section .row .action-btn svg { width: 14px; height: 14px; }
 #tr-section .tr-meta { margin-top: var(--sp-2); font-size: 12px; color: var(--fg-secondary); }
 #tr-section .tr-meta[hidden] { display: none; }
+/* Pre-request estimate on one line (md-translate.js _pbpTrPaintEstimate):
+   the price never shrinks or wraps; only "provider · model" takes the
+   ellipsis, its full text on the line's title. */
+#tr-section #tr-estimate { display: flex; min-width: 0; white-space: nowrap; }
+#tr-section .tr-est-cost { flex: none; white-space: pre; }
+#tr-section .tr-est-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* .rail-disclosure: the disclosure INSIDE a rail section (COMPONENTS.md
    §10) -- native <details>/<summary> (keyboard + expanded state for free), a
    12px secondary-text summary with the rail's thin right-edge chevron, 24px
@@ -3806,16 +3829,20 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
 .typo-row { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-2); }
 .typo-label { color: var(--fg-secondary); }
 .typo-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 26px;
   height: 26px; /* md rung (was 24) */
+  padding: 0;
   border: 1px solid var(--btn-border);
   border-radius: var(--radius-md);
   background: var(--btn-bg);
   color: var(--btn-fg);
-  font-size: 14px;
-  line-height: 1;
   cursor: pointer;
 }
+/* Lucide minus / plus (PBP_ICONS), not the ASCII "-" / "+" glyphs. */
+.typo-step svg { width: 14px; height: 14px; flex: none; }
 .typo-step:hover { background: var(--btn-hover); }
 /* aria-disabled (not disabled): a real disabled attribute would drop focus to
    <body> the instant the boundary tier is reached under the user's pointer --

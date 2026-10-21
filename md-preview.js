@@ -53,12 +53,17 @@ function renderEmptyState(message, actionKey) {
     p.textContent = message;
     wrap.appendChild(p);
     if (actionKey) {
+      // Same .row shell as renderErrorState's actions, so both states space
+      // their buttons from the message the same way.
+      const row = document.createElement("div");
+      row.className = "row";
       const button = document.createElement("button");
       button.type = "button";
       button.className = "action-btn";
       button.textContent = t(actionKey);
       button.addEventListener("click", () => window.close());
-      wrap.appendChild(button);
+      row.appendChild(button);
+      wrap.appendChild(row);
     }
     view.replaceChildren(wrap);
   }
@@ -77,6 +82,10 @@ function renderEmptyState(message, actionKey) {
 // `openUrl` (optional) = the previewed page's own address: a third way out,
 // "Open original", for a page neither engine could read. http(s) only -- any
 // other scheme (javascript:, data:, chrome-extension:, file:) renders nothing.
+// `primary` (optional) = "alt" | "retry" (default): which of the two leads
+// (pbpExtractFailPrimary decides). One action carries the button face, the
+// rest read as quiet text buttons on the same row (2026-10-21 harden pass:
+// three equal faces gave no answer to "what do I do now").
 function pbpOriginalOpenHref(openUrl) {
   if (typeof openUrl !== "string" || !openUrl) return "";
   try {
@@ -84,7 +93,41 @@ function pbpOriginalOpenHref(openUrl) {
     return (u.protocol === "https:" || u.protocol === "http:") ? u.href : "";
   } catch (_) { return ""; }
 }
-function renderErrorState(message, retryFn, permissionRequired, alt, openUrl) {
+// Which way out leads on the extraction-failure page. One rule, so the same
+// failure always offers the same first step:
+//   - a missing grant: "Grant and retry" is the fix itself;
+//   - the reason points at the engine -- anything Jina reports (its servers,
+//     its quota, its key, the network it needs), or a Defuddle run that found
+//     no article or lost its tab: the other engine reads the page a different
+//     way, so switching leads whenever it is available;
+//   - otherwise (a transient or unknown Defuddle failure): retry.
+function pbpExtractFailPrimary(code, engine, hasAlt) {
+  if (code === "host_permission" || !hasAlt) return "retry";
+  if (engine === "jina") return "alt";
+  return (code === "empty" || code === "tab_unavailable" || code === "tab_navigated") ? "alt" : "retry";
+}
+// Failure copy for one reextract answer. `engine` is the engine that was
+// tried; it only adds the reason Jina's empty answer needs (its servers carry
+// none of the reader's sign-ins). Codes come from background.js
+// extractForPreview / reextractMarkdown; anything unrecognised is the
+// generic line, never a guess.
+function pbpEngineErrText(r, engine) {
+  const code = r && r.error;
+  if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
+  if (code === "empty") return engine === "jina" ? t("mdPreviewNoContent") + " " + t("mdEngineJinaNoLogin") : t("mdPreviewNoContent");
+  if (code === "host_permission") return t("aiErrorHostPermission", "https://r.jina.ai");
+  // "network" covers both this file's own sendMessage-throw catches and
+  // jina.js's fetch-TypeError classification relayed unchanged through
+  // background.js -- otherwise every offline failure fell into the generic
+  // mdEngineExtractFailed bucket, indistinguishable from a bad API key or a
+  // dead Jina service (D4-2).
+  if (code === "network") return t("pinboardErrorOffline");
+  if (code === "rate_limited") return t("pinboardErrorRateLimit");
+  if (code === "timeout") return t("pinboardErrorTimeout");
+  if (code === "jina_auth") return t("jinaAuthFailed");
+  return t("mdEngineExtractFailed");
+}
+function renderErrorState(message, retryFn, permissionRequired, alt, openUrl, primary) {
   const view = document.getElementById("rendered-view");
   if (view) {
     view.removeAttribute("aria-busy");
@@ -96,6 +139,12 @@ function renderErrorState(message, retryFn, permissionRequired, alt, openUrl) {
     const p = document.createElement("p");
     p.textContent = message;
     wrap.appendChild(p);
+    // One control row (.row: flex, centred items, sp-2 gap): the <a> and the
+    // <button>s share a line box only by baseline otherwise, and the link's
+    // leading SVG has no baseline, so it rode 2px above its neighbours.
+    const row = document.createElement("div");
+    row.className = "row";
+    let retryBtn = null;
     if (typeof retryFn === "function") {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -111,8 +160,9 @@ function renderErrorState(message, retryFn, permissionRequired, alt, openUrl) {
         catch (e) { console.warn("[preview] retry failed", e && e.name, e && e.message); }
         finally { btn.disabled = false; }
       });
-      wrap.appendChild(btn);
+      retryBtn = btn;
     }
+    let altBtn = null;
     if (alt && typeof alt.run === "function") {
       const other = document.createElement("button");
       other.type = "button";
@@ -125,14 +175,21 @@ function renderErrorState(message, retryFn, permissionRequired, alt, openUrl) {
         catch (e) { console.warn("[preview] engine switch failed", e && e.name, e && e.message); }
         finally { other.disabled = false; }
       });
-      wrap.appendChild(other);
+      altBtn = other;
+    }
+    // Leading action first in DOM and tab order; a "primary" with nothing
+    // behind it falls back to whichever action exists.
+    const lead = (primary === "alt" && altBtn) ? altBtn : (retryBtn || altBtn);
+    if (lead) { lead.classList.add("es-primary"); row.appendChild(lead); }
+    for (const b of [retryBtn, altBtn]) {
+      if (b && b !== lead) { b.classList.add("es-quiet"); row.appendChild(b); }
     }
     const href = pbpOriginalOpenHref(openUrl);
     if (href) {
       // A real external link (extOpen is the true-external-link icon), new tab,
       // no opener: the reader tab stays where it is.
       const a = document.createElement("a");
-      a.className = "action-btn";
+      a.className = "action-btn es-quiet";
       a.href = href;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
@@ -140,8 +197,9 @@ function renderErrorState(message, retryFn, permissionRequired, alt, openUrl) {
       const lab = document.createElement("span");
       lab.textContent = t("libraryOpenOriginal");
       a.appendChild(lab);
-      wrap.appendChild(a);
+      row.appendChild(a);
     }
+    if (row.firstChild) wrap.appendChild(row);
     view.replaceChildren(wrap);
   }
   document.body.classList.remove("md-empty"); // undo renderLoadingState's rail-hide so the engine-switch badge stays reachable
@@ -1220,19 +1278,9 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     if (e === "jina") return !/^https?:\/\//i.test(srcUrlForSwitch);
     return !srcTabId; // local needs the source tab
   }
-  function friendlyEngineErr(r) {
-    const code = r && r.error;
-    if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
-    if (code === "empty") return t("mdPreviewNoContent");
-    if (code === "host_permission") return t("aiErrorHostPermission", "https://r.jina.ai");
-    // "network" covers both this file's own sendMessage-throw catches (below,
-    // and the engine-switch handler further down) and jina.js's fetch-TypeError
-    // classification relayed unchanged through background.js — otherwise every
-    // offline failure fell into the generic mdEngineExtractFailed bucket,
-    // indistinguishable from a bad API key or a dead Jina service (D4-2).
-    if (code === "network") return t("pinboardErrorOffline");
-    return t("mdEngineExtractFailed");
-  }
+  // Top-level pbpEngineErrText owns the code -> copy table (testable on the
+  // file:// pages); `engine` = the engine that was tried.
+  function friendlyEngineErr(r, engine) { return pbpEngineErrText(r, engine); }
   function applyAvailability(curEngine) {
     if (!sourceEl) return;
     sourceEl.querySelectorAll(".src-seg").forEach((seg) => {
@@ -1525,11 +1573,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         const sourceDetails = document.getElementById("reader-source-details");
         if (alt && sourceDetails) sourceDetails.open = true;
         renderErrorState(
-          friendlyEngineErr(pr),
+          friendlyEngineErr(pr, attemptedEngine),
           () => retryExtract(attemptedEngine, pr),
           pr && pr.error === "host_permission",
           alt,
-          url
+          url,
+          pbpExtractFailPrimary(pr && pr.error, attemptedEngine, !!alt)
         );
       }
       // Video pages reach HERE, not the canonical-markdown guard further down:
@@ -1844,7 +1893,9 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         nonce: _pageNonce
       }
     : {
-        restore: true, url, tabId: srcTabId, sourceTabUrl,
+        // title rides along (a few bytes): the shell names the page with it
+        // while re-extracting, and a failed attempt otherwise read "Untitled".
+        restore: true, title: title || "", url, tabId: srcTabId, sourceTabUrl,
         engine: source === "jina" ? "jina" : "local",
         account: previewAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
@@ -2222,7 +2273,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         sourceEl.removeAttribute("aria-busy");
         seg.classList.remove("loading");
         applyAvailability(curEngine);
-        setEngineStatus(friendlyEngineErr(r), true);
+        setEngineStatus(friendlyEngineErr(r, e), true);
         if (e === "local" && r && (r.error === "tab_unavailable" || r.error === "tab_navigated")) {
           const localSeg = sourceEl.querySelector('.src-seg[data-engine="local"]');
           if (localSeg) {

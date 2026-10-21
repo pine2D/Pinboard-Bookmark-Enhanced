@@ -803,6 +803,9 @@
   "mdEngineJinaNeedsHttp": {
     "message": "Jina Reader загружает только страницы http(s), поэтому эту страницу прочитать не может."
   },
+  "mdEngineJinaNoLogin": {
+    "message": "Jina Reader загружает страницы со своих серверов, поэтому не видит того, что доступно только после входа."
+  },
   "mdEngineGroupAria": {
     "message": "Механизм извлечения"
   },

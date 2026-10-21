@@ -1644,7 +1644,8 @@ function _pbpTypoSyncPop() {
 
 // Lazily builds the singleton #typo-pop: native popover="auto" (Esc +
 // light-dismiss for free), same family as #fn-pop/#kbd-help-pop. Four rows:
-// font-size stepper ("-" / readout / "+", ASCII only per the font iron rule),
+// font-size stepper (Lucide minus / readout / Lucide plus -- drawn, not the
+// ASCII "-" / "+" it used to print, 2026-10-21),
 // then three-way segments (aria-pressed toggles, .srch-regex vocabulary) for
 // leading, reading width and appearance.
 function _pbpTypoEnsurePop() {
@@ -1667,7 +1668,7 @@ function _pbpTypoEnsurePop() {
   minus.type = "button";
   minus.id = "typo-font-minus";
   minus.className = "typo-step";
-  minus.textContent = "-";
+  minus.innerHTML = PBP_ICONS.minus; // static shared constant; the name rides title/aria-label
   minus.setAttribute("aria-label", t("typoFontSmaller"));
   minus.title = t("typoFontSmaller");
   minus.addEventListener("click", () => { if (minus.getAttribute("aria-disabled") !== "true") _pbpTypoSet(_pbpTypoFont - 1, _pbpTypoLeading); });
@@ -1678,7 +1679,7 @@ function _pbpTypoEnsurePop() {
   plus.type = "button";
   plus.id = "typo-font-plus";
   plus.className = "typo-step";
-  plus.textContent = "+";
+  plus.innerHTML = PBP_ICONS.plus;
   plus.setAttribute("aria-label", t("typoFontLarger"));
   plus.title = t("typoFontLarger");
   plus.addEventListener("click", () => { if (plus.getAttribute("aria-disabled") !== "true") _pbpTypoSet(_pbpTypoFont + 1, _pbpTypoLeading); });

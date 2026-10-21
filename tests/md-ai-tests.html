@@ -8581,6 +8581,61 @@ suiteIf("extraction error shell: open original (item 6)", "renderErrorState", ()
     host.remove();
     assertEq(kids.join(","), "BUTTON,A");
   });
+  // 2026-10-21 harden pass: three equal faces answered nothing. One action
+  // leads (button face + link edge), the rest are quiet, all on one .row.
+  test("one leading action, the rest quiet, all in one row; the lead follows `primary`", () => {
+    const host = document.createElement("div"); host.id = "rendered-view"; document.body.appendChild(host);
+    try {
+      const alt = { label: "switch", run: () => {} };
+      for (const [primary, lead] of [["alt", "switch"], ["retry", "askErrRetry"], [undefined, "askErrRetry"]]) {
+        renderErrorState("failed", () => {}, false, alt, "https://example.com/", primary);
+        const rows = host.querySelectorAll(".empty-state > .row");
+        assertEq(rows.length, 1, "one control row");
+        const kids = [...rows[0].children];
+        assertEq(kids.length, 3, "retry, switch and open original share the row");
+        assertEq(kids.filter((k) => k.classList.contains("es-primary")).length, 1, "exactly one lead");
+        assertEq(kids[0].classList.contains("es-primary") && kids[0].textContent, lead, "lead comes first: " + primary);
+        assert(kids.slice(1).every((k) => k.classList.contains("es-quiet")), "everything after the lead is quiet");
+        assertEq(kids[2].tagName, "A", "open original stays last");
+      }
+      renderErrorState("failed", null, false, alt, "", "retry");
+      const only = host.querySelector(".row").children;
+      assertEq(only.length === 1 && only[0].classList.contains("es-primary") && only[0].textContent, "switch",
+        "a retry-led page with no retry leads with what it has");
+    } finally { host.remove(); document.body.classList.remove("md-empty"); }
+  });
+  test("pbpExtractFailPrimary: grant leads a permission miss, the other engine leads an engine-bound failure", () => {
+    const P = pbpExtractFailPrimary;
+    assertEq(P("host_permission", "jina", true), "retry", "grant and retry is the fix itself");
+    for (const code of ["empty", "network", "rate_limited", "timeout", "jina_auth", "Jina API returned 503", undefined])
+      assertEq(P(code, "jina", true), "alt", "anything Jina reports: Defuddle leads (" + code + ")");
+    for (const code of ["empty", "tab_unavailable", "tab_navigated"])
+      assertEq(P(code, "local", true), "alt", "Defuddle found nothing or lost its tab: Jina leads (" + code + ")");
+    for (const code of ["network", "Defuddle injection failed", undefined])
+      assertEq(P(code, "local", true), "retry", "a transient or unknown Defuddle failure: retry leads (" + code + ")");
+    for (const code of ["empty", "rate_limited", "tab_unavailable"]) {
+      assertEq(P(code, "jina", false), "retry", "no other engine: retry (" + code + ")");
+      assertEq(P(code, "local", false), "retry", "no other engine: retry (" + code + ")");
+    }
+  });
+  test("pbpEngineErrText names the reason when the code carries one, else the generic line", () => {
+    const realT = window.t;
+    window.t = (k, ...a) => k + (a.length ? "(" + a.join(",") + ")" : "");
+    try {
+      const E = (error, engine) => pbpEngineErrText({ ok: false, error }, engine);
+      assertEq(E("empty", "jina"), "mdPreviewNoContent mdEngineJinaNoLogin", "Jina's empty answer says why: its servers have no sign-in");
+      assertEq(E("empty", "local"), "mdPreviewNoContent", "Defuddle reads the signed-in tab: no such reason");
+      assertEq(E("rate_limited", "jina"), "pinboardErrorRateLimit");
+      assertEq(E("timeout", "jina"), "pinboardErrorTimeout");
+      assertEq(E("jina_auth", "jina"), "jinaAuthFailed");
+      assertEq(E("network", "jina"), "pinboardErrorOffline");
+      assertEq(E("tab_navigated", "local"), "mdEngineTabGone");
+      assertEq(E("host_permission", "jina"), "aiErrorHostPermission(https://r.jina.ai)");
+      for (const raw of ["Jina API returned 503", "bad_request", "", undefined])
+        assertEq(E(raw, "jina"), "mdEngineExtractFailed", "unrecognised code stays generic: " + raw);
+      assertEq(pbpEngineErrText(null), "mdEngineExtractFailed", "no answer at all");
+    } finally { window.t = realT; }
+  });
 });
 
 suiteIf("Ask jump clears the bottom sheet (item 6)", "pbpAskJumpTop", () => {
@@ -9018,6 +9073,125 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       if (cssWidth) document.body.style.setProperty("--pbp-width", cssWidth); else document.body.style.removeProperty("--pbp-width");
       window.t = realT; window.chrome.storage = realStorage; rail.remove();
     }
+  });
+  // 2026-10-21 distill: the highlight colour filter appears only once two
+  // colours are in use, offers only those colours, and is a labelled group.
+  test("highlight colour filter: hidden for one colour, in-use dots only from two, labelled group, never strands a colour off", () => {
+    const realT = window.t;
+    window.t = (k) => k;
+    const was = { els: _pbpHlNbEls, state: _pbpHlState, filter: _pbpHlColorFilter };
+    const rail = document.createElement("aside"); rail.id = "rail";
+    const exp = document.createElement("div"); exp.id = "export-section"; rail.appendChild(exp);
+    document.body.appendChild(rail);
+    const item = (id, color) => ({ id, n: 1, quote: "q " + id, color, ts: 1 });
+    try {
+      _pbpHlNbEls = null; _pbpHlColorFilter = new Set(PBP_HL_COLORS);
+      _pbpHlState = { items: [item("a", 2), item("b", 2)], ranges: {}, orphans: {}, resolvedN: {} };
+      _pbpHlNotebookRender();
+      const row = rail.querySelector(".hl-filter-row");
+      assertEq(row.hidden, true, "one colour in use: no filter");
+      assertEq(row.getAttribute("role") + "|" + row.getAttribute("aria-label"), "group|hlFilterGroupAria", "a labelled group (colours stay unnamed beyond their own labels)");
+      _pbpHlState.items.push(item("c", 4), item("d", 0));
+      _pbpHlNotebookRender();
+      const shown = () => [...row.children].filter((b) => !b.hidden).map((b) => b.dataset.color).join(",");
+      assertEq(row.hidden, false, "two colours in use: the filter appears");
+      assertEq(shown(), "1,2,4", "only colours in use get a dot (an out-of-range colour files as 1, like the list)");
+      row.querySelector('[data-color="4"]').click();
+      assertEq(rail.querySelectorAll(".hl-item").length, 3, "colour 4 filtered out of the list");
+      _pbpHlState.items = _pbpHlState.items.filter((it) => it.id !== "c");
+      _pbpHlNotebookRender();
+      assertEq(_pbpHlColorFilter.has(4), true, "a colour with no highlights left drops back to on");
+      _pbpHlColorFilter.delete(2);
+      _pbpHlState.items = [item("a", 2)];
+      _pbpHlNotebookRender();
+      assertEq(row.hidden, true, "back to one colour: the row goes");
+      assertEq(rail.querySelectorAll(".hl-item").length, 1, "and the remaining colour cannot stay filtered out with no control on screen");
+    } finally {
+      rail.remove();
+      _pbpHlNbEls = was.els; _pbpHlState = was.state; _pbpHlColorFilter = was.filter; window.t = realT;
+    }
+  });
+  // 2026-10-21: the first highlight inserted the notebook above Export and
+  // Contents and the TOC dropped ~117px. At scrollTop 0 Chrome anchors
+  // nothing, so the creation path pays the jump back itself.
+  test("first highlight keeps the on-screen rail block below the notebook in place", () => {
+    const realT = window.t;
+    window.t = (k) => k;
+    const was = { els: _pbpHlNbEls, state: _pbpHlState, filter: _pbpHlColorFilter };
+    const rail = document.createElement("aside"); rail.id = "rail";
+    rail.style.cssText = "position:fixed;left:0;top:0;width:256px;height:300px;overflow-y:auto;display:flex;flex-direction:column";
+    rail.innerHTML = '<div style="height:60px;flex:none">ident</div><div id="export-section" style="height:40px;flex:none">export</div>' +
+      '<nav id="toc" style="flex:none">' + '<div style="height:24px">h</div>'.repeat(30) + "</nav>" +
+      '<div id="rail-bottom-row" style="position:sticky;bottom:0;flex:none;height:30px">tools</div>';
+    document.body.appendChild(rail);
+    try {
+      _pbpHlNbEls = null; _pbpHlColorFilter = new Set(PBP_HL_COLORS);
+      _pbpHlState = { items: [], ranges: {}, orphans: {}, resolvedN: {} };
+      _pbpHlNotebookRender(); // init: section built, hidden
+      const toc = document.getElementById("toc");
+      const before = toc.getBoundingClientRect().top;
+      const snap = _pbpHlRailAnchorSnap();
+      assertEq(snap && snap.el.id, "export-section", "anchors the first visible block after the section (never the sticky tools row)");
+      _pbpHlState.items = [{ id: "a", n: 1, quote: "first", color: 1, ts: 1 }];
+      _pbpHlNotebookRender();
+      assert(!_pbpHlNbEls.sec.hidden && _pbpHlNbEls.sec.getBoundingClientRect().height > 0, "the section appeared");
+      _pbpHlRailAnchorRestore(snap);
+      assert(Math.abs(toc.getBoundingClientRect().top - before) <= 1, "TOC moved " + (toc.getBoundingClientRect().top - before) + "px");
+      assert(rail.scrollTop > 0, "the rail scrolled by the inserted height");
+      assertEq(_pbpHlRailAnchorSnap(), null, "a scrolled rail is left to CSS scroll anchoring");
+      rail.scrollTop = 0;
+      assertEq(_pbpHlRailAnchorSnap(), null, "nothing to hold once the section is already on screen");
+      const src = String(_pbpHlCreateFromRange);
+      const snapAt = src.indexOf("_pbpHlRailAnchorSnap()"), renderAt = src.indexOf("_pbpHlNotebookRender()"), restoreAt = src.indexOf("_pbpHlRailAnchorRestore(");
+      assert(snapAt >= 0 && snapAt < renderAt && renderAt < restoreAt && src.indexOf(".expand(true)") < restoreAt,
+        "creation snaps before the render and restores after the auto-expand");
+      for (const fn of [pbpHlRestore, _pbpHlDeleteItem]) assert(!String(fn).includes("_pbpHlRailAnchor"), fn.name + " never scrolls the rail");
+    } finally {
+      rail.remove();
+      _pbpHlNbEls = was.els; _pbpHlState = was.state; _pbpHlColorFilter = was.filter; window.t = realT;
+    }
+  });
+  // 2026-10-21 distill: the pre-request estimate is one line; only the
+  // model name may ellipsize, the price is its own never-shrinking span.
+  test("translate estimate: price span + model span in the locale's own order, full sentence as text and title", () => {
+    const realT = window.t;
+    try {
+      const est = document.createElement("div");
+      window.t = (k, ...a) => k === "trEstCost" ? "Ca. " + a[0] + " tokens · " + a[1] : k;
+      _pbpTrPaintEstimate(est, 400, { aiProvider: "custom", customModel: "m" });
+      const cost = est.querySelector(".tr-est-cost"), model = est.querySelector(".tr-est-model");
+      assert(cost && model && cost.nextSibling === model, "price span, then model span");
+      assertEq(cost.textContent, "Ca. 300 tokens · ", "the price part keeps the locale's words and joint");
+      assertEq(model.textContent, _pbpTrModelLabel({ aiProvider: "custom", customModel: "m" }), "the model part is the provider · model label");
+      assertEq(est.textContent, est.title, "the full sentence is the text and the title");
+      window.t = (k, ...a) => k === "trEstCost" ? a[1] + " — " + a[0] + " jetonów" : k; // model slot first
+      _pbpTrPaintEstimate(est, 400, { aiProvider: "custom", customModel: "m" });
+      assertEq(est.firstChild.textContent, "", "a model-first locale gets an empty lead");
+      assertEq(est.textContent, est.title, "and still reads in its own order");
+    } finally { window.t = realT; }
+  });
+  // 2026-10-21: the font-size steppers printed ASCII "-" / "+" -- the only
+  // glyph-as-icon left in the panel. Lucide v0.525.0 minus / plus now, with
+  // the names unchanged on title and aria-label.
+  test("Aa font-size steppers are Lucide minus / plus icons, named by title and aria-label", () => {
+    const realT = window.t;
+    window.t = (k) => k;
+    const was = _pbpTypoPopEl;
+    try {
+      _pbpTypoPopEl = null;
+      const pop = _pbpTypoEnsurePop();
+      const paths = (b) => [...b.querySelectorAll("svg path")].map((p) => p.getAttribute("d")).join("|");
+      const minus = pop.querySelector("#typo-font-minus"), plus = pop.querySelector("#typo-font-plus");
+      assertEq(paths(minus), "M5 12h14", "minus is Lucide minus");
+      assertEq(paths(plus), "M5 12h14|M12 5v14", "plus is Lucide plus");
+      for (const [b, name] of [[minus, "typoFontSmaller"], [plus, "typoFontLarger"]]) {
+        assertEq(b.textContent.trim(), "", "no text glyph left in " + b.id);
+        const svg = b.querySelector("svg");
+        assertEq(svg.getAttribute("viewBox") + "|" + svg.getAttribute("stroke-width") + "|" + svg.getAttribute("aria-hidden"), "0 0 24 24|2|true", "24-box, stroke 2, hidden from AT");
+        assertEq(b.title + "|" + b.getAttribute("aria-label"), name + "|" + name, "the name stays on title and aria-label");
+      }
+      pop.remove();
+    } finally { _pbpTypoPopEl = was; window.t = realT; }
   });
   // 2026-10-19 critique + user ruling: in tr-only a click on a translated
   // block still peeks at the original, but the blocks are not buttons (no

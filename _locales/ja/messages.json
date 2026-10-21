@@ -803,6 +803,9 @@
   "mdEngineJinaNeedsHttp": {
     "message": "Jina Reader が取得できるのは http(s) のページだけのため、このページは読み取れません。"
   },
+  "mdEngineJinaNoLogin": {
+    "message": "Jina Reader は自前のサーバーからページを取得するため、ログインしないと見られない内容は読み取れません。"
+  },
   "mdEngineGroupAria": {
     "message": "抽出エンジン"
   },

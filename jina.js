@@ -84,6 +84,9 @@ async function fetchJinaMarkdown(url, options = {}) {
     // every Jina failure falling into one generic bucket (D4-2).
     const offline = (e instanceof TypeError && /failed to fetch/i.test(e.message || "")) ||
       (typeof navigator !== "undefined" && navigator.onLine === false);
-    return { error: offline ? "network" : (e.message || "Jina API request failed"), fallback: true };
+    // fetchWithTimeout's deadline rejects with TimeoutError (ai.js): flagged
+    // separately so the reader can say "timed out" -- the error string itself
+    // is unchanged for the popup callers that log it.
+    return { error: offline ? "network" : (e.message || "Jina API request failed"), timeout: !!(e && e.name === "TimeoutError"), fallback: true };
   }
 }

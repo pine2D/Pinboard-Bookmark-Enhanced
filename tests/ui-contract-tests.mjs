@@ -5722,7 +5722,7 @@ check(drawerSetupStart >= 0 && drawerSetup.includes("main.inert = true") &&
 // Opening the drawer must land focus INSIDE the modal. Any preferred landing
 // element has to be visibility-tested first, with a fallback to the rail's own
 // focusable list: on the extraction-failure shell body.md-shell hides
-// `.rail > .view-toggle`, so focusing a hidden #btn-rendered is a silent no-op
+// `#reader-source-details > .view-toggle`, so focusing a hidden #btn-rendered is a silent no-op
 // and focus stays on the hamburger, outside the aria-modal drawer.
 const drawerOpenStart = drawerSetup.indexOf("if (main) main.inert = true");
 const drawerOpenFocus = drawerOpenStart < 0 ? ""
@@ -6962,6 +6962,23 @@ function stripJsComments(input) {
     "md-preview.js: the pending-extraction branch anchor moved -- re-derive this check before trusting it");
   check(mdPreviewJs.slice(0, earlyReturn).includes("setupDrawer();"),
     "md-preview.js: the error-shell early-return path no longer calls setupDrawer() -- renderErrorState removes body.md-empty, so below 1000px the drawer hamburger paints with no click/Esc listener and the rail stays off-canvas (a lit no-op control)");
+}
+// (1c) The shell hides the Raw/Rendered pair because it is wired only after
+// the branch returns. The hide selector must name the pair's REAL parent: it
+// moved into "Source and extraction tools" and the old `.rail > .view-toggle`
+// silently stopped matching, so the dead pair was back on the failure page
+// (2026-10-21). Same for the token pill, written only on the full path.
+{
+  const bare = mdCss.replace(/\/\*[\s\S]*?\*\//g, "");
+  const details = mdHtml.slice(mdHtml.indexOf('id="reader-source-details"'), mdHtml.indexOf("</details>", mdHtml.indexOf('id="reader-source-details"')));
+  const depthAt = (html, idx) => (html.slice(0, idx).match(/<(div|span|details)\b/g) || []).length - (html.slice(0, idx).match(/<\/(div|span|details)>/g) || []).length;
+  const toggleAt = details.indexOf('class="view-toggle"');
+  check(toggleAt > 0 && depthAt(details, toggleAt) === 1,
+    "md-preview.html: the static Raw/Rendered .view-toggle is no longer a direct child of #reader-source-details -- re-point the body.md-shell hide rule at its real parent");
+  check(/body\.md-shell #reader-source-details > \.view-toggle[^{]*\{[^}]*display:\s*none/.test(bare),
+    "md-preview.css: the extraction shell no longer hides the unwired Raw/Rendered pair (body.md-shell #reader-source-details > .view-toggle)");
+  check(/\.token-badge:empty\s*\{[^}]*display:\s*none/.test(bare),
+    "md-preview.css: an empty .token-badge paints as a bare pill on the extraction shell");
 }
 // (2) #ask-panel INVERTS the meaning of [hidden]: it stays display:flex while
 // closed and hides with transform+visibility, because a transform cannot
