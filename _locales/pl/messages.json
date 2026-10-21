@@ -3995,6 +3995,7 @@
   "hlCopyMd": { "message": "Kopiuj jako Markdown" },
   "hlCopied": { "message": "Skopiowano zaznaczenia" },
   "hlFilterEmpty": { "message": "Żadne zaznaczenie nie pasuje do wybranych kolorów" },
+  "hlStartHint": { "message": "Zaznacz tekst, aby go wyróżnić" },
   "explainSaveNote": { "message": "Zapisz jako notatkę" },
   "explainSavedNote": { "message": "Zapisano jako notatkę" },
   "hlCardExplain": { "message": "Wyjaśnij" },

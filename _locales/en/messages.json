@@ -4001,6 +4001,7 @@
   "hlCopyMd": { "message": "Copy as Markdown" },
   "hlCopied": { "message": "Highlights copied" },
   "hlFilterEmpty": { "message": "No highlights match the selected colors" },
+  "hlStartHint": { "message": "Select text to highlight" },
   "explainSaveNote": { "message": "Save as note" },
   "explainSavedNote": { "message": "Saved as note" },
   "hlCardExplain": { "message": "Explain" },

@@ -894,7 +894,9 @@ async function driveJourney(context, worker, extId, rep) {
       await reader.evaluate(async lang => { await chrome.storage.local.set({optLang:lang}); initI18n(); await pbpI18nReady(); }, locale);
       await seedPreviewData(worker); // Preview handoff slots are consumed on load.
       await reader.reload();
-      await reader.waitForSelector('#hl-rail-section:not([hidden]) .rail-sec-count');
+      // The section is on the rail from the first frame (count blank while
+      // storage is read, "(0)" before the restore); wait for the restored two.
+      await reader.waitForFunction(()=>document.querySelector('#hl-rail-section .rail-sec-count')?.textContent==='(2)');
       for (const mode of ["light","dark"]) for (const width of [320,1280]) {
         await reader.setViewportSize({width,height:900});
         await reader.evaluate(({mode,titleText}) => { pbpReaderSchemeSet(mode); document.getElementById('preview-title').textContent=titleText+' — '+titleText; }, {mode,titleText});
@@ -1302,8 +1304,24 @@ async function drivePreview(context, worker, extId, rep) {
     await step("highlight", async () => {
       const found = await page.evaluate(selectInRendered, "好的阅读器让长文变得可以呼吸");
       if (!found) throw new Error("selection target not found");
+      // The highlights section is on the rail from the first frame; the first
+      // highlight replaces its hint row, so Contents must not move.
+      const railProbe = () => page.evaluate(() => {
+        const sec = document.getElementById("hl-rail-section");
+        const toc = document.getElementById("toc");
+        return { count: sec?.querySelector(".rail-sec-count")?.textContent ?? null,
+          open: !!sec && !sec.classList.contains("rail-collapsed"),
+          toc: toc && !toc.hidden ? toc.getBoundingClientRect().top : null };
+      });
+      const before = await railProbe();
       await page.keyboard.press("1");
       await page.waitForTimeout(800);
+      const after = await railProbe();
+      const delta = before.toc != null && after.toc != null ? after.toc - before.toc : null;
+      s.notes.push(`highlight: count ${before.count} -> ${after.count}, section open ${before.open}, TOC top ${before.toc} -> ${after.toc} (delta ${delta == null ? "n/a" : delta.toFixed(2)}px)`);
+      if (before.count === "(0)" && before.open && delta != null && Math.abs(delta) > 1) {
+        throw new Error(`first highlight moved Contents by ${delta.toFixed(2)}px`);
+      }
       await rep.shot(page, s, "highlight-yellow");
     });
 

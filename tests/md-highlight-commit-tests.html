@@ -1333,7 +1333,8 @@ function selectionRange(n, start, end) {
   check("owner refresh immediately removes all displayed items and painted ranges",
     memoryIds().length === 0 && Object.keys(_pbpHlState.ranges).length === 0 &&
     !CSS.highlights.has("pbp-hl-1") && _pbpHlEchoItems === null &&
-    document.getElementById("hl-rail-section").hidden && !document.getElementById("hl-list").children.length);
+    !document.getElementById("hl-rail-section").hidden && !document.getElementById("hl-list").children.length &&
+    !document.querySelector("#hl-rail-section .hl-start-hint").hidden);
   await oldOwner.started;
   const updated = structuredClone(record());
   updated.items[0].note = "changed while owner read waits";
@@ -1409,7 +1410,7 @@ function selectionRange(n, start, end) {
   const unknownFlags = gatedRead(FLAG_READS);
   authChanged({ pinboardToken: { newValue: "foreign:fixture" } }, "sync");
   check("unknown routing stays empty and re-reads even for a possibly foreign-area event",
-    memoryIds().length === 0 && document.getElementById("hl-rail-section").hidden, memoryIds());
+    memoryIds().length === 0 && !document.getElementById("hl-list").children.length, memoryIds());
   // The baseline has no routing read; releasing a never-entered fixture is
   // harmless and keeps the red run on observable behavior rather than timing.
   unknownFlags.release({ optSyncEnabled: true, syncApiKeys: false });

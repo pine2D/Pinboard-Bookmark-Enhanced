@@ -496,6 +496,7 @@
         "hl-item-main",
         "hl-item-note",
         "hl-item-quote",
+        "hl-start-hint",
         "icon-only",
         "kbd-help-chip",
         "kbd-help-desc",

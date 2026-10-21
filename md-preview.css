@@ -3498,6 +3498,17 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
   .hl-filter-dot:focus-visible { outline-color: Highlight; }
 }
 .hl-filter-empty { font-size: 13px; color: var(--fg-muted); margin: var(--sp-1) 0 var(--sp-2); }
+/* Zero-items hint (2026-10-21): the section is on the rail from the first
+   frame, so at zero it says how to make a highlight. It is the box of one
+   .hl-item row -- sp-1 block padding around a line floored at the 24px
+   delete button, the text inset by .hl-item-main's own sp-0 / sp-1 padding
+   -- so the first highlight replaces it and nothing below it moves. */
+.hl-start-hint {
+  display: flex; align-items: center;
+  min-height: calc(24px + 2 * var(--sp-1)); padding: var(--sp-1) 0;
+  font-size: 12px; color: var(--fg-muted);
+}
+.hl-start-hint > span { padding: var(--sp-0) var(--sp-1); }
 /* Anchoring round: count-gated "N couldn't be located" note (hidden at 0)
    + the orphan rows themselves. Orphan != dim: dim is "temporarily hidden
    by the translation view" (recoverable this session), orphan is "the

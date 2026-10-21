@@ -3995,6 +3995,7 @@
   "hlCopyMd": { "message": "複製為 Markdown" },
   "hlCopied": { "message": "標記已複製" },
   "hlFilterEmpty": { "message": "所選顏色下沒有標記" },
+  "hlStartHint": { "message": "選取文字即可標記" },
   "explainSaveNote": { "message": "存為筆記" },
   "explainSavedNote": { "message": "已存為筆記" },
   "hlCardExplain": { "message": "解釋" },

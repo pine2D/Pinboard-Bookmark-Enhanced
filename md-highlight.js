@@ -1000,14 +1000,19 @@ async function pbpHlInit(detail) {
   try {
     const url = String((detail && detail.url) || "");
     const title = String((detail && detail.title) || "");
+    // Mount the rail section NOW, in the same task as pbp:rendered (the other
+    // rail sections mount there too): waiting for the reads below would let
+    // the article paint first and then push Export and Contents down. It
+    // renders in its pending shape until _pbpHlState exists.
+    try { _pbpHlNotebookRender(); } catch (_) {}
     await _pbpHlRefreshOwner();
     _pbpHlRawItems = await _pbpHlLoad(url);
     const items = _pbpHlOwnerPending ? [] : pbpHlVisibleItems(_pbpHlRawItems, _pbpHlOwner);
     _pbpHlState = { url, title, items, ranges: Object.create(null), degraded: Object.create(null), resolvedN: Object.create(null), orphans: Object.create(null) };
     pbpHlRestore();
-    // Restored-from-storage highlights must surface the rail entry on first
-    // paint too -- storage.local.get fires no onChanged, so without this call
-    // the rail stays hidden until the session's first mutation (create/delete).
+    // Restored-from-storage highlights must reach the rail list right away --
+    // storage.local.get fires no onChanged, so without this call the section
+    // would sit in its pending shape until the session's first mutation.
     _pbpHlNotebookRender();
     _pbpHlBindInteractions(view); // Task 4
   } finally {
@@ -1828,68 +1833,20 @@ async function _pbpHlCreateFromRange(range, color, btn) {
   });
   await _pbpHlLastColorSet(color);
   for (const { item } of created) pbpHlSyncMirror(item.n); // H5 (spec 1.5)
-  const railSnap = _pbpHlRailAnchorSnap(); // before the section can appear
   _pbpHlNotebookRender();
   // Spec 1.3 trigger 4: the FIRST highlight created this session
   // auto-expands the rail's hl section (session-visual only, via
   // expand(temp) -- never persisted, never overwrites the user's
   // stored collapse preference). A restore from storage (pbpHlInit)
-  // does NOT set this flag, only an actual creation does.
+  // does NOT set this flag, only an actual creation does. The section is on
+  // the rail from the first frame (2026-10-21), so this only ever opens one
+  // the reader had folded; an open one is left alone.
   if (!_pbpHlAutoExpandedThisSession) {
     _pbpHlAutoExpandedThisSession = true;
-    if (_pbpHlNbEls && _pbpHlNbEls.handle) _pbpHlNbEls.handle.expand(true);
+    const handle = _pbpHlNbEls && _pbpHlNbEls.handle;
+    if (handle && handle.isCollapsed()) handle.expand(true);
   }
-  _pbpHlRailAnchorRestore(railSnap);
   return created.map((x) => x.item);
-}
-
-// Rail anchor across the notebook's first appearance (2026-10-21). The
-// highlights section sits above Export and Contents, so the first highlight
-// pushes the TOC ~117px down. A scrolled rail already keeps its place (CSS
-// scroll anchoring), but at scrollTop 0 Chrome selects no anchor -- on
-// purpose: at the top, the top is what stays. So this only pays the jump back
-// when the reader is actually AT the rail below the insertion point: the
-// pointer rests on Export / Contents, or keyboard focus is there. Then the
-// first on-screen block below the section stays put and the rail scrolls by
-// the inserted height (clamped by its own scroll range). Reading in the
-// article and highlighting from the keyboard or the selection toolbar leaves
-// the rail at its top -- title and URL stay on screen, the TOC moves down
-// like any peripheral content (an unasked scroll there hid the title for
-// good, 2026-10-21 review). The section keeps its place in the rail order.
-// Only the creation path calls this -- a restore on load, another tab's
-// write or a delete never scrolls the rail.
-function _pbpHlRailAnchorSnap() {
-  const rail = document.getElementById("rail");
-  if (!rail || rail.scrollTop > 0) return null;
-  const sec = _pbpHlNbEls ? _pbpHlNbEls.sec : null;
-  if (sec && !sec.hidden) return null; // already on screen: nothing is inserted
-  // Before the first render the section does not exist yet; it will be
-  // inserted where _pbpHlBuildNotebookDom puts it (before Export, else TOC).
-  let el = sec ? sec.nextElementSibling
-    : (document.getElementById("export-section") || document.getElementById("toc"));
-  if (!el || !_pbpHlRailEngagedFrom(rail, el)) return null;
-  const rr = rail.getBoundingClientRect();
-  for (; el; el = el.nextElementSibling) {
-    if (el.id === "rail-bottom-row" || !el.getClientRects().length) continue; // sticky: never moves
-    const r = el.getBoundingClientRect();
-    if (r.bottom > rr.top && r.top < rr.bottom) return { rail, el, top: r.top };
-  }
-  return null;
-}
-// Is the pointer or keyboard focus on the rail at or below `from` (the first
-// block the insertion would push)? The sticky tools row never moves, so it
-// does not count. `:hover` is read at creation time: no listener is kept.
-function _pbpHlRailEngagedFrom(rail, from) {
-  const hovered = rail.querySelectorAll(":hover");
-  const targets = [hovered.length ? hovered[hovered.length - 1] : null, document.activeElement];
-  return targets.some((n) => n && n !== rail && rail.contains(n)
-    && !n.closest("#rail-bottom-row")
-    && (n === from || (from.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)));
-}
-function _pbpHlRailAnchorRestore(snap) {
-  if (!snap || !snap.el.isConnected) return;
-  const delta = snap.el.getBoundingClientRect().top - snap.top;
-  if (delta > 0.5) snap.rail.scrollTop += delta;
 }
 
 function _pbpHlRegisterRange(item, range) {
@@ -2613,22 +2570,37 @@ function _pbpHlDeleteCurrent() {
 // only 3 call sites are init/delete/onChanged, all in this file -- renamed
 // directly below rather than keeping a now-pointless alias.
 let _pbpHlColorFilter = new Set(PBP_HL_COLORS); // session-only, default all-on (spec 2.2 -- never persisted)
-let _pbpHlNbEls = null; // {sec, list, filterBtns, emptyHint, copyBtn, handle} -- built once
+let _pbpHlNbEls = null; // {sec, list, filterBtns, emptyHint, startHint, copyBtn, openLib, handle} -- built once
 let _pbpHlAutoExpandedThisSession = false; // spec 1.3 trigger 4 guard
 
+// The section is on the rail from the article's first frame, at zero items
+// too (2026-10-21): it used to appear with the first highlight, between Ask
+// and Export, and push Export and Contents down by its whole height. At zero
+// it shows "Highlights (0)" and one muted line saying how to make one; that
+// line is as tall as one list row, so the first highlight REPLACES it and
+// nothing below moves. Deleting the last highlight brings the line back.
+// While pbpHlInit is still reading storage (_pbpHlState not yet set) the line
+// keeps its height but stays invisible and the count is blank, so a page with
+// stored highlights never flashes "(0)" and the hint.
 function _pbpHlNotebookRender() {
   const rail = document.getElementById("rail");
   if (!rail) return;
   if (!_pbpHlNbEls) _pbpHlNbEls = _pbpHlBuildNotebookDom(rail);
+  const pending = !_pbpHlState;
   const items = _pbpHlState ? _pbpHlState.items : [];
-  _pbpHlNbEls.sec.hidden = items.length === 0; // 0 total -> whole section hidden (unchanged from before)
+  const empty = items.length === 0;
+  _pbpHlNbEls.startHint.hidden = !empty;
+  _pbpHlNbEls.startHint.style.visibility = pending ? "hidden" : "";
+  // Copy and "open in library" have nothing to act on at zero.
+  _pbpHlNbEls.copyBtn.hidden = empty;
+  if (_pbpHlNbEls.openLib) _pbpHlNbEls.openLib.hidden = empty;
   // Header count badge is TOTAL and always live. pbpRailCollapsible (Task 1)
   // reads opts.count ONCE at build to seed the .rail-sec-count span; keeping
   // it in sync on every mutation is this render's job (spec 2.3: render =
   // count + list), mirroring md-translate.js writing #tr-section
   // .rail-sec-progress by selector rather than relying on the engine to re-poll.
   const countEl = _pbpHlNbEls.sec.querySelector(".rail-sec-count");
-  if (countEl) countEl.textContent = "(" + items.length + ")";
+  if (countEl) countEl.textContent = pending ? "" : "(" + items.length + ")";
   // Progressive disclosure (2026-10-21): the colour filter appears once two
   // or more colours are in use, and offers only those colours. Five dots all
   // pressed over a one-colour list read as decoration, not a filter. A colour
@@ -2660,14 +2632,14 @@ function _pbpHlNotebookRender() {
   _pbpHlNbEls.orphanNote.textContent = orphanCount ? t("hlOrphanNote", String(orphanCount)) : "";
 }
 
-// One-time DOM build: filter row + list + empty-filter hint + header actions,
-// then installs the collapsible header via pbpRailCollapsible (Task 1,
-// md-preview.js). Insert before Export so Contents remains near the title.
+// One-time DOM build: filter row + list + zero-items hint + empty-filter hint
+// + header actions, then installs the collapsible header via
+// pbpRailCollapsible (Task 1, md-preview.js). Insert before Export so
+// Contents remains near the title.
 function _pbpHlBuildNotebookDom(rail) {
   const sec = document.createElement("div");
   sec.className = "rail-section";
   sec.id = "hl-rail-section";
-  sec.hidden = true;
 
   const filterRow = document.createElement("div");
   filterRow.className = "hl-filter-row";
@@ -2702,6 +2674,15 @@ function _pbpHlBuildNotebookDom(rail) {
   list.id = "hl-list";
   sec.appendChild(list);
 
+  // Zero items: how to make one. One list row tall (md-preview.css), so the
+  // first highlight takes its place without moving the rail below it.
+  const startHint = document.createElement("p");
+  startHint.className = "hl-start-hint";
+  const startText = document.createElement("span");
+  startText.textContent = t("hlStartHint");
+  startHint.appendChild(startText);
+  sec.appendChild(startHint);
+
   const emptyHint = document.createElement("p");
   emptyHint.className = "hl-filter-empty";
   emptyHint.textContent = t("hlFilterEmpty");
@@ -2732,7 +2713,7 @@ function _pbpHlBuildNotebookDom(rail) {
   const handle = (typeof pbpRailCollapsible === "function")
     ? pbpRailCollapsible(sec, "hl", {
         label: t("hlSectionTitle"),
-        count: () => "(" + (_pbpHlState ? _pbpHlState.items.length : 0) + ")",
+        count: () => (_pbpHlState ? "(" + _pbpHlState.items.length + ")" : ""),
         defaultCollapsed: false,
       })
     : null; // degrade: no collapsible header (file:// test harness has no #rail at all, never reaches here)
@@ -2740,6 +2721,7 @@ function _pbpHlBuildNotebookDom(rail) {
   // Keep the toggle and actions as independent siblings in one persistent
   // header. Only the list/filter content participates in folding.
   const headBtn = sec.querySelector(".rail-sec-head");
+  let openLib = null;
   if (headBtn) {
     const toolbar = document.createElement("div");
     toolbar.className = "rail-sec-toolbar";
@@ -2749,7 +2731,7 @@ function _pbpHlBuildNotebookDom(rail) {
     caption.append(headBtn.querySelector(".rail-sec-label"), headBtn.querySelector(".rail-sec-count"));
     headBtn.appendChild(caption);
     toolbar.append(headBtn, copyBtn);
-    const openLib = document.createElement("button");
+    openLib = document.createElement("button");
     openLib.type = "button";
     openLib.className = "rail-sec-open";
     openLib.innerHTML = (typeof PBP_ICONS === "object" && PBP_ICONS && PBP_ICONS.library) || ""; // book is the dictionary glyph
@@ -2766,7 +2748,7 @@ function _pbpHlBuildNotebookDom(rail) {
     toolbar.appendChild(openLib); // Tab order: fold, copy, library.
   }
 
-  return { sec, list, filterRow, filterBtns, emptyHint, copyBtn, handle, orphanNote };
+  return { sec, list, filterRow, filterBtns, emptyHint, startHint, copyBtn, openLib, handle, orphanNote };
 }
 
 // One <li> per notebook entry (spec 2.1). textContent/title only for all

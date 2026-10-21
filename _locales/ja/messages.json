@@ -3995,6 +3995,7 @@
   "hlCopyMd": { "message": "Markdownとしてコピー" },
   "hlCopied": { "message": "ハイライトをコピーしました" },
   "hlFilterEmpty": { "message": "選択した色に一致するハイライトがありません" },
+  "hlStartHint": { "message": "文字を選択してハイライト" },
   "explainSaveNote": { "message": "メモとして保存" },
   "explainSavedNote": { "message": "メモとして保存しました" },
   "hlCardExplain": { "message": "解説" },

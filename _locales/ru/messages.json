@@ -3995,6 +3995,7 @@
   "hlCopyMd": { "message": "Копировать как Markdown" },
   "hlCopied": { "message": "Выделения скопированы" },
   "hlFilterEmpty": { "message": "Нет выделений, соответствующих выбранным цветам" },
+  "hlStartHint": { "message": "Выделите текст для подсветки" },
   "explainSaveNote": { "message": "Сохранить как заметку" },
   "explainSavedNote": { "message": "Сохранено как заметка" },
   "hlCardExplain": { "message": "Объяснить" },

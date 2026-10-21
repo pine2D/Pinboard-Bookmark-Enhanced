@@ -118,8 +118,9 @@ async function pbpAskInit(detail) {
 //     </button>
 //   </div>
 // Anchor: directly after #tr-section when the translate entry rendered, else
-// before #export-section. Rail order (user ruling, kept on 2026-10-15; see
-// 8c681e0b): [tr-section], ask-section, [hl section], Export, Contents,
+// before the highlights section, else before #export-section. Rail order (user
+// ruling, kept on 2026-10-15; see 8c681e0b): [tr-section], ask-section, hl
+// section (on every article page since 2026-10-21), Export, Contents,
 // Source and extraction tools -- Contents stays AFTER Export, do not move it.
 function _pbpAskBuildRailEntry() {
   const rail = document.getElementById("rail");
@@ -161,7 +162,9 @@ function _pbpAskBuildRailEntry() {
   head.setAttribute("aria-hidden", "true");
   sec.insertBefore(head, btn);
   const translation = document.getElementById("tr-section");
-  const primaryAnchor = document.getElementById("export-section");
+  // The highlights section mounts on the same pbp:rendered and is often
+  // already in its slot on Export: Ask goes above it.
+  const primaryAnchor = document.getElementById("hl-rail-section") || document.getElementById("export-section");
   if (translation) translation.insertAdjacentElement("afterend", sec);
   else if (primaryAnchor) rail.insertBefore(sec, primaryAnchor);
   else anchor.insertAdjacentElement("afterend", sec);

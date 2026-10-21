@@ -3995,6 +3995,7 @@
   "hlCopyMd": { "message": "Als Markdown kopieren" },
   "hlCopied": { "message": "Markierungen kopiert" },
   "hlFilterEmpty": { "message": "Keine Markierungen entsprechen den ausgewählten Farben" },
+  "hlStartHint": { "message": "Text zum Hervorheben markieren" },
   "explainSaveNote": { "message": "Als Notiz speichern" },
   "explainSavedNote": { "message": "Als Notiz gespeichert" },
   "hlCardExplain": { "message": "Erklären" },

@@ -9167,52 +9167,49 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
       _pbpHlNbEls = was.els; _pbpHlState = was.state; _pbpHlColorFilter = was.filter; window.t = realT;
     }
   });
-  // 2026-10-21: the first highlight inserted the notebook above Export and
-  // Contents and the TOC dropped ~117px. At scrollTop 0 Chrome anchors
-  // nothing, so the creation path pays the jump back itself -- but only when
-  // the reader is at the rail below the insertion (pointer or focus there);
-  // reading in the article leaves the rail at its top, title on screen.
-  test("first highlight keeps the rail block below the notebook in place only while the reader is there", () => {
+  // 2026-10-21: the notebook used to appear with the first highlight, between
+  // Ask and Export, and push Export and Contents down. It is now on the rail
+  // from the first frame: "(0)" plus one hint line, no copy / library / colour
+  // tools at zero, and back to that shape when the last highlight goes.
+  test("highlights section: on the rail at zero with the hint, tools only once there is something to act on", () => {
     const realT = window.t;
     window.t = (k) => k;
-    const was = { els: _pbpHlNbEls, state: _pbpHlState, filter: _pbpHlColorFilter };
+    const was = { els: _pbpHlNbEls, state: _pbpHlState, filter: _pbpHlColorFilter, auto: _pbpHlAutoExpandedThisSession };
     const rail = document.createElement("aside"); rail.id = "rail";
-    rail.style.cssText = "position:fixed;left:0;top:0;width:256px;height:300px;overflow-y:auto;display:flex;flex-direction:column";
-    rail.innerHTML = '<div id="t-ident" tabindex="-1" style="height:60px;flex:none">ident</div><div id="export-section" style="height:40px;flex:none">export</div>' +
-      '<nav id="toc" style="flex:none">' + '<div tabindex="-1" style="height:24px">h</div>'.repeat(30) + "</nav>" +
-      '<div id="rail-bottom-row" style="position:sticky;bottom:0;flex:none;height:30px">tools</div>';
+    const exp = document.createElement("div"); exp.id = "export-section"; rail.appendChild(exp);
     document.body.appendChild(rail);
     try {
       _pbpHlNbEls = null; _pbpHlColorFilter = new Set(PBP_HL_COLORS);
+      _pbpHlState = null; // pbpHlInit's first render: storage not read yet
+      _pbpHlNotebookRender();
+      const sec = document.getElementById("hl-rail-section");
+      const hint = sec.querySelector(".hl-start-hint");
+      const count = () => sec.querySelector(".rail-sec-count").textContent;
+      const shown = (el) => !!el && !el.hidden && !el.closest("[hidden]");
+      assert(shown(sec), "the section is there before storage answers");
+      assertEq(sec.nextElementSibling, exp, "in its rail slot, before Export");
+      assertEq(count() + "|" + hint.hidden + "|" + hint.style.visibility, "|false|hidden",
+        "pending: blank count, the hint keeps its row but is not shown (no '(0)' flash on a page with highlights)");
       _pbpHlState = { items: [], ranges: {}, orphans: {}, resolvedN: {} };
-      _pbpHlNotebookRender(); // init: section built, hidden
-      const toc = document.getElementById("toc");
-      const before = toc.getBoundingClientRect().top;
-      document.activeElement && document.activeElement.blur && document.activeElement.blur();
-      assertEq(_pbpHlRailAnchorSnap(), null, "reader elsewhere (pointer off the rail, focus outside): the rail keeps its top");
-      document.getElementById("t-ident").focus();
-      assertEq(_pbpHlRailAnchorSnap(), null, "focus above the insertion point: holding the TOC would move what the reader is on");
-      toc.children[2].focus();
-      const snap = _pbpHlRailAnchorSnap();
-      assertEq(snap && snap.el.id, "export-section", "anchors the first visible block after the section (never the sticky tools row)");
+      _pbpHlNotebookRender();
+      assertEq(count(), "(0)", "zero items: the header reads (0)");
+      assert(shown(hint) && !hint.style.visibility && hint.textContent === "hlStartHint", "zero items: the hint line says how to make one");
+      assertEq(sec.querySelectorAll(".hl-item").length, 0, "no list rows");
+      assert(!shown(_pbpHlNbEls.copyBtn) && !shown(_pbpHlNbEls.openLib) && !shown(_pbpHlNbEls.filterRow),
+        "copy, open-library and the colour filter are absent at zero");
       _pbpHlState.items = [{ id: "a", n: 1, quote: "first", color: 1, ts: 1 }];
       _pbpHlNotebookRender();
-      assert(!_pbpHlNbEls.sec.hidden && _pbpHlNbEls.sec.getBoundingClientRect().height > 0, "the section appeared");
-      _pbpHlRailAnchorRestore(snap);
-      assert(Math.abs(toc.getBoundingClientRect().top - before) <= 1, "TOC moved " + (toc.getBoundingClientRect().top - before) + "px");
-      assert(rail.scrollTop > 0, "the rail scrolled by the inserted height");
-      assertEq(_pbpHlRailAnchorSnap(), null, "a scrolled rail is left to CSS scroll anchoring");
-      rail.scrollTop = 0;
-      assertEq(_pbpHlRailAnchorSnap(), null, "nothing to hold once the section is already on screen");
+      assert(!shown(hint) && sec.querySelectorAll(".hl-item").length === 1 && count() === "(1)", "the first highlight replaces the hint");
+      assert(shown(_pbpHlNbEls.copyBtn) && shown(_pbpHlNbEls.openLib), "copy and open-library appear with it");
+      _pbpHlState.items = [];
+      _pbpHlNotebookRender();
+      assert(shown(sec) && shown(hint) && count() === "(0)" && !shown(_pbpHlNbEls.copyBtn), "deleting the last one returns to the hint, not to a missing section");
       const src = String(_pbpHlCreateFromRange);
-      const snapAt = src.indexOf("_pbpHlRailAnchorSnap()"), renderAt = src.indexOf("_pbpHlNotebookRender()"), restoreAt = src.indexOf("_pbpHlRailAnchorRestore(");
-      assert(snapAt >= 0 && snapAt < renderAt && renderAt < restoreAt && src.indexOf(".expand(true)") < restoreAt,
-        "creation snaps before the render and restores after the auto-expand");
-      for (const fn of [pbpHlRestore, _pbpHlDeleteItem]) assert(!String(fn).includes("_pbpHlRailAnchor"), fn.name + " never scrolls the rail");
+      assert(!/scrollTop|_pbpHlRail/.test(src), "creation no longer scrolls the rail to pay back an insertion");
+      assert(/isCollapsed\(\)\)\s*handle\.expand\(true\)/.test(src), "the first-creation auto-expand only opens a section the reader had folded");
     } finally {
-      if (rail.contains(document.activeElement)) document.activeElement.blur();
       rail.remove();
-      _pbpHlNbEls = was.els; _pbpHlState = was.state; _pbpHlColorFilter = was.filter; window.t = realT;
+      _pbpHlNbEls = was.els; _pbpHlState = was.state; _pbpHlColorFilter = was.filter; _pbpHlAutoExpandedThisSession = was.auto; window.t = realT;
     }
   });
   // 2026-10-21 distill: the pre-request estimate is one line; only the
@@ -9371,6 +9368,72 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
     } finally { wrap.remove(); }
   });
 });
+
+// 2026-10-21: the zero-items hint is one list row tall, so the first highlight
+// replaces it and the next rail section does not move. Measured under the real
+// md-preview.css in a frame (this page loads no stylesheet), with the section
+// markup the render actually builds, for a Latin and a CJK quote.
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "highlights section geometry (async)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  const name = "first highlight replaces the hint row: the section below keeps its top (<=1px) while open";
+  const realT = window.t;
+  const was = { els: _pbpHlNbEls, state: _pbpHlState, filter: _pbpHlColorFilter };
+  const rail = document.createElement("aside"); rail.id = "rail";
+  const exp = document.createElement("div"); exp.id = "export-section"; rail.appendChild(exp);
+  const frame = document.createElement("iframe");
+  try {
+    window.t = (k) => (k === "hlStartHint" ? "Select text to highlight" : k);
+    document.body.appendChild(rail);
+    _pbpHlNbEls = null; _pbpHlColorFilter = new Set(PBP_HL_COLORS);
+    const snapshot = (items) => {
+      _pbpHlState = { items, ranges: {}, orphans: {}, resolvedN: {} };
+      _pbpHlNotebookRender();
+      const c = document.getElementById("hl-rail-section").cloneNode(true);
+      c.classList.remove("rail-collapsed"); c.removeAttribute("style");
+      return c.outerHTML;
+    };
+    const zero = snapshot([]);
+    const latin = snapshot([{ id: "a", n: 1, quote: "the quick brown fox", color: 1, ts: 1 }]);
+    const cjk = snapshot([{ id: "b", n: 1, quote: "这是第一条高亮，用来量行高", color: 2, ts: 1 }]);
+    // Put the module state back BEFORE awaiting: other async suites may run
+    // while the frame loads and must not see this fixture.
+    rail.remove();
+    _pbpHlNbEls = was.els; _pbpHlState = was.state; _pbpHlColorFilter = was.filter; window.t = realT;
+    frame.style.cssText = "position:absolute;left:-3000px;top:0;width:1280px;height:800px";
+    frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../md-preview.css"></head>' +
+      '<body><aside id="rail" class="rail"><div id="slot"></div><div id="next" class="rail-section">next</div></aside></body></html>';
+    await new Promise((res, rej) => { frame.onload = res; frame.onerror = rej; document.body.appendChild(frame); });
+    const fd = frame.contentDocument;
+    assert(fd.styleSheets.length && getComputedStyle(fd.body).boxSizing === "border-box", "md-preview.css loaded in the frame");
+    const topWith = (html) => { fd.getElementById("slot").innerHTML = html; return fd.getElementById("next").getBoundingClientRect().top; };
+    const t0 = topWith(zero);
+    const hintBox = fd.querySelector(".hl-start-hint").getBoundingClientRect();
+    assert(hintBox.height >= 32, "the hint row is at least one 24px row plus its sp-1 padding: " + hintBox.height);
+    for (const [label, html] of [["latin", latin], ["cjk", cjk]]) {
+      const t1 = topWith(html);
+      assert(fd.querySelectorAll(".hl-item").length === 1, label + ": one list row rendered");
+      assert(Math.abs(t1 - t0) <= 1, label + ": next section moved " + (t1 - t0).toFixed(2) + "px");
+    }
+    report(name);
+  } catch (e) {
+    report(name, e);
+  } finally {
+    frame.remove(); rail.remove();
+    if (_pbpHlNbEls !== was.els) { _pbpHlNbEls = was.els; _pbpHlState = was.state; _pbpHlColorFilter = was.filter; }
+    window.t = realT;
+  }
+})();
 
 // Critique 2026-10-20 #3 (distill): the done state is one status line, the
 // view toggle, the view line and a fold. Built through the real section

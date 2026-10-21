@@ -587,7 +587,8 @@ function pbpAiRenderSetupEntry(s) {
   button.textContent = t("aiConfigure");
   button.addEventListener("click", () => pbpOpenOptionsTab("ai"));
   section.appendChild(button);
-  rail.insertBefore(section, document.getElementById("export-section"));
+  // Above the highlights section, which mounts first and sits on Export.
+  rail.insertBefore(section, document.getElementById("hl-rail-section") || document.getElementById("export-section"));
 }
 
 let _pbpAiSetupDetail = null;

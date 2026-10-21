@@ -3989,6 +3989,7 @@
   "hlCopyMd": { "message": "复制为 Markdown" },
   "hlCopied": { "message": "高亮已复制" },
   "hlFilterEmpty": { "message": "所选颜色下没有高亮" },
+  "hlStartHint": { "message": "选中文字即可高亮" },
   "explainSaveNote": { "message": "存为笔记" },
   "explainSavedNote": { "message": "已存为笔记" },
   "hlCardExplain": { "message": "解释" },

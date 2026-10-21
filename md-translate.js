@@ -1631,7 +1631,10 @@ function _pbpTrBuildSection(st) {
   // bug. Never auto-translates: expanding costs zero tokens.
   st.railHandle = pbpRailCollapsible(sec, "tr", { label, defaultCollapsed: !_pbpTrDefaultExpanded(st.articleLang, st.target.code) });
 
-  const primaryAnchor = document.getElementById("ask-section") || document.getElementById("export-section");
+  // Above Ask, else above the highlights section (mounted on pbp:rendered,
+  // usually before this one), else above Export.
+  const primaryAnchor = document.getElementById("ask-section") || document.getElementById("hl-rail-section")
+    || document.getElementById("export-section");
   if (primaryAnchor) rail.insertBefore(sec, primaryAnchor);
   else anchor.insertAdjacentElement("afterend", sec);
   btn.addEventListener("click", () => { _pbpTrTrigger(st); });
