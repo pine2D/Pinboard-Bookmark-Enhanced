@@ -3957,6 +3957,7 @@
   "hlColorRed": { "message": "Красный" },
   "hlColorPurple": { "message": "Фиолетовый" },
   "hlTrBadgeAria": { "message": "Выделение перевода ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
+  "hlInOriginal": { "message": "в оригинале" },
   "hlNoteBtn": { "message": "Выделить и добавить заметку" },
   "hlSaveFailed": { "message": "Не удалось сохранить выделение" },
   "hlNotePlaceholder": { "message": "Добавить заметку…" },

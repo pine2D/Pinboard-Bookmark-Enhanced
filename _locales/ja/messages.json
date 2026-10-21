@@ -3957,6 +3957,7 @@
   "hlColorRed": { "message": "赤" },
   "hlColorPurple": { "message": "紫" },
   "hlTrBadgeAria": { "message": "翻訳のハイライト（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
+  "hlInOriginal": { "message": "原文" },
   "hlNoteBtn": { "message": "ハイライトしてメモを追加" },
   "hlSaveFailed": { "message": "ハイライトを保存できませんでした" },
   "hlNotePlaceholder": { "message": "メモを追加…" },

@@ -3957,6 +3957,7 @@
   "hlColorRed": { "message": "Rouge" },
   "hlColorPurple": { "message": "Violet" },
   "hlTrBadgeAria": { "message": "Surlignage de la traduction ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
+  "hlInOriginal": { "message": "dans l'original" },
   "hlNoteBtn": { "message": "Surligner et ajouter une note" },
   "hlSaveFailed": { "message": "Impossible d'enregistrer le surlignage" },
   "hlNotePlaceholder": { "message": "Ajouter une note…" },

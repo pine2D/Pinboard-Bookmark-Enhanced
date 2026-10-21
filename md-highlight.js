@@ -2825,6 +2825,13 @@ function _pbpHlBuildItemEl(m) {
     badge.textContent = full.lang || "";
     badge.setAttribute("aria-label", t("hlTrBadgeAria", full.lang || ""));
     main.appendChild(badge);
+  } else if (dimmed) {
+    // An original-side highlight whose block tr-only is hiding. The tr side
+    // already names its language, so only this side needs the chip.
+    const where = document.createElement("span");
+    where.className = "hl-item-lang";
+    where.textContent = t("hlInOriginal");
+    main.appendChild(where);
   }
   main.title = full ? full.quote : m.excerpt;
   if (!blockEl || orphan) {

@@ -3957,6 +3957,7 @@
   "hlColorRed": { "message": "Rot" },
   "hlColorPurple": { "message": "Violett" },
   "hlTrBadgeAria": { "message": "Hervorhebung der Übersetzung ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
+  "hlInOriginal": { "message": "im Original" },
   "hlNoteBtn": { "message": "Markieren und Notiz hinzufügen" },
   "hlSaveFailed": { "message": "Die Markierung konnte nicht gespeichert werden" },
   "hlNotePlaceholder": { "message": "Notiz hinzufügen…" },

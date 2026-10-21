@@ -151,6 +151,15 @@ html { scrollbar-gutter: stable; }
   --hl-3: light-dark(rgba(96, 165, 250, 0.4), #5689B659);
   --hl-4: light-dark(rgba(248, 113, 113, 0.4), #B86F8C59);
   --hl-5: light-dark(rgba(192, 132, 252, 0.4), #8B72AF59);
+  /* Solid ink of each hue for the translation-side mirror bar: the
+     translucent fills above fall to about 1.2:1 as a 3px edge. Every value
+     clears 3:1 (non-text contrast) on both --bg and --surface; the dark side
+     reuses the swatch colours. */
+  --hl-ink-1: light-dark(#A87C00, #D9A441);
+  --hl-ink-2: light-dark(#3A9A46, #5E9C69);
+  --hl-ink-3: light-dark(#3B82F6, #5689B6);
+  --hl-ink-4: light-dark(#EF4444, #B86F8C);
+  --hl-ink-5: light-dark(#A855F7, #8B72AF);
   /* R4 in-document search (md-reader.js): a low-saturation NEUTRAL tint
      distinct from every saturated user-highlight hue above (yellow/
      green/blue/pink/purple) and from --hl-flash's yellow, so all three
@@ -2595,11 +2604,11 @@ body.tr-bilingual #rendered-view [data-pb-hl-mirror]:dir(rtl),
 body.tr-only #rendered-view [data-pb-hl-mirror]:dir(rtl) { --mirror-x: -3px; }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror],
 body.tr-only #rendered-view [data-pb-hl-mirror] { box-shadow: inset var(--mirror-x) 0 0 0 var(--mirror-c); }
-#rendered-view [data-pb-hl-mirror="1"] { --mirror-c: var(--hl-1); }
-#rendered-view [data-pb-hl-mirror="2"] { --mirror-c: var(--hl-2); }
-#rendered-view [data-pb-hl-mirror="3"] { --mirror-c: var(--hl-3); }
-#rendered-view [data-pb-hl-mirror="4"] { --mirror-c: var(--hl-4); }
-#rendered-view [data-pb-hl-mirror="5"] { --mirror-c: var(--hl-5); }
+#rendered-view [data-pb-hl-mirror="1"] { --mirror-c: var(--hl-ink-1); }
+#rendered-view [data-pb-hl-mirror="2"] { --mirror-c: var(--hl-ink-2); }
+#rendered-view [data-pb-hl-mirror="3"] { --mirror-c: var(--hl-ink-3); }
+#rendered-view [data-pb-hl-mirror="4"] { --mirror-c: var(--hl-ink-4); }
+#rendered-view [data-pb-hl-mirror="5"] { --mirror-c: var(--hl-ink-5); }
 /* A quote already has its own bar: a mirror on it (or on the .pb-tr that only
    wraps a translated quote) recolours THAT bar instead of drawing a second
    one beside it (2026-10-19 reader critique: double bar in tr-only). */
@@ -3594,7 +3603,10 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
   color: var(--fg-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.hl-item-dim .hl-item-main { opacity: 0.45; }
+/* A dimmed row's highlight sits in the half of the page this view hides.
+   Muted text plus a "where" chip (.hl-item-lang, the tr badge's shape) say
+   so; opacity used to take the 12px quote down to about 2.8:1. */
+.hl-item-dim .hl-item-quote { color: var(--fg-muted); }
 
 /* ---- Footnote popover (md-reader.js, spec 2026-07-06 sec.3 R3).
    Derived from the #explain-pop/#pb-hl-card popover family above --

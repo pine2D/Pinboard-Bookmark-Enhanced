@@ -3957,6 +3957,7 @@
   "hlColorRed": { "message": "紅色" },
   "hlColorPurple": { "message": "紫色" },
   "hlTrBadgeAria": { "message": "譯文標記（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
+  "hlInOriginal": { "message": "原文" },
   "hlNoteBtn": { "message": "標記並加入筆記" },
   "hlSaveFailed": { "message": "標記未能儲存" },
   "hlNotePlaceholder": { "message": "新增筆記…" },

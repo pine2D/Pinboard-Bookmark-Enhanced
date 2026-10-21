@@ -3957,6 +3957,7 @@
   "hlColorRed": { "message": "Czerwony" },
   "hlColorPurple": { "message": "Fioletowy" },
   "hlTrBadgeAria": { "message": "Podświetlenie tłumaczenia ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
+  "hlInOriginal": { "message": "w oryginale" },
   "hlNoteBtn": { "message": "Zaznacz i dodaj notatkę" },
   "hlSaveFailed": { "message": "Nie udało się zapisać zaznaczenia" },
   "hlNotePlaceholder": { "message": "Dodaj notatkę…" },
