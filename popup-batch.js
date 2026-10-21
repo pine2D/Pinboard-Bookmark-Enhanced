@@ -43,16 +43,47 @@ function batchAiPermissionRows(origins, s) {
 }
 
 function showBatchAiPermission(origins, s) {
+  showBatchPreflight({
+    title: t("batchPermConfirm", String(origins.length)),
+    rows: batchAiPermissionRows(origins, s),
+    detail: t("batchConfirmDetailAi"),
+    grantText: t("batchPermGrant"),
+  });
+}
+
+// The same card asks before a plain Batch Save of more than 3 tabs, or one
+// that runs AI on tabs whose sites are already granted (critique
+// 2026-10-21): one click used to write the whole window to Pinboard and
+// bill the AI key per tab without a word. Not the shared confirm popover --
+// that one is the destructive confirm, its button solid danger red.
+function showBatchConfirm(count, useAi) {
+  showBatchPreflight({
+    title: t("batchConfirmMsg", String(count)),
+    rows: [],
+    detail: t(useAi ? "batchConfirmDetailAi" : "batchConfirmDetail"),
+    grantText: t("submit"),
+  });
+}
+
+function showBatchPreflight({ title: titleText, rows, detail, grantText }) {
   const panel = $id("batch-permission");
   const title = $id("batch-permission-title");
   const list = $id("batch-permission-list");
   if (!panel || !title || !list) return;
-  title.textContent = t("batchPermConfirm", String(origins.length));
-  list.replaceChildren(...batchAiPermissionRows(origins, s).map(text => {
+  title.textContent = titleText;
+  list.replaceChildren(...rows.map(text => {
     const item = document.createElement("li");
     item.textContent = text;
     return item;
   }));
+  list.classList.toggle("hidden", !rows.length);
+  const detailEl = $id("batch-permission-detail");
+  if (detailEl) {
+    detailEl.textContent = detail || "";
+    detailEl.classList.toggle("hidden", !detail);
+  }
+  const grant = $id("batch-permission-grant");
+  if (grant) grant.textContent = grantText;
   clearTimeout(_batchPermHideTimer);
   panel.classList.remove("dismissing");
   panel.classList.remove("hidden");
@@ -177,7 +208,9 @@ function setupTabSet() {
     grantBtn.disabled = true;
     if (cancelBtn) cancelBtn.disabled = true;
     try {
-      const granted = await chrome.permissions.request({ origins: pending.origins });
+      // A confirm-only card has nothing to request: its sites (if any) were
+      // already granted when it opened.
+      const granted = pending.mode === "confirm" || await chrome.permissions.request({ origins: pending.origins });
       if (!granted) {
         showStatus("status-msg", t("batchPermDenied"), "error");
         grantBtn.disabled = false;
@@ -255,6 +288,8 @@ function setupTabSet() {
         if (!(await chrome.permissions.contains({ origins }))) {
           const current = await readBatchAccount();
           if (current.account !== startAuth.account) throw new Error("account_changed");
+          // The grant card is the confirm here: it names the sites, says AI
+          // bills per tab, and its button starts the run.
           batchAiPermissionPending = { tabs: snapshot, origins, account: startAuth.account };
           showBatchAiPermission(origins, settings);
           setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
@@ -263,6 +298,12 @@ function setupTabSet() {
       }
       const current = await readBatchAccount();
       if (current.account !== startAuth.account) throw new Error("account_changed");
+      if (validTabs.length > 3 || useAiTags || useAiSummary) {
+        batchAiPermissionPending = { mode: "confirm", tabs: snapshot, origins: [], account: startAuth.account };
+        showBatchConfirm(validTabs.length, useAiTags || useAiSummary);
+        setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
+        return;
+      }
       await dispatchBatchSave(snapshot, batchBtn, startAuth.account);
     } catch (e) {
       // The account guards above throw the bare reason code; name the cause

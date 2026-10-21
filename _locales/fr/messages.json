@@ -456,7 +456,7 @@
     "message": "Envoyé !"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -4334,5 +4334,8 @@
     "driveNotesErrorEntryTooLarge": {
       "message": "Un surlignage ou une note est trop volumineux pour la synchronisation. Raccourcissez-le ou supprimez-le, puis cliquez sur « Synchroniser maintenant »."
     },
-  "saveWaitRateLimit": { "message": "Enregistrement en cours : Pinboard n’accepte qu’une requête toutes les 3 secondes." }
+  "saveWaitRateLimit": { "message": "Enregistrement en cours : Pinboard n’accepte qu’une requête toutes les 3 secondes." },
+  "batchConfirmMsg": { "message": "Enregistrer les $COUNT$ onglets de cette fenêtre ?", "placeholders": {"count": {"content": "$1"}} },
+  "batchConfirmDetail": { "message": "Les pages déjà enregistrées sont ignorées." },
+  "batchConfirmDetailAi": { "message": "Les pages déjà enregistrées sont ignorées. L’IA s’exécute pour chaque nouvel onglet et est facturée sur votre clé API." }
 }

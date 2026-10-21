@@ -456,7 +456,7 @@
     "message": "已发送！"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$（$SAVED$/$FAILED$）",
+    "message": "$CURRENT$/$TOTAL$",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -4328,5 +4328,8 @@
     "driveNotesErrorEntryTooLarge": {
       "message": "有一条高亮或笔记过大，无法同步。请缩短或删除该条内容，然后点击「立即同步」。"
     },
-  "saveWaitRateLimit": { "message": "仍在保存：Pinboard 每 3 秒只接受一次请求。" }
+  "saveWaitRateLimit": { "message": "仍在保存：Pinboard 每 3 秒只接受一次请求。" },
+  "batchConfirmMsg": { "message": "保存当前窗口的 $COUNT$ 个标签页？", "placeholders": {"count": {"content": "$1"}} },
+  "batchConfirmDetail": { "message": "已收藏的页面会跳过。" },
+  "batchConfirmDetailAi": { "message": "已收藏的页面会跳过。每个新标签页都会调用一次 AI，费用计入你的 API Key。" }
 }

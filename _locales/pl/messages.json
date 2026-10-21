@@ -456,7 +456,7 @@
     "message": "Wysłano!"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -4334,5 +4334,8 @@
     "driveNotesErrorEntryTooLarge": {
       "message": "Zaznaczenie lub notatka ma zbyt duży rozmiar do synchronizacji. Skróć treść lub usuń zapis, a potem kliknij „Synchronizuj teraz”."
     },
-  "saveWaitRateLimit": { "message": "Nadal zapisywanie: Pinboard przyjmuje jedno żądanie co 3 sekundy." }
+  "saveWaitRateLimit": { "message": "Nadal zapisywanie: Pinboard przyjmuje jedno żądanie co 3 sekundy." },
+  "batchConfirmMsg": { "message": "Zapisać karty z tego okna ($COUNT$)?", "placeholders": {"count": {"content": "$1"}} },
+  "batchConfirmDetail": { "message": "Strony, które już zapisano, zostaną pominięte." },
+  "batchConfirmDetailAi": { "message": "Strony, które już zapisano, zostaną pominięte. Dla każdej nowej karty uruchomi się AI, a koszt obciąży twój klucz API." }
 }

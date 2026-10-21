@@ -456,7 +456,7 @@
     "message": "Gesendet!"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -4334,5 +4334,8 @@
     "driveNotesErrorEntryTooLarge": {
       "message": "Eine Markierung oder Notiz ist zu groß zum Synchronisieren. Kürze oder entferne sie und klicke auf „Jetzt synchronisieren“."
     },
-  "saveWaitRateLimit": { "message": "Wird noch gespeichert: Pinboard nimmt nur alle 3 Sekunden eine Anfrage an." }
+  "saveWaitRateLimit": { "message": "Wird noch gespeichert: Pinboard nimmt nur alle 3 Sekunden eine Anfrage an." },
+  "batchConfirmMsg": { "message": "$COUNT$ Tabs aus diesem Fenster speichern?", "placeholders": {"count": {"content": "$1"}} },
+  "batchConfirmDetail": { "message": "Bereits gespeicherte Seiten werden übersprungen." },
+  "batchConfirmDetailAi": { "message": "Bereits gespeicherte Seiten werden übersprungen. Für jeden neuen Tab läuft die KI und wird über deinen API-Schlüssel abgerechnet." }
 }

@@ -1569,6 +1569,10 @@ html[data-theme] .batch-progress-text {
   font: 10px/1.45 "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
   overflow-wrap: anywhere;
 }
+/* What the run will do (skips saved pages, AI bills per tab): plain-weight
+   text under the bold title or the site list, same 11px as the title. */
+.batch-permission-detail { margin: 0; font-size: 11px; }
+.batch-permission-list:not(.hidden) + .batch-permission-detail { margin-top: var(--pp-sp-2); }
 .batch-permission > .actions { margin-top: var(--pp-sp-3); }
 /* Buttons are .fc-btn (ghost, family standard) in the markup; the primary
    action is bolded, de-emphasis via order not colour. */

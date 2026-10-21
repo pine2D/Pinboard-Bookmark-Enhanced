@@ -456,7 +456,7 @@
     "message": "送信しました！"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$（$SAVED$/$FAILED$）",
+    "message": "$CURRENT$/$TOTAL$",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -4334,5 +4334,8 @@
     "driveNotesErrorEntryTooLarge": {
       "message": "ハイライトまたはメモが大きすぎるため同期できません。短くするか削除してから「今すぐ同期」をクリックしてください。"
     },
-  "saveWaitRateLimit": { "message": "保存しています。Pinboard が受け付けるリクエストは 3 秒に 1 回です。" }
+  "saveWaitRateLimit": { "message": "保存しています。Pinboard が受け付けるリクエストは 3 秒に 1 回です。" },
+  "batchConfirmMsg": { "message": "このウィンドウの $COUNT$ 個のタブを保存しますか？", "placeholders": {"count": {"content": "$1"}} },
+  "batchConfirmDetail": { "message": "保存済みのページはスキップします。" },
+  "batchConfirmDetailAi": { "message": "保存済みのページはスキップします。新しいタブごとに AI を呼び出し、料金は API キーに請求されます。" }
 }

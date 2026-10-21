@@ -459,7 +459,7 @@
     "message": "Sent!"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -4341,5 +4341,8 @@
     "driveNotesErrorEntryTooLarge": {
       "message": "A highlight or note is too large to sync. Shorten or remove it, then click Sync now."
     },
-  "saveWaitRateLimit": { "message": "Still saving: Pinboard accepts one request every 3 seconds." }
+  "saveWaitRateLimit": { "message": "Still saving: Pinboard accepts one request every 3 seconds." },
+  "batchConfirmMsg": { "message": "Save $COUNT$ tabs from this window?", "placeholders": {"count": {"content": "$1"}} },
+  "batchConfirmDetail": { "message": "Pages you’ve already saved are skipped." },
+  "batchConfirmDetailAi": { "message": "Pages you’ve already saved are skipped. AI runs on each new tab and bills your API key." }
 }

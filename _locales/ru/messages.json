@@ -456,7 +456,7 @@
     "message": "Отправлено!"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -4334,5 +4334,8 @@
     "driveNotesErrorEntryTooLarge": {
       "message": "Выделение или заметка слишком велики для синхронизации. Сократите или удалите их, затем нажмите «Синхронизировать сейчас»."
     },
-  "saveWaitRateLimit": { "message": "Сохранение продолжается: Pinboard принимает не больше одного запроса в 3 секунды." }
+  "saveWaitRateLimit": { "message": "Сохранение продолжается: Pinboard принимает не больше одного запроса в 3 секунды." },
+  "batchConfirmMsg": { "message": "Сохранить вкладки этого окна ($COUNT$)?", "placeholders": {"count": {"content": "$1"}} },
+  "batchConfirmDetail": { "message": "Уже сохранённые страницы будут пропущены." },
+  "batchConfirmDetailAi": { "message": "Уже сохранённые страницы будут пропущены. Для каждой новой вкладки запускается AI, оплата идёт с вашего API-ключа." }
 }

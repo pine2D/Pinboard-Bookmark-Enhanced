@@ -121,6 +121,7 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
     "batch-permission": fakeElement(),
     "batch-permission-title": fakeElement(),
     "batch-permission-list": fakeElement(),
+    "batch-permission-detail": fakeElement(),
     "batch-permission-grant": fakeButton(),
     "batch-permission-cancel": fakeButton(),
   };
@@ -303,13 +304,50 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(h.elements["batch-permission-grant"].focused, true);
   });
 
-  await test("already-granted exact origins start directly without showing disclosure", async () => {
+  // Critique 2026-10-21: batch AI bills the key per tab, so even with every
+  // site granted the run is confirmed first -- in the same inline card, as a
+  // confirm-only step with nothing left to request.
+  await test("already-granted exact origins skip the request but still confirm the AI run", async () => {
     const h = await createBatchClickHarness({ contains: true });
     await h.click();
     equal(h.calls.contains.length, 1);
     equal(h.calls.request.length, 0);
+    equal(h.calls.messages.length, 0, "AI batch started without a confirm");
+    equal(h.elements["batch-permission"].classList.contains("hidden"), false);
+    equal(h.elements["batch-permission-title"].textContent, "batchConfirmMsg:2");
+    equal(h.elements["batch-permission-detail"].textContent, "batchConfirmDetailAi");
+    equal(h.elements["batch-permission-list"].classList.contains("hidden"), true);
+    equal(h.elements["batch-permission-grant"].textContent, "submit");
+    equal(h.elements["batch-permission-grant"].focused, true, "Enter should confirm");
+    await h.grant();
+    equal(h.calls.request.length, 0, "a confirm-only card requested permissions");
     equal(h.calls.messages.length, 1);
     equal(h.elements["batch-permission"].classList.contains("hidden"), true);
+  });
+
+  await test("a few tabs without AI start directly; more than 3 confirm first", async () => {
+    const few = await createBatchClickHarness({ ai: false });
+    await few.click();
+    equal(few.calls.messages.length, 1);
+    equal(few.elements["batch-permission"].classList.contains("hidden"), true);
+    const tabs = Array.from({ length: 4 }, (_, i) => ({ id: i + 1, url: `https://site-${i + 1}.example/p` }));
+    const many = await createBatchClickHarness({ ai: false, tabs });
+    await many.click();
+    equal(many.calls.messages.length, 0);
+    equal(many.elements["batch-permission-title"].textContent, "batchConfirmMsg:4");
+    equal(many.elements["batch-permission-detail"].textContent, "batchConfirmDetail");
+    many.cancel();
+    equal(many.calls.messages.length, 0);
+    equal(many.calls.writes, 0);
+    equal(many.elements["batch-bookmark-btn"].disabled, false);
+  });
+
+  await test("the grant card also says AI bills per tab", async () => {
+    const h = await createBatchClickHarness();
+    await h.click();
+    equal(h.elements["batch-permission-detail"].textContent, "batchConfirmDetailAi");
+    equal(h.elements["batch-permission-detail"].classList.contains("hidden"), false);
+    equal(h.elements["batch-permission-grant"].textContent, "batchPermGrant");
   });
 
   await test("Batch without AI starts with zero permission work", async () => {

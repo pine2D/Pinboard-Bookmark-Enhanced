@@ -456,7 +456,7 @@
     "message": "已發送！"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$（$SAVED$/$FAILED$）",
+    "message": "$CURRENT$/$TOTAL$",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -4334,5 +4334,8 @@
     "driveNotesErrorEntryTooLarge": {
       "message": "有一項標記或筆記過大，無法同步。請縮短或刪除該項內容，然後按「立即同步」。"
     },
-  "saveWaitRateLimit": { "message": "仍在儲存：Pinboard 每 3 秒只接受一次請求。" }
+  "saveWaitRateLimit": { "message": "仍在儲存：Pinboard 每 3 秒只接受一次請求。" },
+  "batchConfirmMsg": { "message": "要儲存目前視窗的 $COUNT$ 個標籤頁嗎？", "placeholders": {"count": {"content": "$1"}} },
+  "batchConfirmDetail": { "message": "已收藏的頁面會略過。" },
+  "batchConfirmDetailAi": { "message": "已收藏的頁面會略過。每個新標籤頁都會呼叫一次 AI，費用計入你的 API Key。" }
 }
