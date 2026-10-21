@@ -686,7 +686,10 @@ function test(name, fn) {
   test("expanded choice help contributes only one gap before the next setting", () => {
     const readVar = (name) => parseFloat(frame.contentWindow.getComputedStyle(doc.documentElement).getPropertyValue(name));
     const { details, host, body } = parts("optSyncHint");
-    const next = host.nextElementSibling;
+    // A hidden dependency note (#opt-sync-api-keys-requires, shown only
+    // while the sync switch is off) sits between the two rows; it has no box.
+    let next = host.nextElementSibling;
+    while (next?.matches("[data-parent-note][hidden]")) next = next.nextElementSibling;
     const nextLabel = next?.querySelector(":scope > label");
     assert(next?.classList.contains("context-help-host") && nextLabel, "sync fixture has no following setting");
     [null, "compact"].forEach((density) => {
