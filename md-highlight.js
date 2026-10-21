@@ -1532,6 +1532,10 @@ function _pbpHlNewId() {
 // 4), horizontally clamped to the viewport the same way #explain-pop is. ----
 let _pbpHlBarEl = null;
 let _pbpHlBarShowTimer = 0;
+// True while the current press began on a control (rail button, hamburger,
+// Ask panel input...). A click there never makes a selection, so its mouseup
+// must not re-raise the bar for a selection left over in the article.
+let _pbpHlPressOnControl = false;
 let _pbpHlBarRange = null;
 // Last _pbpHlShowBar arguments, kept ACROSS the dismissal: _pbpHlBarRange is
 // cleared by the popover's own "closed" toggle handler, and the creation paths
@@ -1900,6 +1904,7 @@ function _pbpHlOnMouseUp(e) {
   if (e.button !== 0) return;
   if (e.target.closest && e.target.closest("#pb-hl-bar, #pb-hl-card, #explain-pop")) return;
   clearTimeout(_pbpHlBarShowTimer);
+  if (_pbpHlPressOnControl) { _pbpHlPressOnControl = false; _pbpHlHideBar(); return; }
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) { _pbpHlHideBar(); return; }
   const range = sel.getRangeAt(0).cloneRange();
@@ -1986,9 +1991,11 @@ function _pbpHlBindInteractions(view) {
   // can finish outside either host. The deferred handler checks both ends
   // of the selection against the currently visible study host.
   document.addEventListener("mouseup", _pbpHlOnMouseUp);
-  document.addEventListener("pointerdown", () => {
+  document.addEventListener("pointerdown", (e) => {
     clearTimeout(_pbpHlBarShowTimer);
     _pbpHlBarShowTimer = 0;
+    _pbpHlPressOnControl = !!(e.target && e.target.closest && e.target.closest(
+      'button, a[href], input, textarea, select, summary, label, [role="button"], [role="menuitem"], [role="tab"], [contenteditable="true"], [contenteditable=""]'));
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") _pbpHlHideBar(); });
   document.addEventListener("keydown", _pbpHlOnKeyDown);

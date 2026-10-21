@@ -4054,6 +4054,9 @@ function setupDrawer() {
     scrim.hidden = !open;
     if (open) {
       lastFocus = document.activeElement;
+      // The drawer is aria-modal over the article: a selection bar left in
+      // the top layer would sit on top of it.
+      if (typeof _pbpHlHideBar === "function") _pbpHlHideBar();
       const ident = rail.querySelector(".rail-ident");
       if (ident) ident.insertBefore(toggle, document.getElementById("preview-url"));
       rail.setAttribute("role", "dialog");
