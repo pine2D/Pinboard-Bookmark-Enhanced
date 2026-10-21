@@ -4333,6 +4333,6 @@
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "ハイライトまたはメモが大きすぎるため同期できません。短くするか削除してから「今すぐ同期」をクリックしてください。"
-    }
-
+    },
+  "saveWaitRateLimit": { "message": "保存しています。Pinboard が受け付けるリクエストは 3 秒に 1 回です。" }
 }

@@ -4340,6 +4340,6 @@
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "A highlight or note is too large to sync. Shorten or remove it, then click Sync now."
-    }
-
+    },
+  "saveWaitRateLimit": { "message": "Still saving: Pinboard accepts one request every 3 seconds." }
 }

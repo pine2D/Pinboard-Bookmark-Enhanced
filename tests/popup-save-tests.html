@@ -3833,8 +3833,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // Critique 2026-10-19: Save -> Saving… -> Saved! -> Save made the
     // content-sized button jump under the pointer. Real <button>, shipped code.
     test("submit button width only grows across a save cycle", () => {
-      const fnStart = source.indexOf("  function setSubmitState(state, label) {");
-      const fnEnd = source.indexOf("\n  }\n", fnStart) + 4;
+      const fnStart = source.indexOf("  let saveWaitNoteTimer = null;");
+      const fnEnd = source.indexOf("\n  }\n", source.indexOf("  function setSubmitState(state, label) {")) + 4;
       assert(fnStart >= 0 && fnEnd > fnStart, "setSubmitState source not found");
       const btn = document.createElement("button");
       btn.style.cssText = "font: 13px sans-serif; padding: 0 8px; white-space: nowrap;";
@@ -3856,6 +3856,62 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(wDone >= wLoading && wIdle >= wLoading,
           `the button shrank back mid-cycle: ${w0} -> ${wLoading} -> ${wDone} -> ${wIdle}`);
       } finally { btn.remove(); }
+    });
+
+    // Critique 2026-10-21: the lookup on open spends Pinboard's 3s slot, so a
+    // save waits 2-3s at "Saving…". Past 800ms the status line says why, and
+    // the note goes away with the loading state unless something replaced it.
+    test("a slow save explains the rate limit and takes the note down after", () => {
+      const fnStart = source.indexOf("  let saveWaitNoteTimer = null;");
+      const fnEnd = source.indexOf("\n  }\n", source.indexOf("  function setSubmitState(state, label) {")) + 4;
+      assert(fnStart >= 0 && fnEnd > fnStart, "setSubmitState source not found");
+      const make = () => {
+        const btn = document.createElement("button");
+        document.body.appendChild(btn);
+        const status = document.createElement("p");
+        status.className = "status-msg hidden";
+        const timers = [];
+        const shown = [];
+        const showStatus = (id, msg, kind) => {
+          shown.push([id, msg, kind]);
+          status.textContent = msg;
+          status.className = "status-msg " + kind;
+        };
+        const setSubmitState = new Function("btn", "t", "$id", "bookmarkLookup", "updateCharCount",
+          "showStatus", "setTimeout", "clearTimeout",
+          source.slice(fnStart, fnEnd) + "; return setSubmitState;")(
+          btn, (k) => k, (id) => (id === "status-msg" ? status : { value: "" }), { status: "none" }, () => {},
+          showStatus,
+          (fn, ms) => { timers.push({ fn, ms, live: true }); return timers.length; },
+          (id) => { if (id && timers[id - 1]) timers[id - 1].live = false; });
+        return { btn, status, timers, shown, setSubmitState };
+      };
+      const a = make();
+      try {
+        a.setSubmitState("loading");
+        assert(a.timers.length === 1 && a.timers[0].ms === 800, "loading arms one 800ms note timer");
+        a.timers[0].fn();
+        assert(a.shown.length === 1 && a.shown[0][1] === "saveWaitRateLimit" && a.shown[0][2] === "info",
+          "the note goes to the status line as info");
+        a.setSubmitState("idle");
+        assert(a.status.classList.contains("hidden"), "leaving loading takes the note down");
+        assert(!a.status.dataset.saveWait, "the note marker is cleared");
+      } finally { a.btn.remove(); }
+      const b = make();
+      try {
+        b.setSubmitState("loading");
+        b.timers[0].fn();
+        b.status.textContent = "bookmarkSaved";
+        b.status.className = "status-msg success";
+        b.setSubmitState("success");
+        assert(!b.status.classList.contains("hidden"), "a message that replaced the note stays up");
+      } finally { b.btn.remove(); }
+      const c = make();
+      try {
+        c.setSubmitState("loading");
+        c.setSubmitState("success");
+        assert(!c.timers[0].live, "a fast save cancels the note before it shows");
+      } finally { c.btn.remove(); }
     });
 
     // Critique 2026-10-19: a failed recent-list delete was reported by the

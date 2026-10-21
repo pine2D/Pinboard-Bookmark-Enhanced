@@ -4333,6 +4333,6 @@
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "有一項標記或筆記過大，無法同步。請縮短或刪除該項內容，然後按「立即同步」。"
-    }
-
+    },
+  "saveWaitRateLimit": { "message": "仍在儲存：Pinboard 每 3 秒只接受一次請求。" }
 }

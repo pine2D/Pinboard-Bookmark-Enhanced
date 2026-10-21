@@ -4327,6 +4327,6 @@
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "有一条高亮或笔记过大，无法同步。请缩短或删除该条内容，然后点击「立即同步」。"
-    }
-
+    },
+  "saveWaitRateLimit": { "message": "仍在保存：Pinboard 每 3 秒只接受一次请求。" }
 }

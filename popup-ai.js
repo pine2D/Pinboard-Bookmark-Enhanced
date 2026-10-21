@@ -1079,29 +1079,32 @@ async function doAISummary(forceRefresh, sOverride) {
     return;
   }
   hideAIError();
-  // audit A2: a pending bookmark lookup rewrites the description when it
-  // lands - a summary inserted before that gets clobbered (paid result
-  // lost, regenerate/remove bar stranded over nothing).
-  await _aiAwaitBookmarkLookup();
-  if (!_aiOpStillCurrent(account)) return;
-
-  if (!forceRefresh) {
-    const cached = await pbpAiFastCached("summary", s, account);
-    if (cached && _aiOpStillCurrent(account)) {
-      const adopted = await _aiRestoreSummaryOwnership(account, pageInfo.url, cached);
-      if (!_aiOpStillCurrent(account)) return;
-      if (adopted) return;
-      upsertSummary(cached);
-      showSummaryActions(true);
-      return;
-    }
-  }
-
+  // The button goes busy before the lookup wait, not after it: that wait is
+  // a Pinboard round trip behind its 3s rate limit, and a click that shows
+  // nothing for a second reads as a dead button (critique 2026-10-21).
   const showProgressOnBtn = btn && !btn.classList.contains("hidden");
   if (showProgressOnBtn) {
     btn.classList.add("loading");
   }
   try {
+    // audit A2: a pending bookmark lookup rewrites the description when it
+    // lands - a summary inserted before that gets clobbered (paid result
+    // lost, regenerate/remove bar stranded over nothing).
+    await _aiAwaitBookmarkLookup();
+    if (!_aiOpStillCurrent(account)) return;
+
+    if (!forceRefresh) {
+      const cached = await pbpAiFastCached("summary", s, account);
+      if (cached && _aiOpStillCurrent(account)) {
+        const adopted = await _aiRestoreSummaryOwnership(account, pageInfo.url, cached);
+        if (!_aiOpStillCurrent(account)) return;
+        if (adopted) return;
+        upsertSummary(cached);
+        showSummaryActions(true);
+        return;
+      }
+    }
+
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "extracting" });
     const contentSource = await ensurePageText(s, showProgressOnBtn ? "ai-summary-btn" : "");
     if (!_aiOpStillCurrent(account)) return;

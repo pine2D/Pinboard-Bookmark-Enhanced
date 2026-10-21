@@ -4333,6 +4333,6 @@
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "Un surlignage ou une note est trop volumineux pour la synchronisation. Raccourcissez-le ou supprimez-le, puis cliquez sur « Synchroniser maintenant »."
-    }
-
+    },
+  "saveWaitRateLimit": { "message": "Enregistrement en cours : Pinboard n’accepte qu’une requête toutes les 3 secondes." }
 }

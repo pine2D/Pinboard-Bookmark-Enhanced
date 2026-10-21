@@ -4333,6 +4333,6 @@
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "Zaznaczenie lub notatka ma zbyt duży rozmiar do synchronizacji. Skróć treść lub usuń zapis, a potem kliknij „Synchronizuj teraz”."
-    }
-
+    },
+  "saveWaitRateLimit": { "message": "Nadal zapisywanie: Pinboard przyjmuje jedno żądanie co 3 sekundy." }
 }

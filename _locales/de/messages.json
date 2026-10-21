@@ -4333,6 +4333,6 @@
     },
     "driveNotesErrorEntryTooLarge": {
       "message": "Eine Markierung oder Notiz ist zu groß zum Synchronisieren. Kürze oder entferne sie und klicke auf „Jetzt synchronisieren“."
-    }
-
+    },
+  "saveWaitRateLimit": { "message": "Wird noch gespeichert: Pinboard nimmt nur alle 3 Sekunden eine Anfrage an." }
 }

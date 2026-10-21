@@ -1632,7 +1632,19 @@ function setupSubmit(token) {
   let submitErrorResetTimer = null;
   let submitAttemptSeq = 0;
 
+  // Pinboard takes one API call per 3s and the bookmark lookup made on open
+  // already spent the slot, so a save can sit at "Saving…" for 2-3s with
+  // nothing wrong. Past 800ms the status line says why (critique 2026-10-21).
+  let saveWaitNoteTimer = null;
   function setSubmitState(state, label) {
+    clearTimeout(saveWaitNoteTimer);
+    saveWaitNoteTimer = null;
+    const statusEl = $id("status-msg");
+    if (statusEl?.dataset?.saveWait) {
+      // Only take the note down if nothing has replaced it since.
+      if (statusEl.textContent === t("saveWaitRateLimit")) statusEl.classList.add("hidden");
+      delete statusEl.dataset.saveWait;
+    }
     // The width stays content-adaptive, but a save cycle (Save -> Saving… ->
     // Saved! / Retry -> Save) must not make the button jump back and forth
     // under the pointer (critique 2026-10-19): min-width only ever grows to
@@ -1643,6 +1655,13 @@ function setupSubmit(token) {
       btn.disabled = true;
       btn.classList.add("loading");
       btn.textContent = label || t("saving");
+      saveWaitNoteTimer = setTimeout(() => {
+        saveWaitNoteTimer = null;
+        if (!btn.classList.contains("loading")) return;
+        showStatus("status-msg", t("saveWaitRateLimit"), "info");
+        const el = $id("status-msg");
+        if (el?.dataset) el.dataset.saveWait = "1";
+      }, 800);
     } else if (state === "success") {
       btn.disabled = false;
       btn.classList.add("saved-success");
