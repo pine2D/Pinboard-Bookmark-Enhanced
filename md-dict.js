@@ -607,11 +607,10 @@ const PBP_DICT_SPEAKER_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.speake
 // explain-pop action switch and the highlight card use for Dictionary.
 const PBP_DICT_BOOK_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.book : "";
 
-// Ready-signal dot (inline SVG, never a literal glyph). Filled circle plus a
-// down chevron so it also reads as "there is more below".
-// Composed from pack parts (Lucide chevron-down + a plain dot primitive):
-// "a fresh contextual sense landed below" marker.
-const PBP_DICT_CTX_READY_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.6" fill="currentColor" stroke="none"/><g transform="translate(0 5)"><path d="m6 9 6 6 6-6"/></g></svg>';
+// Ready signal: Lucide arrow-down (PBP_ICONS.arrowDownLine) -- "the AI
+// gloss landed below, jump to it". A direction, not a state, so it must not
+// borrow the link-coloured border the reader uses for pressed toggles.
+const PBP_DICT_CTX_READY_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.arrowDownLine : "";
 
 // The AI gloss streams in seconds after the (often cached, instant) online
 // entry, and it renders at the BOTTOM of the popover body -- a long entry
@@ -624,6 +623,9 @@ function _pbpDictCtxSignal(body, ctxEl, btn) {
   const br = body.getBoundingClientRect();
   if (ctxEl.getBoundingClientRect().top < br.bottom - 12) return; // already visible
   btn.hidden = false;
+  // The button appearing is the only signal, and it says nothing to a
+  // screen reader on its own.
+  if (typeof pbpAnnounce === "function") pbpAnnounce(btn.getAttribute("aria-label") || "");
   const io = new IntersectionObserver((entries) => {
     if (entries.some((e) => e.isIntersecting)) {
       btn.hidden = true;

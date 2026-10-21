@@ -2250,9 +2250,10 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-speak:hover { background: var(--btn-hover); }
 .xp-dict-speak:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .xp-dict-speak svg { width: 14px; height: 14px; }
-/* AI-gloss ready signal: same head-button family as speak, tinted so the
-   "new content below" state is visible at a glance. */
-.xp-dict-ctx-ready { color: var(--link); border-color: var(--link); }
+/* AI-gloss ready signal: same head-button family as speak. Only the arrow
+   takes the link colour; a link-coloured border would read as a pressed
+   toggle (.toggle-btn.active) instead of "jump to what landed below". */
+.xp-dict-ctx-ready { color: var(--link); }
 /* Click-to-expand for senses past SHOW: text-link styling, one line. */
 .xp-dict-more {
   display: block;
