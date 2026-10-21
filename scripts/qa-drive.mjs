@@ -1342,6 +1342,35 @@ async function drivePreview(context, worker, extId, rep) {
       await page.waitForTimeout(300);
     });
 
+    // t in drawer mode (<=1000px): the rail price is off screen, so the first
+    // press asks (#tr-ask) instead of spending tokens. Pressed mid-article:
+    // the bar sticks to the top of the viewport, so it must be on screen.
+    await step("translate-ask", async () => {
+      await page.setViewportSize({ width: 900, height: 900 });
+      await page.waitForTimeout(300);
+      // Blur instead of clicking the article: a locator click would scroll
+      // it back to the top and hide exactly the case under test.
+      await page.evaluate(() => { window.scrollTo(0, 900); document.activeElement?.blur?.(); });
+      await page.keyboard.press("t");
+      await page.waitForTimeout(400);
+      const bar = await page.evaluate(() => {
+        const b = document.getElementById("tr-ask");
+        if (!b) return null;
+        const r = b.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, translating: document.querySelectorAll(".pb-tr").length };
+      });
+      s.notes.push(`translate-ask: ${JSON.stringify(bar)}`);
+      if (!bar) throw new Error("t in drawer mode did not show #tr-ask");
+      if (bar.top < 0 || bar.bottom > 900) throw new Error(`#tr-ask off screen mid-article (top ${bar.top})`);
+      if (bar.translating) throw new Error("t in drawer mode translated without asking");
+      await rep.shot(page, s, "translate-ask-drawer");
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(200);
+      if (await page.locator("#tr-ask").count()) throw new Error("Esc left #tr-ask up");
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.waitForTimeout(300);
+    });
+
     await step("translate", async () => {
       await page.keyboard.press("t");
       // Bilingual blocks appear as .pb-tr; give the mock round-trips time.

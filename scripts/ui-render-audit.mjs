@@ -8435,7 +8435,7 @@ function reconcileSpacing(sweepHits) {
 // the dictionary view), so "explain-pop" leaves it open and "explain-dict"
 // closes it. The answered-state footer actions are unhidden by hand: they
 // appear once a reply lands, and the sweep measures geometry, not the flow.
-const READER_SURFACES = ["reader-source-details", "export-more", "explain-pop", "explain-dict", "ask-panel", "search-pop", "kbd-help-pop", "typo-pop", "pb-hl-card", "send-menu", "confirm-popover"];
+const READER_SURFACES = ["reader-source-details", "export-more", "explain-pop", "explain-dict", "ask-panel", "search-pop", "kbd-help-pop", "typo-pop", "pb-hl-card", "send-menu", "confirm-popover", "tr-ask"];
 async function openReaderSurface(name) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const shown = (el) => !!(el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getBoundingClientRect().width > 0);
@@ -8494,6 +8494,14 @@ async function openReaderSurface(name) {
       c.click(); await wait(400);
       return shown(document.getElementById("send-menu")) || "menu not visible after the caret click";
     }
+    case "tr-ask": {
+      // The t-key confirm bar (md-translate.js): opened through its own
+      // builder with a fixed estimate; it closes itself after 8s, far longer
+      // than one probe.
+      if (typeof _pbpTrAskOpen !== "function" || typeof _pbpTrState === "undefined" || !_pbpTrState) return "no translate state (reader AI off?)";
+      _pbpTrAskOpen(_pbpTrState, 1234); await wait(150);
+      return shown(document.getElementById("tr-ask"));
+    }
     case "confirm-popover": {
       if (typeof showConfirmPopover !== "function") return false;
       showConfirmPopover(document.getElementById("rail-zen-btn") || document.body.firstElementChild, { msg: "Delete this highlight?", yesText: "Delete", noText: "Cancel" });
@@ -8513,6 +8521,7 @@ function closeReaderSurface(name) {
     case "ask-panel": { const btn = document.getElementById("ask-open"); const panel = document.getElementById("ask-panel"); if (btn && panel && !panel.hidden) btn.click(); return; }
     case "send-menu": { const c = document.getElementById("send-caret"); const m = document.getElementById("send-menu"); if (c && m && !m.hidden) c.click(); return; }
     case "confirm-popover": { document.querySelector(".confirm-popover .confirm-no")?.click(); return; }
+    case "tr-ask": { if (typeof _pbpTrAskClose === "function") _pbpTrAskClose(); return; }
     default: hide(document.getElementById(name));
   }
 }

@@ -4013,13 +4013,25 @@ html.motion-ready #skim-collapse.motion-toggle svg { transition: transform 150ms
   display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
   margin-top: var(--sp-2); font-size: 0.8em;
 }
-/* t-key confirm (md-translate.js _pbpTrAskOpen): .msg-bar plus layout only. */
+/* t-key confirm (md-translate.js _pbpTrAskOpen): .msg-bar plus layout. It is
+   inserted above the article, so it sticks to the top of the viewport: t is
+   pressed mid-article as often as at the top, and a bar scrolled out of view
+   left the key looking dead. Lifted off the text it floats over with the
+   same shadow as .pbv-back-current; z-index stays under the drawer toggle
+   and #zen-bar (30). */
 #tr-ask {
+  position: sticky; top: var(--sp-3); z-index: 2;
   display: flex; align-items: center; gap: var(--sp-1) var(--sp-3); flex-wrap: wrap;
   margin-bottom: var(--sp-3); font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
 }
 #tr-ask label { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 24px; cursor: pointer; }
 #tr-ask input { margin: 0; accent-color: var(--link); }
+/* The reader's own focus ring, not the UA's black/white one. */
+#tr-ask input:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+/* Zen: stick below #zen-bar (12px inset + 36px box: 4 + 26 + 4 + 2), which
+   covers the column's top-right corner once the window is narrow. */
+body.zen #tr-ask { top: calc(12px + 36px + var(--sp-2)); }
 .skim-stale-btn { padding: var(--sp-1) var(--sp-2); font-size: 12px; /* secondary md face in px, not the panel's prose scale */ }
 #skim-body { margin-top: var(--sp-2); }
 #skim-body > :first-child { margin-top: 0; }
