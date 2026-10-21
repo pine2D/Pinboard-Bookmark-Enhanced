@@ -3774,14 +3774,16 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
    margin-bottom both cancel the rail's 20px bottom padding: the row's own
    sp-5 inset then sits on the scrollport edge in both the stuck and the
    scrolled-to-end positions (no 20px jump, no rows peeking out below it).
-   The hairline marks where scrolling content passes under. */
+   That inset is sp-3, not sp-5: 24px under 26px buttons read as a gap of
+   its own (2026-10-21 review). The hairline marks where scrolling content
+   passes under. */
 #rail-bottom-row {
   position: sticky;
   bottom: -20px;
   z-index: 1;
   margin-top: auto;
   margin-bottom: -20px;
-  padding-block: var(--sp-2) var(--sp-5);
+  padding-block: var(--sp-2) var(--sp-3);
   background: var(--surface);
   border-top: 1px solid var(--border-light);
 }
