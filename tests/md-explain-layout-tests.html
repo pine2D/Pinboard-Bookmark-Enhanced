@@ -374,6 +374,40 @@ function assertLayout(frame, locale) {
           assert(est.scrollWidth <= est.clientWidth + 1, `${tag}: estimate overflows the rail`);
         }
       }
+      // _pbpTrSetStatus hides the line once nothing is left to translate; the
+      // one-line rule (two ids) must not outrank .tr-meta[hidden].
+      est.hidden = true;
+      assert(frame.contentWindow.getComputedStyle(est).display === "none", "hidden estimate still displayed");
+    } finally { frame.remove(); }
+  });
+
+  // 2026-10-21: with no Send-to destination the split button is one whole
+  // "Set up a destination…" action (md-preview.js setupSendMenu). The
+  // longest locales must fit the 256px rail, and its corners must match.
+  await test("empty Send-to: the set-up button fits the rail in every locale, one whole button", async () => {
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "width:1200px;height:300px;border:0";
+    frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../md-preview.css"></head>
+      <body><aside class="rail" id="rail"><div class="rail-section" id="export-section"><div class="send-split send-empty" id="send-split">
+        <button id="send-primary" class="action-btn send-primary" type="button"><span class="send-ic" aria-hidden="true"><svg viewBox="0 0 24 24"></svg></span><span class="btn-label" id="send-primary-label"></span></button>
+        <button id="send-caret" class="action-btn send-caret" type="button" hidden><span class="send-tri"></span></button></div></div></aside></body></html>`;
+    document.body.appendChild(frame);
+    await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+    try {
+      const doc = frame.contentDocument, w = frame.contentWindow;
+      const btn = doc.getElementById("send-primary"), label = doc.getElementById("send-primary-label"), sec = doc.getElementById("export-section");
+      for (const locale of LOCALES) {
+        label.textContent = messages[locale].mdSendSetupEllipsis.message;
+        await new Promise((resolve) => w.requestAnimationFrame(resolve));
+        const b = btn.getBoundingClientRect(), r = sec.getBoundingClientRect();
+        assert(label.scrollWidth <= label.clientWidth + 0.5 && btn.scrollWidth <= btn.clientWidth + 0.5, `${locale}: "${label.textContent}" clipped`);
+        assert(b.left >= r.left - 0.5 && b.right <= r.right + 0.5, `${locale}: the button sticks out of the rail`);
+        assert(Math.round(b.height) === 26, `${locale}: off the 26px rung (${b.height})`);
+      }
+      const cs = w.getComputedStyle(btn);
+      const radii = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius];
+      assert(new Set(radii).size === 1, "corners differ: " + radii.join(" / "));
+      assert(cs.opacity === "1", "the set-up action is dimmed like a disabled control (opacity " + cs.opacity + ")");
     } finally { frame.remove(); }
   });
 

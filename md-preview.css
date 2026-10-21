@@ -1844,8 +1844,11 @@ body.md-shell #reader-source-details > .view-toggle { display: none; }
    Opting the glyph out keeps the sides transparent; the top edge still
    follows the forced currentColor of its button. */
 @media (forced-colors: active) { .send-tri { forced-color-adjust: none; } }
+/* Empty state: one whole button that opens Settings ("Set up a
+   destination…", 2026-10-21). Its right corners match the left ones (the
+   literal 6px left 8/6 corners), and it is not dimmed: it is the action. */
 .send-empty .send-primary { justify-content: center;
-  border-top-right-radius: 6px; border-bottom-right-radius: 6px; opacity: .85; }
+  border-top-right-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md); }
 .send-menu { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
   background: var(--bg, #fff); border: 1px solid var(--border, #DAD8CE); border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: var(--sp-1); max-height: 320px; overflow: auto; }
@@ -2954,8 +2957,10 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #tr-section .tr-meta[hidden] { display: none; }
 /* Pre-request estimate on one line (md-translate.js _pbpTrPaintEstimate):
    the price never shrinks or wraps; only "provider · model" takes the
-   ellipsis, its full text on the line's title. */
-#tr-section #tr-estimate { display: flex; min-width: 0; white-space: nowrap; }
+   ellipsis, its full text on the line's title. :not([hidden]) because two
+   ids outrank `.tr-meta[hidden]` above -- without it the estimate never hid
+   once the run was done (2026-10-21). */
+#tr-section #tr-estimate:not([hidden]) { display: flex; min-width: 0; white-space: nowrap; }
 #tr-section .tr-est-cost { flex: none; white-space: pre; }
 #tr-section .tr-est-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* .rail-disclosure: the disclosure INSIDE a rail section (COMPONENTS.md
@@ -3781,14 +3786,17 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
    padding (.rail) still shows what scrolls underneath: the rotated section
    chevrons (.rail-sec-tri) reach a pixel or two past that edge, and their
    tips peeked out beside "Aa" (README shots 2026-10-20). A strip of the same
-   fill closes the padding; the scrollbar gutter beyond it clips by itself. */
+   fill closes the padding; the scrollbar gutter beyond it clips by itself.
+   It starts 1px inside the row: at a fractional edge (DPR 1.5 puts the
+   row's right edge at 239.33px) two abutting fills each antialias the shared
+   device pixel and a hairline seam showed beside "Aa" (2026-10-21). */
 #rail-bottom-row::after {
   content: "";
   position: absolute;
   top: -1px;
   bottom: 0;
-  left: 100%;
-  width: 6px;
+  left: calc(100% - 1px);
+  width: 7px;
   background: var(--surface);
 }
 .rail-kbd-help-btn {
