@@ -306,6 +306,16 @@ export const COMPONENT_PAIR_SPEC = [
   ["link", "panel", 4.5, ["opt"], false, true],
   ["link", "bg", 4.5, ["opt"], false, true],
   ["link", "pf-bg", 4.5, ["opt"]],
+  // Warning ink (2026-10-21 options critique): --opt-warn is text on the
+  // connection-health row (btn-bg, btn-hover on :hover) as well as on panel,
+  // pf-bg and bg; options-chrome.mjs warnInk() derives it against exactly
+  // these five. Before it, 10 of 14 blocks shipped sub-AA on btn-bg and the
+  // default light 4.03:1 -- caught by the impeccable detector, not here.
+  ["warn", "panel", 4.5, ["opt"], false, true],
+  ["warn", "bg", 4.5, ["opt"], false, true],
+  ["warn", "pf-bg", 4.5, ["opt"]],
+  ["warn", "btn-bg", 4.5, ["opt"], false, true],
+  ["warn", "btn-hover", 4.5, ["opt"], false, true],
   // Popup's link ink (2026-10-19 popup critique): popup-chrome.mjs derives
   // --pp-link against these two hosts; flexoki-dark had shipped 4.37:1. The
   // danger TEXT rules read danger-quiet-fg, already gated on bg and bg2.
@@ -778,6 +788,7 @@ export const DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS = {
   "btn-hover": "derived from btn-bg by the same fillSeparate call, same reasoning as btn-bg",
   "input-bg": "hand-maintained base token for field fills",
   danger: "raw palette input role (ui.<surface>.<mode>.danger), never a derived output",
+  warn: "options: an INPUT role (13/13 pilots set ui.options.<mode>.warn), taken as the seed and moved only where it misses 4.5 on its five hosts (options-chrome.mjs warnInk); the default-block warn rows are defaultStrict, so it cannot silently SKIP there",
   accent: "raw palette input role, same reasoning as danger",
   border: "derived by borderToAA, a separate pass from finalizeUiControlRoles; never added to UI_DERIVED_OUTPUT_ROLES",
   "focus-bd": "derived by focusBdToAA, same separate-pass reasoning as border",

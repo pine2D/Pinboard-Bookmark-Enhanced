@@ -58,22 +58,14 @@ const DEFAULT_LIGHT = {
   // var(x, literal) fallback text -- three different ad-hoc "warn" ambers
   // and two different "save" greens drifted in from different call sites.
   // Both converge here on github-light's real per-theme value for the same
-  // role (so the default surface and one of the 13 presets agree), NOT on a
-  // fresh AA derivation against this default bg (#f5f5f0):
+  // role (so the default surface and one of the 13 presets agree):
   //   save #1a7f37 vs #f5f5f0 = 4.64:1 -- clears 4.5:1.
-  //   warn #9a6700 vs #f5f5f0 = 4.45:1 -- does NOT clear 4.5:1.
-  // warn is left as-is rather than re-derived: nothing currently gates
-  // --opt-warn's contrast (contrast-audit's warn-fg/warn-bg pair targets a
-  // different, tinted-fill role options.css doesn't have), and this exact
-  // literal is already github-light's real per-theme value (where it DOES
-  // clear AA -- 4.57:1 against that theme's own #f6f8fa bg, 4.87:1 against
-  // its #ffffff panel; the default surface's #f5f5f0 is a hair darker,
-  // which is what drops it under 4.5). Re-deriving a bespoke default-only
-  // value would decouple it from its one visible precedent for a policy
-  // bar (plain-text AA on the never-audited default surface) this task
-  // didn't establish. Flagged here instead of silently claiming AA.
+  // warn started as github-light's #9a6700 too, which never cleared AA here
+  // (4.45:1 on bg, 4.03 on the connection row's btn-bg, 3.65 on its hover).
+  // Since 2026-10-21 it is warnInk() over this block's own hosts (below):
+  // #865900 = 6.10 panel / 5.58 bg / 5.78 pf-bg / 5.05 btn-bg / 4.58 btn-hover.
   "save": "#1a7f37",
-  "warn": "#9a6700",
+  "warn": "#865900",
   // Soft Fill control fills (design-uplift 2026-08-05). Both were hand-written
   // :root literals until now; both were exactly the surface they sit on, so the
   // moment the resting frame collapsed into the fill they became invisible
@@ -128,13 +120,27 @@ const DEFAULT_LIGHT = {
 // finalizer resolves every fill before this runs, and a non-hex host here
 // would silently measure the wrong pair, so it throws instead.
 export const LINK_HOST_ROLES = Object.freeze(["panel", "bg", "pf-bg"]);
-export function linkInk(map) {
-  const hosts = LINK_HOST_ROLES.map(role => {
+function opaqueHosts(map, roles, what) {
+  return roles.map(role => {
     const v = map[role];
-    if (!/^#[0-9a-f]{6}$/i.test(String(v))) throw new Error(`options-chrome: link host --opt-${role} is not opaque hex (${v})`);
+    if (!/^#[0-9a-f]{6}$/i.test(String(v))) throw new Error(`options-chrome: ${what} host --opt-${role} is not opaque hex (${v})`);
     return hexToRgb(v);
   });
-  return rgbToHex(fgToAAMulti(hexToRgb(map.accent), hosts));
+}
+export function linkInk(map) {
+  return rgbToHex(fgToAAMulti(hexToRgb(map.accent), opaqueHosts(map, LINK_HOST_ROLES, "link")));
+}
+
+// Warning ink (2026-10-21 options critique): --opt-warn is TEXT on more hosts
+// than the page -- .connection-health-state.warn sits on the row's btn-bg fill
+// and its :hover btn-hover, .field-warn / .save-status.warn on panel, pf-bg and
+// bg. The pilots' literal ambers were only ever picked against bg/panel:
+// 10 of 14 blocks shipped under 4.5:1 on btn-bg (gruvbox-dark 3.49, 2.58 on
+// hover), and the default light 4.03 / 3.65. Pushed to AA against all five,
+// identity where a value already clears them.
+export const WARN_HOST_ROLES = Object.freeze(["panel", "bg", "pf-bg", "btn-bg", "btn-hover"]);
+export function warnInk(map) {
+  return rgbToHex(fgToAAMulti(hexToRgb(map.warn), opaqueHosts(map, WARN_HOST_ROLES, "warn")));
 }
 
 // Map canonical UI colors (from _ui-derive) + a few options-only roles to --opt-* names.
@@ -170,6 +176,7 @@ function emitOpt(ui, palette, overrides, radius, mode) {
   // five paired output roles against the values that will actually ship.
   map = finalizeUiControlRoles(map, palette, overrides, { fieldRoles: true, fieldChevron: true });
   map.link = linkInk(map);
+  if (map.warn) map.warn = warnInk(map);
 
   // Returns the computed map alongside the rendered text (not just text):
   // composeOptionsThemes needs map.accent AFTER pilot overrides are applied
