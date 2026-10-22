@@ -21,6 +21,7 @@ var _vocabExportBusy = false;    // a TSV / Anki / Eudic export is running
 let _vocabRows = [];     // last render's rows for the current owner
 let _vocabViewRows = []; // current filtered + sorted view (selection boundary)
 let _vocabSelected = new Set();
+let _vocabFrozenOrder = null; // Map id -> row position while edits hold the order (pbpVocabApplyFrozenOrder)
 // Deleted-card exit, decoupled from the data path: the mutation and reload
 // fire immediately; only the reload's final DOM commit waits out this window
 // (see _pbpVocabExitSettle call in _pbpVocabReloadAfterMutation), so the
@@ -102,6 +103,27 @@ function pbpVocabFilterSort(rows, query, group, sortMode, status) {
     return cmp || a.index - b.index;
   });
   return filtered.map((item) => item.row);
+}
+
+// Row order held still while the user works through the list (critique
+// round 5, 2026-10-22): a status flip, a group edit or a note bumps
+// updatedAt, and under the default newest-first sort the row would jump to
+// the top under the user's hand. `order` maps id -> position at the moment
+// of the first edit. Rows it knows keep their relative order inside the
+// slots the sort gave them; rows it does not know (a word another tab or a
+// Drive pull just added) keep the slot the sort chose. Pure: the caller
+// decides when a freeze starts and ends.
+function pbpVocabApplyFrozenOrder(rows, order) {
+  if (!(order instanceof Map) || !order.size || !Array.isArray(rows)) return rows;
+  const slots = [];
+  const held = [];
+  rows.forEach((row, i) => {
+    if (row && order.has(row.id)) { slots.push(i); held.push(row); }
+  });
+  held.sort((a, b) => order.get(a.id) - order.get(b.id));
+  const out = rows.slice();
+  slots.forEach((slot, k) => { out[slot] = held[k]; });
+  return out;
 }
 
 // Read-only stats over the owner's full row set. `now` injected for testability.
@@ -1598,13 +1620,27 @@ function _pbpVocabHighlightTerm(host, quote, term) {
   host.appendChild(document.createTextNode(quote.slice(idx)));
 }
 
-// A detail-pane edit acts on ONE word; it is not a batch action, so the list
-// selection it never touched must survive its reload. _pbpVocabReloadAfterMutation
-// clears the selection unconditionally -- correct for the batch-bar callers,
-// wrong for these. Snapshot before, hand it back after, and let
-// _pbpVocabSyncSelectionUi prune whatever the fresh rows no longer contain
-// (the same pruning _pbpVocabSoftReload leans on).
+// An edit that keeps every word on the list -- a detail-pane change, K on a
+// row, a batch group or status change -- holds the user's place: the
+// selection survives the reload and the row order stays put (critique round
+// 5, 2026-10-22: clearing the batch selection broke "group these, then mark
+// them known"). _pbpVocabReloadAfterMutation still clears the selection
+// unconditionally, which remains right for deletes. Snapshot before, hand it
+// back after, and let _pbpVocabSyncSelectionUi prune whatever the fresh rows
+// no longer contain (the same pruning _pbpVocabSoftReload leans on).
+// The freeze starts at the first held edit and records the view as it is on
+// screen (already frozen, if an earlier edit froze it). It ends when the user
+// asks for a new order or a new set: sort, search, filters, an account change
+// or a fresh render (_pbpVocabThawOrder).
+function _pbpVocabFreezeOrder() {
+  _vocabFrozenOrder = new Map(_vocabViewRows.map((row, i) => [row.id, i]));
+}
+function _pbpVocabThawOrder() {
+  _vocabFrozenOrder = null;
+}
+
 function _pbpVocabHoldSelection(gen) {
+  _pbpVocabFreezeOrder();
   const saved = new Set(_vocabSelected);
   const anchor = _vocabLastSelectedId;
   return () => {
@@ -1702,6 +1738,22 @@ function _pbpVocabFocusStable() {
   if (!search || search.disabled || search.closest("[hidden], [inert]")) return false;
   try { search.focus({ preventScroll: true }); } catch (_) { search.focus(); }
   return document.activeElement === search;
+}
+
+// After a held batch edit the selection is still there, so focus stays in the
+// batch row: on the button that ran it, or -- when that button just went
+// disabled (Add once its input is cleared, Mark known once every selected
+// word is known) -- on the next control of the same job. Falls back to the
+// search box when the batch row is gone (the selection emptied: a filter
+// dropped every selected word).
+function _pbpVocabFocusBatch(...ids) {
+  for (const id of ids) {
+    const el = $id(id);
+    if (!el || el.disabled || el.closest("[hidden], [inert]") || !el.getClientRects().length) continue;
+    try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); }
+    if (document.activeElement === el) return true;
+  }
+  return _pbpVocabFocusStable();
 }
 
 function pbpVocabSelectionSnapshotValid(ids, selected, rows) {
@@ -2035,6 +2087,7 @@ function _pbpVocabApplyView(resetLimit) {
     ($id("vocab-group-filter") || {}).value || "",
     ($id("vocab-sort") || {}).value || "latest",
     ($id("vocab-status-filter") || {}).value || "");
+  if (_vocabFrozenOrder) _vocabViewRows = pbpVocabApplyFrozenOrder(_vocabViewRows, _vocabFrozenOrder);
   _pbpVocabRenderList();
   _pbpVocabRenderCover();
 }
@@ -2112,6 +2165,7 @@ function _pbpVocabClearVisibleState() {
   _vocabViewRows = [];
   _vocabOwnerLabel = "";
   _vocabCurrentOwner = null;
+  _pbpVocabThawOrder();
   const pane = $id("vocab-list-pane");
   if (pane) pane.classList.remove("vocab-signed-out");
   const noAccount = $id("vocab-no-account");
@@ -2514,6 +2568,10 @@ async function _pbpVocabApplyGroupChange(adding) {
   const affected = adding ? ids.length : _pbpVocabSelectedInGroup(group);
   _pbpVocabSetBatchBusy(true);
   const gen = ++_vocabRenderGen;
+  const restoreSelection = _pbpVocabHoldSelection(gen);
+  const focusBack = () => _pbpVocabFocusBatch(button.id, "vocab-group-input");
+  // Busy disables the whole batch row, so the landing waits for finally.
+  let refocus = false;
   let owner = null;
   try {
     owner = await pbpVocabCurrentOwner();
@@ -2521,30 +2579,36 @@ async function _pbpVocabApplyGroupChange(adding) {
       ? await pbpVocabBatchAddGroup(ids, owner, group)
       : await pbpVocabBatchRemoveGroup(ids, owner, group);
     const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
+    restoreSelection();
     if (gen !== _vocabRenderGen) return;
-    _pbpVocabFocusStable();
     if (!ok) {
+      refocus = true;
       _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
       return;
     }
     if (!refreshed) {
+      refocus = true;
       _pbpVocabFlashStatus(false, t("vocabRefreshFailed"));
       return;
     }
+    // Clearing the name re-gates + and -; finally's busy sync redraws them
+    // before focus lands.
     input.value = "";
+    refocus = true;
     _pbpVocabFlashStatus(true, t(adding ? "vocabBatchGrouped" : "vocabBatchUngrouped", String(affected), group));
   } catch (_) {
-    if (owner) await _pbpVocabReloadAfterMutation(owner, gen);
+    if (owner) { await _pbpVocabReloadAfterMutation(owner, gen); restoreSelection(); }
     else if (gen === _vocabRenderGen) {
       _pbpVocabClearVisibleState();
       _pbpVocabSetLoading(false);
     }
     if (gen === _vocabRenderGen) {
-      _pbpVocabFocusStable();
+      refocus = true;
       _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
     }
   } finally {
     _pbpVocabSetBatchBusy(false);
+    if (refocus && gen === _vocabRenderGen) focusBack();
   }
 }
 
@@ -2556,13 +2620,20 @@ async function _pbpVocabApplyStatusChange(known) {
   const ids = [..._vocabSelected];
   _pbpVocabSetBatchBusy(true);
   const gen = ++_vocabRenderGen;
+  const restoreSelection = _pbpVocabHoldSelection(gen);
+  // The opposite button is the undo of this one, and the one left enabled
+  // once every selected word has the new status.
+  const focusBack = () => _pbpVocabFocusBatch(button.id, known ? "vocab-mark-learning" : "vocab-mark-known");
+  // Busy disables the whole batch row, so the landing waits for finally.
+  let refocus = false;
   let owner = null;
   try {
     owner = await pbpVocabCurrentOwner();
     const ok = await pbpVocabBatchSetStatus(ids, owner, known ? "known" : "new");
     const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
+    restoreSelection();
     if (gen !== _vocabRenderGen) return;
-    _pbpVocabFocusStable();
+    refocus = true;
     if (!ok) { _pbpVocabFlashStatus(false, t("vocabBatchFailed")); return; }
     if (!refreshed) { _pbpVocabFlashStatus(false, t("vocabRefreshFailed")); return; }
     const n = ids.length;
@@ -2570,17 +2641,18 @@ async function _pbpVocabApplyStatusChange(known) {
       ? pbpLibCountKey(n, "vocabBatchKnownDoneOne", "vocabBatchKnownDone")
       : pbpLibCountKey(n, "vocabBatchLearningDoneOne", "vocabBatchLearningDone"), String(n)));
   } catch (_) {
-    if (owner) await _pbpVocabReloadAfterMutation(owner, gen);
+    if (owner) { await _pbpVocabReloadAfterMutation(owner, gen); restoreSelection(); }
     else if (gen === _vocabRenderGen) {
       _pbpVocabClearVisibleState();
       _pbpVocabSetLoading(false);
     }
     if (gen === _vocabRenderGen) {
-      _pbpVocabFocusStable();
+      refocus = true;
       _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
     }
   } finally {
     _pbpVocabSetBatchBusy(false);
+    if (refocus && gen === _vocabRenderGen) focusBack();
   }
 }
 
@@ -2599,7 +2671,7 @@ function _pbpVocabClearFilters() {
   for(const id of ["vocab-group-filter", "vocab-status-filter"]) {
     const control = $id(id);if(control){control.value="";window.pbpListboxSync?.(control);}
   }
-  _pbpVocabClearSelection();_pbpVocabApplyView(true);_pbpVocabResetListScroll();
+  _pbpVocabClearSelection();_pbpVocabThawOrder();_pbpVocabApplyView(true);_pbpVocabResetListScroll();
   if(search)search.focus({preventScroll:true});
 }
 $id("vocab-clear-filters")?.addEventListener("click", _pbpVocabClearFilters);
@@ -2608,6 +2680,7 @@ const _vocabSearch = $id("vocab-search");
 if (_vocabSearch) _vocabSearch.addEventListener("input", () => {
   pbpLibQuietCount($id("vocab-count"));
   _pbpVocabClearSelection();
+  _pbpVocabThawOrder();
   _pbpVocabApplyView(true);
   _pbpVocabResetListScroll();
 });
@@ -2615,6 +2688,7 @@ for (const id of ["vocab-group-filter", "vocab-status-filter"]) {
   const control = $id(id);
   if (control) control.addEventListener("change", () => {
     _pbpVocabClearSelection();
+    _pbpVocabThawOrder();
     _pbpVocabApplyView(true);
     _pbpVocabResetListScroll();
   });
@@ -2712,6 +2786,7 @@ for (const id of ["vocab-lookup-narrow", "vocab-signed-out-lookup"]) {
 const _vocabSortSelect = $id("vocab-sort");
 if (_vocabSortSelect) _vocabSortSelect.addEventListener("change", () => {
   _vocabLastSelectedId = null;
+  _pbpVocabThawOrder();
   _pbpVocabApplyView(true);
   _pbpVocabResetListScroll();
   _pbpVocabSyncSortFace();

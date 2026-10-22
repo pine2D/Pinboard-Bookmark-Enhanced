@@ -192,6 +192,20 @@ check("account-switch clearing removes the previous owner scope before the next 
   !$id("vocab-count").textContent && $id("vocab-empty").hidden &&
   (typeof _vocabOwnerLabel === "undefined" || !_vocabOwnerLabel));
 
+// Frozen row order (critique round 5): held rows keep their relative order
+// inside the slots the sort gave them; an unknown row keeps its own slot.
+{
+  const r = (id) => ({ id });
+  const frozen = new Map([["a", 0], ["b", 1], ["c", 2]]);
+  check("a frozen order puts an edited row back where it was, not at the top",
+    ids(pbpVocabApplyFrozenOrder([r("c"), r("a"), r("b")], frozen)) === "a,b,c");
+  check("a row the freeze never saw keeps the slot the sort chose",
+    ids(pbpVocabApplyFrozenOrder([r("n"), r("c"), r("a"), r("b")], frozen)) === "n,a,b,c" &&
+    ids(pbpVocabApplyFrozenOrder([r("c"), r("a"), r("n"), r("b")], frozen)) === "a,b,n,c");
+  check("no freeze, or an empty one, leaves the sorted rows alone",
+    ids(pbpVocabApplyFrozenOrder([r("c"), r("a")], null)) === "c,a" &&
+    ids(pbpVocabApplyFrozenOrder([r("c"), r("a")], new Map())) === "c,a");
+}
 check("search matches term case-insensitively", ids(pbpVocabFilterSort(sample,"DÉFENSE","","latest")) === "a");
 check("search matches lemma", ids(pbpVocabFilterSort(sample,"défendre","","latest")) === "a");
 check("search matches gloss", ids(pbpVocabFilterSort(sample,"protection","","latest")) === "a");
@@ -1337,7 +1351,37 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     _pbpVocabReloadAfterMutation = async () => true;
     $id("vocab-add-group").focus();
     await _pbpVocabApplyGroupChange(true);
-    check("successful batch add-group moves focus to visible search", document.activeElement === $id("vocab-search") && !$id("vocab-search").closest("[hidden]"));
+    check("successful batch add-group keeps the selection and lands on the cleared group name (Add is disabled until a new one)",
+      _vocabSelected.size === 3 && $id("vocab-group-input").value === "" && $id("vocab-add-group").disabled &&
+      document.activeElement === $id("vocab-group-input"));
+
+    // A held batch edit against a reload that behaves like the real one:
+    // clears the selection and re-sorts rows whose updatedAt just moved.
+    await prepareSelection();
+    const realSetStatus = pbpVocabBatchSetStatus;
+    try {
+      const before = ids(_vocabViewRows);
+      _vocabSelected = new Set(["b", "c"]);
+      _pbpVocabSyncSelectionUi();
+      pbpVocabBatchSetStatus = async () => true;
+      _pbpVocabReloadAfterMutation = async () => {
+        _vocabRows = _vocabRows.map((row) => (row.id === "b" || row.id === "c") ? { ...row, status: "known", updatedAt: 99 } : row);
+        _pbpVocabClearSelection();
+        _pbpVocabApplyView(false);
+        return true;
+      };
+      $id("vocab-mark-known").focus();
+      await _pbpVocabApplyStatusChange(true);
+      check("a batch status change keeps the selection it acted on", [..._vocabSelected].sort().join(",") === "b,c");
+      check("a batch status change holds the row order instead of lifting the edited rows to the top",
+        ids(_vocabViewRows) === before, ids(_vocabViewRows) + " vs " + before);
+      check("focus stays on the batch button that ran the change", document.activeElement === $id("vocab-mark-known"));
+      $id("vocab-sort").dispatchEvent(new Event("change"));
+      check("choosing a sort again releases the held order", ids(_vocabViewRows) !== before && _vocabViewRows[0].id !== "a",
+        ids(_vocabViewRows));
+    } finally {
+      pbpVocabBatchSetStatus = realSetStatus;
+    }
 
     // Remove-from-group. sample carries "Numbers" on exactly one row, so the
     // gating and the reported count are distinguishable from the selection size
