@@ -1,0 +1,66 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Pinboard theme rendering fixtures</title>
+<!-- Manually reduced from Pinboard pages inspected 2026-10-22. Native CSS and
+     DOM shapes are independent of the theme composer. All content is synthetic;
+     no account data, server scripts or external resources belong in this file. -->
+<style>
+  body { margin: 8px; color: #000; background: #fff; font: 13px Arial, sans-serif; }
+  #content { width: 1050px; }
+  #main_column { width: 700px; position: relative; }
+  blockquote { color: #224477; }
+  .tagNode { padding: 3px; background: #fec; }
+  .tagSelected { background: #fa9; border: 1px dotted #a82; padding: 2px; }
+  .tagNode:hover { background: #ffc; }
+  .tagSelected:hover { background: #acf; }
+  #help_banner { color: #11a; }
+  code { color: #22a; font-family: monaco; }
+  tt { background: #ffa; font-family: verdana; color: #37d; }
+  a { color: #11a; text-decoration: none; }
+  a.bookmarklet { background: #ffe; border: 1px dotted #aaa; color: #444; padding: 1px 2px 0; font-size: 90%; }
+  .private { background: #ddd; border: 1px solid #d1d1d1; }
+  a.bundle { color: #a21; font-weight: bold; }
+  #edit_bookmark_form { color: #888; }
+  #edit_bookmark_form p { line-height: 100%; margin-bottom: 0; color: #888; }
+  #status_display { display: inline; float: left; margin: 3px 0 0 90px; color: #555; }
+  .api_token { color: #5588aa; }
+  #sub_banner a.selected { background: #ffff77; }
+</style>
+<body id="pinboard">
+<div id="content"></div>
+<template id="note">
+  <div id="note_column"><blockquote class="note">A note with readable body text.<p>Another paragraph with <strong>emphasis</strong>.</p></blockquote></div>
+</template>
+<template id="help">
+  <div id="help_banner"><p class="logo">Tag editor help</p></div>
+  <div id="help_content"><p>Choosing tags: <span class="tagNode tagSelected">Selected tags</span></p><p>Bundled tags: <span class="tagNode bundled">orange background</span></p></div>
+</template>
+<template id="howto">
+  <div id="main_column"><div id="content_column">
+    <ul><li><a href="#bookmarklet" class="bookmarklet">Save to Pinboard</a></li></ul>
+    <code>example:tag</code><ol class="download_instructions"><li><tt>Command example</tt></li></ol>
+    <p><span class="private">private</span> <a href="#bundle" class="bundle private">Bundle</a></p>
+  </div></div>
+</template>
+<template id="editor">
+  <div id="main_column"><div class="bookmark"><div id="edit_bookmark_form">
+    <div id="edit_form_copy_header"><p>Copy this bookmark</p></div>
+    <form><div id="edit_form_checkboxes"><label style="display:inline"><input type="checkbox"> Private</label></div></form>
+  </div></div></div>
+</template>
+<template id="bulk">
+  <div id="main_column"><div id="bookmarks"><div id="nextprev"><table class="edit_organize_widget"><tr><td><a href="#bulk" id="bulk_edit" class="edit">bulk edit</a></td></tr></table></div></div></div>
+</template>
+<template id="status">
+  <div id="header"><div id="status_display">2 tags selected</div></div>
+</template>
+<template id="token">
+  <div id="main_column"><div id="settings_panel"><span class="api_token">synthetic:test-token</span></div></div>
+</template>
+<template id="nav">
+  <div id="sub_banner"><span><a href="#all" class="selected">all</a></span></div>
+</template>
+<template id="completion">
+  <div class="pin-ac"><div class="bd"><ul><li class="active">agriculture</li></ul></div></div>
+</template>
+</body>

@@ -308,6 +308,13 @@ export function expandSitePalette(raw) {
     out[onKey] = rgbToHex(fgToAA(hexToRgb(out[onKey]), hexToRgb(out[fillKey])));
   }
 
+  // Autocomplete paints selection-fg on selection-bg as ordinary small text.
+  // Unlike ::selection this is a persistent, keyboard-selected list item.
+  if (isHex(p["selection-fg"]) && p["selection-bg"]) {
+    const selectionBases = pageBases.map(b => resolveOpaqueBg(p["selection-bg"], b));
+    out["selection-fg"] = rgbToHex(fgToAAMulti(hexToRgb(p["selection-fg"]), selectionBases));
+  }
+
   // Focus outlines are non-text UI boundaries (WCAG 1.4.11), including links
   // focused inside a private bookmark row.
   if (isHex(p["focus-ring"])) {

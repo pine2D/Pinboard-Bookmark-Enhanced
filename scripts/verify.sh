@@ -179,6 +179,7 @@ node "tests/theme-css-syntax-tests.mjs"
 node "tests/theme-tooling-tests.mjs"
 node "tests/theme-ui-derive-tests.mjs"
 node "tests/theme-media-audit-tests.mjs"
+node "tests/pinboard-theme-render-tests.mjs"
 node "tests/theme-override-debt-tests.mjs"
 node "tests/theme-sync-check-tests.mjs"
 node "docs/theme-surface/tools/diff-all.mjs" --strict

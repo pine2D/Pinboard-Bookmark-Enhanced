@@ -220,6 +220,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -478,7 +479,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -521,6 +523,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -566,12 +569,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -621,15 +629,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -815,6 +825,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -969,7 +985,7 @@ h2 { color: #3c4043 !important; }
   --pinboard-private-bg: #2e3440;
   --pinboard-private-accent: #ebcb8b;
   --pinboard-selection-bg: #5e81ac;
-  --pinboard-selection-fg: #eceff4;
+  --pinboard-selection-fg: #0f131a;
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #a3be8c;
   --pinboard-row-hover: #434c5e;
@@ -1162,6 +1178,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -1420,7 +1437,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -1463,6 +1481,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -1508,12 +1527,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -1563,15 +1587,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -1757,6 +1783,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -2061,6 +2093,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -2319,7 +2352,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -2362,6 +2396,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -2407,12 +2442,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -2462,15 +2502,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -2656,6 +2698,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -3004,6 +3052,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -3262,7 +3311,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -3305,6 +3355,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -3350,12 +3401,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -3405,15 +3461,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -3599,6 +3657,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -3751,7 +3815,7 @@ h2 { font-family: "Georgia", serif !important; }`
   --pinboard-private-bg: #44475a;
   --pinboard-private-accent: #f1fa8c;
   --pinboard-selection-bg: #6272a4;
-  --pinboard-selection-fg: #f8f8f2;
+  --pinboard-selection-fg: #fcfcf9;
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #50fa7b;
   --pinboard-row-hover: #44475a;
@@ -3944,6 +4008,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -4202,7 +4267,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -4245,6 +4311,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -4290,12 +4357,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -4345,15 +4417,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -4539,6 +4613,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -4593,7 +4673,6 @@ input[type="submit"], input[type="button"], .search_button input[type="submit"] 
 .banner_username { color: #bd93f9 !important; }
 #pinboard_name a { color: #bd93f9 !important; }
 #sub_banner a:hover { color: #ff79c6 !important; }
-#sub_banner a.selected { color: #ff79c6 !important; }
 a.bundle { color: #bd93f9 !important; }
 #search_query_field { border: 1px solid #6272a4 !important; }
 #banner_searchbox input[type="text"] { border: 1px solid #6272a4 !important; }
@@ -4676,7 +4755,7 @@ a { color: #bd93f9 !important; }`
   --pinboard-private-bg: #f5ebd0;
   --pinboard-private-accent: #D0A215;
   --pinboard-selection-bg: #F2F0E5;
-  --pinboard-selection-fg: #100F0F;
+  --pinboard-selection-fg: #100f0f;
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #846401;
   --pinboard-row-hover: #F2F0E5;
@@ -4869,6 +4948,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -5127,7 +5207,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -5170,6 +5251,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -5215,12 +5297,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -5270,15 +5357,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -5464,6 +5553,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -5525,7 +5620,7 @@ html.pbp-dark {
   --pinboard-private-bg: #2a2518;
   --pinboard-private-accent: #D0A215;
   --pinboard-selection-bg: #403E3C;
-  --pinboard-selection-fg: #CECDC3;
+  --pinboard-selection-fg: #cecdc3;
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #d0a215;
   --pinboard-row-hover: #343331;
@@ -5718,6 +5813,7 @@ html.pbp-dark #pinboard_name a { color: var(--pinboard-accent) !important; font-
 html.pbp-dark #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 html.pbp-dark #sub_banner a { color: var(--pinboard-muted) !important; }
 html.pbp-dark #sub_banner a:hover, html.pbp-dark #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+html.pbp-dark #sub_banner a.selected, html.pbp-dark #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -5976,7 +6072,8 @@ html.pbp-dark input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 html.pbp-dark .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-html.pbp-dark #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+html.pbp-dark #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+html.pbp-dark #edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 html.pbp-dark #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -6019,6 +6116,7 @@ html.pbp-dark [class*="settings_tab_spacer"] { border-bottom-color: var(--pinboa
 html.pbp-dark .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 html.pbp-dark a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 html.pbp-dark .email_secret { color: var(--pinboard-accent) !important; }
+html.pbp-dark body .api_token { color: var(--pinboard-fg) !important; }
 html.pbp-dark #settings_tab_panes { border: none !important; }
 html.pbp-dark #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -6064,12 +6162,17 @@ html.pbp-dark #profile_main_column table td, html.pbp-dark #profile_right_column
 
 /* ---- Notes ---- */
 html.pbp-dark .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+html.pbp-dark blockquote.note { color: var(--pinboard-fg) !important; }
 html.pbp-dark .note a { color: var(--pinboard-accent) !important; }
 html.pbp-dark .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 html.pbp-dark #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 html.pbp-dark #bulk_top_bar, html.pbp-dark #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+html.pbp-dark #bulk_edit { background: transparent !important; border-color: transparent !important; }
+html.pbp-dark #nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 html.pbp-dark #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -6119,15 +6222,17 @@ html.pbp-dark #main_column form[name="sort"] table tr:hover td a.destroy { opaci
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-html.pbp-dark #tagpicker .tagNode, html.pbp-dark #bundle .tagNode {
+html.pbp-dark #tagpicker .tagNode, html.pbp-dark #bundle .tagNode, html.pbp-dark #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 html.pbp-dark #tagpicker .tagNode.unbundled { background: transparent !important; }
-html.pbp-dark #tagpicker .tagNode:hover, html.pbp-dark #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-html.pbp-dark #tagpicker .tagNode.tagSelected, html.pbp-dark #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-html.pbp-dark #tagpicker .tagNode.tagSelected:hover, html.pbp-dark #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+html.pbp-dark #tagpicker .tagNode:hover, html.pbp-dark #bundle .tagNode:hover, html.pbp-dark #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+html.pbp-dark #tagpicker .tagNode.tagSelected, html.pbp-dark #bundle .tagNode.tagSelected, html.pbp-dark #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+html.pbp-dark #tagpicker .tagNode.tagSelected:hover, html.pbp-dark #bundle .tagNode.tagSelected:hover, html.pbp-dark #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+html.pbp-dark #status_display { color: var(--pinboard-muted) !important; }
+html.pbp-dark #help_banner .logo { color: var(--pinboard-accent) !important; }
 html.pbp-dark #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -6313,6 +6418,12 @@ html.pbp-dark h2 { color: var(--pinboard-muted) !important; }
 html.pbp-dark hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+html.pbp-dark code, html.pbp-dark tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+html.pbp-dark a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+html.pbp-dark #content_column span.private, html.pbp-dark #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+html.pbp-dark #content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 html.pbp-dark pre {
@@ -6514,7 +6625,7 @@ html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 
   --pinboard-private-bg: #f0e0b8;
   --pinboard-private-accent: #b58900;
   --pinboard-selection-bg: #268bd2;
-  --pinboard-selection-fg: #fdf6e3;
+  --pinboard-selection-fg: #271d03;
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #1b6863;
   --pinboard-row-hover: #eee8d5;
@@ -6707,6 +6818,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -6965,7 +7077,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -7008,6 +7121,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -7053,12 +7167,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -7108,15 +7227,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -7302,6 +7423,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -7591,6 +7718,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -7849,7 +7977,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -7892,6 +8021,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -7937,12 +8067,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -7992,15 +8127,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -8186,6 +8323,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -8286,7 +8429,7 @@ a.sort_order_selected { background: #073642 !important; }
   --pinboard-private-bg: #f0e6d0;
   --pinboard-private-accent: #df8e1d;
   --pinboard-selection-bg: #7287fd;
-  --pinboard-selection-fg: #eff1f5;
+  --pinboard-selection-fg: #212835;
   --pinboard-tag-bg: #dce0e8;
   --pinboard-tag-fg: #127076;
   --pinboard-row-hover: #ccd0da;
@@ -8479,6 +8622,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -8737,7 +8881,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -8780,6 +8925,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -8825,12 +8971,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -8880,15 +9031,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -9074,6 +9227,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -9377,6 +9536,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -9635,7 +9795,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -9678,6 +9839,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -9723,12 +9885,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -9778,15 +9945,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -9972,6 +10141,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -10288,6 +10463,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -10546,7 +10722,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -10589,6 +10766,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -10634,12 +10812,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -10689,15 +10872,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -10883,6 +11068,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -11192,6 +11383,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -11450,7 +11642,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -11493,6 +11686,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -11538,12 +11732,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -11593,15 +11792,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -11787,6 +11988,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {
@@ -12102,6 +12309,7 @@ a, a:link { color: var(--pinboard-accent) !important; }
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
    Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
@@ -12360,7 +12568,8 @@ input[type="file"]::file-selector-button:hover {
   color: var(--pinboard-accent) !important;
 }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
-#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
 #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
@@ -12403,6 +12612,7 @@ input[type="file"]::file-selector-button:hover {
 .settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
 a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
 .email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
@@ -12448,12 +12658,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 
 /* ---- Notes ---- */
 .note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
 .note a { color: var(--pinboard-accent) !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 #note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -12503,15 +12718,17 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
  * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
  * (so it never introduces a third fill). Padding stays identical across states;
  * native trades 1px of padding for a dotted border on select, which jitters. */
-#tagpicker .tagNode, #bundle .tagNode {
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
   background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
   border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
   border-radius: var(--pinboard-radius-sm) !important;
 }
 #tagpicker .tagNode.unbundled { background: transparent !important; }
-#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
-#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
-#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
 #bundle {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -12697,6 +12914,12 @@ h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
 /* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
 /* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
    Font-family left as the <pre> default monospace. */
 pre {

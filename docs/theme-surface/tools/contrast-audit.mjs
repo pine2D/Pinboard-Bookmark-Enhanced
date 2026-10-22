@@ -1729,6 +1729,19 @@ function auditPalette(slug, rawPalette) {
       console.log(check("pinboard", slug, "fg vs bundle-chip-bg", cr(chip, fg), 4.5));
     }
   }
+  // Keyboard-selected autocomplete rows use these as a normal text pair.
+  {
+    const selectionFg = hexRgb(p["selection-fg"] || "");
+    if (!selectionFg || !p["selection-bg"]) {
+      const line = `  pinboard  ${slug}  selection pair  MISSING TOKEN  FAIL`;
+      console.log(line);
+      violations.push(line);
+    } else {
+      for (const [label, base] of [["bg", bg], ["bg-surface", bgSurface], ["private-bg", privateBg]]) {
+        if (base) console.log(check("pinboard", slug, `selection-fg vs selection-bg@${label}`, cr(resolveOpaqueBg(p["selection-bg"], base), selectionFg), 4.5));
+      }
+    }
+  }
   const urlFg = hexRgb(p["url-link-fg"] || "");
   if (!urlFg) {
     const line = `  pinboard  ${slug}  url-link-fg  MISSING TOKEN  FAIL`;
